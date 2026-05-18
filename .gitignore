@@ -1,6 +1,8 @@
 .vir.git/
 .lake/
+.tools/
 build/
+third_party/lean4-src/
 node_modules/
 web/public/vir.wasm
 .npm-cache/

@@ -13,8 +13,11 @@ This repository is a proof of concept for running Lean 4 IR-shaped programs in
 
 - `npm install`
 - `npm run export:ir`
+- `npm run install:wasi`
 - `npm run build`
+- `npm run build:wasi`
 - `npm test`
+- `npm run test:wasi`
 - `npm run dev -- --port 5173`
 
 ## Git Layout
@@ -37,4 +40,3 @@ In a normal checkout from GitHub, use ordinary `git` commands.
   `vir_target_layout_ok`.
 - Do not claim full Lean runtime portability until the C++ interpreter path is
   linked and tested under `wasm32-wasi`.
-

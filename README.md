@@ -36,6 +36,7 @@ Lean `v4.30.0-rc2` into the strict `wasm32-wasi` build.
 npm install
 npm run build
 npm test
+npm run test:wasi
 npm run dev
 ```
 
@@ -43,15 +44,30 @@ Open the Vite URL and the page should report `fib 8 = 21`.
 
 ## Strict WASI C Build
 
-When `wasm-ld` is available, or `WASI_SDK_PATH` points at a WASI SDK, run:
+Install a local WASI SDK into `.tools/`:
+
+```bash
+npm run install:wasi
+```
+
+Then build the strict C runner:
 
 ```bash
 npm run export:ir
 npm run build:wasi
+npm run test:wasi
 ```
 
-That compiles `wasm/runner.c` for `wasm32-wasi` and writes
+That compiles `wasm/runner.c` for `wasm32-wasip1` and writes
 `web/public/vir.wasm`.
+
+By default the installer pins `wasi-sdk-33.0-x86_64-linux.tar.gz` from
+`WebAssembly/wasi-sdk` and verifies its SHA-256 digest. Override with
+`WASI_SDK_VERSION`, `WASI_SDK_VERSION_FULL`, `WASI_SDK_ARCH`, `WASI_SDK_OS`, or
+`WASI_SDK_SHA256` if needed.
+
+Override the compiler target with `WASI_TARGET`; the default is
+`wasm32-wasip1`, the current spelling for WASI Preview 1.
 
 ## Git Note
 
