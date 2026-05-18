@@ -12,10 +12,12 @@
 #include "kernel/trace.h"
 #include "library/elab_environment.h"
 #include "library/init_attribute.h"
+#include "library/ir_interpreter.h"
 #include "library/time_task.h"
 #include "runtime/io.h"
 #include "runtime/object.h"
 #include "util/name.h"
+#include "util/option_declarations.h"
 #include "util/options.h"
 
 extern "C" void * dlsym(void *, char const *) {
@@ -122,6 +124,8 @@ optional<name> get_init_fn_name_for(elab_environment const &, name const &) {
     return optional<name>();
 }
 
+void register_option(name const &, name const &, data_value_kind, char const *, char const *) {}
+
 } // namespace lean
 
 extern "C" lean::object * lean_decl_get_sorry_dep(lean::object *, lean::object *) {
@@ -179,4 +183,26 @@ extern "C" lean::object * lean_ir_find_env_decl_boxed(lean::object *, lean::obje
 
 extern "C" uint32_t vir_upstream_shim_fixture_count(void) {
     return lean::vir::static_decl_count();
+}
+
+extern "C" uint32_t vir_upstream_target_pointer_bytes(void) {
+    return sizeof(void *);
+}
+
+extern "C" uint32_t vir_upstream_fib(uint32_t n) {
+    static bool initialized = false;
+    if (!initialized) {
+        lean::initialize_ir_interpreter();
+        initialized = true;
+    }
+
+    lean::elab_environment env(lean_box(0));
+    lean::options opts(lean_box(0));
+    lean::name fn("fib");
+    lean::object * arg = lean::vir::mk_static_nat(n);
+    lean::object * args[] = { arg };
+    lean::object * result = lean::ir::run_boxed(env, opts, fn, 1, args);
+    uint32_t out = static_cast<uint32_t>(lean::vir::static_nat_to_usize(result));
+    lean_dec(result);
+    return out;
 }

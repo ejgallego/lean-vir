@@ -34,9 +34,9 @@ npm run probe:upstream
 The generated report is written to `build/upstream-probe/boundary.md`.
 
 The current upstream probe links strictly for `wasm32-wasip1` with zero
-unresolved symbols. That means the linker-visible boundary is closed for the
-real `ir_interpreter.cpp` file; the remaining work is making the fixture
-provider complete enough for execution.
+unresolved symbols. The upstream artifact exports `vir_upstream_fib`, and
+`npm run test:upstream` checks that it executes the fixture through the real
+`ir_interpreter.cpp` file.
 
 ## Initial Port Shape
 
@@ -81,9 +81,8 @@ The shim exports the Lean C hooks, but the demo declaration closure is isolated
 in `static_decl_provider.cpp` behind `decl_provider.h`. It currently returns
 real IR declarations for `fib`, `fib._boxed`, `Nat.add`, `Nat.sub`, and
 `Nat.decEq`. The `fib` declarations have function bodies matching
-`examples/Fib.lean`; the arithmetic declarations are still `Extern`
-placeholders and should be replaced with real IR bodies before claiming upstream
-execution of the example.
+`examples/Fib.lean`; the arithmetic declarations are executable IR bodies over
+a static Peano-shaped Nat representation.
 
 This keeps the demo path static and small while leaving a clear future seam for
 a more faithful provider that reads generated module data or a real Lean

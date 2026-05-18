@@ -37,10 +37,10 @@ with a wasm backend but not `wasm-ld` or a WASI sysroot.
 The current runnable milestone is a browser and Node smoke test for the Lean IR
 shape emitted by `examples/Fib.lean`.
 
-This is not yet a full upstream Lean IR interpreter port. The next milestone is
-to implement the remaining semantic fixture boundary so the real upstream
-interpreter can execute `fib` end to end. The strict link of the upstream
-interpreter and local shim now closes with zero unresolved symbols.
+This is not a full upstream Lean module/environment port. The current upstream
+milestone does execute the demo `fib` through Lean's real `ir_interpreter.cpp`
+using a statically loaded declaration closure. The strict link closes with zero
+unresolved symbols.
 
 ## Quick Start
 
@@ -50,6 +50,7 @@ npm run build
 npm test
 npm run test:wasi
 npm run test:interp
+npm run test:upstream
 npm run probe:upstream
 npm run dev
 ```
@@ -108,9 +109,10 @@ sources first, provide real Lean IR declaration objects through
 `lean_ir_find_env_decl`, and stub only unused runtime/library pieces as the fib
 path needs them.
 
-At this point the strict upstream probe links. The active boundary is that
-`Nat.add`, `Nat.sub`, and `Nat.decEq` are present as real IR `Extern`
-declarations but do not yet have non-native WASI implementations.
+At this point the strict upstream probe links and `npm run test:upstream`
+checks `vir_upstream_fib` from the upstream artifact. `Nat.add`, `Nat.sub`, and
+`Nat.decEq` are executable real IR function bodies over a static Peano-shaped
+Nat representation, not native lookup stubs.
 
 The intended demo path is to keep loading the needed declaration closure
 statically. That keeps the POC small while preserving a clear future path toward

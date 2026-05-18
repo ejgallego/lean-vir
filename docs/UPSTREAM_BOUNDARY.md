@@ -14,10 +14,9 @@ The generated report is written to `build/upstream-probe/boundary.md`.
 
 Current status: the strict `wasm32-wasip1` link succeeds with the real upstream
 `ir_interpreter.cpp`, the linked Lean runtime subset, and
-`wasm/upstream_shim/`. The remaining boundary is semantic: the static demo
-closure is supplied as real Lean IR declaration objects, while its arithmetic
-dependencies are still represented as unresolved-at-runtime IR `Extern`
-declarations.
+`wasm/upstream_shim/`. The static demo closure is supplied as real Lean IR
+declaration objects, and `vir_upstream_fib` executes that closure through the
+real upstream interpreter.
 
 ## Policy
 
@@ -81,8 +80,8 @@ return `Option decl` values using the same constructor layout:
   result type, and `fn_body`.
 - `fn_body` uses the real `VDecl`, `Dec`, `Case`, `Ret`, and later additional
   body constructors.
-- `expr` uses the real `Lit` and `FAp` constructors for the current `fib`
-  fixture.
+- `expr` uses the real `Lit`, `FAp`, `Ctor`, and `Proj` constructors for the
+  current fixture closure.
 - `arg` uses constructor-backed variables and scalar erased arguments.
 - arrays must be Lean array objects, not C arrays.
 
@@ -96,17 +95,21 @@ by `fib` rather than loading Lean module data. This keeps `.olean` loading,
 module initialization, and full environment construction out of scope while
 still exercising the real upstream interpreter over real Lean IR objects.
 
+The current arithmetic closure uses a static Peano-shaped Nat representation:
+`zero` is scalar constructor tag `0`, and `succ` is a constructor object with tag
+`1` and one predecessor field. This keeps the arithmetic bodies expressible in
+ordinary IR using `case`, `proj`, recursive `FAp`, and `ctor`, while avoiding
+native lookup and the full Lean module loader.
+
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
 `decl_provider.h`. Today that provider is backed by C++ fixture construction.
 Later it can be backed by generated module data or a real environment loader
 without changing `ir_interpreter.cpp` or the WASI/platform shim.
 
-## Next Boundary
+## Current Boundary
 
-To run `fib` through the real upstream interpreter, the next step is to remove
-the arithmetic gap without relying on native lookup. The current shim has real
-IR `Extern` declarations for `Nat.add`, `Nat.sub`, and `Nat.decEq`, so a call
-that reaches them will report a missing native implementation. For the demo we
-should provide their real IR bodies from Lean's generated `Init.ir` data and
-keep native lookup unsupported.
+The remaining gap is fidelity, not execution. The demo arithmetic bodies are
+static IR bodies tailored to the closure needed by `fib`; they are not loaded
+from Lean's generated `Init.ir` module data. A later provider can replace this
+static closure with generated module data behind `decl_provider.h`.

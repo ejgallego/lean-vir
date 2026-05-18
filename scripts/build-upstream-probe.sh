@@ -106,6 +106,8 @@ exports=(
   -Wl,--export=lean_run_init
   -Wl,--export=lean_run_mod_init_core
   -Wl,--export=vir_upstream_shim_fixture_count
+  -Wl,--export=vir_upstream_target_pointer_bytes
+  -Wl,--export=vir_upstream_fib
 )
 
 "$cxx" "${common_flags[@]}" -c "$upstream" -o "$obj"
@@ -260,9 +262,9 @@ shim_source_count="${#shim_sources[@]}"
   echo "boundary for the strict WASI link. \`static_decl_provider.cpp\` supplies"
   echo "the statically loaded demo declaration closure for \`fib\`, \`fib._boxed\`,"
   echo "\`Nat.add\`, \`Nat.sub\`, and \`Nat.decEq\`."
-  echo "The arithmetic declarations are represented as real IR \`Extern\`"
-  echo "declarations; their implementations remain the next boundary before the"
-  echo "real upstream interpreter can execute the fixture end to end."
+  echo "The arithmetic declarations are executable real IR function bodies over a"
+  echo "static Peano-shaped Nat representation, so \`vir_upstream_fib\` now runs"
+  echo "the fixture through the real upstream interpreter."
 } > "$report"
 
 echo "wrote $report"

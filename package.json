@@ -14,6 +14,7 @@
     "test": "npm run build && node scripts/smoke_node.mjs",
     "test:wasi": "npm run export:ir && npm run build:wasi && node scripts/smoke_node.mjs",
     "test:interp": "npm run export:ir && npm run build:interp && node scripts/smoke_node.mjs",
+    "test:upstream": "npm run probe:upstream && node scripts/smoke_upstream.mjs",
     "dev": "vite web --host 127.0.0.1"
   },
   "devDependencies": {
