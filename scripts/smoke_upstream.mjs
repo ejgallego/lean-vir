@@ -43,8 +43,47 @@ if (typeof exports.vir_upstream_tamagotchi_run_demo !== "function") {
 if (typeof exports.vir_eval_const_nat !== "function") {
   throw new Error("vir_eval_const_nat export is missing");
 }
+if (typeof exports.vir_sort_checksum !== "function") {
+  throw new Error("vir_sort_checksum export is missing");
+}
+if (typeof exports.vir_last_package_error !== "function") {
+  throw new Error("vir_last_package_error export is missing");
+}
+if (typeof exports.vir_last_package_error_size !== "function") {
+  throw new Error("vir_last_package_error_size export is missing");
+}
 if (exports.vir_upstream_target_pointer_bytes() !== 4) {
   throw new Error("upstream wasm target layout guard failed");
+}
+
+function readWasmString(ptr, len) {
+  return new TextDecoder().decode(new Uint8Array(exports.memory.buffer, ptr, len));
+}
+
+function lastPackageError() {
+  const len = exports.vir_last_package_error_size();
+  if (len === 0) return "";
+  return readWasmString(exports.vir_last_package_error(), len);
+}
+
+const badPackage = Uint8Array.from([
+  3, 0, 0, 0, 98, 97, 100,
+  1, 0, 0, 0,
+  0, 0, 0, 0,
+]);
+const badPackagePtr = exports.vir_alloc_bytes(badPackage.byteLength);
+try {
+  new Uint8Array(exports.memory.buffer, badPackagePtr, badPackage.byteLength).set(badPackage);
+  const loadedDecls = exports.vir_load_ir_package(badPackagePtr, badPackage.byteLength);
+  if (loadedDecls !== 0) {
+    throw new Error("invalid IR package unexpectedly loaded");
+  }
+  const error = lastPackageError();
+  if (!error.includes("invalid IR package magic")) {
+    throw new Error(`invalid package diagnostic did not mention magic: ${error}`);
+  }
+} finally {
+  exports.vir_free_bytes?.(badPackagePtr);
 }
 
 const packagePtr = exports.vir_alloc_bytes(irPackage.byteLength);
@@ -141,4 +180,20 @@ if (sortChecksum !== 192) {
   throw new Error(`upstream SortDemo.demo: expected 192, got ${sortChecksum}`);
 }
 
-console.log("upstream smoke ok: fib 17 = 1597, Tamagotchi ends angry, SortDemo checksum = 192");
+function sortChecksumFor(values) {
+  const ptr = exports.vir_alloc_bytes(values.length * 4);
+  try {
+    const view = new DataView(exports.memory.buffer, ptr, values.length * 4);
+    values.forEach((value, index) => view.setUint32(index * 4, value, true));
+    return exports.vir_sort_checksum(ptr, values.length);
+  } finally {
+    exports.vir_free_bytes?.(ptr);
+  }
+}
+
+const editableChecksum = sortChecksumFor([4, 1, 3, 2]);
+if (editableChecksum !== 30) {
+  throw new Error(`upstream SortDemo.demoFromArray: expected 30, got ${editableChecksum}`);
+}
+
+console.log("upstream smoke ok: fib 17 = 1597, Tamagotchi ends angry, editable SortDemo works");

@@ -29,6 +29,7 @@ struct decl_entry {
 };
 
 static std::vector<decl_entry> g_entries;
+static std::string g_last_error;
 
 static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
     object * obj = lean_alloc_ctor(tag, fields.size(), scalar_size);
@@ -241,16 +242,46 @@ public:
         m_size(size) {
     }
 
-    uint8_t u8() {
-        if (!ok || m_pos >= m_size) {
+    std::string const & error() const {
+        return m_error;
+    }
+
+    bool at_end() const {
+        return m_pos == m_size;
+    }
+
+    size_t pos() const {
+        return m_pos;
+    }
+
+    void fail(std::string const & message) {
+        if (ok) {
             ok = false;
+            m_error = "byte " + std::to_string(m_pos) + ": " + message;
+        }
+    }
+
+    uint8_t u8() {
+        if (!ok) {
+            return 0;
+        }
+        if (m_pos >= m_size) {
+            fail("unexpected end of IR package");
             return 0;
         }
         return m_data[m_pos++];
     }
 
     bool boolean() {
-        return u8() != 0;
+        uint8_t value = u8();
+        if (value == 0) {
+            return false;
+        }
+        if (value == 1) {
+            return true;
+        }
+        fail("invalid boolean tag " + std::to_string(value));
+        return false;
     }
 
     uint32_t u32() {
@@ -263,8 +294,11 @@ public:
 
     std::string string() {
         uint32_t len = u32();
-        if (!ok || m_pos + len > m_size) {
-            ok = false;
+        if (!ok) {
+            return std::string();
+        }
+        if (len > m_size - m_pos) {
+            fail("string length " + std::to_string(len) + " exceeds remaining package bytes");
             return std::string();
         }
         std::string out(reinterpret_cast<char const *>(m_data + m_pos), len);
@@ -286,12 +320,13 @@ public:
             object * prefix = name();
             return mk_name_num(prefix, u32());
         }
-        ok = false;
+        fail("unsupported name tag " + std::to_string(tag));
         return lean_box(0);
     }
 
     type ir_type() {
-        switch (u8()) {
+        uint8_t tag = u8();
+        switch (tag) {
         case 0: return type::Float;
         case 1: return type::UInt8;
         case 2: return type::UInt16;
@@ -305,7 +340,7 @@ public:
         case 12: return type::Tagged;
         case 13: return type::Void;
         default:
-            ok = false;
+            fail("unsupported IR type tag " + std::to_string(tag));
             return type::Void;
         }
     }
@@ -318,7 +353,7 @@ public:
         if (tag == 1) {
             return mk_arg_erased();
         }
-        ok = false;
+        fail("unsupported arg tag " + std::to_string(tag));
         return mk_arg_erased();
     }
 
@@ -334,7 +369,7 @@ public:
         if (tag == 1) {
             return mk_lit_str(string());
         }
-        ok = false;
+        fail("unsupported literal tag " + std::to_string(tag));
         return mk_lit_num(0);
     }
 
@@ -395,7 +430,7 @@ public:
         case 12:
             return mk_is_shared(u32());
         default:
-            ok = false;
+            fail("unsupported expression tag " + std::to_string(tag));
             return mk_lit_num(0);
         }
     }
@@ -419,7 +454,7 @@ public:
         if (tag == 1) {
             return mk_default_alt(body());
         }
-        ok = false;
+        fail("unsupported alternative tag " + std::to_string(tag));
         return mk_default_alt(mk_unreachable());
     }
 
@@ -498,7 +533,7 @@ public:
         case 12:
             return mk_unreachable();
         default:
-            ok = false;
+            fail("unsupported function body tag " + std::to_string(tag));
             return mk_unreachable();
         }
     }
@@ -513,11 +548,13 @@ public:
         if (tag == 1) {
             return mk_extern_decl(fn, ps, result_type);
         }
-        ok = false;
+        fail("unsupported declaration tag " + std::to_string(tag));
         return mk_extern_decl(fn, ps, result_type);
     }
 
 private:
+    std::string m_error;
+
     template <typename F>
     std::vector<object *> object_array(F read_one) {
         uint32_t count = u32();
@@ -531,11 +568,26 @@ private:
 };
 
 static bool load_package(uint8_t const * data, size_t size) {
+    g_last_error.clear();
+    if (data == nullptr && size != 0) {
+        g_last_error = "IR package pointer is null";
+        return false;
+    }
+
     reader r(data, size);
     std::string magic = r.string();
     uint32_t version = r.u32();
     uint32_t count = r.u32();
-    if (!r.ok || magic != "lean-vir-ir-package" || version != 1) {
+    if (!r.ok) {
+        g_last_error = r.error();
+        return false;
+    }
+    if (magic != "lean-vir-ir-package") {
+        g_last_error = "invalid IR package magic `" + magic + "`";
+        return false;
+    }
+    if (version != 1) {
+        g_last_error = "unsupported IR package version " + std::to_string(version);
         return false;
     }
 
@@ -548,6 +600,11 @@ static bool load_package(uint8_t const * data, size_t size) {
         entries.push_back({ n, boxed_base, d });
     }
     if (!r.ok) {
+        g_last_error = r.error();
+        return false;
+    }
+    if (!r.at_end()) {
+        g_last_error = "trailing bytes after IR package at byte " + std::to_string(r.pos());
         return false;
     }
     g_entries = std::move(entries);
@@ -586,6 +643,14 @@ uint32_t static_decl_count() {
     return g_entries.size();
 }
 
+char const * last_package_error() {
+    return g_last_error.c_str();
+}
+
+uint32_t last_package_error_size() {
+    return static_cast<uint32_t>(g_last_error.size());
+}
+
 } // namespace lean::vir
 
 extern "C" void * vir_alloc_bytes(uint32_t size) {
@@ -601,4 +666,12 @@ extern "C" uint32_t vir_load_ir_package(uint8_t const * data, uint32_t size) {
         return 0;
     }
     return lean::vir::static_decl_count();
+}
+
+extern "C" char const * vir_last_package_error(void) {
+    return lean::vir::last_package_error();
+}
+
+extern "C" uint32_t vir_last_package_error_size(void) {
+    return lean::vir::last_package_error_size();
 }

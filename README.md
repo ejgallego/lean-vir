@@ -15,7 +15,8 @@ The browser page currently runs three examples through that upstream interpreter
 
 - `fib`, with the current input range capped at `0..17`.
 - `Tamagotchi.step`, a tiny automaton driven one action at a time.
-- `SortDemo.demo`, a small merge-sort style demo over a Lean array literal.
+- `SortDemo.demoFromArray`, a small merge-sort style demo over editable
+  browser input passed to Lean as an `Array Nat`.
 
 The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
 `examples/MergeSort.lean`.
@@ -48,6 +49,8 @@ and deploys the static site artifact.
   upstream interpreter.
 - `tools/GeneratePackage.lean` elaborates the demo Lean sources, walks the
   typed `Lean.IR.Decl` closure, and emits `build/generated/vir-demo.irpkg`.
+- `docs/ADDING_DEMOS.md` describes the path for adding a Lean example and
+  checking its package diagnostics.
 - `scripts/build-upstream-probe.sh` compiles and links the upstream
   interpreter, writes `build/upstream-probe/boundary.md`, and copies the strict
   artifact to `web/public/vir-upstream.wasm`.
@@ -83,6 +86,11 @@ These generated files should not be committed.
 
 `npm run build:site` additionally writes `web/dist/`, which is also generated
 and should not be committed.
+
+For fast example iteration, run `npm run check:package`. It regenerates the IR
+package and points at `build/generated/ir-provider-report.md`, including
+separate sections for missing IR declarations and missing native extern
+registrations.
 
 The demo link uses 4 MiB of initial memory and a 1 MiB stack by default.
 Override those with `VIR_WASM_INITIAL_MEMORY` and `VIR_WASM_STACK_SIZE`.

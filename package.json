@@ -8,6 +8,7 @@
     "install:wasi": "bash scripts/install-wasi-sdk.sh",
     "generate:package": "bash scripts/generate-ir-package.sh",
     "generate:provider": "npm run generate:package",
+    "check:package": "bash scripts/check-demo-package.sh",
     "probe:upstream": "bash scripts/build-upstream-probe.sh",
     "build": "npm run build:demo",
     "build:demo": "npm run probe:upstream",

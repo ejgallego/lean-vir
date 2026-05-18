@@ -184,9 +184,12 @@ exports=(
   -Wl,--export=vir_upstream_tamagotchi_step
   -Wl,--export=vir_upstream_tamagotchi_run_demo
   -Wl,--export=vir_eval_const_nat
+  -Wl,--export=vir_sort_checksum
   -Wl,--export=vir_alloc_bytes
   -Wl,--export=vir_free_bytes
   -Wl,--export=vir_load_ir_package
+  -Wl,--export=vir_last_package_error
+  -Wl,--export=vir_last_package_error_size
 )
 
 link_stamp="$obj_dir/link-flags.stamp"

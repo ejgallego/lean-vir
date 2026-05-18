@@ -172,6 +172,14 @@ static uint32_t run_tagged_function(name const & fn, unsigned n, object ** args)
     return out;
 }
 
+static object * mk_nat_array(uint32_t const * values, uint32_t len) {
+    object * array = lean_alloc_array(len, len);
+    for (uint32_t i = 0; i < len; i++) {
+        lean_array_set_core(array, i, vir::mk_static_nat(values[i]));
+    }
+    return array;
+}
+
 static char const * known_symbol_stem(name const & n) {
     if (n == name({ "Nat", "add" })) {
         return "lean_nat_add";
@@ -392,4 +400,14 @@ extern "C" uint32_t vir_eval_const_nat(char const * name_text, uint32_t name_len
     lean::ensure_ir_interpreter_initialized();
     lean::name fn = lean::name_from_dotted(name_text, name_len);
     return lean::run_nat_function(fn, 0, nullptr);
+}
+
+extern "C" uint32_t vir_sort_checksum(uint32_t const * values, uint32_t len) {
+    if (values == nullptr && len != 0) {
+        return 0;
+    }
+    lean::ensure_ir_interpreter_initialized();
+    lean::object * input = lean::mk_nat_array(values, len);
+    lean::object * args[] = { input };
+    return lean::run_nat_function(lean::name({ "SortDemo", "demoFromArray" }), 1, args);
 }

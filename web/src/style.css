@@ -147,6 +147,10 @@ h2 {
   background: #ffffff;
 }
 
+.sort-source.controls {
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
 .sort-source span {
   display: block;
   color: #5f6f64;
@@ -255,15 +259,24 @@ h2 {
 
 .details div {
   display: flex;
+  align-items: baseline;
   justify-content: space-between;
   gap: 12px;
+  min-width: 0;
   min-height: 54px;
   padding: 16px;
   background: #ffffff;
 }
 
 .details span {
+  flex: 0 0 auto;
   color: #5f6f64;
+}
+
+.details strong {
+  min-width: 0;
+  text-align: right;
+  overflow-wrap: anywhere;
 }
 
 @media (max-width: 920px) {

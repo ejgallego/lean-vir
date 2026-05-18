@@ -10,12 +10,22 @@ const petActionDisplay = document.querySelector("#pet-action-display");
 const petTraceDisplay = document.querySelector("#pet-trace-display");
 const petActionButtons = document.querySelectorAll("[data-action]");
 const petResetButton = document.querySelector("#pet-reset-button");
+const sortInput = document.querySelector("#sort-input");
 const sortRunButton = document.querySelector("#sort-run-button");
+const sortOutputDisplay = document.querySelector("#sort-output-display");
 const sortResultDisplay = document.querySelector("#sort-result-display");
+const wasmTarget = document.querySelector("#wasm-target");
+const linkStatus = document.querySelector("#link-status");
+const packageName = document.querySelector("#package-name");
+const packageSize = document.querySelector("#package-size");
 const ptrWidth = document.querySelector("#ptr-width");
 const declCount = document.querySelector("#decl-count");
 const layoutGuard = document.querySelector("#layout-guard");
 const maxFibInput = 17;
+const maxSortItems = 16;
+const maxSortValue = 9999;
+const wasmFile = "vir-upstream.wasm";
+const irPackageFile = "vir-demo.irpkg";
 const moods = ["happy", "hungry", "sleepy", "angry", "asleep", "dead"];
 const actions = ["feed", "play", "nap", "wake", "ignore"];
 let petMood = 0;
@@ -64,12 +74,33 @@ async function loadIrPackage(exports, path) {
     new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
     const count = exports.vir_load_ir_package(ptr, bytes.byteLength);
     if (count === 0) {
-      throw new Error("IR package load failed");
+      const detail = lastPackageError(exports);
+      throw new Error(`IR package load failed${detail ? `: ${detail}` : ""}`);
     }
-    return count;
+    return { count, byteLength: bytes.byteLength };
   } finally {
     exports.vir_free_bytes?.(ptr);
   }
+}
+
+function readWasmString(exports, ptr, len) {
+  return new TextDecoder().decode(new Uint8Array(exports.memory.buffer, ptr, len));
+}
+
+function lastPackageError(exports) {
+  if (
+    typeof exports.vir_last_package_error !== "function" ||
+    typeof exports.vir_last_package_error_size !== "function"
+  ) {
+    return "";
+  }
+  const len = exports.vir_last_package_error_size();
+  return len === 0 ? "" : readWasmString(exports, exports.vir_last_package_error(), len);
+}
+
+function formatBytes(bytes) {
+  if (bytes < 1024) return `${bytes} B`;
+  return `${(bytes / 1024).toFixed(1)} KiB`;
 }
 
 function clampInput(value, max) {
@@ -142,21 +173,57 @@ function evalConstNat(exports, name) {
 
 function renderSort(exports) {
   try {
-    sortResultDisplay.textContent = String(evalConstNat(exports, "SortDemo.demo"));
+    const values = parseSortInput(sortInput.value);
+    sortInput.value = values.join(", ");
+    sortOutputDisplay.textContent = `[${[...values].sort((a, b) => a - b).join(", ")}]`;
+    sortResultDisplay.textContent = String(sortChecksumFor(exports, values));
     setReady();
   } catch (error) {
+    sortOutputDisplay.textContent = "error";
     sortResultDisplay.textContent = "error";
     setTrap(error);
   }
 }
 
+function parseSortInput(text) {
+  const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
+  if (parts.length > maxSortItems) {
+    throw new Error(`sort input is capped at ${maxSortItems} items`);
+  }
+  return parts.map((part) => {
+    if (!/^\d+$/.test(part)) {
+      throw new Error(`invalid Nat literal: ${part}`);
+    }
+    const value = Number(part);
+    if (!Number.isSafeInteger(value) || value > maxSortValue) {
+      throw new Error(`sort input value is capped at ${maxSortValue}`);
+    }
+    return value;
+  });
+}
+
+function sortChecksumFor(exports, values) {
+  const ptr = exports.vir_alloc_bytes(values.length * 4);
+  try {
+    const view = new DataView(exports.memory.buffer, ptr, values.length * 4);
+    values.forEach((value, index) => view.setUint32(index * 4, value, true));
+    return exports.vir_sort_checksum(ptr, values.length);
+  } finally {
+    exports.vir_free_bytes?.(ptr);
+  }
+}
+
 try {
-  const exports = await instantiate(`${import.meta.env.BASE_URL}vir-upstream.wasm`);
-  const loadedDeclCount = await loadIrPackage(exports, `${import.meta.env.BASE_URL}vir-demo.irpkg`);
+  const exports = await instantiate(`${import.meta.env.BASE_URL}${wasmFile}`);
+  const packageInfo = await loadIrPackage(exports, `${import.meta.env.BASE_URL}${irPackageFile}`);
   const pointerBytes = exports.vir_upstream_target_pointer_bytes();
 
+  wasmTarget.textContent = "wasm32-wasip1";
+  linkStatus.textContent = "strict";
+  packageName.textContent = irPackageFile;
+  packageSize.textContent = formatBytes(packageInfo.byteLength);
   ptrWidth.textContent = `${pointerBytes} bytes`;
-  declCount.textContent = String(loadedDeclCount);
+  declCount.textContent = String(packageInfo.count);
   layoutGuard.textContent = pointerBytes === 4 ? "pass" : "fail";
   setReady();
 
@@ -167,6 +234,7 @@ try {
   }
   petResetButton.addEventListener("click", resetPet);
   sortRunButton.addEventListener("click", () => renderSort(exports));
+  sortInput.addEventListener("change", () => renderSort(exports));
   renderFib(exports);
   resetPet();
   renderSort(exports);
@@ -175,6 +243,7 @@ try {
   statusEl.dataset.ready = "false";
   fibResultDisplay.textContent = "error";
   petMoodDisplay.textContent = "error";
+  sortOutputDisplay.textContent = "error";
   sortResultDisplay.textContent = "error";
   console.error(error);
 }

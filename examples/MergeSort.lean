@@ -34,15 +34,21 @@ def mergeSortFuel : Nat -> List Nat -> List Nat
       let halves := split xs
       merge (mergeSortFuel fuel halves.1) (mergeSortFuel fuel halves.2)
 
+def sortedFromArray (input : Array Nat) : List Nat :=
+  mergeSortFuel 32 input.toList
+
 def sorted : List Nat :=
-  mergeSortFuel 8 inputArray.toList
+  sortedFromArray inputArray
 
 def checksumAux : Nat -> List Nat -> Nat
   | _, [] => 0
   | weight, x :: xs => weight * x + checksumAux (weight + 1) xs
 
+def demoFromArray (input : Array Nat) : Nat :=
+  checksumAux 1 (sortedFromArray input)
+
 def demo : Nat :=
-  checksumAux 1 sorted
+  demoFromArray inputArray
 
 #eval sorted
 -- [1, 1, 2, 3, 4, 5, 7, 9]

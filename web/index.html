@@ -64,9 +64,9 @@
 
           <section class="demo-panel" aria-label="Merge sort array demo">
             <h2>SortDemo.demo</h2>
-            <div class="sort-source">
-              <span>array</span>
-              <strong>[7, 3, 9, 1, 4, 1, 5, 2]</strong>
+            <div class="sort-source controls">
+              <label for="sort-input">Array</label>
+              <input id="sort-input" type="text" value="7, 3, 9, 1, 4, 1, 5, 2" />
             </div>
             <div class="controls sort-controls">
               <button id="sort-run-button" type="button">Run</button>
@@ -85,6 +85,22 @@
         </section>
 
         <section class="details">
+          <div>
+            <span>WASM target</span>
+            <strong id="wasm-target">wasm32-wasip1</strong>
+          </div>
+          <div>
+            <span>Link</span>
+            <strong id="link-status">strict</strong>
+          </div>
+          <div>
+            <span>Package</span>
+            <strong id="package-name">...</strong>
+          </div>
+          <div>
+            <span>Package size</span>
+            <strong id="package-size">...</strong>
+          </div>
           <div>
             <span>Pointer width</span>
             <strong id="ptr-width">...</strong>

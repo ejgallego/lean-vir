@@ -3,7 +3,7 @@
 The demo goal is to compile Lean's real `src/library/ir_interpreter.cpp` for
 `wasm32-wasip1` and then supply only the runtime and environment surface needed
 for small browser examples such as `fib`, `Tamagotchi.step`, and
-`SortDemo.demo`.
+`SortDemo.demoFromArray`.
 
 Run the boundary probe with:
 
@@ -62,7 +62,8 @@ Together they supply:
 
 - `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` for the generated
   demo closure, including `fib`, `Tamagotchi.step`, `Tamagotchi.run`,
-  `Tamagotchi.trace`, `Tamagotchi.demoScript`, and their current dependencies.
+  `Tamagotchi.trace`, `Tamagotchi.demoScript`, `SortDemo.demoFromArray`, and
+  their current dependencies.
 - small WASI/platform stubs for dynamic symbol lookup, C++ exception throwing,
   trace/time/options hooks, and the few environment helpers pulled in by the
   interpreter.
@@ -108,7 +109,10 @@ The closure is extracted by `tools/GeneratePackage.lean` from the real
 `Lean.IR.Decl` values produced for the example sources. The generator walks
 `FAp`/`PAP` references to include the transitive local closure, then emits a
 small binary package. `wasm/upstream_shim/package_decl_provider.cpp` decodes that
-package into the upstream interpreter's expected object layout at runtime.
+package into the upstream interpreter's expected object layout at runtime. The
+generator report separates missing Lean IR declarations from missing native
+extern registrations, and the package decoder exposes its last load error for
+browser and smoke-test diagnostics.
 The current explicit native externs are `Nat.add`, `Nat.sub`, `Nat.decEq`,
 `Nat.decLe`, `Nat.mul`, `Array.mkEmpty`, `Array.push`, and `Array.toList`.
 They are backed by a small shim registry; a full native symbol loader is still

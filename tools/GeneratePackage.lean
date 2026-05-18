@@ -27,7 +27,8 @@ structure Closure where
   seen : NameSet := {}
   decls : Array LoadedDecl := #[]
   externs : Array NativeExtern := #[]
-  missing : Array Name := #[]
+  missingDecls : Array Name := #[]
+  missingExterns : Array Name := #[]
 
 def targets : Array Target := #[
   {
@@ -48,7 +49,7 @@ def targets : Array Target := #[
   },
   {
     source := "examples/MergeSort.lean",
-    roots := #[`SortDemo.demo]
+    roots := #[`SortDemo.demo, `SortDemo.demoFromArray]
   }
 ]
 
@@ -108,6 +109,24 @@ def nativeExterns : Array NativeExtern := #[
 
 def nativeExtern? (n : Name) : Option NativeExtern :=
   nativeExterns.find? fun ext => ext.name == n
+
+def primitiveNamespaces : List String :=
+  [
+    "Array", "Bool", "ByteArray", "Char", "Float", "Float32", "IO", "Int",
+    "Nat", "Ptr", "ST", "String", "UInt8", "UInt16", "UInt32", "UInt64",
+    "USize"
+  ]
+
+partial def nameHead? : Name -> Option String
+  | .anonymous => none
+  | .str .anonymous part => some part
+  | .str pre _ => nameHead? pre
+  | .num pre _ => nameHead? pre
+
+def isNativeExternCandidate (n : Name) : Bool :=
+  match nameHead? n with
+  | some head => primitiveNamespaces.contains head
+  | none => false
 
 def sanitizeSource (input : String) : String :=
   "\n".intercalate <|
@@ -174,7 +193,11 @@ partial def collectName (index : NameMap LoadedDecl) (name : Name) (state : Clos
     | some ext => { state with externs := state.externs.push ext }
     | none =>
         match index.find? name with
-        | none => { state with missing := state.missing.push name }
+        | none =>
+            if isNativeExternCandidate name then
+              { state with missingExterns := state.missingExterns.push name }
+            else
+              { state with missingDecls := state.missingDecls.push name }
         | some loaded =>
             let state := { state with decls := state.decls.push loaded }
             refsOfDecl loaded.decl |>.foldl (fun state dep => collectName index dep state) state
@@ -187,6 +210,12 @@ abbrev EmitM := StateT ByteArray (Except String)
 
 def maxU32 : Nat := 4294967295
 
+def withEmitContext (context : String) (action : EmitM α) : EmitM α :=
+  fun bytes =>
+    match action.run bytes with
+    | .ok result => .ok result
+    | .error err => .error s!"{context}: {err}"
+
 def emitU8 (value : Nat) : EmitM Unit :=
   modify fun bytes => bytes.push (UInt8.ofNat value)
 
@@ -195,7 +224,7 @@ def emitBool (value : Bool) : EmitM Unit :=
 
 def emitU32 (value : Nat) : EmitM Unit := do
   if value > maxU32 then
-    throw s!"value does not fit in u32: {value}"
+    throw s!"package format stores this field as u32, but got {value}"
   emitU8 (value % 256)
   emitU8 ((value / 256) % 256)
   emitU8 ((value / 65536) % 256)
@@ -231,8 +260,8 @@ def emitType : IRType -> EmitM Unit
   | .object => emitU8 7
   | .tobject => emitU8 8
   | .float32 => emitU8 9
-  | .struct .. => throw "IR struct return values are not supported by the demo package yet"
-  | .union .. => throw "IR union return values are not supported by the demo package yet"
+  | .struct .. => throw "unsupported IR type: struct values are not encoded by the demo package yet"
+  | .union .. => throw "unsupported IR type: union values are not encoded by the demo package yet"
   | .tagged => emitU8 12
   | .void => emitU8 13
 
@@ -322,23 +351,25 @@ def emitEntryHeader (name : Name) : EmitM Unit := do
   | none => emitBool false
 
 def emitDeclEntry (loaded : LoadedDecl) : EmitM Unit := do
-  emitEntryHeader loaded.decl.name
-  match loaded.decl with
-  | .fdecl _ params resultType body _ => do
-      emitU8 0
-      emitArray params emitParam
-      emitType resultType
-      emitBody body
-  | .extern _ params resultType _ => do
-      emitU8 1
-      emitArray params emitParam
-      emitType resultType
+  withEmitContext s!"while encoding declaration `{loaded.decl.name}` from `{loaded.source}`" do
+    emitEntryHeader loaded.decl.name
+    match loaded.decl with
+    | .fdecl _ params resultType body _ => do
+        emitU8 0
+        emitArray params emitParam
+        emitType resultType
+        emitBody body
+    | .extern _ params resultType _ => do
+        emitU8 1
+        emitArray params emitParam
+        emitType resultType
 
 def emitExternEntry (ext : NativeExtern) : EmitM Unit := do
-  emitEntryHeader ext.name
-  emitU8 1
-  emitArray ext.params emitParam
-  emitType ext.resultType
+  withEmitContext s!"while encoding native extern `{ext.name}` mapped to `{ext.symbol}`" do
+    emitEntryHeader ext.name
+    emitU8 1
+    emitArray ext.params emitParam
+    emitType ext.resultType
 
 def emitPackageM (closure : Closure) : EmitM Unit := do
   emitString "lean-vir-ir-package"
@@ -360,18 +391,24 @@ def reportFor (closure : Closure) : String :=
   let externLines :=
     closure.externs.map fun ext =>
       s!"- `{ext.name}` -> `{ext.symbol}`"
-  let missingLines :=
-    if closure.missing.isEmpty then #["None."] else closure.missing.map fun n => s!"- `{n}`"
+  let missingDeclLines :=
+    if closure.missingDecls.isEmpty then #["None."] else closure.missingDecls.map fun n => s!"- `{n}`"
+  let missingExternLines :=
+    if closure.missingExterns.isEmpty then #["None."] else closure.missingExterns.map fun n => s!"- `{n}`"
   "# Generated IR Package Report\n\n"
   ++ "Generated by `tools/GeneratePackage.lean` from typed `Lean.IR.Decl` values.\n\n"
+  ++ s!"Loaded declarations: {closure.decls.size}\n\n"
+  ++ s!"Native extern declarations: {closure.externs.size}\n\n"
   ++ "## Roots\n\n"
   ++ "\n".intercalate (roots.map (fun n => s!"- `{n}`")).toList ++ "\n\n"
   ++ "## Loaded IR Declarations\n\n"
   ++ "\n".intercalate loadedLines.toList ++ "\n\n"
   ++ "## Native Extern Declarations\n\n"
   ++ "\n".intercalate externLines.toList ++ "\n\n"
-  ++ "## Missing Declarations\n\n"
-  ++ "\n".intercalate missingLines.toList ++ "\n"
+  ++ "## Missing IR Declarations\n\n"
+  ++ "\n".intercalate missingDeclLines.toList ++ "\n\n"
+  ++ "## Missing Native Extern Registrations\n\n"
+  ++ "\n".intercalate missingExternLines.toList ++ "\n"
 
 def readTextFile? (path : System.FilePath) : IO (Option String) := do
   try
@@ -402,8 +439,16 @@ unsafe def run (packagePath reportPath : System.FilePath) : IO UInt32 := do
   let closure := collectClosure index
   let report := reportFor closure
   writeTextFile reportPath report
-  if !closure.missing.isEmpty then
-    IO.eprintln s!"missing IR declarations; see {reportPath}"
+  if !closure.missingDecls.isEmpty || !closure.missingExterns.isEmpty then
+    if !closure.missingDecls.isEmpty then
+      IO.eprintln "missing IR declarations:"
+      for name in closure.missingDecls do
+        IO.eprintln s!"  - {name}"
+    if !closure.missingExterns.isEmpty then
+      IO.eprintln "missing native extern registrations:"
+      for name in closure.missingExterns do
+        IO.eprintln s!"  - {name}"
+    IO.eprintln s!"see {reportPath}"
     return 1
   match emitPackage closure with
   | .ok bytes =>

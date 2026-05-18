@@ -16,9 +16,11 @@ module data or a real environment loader.
 
 The browser exposes three demos over the same upstream interpreter artifact:
 `fib`, a step-by-step `Tamagotchi.step` automaton, and a merge-sort style
-`SortDemo.demo` over a Lean array literal. The automaton values are encoded as
-nullary inductive constructors using the same tagged representation that the
-upstream interpreter expects.
+`SortDemo.demoFromArray` over an editable `Array Nat` input. The automaton
+values are encoded as nullary inductive constructors using the same tagged
+representation that the upstream interpreter expects. The sort demo uses a
+narrow WASM export to build a Lean array object from browser-provided `UInt32`
+values, then calls the real interpreter on the Lean entry point.
 
 Generated artifacts live under `build/`, `web/public/vir-upstream.wasm`, and
 `web/public/vir-demo.irpkg`. They should not be committed.
