@@ -75,10 +75,15 @@ support_sources=(
   "$src/src/util/name.cpp"
 )
 
+shim_sources=(
+  "wasm/upstream_shim/shim.cpp"
+)
+
 link_sources=(
   "$upstream"
   "${runtime_sources[@]}"
   "${support_sources[@]}"
+  "${shim_sources[@]}"
 )
 
 common_flags=(
@@ -99,6 +104,7 @@ exports=(
   -Wl,--export=lean_eval_main
   -Wl,--export=lean_run_init
   -Wl,--export=lean_run_mod_init_core
+  -Wl,--export=vir_upstream_shim_fixture_count
 )
 
 "$cxx" "${common_flags[@]}" -c "$upstream" -o "$obj"
@@ -152,6 +158,7 @@ env_import_count="$(wc -l < "$env_imports" | tr -d ' ')"
 wasi_import_count="$(wc -l < "$wasi_imports" | tr -d ' ')"
 runtime_source_count="${#runtime_sources[@]}"
 support_source_count="${#support_sources[@]}"
+shim_source_count="${#shim_sources[@]}"
 
 {
   echo "# Upstream IR Interpreter WASI Boundary"
@@ -169,6 +176,7 @@ support_source_count="${#support_sources[@]}"
   echo "- Generated config overlay: \`$overlay_include/lean/config.h\`"
   echo "- Real Lean runtime sources linked: $runtime_source_count"
   echo "- Lean support sources linked: $support_source_count"
+  echo "- Local WASI shim sources linked: $shim_source_count"
   echo
   echo "## Outputs"
   echo
@@ -186,6 +194,12 @@ support_source_count="${#support_sources[@]}"
   echo "## Linked Lean Support Sources"
   echo
   for path in "${support_sources[@]}"; do
+    printf -- '- `%s`\n' "$path"
+  done
+  echo
+  echo "## Linked Local Shim Sources"
+  echo
+  for path in "${shim_sources[@]}"; do
     printf -- '- `%s`\n' "$path"
   done
   echo
@@ -238,6 +252,15 @@ support_source_count="${#support_sources[@]}"
   echo "- Provide real Lean IR declaration objects through \`lean_ir_find_env_decl\`."
   echo "- Stub only runtime/library pieces that the fib path does not execute."
   echo "- Leave native symbol lookup unsupported until a real use case needs it."
+  echo
+  echo "## Current Shim Scope"
+  echo
+  echo "\`wasm/upstream_shim/shim.cpp\` supplies the minimal host/environment"
+  echo "boundary for the strict WASI link and a fixture-backed declaration provider"
+  echo "for \`fib\`, \`fib._boxed\`, \`Nat.add\`, \`Nat.sub\`, and \`Nat.decEq\`."
+  echo "The arithmetic declarations are represented as real IR \`Extern\`"
+  echo "declarations; their implementations remain the next boundary before the"
+  echo "real upstream interpreter can execute the fixture end to end."
 } > "$report"
 
 echo "wrote $report"

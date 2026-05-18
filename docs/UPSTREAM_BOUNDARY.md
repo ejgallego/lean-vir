@@ -12,6 +12,13 @@ npm run probe:upstream
 
 The generated report is written to `build/upstream-probe/boundary.md`.
 
+Current status: the strict `wasm32-wasip1` link succeeds with the real upstream
+`ir_interpreter.cpp`, the linked Lean runtime subset, and
+`wasm/upstream_shim/shim.cpp`. The remaining boundary is semantic: the `fib`
+fixture is supplied as real Lean IR declaration objects, while its arithmetic
+dependencies are still represented as unresolved-at-runtime IR `Extern`
+declarations.
+
 ## Policy
 
 - Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified.
@@ -41,6 +48,16 @@ The probe links these upstream runtime sources:
 It also links `src/util/name.cpp`, which is not runtime proper but is needed by
 the interpreter's name formatting and diagnostics.
 
+The probe additionally links `wasm/upstream_shim/shim.cpp`. This is local demo
+code, not a fork of Lean. It supplies:
+
+- `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` for `fib`,
+  `fib._boxed`, `Nat.add`, `Nat.sub`, and `Nat.decEq`.
+- small WASI/platform stubs for dynamic symbol lookup, C++ exception throwing,
+  trace/time/options hooks, and the few environment helpers pulled in by the
+  interpreter.
+- name construction primitives needed by `src/util/name.cpp`.
+
 The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
 disabled. The pinned Lean source checkout contains the runtime sources but does
 not include vendored mimalloc sources for a WASI rebuild, so this selects Lean's
@@ -63,3 +80,12 @@ return `Option decl` values using the same constructor layout:
 
 This is the main difference from the first harness in `wasm/interpreter_port/`,
 which intentionally used a smaller C++ fixture schema.
+
+## Next Boundary
+
+To run `fib` through the real upstream interpreter, the next step is to remove
+the arithmetic gap without relying on native lookup. The current shim has real
+IR `Extern` declarations for `Nat.add`, `Nat.sub`, and `Nat.decEq`, so a call
+that reaches them will report a missing native implementation. For the demo we
+should provide their real IR bodies from Lean's generated `Init.ir` data and
+keep native lookup unsupported.

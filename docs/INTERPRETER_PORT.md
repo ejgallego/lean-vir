@@ -33,6 +33,11 @@ npm run probe:upstream
 
 The generated report is written to `build/upstream-probe/boundary.md`.
 
+The current upstream probe links strictly for `wasm32-wasip1` with zero
+unresolved symbols. That means the linker-visible boundary is closed for the
+real `ir_interpreter.cpp` file; the remaining work is making the fixture
+provider complete enough for execution.
+
 ## Initial Port Shape
 
 - Keep the browser ABI stable: `vir_fib`, `vir_target_pointer_bytes`,
@@ -65,17 +70,23 @@ construction of the actual Lean runtime object shape used by
 `scripts/build-upstream-probe.sh` compiles
 `third_party/lean4-src/src/library/ir_interpreter.cpp` without modifying it and
 links the real Lean runtime sources that are viable in the strict WASI probe.
-The strict link is expected to fail at first; its unresolved symbols are the
-tracked boundary for the WASI demo.
+The strict link now succeeds with `wasm/upstream_shim/shim.cpp`.
 
 The intended adapter surface is `lean_ir_find_env_decl`: it should return real
 Lean `Option decl` values whose constructors match the accessors in upstream
 `ir_interpreter.cpp`. This lets the demo feed fixture-backed IR declarations
 without porting full `.olean` loading or a complete elaboration environment.
 
+The shim currently returns real IR declarations for `fib`, `fib._boxed`,
+`Nat.add`, `Nat.sub`, and `Nat.decEq`. The `fib` declarations have function
+bodies matching `examples/Fib.lean`; the arithmetic declarations are still
+`Extern` placeholders and should be replaced with real IR bodies before claiming
+upstream execution of the example.
+
 ## Current Known Hotspots
 
-- `src/library/ir_interpreter.cpp` uses native symbol lookup for fallback calls.
+- `src/library/ir_interpreter.cpp` uses native symbol lookup for fallback calls;
+  the demo keeps that path disabled/empty.
 - The runtime has platform branches for Emscripten but not a dedicated strict
   WASI configuration.
 - Full environment/module loading is out of scope for the first port; the first

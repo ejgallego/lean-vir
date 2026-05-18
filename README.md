@@ -16,6 +16,9 @@ and calls `vir_fib`.
   the strict C/WASI path.
 - `wasm/interpreter_port/` is the first upstream-shaped interpreter harness. It
   evaluates generated `FnBody`/`Expr`/`Arg` fixtures instead of bytecode.
+- `wasm/upstream_shim/` is the current WASI boundary shim for Lean's real
+  upstream interpreter. It supplies fixture-backed real Lean IR declaration
+  objects and stubs platform/library pieces that the demo path should not use.
 - `scripts/build-upstream-probe.sh` compiles Lean's real
   `src/library/ir_interpreter.cpp`, links viable Lean runtime sources for WASI,
   and writes an unresolved-boundary report.
@@ -32,8 +35,9 @@ The current runnable milestone is a browser and Node smoke test for the Lean IR
 shape emitted by `examples/Fib.lean`.
 
 This is not yet a full upstream Lean IR interpreter port. The next milestone is
-to stage Lean's `src/library/ir_interpreter.cpp` and enough runtime support from
-Lean `v4.30.0-rc2` into the strict `wasm32-wasi` build.
+to implement the remaining semantic fixture boundary so the real upstream
+interpreter can execute `fib` end to end. The strict link of the upstream
+interpreter and local shim now closes with zero unresolved symbols.
 
 ## Quick Start
 
@@ -100,6 +104,10 @@ demo is to keep `ir_interpreter.cpp` unmodified, link Lean's real runtime
 sources first, provide real Lean IR declaration objects through
 `lean_ir_find_env_decl`, and stub only unused runtime/library pieces as the fib
 path needs them.
+
+At this point the strict upstream probe links. The active boundary is that
+`Nat.add`, `Nat.sub`, and `Nat.decEq` are present as real IR `Extern`
+declarations but do not yet have non-native WASI implementations.
 
 ## Git Note
 

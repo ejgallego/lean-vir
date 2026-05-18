@@ -41,5 +41,7 @@ In a normal checkout from GitHub, use ordinary `git` commands.
 - Keep `wasm/runner.wat` and `wasm/runner.c` export-compatible:
   `vir_fib`, `vir_target_pointer_bytes`, `vir_target_size_t_bytes`, and
   `vir_target_layout_ok`.
-- Do not claim full Lean runtime portability until the C++ interpreter path is
-  linked and tested under `wasm32-wasi`.
+- Do not claim full Lean runtime portability until the real upstream
+  `ir_interpreter.cpp` path is linked and execution-tested under `wasm32-wasi`.
+- Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified. Put
+  demo-only WASI stubs and fixture providers under `wasm/upstream_shim/`.
