@@ -12,6 +12,11 @@ real Lean IR declaration objects, not a parallel demo schema. This keeps the
 browser demo small while preserving the future replacement point for generated
 module data or a real environment loader.
 
+The browser exposes two demos over the same upstream interpreter artifact:
+`fib`, and a step-by-step `Tamagotchi.step` automaton. The automaton values are
+encoded as nullary inductive constructors using the same tagged representation
+that the upstream interpreter expects.
+
 Generated artifacts live under `build/` and `web/public/vir-upstream.wasm`.
 They should not be committed.
 

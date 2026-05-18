@@ -1,17 +1,26 @@
 import "./style.css";
 
 const statusEl = document.querySelector("#status");
-const inputEl = document.querySelector("#fib-input");
-const runButton = document.querySelector("#run-button");
-const inputDisplay = document.querySelector("#input-display");
-const resultDisplay = document.querySelector("#result-display");
+const fibInput = document.querySelector("#fib-input");
+const fibRunButton = document.querySelector("#fib-run-button");
+const fibInputDisplay = document.querySelector("#fib-input-display");
+const fibResultDisplay = document.querySelector("#fib-result-display");
+const petMoodDisplay = document.querySelector("#pet-mood-display");
+const petActionDisplay = document.querySelector("#pet-action-display");
+const petTraceDisplay = document.querySelector("#pet-trace-display");
+const petActionButtons = document.querySelectorAll("[data-action]");
+const petResetButton = document.querySelector("#pet-reset-button");
 const ptrWidth = document.querySelector("#ptr-width");
 const declCount = document.querySelector("#decl-count");
 const layoutGuard = document.querySelector("#layout-guard");
-const maxInput = 17;
+const maxFibInput = 17;
+const moods = ["happy", "hungry", "sleepy", "angry", "asleep", "dead"];
+const actions = ["feed", "play", "nap", "wake", "ignore"];
+let petMood = 0;
+let petTrace = [petMood];
 
 async function instantiate(path) {
-  const response = await fetch(path);
+  const response = await fetch(path, { cache: "no-store" });
   if (!response.ok) {
     throw new Error(`failed to load ${path}`);
   }
@@ -36,25 +45,61 @@ async function instantiate(path) {
   return instance.exports;
 }
 
-function clampInput(value) {
+function clampInput(value, max) {
   if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(maxInput, Math.trunc(value)));
+  return Math.max(0, Math.min(max, Math.trunc(value)));
 }
 
-function render(exports) {
-  const n = clampInput(Number(inputEl.value));
-  inputEl.value = String(n);
-  inputDisplay.textContent = String(n);
+function setReady() {
+  statusEl.textContent = "Ready";
+  statusEl.dataset.ready = "true";
+}
+
+function setTrap(error) {
+  statusEl.textContent = "Trap";
+  statusEl.dataset.ready = "false";
+  console.error(error);
+}
+
+function renderFib(exports) {
+  const n = clampInput(Number(fibInput.value), maxFibInput);
+  fibInput.value = String(n);
+  fibInputDisplay.textContent = String(n);
   try {
-    resultDisplay.textContent = String(exports.vir_upstream_fib(n));
-    statusEl.textContent = "Ready";
-    statusEl.dataset.ready = "true";
+    fibResultDisplay.textContent = String(exports.vir_upstream_fib(n));
+    setReady();
   } catch (error) {
-    statusEl.textContent = "Trap";
-    statusEl.dataset.ready = "false";
-    resultDisplay.textContent = "error";
-    console.error(error);
+    fibResultDisplay.textContent = "error";
+    setTrap(error);
   }
+}
+
+function renderPet() {
+  petMoodDisplay.textContent = moods[petMood] ?? "?";
+  petTraceDisplay.textContent = petTrace.map((mood) => moods[mood] ?? "?").join(" -> ");
+}
+
+function stepPet(exports, actionName) {
+  const action = actions.indexOf(actionName);
+  if (action < 0) return;
+  petActionDisplay.textContent = actionName;
+  try {
+    petMood = exports.vir_upstream_tamagotchi_step(petMood, action);
+    petTrace.push(petMood);
+    renderPet();
+    setReady();
+  } catch (error) {
+    petMoodDisplay.textContent = "error";
+    setTrap(error);
+  }
+}
+
+function resetPet() {
+  petMood = 0;
+  petTrace = [petMood];
+  petActionDisplay.textContent = "...";
+  renderPet();
+  setReady();
 }
 
 try {
@@ -64,15 +109,20 @@ try {
   ptrWidth.textContent = `${pointerBytes} bytes`;
   declCount.textContent = String(exports.vir_upstream_shim_fixture_count());
   layoutGuard.textContent = pointerBytes === 4 ? "pass" : "fail";
-  statusEl.textContent = "Ready";
-  statusEl.dataset.ready = "true";
+  setReady();
 
-  runButton.addEventListener("click", () => render(exports));
-  inputEl.addEventListener("change", () => render(exports));
-  render(exports);
+  fibRunButton.addEventListener("click", () => renderFib(exports));
+  fibInput.addEventListener("change", () => renderFib(exports));
+  for (const button of petActionButtons) {
+    button.addEventListener("click", () => stepPet(exports, button.dataset.action));
+  }
+  petResetButton.addEventListener("click", resetPet);
+  renderFib(exports);
+  resetPet();
 } catch (error) {
   statusEl.textContent = "Failed";
   statusEl.dataset.ready = "false";
-  resultDisplay.textContent = "error";
+  fibResultDisplay.textContent = "error";
+  petMoodDisplay.textContent = "error";
   console.error(error);
 }

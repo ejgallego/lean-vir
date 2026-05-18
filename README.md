@@ -9,13 +9,15 @@ browser demo loads a `wasm32-wasip1` module built from Lean's upstream
 
 ## Current Shape
 
-- `examples/Fib.lean` is the Lean source for the demo program.
+- `examples/Fib.lean` and `examples/Tamagotchi.lean` are the Lean sources for
+  the demo programs.
 - `wasm/upstream_shim/` supplies the current WASI boundary for Lean's real
   upstream interpreter. It provides fixture-backed Lean IR declaration objects
   and stubs platform/library pieces that the demo path should not execute.
 - `wasm/upstream_shim/decl_provider.h` is the replacement point for a future
   module-backed provider. The current provider statically loads the declaration
-  closure for `fib`, `fib._boxed`, `Nat.add`, `Nat.sub`, and `Nat.decEq`.
+  closure for `fib`, `fib._boxed`, `Nat.add`, `Nat.sub`, `Nat.decEq`, and
+  `Tamagotchi.step`.
 - `scripts/build-upstream-probe.sh` compiles Lean's real
   `src/library/ir_interpreter.cpp`, links the viable Lean runtime sources for
   WASI, writes `build/upstream-probe/boundary.md`, and copies the strict wasm to
@@ -46,8 +48,8 @@ npm test
 npm run dev
 ```
 
-Open the Vite URL and the page should report `fib 8 = 21` from the upstream
-interpreter artifact.
+Open the Vite URL and the page should show the `fib` runner and the
+Tamagotchi automaton running through the upstream interpreter artifact.
 
 ## Demo Artifact
 
@@ -63,9 +65,9 @@ The demo link currently gives the WASM module 4 MiB of initial memory and a
 1 MiB stack. Override those with `VIR_WASM_INITIAL_MEMORY` and
 `VIR_WASM_STACK_SIZE` when running `npm run build:demo`.
 
-The browser input is capped at `17` for the current static Peano arithmetic
-closure. Higher values still need either a more memory-efficient closure or a
-more faithful module/runtime path.
+The browser `fib` input is capped at `17` for the current static Peano
+arithmetic closure. Higher values still need either a more memory-efficient
+closure or a more faithful module/runtime path.
 
 By default the WASI installer pins `wasi-sdk-33.0-x86_64-linux.tar.gz` from
 `WebAssembly/wasi-sdk` and verifies its SHA-256 digest. Override with

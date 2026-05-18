@@ -57,6 +57,32 @@ static void set_name_hash(object * name, uint64_t hash) {
     lean_ctor_set_uint64(name, NAME_HASH_OFFSET, hash);
 }
 
+static void ensure_ir_interpreter_initialized() {
+    static bool initialized = false;
+    if (!initialized) {
+        initialize_ir_interpreter();
+        initialized = true;
+    }
+}
+
+static uint32_t run_nat_function(name const & fn, unsigned n, object ** args) {
+    elab_environment env(lean_box(0));
+    options opts(lean_box(0));
+    object * result = ir::run_boxed(env, opts, fn, n, args);
+    uint32_t out = static_cast<uint32_t>(vir::static_nat_to_usize(result));
+    lean_dec(result);
+    return out;
+}
+
+static uint32_t run_tagged_function(name const & fn, unsigned n, object ** args) {
+    elab_environment env(lean_box(0));
+    options opts(lean_box(0));
+    object * result = ir::run_boxed(env, opts, fn, n, args);
+    uint32_t out = static_cast<uint32_t>(lean_obj_tag(result));
+    lean_dec(result);
+    return out;
+}
+
 } // namespace
 
 extern "C" obj_res lean_name_mk_string(obj_arg prefix, obj_arg suffix) {
@@ -190,19 +216,16 @@ extern "C" uint32_t vir_upstream_target_pointer_bytes(void) {
 }
 
 extern "C" uint32_t vir_upstream_fib(uint32_t n) {
-    static bool initialized = false;
-    if (!initialized) {
-        lean::initialize_ir_interpreter();
-        initialized = true;
-    }
-
-    lean::elab_environment env(lean_box(0));
-    lean::options opts(lean_box(0));
-    lean::name fn("fib");
+    lean::ensure_ir_interpreter_initialized();
     lean::object * arg = lean::vir::mk_static_nat(n);
     lean::object * args[] = { arg };
-    lean::object * result = lean::ir::run_boxed(env, opts, fn, 1, args);
-    uint32_t out = static_cast<uint32_t>(lean::vir::static_nat_to_usize(result));
-    lean_dec(result);
-    return out;
+    return lean::run_nat_function(lean::name("fib"), 1, args);
+}
+
+extern "C" uint32_t vir_upstream_tamagotchi_step(uint32_t mood, uint32_t action) {
+    lean::ensure_ir_interpreter_initialized();
+    lean::object * mood_obj = lean_box(mood);
+    lean::object * action_obj = lean_box(action);
+    lean::object * args[] = { mood_obj, action_obj };
+    return lean::run_tagged_function(lean::name({ "Tamagotchi", "step" }), 2, args);
 }

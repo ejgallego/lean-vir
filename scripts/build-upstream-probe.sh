@@ -119,6 +119,7 @@ exports=(
   -Wl,--export=vir_upstream_shim_fixture_count
   -Wl,--export=vir_upstream_target_pointer_bytes
   -Wl,--export=vir_upstream_fib
+  -Wl,--export=vir_upstream_tamagotchi_step
 )
 
 "$cxx" "${common_flags[@]}" -c "$upstream" -o "$obj"
@@ -289,7 +290,7 @@ shim_source_count="${#shim_sources[@]}"
   echo "\`wasm/upstream_shim/shim.cpp\` supplies the minimal host/environment"
   echo "boundary for the strict WASI link. \`static_decl_provider.cpp\` supplies"
   echo "the statically loaded demo declaration closure for \`fib\`, \`fib._boxed\`,"
-  echo "\`Nat.add\`, \`Nat.sub\`, and \`Nat.decEq\`."
+  echo "\`Nat.add\`, \`Nat.sub\`, \`Nat.decEq\`, and \`Tamagotchi.step\`."
   echo "The arithmetic declarations are executable real IR function bodies over a"
   echo "static Peano-shaped Nat representation, so \`vir_upstream_fib\` now runs"
   echo "the fixture through the real upstream interpreter."

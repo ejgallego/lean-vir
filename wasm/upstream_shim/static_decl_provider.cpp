@@ -45,6 +45,13 @@ static object * mk_name2(char const * a, char const * b) {
     return result;
 }
 
+static object * mk_name3(char const * a, char const * b, char const * c) {
+    object * n = mk_name2(a, b);
+    object * result = mk_name_part(n, c);
+    lean_dec(n);
+    return result;
+}
+
 static object * mk_nat(size_t n) {
     return lean_usize_to_nat(n);
 }
@@ -154,6 +161,10 @@ static object * mk_fun_decl(object * fn, object * params, type result_type, obje
     return mk_ctor(0, { fn, params, lean_box(static_cast<unsigned>(result_type)), body });
 }
 
+static object * mk_tagged_ctor_ret(size_t var, object * ctor_info) {
+    return mk_vdecl(var, type::Tagged, mk_ctor_expr(ctor_info, mk_array({})), mk_ret(mk_arg_var(var)));
+}
+
 struct fixture {
     object * name_bool;
     object * name_bool_false;
@@ -165,11 +176,26 @@ struct fixture {
     object * name_nat_dec_eq;
     object * name_nat_succ;
     object * name_nat_sub;
+    object * name_tamagotchi_action;
+    object * name_tamagotchi_action_feed;
+    object * name_tamagotchi_action_ignore;
+    object * name_tamagotchi_action_nap;
+    object * name_tamagotchi_action_play;
+    object * name_tamagotchi_action_wake;
+    object * name_tamagotchi_mood;
+    object * name_tamagotchi_mood_angry;
+    object * name_tamagotchi_mood_asleep;
+    object * name_tamagotchi_mood_dead;
+    object * name_tamagotchi_mood_happy;
+    object * name_tamagotchi_mood_hungry;
+    object * name_tamagotchi_mood_sleepy;
+    object * name_tamagotchi_step;
     object * decl_fib;
     object * decl_fib_boxed;
     object * decl_nat_add;
     object * decl_nat_dec_eq;
     object * decl_nat_sub;
+    object * decl_tamagotchi_step;
 };
 
 static fixture * g_fixture = nullptr;
@@ -246,6 +272,69 @@ static object * mk_nat_dec_eq_body(fixture * f, object * ctor_zero, object * cto
     }));
 }
 
+static object * mk_tamagotchi_action_case(
+    fixture * f,
+    object * ctor_feed,
+    object * ctor_play,
+    object * ctor_nap,
+    object * ctor_wake,
+    object * ctor_ignore,
+    object * on_feed,
+    object * on_play,
+    object * on_nap,
+    object * on_wake,
+    object * on_ignore) {
+    return mk_case(f->name_tamagotchi_action, 2, type::Tagged, mk_array({
+        mk_ctor_alt(ctor_feed, on_feed),
+        mk_ctor_alt(ctor_play, on_play),
+        mk_ctor_alt(ctor_nap, on_nap),
+        mk_ctor_alt(ctor_wake, on_wake),
+        mk_ctor_alt(ctor_ignore, on_ignore),
+    }));
+}
+
+static object * mk_tamagotchi_step_body(fixture * f) {
+    object * mood_happy = mk_ctor_info(f->name_tamagotchi_mood_happy, 0);
+    object * mood_hungry = mk_ctor_info(f->name_tamagotchi_mood_hungry, 1);
+    object * mood_sleepy = mk_ctor_info(f->name_tamagotchi_mood_sleepy, 2);
+    object * mood_angry = mk_ctor_info(f->name_tamagotchi_mood_angry, 3);
+    object * mood_asleep = mk_ctor_info(f->name_tamagotchi_mood_asleep, 4);
+    object * mood_dead = mk_ctor_info(f->name_tamagotchi_mood_dead, 5);
+
+    object * action_feed = mk_ctor_info(f->name_tamagotchi_action_feed, 0);
+    object * action_play = mk_ctor_info(f->name_tamagotchi_action_play, 1);
+    object * action_nap = mk_ctor_info(f->name_tamagotchi_action_nap, 2);
+    object * action_wake = mk_ctor_info(f->name_tamagotchi_action_wake, 3);
+    object * action_ignore = mk_ctor_info(f->name_tamagotchi_action_ignore, 4);
+
+    object * ret_happy = mk_tagged_ctor_ret(3, mood_happy);
+    object * ret_hungry = mk_tagged_ctor_ret(3, mood_hungry);
+    object * ret_sleepy = mk_tagged_ctor_ret(3, mood_sleepy);
+    object * ret_angry = mk_tagged_ctor_ret(3, mood_angry);
+    object * ret_asleep = mk_tagged_ctor_ret(3, mood_asleep);
+    object * ret_dead = mk_tagged_ctor_ret(3, mood_dead);
+
+    object * case_happy = mk_tamagotchi_action_case(f, action_feed, action_play, action_nap, action_wake, action_ignore,
+        ret_happy, ret_sleepy, ret_asleep, ret_happy, ret_hungry);
+    object * case_hungry = mk_tamagotchi_action_case(f, action_feed, action_play, action_nap, action_wake, action_ignore,
+        ret_happy, ret_angry, ret_asleep, ret_hungry, ret_angry);
+    object * case_sleepy = mk_tamagotchi_action_case(f, action_feed, action_play, action_nap, action_wake, action_ignore,
+        ret_happy, ret_angry, ret_asleep, ret_hungry, ret_asleep);
+    object * case_angry = mk_tamagotchi_action_case(f, action_feed, action_play, action_nap, action_wake, action_ignore,
+        ret_hungry, ret_angry, ret_asleep, ret_angry, ret_dead);
+    object * case_asleep = mk_tamagotchi_action_case(f, action_feed, action_play, action_nap, action_wake, action_ignore,
+        ret_asleep, ret_angry, ret_asleep, ret_happy, ret_hungry);
+
+    return mk_case(f->name_tamagotchi_mood, 1, type::Tagged, mk_array({
+        mk_ctor_alt(mood_happy, case_happy),
+        mk_ctor_alt(mood_hungry, case_hungry),
+        mk_ctor_alt(mood_sleepy, case_sleepy),
+        mk_ctor_alt(mood_angry, case_angry),
+        mk_ctor_alt(mood_asleep, case_asleep),
+        mk_ctor_alt(mood_dead, ret_dead),
+    }));
+}
+
 static fixture * get_fixture() {
     if (g_fixture) {
         return g_fixture;
@@ -263,6 +352,20 @@ static fixture * get_fixture() {
     f->name_nat_dec_eq = mk_name2("Nat", "decEq");
     f->name_nat_succ = mk_name2("Nat", "succ");
     f->name_nat_sub = mk_name2("Nat", "sub");
+    f->name_tamagotchi_action = mk_name2("Tamagotchi", "Action");
+    f->name_tamagotchi_action_feed = mk_name3("Tamagotchi", "Action", "feed");
+    f->name_tamagotchi_action_ignore = mk_name3("Tamagotchi", "Action", "ignore");
+    f->name_tamagotchi_action_nap = mk_name3("Tamagotchi", "Action", "nap");
+    f->name_tamagotchi_action_play = mk_name3("Tamagotchi", "Action", "play");
+    f->name_tamagotchi_action_wake = mk_name3("Tamagotchi", "Action", "wake");
+    f->name_tamagotchi_mood = mk_name2("Tamagotchi", "Mood");
+    f->name_tamagotchi_mood_angry = mk_name3("Tamagotchi", "Mood", "angry");
+    f->name_tamagotchi_mood_asleep = mk_name3("Tamagotchi", "Mood", "asleep");
+    f->name_tamagotchi_mood_dead = mk_name3("Tamagotchi", "Mood", "dead");
+    f->name_tamagotchi_mood_happy = mk_name3("Tamagotchi", "Mood", "happy");
+    f->name_tamagotchi_mood_hungry = mk_name3("Tamagotchi", "Mood", "hungry");
+    f->name_tamagotchi_mood_sleepy = mk_name3("Tamagotchi", "Mood", "sleepy");
+    f->name_tamagotchi_step = mk_name2("Tamagotchi", "step");
 
     object * arg_x1 = mk_arg_var(1);
     object * arg_x2 = mk_arg_var(2);
@@ -348,6 +451,13 @@ static fixture * get_fixture() {
     f->decl_nat_dec_eq = mk_fun_decl(f->name_nat_dec_eq, nat_binary_params, type::UInt8,
         mk_nat_dec_eq_body(f, ctor_nat_zero, ctor_nat_succ));
 
+    object * tamagotchi_step_params = mk_array({
+        mk_param(1, type::Tagged, true),
+        mk_param(2, type::Tagged, true),
+    });
+    f->decl_tamagotchi_step = mk_fun_decl(f->name_tamagotchi_step, tamagotchi_step_params, type::Tagged,
+        mk_tamagotchi_step_body(f));
+
     g_fixture = f;
     return f;
 }
@@ -379,6 +489,9 @@ object * find_static_decl(object * n) {
     if (lean_name_eq(n, f->name_nat_sub)) {
         return f->decl_nat_sub;
     }
+    if (lean_name_eq(n, f->name_tamagotchi_step)) {
+        return f->decl_tamagotchi_step;
+    }
     return nullptr;
 }
 
@@ -392,7 +505,7 @@ object * find_static_boxed_decl(object * n) {
 
 uint32_t static_decl_count() {
     (void)get_fixture();
-    return 5;
+    return 6;
 }
 
 } // namespace lean::vir

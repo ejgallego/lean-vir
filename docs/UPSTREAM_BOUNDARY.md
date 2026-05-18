@@ -59,7 +59,7 @@ not a fork of Lean. It is split by responsibility:
 Together they supply:
 
 - `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` for `fib`,
-  `fib._boxed`, `Nat.add`, `Nat.sub`, and `Nat.decEq`.
+  `fib._boxed`, `Nat.add`, `Nat.sub`, `Nat.decEq`, and `Tamagotchi.step`.
 - small WASI/platform stubs for dynamic symbol lookup, C++ exception throwing,
   trace/time/options hooks, and the few environment helpers pulled in by the
   interpreter.

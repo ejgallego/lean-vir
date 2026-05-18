@@ -26,7 +26,7 @@ input {
 }
 
 .workspace {
-  max-width: 860px;
+  max-width: 1080px;
   margin: 0 auto;
 }
 
@@ -54,6 +54,13 @@ h1 {
   letter-spacing: 0;
 }
 
+h2 {
+  margin: 0;
+  font-size: 1.2rem;
+  line-height: 1;
+  letter-spacing: 0;
+}
+
 .status {
   min-width: 128px;
   padding: 10px 14px;
@@ -74,12 +81,23 @@ h1 {
   color: #7c2820;
 }
 
+.demo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 32px;
+  margin-top: 32px;
+}
+
+.demo-panel {
+  min-width: 0;
+}
+
 .controls {
   display: grid;
   grid-template-columns: auto minmax(96px, 140px) auto;
   align-items: center;
   gap: 12px;
-  margin-top: 32px;
+  margin-top: 18px;
 }
 
 .controls label {
@@ -109,11 +127,53 @@ h1 {
   background: #1c2f22;
 }
 
+.pet-state {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 54px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+}
+
+.pet-state span {
+  color: #5f6f64;
+  font-weight: 700;
+}
+
+.pet-state strong {
+  font-size: 1.8rem;
+}
+
+.action-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+  margin-top: 14px;
+}
+
+.action-grid button {
+  min-height: 44px;
+  border: 1px solid #bdc8bb;
+  background: #ffffff;
+  color: #263d2c;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.action-grid button:hover {
+  border-color: #7fa37f;
+  color: #255b32;
+}
+
 .result-band {
   display: grid;
   grid-template-columns: minmax(100px, 0.7fr) minmax(180px, 1fr);
   gap: 1px;
-  margin-top: 40px;
+  margin-top: 24px;
   background: #d9ded2;
   border-top: 1px solid #d9ded2;
   border-bottom: 1px solid #d9ded2;
@@ -138,6 +198,12 @@ h1 {
   margin-top: 18px;
   font-size: 4rem;
   line-height: 1;
+}
+
+#pet-trace-display {
+  font-size: 1.1rem;
+  line-height: 1.35;
+  word-break: break-word;
 }
 
 .details {
@@ -183,6 +249,14 @@ h1 {
 
   .controls {
     grid-template-columns: 1fr;
+  }
+
+  .demo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .action-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .result-band strong {

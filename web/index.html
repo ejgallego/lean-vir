@@ -11,26 +11,56 @@
         <header class="topbar">
           <div>
             <p class="eyebrow">Lean 4.30-rc2 / wasm32-wasip1</p>
-            <h1>IR Fib Demo</h1>
+            <h1>IR Interpreter Demo</h1>
           </div>
           <div id="status" class="status">Loading WASM</div>
         </header>
 
-        <section class="controls" aria-label="Fib controls">
-          <label for="fib-input">Input</label>
-          <input id="fib-input" type="number" min="0" max="17" value="8" />
-          <button id="run-button" type="button">Run</button>
-        </section>
+        <section class="demo-grid">
+          <section class="demo-panel" aria-label="Fib demo">
+            <h2>fib</h2>
+            <div class="controls">
+              <label for="fib-input">Input</label>
+              <input id="fib-input" type="number" min="0" max="17" value="8" />
+              <button id="fib-run-button" type="button">Run</button>
+            </div>
+            <section class="result-band" aria-live="polite">
+              <div>
+                <span>input</span>
+                <strong id="fib-input-display">8</strong>
+              </div>
+              <div>
+                <span>result</span>
+                <strong id="fib-result-display">...</strong>
+              </div>
+            </section>
+          </section>
 
-        <section class="result-band" aria-live="polite">
-          <div>
-            <span>input</span>
-            <strong id="input-display">8</strong>
-          </div>
-          <div>
-            <span>upstream interpreter</span>
-            <strong id="result-display">...</strong>
-          </div>
+          <section class="demo-panel" aria-label="Tamagotchi automaton demo">
+            <h2>Tamagotchi.step</h2>
+            <div class="pet-state">
+              <span>Mood</span>
+              <strong id="pet-mood-display">happy</strong>
+            </div>
+            <div class="action-grid">
+              <button type="button" data-action="feed">Feed</button>
+              <button type="button" data-action="play">Play</button>
+              <button type="button" data-action="nap">Nap</button>
+              <button type="button" data-action="wake">Wake</button>
+              <button type="button" data-action="ignore">Ignore</button>
+              <button type="button" id="pet-reset-button">Reset</button>
+            </div>
+            <section class="result-band" aria-live="polite">
+              <div>
+                <span>last action</span>
+                <strong id="pet-action-display">...</strong>
+              </div>
+              <div>
+                <span>trace</span>
+                <strong id="pet-trace-display">happy</strong>
+              </div>
+            </section>
+          </section>
         </section>
 
         <section class="details">
