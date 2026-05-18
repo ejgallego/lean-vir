@@ -1,5 +1,5 @@
 {
-  "name": "lean-ir-wasi-poc",
+  "name": "lean-vir",
   "version": "0.1.0",
   "private": true,
   "type": "module",

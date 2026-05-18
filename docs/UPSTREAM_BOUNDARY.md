@@ -2,7 +2,7 @@
 
 The demo goal is to compile Lean's real `src/library/ir_interpreter.cpp` for
 `wasm32-wasip1` and then supply only the runtime and environment surface needed
-for a small example such as `fib`.
+for small browser examples such as `fib` and `Tamagotchi.step`.
 
 Run the boundary probe with:
 
@@ -15,8 +15,8 @@ The generated report is written to `build/upstream-probe/boundary.md`.
 Current status: the strict `wasm32-wasip1` link succeeds with the real upstream
 `ir_interpreter.cpp`, the linked Lean runtime subset, and
 `wasm/upstream_shim/`. The static demo closure is supplied as real Lean IR
-declaration objects, and `vir_upstream_fib` executes that closure through the
-real upstream interpreter.
+declaration objects, and the exported demo functions execute that closure
+through the real upstream interpreter.
 
 ## Policy
 
@@ -27,7 +27,7 @@ real upstream interpreter.
   stubs.
 - Do not model the demo interpreter with a parallel bespoke IR schema.
 - Provide real Lean IR declaration objects through `lean_ir_find_env_decl`.
-- Stub only runtime/library pieces that the `fib` path does not execute.
+- Stub only runtime/library pieces that the current demo paths do not execute.
 - Leave native symbol lookup unsupported until we need compiled externs.
 
 ## Linked Runtime
@@ -91,9 +91,9 @@ no longer uses a parallel C/C++ interpreter schema.
 ## Static Closure Strategy
 
 For the demo, we will statically load the transitive declaration closure needed
-by `fib` rather than loading Lean module data. This keeps `.olean` loading,
-module initialization, and full environment construction out of scope while
-still exercising the real upstream interpreter over real Lean IR objects.
+by the examples rather than loading Lean module data. This keeps `.olean`
+loading, module initialization, and full environment construction out of scope
+while still exercising the real upstream interpreter over real Lean IR objects.
 
 The current arithmetic closure uses a static Peano-shaped Nat representation:
 `zero` is scalar constructor tag `0`, and `succ` is a constructor object with tag
@@ -109,7 +109,7 @@ without changing `ir_interpreter.cpp` or the WASI/platform shim.
 
 ## Current Boundary
 
-The remaining gap is fidelity, not execution. The demo arithmetic bodies are
-static IR bodies tailored to the closure needed by `fib`; they are not loaded
-from Lean's generated `Init.ir` module data. A later provider can replace this
+The remaining gap is fidelity, not execution. The demo bodies are static IR
+bodies tailored to the closure needed by the current examples; they are not
+loaded from Lean's generated module data. A later provider can replace this
 static closure with generated module data behind `decl_provider.h`.
