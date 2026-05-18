@@ -1,7 +1,7 @@
-# Lean IR WASI POC
+# Lean VIR
 
-This repository is a proof of concept for running a Lean 4 IR-shaped `fib`
-program from WebAssembly in the browser.
+Lean VIR is a proof of concept for running Lean 4 IR-shaped programs from
+WebAssembly in the browser.
 
 The target Lean toolchain is pinned to `leanprover/lean4:v4.30.0-rc2`.
 The browser demo loads a `wasm32` module with a WASI Preview 1 import namespace
@@ -20,6 +20,15 @@ and calls `vir_fib`.
 
 The WAT fallback exists because this machine currently has Lean's bundled Clang
 with a wasm backend but not `wasm-ld` or a WASI sysroot.
+
+## Status
+
+The current runnable milestone is a browser and Node smoke test for the Lean IR
+shape emitted by `examples/Fib.lean`.
+
+This is not yet a full upstream Lean IR interpreter port. The next milestone is
+to stage Lean's `src/library/ir_interpreter.cpp` and enough runtime support from
+Lean `v4.30.0-rc2` into the strict `wasm32-wasi` build.
 
 ## Quick Start
 
@@ -53,4 +62,3 @@ created at `.vir.git`; use:
 ```bash
 git --git-dir=.vir.git --work-tree=. status
 ```
-
