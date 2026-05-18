@@ -16,6 +16,9 @@ and calls `vir_fib`.
   the strict C/WASI path.
 - `wasm/interpreter_port/` is the first upstream-shaped interpreter harness. It
   evaluates generated `FnBody`/`Expr`/`Arg` fixtures instead of bytecode.
+- `scripts/build-upstream-probe.sh` compiles Lean's real
+  `src/library/ir_interpreter.cpp` for WASI and writes an unresolved-boundary
+  report.
 - `wasm/runner.wat` is a checked-in runnable fallback used when `wasm-ld` or a
   WASI SDK is not available locally.
 - `web/` is the browser harness.
@@ -40,6 +43,7 @@ npm run build
 npm test
 npm run test:wasi
 npm run test:interp
+npm run probe:upstream
 npm run dev
 ```
 
@@ -84,6 +88,17 @@ This path keeps native fallback, dynlibs, libuv, threads, and `.olean` loading
 disabled. It feeds generated Lean IR tree fixtures to an evaluator with the
 same core concepts as Lean's upstream interpreter: declaration lookup, function
 bodies, expressions, arguments, cases, and stack slots.
+
+Track the boundary for compiling the real upstream interpreter file:
+
+```bash
+npm run probe:upstream
+```
+
+The report is written to `build/upstream-probe/boundary.md`. The policy for the
+demo is to keep `ir_interpreter.cpp` unmodified, provide real Lean IR
+declaration objects through `lean_ir_find_env_decl`, and stub only unused
+runtime/library pieces as the fib path needs them.
 
 ## Git Note
 

@@ -25,6 +25,14 @@ Run the first fixture-backed interpreter harness:
 npm run test:interp
 ```
 
+Track the unresolved boundary for compiling the exact upstream interpreter file:
+
+```bash
+npm run probe:upstream
+```
+
+The generated report is written to `build/upstream-probe/boundary.md`.
+
 ## Initial Port Shape
 
 - Keep the browser ABI stable: `vir_fib`, `vir_target_pointer_bytes`,
@@ -51,6 +59,18 @@ as generated fixtures:
 The next increment is replacing the handwritten fixture schema with target-safe
 construction of the actual Lean runtime object shape used by
 `src/library/ir_interpreter.cpp`.
+
+## Real Upstream File
+
+`scripts/build-upstream-probe.sh` compiles
+`third_party/lean4-src/src/library/ir_interpreter.cpp` without modifying it. The
+strict link is expected to fail at first; its unresolved symbols are the tracked
+boundary for the WASI demo.
+
+The intended adapter surface is `lean_ir_find_env_decl`: it should return real
+Lean `Option decl` values whose constructors match the accessors in upstream
+`ir_interpreter.cpp`. This lets the demo feed fixture-backed IR declarations
+without porting full `.olean` loading or a complete elaboration environment.
 
 ## Current Known Hotspots
 

@@ -17,6 +17,7 @@ This repository is a proof of concept for running Lean 4 IR-shaped programs in
 - `npm run build`
 - `npm run build:wasi`
 - `npm run build:interp`
+- `npm run probe:upstream`
 - `npm test`
 - `npm run test:wasi`
 - `npm run test:interp`

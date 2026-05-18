@@ -9,6 +9,7 @@
     "build:wat": "bash scripts/build-wat.sh",
     "build:wasi": "bash scripts/build-wasi.sh",
     "build:interp": "bash scripts/build-interp.sh",
+    "probe:upstream": "bash scripts/build-upstream-probe.sh",
     "build": "npm run export:ir && npm run build:wat",
     "test": "npm run build && node scripts/smoke_node.mjs",
     "test:wasi": "npm run export:ir && npm run build:wasi && node scripts/smoke_node.mjs",
