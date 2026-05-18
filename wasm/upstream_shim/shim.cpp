@@ -3,6 +3,7 @@
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
+#include <string.h>
 
 #include <initializer_list>
 #include <string>
@@ -20,7 +21,37 @@
 #include "util/option_declarations.h"
 #include "util/options.h"
 
-extern "C" void * dlsym(void *, char const *) {
+extern "C" lean_object * lean_nat_add___boxed(lean_object * a, lean_object * b) {
+    lean_object * result = lean_nat_add(a, b);
+    lean_dec(a);
+    lean_dec(b);
+    return result;
+}
+
+extern "C" lean_object * lean_nat_sub___boxed(lean_object * a, lean_object * b) {
+    lean_object * result = lean_nat_sub(a, b);
+    lean_dec(a);
+    lean_dec(b);
+    return result;
+}
+
+extern "C" lean_object * lean_nat_dec_eq___boxed(lean_object * a, lean_object * b) {
+    uint8_t result = lean_nat_dec_eq(a, b);
+    lean_dec(a);
+    lean_dec(b);
+    return lean_box(result);
+}
+
+extern "C" void * dlsym(void *, char const * sym) {
+    if (strcmp(sym, "lean_nat_add___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_nat_add___boxed);
+    }
+    if (strcmp(sym, "lean_nat_sub___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_nat_sub___boxed);
+    }
+    if (strcmp(sym, "lean_nat_dec_eq___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_nat_dec_eq___boxed);
+    }
     return nullptr;
 }
 
@@ -81,6 +112,19 @@ static uint32_t run_tagged_function(name const & fn, unsigned n, object ** args)
     uint32_t out = static_cast<uint32_t>(lean_obj_tag(result));
     lean_dec(result);
     return out;
+}
+
+static char const * known_symbol_stem(name const & n) {
+    if (n == name({ "Nat", "add" })) {
+        return "lean_nat_add";
+    }
+    if (n == name({ "Nat", "sub" })) {
+        return "lean_nat_sub";
+    }
+    if (n == name({ "Nat", "decEq" })) {
+        return "lean_nat_dec_eq";
+    }
+    return nullptr;
 }
 
 } // namespace
@@ -166,12 +210,20 @@ extern "C" lean::object * lean_get_export_name_for(lean::object *, lean::object 
     return lean_box(0);
 }
 
-extern "C" lean::obj_res lean_get_symbol_stem(lean::obj_arg, lean::obj_arg) {
-    return lean_mk_string("");
+extern "C" lean::obj_res lean_get_symbol_stem(lean::obj_arg env, lean::obj_arg fn) {
+    lean_dec(env);
+    lean::name n(fn);
+    if (char const * stem = lean::known_symbol_stem(n)) {
+        return lean_mk_string(stem);
+    }
+    std::string fallback = n.to_string();
+    return lean_mk_string(fallback.c_str());
 }
 
 extern "C" lean::obj_res lean_mk_mangled_boxed_name(lean::obj_arg str) {
-    return str;
+    lean::string_ref stem(str);
+    std::string boxed = stem.to_std_string() + "___boxed";
+    return lean_mk_string(boxed.c_str());
 }
 
 extern "C" double lean_float_of_nat(lean_obj_arg a) {
@@ -228,4 +280,17 @@ extern "C" uint32_t vir_upstream_tamagotchi_step(uint32_t mood, uint32_t action)
     lean::object * action_obj = lean_box(action);
     lean::object * args[] = { mood_obj, action_obj };
     return lean::run_tagged_function(lean::name({ "Tamagotchi", "step" }), 2, args);
+}
+
+extern "C" uint32_t vir_upstream_tamagotchi_run_demo(void) {
+    lean::ensure_ir_interpreter_initialized();
+    lean::elab_environment env(lean_box(0));
+    lean::options opts(lean_box(0));
+    lean::object * script = lean::ir::run_boxed(env, opts, lean::name({ "Tamagotchi", "demoScript" }), 0, nullptr);
+    lean::object * initial = lean_box(0);
+    lean::object * args[] = { initial, script };
+    lean::object * result = lean::ir::run_boxed(env, opts, lean::name({ "Tamagotchi", "run" }), 2, args);
+    uint32_t out = static_cast<uint32_t>(lean_obj_tag(result));
+    lean_dec(result);
+    return out;
 }

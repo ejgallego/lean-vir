@@ -44,9 +44,9 @@ and deploys the static site artifact.
 
 - `wasm/upstream_shim/` supplies the current WASI boundary for Lean's real
   upstream interpreter.
-- `wasm/upstream_shim/static_decl_provider.cpp` statically loads the demo
-  declaration closure for `fib`, `fib._boxed`, `Nat.add`, `Nat.sub`,
-  `Nat.decEq`, and `Tamagotchi.step`.
+- `tools/GenerateProvider.lean` elaborates the demo Lean sources, walks the
+  typed `Lean.IR.Decl` closure, and emits
+  `build/generated/static_decl_provider.generated.cpp`.
 - `scripts/build-upstream-probe.sh` compiles and links the upstream
   interpreter, writes `build/upstream-probe/boundary.md`, and copies the strict
   artifact to `web/public/vir-upstream.wasm`.
@@ -62,6 +62,12 @@ closure instead of loading `Init.ir` or `.olean` module data.
 The static closure is isolated behind `decl_provider.h` so a future provider
 can become more faithful without changing the upstream interpreter or platform
 shim.
+
+The build caches the upstream interpreter, Lean runtime, support, and shim
+objects under `build/upstream-probe/obj`. Updating the Lean examples regenerates
+the provider and relinks the WASM artifact, but does not recompile
+`ir_interpreter.cpp` unless the upstream source, compiler flags, or runtime
+overlay change.
 
 ## Generated Artifacts
 

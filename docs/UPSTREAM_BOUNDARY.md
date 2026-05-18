@@ -28,7 +28,8 @@ through the real upstream interpreter.
 - Do not model the demo interpreter with a parallel bespoke IR schema.
 - Provide real Lean IR declaration objects through `lean_ir_find_env_decl`.
 - Stub only runtime/library pieces that the current demo paths do not execute.
-- Leave native symbol lookup unsupported until we need compiled externs.
+- Keep general native symbol lookup unsupported; register only the demo externs
+  that are needed by the current closure.
 
 ## Linked Runtime
 
@@ -51,15 +52,16 @@ The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
 
 - `shim.cpp` owns WASI/platform stubs and the exported Lean C hooks.
-- `static_decl_provider.cpp` owns the statically loaded demo declaration
-  closure.
+- `tools/GenerateProvider.lean` owns extraction of the statically loaded demo
+  declaration closure from typed `Lean.IR.Decl` values.
 - `decl_provider.h` is the replacement point for a future module-backed
   provider.
 
 Together they supply:
 
-- `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` for `fib`,
-  `fib._boxed`, `Nat.add`, `Nat.sub`, `Nat.decEq`, and `Tamagotchi.step`.
+- `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` for the generated
+  demo closure, including `fib`, `Tamagotchi.step`, `Tamagotchi.run`,
+  `Tamagotchi.trace`, `Tamagotchi.demoScript`, and their current dependencies.
 - small WASI/platform stubs for dynamic symbol lookup, C++ exception throwing,
   trace/time/options hooks, and the few environment helpers pulled in by the
   interpreter.
@@ -69,6 +71,12 @@ The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
 disabled. The pinned Lean source checkout contains the runtime sources but does
 not include vendored mimalloc sources for a WASI rebuild, so this selects Lean's
 ordinary allocator path while still compiling Lean's real runtime code.
+
+The build compiles stable sources into cached objects under
+`build/upstream-probe/obj`. Example edits regenerate the provider and relink the
+WASM artifact, but they do not recompile the upstream interpreter or linked
+runtime objects unless their sources, compiler flags, Lean source commit, or the
+runtime config overlay change.
 
 ## Real IR Declarations
 
@@ -95,21 +103,35 @@ by the examples rather than loading Lean module data. This keeps `.olean`
 loading, module initialization, and full environment construction out of scope
 while still exercising the real upstream interpreter over real Lean IR objects.
 
-The current arithmetic closure uses a static Peano-shaped Nat representation:
-`zero` is scalar constructor tag `0`, and `succ` is a constructor object with tag
-`1` and one predecessor field. This keeps the arithmetic bodies expressible in
-ordinary IR using `case`, `proj`, recursive `FAp`, and `ctor`, while avoiding
-native lookup and the full Lean module loader.
+The closure is extracted by `tools/GenerateProvider.lean` from the real
+`Lean.IR.Decl` values produced for the example sources. The generator walks
+`FAp`/`PAP` references to include the transitive local closure, then emits C++
+fixture construction for the upstream interpreter's expected object layout.
+`Nat.add`, `Nat.sub`, and `Nat.decEq` remain explicit native externs backed by a
+small shim registry; a full native symbol loader is still out of scope.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
-`decl_provider.h`. Today that provider is backed by C++ fixture construction.
-Later it can be backed by generated module data or a real environment loader
-without changing `ir_interpreter.cpp` or the WASI/platform shim.
+`decl_provider.h`. Today that provider is backed by generated C++ fixture
+construction emitted by a Lean extractor. Later it can be backed by generated
+module data or a real environment loader without changing `ir_interpreter.cpp`
+or the WASI/platform shim.
 
 ## Current Boundary
 
-The remaining gap is fidelity, not execution. The demo bodies are static IR
-bodies tailored to the closure needed by the current examples; they are not
-loaded from Lean's generated module data. A later provider can replace this
-static closure with generated module data behind `decl_provider.h`.
+The remaining gap is fidelity, not execution. The demo bodies now come from the
+real Lean compiler IR for the example sources, but they are still statically
+embedded instead of loaded from Lean's generated module data. A later provider
+can replace this static closure with generated module data behind
+`decl_provider.h`.
+
+## Future Loading Path
+
+The next compatibility step is to stop compiling the generated provider as C++
+and instead load an IR package as data. The stable WASM artifact would export a
+small loader such as `vir_load_ir_package(ptr, len)`, and `decl_provider.h`
+would serve `lean_ir_find_env_decl` from that decoded package. The Lean
+extractor can keep owning the typed `Lean.IR.Decl` traversal, but emit a compact
+data format rather than C++ fixture construction. At that point editing examples
+would only update a data asset, and the WASM interpreter artifact would remain
+unchanged.

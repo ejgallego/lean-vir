@@ -27,6 +27,9 @@ if (typeof exports.vir_upstream_fib !== "function") {
 if (typeof exports.vir_upstream_tamagotchi_step !== "function") {
   throw new Error("vir_upstream_tamagotchi_step export is missing");
 }
+if (typeof exports.vir_upstream_tamagotchi_run_demo !== "function") {
+  throw new Error("vir_upstream_tamagotchi_run_demo export is missing");
+}
 if (exports.vir_upstream_target_pointer_bytes() !== 4) {
   throw new Error("upstream wasm target layout guard failed");
 }
@@ -93,4 +96,9 @@ if (trace.join(",") !== expectedTrace.join(",")) {
   throw new Error(`upstream Tamagotchi trace: expected ${expectedTrace}, got ${trace}`);
 }
 
-console.log("upstream smoke ok: fib 17 = 1597, Tamagotchi demo trace ends angry");
+const runDemo = exports.vir_upstream_tamagotchi_run_demo();
+if (runDemo !== mood.angry) {
+  throw new Error(`upstream Tamagotchi.run demoScript: expected ${mood.angry}, got ${runDemo}`);
+}
+
+console.log("upstream smoke ok: fib 17 = 1597, Tamagotchi step/run demos end angry");
