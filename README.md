@@ -14,6 +14,8 @@ and calls `vir_fib`.
   generated IR, and emits a small bytecode fixture for the runner.
 - `wasm/runner.c` is the freestanding `wasm32-wasi` bytecode runner intended for
   the strict C/WASI path.
+- `wasm/interpreter_port/` is the first upstream-shaped interpreter harness. It
+  evaluates generated `FnBody`/`Expr`/`Arg` fixtures instead of bytecode.
 - `wasm/runner.wat` is a checked-in runnable fallback used when `wasm-ld` or a
   WASI SDK is not available locally.
 - `web/` is the browser harness.
@@ -37,6 +39,7 @@ npm install
 npm run build
 npm test
 npm run test:wasi
+npm run test:interp
 npm run dev
 ```
 
@@ -68,6 +71,19 @@ By default the installer pins `wasi-sdk-33.0-x86_64-linux.tar.gz` from
 
 Override the compiler target with `WASI_TARGET`; the default is
 `wasm32-wasip1`, the current spelling for WASI Preview 1.
+
+## Interpreter Port Harness
+
+Build and test the first upstream-shaped interpreter harness:
+
+```bash
+npm run test:interp
+```
+
+This path keeps native fallback, dynlibs, libuv, threads, and `.olean` loading
+disabled. It feeds generated Lean IR tree fixtures to an evaluator with the
+same core concepts as Lean's upstream interpreter: declaration lookup, function
+bodies, expressions, arguments, cases, and stack slots.
 
 ## Git Note
 

@@ -16,8 +16,10 @@ This repository is a proof of concept for running Lean 4 IR-shaped programs in
 - `npm run install:wasi`
 - `npm run build`
 - `npm run build:wasi`
+- `npm run build:interp`
 - `npm test`
 - `npm run test:wasi`
+- `npm run test:interp`
 - `npm run dev -- --port 5173`
 
 ## Git Layout
