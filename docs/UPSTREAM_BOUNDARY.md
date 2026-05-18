@@ -14,8 +14,8 @@ The generated report is written to `build/upstream-probe/boundary.md`.
 
 Current status: the strict `wasm32-wasip1` link succeeds with the real upstream
 `ir_interpreter.cpp`, the linked Lean runtime subset, and
-`wasm/upstream_shim/shim.cpp`. The remaining boundary is semantic: the `fib`
-fixture is supplied as real Lean IR declaration objects, while its arithmetic
+`wasm/upstream_shim/`. The remaining boundary is semantic: the static demo
+closure is supplied as real Lean IR declaration objects, while its arithmetic
 dependencies are still represented as unresolved-at-runtime IR `Extern`
 declarations.
 
@@ -48,8 +48,16 @@ The probe links these upstream runtime sources:
 It also links `src/util/name.cpp`, which is not runtime proper but is needed by
 the interpreter's name formatting and diagnostics.
 
-The probe additionally links `wasm/upstream_shim/shim.cpp`. This is local demo
-code, not a fork of Lean. It supplies:
+The probe additionally links `wasm/upstream_shim/`. This is local demo code,
+not a fork of Lean. It is split by responsibility:
+
+- `shim.cpp` owns WASI/platform stubs and the exported Lean C hooks.
+- `static_decl_provider.cpp` owns the statically loaded demo declaration
+  closure.
+- `decl_provider.h` is the replacement point for a future module-backed
+  provider.
+
+Together they supply:
 
 - `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` for `fib`,
   `fib._boxed`, `Nat.add`, `Nat.sub`, and `Nat.decEq`.
@@ -80,6 +88,19 @@ return `Option decl` values using the same constructor layout:
 
 This is the main difference from the first harness in `wasm/interpreter_port/`,
 which intentionally used a smaller C++ fixture schema.
+
+## Static Closure Strategy
+
+For the demo, we will statically load the transitive declaration closure needed
+by `fib` rather than loading Lean module data. This keeps `.olean` loading,
+module initialization, and full environment construction out of scope while
+still exercising the real upstream interpreter over real Lean IR objects.
+
+The boundary between the two approaches is intentionally narrow:
+`lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
+`decl_provider.h`. Today that provider is backed by C++ fixture construction.
+Later it can be backed by generated module data or a real environment loader
+without changing `ir_interpreter.cpp` or the WASI/platform shim.
 
 ## Next Boundary
 

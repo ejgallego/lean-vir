@@ -77,6 +77,7 @@ support_sources=(
 
 shim_sources=(
   "wasm/upstream_shim/shim.cpp"
+  "wasm/upstream_shim/static_decl_provider.cpp"
 )
 
 link_sources=(
@@ -256,8 +257,9 @@ shim_source_count="${#shim_sources[@]}"
   echo "## Current Shim Scope"
   echo
   echo "\`wasm/upstream_shim/shim.cpp\` supplies the minimal host/environment"
-  echo "boundary for the strict WASI link and a fixture-backed declaration provider"
-  echo "for \`fib\`, \`fib._boxed\`, \`Nat.add\`, \`Nat.sub\`, and \`Nat.decEq\`."
+  echo "boundary for the strict WASI link. \`static_decl_provider.cpp\` supplies"
+  echo "the statically loaded demo declaration closure for \`fib\`, \`fib._boxed\`,"
+  echo "\`Nat.add\`, \`Nat.sub\`, and \`Nat.decEq\`."
   echo "The arithmetic declarations are represented as real IR \`Extern\`"
   echo "declarations; their implementations remain the next boundary before the"
   echo "real upstream interpreter can execute the fixture end to end."

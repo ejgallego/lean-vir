@@ -19,6 +19,9 @@ and calls `vir_fib`.
 - `wasm/upstream_shim/` is the current WASI boundary shim for Lean's real
   upstream interpreter. It supplies fixture-backed real Lean IR declaration
   objects and stubs platform/library pieces that the demo path should not use.
+  The static declaration closure is isolated behind `decl_provider.h` so a
+  future module-backed provider can replace it without touching the upstream
+  interpreter or platform shim.
 - `scripts/build-upstream-probe.sh` compiles Lean's real
   `src/library/ir_interpreter.cpp`, links viable Lean runtime sources for WASI,
   and writes an unresolved-boundary report.
@@ -108,6 +111,10 @@ path needs them.
 At this point the strict upstream probe links. The active boundary is that
 `Nat.add`, `Nat.sub`, and `Nat.decEq` are present as real IR `Extern`
 declarations but do not yet have non-native WASI implementations.
+
+The intended demo path is to keep loading the needed declaration closure
+statically. That keeps the POC small while preserving a clear future path toward
+a more faithful provider that reads real module data.
 
 ## Git Note
 

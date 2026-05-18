@@ -70,18 +70,24 @@ construction of the actual Lean runtime object shape used by
 `scripts/build-upstream-probe.sh` compiles
 `third_party/lean4-src/src/library/ir_interpreter.cpp` without modifying it and
 links the real Lean runtime sources that are viable in the strict WASI probe.
-The strict link now succeeds with `wasm/upstream_shim/shim.cpp`.
+The strict link now succeeds with `wasm/upstream_shim/`.
 
 The intended adapter surface is `lean_ir_find_env_decl`: it should return real
 Lean `Option decl` values whose constructors match the accessors in upstream
 `ir_interpreter.cpp`. This lets the demo feed fixture-backed IR declarations
 without porting full `.olean` loading or a complete elaboration environment.
 
-The shim currently returns real IR declarations for `fib`, `fib._boxed`,
-`Nat.add`, `Nat.sub`, and `Nat.decEq`. The `fib` declarations have function
-bodies matching `examples/Fib.lean`; the arithmetic declarations are still
-`Extern` placeholders and should be replaced with real IR bodies before claiming
-upstream execution of the example.
+The shim exports the Lean C hooks, but the demo declaration closure is isolated
+in `static_decl_provider.cpp` behind `decl_provider.h`. It currently returns
+real IR declarations for `fib`, `fib._boxed`, `Nat.add`, `Nat.sub`, and
+`Nat.decEq`. The `fib` declarations have function bodies matching
+`examples/Fib.lean`; the arithmetic declarations are still `Extern`
+placeholders and should be replaced with real IR bodies before claiming upstream
+execution of the example.
+
+This keeps the demo path static and small while leaving a clear future seam for
+a more faithful provider that reads generated module data or a real Lean
+environment.
 
 ## Current Known Hotspots
 

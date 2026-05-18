@@ -45,3 +45,6 @@ In a normal checkout from GitHub, use ordinary `git` commands.
   `ir_interpreter.cpp` path is linked and execution-tested under `wasm32-wasi`.
 - Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified. Put
   demo-only WASI stubs and fixture providers under `wasm/upstream_shim/`.
+- Keep the static declaration provider behind `wasm/upstream_shim/decl_provider.h`;
+  future module-backed loading should replace that provider, not the upstream
+  interpreter or the platform shim.
