@@ -17,8 +17,8 @@ and calls `vir_fib`.
 - `wasm/interpreter_port/` is the first upstream-shaped interpreter harness. It
   evaluates generated `FnBody`/`Expr`/`Arg` fixtures instead of bytecode.
 - `scripts/build-upstream-probe.sh` compiles Lean's real
-  `src/library/ir_interpreter.cpp` for WASI and writes an unresolved-boundary
-  report.
+  `src/library/ir_interpreter.cpp`, links viable Lean runtime sources for WASI,
+  and writes an unresolved-boundary report.
 - `wasm/runner.wat` is a checked-in runnable fallback used when `wasm-ld` or a
   WASI SDK is not available locally.
 - `web/` is the browser harness.
@@ -96,9 +96,10 @@ npm run probe:upstream
 ```
 
 The report is written to `build/upstream-probe/boundary.md`. The policy for the
-demo is to keep `ir_interpreter.cpp` unmodified, provide real Lean IR
-declaration objects through `lean_ir_find_env_decl`, and stub only unused
-runtime/library pieces as the fib path needs them.
+demo is to keep `ir_interpreter.cpp` unmodified, link Lean's real runtime
+sources first, provide real Lean IR declaration objects through
+`lean_ir_find_env_decl`, and stub only unused runtime/library pieces as the fib
+path needs them.
 
 ## Git Note
 

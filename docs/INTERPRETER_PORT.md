@@ -63,9 +63,10 @@ construction of the actual Lean runtime object shape used by
 ## Real Upstream File
 
 `scripts/build-upstream-probe.sh` compiles
-`third_party/lean4-src/src/library/ir_interpreter.cpp` without modifying it. The
-strict link is expected to fail at first; its unresolved symbols are the tracked
-boundary for the WASI demo.
+`third_party/lean4-src/src/library/ir_interpreter.cpp` without modifying it and
+links the real Lean runtime sources that are viable in the strict WASI probe.
+The strict link is expected to fail at first; its unresolved symbols are the
+tracked boundary for the WASI demo.
 
 The intended adapter surface is `lean_ir_find_env_decl`: it should return real
 Lean `Option decl` values whose constructors match the accessors in upstream
