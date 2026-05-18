@@ -35,6 +35,7 @@ In a normal checkout from GitHub, use ordinary `git` commands.
 
 - Keep generated `build/` outputs out of Git.
 - `web/public/vir-upstream.wasm` is generated and should not be committed.
+- The current browser demo input range is `0..17`.
 - Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified.
 - Put demo-only WASI stubs and fixture providers under `wasm/upstream_shim/`.
 - Keep the static declaration provider behind `wasm/upstream_shim/decl_provider.h`;

@@ -33,6 +33,8 @@ const cases = [
   [1, 1],
   [8, 21],
   [10, 55],
+  [12, 144],
+  [17, 1597],
 ];
 
 for (const [input, expected] of cases) {
@@ -42,4 +44,4 @@ for (const [input, expected] of cases) {
   }
 }
 
-console.log("upstream smoke ok: fib 8 = 21, fib 10 = 55");
+console.log("upstream smoke ok: fib 12 = 144, fib 17 = 1597");

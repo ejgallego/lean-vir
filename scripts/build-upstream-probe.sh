@@ -29,6 +29,8 @@ fi
 
 lean_prefix="${LEAN_PREFIX:-$(lean --print-prefix)}"
 target="${WASI_TARGET:-wasm32-wasip1}"
+wasm_initial_memory="${VIR_WASM_INITIAL_MEMORY:-4194304}"
+wasm_stack_size="${VIR_WASM_STACK_SIZE:-1048576}"
 upstream="$src/src/library/ir_interpreter.cpp"
 overlay_include="$out/include"
 obj="$out/ir_interpreter.o"
@@ -102,6 +104,13 @@ common_flags=(
   -fdata-sections
 )
 
+link_flags=(
+  -Wl,--no-entry
+  -Wl,--gc-sections
+  "-Wl,--initial-memory=$wasm_initial_memory"
+  "-Wl,-z,stack-size=$wasm_stack_size"
+)
+
 exports=(
   -Wl,--export=lean_eval_const
   -Wl,--export=lean_eval_main
@@ -115,16 +124,14 @@ exports=(
 "$cxx" "${common_flags[@]}" -c "$upstream" -o "$obj"
 
 "$cxx" "${common_flags[@]}" "${link_sources[@]}" \
-  -Wl,--no-entry \
-  -Wl,--gc-sections \
+  "${link_flags[@]}" \
   -Wl,--allow-undefined \
   "${exports[@]}" \
   -o "$wasm"
 
 strict_status=0
 "$cxx" "${common_flags[@]}" "${link_sources[@]}" \
-  -Wl,--no-entry \
-  -Wl,--gc-sections \
+  "${link_flags[@]}" \
   -Wl,--error-limit=0 \
   "${exports[@]}" \
   -o "$strict_wasm" > "$strict_log" 2>&1 || strict_status=$?
@@ -184,6 +191,8 @@ shim_source_count="${#shim_sources[@]}"
   echo "- Upstream file: \`$upstream\`"
   echo "- WASI target: \`$target\`"
   echo "- Compiler: \`$cxx\`"
+  echo "- Initial wasm memory: $wasm_initial_memory bytes"
+  echo "- Wasm stack size: $wasm_stack_size bytes"
   echo "- Generated config overlay: \`$overlay_include/lean/config.h\`"
   echo "- Real Lean runtime sources linked: $runtime_source_count"
   echo "- Lean support sources linked: $support_source_count"

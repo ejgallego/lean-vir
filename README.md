@@ -59,6 +59,14 @@ interpreter artifact.
 
 The browser artifact is generated and should not be committed.
 
+The demo link currently gives the WASM module 4 MiB of initial memory and a
+1 MiB stack. Override those with `VIR_WASM_INITIAL_MEMORY` and
+`VIR_WASM_STACK_SIZE` when running `npm run build:demo`.
+
+The browser input is capped at `17` for the current static Peano arithmetic
+closure. Higher values still need either a more memory-efficient closure or a
+more faithful module/runtime path.
+
 By default the WASI installer pins `wasi-sdk-33.0-x86_64-linux.tar.gz` from
 `WebAssembly/wasi-sdk` and verifies its SHA-256 digest. Override with
 `WASI_SDK_VERSION`, `WASI_SDK_VERSION_FULL`, `WASI_SDK_ARCH`, `WASI_SDK_OS`, or

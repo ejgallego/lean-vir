@@ -8,7 +8,7 @@ const resultDisplay = document.querySelector("#result-display");
 const ptrWidth = document.querySelector("#ptr-width");
 const declCount = document.querySelector("#decl-count");
 const layoutGuard = document.querySelector("#layout-guard");
-const maxInput = 10;
+const maxInput = 17;
 
 async function instantiate(path) {
   const response = await fetch(path);
@@ -45,7 +45,16 @@ function render(exports) {
   const n = clampInput(Number(inputEl.value));
   inputEl.value = String(n);
   inputDisplay.textContent = String(n);
-  resultDisplay.textContent = String(exports.vir_upstream_fib(n));
+  try {
+    resultDisplay.textContent = String(exports.vir_upstream_fib(n));
+    statusEl.textContent = "Ready";
+    statusEl.dataset.ready = "true";
+  } catch (error) {
+    statusEl.textContent = "Trap";
+    statusEl.dataset.ready = "false";
+    resultDisplay.textContent = "error";
+    console.error(error);
+  }
 }
 
 try {

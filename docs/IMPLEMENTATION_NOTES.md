@@ -14,3 +14,8 @@ module data or a real environment loader.
 
 Generated artifacts live under `build/` and `web/public/vir-upstream.wasm`.
 They should not be committed.
+
+The demo artifact uses a bounded memory configuration: 4 MiB initial linear
+memory and a 1 MiB stack by default. This is enough for the current smoke range
+through `fib 17`; larger inputs still expose the cost of the static
+Peano-shaped arithmetic closure.
