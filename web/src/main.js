@@ -103,7 +103,7 @@ function resetPet() {
 }
 
 try {
-  const exports = await instantiate("/vir-upstream.wasm");
+  const exports = await instantiate(`${import.meta.env.BASE_URL}vir-upstream.wasm`);
   const pointerBytes = exports.vir_upstream_target_pointer_bytes();
 
   ptrWidth.textContent = `${pointerBytes} bytes`;

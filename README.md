@@ -31,6 +31,15 @@ npm run dev
 Open the Vite URL and the page should show both demos. `npm test` rebuilds the
 WASM artifact and runs the Node smoke test.
 
+## Hosted Demo
+
+Pushes to `main` deploy the browser demo to GitHub Pages:
+
+https://ejgallego.github.io/lean-vir/
+
+For local development, keep using `npm run dev`. The Pages workflow only builds
+and deploys the static site artifact.
+
 ## Repository Shape
 
 - `wasm/upstream_shim/` supplies the current WASI boundary for Lean's real
@@ -63,6 +72,9 @@ shim.
 - `web/public/vir-upstream.wasm`
 
 These generated files should not be committed.
+
+`npm run build:site` additionally writes `web/dist/`, which is also generated
+and should not be committed.
 
 The demo link uses 4 MiB of initial memory and a 1 MiB stack by default.
 Override those with `VIR_WASM_INITIAL_MEMORY` and `VIR_WASM_STACK_SIZE`.

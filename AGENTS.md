@@ -15,6 +15,7 @@ in `wasm32-wasip1`.
 - `npm run fetch:lean`
 - `npm run install:wasi`
 - `npm run build:demo`
+- `npm run build:site`
 - `npm run probe:upstream`
 - `npm test`
 - `npm run test:upstream`
@@ -34,6 +35,7 @@ In a normal checkout from GitHub, use ordinary `git` commands.
 ## Development Notes
 
 - Keep generated `build/` outputs out of Git.
+- Keep generated `web/dist/` outputs out of Git.
 - `web/public/vir-upstream.wasm` is generated and should not be committed.
 - The current browser `fib` input range is `0..17`.
 - Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified.

@@ -4,6 +4,7 @@
 build/
 third_party/lean4-src/
 node_modules/
+web/dist/
 web/public/*.wasm
 .npm-cache/
 npm-debug.log*

@@ -9,6 +9,7 @@
     "probe:upstream": "bash scripts/build-upstream-probe.sh",
     "build": "npm run build:demo",
     "build:demo": "npm run probe:upstream",
+    "build:site": "npm run build:demo && vite build web --base /lean-vir/",
     "test": "npm run test:upstream",
     "test:upstream": "npm run build:demo && node scripts/smoke_upstream.mjs",
     "dev": "vite web --host 127.0.0.1"
