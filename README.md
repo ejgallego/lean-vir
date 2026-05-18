@@ -1,82 +1,65 @@
 # Lean VIR
 
-Lean VIR is a proof of concept for running Lean 4 IR-shaped programs from
+Lean VIR is a proof of concept for running Lean 4's real IR interpreter from
 WebAssembly in the browser.
 
-The target Lean toolchain is pinned to `leanprover/lean4:v4.30.0-rc2`.
-The browser demo loads a `wasm32` module with a WASI Preview 1 import namespace
-and calls `vir_fib`.
+The target Lean toolchain is pinned to `leanprover/lean4:v4.30.0-rc2`. The
+browser demo loads a `wasm32-wasip1` module built from Lean's upstream
+`src/library/ir_interpreter.cpp` and calls `vir_upstream_fib`.
 
 ## Current Shape
 
 - `examples/Fib.lean` is the Lean source for the demo program.
-- `scripts/export_ir.py` runs Lean with `trace.compiler.ir.result`, records the
-  generated IR, and emits a small bytecode fixture for the runner.
-- `wasm/runner.c` is the freestanding `wasm32-wasi` bytecode runner intended for
-  the strict C/WASI path.
-- `wasm/interpreter_port/` is the first upstream-shaped interpreter harness. It
-  evaluates generated `FnBody`/`Expr`/`Arg` fixtures instead of bytecode.
-- `wasm/upstream_shim/` is the current WASI boundary shim for Lean's real
-  upstream interpreter. It supplies fixture-backed real Lean IR declaration
-  objects and stubs platform/library pieces that the demo path should not use.
-  The static declaration closure is isolated behind `decl_provider.h` so a
-  future module-backed provider can replace it without touching the upstream
-  interpreter or platform shim.
+- `wasm/upstream_shim/` supplies the current WASI boundary for Lean's real
+  upstream interpreter. It provides fixture-backed Lean IR declaration objects
+  and stubs platform/library pieces that the demo path should not execute.
+- `wasm/upstream_shim/decl_provider.h` is the replacement point for a future
+  module-backed provider. The current provider statically loads the declaration
+  closure for `fib`, `fib._boxed`, `Nat.add`, `Nat.sub`, and `Nat.decEq`.
 - `scripts/build-upstream-probe.sh` compiles Lean's real
-  `src/library/ir_interpreter.cpp`, links viable Lean runtime sources for WASI,
-  and writes an unresolved-boundary report.
-- `wasm/runner.wat` is a checked-in runnable fallback used when `wasm-ld` or a
-  WASI SDK is not available locally.
+  `src/library/ir_interpreter.cpp`, links the viable Lean runtime sources for
+  WASI, writes `build/upstream-probe/boundary.md`, and copies the strict wasm to
+  `web/public/vir-upstream.wasm`.
+- `scripts/smoke_upstream.mjs` executes the generated browser artifact in Node.
 - `web/` is the browser harness.
-
-The WAT fallback exists because this machine currently has Lean's bundled Clang
-with a wasm backend but not `wasm-ld` or a WASI sysroot.
 
 ## Status
 
-The current runnable milestone is a browser and Node smoke test for the Lean IR
-shape emitted by `examples/Fib.lean`.
+The current runnable milestone executes `fib` through Lean's real
+`ir_interpreter.cpp` in both Node and the browser. The strict WASI link closes
+with zero unresolved symbols.
 
-This is not a full upstream Lean module/environment port. The current upstream
-milestone does execute the demo `fib` through Lean's real `ir_interpreter.cpp`
-using a statically loaded declaration closure. The strict link closes with zero
-unresolved symbols.
+This is not yet a full upstream Lean module/environment port. The demo uses a
+statically loaded declaration closure instead of loading `Init.ir` or `.olean`
+module data. The static closure is intentionally isolated behind
+`decl_provider.h` so a later provider can become more faithful without changing
+the upstream interpreter or platform shim.
 
 ## Quick Start
 
 ```bash
 npm install
-npm run build
+npm run fetch:lean
+npm run install:wasi
+npm run build:demo
 npm test
-npm run test:wasi
-npm run test:interp
-npm run test:upstream
-npm run probe:upstream
 npm run dev
 ```
 
-Open the Vite URL and the page should report `fib 8 = 21`.
+Open the Vite URL and the page should report `fib 8 = 21` from the upstream
+interpreter artifact.
 
-## Strict WASI C Build
+## Demo Artifact
 
-Install a local WASI SDK into `.tools/`:
+`npm run build:demo` writes:
 
-```bash
-npm run install:wasi
-```
+- `build/upstream-probe/ir_interpreter.strict.wasm`
+- `build/upstream-probe/boundary.md`
+- `web/public/vir-upstream.wasm`
 
-Then build the strict C runner:
+The browser artifact is generated and should not be committed.
 
-```bash
-npm run export:ir
-npm run build:wasi
-npm run test:wasi
-```
-
-That compiles `wasm/runner.c` for `wasm32-wasip1` and writes
-`web/public/vir.wasm`.
-
-By default the installer pins `wasi-sdk-33.0-x86_64-linux.tar.gz` from
+By default the WASI installer pins `wasi-sdk-33.0-x86_64-linux.tar.gz` from
 `WebAssembly/wasi-sdk` and verifies its SHA-256 digest. Override with
 `WASI_SDK_VERSION`, `WASI_SDK_VERSION_FULL`, `WASI_SDK_ARCH`, `WASI_SDK_OS`, or
 `WASI_SDK_SHA256` if needed.
@@ -84,20 +67,9 @@ By default the installer pins `wasi-sdk-33.0-x86_64-linux.tar.gz` from
 Override the compiler target with `WASI_TARGET`; the default is
 `wasm32-wasip1`, the current spelling for WASI Preview 1.
 
-## Interpreter Port Harness
+## Upstream Boundary
 
-Build and test the first upstream-shaped interpreter harness:
-
-```bash
-npm run test:interp
-```
-
-This path keeps native fallback, dynlibs, libuv, threads, and `.olean` loading
-disabled. It feeds generated Lean IR tree fixtures to an evaluator with the
-same core concepts as Lean's upstream interpreter: declaration lookup, function
-bodies, expressions, arguments, cases, and stack slots.
-
-Track the boundary for compiling the real upstream interpreter file:
+Track the unresolved boundary with:
 
 ```bash
 npm run probe:upstream
@@ -109,20 +81,14 @@ sources first, provide real Lean IR declaration objects through
 `lean_ir_find_env_decl`, and stub only unused runtime/library pieces as the fib
 path needs them.
 
-At this point the strict upstream probe links and `npm run test:upstream`
-checks `vir_upstream_fib` from the upstream artifact. `Nat.add`, `Nat.sub`, and
-`Nat.decEq` are executable real IR function bodies over a static Peano-shaped
-Nat representation, not native lookup stubs.
-
-The intended demo path is to keep loading the needed declaration closure
-statically. That keeps the POC small while preserving a clear future path toward
-a more faithful provider that reads real module data.
+At this point `Nat.add`, `Nat.sub`, and `Nat.decEq` are executable real IR
+function bodies over a static Peano-shaped Nat representation, not native
+lookup stubs.
 
 ## Git Note
 
-The environment mounted an empty read-only `.git` directory in this workspace.
-That cannot be replaced from inside the sandbox. A usable bare Git directory was
-created at `.vir.git`; use:
+The initial sandbox mounted an empty read-only `.git` directory in this
+workspace. A usable bare Git directory was created at `.vir.git`; use:
 
 ```bash
 git --git-dir=.vir.git --work-tree=. status

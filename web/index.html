@@ -10,23 +10,27 @@
       <section class="workspace">
         <header class="topbar">
           <div>
-            <p class="eyebrow">Lean 4.30-rc2 / wasm32-wasi</p>
-            <h1>IR Fib Runner</h1>
+            <p class="eyebrow">Lean 4.30-rc2 / wasm32-wasip1</p>
+            <h1>IR Fib Demo</h1>
           </div>
           <div id="status" class="status">Loading WASM</div>
         </header>
 
         <section class="controls" aria-label="Fib controls">
           <label for="fib-input">Input</label>
-          <input id="fib-input" type="number" min="0" max="30" value="8" />
+          <input id="fib-input" type="number" min="0" max="10" value="8" />
           <button id="run-button" type="button">Run</button>
         </section>
 
         <section class="result-band" aria-live="polite">
-          <span>fib</span>
-          <strong id="input-display">8</strong>
-          <span>=</span>
-          <strong id="result-display">...</strong>
+          <div>
+            <span>input</span>
+            <strong id="input-display">8</strong>
+          </div>
+          <div>
+            <span>upstream interpreter</span>
+            <strong id="result-display">...</strong>
+          </div>
         </section>
 
         <section class="details">
@@ -35,8 +39,8 @@
             <strong id="ptr-width">...</strong>
           </div>
           <div>
-            <span>size_t width</span>
-            <strong id="size-width">...</strong>
+            <span>Static declarations</span>
+            <strong id="decl-count">...</strong>
           </div>
           <div>
             <span>Layout guard</span>
@@ -48,4 +52,3 @@
     <script type="module" src="/src/main.js"></script>
   </body>
 </html>
-

@@ -7,7 +7,7 @@ src="${LEAN4_SRC:-third_party/lean4-src}"
 out="build/upstream-probe"
 
 if [ ! -f "$src/src/library/ir_interpreter.cpp" ]; then
-  echo "error: Lean source not found at $src; run scripts/fetch-lean-source.sh first" >&2
+  echo "error: Lean source not found at $src; run npm run fetch:lean first" >&2
   exit 1
 fi
 
@@ -34,6 +34,7 @@ overlay_include="$out/include"
 obj="$out/ir_interpreter.o"
 wasm="$out/ir_interpreter.allow-undefined.wasm"
 strict_wasm="$out/ir_interpreter.strict.wasm"
+demo_wasm="web/public/vir-upstream.wasm"
 strict_log="$out/strict-link.log"
 import_section="$out/import-section.txt"
 env_imports="$out/env-imports.txt"
@@ -43,6 +44,7 @@ report="$out/boundary.md"
 
 mkdir -p "$out"
 mkdir -p "$overlay_include/lean"
+mkdir -p web/public
 
 cat > "$overlay_include/lean/config.h" <<'EOF'
 /*
@@ -127,6 +129,10 @@ strict_status=0
   "${exports[@]}" \
   -o "$strict_wasm" > "$strict_log" 2>&1 || strict_status=$?
 
+if [ "$strict_status" = "0" ]; then
+  cp "$strict_wasm" "$demo_wasm"
+fi
+
 if command -v wasm-objdump >/dev/null 2>&1; then
   wasm_objdump=wasm-objdump
 elif [ -x node_modules/.bin/wasm-objdump ]; then
@@ -135,7 +141,9 @@ else
   wasm_objdump=
 fi
 
+imports_collected=0
 if [ -n "$wasm_objdump" ]; then
+  imports_collected=1
   "$wasm_objdump" -x "$wasm" | sed -n '/^Import/,/^Function/p' > "$import_section"
   sed -n 's/^ - func.* <- env\.//p' "$import_section" | sort -u > "$env_imports"
   sed -n 's/^ - func.* <- wasi_snapshot_preview1\.//p' "$import_section" | sort -u > "$wasi_imports"
@@ -185,6 +193,9 @@ shim_source_count="${#shim_sources[@]}"
   echo
   echo "- Object: \`$obj\` (${object_bytes} bytes)"
   echo "- Allow-undefined wasm with runtime: \`$wasm\` (${wasm_bytes} bytes)"
+  if [ "$strict_status" = "0" ]; then
+    echo "- Browser demo wasm: \`$demo_wasm\`"
+  fi
   echo "- Strict link log: \`$strict_log\`"
   echo "- Strict link status: \`$strict_status\`"
   echo
@@ -216,8 +227,12 @@ shim_source_count="${#shim_sources[@]}"
   echo "## Boundary Summary"
   echo
   echo "- Strict unresolved symbols: $unresolved_count"
-  echo "- Imported \`env\` symbols in allow-undefined wasm: $env_import_count"
-  echo "- Imported WASI symbols in allow-undefined wasm: $wasi_import_count"
+  if [ "$imports_collected" = "1" ]; then
+    echo "- Imported \`env\` symbols in allow-undefined wasm: $env_import_count"
+    echo "- Imported WASI symbols in allow-undefined wasm: $wasi_import_count"
+  else
+    echo "- Allow-undefined import scan: not collected; \`wasm-objdump\` was not available"
+  fi
   echo
   echo "## Strict Unresolved Symbols"
   echo
@@ -231,7 +246,9 @@ shim_source_count="${#shim_sources[@]}"
   echo
   echo "## Allow-Undefined \`env\` Imports"
   echo
-  if [ "$env_import_count" = "0" ]; then
+  if [ "$imports_collected" != "1" ]; then
+    echo "Not collected; \`wasm-objdump\` was not available."
+  elif [ "$env_import_count" = "0" ]; then
     echo "None."
   else
     while IFS= read -r sym; do
@@ -241,7 +258,9 @@ shim_source_count="${#shim_sources[@]}"
   echo
   echo "## Allow-Undefined WASI Imports"
   echo
-  if [ "$wasi_import_count" = "0" ]; then
+  if [ "$imports_collected" != "1" ]; then
+    echo "Not collected; \`wasm-objdump\` was not available."
+  elif [ "$wasi_import_count" = "0" ]; then
     echo "None."
   else
     while IFS= read -r sym; do
@@ -268,4 +287,7 @@ shim_source_count="${#shim_sources[@]}"
 } > "$report"
 
 echo "wrote $report"
+if [ "$strict_status" = "0" ]; then
+  echo "wrote $demo_wasm"
+fi
 echo "strict unresolved symbols: $unresolved_count"

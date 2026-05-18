@@ -110,17 +110,32 @@ h1 {
 }
 
 .result-band {
-  display: flex;
-  align-items: baseline;
-  gap: 16px;
+  display: grid;
+  grid-template-columns: minmax(100px, 0.7fr) minmax(180px, 1fr);
+  gap: 1px;
   margin-top: 40px;
-  padding: 34px 0;
+  background: #d9ded2;
   border-top: 1px solid #d9ded2;
   border-bottom: 1px solid #d9ded2;
-  font-size: 2rem;
+}
+
+.result-band div {
+  min-height: 136px;
+  padding: 24px;
+  background: #ffffff;
+}
+
+.result-band span {
+  display: block;
+  color: #5f6f64;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-transform: uppercase;
 }
 
 .result-band strong {
+  display: block;
+  margin-top: 18px;
   font-size: 4rem;
   line-height: 1;
 }
@@ -170,17 +185,12 @@ h1 {
     grid-template-columns: 1fr;
   }
 
-  .result-band {
-    flex-wrap: wrap;
-    font-size: 1.4rem;
-  }
-
   .result-band strong {
     font-size: 3rem;
   }
 
+  .result-band,
   .details {
     grid-template-columns: 1fr;
   }
 }
-

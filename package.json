@@ -4,21 +4,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "export:ir": "python3 scripts/export_ir.py",
+    "fetch:lean": "bash scripts/fetch-lean-source.sh",
     "install:wasi": "bash scripts/install-wasi-sdk.sh",
-    "build:wat": "bash scripts/build-wat.sh",
-    "build:wasi": "bash scripts/build-wasi.sh",
-    "build:interp": "bash scripts/build-interp.sh",
     "probe:upstream": "bash scripts/build-upstream-probe.sh",
-    "build": "npm run export:ir && npm run build:wat",
-    "test": "npm run build && node scripts/smoke_node.mjs",
-    "test:wasi": "npm run export:ir && npm run build:wasi && node scripts/smoke_node.mjs",
-    "test:interp": "npm run export:ir && npm run build:interp && node scripts/smoke_node.mjs",
-    "test:upstream": "npm run probe:upstream && node scripts/smoke_upstream.mjs",
+    "build": "npm run build:demo",
+    "build:demo": "npm run probe:upstream",
+    "test": "npm run test:upstream",
+    "test:upstream": "npm run build:demo && node scripts/smoke_upstream.mjs",
     "dev": "vite web --host 127.0.0.1"
   },
   "devDependencies": {
-    "vite": "^8.0.13",
-    "wabt": "^1.0.39"
+    "vite": "^8.0.13"
   }
 }

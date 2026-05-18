@@ -85,8 +85,8 @@ return `Option decl` values using the same constructor layout:
 - `arg` uses constructor-backed variables and scalar erased arguments.
 - arrays must be Lean array objects, not C arrays.
 
-This is the main difference from the first harness in `wasm/interpreter_port/`,
-which intentionally used a smaller C++ fixture schema.
+This is the critical distinction from the discarded bootstrap runners: the demo
+no longer uses a parallel C/C++ interpreter schema.
 
 ## Static Closure Strategy
 

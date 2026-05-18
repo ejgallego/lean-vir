@@ -1,6 +1,6 @@
 import { readFile } from "node:fs/promises";
 
-const wasm = await readFile(new URL("../build/upstream-probe/ir_interpreter.strict.wasm", import.meta.url));
+const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const mod = new WebAssembly.Module(wasm);
 const imports = {};
 
