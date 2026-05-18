@@ -1,0 +1,51 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lean IR WASI POC</title>
+  </head>
+  <body>
+    <main id="app">
+      <section class="workspace">
+        <header class="topbar">
+          <div>
+            <p class="eyebrow">Lean 4.30-rc2 / wasm32-wasi</p>
+            <h1>IR Fib Runner</h1>
+          </div>
+          <div id="status" class="status">Loading WASM</div>
+        </header>
+
+        <section class="controls" aria-label="Fib controls">
+          <label for="fib-input">Input</label>
+          <input id="fib-input" type="number" min="0" max="30" value="8" />
+          <button id="run-button" type="button">Run</button>
+        </section>
+
+        <section class="result-band" aria-live="polite">
+          <span>fib</span>
+          <strong id="input-display">8</strong>
+          <span>=</span>
+          <strong id="result-display">...</strong>
+        </section>
+
+        <section class="details">
+          <div>
+            <span>Pointer width</span>
+            <strong id="ptr-width">...</strong>
+          </div>
+          <div>
+            <span>size_t width</span>
+            <strong id="size-width">...</strong>
+          </div>
+          <div>
+            <span>Layout guard</span>
+            <strong id="layout-guard">...</strong>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
+

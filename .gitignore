@@ -1,0 +1,7 @@
+.vir.git/
+.lake/
+build/
+node_modules/
+web/public/vir.wasm
+.npm-cache/
+npm-debug.log*
