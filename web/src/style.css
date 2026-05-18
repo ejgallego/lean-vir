@@ -83,7 +83,7 @@ h2 {
 
 .demo-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 32px;
   margin-top: 32px;
 }
@@ -137,6 +137,35 @@ h2 {
   padding: 16px;
   border: 1px solid #d9ded2;
   background: #ffffff;
+}
+
+.sort-source {
+  min-height: 54px;
+  margin-top: 18px;
+  padding: 16px;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+}
+
+.sort-source span {
+  display: block;
+  color: #5f6f64;
+  font-weight: 700;
+}
+
+.sort-source strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 1rem;
+  line-height: 1.25;
+}
+
+.sort-controls {
+  grid-template-columns: 1fr;
+}
+
+.sort-band {
+  grid-template-columns: 1.2fr 0.8fr;
 }
 
 .pet-state span {
@@ -206,6 +235,15 @@ h2 {
   word-break: break-word;
 }
 
+#sort-output-display {
+  font-size: 1rem;
+  line-height: 1.35;
+}
+
+#sort-result-display {
+  font-size: 3.2rem;
+}
+
 .details {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -226,6 +264,12 @@ h2 {
 
 .details span {
   color: #5f6f64;
+}
+
+@media (max-width: 920px) {
+  .demo-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
 }
 
 @media (max-width: 640px) {

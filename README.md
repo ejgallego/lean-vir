@@ -5,18 +5,20 @@ WebAssembly in the browser.
 
 The demo builds Lean `v4.30.0-rc2`'s upstream
 `src/library/ir_interpreter.cpp` to `wasm32-wasip1`, links the required Lean
-runtime subset, and serves one generated artifact:
-`web/public/vir-upstream.wasm`.
+runtime subset, and serves generated artifacts:
+`web/public/vir-upstream.wasm` plus the demo IR package
+`web/public/vir-demo.irpkg`.
 
 ## Demos
 
-The browser page currently runs two examples through that upstream interpreter:
+The browser page currently runs three examples through that upstream interpreter:
 
 - `fib`, with the current input range capped at `0..17`.
 - `Tamagotchi.step`, a tiny automaton driven one action at a time.
+- `SortDemo.demo`, a small merge-sort style demo over a Lean array literal.
 
-The Lean sources are in `examples/Fib.lean` and
-`examples/Tamagotchi.lean`.
+The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
+`examples/MergeSort.lean`.
 
 ## Quick Start
 
@@ -28,7 +30,7 @@ npm test
 npm run dev
 ```
 
-Open the Vite URL and the page should show both demos. `npm test` rebuilds the
+Open the Vite URL and the page should show all three demos. `npm test` rebuilds the
 WASM artifact and runs the Node smoke test.
 
 ## Hosted Demo
@@ -44,9 +46,8 @@ and deploys the static site artifact.
 
 - `wasm/upstream_shim/` supplies the current WASI boundary for Lean's real
   upstream interpreter.
-- `tools/GenerateProvider.lean` elaborates the demo Lean sources, walks the
-  typed `Lean.IR.Decl` closure, and emits
-  `build/generated/static_decl_provider.generated.cpp`.
+- `tools/GeneratePackage.lean` elaborates the demo Lean sources, walks the
+  typed `Lean.IR.Decl` closure, and emits `build/generated/vir-demo.irpkg`.
 - `scripts/build-upstream-probe.sh` compiles and links the upstream
   interpreter, writes `build/upstream-probe/boundary.md`, and copies the strict
   artifact to `web/public/vir-upstream.wasm`.
@@ -56,18 +57,17 @@ and deploys the static site artifact.
 ## Status
 
 The strict WASI link closes with zero unresolved symbols. The current demo is
-not a full Lean module/environment port: it uses a statically loaded declaration
-closure instead of loading `Init.ir` or `.olean` module data.
+not a full Lean module/environment port: it uses a demo IR package instead of
+loading `Init.ir` or `.olean` module data.
 
-The static closure is isolated behind `decl_provider.h` so a future provider
-can become more faithful without changing the upstream interpreter or platform
-shim.
+The package-backed provider is isolated behind `decl_provider.h` so a future
+provider can become more faithful without changing the upstream interpreter or
+platform shim.
 
 The build caches the upstream interpreter, Lean runtime, support, and shim
 objects under `build/upstream-probe/obj`. Updating the Lean examples regenerates
-the provider and relinks the WASM artifact, but does not recompile
-`ir_interpreter.cpp` unless the upstream source, compiler flags, or runtime
-overlay change.
+the IR package asset, but does not recompile or relink `ir_interpreter.cpp`
+unless the upstream source, compiler flags, runtime overlay, or shim changes.
 
 ## Generated Artifacts
 
@@ -75,7 +75,9 @@ overlay change.
 
 - `build/upstream-probe/ir_interpreter.strict.wasm`
 - `build/upstream-probe/boundary.md`
+- `build/generated/vir-demo.irpkg`
 - `web/public/vir-upstream.wasm`
+- `web/public/vir-demo.irpkg`
 
 These generated files should not be committed.
 

@@ -43,15 +43,19 @@ env_imports="$out/env-imports.txt"
 wasi_imports="$out/wasi-imports.txt"
 unresolved="$out/unresolved-symbols.txt"
 report="$out/boundary.md"
-generated_provider="build/generated/static_decl_provider.generated.cpp"
+generated_package="build/generated/vir-demo.irpkg"
 generated_provider_report="build/generated/ir-provider-report.md"
+demo_package="web/public/vir-demo.irpkg"
 
 mkdir -p "$out"
 mkdir -p "$obj_dir"
 mkdir -p "$overlay_include/lean"
 mkdir -p web/public
 
-npm run --silent generate:provider
+npm run --silent generate:package
+if ! cmp -s "$generated_package" "$demo_package"; then
+  cp "$generated_package" "$demo_package"
+fi
 
 src_commit="unknown"
 if git -C "$src" rev-parse HEAD >/dev/null 2>&1; then
@@ -98,6 +102,7 @@ support_sources=(
 
 shim_sources=(
   "wasm/upstream_shim/shim.cpp"
+  "wasm/upstream_shim/package_decl_provider.cpp"
 )
 
 common_flags=(
@@ -156,17 +161,14 @@ for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]
   stable_objects+=("$object")
 done
 
-generated_provider_obj="$obj_dir/static_decl_provider.generated.o"
-compile_one "$generated_provider" "$generated_provider_obj"
-
 link_objects=(
   "${stable_objects[@]}"
-  "$generated_provider_obj"
 )
 
 link_flags=(
   -Wl,--no-entry
   -Wl,--gc-sections
+  -Wl,--export-memory
   "-Wl,--initial-memory=$wasm_initial_memory"
   "-Wl,-z,stack-size=$wasm_stack_size"
 )
@@ -181,23 +183,62 @@ exports=(
   -Wl,--export=vir_upstream_fib
   -Wl,--export=vir_upstream_tamagotchi_step
   -Wl,--export=vir_upstream_tamagotchi_run_demo
+  -Wl,--export=vir_eval_const_nat
+  -Wl,--export=vir_alloc_bytes
+  -Wl,--export=vir_free_bytes
+  -Wl,--export=vir_load_ir_package
 )
 
-"$cxx" "--target=$target" "${link_objects[@]}" \
-  "${link_flags[@]}" \
-  -Wl,--allow-undefined \
-  "${exports[@]}" \
-  -o "$wasm"
+link_stamp="$obj_dir/link-flags.stamp"
+link_stamp_tmp="$link_stamp.tmp"
+{
+  printf 'wasi_target=%s\n' "$target"
+  printf 'initial_memory=%s\n' "$wasm_initial_memory"
+  printf 'stack_size=%s\n' "$wasm_stack_size"
+  printf 'link_flag=%s\n' "${link_flags[@]}"
+  printf 'export=%s\n' "${exports[@]}"
+} > "$link_stamp_tmp"
+if ! cmp -s "$link_stamp_tmp" "$link_stamp"; then
+  mv "$link_stamp_tmp" "$link_stamp"
+else
+  rm "$link_stamp_tmp"
+fi
+
+needs_link=0
+if [ ! -f "$wasm" ] || [ ! -f "$strict_wasm" ] || [ "$link_stamp" -nt "$strict_wasm" ]; then
+  needs_link=1
+else
+  for object in "${link_objects[@]}"; do
+    if [ "$object" -nt "$strict_wasm" ]; then
+      needs_link=1
+      break
+    fi
+  done
+fi
 
 strict_status=0
-"$cxx" "--target=$target" "${link_objects[@]}" \
-  "${link_flags[@]}" \
-  -Wl,--error-limit=0 \
-  "${exports[@]}" \
-  -o "$strict_wasm" > "$strict_log" 2>&1 || strict_status=$?
+if [ "$needs_link" = "1" ]; then
+  echo "link $wasm"
+  "$cxx" "--target=$target" "${link_objects[@]}" \
+    "${link_flags[@]}" \
+    -Wl,--allow-undefined \
+    "${exports[@]}" \
+    -o "$wasm"
 
-if [ "$strict_status" = "0" ]; then
+  echo "link $strict_wasm"
+  "$cxx" "--target=$target" "${link_objects[@]}" \
+    "${link_flags[@]}" \
+    -Wl,--error-limit=0 \
+    "${exports[@]}" \
+    -o "$strict_wasm" > "$strict_log" 2>&1 || strict_status=$?
+else
+  strict_status=0
+fi
+
+copied_demo_wasm=0
+if [ "$strict_status" = "0" ] && { [ ! -f "$demo_wasm" ] || [ "$strict_wasm" -nt "$demo_wasm" ]; }; then
   cp "$strict_wasm" "$demo_wasm"
+  copied_demo_wasm=1
 fi
 
 if command -v wasm-objdump >/dev/null 2>&1; then
@@ -257,11 +298,14 @@ shim_source_count="${#shim_sources[@]}"
   echo "- Real Lean runtime sources linked: $runtime_source_count"
   echo "- Lean support sources linked: $support_source_count"
   echo "- Local WASI shim sources linked: $shim_source_count"
-  echo "- Generated IR provider report: \`$generated_provider_report\`"
+  echo "- Generated IR package: \`$generated_package\`"
+  echo "- Browser demo IR package: \`$demo_package\`"
+  echo "- Generated IR package report: \`$generated_provider_report\`"
   echo
   echo "## Outputs"
   echo
   echo "- Linked objects: $object_count (${object_bytes} bytes total)"
+  echo "- Link reused cached wasm: $([ "$needs_link" = "0" ] && echo "yes" || echo "no")"
   echo "- Allow-undefined wasm with runtime: \`$wasm\` (${wasm_bytes} bytes)"
   if [ "$strict_status" = "0" ]; then
     echo "- Browser demo wasm: \`$demo_wasm\`"
@@ -348,16 +392,19 @@ shim_source_count="${#shim_sources[@]}"
   echo "## Current Shim Scope"
   echo
   echo "\`wasm/upstream_shim/shim.cpp\` supplies the minimal host/environment"
-  echo "boundary for the strict WASI link. \`$generated_provider\` supplies"
-  echo "a generated static declaration closure emitted from typed \`Lean.IR.Decl\`"
-  echo "values by \`tools/GenerateProvider.lean\`. \`Nat.add\`, \`Nat.sub\`, and"
-  echo "\`Nat.decEq\` are represented as native extern declarations backed by the"
-  echo "small WASI symbol registry in the shim. The browser demos run through the"
-  echo "real upstream interpreter."
+  echo "boundary for the strict WASI link. \`wasm/upstream_shim/package_decl_provider.cpp\`"
+  echo "loads \`$generated_package\`, a static declaration closure emitted from typed"
+  echo "\`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`. The current"
+  echo "Nat and Array demo externs are represented as native extern declarations"
+  echo "backed by the small WASI symbol registry in the shim. The browser demos run"
+  echo "through the real upstream interpreter."
 } > "$report"
 
 echo "wrote $report"
-if [ "$strict_status" = "0" ]; then
+if [ "$copied_demo_wasm" = "1" ]; then
   echo "wrote $demo_wasm"
 fi
 echo "strict unresolved symbols: $unresolved_count"
+if [ "$strict_status" != "0" ]; then
+  exit "$strict_status"
+fi

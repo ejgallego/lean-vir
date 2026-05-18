@@ -42,6 +42,49 @@ extern "C" lean_object * lean_nat_dec_eq___boxed(lean_object * a, lean_object * 
     return lean_box(result);
 }
 
+extern "C" lean_object * lean_nat_dec_le___boxed(lean_object * a, lean_object * b) {
+    uint8_t result = lean_nat_dec_le(a, b);
+    lean_dec(a);
+    lean_dec(b);
+    return lean_box(result);
+}
+
+extern "C" lean_object * lean_nat_mul___boxed(lean_object * a, lean_object * b) {
+    lean_object * result = lean_nat_mul(a, b);
+    lean_dec(a);
+    lean_dec(b);
+    return result;
+}
+
+extern "C" lean_object * lean_array_mk_empty___boxed(lean_object * type, lean_object * capacity) {
+    lean_dec(type);
+    lean_object * result = lean_mk_empty_array_with_capacity(capacity);
+    lean_dec(capacity);
+    return result;
+}
+
+extern "C" lean_object * lean_array_push___boxed(lean_object * type, lean_object * array, lean_object * value) {
+    lean_dec(type);
+    return lean_array_push(array, value);
+}
+
+extern "C" lean_object * lean_array_to_list___boxed(lean_object * type, lean_object * array) {
+    lean_dec(type);
+    lean_object * result = lean_box(0);
+    size_t idx = lean_array_size(array);
+    while (idx > 0) {
+        idx--;
+        lean_object * value = lean_array_get_core(array, idx);
+        lean_inc(value);
+        lean_object * cons = lean_alloc_ctor(1, 2, 0);
+        lean_ctor_set(cons, 0, value);
+        lean_ctor_set(cons, 1, result);
+        result = cons;
+    }
+    lean_dec(array);
+    return result;
+}
+
 extern "C" void * dlsym(void *, char const * sym) {
     if (strcmp(sym, "lean_nat_add___boxed") == 0) {
         return reinterpret_cast<void *>(lean_nat_add___boxed);
@@ -51,6 +94,21 @@ extern "C" void * dlsym(void *, char const * sym) {
     }
     if (strcmp(sym, "lean_nat_dec_eq___boxed") == 0) {
         return reinterpret_cast<void *>(lean_nat_dec_eq___boxed);
+    }
+    if (strcmp(sym, "lean_nat_dec_le___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_nat_dec_le___boxed);
+    }
+    if (strcmp(sym, "lean_nat_mul___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_nat_mul___boxed);
+    }
+    if (strcmp(sym, "lean_array_mk_empty___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_array_mk_empty___boxed);
+    }
+    if (strcmp(sym, "lean_array_push___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_array_push___boxed);
+    }
+    if (strcmp(sym, "lean_array_to_list___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_array_to_list___boxed);
     }
     return nullptr;
 }
@@ -124,7 +182,42 @@ static char const * known_symbol_stem(name const & n) {
     if (n == name({ "Nat", "decEq" })) {
         return "lean_nat_dec_eq";
     }
+    if (n == name({ "Nat", "decLe" })) {
+        return "lean_nat_dec_le";
+    }
+    if (n == name({ "Nat", "mul" })) {
+        return "lean_nat_mul";
+    }
+    if (n == name({ "Array", "mkEmpty" })) {
+        return "lean_array_mk_empty";
+    }
+    if (n == name({ "Array", "push" })) {
+        return "lean_array_push";
+    }
+    if (n == name({ "Array", "toList" })) {
+        return "lean_array_to_list";
+    }
     return nullptr;
+}
+
+static name name_from_dotted(char const * text, size_t len) {
+    name current;
+    size_t start = 0;
+    while (start <= len) {
+        size_t end = start;
+        while (end < len && text[end] != '.') {
+            end++;
+        }
+        if (end > start) {
+            std::string part(text + start, end - start);
+            current = name(current, part.c_str());
+        }
+        if (end == len) {
+            break;
+        }
+        start = end + 1;
+    }
+    return current;
 }
 
 } // namespace
@@ -293,4 +386,10 @@ extern "C" uint32_t vir_upstream_tamagotchi_run_demo(void) {
     uint32_t out = static_cast<uint32_t>(lean_obj_tag(result));
     lean_dec(result);
     return out;
+}
+
+extern "C" uint32_t vir_eval_const_nat(char const * name_text, uint32_t name_len) {
+    lean::ensure_ir_interpreter_initialized();
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    return lean::run_nat_function(fn, 0, nullptr);
 }

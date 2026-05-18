@@ -10,6 +10,8 @@ const petActionDisplay = document.querySelector("#pet-action-display");
 const petTraceDisplay = document.querySelector("#pet-trace-display");
 const petActionButtons = document.querySelectorAll("[data-action]");
 const petResetButton = document.querySelector("#pet-reset-button");
+const sortRunButton = document.querySelector("#sort-run-button");
+const sortResultDisplay = document.querySelector("#sort-result-display");
 const ptrWidth = document.querySelector("#ptr-width");
 const declCount = document.querySelector("#decl-count");
 const layoutGuard = document.querySelector("#layout-guard");
@@ -43,6 +45,31 @@ async function instantiate(path) {
   const instance = await WebAssembly.instantiate(module, imports);
   instance.exports.__wasm_call_ctors?.();
   return instance.exports;
+}
+
+async function loadIrPackage(exports, path) {
+  const response = await fetch(path, { cache: "no-store" });
+  if (!response.ok) {
+    throw new Error(`failed to load ${path}`);
+  }
+  if (typeof exports.vir_alloc_bytes !== "function" || typeof exports.vir_load_ir_package !== "function") {
+    throw new Error("IR package loader exports are missing");
+  }
+  if (!exports.memory) {
+    throw new Error("WASM memory export is missing");
+  }
+  const bytes = new Uint8Array(await response.arrayBuffer());
+  const ptr = exports.vir_alloc_bytes(bytes.byteLength);
+  try {
+    new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
+    const count = exports.vir_load_ir_package(ptr, bytes.byteLength);
+    if (count === 0) {
+      throw new Error("IR package load failed");
+    }
+    return count;
+  } finally {
+    exports.vir_free_bytes?.(ptr);
+  }
 }
 
 function clampInput(value, max) {
@@ -102,12 +129,34 @@ function resetPet() {
   setReady();
 }
 
+function evalConstNat(exports, name) {
+  const bytes = new TextEncoder().encode(name);
+  const ptr = exports.vir_alloc_bytes(bytes.byteLength);
+  try {
+    new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
+    return exports.vir_eval_const_nat(ptr, bytes.byteLength);
+  } finally {
+    exports.vir_free_bytes?.(ptr);
+  }
+}
+
+function renderSort(exports) {
+  try {
+    sortResultDisplay.textContent = String(evalConstNat(exports, "SortDemo.demo"));
+    setReady();
+  } catch (error) {
+    sortResultDisplay.textContent = "error";
+    setTrap(error);
+  }
+}
+
 try {
   const exports = await instantiate(`${import.meta.env.BASE_URL}vir-upstream.wasm`);
+  const loadedDeclCount = await loadIrPackage(exports, `${import.meta.env.BASE_URL}vir-demo.irpkg`);
   const pointerBytes = exports.vir_upstream_target_pointer_bytes();
 
   ptrWidth.textContent = `${pointerBytes} bytes`;
-  declCount.textContent = String(exports.vir_upstream_shim_fixture_count());
+  declCount.textContent = String(loadedDeclCount);
   layoutGuard.textContent = pointerBytes === 4 ? "pass" : "fail";
   setReady();
 
@@ -117,12 +166,15 @@ try {
     button.addEventListener("click", () => stepPet(exports, button.dataset.action));
   }
   petResetButton.addEventListener("click", resetPet);
+  sortRunButton.addEventListener("click", () => renderSort(exports));
   renderFib(exports);
   resetPet();
+  renderSort(exports);
 } catch (error) {
   statusEl.textContent = "Failed";
   statusEl.dataset.ready = "false";
   fibResultDisplay.textContent = "error";
   petMoodDisplay.textContent = "error";
+  sortResultDisplay.textContent = "error";
   console.error(error);
 }
