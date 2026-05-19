@@ -128,6 +128,14 @@ default guard that can be overridden with `VIR_WASMEDGE_TIMEOUT_MS`.
 The demo link uses 4 MiB of initial memory and a 1 MiB stack by default.
 Override those with `VIR_WASM_INITIAL_MEMORY` and `VIR_WASM_STACK_SIZE`.
 
+## License
+
+This repository is licensed under the Apache License, Version 2.0. See
+`LICENSE` and `NOTICE`.
+
+The generated WASM demo can include object code compiled from Lean 4 source.
+Lean 4 is also Apache-2.0 and retains its upstream copyright notices.
+
 The default WASI installer pins `wasi-sdk-33.0-x86_64-linux.tar.gz` from
 `WebAssembly/wasi-sdk` and verifies its SHA-256 digest. Override with
 `WASI_SDK_VERSION`, `WASI_SDK_VERSION_FULL`, `WASI_SDK_ARCH`, `WASI_SDK_OS`, or
