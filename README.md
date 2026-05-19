@@ -77,7 +77,8 @@ surface includes recursion, inductive pattern matching, local list processing,
 partial application, array push/toList, branches over comparisons, and
 standard `Array.map`/`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`,
 plus basic `String.append`/`String.length`/`String.utf8ByteSize`/
-`String.getUTF8Byte`/`String.decEq`.
+`String.getUTF8Byte`/`String.decEq`, and `ByteArray.empty`/`ByteArray.push`/
+`ByteArray.get!`/`ByteArray.size`.
 The runner also writes `build/fixtures/summary.json` with per-fixture status
 for CI and boundary debugging.
 

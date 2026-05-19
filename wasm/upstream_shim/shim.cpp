@@ -27,6 +27,10 @@ Author: Emilio J. Gallego Arias
 #include "util/option_declarations.h"
 #include "util/options.h"
 
+extern "C" {
+lean_object * l_ByteArray_empty = nullptr;
+}
+
 extern "C" lean_object * lean_nat_add___boxed(lean_object * a, lean_object * b) {
     lean_object * result = lean_nat_add(a, b);
     lean_dec(a);
@@ -139,6 +143,25 @@ extern "C" lean_object * lean_array_uset___boxed(lean_object * type, lean_object
     return result;
 }
 
+extern "C" lean_object * lean_byte_array_push___boxed(lean_object * array, lean_object * value) {
+    uint8_t byte = static_cast<uint8_t>(lean_unbox(value));
+    lean_dec(value);
+    return lean_byte_array_push(array, byte);
+}
+
+extern "C" lean_object * lean_byte_array_get___boxed(lean_object * array, lean_object * index) {
+    uint8_t result = lean_byte_array_get(array, index);
+    lean_dec(array);
+    lean_dec(index);
+    return lean_box(result);
+}
+
+extern "C" lean_object * lean_byte_array_size___boxed(lean_object * array) {
+    lean_object * result = lean_byte_array_size(array);
+    lean_dec(array);
+    return result;
+}
+
 extern "C" lean_object * lean_usize_of_nat___boxed(lean_object * a) {
     size_t result = lean_usize_of_nat(a);
     lean_dec(a);
@@ -248,6 +271,18 @@ extern "C" void * dlsym(void *, char const * sym) {
     if (strcmp(sym, "lean_array_uset___boxed") == 0) {
         return reinterpret_cast<void *>(lean_array_uset___boxed);
     }
+    if (strcmp(sym, "l_ByteArray_empty") == 0) {
+        return reinterpret_cast<void *>(&l_ByteArray_empty);
+    }
+    if (strcmp(sym, "lean_byte_array_push___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_byte_array_push___boxed);
+    }
+    if (strcmp(sym, "lean_byte_array_get___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_byte_array_get___boxed);
+    }
+    if (strcmp(sym, "lean_byte_array_size___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_byte_array_size___boxed);
+    }
     if (strcmp(sym, "lean_usize_of_nat___boxed") == 0) {
         return reinterpret_cast<void *>(lean_usize_of_nat___boxed);
     }
@@ -318,6 +353,8 @@ static void ensure_ir_interpreter_initialized() {
     static bool initialized = false;
     if (!initialized) {
         initialize_ir_interpreter();
+        l_ByteArray_empty = lean_mk_empty_byte_array(lean_box(0));
+        lean_mark_persistent(l_ByteArray_empty);
         initialized = true;
     }
 }
@@ -390,6 +427,18 @@ static char const * known_symbol_stem(name const & n) {
     }
     if (n == name({ "Array", "uset" })) {
         return "lean_array_uset";
+    }
+    if (n == name({ "ByteArray", "empty" })) {
+        return "l_ByteArray_empty";
+    }
+    if (n == name({ "ByteArray", "push" })) {
+        return "lean_byte_array_push";
+    }
+    if (n == name({ "ByteArray", "get!" })) {
+        return "lean_byte_array_get";
+    }
+    if (n == name({ "ByteArray", "size" })) {
+        return "lean_byte_array_size";
     }
     if (n == name({ "USize", "ofNat" })) {
         return "lean_usize_of_nat";

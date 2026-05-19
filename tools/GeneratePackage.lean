@@ -148,6 +148,30 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_array_uset"
   },
   {
+    name := `ByteArray.empty,
+    params := #[],
+    resultType := .object,
+    symbol := "l_ByteArray_empty"
+  },
+  {
+    name := `ByteArray.push,
+    params := #[param 1 false .object, param 2 false .uint8],
+    resultType := .object,
+    symbol := "lean_byte_array_push"
+  },
+  {
+    name := `ByteArray.get!,
+    params := #[param 1 true .object, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_byte_array_get"
+  },
+  {
+    name := `ByteArray.size,
+    params := #[param 1 true .object],
+    resultType := .tagged,
+    symbol := "lean_byte_array_size"
+  },
+  {
     name := `USize.ofNat,
     params := #[param 1 true .tobject],
     resultType := .usize,

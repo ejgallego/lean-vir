@@ -113,4 +113,11 @@ def stringByteAtScore (s : String) (h : (⟨1⟩ : String.Pos.Raw) < s.rawEndPos
 def upstreamStringByteAtScore : Nat :=
   stringByteAtScore "lean" (by decide)
 
+def upstreamByteArrayPushGetScore : Nat :=
+  let bs := ByteArray.empty.push 65
+  let bs := bs.push 66
+  let bs := bs.push 67
+  let b := bs.get! 1
+  bs.size + b.toNat
+
 end Vir.Fixtures.Basic
