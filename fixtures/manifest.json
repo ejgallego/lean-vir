@@ -78,6 +78,18 @@
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamStringEqScore",
       "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-utf8-byte-size",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringUtf8ByteScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-byte-at",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringByteAtScore",
+      "result": { "type": "Nat" }
     }
   ]
 }

@@ -101,4 +101,16 @@ def stringEqScore (a b c : String) : Nat :=
 def upstreamStringEqScore : Nat :=
   stringEqScore "lean" "lean" "-vir"
 
+def stringUtf8ByteScore (a b c : String) : Nat :=
+  (a ++ b).utf8ByteSize + c.utf8ByteSize
+
+def upstreamStringUtf8ByteScore : Nat :=
+  stringUtf8ByteScore "lean" "-vir" "wasm"
+
+def stringByteAtScore (s : String) (h : (⟨1⟩ : String.Pos.Raw) < s.rawEndPos) : Nat :=
+  (s.getUTF8Byte ⟨1⟩ h).toNat
+
+def upstreamStringByteAtScore : Nat :=
+  stringByteAtScore "lean" (by decide)
+
 end Vir.Fixtures.Basic

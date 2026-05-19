@@ -178,11 +178,31 @@ extern "C" lean_object * lean_string_length___boxed(lean_object * a) {
     return result;
 }
 
+extern "C" lean_object * lean_string_utf8_byte_size___boxed(lean_object * a) {
+    lean_object * result = lean_string_utf8_byte_size(a);
+    lean_dec(a);
+    return result;
+}
+
+extern "C" lean_object * lean_string_get_byte_fast___boxed(lean_object * s, lean_object * pos, lean_object * proof) {
+    uint8_t result = lean_string_get_byte_fast(s, pos);
+    lean_dec(s);
+    lean_dec(pos);
+    lean_dec(proof);
+    return lean_box(result);
+}
+
 extern "C" lean_object * lean_string_dec_eq___boxed(lean_object * a, lean_object * b) {
     uint8_t result = lean_string_dec_eq(a, b);
     lean_dec(a);
     lean_dec(b);
     return lean_box(result);
+}
+
+extern "C" lean_object * lean_uint8_to_nat___boxed(lean_object * a) {
+    lean_object * result = lean_uint8_to_nat(static_cast<uint8_t>(lean_unbox(a)));
+    lean_dec(a);
+    return result;
 }
 
 extern "C" void * dlsym(void *, char const * sym) {
@@ -246,8 +266,17 @@ extern "C" void * dlsym(void *, char const * sym) {
     if (strcmp(sym, "lean_string_length___boxed") == 0) {
         return reinterpret_cast<void *>(lean_string_length___boxed);
     }
+    if (strcmp(sym, "lean_string_utf8_byte_size___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_string_utf8_byte_size___boxed);
+    }
+    if (strcmp(sym, "lean_string_get_byte_fast___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_string_get_byte_fast___boxed);
+    }
     if (strcmp(sym, "lean_string_dec_eq___boxed") == 0) {
         return reinterpret_cast<void *>(lean_string_dec_eq___boxed);
+    }
+    if (strcmp(sym, "lean_uint8_to_nat___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_uint8_to_nat___boxed);
     }
     return nullptr;
 }
@@ -380,8 +409,17 @@ static char const * known_symbol_stem(name const & n) {
     if (n == name({ "String", "length" })) {
         return "lean_string_length";
     }
+    if (n == name({ "String", "utf8ByteSize" })) {
+        return "lean_string_utf8_byte_size";
+    }
+    if (n == name({ "String", "getUTF8Byte" })) {
+        return "lean_string_get_byte_fast";
+    }
     if (n == name({ "String", "decEq" })) {
         return "lean_string_dec_eq";
+    }
+    if (n == name({ "UInt8", "toNat" })) {
+        return "lean_uint8_to_nat";
     }
     return nullptr;
 }

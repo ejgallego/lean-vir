@@ -114,11 +114,12 @@ generator report separates missing Lean IR declarations from missing native
 extern registrations, and the package decoder exposes its last load error for
 browser and smoke-test diagnostics.
 The current explicit native externs cover the small fixture/demo surface for
-`Nat`, `Array`, `USize`, and `String`: `Nat.add`, `Nat.sub`, `Nat.decEq`,
-`Nat.decLe`, `Nat.decLt`, `Nat.mul`, `Array.mkEmpty`, `Array.push`,
-`Array.toList`, `Array.size`, `Array.usize`, `Array.uget`,
+`Nat`, `Array`, `USize`, `UInt8`, and `String`: `Nat.add`, `Nat.sub`,
+`Nat.decEq`, `Nat.decLe`, `Nat.decLt`, `Nat.mul`, `Array.mkEmpty`,
+`Array.push`, `Array.toList`, `Array.size`, `Array.usize`, `Array.uget`,
 `Array.ugetBorrowed`, `Array.uset`, `USize.ofNat`, `USize.add`,
-`USize.decEq`, `USize.decLt`, `String.append`, `String.length`, and
+`USize.decEq`, `USize.decLt`, `UInt8.toNat`, `String.append`,
+`String.length`, `String.utf8ByteSize`, `String.getUTF8Byte`, and
 `String.decEq`. They are backed by a small shim registry; a full native symbol
 loader is still out of scope.
 

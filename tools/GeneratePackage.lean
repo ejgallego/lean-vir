@@ -184,10 +184,28 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_length"
   },
   {
+    name := `String.utf8ByteSize,
+    params := #[param 1 true .object],
+    resultType := .tagged,
+    symbol := "lean_string_utf8_byte_size"
+  },
+  {
+    name := `String.getUTF8Byte,
+    params := #[param 1 true .object, param 2 false .tobject, param 3 false .erased],
+    resultType := .uint8,
+    symbol := "lean_string_get_byte_fast"
+  },
+  {
     name := `String.decEq,
     params := #[param 1 true .object, param 2 true .object],
     resultType := .uint8,
     symbol := "lean_string_dec_eq"
+  },
+  {
+    name := `UInt8.toNat,
+    params := #[param 1 false .uint8],
+    resultType := .tagged,
+    symbol := "lean_uint8_to_nat"
   }
 ]
 
