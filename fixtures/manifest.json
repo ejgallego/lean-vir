@@ -1,0 +1,53 @@
+{
+  "version": 1,
+  "fixtures": [
+    {
+      "id": "fib12",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.fib12",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "inductive-match",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.inductiveMatch",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "local-list-reverse",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.localListReverseChecksum",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "partial-application",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.partialApplication",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "array-push-to-list",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.arrayPushChecksum",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "branch-and-sub",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.branchAndSub",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-array-map",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamArrayMapChecksum",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-array-foldl",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamArrayFoldlSum",
+      "result": { "type": "Nat" }
+    }
+  ]
+}

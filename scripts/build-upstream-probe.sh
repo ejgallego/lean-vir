@@ -163,6 +163,7 @@ for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]
   compile_one "$source" "$object"
   stable_objects+=("$object")
 done
+printf '%s\n' "${stable_objects[@]}" > "$out/objects.txt"
 
 link_objects=(
   "${stable_objects[@]}"

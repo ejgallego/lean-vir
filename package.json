@@ -6,6 +6,7 @@
   "scripts": {
     "fetch:lean": "bash scripts/fetch-lean-source.sh",
     "install:wasi": "bash scripts/install-wasi-sdk.sh",
+    "install:engines": "bash scripts/install-wasm-engines.sh",
     "generate:package": "bash scripts/generate-ir-package.sh",
     "generate:provider": "npm run generate:package",
     "check:package": "bash scripts/check-demo-package.sh",
@@ -14,7 +15,9 @@
     "build:demo": "npm run probe:upstream",
     "build:site": "npm run build:demo && vite build web --base /lean-vir/",
     "bench": "node scripts/bench-vir.mjs",
-    "test": "npm run test:upstream",
+    "bench:engines": "node scripts/bench-engines.mjs",
+    "test": "npm run test:upstream && npm run test:fixtures",
+    "test:fixtures": "node scripts/run-fixtures.mjs",
     "test:upstream": "npm run build:demo && node scripts/smoke_upstream.mjs",
     "dev": "vite web --host 127.0.0.1"
   },

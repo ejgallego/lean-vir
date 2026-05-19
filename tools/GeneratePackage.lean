@@ -30,7 +30,7 @@ structure Closure where
   missingDecls : Array Name := #[]
   missingExterns : Array Name := #[]
 
-def targets : Array Target := #[
+def defaultTargets : Array Target := #[
   {
     source := "examples/Fib.lean",
     roots := #[`fib, `fib._boxed]
@@ -82,6 +82,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_nat_dec_le"
   },
   {
+    name := `Nat.decLt,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_nat_dec_lt"
+  },
+  {
     name := `Nat.mul,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
@@ -104,6 +110,60 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .erased, param 2 false .object],
     resultType := .tobject,
     symbol := "lean_array_to_list"
+  },
+  {
+    name := `Array.size,
+    params := #[param 1 false .erased, param 2 true .object],
+    resultType := .tagged,
+    symbol := "lean_array_get_size"
+  },
+  {
+    name := `Array.usize,
+    params := #[param 1 false .erased, param 2 true .object],
+    resultType := .usize,
+    symbol := "lean_array_size"
+  },
+  {
+    name := `Array.uget,
+    params := #[param 1 false .erased, param 2 true .object, param 3 false .usize, param 4 false .erased],
+    resultType := .tobject,
+    symbol := "lean_array_uget"
+  },
+  {
+    name := `Array.ugetBorrowed,
+    params := #[param 1 false .erased, param 2 true .object, param 3 false .usize, param 4 false .erased],
+    resultType := .tobject,
+    symbol := "lean_array_uget_borrowed"
+  },
+  {
+    name := `Array.uset,
+    params := #[param 1 false .erased, param 2 false .object, param 3 false .usize, param 4 false .tobject, param 5 false .erased],
+    resultType := .object,
+    symbol := "lean_array_uset"
+  },
+  {
+    name := `USize.ofNat,
+    params := #[param 1 true .tobject],
+    resultType := .usize,
+    symbol := "lean_usize_of_nat"
+  },
+  {
+    name := `USize.add,
+    params := #[param 1 false .usize, param 2 false .usize],
+    resultType := .usize,
+    symbol := "lean_usize_add"
+  },
+  {
+    name := `USize.decEq,
+    params := #[param 1 false .usize, param 2 false .usize],
+    resultType := .uint8,
+    symbol := "lean_usize_dec_eq"
+  },
+  {
+    name := `USize.decLt,
+    params := #[param 1 false .usize, param 2 false .usize],
+    resultType := .uint8,
+    symbol := "lean_usize_dec_lt"
   }
 ]
 
@@ -146,7 +206,7 @@ unsafe def frontendEnv (target : Target) : IO Environment := do
   | some env => return env
   | none => throw <| IO.userError s!"Lean frontend failed for {fileName}"
 
-unsafe def loadDeclIndex : IO (NameMap LoadedDecl) := do
+unsafe def loadDeclIndex (targets : Array Target) : IO (NameMap LoadedDecl) := do
   initSearchPath (← getBuildDir)
   let mut index : NameMap LoadedDecl := {}
   for target in targets do
@@ -202,7 +262,7 @@ partial def collectName (index : NameMap LoadedDecl) (name : Name) (state : Clos
             let state := { state with decls := state.decls.push loaded }
             refsOfDecl loaded.decl |>.foldl (fun state dep => collectName index dep state) state
 
-def collectClosure (index : NameMap LoadedDecl) : Closure :=
+def collectClosure (targets : Array Target) (index : NameMap LoadedDecl) : Closure :=
   targets.foldl (fun state target =>
     target.roots.foldl (fun state root => collectName index root state) state) {}
 
@@ -382,7 +442,7 @@ def emitPackage (closure : Closure) : Except String ByteArray := do
   let (_, bytes) <- (emitPackageM closure).run ByteArray.empty
   return bytes
 
-def reportFor (closure : Closure) : String :=
+def reportFor (targets : Array Target) (closure : Closure) : String :=
   let roots :=
     targets.foldl (fun acc target => acc ++ target.roots) #[]
   let loadedLines :=
@@ -434,10 +494,10 @@ def writeBinFile (path : System.FilePath) (content : ByteArray) : IO Unit := do
   if (← readBinFile? path) != some content then
     IO.FS.writeBinFile path content
 
-unsafe def run (packagePath reportPath : System.FilePath) : IO UInt32 := do
-  let index <- loadDeclIndex
-  let closure := collectClosure index
-  let report := reportFor closure
+unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath) : IO UInt32 := do
+  let index <- loadDeclIndex targets
+  let closure := collectClosure targets index
+  let report := reportFor targets closure
   writeTextFile reportPath report
   if !closure.missingDecls.isEmpty || !closure.missingExterns.isEmpty then
     if !closure.missingDecls.isEmpty then
@@ -462,10 +522,36 @@ unsafe def run (packagePath reportPath : System.FilePath) : IO UInt32 := do
 
 end Vir.GeneratePackage
 
+def nameFromDotted (text : String) : Name :=
+  text.splitOn "." |>.foldl (fun name part =>
+    if part.isEmpty then name else .str name part) .anonymous
+
+partial def takeTargetRoots : List String -> List String -> List String × List String
+  | [], roots => (roots.reverse, [])
+  | "--target" :: rest, roots => (roots.reverse, "--target" :: rest)
+  | root :: rest, roots => takeTargetRoots rest (root :: roots)
+
+partial def parseTargets : List String -> Except String (Array Vir.GeneratePackage.Target)
+  | [] => pure #[]
+  | "--target" :: source :: rest => do
+      let (roots, rest) := takeTargetRoots rest []
+      if roots.isEmpty then
+        throw s!"target `{source}` has no roots"
+      let target : Vir.GeneratePackage.Target :=
+        { source := source, roots := roots.toArray.map nameFromDotted }
+      return (#[target] ++ (← parseTargets rest))
+  | arg :: _ => throw s!"expected `--target`, got `{arg}`"
+
 unsafe def main (args : List String) : IO UInt32 := do
   match args with
   | [packagePath, reportPath] =>
-      Vir.GeneratePackage.run packagePath reportPath
+      Vir.GeneratePackage.run Vir.GeneratePackage.defaultTargets packagePath reportPath
+  | packagePath :: reportPath :: targetArgs =>
+      match parseTargets targetArgs with
+      | .ok targets => Vir.GeneratePackage.run targets packagePath reportPath
+      | .error err =>
+          IO.eprintln err
+          return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md>"
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--target <source.lean> <root>...]"
       return 2

@@ -49,6 +49,13 @@ extern "C" lean_object * lean_nat_dec_le___boxed(lean_object * a, lean_object * 
     return lean_box(result);
 }
 
+extern "C" lean_object * lean_nat_dec_lt___boxed(lean_object * a, lean_object * b) {
+    uint8_t result = lean_nat_dec_lt(a, b);
+    lean_dec(a);
+    lean_dec(b);
+    return lean_box(result);
+}
+
 extern "C" lean_object * lean_nat_mul___boxed(lean_object * a, lean_object * b) {
     lean_object * result = lean_nat_mul(a, b);
     lean_dec(a);
@@ -85,6 +92,74 @@ extern "C" lean_object * lean_array_to_list___boxed(lean_object * type, lean_obj
     return result;
 }
 
+extern "C" lean_object * lean_array_get_size___boxed(lean_object * type, lean_object * array) {
+    lean_dec(type);
+    lean_object * result = lean_array_get_size(array);
+    lean_dec(array);
+    return result;
+}
+
+extern "C" lean_object * lean_array_size___boxed(lean_object * type, lean_object * array) {
+    lean_dec(type);
+    size_t result = lean_array_size(array);
+    lean_dec(array);
+    return lean_box_usize(result);
+}
+
+extern "C" lean_object * lean_array_uget___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
+    lean_dec(type);
+    lean_object * result = lean_array_uget(array, lean_unbox_usize(index));
+    lean_dec(array);
+    lean_dec(index);
+    lean_dec(proof);
+    return result;
+}
+
+extern "C" lean_object * lean_array_uget_borrowed___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
+    lean_dec(type);
+    lean_object * result = lean_array_uget_borrowed(array, lean_unbox_usize(index));
+    lean_inc(result);
+    lean_dec(array);
+    lean_dec(index);
+    lean_dec(proof);
+    return result;
+}
+
+extern "C" lean_object * lean_array_uset___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * value, lean_object * proof) {
+    lean_dec(type);
+    lean_object * result = lean_array_uset(array, lean_unbox_usize(index), value);
+    lean_dec(index);
+    lean_dec(proof);
+    return result;
+}
+
+extern "C" lean_object * lean_usize_of_nat___boxed(lean_object * a) {
+    size_t result = lean_usize_of_nat(a);
+    lean_dec(a);
+    return lean_box_usize(result);
+}
+
+extern "C" lean_object * lean_usize_add___boxed(lean_object * a, lean_object * b) {
+    size_t result = lean_usize_add(lean_unbox_usize(a), lean_unbox_usize(b));
+    lean_dec(a);
+    lean_dec(b);
+    return lean_box_usize(result);
+}
+
+extern "C" lean_object * lean_usize_dec_eq___boxed(lean_object * a, lean_object * b) {
+    uint8_t result = lean_usize_dec_eq(lean_unbox_usize(a), lean_unbox_usize(b));
+    lean_dec(a);
+    lean_dec(b);
+    return lean_box(result);
+}
+
+extern "C" lean_object * lean_usize_dec_lt___boxed(lean_object * a, lean_object * b) {
+    uint8_t result = lean_usize_dec_lt(lean_unbox_usize(a), lean_unbox_usize(b));
+    lean_dec(a);
+    lean_dec(b);
+    return lean_box(result);
+}
+
 extern "C" void * dlsym(void *, char const * sym) {
     if (strcmp(sym, "lean_nat_add___boxed") == 0) {
         return reinterpret_cast<void *>(lean_nat_add___boxed);
@@ -98,6 +173,9 @@ extern "C" void * dlsym(void *, char const * sym) {
     if (strcmp(sym, "lean_nat_dec_le___boxed") == 0) {
         return reinterpret_cast<void *>(lean_nat_dec_le___boxed);
     }
+    if (strcmp(sym, "lean_nat_dec_lt___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_nat_dec_lt___boxed);
+    }
     if (strcmp(sym, "lean_nat_mul___boxed") == 0) {
         return reinterpret_cast<void *>(lean_nat_mul___boxed);
     }
@@ -109,6 +187,33 @@ extern "C" void * dlsym(void *, char const * sym) {
     }
     if (strcmp(sym, "lean_array_to_list___boxed") == 0) {
         return reinterpret_cast<void *>(lean_array_to_list___boxed);
+    }
+    if (strcmp(sym, "lean_array_get_size___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_array_get_size___boxed);
+    }
+    if (strcmp(sym, "lean_array_size___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_array_size___boxed);
+    }
+    if (strcmp(sym, "lean_array_uget___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_array_uget___boxed);
+    }
+    if (strcmp(sym, "lean_array_uget_borrowed___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_array_uget_borrowed___boxed);
+    }
+    if (strcmp(sym, "lean_array_uset___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_array_uset___boxed);
+    }
+    if (strcmp(sym, "lean_usize_of_nat___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_usize_of_nat___boxed);
+    }
+    if (strcmp(sym, "lean_usize_add___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_usize_add___boxed);
+    }
+    if (strcmp(sym, "lean_usize_dec_eq___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_usize_dec_eq___boxed);
+    }
+    if (strcmp(sym, "lean_usize_dec_lt___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_usize_dec_lt___boxed);
     }
     return nullptr;
 }
@@ -193,6 +298,9 @@ static char const * known_symbol_stem(name const & n) {
     if (n == name({ "Nat", "decLe" })) {
         return "lean_nat_dec_le";
     }
+    if (n == name({ "Nat", "decLt" })) {
+        return "lean_nat_dec_lt";
+    }
     if (n == name({ "Nat", "mul" })) {
         return "lean_nat_mul";
     }
@@ -204,6 +312,33 @@ static char const * known_symbol_stem(name const & n) {
     }
     if (n == name({ "Array", "toList" })) {
         return "lean_array_to_list";
+    }
+    if (n == name({ "Array", "size" })) {
+        return "lean_array_get_size";
+    }
+    if (n == name({ "Array", "usize" })) {
+        return "lean_array_size";
+    }
+    if (n == name({ "Array", "uget" })) {
+        return "lean_array_uget";
+    }
+    if (n == name({ "Array", "ugetBorrowed" })) {
+        return "lean_array_uget_borrowed";
+    }
+    if (n == name({ "Array", "uset" })) {
+        return "lean_array_uset";
+    }
+    if (n == name({ "USize", "ofNat" })) {
+        return "lean_usize_of_nat";
+    }
+    if (n == name({ "USize", "add" })) {
+        return "lean_usize_add";
+    }
+    if (n == name({ "USize", "decEq" })) {
+        return "lean_usize_dec_eq";
+    }
+    if (n == name({ "USize", "decLt" })) {
+        return "lean_usize_dec_lt";
     }
     return nullptr;
 }

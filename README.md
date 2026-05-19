@@ -67,6 +67,16 @@ The package-backed provider is isolated behind `decl_provider.h` so a future
 provider can become more faithful without changing the upstream interpreter or
 platform shim.
 
+`npm run test:fixtures` runs the upstream-backed conformance fixture surface.
+Each fixture is Lean source under `fixtures/`, elaborated by Lean 4.30-rc2 into
+real `Lean.IR.Decl` values, packaged with `tools/GeneratePackage.lean`, and
+then compared against Lean's host IR interpreter with
+`interpreter.prefer_native=false`. Known unsupported fixtures are tracked in
+`fixtures/manifest.json` so boundary gaps remain explicit. The current passing
+surface includes recursion, inductive pattern matching, local list processing,
+partial application, array push/toList, branches over comparisons, and
+standard `Array.map`/`Array.foldl`.
+
 The build caches the upstream interpreter, Lean runtime, support, and shim
 objects under `build/upstream-probe/obj`. Updating the Lean examples regenerates
 the IR package asset, but does not recompile or relink `ir_interpreter.cpp`
@@ -91,6 +101,26 @@ For fast example iteration, run `npm run check:package`. It regenerates the IR
 package and points at `build/generated/ir-provider-report.md`, including
 separate sections for missing IR declarations and missing native extern
 registrations.
+
+## Benchmarks
+
+`npm run bench` compares the browser-style Node/V8 WASM path against Lean's
+host IR interpreter with `interpreter.prefer_native=false`.
+
+`npm run bench:engines` builds `build/upstream-probe/vir-engine-bench.wasm`, a
+small WASI command module that embeds the generated demo IR package and measures
+inside WASM. It runs under Node/V8 by default and also uses local CLI engines
+when present. Install the optional local engines with:
+
+```bash
+npm run install:engines
+npm run bench:engines
+```
+
+The engine installer writes Wasmtime, Wasmer, and WasmEdge under `.tools/`.
+Slow or incompatible engines are reported instead of blocking the run. Override
+the per-engine timeout with `VIR_ENGINE_TIMEOUT_MS`; WasmEdge has a shorter
+default guard that can be overridden with `VIR_WASMEDGE_TIMEOUT_MS`.
 
 The demo link uses 4 MiB of initial memory and a 1 MiB stack by default.
 Override those with `VIR_WASM_INITIAL_MEMORY` and `VIR_WASM_STACK_SIZE`.

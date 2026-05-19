@@ -113,8 +113,11 @@ package into the upstream interpreter's expected object layout at runtime. The
 generator report separates missing Lean IR declarations from missing native
 extern registrations, and the package decoder exposes its last load error for
 browser and smoke-test diagnostics.
-The current explicit native externs are `Nat.add`, `Nat.sub`, `Nat.decEq`,
-`Nat.decLe`, `Nat.mul`, `Array.mkEmpty`, `Array.push`, and `Array.toList`.
+The current explicit native externs cover the small fixture/demo surface for
+`Nat`, `Array`, and `USize`: `Nat.add`, `Nat.sub`, `Nat.decEq`, `Nat.decLe`,
+`Nat.decLt`, `Nat.mul`, `Array.mkEmpty`, `Array.push`, `Array.toList`,
+`Array.size`, `Array.usize`, `Array.uget`, `Array.ugetBorrowed`,
+`Array.uset`, `USize.ofNat`, `USize.add`, `USize.decEq`, and `USize.decLt`.
 They are backed by a small shim registry; a full native symbol loader is still
 out of scope.
 

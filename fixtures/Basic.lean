@@ -1,0 +1,66 @@
+namespace Vir.Fixtures.Basic
+
+def fib : Nat -> Nat
+  | 0 => 0
+  | 1 => 1
+  | n + 2 => fib n + fib (n + 1)
+
+def fib12 : Nat :=
+  fib 12
+
+inductive Token where
+  | zero
+  | one
+  | many
+
+def tokenScore : Token -> Nat
+  | .zero => 0
+  | .one => 1
+  | .many => 7
+
+def inductiveMatch : Nat :=
+  tokenScore .many + tokenScore .one
+
+def checksum : Nat -> List Nat -> Nat
+  | _, [] => 0
+  | weight, x :: xs => weight * x + checksum (weight + 1) xs
+
+def reverseAux : List Nat -> List Nat -> List Nat
+  | [], acc => acc
+  | x :: xs, acc => reverseAux xs (x :: acc)
+
+def reverse (xs : List Nat) : List Nat :=
+  reverseAux xs []
+
+def localListReverseChecksum : Nat :=
+  checksum 1 (reverse [3, 1, 4, 1, 5])
+
+def addN (n : Nat) : Nat -> Nat :=
+  fun x => n + x
+
+def partialApplication : Nat :=
+  let f := addN 9
+  f 4
+
+def arrayPushChecksum : Nat :=
+  let xs := (#[] : Array Nat)
+  let xs := xs.push 8
+  let xs := xs.push 6
+  let xs := xs.push 7
+  checksum 1 xs.toList
+
+def branchAndSub : Nat :=
+  if 3 <= 5 then
+    100 - 58
+  else
+    0
+
+def upstreamArrayMapChecksum : Nat :=
+  let xs := #[1, 2, 3]
+  checksum 1 ((xs.map fun x => x + 1).toList)
+
+def upstreamArrayFoldlSum : Nat :=
+  let xs := #[2, 4, 6, 8]
+  xs.foldl (fun acc x => acc + x) 10
+
+end Vir.Fixtures.Basic
