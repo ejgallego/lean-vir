@@ -63,4 +63,15 @@ def upstreamArrayFoldlSum : Nat :=
   let xs := #[2, 4, 6, 8]
   xs.foldl (fun acc x => acc + x) 10
 
+def upstreamArrayAnyScore : Nat :=
+  let xs := #[1, 3, 8, 2]
+  if xs.any (fun x => 5 <= x) then
+    99
+  else
+    0
+
+def upstreamArrayFilterChecksum : Nat :=
+  let xs := #[1, 5, 2, 8]
+  checksum 1 ((xs.filter fun x => 3 <= x).toList)
+
 end Vir.Fixtures.Basic

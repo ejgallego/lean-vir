@@ -48,6 +48,18 @@
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamArrayFoldlSum",
       "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-array-any",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamArrayAnyScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-array-filter",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamArrayFilterChecksum",
+      "result": { "type": "Nat" }
     }
   ]
 }
