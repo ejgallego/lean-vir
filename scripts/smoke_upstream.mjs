@@ -34,6 +34,9 @@ if (!exports.memory) {
 if (typeof exports.vir_upstream_fib !== "function") {
   throw new Error("vir_upstream_fib export is missing");
 }
+if (typeof exports.vir_upstream_fib_repeated !== "function") {
+  throw new Error("vir_upstream_fib_repeated export is missing");
+}
 if (typeof exports.vir_upstream_tamagotchi_step !== "function") {
   throw new Error("vir_upstream_tamagotchi_step export is missing");
 }
@@ -45,6 +48,9 @@ if (typeof exports.vir_eval_const_nat !== "function") {
 }
 if (typeof exports.vir_sort_checksum !== "function") {
   throw new Error("vir_sort_checksum export is missing");
+}
+if (typeof exports.vir_sort_checksum_repeated !== "function") {
+  throw new Error("vir_sort_checksum_repeated export is missing");
 }
 if (typeof exports.vir_last_package_error !== "function") {
   throw new Error("vir_last_package_error export is missing");
@@ -111,6 +117,11 @@ for (const [input, expected] of fibCases) {
   if (actual !== expected) {
     throw new Error(`upstream fib ${input}: expected ${expected}, got ${actual}`);
   }
+}
+
+const repeatedFib = exports.vir_upstream_fib_repeated(80, 17);
+if (repeatedFib !== 127760) {
+  throw new Error(`upstream repeated fib: expected 127760, got ${repeatedFib}`);
 }
 
 const mood = {
@@ -194,6 +205,22 @@ function sortChecksumFor(values) {
 const editableChecksum = sortChecksumFor([4, 1, 3, 2]);
 if (editableChecksum !== 30) {
   throw new Error(`upstream SortDemo.demoFromArray: expected 30, got ${editableChecksum}`);
+}
+
+function repeatedSortChecksumFor(values, iterations) {
+  const ptr = exports.vir_alloc_bytes(values.length * 4);
+  try {
+    const view = new DataView(exports.memory.buffer, ptr, values.length * 4);
+    values.forEach((value, index) => view.setUint32(index * 4, value, true));
+    return exports.vir_sort_checksum_repeated(ptr, values.length, iterations);
+  } finally {
+    exports.vir_free_bytes?.(ptr);
+  }
+}
+
+const repeatedSortChecksum = repeatedSortChecksumFor([4, 1, 3, 2], 5);
+if (repeatedSortChecksum !== 150) {
+  throw new Error(`upstream repeated SortDemo.demoFromArray: expected 150, got ${repeatedSortChecksum}`);
 }
 
 console.log("upstream smoke ok: fib 17 = 1597, Tamagotchi ends angry, editable SortDemo works");

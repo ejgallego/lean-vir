@@ -375,6 +375,20 @@ extern "C" uint32_t vir_upstream_fib(uint32_t n) {
     return lean::run_nat_function(lean::name("fib"), 1, args);
 }
 
+extern "C" uint32_t vir_upstream_fib_repeated(uint32_t iterations, uint32_t n) {
+    lean::ensure_ir_interpreter_initialized();
+    lean::name fn("fib");
+    lean::object * arg = lean::vir::mk_static_nat(n);
+    uint32_t acc = 0;
+    for (uint32_t i = 0; i < iterations; i++) {
+        lean_inc(arg);
+        lean::object * args[] = { arg };
+        acc += lean::run_nat_function(fn, 1, args);
+    }
+    lean_dec(arg);
+    return acc;
+}
+
 extern "C" uint32_t vir_upstream_tamagotchi_step(uint32_t mood, uint32_t action) {
     lean::ensure_ir_interpreter_initialized();
     lean::object * mood_obj = lean_box(mood);
@@ -410,4 +424,21 @@ extern "C" uint32_t vir_sort_checksum(uint32_t const * values, uint32_t len) {
     lean::object * input = lean::mk_nat_array(values, len);
     lean::object * args[] = { input };
     return lean::run_nat_function(lean::name({ "SortDemo", "demoFromArray" }), 1, args);
+}
+
+extern "C" uint32_t vir_sort_checksum_repeated(uint32_t const * values, uint32_t len, uint32_t iterations) {
+    if (values == nullptr && len != 0) {
+        return 0;
+    }
+    lean::ensure_ir_interpreter_initialized();
+    lean::name fn({ "SortDemo", "demoFromArray" });
+    lean::object * input = lean::mk_nat_array(values, len);
+    uint32_t acc = 0;
+    for (uint32_t i = 0; i < iterations; i++) {
+        lean_inc(input);
+        lean::object * args[] = { input };
+        acc += lean::run_nat_function(fn, 1, args);
+    }
+    lean_dec(input);
+    return acc;
 }

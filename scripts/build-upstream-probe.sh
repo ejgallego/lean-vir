@@ -29,6 +29,7 @@ fi
 
 lean_prefix="${LEAN_PREFIX:-$(lean --print-prefix)}"
 target="${WASI_TARGET:-wasm32-wasip1}"
+wasm_opt_level="${VIR_WASM_OPT_LEVEL:--O3}"
 wasm_initial_memory="${VIR_WASM_INITIAL_MEMORY:-4194304}"
 wasm_stack_size="${VIR_WASM_STACK_SIZE:-1048576}"
 upstream="$src/src/library/ir_interpreter.cpp"
@@ -109,6 +110,7 @@ common_flags=(
   "--target=$target"
   -std=c++20
   -DNDEBUG
+  "$wasm_opt_level"
   -DLEAN_DEFAULT_INTERPRETER_PREFER_NATIVE=false
   "-I$overlay_include"
   "-I$src/src/include"
@@ -126,6 +128,7 @@ compile_stamp_tmp="$compile_stamp.tmp"
   printf 'lean_prefix=%s\n' "$lean_prefix"
   printf 'lean_source_commit=%s\n' "$src_commit"
   printf 'wasi_target=%s\n' "$target"
+  printf 'opt_level=%s\n' "$wasm_opt_level"
   printf 'flag=%s\n' "${common_flags[@]}"
 } > "$compile_stamp_tmp"
 if ! cmp -s "$compile_stamp_tmp" "$compile_stamp"; then
@@ -181,10 +184,12 @@ exports=(
   -Wl,--export=vir_upstream_shim_fixture_count
   -Wl,--export=vir_upstream_target_pointer_bytes
   -Wl,--export=vir_upstream_fib
+  -Wl,--export=vir_upstream_fib_repeated
   -Wl,--export=vir_upstream_tamagotchi_step
   -Wl,--export=vir_upstream_tamagotchi_run_demo
   -Wl,--export=vir_eval_const_nat
   -Wl,--export=vir_sort_checksum
+  -Wl,--export=vir_sort_checksum_repeated
   -Wl,--export=vir_alloc_bytes
   -Wl,--export=vir_free_bytes
   -Wl,--export=vir_load_ir_package
@@ -293,6 +298,7 @@ shim_source_count="${#shim_sources[@]}"
   echo "- Lean include prefix: \`$lean_prefix\`"
   echo "- Upstream file: \`$upstream\`"
   echo "- WASI target: \`$target\`"
+  echo "- WASM optimization level: \`$wasm_opt_level\`"
   echo "- Compiler: \`$cxx\`"
   echo "- Initial wasm memory: $wasm_initial_memory bytes"
   echo "- Wasm stack size: $wasm_stack_size bytes"
