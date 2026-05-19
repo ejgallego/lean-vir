@@ -176,6 +176,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object],
     resultType := .tagged,
     symbol := "lean_string_length"
+  },
+  {
+    name := `String.decEq,
+    params := #[param 1 true .object, param 2 true .object],
+    resultType := .uint8,
+    symbol := "lean_string_dec_eq"
   }
 ]
 

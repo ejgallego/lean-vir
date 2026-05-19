@@ -172,6 +172,13 @@ extern "C" lean_object * lean_string_length___boxed(lean_object * a) {
     return result;
 }
 
+extern "C" lean_object * lean_string_dec_eq___boxed(lean_object * a, lean_object * b) {
+    uint8_t result = lean_string_dec_eq(a, b);
+    lean_dec(a);
+    lean_dec(b);
+    return lean_box(result);
+}
+
 extern "C" void * dlsym(void *, char const * sym) {
     if (strcmp(sym, "lean_nat_add___boxed") == 0) {
         return reinterpret_cast<void *>(lean_nat_add___boxed);
@@ -232,6 +239,9 @@ extern "C" void * dlsym(void *, char const * sym) {
     }
     if (strcmp(sym, "lean_string_length___boxed") == 0) {
         return reinterpret_cast<void *>(lean_string_length___boxed);
+    }
+    if (strcmp(sym, "lean_string_dec_eq___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_string_dec_eq___boxed);
     }
     return nullptr;
 }
@@ -363,6 +373,9 @@ static char const * known_symbol_stem(name const & n) {
     }
     if (n == name({ "String", "length" })) {
         return "lean_string_length";
+    }
+    if (n == name({ "String", "decEq" })) {
+        return "lean_string_dec_eq";
     }
     return nullptr;
 }

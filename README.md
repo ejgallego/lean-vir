@@ -76,7 +76,9 @@ then compared against Lean's host IR interpreter with
 surface includes recursion, inductive pattern matching, local list processing,
 partial application, array push/toList, branches over comparisons, and
 standard `Array.map`/`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`,
-plus basic `String.append`/`String.length`.
+plus basic `String.append`/`String.length`/`String.decEq`.
+The runner also writes `build/fixtures/summary.json` with per-fixture status
+for CI and boundary debugging.
 
 The build caches the upstream interpreter, Lean runtime, support, and shim
 objects under `build/upstream-probe/obj`. Updating the Lean examples regenerates

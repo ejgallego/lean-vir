@@ -118,9 +118,9 @@ The current explicit native externs cover the small fixture/demo surface for
 `Nat.decLe`, `Nat.decLt`, `Nat.mul`, `Array.mkEmpty`, `Array.push`,
 `Array.toList`, `Array.size`, `Array.usize`, `Array.uget`,
 `Array.ugetBorrowed`, `Array.uset`, `USize.ofNat`, `USize.add`,
-`USize.decEq`, `USize.decLt`, `String.append`, and `String.length`. They are
-backed by a small shim registry; a full native symbol loader is still out of
-scope.
+`USize.decEq`, `USize.decLt`, `String.append`, `String.length`, and
+`String.decEq`. They are backed by a small shim registry; a full native symbol
+loader is still out of scope.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to

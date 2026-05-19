@@ -5,6 +5,7 @@ const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
 const buildDir = new URL("../build/fixtures/", import.meta.url);
 const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
+const summaryPath = new URL("summary.json", buildDir);
 
 function run(cmd, args, options = {}) {
   const result = spawnSync(cmd, args, {
@@ -231,8 +232,28 @@ for (const result of results) {
   }
 }
 
+const summary = {
+  version: 1,
+  totals: {
+    passed,
+    expectedUnsupported: unsupported,
+    failed,
+  },
+  fixtures: results.map((result) => ({
+    id: result.fixture.id,
+    entry: result.fixture.entry,
+    status: result.status,
+    expectedStatus: result.fixture.expect?.status ?? "pass",
+    host: result.host,
+    wasm: result.wasm,
+    detail: result.detail,
+  })),
+};
+await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
+
 console.log();
 console.log(`fixture summary: ${passed} passed, ${unsupported} expected unsupported, ${failed} failed`);
+console.log(`wrote ${summaryPath.pathname}`);
 
 if (failed !== 0) {
   process.exit(1);

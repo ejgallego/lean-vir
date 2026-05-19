@@ -86,4 +86,13 @@ def stringAppendLength (a b c : String) : Nat :=
 def upstreamStringAppendLength : Nat :=
   stringAppendLength "lean" "-vir" "wasm"
 
+def stringEqScore (a b c : String) : Nat :=
+  if a = b then
+    a.length + 100
+  else
+    (a ++ c).length
+
+def upstreamStringEqScore : Nat :=
+  stringEqScore "lean" "lean" "-vir"
+
 end Vir.Fixtures.Basic

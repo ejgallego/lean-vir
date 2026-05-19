@@ -72,6 +72,12 @@
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamStringAppendLength",
       "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-eq",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringEqScore",
+      "result": { "type": "Nat" }
     }
   ]
 }
