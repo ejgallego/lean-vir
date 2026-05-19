@@ -60,6 +60,12 @@
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamArrayFilterChecksum",
       "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-array-find",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamArrayFindScore",
+      "result": { "type": "Nat" }
     }
   ]
 }

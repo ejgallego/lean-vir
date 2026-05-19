@@ -74,4 +74,10 @@ def upstreamArrayFilterChecksum : Nat :=
   let xs := #[1, 5, 2, 8]
   checksum 1 ((xs.filter fun x => 3 <= x).toList)
 
+def upstreamArrayFindScore : Nat :=
+  let xs := #[7, 6, 5, 8, 1, 2, 6]
+  match xs.find? (fun x => x <= 2) with
+  | some x => x + 40
+  | none => 0
+
 end Vir.Fixtures.Basic
