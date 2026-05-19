@@ -166,6 +166,18 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_byte_array_get"
   },
   {
+    name := `ByteArray.set!,
+    params := #[param 1 false .object, param 2 true .tobject, param 3 false .uint8],
+    resultType := .object,
+    symbol := "lean_byte_array_set"
+  },
+  {
+    name := `ByteArray.extract,
+    params := #[param 1 false .object, param 2 false .tobject, param 3 false .tobject],
+    resultType := .object,
+    symbol := "l_ByteArray_extract"
+  },
+  {
     name := `ByteArray.size,
     params := #[param 1 true .object],
     resultType := .tagged,

@@ -118,13 +118,16 @@ The current explicit native externs cover the small fixture/demo surface for
 `Nat.sub`, `Nat.decEq`, `Nat.decLe`, `Nat.decLt`, `Nat.mul`,
 `Array.mkEmpty`, `Array.push`, `Array.toList`, `Array.size`, `Array.usize`,
 `Array.uget`, `Array.ugetBorrowed`, `Array.uset`, `ByteArray.empty`,
-`ByteArray.push`, `ByteArray.get!`, `ByteArray.size`, `USize.ofNat`,
-`USize.add`, `USize.decEq`, `USize.decLt`, `UInt8.toNat`, `String.append`,
-`String.length`, `String.utf8ByteSize`, `String.getUTF8Byte`, and
-`String.decEq`. They are backed by a small shim registry; a full native symbol
-loader is still out of scope. `ByteArray.empty` is exposed as Lean's native
-constant symbol (`l_ByteArray_empty`), not as a boxed nullary function, because
-the upstream interpreter loads native constants through the symbol address.
+`ByteArray.push`, `ByteArray.get!`, `ByteArray.set!`, `ByteArray.extract`,
+`ByteArray.size`, `USize.ofNat`, `USize.add`, `USize.decEq`, `USize.decLt`,
+`UInt8.toNat`, `String.append`, `String.length`, `String.utf8ByteSize`,
+`String.getUTF8Byte`, and `String.decEq`. They are backed by a small shim
+registry; a full native symbol loader is still out of scope. `ByteArray.empty`
+is exposed as Lean's native constant symbol (`l_ByteArray_empty`), not as a
+boxed nullary function, because the upstream interpreter loads native constants
+through the symbol address. `ByteArray.extract` is exposed as Lean's compiled
+symbol stem (`l_ByteArray_extract`) and delegates to the linked runtime
+`lean_byte_array_copy_slice` path.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to

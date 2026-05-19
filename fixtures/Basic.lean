@@ -120,4 +120,20 @@ def upstreamByteArrayPushGetScore : Nat :=
   let b := bs.get! 1
   bs.size + b.toNat
 
+def upstreamByteArraySetScore : Nat :=
+  let bs := ByteArray.empty.push 10
+  let bs := bs.push 20
+  let bs := bs.push 30
+  let bs := bs.set! 1 99
+  (bs.get! 0).toNat + (bs.get! 1).toNat + (bs.get! 2).toNat + bs.size
+
+def upstreamByteArrayExtractScore : Nat :=
+  let bs := ByteArray.empty.push 5
+  let bs := bs.push 9
+  let bs := bs.push 7
+  let bs := bs.push 8
+  let bs := bs.push 1
+  let slice := bs.extract 1 4
+  (slice.get! 0).toNat + (slice.get! 1).toNat + (slice.get! 2).toNat + slice.size
+
 end Vir.Fixtures.Basic

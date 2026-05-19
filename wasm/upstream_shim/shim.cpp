@@ -29,6 +29,13 @@ Author: Emilio J. Gallego Arias
 
 extern "C" {
 lean_object * l_ByteArray_empty = nullptr;
+lean_object * lean_byte_array_copy_slice(
+    lean_object * src,
+    lean_object * src_off,
+    lean_object * dest,
+    lean_object * dest_off,
+    lean_object * len,
+    bool exact);
 }
 
 extern "C" lean_object * lean_nat_add___boxed(lean_object * a, lean_object * b) {
@@ -156,6 +163,30 @@ extern "C" lean_object * lean_byte_array_get___boxed(lean_object * array, lean_o
     return lean_box(result);
 }
 
+extern "C" lean_object * lean_byte_array_set___boxed(lean_object * array, lean_object * index, lean_object * value) {
+    uint8_t byte = static_cast<uint8_t>(lean_unbox(value));
+    lean_dec(value);
+    lean_object * result = lean_byte_array_set(array, index, byte);
+    lean_dec(index);
+    return result;
+}
+
+extern "C" lean_object * l_ByteArray_extract___boxed(lean_object * array, lean_object * start, lean_object * stop) {
+    lean_object * len = lean_nat_sub(stop, start);
+    lean_object * result = lean_byte_array_copy_slice(
+        array,
+        start,
+        lean_mk_empty_byte_array(lean_box(0)),
+        lean_box(0),
+        len,
+        true);
+    lean_dec(array);
+    lean_dec(start);
+    lean_dec(stop);
+    lean_dec(len);
+    return result;
+}
+
 extern "C" lean_object * lean_byte_array_size___boxed(lean_object * array) {
     lean_object * result = lean_byte_array_size(array);
     lean_dec(array);
@@ -279,6 +310,12 @@ extern "C" void * dlsym(void *, char const * sym) {
     }
     if (strcmp(sym, "lean_byte_array_get___boxed") == 0) {
         return reinterpret_cast<void *>(lean_byte_array_get___boxed);
+    }
+    if (strcmp(sym, "lean_byte_array_set___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_byte_array_set___boxed);
+    }
+    if (strcmp(sym, "l_ByteArray_extract___boxed") == 0) {
+        return reinterpret_cast<void *>(l_ByteArray_extract___boxed);
     }
     if (strcmp(sym, "lean_byte_array_size___boxed") == 0) {
         return reinterpret_cast<void *>(lean_byte_array_size___boxed);
@@ -436,6 +473,12 @@ static char const * known_symbol_stem(name const & n) {
     }
     if (n == name({ "ByteArray", "get!" })) {
         return "lean_byte_array_get";
+    }
+    if (n == name({ "ByteArray", "set!" })) {
+        return "lean_byte_array_set";
+    }
+    if (n == name({ "ByteArray", "extract" })) {
+        return "l_ByteArray_extract";
     }
     if (n == name({ "ByteArray", "size" })) {
         return "lean_byte_array_size";
