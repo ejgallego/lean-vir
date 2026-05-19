@@ -132,6 +132,8 @@ Override those with `VIR_WASM_INITIAL_MEMORY` and `VIR_WASM_STACK_SIZE`.
 
 This repository is licensed under the Apache License, Version 2.0. See
 `LICENSE` and `NOTICE`.
+Project-owned source files are copyright Lean FRO LLC, with Emilio J. Gallego
+Arias listed as author.
 
 The generated WASM demo can include object code compiled from Lean 4 source.
 Lean 4 is also Apache-2.0 and retains its upstream copyright notices.

@@ -1,4 +1,10 @@
 /-
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+-/
+
+/-
 A tiny merge-sort style demo.
 
 The public entry point returns a weighted checksum so the browser can display a

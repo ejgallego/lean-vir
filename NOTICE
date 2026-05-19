@@ -1,7 +1,7 @@
 Lean VIR
-Copyright 2026 Lean VIR contributors
-
-This project is licensed under the Apache License, Version 2.0.
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
 
 This project downloads, compiles, links against, and documents behavior of
 Lean 4. Lean 4 is licensed under the Apache License, Version 2.0 and carries
