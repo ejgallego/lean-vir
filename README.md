@@ -75,7 +75,8 @@ then compared against Lean's host IR interpreter with
 `fixtures/manifest.json` so boundary gaps remain explicit. The current passing
 surface includes recursion, inductive pattern matching, local list processing,
 partial application, array push/toList, branches over comparisons, and
-standard `Array.map`/`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`.
+standard `Array.map`/`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`,
+plus basic `String.append`/`String.length`.
 
 The build caches the upstream interpreter, Lean runtime, support, and shim
 objects under `build/upstream-probe/obj`. Updating the Lean examples regenerates

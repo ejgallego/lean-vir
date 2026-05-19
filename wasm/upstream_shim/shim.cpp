@@ -160,6 +160,18 @@ extern "C" lean_object * lean_usize_dec_lt___boxed(lean_object * a, lean_object 
     return lean_box(result);
 }
 
+extern "C" lean_object * lean_string_append___boxed(lean_object * a, lean_object * b) {
+    lean_object * result = lean_string_append(a, b);
+    lean_dec(b);
+    return result;
+}
+
+extern "C" lean_object * lean_string_length___boxed(lean_object * a) {
+    lean_object * result = lean_string_length(a);
+    lean_dec(a);
+    return result;
+}
+
 extern "C" void * dlsym(void *, char const * sym) {
     if (strcmp(sym, "lean_nat_add___boxed") == 0) {
         return reinterpret_cast<void *>(lean_nat_add___boxed);
@@ -214,6 +226,12 @@ extern "C" void * dlsym(void *, char const * sym) {
     }
     if (strcmp(sym, "lean_usize_dec_lt___boxed") == 0) {
         return reinterpret_cast<void *>(lean_usize_dec_lt___boxed);
+    }
+    if (strcmp(sym, "lean_string_append___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_string_append___boxed);
+    }
+    if (strcmp(sym, "lean_string_length___boxed") == 0) {
+        return reinterpret_cast<void *>(lean_string_length___boxed);
     }
     return nullptr;
 }
@@ -339,6 +357,12 @@ static char const * known_symbol_stem(name const & n) {
     }
     if (n == name({ "USize", "decLt" })) {
         return "lean_usize_dec_lt";
+    }
+    if (n == name({ "String", "append" })) {
+        return "lean_string_append";
+    }
+    if (n == name({ "String", "length" })) {
+        return "lean_string_length";
     }
     return nullptr;
 }

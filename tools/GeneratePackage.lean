@@ -164,6 +164,18 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .uint8,
     symbol := "lean_usize_dec_lt"
+  },
+  {
+    name := `String.append,
+    params := #[param 1 false .object, param 2 true .object],
+    resultType := .object,
+    symbol := "lean_string_append"
+  },
+  {
+    name := `String.length,
+    params := #[param 1 true .object],
+    resultType := .tagged,
+    symbol := "lean_string_length"
   }
 ]
 

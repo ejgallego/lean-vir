@@ -80,4 +80,10 @@ def upstreamArrayFindScore : Nat :=
   | some x => x + 40
   | none => 0
 
+def stringAppendLength (a b c : String) : Nat :=
+  (a ++ b).length + c.length
+
+def upstreamStringAppendLength : Nat :=
+  stringAppendLength "lean" "-vir" "wasm"
+
 end Vir.Fixtures.Basic
