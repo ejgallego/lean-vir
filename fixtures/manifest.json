@@ -20,6 +20,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-list-map-filter-fold",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamListMapFilterFoldScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "partial-application",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.partialApplication",
@@ -35,6 +41,24 @@
       "id": "branch-and-sub",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.branchAndSub",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-bool-gate",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamBoolGateScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-option-prod-some",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamOptionProdSomeScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-option-prod-none",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamOptionProdNoneScore",
       "result": { "type": "Nat" }
     },
     {
@@ -65,6 +89,12 @@
       "id": "upstream-array-find",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamArrayFindScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-array-find-option-prod",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamArrayFindOptionProdScore",
       "result": { "type": "Nat" }
     },
     {

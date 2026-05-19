@@ -23,6 +23,10 @@ structure LoadedDecl where
   source : String
   decl : Decl
 
+structure DeclIndex where
+  localDecls : NameMap LoadedDecl := {}
+  envs : Array (String × Environment) := #[]
+
 structure NativeExtern where
   name : Name
   params : Array Param
@@ -284,14 +288,26 @@ unsafe def frontendEnv (target : Target) : IO Environment := do
   | some env => return env
   | none => throw <| IO.userError s!"Lean frontend failed for {fileName}"
 
-unsafe def loadDeclIndex (targets : Array Target) : IO (NameMap LoadedDecl) := do
+unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
   initSearchPath (← getBuildDir)
-  let mut index : NameMap LoadedDecl := {}
+  let mut index : DeclIndex := {}
   for target in targets do
     let env <- frontendEnv target
+    index := { index with envs := index.envs.push (target.source.toString, env) }
     for decl in getDecls env do
-      index := index.insert decl.name { source := target.source.toString, decl }
+      let loaded := { source := target.source.toString, decl }
+      index := { index with localDecls := index.localDecls.insert decl.name loaded }
   return index
+
+def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
+  match index.localDecls.find? name with
+  | some decl => some decl
+  | none =>
+      index.envs.findSome? fun (source, env) => do
+        let decl <- findEnvDecl env name
+        match decl with
+        | .fdecl .. => some { source := s!"imported by {source}", decl }
+        | .extern .. => none
 
 def refsOfExpr (expr : IR.Expr) (refs : Array Name) : Array Name :=
   match expr with
@@ -322,7 +338,7 @@ def refsOfDecl : Decl -> Array Name
   | .fdecl (body := body) .. => refsOfBody body #[]
   | .extern .. => #[]
 
-partial def collectName (index : NameMap LoadedDecl) (name : Name) (state : Closure) : Closure :=
+partial def collectName (index : DeclIndex) (name : Name) (state : Closure) : Closure :=
   if state.seen.contains name then
     state
   else
@@ -340,7 +356,7 @@ partial def collectName (index : NameMap LoadedDecl) (name : Name) (state : Clos
             let state := { state with decls := state.decls.push loaded }
             refsOfDecl loaded.decl |>.foldl (fun state dep => collectName index dep state) state
 
-def collectClosure (targets : Array Target) (index : NameMap LoadedDecl) : Closure :=
+def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
   targets.foldl (fun state target =>
     target.roots.foldl (fun state root => collectName index root state) state) {}
 

@@ -41,6 +41,12 @@ def reverse (xs : List Nat) : List Nat :=
 def localListReverseChecksum : Nat :=
   checksum 1 (reverse [3, 1, 4, 1, 5])
 
+def upstreamListMapFilterFoldScore : Nat :=
+  let xs := [1, 2, 3, 4, 5]
+  let ys := xs.map (fun x => x + 1)
+  let zs := ys.filter (fun x => 4 <= x)
+  zs.foldl (fun acc x => acc + x) 0
+
 def addN (n : Nat) : Nat -> Nat :=
   fun x => n + x
 
@@ -60,6 +66,25 @@ def branchAndSub : Nat :=
     100 - 58
   else
     0
+
+def boolGateScore (flag other : Bool) : Nat :=
+  if flag then
+    if other then 11 else 17
+  else
+    3
+
+def upstreamBoolGateScore : Nat :=
+  boolGateScore true false
+
+def optionProdScore : Option (Nat × Nat) -> Nat
+  | some (a, b) => a * 10 + b
+  | none => 4
+
+def upstreamOptionProdSomeScore : Nat :=
+  optionProdScore (some (7, 3))
+
+def upstreamOptionProdNoneScore : Nat :=
+  optionProdScore none
 
 def upstreamArrayMapChecksum : Nat :=
   let xs := #[1, 2, 3]
@@ -85,6 +110,14 @@ def upstreamArrayFindScore : Nat :=
   match xs.find? (fun x => x <= 2) with
   | some x => x + 40
   | none => 0
+
+def classifyFind (xs : Array Nat) : Option (Nat × Nat) :=
+  match xs.find? (fun x => 5 <= x) with
+  | some x => some (x, xs.size)
+  | none => none
+
+def upstreamArrayFindOptionProdScore : Nat :=
+  optionProdScore (classifyFind #[1, 3, 8, 2])
 
 def stringAppendLength (a b c : String) : Nat :=
   (a ++ b).length + c.length

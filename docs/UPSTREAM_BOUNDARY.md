@@ -105,14 +105,18 @@ by the examples rather than loading Lean module data. This keeps `.olean`
 loading, module initialization, and full environment construction out of scope
 while still exercising the real upstream interpreter over real Lean IR objects.
 
-The closure is extracted by `tools/GeneratePackage.lean` from the real
-`Lean.IR.Decl` values produced for the example sources. The generator walks
-`FAp`/`PAP` references to include the transitive local closure, then emits a
-small binary package. `wasm/upstream_shim/package_decl_provider.cpp` decodes that
-package into the upstream interpreter's expected object layout at runtime. The
-generator report separates missing Lean IR declarations from missing native
-extern registrations, and the package decoder exposes its last load error for
-browser and smoke-test diagnostics.
+The closure is extracted by `tools/GeneratePackage.lean` from real
+`Lean.IR.Decl` values. The generator starts with declarations produced for the
+example sources, walks `FAp`/`PAP` references, and can now fall back to
+`Lean.IR.findEnvDecl` for imported IR declarations already available through
+the elaborated environment. This is still package-backed loading, not full
+module loading, but it lets fixtures include small upstream library closures
+such as `List.reverse._redArg`. The generator then emits a small binary package.
+`wasm/upstream_shim/package_decl_provider.cpp` decodes that package into the
+upstream interpreter's expected object layout at runtime. The generator report
+separates missing Lean IR declarations from missing native extern
+registrations, and the package decoder exposes its last load error for browser
+and smoke-test diagnostics.
 The current explicit native externs cover the small fixture/demo surface for
 `Nat`, `Array`, `ByteArray`, `USize`, `UInt8`, and `String`: `Nat.add`,
 `Nat.sub`, `Nat.decEq`, `Nat.decLe`, `Nat.decLt`, `Nat.mul`,
@@ -139,9 +143,10 @@ shim.
 ## Current Boundary
 
 The remaining gap is fidelity, not execution. The demo bodies now come from the
-real Lean compiler IR for the example sources, but they are loaded from a
-demo-specific package instead of Lean's generated module data. A later provider
-can replace this package with generated module data behind
+real Lean compiler IR for the example sources and selected imported IR
+declarations, but they are loaded from a demo-specific package instead of Lean's
+generated module data. A later provider can replace this package with generated
+module data behind
 `decl_provider.h`.
 
 ## Future Loading Path

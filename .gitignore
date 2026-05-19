@@ -1,4 +1,5 @@
 .vir.git/
+.beam/
 .lake/
 .tools/
 build/

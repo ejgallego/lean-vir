@@ -74,11 +74,12 @@ then compared against Lean's host IR interpreter with
 `interpreter.prefer_native=false`. Known unsupported fixtures are tracked in
 `fixtures/manifest.json` so boundary gaps remain explicit. The current passing
 surface includes recursion, inductive pattern matching, local list processing,
-partial application, array push/toList, branches over comparisons, and
-standard `Array.map`/`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`,
-plus basic `String.append`/`String.length`/`String.utf8ByteSize`/
-`String.getUTF8Byte`/`String.decEq`, and `ByteArray.empty`/`ByteArray.push`/
-`ByteArray.get!`/`ByteArray.set!`/`ByteArray.extract`/`ByteArray.size`.
+standard `List.map`/`List.filter`/`List.foldl`, partial application, array
+push/toList, branches over comparisons, `Bool`, `Option`, `Prod`, standard
+`Array.map`/`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, plus basic
+`String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
+`String.decEq`, and `ByteArray.empty`/`ByteArray.push`/`ByteArray.get!`/
+`ByteArray.set!`/`ByteArray.extract`/`ByteArray.size`.
 The runner also writes `build/fixtures/summary.json` with per-fixture status
 for CI and boundary debugging.
 
