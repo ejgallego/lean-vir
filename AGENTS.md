@@ -23,14 +23,7 @@ in `wasm32-wasip1`.
 
 ## Git Layout
 
-The Codex sandbox used for initial setup mounted `.git` read-only. In that
-environment, use:
-
-```bash
-git --git-dir=.vir.git --work-tree=. status
-```
-
-In a normal checkout from GitHub, use ordinary `git` commands.
+Use ordinary `git` commands in this checkout.
 
 ## Development Notes
 
