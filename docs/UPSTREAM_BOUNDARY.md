@@ -126,8 +126,9 @@ String raw-position iteration and slicing through `String.push`/
 `String.Internal.next`/`String.Internal.extract`/`String.Pos.Raw.get`/
 `String.Pos.Raw.prev`/`String.Internal.atEnd` plus string ordering, public
 `String.contains`/`startsWith`/`drop`/`dropEnd`/`trimAscii`/`splitOn`/
-`intercalate`/`any`/`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`
-backed by imported upstream IR, and the current
+`intercalate`/`any`/`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/
+`String.find`/`String.Pos.Raw.offsetOfPos` backed by imported upstream IR,
+and the current
 numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
 arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
 comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,

@@ -188,6 +188,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-string-find-offset",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringFindOffsetScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-bytearray-push-get",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayPushGetScore",

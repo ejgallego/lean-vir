@@ -84,8 +84,9 @@ comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
 `String.Pos.Raw.get`/`String.Pos.Raw.prev`/`String.Internal.atEnd`/
 `String.decEq`/string ordering plus public `String.contains`/`startsWith`/
 `drop`/`dropEnd`/`trimAscii`/`splitOn`/`intercalate`/`any`/`front`/
-`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`, `UInt8`/`UInt16` `toNat`
-plus arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
+`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/`String.find`/
+`String.Pos.Raw.offsetOfPos`, `UInt8`/`UInt16` `toNat` plus
+arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
 `UInt32.ofNat`/`toNat`,
 `UInt32` arithmetic/bitwise/shift/comparison operations, `UInt64.ofNat`/
 `toNat`/`toFloat` plus arithmetic/bitwise/shift/comparison operations, large

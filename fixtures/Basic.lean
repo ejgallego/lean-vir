@@ -219,6 +219,19 @@ def stringPredicatePositionScore (s : String) : Nat :=
 def upstreamStringPredicatePositionScore : Nat :=
   stringPredicatePositionScore "  λean"
 
+def stringFindOffsetScore (s : String) : Nat :=
+  let found := (s.find '∀').offset
+  let missing := (s.find 'x').offset
+  let charOffset := String.Pos.Raw.offsetOfPos s found
+  let invalidOffset := String.Pos.Raw.offsetOfPos s ⟨2⟩
+  let next := String.Pos.Raw.next s found
+  let slice := String.Pos.Raw.extract s found next
+  found.byteIdx + missing.byteIdx + charOffset + invalidOffset +
+    slice.length + slice.utf8ByteSize + if slice = "∀" then 1000 else 0
+
+def upstreamStringFindOffsetScore : Nat :=
+  stringFindOffsetScore "Aé∀Z"
+
 def upstreamByteArrayPushGetScore : Nat :=
   let bs := ByteArray.empty.push 65
   let bs := bs.push 66
