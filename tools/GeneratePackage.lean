@@ -350,6 +350,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_utf8_next"
   },
   {
+    name := `String.Pos.Raw.next,
+    params := #[param 1 true .object, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_string_utf8_next"
+  },
+  {
     name := `String.Pos.next,
     params := #[param 1 true .object, param 2 true .tobject, param 3 false .erased],
     resultType := .tagged,
@@ -363,6 +369,12 @@ def nativeExterns : Array NativeExtern := #[
   },
   {
     name := `String.extract,
+    params := #[param 1 true .object, param 2 true .tobject, param 3 true .tobject],
+    resultType := .object,
+    symbol := "lean_string_utf8_extract"
+  },
+  {
+    name := `String.Pos.Raw.extract,
     params := #[param 1 true .object, param 2 true .tobject, param 3 true .tobject],
     resultType := .object,
     symbol := "lean_string_utf8_extract"
@@ -387,6 +399,12 @@ def nativeExterns : Array NativeExtern := #[
   },
   {
     name := `String.Internal.atEnd,
+    params := #[param 1 true .object, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_string_utf8_at_end"
+  },
+  {
+    name := `String.Pos.Raw.atEnd,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint8,
     symbol := "lean_string_utf8_at_end"

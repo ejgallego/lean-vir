@@ -125,8 +125,8 @@ through `Array.replicate`/`Array.set!`/`Array.swapIfInBounds`/`Array.pop`,
 String raw-position iteration and slicing through `String.push`/
 `String.Internal.next`/`String.Internal.extract`/`String.Pos.Raw.get`/
 `String.Pos.Raw.prev`/`String.Internal.atEnd` plus string ordering, public
-`String.contains`/`startsWith`/`drop`/`trimAscii` backed by imported upstream IR,
-and the current
+`String.contains`/`startsWith`/`drop`/`trimAscii`/`splitOn`/`intercalate`
+backed by imported upstream IR, and the current
 numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
 arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
 comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,
@@ -138,6 +138,9 @@ native symbol loader is still out of scope. The public String search/drop fixtur
 currently imports a small upstream IR closure and adds native registrations for
 the runtime helper boundary that closure reaches (`Nat.ble`, `String.Pos.next`,
 `String.decodeChar`, `String.extract`, and `String.Slice.Pattern.Internal.memcmpStr`).
+`String.splitOn` additionally exercises the legacy `String.Pos.Raw.next`/
+`String.Pos.Raw.extract`/`String.Pos.Raw.atEnd` aliases over the same runtime
+helpers.
 `ByteArray.empty` is exposed as
 Lean's native constant symbol (`l_ByteArray_empty`), not as a boxed nullary
 function, because the upstream interpreter loads native constants through the

@@ -176,6 +176,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-string-split-intercalate",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringSplitIntercalateScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-bytearray-push-get",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayPushGetScore",

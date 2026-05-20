@@ -195,6 +195,16 @@ def stringSearchDropScore (s : String) : Nat :=
 def upstreamStringSearchDropScore : Nat :=
   stringSearchDropScore "  lean-vir∀  "
 
+def stringSplitIntercalateScore (s : String) : Nat :=
+  let parts := s.splitOn "|"
+  let joined := "-".intercalate parts
+  parts.length + joined.length + joined.utf8ByteSize +
+    (if joined.contains 'β' then 100 else 0) +
+    if joined = "lean-β-vir" then 1000 else 0
+
+def upstreamStringSplitIntercalateScore : Nat :=
+  stringSplitIntercalateScore "lean|β|vir"
+
 def upstreamByteArrayPushGetScore : Nat :=
   let bs := ByteArray.empty.push 65
   let bs := bs.push 66

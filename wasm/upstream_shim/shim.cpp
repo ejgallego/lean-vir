@@ -879,13 +879,16 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("String.utf8ByteSize", "lean_string_utf8_byte_size", lean_string_utf8_byte_size___boxed) \
     X("String.getUTF8Byte", "lean_string_get_byte_fast", lean_string_get_byte_fast___boxed) \
     X("String.Internal.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
+    X("String.Pos.Raw.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
     X("String.Pos.next", "lean_string_utf8_next_fast", lean_string_utf8_next_fast___boxed) \
     X("String.Internal.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
     X("String.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
+    X("String.Pos.Raw.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
     X("String.Pos.Raw.prev", "lean_string_utf8_prev", lean_string_utf8_prev___boxed) \
     X("String.decodeChar", "lean_string_utf8_get_fast", lean_string_utf8_get_fast___boxed) \
     X("String.Pos.Raw.get", "lean_string_utf8_get", lean_string_utf8_get___boxed) \
     X("String.Internal.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
+    X("String.Pos.Raw.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
     X("String.decEq", "lean_string_dec_eq", lean_string_dec_eq___boxed) \
     X("String.decidableLT", "lean_string_dec_lt", lean_string_dec_lt___boxed) \
     X("String.Slice.Pattern.Internal.memcmpStr", "lean_string_memcmp", lean_string_memcmp___boxed) \
