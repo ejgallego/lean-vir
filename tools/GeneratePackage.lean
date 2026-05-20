@@ -332,6 +332,96 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint32_to_nat"
   },
   {
+    name := `UInt32.add,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_add"
+  },
+  {
+    name := `UInt32.sub,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_sub"
+  },
+  {
+    name := `UInt32.mul,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_mul"
+  },
+  {
+    name := `UInt32.div,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_div"
+  },
+  {
+    name := `UInt32.mod,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_mod"
+  },
+  {
+    name := `UInt32.land,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_land"
+  },
+  {
+    name := `UInt32.lor,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_lor"
+  },
+  {
+    name := `UInt32.xor,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_xor"
+  },
+  {
+    name := `UInt32.shiftLeft,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_shift_left"
+  },
+  {
+    name := `UInt32.shiftRight,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_shift_right"
+  },
+  {
+    name := `UInt32.complement,
+    params := #[param 1 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_complement"
+  },
+  {
+    name := `UInt32.neg,
+    params := #[param 1 false .uint32],
+    resultType := .uint32,
+    symbol := "lean_uint32_neg"
+  },
+  {
+    name := `UInt32.decEq,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint8,
+    symbol := "lean_uint32_dec_eq"
+  },
+  {
+    name := `UInt32.decLt,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint8,
+    symbol := "lean_uint32_dec_lt"
+  },
+  {
+    name := `UInt32.decLe,
+    params := #[param 1 false .uint32, param 2 false .uint32],
+    resultType := .uint8,
+    symbol := "lean_uint32_dec_le"
+  },
+  {
     name := `UInt64.ofNat,
     params := #[param 1 true .tobject],
     resultType := .uint64,

@@ -194,6 +194,24 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-uint32-arithmetic",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint32ArithmeticScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-uint32-bitwise",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint32BitwiseScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-uint32-compare",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint32CompareScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-uint64-to-float",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.uint64ToFloatScore",
