@@ -79,10 +79,12 @@ standard `List.map`/`List.filter`/`List.foldl`/`List.any`/`List.all`/
 comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
 `Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, plus basic
 `String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
-`String.decEq`, `UInt8.toNat`, `UInt32` literals, `UInt32.ofNat`/`toNat`,
-`UInt32` arithmetic/bitwise/shift/comparison operations,
-`UInt64.ofNat`/`toFloat`, small `Int` arithmetic, `Nat.div`/`pow`/`log2`/
-`shiftLeft`/`shiftRight`, `Float.scaleB`/`toUInt32`, and
+`String.decEq`, `UInt8`/`UInt16` `toNat` plus arithmetic/bitwise/shift/
+comparison operations, `UInt32` literals, `UInt32.ofNat`/`toNat`,
+`UInt32` arithmetic/bitwise/shift/comparison operations, `UInt64.ofNat`/
+`toNat`/`toFloat` plus arithmetic/bitwise/shift/comparison operations, small
+`Int` arithmetic, `Nat.div`/`pow`/`log2`/`shiftLeft`/`shiftRight`,
+`Float.scaleB`/`toUInt32`, and
 `ByteArray.empty`/`ByteArray.push`/`ByteArray.get!`/`ByteArray.set!`/
 `ByteArray.extract`/`ByteArray.size`.
 The runner also writes `build/fixtures/summary.json` with per-fixture status,

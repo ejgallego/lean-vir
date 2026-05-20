@@ -54,6 +54,64 @@ def uint32CompareScore : Nat :=
   (if a = c then 30 else 0) +
   (if b < a then 100 else 5)
 
+def uint8OperationsScore : Nat :=
+  let a : UInt8 := 250
+  let b : UInt8 := 12
+  let arith := ((a + b) * 2 - 5) / 3
+  let wrap := (255 : UInt8) + 2
+  let andv := UInt8.land 240 51
+  let xorv := UInt8.xor 240 51
+  let shifted := UInt8.shiftRight (UInt8.shiftLeft andv 2) 1
+  let combined := UInt8.lor shifted xorv
+  let negBack := UInt8.neg (UInt8.neg 9)
+  let compBack := UInt8.complement (UInt8.complement 13)
+  arith.toNat + (a % b).toNat + wrap.toNat + combined.toNat +
+  negBack.toNat + compBack.toNat +
+  (if (17 : UInt8) < 21 then 10 else 0) +
+  (if (17 : UInt8) <= 17 then 20 else 0) +
+  (if (17 : UInt8) = 17 then 30 else 0) +
+  (if (21 : UInt8) < 17 then 100 else 5)
+
+def uint16OperationsScore : Nat :=
+  let a : UInt16 := 65000
+  let b : UInt16 := 1234
+  let arith := ((a + b) * 3 - 17) / 7
+  let wrap := (65535 : UInt16) + 3
+  let andv := UInt16.land 61680 4951
+  let xorv := UInt16.xor 61680 4951
+  let shifted := UInt16.shiftRight (UInt16.shiftLeft andv 2) 1
+  let combined := UInt16.lor shifted xorv
+  let negBack := UInt16.neg (UInt16.neg 19)
+  let compBack := UInt16.complement (UInt16.complement 27)
+  arith.toNat + (a % b).toNat + wrap.toNat + combined.toNat +
+  negBack.toNat + compBack.toNat +
+  (if (17 : UInt16) < 21 then 10 else 0) +
+  (if (17 : UInt16) <= 17 then 20 else 0) +
+  (if (17 : UInt16) = 17 then 30 else 0) +
+  (if (21 : UInt16) < 17 then 100 else 5)
+
+def uint64ArithmeticScore : Nat :=
+  let a : UInt64 := 100000
+  let b : UInt64 := 321
+  let arith := ((a + b) * 7 - 20) / 11
+  let wrap := (18446744073709551615 : UInt64) + 8
+  arith.toNat + (a % b).toNat + wrap.toNat
+
+def uint64BitwiseCompareScore : Nat :=
+  let a : UInt64 := 16711935
+  let b : UInt64 := 61680
+  let andv := UInt64.land a b
+  let xorv := UInt64.xor a b
+  let shifted := UInt64.shiftRight (UInt64.shiftLeft andv 4) 2
+  let combined := UInt64.lor shifted xorv
+  let negBack := UInt64.neg (UInt64.neg 29)
+  let compBack := UInt64.complement (UInt64.complement 31)
+  combined.toNat + negBack.toNat + compBack.toNat +
+  (if (17 : UInt64) < 21 then 10 else 0) +
+  (if (17 : UInt64) <= 17 then 20 else 0) +
+  (if (17 : UInt64) = 17 then 30 else 0) +
+  (if (21 : UInt64) < 17 then 100 else 5)
+
 def uint64ToFloatScore : Nat :=
   let n := Nat.shiftLeft 3 5
   let x := UInt64.ofNat n

@@ -122,8 +122,10 @@ The current explicit native externs cover the small fixture/demo surface for
 `Float`, and `String`. This includes the arithmetic and comparison operations
 needed by the demos, List/Array/String/ByteArray fixtures, and the current
 numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
-arithmetic, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift, and
-comparison operations, `UInt64.ofNat`/`toFloat`, and `Float.scaleB`/`toUInt32`.
+arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
+comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,
+and comparison operations, `UInt64.ofNat`/`toNat`/`toFloat` plus arithmetic,
+bitwise, shift, and comparison operations, and `Float.scaleB`/`toUInt32`.
 They are backed by a small shim registry; a full
 native symbol loader is still out of scope. `ByteArray.empty` is exposed as
 Lean's native constant symbol (`l_ByteArray_empty`), not as a boxed nullary

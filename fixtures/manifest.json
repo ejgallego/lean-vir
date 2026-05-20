@@ -212,6 +212,30 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-uint8-operations",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint8OperationsScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-uint16-operations",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint16OperationsScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-uint64-arithmetic",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint64ArithmeticScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-uint64-bitwise-compare",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint64BitwiseCompareScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-uint64-to-float",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.uint64ToFloatScore",
