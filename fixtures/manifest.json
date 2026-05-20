@@ -256,6 +256,18 @@
       "expect": { "status": "unsupported" }
     },
     {
+      "id": "upstream-task-pure-get",
+      "source": "fixtures/Task.lean",
+      "entry": "Vir.Fixtures.Task.taskPureGetScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-task-map-get",
+      "source": "fixtures/Task.lean",
+      "entry": "Vir.Fixtures.Task.taskMapGetScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-uint32-literal-to-nat",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.uint32LiteralToNatScore",

@@ -234,6 +234,32 @@ extern "C" lean_object * lean_panic_fn_borrowed___boxed(lean_object * type, lean
     return result;
 }
 
+extern "C" lean_object * lean_task_pure___boxed(lean_object * type, lean_object * value) {
+    lean_dec(type);
+    return lean_task_pure(value);
+}
+
+extern "C" lean_object * lean_task_get_own___boxed(lean_object * type, lean_object * task) {
+    lean_dec(type);
+    return lean_task_get_own(task);
+}
+
+extern "C" lean_object * lean_task_map___boxed(
+    lean_object * alpha,
+    lean_object * beta,
+    lean_object * fn,
+    lean_object * task,
+    lean_object * prio,
+    lean_object * sync) {
+    lean_dec(alpha);
+    lean_dec(beta);
+    unsigned prio_value = static_cast<unsigned>(lean_unbox(prio));
+    uint8_t sync_value = static_cast<uint8_t>(lean_unbox(sync));
+    lean_dec(prio);
+    lean_dec(sync);
+    return lean_task_map_core(fn, task, prio_value, sync_value, false);
+}
+
 extern "C" lean_object * lean_array_mk_empty___boxed(lean_object * type, lean_object * capacity) {
     lean_dec(type);
     lean_object * result = lean_mk_empty_array_with_capacity(capacity);
@@ -985,6 +1011,9 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("Int.natAbs", "lean_nat_abs", lean_nat_abs___boxed) \
     X("System.Platform.getNumBits", "lean_system_platform_nbits", lean_system_platform_nbits___boxed) \
     X("panicCore", "lean_panic_fn_borrowed", lean_panic_fn_borrowed___boxed) \
+    X("Task.pure", "lean_task_pure", lean_task_pure___boxed) \
+    X("Task.get", "lean_task_get_own", lean_task_get_own___boxed) \
+    X("Task.map", "lean_task_map", lean_task_map___boxed) \
     X("Array.mkEmpty", "lean_array_mk_empty", lean_array_mk_empty___boxed) \
     X("Array.mk", "lean_array_mk", lean_array_mk___boxed) \
     X("Array.push", "lean_array_push", lean_array_push___boxed) \

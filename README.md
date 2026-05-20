@@ -100,8 +100,11 @@ arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
 `ByteArray.extract`/`ByteArray.size`/`ByteArray.validateUTF8`, plus the
 Lean parser input layer through `Lean.Parser.mkInputContext`,
 `Lean.FileMap.toPosition`, and `Lean.Parser.mkParserState`.
+The demo also has narrow synchronous coverage for already-resolved
+`Task.pure`/`Task.get`/`Task.map`, because real `Environment` values store a
+checked kernel environment behind `Task`.
 `Lean.Parser.parseHeader` is tracked as an expected-unsupported vertical target
-while the demo still lacks the real environment/IO/task boundary it needs.
+while the demo still lacks more of the real environment/IO boundary it needs.
 The runner also writes `build/fixtures/summary.json` with per-fixture status,
 imported IR declarations, native externs, and missing-boundary diagnostics for
 CI and boundary debugging.

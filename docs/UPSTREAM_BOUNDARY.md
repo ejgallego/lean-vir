@@ -141,6 +141,9 @@ fixture returned through `vir_eval_const_nat_string`, and
 `Float.scaleB`/`toUInt32`. The parser input fixture additionally runs
 `Lean.Parser.mkInputContext`, `Lean.FileMap.toPosition`, and
 `Lean.Parser.mkParserState` over real upstream parser/input infrastructure.
+`Task.pure`, `Task.get`, and `Task.map` are covered only in the synchronous,
+already-resolved mode needed by real `Environment` values; the demo does not
+attempt to provide a task scheduler.
 They are backed by a table-driven shim registry; a full native symbol loader is
 still out of scope. The public String search/drop fixture currently imports a
 small upstream IR closure and adds native registrations for the runtime helper
@@ -185,11 +188,11 @@ module data behind `decl_provider.h`.
 
 The fixture suite tracks `Lean.Parser.parseHeader` as expected unsupported. It
 is the current vertical parser target: the host oracle can evaluate it, but the
-WASM package closure still reaches environment/IO/task primitives such as
-`IO.initializing`, `ST.Prim.Ref.get`, `Task.get`, and `Task.map`, plus additional
-array, string, `ByteArray`, `USize`, and hashing externs. Keep that boundary
-explicit in `fixtures/manifest.json` until the required shim or package-loader
-support is added.
+WASM package closure still reaches environment/IO primitives such as
+`IO.initializing` and `ST.Prim.Ref.get`, plus additional array, string,
+`ByteArray`, `USize`, and hashing externs. Keep that boundary explicit in
+`fixtures/manifest.json` until the required shim or package-loader support is
+added.
 
 ## Future Loading Path
 

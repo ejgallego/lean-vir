@@ -200,6 +200,31 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_panic_fn_borrowed"
   },
   {
+    name := `Task.pure,
+    params := #[param 1 false .erased, param 2 false .tobject],
+    resultType := .object,
+    symbol := "lean_task_pure"
+  },
+  {
+    name := `Task.get,
+    params := #[param 1 false .erased, param 2 false .object],
+    resultType := .tobject,
+    symbol := "lean_task_get_own"
+  },
+  {
+    name := `Task.map,
+    params := #[
+      param 1 false .erased,
+      param 2 false .erased,
+      param 3 false .tobject,
+      param 4 false .object,
+      param 5 false .tobject,
+      param 6 false .uint8
+    ],
+    resultType := .object,
+    symbol := "lean_task_map"
+  },
+  {
     name := `Array.mkEmpty,
     params := #[param 1 false .erased, param 2 false .tagged],
     resultType := .object,
