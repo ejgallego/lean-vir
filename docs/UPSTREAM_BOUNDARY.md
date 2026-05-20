@@ -128,7 +128,8 @@ String raw-position iteration and slicing through `String.push`/
 `String.contains`/`startsWith`/`drop`/`dropEnd`/`trimAscii`/`splitOn`/
 `intercalate`/`any`/`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/
 `String.find`/`String.Pos.Raw.offsetOfPos` backed by imported upstream IR,
-and the current
+plus UTF-8 conversion through `String.toUTF8`, `String.fromUTF8?`,
+`String.ofByteArray`, and `ByteArray.validateUTF8`, and the current
 numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
 arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
 comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,
@@ -148,7 +149,9 @@ Lean's native constant symbol (`l_ByteArray_empty`), not as a boxed nullary
 function, because the upstream interpreter loads native constants through the
 symbol address. `ByteArray.extract` is exposed as Lean's compiled symbol stem
 (`l_ByteArray_extract`) and delegates to the linked runtime
-`lean_byte_array_copy_slice` path.
+`lean_byte_array_copy_slice` path. Its registered IR parameters mirror the real
+compiled declaration: the source byte array and stop index are borrowed, while
+the start index is consumed.
 
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
 registry. It checks that every `nativeExterns` entry in

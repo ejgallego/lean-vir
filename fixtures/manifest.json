@@ -194,6 +194,30 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-string-to-utf8-bytearray",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringToUtf8ByteArrayScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-from-utf8-valid",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringFromUtf8ValidScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-from-utf8-invalid",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.stringFromUtf8InvalidScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-utf8-roundtrip",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringUtf8RoundtripScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-bytearray-push-get",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayPushGetScore",

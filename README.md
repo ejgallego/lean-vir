@@ -82,10 +82,11 @@ comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
 `String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
 `String.push`/`String.Internal.next`/`String.Internal.extract`/
 `String.Pos.Raw.get`/`String.Pos.Raw.prev`/`String.Internal.atEnd`/
-`String.decEq`/string ordering plus public `String.contains`/`startsWith`/
-`drop`/`dropEnd`/`trimAscii`/`splitOn`/`intercalate`/`any`/`front`/
-`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/`String.find`/
-`String.Pos.Raw.offsetOfPos`, `UInt8`/`UInt16` `toNat` plus
+`String.decEq`/string ordering/`String.toUTF8`/`String.ofByteArray` plus
+public `String.fromUTF8?`/`String.contains`/`startsWith`/`drop`/`dropEnd`/
+`trimAscii`/`splitOn`/`intercalate`/`any`/`front`/`pushn`/`isEmpty`/
+`String.Pos.Raw.nextWhile`/`String.find`/`String.Pos.Raw.offsetOfPos`,
+`UInt8`/`UInt16` `toNat` plus
 arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
 `UInt32.ofNat`/`toNat`,
 `UInt32` arithmetic/bitwise/shift/comparison operations, `UInt64.ofNat`/
@@ -94,7 +95,7 @@ arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
 `Int` arithmetic, `Nat.div`/`pow`/`log2`/`shiftLeft`/`shiftRight`,
 `Float.scaleB`/`toUInt32`, and
 `ByteArray.empty`/`ByteArray.push`/`ByteArray.get!`/`ByteArray.set!`/
-`ByteArray.extract`/`ByteArray.size`.
+`ByteArray.extract`/`ByteArray.size`/`ByteArray.validateUTF8`.
 The runner also writes `build/fixtures/summary.json` with per-fixture status,
 imported IR declarations, native externs, and missing-boundary diagnostics for
 CI and boundary debugging.

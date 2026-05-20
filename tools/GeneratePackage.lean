@@ -279,7 +279,7 @@ def nativeExterns : Array NativeExtern := #[
   },
   {
     name := `ByteArray.extract,
-    params := #[param 1 false .object, param 2 false .tobject, param 3 false .tobject],
+    params := #[param 1 true .object, param 2 false .tobject, param 3 true .tobject],
     resultType := .object,
     symbol := "l_ByteArray_extract"
   },
@@ -288,6 +288,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object],
     resultType := .tagged,
     symbol := "lean_byte_array_size"
+  },
+  {
+    name := `ByteArray.validateUTF8,
+    params := #[param 1 true .object],
+    resultType := .uint8,
+    symbol := "lean_string_validate_utf8"
   },
   {
     name := `USize.ofNat,
@@ -318,6 +324,18 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .object, param 2 true .object],
     resultType := .object,
     symbol := "lean_string_append"
+  },
+  {
+    name := `String.toUTF8,
+    params := #[param 1 true .object],
+    resultType := .object,
+    symbol := "lean_string_to_utf8"
+  },
+  {
+    name := `String.ofByteArray,
+    params := #[param 1 false .object, param 2 false .erased],
+    resultType := .object,
+    symbol := "lean_string_from_utf8_unchecked"
   },
   {
     name := `String.push,

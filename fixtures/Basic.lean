@@ -232,6 +232,48 @@ def stringFindOffsetScore (s : String) : Nat :=
 def upstreamStringFindOffsetScore : Nat :=
   stringFindOffsetScore "Aé∀Z"
 
+def stringToUtf8ByteArrayScore (s : String) : Nat :=
+  let bytes := s.toUTF8
+  bytes.size + (bytes.get! 1).toNat + (bytes.get! 3).toNat + (bytes.get! 6).toNat
+
+def upstreamStringToUtf8ByteArrayScore : Nat :=
+  stringToUtf8ByteArrayScore "Aé∀Z"
+
+def stringFromUtf8ValidScore (s : String) : Nat :=
+  let bytes := s.toUTF8
+  match String.fromUTF8? bytes with
+  | some t =>
+      (if t = s then 1000 else 0) + t.length + t.utf8ByteSize
+  | none => 0
+
+def upstreamStringFromUtf8ValidScore : Nat :=
+  stringFromUtf8ValidScore "Aé∀Z"
+
+def stringFromUtf8InvalidScore : Nat :=
+  let invalid := (ByteArray.empty.push 255).push 255
+  match String.fromUTF8? invalid with
+  | some _ => 0
+  | none => 100
+
+def stringUtf8RoundtripScore (s : String) : Nat :=
+  let bytes := s.toUTF8
+  let headBytes := bytes.extract 0 3
+  let invalid := (ByteArray.empty.push 255).push 255
+  let validScore :=
+    match String.fromUTF8? bytes with
+    | some t =>
+        (if t = s then 1000 else 0) + t.length + t.utf8ByteSize
+    | none => 0
+  let invalidScore :=
+    match String.fromUTF8? invalid with
+    | some _ => 0
+    | none => 100
+  validScore + invalidScore + bytes.size + (bytes.get! 1).toNat +
+    headBytes.size + (headBytes.get! 0).toNat
+
+def upstreamStringUtf8RoundtripScore : Nat :=
+  stringUtf8RoundtripScore "Aé∀Z"
+
 def upstreamByteArrayPushGetScore : Nat :=
   let bs := ByteArray.empty.push 65
   let bs := bs.push 66

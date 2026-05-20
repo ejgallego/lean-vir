@@ -36,6 +36,9 @@ lean_object * lean_byte_array_copy_slice(
     lean_object * dest_off,
     lean_object * len,
     bool exact);
+uint8_t lean_string_validate_utf8(lean_object * bytes);
+lean_object * lean_string_to_utf8(lean_object * str);
+lean_object * lean_string_from_utf8_unchecked(lean_object * bytes);
 }
 
 static lean_object * box_uint8_binary(lean_object * a, lean_object * b, uint8_t (*fn)(uint8_t, uint8_t)) {
@@ -349,6 +352,12 @@ extern "C" lean_object * lean_byte_array_size___boxed(lean_object * array) {
     return result;
 }
 
+extern "C" lean_object * lean_string_validate_utf8___boxed(lean_object * array) {
+    uint8_t result = lean_string_validate_utf8(array);
+    lean_dec(array);
+    return lean_box(result);
+}
+
 extern "C" lean_object * lean_usize_of_nat___boxed(lean_object * a) {
     size_t result = lean_usize_of_nat(a);
     lean_dec(a);
@@ -379,6 +388,18 @@ extern "C" lean_object * lean_usize_dec_lt___boxed(lean_object * a, lean_object 
 extern "C" lean_object * lean_string_append___boxed(lean_object * a, lean_object * b) {
     lean_object * result = lean_string_append(a, b);
     lean_dec(b);
+    return result;
+}
+
+extern "C" lean_object * lean_string_to_utf8___boxed(lean_object * s) {
+    lean_object * result = lean_string_to_utf8(s);
+    lean_dec(s);
+    return result;
+}
+
+extern "C" lean_object * lean_string_from_utf8_unchecked___boxed(lean_object * bytes, lean_object * proof) {
+    lean_object * result = lean_string_from_utf8_unchecked(bytes);
+    lean_dec(proof);
     return result;
 }
 
@@ -869,11 +890,14 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("ByteArray.set!", "lean_byte_array_set", lean_byte_array_set___boxed) \
     X("ByteArray.extract", "l_ByteArray_extract", l_ByteArray_extract___boxed) \
     X("ByteArray.size", "lean_byte_array_size", lean_byte_array_size___boxed) \
+    X("ByteArray.validateUTF8", "lean_string_validate_utf8", lean_string_validate_utf8___boxed) \
     X("USize.ofNat", "lean_usize_of_nat", lean_usize_of_nat___boxed) \
     X("USize.add", "lean_usize_add", lean_usize_add___boxed) \
     X("USize.decEq", "lean_usize_dec_eq", lean_usize_dec_eq___boxed) \
     X("USize.decLt", "lean_usize_dec_lt", lean_usize_dec_lt___boxed) \
     X("String.append", "lean_string_append", lean_string_append___boxed) \
+    X("String.toUTF8", "lean_string_to_utf8", lean_string_to_utf8___boxed) \
+    X("String.ofByteArray", "lean_string_from_utf8_unchecked", lean_string_from_utf8_unchecked___boxed) \
     X("String.push", "lean_string_push", lean_string_push___boxed) \
     X("String.length", "lean_string_length", lean_string_length___boxed) \
     X("String.utf8ByteSize", "lean_string_utf8_byte_size", lean_string_utf8_byte_size___boxed) \
