@@ -9,6 +9,7 @@ import Init.Data.Nat.Log2
 import Init.Data.Array.Set
 import Init.Data.ByteArray.Basic
 import Init.Data.String.Basic
+import Init.System.IO
 
 namespace Vir.Fixtures.Boundary
 
@@ -119,6 +120,10 @@ def uint64LargeToNatScore : Nat :=
   let high := UInt64.shiftLeft 1 63
   (high + 12345).toNat
 
+def largeNatLiteralScore : Nat :=
+  let n : Nat := 18446744073709551616
+  if n = UInt64.size then 42 else 0
+
 def uint64ToFloatScore : Nat :=
   let n := Nat.shiftLeft 3 5
   let x := UInt64.ofNat n
@@ -179,6 +184,15 @@ unsafe def nameHashSubstringPtrScore : Nat :=
   (if sameSubstring then 20 else 0) +
   (if diffSubstring then 200 else 5) +
   (if samePtr then 30 else 0)
+
+unsafe def ioRefReadBoundaryScore : Nat :=
+  match unsafeIO do
+    let initializing ← IO.initializing
+    let ref ← IO.mkRef 41
+    let value ← ref.get
+    pure (value + if initializing then 100 else 1) with
+  | .ok score => score
+  | .error _ => 1000
 
 def floatScaleScore : Nat :=
   let x := Float.scaleB 1.5 (2 : Int)

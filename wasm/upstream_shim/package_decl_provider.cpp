@@ -87,11 +87,16 @@ static object * mk_arg_erased() {
     return lean_box(1);
 }
 
-static object * mk_lit_num(size_t value) {
-    object * lit_val = mk_ctor(0, { mk_nat(value) });
+static object * mk_lit_num(object * value) {
+    object * lit_val = mk_ctor(0, { value });
+    lean_dec(value);
     object * expr = mk_ctor(11, { lit_val });
     lean_dec(lit_val);
     return expr;
+}
+
+static object * mk_lit_num(size_t value) {
+    return mk_lit_num(mk_nat(value));
 }
 
 static object * mk_lit_str(std::string const & value) {
@@ -260,6 +265,10 @@ public:
         return m_pos;
     }
 
+    void set_version(uint32_t version) {
+        m_version = version;
+    }
+
     void fail(std::string const & message) {
         if (ok) {
             ok = false;
@@ -296,6 +305,11 @@ public:
         uint32_t b2 = u8();
         uint32_t b3 = u8();
         return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+    }
+
+    object * nat() {
+        std::string decimal = string();
+        return lean_cstr_to_nat(decimal.c_str());
     }
 
     std::string string() {
@@ -370,13 +384,16 @@ public:
     object * lit() {
         uint8_t tag = u8();
         if (tag == 0) {
+            if (m_version >= 2) {
+                return mk_lit_num(nat());
+            }
             return mk_lit_num(u32());
         }
         if (tag == 1) {
             return mk_lit_str(string());
         }
         fail("unsupported literal tag " + std::to_string(tag));
-        return mk_lit_num(0);
+        return mk_lit_num(static_cast<size_t>(0));
     }
 
     object * ctor_info() {
@@ -437,7 +454,7 @@ public:
             return mk_is_shared(u32());
         default:
             fail("unsupported expression tag " + std::to_string(tag));
-            return mk_lit_num(0);
+            return mk_lit_num(static_cast<size_t>(0));
         }
     }
 
@@ -560,6 +577,7 @@ public:
 
 private:
     std::string m_error;
+    uint32_t m_version = 1;
 
     template <typename F>
     std::vector<object *> object_array(F read_one) {
@@ -592,10 +610,11 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "invalid IR package magic `" + magic + "`";
         return false;
     }
-    if (version != 1) {
+    if (version != 1 && version != 2) {
         g_last_error = "unsupported IR package version " + std::to_string(version);
         return false;
     }
+    r.set_version(version);
 
     std::vector<decl_entry> entries;
     entries.reserve(count);

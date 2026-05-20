@@ -96,7 +96,8 @@ arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
 `UInt32` arithmetic/bitwise/shift/comparison operations, `UInt64.ofNat`/
 `ofNatLT`/`toNat`/`toUSize`/`toFloat` plus arithmetic/bitwise/shift/comparison
 operations, large `UInt64.toNat` results returned through the decimal-string
-Nat API, `USize` `sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
+Nat API, package-backed `Nat` literals wider than 32 bits, `USize`
+`sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
 small `Int` arithmetic, `Nat.div`/`pow`/`log2`/`shiftLeft`/`shiftRight`,
 `Float.scaleB`/`toUInt32`, and
 `ByteArray.mk`/`ByteArray.empty`/`ByteArray.push`/`ByteArray.get`/
@@ -109,8 +110,11 @@ namely `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
 The demo also has narrow synchronous coverage for already-resolved
 `Task.pure`/`Task.get`/`Task.map`, because real `Environment` values store a
 checked kernel environment behind `Task`.
+It models the demo as post-initialization (`IO.initializing = false`) and has
+single-threaded `ST.Prim.mkRef`/`ST.Prim.Ref.get` support for read-only ref
+access reached by fixtures and parser setup.
 `Lean.Parser.parseHeader` is tracked as an expected-unsupported vertical target
-while the demo still lacks more of the real environment/IO boundary it needs.
+while the demo still lacks initialized parser/environment extension globals.
 The runner also writes `build/fixtures/summary.json` with per-fixture status,
 imported IR declarations, native externs, and missing-boundary diagnostics for
 CI and boundary debugging.

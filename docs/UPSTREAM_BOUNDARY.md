@@ -140,8 +140,9 @@ comparison operations, `UInt32.ofNat`/`toNat`/`toUInt8` plus arithmetic,
 bitwise, shift, and comparison operations, `UInt64.ofNat`/`ofNatLT`/`toNat`/
 `toUSize`/`toFloat` plus arithmetic, bitwise, shift, and comparison operations
 including a wide `UInt64.toNat` fixture returned through
-`vir_eval_const_nat_string`, `USize` `sub`/`mul`/`land`/`shiftLeft`/
-`shiftRight`/`toNat`/`decLe`, `ByteArray.mk`/`ByteArray.get`, and
+`vir_eval_const_nat_string`, package-backed `Nat` literals wider than 32 bits,
+`USize` `sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
+`ByteArray.mk`/`ByteArray.get`, and
 `Float.scaleB`/`toUInt32`. Parser-adjacent hash/name/substring/pointer-address
 primitives (`mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
 `ptrAddrUnsafe`) are covered by a separate unsafe fixture that only compares
@@ -151,6 +152,9 @@ stable same-object pointer equality. The parser input fixture additionally runs
 `Task.pure`, `Task.get`, and `Task.map` are covered only in the synchronous,
 already-resolved mode needed by real `Environment` values; the demo does not
 attempt to provide a task scheduler.
+`IO.initializing` is modeled as post-initialization, and `ST.Prim.mkRef`/
+`ST.Prim.Ref.get` cover single-threaded ref allocation/read semantics. Mutation,
+blocking IO, and scheduler behavior are still outside the demo boundary.
 They are backed by a table-driven shim registry; a full native symbol loader is
 still out of scope. The public String search/drop fixture currently imports a
 small upstream IR closure and adds native registrations for the runtime helper
@@ -194,11 +198,15 @@ generated module data. A later provider can replace this package with generated
 module data behind `decl_provider.h`.
 
 The fixture suite tracks `Lean.Parser.parseHeader` as expected unsupported. It
-is the current vertical parser target: the host oracle can evaluate it, but the
-WASM package closure still reaches environment/IO primitives `IO.initializing`
-and `ST.Prim.Ref.get`. Its current report has no missing IR declarations; keep
-the remaining native boundary explicit in `fixtures/manifest.json` until the
-required environment support is added.
+is the current vertical parser target: the host oracle can evaluate it, and the
+WASM package closure now has no missing IR declarations or native extern
+registrations. It still reaches nullary declarations produced by Lean
+`builtin_initialize` commands whose IR body is top-level `unreachable`:
+`_private.Lean.Environment.0.Lean.EnvExtension.envExtensionsRef`,
+`Lean.Parser.categoryParserFnExtension`, and `Lean.Parser.parserExtension`.
+These are initialized parser/environment extension globals, so the generator
+reports them under `Unsupported Init Globals` and keeps the fixture explicitly
+expected-unsupported until the demo has a faithful initialized-global story.
 
 ## Future Loading Path
 

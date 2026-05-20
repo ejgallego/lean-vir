@@ -67,17 +67,24 @@ function parseNativeExtern(line) {
   return { name: match[1], symbol: match[2] };
 }
 
+function parseBulletName(line) {
+  const match = line.match(/^- `([^`]+)`$/);
+  return match?.[1] ?? line;
+}
+
 function packageDiagnostics(report) {
   const loadedDecls = sectionLines(report, "Loaded IR Declarations").map(parseLoadedDecl).filter(Boolean);
   const nativeExterns = sectionLines(report, "Native Extern Declarations").map(parseNativeExtern).filter(Boolean);
   const missingDecls = sectionLines(report, "Missing IR Declarations");
   const missingNativeExterns = sectionLines(report, "Missing Native Extern Registrations");
+  const unsupportedInitGlobals = sectionLines(report, "Unsupported Init Globals").map(parseBulletName);
   return {
     loadedDecls,
     importedDecls: loadedDecls.filter((decl) => decl.imported),
     nativeExterns,
     missingDecls,
     missingNativeExterns,
+    unsupportedInitGlobals,
   };
 }
 
@@ -89,6 +96,10 @@ function classifyPackageFailure(report, stderr) {
   const missingDecls = sectionLines(report, "Missing IR Declarations");
   if (missingDecls.length !== 0) {
     return { kind: "missing-ir-decl", detail: missingDecls.join(", ") };
+  }
+  const unsupportedInitGlobals = sectionLines(report, "Unsupported Init Globals").map(parseBulletName);
+  if (unsupportedInitGlobals.length !== 0) {
+    return { kind: "unsupported-init-global", detail: unsupportedInitGlobals.join(", ") };
   }
   if (stderr.includes("unsupported")) {
     return { kind: "unsupported-ir-package", detail: stderr.trim().split("\n")[0] };
@@ -312,6 +323,7 @@ const summary = {
       nativeExterns: result.diagnostics.nativeExterns,
       missingDecls: result.diagnostics.missingDecls,
       missingNativeExterns: result.diagnostics.missingNativeExterns,
+      unsupportedInitGlobals: result.diagnostics.unsupportedInitGlobals,
     },
   })),
 };

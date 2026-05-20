@@ -265,6 +265,39 @@ extern "C" lean_object * lean_ptr_addr___boxed(lean_object * type, lean_object *
     return lean_box_usize(result);
 }
 
+extern "C" lean_object * lean_io_initializing___boxed(lean_object * world) {
+    lean_dec(world);
+    return lean_box(0);
+}
+
+extern "C" lean_object * lean_st_mk_ref___boxed(
+    lean_object * sigma,
+    lean_object * alpha,
+    lean_object * value,
+    lean_object * world) {
+    lean_dec(sigma);
+    lean_dec(alpha);
+    lean_dec(world);
+    lean_ref_object * ref = reinterpret_cast<lean_ref_object *>(lean_alloc_small_object(sizeof(lean_ref_object)));
+    lean_set_st_header(reinterpret_cast<lean_object *>(ref), LeanRef, 0);
+    ref->m_value = value;
+    return reinterpret_cast<lean_object *>(ref);
+}
+
+extern "C" lean_object * lean_st_ref_get___boxed(
+    lean_object * sigma,
+    lean_object * alpha,
+    lean_object * ref,
+    lean_object * world) {
+    lean_dec(sigma);
+    lean_dec(alpha);
+    lean_dec(world);
+    lean_object * value = lean_to_ref(ref)->m_value;
+    lean_inc(value);
+    lean_dec(ref);
+    return value;
+}
+
 extern "C" lean_object * lean_task_pure___boxed(lean_object * type, lean_object * value) {
     lean_dec(type);
     return lean_task_pure(value);
@@ -1200,6 +1233,9 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("System.Platform.getNumBits", "lean_system_platform_nbits", lean_system_platform_nbits___boxed) \
     X("panicCore", "lean_panic_fn_borrowed", lean_panic_fn_borrowed___boxed) \
     X("ptrAddrUnsafe", "lean_ptr_addr", lean_ptr_addr___boxed) \
+    X("IO.initializing", "lean_io_initializing", lean_io_initializing___boxed) \
+    X("ST.Prim.mkRef", "lean_st_mk_ref", lean_st_mk_ref___boxed) \
+    X("ST.Prim.Ref.get", "lean_st_ref_get", lean_st_ref_get___boxed) \
     X("Task.pure", "lean_task_pure", lean_task_pure___boxed) \
     X("Task.get", "lean_task_get_own", lean_task_get_own___boxed) \
     X("Task.map", "lean_task_map", lean_task_map___boxed) \

@@ -340,6 +340,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-large-nat-literal",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.largeNatLiteralScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-uint64-to-float",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.uint64ToFloatScore",
@@ -379,6 +385,13 @@
       "id": "boundary-name-hash-substring-ptr",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.nameHashSubstringPtrScore",
+      "result": { "type": "Nat" },
+      "unsafe": true
+    },
+    {
+      "id": "boundary-io-ref-read",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.ioRefReadBoundaryScore",
       "result": { "type": "Nat" },
       "unsafe": true
     },

@@ -25,6 +25,9 @@ The generated report has separate sections for the two common failure modes:
   generated example declarations.
 - `Missing Native Extern Registrations`: the closure references a primitive or
   runtime-backed function that needs an explicit demo shim registration.
+- `Unsupported Init Globals`: the closure reached a nullary declaration emitted
+  from Lean initialization code whose body is top-level `unreachable`; these
+  need an initialized-global provider rather than another normal IR declaration.
 
 If the package generator reaches an unsupported IR shape, it reports the
 declaration being encoded and the unsupported package field. That usually means
