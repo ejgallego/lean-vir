@@ -182,6 +182,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-string-predicate-position",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringPredicatePositionScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-bytearray-push-get",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayPushGetScore",

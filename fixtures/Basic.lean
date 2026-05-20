@@ -205,6 +205,20 @@ def stringSplitIntercalateScore (s : String) : Nat :=
 def upstreamStringSplitIntercalateScore : Nat :=
   stringSplitIntercalateScore "lean|β|vir"
 
+def stringPredicatePositionScore (s : String) : Nat :=
+  let padded := s.pushn '!' 2
+  let right := (padded.dropEnd 2).copy
+  let p0 : String.Pos.Raw := ⟨0⟩
+  let firstNonSpace := String.Pos.Raw.nextWhile right Char.isWhitespace p0
+  let compact := right.trimAscii.copy
+  (if right.any (fun c => c = 'λ') then 100 else 0) +
+  (if String.isEmpty "" then 200 else 0) +
+  (if right.front = ' ' then 300 else 0) +
+  firstNonSpace.byteIdx + compact.length + compact.utf8ByteSize
+
+def upstreamStringPredicatePositionScore : Nat :=
+  stringPredicatePositionScore "  λean"
+
 def upstreamByteArrayPushGetScore : Nat :=
   let bs := ByteArray.empty.push 65
   let bs := bs.push 66
