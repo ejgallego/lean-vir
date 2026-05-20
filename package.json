@@ -9,19 +9,25 @@
     "install:wasi": "bash scripts/install-wasi-sdk.sh",
     "install:engines": "bash scripts/install-wasm-engines.sh",
     "generate:package": "bash scripts/generate-ir-package.sh",
+    "generate:irpkg": "bash scripts/lean-to-irpkg.sh",
+    "prepare:irpkg": "node scripts/prepare-irpkg.mjs",
+    "prepare:pages": "npm run prepare:irpkg -- examples/fib.virpkg.json && npm run prepare:irpkg -- examples/mergesort.virpkg.json",
     "generate:provider": "npm run generate:package",
     "check:package": "bash scripts/check-demo-package.sh",
     "check:boundary-registry": "node scripts/check-boundary-registry.mjs",
     "probe:upstream": "bash scripts/build-upstream-probe.sh",
     "build": "npm run build:demo",
     "build:demo": "npm run probe:upstream",
-    "build:site": "npm run build:demo && vite build web --base /lean-vir/",
+    "build:site": "npm run build:demo && npm run prepare:pages && vite build --base /lean-vir/",
     "bench": "node scripts/bench-vir.mjs",
     "bench:engines": "node scripts/bench-engines.mjs",
-    "test": "npm run check:boundary-registry && npm run test:upstream && npm run test:fixtures",
+    "test": "npm run check:boundary-registry && npm run test:upstream && npm run test:runtime && npm run test:fixtures",
     "test:fixtures": "node scripts/run-fixtures.mjs",
+    "test:pages": "node scripts/check-pages-artifact.mjs",
+    "test:pages:browser": "node scripts/smoke-pages-browser.mjs",
+    "test:runtime": "node scripts/test-vir-runtime.mjs",
     "test:upstream": "npm run build:demo && node scripts/smoke_upstream.mjs",
-    "dev": "vite web --host 127.0.0.1"
+    "dev": "vite --host 127.0.0.1"
   },
   "devDependencies": {
     "vite": "^8.0.13"

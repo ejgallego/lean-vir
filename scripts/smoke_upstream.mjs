@@ -56,6 +56,12 @@ if (typeof exports.vir_eval_const_nat !== "function") {
 if (typeof exports.vir_eval_const_nat_string !== "function") {
   throw new Error("vir_eval_const_nat_string export is missing");
 }
+if (typeof exports.vir_eval_nat_to_nat_string !== "function") {
+  throw new Error("vir_eval_nat_to_nat_string export is missing");
+}
+if (typeof exports.vir_eval_nat_array_to_nat_string !== "function") {
+  throw new Error("vir_eval_nat_array_to_nat_string export is missing");
+}
 if (typeof exports.vir_eval_const_nat_string_size !== "function") {
   throw new Error("vir_eval_const_nat_string_size export is missing");
 }
@@ -201,9 +207,27 @@ function evalConstNat(name) {
   }
 }
 
+function evalNatToNat(name, value) {
+  const bytes = new TextEncoder().encode(name);
+  const ptr = exports.vir_alloc_bytes(bytes.byteLength);
+  try {
+    new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
+    const resultPtr = exports.vir_eval_nat_to_nat_string(ptr, bytes.byteLength, value);
+    const resultLen = exports.vir_eval_const_nat_string_size();
+    return readWasmString(resultPtr, resultLen);
+  } finally {
+    exports.vir_free_bytes?.(ptr);
+  }
+}
+
 const sortChecksum = evalConstNat("SortDemo.demo");
 if (sortChecksum !== "192") {
   throw new Error(`upstream SortDemo.demo: expected 192, got ${sortChecksum}`);
+}
+
+const genericFib = evalNatToNat("fib", 12);
+if (genericFib !== "144") {
+  throw new Error(`generic fib input: expected 144, got ${genericFib}`);
 }
 
 function sortChecksumFor(values) {
@@ -217,9 +241,31 @@ function sortChecksumFor(values) {
   }
 }
 
+function genericSortChecksumFor(name, values) {
+  const nameBytes = new TextEncoder().encode(name);
+  const namePtr = exports.vir_alloc_bytes(nameBytes.byteLength);
+  const valuesPtr = exports.vir_alloc_bytes(values.length * 4);
+  try {
+    new Uint8Array(exports.memory.buffer, namePtr, nameBytes.byteLength).set(nameBytes);
+    const view = new DataView(exports.memory.buffer, valuesPtr, values.length * 4);
+    values.forEach((value, index) => view.setUint32(index * 4, value, true));
+    const resultPtr = exports.vir_eval_nat_array_to_nat_string(namePtr, nameBytes.byteLength, valuesPtr, values.length);
+    const resultLen = exports.vir_eval_const_nat_string_size();
+    return readWasmString(resultPtr, resultLen);
+  } finally {
+    exports.vir_free_bytes?.(valuesPtr);
+    exports.vir_free_bytes?.(namePtr);
+  }
+}
+
 const editableChecksum = sortChecksumFor([4, 1, 3, 2]);
 if (editableChecksum !== 30) {
   throw new Error(`upstream SortDemo.demoFromArray: expected 30, got ${editableChecksum}`);
+}
+
+const genericEditableChecksum = genericSortChecksumFor("SortDemo.demoFromArray", [4, 1, 3, 2]);
+if (genericEditableChecksum !== "30") {
+  throw new Error(`generic SortDemo.demoFromArray: expected 30, got ${genericEditableChecksum}`);
 }
 
 function repeatedSortChecksumFor(values, iterations) {

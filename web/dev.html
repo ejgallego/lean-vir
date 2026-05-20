@@ -1,0 +1,101 @@
+<!doctype html>
+<!--
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Lean IR Package Runner</title>
+  </head>
+  <body>
+    <main id="app">
+      <section class="workspace">
+        <header class="topbar">
+          <div class="topbar-title">
+            <p class="eyebrow">Lean 4.30-rc2 / wasm32-wasip1</p>
+            <h1>IR Package Runner</h1>
+          </div>
+          <div class="runtime-summary" aria-label="Runtime summary">
+            <div id="status" class="status">Loading WASM</div>
+            <div>
+              <span>Package</span>
+              <strong id="dev-package-name">...</strong>
+            </div>
+            <div>
+              <span>Size</span>
+              <strong id="dev-package-size">...</strong>
+            </div>
+            <div>
+              <span>Decls</span>
+              <strong id="dev-decl-count">...</strong>
+            </div>
+            <div>
+              <span>Ptr</span>
+              <strong id="dev-ptr-width">...</strong>
+            </div>
+          </div>
+        </header>
+
+        <section class="dev-runner" aria-labelledby="dev-package-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Local package</p>
+              <h2 id="dev-package-title">Load IR package</h2>
+            </div>
+          </div>
+          <div class="dev-runner-grid">
+            <label class="dev-field">
+              <span>Package URL</span>
+              <input id="dev-package-url" type="text" value="vir-demo.irpkg" />
+            </label>
+            <button id="dev-load-url" type="button">Load URL</button>
+            <label class="dev-field">
+              <span>Package file</span>
+              <input id="dev-package-file" type="file" accept=".irpkg,application/octet-stream" />
+            </label>
+          </div>
+        </section>
+
+        <section class="dev-runner" aria-labelledby="dev-eval-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Input spec</p>
+              <h2 id="dev-eval-title">Evaluate entry</h2>
+            </div>
+          </div>
+          <div class="dev-spec-grid">
+            <label class="dev-field">
+              <span>Spec URL</span>
+              <input id="dev-spec-url" type="text" value="local-fib.input.json" />
+            </label>
+            <button id="dev-load-spec-url" type="button">Load Spec URL</button>
+            <label class="dev-field">
+              <span>Spec file</span>
+              <input id="dev-spec-file" type="file" accept=".json,application/json" />
+            </label>
+          </div>
+          <div class="dev-spec-editor">
+            <label class="dev-field">
+              <span>Spec JSON</span>
+              <textarea id="dev-input-spec" spellcheck="false"></textarea>
+            </label>
+            <button id="dev-apply-spec" type="button">Apply Spec</button>
+          </div>
+          <div class="dev-eval-row">
+            <label class="dev-field">
+              <span>Entry</span>
+              <select id="dev-entry-select"></select>
+            </label>
+            <div id="dev-input-fields" class="dev-input-fields"></div>
+            <button id="dev-run-entry" type="button" disabled>Run</button>
+            <output id="dev-result">...</output>
+          </div>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/src/dev.js"></script>
+  </body>
+</html>

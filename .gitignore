@@ -8,5 +8,6 @@ node_modules/
 web/dist/
 web/public/*.wasm
 web/public/*.irpkg
+web/public/*.input.json
 .npm-cache/
 npm-debug.log*

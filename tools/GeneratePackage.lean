@@ -19,6 +19,7 @@ open Lean.IR
 structure Target where
   source : System.FilePath
   roots : Array Name
+  includeAll : Bool := false
 
 structure LoadedDecl where
   source : String
@@ -27,6 +28,7 @@ structure LoadedDecl where
 structure DeclIndex where
   localDecls : NameMap LoadedDecl := {}
   envs : Array (String × Environment) := #[]
+  sourceDecls : Array (String × Array Name) := #[]
 
 structure NativeExtern where
   name : Name
@@ -1263,10 +1265,13 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
   let mut index : DeclIndex := {}
   for target in targets do
     let env <- frontendEnv target
+    let mut names : Array Name := #[]
     index := { index with envs := index.envs.push (target.source.toString, env) }
     for decl in getDecls env do
+      names := names.push decl.name
       let loaded := { source := target.source.toString, decl }
       index := { index with localDecls := index.localDecls.insert decl.name loaded }
+    index := { index with sourceDecls := index.sourceDecls.push (target.source.toString, names) }
   return index
 
 def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
@@ -1350,9 +1355,16 @@ partial def collectName (index : DeclIndex) (name : Name) (state : Closure) : Cl
               let state := { state with decls := state.decls.push loaded }
               refsOfDecl loaded.decl |>.foldl (fun state dep => collectName index dep state) state
 
+def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
+  if target.includeAll then
+    index.sourceDecls.findSome? (fun (source, names) =>
+      if source == target.source.toString then some names else none) |>.getD #[]
+  else
+    target.roots
+
 def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
   targets.foldl (fun state target =>
-    target.roots.foldl (fun state root => collectName index root state) state) {}
+    (rootsForTarget index target).foldl (fun state root => collectName index root state) state) {}
 
 abbrev EmitM := StateT ByteArray (Except String)
 
@@ -1538,7 +1550,13 @@ def emitPackage (closure : Closure) : Except String ByteArray := do
 
 def reportFor (targets : Array Target) (closure : Closure) : String :=
   let roots :=
-    targets.foldl (fun acc target => acc ++ target.roots) #[]
+    targets.foldl (fun acc target =>
+      if target.includeAll then
+        let localRoots := closure.decls.foldl (fun roots loaded =>
+          if loaded.source == target.source.toString then roots.push loaded.decl.name else roots) #[]
+        acc ++ localRoots
+      else
+        acc ++ target.roots) #[]
   let loadedLines :=
     closure.decls.map fun loaded =>
       s!"- `{loaded.decl.name}` from `{loaded.source}`"
@@ -1637,6 +1655,7 @@ def nameFromDotted (text : String) : Name :=
 partial def takeTargetRoots : List String -> List String -> List String × List String
   | [], roots => (roots.reverse, [])
   | "--target" :: rest, roots => (roots.reverse, "--target" :: rest)
+  | "--target-all" :: rest, roots => (roots.reverse, "--target-all" :: rest)
   | root :: rest, roots => takeTargetRoots rest (root :: roots)
 
 partial def parseTargets : List String -> Except String (Array Vir.GeneratePackage.Target)
@@ -1648,7 +1667,11 @@ partial def parseTargets : List String -> Except String (Array Vir.GeneratePacka
       let target : Vir.GeneratePackage.Target :=
         { source := source, roots := roots.toArray.map nameFromDotted }
       return (#[target] ++ (← parseTargets rest))
-  | arg :: _ => throw s!"expected `--target`, got `{arg}`"
+  | "--target-all" :: source :: rest => do
+      let target : Vir.GeneratePackage.Target :=
+        { source := source, roots := #[], includeAll := true }
+      return (#[target] ++ (← parseTargets rest))
+  | arg :: _ => throw s!"expected `--target` or `--target-all`, got `{arg}`"
 
 unsafe def main (args : List String) : IO UInt32 := do
   match args with
@@ -1661,5 +1684,5 @@ unsafe def main (args : List String) : IO UInt32 := do
           IO.eprintln err
           return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--target <source.lean> <root>...]"
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--target <source.lean> <root>... | --target-all <source.lean>]..."
       return 2

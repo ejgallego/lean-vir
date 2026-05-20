@@ -49,6 +49,31 @@ input {
   flex: 0 1 320px;
 }
 
+.topbar-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.topbar-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 34px;
+  border: 1px solid #bdc8bb;
+  background: #ffffff;
+  color: #263d2c;
+  padding: 0 12px;
+  text-decoration: none;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.topbar-links a:hover {
+  border-color: #516f88;
+  color: #20384a;
+}
+
 .eyebrow {
   margin: 0 0 6px;
   color: #5f6f64;
@@ -132,6 +157,59 @@ h2 {
   color: #17201a;
   font-size: 0.72rem;
   line-height: 1.15;
+}
+
+.pipeline-panel {
+  margin-top: 24px;
+}
+
+.pipeline-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 12px;
+  border: 1px solid #d9ded2;
+  background: #d9ded2;
+}
+
+.pipeline-item {
+  display: grid;
+  align-content: start;
+  min-width: 0;
+  min-height: 104px;
+  background: #ffffff;
+  color: #17201a;
+  padding: 16px;
+  text-decoration: none;
+}
+
+.pipeline-item:hover {
+  color: #20384a;
+}
+
+.pipeline-item strong,
+.pipeline-item span,
+.pipeline-item small {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pipeline-item strong {
+  font-size: 1rem;
+}
+
+.pipeline-item span {
+  margin-top: 8px;
+  color: #263d2c;
+  font-size: 0.86rem;
+  font-weight: 800;
+}
+
+.pipeline-item small {
+  margin-top: 10px;
+  color: #5f6f64;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.72rem;
 }
 
 .pet-demo {
@@ -546,6 +624,129 @@ h2 {
   background: #ffffff;
 }
 
+.dev-runner {
+  margin-top: 28px;
+}
+
+.dev-runner-grid,
+.dev-spec-grid,
+.dev-eval-row {
+  display: grid;
+  align-items: end;
+  gap: 12px;
+  margin-top: 16px;
+  padding: 16px;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+}
+
+.dev-runner-grid {
+  grid-template-columns: minmax(280px, 1fr) minmax(112px, auto) minmax(280px, 1fr);
+}
+
+.dev-eval-row {
+  grid-template-columns: minmax(220px, 0.75fr) minmax(260px, 1fr) minmax(112px, auto) minmax(160px, 0.45fr);
+}
+
+.dev-spec-grid {
+  grid-template-columns: minmax(280px, 1fr) minmax(132px, auto) minmax(280px, 1fr);
+}
+
+.dev-spec-editor {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(112px, auto);
+  align-items: end;
+  gap: 12px;
+  margin-top: 12px;
+  padding: 16px;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+}
+
+.dev-field {
+  display: block;
+  min-width: 0;
+}
+
+.dev-field span {
+  display: block;
+  color: #5f6f64;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.dev-field input {
+  width: 100%;
+  min-height: 42px;
+  margin-top: 6px;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+  padding: 8px 10px;
+}
+
+.dev-field select,
+.dev-field textarea {
+  width: 100%;
+  margin-top: 6px;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+  padding: 8px 10px;
+}
+
+.dev-field select {
+  min-height: 42px;
+}
+
+.dev-field textarea {
+  min-height: 220px;
+  resize: vertical;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.dev-input-fields {
+  min-width: 0;
+}
+
+.dev-input-empty {
+  min-height: 42px;
+  margin: 0;
+  padding: 11px 12px;
+  border: 1px solid #d9ded2;
+  background: #f6f7f2;
+  color: #5f6f64;
+  font-weight: 800;
+}
+
+.dev-runner button {
+  min-height: 42px;
+  border: 0;
+  background: #263d2c;
+  color: #ffffff;
+  padding: 0 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.dev-runner button:disabled {
+  background: #bdc8bb;
+  color: #415146;
+  cursor: default;
+}
+
+.dev-eval-row output {
+  display: block;
+  min-height: 42px;
+  border: 1px solid #d9ded2;
+  background: #f6f7f2;
+  padding: 10px 12px;
+  font-size: 1.2rem;
+  font-weight: 900;
+  overflow-wrap: anywhere;
+}
+
 @media (max-width: 920px) {
   .topbar {
     flex-direction: column;
@@ -557,6 +758,10 @@ h2 {
   }
 
   .pet-demo {
+    grid-template-columns: 1fr;
+  }
+
+  .pipeline-grid {
     grid-template-columns: 1fr;
   }
 
@@ -624,6 +829,13 @@ h2 {
   }
 
   .fixture-source-controls {
+    grid-template-columns: 1fr;
+  }
+
+  .dev-runner-grid,
+  .dev-spec-grid,
+  .dev-spec-editor,
+  .dev-eval-row {
     grid-template-columns: 1fr;
   }
 

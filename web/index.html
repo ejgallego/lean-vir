@@ -17,6 +17,12 @@ Author: Emilio J. Gallego Arias
           <div class="topbar-title">
             <p class="eyebrow">Lean 4.30-rc2 / wasm32-wasip1</p>
             <h1>IR Interpreter Demo</h1>
+            <nav class="topbar-links" aria-label="Demo pages">
+              <a href="dev.html">Package Runner</a>
+              <a href="dev.html?package=local-fib.irpkg&amp;spec=local-fib.input.json&amp;entry=fib">
+                Fib Package
+              </a>
+            </nav>
           </div>
           <div class="runtime-summary" aria-label="Runtime summary">
             <div id="status" class="status">Loading WASM</div>
@@ -50,6 +56,38 @@ Author: Emilio J. Gallego Arias
             </div>
           </div>
         </header>
+
+        <section class="pipeline-panel" aria-labelledby="pipeline-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Generated interface</p>
+              <h2 id="pipeline-title">Local package runners</h2>
+            </div>
+          </div>
+          <div class="pipeline-grid">
+            <a
+              class="pipeline-item"
+              href="dev.html?package=local-fib.irpkg&amp;spec=local-fib.input.json&amp;entry=fib"
+            >
+              <strong>fib</strong>
+              <span>Nat -&gt; Nat</span>
+              <small>local-fib.irpkg</small>
+            </a>
+            <a
+              class="pipeline-item"
+              href="dev.html?package=local-mergesort.irpkg&amp;spec=local-mergesort.input.json&amp;entry=sort-array"
+            >
+              <strong>mergesort</strong>
+              <span>Array Nat -&gt; Nat</span>
+              <small>local-mergesort.irpkg</small>
+            </a>
+            <a class="pipeline-item" href="dev.html?package=vir-demo.irpkg&amp;entry=sort-array">
+              <strong>demo bundle</strong>
+              <span>fixture package</span>
+              <small>vir-demo.irpkg</small>
+            </a>
+          </div>
+        </section>
 
         <section class="pet-demo" aria-label="Tamagotchi automaton demo">
           <div class="pet-state-card">

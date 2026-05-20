@@ -37,11 +37,51 @@ Open the Vite URL and the page should show the Tamagotchi demo plus fixture
 source and run controls. `npm test` rebuilds the WASM artifact and runs the
 Node smoke test.
 
+For focused local package experiments, generate an IR package from one Lean file:
+
+```bash
+npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
+```
+
+Omit the root names to package every IR declaration produced by the file:
+
+```bash
+npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
+```
+
+Then run `npm run dev` and open `/dev.html`. The developer entry point can load a
+served package URL such as `vir-demo.irpkg` or an uploaded `.irpkg` file, then
+evaluate `() -> Nat`, `Nat -> Nat`, or `Array Nat -> Nat` entries through an
+editable input spec.
+
+For the config-driven path that also writes URL-loadable UI input specs:
+
+```bash
+npm run prepare:irpkg -- examples/fib.virpkg.json
+npm run dev
+```
+
 ## Hosted Demo
 
 Pushes to `main` deploy the browser demo to GitHub Pages:
 
 https://ejgallego.github.io/lean-vir/
+
+The hosted page includes the main Tamagotchi and fixture demos, plus links to
+the package runner for generated local sample packages. The Pages build prepares
+the `fib` and `mergesort` package/spec pairs before copying static assets into
+the site artifact, then runs `npm run test:pages` to check the generated landing
+page, package runner, WASM, packages, and input specs.
+
+For a local browser sanity check of the built Pages artifact, run:
+
+```bash
+npm run test:pages:browser
+```
+
+That command serves `web/dist/` under `/lean-vir/`, launches local Chromium, and
+checks the landing page plus the generated `fib` and `mergesort` package runner
+links.
 
 For local development, keep using `npm run dev`. The Pages workflow only builds
 and deploys the static site artifact.
@@ -55,11 +95,19 @@ and deploys the static site artifact.
   `build/generated/vir-demo.irpkg`.
 - `docs/ADDING_DEMOS.md` describes the path for adding a Lean example and
   checking its package diagnostics.
+- `docs/LOCAL_IRPKG.md` documents the focused `.lean` to `.irpkg` workflow and
+  `/dev.html` package runner.
+- `docs/INTERFACE_PIPELINE.md` documents the config-driven package plus input
+  spec pipeline and the current WIT direction.
 - `scripts/build-upstream-probe.sh` compiles and links the upstream
   interpreter, writes `build/upstream-probe/boundary.md`, and copies the strict
   artifact to `web/public/vir-upstream.wasm`.
+- `scripts/lean-to-irpkg.sh` generates a local `.irpkg` from a `.lean` file,
+  either for explicit roots or all declarations in that source.
+- `scripts/prepare-irpkg.mjs` generates a configured package plus optional
+  browser input spec for `/dev.html` and the hosted Pages package links.
 - `scripts/smoke_upstream.mjs` executes the generated browser artifact in Node.
-- `web/` is the browser harness.
+- `web/` is the browser harness. `/dev.html` is the local package runner.
 
 ## Status
 
@@ -148,8 +196,15 @@ unless the upstream source, compiler flags, runtime overlay, or shim changes.
 
 These generated files should not be committed.
 
-`npm run build:site` additionally writes `web/dist/`, which is also generated
-and should not be committed.
+`npm run build:site` also runs `npm run prepare:pages` and writes:
+
+- `web/public/local-fib.irpkg`
+- `web/public/local-fib.input.json`
+- `web/public/local-mergesort.irpkg`
+- `web/public/local-mergesort.input.json`
+- `web/dist/`
+
+These files are generated and should not be committed.
 
 For fast example iteration, run `npm run check:package`. It regenerates the IR
 package and points at `build/generated/ir-provider-report.md`, including

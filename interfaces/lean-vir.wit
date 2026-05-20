@@ -1,0 +1,30 @@
+package lean:vir;
+
+interface runtime {
+  record package-info {
+    decls: u32,
+    bytes: u32,
+  }
+
+  variant input {
+    none,
+    nat(string),
+    nat-array(list<string>),
+  }
+
+  record eval-request {
+    entry: string,
+    input: input,
+  }
+
+  record eval-output {
+    value: string,
+  }
+
+  load-package: func(bytes: list<u8>) -> result<package-info, string>;
+  eval-nat: func(request: eval-request) -> result<eval-output, string>;
+}
+
+world runner {
+  export runtime;
+}

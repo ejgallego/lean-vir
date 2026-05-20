@@ -17,6 +17,32 @@ and the browser loads that package without rebuilding the upstream interpreter.
 Most example-only edits should only regenerate `web/public/vir-demo.irpkg`.
 They should not recompile or relink `ir_interpreter.cpp`.
 
+## Local Package Runner
+
+For a narrower developer loop, generate a package from a single Lean file:
+
+```bash
+npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
+```
+
+When no roots are supplied, the utility packages every IR declaration emitted for
+the source:
+
+```bash
+npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
+```
+
+Run `npm run dev` and open `/dev.html` to load a served package URL or upload the
+generated `.irpkg`, then use the input spec to evaluate a `Nat` entry. The
+developer page currently supports `() -> Nat`, `Nat -> Nat`, and
+`Array Nat -> Nat` entry shapes.
+See `docs/LOCAL_IRPKG.md` for the full local package workflow and current
+limitations.
+
+For a reproducible local setup, prefer `npm run prepare:irpkg -- <config.json>`.
+The example configs under `examples/*.virpkg.json` generate both an `.irpkg` and
+an input-spec JSON file that `/dev.html` can load by URL.
+
 ## Reading The Report
 
 The generated report has separate sections for the two common failure modes:

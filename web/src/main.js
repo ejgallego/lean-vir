@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import "./style.css";
+import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
 import fibSource from "../../examples/Fib.lean?raw";
 import mergeSortSource from "../../examples/MergeSort.lean?raw";
 import fixtureBasicSource from "../../fixtures/Basic.lean?raw";
@@ -47,6 +48,7 @@ const maxSortItems = 16;
 const maxSortValue = 9999;
 const wasmFile = "vir-upstream.wasm";
 const irPackageFile = "vir-demo.irpkg";
+const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
 const moods = ["happy", "hungry", "sleepy", "angry", "asleep", "dead"];
 const actions = ["feed", "play", "nap", "wake", "ignore"];
 const sourceFiles = [
@@ -100,85 +102,20 @@ const fixtureInputs = new Map(
     .filter((fixture) => fixture.input)
     .map((fixture) => [fixture.id, fixture.input.defaultValue ?? ""]),
 );
-const byteCache = new Map();
-let wasmModule = null;
-let runtimeExports = null;
+let irPackageBytesPromise = null;
+let runtime = null;
 let currentFixtureFilter = "all";
 let selectedFixtureId = null;
 let petMood = 0;
 let petTrace = [petMood];
 
-async function fetchBytes(path) {
-  if (byteCache.has(path)) {
-    return byteCache.get(path);
-  }
-  const response = await fetch(path, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`failed to load ${path}`);
-  }
-  const bytes = new Uint8Array(await response.arrayBuffer());
-  byteCache.set(path, bytes);
-  return bytes;
+function demoPackageBytes() {
+  irPackageBytesPromise ??= fetchBytes(`${import.meta.env.BASE_URL}${irPackageFile}`);
+  return irPackageBytesPromise;
 }
 
-async function instantiate(path) {
-  const bytes = await fetchBytes(path);
-  wasmModule ??= new WebAssembly.Module(bytes);
-  const module = wasmModule;
-  const imports = {};
-
-  for (const spec of WebAssembly.Module.imports(module)) {
-    imports[spec.module] ??= {};
-    if (spec.kind === "function") {
-      imports[spec.module][spec.name] = (...args) => {
-        if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
-          throw new Error(`WASI proc_exit(${args[0]})`);
-        }
-        return 0;
-      };
-    }
-  }
-
-  const instance = await WebAssembly.instantiate(module, imports);
-  instance.exports.__wasm_call_ctors?.();
-  return instance.exports;
-}
-
-async function loadIrPackage(exports, path) {
-  if (typeof exports.vir_alloc_bytes !== "function" || typeof exports.vir_load_ir_package !== "function") {
-    throw new Error("IR package loader exports are missing");
-  }
-  if (!exports.memory) {
-    throw new Error("WASM memory export is missing");
-  }
-  const bytes = await fetchBytes(path);
-  const ptr = exports.vir_alloc_bytes(bytes.byteLength);
-  try {
-    new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
-    const count = exports.vir_load_ir_package(ptr, bytes.byteLength);
-    if (count === 0) {
-      const detail = lastPackageError(exports);
-      throw new Error(`IR package load failed${detail ? `: ${detail}` : ""}`);
-    }
-    return { count, byteLength: bytes.byteLength };
-  } finally {
-    exports.vir_free_bytes?.(ptr);
-  }
-}
-
-function readWasmString(exports, ptr, len) {
-  return new TextDecoder().decode(new Uint8Array(exports.memory.buffer, ptr, len));
-}
-
-function lastPackageError(exports) {
-  if (
-    typeof exports.vir_last_package_error !== "function" ||
-    typeof exports.vir_last_package_error_size !== "function"
-  ) {
-    return "";
-  }
-  const len = exports.vir_last_package_error_size();
-  return len === 0 ? "" : readWasmString(exports, exports.vir_last_package_error(), len);
+async function createDemoRuntime() {
+  return runtimeFactory.createRuntime({ irPackageBytes: await demoPackageBytes() });
 }
 
 function formatBytes(bytes) {
@@ -207,12 +144,12 @@ function renderPet() {
   petTraceDisplay.textContent = petTrace.map((mood) => moods[mood] ?? "?").join(" -> ");
 }
 
-function stepPet(exports, actionName) {
+function stepPet(runtime, actionName) {
   const action = actions.indexOf(actionName);
   if (action < 0) return;
   petActionDisplay.textContent = actionName;
   try {
-    petMood = exports.vir_upstream_tamagotchi_step(petMood, action);
+    petMood = runtime.exports.vir_upstream_tamagotchi_step(petMood, action);
     petTrace.push(petMood);
     renderPet();
     setReady();
@@ -230,25 +167,6 @@ function resetPet() {
   setReady();
 }
 
-function evalConstNat(exports, name) {
-  const bytes = new TextEncoder().encode(name);
-  const ptr = exports.vir_alloc_bytes(bytes.byteLength);
-  try {
-    new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
-    if (
-      typeof exports.vir_eval_const_nat_string === "function" &&
-      typeof exports.vir_eval_const_nat_string_size === "function"
-    ) {
-      const resultPtr = exports.vir_eval_const_nat_string(ptr, bytes.byteLength);
-      const resultLen = exports.vir_eval_const_nat_string_size();
-      return readWasmString(exports, resultPtr, resultLen);
-    }
-    return exports.vir_eval_const_nat(ptr, bytes.byteLength);
-  } finally {
-    exports.vir_free_bytes?.(ptr);
-  }
-}
-
 function parseSortInput(text) {
   const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
   if (parts.length > maxSortItems) {
@@ -264,17 +182,6 @@ function parseSortInput(text) {
     }
     return value;
   });
-}
-
-function sortChecksumFor(exports, values) {
-  const ptr = exports.vir_alloc_bytes(values.length * 4);
-  try {
-    const view = new DataView(exports.memory.buffer, ptr, values.length * 4);
-    values.forEach((value, index) => view.setUint32(index * 4, value, true));
-    return exports.vir_sort_checksum(ptr, values.length);
-  } finally {
-    exports.vir_free_bytes?.(ptr);
-  }
 }
 
 function sourceLabel(path) {
@@ -415,7 +322,7 @@ function visibleFixtures() {
 }
 
 function updateFixtureRunControls() {
-  const enabled = runtimeExports !== null;
+  const enabled = runtime !== null;
   fixtureRunVisibleButton.disabled = !enabled;
   fixtureRunSelectedButton.disabled = !enabled || selectedFixtureId === null;
 }
@@ -440,14 +347,14 @@ function parseNatInput(text, max) {
   return clampInput(value, max);
 }
 
-function runInputFixture(exports, fixture) {
+function runInputFixture(runtime, fixture) {
   if (fixture.runner === "fib") {
     const n = parseNatInput(fixtureInputValue(fixture), fixture.input.max ?? maxFibInput);
     fixtureInputs.set(fixture.id, String(n));
     if (fixture.id === selectedFixtureId) {
       fixtureInput.value = String(n);
     }
-    return String(exports.vir_upstream_fib(n));
+    return runtime.evalNatToNat(fixture.entry, n);
   }
 
   if (fixture.runner === "sort") {
@@ -458,27 +365,26 @@ function runInputFixture(exports, fixture) {
       fixtureInput.value = normalized;
     }
     const sorted = [...values].sort((a, b) => a - b);
-    return `checksum ${sortChecksumFor(exports, values)} / [${sorted.join(", ")}]`;
+    return `checksum ${runtime.evalNatArrayToNat(fixture.entry, values)} / [${sorted.join(", ")}]`;
   }
 
   return null;
 }
 
-function evaluateFixture(exports, fixture) {
+function evaluateFixture(runtime, fixture) {
   if (fixture.runner) {
-    return runInputFixture(exports, fixture);
+    return runInputFixture(runtime, fixture);
   }
-  return String(evalConstNat(exports, fixture.entry));
+  return runtime.evalConstNat(fixture.entry);
 }
 
 async function runFixture(fixture) {
-  if (runtimeExports === null) return null;
+  if (runtime === null) return null;
   fixtureRunStatus.textContent = `Running ${fixture.id}`;
   setFixtureResult(fixture, "running");
   try {
-    const exports = await instantiate(`${import.meta.env.BASE_URL}${wasmFile}`);
-    await loadIrPackage(exports, `${import.meta.env.BASE_URL}${irPackageFile}`);
-    const result = evaluateFixture(exports, fixture);
+    const fixtureRuntime = await createDemoRuntime();
+    const result = evaluateFixture(fixtureRuntime, fixture);
     setFixtureResult(fixture, result);
     fixtureRunStatus.textContent = `${fixture.id}: ${result}`;
     setReady();
@@ -492,7 +398,7 @@ async function runFixture(fixture) {
 }
 
 async function runVisibleFixtures() {
-  if (runtimeExports === null) return;
+  if (runtime === null) return;
   const selected = visibleFixtures();
   let passed = 0;
   let failed = 0;
@@ -532,9 +438,9 @@ renderFixtureList();
 selectFixture(fixtures[0]);
 
 try {
-  runtimeExports = await instantiate(`${import.meta.env.BASE_URL}${wasmFile}`);
-  const packageInfo = await loadIrPackage(runtimeExports, `${import.meta.env.BASE_URL}${irPackageFile}`);
-  const pointerBytes = runtimeExports.vir_upstream_target_pointer_bytes();
+  runtime = await createDemoRuntime();
+  const packageInfo = runtime.packageInfo;
+  const pointerBytes = runtime.targetPointerBytes();
 
   wasmTarget.textContent = "wasm32-wasip1";
   linkStatus.textContent = "strict";
@@ -548,12 +454,12 @@ try {
   setReady();
 
   for (const button of petActionButtons) {
-    button.addEventListener("click", () => stepPet(runtimeExports, button.dataset.action));
+    button.addEventListener("click", () => stepPet(runtime, button.dataset.action));
   }
   petResetButton.addEventListener("click", resetPet);
   resetPet();
 } catch (error) {
-  runtimeExports = null;
+  runtime = null;
   statusEl.textContent = "Failed";
   statusEl.dataset.ready = "false";
   fixtureRunStatus.textContent = "Unavailable";

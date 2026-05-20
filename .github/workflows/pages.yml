@@ -36,6 +36,7 @@ jobs:
       - run: npm run fetch:lean
       - run: npm run install:wasi
       - run: npm run build:site
+      - run: npm run test:pages
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v5
         with:

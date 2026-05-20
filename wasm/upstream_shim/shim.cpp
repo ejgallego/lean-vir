@@ -1807,6 +1807,32 @@ extern "C" char const * vir_eval_const_nat_string(char const * name_text, uint32
     return lean::g_eval_const_nat_string.c_str();
 }
 
+extern "C" char const * vir_eval_nat_to_nat_string(char const * name_text, uint32_t name_len, uint32_t value) {
+    lean::ensure_ir_interpreter_initialized();
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    lean::object * arg = lean::vir::mk_static_nat(value);
+    lean::object * args[] = { arg };
+    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 1, args);
+    return lean::g_eval_const_nat_string.c_str();
+}
+
+extern "C" char const * vir_eval_nat_array_to_nat_string(
+    char const * name_text,
+    uint32_t name_len,
+    uint32_t const * values,
+    uint32_t len) {
+    if (values == nullptr && len != 0) {
+        lean::g_eval_const_nat_string = "0";
+        return lean::g_eval_const_nat_string.c_str();
+    }
+    lean::ensure_ir_interpreter_initialized();
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    lean::object * input = lean::mk_nat_array(values, len);
+    lean::object * args[] = { input };
+    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 1, args);
+    return lean::g_eval_const_nat_string.c_str();
+}
+
 extern "C" uint32_t vir_eval_const_nat_string_size(void) {
     return static_cast<uint32_t>(lean::g_eval_const_nat_string.size());
 }
