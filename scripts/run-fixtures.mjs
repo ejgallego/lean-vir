@@ -101,11 +101,12 @@ async function hostOracle(fixture) {
     throw new Error(`${fixture.id}: unsupported host result type ${fixture.result?.type}`);
   }
   const source = await readFile(new URL(`../${fixture.source}`, import.meta.url), "utf8");
+  const mainDecl = fixture.unsafe ? "unsafe def main : IO UInt32 := do" : "def main : IO UInt32 := do";
   const hostSource = [
     source,
     "",
     "set_option interpreter.prefer_native false",
-    "def main : IO UInt32 := do",
+    mainDecl,
     `  IO.println (toString ${fixture.entry})`,
     "  return 0",
     "",

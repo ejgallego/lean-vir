@@ -116,6 +116,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_nat_div"
   },
   {
+    name := `Nat.mod,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_mod"
+  },
+  {
     name := `Nat.pow,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
@@ -182,10 +188,28 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_nat_abs"
   },
   {
+    name := `System.Platform.getNumBits,
+    params := #[param 1 false .tagged],
+    resultType := .tobject,
+    symbol := "lean_system_platform_nbits"
+  },
+  {
+    name := `panicCore,
+    params := #[param 1 false .erased, param 2 true .tobject, param 3 false .object],
+    resultType := .tobject,
+    symbol := "lean_panic_fn_borrowed"
+  },
+  {
     name := `Array.mkEmpty,
     params := #[param 1 false .erased, param 2 false .tagged],
     resultType := .object,
     symbol := "lean_array_mk_empty"
+  },
+  {
+    name := `Array.mk,
+    params := #[param 1 false .erased, param 2 false .tobject],
+    resultType := .object,
+    symbol := "lean_array_mk"
   },
   {
     name := `Array.push,
@@ -222,6 +246,24 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .erased, param 2 true .object, param 3 false .usize, param 4 false .erased],
     resultType := .tobject,
     symbol := "lean_array_uget_borrowed"
+  },
+  {
+    name := `Array.getInternalBorrowed,
+    params := #[param 1 false .erased, param 2 true .object, param 3 true .tobject, param 4 false .erased],
+    resultType := .tobject,
+    symbol := "lean_array_fget_borrowed"
+  },
+  {
+    name := `Array.get!Internal,
+    params := #[param 1 false .erased, param 2 true .tobject, param 3 true .object, param 4 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_array_get"
+  },
+  {
+    name := `Array.get!InternalBorrowed,
+    params := #[param 1 false .erased, param 2 true .tobject, param 3 true .object, param 4 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_array_get_borrowed"
   },
   {
     name := `Array.uset,
@@ -302,6 +344,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_usize_of_nat"
   },
   {
+    name := `USize.ofNatLT,
+    params := #[param 1 true .tobject, param 2 false .erased],
+    resultType := .usize,
+    symbol := "l_USize_ofNatLT"
+  },
+  {
     name := `USize.add,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .usize,
@@ -320,10 +368,28 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_usize_dec_lt"
   },
   {
+    name := `USize.repr,
+    params := #[param 1 true .usize],
+    resultType := .object,
+    symbol := "lean_string_of_usize"
+  },
+  {
     name := `String.append,
     params := #[param 1 false .object, param 2 true .object],
     resultType := .object,
     symbol := "lean_string_append"
+  },
+  {
+    name := `String.Internal.append,
+    params := #[param 1 false .object, param 2 true .object],
+    resultType := .object,
+    symbol := "lean_string_append"
+  },
+  {
+    name := `String.ofList,
+    params := #[param 1 false .tobject],
+    resultType := .object,
+    symbol := "lean_string_mk"
   },
   {
     name := `String.toUTF8,
@@ -398,6 +464,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_utf8_next_fast"
   },
   {
+    name := `String.Pos.Raw.next',
+    params := #[param 1 true .object, param 2 true .tobject, param 3 false .erased],
+    resultType := .tagged,
+    symbol := "lean_string_utf8_next_fast"
+  },
+  {
     name := `String.Internal.extract,
     params := #[param 1 true .object, param 2 true .tobject, param 3 true .tobject],
     resultType := .object,
@@ -432,6 +504,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint32,
     symbol := "lean_string_utf8_get"
+  },
+  {
+    name := `String.Pos.Raw.get',
+    params := #[param 1 true .object, param 2 true .tobject, param 3 false .erased],
+    resultType := .uint32,
+    symbol := "lean_string_utf8_get_fast"
   },
   {
     name := `String.Internal.atEnd,

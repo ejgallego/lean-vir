@@ -138,10 +138,13 @@ comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,
 and comparison operations, `UInt64.ofNat`/`toNat`/`toFloat` plus arithmetic,
 bitwise, shift, and comparison operations including a wide `UInt64.toNat`
 fixture returned through `vir_eval_const_nat_string`, and
-`Float.scaleB`/`toUInt32`. They are backed by a table-driven shim registry; a full
-native symbol loader is still out of scope. The public String search/drop fixture
-currently imports a small upstream IR closure and adds native registrations for
-the runtime helper boundary that closure reaches (`Nat.ble`, `String.Pos.next`,
+`Float.scaleB`/`toUInt32`. The parser input fixture additionally runs
+`Lean.Parser.mkInputContext`, `Lean.FileMap.toPosition`, and
+`Lean.Parser.mkParserState` over real upstream parser/input infrastructure.
+They are backed by a table-driven shim registry; a full native symbol loader is
+still out of scope. The public String search/drop fixture currently imports a
+small upstream IR closure and adds native registrations for the runtime helper
+boundary that closure reaches (`Nat.ble`, `String.Pos.next`,
 `String.decodeChar`, `String.extract`, and `String.Slice.Pattern.Internal.memcmpStr`).
 `String.splitOn` additionally exercises the legacy `String.Pos.Raw.next`/
 `String.Pos.Raw.extract`/`String.Pos.Raw.atEnd` aliases over the same runtime
@@ -180,9 +183,13 @@ declarations, but they are loaded from a demo-specific package instead of Lean's
 generated module data. A later provider can replace this package with generated
 module data behind `decl_provider.h`.
 
-The fixture suite currently has no expected-unsupported entry. When the next
-native or imported-IR gap appears, keep it explicit in `fixtures/manifest.json`
-until the required shim or package-loader support is added.
+The fixture suite tracks `Lean.Parser.parseHeader` as expected unsupported. It
+is the current vertical parser target: the host oracle can evaluate it, but the
+WASM package closure still reaches environment/IO/task primitives such as
+`IO.initializing`, `ST.Prim.Ref.get`, `Task.get`, and `Task.map`, plus additional
+array, string, `ByteArray`, `USize`, and hashing externs. Keep that boundary
+explicit in `fixtures/manifest.json` until the required shim or package-loader
+support is added.
 
 ## Future Loading Path
 

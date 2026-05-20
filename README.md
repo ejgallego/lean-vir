@@ -97,7 +97,11 @@ arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
 `Int` arithmetic, `Nat.div`/`pow`/`log2`/`shiftLeft`/`shiftRight`,
 `Float.scaleB`/`toUInt32`, and
 `ByteArray.empty`/`ByteArray.push`/`ByteArray.get!`/`ByteArray.set!`/
-`ByteArray.extract`/`ByteArray.size`/`ByteArray.validateUTF8`.
+`ByteArray.extract`/`ByteArray.size`/`ByteArray.validateUTF8`, plus the
+Lean parser input layer through `Lean.Parser.mkInputContext`,
+`Lean.FileMap.toPosition`, and `Lean.Parser.mkParserState`.
+`Lean.Parser.parseHeader` is tracked as an expected-unsupported vertical target
+while the demo still lacks the real environment/IO/task boundary it needs.
 The runner also writes `build/fixtures/summary.json` with per-fixture status,
 imported IR declarations, native externs, and missing-boundary diagnostics for
 CI and boundary debugging.

@@ -144,6 +144,13 @@ extern "C" lean_object * lean_nat_div___boxed(lean_object * a, lean_object * b) 
     return result;
 }
 
+extern "C" lean_object * lean_nat_mod___boxed(lean_object * a, lean_object * b) {
+    lean_object * result = lean_nat_mod(a, b);
+    lean_dec(a);
+    lean_dec(b);
+    return result;
+}
+
 extern "C" lean_object * lean_nat_pow___boxed(lean_object * a, lean_object * b) {
     lean_object * result = lean_nat_pow(a, b);
     lean_dec(a);
@@ -215,11 +222,41 @@ extern "C" lean_object * lean_nat_abs___boxed(lean_object * a) {
     return result;
 }
 
+extern "C" lean_object * lean_system_platform_nbits___boxed(lean_object * unit) {
+    lean_dec(unit);
+    return lean_box(sizeof(void*) == 8 ? 64 : 32);
+}
+
+extern "C" lean_object * lean_panic_fn_borrowed___boxed(lean_object * type, lean_object * default_value, lean_object * msg) {
+    lean_dec(type);
+    lean_object * result = lean_panic_fn_borrowed(default_value, msg);
+    lean_dec(default_value);
+    return result;
+}
+
 extern "C" lean_object * lean_array_mk_empty___boxed(lean_object * type, lean_object * capacity) {
     lean_dec(type);
     lean_object * result = lean_mk_empty_array_with_capacity(capacity);
     lean_dec(capacity);
     return result;
+}
+
+extern "C" lean_object * lean_array_mk___boxed(lean_object * type, lean_object * list) {
+    lean_dec(type);
+    size_t len = 0;
+    for (lean_object * it = list; !lean_is_scalar(it); it = lean_ctor_get(it, 1)) {
+        len++;
+    }
+    lean_object * array = lean_alloc_array(len, len);
+    size_t i = 0;
+    for (lean_object * it = list; !lean_is_scalar(it); it = lean_ctor_get(it, 1)) {
+        lean_object * value = lean_ctor_get(it, 0);
+        lean_inc(value);
+        lean_array_set_core(array, i, value);
+        i++;
+    }
+    lean_dec(list);
+    return array;
 }
 
 extern "C" lean_object * lean_array_push___boxed(lean_object * type, lean_object * array, lean_object * value) {
@@ -274,6 +311,33 @@ extern "C" lean_object * lean_array_uget_borrowed___boxed(lean_object * type, le
     lean_dec(array);
     lean_dec(index);
     lean_dec(proof);
+    return result;
+}
+
+extern "C" lean_object * lean_array_fget_borrowed___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
+    lean_dec(type);
+    lean_object * result = lean_array_fget(array, index);
+    lean_dec(array);
+    lean_dec(index);
+    lean_dec(proof);
+    return result;
+}
+
+extern "C" lean_object * lean_array_get___boxed(lean_object * type, lean_object * default_value, lean_object * array, lean_object * index) {
+    lean_dec(type);
+    lean_object * result = lean_array_get(default_value, array, index);
+    lean_dec(default_value);
+    lean_dec(array);
+    lean_dec(index);
+    return result;
+}
+
+extern "C" lean_object * lean_array_get_borrowed___boxed(lean_object * type, lean_object * default_value, lean_object * array, lean_object * index) {
+    lean_dec(type);
+    lean_object * result = lean_array_get(default_value, array, index);
+    lean_dec(default_value);
+    lean_dec(array);
+    lean_dec(index);
     return result;
 }
 
@@ -365,6 +429,13 @@ extern "C" lean_object * lean_usize_of_nat___boxed(lean_object * a) {
     return lean_box_usize(result);
 }
 
+extern "C" lean_object * l_USize_ofNatLT___boxed(lean_object * a, lean_object * proof) {
+    size_t result = lean_usize_of_nat(a);
+    lean_dec(a);
+    lean_dec(proof);
+    return lean_box_usize(result);
+}
+
 extern "C" lean_object * lean_usize_add___boxed(lean_object * a, lean_object * b) {
     size_t result = lean_usize_add(lean_unbox_usize(a), lean_unbox_usize(b));
     lean_dec(a);
@@ -386,10 +457,20 @@ extern "C" lean_object * lean_usize_dec_lt___boxed(lean_object * a, lean_object 
     return lean_box(result);
 }
 
+extern "C" lean_object * lean_string_of_usize___boxed(lean_object * a) {
+    lean_object * result = lean_string_of_usize(lean_unbox_usize(a));
+    lean_dec(a);
+    return result;
+}
+
 extern "C" lean_object * lean_string_append___boxed(lean_object * a, lean_object * b) {
     lean_object * result = lean_string_append(a, b);
     lean_dec(b);
     return result;
+}
+
+extern "C" lean_object * lean_string_mk___boxed(lean_object * chars) {
+    return lean_string_mk(chars);
 }
 
 extern "C" lean_object * lean_string_to_utf8___boxed(lean_object * s) {
@@ -890,6 +971,7 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("Nat.decLt", "lean_nat_dec_lt", lean_nat_dec_lt___boxed) \
     X("Nat.mul", "lean_nat_mul", lean_nat_mul___boxed) \
     X("Nat.div", "lean_nat_div", lean_nat_div___boxed) \
+    X("Nat.mod", "lean_nat_mod", lean_nat_mod___boxed) \
     X("Nat.pow", "lean_nat_pow", lean_nat_pow___boxed) \
     X("Nat.log2", "lean_nat_log2", lean_nat_log2___boxed) \
     X("Nat.shiftLeft", "lean_nat_shiftl", lean_nat_shiftl___boxed) \
@@ -901,13 +983,19 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("Int.neg", "lean_int_neg", lean_int_neg___boxed) \
     X("Int.decLt", "lean_int_dec_lt", lean_int_dec_lt___boxed) \
     X("Int.natAbs", "lean_nat_abs", lean_nat_abs___boxed) \
+    X("System.Platform.getNumBits", "lean_system_platform_nbits", lean_system_platform_nbits___boxed) \
+    X("panicCore", "lean_panic_fn_borrowed", lean_panic_fn_borrowed___boxed) \
     X("Array.mkEmpty", "lean_array_mk_empty", lean_array_mk_empty___boxed) \
+    X("Array.mk", "lean_array_mk", lean_array_mk___boxed) \
     X("Array.push", "lean_array_push", lean_array_push___boxed) \
     X("Array.toList", "lean_array_to_list", lean_array_to_list___boxed) \
     X("Array.size", "lean_array_get_size", lean_array_get_size___boxed) \
     X("Array.usize", "lean_array_size", lean_array_size___boxed) \
     X("Array.uget", "lean_array_uget", lean_array_uget___boxed) \
     X("Array.ugetBorrowed", "lean_array_uget_borrowed", lean_array_uget_borrowed___boxed) \
+    X("Array.getInternalBorrowed", "lean_array_fget_borrowed", lean_array_fget_borrowed___boxed) \
+    X("Array.get!Internal", "lean_array_get", lean_array_get___boxed) \
+    X("Array.get!InternalBorrowed", "lean_array_get_borrowed", lean_array_get_borrowed___boxed) \
     X("Array.uset", "lean_array_uset", lean_array_uset___boxed) \
     X("Array.set!", "lean_array_set", lean_array_set___boxed) \
     X("Array.pop", "lean_array_pop", lean_array_pop___boxed) \
@@ -921,10 +1009,14 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("ByteArray.size", "lean_byte_array_size", lean_byte_array_size___boxed) \
     X("ByteArray.validateUTF8", "lean_string_validate_utf8", lean_string_validate_utf8___boxed) \
     X("USize.ofNat", "lean_usize_of_nat", lean_usize_of_nat___boxed) \
+    X("USize.ofNatLT", "l_USize_ofNatLT", l_USize_ofNatLT___boxed) \
     X("USize.add", "lean_usize_add", lean_usize_add___boxed) \
     X("USize.decEq", "lean_usize_dec_eq", lean_usize_dec_eq___boxed) \
     X("USize.decLt", "lean_usize_dec_lt", lean_usize_dec_lt___boxed) \
+    X("USize.repr", "lean_string_of_usize", lean_string_of_usize___boxed) \
     X("String.append", "lean_string_append", lean_string_append___boxed) \
+    X("String.Internal.append", "lean_string_append", lean_string_append___boxed) \
+    X("String.ofList", "lean_string_mk", lean_string_mk___boxed) \
     X("String.toUTF8", "lean_string_to_utf8", lean_string_to_utf8___boxed) \
     X("String.ofByteArray", "lean_string_from_utf8_unchecked", lean_string_from_utf8_unchecked___boxed) \
     X("String.push", "lean_string_push", lean_string_push___boxed) \
@@ -937,12 +1029,14 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("String.Internal.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
     X("String.Pos.Raw.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
     X("String.Pos.next", "lean_string_utf8_next_fast", lean_string_utf8_next_fast___boxed) \
+    X("String.Pos.Raw.next'", "lean_string_utf8_next_fast", lean_string_utf8_next_fast___boxed) \
     X("String.Internal.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
     X("String.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
     X("String.Pos.Raw.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
     X("String.Pos.Raw.prev", "lean_string_utf8_prev", lean_string_utf8_prev___boxed) \
     X("String.decodeChar", "lean_string_utf8_get_fast", lean_string_utf8_get_fast___boxed) \
     X("String.Pos.Raw.get", "lean_string_utf8_get", lean_string_utf8_get___boxed) \
+    X("String.Pos.Raw.get'", "lean_string_utf8_get_fast", lean_string_utf8_get_fast___boxed) \
     X("String.Internal.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
     X("String.Pos.Raw.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
     X("String.decEq", "lean_string_dec_eq", lean_string_dec_eq___boxed) \

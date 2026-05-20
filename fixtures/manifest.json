@@ -242,6 +242,20 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-parser-input-context",
+      "source": "fixtures/LeanParser.lean",
+      "entry": "Vir.Fixtures.LeanParser.upstreamParserInputContextScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-parser-header",
+      "source": "fixtures/LeanParserHeader.lean",
+      "entry": "Vir.Fixtures.LeanParserHeader.upstreamParseHeaderScore",
+      "result": { "type": "Nat" },
+      "unsafe": true,
+      "expect": { "status": "unsupported" }
+    },
+    {
       "id": "upstream-uint32-literal-to-nat",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.uint32LiteralToNatScore",
