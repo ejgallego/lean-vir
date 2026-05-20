@@ -104,6 +104,78 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_nat_mul"
   },
   {
+    name := `Nat.div,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_div"
+  },
+  {
+    name := `Nat.pow,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_pow"
+  },
+  {
+    name := `Nat.log2,
+    params := #[param 1 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_log2"
+  },
+  {
+    name := `Nat.shiftLeft,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_shiftl"
+  },
+  {
+    name := `Nat.shiftRight,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_shiftr"
+  },
+  {
+    name := `Int.ofNat,
+    params := #[param 1 false .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_to_int"
+  },
+  {
+    name := `Int.add,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_int_add"
+  },
+  {
+    name := `Int.sub,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_int_sub"
+  },
+  {
+    name := `Int.mul,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_int_mul"
+  },
+  {
+    name := `Int.neg,
+    params := #[param 1 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_int_neg"
+  },
+  {
+    name := `Int.decLt,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_int_dec_lt"
+  },
+  {
+    name := `Int.natAbs,
+    params := #[param 1 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_abs"
+  },
+  {
     name := `Array.mkEmpty,
     params := #[param 1 false .erased, param 2 false .tagged],
     resultType := .object,
@@ -246,6 +318,42 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .uint8],
     resultType := .tagged,
     symbol := "lean_uint8_to_nat"
+  },
+  {
+    name := `UInt32.ofNat,
+    params := #[param 1 true .tobject],
+    resultType := .uint32,
+    symbol := "lean_uint32_of_nat"
+  },
+  {
+    name := `UInt32.toNat,
+    params := #[param 1 false .uint32],
+    resultType := .tobject,
+    symbol := "lean_uint32_to_nat"
+  },
+  {
+    name := `UInt64.ofNat,
+    params := #[param 1 true .tobject],
+    resultType := .uint64,
+    symbol := "lean_uint64_of_nat"
+  },
+  {
+    name := `UInt64.toFloat,
+    params := #[param 1 false .uint64],
+    resultType := .float,
+    symbol := "lean_uint64_to_float"
+  },
+  {
+    name := `Float.scaleB,
+    params := #[param 1 false .float, param 2 true .tobject],
+    resultType := .float,
+    symbol := "lean_float_scaleb"
+  },
+  {
+    name := `Float.toUInt32,
+    params := #[param 1 false .float],
+    resultType := .uint32,
+    symbol := "lean_float_to_uint32"
   }
 ]
 

@@ -176,11 +176,40 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-nat-shift-pow-div",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.natShiftPowDivScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-int-arithmetic",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.intArithmeticScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-uint32-ofnat-tonat",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint32OfNatToNatScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-uint64-to-float",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint64ToFloatScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-float-scale",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.floatScaleScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-float-to-uint32",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.floatToUInt32Score",
-      "result": { "type": "Nat" },
-      "expect": { "status": "unsupported" }
+      "result": { "type": "Nat" }
     }
   ]
 }

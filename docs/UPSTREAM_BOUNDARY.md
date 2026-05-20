@@ -118,19 +118,17 @@ separates missing Lean IR declarations from missing native extern
 registrations, and the package decoder exposes its last load error for browser
 and smoke-test diagnostics.
 The current explicit native externs cover the small fixture/demo surface for
-`Nat`, `Array`, `ByteArray`, `USize`, `UInt8`, and `String`: `Nat.add`,
-`Nat.sub`, `Nat.decEq`, `Nat.decLe`, `Nat.decLt`, `Nat.mul`,
-`Array.mkEmpty`, `Array.push`, `Array.toList`, `Array.size`, `Array.usize`,
-`Array.uget`, `Array.ugetBorrowed`, `Array.uset`, `ByteArray.empty`,
-`ByteArray.push`, `ByteArray.get!`, `ByteArray.set!`, `ByteArray.extract`,
-`ByteArray.size`, `USize.ofNat`, `USize.add`, `USize.decEq`, `USize.decLt`,
-`UInt8.toNat`, `String.append`, `String.length`, `String.utf8ByteSize`,
-`String.getUTF8Byte`, and `String.decEq`. They are backed by a small shim
-registry; a full native symbol loader is still out of scope. `ByteArray.empty`
-is exposed as Lean's native constant symbol (`l_ByteArray_empty`), not as a
-boxed nullary function, because the upstream interpreter loads native constants
-through the symbol address. `ByteArray.extract` is exposed as Lean's compiled
-symbol stem (`l_ByteArray_extract`) and delegates to the linked runtime
+`Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
+`Float`, and `String`. This includes the arithmetic and comparison operations
+needed by the demos, List/Array/String/ByteArray fixtures, and the current
+numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
+arithmetic, `UInt32.ofNat`/`toNat`, `UInt64.ofNat`/`toFloat`, and
+`Float.scaleB`/`toUInt32`. They are backed by a small shim registry; a full
+native symbol loader is still out of scope. `ByteArray.empty` is exposed as
+Lean's native constant symbol (`l_ByteArray_empty`), not as a boxed nullary
+function, because the upstream interpreter loads native constants through the
+symbol address. `ByteArray.extract` is exposed as Lean's compiled symbol stem
+(`l_ByteArray_extract`) and delegates to the linked runtime
 `lean_byte_array_copy_slice` path.
 
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
@@ -154,11 +152,9 @@ declarations, but they are loaded from a demo-specific package instead of Lean's
 generated module data. A later provider can replace this package with generated
 module data behind `decl_provider.h`.
 
-The fixture suite intentionally tracks the next unsupported native boundary:
-Float-to-UInt32 conversion currently reports missing native registrations for
-the float, integer, and wider-UInt operations pulled into that lowered path.
-This keeps the unsupported surface visible without widening the demo runtime
-until a fixture or demo actually needs it.
+The fixture suite currently has no expected-unsupported entry. When the next
+native or imported-IR gap appears, keep it explicit in `fixtures/manifest.json`
+until the required shim or package-loader support is added.
 
 ## Future Loading Path
 

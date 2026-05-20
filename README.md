@@ -71,7 +71,7 @@ platform shim.
 Each fixture is Lean source under `fixtures/`, elaborated by Lean 4.30-rc2 into
 real `Lean.IR.Decl` values, packaged with `tools/GeneratePackage.lean`, and
 then compared against Lean's host IR interpreter with
-`interpreter.prefer_native=false`. Known unsupported fixtures are tracked in
+`interpreter.prefer_native=false`. Known unsupported fixtures can be tracked in
 `fixtures/manifest.json` so boundary gaps remain explicit. The current passing
 surface includes recursion, inductive pattern matching, local list processing,
 standard `List.map`/`List.filter`/`List.foldl`/`List.any`/`List.all`/
@@ -79,10 +79,11 @@ standard `List.map`/`List.filter`/`List.foldl`/`List.any`/`List.all`/
 comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
 `Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, plus basic
 `String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
-`String.decEq`, `UInt32` literals, and `ByteArray.empty`/`ByteArray.push`/
-`ByteArray.get!`/`ByteArray.set!`/`ByteArray.extract`/`ByteArray.size`. The
-current expected unsupported boundary is Float/UInt32 conversion, which would
-need a wider native runtime registration set.
+`String.decEq`, `UInt8.toNat`, `UInt32` literals and `UInt32.ofNat`/`toNat`,
+`UInt64.ofNat`/`toFloat`, small `Int` arithmetic, `Nat.div`/`pow`/`log2`/
+`shiftLeft`/`shiftRight`, `Float.scaleB`/`toUInt32`, and
+`ByteArray.empty`/`ByteArray.push`/`ByteArray.get!`/`ByteArray.set!`/
+`ByteArray.extract`/`ByteArray.size`.
 The runner also writes `build/fixtures/summary.json` with per-fixture status,
 imported IR declarations, native externs, and missing-boundary diagnostics for
 CI and boundary debugging.
