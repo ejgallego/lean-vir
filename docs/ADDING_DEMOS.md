@@ -34,8 +34,8 @@ npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
 
 Run `npm run dev` and open `/dev.html` to load a served package URL or upload the
 generated `.irpkg`, then use the input spec to evaluate a `Nat` entry. The
-developer page currently supports `() -> Nat`, `Nat -> Nat`, and
-`Array Nat -> Nat` entry shapes.
+developer page currently supports `() -> Nat`, `Nat -> Nat`, `Array Nat -> Nat`,
+`String -> Nat`, and `ByteArray -> Nat` entry shapes.
 See `docs/LOCAL_IRPKG.md` for the full local package workflow and current
 limitations.
 
@@ -67,7 +67,11 @@ the package-backed imported closure or the explicit native boundary.
 ## Browser Entrypoints
 
 Prefer `vir_eval_const_nat_string` for zero-argument `Nat` demos, since it also
-handles values wider than 32 bits. If a demo needs browser-supplied input, add
-a narrow export in `wasm/upstream_shim/shim.cpp` that constructs the Lean
-argument object and then calls `lean::ir::run_boxed`. Keep the Lean declaration
-itself in `examples/` and include it as a root in `tools/GeneratePackage.lean`.
+handles values wider than 32 bits. The JavaScript wrapper in
+`web/src/vir-runtime.js` currently covers `() -> Nat`, `Nat -> Nat`,
+`Array Nat -> Nat`, `String -> Nat`, and `ByteArray -> Nat`.
+
+If a demo needs another browser-supplied input or result shape, add a narrow
+export in `wasm/upstream_shim/shim.cpp` that constructs the Lean object and then
+calls `lean::ir::run_boxed`. Keep the Lean declaration itself in `examples/` and
+include it as a root in `tools/GeneratePackage.lean`.

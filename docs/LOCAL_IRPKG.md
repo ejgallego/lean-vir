@@ -120,6 +120,31 @@ Example:
           "maxValue": 9999
         }
       ]
+    },
+    {
+      "id": "string",
+      "entry": "Vir.Fixtures.Basic.stringUtf8RoundtripScore",
+      "result": { "type": "Nat" },
+      "inputs": [
+        {
+          "name": "text",
+          "type": "String",
+          "defaultValue": "Aé∀Z"
+        }
+      ]
+    },
+    {
+      "id": "bytes",
+      "entry": "Vir.Fixtures.Basic.byteArrayInputScore",
+      "result": { "type": "Nat" },
+      "inputs": [
+        {
+          "name": "bytes",
+          "type": "ByteArray",
+          "defaultValue": "65, 66, 67",
+          "maxItems": 1024
+        }
+      ]
     }
   ]
 }
@@ -129,12 +154,15 @@ Supported entry shapes:
 
 - `() -> Nat`, marshaled through `vir_eval_const_nat_string`;
 - `Nat -> Nat`, marshaled through `vir_eval_nat_to_nat_string`;
-- `Array Nat -> Nat`, marshaled through `vir_eval_nat_array_to_nat_string`.
+- `Array Nat -> Nat`, marshaled through `vir_eval_nat_array_to_nat_string`;
+- `String -> Nat`, marshaled through `vir_eval_string_to_nat_string`;
+- `ByteArray -> Nat`, marshaled through `vir_eval_byte_array_to_nat_string`.
 
-`Nat` inputs are decimal strings. `Array Nat` inputs are comma- or
-whitespace-separated decimal strings. The optional `min`, `max`, `maxItems`, and
-`maxValue` fields are UI-side guardrails; the Lean function still receives the
-normalized value after parsing.
+`Nat` inputs are decimal strings. `Array Nat` and `ByteArray` inputs are comma-
+or whitespace-separated decimal strings. `String` inputs are UTF-8 encoded
+browser strings. The optional `min`, `max`, `maxItems`, and `maxValue` fields are
+UI-side guardrails; the Lean function still receives the normalized value after
+parsing.
 
 ## Current Scope
 

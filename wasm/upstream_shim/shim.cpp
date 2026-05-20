@@ -1578,6 +1578,18 @@ static object * mk_nat_array(uint32_t const * values, uint32_t len) {
     return array;
 }
 
+static object * mk_string_from_bytes(char const * text, uint32_t len) {
+    return lean::mk_string(std::string(text, len));
+}
+
+static object * mk_byte_array(uint8_t const * values, uint32_t len) {
+    object * array = lean_alloc_sarray(1, len, len);
+    if (len != 0) {
+        memcpy(lean_sarray_cptr(array), values, len);
+    }
+    return array;
+}
+
 static char const * known_symbol_stem(name const & n) {
     std::string dotted = n.to_string();
     for (::NativeSymbol const & entry : ::g_native_symbols) {
@@ -1828,6 +1840,40 @@ extern "C" char const * vir_eval_nat_array_to_nat_string(
     lean::ensure_ir_interpreter_initialized();
     lean::name fn = lean::name_from_dotted(name_text, name_len);
     lean::object * input = lean::mk_nat_array(values, len);
+    lean::object * args[] = { input };
+    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 1, args);
+    return lean::g_eval_const_nat_string.c_str();
+}
+
+extern "C" char const * vir_eval_string_to_nat_string(
+    char const * name_text,
+    uint32_t name_len,
+    char const * value,
+    uint32_t value_len) {
+    if (value == nullptr && value_len != 0) {
+        lean::g_eval_const_nat_string = "0";
+        return lean::g_eval_const_nat_string.c_str();
+    }
+    lean::ensure_ir_interpreter_initialized();
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    lean::object * input = lean::mk_string_from_bytes(value, value_len);
+    lean::object * args[] = { input };
+    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 1, args);
+    return lean::g_eval_const_nat_string.c_str();
+}
+
+extern "C" char const * vir_eval_byte_array_to_nat_string(
+    char const * name_text,
+    uint32_t name_len,
+    uint8_t const * values,
+    uint32_t len) {
+    if (values == nullptr && len != 0) {
+        lean::g_eval_const_nat_string = "0";
+        return lean::g_eval_const_nat_string.c_str();
+    }
+    lean::ensure_ir_interpreter_initialized();
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    lean::object * input = lean::mk_byte_array(values, len);
     lean::object * args[] = { input };
     lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 1, args);
     return lean::g_eval_const_nat_string.c_str();

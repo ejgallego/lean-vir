@@ -6,25 +6,13 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+import { createVirImports, VirRuntime } from "../web/src/vir-runtime.js";
+
 const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const irPackage = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
 const fixtureManifest = JSON.parse(await readFile(new URL("../fixtures/manifest.json", import.meta.url), "utf8"));
 const mod = new WebAssembly.Module(wasm);
-const imports = {};
-
-for (const spec of WebAssembly.Module.imports(mod)) {
-  if (!imports[spec.module]) {
-    imports[spec.module] = {};
-  }
-  if (spec.kind === "function") {
-    imports[spec.module][spec.name] = (...args) => {
-      if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
-        throw new Error(`WASI proc_exit(${args[0]})`);
-      }
-      return 0;
-    };
-  }
-}
+const imports = createVirImports(mod);
 
 const { exports } = await WebAssembly.instantiate(mod, imports);
 exports.__wasm_call_ctors?.();
@@ -61,6 +49,12 @@ if (typeof exports.vir_eval_nat_to_nat_string !== "function") {
 }
 if (typeof exports.vir_eval_nat_array_to_nat_string !== "function") {
   throw new Error("vir_eval_nat_array_to_nat_string export is missing");
+}
+if (typeof exports.vir_eval_string_to_nat_string !== "function") {
+  throw new Error("vir_eval_string_to_nat_string export is missing");
+}
+if (typeof exports.vir_eval_byte_array_to_nat_string !== "function") {
+  throw new Error("vir_eval_byte_array_to_nat_string export is missing");
 }
 if (typeof exports.vir_eval_const_nat_string_size !== "function") {
   throw new Error("vir_eval_const_nat_string_size export is missing");
@@ -121,6 +115,8 @@ try {
 } finally {
   exports.vir_free_bytes?.(packagePtr);
 }
+
+const runtime = new VirRuntime(exports);
 
 const fibCases = [
   [0, 0],
@@ -194,38 +190,12 @@ if (runDemo !== mood.angry) {
   throw new Error(`upstream Tamagotchi.run demoScript: expected ${mood.angry}, got ${runDemo}`);
 }
 
-function evalConstNat(name) {
-  const bytes = new TextEncoder().encode(name);
-  const ptr = exports.vir_alloc_bytes(bytes.byteLength);
-  try {
-    new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
-    const resultPtr = exports.vir_eval_const_nat_string(ptr, bytes.byteLength);
-    const resultLen = exports.vir_eval_const_nat_string_size();
-    return readWasmString(resultPtr, resultLen);
-  } finally {
-    exports.vir_free_bytes?.(ptr);
-  }
-}
-
-function evalNatToNat(name, value) {
-  const bytes = new TextEncoder().encode(name);
-  const ptr = exports.vir_alloc_bytes(bytes.byteLength);
-  try {
-    new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
-    const resultPtr = exports.vir_eval_nat_to_nat_string(ptr, bytes.byteLength, value);
-    const resultLen = exports.vir_eval_const_nat_string_size();
-    return readWasmString(resultPtr, resultLen);
-  } finally {
-    exports.vir_free_bytes?.(ptr);
-  }
-}
-
-const sortChecksum = evalConstNat("SortDemo.demo");
+const sortChecksum = runtime.evalConstNat("SortDemo.demo");
 if (sortChecksum !== "192") {
   throw new Error(`upstream SortDemo.demo: expected 192, got ${sortChecksum}`);
 }
 
-const genericFib = evalNatToNat("fib", 12);
+const genericFib = runtime.evalNatToNat("fib", 12);
 if (genericFib !== "144") {
   throw new Error(`generic fib input: expected 144, got ${genericFib}`);
 }
@@ -241,31 +211,24 @@ function sortChecksumFor(values) {
   }
 }
 
-function genericSortChecksumFor(name, values) {
-  const nameBytes = new TextEncoder().encode(name);
-  const namePtr = exports.vir_alloc_bytes(nameBytes.byteLength);
-  const valuesPtr = exports.vir_alloc_bytes(values.length * 4);
-  try {
-    new Uint8Array(exports.memory.buffer, namePtr, nameBytes.byteLength).set(nameBytes);
-    const view = new DataView(exports.memory.buffer, valuesPtr, values.length * 4);
-    values.forEach((value, index) => view.setUint32(index * 4, value, true));
-    const resultPtr = exports.vir_eval_nat_array_to_nat_string(namePtr, nameBytes.byteLength, valuesPtr, values.length);
-    const resultLen = exports.vir_eval_const_nat_string_size();
-    return readWasmString(resultPtr, resultLen);
-  } finally {
-    exports.vir_free_bytes?.(valuesPtr);
-    exports.vir_free_bytes?.(namePtr);
-  }
-}
-
 const editableChecksum = sortChecksumFor([4, 1, 3, 2]);
 if (editableChecksum !== 30) {
   throw new Error(`upstream SortDemo.demoFromArray: expected 30, got ${editableChecksum}`);
 }
 
-const genericEditableChecksum = genericSortChecksumFor("SortDemo.demoFromArray", [4, 1, 3, 2]);
+const genericEditableChecksum = runtime.evalNatArrayToNat("SortDemo.demoFromArray", [4, 1, 3, 2]);
 if (genericEditableChecksum !== "30") {
   throw new Error(`generic SortDemo.demoFromArray: expected 30, got ${genericEditableChecksum}`);
+}
+
+const genericStringScore = runtime.evalStringToNat("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z");
+if (genericStringScore !== "1381") {
+  throw new Error(`generic String input: expected 1381, got ${genericStringScore}`);
+}
+
+const genericByteArrayScore = runtime.evalByteArrayToNat("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]);
+if (genericByteArrayScore !== "136") {
+  throw new Error(`generic ByteArray input: expected 136, got ${genericByteArrayScore}`);
 }
 
 function repeatedSortChecksumFor(values, iterations) {
@@ -303,16 +266,7 @@ for (const fixture of fixtureManifest.fixtures ?? []) {
       fixtureExports.vir_free_bytes?.(fixturePackagePtr);
     }
 
-    const bytes = new TextEncoder().encode(fixture.entry);
-    const ptr = fixtureExports.vir_alloc_bytes(bytes.byteLength);
-    try {
-      new Uint8Array(fixtureExports.memory.buffer, ptr, bytes.byteLength).set(bytes);
-      const resultPtr = fixtureExports.vir_eval_const_nat_string(ptr, bytes.byteLength);
-      const resultLen = fixtureExports.vir_eval_const_nat_string_size();
-      value = new TextDecoder().decode(new Uint8Array(fixtureExports.memory.buffer, resultPtr, resultLen));
-    } finally {
-      fixtureExports.vir_free_bytes?.(ptr);
-    }
+    value = new VirRuntime(fixtureExports).evalConstNat(fixture.entry);
   } catch (error) {
     throw new Error(`${fixture.id}: fixture evaluation failed`, { cause: error });
   }

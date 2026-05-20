@@ -14,6 +14,8 @@ import fixtureBoundarySource from "../../fixtures/Boundary.lean?raw";
 import fixtureManifest from "../../fixtures/manifest.json";
 
 const statusEl = document.querySelector("#status");
+const petDevice = document.querySelector("#pet-device");
+const petArtToggle = document.querySelector("#pet-art-toggle");
 const petMoodDisplay = document.querySelector("#pet-mood-display");
 const petActionDisplay = document.querySelector("#pet-action-display");
 const petTraceDisplay = document.querySelector("#pet-trace-display");
@@ -108,6 +110,7 @@ let currentFixtureFilter = "all";
 let selectedFixtureId = null;
 let petMood = 0;
 let petTrace = [petMood];
+let petArtwork = petArtToggle.checked ? "octopus" : "pet";
 
 function demoPackageBytes() {
   irPackageBytesPromise ??= fetchBytes(`${import.meta.env.BASE_URL}${irPackageFile}`);
@@ -140,7 +143,11 @@ function setTrap(error) {
 }
 
 function renderPet() {
-  petMoodDisplay.textContent = moods[petMood] ?? "?";
+  const mood = moods[petMood] ?? "?";
+  petMoodDisplay.textContent = mood;
+  petDevice.dataset.mood = mood;
+  petDevice.dataset.art = petArtwork;
+  petDevice.setAttribute("aria-label", `${petArtwork === "octopus" ? "Octopus" : "Virtual pet"} mood ${mood}`);
   petTraceDisplay.textContent = petTrace.map((mood) => moods[mood] ?? "?").join(" -> ");
 }
 
@@ -431,6 +438,10 @@ fixtureRunSelectedButton.addEventListener("click", () => {
   if (fixture) {
     runFixture(fixture);
   }
+});
+petArtToggle.addEventListener("change", () => {
+  petArtwork = petArtToggle.checked ? "octopus" : "pet";
+  renderPet();
 });
 
 renderFixtureSummary();

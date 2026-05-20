@@ -57,6 +57,77 @@ Author: Emilio J. Gallego Arias
           </div>
         </header>
 
+        <section class="pet-demo" aria-label="Tamagotchi automaton demo">
+          <div class="pet-state-card">
+            <div class="pet-card-heading">
+              <div>
+                <p class="eyebrow">Interactive demo</p>
+                <h2>Tamagotchi.step</h2>
+              </div>
+              <label class="art-switch" for="pet-art-toggle">
+                <input id="pet-art-toggle" type="checkbox" checked />
+                <span class="art-switch-track" aria-hidden="true">
+                  <span class="art-switch-thumb"></span>
+                </span>
+                <span>Octopus</span>
+              </label>
+            </div>
+            <div class="pet-state">
+              <div
+                id="pet-device"
+                class="pet-device"
+                role="img"
+                aria-label="Octopus mood happy"
+                data-art="octopus"
+              >
+                <div class="pet-screen">
+                  <div class="pet-pixel-pet" aria-hidden="true">
+                    <span class="pet-ear pet-ear-left"></span>
+                    <span class="pet-ear pet-ear-right"></span>
+                    <span class="pet-body"></span>
+                    <span class="pet-tentacle pet-tentacle-1"></span>
+                    <span class="pet-tentacle pet-tentacle-2"></span>
+                    <span class="pet-tentacle pet-tentacle-3"></span>
+                    <span class="pet-tentacle pet-tentacle-4"></span>
+                    <span class="pet-tentacle pet-tentacle-5"></span>
+                    <span class="pet-eye pet-eye-left"></span>
+                    <span class="pet-eye pet-eye-right"></span>
+                    <span class="pet-mouth"></span>
+                    <span class="pet-signal"></span>
+                  </div>
+                </div>
+                <span class="pet-device-button pet-device-button-left"></span>
+                <span class="pet-device-button pet-device-button-center"></span>
+                <span class="pet-device-button pet-device-button-right"></span>
+              </div>
+              <div class="pet-mood-readout">
+                <span>Mood</span>
+                <strong id="pet-mood-display">happy</strong>
+              </div>
+            </div>
+          </div>
+          <div class="pet-action-card">
+            <div class="action-grid">
+              <button type="button" data-action="feed">Feed</button>
+              <button type="button" data-action="play">Play</button>
+              <button type="button" data-action="nap">Nap</button>
+              <button type="button" data-action="wake">Wake</button>
+              <button type="button" data-action="ignore">Ignore</button>
+              <button type="button" id="pet-reset-button">Reset</button>
+            </div>
+            <section class="pet-trace-band" aria-live="polite">
+              <div>
+                <span>last action</span>
+                <strong id="pet-action-display">...</strong>
+              </div>
+              <div>
+                <span>trace</span>
+                <strong id="pet-trace-display">happy</strong>
+              </div>
+            </section>
+          </div>
+        </section>
+
         <section class="pipeline-panel" aria-labelledby="pipeline-title">
           <div class="section-heading">
             <div>
@@ -86,39 +157,6 @@ Author: Emilio J. Gallego Arias
               <span>fixture package</span>
               <small>vir-demo.irpkg</small>
             </a>
-          </div>
-        </section>
-
-        <section class="pet-demo" aria-label="Tamagotchi automaton demo">
-          <div class="pet-state-card">
-            <div>
-              <p class="eyebrow">Interactive demo</p>
-              <h2>Tamagotchi.step</h2>
-            </div>
-            <div class="pet-state">
-              <span>Mood</span>
-              <strong id="pet-mood-display">happy</strong>
-            </div>
-          </div>
-          <div class="pet-action-card">
-            <div class="action-grid">
-              <button type="button" data-action="feed">Feed</button>
-              <button type="button" data-action="play">Play</button>
-              <button type="button" data-action="nap">Nap</button>
-              <button type="button" data-action="wake">Wake</button>
-              <button type="button" data-action="ignore">Ignore</button>
-              <button type="button" id="pet-reset-button">Reset</button>
-            </div>
-            <section class="pet-trace-band" aria-live="polite">
-              <div>
-                <span>last action</span>
-                <strong id="pet-action-display">...</strong>
-              </div>
-              <div>
-                <span>trace</span>
-                <strong id="pet-trace-display">happy</strong>
-              </div>
-            </section>
           </div>
         </section>
 

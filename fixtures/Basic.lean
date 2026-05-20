@@ -311,4 +311,16 @@ def upstreamByteArrayExtractScore : Nat :=
   let slice := bs.extract 1 4
   (slice.get! 0).toNat + (slice.get! 1).toNat + (slice.get! 2).toNat + slice.size
 
+def byteArrayInputScore (bs : ByteArray) : Nat :=
+  let slice := bs.extract 1 4
+  let first := if h : 0 < bs.size then (bs.get 0 h).toNat else 0
+  let second := if h : 1 < bs.size then (bs.get 1 h).toNat else 0
+  first + second + bs.size + slice.size
+
+def upstreamByteArrayInputScore : Nat :=
+  let bs := ByteArray.empty.push 65
+  let bs := bs.push 66
+  let bs := bs.push 67
+  byteArrayInputScore bs
+
 end Vir.Fixtures.Basic

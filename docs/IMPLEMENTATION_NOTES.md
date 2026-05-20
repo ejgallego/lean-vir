@@ -20,9 +20,9 @@ The same package encoder also supports focused developer packages through
 `scripts/lean-to-irpkg.sh`. That utility accepts explicit roots or packages every
 IR declaration emitted for a single Lean file. The `/dev.html` Vite entry point
 loads a served or uploaded `.irpkg` into a fresh WASM instance. Its input spec
-currently supports `() -> Nat`, `Nat -> Nat`, and `Array Nat -> Nat`, backed by
-narrow WASM exports that construct the Lean input object and call the upstream
-interpreter by name.
+currently supports `() -> Nat`, `Nat -> Nat`, `Array Nat -> Nat`,
+`String -> Nat`, and `ByteArray -> Nat`, backed by narrow WASM exports that
+construct the Lean input object and call the upstream interpreter by name.
 
 The browser keeps a step-by-step `Tamagotchi.step` automaton as the top-level
 interactive demo over the same upstream interpreter artifact. The automaton

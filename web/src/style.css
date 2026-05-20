@@ -228,29 +228,444 @@ h2 {
   padding: 18px;
 }
 
+.pet-card-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.art-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 30px;
+  color: #33415c;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  cursor: pointer;
+}
+
+.art-switch input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+}
+
+.art-switch-track {
+  position: relative;
+  width: 44px;
+  height: 24px;
+  border: 1px solid #bdc8bb;
+  border-radius: 999px;
+  background: #f6f7f2;
+  transition: background 120ms ease, border-color 120ms ease;
+}
+
+.art-switch-thumb {
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  background: #263d2c;
+  transition: transform 120ms ease, background 120ms ease;
+}
+
+.art-switch input:checked + .art-switch-track {
+  border-color: #516f88;
+  background: #e8eff4;
+}
+
+.art-switch input:checked + .art-switch-track .art-switch-thumb {
+  background: #516f88;
+  transform: translateX(20px);
+}
+
+.art-switch input:focus-visible + .art-switch-track {
+  outline: 2px solid #516f88;
+  outline-offset: 2px;
+}
+
 .pet-state {
   display: flex;
-  align-items: flex-end;
+  align-items: center;
   justify-content: space-between;
   gap: 18px;
-  min-height: 120px;
+  min-height: 168px;
   margin-top: 18px;
   padding: 18px;
   border: 1px solid #d9ded2;
-  background: #f3f7ef;
+  background: linear-gradient(135deg, #f9faf5 0%, #edf6ec 100%);
 }
 
-.pet-state span {
+.pet-mood-readout {
+  min-width: 0;
+  text-align: right;
+}
+
+.pet-mood-readout span {
   color: #5f6f64;
   font-size: 0.76rem;
   font-weight: 700;
   text-transform: uppercase;
 }
 
-.pet-state strong {
+.pet-mood-readout strong {
+  display: block;
+  margin-top: 8px;
   color: #20384a;
   font-size: 2.55rem;
   line-height: 0.95;
+  overflow-wrap: anywhere;
+}
+
+.pet-device {
+  --pet-shell: #d8505d;
+  --pet-shell-dark: #9f303b;
+  --pet-screen: #d9edc7;
+  --pet-ink: #1e3328;
+  position: relative;
+  flex: 0 0 auto;
+  width: 126px;
+  aspect-ratio: 0.82;
+  border: 3px solid #6d2b34;
+  border-radius: 52% 52% 44% 44% / 58% 58% 42% 42%;
+  background:
+    radial-gradient(circle at 32% 18%, rgba(255, 255, 255, 0.46) 0 12%, transparent 13%),
+    linear-gradient(145deg, #f06b73 0%, var(--pet-shell) 58%, var(--pet-shell-dark) 100%);
+  box-shadow:
+    inset 0 -10px 0 rgba(0, 0, 0, 0.08),
+    0 12px 18px rgba(52, 64, 54, 0.14);
+}
+
+.pet-device::before {
+  content: "";
+  position: absolute;
+  top: -10px;
+  left: 50%;
+  width: 18px;
+  height: 18px;
+  border: 3px solid #6d2b34;
+  border-bottom: 0;
+  border-radius: 50% 50% 0 0;
+  transform: translateX(-50%);
+}
+
+.pet-screen {
+  position: absolute;
+  top: 32px;
+  left: 21px;
+  right: 21px;
+  height: 72px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 3px solid #263d2c;
+  border-radius: 10px;
+  background:
+    linear-gradient(rgba(38, 61, 44, 0.07) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(38, 61, 44, 0.07) 1px, transparent 1px),
+    var(--pet-screen);
+  background-size: 10px 10px;
+  box-shadow: inset 0 0 0 2px rgba(255, 255, 255, 0.34);
+}
+
+.pet-pixel-pet {
+  position: relative;
+  width: 60px;
+  height: 54px;
+}
+
+.pet-ear,
+.pet-body,
+.pet-eye,
+.pet-mouth,
+.pet-tentacle,
+.pet-signal {
+  position: absolute;
+}
+
+.pet-tentacle {
+  display: none;
+}
+
+.pet-ear {
+  top: 7px;
+  width: 12px;
+  height: 12px;
+  background: var(--pet-ink);
+  transform: rotate(45deg);
+}
+
+.pet-ear-left {
+  left: 14px;
+}
+
+.pet-ear-right {
+  right: 14px;
+}
+
+.pet-body {
+  left: 11px;
+  top: 15px;
+  width: 38px;
+  height: 31px;
+  border-radius: 9px 9px 12px 12px;
+  background: var(--pet-ink);
+}
+
+.pet-body::before,
+.pet-body::after {
+  content: "";
+  position: absolute;
+  bottom: -5px;
+  width: 10px;
+  height: 7px;
+  background: var(--pet-ink);
+  border-radius: 0 0 5px 5px;
+}
+
+.pet-body::before {
+  left: 6px;
+}
+
+.pet-body::after {
+  right: 6px;
+}
+
+.pet-eye {
+  top: 25px;
+  width: 5px;
+  height: 5px;
+  background: var(--pet-screen);
+  border-radius: 1px;
+}
+
+.pet-eye-left {
+  left: 22px;
+}
+
+.pet-eye-right {
+  right: 22px;
+}
+
+.pet-eye::after {
+  content: "";
+}
+
+.pet-mouth {
+  left: 25px;
+  top: 34px;
+  width: 11px;
+  height: 6px;
+  border-bottom: 2px solid var(--pet-screen);
+  border-radius: 0 0 8px 8px;
+}
+
+.pet-signal {
+  top: 0;
+  right: 2px;
+  color: var(--pet-ink);
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.82rem;
+  font-weight: 900;
+  line-height: 1;
+}
+
+.pet-device-button {
+  position: absolute;
+  bottom: 18px;
+  width: 16px;
+  height: 16px;
+  border: 2px solid #6d2b34;
+  border-radius: 50%;
+  background: #ffe6c9;
+  box-shadow: inset 0 -3px 0 rgba(109, 43, 52, 0.16);
+}
+
+.pet-device-button-left {
+  left: 30px;
+}
+
+.pet-device-button-center {
+  left: 55px;
+}
+
+.pet-device-button-right {
+  right: 30px;
+}
+
+.pet-device[data-mood="hungry"] {
+  --pet-shell: #d68f3b;
+  --pet-shell-dark: #946026;
+  --pet-screen: #f1e2b6;
+}
+
+.pet-device[data-mood="hungry"] .pet-signal::before {
+  content: "!";
+}
+
+.pet-device[data-mood="sleepy"],
+.pet-device[data-mood="asleep"] {
+  --pet-shell: #6083b8;
+  --pet-shell-dark: #354f79;
+  --pet-screen: #d8e4f4;
+}
+
+.pet-device[data-mood="sleepy"] .pet-mouth,
+.pet-device[data-mood="asleep"] .pet-mouth {
+  left: 27px;
+  width: 7px;
+  height: 7px;
+  border: 2px solid var(--pet-screen);
+  border-radius: 50%;
+}
+
+.pet-device[data-mood="sleepy"] .pet-signal::before,
+.pet-device[data-mood="asleep"] .pet-signal::before {
+  content: "zz";
+}
+
+.pet-device[data-mood="angry"] {
+  --pet-shell: #bd3c38;
+  --pet-shell-dark: #782523;
+  --pet-screen: #f1d3bf;
+}
+
+.pet-device[data-mood="angry"] .pet-eye {
+  width: 8px;
+  height: 3px;
+  transform: rotate(18deg);
+}
+
+.pet-device[data-mood="angry"] .pet-eye-right {
+  transform: rotate(-18deg);
+}
+
+.pet-device[data-mood="angry"] .pet-mouth {
+  top: 36px;
+  height: 0;
+  border-bottom-width: 2px;
+  border-radius: 0;
+}
+
+.pet-device[data-mood="angry"] .pet-signal::before {
+  content: "!!";
+}
+
+.pet-device[data-mood="dead"] {
+  --pet-shell: #70736f;
+  --pet-shell-dark: #444946;
+  --pet-screen: #d8ded2;
+  filter: saturate(0.35);
+}
+
+.pet-device[data-mood="dead"] .pet-eye {
+  width: 9px;
+  height: 2px;
+  transform: rotate(45deg);
+}
+
+.pet-device[data-mood="dead"] .pet-eye::after {
+  position: absolute;
+  inset: 0;
+  display: block;
+  background: var(--pet-screen);
+  transform: rotate(90deg);
+}
+
+.pet-device[data-mood="dead"] .pet-mouth {
+  top: 38px;
+  height: 0;
+  border-bottom-width: 2px;
+  border-radius: 0;
+}
+
+.pet-device[data-art="octopus"] {
+  --pet-ink: #314f78;
+}
+
+.pet-device[data-art="octopus"] .pet-ear {
+  display: none;
+}
+
+.pet-device[data-art="octopus"] .pet-body {
+  left: 14px;
+  top: 9px;
+  width: 32px;
+  height: 30px;
+  border-radius: 48% 48% 42% 42%;
+}
+
+.pet-device[data-art="octopus"] .pet-body::before,
+.pet-device[data-art="octopus"] .pet-body::after {
+  display: none;
+}
+
+.pet-device[data-art="octopus"] .pet-tentacle {
+  display: block;
+  top: 34px;
+  width: 7px;
+  height: 14px;
+  background: var(--pet-ink);
+  border-radius: 0 0 7px 7px;
+}
+
+.pet-device[data-art="octopus"] .pet-tentacle-1 {
+  left: 13px;
+  transform: rotate(12deg);
+}
+
+.pet-device[data-art="octopus"] .pet-tentacle-2 {
+  left: 21px;
+}
+
+.pet-device[data-art="octopus"] .pet-tentacle-3 {
+  left: 29px;
+}
+
+.pet-device[data-art="octopus"] .pet-tentacle-4 {
+  left: 37px;
+}
+
+.pet-device[data-art="octopus"] .pet-tentacle-5 {
+  left: 45px;
+  transform: rotate(-12deg);
+}
+
+.pet-device[data-art="octopus"] .pet-eye {
+  top: 20px;
+}
+
+.pet-device[data-art="octopus"] .pet-eye-left {
+  left: 23px;
+}
+
+.pet-device[data-art="octopus"] .pet-eye-right {
+  right: 23px;
+}
+
+.pet-device[data-art="octopus"] .pet-mouth {
+  left: 26px;
+  top: 29px;
+}
+
+.pet-device[data-art="octopus"][data-mood="sleepy"] .pet-mouth,
+.pet-device[data-art="octopus"][data-mood="asleep"] .pet-mouth {
+  left: 27px;
+}
+
+.pet-device[data-art="octopus"][data-mood="angry"] .pet-mouth {
+  top: 31px;
+}
+
+.pet-device[data-art="octopus"][data-mood="dead"] .pet-mouth {
+  top: 32px;
 }
 
 .action-grid {
@@ -809,7 +1224,11 @@ h2 {
     min-height: 100px;
   }
 
-  .pet-state strong {
+  .pet-mood-readout {
+    text-align: left;
+  }
+
+  .pet-mood-readout strong {
     font-size: 2.15rem;
   }
 
