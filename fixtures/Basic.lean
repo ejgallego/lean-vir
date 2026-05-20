@@ -170,6 +170,20 @@ def rawStringIterationScore (s : String) : Nat :=
 def upstreamStringRawIterationScore : Nat :=
   rawStringIterationScore "Aé∀Z"
 
+def stringSliceExtractScore (s : String) : Nat :=
+  let p0 : String.Pos.Raw := ⟨0⟩
+  let p1 := String.Internal.next s p0
+  let p2 := String.Internal.next s p1
+  let p3 := String.Internal.next s p2
+  let middle := String.Internal.extract s p1 p3
+  let pushed := middle.push '!'
+  pushed.length + pushed.utf8ByteSize + (String.Pos.Raw.prev s p3).byteIdx +
+    (if ("A" : String) < pushed then 100 else 0) +
+    if middle = "é∀" then 1000 else 0
+
+def upstreamStringSliceExtractScore : Nat :=
+  stringSliceExtractScore "Aé∀Z"
+
 def upstreamByteArrayPushGetScore : Nat :=
   let bs := ByteArray.empty.push 65
   let bs := bs.push 66

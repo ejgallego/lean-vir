@@ -382,6 +382,12 @@ extern "C" lean_object * lean_string_append___boxed(lean_object * a, lean_object
     return result;
 }
 
+extern "C" lean_object * lean_string_push___boxed(lean_object * s, lean_object * c) {
+    uint32_t ch = lean_unbox_uint32(c);
+    lean_dec(c);
+    return lean_string_push(s, ch);
+}
+
 extern "C" lean_object * lean_string_length___boxed(lean_object * a) {
     lean_object * result = lean_string_length(a);
     lean_dec(a);
@@ -409,6 +415,21 @@ extern "C" lean_object * lean_string_utf8_next___boxed(lean_object * s, lean_obj
     return result;
 }
 
+extern "C" lean_object * lean_string_utf8_extract___boxed(lean_object * s, lean_object * start, lean_object * stop) {
+    lean_object * result = lean_string_utf8_extract(s, start, stop);
+    lean_dec(s);
+    lean_dec(start);
+    lean_dec(stop);
+    return result;
+}
+
+extern "C" lean_object * lean_string_utf8_prev___boxed(lean_object * s, lean_object * pos) {
+    lean_object * result = lean_string_utf8_prev(s, pos);
+    lean_dec(s);
+    lean_dec(pos);
+    return result;
+}
+
 extern "C" lean_object * lean_string_utf8_get___boxed(lean_object * s, lean_object * pos) {
     uint32_t result = lean_string_utf8_get(s, pos);
     lean_dec(s);
@@ -425,6 +446,13 @@ extern "C" lean_object * lean_string_utf8_at_end___boxed(lean_object * s, lean_o
 
 extern "C" lean_object * lean_string_dec_eq___boxed(lean_object * a, lean_object * b) {
     uint8_t result = lean_string_dec_eq(a, b);
+    lean_dec(a);
+    lean_dec(b);
+    return lean_box(result);
+}
+
+extern "C" lean_object * lean_string_dec_lt___boxed(lean_object * a, lean_object * b) {
+    uint8_t result = lean_string_dec_lt(a, b);
     lean_dec(a);
     lean_dec(b);
     return lean_box(result);
@@ -810,13 +838,17 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("USize.decEq", "lean_usize_dec_eq", lean_usize_dec_eq___boxed) \
     X("USize.decLt", "lean_usize_dec_lt", lean_usize_dec_lt___boxed) \
     X("String.append", "lean_string_append", lean_string_append___boxed) \
+    X("String.push", "lean_string_push", lean_string_push___boxed) \
     X("String.length", "lean_string_length", lean_string_length___boxed) \
     X("String.utf8ByteSize", "lean_string_utf8_byte_size", lean_string_utf8_byte_size___boxed) \
     X("String.getUTF8Byte", "lean_string_get_byte_fast", lean_string_get_byte_fast___boxed) \
     X("String.Internal.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
+    X("String.Internal.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
+    X("String.Pos.Raw.prev", "lean_string_utf8_prev", lean_string_utf8_prev___boxed) \
     X("String.Pos.Raw.get", "lean_string_utf8_get", lean_string_utf8_get___boxed) \
     X("String.Internal.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
     X("String.decEq", "lean_string_dec_eq", lean_string_dec_eq___boxed) \
+    X("String.decidableLT", "lean_string_dec_lt", lean_string_dec_lt___boxed) \
     X("UInt8.toNat", "lean_uint8_to_nat", lean_uint8_to_nat___boxed) \
     X("UInt8.add", "lean_uint8_add", lean_uint8_add___boxed) \
     X("UInt8.sub", "lean_uint8_sub", lean_uint8_sub___boxed) \

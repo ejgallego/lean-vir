@@ -314,6 +314,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_append"
   },
   {
+    name := `String.push,
+    params := #[param 1 false .object, param 2 false .uint32],
+    resultType := .object,
+    symbol := "lean_string_push"
+  },
+  {
     name := `String.length,
     params := #[param 1 true .object],
     resultType := .tagged,
@@ -338,6 +344,18 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_utf8_next"
   },
   {
+    name := `String.Internal.extract,
+    params := #[param 1 true .object, param 2 true .tobject, param 3 true .tobject],
+    resultType := .object,
+    symbol := "lean_string_utf8_extract"
+  },
+  {
+    name := `String.Pos.Raw.prev,
+    params := #[param 1 true .object, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_string_utf8_prev"
+  },
+  {
     name := `String.Pos.Raw.get,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint32,
@@ -354,6 +372,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .object],
     resultType := .uint8,
     symbol := "lean_string_dec_eq"
+  },
+  {
+    name := `String.decidableLT,
+    params := #[param 1 true .object, param 2 true .object],
+    resultType := .uint8,
+    symbol := "lean_string_dec_lt"
   },
   {
     name := `UInt8.toNat,

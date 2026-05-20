@@ -122,8 +122,9 @@ The current explicit native externs cover the small fixture/demo surface for
 `Float`, and `String`. This includes the arithmetic and comparison operations
 needed by the demos, List/Array/String/ByteArray fixtures, array mutation
 through `Array.replicate`/`Array.set!`/`Array.swapIfInBounds`/`Array.pop`,
-String raw-position iteration through `String.Internal.next`/
-`String.Pos.Raw.get`/`String.Internal.atEnd`, and the current
+String raw-position iteration and slicing through `String.push`/
+`String.Internal.next`/`String.Internal.extract`/`String.Pos.Raw.get`/
+`String.Pos.Raw.prev`/`String.Internal.atEnd` plus string ordering, and the current
 numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
 arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
 comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,
