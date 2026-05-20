@@ -67,6 +67,12 @@ function parseNativeExtern(line) {
   return { name: match[1], symbol: match[2] };
 }
 
+function parseInitGlobal(line) {
+  const match = line.match(/^- `([^`]+)` <- `([^`]+)`$/);
+  if (!match) return null;
+  return { name: match[1], initName: match[2] };
+}
+
 function parseBulletName(line) {
   const match = line.match(/^- `([^`]+)`$/);
   return match?.[1] ?? line;
@@ -75,6 +81,7 @@ function parseBulletName(line) {
 function packageDiagnostics(report) {
   const loadedDecls = sectionLines(report, "Loaded IR Declarations").map(parseLoadedDecl).filter(Boolean);
   const nativeExterns = sectionLines(report, "Native Extern Declarations").map(parseNativeExtern).filter(Boolean);
+  const initGlobals = sectionLines(report, "Initializer Globals").map(parseInitGlobal).filter(Boolean);
   const missingDecls = sectionLines(report, "Missing IR Declarations");
   const missingNativeExterns = sectionLines(report, "Missing Native Extern Registrations");
   const unsupportedInitGlobals = sectionLines(report, "Unsupported Init Globals").map(parseBulletName);
@@ -82,6 +89,7 @@ function packageDiagnostics(report) {
     loadedDecls,
     importedDecls: loadedDecls.filter((decl) => decl.imported),
     nativeExterns,
+    initGlobals,
     missingDecls,
     missingNativeExterns,
     unsupportedInitGlobals,

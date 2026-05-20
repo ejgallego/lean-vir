@@ -110,11 +110,13 @@ namely `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
 The demo also has narrow synchronous coverage for already-resolved
 `Task.pure`/`Task.get`/`Task.map`, because real `Environment` values store a
 checked kernel environment behind `Task`.
-It models the demo as post-initialization (`IO.initializing = false`) and has
-single-threaded `ST.Prim.mkRef`/`ST.Prim.Ref.get` support for read-only ref
-access reached by fixtures and parser setup.
-`Lean.Parser.parseHeader` is tracked as an expected-unsupported vertical target
-while the demo still lacks initialized parser/environment extension globals.
+It models normal execution as post-initialization (`IO.initializing = false`),
+switches to initialization mode while running packaged `builtin_initialize`
+globals through upstream `lean_run_init`, and has single-threaded
+`ST.Prim.mkRef`/`ST.Prim.Ref.get`/`ST.Prim.Ref.set`/`ST.Prim.Ref.take` support
+for ref access reached by fixtures and parser setup.
+`Lean.Parser.parseHeader` is now a passing vertical parser fixture backed by
+packaged initialized parser/environment extension globals.
 The runner also writes `build/fixtures/summary.json` with per-fixture status,
 imported IR declarations, native externs, and missing-boundary diagnostics for
 CI and boundary debugging.

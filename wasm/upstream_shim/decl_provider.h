@@ -26,3 +26,6 @@ extern "C" void vir_free_bytes(void * ptr);
 extern "C" uint32_t vir_load_ir_package(uint8_t const * data, uint32_t size);
 extern "C" char const * vir_last_package_error(void);
 extern "C" uint32_t vir_last_package_error_size(void);
+extern "C" void vir_ensure_ir_interpreter_initialized(void);
+extern "C" void vir_set_io_initializing(uint8_t value);
+extern "C" uint8_t vir_get_io_initializing(void);

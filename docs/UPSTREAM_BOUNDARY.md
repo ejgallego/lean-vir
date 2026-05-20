@@ -197,16 +197,19 @@ declarations, but they are loaded from a demo-specific package instead of Lean's
 generated module data. A later provider can replace this package with generated
 module data behind `decl_provider.h`.
 
-The fixture suite tracks `Lean.Parser.parseHeader` as expected unsupported. It
-is the current vertical parser target: the host oracle can evaluate it, and the
-WASM package closure now has no missing IR declarations or native extern
-registrations. It still reaches nullary declarations produced by Lean
-`builtin_initialize` commands whose IR body is top-level `unreachable`:
-`_private.Lean.Environment.0.Lean.EnvExtension.envExtensionsRef`,
-`Lean.Parser.categoryParserFnExtension`, and `Lean.Parser.parserExtension`.
-These are initialized parser/environment extension globals, so the generator
-reports them under `Unsupported Init Globals` and keeps the fixture explicitly
-expected-unsupported until the demo has a faithful initialized-global story.
+The parser vertical target now reaches `Lean.Parser.parseHeader`. Package
+generation records initialized globals as `(declaration, initializer)`
+pairs using Lean's own init-attribute metadata, then the WASM loader executes
+those initializers through upstream `lean_run_init` before evaluating demo
+roots. This initializes the parser and environment extension globals needed by
+the header parser while keeping the path compatible with a future generated
+module loader.
+
+The current parser support still uses a small shim boundary for opaque
+environment bridges: `evalConstCore` delegates to upstream `lean_eval_const`,
+`isReservedName` delegates back into packaged IR for `Lean.isReservedName`, and
+`evalCheckMeta` is accepted for the demo. That is the next fidelity boundary to
+remove if we want parser loading to behave exactly like a full Lean runtime.
 
 ## Future Loading Path
 

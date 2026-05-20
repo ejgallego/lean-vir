@@ -23,6 +23,13 @@ extern "C" obj_res lean_name_mk_string(obj_arg prefix, obj_arg suffix);
 extern "C" obj_res lean_name_mk_numeral(obj_arg prefix, obj_arg suffix);
 }
 
+extern "C" lean::object * lean_run_init(
+    lean::object * env,
+    lean::object * opts,
+    lean::object * decl,
+    lean::object * init_decl,
+    lean::object * world);
+
 namespace lean::vir {
 namespace {
 
@@ -34,7 +41,13 @@ struct decl_entry {
     object * decl;
 };
 
+struct init_global_entry {
+    object * name;
+    object * init_name;
+};
+
 static std::vector<decl_entry> g_entries;
+static std::vector<init_global_entry> g_init_entries;
 static std::string g_last_error;
 
 static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
@@ -610,7 +623,7 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "invalid IR package magic `" + magic + "`";
         return false;
     }
-    if (version != 1 && version != 2) {
+    if (version != 1 && version != 2 && version != 3) {
         g_last_error = "unsupported IR package version " + std::to_string(version);
         return false;
     }
@@ -624,6 +637,17 @@ static bool load_package(uint8_t const * data, size_t size) {
         object * d = r.decl(n);
         entries.push_back({ n, boxed_base, d });
     }
+
+    std::vector<init_global_entry> init_entries;
+    if (version >= 3) {
+        uint32_t init_count = r.u32();
+        init_entries.reserve(init_count);
+        for (uint32_t i = 0; i < init_count; i++) {
+            object * n = r.name();
+            object * init_name = r.name();
+            init_entries.push_back({ n, init_name });
+        }
+    }
     if (!r.ok) {
         g_last_error = r.error();
         return false;
@@ -633,6 +657,52 @@ static bool load_package(uint8_t const * data, size_t size) {
         return false;
     }
     g_entries = std::move(entries);
+    g_init_entries = std::move(init_entries);
+    return true;
+}
+
+class scoped_io_initializing {
+    uint8_t m_old_value;
+
+public:
+    scoped_io_initializing():
+        m_old_value(vir_get_io_initializing()) {
+        vir_set_io_initializing(1);
+    }
+
+    ~scoped_io_initializing() {
+        vir_set_io_initializing(m_old_value);
+    }
+};
+
+static bool run_init_global(init_global_entry const & entry) {
+    object * result = lean_run_init(lean_box(0), lean_box(0), entry.name, entry.init_name, lean_box(0));
+    if (lean_io_result_is_ok(result)) {
+        lean_dec(result);
+        return true;
+    }
+
+    name global_name(entry.name, true);
+    name init_name(entry.init_name, true);
+    g_last_error =
+        "initializer failed for `" + global_name.to_string() +
+        "` via `" + init_name.to_string() + "`";
+    lean_dec(result);
+    return false;
+}
+
+static bool run_package_initializers() {
+    if (g_init_entries.empty()) {
+        return true;
+    }
+
+    vir_ensure_ir_interpreter_initialized();
+    scoped_io_initializing scope;
+    for (init_global_entry const & entry : g_init_entries) {
+        if (!run_init_global(entry)) {
+            return false;
+        }
+    }
     return true;
 }
 
@@ -688,6 +758,9 @@ extern "C" void vir_free_bytes(void * ptr) {
 
 extern "C" uint32_t vir_load_ir_package(uint8_t const * data, uint32_t size) {
     if (!lean::vir::load_package(data, size)) {
+        return 0;
+    }
+    if (!lean::vir::run_package_initializers()) {
         return 0;
     }
     return lean::vir::static_decl_count();

@@ -17,6 +17,18 @@ function cppNameKey(parts) {
   return parts.join(".");
 }
 
+function normalizeNativeName(nameExpr) {
+  const trimmed = nameExpr.trim();
+  if (trimmed.startsWith("`")) {
+    return trimmed.slice(1);
+  }
+  const privateEnvironmentMatch = trimmed.match(/^privateEnvironmentName\s+"([^"]+)"$/);
+  if (privateEnvironmentMatch) {
+    return `_private.Lean.Environment.0.Lean.Environment.${privateEnvironmentMatch[1]}`;
+  }
+  throw new Error(`unsupported native extern name expression: ${trimmed}`);
+}
+
 function parseNativeExterns(source) {
   const entries = [];
   const externsMatch = source.match(/def nativeExterns : Array NativeExtern := #\[((?:.|\n)*?)\n\]/);
@@ -24,9 +36,9 @@ function parseNativeExterns(source) {
     throw new Error("could not find nativeExterns table");
   }
 
-  const blockRegex = /\{\s*name := `([^,\n]+),\s*params := #\[(.*?)\],\s*resultType := [^,]+,\s*symbol := "([^"]+)"\s*\}/gs;
+  const blockRegex = /\{\s*name := ([^,\n]+(?:\s+"[^"]+")?),\s*params := #\[(.*?)\],\s*resultType := [^,]+,\s*symbol := "([^"]+)"(?:,\s*deps := #\[(.*?)\])?\s*\}/gs;
   for (const match of externsMatch[1].matchAll(blockRegex)) {
-    const name = match[1].trim();
+    const name = normalizeNativeName(match[1]);
     const params = [...match[2].matchAll(/\bparam\s+\d+/g)].map((paramMatch) => paramMatch[0]);
     entries.push({
       name,

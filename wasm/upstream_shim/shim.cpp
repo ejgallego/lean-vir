@@ -41,6 +41,17 @@ lean_object * lean_string_to_utf8(lean_object * str);
 lean_object * lean_string_from_utf8_unchecked(lean_object * bytes);
 lean_object * lean_string_utf8_set(lean_object * str, lean_object * pos, uint32_t c);
 uint8_t lean_string_is_valid_pos(lean_object * str, lean_object * pos);
+lean_object * lean_eval_const(lean_object * env, lean_object * opts, lean_object * c);
+}
+
+static uint8_t g_vir_io_initializing = 0;
+
+extern "C" void vir_set_io_initializing(uint8_t value) {
+    g_vir_io_initializing = value ? 1 : 0;
+}
+
+extern "C" uint8_t vir_get_io_initializing(void) {
+    return g_vir_io_initializing;
 }
 
 static lean_object * box_uint8_binary(lean_object * a, lean_object * b, uint8_t (*fn)(uint8_t, uint8_t)) {
@@ -267,7 +278,7 @@ extern "C" lean_object * lean_ptr_addr___boxed(lean_object * type, lean_object *
 
 extern "C" lean_object * lean_io_initializing___boxed(lean_object * world) {
     lean_dec(world);
-    return lean_box(0);
+    return lean_box(g_vir_io_initializing);
 }
 
 extern "C" lean_object * lean_st_mk_ref___boxed(
@@ -294,6 +305,38 @@ extern "C" lean_object * lean_st_ref_get___boxed(
     lean_dec(world);
     lean_object * value = lean_to_ref(ref)->m_value;
     lean_inc(value);
+    lean_dec(ref);
+    return value;
+}
+
+extern "C" lean_object * lean_st_ref_set___boxed(
+    lean_object * sigma,
+    lean_object * alpha,
+    lean_object * ref,
+    lean_object * value,
+    lean_object * world) {
+    lean_dec(sigma);
+    lean_dec(alpha);
+    lean_dec(world);
+    lean_ref_object * ref_obj = lean_to_ref(ref);
+    lean_object * old_value = ref_obj->m_value;
+    ref_obj->m_value = value;
+    lean_dec(old_value);
+    lean_dec(ref);
+    return lean_box(0);
+}
+
+extern "C" lean_object * lean_st_ref_take___boxed(
+    lean_object * sigma,
+    lean_object * alpha,
+    lean_object * ref,
+    lean_object * world) {
+    lean_dec(sigma);
+    lean_dec(alpha);
+    lean_dec(world);
+    lean_ref_object * ref_obj = lean_to_ref(ref);
+    lean_object * value = ref_obj->m_value;
+    ref_obj->m_value = nullptr;
     lean_dec(ref);
     return value;
 }
@@ -1209,6 +1252,34 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     return lean_box_uint32(result);
 }
 
+extern "C" lean_object * lean_is_reserved_name___boxed(lean_object * env, lean_object * n) {
+    lean::elab_environment ienv(lean_box(0));
+    lean::options opts(lean_box(0));
+    lean_object * args[] = { env, n };
+    return lean::ir::run_boxed(ienv, opts, lean::name({ "Lean", "isReservedName" }), 2, args);
+}
+
+extern "C" lean_object * lean_eval_const___boxed(
+    lean_object * type,
+    lean_object * env,
+    lean_object * opts,
+    lean_object * const_name) {
+    lean_dec(type);
+    lean_object * result = lean_eval_const(env, opts, const_name);
+    lean_dec(env);
+    lean_dec(opts);
+    lean_dec(const_name);
+    return result;
+}
+
+extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_object * const_name) {
+    lean_dec(env);
+    lean_dec(const_name);
+    lean_object * result = lean_alloc_ctor(1, 1, 0);
+    lean_ctor_set(result, 0, lean_box(0));
+    return result;
+}
+
 #define VIR_NATIVE_SYMBOLS(X, X_CONST) \
     X("Nat.add", "lean_nat_add", lean_nat_add___boxed) \
     X("Nat.sub", "lean_nat_sub", lean_nat_sub___boxed) \
@@ -1236,6 +1307,11 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("IO.initializing", "lean_io_initializing", lean_io_initializing___boxed) \
     X("ST.Prim.mkRef", "lean_st_mk_ref", lean_st_mk_ref___boxed) \
     X("ST.Prim.Ref.get", "lean_st_ref_get", lean_st_ref_get___boxed) \
+    X("ST.Prim.Ref.set", "lean_st_ref_set", lean_st_ref_set___boxed) \
+    X("ST.Prim.Ref.take", "lean_st_ref_take", lean_st_ref_take___boxed) \
+    X("_private.Lean.Environment.0.Lean.Environment.isReservedName", "lean_is_reserved_name", lean_is_reserved_name___boxed) \
+    X("_private.Lean.Environment.0.Lean.Environment.evalConstCore", "lean_eval_const", lean_eval_const___boxed) \
+    X("_private.Lean.Environment.0.Lean.Environment.evalCheckMeta", "lean_eval_check_meta", lean_eval_check_meta___boxed) \
     X("Task.pure", "lean_task_pure", lean_task_pure___boxed) \
     X("Task.get", "lean_task_get_own", lean_task_get_own___boxed) \
     X("Task.map", "lean_task_map", lean_task_map___boxed) \
@@ -1602,6 +1678,10 @@ optional<name> get_init_fn_name_for(elab_environment const &, name const &) {
 void register_option(name const &, name const &, data_value_kind, char const *, char const *) {}
 
 } // namespace lean
+
+extern "C" void vir_ensure_ir_interpreter_initialized(void) {
+    lean::ensure_ir_interpreter_initialized();
+}
 
 extern "C" lean::object * lean_decl_get_sorry_dep(lean::object *, lean::object *) {
     return lean_box(0);

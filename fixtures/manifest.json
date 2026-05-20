@@ -252,8 +252,7 @@
       "source": "fixtures/LeanParserHeader.lean",
       "entry": "Vir.Fixtures.LeanParserHeader.upstreamParseHeaderScore",
       "result": { "type": "Nat" },
-      "unsafe": true,
-      "expect": { "status": "unsupported" }
+      "unsafe": true
     },
     {
       "id": "upstream-task-pure-get",
@@ -392,6 +391,13 @@
       "id": "boundary-io-ref-read",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.ioRefReadBoundaryScore",
+      "result": { "type": "Nat" },
+      "unsafe": true
+    },
+    {
+      "id": "boundary-io-ref-modify",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.ioRefModifyBoundaryScore",
       "result": { "type": "Nat" },
       "unsafe": true
     },

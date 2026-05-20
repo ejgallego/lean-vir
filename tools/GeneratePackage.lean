@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import Lean
 import Lean.Elab.Frontend
 import Lean.Compiler.IR.CompilerM
+import Lean.Compiler.InitAttr
 import Lean.Compiler.LCNF.Main
 
 open Lean
@@ -32,11 +33,18 @@ structure NativeExtern where
   params : Array Param
   resultType : IRType
   symbol : String
+  deps : Array Name := #[]
+
+structure InitGlobal where
+  name : Name
+  initName : Name
 
 structure Closure where
   seen : NameSet := {}
+  initGlobalSeen : NameSet := {}
   decls : Array LoadedDecl := #[]
   externs : Array NativeExtern := #[]
+  initGlobals : Array InitGlobal := #[]
   missingDecls : Array Name := #[]
   missingExterns : Array Name := #[]
   unsupportedInitGlobals : Array Name := #[]
@@ -66,6 +74,11 @@ def defaultTargets : Array Target := #[
 
 def param (idx : Nat) (borrow : Bool) (ty : IRType) : Param :=
   { x := { idx }, borrow, ty }
+
+def privateEnvironmentName (part : String) : Name :=
+  let root := .str (.str (.str .anonymous "_private") "Lean") "Environment"
+  let pre := .str (.str (.num root 0) "Lean") "Environment"
+  .str pre part
 
 def nativeExterns : Array NativeExtern := #[
   {
@@ -233,6 +246,53 @@ def nativeExterns : Array NativeExtern := #[
     ],
     resultType := .tobject,
     symbol := "lean_st_ref_get"
+  },
+  {
+    name := `ST.Prim.Ref.set,
+    params := #[
+      param 1 false .erased,
+      param 2 false .erased,
+      param 3 true .tobject,
+      param 4 false .tobject,
+      param 5 false .void
+    ],
+    resultType := .tobject,
+    symbol := "lean_st_ref_set"
+  },
+  {
+    name := `ST.Prim.Ref.take,
+    params := #[
+      param 1 false .erased,
+      param 2 false .erased,
+      param 3 true .tobject,
+      param 4 false .void
+    ],
+    resultType := .tobject,
+    symbol := "lean_st_ref_take"
+  },
+  {
+    name := privateEnvironmentName "isReservedName",
+    params := #[param 1 false .object, param 2 false .tobject],
+    resultType := .uint8,
+    symbol := "lean_is_reserved_name",
+    deps := #[`Lean.isReservedName]
+  },
+  {
+    name := privateEnvironmentName "evalConstCore",
+    params := #[
+      param 1 false .erased,
+      param 2 true .object,
+      param 3 true .object,
+      param 4 true .tobject
+    ],
+    resultType := .object,
+    symbol := "lean_eval_const"
+  },
+  {
+    name := privateEnvironmentName "evalCheckMeta",
+    params := #[param 1 false .object, param 2 false .tobject],
+    resultType := .object,
+    symbol := "lean_eval_check_meta"
   },
   {
     name := `Task.pure,
@@ -1219,6 +1279,9 @@ def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
         | .fdecl .. => some { source := s!"imported by {source}", decl }
         | .extern .. => none
 
+def DeclIndex.initFnNameFor? (index : DeclIndex) (name : Name) : Option Name :=
+  index.envs.findSome? fun (_, env) => getInitFnNameFor? env name
+
 def refsOfExpr (expr : IR.Expr) (refs : Array Name) : Array Name :=
   match expr with
   | .fap f _ => refs.push f
@@ -1248,13 +1311,23 @@ def refsOfDecl : Decl -> Array Name
   | .fdecl (body := body) .. => refsOfBody body #[]
   | .extern .. => #[]
 
+def addInitGlobal (name initName : Name) (state : Closure) : Closure :=
+  if state.initGlobalSeen.contains name then
+    state
+  else
+    { state with
+      initGlobalSeen := state.initGlobalSeen.insert name
+      initGlobals := state.initGlobals.push { name, initName } }
+
 partial def collectName (index : DeclIndex) (name : Name) (state : Closure) : Closure :=
   if state.seen.contains name then
     state
   else
     let state := { state with seen := state.seen.insert name }
     match nativeExtern? name with
-    | some ext => { state with externs := state.externs.push ext }
+    | some ext =>
+        let state := { state with externs := state.externs.push ext }
+        ext.deps.foldl (fun state dep => collectName index dep state) state
     | none =>
         match index.find? name with
         | none =>
@@ -1263,14 +1336,19 @@ partial def collectName (index : DeclIndex) (name : Name) (state : Closure) : Cl
             else
               { state with missingDecls := state.missingDecls.push name }
         | some loaded =>
-            let state :=
-              if isUnsupportedInitGlobal loaded.decl then
-                { state with
-                  decls := state.decls.push loaded
-                  unsupportedInitGlobals := state.unsupportedInitGlobals.push name }
-              else
-                { state with decls := state.decls.push loaded }
-            refsOfDecl loaded.decl |>.foldl (fun state dep => collectName index dep state) state
+            if isUnsupportedInitGlobal loaded.decl then
+              match index.initFnNameFor? name with
+              | some initName =>
+                  let state := { state with decls := state.decls.push loaded }
+                  let state := collectName index initName state
+                  addInitGlobal name initName state
+              | none =>
+                  { state with
+                    decls := state.decls.push loaded
+                    unsupportedInitGlobals := state.unsupportedInitGlobals.push name }
+            else
+              let state := { state with decls := state.decls.push loaded }
+              refsOfDecl loaded.decl |>.foldl (fun state dep => collectName index dep state) state
 
 def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
   targets.foldl (fun state target =>
@@ -1441,12 +1519,18 @@ def emitExternEntry (ext : NativeExtern) : EmitM Unit := do
     emitArray ext.params emitParam
     emitType ext.resultType
 
+def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
+  withEmitContext s!"while encoding initializer global `{entry.name}`" do
+    emitName entry.name
+    emitName entry.initName
+
 def emitPackageM (closure : Closure) : EmitM Unit := do
   emitString "lean-vir-ir-package"
-  emitU32 2
+  emitU32 3
   emitU32 (closure.decls.size + closure.externs.size)
   closure.decls.forM emitDeclEntry
   closure.externs.forM emitExternEntry
+  emitArray closure.initGlobals emitInitGlobal
 
 def emitPackage (closure : Closure) : Except String ByteArray := do
   let (_, bytes) <- (emitPackageM closure).run ByteArray.empty
@@ -1461,6 +1545,9 @@ def reportFor (targets : Array Target) (closure : Closure) : String :=
   let externLines :=
     closure.externs.map fun ext =>
       s!"- `{ext.name}` -> `{ext.symbol}`"
+  let initGlobalLines :=
+    if closure.initGlobals.isEmpty then #["None."] else closure.initGlobals.map fun entry =>
+      s!"- `{entry.name}` <- `{entry.initName}`"
   let missingDeclLines :=
     if closure.missingDecls.isEmpty then #["None."] else closure.missingDecls.map fun n => s!"- `{n}`"
   let missingExternLines :=
@@ -1471,12 +1558,15 @@ def reportFor (targets : Array Target) (closure : Closure) : String :=
   ++ "Generated by `tools/GeneratePackage.lean` from typed `Lean.IR.Decl` values.\n\n"
   ++ s!"Loaded declarations: {closure.decls.size}\n\n"
   ++ s!"Native extern declarations: {closure.externs.size}\n\n"
+  ++ s!"Initializer globals: {closure.initGlobals.size}\n\n"
   ++ "## Roots\n\n"
   ++ "\n".intercalate (roots.map (fun n => s!"- `{n}`")).toList ++ "\n\n"
   ++ "## Loaded IR Declarations\n\n"
   ++ "\n".intercalate loadedLines.toList ++ "\n\n"
   ++ "## Native Extern Declarations\n\n"
   ++ "\n".intercalate externLines.toList ++ "\n\n"
+  ++ "## Initializer Globals\n\n"
+  ++ "\n".intercalate initGlobalLines.toList ++ "\n\n"
   ++ "## Missing IR Declarations\n\n"
   ++ "\n".intercalate missingDeclLines.toList ++ "\n\n"
   ++ "## Missing Native Extern Registrations\n\n"

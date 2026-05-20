@@ -194,6 +194,15 @@ unsafe def ioRefReadBoundaryScore : Nat :=
   | .ok score => score
   | .error _ => 1000
 
+unsafe def ioRefModifyBoundaryScore : Nat :=
+  match unsafeIO do
+    let ref ← IO.mkRef 40
+    let old ← ref.modifyGet fun value => (value, value + 2)
+    let value ← ref.get
+    pure (old + value) with
+  | .ok score => score
+  | .error _ => 1000
+
 def floatScaleScore : Nat :=
   let x := Float.scaleB 1.5 (2 : Int)
   x.toUInt32.toNat
