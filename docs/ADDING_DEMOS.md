@@ -10,8 +10,9 @@ and the browser loads that package without rebuilding the upstream interpreter.
 2. Add the public root names to `targets` in `tools/GeneratePackage.lean`.
 3. Run `npm run check:package`.
 4. Inspect `build/generated/ir-provider-report.md`.
-5. Run `npm test`.
-6. Update `web/` only if the demo needs new UI or a new stable WASM export.
+5. Run `npm run check:boundary-registry` if you add or change a native extern.
+6. Run `npm test`.
+7. Update `web/` only if the demo needs new UI or a new stable WASM export.
 
 Most example-only edits should only regenerate `web/public/vir-demo.irpkg`.
 They should not recompile or relink `ir_interpreter.cpp`.
@@ -29,6 +30,10 @@ If the package generator reaches an unsupported IR shape, it reports the
 declaration being encoded and the unsupported package field. That usually means
 the package encoder/decoder needs one more constructor or type case before the
 new demo can run.
+
+`build/fixtures/summary.json` also records imported IR declarations and native
+extern dependencies per fixture. Use it to see whether a new fixture is growing
+the package-backed imported closure or the explicit native boundary.
 
 ## Browser Entrypoints
 

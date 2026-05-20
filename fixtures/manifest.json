@@ -26,6 +26,36 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-list-any-all-find",
+      "source": "fixtures/ListOption.lean",
+      "entry": "Vir.Fixtures.ListOption.listAnyAllFindScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-list-zip",
+      "source": "fixtures/ListOption.lean",
+      "entry": "Vir.Fixtures.ListOption.listZipScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "nested-option-sum",
+      "source": "fixtures/ListOption.lean",
+      "entry": "Vir.Fixtures.ListOption.nestedOptionSumScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "except-option-sum",
+      "source": "fixtures/ListOption.lean",
+      "entry": "Vir.Fixtures.ListOption.exceptOptionSumScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "assoc-list-lookup",
+      "source": "fixtures/ListOption.lean",
+      "entry": "Vir.Fixtures.ListOption.assocLookupScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "partial-application",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.partialApplication",
@@ -138,6 +168,19 @@
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayExtractScore",
       "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-uint32-literal-to-nat",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uint32LiteralToNatScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-float-to-uint32",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.floatToUInt32Score",
+      "result": { "type": "Nat" },
+      "expect": { "status": "unsupported" }
     }
   ]
 }

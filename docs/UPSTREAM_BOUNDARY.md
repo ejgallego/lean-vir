@@ -133,6 +133,12 @@ through the symbol address. `ByteArray.extract` is exposed as Lean's compiled
 symbol stem (`l_ByteArray_extract`) and delegates to the linked runtime
 `lean_byte_array_copy_slice` path.
 
+`scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
+registry. It checks that every `nativeExterns` entry in
+`tools/GeneratePackage.lean` has a matching `known_symbol_stem` branch, `dlsym`
+entry, and boxed wrapper or native constant entry in `wasm/upstream_shim/shim.cpp`.
+`npm test` runs this before the smoke and fixture suites.
+
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
 `decl_provider.h`. Today that provider is backed by a small package decoded from
@@ -146,8 +152,13 @@ The remaining gap is fidelity, not execution. The demo bodies now come from the
 real Lean compiler IR for the example sources and selected imported IR
 declarations, but they are loaded from a demo-specific package instead of Lean's
 generated module data. A later provider can replace this package with generated
-module data behind
-`decl_provider.h`.
+module data behind `decl_provider.h`.
+
+The fixture suite intentionally tracks the next unsupported native boundary:
+Float-to-UInt32 conversion currently reports missing native registrations for
+the float, integer, and wider-UInt operations pulled into that lowered path.
+This keeps the unsupported surface visible without widening the demo runtime
+until a fixture or demo actually needs it.
 
 ## Future Loading Path
 

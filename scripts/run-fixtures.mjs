@@ -55,6 +55,32 @@ function sectionLines(report, header) {
   return out.filter((line) => line !== "- `None.`" && line !== "- None.");
 }
 
+function parseLoadedDecl(line) {
+  const match = line.match(/^- `([^`]+)` from `([^`]+)`$/);
+  if (!match) return null;
+  return { name: match[1], source: match[2], imported: match[2].startsWith("imported by ") };
+}
+
+function parseNativeExtern(line) {
+  const match = line.match(/^- `([^`]+)` -> `([^`]+)`$/);
+  if (!match) return null;
+  return { name: match[1], symbol: match[2] };
+}
+
+function packageDiagnostics(report) {
+  const loadedDecls = sectionLines(report, "Loaded IR Declarations").map(parseLoadedDecl).filter(Boolean);
+  const nativeExterns = sectionLines(report, "Native Extern Declarations").map(parseNativeExtern).filter(Boolean);
+  const missingDecls = sectionLines(report, "Missing IR Declarations");
+  const missingNativeExterns = sectionLines(report, "Missing Native Extern Registrations");
+  return {
+    loadedDecls,
+    importedDecls: loadedDecls.filter((decl) => decl.imported),
+    nativeExterns,
+    missingDecls,
+    missingNativeExterns,
+  };
+}
+
 function classifyPackageFailure(report, stderr) {
   const missingExterns = sectionLines(report, "Missing Native Extern Registrations");
   if (missingExterns.length !== 0) {
@@ -167,16 +193,18 @@ async function generatePackage(fixture) {
   ];
   const result = run("lean", args, { capture: true });
   const report = await readFile(reportPath, "utf8").catch(() => "");
+  const diagnostics = packageDiagnostics(report);
   if (!result.ok) {
     return {
       ok: false,
       packagePath,
       reportPath,
+      diagnostics,
       failure: classifyPackageFailure(report, result.stderr),
       stderr: result.stderr,
     };
   }
-  return { ok: true, packagePath, reportPath };
+  return { ok: true, packagePath, reportPath, diagnostics };
 }
 
 async function runFixture(fixture) {
@@ -190,6 +218,7 @@ async function runFixture(fixture) {
         status: "expected-unsupported",
         fixture,
         host,
+        diagnostics: generated.diagnostics,
         detail: `${generated.failure.kind}: ${generated.failure.detail}`,
       };
     }
@@ -197,6 +226,7 @@ async function runFixture(fixture) {
       status: "failed",
       fixture,
       host,
+      diagnostics: generated.diagnostics,
       detail: `${generated.failure.kind}: ${generated.failure.detail}`,
     };
   }
@@ -204,12 +234,26 @@ async function runFixture(fixture) {
   const exports = await instantiateWasm(generated.packagePath);
   const wasm = evalConstNat(exports, fixture.entry);
   if (expectedStatus === "unsupported") {
-    return { status: "failed", fixture, host, wasm, detail: "expected unsupported fixture passed" };
+    return {
+      status: "failed",
+      fixture,
+      host,
+      wasm,
+      diagnostics: generated.diagnostics,
+      detail: "expected unsupported fixture passed",
+    };
   }
   if (wasm !== host) {
-    return { status: "failed", fixture, host, wasm, detail: `host=${host} wasm=${wasm}` };
+    return {
+      status: "failed",
+      fixture,
+      host,
+      wasm,
+      diagnostics: generated.diagnostics,
+      detail: `host=${host} wasm=${wasm}`,
+    };
   }
-  return { status: "passed", fixture, host, wasm };
+  return { status: "passed", fixture, host, wasm, diagnostics: generated.diagnostics };
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -253,12 +297,25 @@ const summary = {
     host: result.host,
     wasm: result.wasm,
     detail: result.detail,
+    diagnostics: result.diagnostics && {
+      loadedDeclCount: result.diagnostics.loadedDecls.length,
+      importedDecls: result.diagnostics.importedDecls,
+      nativeExterns: result.diagnostics.nativeExterns,
+      missingDecls: result.diagnostics.missingDecls,
+      missingNativeExterns: result.diagnostics.missingNativeExterns,
+    },
   })),
 };
 await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
 
 console.log();
 console.log(`fixture summary: ${passed} passed, ${unsupported} expected unsupported, ${failed} failed`);
+const importedSummaries = results
+  .filter((result) => result.diagnostics?.importedDecls?.length)
+  .map((result) => `${result.fixture.id}:${result.diagnostics.importedDecls.length}`);
+if (importedSummaries.length !== 0) {
+  console.log(`imported IR deps: ${importedSummaries.join(", ")}`);
+}
 console.log(`wrote ${summaryPath.pathname}`);
 
 if (failed !== 0) {

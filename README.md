@@ -74,14 +74,23 @@ then compared against Lean's host IR interpreter with
 `interpreter.prefer_native=false`. Known unsupported fixtures are tracked in
 `fixtures/manifest.json` so boundary gaps remain explicit. The current passing
 surface includes recursion, inductive pattern matching, local list processing,
-standard `List.map`/`List.filter`/`List.foldl`, partial application, array
-push/toList, branches over comparisons, `Bool`, `Option`, `Prod`, standard
-`Array.map`/`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, plus basic
+standard `List.map`/`List.filter`/`List.foldl`/`List.any`/`List.all`/
+`List.find?`/`List.zip`, partial application, array push/toList, branches over
+comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
+`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, plus basic
 `String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
-`String.decEq`, and `ByteArray.empty`/`ByteArray.push`/`ByteArray.get!`/
-`ByteArray.set!`/`ByteArray.extract`/`ByteArray.size`.
-The runner also writes `build/fixtures/summary.json` with per-fixture status
-for CI and boundary debugging.
+`String.decEq`, `UInt32` literals, and `ByteArray.empty`/`ByteArray.push`/
+`ByteArray.get!`/`ByteArray.set!`/`ByteArray.extract`/`ByteArray.size`. The
+current expected unsupported boundary is Float/UInt32 conversion, which would
+need a wider native runtime registration set.
+The runner also writes `build/fixtures/summary.json` with per-fixture status,
+imported IR declarations, native externs, and missing-boundary diagnostics for
+CI and boundary debugging.
+
+`npm run check:boundary-registry` verifies that `tools/GeneratePackage.lean`
+and `wasm/upstream_shim/shim.cpp` agree on the explicit native extern registry.
+`npm test` runs this check before rebuilding the upstream smoke artifact and
+running the fixture suite.
 
 The build caches the upstream interpreter, Lean runtime, support, and shim
 objects under `build/upstream-probe/obj`. Updating the Lean examples regenerates
