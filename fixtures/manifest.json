@@ -346,6 +346,43 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-usize-parser-data",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.usizeParserDataScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-uint-conversion-parser-data",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.uintConversionParserDataScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-array-proof-ops",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.arrayProofOpsScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-bytearray-mk-get",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.byteArrayMkGetScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-string-parser-data",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.stringParserDataScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-name-hash-substring-ptr",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.nameHashSubstringPtrScore",
+      "result": { "type": "Nat" },
+      "unsafe": true
+    },
+    {
       "id": "boundary-float-scale",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.floatScaleScore",

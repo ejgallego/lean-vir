@@ -121,24 +121,31 @@ The current explicit native externs cover the small fixture/demo surface for
 `Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
 `Float`, and `String`. This includes the arithmetic and comparison operations
 needed by the demos, List/Array/String/ByteArray fixtures, array mutation
-through `Array.replicate`/`Array.set!`/`Array.swapIfInBounds`/`Array.pop`,
+through `Array.emptyWithCapacity`/`Array.getInternal`/`Array.replicate`/
+`Array.set`/`Array.set!`/`Array.swap`/`Array.swapIfInBounds`/`Array.pop`,
 String raw-position iteration and slicing through `String.push`/
 `String.Internal.next`/`String.Internal.extract`/`String.Pos.Raw.get`/
 `String.Pos.Raw.prev`/`String.Internal.atEnd` plus string ordering, public
 `String.contains`/`startsWith`/`drop`/`dropEnd`/`trimAscii`/`splitOn`/
 `intercalate`/`any`/`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/
-`String.find`/`String.Pos.Raw.offsetOfPos` backed by imported upstream IR,
-plus UTF-8 conversion through `String.toUTF8`, `String.fromUTF8?`,
+`String.find`/`String.Pos.Raw.offsetOfPos`, plus parser-data primitives
+`String.hash`/`String.Internal.contains`/`String.Pos.Raw.isValid`, backed by
+imported upstream IR, plus UTF-8 conversion through `String.toUTF8`, `String.fromUTF8?`,
 `String.ofByteArray`, and `ByteArray.validateUTF8`, case conversion and string
 mutation through `String.toUpper`/`String.toLower`/`String.capitalize`/
 `String.decapitalize`, `Char.toUpper`/`Char.toLower`/`Char.utf8Size`, and the
 current numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
 arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
-comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,
-and comparison operations, `UInt64.ofNat`/`toNat`/`toFloat` plus arithmetic,
-bitwise, shift, and comparison operations including a wide `UInt64.toNat`
-fixture returned through `vir_eval_const_nat_string`, and
-`Float.scaleB`/`toUInt32`. The parser input fixture additionally runs
+comparison operations, `UInt32.ofNat`/`toNat`/`toUInt8` plus arithmetic,
+bitwise, shift, and comparison operations, `UInt64.ofNat`/`ofNatLT`/`toNat`/
+`toUSize`/`toFloat` plus arithmetic, bitwise, shift, and comparison operations
+including a wide `UInt64.toNat` fixture returned through
+`vir_eval_const_nat_string`, `USize` `sub`/`mul`/`land`/`shiftLeft`/
+`shiftRight`/`toNat`/`decLe`, `ByteArray.mk`/`ByteArray.get`, and
+`Float.scaleB`/`toUInt32`. Parser-adjacent hash/name/substring/pointer-address
+primitives (`mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
+`ptrAddrUnsafe`) are covered by a separate unsafe fixture that only compares
+stable same-object pointer equality. The parser input fixture additionally runs
 `Lean.Parser.mkInputContext`, `Lean.FileMap.toPosition`, and
 `Lean.Parser.mkParserState` over real upstream parser/input infrastructure.
 `Task.pure`, `Task.get`, and `Task.map` are covered only in the synchronous,
@@ -188,11 +195,10 @@ module data behind `decl_provider.h`.
 
 The fixture suite tracks `Lean.Parser.parseHeader` as expected unsupported. It
 is the current vertical parser target: the host oracle can evaluate it, but the
-WASM package closure still reaches environment/IO primitives such as
-`IO.initializing` and `ST.Prim.Ref.get`, plus additional array, string,
-`ByteArray`, `USize`, and hashing externs. Keep that boundary explicit in
-`fixtures/manifest.json` until the required shim or package-loader support is
-added.
+WASM package closure still reaches environment/IO primitives `IO.initializing`
+and `ST.Prim.Ref.get`. Its current report has no missing IR declarations; keep
+the remaining native boundary explicit in `fixtures/manifest.json` until the
+required environment support is added.
 
 ## Future Loading Path
 

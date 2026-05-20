@@ -77,28 +77,34 @@ surface includes recursion, inductive pattern matching, local list processing,
 standard `List.map`/`List.filter`/`List.foldl`/`List.any`/`List.all`/
 `List.find?`/`List.zip`, partial application, array push/toList, branches over
 comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
-`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, array mutation through
-`Array.replicate`/`Array.set!`/`Array.swapIfInBounds`/`Array.pop`, plus basic
+`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, array construction and
+mutation through `Array.emptyWithCapacity`/`Array.getInternal`/`Array.replicate`/
+`Array.set`/`Array.set!`/`Array.swap`/`Array.swapIfInBounds`/`Array.pop`, plus basic
 `String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
 `String.push`/`String.Internal.next`/`String.Internal.extract`/
 `String.Pos.Raw.get`/`String.Pos.Raw.prev`/`String.Internal.atEnd`/
 `String.decEq`/string ordering/`String.toUTF8`/`String.ofByteArray`/
 `String.toUpper`/`String.toLower`/`String.capitalize`/
-`String.decapitalize` plus public `String.fromUTF8?`/`String.contains`/
+`String.decapitalize`/`String.hash`/`String.Internal.contains`/
+`String.Pos.Raw.isValid` plus public `String.fromUTF8?`/`String.contains`/
 `startsWith`/`drop`/`dropEnd`/`trimAscii`/`splitOn`/`intercalate`/`any`/
 `front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/`String.find`/
 `String.Pos.Raw.offsetOfPos`, `Char.toUpper`/`Char.toLower`/
 `Char.utf8Size`, `UInt8`/`UInt16` `toNat` plus
 arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
-`UInt32.ofNat`/`toNat`,
+`UInt32.ofNat`/`toNat`/`toUInt8`,
 `UInt32` arithmetic/bitwise/shift/comparison operations, `UInt64.ofNat`/
-`toNat`/`toFloat` plus arithmetic/bitwise/shift/comparison operations, large
-`UInt64.toNat` results returned through the decimal-string Nat API, small
-`Int` arithmetic, `Nat.div`/`pow`/`log2`/`shiftLeft`/`shiftRight`,
+`ofNatLT`/`toNat`/`toUSize`/`toFloat` plus arithmetic/bitwise/shift/comparison
+operations, large `UInt64.toNat` results returned through the decimal-string
+Nat API, `USize` `sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
+small `Int` arithmetic, `Nat.div`/`pow`/`log2`/`shiftLeft`/`shiftRight`,
 `Float.scaleB`/`toUInt32`, and
-`ByteArray.empty`/`ByteArray.push`/`ByteArray.get!`/`ByteArray.set!`/
-`ByteArray.extract`/`ByteArray.size`/`ByteArray.validateUTF8`, plus the
-Lean parser input layer through `Lean.Parser.mkInputContext`,
+`ByteArray.mk`/`ByteArray.empty`/`ByteArray.push`/`ByteArray.get`/
+`ByteArray.get!`/`ByteArray.set!`/
+`ByteArray.extract`/`ByteArray.size`/`ByteArray.validateUTF8`. It also covers the
+hash/name/substring/pointer-address primitives reached by parser data paths,
+namely `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
+`ptrAddrUnsafe`. The Lean parser input layer runs through `Lean.Parser.mkInputContext`,
 `Lean.FileMap.toPosition`, and `Lean.Parser.mkParserState`.
 The demo also has narrow synchronous coverage for already-resolved
 `Task.pure`/`Task.get`/`Task.map`, because real `Environment` values store a

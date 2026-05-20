@@ -200,6 +200,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_panic_fn_borrowed"
   },
   {
+    name := `ptrAddrUnsafe,
+    params := #[param 1 false .erased, param 2 true .tobject],
+    resultType := .usize,
+    symbol := "lean_ptr_addr"
+  },
+  {
     name := `Task.pure,
     params := #[param 1 false .erased, param 2 false .tobject],
     resultType := .object,
@@ -227,6 +233,12 @@ def nativeExterns : Array NativeExtern := #[
   {
     name := `Array.mkEmpty,
     params := #[param 1 false .erased, param 2 false .tagged],
+    resultType := .object,
+    symbol := "lean_array_mk_empty"
+  },
+  {
+    name := `Array.emptyWithCapacity,
+    params := #[param 1 false .erased, param 2 true .tobject],
     resultType := .object,
     symbol := "lean_array_mk_empty"
   },
@@ -273,6 +285,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_array_uget_borrowed"
   },
   {
+    name := `Array.getInternal,
+    params := #[param 1 false .erased, param 2 true .object, param 3 true .tobject, param 4 false .erased],
+    resultType := .tobject,
+    symbol := "lean_array_fget"
+  },
+  {
     name := `Array.getInternalBorrowed,
     params := #[param 1 false .erased, param 2 true .object, param 3 true .tobject, param 4 false .erased],
     resultType := .tobject,
@@ -295,6 +313,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .erased, param 2 false .object, param 3 false .usize, param 4 false .tobject, param 5 false .erased],
     resultType := .object,
     symbol := "lean_array_uset"
+  },
+  {
+    name := `Array.set,
+    params := #[param 1 false .erased, param 2 false .object, param 3 true .tobject, param 4 false .tobject, param 5 false .erased],
+    resultType := .object,
+    symbol := "lean_array_fset"
   },
   {
     name := `Array.set!,
@@ -321,6 +345,18 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_array_swap"
   },
   {
+    name := `Array.swap,
+    params := #[param 1 false .erased, param 2 false .object, param 3 true .tobject, param 4 true .tobject, param 5 false .erased, param 6 false .erased],
+    resultType := .object,
+    symbol := "lean_array_fswap"
+  },
+  {
+    name := `ByteArray.mk,
+    params := #[param 1 false .object],
+    resultType := .object,
+    symbol := "lean_byte_array_mk"
+  },
+  {
     name := `ByteArray.empty,
     params := #[],
     resultType := .object,
@@ -337,6 +373,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint8,
     symbol := "lean_byte_array_get"
+  },
+  {
+    name := `ByteArray.get,
+    params := #[param 1 true .object, param 2 true .tobject, param 3 false .erased],
+    resultType := .uint8,
+    symbol := "lean_byte_array_fget"
   },
   {
     name := `ByteArray.set!,
@@ -381,6 +423,42 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_usize_add"
   },
   {
+    name := `USize.sub,
+    params := #[param 1 false .usize, param 2 false .usize],
+    resultType := .usize,
+    symbol := "lean_usize_sub"
+  },
+  {
+    name := `USize.mul,
+    params := #[param 1 false .usize, param 2 false .usize],
+    resultType := .usize,
+    symbol := "lean_usize_mul"
+  },
+  {
+    name := `USize.land,
+    params := #[param 1 false .usize, param 2 false .usize],
+    resultType := .usize,
+    symbol := "lean_usize_land"
+  },
+  {
+    name := `USize.shiftLeft,
+    params := #[param 1 false .usize, param 2 false .usize],
+    resultType := .usize,
+    symbol := "lean_usize_shift_left"
+  },
+  {
+    name := `USize.shiftRight,
+    params := #[param 1 false .usize, param 2 false .usize],
+    resultType := .usize,
+    symbol := "lean_usize_shift_right"
+  },
+  {
+    name := `USize.toNat,
+    params := #[param 1 false .usize],
+    resultType := .tobject,
+    symbol := "lean_usize_to_nat"
+  },
+  {
     name := `USize.decEq,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .uint8,
@@ -391,6 +469,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .uint8,
     symbol := "lean_usize_dec_lt"
+  },
+  {
+    name := `USize.decLe,
+    params := #[param 1 false .usize, param 2 false .usize],
+    resultType := .uint8,
+    symbol := "lean_usize_dec_le"
   },
   {
     name := `USize.repr,
@@ -427,6 +511,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .object, param 2 false .erased],
     resultType := .object,
     symbol := "lean_string_from_utf8_unchecked"
+  },
+  {
+    name := `String.hash,
+    params := #[param 1 true .object],
+    resultType := .uint64,
+    symbol := "lean_string_hash"
   },
   {
     name := `String.push,
@@ -549,6 +639,18 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_utf8_at_end"
   },
   {
+    name := `String.Pos.Raw.isValid,
+    params := #[param 1 true .object, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_string_is_valid_pos"
+  },
+  {
+    name := `String.Internal.contains,
+    params := #[param 1 false .object, param 2 false .uint32],
+    resultType := .uint8,
+    symbol := "lean_string_contains"
+  },
+  {
     name := `String.decEq,
     params := #[param 1 true .object, param 2 true .object],
     resultType := .uint8,
@@ -565,6 +667,18 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .object, param 3 true .tobject, param 4 true .tobject, param 5 true .tobject, param 6 false .erased, param 7 false .erased],
     resultType := .uint8,
     symbol := "lean_string_memcmp"
+  },
+  {
+    name := `Substring.Raw.Internal.beq,
+    params := #[param 1 false .object, param 2 false .object],
+    resultType := .uint8,
+    symbol := "lean_substring_beq"
+  },
+  {
+    name := `Lean.Name.beq,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_name_eq"
   },
   {
     name := `UInt8.toNat,
@@ -777,6 +891,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint32_to_nat"
   },
   {
+    name := `UInt32.toUInt8,
+    params := #[param 1 false .uint32],
+    resultType := .uint8,
+    symbol := "lean_uint32_to_uint8"
+  },
+  {
     name := `UInt32.add,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
@@ -873,10 +993,28 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint64_of_nat"
   },
   {
+    name := `mixHash,
+    params := #[param 1 false .uint64, param 2 false .uint64],
+    resultType := .uint64,
+    symbol := "lean_uint64_mix_hash"
+  },
+  {
+    name := `UInt64.ofNatLT,
+    params := #[param 1 true .tobject, param 2 false .erased],
+    resultType := .uint64,
+    symbol := "l_UInt64_ofNatLT"
+  },
+  {
     name := `UInt64.toNat,
     params := #[param 1 false .uint64],
     resultType := .tobject,
     symbol := "lean_uint64_to_nat"
+  },
+  {
+    name := `UInt64.toUSize,
+    params := #[param 1 false .uint64],
+    resultType := .usize,
+    symbol := "lean_uint64_to_usize"
   },
   {
     name := `UInt64.add,

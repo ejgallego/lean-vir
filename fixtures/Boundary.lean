@@ -6,6 +6,9 @@ Author: Emilio J. Gallego Arias
 
 import Init.Data.Nat.Bitwise.Basic
 import Init.Data.Nat.Log2
+import Init.Data.Array.Set
+import Init.Data.ByteArray.Basic
+import Init.Data.String.Basic
 
 namespace Vir.Fixtures.Boundary
 
@@ -120,6 +123,62 @@ def uint64ToFloatScore : Nat :=
   let n := Nat.shiftLeft 3 5
   let x := UInt64.ofNat n
   x.toFloat.toUInt32.toNat + 4
+
+def usizeParserDataScore : Nat :=
+  let a : USize := USize.ofNat 42
+  let b : USize := USize.ofNat 5
+  let diff := USize.sub a b
+  let product := USize.mul diff 3
+  let masked := USize.land (USize.shiftLeft product b) 255
+  let shifted := USize.shiftRight masked 1
+  product.toNat + shifted.toNat + (if b <= a then 11 else 0)
+
+def uintConversionParserDataScore : Nat :=
+  let wide := UInt64.ofNatLT 123456 (by decide)
+  let narrowed := wide.toUSize
+  let byte := (511 : UInt32).toUInt8
+  narrowed.toNat + byte.toNat
+
+def arrayProofOpsScore : Nat :=
+  let xs : Array Nat := Array.emptyWithCapacity 4
+  let xs := (xs.push 10).push 20 |>.push 30
+  let mid := xs.getInternal 1 (by decide)
+  let xs := xs.set 0 99 (by decide)
+  let xs := xs.swap 0 2 (by decide) (by decide)
+  mid +
+  xs.getInternal 0 (by decide) +
+  xs.getInternal 1 (by decide) +
+  xs.getInternal 2 (by decide)
+
+def byteArrayMkGetScore : Nat :=
+  let bytes : ByteArray := ByteArray.mk #[65, 66, 67]
+  (bytes.get 1 (by decide)).toNat + (bytes.get 2 (by decide)).toNat + bytes.size
+
+def stringParserDataScore : Nat :=
+  let s := "Aé∀Z"
+  let hashScore := s.hash.toNat % 97
+  let validScore :=
+    (if String.Pos.Raw.isValid s ⟨1⟩ then 10 else 0) +
+    (if String.Pos.Raw.isValid s ⟨2⟩ then 100 else 3)
+  let containsScore := if String.Internal.contains s '∀' then 20 else 0
+  hashScore + validScore + containsScore
+
+unsafe def nameHashSubstringPtrScore : Nat :=
+  let sameName := Lean.Name.beq `Lean.Parser `Lean.Parser
+  let diffName := Lean.Name.beq `Lean.Parser `Lean.Elab
+  let raw1 : Substring.Raw := ⟨"abcdef", ⟨1⟩, ⟨4⟩⟩
+  let raw2 : Substring.Raw := ⟨"abcdef", ⟨1⟩, ⟨4⟩⟩
+  let raw3 : Substring.Raw := ⟨"abcdef", ⟨2⟩, ⟨4⟩⟩
+  let sameSubstring := Substring.Raw.Internal.beq raw1 raw2
+  let diffSubstring := Substring.Raw.Internal.beq raw1 raw3
+  let xs := [1, 2, 3]
+  let samePtr := ptrAddrUnsafe xs == ptrAddrUnsafe xs
+  (mixHash 17 23).toNat % 101 +
+  (if sameName then 10 else 0) +
+  (if diffName then 100 else 3) +
+  (if sameSubstring then 20 else 0) +
+  (if diffSubstring then 200 else 5) +
+  (if samePtr then 30 else 0)
 
 def floatScaleScore : Nat :=
   let x := Float.scaleB 1.5 (2 : Int)
