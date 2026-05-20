@@ -14,39 +14,55 @@ Author: Emilio J. Gallego Arias
     <main id="app">
       <section class="workspace">
         <header class="topbar">
-          <div>
+          <div class="topbar-title">
             <p class="eyebrow">Lean 4.30-rc2 / wasm32-wasip1</p>
             <h1>IR Interpreter Demo</h1>
           </div>
-          <div id="status" class="status">Loading WASM</div>
+          <div class="runtime-summary" aria-label="Runtime summary">
+            <div id="status" class="status">Loading WASM</div>
+            <div>
+              <span>WASM</span>
+              <strong id="wasm-target">wasm32-wasip1</strong>
+            </div>
+            <div>
+              <span>Link</span>
+              <strong id="link-status">strict</strong>
+            </div>
+            <div>
+              <span>Package</span>
+              <strong id="package-name">...</strong>
+            </div>
+            <div>
+              <span>Size</span>
+              <strong id="package-size">...</strong>
+            </div>
+            <div>
+              <span>Ptr</span>
+              <strong id="ptr-width">...</strong>
+            </div>
+            <div>
+              <span>Decls</span>
+              <strong id="decl-count">...</strong>
+            </div>
+            <div>
+              <span>Layout</span>
+              <strong id="layout-guard">...</strong>
+            </div>
+          </div>
         </header>
 
-        <section class="demo-grid">
-          <section class="demo-panel" aria-label="Fib demo">
-            <h2>fib</h2>
-            <div class="controls">
-              <label for="fib-input">Input</label>
-              <input id="fib-input" type="number" min="0" max="17" value="8" />
-              <button id="fib-run-button" type="button">Run</button>
+        <section class="pet-demo" aria-label="Tamagotchi automaton demo">
+          <div class="pet-state-card">
+            <div>
+              <p class="eyebrow">Interactive demo</p>
+              <h2>Tamagotchi.step</h2>
             </div>
-            <section class="result-band" aria-live="polite">
-              <div>
-                <span>input</span>
-                <strong id="fib-input-display">8</strong>
-              </div>
-              <div>
-                <span>result</span>
-                <strong id="fib-result-display">...</strong>
-              </div>
-            </section>
-          </section>
-
-          <section class="demo-panel" aria-label="Tamagotchi automaton demo">
-            <h2>Tamagotchi.step</h2>
             <div class="pet-state">
               <span>Mood</span>
               <strong id="pet-mood-display">happy</strong>
             </div>
+          </div>
+          <div class="pet-action-card">
             <div class="action-grid">
               <button type="button" data-action="feed">Feed</button>
               <button type="button" data-action="play">Play</button>
@@ -55,7 +71,7 @@ Author: Emilio J. Gallego Arias
               <button type="button" data-action="ignore">Ignore</button>
               <button type="button" id="pet-reset-button">Reset</button>
             </div>
-            <section class="result-band" aria-live="polite">
+            <section class="pet-trace-band" aria-live="polite">
               <div>
                 <span>last action</span>
                 <strong id="pet-action-display">...</strong>
@@ -65,58 +81,67 @@ Author: Emilio J. Gallego Arias
                 <strong id="pet-trace-display">happy</strong>
               </div>
             </section>
-          </section>
-
-          <section class="demo-panel" aria-label="Merge sort array demo">
-            <h2>SortDemo.demo</h2>
-            <div class="sort-source controls">
-              <label for="sort-input">Array</label>
-              <input id="sort-input" type="text" value="7, 3, 9, 1, 4, 1, 5, 2" />
-            </div>
-            <div class="controls sort-controls">
-              <button id="sort-run-button" type="button">Run</button>
-            </div>
-            <section class="result-band sort-band" aria-live="polite">
-              <div>
-                <span>sorted</span>
-                <strong id="sort-output-display">[1, 1, 2, 3, 4, 5, 7, 9]</strong>
-              </div>
-              <div>
-                <span>checksum</span>
-                <strong id="sort-result-display">...</strong>
-              </div>
-            </section>
-          </section>
+          </div>
         </section>
 
-        <section class="details">
-          <div>
-            <span>WASM target</span>
-            <strong id="wasm-target">wasm32-wasip1</strong>
+        <section class="fixture-workbench" aria-labelledby="fixture-title">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">Fixture coverage</p>
+              <h2 id="fixture-title">Runnable entries</h2>
+            </div>
+            <div class="fixture-stats" aria-label="Fixture manifest summary">
+              <div>
+                <span>entries</span>
+                <strong id="fixture-count">...</strong>
+              </div>
+              <div>
+                <span>files</span>
+                <strong id="fixture-file-count">...</strong>
+              </div>
+              <div>
+                <span>result type</span>
+                <strong id="fixture-result-type">Nat</strong>
+              </div>
+            </div>
           </div>
-          <div>
-            <span>Link</span>
-            <strong id="link-status">strict</strong>
+          <div class="fixture-actions">
+            <div class="fixture-toolbar" aria-label="Fixture source filter">
+              <button type="button" data-fixture-filter="all" aria-pressed="true">All</button>
+              <button type="button" data-fixture-filter="demos">Demos</button>
+              <button type="button" data-fixture-filter="fixtures/Basic.lean">Basic</button>
+              <button type="button" data-fixture-filter="fixtures/ListOption.lean">List/Option</button>
+              <button type="button" data-fixture-filter="fixtures/Boundary.lean">Boundary</button>
+            </div>
+            <button id="fixture-run-visible" class="fixture-run-visible" type="button" disabled>
+              Run visible
+            </button>
           </div>
-          <div>
-            <span>Package</span>
-            <strong id="package-name">...</strong>
-          </div>
-          <div>
-            <span>Package size</span>
-            <strong id="package-size">...</strong>
-          </div>
-          <div>
-            <span>Pointer width</span>
-            <strong id="ptr-width">...</strong>
-          </div>
-          <div>
-            <span>Loaded declarations</span>
-            <strong id="decl-count">...</strong>
-          </div>
-          <div>
-            <span>Layout guard</span>
-            <strong id="layout-guard">...</strong>
+          <p id="fixture-run-status" class="fixture-run-status">Waiting for WASM</p>
+          <div class="fixture-runner-layout">
+            <div id="fixture-list" class="fixture-list"></div>
+            <aside class="fixture-source-panel" aria-labelledby="fixture-source-title">
+              <div class="fixture-source-header">
+                <div>
+                  <span id="fixture-source-path">fixtures/Basic.lean</span>
+                  <strong id="fixture-source-title">Fixture source</strong>
+                </div>
+                <small id="fixture-source-entry">...</small>
+              </div>
+              <div class="fixture-source-controls">
+                <div id="fixture-input-panel" class="fixture-input-panel" hidden>
+                  <label id="fixture-input-label" for="fixture-input">Input</label>
+                  <input id="fixture-input" type="text" />
+                  <small id="fixture-input-hint"></small>
+                </div>
+                <div>
+                  <span>Result</span>
+                  <output id="fixture-selected-result">...</output>
+                </div>
+                <button id="fixture-run-selected" type="button" disabled>Run</button>
+              </div>
+              <pre class="fixture-source-viewer"><code id="fixture-source-code"></code></pre>
+            </aside>
           </div>
         </section>
       </section>

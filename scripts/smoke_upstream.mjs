@@ -8,6 +8,7 @@ import { readFile } from "node:fs/promises";
 
 const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const irPackage = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
+const fixtureManifest = JSON.parse(await readFile(new URL("../fixtures/manifest.json", import.meta.url), "utf8"));
 const mod = new WebAssembly.Module(wasm);
 const imports = {};
 
@@ -237,4 +238,43 @@ if (repeatedSortChecksum !== 150) {
   throw new Error(`upstream repeated SortDemo.demoFromArray: expected 150, got ${repeatedSortChecksum}`);
 }
 
-console.log("upstream smoke ok: fib 17 = 1597, Tamagotchi ends angry, editable SortDemo works");
+for (const fixture of fixtureManifest.fixtures ?? []) {
+  if (fixture.result?.type !== "Nat") {
+    throw new Error(`${fixture.id}: unsupported smoke result type ${fixture.result?.type}`);
+  }
+  let value;
+  try {
+    const { exports: fixtureExports } = await WebAssembly.instantiate(mod, imports);
+    fixtureExports.__wasm_call_ctors?.();
+    const fixturePackagePtr = fixtureExports.vir_alloc_bytes(irPackage.byteLength);
+    try {
+      new Uint8Array(fixtureExports.memory.buffer, fixturePackagePtr, irPackage.byteLength).set(irPackage);
+      const loadedDecls = fixtureExports.vir_load_ir_package(fixturePackagePtr, irPackage.byteLength);
+      if (loadedDecls === 0) {
+        throw new Error("IR package load failed");
+      }
+    } finally {
+      fixtureExports.vir_free_bytes?.(fixturePackagePtr);
+    }
+
+    const bytes = new TextEncoder().encode(fixture.entry);
+    const ptr = fixtureExports.vir_alloc_bytes(bytes.byteLength);
+    try {
+      new Uint8Array(fixtureExports.memory.buffer, ptr, bytes.byteLength).set(bytes);
+      const resultPtr = fixtureExports.vir_eval_const_nat_string(ptr, bytes.byteLength);
+      const resultLen = fixtureExports.vir_eval_const_nat_string_size();
+      value = new TextDecoder().decode(new Uint8Array(fixtureExports.memory.buffer, resultPtr, resultLen));
+    } finally {
+      fixtureExports.vir_free_bytes?.(ptr);
+    }
+  } catch (error) {
+    throw new Error(`${fixture.id}: fixture evaluation failed`, { cause: error });
+  }
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`${fixture.id}: expected Nat result, got ${value}`);
+  }
+}
+
+console.log(
+  `upstream smoke ok: fib 17 = 1597, Tamagotchi ends angry, editable SortDemo works, ${fixtureManifest.fixtures.length} fixtures run`,
+);
