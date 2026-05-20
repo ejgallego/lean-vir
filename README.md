@@ -82,8 +82,9 @@ comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
 `String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
 `String.push`/`String.Internal.next`/`String.Internal.extract`/
 `String.Pos.Raw.get`/`String.Pos.Raw.prev`/`String.Internal.atEnd`/
-`String.decEq`/string ordering, `UInt8`/`UInt16` `toNat` plus arithmetic/
-bitwise/shift/comparison operations, `UInt32` literals, `UInt32.ofNat`/`toNat`,
+`String.decEq`/string ordering plus public `String.contains`/`startsWith`/
+`drop`/`trimAscii`, `UInt8`/`UInt16` `toNat` plus arithmetic/bitwise/shift/
+comparison operations, `UInt32` literals, `UInt32.ofNat`/`toNat`,
 `UInt32` arithmetic/bitwise/shift/comparison operations, `UInt64.ofNat`/
 `toNat`/`toFloat` plus arithmetic/bitwise/shift/comparison operations, large
 `UInt64.toNat` results returned through the decimal-string Nat API, small

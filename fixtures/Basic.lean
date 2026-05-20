@@ -184,6 +184,17 @@ def stringSliceExtractScore (s : String) : Nat :=
 def upstreamStringSliceExtractScore : Nat :=
   stringSliceExtractScore "Aé∀Z"
 
+def stringSearchDropScore (s : String) : Nat :=
+  let trimmed := s.trimAscii.copy
+  let tail := (trimmed.drop 5).copy
+  (if trimmed.contains '∀' then 100 else 0) +
+  (if trimmed.startsWith "lean" then 200 else 0) +
+  (if tail = "vir∀" then 300 else 0) +
+  tail.length + tail.utf8ByteSize
+
+def upstreamStringSearchDropScore : Nat :=
+  stringSearchDropScore "  lean-vir∀  "
+
 def upstreamByteArrayPushGetScore : Nat :=
   let bs := ByteArray.empty.push 65
   let bs := bs.push 66

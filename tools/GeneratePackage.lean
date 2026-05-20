@@ -92,6 +92,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_nat_dec_le"
   },
   {
+    name := `Nat.ble,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_nat_dec_le"
+  },
+  {
     name := `Nat.decLt,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .uint8,
@@ -344,7 +350,19 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_utf8_next"
   },
   {
+    name := `String.Pos.next,
+    params := #[param 1 true .object, param 2 true .tobject, param 3 false .erased],
+    resultType := .tagged,
+    symbol := "lean_string_utf8_next_fast"
+  },
+  {
     name := `String.Internal.extract,
+    params := #[param 1 true .object, param 2 true .tobject, param 3 true .tobject],
+    resultType := .object,
+    symbol := "lean_string_utf8_extract"
+  },
+  {
+    name := `String.extract,
     params := #[param 1 true .object, param 2 true .tobject, param 3 true .tobject],
     resultType := .object,
     symbol := "lean_string_utf8_extract"
@@ -354,6 +372,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .tobject,
     symbol := "lean_string_utf8_prev"
+  },
+  {
+    name := `String.decodeChar,
+    params := #[param 1 true .object, param 2 true .tobject, param 3 false .erased],
+    resultType := .uint32,
+    symbol := "lean_string_utf8_get_fast"
   },
   {
     name := `String.Pos.Raw.get,
@@ -378,6 +402,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .object],
     resultType := .uint8,
     symbol := "lean_string_dec_lt"
+  },
+  {
+    name := `String.Slice.Pattern.Internal.memcmpStr,
+    params := #[param 1 true .object, param 2 true .object, param 3 true .tobject, param 4 true .tobject, param 5 true .tobject, param 6 false .erased, param 7 false .erased],
+    resultType := .uint8,
+    symbol := "lean_string_memcmp"
   },
   {
     name := `UInt8.toNat,

@@ -124,7 +124,9 @@ needed by the demos, List/Array/String/ByteArray fixtures, array mutation
 through `Array.replicate`/`Array.set!`/`Array.swapIfInBounds`/`Array.pop`,
 String raw-position iteration and slicing through `String.push`/
 `String.Internal.next`/`String.Internal.extract`/`String.Pos.Raw.get`/
-`String.Pos.Raw.prev`/`String.Internal.atEnd` plus string ordering, and the current
+`String.Pos.Raw.prev`/`String.Internal.atEnd` plus string ordering, public
+`String.contains`/`startsWith`/`drop`/`trimAscii` backed by imported upstream IR,
+and the current
 numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
 arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
 comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,
@@ -132,7 +134,11 @@ and comparison operations, `UInt64.ofNat`/`toNat`/`toFloat` plus arithmetic,
 bitwise, shift, and comparison operations including a wide `UInt64.toNat`
 fixture returned through `vir_eval_const_nat_string`, and
 `Float.scaleB`/`toUInt32`. They are backed by a table-driven shim registry; a full
-native symbol loader is still out of scope. `ByteArray.empty` is exposed as
+native symbol loader is still out of scope. The public String search/drop fixture
+currently imports a small upstream IR closure and adds native registrations for
+the runtime helper boundary that closure reaches (`Nat.ble`, `String.Pos.next`,
+`String.decodeChar`, `String.extract`, and `String.Slice.Pattern.Internal.memcmpStr`).
+`ByteArray.empty` is exposed as
 Lean's native constant symbol (`l_ByteArray_empty`), not as a boxed nullary
 function, because the upstream interpreter loads native constants through the
 symbol address. `ByteArray.extract` is exposed as Lean's compiled symbol stem

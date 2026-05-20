@@ -170,6 +170,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-string-search-drop",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringSearchDropScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-bytearray-push-get",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayPushGetScore",

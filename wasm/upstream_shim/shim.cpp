@@ -415,6 +415,14 @@ extern "C" lean_object * lean_string_utf8_next___boxed(lean_object * s, lean_obj
     return result;
 }
 
+extern "C" lean_object * lean_string_utf8_next_fast___boxed(lean_object * s, lean_object * pos, lean_object * proof) {
+    lean_object * result = lean_string_utf8_next_fast(s, pos);
+    lean_dec(s);
+    lean_dec(pos);
+    lean_dec(proof);
+    return result;
+}
+
 extern "C" lean_object * lean_string_utf8_extract___boxed(lean_object * s, lean_object * start, lean_object * stop) {
     lean_object * result = lean_string_utf8_extract(s, start, stop);
     lean_dec(s);
@@ -428,6 +436,14 @@ extern "C" lean_object * lean_string_utf8_prev___boxed(lean_object * s, lean_obj
     lean_dec(s);
     lean_dec(pos);
     return result;
+}
+
+extern "C" lean_object * lean_string_utf8_get_fast___boxed(lean_object * s, lean_object * pos, lean_object * proof) {
+    uint32_t result = lean_string_utf8_get_fast(s, pos);
+    lean_dec(s);
+    lean_dec(pos);
+    lean_dec(proof);
+    return lean_box_uint32(result);
 }
 
 extern "C" lean_object * lean_string_utf8_get___boxed(lean_object * s, lean_object * pos) {
@@ -455,6 +471,25 @@ extern "C" lean_object * lean_string_dec_lt___boxed(lean_object * a, lean_object
     uint8_t result = lean_string_dec_lt(a, b);
     lean_dec(a);
     lean_dec(b);
+    return lean_box(result);
+}
+
+extern "C" lean_object * lean_string_memcmp___boxed(
+    lean_object * lhs,
+    lean_object * rhs,
+    lean_object * lstart,
+    lean_object * rstart,
+    lean_object * len,
+    lean_object * h1,
+    lean_object * h2) {
+    uint8_t result = lean_string_memcmp(lhs, rhs, lstart, rstart, len);
+    lean_dec(lhs);
+    lean_dec(rhs);
+    lean_dec(lstart);
+    lean_dec(rstart);
+    lean_dec(len);
+    lean_dec(h1);
+    lean_dec(h2);
     return lean_box(result);
 }
 
@@ -801,6 +836,7 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("Nat.sub", "lean_nat_sub", lean_nat_sub___boxed) \
     X("Nat.decEq", "lean_nat_dec_eq", lean_nat_dec_eq___boxed) \
     X("Nat.decLe", "lean_nat_dec_le", lean_nat_dec_le___boxed) \
+    X("Nat.ble", "lean_nat_dec_le", lean_nat_dec_le___boxed) \
     X("Nat.decLt", "lean_nat_dec_lt", lean_nat_dec_lt___boxed) \
     X("Nat.mul", "lean_nat_mul", lean_nat_mul___boxed) \
     X("Nat.div", "lean_nat_div", lean_nat_div___boxed) \
@@ -843,12 +879,16 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("String.utf8ByteSize", "lean_string_utf8_byte_size", lean_string_utf8_byte_size___boxed) \
     X("String.getUTF8Byte", "lean_string_get_byte_fast", lean_string_get_byte_fast___boxed) \
     X("String.Internal.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
+    X("String.Pos.next", "lean_string_utf8_next_fast", lean_string_utf8_next_fast___boxed) \
     X("String.Internal.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
+    X("String.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
     X("String.Pos.Raw.prev", "lean_string_utf8_prev", lean_string_utf8_prev___boxed) \
+    X("String.decodeChar", "lean_string_utf8_get_fast", lean_string_utf8_get_fast___boxed) \
     X("String.Pos.Raw.get", "lean_string_utf8_get", lean_string_utf8_get___boxed) \
     X("String.Internal.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
     X("String.decEq", "lean_string_dec_eq", lean_string_dec_eq___boxed) \
     X("String.decidableLT", "lean_string_dec_lt", lean_string_dec_lt___boxed) \
+    X("String.Slice.Pattern.Internal.memcmpStr", "lean_string_memcmp", lean_string_memcmp___boxed) \
     X("UInt8.toNat", "lean_uint8_to_nat", lean_uint8_to_nat___boxed) \
     X("UInt8.add", "lean_uint8_add", lean_uint8_add___boxed) \
     X("UInt8.sub", "lean_uint8_sub", lean_uint8_sub___boxed) \
