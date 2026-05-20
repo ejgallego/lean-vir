@@ -129,8 +129,10 @@ String raw-position iteration and slicing through `String.push`/
 `intercalate`/`any`/`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/
 `String.find`/`String.Pos.Raw.offsetOfPos` backed by imported upstream IR,
 plus UTF-8 conversion through `String.toUTF8`, `String.fromUTF8?`,
-`String.ofByteArray`, and `ByteArray.validateUTF8`, and the current
-numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
+`String.ofByteArray`, and `ByteArray.validateUTF8`, case conversion and string
+mutation through `String.toUpper`/`String.toLower`/`String.capitalize`/
+`String.decapitalize`, `Char.toUpper`/`Char.toLower`/`Char.utf8Size`, and the
+current numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
 arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
 comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,
 and comparison operations, `UInt64.ofNat`/`toNat`/`toFloat` plus arithmetic,
@@ -152,6 +154,10 @@ symbol address. `ByteArray.extract` is exposed as Lean's compiled symbol stem
 `lean_byte_array_copy_slice` path. Its registered IR parameters mirror the real
 compiled declaration: the source byte array and stop index are borrowed, while
 the start index is consumed.
+`String.Pos.set`, `String.Pos.Raw.set`, and the legacy `String.set` each use a
+distinct native stem in the shim because their boxed arities differ, but all
+three wrappers delegate to the same linked runtime helper,
+`lean_string_utf8_set`.
 
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
 registry. It checks that every `nativeExterns` entry in

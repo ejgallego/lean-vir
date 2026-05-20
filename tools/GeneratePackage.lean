@@ -362,6 +362,24 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_get_byte_fast"
   },
   {
+    name := `String.Pos.set,
+    params := #[param 1 false .object, param 2 false .tobject, param 3 false .uint32, param 4 false .erased],
+    resultType := .object,
+    symbol := "l_String_Pos_set"
+  },
+  {
+    name := `String.Pos.Raw.set,
+    params := #[param 1 false .object, param 2 true .tobject, param 3 false .uint32],
+    resultType := .object,
+    symbol := "l_String_Pos_Raw_set"
+  },
+  {
+    name := `String.set,
+    params := #[param 1 false .object, param 2 true .tobject, param 3 false .uint32],
+    resultType := .object,
+    symbol := "l_String_set"
+  },
+  {
     name := `String.Internal.next,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .tobject,
@@ -642,6 +660,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .tobject],
     resultType := .uint32,
     symbol := "lean_uint32_of_nat"
+  },
+  {
+    name := `UInt32.ofNatLT,
+    params := #[param 1 true .tobject, param 2 false .erased],
+    resultType := .uint32,
+    symbol := "l_UInt32_ofNatLT"
   },
   {
     name := `UInt32.toNat,

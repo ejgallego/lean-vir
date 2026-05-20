@@ -82,11 +82,13 @@ comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
 `String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
 `String.push`/`String.Internal.next`/`String.Internal.extract`/
 `String.Pos.Raw.get`/`String.Pos.Raw.prev`/`String.Internal.atEnd`/
-`String.decEq`/string ordering/`String.toUTF8`/`String.ofByteArray` plus
-public `String.fromUTF8?`/`String.contains`/`startsWith`/`drop`/`dropEnd`/
-`trimAscii`/`splitOn`/`intercalate`/`any`/`front`/`pushn`/`isEmpty`/
-`String.Pos.Raw.nextWhile`/`String.find`/`String.Pos.Raw.offsetOfPos`,
-`UInt8`/`UInt16` `toNat` plus
+`String.decEq`/string ordering/`String.toUTF8`/`String.ofByteArray`/
+`String.toUpper`/`String.toLower`/`String.capitalize`/
+`String.decapitalize` plus public `String.fromUTF8?`/`String.contains`/
+`startsWith`/`drop`/`dropEnd`/`trimAscii`/`splitOn`/`intercalate`/`any`/
+`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/`String.find`/
+`String.Pos.Raw.offsetOfPos`, `Char.toUpper`/`Char.toLower`/
+`Char.utf8Size`, `UInt8`/`UInt16` `toNat` plus
 arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
 `UInt32.ofNat`/`toNat`,
 `UInt32` arithmetic/bitwise/shift/comparison operations, `UInt64.ofNat`/

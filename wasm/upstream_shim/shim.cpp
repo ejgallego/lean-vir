@@ -39,6 +39,7 @@ lean_object * lean_byte_array_copy_slice(
 uint8_t lean_string_validate_utf8(lean_object * bytes);
 lean_object * lean_string_to_utf8(lean_object * str);
 lean_object * lean_string_from_utf8_unchecked(lean_object * bytes);
+lean_object * lean_string_utf8_set(lean_object * str, lean_object * pos, uint32_t c);
 }
 
 static lean_object * box_uint8_binary(lean_object * a, lean_object * b, uint8_t (*fn)(uint8_t, uint8_t)) {
@@ -403,6 +404,27 @@ extern "C" lean_object * lean_string_from_utf8_unchecked___boxed(lean_object * b
     return result;
 }
 
+extern "C" lean_object * l_String_Pos_set___boxed(lean_object * s, lean_object * pos, lean_object * c, lean_object * proof) {
+    uint32_t ch = lean_unbox_uint32(c);
+    lean_dec(c);
+    lean_object * result = lean_string_utf8_set(s, pos, ch);
+    lean_dec(pos);
+    lean_dec(proof);
+    return result;
+}
+
+extern "C" lean_object * l_String_Pos_Raw_set___boxed(lean_object * s, lean_object * pos, lean_object * c) {
+    uint32_t ch = lean_unbox_uint32(c);
+    lean_dec(c);
+    lean_object * result = lean_string_utf8_set(s, pos, ch);
+    lean_dec(pos);
+    return result;
+}
+
+extern "C" lean_object * l_String_set___boxed(lean_object * s, lean_object * pos, lean_object * c) {
+    return l_String_Pos_Raw_set___boxed(s, pos, c);
+}
+
 extern "C" lean_object * lean_string_push___boxed(lean_object * s, lean_object * c) {
     uint32_t ch = lean_unbox_uint32(c);
     lean_dec(c);
@@ -649,6 +671,13 @@ extern "C" lean_object * lean_uint16_dec_le___boxed(lean_object * a, lean_object
 extern "C" lean_object * lean_uint32_of_nat___boxed(lean_object * a) {
     uint32_t result = lean_uint32_of_nat(a);
     lean_dec(a);
+    return lean_box_uint32(result);
+}
+
+extern "C" lean_object * l_UInt32_ofNatLT___boxed(lean_object * a, lean_object * proof) {
+    uint32_t result = lean_uint32_of_nat(a);
+    lean_dec(a);
+    lean_dec(proof);
     return lean_box_uint32(result);
 }
 
@@ -902,6 +931,9 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("String.length", "lean_string_length", lean_string_length___boxed) \
     X("String.utf8ByteSize", "lean_string_utf8_byte_size", lean_string_utf8_byte_size___boxed) \
     X("String.getUTF8Byte", "lean_string_get_byte_fast", lean_string_get_byte_fast___boxed) \
+    X("String.Pos.set", "l_String_Pos_set", l_String_Pos_set___boxed) \
+    X("String.Pos.Raw.set", "l_String_Pos_Raw_set", l_String_Pos_Raw_set___boxed) \
+    X("String.set", "l_String_set", l_String_set___boxed) \
     X("String.Internal.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
     X("String.Pos.Raw.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
     X("String.Pos.next", "lean_string_utf8_next_fast", lean_string_utf8_next_fast___boxed) \
@@ -949,6 +981,7 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("UInt16.decLt", "lean_uint16_dec_lt", lean_uint16_dec_lt___boxed) \
     X("UInt16.decLe", "lean_uint16_dec_le", lean_uint16_dec_le___boxed) \
     X("UInt32.ofNat", "lean_uint32_of_nat", lean_uint32_of_nat___boxed) \
+    X("UInt32.ofNatLT", "l_UInt32_ofNatLT", l_UInt32_ofNatLT___boxed) \
     X("UInt32.toNat", "lean_uint32_to_nat", lean_uint32_to_nat___boxed) \
     X("UInt32.add", "lean_uint32_add", lean_uint32_add___boxed) \
     X("UInt32.sub", "lean_uint32_sub", lean_uint32_sub___boxed) \

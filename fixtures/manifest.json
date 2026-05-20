@@ -218,6 +218,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-string-case-modify",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamStringCaseModifyScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-bytearray-push-get",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayPushGetScore",

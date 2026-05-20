@@ -274,6 +274,20 @@ def stringUtf8RoundtripScore (s : String) : Nat :=
 def upstreamStringUtf8RoundtripScore : Nat :=
   stringUtf8RoundtripScore "Aé∀Z"
 
+def stringCaseModifyScore (s : String) : Nat :=
+  let upper := s.toUpper
+  let lower := upper.toLower
+  let cap := "lean".capitalize
+  let decap := "LEAN".decapitalize
+  (if upper = "LEAN42∀" then 1000 else 0) +
+    (if lower = "lean42∀" then 100 else 0) +
+    (if cap = "Lean" then 20 else 0) +
+    (if decap = "lEAN" then 3 else 0) +
+    upper.length + upper.utf8ByteSize
+
+def upstreamStringCaseModifyScore : Nat :=
+  stringCaseModifyScore "lean42∀"
+
 def upstreamByteArrayPushGetScore : Nat :=
   let bs := ByteArray.empty.push 65
   let bs := bs.push 66
