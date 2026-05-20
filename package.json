@@ -4,6 +4,10 @@
   "private": true,
   "license": "Apache-2.0",
   "type": "module",
+  "exports": {
+    ".": "./web/src/vir-runtime.js",
+    "./vir-runtime": "./web/src/vir-runtime.js"
+  },
   "scripts": {
     "fetch:lean": "bash scripts/fetch-lean-source.sh",
     "install:wasi": "bash scripts/install-wasi-sdk.sh",

@@ -242,6 +242,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-bytearray-input",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.upstreamByteArrayInputScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-parser-input-context",
       "source": "fixtures/LeanParser.lean",
       "entry": "Vir.Fixtures.LeanParser.upstreamParserInputContextScore",

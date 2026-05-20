@@ -177,6 +177,38 @@ export class VirRuntime {
     }
   }
 
+  evalStringToNat(name, value) {
+    return this.evalBytesArgumentToNat("vir_eval_string_to_nat_string", name, textEncoder.encode(value));
+  }
+
+  evalByteArrayToNat(name, values) {
+    return this.evalBytesArgumentToNat("vir_eval_byte_array_to_nat_string", name, asByteArrayBytes(values));
+  }
+
+  evalBytesArgumentToNat(exportName, name, bytes) {
+    this.requireFunction(exportName);
+    this.requireFunction("vir_eval_const_nat_string_size");
+
+    const nameBytes = textEncoder.encode(name);
+    const argumentBytes = asBytes(bytes, "argument bytes");
+    const namePtr = this.allocBytes(nameBytes);
+    const argumentPtr = this.allocBytes(argumentBytes);
+
+    try {
+      const resultPtr = this.exports[exportName](
+        namePtr,
+        nameBytes.byteLength,
+        argumentPtr,
+        argumentBytes.byteLength,
+      );
+      const resultLen = this.exports.vir_eval_const_nat_string_size();
+      return this.readWasmString(resultPtr, resultLen);
+    } finally {
+      this.freeBytes(argumentPtr);
+      this.freeBytes(namePtr);
+    }
+  }
+
   evalNamedString(exportName, name, ...args) {
     this.requireFunction(exportName);
     this.requireFunction("vir_eval_const_nat_string_size");
@@ -253,4 +285,21 @@ function normalizeUint32Array(values) {
     throw new Error("values must be iterable");
   }
   return Array.from(values, (value, index) => normalizeUint32(value, `values[${index}]`));
+}
+
+function asByteArrayBytes(values) {
+  if (values instanceof Uint8Array || values instanceof ArrayBuffer || ArrayBuffer.isView(values)) {
+    return asBytes(values, "byte array values");
+  }
+  if (values == null || typeof values[Symbol.iterator] !== "function") {
+    throw new Error("byte array values must be iterable or an ArrayBuffer view");
+  }
+  return Uint8Array.from(values, (value) => normalizeByte(value));
+}
+
+function normalizeByte(value) {
+  if (!Number.isInteger(value) || value < 0 || value > 0xff) {
+    throw new Error("byte array values must be integers in 0..255");
+  }
+  return value;
 }

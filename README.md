@@ -3,6 +3,10 @@
 Lean VIR is a proof of concept for running Lean 4's real IR interpreter from
 WebAssembly in the browser.
 
+It is a focused browser harness, not a full Lean-in-the-browser distribution:
+the browser loads a generated IR package, then calls selected Lean declarations
+through the upstream interpreter and a small JavaScript runtime wrapper.
+
 The demo builds Lean `v4.30.0-rc2`'s upstream
 `src/library/ir_interpreter.cpp` to `wasm32-wasip1`, links the required Lean
 runtime subset, and serves generated artifacts:
@@ -34,8 +38,8 @@ npm run dev
 ```
 
 Open the Vite URL and the page should show the Tamagotchi demo plus fixture
-source and run controls. `npm test` rebuilds the WASM artifact and runs the
-Node smoke test.
+source and run controls. `npm test` rebuilds the WASM artifact, runs the Node
+smoke tests, and checks the fixture suite.
 
 For focused local package experiments, generate an IR package from one Lean file:
 
@@ -51,8 +55,12 @@ npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
 
 Then run `npm run dev` and open `/dev.html`. The developer entry point can load a
 served package URL such as `vir-demo.irpkg` or an uploaded `.irpkg` file, then
-evaluate `() -> Nat`, `Nat -> Nat`, or `Array Nat -> Nat` entries through an
-editable input spec.
+evaluate `() -> Nat`, `Nat -> Nat`, `Array Nat -> Nat`, `String -> Nat`, or
+`ByteArray -> Nat` entries through an editable input spec.
+
+The browser-facing runtime wrapper is exported from `web/src/vir-runtime.js` and
+documented in `docs/JS_API.md`. A minimal page that imports the wrapper directly
+is available at `/runtime-example.html` when running `npm run dev`.
 
 For the config-driven path that also writes URL-loadable UI input specs:
 
@@ -97,8 +105,11 @@ and deploys the static site artifact.
   checking its package diagnostics.
 - `docs/LOCAL_IRPKG.md` documents the focused `.lean` to `.irpkg` workflow and
   `/dev.html` package runner.
+- `docs/JS_API.md` documents the browser-facing JavaScript runtime wrapper.
 - `docs/INTERFACE_PIPELINE.md` documents the config-driven package plus input
   spec pipeline and the current WIT direction.
+- `docs/FIXTURE_COVERAGE.md` records the current fixture and boundary coverage
+  in detail.
 - `scripts/build-upstream-probe.sh` compiles and links the upstream
   interpreter, writes `build/upstream-probe/boundary.md`, and copies the strict
   artifact to `web/public/vir-upstream.wasm`.
@@ -123,55 +134,16 @@ platform shim.
 Each fixture is Lean source under `fixtures/`, elaborated by Lean 4.30-rc2 into
 real `Lean.IR.Decl` values, packaged with `tools/GeneratePackage.lean`, and
 then compared against Lean's host IR interpreter with
-`interpreter.prefer_native=false`. Known unsupported fixtures can be tracked in
-`fixtures/manifest.json` so boundary gaps remain explicit. The current passing
-surface includes recursion, inductive pattern matching, local list processing,
-standard `List.map`/`List.filter`/`List.foldl`/`List.any`/`List.all`/
-`List.find?`/`List.zip`, partial application, array push/toList, branches over
-comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
-`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, array construction and
-mutation through `Array.emptyWithCapacity`/`Array.getInternal`/`Array.replicate`/
-`Array.set`/`Array.set!`/`Array.swap`/`Array.swapIfInBounds`/`Array.pop`, plus basic
-`String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
-`String.push`/`String.Internal.next`/`String.Internal.extract`/
-`String.Pos.Raw.get`/`String.Pos.Raw.prev`/`String.Internal.atEnd`/
-`String.decEq`/string ordering/`String.toUTF8`/`String.ofByteArray`/
-`String.toUpper`/`String.toLower`/`String.capitalize`/
-`String.decapitalize`/`String.hash`/`String.Internal.contains`/
-`String.Pos.Raw.isValid` plus public `String.fromUTF8?`/`String.contains`/
-`startsWith`/`drop`/`dropEnd`/`trimAscii`/`splitOn`/`intercalate`/`any`/
-`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/`String.find`/
-`String.Pos.Raw.offsetOfPos`, `Char.toUpper`/`Char.toLower`/
-`Char.utf8Size`, `UInt8`/`UInt16` `toNat` plus
-arithmetic/bitwise/shift/comparison operations, `UInt32` literals,
-`UInt32.ofNat`/`toNat`/`toUInt8`,
-`UInt32` arithmetic/bitwise/shift/comparison operations, `UInt64.ofNat`/
-`ofNatLT`/`toNat`/`toUSize`/`toFloat` plus arithmetic/bitwise/shift/comparison
-operations, large `UInt64.toNat` results returned through the decimal-string
-Nat API, package-backed `Nat` literals wider than 32 bits, `USize`
-`sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
-small `Int` arithmetic, `Nat.div`/`pow`/`log2`/`shiftLeft`/`shiftRight`,
-`Float.scaleB`/`toUInt32`, and
-`ByteArray.mk`/`ByteArray.empty`/`ByteArray.push`/`ByteArray.get`/
-`ByteArray.get!`/`ByteArray.set!`/
-`ByteArray.extract`/`ByteArray.size`/`ByteArray.validateUTF8`. It also covers the
-hash/name/substring/pointer-address primitives reached by parser data paths,
-namely `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
-`ptrAddrUnsafe`. The Lean parser input layer runs through `Lean.Parser.mkInputContext`,
-`Lean.FileMap.toPosition`, and `Lean.Parser.mkParserState`.
-The demo also has narrow synchronous coverage for already-resolved
-`Task.pure`/`Task.get`/`Task.map`, because real `Environment` values store a
-checked kernel environment behind `Task`.
-It models normal execution as post-initialization (`IO.initializing = false`),
-switches to initialization mode while running packaged `builtin_initialize`
-globals through upstream `lean_run_init`, and has single-threaded
-`ST.Prim.mkRef`/`ST.Prim.Ref.get`/`ST.Prim.Ref.set`/`ST.Prim.Ref.take` support
-for ref access reached by fixtures and parser setup.
-`Lean.Parser.parseHeader` is now a passing vertical parser fixture backed by
-packaged initialized parser/environment extension globals.
-The runner also writes `build/fixtures/summary.json` with per-fixture status,
+`interpreter.prefer_native=false`. The current passing surface covers recursive
+functions, inductive pattern matching, common `List`/`Array`/`String`/
+`ByteArray` operations, numeric primitive boundaries, parser setup paths, and
+selected task/ref initialization paths. See `docs/FIXTURE_COVERAGE.md` for the
+detailed boundary list.
+
+The fixture runner writes `build/fixtures/summary.json` with per-fixture status,
 imported IR declarations, native externs, and missing-boundary diagnostics for
-CI and boundary debugging.
+CI and boundary debugging. Known unsupported fixtures can be tracked in
+`fixtures/manifest.json` so boundary gaps remain explicit.
 
 `npm run check:boundary-registry` verifies that `tools/GeneratePackage.lean`
 and the table-driven native shim registry in `wasm/upstream_shim/shim.cpp`

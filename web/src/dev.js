@@ -68,6 +68,31 @@ const defaultInputSpec = {
         },
       ],
     },
+    {
+      id: "string-score",
+      entry: "Vir.Fixtures.Basic.stringUtf8RoundtripScore",
+      result: { type: "Nat" },
+      inputs: [
+        {
+          name: "text",
+          type: "String",
+          defaultValue: "Aé∀Z",
+        },
+      ],
+    },
+    {
+      id: "bytearray-score",
+      entry: "Vir.Fixtures.Basic.byteArrayInputScore",
+      result: { type: "Nat" },
+      inputs: [
+        {
+          name: "bytes",
+          type: "ByteArray",
+          defaultValue: "65, 66, 67",
+          maxItems: 1024,
+        },
+      ],
+    },
   ],
 };
 
@@ -220,6 +245,24 @@ function parseNatArrayInput(text, input) {
   });
 }
 
+function parseByteArrayInput(text, input) {
+  const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
+  const maxItems = input.maxItems ?? 1024;
+  if (parts.length > maxItems) {
+    throw new Error(`ByteArray input is capped at ${maxItems} items`);
+  }
+  return parts.map((part) => {
+    if (!/^\d+$/.test(part)) {
+      throw new Error(`invalid byte literal: ${part}`);
+    }
+    const value = Number(part);
+    if (!Number.isInteger(value) || value < 0 || value > 255) {
+      throw new Error("ByteArray values must be in 0..255");
+    }
+    return value;
+  });
+}
+
 async function loadIrPackageBytes(label, bytes) {
   runtime = await runtimeFactory.createRuntime({ irPackageBytes: bytes });
   packageName.textContent = label;
@@ -285,6 +328,14 @@ function evaluateEntry(runtime, entry) {
     const values = parseNatArrayInput(text, input);
     if (field) field.value = values.join(", ");
     return runtime.evalNatArrayToNat(entry.entry, values);
+  }
+  if (input.type === "String") {
+    return runtime.evalStringToNat(entry.entry, text);
+  }
+  if (input.type === "ByteArray") {
+    const values = parseByteArrayInput(text, input);
+    if (field) field.value = values.join(", ");
+    return runtime.evalByteArrayToNat(entry.entry, values);
   }
   throw new Error(`unsupported input type: ${input.type}`);
 }
