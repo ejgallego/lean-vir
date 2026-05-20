@@ -9,17 +9,19 @@ runtime subset, and serves generated artifacts:
 `web/public/vir-upstream.wasm` plus the demo IR package
 `web/public/vir-demo.irpkg`.
 
-## Demos
+## Browser Demo
 
-The browser page currently runs three examples through that upstream interpreter:
-
-- `fib`, with the current input range capped at `0..17`.
-- `Tamagotchi.step`, a tiny automaton driven one action at a time.
-- `SortDemo.demoFromArray`, a small merge-sort style demo over editable
-  browser input passed to Lean as an `Array Nat`.
+The browser page keeps `Tamagotchi.step` as the main interactive demo, driven
+one action at a time through the upstream interpreter.
 
 The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
 `examples/MergeSort.lean`.
+
+The page also includes a fixture browser for the demo entries plus
+`fixtures/manifest.json`. Each entry can show its Lean source file and run
+through a fresh WASM interpreter instance backed by the same generated IR
+package. Input-capable entries, currently `fib` and `SortDemo.demoFromArray`,
+render an input control in the fixture source panel.
 
 ## Quick Start
 
@@ -31,8 +33,9 @@ npm test
 npm run dev
 ```
 
-Open the Vite URL and the page should show all three demos. `npm test` rebuilds the
-WASM artifact and runs the Node smoke test.
+Open the Vite URL and the page should show the Tamagotchi demo plus fixture
+source and run controls. `npm test` rebuilds the WASM artifact and runs the
+Node smoke test.
 
 ## Hosted Demo
 
@@ -47,8 +50,9 @@ and deploys the static site artifact.
 
 - `wasm/upstream_shim/` supplies the current WASI boundary for Lean's real
   upstream interpreter.
-- `tools/GeneratePackage.lean` elaborates the demo Lean sources, walks the
-  typed `Lean.IR.Decl` closure, and emits `build/generated/vir-demo.irpkg`.
+- `tools/GeneratePackage.lean` elaborates the demo and fixture Lean sources,
+  walks the typed `Lean.IR.Decl` closure, and emits
+  `build/generated/vir-demo.irpkg`.
 - `docs/ADDING_DEMOS.md` describes the path for adding a Lean example and
   checking its package diagnostics.
 - `scripts/build-upstream-probe.sh` compiles and links the upstream
