@@ -172,6 +172,14 @@ function evalConstNat(exports, name) {
   const ptr = exports.vir_alloc_bytes(bytes.byteLength);
   try {
     new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
+    if (
+      typeof exports.vir_eval_const_nat_string === "function" &&
+      typeof exports.vir_eval_const_nat_string_size === "function"
+    ) {
+      const resultPtr = exports.vir_eval_const_nat_string(ptr, bytes.byteLength);
+      const resultLen = exports.vir_eval_const_nat_string_size();
+      return readWasmString(exports, resultPtr, resultLen);
+    }
     return String(exports.vir_eval_const_nat(ptr, bytes.byteLength));
   } finally {
     exports.vir_free_bytes?.(ptr);

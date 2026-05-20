@@ -308,6 +308,24 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_get_byte_fast"
   },
   {
+    name := `String.Internal.next,
+    params := #[param 1 true .object, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_string_utf8_next"
+  },
+  {
+    name := `String.Pos.Raw.get,
+    params := #[param 1 true .object, param 2 true .tobject],
+    resultType := .uint32,
+    symbol := "lean_string_utf8_get"
+  },
+  {
+    name := `String.Internal.atEnd,
+    params := #[param 1 true .object, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_string_utf8_at_end"
+  },
+  {
     name := `String.decEq,
     params := #[param 1 true .object, param 2 true .object],
     resultType := .uint8,

@@ -120,13 +120,16 @@ and smoke-test diagnostics.
 The current explicit native externs cover the small fixture/demo surface for
 `Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
 `Float`, and `String`. This includes the arithmetic and comparison operations
-needed by the demos, List/Array/String/ByteArray fixtures, and the current
+needed by the demos, List/Array/String/ByteArray fixtures, String raw-position
+iteration through `String.Internal.next`/`String.Pos.Raw.get`/
+`String.Internal.atEnd`, and the current
 numeric boundary fixtures for `Nat.div`/`pow`/`log2`/shifts, small `Int`
 arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
 comparison operations, `UInt32.ofNat`/`toNat` plus arithmetic, bitwise, shift,
 and comparison operations, `UInt64.ofNat`/`toNat`/`toFloat` plus arithmetic,
-bitwise, shift, and comparison operations, and `Float.scaleB`/`toUInt32`.
-They are backed by a small shim registry; a full
+bitwise, shift, and comparison operations including a wide `UInt64.toNat`
+fixture returned through `vir_eval_const_nat_string`, and
+`Float.scaleB`/`toUInt32`. They are backed by a table-driven shim registry; a full
 native symbol loader is still out of scope. `ByteArray.empty` is exposed as
 Lean's native constant symbol (`l_ByteArray_empty`), not as a boxed nullary
 function, because the upstream interpreter loads native constants through the
@@ -136,8 +139,8 @@ symbol address. `ByteArray.extract` is exposed as Lean's compiled symbol stem
 
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
 registry. It checks that every `nativeExterns` entry in
-`tools/GeneratePackage.lean` has a matching `known_symbol_stem` branch, `dlsym`
-entry, and boxed wrapper or native constant entry in `wasm/upstream_shim/shim.cpp`.
+`tools/GeneratePackage.lean` has a matching table entry, `dlsym` symbol, and
+boxed wrapper or native constant entry in `wasm/upstream_shim/shim.cpp`.
 `npm test` runs this before the smoke and fixture suites.
 
 The boundary between the two approaches is intentionally narrow:

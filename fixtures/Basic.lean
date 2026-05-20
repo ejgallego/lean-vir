@@ -146,6 +146,22 @@ def stringByteAtScore (s : String) (h : (⟨1⟩ : String.Pos.Raw) < s.rawEndPos
 def upstreamStringByteAtScore : Nat :=
   stringByteAtScore "lean" (by decide)
 
+def rawStringIterationScore (s : String) : Nat :=
+  let p0 : String.Pos.Raw := ⟨0⟩
+  let c0 := String.Pos.Raw.get s p0
+  let p1 := String.Internal.next s p0
+  let c1 := String.Pos.Raw.get s p1
+  let p2 := String.Internal.next s p1
+  let c2 := String.Pos.Raw.get s p2
+  let p3 := String.Internal.next s p2
+  let c3 := String.Pos.Raw.get s p3
+  let p4 := String.Internal.next s p3
+  c0.toNat + c1.toNat + c2.toNat + c3.toNat + p4.byteIdx +
+    if String.Internal.atEnd s p4 then 1000 else 0
+
+def upstreamStringRawIterationScore : Nat :=
+  rawStringIterationScore "Aé∀Z"
+
 def upstreamByteArrayPushGetScore : Nat :=
   let bs := ByteArray.empty.push 65
   let bs := bs.push 66

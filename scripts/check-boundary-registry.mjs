@@ -38,23 +38,29 @@ function parseNativeExterns(source) {
   return entries;
 }
 
-function parseKnownSymbolStems(source) {
+function parseShimRegistry(source) {
   const entries = new Map();
-  const knownMatch = source.match(/static char const \* known_symbol_stem\(name const & n\) \{((?:.|\n)*?)\n\}/);
-  if (!knownMatch) {
-    throw new Error("could not find known_symbol_stem");
+  const startMarker = "#define VIR_NATIVE_SYMBOLS(X, X_CONST) \\\n";
+  const endMarker = "\n\nstruct NativeSymbol";
+  const start = source.indexOf(startMarker);
+  const end = source.indexOf(endMarker, start);
+  if (start < 0 || end < 0) {
+    throw new Error("could not find VIR_NATIVE_SYMBOLS table");
   }
 
-  const entryRegex = /if \(n == name\(\{\s*([^}]+?)\s*\}\)\) \{\s*return "([^"]+)";\s*\}/gs;
-  for (const match of knownMatch[1].matchAll(entryRegex)) {
-    const parts = [...match[1].matchAll(/"([^"]+)"/g)].map((partMatch) => partMatch[1]);
-    entries.set(cppNameKey(parts), match[2]);
+  const table = source.slice(start + startMarker.length, end);
+  const entryRegex = /^\s*(X|X_CONST)\("([^"]+)",\s*"([^"]+)",\s*([A-Za-z0-9_&]+)\)\s*\\?$/gm;
+  for (const match of table.matchAll(entryRegex)) {
+    const kind = match[1];
+    const name = match[2];
+    const symbol = match[3];
+    entries.set(name, {
+      symbol,
+      dlsymSymbol: kind === "X_CONST" ? symbol : `${symbol}___boxed`,
+    });
   }
+
   return entries;
-}
-
-function parseDlsymSymbols(source) {
-  return new Set([...source.matchAll(/strcmp\(sym, "([^"]+)"\) == 0/g)].map((match) => match[1]));
 }
 
 function parseBoxedWrappers(source) {
@@ -79,34 +85,31 @@ const generator = await readFile(generatorPath, "utf8");
 const shim = await readFile(shimPath, "utf8");
 
 const nativeExterns = parseNativeExterns(generator);
-const knownSymbols = parseKnownSymbolStems(shim);
-const dlsymSymbols = parseDlsymSymbols(shim);
+const shimRegistry = parseShimRegistry(shim);
 const boxedWrappers = parseBoxedWrappers(shim);
 const failures = [];
 
-const expectedKnownKeys = new Set();
 const expectedDlsymSymbols = new Set();
 const expectedWrappers = new Set();
 
 for (const entry of nativeExterns) {
   const key = cppNameKey(entry.parts);
-  expectedKnownKeys.add(key);
   expectedDlsymSymbols.add(expectedDlsymSymbol(entry));
   const wrapper = expectedWrapper(entry);
   if (wrapper) {
     expectedWrappers.add(wrapper);
   }
 
-  const knownSymbol = knownSymbols.get(key);
-  if (knownSymbol === undefined) {
-    failures.push(`${entry.name}: missing known_symbol_stem entry`);
-  } else if (knownSymbol !== entry.symbol) {
-    failures.push(`${entry.name}: known_symbol_stem has ${knownSymbol}, expected ${entry.symbol}`);
+  const registryEntry = shimRegistry.get(key);
+  if (registryEntry === undefined) {
+    failures.push(`${entry.name}: missing VIR_NATIVE_SYMBOLS entry`);
+  } else if (registryEntry.symbol !== entry.symbol) {
+    failures.push(`${entry.name}: registry has ${registryEntry.symbol}, expected ${entry.symbol}`);
   }
 
   const dlsymSymbol = expectedDlsymSymbol(entry);
-  if (!dlsymSymbols.has(dlsymSymbol)) {
-    failures.push(`${entry.name}: missing dlsym entry for ${dlsymSymbol}`);
+  if (registryEntry !== undefined && registryEntry.dlsymSymbol !== dlsymSymbol) {
+    failures.push(`${entry.name}: registry dlsym symbol has ${registryEntry.dlsymSymbol}, expected ${dlsymSymbol}`);
   }
 
   if (wrapper && !boxedWrappers.has(wrapper)) {
@@ -114,15 +117,12 @@ for (const entry of nativeExterns) {
   }
 }
 
-for (const key of knownSymbols.keys()) {
-  if (!expectedKnownKeys.has(key)) {
-    failures.push(`${key}: shim has extra known_symbol_stem entry`);
+for (const [key, entry] of shimRegistry.entries()) {
+  if (!nativeExterns.some((nativeExtern) => cppNameKey(nativeExtern.parts) === key)) {
+    failures.push(`${key}: shim has extra VIR_NATIVE_SYMBOLS entry`);
   }
-}
-
-for (const symbol of dlsymSymbols) {
-  if (!expectedDlsymSymbols.has(symbol)) {
-    failures.push(`${symbol}: shim has extra dlsym entry`);
+  if (!expectedDlsymSymbols.has(entry.dlsymSymbol)) {
+    failures.push(`${entry.dlsymSymbol}: shim has extra dlsym registry entry`);
   }
 }
 

@@ -79,10 +79,12 @@ standard `List.map`/`List.filter`/`List.foldl`/`List.any`/`List.all`/
 comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
 `Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, plus basic
 `String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
+`String.Internal.next`/`String.Pos.Raw.get`/`String.Internal.atEnd`/
 `String.decEq`, `UInt8`/`UInt16` `toNat` plus arithmetic/bitwise/shift/
 comparison operations, `UInt32` literals, `UInt32.ofNat`/`toNat`,
 `UInt32` arithmetic/bitwise/shift/comparison operations, `UInt64.ofNat`/
-`toNat`/`toFloat` plus arithmetic/bitwise/shift/comparison operations, small
+`toNat`/`toFloat` plus arithmetic/bitwise/shift/comparison operations, large
+`UInt64.toNat` results returned through the decimal-string Nat API, small
 `Int` arithmetic, `Nat.div`/`pow`/`log2`/`shiftLeft`/`shiftRight`,
 `Float.scaleB`/`toUInt32`, and
 `ByteArray.empty`/`ByteArray.push`/`ByteArray.get!`/`ByteArray.set!`/
@@ -92,7 +94,8 @@ imported IR declarations, native externs, and missing-boundary diagnostics for
 CI and boundary debugging.
 
 `npm run check:boundary-registry` verifies that `tools/GeneratePackage.lean`
-and `wasm/upstream_shim/shim.cpp` agree on the explicit native extern registry.
+and the table-driven native shim registry in `wasm/upstream_shim/shim.cpp`
+agree on the explicit native extern surface.
 `npm test` runs this check before rebuilding the upstream smoke artifact and
 running the fixture suite.
 

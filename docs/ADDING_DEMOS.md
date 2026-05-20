@@ -37,8 +37,8 @@ the package-backed imported closure or the explicit native boundary.
 
 ## Browser Entrypoints
 
-Prefer `vir_eval_const_nat` for zero-argument `Nat` demos. If a demo needs
-browser-supplied input, add a narrow export in `wasm/upstream_shim/shim.cpp`
-that constructs the Lean argument object and then calls `lean::ir::run_boxed`.
-Keep the Lean declaration itself in `examples/` and include it as a root in
-`tools/GeneratePackage.lean`.
+Prefer `vir_eval_const_nat_string` for zero-argument `Nat` demos, since it also
+handles values wider than 32 bits. If a demo needs browser-supplied input, add
+a narrow export in `wasm/upstream_shim/shim.cpp` that constructs the Lean
+argument object and then calls `lean::ir::run_boxed`. Keep the Lean declaration
+itself in `examples/` and include it as a root in `tools/GeneratePackage.lean`.

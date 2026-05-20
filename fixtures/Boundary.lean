@@ -112,6 +112,10 @@ def uint64BitwiseCompareScore : Nat :=
   (if (17 : UInt64) = 17 then 30 else 0) +
   (if (21 : UInt64) < 17 then 100 else 5)
 
+def uint64LargeToNatScore : Nat :=
+  let high := UInt64.shiftLeft 1 63
+  (high + 12345).toNat
+
 def uint64ToFloatScore : Nat :=
   let n := Nat.shiftLeft 3 5
   let x := UInt64.ofNat n

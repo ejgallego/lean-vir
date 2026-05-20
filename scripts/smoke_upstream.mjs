@@ -52,6 +52,12 @@ if (typeof exports.vir_upstream_tamagotchi_run_demo !== "function") {
 if (typeof exports.vir_eval_const_nat !== "function") {
   throw new Error("vir_eval_const_nat export is missing");
 }
+if (typeof exports.vir_eval_const_nat_string !== "function") {
+  throw new Error("vir_eval_const_nat_string export is missing");
+}
+if (typeof exports.vir_eval_const_nat_string_size !== "function") {
+  throw new Error("vir_eval_const_nat_string_size export is missing");
+}
 if (typeof exports.vir_sort_checksum !== "function") {
   throw new Error("vir_sort_checksum export is missing");
 }
@@ -186,14 +192,16 @@ function evalConstNat(name) {
   const ptr = exports.vir_alloc_bytes(bytes.byteLength);
   try {
     new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
-    return exports.vir_eval_const_nat(ptr, bytes.byteLength);
+    const resultPtr = exports.vir_eval_const_nat_string(ptr, bytes.byteLength);
+    const resultLen = exports.vir_eval_const_nat_string_size();
+    return readWasmString(resultPtr, resultLen);
   } finally {
     exports.vir_free_bytes?.(ptr);
   }
 }
 
 const sortChecksum = evalConstNat("SortDemo.demo");
-if (sortChecksum !== 192) {
+if (sortChecksum !== "192") {
   throw new Error(`upstream SortDemo.demo: expected 192, got ${sortChecksum}`);
 }
 

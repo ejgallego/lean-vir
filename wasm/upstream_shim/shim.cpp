@@ -377,6 +377,27 @@ extern "C" lean_object * lean_string_get_byte_fast___boxed(lean_object * s, lean
     return lean_box(result);
 }
 
+extern "C" lean_object * lean_string_utf8_next___boxed(lean_object * s, lean_object * pos) {
+    lean_object * result = lean_string_utf8_next(s, pos);
+    lean_dec(s);
+    lean_dec(pos);
+    return result;
+}
+
+extern "C" lean_object * lean_string_utf8_get___boxed(lean_object * s, lean_object * pos) {
+    uint32_t result = lean_string_utf8_get(s, pos);
+    lean_dec(s);
+    lean_dec(pos);
+    return lean_box_uint32(result);
+}
+
+extern "C" lean_object * lean_string_utf8_at_end___boxed(lean_object * s, lean_object * pos) {
+    uint8_t result = lean_string_utf8_at_end(s, pos);
+    lean_dec(s);
+    lean_dec(pos);
+    return lean_box(result);
+}
+
 extern "C" lean_object * lean_string_dec_eq___boxed(lean_object * a, lean_object * b) {
     uint8_t result = lean_string_dec_eq(a, b);
     lean_dec(a);
@@ -722,336 +743,143 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     return lean_box_uint32(result);
 }
 
+#define VIR_NATIVE_SYMBOLS(X, X_CONST) \
+    X("Nat.add", "lean_nat_add", lean_nat_add___boxed) \
+    X("Nat.sub", "lean_nat_sub", lean_nat_sub___boxed) \
+    X("Nat.decEq", "lean_nat_dec_eq", lean_nat_dec_eq___boxed) \
+    X("Nat.decLe", "lean_nat_dec_le", lean_nat_dec_le___boxed) \
+    X("Nat.decLt", "lean_nat_dec_lt", lean_nat_dec_lt___boxed) \
+    X("Nat.mul", "lean_nat_mul", lean_nat_mul___boxed) \
+    X("Nat.div", "lean_nat_div", lean_nat_div___boxed) \
+    X("Nat.pow", "lean_nat_pow", lean_nat_pow___boxed) \
+    X("Nat.log2", "lean_nat_log2", lean_nat_log2___boxed) \
+    X("Nat.shiftLeft", "lean_nat_shiftl", lean_nat_shiftl___boxed) \
+    X("Nat.shiftRight", "lean_nat_shiftr", lean_nat_shiftr___boxed) \
+    X("Int.ofNat", "lean_nat_to_int", lean_nat_to_int___boxed) \
+    X("Int.add", "lean_int_add", lean_int_add___boxed) \
+    X("Int.sub", "lean_int_sub", lean_int_sub___boxed) \
+    X("Int.mul", "lean_int_mul", lean_int_mul___boxed) \
+    X("Int.neg", "lean_int_neg", lean_int_neg___boxed) \
+    X("Int.decLt", "lean_int_dec_lt", lean_int_dec_lt___boxed) \
+    X("Int.natAbs", "lean_nat_abs", lean_nat_abs___boxed) \
+    X("Array.mkEmpty", "lean_array_mk_empty", lean_array_mk_empty___boxed) \
+    X("Array.push", "lean_array_push", lean_array_push___boxed) \
+    X("Array.toList", "lean_array_to_list", lean_array_to_list___boxed) \
+    X("Array.size", "lean_array_get_size", lean_array_get_size___boxed) \
+    X("Array.usize", "lean_array_size", lean_array_size___boxed) \
+    X("Array.uget", "lean_array_uget", lean_array_uget___boxed) \
+    X("Array.ugetBorrowed", "lean_array_uget_borrowed", lean_array_uget_borrowed___boxed) \
+    X("Array.uset", "lean_array_uset", lean_array_uset___boxed) \
+    X_CONST("ByteArray.empty", "l_ByteArray_empty", &l_ByteArray_empty) \
+    X("ByteArray.push", "lean_byte_array_push", lean_byte_array_push___boxed) \
+    X("ByteArray.get!", "lean_byte_array_get", lean_byte_array_get___boxed) \
+    X("ByteArray.set!", "lean_byte_array_set", lean_byte_array_set___boxed) \
+    X("ByteArray.extract", "l_ByteArray_extract", l_ByteArray_extract___boxed) \
+    X("ByteArray.size", "lean_byte_array_size", lean_byte_array_size___boxed) \
+    X("USize.ofNat", "lean_usize_of_nat", lean_usize_of_nat___boxed) \
+    X("USize.add", "lean_usize_add", lean_usize_add___boxed) \
+    X("USize.decEq", "lean_usize_dec_eq", lean_usize_dec_eq___boxed) \
+    X("USize.decLt", "lean_usize_dec_lt", lean_usize_dec_lt___boxed) \
+    X("String.append", "lean_string_append", lean_string_append___boxed) \
+    X("String.length", "lean_string_length", lean_string_length___boxed) \
+    X("String.utf8ByteSize", "lean_string_utf8_byte_size", lean_string_utf8_byte_size___boxed) \
+    X("String.getUTF8Byte", "lean_string_get_byte_fast", lean_string_get_byte_fast___boxed) \
+    X("String.Internal.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
+    X("String.Pos.Raw.get", "lean_string_utf8_get", lean_string_utf8_get___boxed) \
+    X("String.Internal.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
+    X("String.decEq", "lean_string_dec_eq", lean_string_dec_eq___boxed) \
+    X("UInt8.toNat", "lean_uint8_to_nat", lean_uint8_to_nat___boxed) \
+    X("UInt8.add", "lean_uint8_add", lean_uint8_add___boxed) \
+    X("UInt8.sub", "lean_uint8_sub", lean_uint8_sub___boxed) \
+    X("UInt8.mul", "lean_uint8_mul", lean_uint8_mul___boxed) \
+    X("UInt8.div", "lean_uint8_div", lean_uint8_div___boxed) \
+    X("UInt8.mod", "lean_uint8_mod", lean_uint8_mod___boxed) \
+    X("UInt8.land", "lean_uint8_land", lean_uint8_land___boxed) \
+    X("UInt8.lor", "lean_uint8_lor", lean_uint8_lor___boxed) \
+    X("UInt8.xor", "lean_uint8_xor", lean_uint8_xor___boxed) \
+    X("UInt8.shiftLeft", "lean_uint8_shift_left", lean_uint8_shift_left___boxed) \
+    X("UInt8.shiftRight", "lean_uint8_shift_right", lean_uint8_shift_right___boxed) \
+    X("UInt8.complement", "lean_uint8_complement", lean_uint8_complement___boxed) \
+    X("UInt8.neg", "lean_uint8_neg", lean_uint8_neg___boxed) \
+    X("UInt8.decEq", "lean_uint8_dec_eq", lean_uint8_dec_eq___boxed) \
+    X("UInt8.decLt", "lean_uint8_dec_lt", lean_uint8_dec_lt___boxed) \
+    X("UInt8.decLe", "lean_uint8_dec_le", lean_uint8_dec_le___boxed) \
+    X("UInt16.toNat", "lean_uint16_to_nat", lean_uint16_to_nat___boxed) \
+    X("UInt16.add", "lean_uint16_add", lean_uint16_add___boxed) \
+    X("UInt16.sub", "lean_uint16_sub", lean_uint16_sub___boxed) \
+    X("UInt16.mul", "lean_uint16_mul", lean_uint16_mul___boxed) \
+    X("UInt16.div", "lean_uint16_div", lean_uint16_div___boxed) \
+    X("UInt16.mod", "lean_uint16_mod", lean_uint16_mod___boxed) \
+    X("UInt16.land", "lean_uint16_land", lean_uint16_land___boxed) \
+    X("UInt16.lor", "lean_uint16_lor", lean_uint16_lor___boxed) \
+    X("UInt16.xor", "lean_uint16_xor", lean_uint16_xor___boxed) \
+    X("UInt16.shiftLeft", "lean_uint16_shift_left", lean_uint16_shift_left___boxed) \
+    X("UInt16.shiftRight", "lean_uint16_shift_right", lean_uint16_shift_right___boxed) \
+    X("UInt16.complement", "lean_uint16_complement", lean_uint16_complement___boxed) \
+    X("UInt16.neg", "lean_uint16_neg", lean_uint16_neg___boxed) \
+    X("UInt16.decEq", "lean_uint16_dec_eq", lean_uint16_dec_eq___boxed) \
+    X("UInt16.decLt", "lean_uint16_dec_lt", lean_uint16_dec_lt___boxed) \
+    X("UInt16.decLe", "lean_uint16_dec_le", lean_uint16_dec_le___boxed) \
+    X("UInt32.ofNat", "lean_uint32_of_nat", lean_uint32_of_nat___boxed) \
+    X("UInt32.toNat", "lean_uint32_to_nat", lean_uint32_to_nat___boxed) \
+    X("UInt32.add", "lean_uint32_add", lean_uint32_add___boxed) \
+    X("UInt32.sub", "lean_uint32_sub", lean_uint32_sub___boxed) \
+    X("UInt32.mul", "lean_uint32_mul", lean_uint32_mul___boxed) \
+    X("UInt32.div", "lean_uint32_div", lean_uint32_div___boxed) \
+    X("UInt32.mod", "lean_uint32_mod", lean_uint32_mod___boxed) \
+    X("UInt32.land", "lean_uint32_land", lean_uint32_land___boxed) \
+    X("UInt32.lor", "lean_uint32_lor", lean_uint32_lor___boxed) \
+    X("UInt32.xor", "lean_uint32_xor", lean_uint32_xor___boxed) \
+    X("UInt32.shiftLeft", "lean_uint32_shift_left", lean_uint32_shift_left___boxed) \
+    X("UInt32.shiftRight", "lean_uint32_shift_right", lean_uint32_shift_right___boxed) \
+    X("UInt32.complement", "lean_uint32_complement", lean_uint32_complement___boxed) \
+    X("UInt32.neg", "lean_uint32_neg", lean_uint32_neg___boxed) \
+    X("UInt32.decEq", "lean_uint32_dec_eq", lean_uint32_dec_eq___boxed) \
+    X("UInt32.decLt", "lean_uint32_dec_lt", lean_uint32_dec_lt___boxed) \
+    X("UInt32.decLe", "lean_uint32_dec_le", lean_uint32_dec_le___boxed) \
+    X("UInt64.ofNat", "lean_uint64_of_nat", lean_uint64_of_nat___boxed) \
+    X("UInt64.toNat", "lean_uint64_to_nat", lean_uint64_to_nat___boxed) \
+    X("UInt64.add", "lean_uint64_add", lean_uint64_add___boxed) \
+    X("UInt64.sub", "lean_uint64_sub", lean_uint64_sub___boxed) \
+    X("UInt64.mul", "lean_uint64_mul", lean_uint64_mul___boxed) \
+    X("UInt64.div", "lean_uint64_div", lean_uint64_div___boxed) \
+    X("UInt64.mod", "lean_uint64_mod", lean_uint64_mod___boxed) \
+    X("UInt64.land", "lean_uint64_land", lean_uint64_land___boxed) \
+    X("UInt64.lor", "lean_uint64_lor", lean_uint64_lor___boxed) \
+    X("UInt64.xor", "lean_uint64_xor", lean_uint64_xor___boxed) \
+    X("UInt64.shiftLeft", "lean_uint64_shift_left", lean_uint64_shift_left___boxed) \
+    X("UInt64.shiftRight", "lean_uint64_shift_right", lean_uint64_shift_right___boxed) \
+    X("UInt64.complement", "lean_uint64_complement", lean_uint64_complement___boxed) \
+    X("UInt64.neg", "lean_uint64_neg", lean_uint64_neg___boxed) \
+    X("UInt64.decEq", "lean_uint64_dec_eq", lean_uint64_dec_eq___boxed) \
+    X("UInt64.decLt", "lean_uint64_dec_lt", lean_uint64_dec_lt___boxed) \
+    X("UInt64.decLe", "lean_uint64_dec_le", lean_uint64_dec_le___boxed) \
+    X("UInt64.toFloat", "lean_uint64_to_float", lean_uint64_to_float___boxed) \
+    X("Float.scaleB", "lean_float_scaleb", lean_float_scaleb___boxed) \
+    X("Float.toUInt32", "lean_float_to_uint32", lean_float_to_uint32___boxed)
+
+struct NativeSymbol {
+    char const * lean_name;
+    char const * stem;
+    char const * dlsym_name;
+    void * address;
+};
+
+static NativeSymbol const g_native_symbols[] = {
+#define VIR_NATIVE_BOXED_ENTRY(lean_name, stem, fn) \
+    { lean_name, stem, stem "___boxed", reinterpret_cast<void *>(fn) },
+#define VIR_NATIVE_CONST_ENTRY(lean_name, stem, ptr) \
+    { lean_name, stem, stem, reinterpret_cast<void *>(ptr) },
+    VIR_NATIVE_SYMBOLS(VIR_NATIVE_BOXED_ENTRY, VIR_NATIVE_CONST_ENTRY)
+#undef VIR_NATIVE_CONST_ENTRY
+#undef VIR_NATIVE_BOXED_ENTRY
+};
+
 extern "C" void * dlsym(void *, char const * sym) {
-    if (strcmp(sym, "lean_nat_add___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_add___boxed);
-    }
-    if (strcmp(sym, "lean_nat_sub___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_sub___boxed);
-    }
-    if (strcmp(sym, "lean_nat_dec_eq___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_dec_eq___boxed);
-    }
-    if (strcmp(sym, "lean_nat_dec_le___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_dec_le___boxed);
-    }
-    if (strcmp(sym, "lean_nat_dec_lt___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_dec_lt___boxed);
-    }
-    if (strcmp(sym, "lean_nat_mul___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_mul___boxed);
-    }
-    if (strcmp(sym, "lean_nat_div___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_div___boxed);
-    }
-    if (strcmp(sym, "lean_nat_pow___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_pow___boxed);
-    }
-    if (strcmp(sym, "lean_nat_log2___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_log2___boxed);
-    }
-    if (strcmp(sym, "lean_nat_shiftl___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_shiftl___boxed);
-    }
-    if (strcmp(sym, "lean_nat_shiftr___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_shiftr___boxed);
-    }
-    if (strcmp(sym, "lean_nat_to_int___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_to_int___boxed);
-    }
-    if (strcmp(sym, "lean_int_add___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_int_add___boxed);
-    }
-    if (strcmp(sym, "lean_int_sub___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_int_sub___boxed);
-    }
-    if (strcmp(sym, "lean_int_mul___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_int_mul___boxed);
-    }
-    if (strcmp(sym, "lean_int_neg___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_int_neg___boxed);
-    }
-    if (strcmp(sym, "lean_int_dec_lt___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_int_dec_lt___boxed);
-    }
-    if (strcmp(sym, "lean_nat_abs___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_nat_abs___boxed);
-    }
-    if (strcmp(sym, "lean_array_mk_empty___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_array_mk_empty___boxed);
-    }
-    if (strcmp(sym, "lean_array_push___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_array_push___boxed);
-    }
-    if (strcmp(sym, "lean_array_to_list___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_array_to_list___boxed);
-    }
-    if (strcmp(sym, "lean_array_get_size___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_array_get_size___boxed);
-    }
-    if (strcmp(sym, "lean_array_size___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_array_size___boxed);
-    }
-    if (strcmp(sym, "lean_array_uget___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_array_uget___boxed);
-    }
-    if (strcmp(sym, "lean_array_uget_borrowed___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_array_uget_borrowed___boxed);
-    }
-    if (strcmp(sym, "lean_array_uset___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_array_uset___boxed);
-    }
-    if (strcmp(sym, "l_ByteArray_empty") == 0) {
-        return reinterpret_cast<void *>(&l_ByteArray_empty);
-    }
-    if (strcmp(sym, "lean_byte_array_push___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_byte_array_push___boxed);
-    }
-    if (strcmp(sym, "lean_byte_array_get___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_byte_array_get___boxed);
-    }
-    if (strcmp(sym, "lean_byte_array_set___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_byte_array_set___boxed);
-    }
-    if (strcmp(sym, "l_ByteArray_extract___boxed") == 0) {
-        return reinterpret_cast<void *>(l_ByteArray_extract___boxed);
-    }
-    if (strcmp(sym, "lean_byte_array_size___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_byte_array_size___boxed);
-    }
-    if (strcmp(sym, "lean_usize_of_nat___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_usize_of_nat___boxed);
-    }
-    if (strcmp(sym, "lean_usize_add___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_usize_add___boxed);
-    }
-    if (strcmp(sym, "lean_usize_dec_eq___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_usize_dec_eq___boxed);
-    }
-    if (strcmp(sym, "lean_usize_dec_lt___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_usize_dec_lt___boxed);
-    }
-    if (strcmp(sym, "lean_string_append___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_string_append___boxed);
-    }
-    if (strcmp(sym, "lean_string_length___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_string_length___boxed);
-    }
-    if (strcmp(sym, "lean_string_utf8_byte_size___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_string_utf8_byte_size___boxed);
-    }
-    if (strcmp(sym, "lean_string_get_byte_fast___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_string_get_byte_fast___boxed);
-    }
-    if (strcmp(sym, "lean_string_dec_eq___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_string_dec_eq___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_to_nat___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_to_nat___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_add___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_add___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_sub___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_sub___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_mul___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_mul___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_div___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_div___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_mod___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_mod___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_land___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_land___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_lor___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_lor___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_xor___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_xor___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_shift_left___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_shift_left___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_shift_right___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_shift_right___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_complement___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_complement___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_neg___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_neg___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_dec_eq___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_dec_eq___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_dec_lt___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_dec_lt___boxed);
-    }
-    if (strcmp(sym, "lean_uint8_dec_le___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint8_dec_le___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_to_nat___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_to_nat___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_add___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_add___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_sub___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_sub___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_mul___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_mul___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_div___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_div___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_mod___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_mod___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_land___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_land___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_lor___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_lor___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_xor___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_xor___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_shift_left___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_shift_left___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_shift_right___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_shift_right___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_complement___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_complement___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_neg___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_neg___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_dec_eq___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_dec_eq___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_dec_lt___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_dec_lt___boxed);
-    }
-    if (strcmp(sym, "lean_uint16_dec_le___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint16_dec_le___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_of_nat___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_of_nat___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_to_nat___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_to_nat___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_add___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_add___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_sub___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_sub___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_mul___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_mul___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_div___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_div___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_mod___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_mod___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_land___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_land___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_lor___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_lor___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_xor___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_xor___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_shift_left___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_shift_left___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_shift_right___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_shift_right___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_complement___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_complement___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_neg___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_neg___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_dec_eq___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_dec_eq___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_dec_lt___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_dec_lt___boxed);
-    }
-    if (strcmp(sym, "lean_uint32_dec_le___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint32_dec_le___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_of_nat___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_of_nat___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_to_nat___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_to_nat___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_add___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_add___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_sub___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_sub___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_mul___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_mul___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_div___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_div___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_mod___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_mod___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_land___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_land___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_lor___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_lor___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_xor___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_xor___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_shift_left___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_shift_left___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_shift_right___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_shift_right___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_complement___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_complement___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_neg___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_neg___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_dec_eq___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_dec_eq___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_dec_lt___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_dec_lt___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_dec_le___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_dec_le___boxed);
-    }
-    if (strcmp(sym, "lean_uint64_to_float___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_uint64_to_float___boxed);
-    }
-    if (strcmp(sym, "lean_float_scaleb___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_float_scaleb___boxed);
-    }
-    if (strcmp(sym, "lean_float_to_uint32___boxed") == 0) {
-        return reinterpret_cast<void *>(lean_float_to_uint32___boxed);
+    for (NativeSymbol const & entry : g_native_symbols) {
+        if (strcmp(sym, entry.dlsym_name) == 0) {
+            return entry.address;
+        }
     }
     return nullptr;
 }
@@ -1108,6 +936,24 @@ static uint32_t run_nat_function(name const & fn, unsigned n, object ** args) {
     return out;
 }
 
+static std::string nat_to_decimal(object * value) {
+    if (lean_is_scalar(value)) {
+        return std::to_string(lean_unbox(value));
+    }
+    return mpz_value(value).to_string();
+}
+
+static std::string run_nat_function_string(name const & fn, unsigned n, object ** args) {
+    elab_environment env(lean_box(0));
+    options opts(lean_box(0));
+    object * result = ir::run_boxed(env, opts, fn, n, args);
+    std::string out = nat_to_decimal(result);
+    lean_dec(result);
+    return out;
+}
+
+static std::string g_eval_const_nat_string;
+
 static uint32_t run_tagged_function(name const & fn, unsigned n, object ** args) {
     elab_environment env(lean_box(0));
     options opts(lean_box(0));
@@ -1126,335 +972,11 @@ static object * mk_nat_array(uint32_t const * values, uint32_t len) {
 }
 
 static char const * known_symbol_stem(name const & n) {
-    if (n == name({ "Nat", "add" })) {
-        return "lean_nat_add";
-    }
-    if (n == name({ "Nat", "sub" })) {
-        return "lean_nat_sub";
-    }
-    if (n == name({ "Nat", "decEq" })) {
-        return "lean_nat_dec_eq";
-    }
-    if (n == name({ "Nat", "decLe" })) {
-        return "lean_nat_dec_le";
-    }
-    if (n == name({ "Nat", "decLt" })) {
-        return "lean_nat_dec_lt";
-    }
-    if (n == name({ "Nat", "mul" })) {
-        return "lean_nat_mul";
-    }
-    if (n == name({ "Nat", "div" })) {
-        return "lean_nat_div";
-    }
-    if (n == name({ "Nat", "pow" })) {
-        return "lean_nat_pow";
-    }
-    if (n == name({ "Nat", "log2" })) {
-        return "lean_nat_log2";
-    }
-    if (n == name({ "Nat", "shiftLeft" })) {
-        return "lean_nat_shiftl";
-    }
-    if (n == name({ "Nat", "shiftRight" })) {
-        return "lean_nat_shiftr";
-    }
-    if (n == name({ "Int", "ofNat" })) {
-        return "lean_nat_to_int";
-    }
-    if (n == name({ "Int", "add" })) {
-        return "lean_int_add";
-    }
-    if (n == name({ "Int", "sub" })) {
-        return "lean_int_sub";
-    }
-    if (n == name({ "Int", "mul" })) {
-        return "lean_int_mul";
-    }
-    if (n == name({ "Int", "neg" })) {
-        return "lean_int_neg";
-    }
-    if (n == name({ "Int", "decLt" })) {
-        return "lean_int_dec_lt";
-    }
-    if (n == name({ "Int", "natAbs" })) {
-        return "lean_nat_abs";
-    }
-    if (n == name({ "Array", "mkEmpty" })) {
-        return "lean_array_mk_empty";
-    }
-    if (n == name({ "Array", "push" })) {
-        return "lean_array_push";
-    }
-    if (n == name({ "Array", "toList" })) {
-        return "lean_array_to_list";
-    }
-    if (n == name({ "Array", "size" })) {
-        return "lean_array_get_size";
-    }
-    if (n == name({ "Array", "usize" })) {
-        return "lean_array_size";
-    }
-    if (n == name({ "Array", "uget" })) {
-        return "lean_array_uget";
-    }
-    if (n == name({ "Array", "ugetBorrowed" })) {
-        return "lean_array_uget_borrowed";
-    }
-    if (n == name({ "Array", "uset" })) {
-        return "lean_array_uset";
-    }
-    if (n == name({ "ByteArray", "empty" })) {
-        return "l_ByteArray_empty";
-    }
-    if (n == name({ "ByteArray", "push" })) {
-        return "lean_byte_array_push";
-    }
-    if (n == name({ "ByteArray", "get!" })) {
-        return "lean_byte_array_get";
-    }
-    if (n == name({ "ByteArray", "set!" })) {
-        return "lean_byte_array_set";
-    }
-    if (n == name({ "ByteArray", "extract" })) {
-        return "l_ByteArray_extract";
-    }
-    if (n == name({ "ByteArray", "size" })) {
-        return "lean_byte_array_size";
-    }
-    if (n == name({ "USize", "ofNat" })) {
-        return "lean_usize_of_nat";
-    }
-    if (n == name({ "USize", "add" })) {
-        return "lean_usize_add";
-    }
-    if (n == name({ "USize", "decEq" })) {
-        return "lean_usize_dec_eq";
-    }
-    if (n == name({ "USize", "decLt" })) {
-        return "lean_usize_dec_lt";
-    }
-    if (n == name({ "String", "append" })) {
-        return "lean_string_append";
-    }
-    if (n == name({ "String", "length" })) {
-        return "lean_string_length";
-    }
-    if (n == name({ "String", "utf8ByteSize" })) {
-        return "lean_string_utf8_byte_size";
-    }
-    if (n == name({ "String", "getUTF8Byte" })) {
-        return "lean_string_get_byte_fast";
-    }
-    if (n == name({ "String", "decEq" })) {
-        return "lean_string_dec_eq";
-    }
-    if (n == name({ "UInt8", "toNat" })) {
-        return "lean_uint8_to_nat";
-    }
-    if (n == name({ "UInt8", "add" })) {
-        return "lean_uint8_add";
-    }
-    if (n == name({ "UInt8", "sub" })) {
-        return "lean_uint8_sub";
-    }
-    if (n == name({ "UInt8", "mul" })) {
-        return "lean_uint8_mul";
-    }
-    if (n == name({ "UInt8", "div" })) {
-        return "lean_uint8_div";
-    }
-    if (n == name({ "UInt8", "mod" })) {
-        return "lean_uint8_mod";
-    }
-    if (n == name({ "UInt8", "land" })) {
-        return "lean_uint8_land";
-    }
-    if (n == name({ "UInt8", "lor" })) {
-        return "lean_uint8_lor";
-    }
-    if (n == name({ "UInt8", "xor" })) {
-        return "lean_uint8_xor";
-    }
-    if (n == name({ "UInt8", "shiftLeft" })) {
-        return "lean_uint8_shift_left";
-    }
-    if (n == name({ "UInt8", "shiftRight" })) {
-        return "lean_uint8_shift_right";
-    }
-    if (n == name({ "UInt8", "complement" })) {
-        return "lean_uint8_complement";
-    }
-    if (n == name({ "UInt8", "neg" })) {
-        return "lean_uint8_neg";
-    }
-    if (n == name({ "UInt8", "decEq" })) {
-        return "lean_uint8_dec_eq";
-    }
-    if (n == name({ "UInt8", "decLt" })) {
-        return "lean_uint8_dec_lt";
-    }
-    if (n == name({ "UInt8", "decLe" })) {
-        return "lean_uint8_dec_le";
-    }
-    if (n == name({ "UInt16", "toNat" })) {
-        return "lean_uint16_to_nat";
-    }
-    if (n == name({ "UInt16", "add" })) {
-        return "lean_uint16_add";
-    }
-    if (n == name({ "UInt16", "sub" })) {
-        return "lean_uint16_sub";
-    }
-    if (n == name({ "UInt16", "mul" })) {
-        return "lean_uint16_mul";
-    }
-    if (n == name({ "UInt16", "div" })) {
-        return "lean_uint16_div";
-    }
-    if (n == name({ "UInt16", "mod" })) {
-        return "lean_uint16_mod";
-    }
-    if (n == name({ "UInt16", "land" })) {
-        return "lean_uint16_land";
-    }
-    if (n == name({ "UInt16", "lor" })) {
-        return "lean_uint16_lor";
-    }
-    if (n == name({ "UInt16", "xor" })) {
-        return "lean_uint16_xor";
-    }
-    if (n == name({ "UInt16", "shiftLeft" })) {
-        return "lean_uint16_shift_left";
-    }
-    if (n == name({ "UInt16", "shiftRight" })) {
-        return "lean_uint16_shift_right";
-    }
-    if (n == name({ "UInt16", "complement" })) {
-        return "lean_uint16_complement";
-    }
-    if (n == name({ "UInt16", "neg" })) {
-        return "lean_uint16_neg";
-    }
-    if (n == name({ "UInt16", "decEq" })) {
-        return "lean_uint16_dec_eq";
-    }
-    if (n == name({ "UInt16", "decLt" })) {
-        return "lean_uint16_dec_lt";
-    }
-    if (n == name({ "UInt16", "decLe" })) {
-        return "lean_uint16_dec_le";
-    }
-    if (n == name({ "UInt32", "ofNat" })) {
-        return "lean_uint32_of_nat";
-    }
-    if (n == name({ "UInt32", "toNat" })) {
-        return "lean_uint32_to_nat";
-    }
-    if (n == name({ "UInt32", "add" })) {
-        return "lean_uint32_add";
-    }
-    if (n == name({ "UInt32", "sub" })) {
-        return "lean_uint32_sub";
-    }
-    if (n == name({ "UInt32", "mul" })) {
-        return "lean_uint32_mul";
-    }
-    if (n == name({ "UInt32", "div" })) {
-        return "lean_uint32_div";
-    }
-    if (n == name({ "UInt32", "mod" })) {
-        return "lean_uint32_mod";
-    }
-    if (n == name({ "UInt32", "land" })) {
-        return "lean_uint32_land";
-    }
-    if (n == name({ "UInt32", "lor" })) {
-        return "lean_uint32_lor";
-    }
-    if (n == name({ "UInt32", "xor" })) {
-        return "lean_uint32_xor";
-    }
-    if (n == name({ "UInt32", "shiftLeft" })) {
-        return "lean_uint32_shift_left";
-    }
-    if (n == name({ "UInt32", "shiftRight" })) {
-        return "lean_uint32_shift_right";
-    }
-    if (n == name({ "UInt32", "complement" })) {
-        return "lean_uint32_complement";
-    }
-    if (n == name({ "UInt32", "neg" })) {
-        return "lean_uint32_neg";
-    }
-    if (n == name({ "UInt32", "decEq" })) {
-        return "lean_uint32_dec_eq";
-    }
-    if (n == name({ "UInt32", "decLt" })) {
-        return "lean_uint32_dec_lt";
-    }
-    if (n == name({ "UInt32", "decLe" })) {
-        return "lean_uint32_dec_le";
-    }
-    if (n == name({ "UInt64", "ofNat" })) {
-        return "lean_uint64_of_nat";
-    }
-    if (n == name({ "UInt64", "toNat" })) {
-        return "lean_uint64_to_nat";
-    }
-    if (n == name({ "UInt64", "add" })) {
-        return "lean_uint64_add";
-    }
-    if (n == name({ "UInt64", "sub" })) {
-        return "lean_uint64_sub";
-    }
-    if (n == name({ "UInt64", "mul" })) {
-        return "lean_uint64_mul";
-    }
-    if (n == name({ "UInt64", "div" })) {
-        return "lean_uint64_div";
-    }
-    if (n == name({ "UInt64", "mod" })) {
-        return "lean_uint64_mod";
-    }
-    if (n == name({ "UInt64", "land" })) {
-        return "lean_uint64_land";
-    }
-    if (n == name({ "UInt64", "lor" })) {
-        return "lean_uint64_lor";
-    }
-    if (n == name({ "UInt64", "xor" })) {
-        return "lean_uint64_xor";
-    }
-    if (n == name({ "UInt64", "shiftLeft" })) {
-        return "lean_uint64_shift_left";
-    }
-    if (n == name({ "UInt64", "shiftRight" })) {
-        return "lean_uint64_shift_right";
-    }
-    if (n == name({ "UInt64", "complement" })) {
-        return "lean_uint64_complement";
-    }
-    if (n == name({ "UInt64", "neg" })) {
-        return "lean_uint64_neg";
-    }
-    if (n == name({ "UInt64", "decEq" })) {
-        return "lean_uint64_dec_eq";
-    }
-    if (n == name({ "UInt64", "decLt" })) {
-        return "lean_uint64_dec_lt";
-    }
-    if (n == name({ "UInt64", "decLe" })) {
-        return "lean_uint64_dec_le";
-    }
-    if (n == name({ "UInt64", "toFloat" })) {
-        return "lean_uint64_to_float";
-    }
-    if (n == name({ "Float", "scaleB" })) {
-        return "lean_float_scaleb";
-    }
-    if (n == name({ "Float", "toUInt32" })) {
-        return "lean_float_to_uint32";
+    std::string dotted = n.to_string();
+    for (::NativeSymbol const & entry : ::g_native_symbols) {
+        if (dotted == entry.lean_name) {
+            return entry.stem;
+        }
     }
     return nullptr;
 }
@@ -1665,6 +1187,17 @@ extern "C" uint32_t vir_eval_const_nat(char const * name_text, uint32_t name_len
     lean::ensure_ir_interpreter_initialized();
     lean::name fn = lean::name_from_dotted(name_text, name_len);
     return lean::run_nat_function(fn, 0, nullptr);
+}
+
+extern "C" char const * vir_eval_const_nat_string(char const * name_text, uint32_t name_len) {
+    lean::ensure_ir_interpreter_initialized();
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 0, nullptr);
+    return lean::g_eval_const_nat_string.c_str();
+}
+
+extern "C" uint32_t vir_eval_const_nat_string_size(void) {
+    return static_cast<uint32_t>(lean::g_eval_const_nat_string.size());
 }
 
 extern "C" uint32_t vir_sort_checksum(uint32_t const * values, uint32_t len) {
