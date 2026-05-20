@@ -224,6 +224,30 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_array_uset"
   },
   {
+    name := `Array.set!,
+    params := #[param 1 false .erased, param 2 false .object, param 3 true .tobject, param 4 false .tobject],
+    resultType := .object,
+    symbol := "lean_array_set"
+  },
+  {
+    name := `Array.pop,
+    params := #[param 1 false .erased, param 2 false .object],
+    resultType := .object,
+    symbol := "lean_array_pop"
+  },
+  {
+    name := `Array.replicate,
+    params := #[param 1 false .erased, param 2 true .tobject, param 3 false .tobject],
+    resultType := .object,
+    symbol := "lean_mk_array"
+  },
+  {
+    name := `Array.swapIfInBounds,
+    params := #[param 1 false .erased, param 2 false .object, param 3 true .tobject, param 4 true .tobject],
+    resultType := .object,
+    symbol := "lean_array_swap"
+  },
+  {
     name := `ByteArray.empty,
     params := #[],
     resultType := .object,

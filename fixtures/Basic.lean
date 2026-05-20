@@ -119,6 +119,14 @@ def classifyFind (xs : Array Nat) : Option (Nat × Nat) :=
 def upstreamArrayFindOptionProdScore : Nat :=
   optionProdScore (classifyFind #[1, 3, 8, 2])
 
+def upstreamArrayMutatingScore : Nat :=
+  let xs := Array.replicate 4 3
+  let xs := xs.set! 1 9
+  let xs := xs.push 5
+  let xs := xs.swapIfInBounds 0 1
+  let xs := xs.pop
+  checksum 1 xs.toList + xs.size
+
 def stringAppendLength (a b c : String) : Nat :=
   (a ++ b).length + c.length
 

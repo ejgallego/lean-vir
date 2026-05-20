@@ -281,6 +281,31 @@ extern "C" lean_object * lean_array_uset___boxed(lean_object * type, lean_object
     return result;
 }
 
+extern "C" lean_object * lean_array_set___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * value) {
+    lean_dec(type);
+    lean_object * result = lean_array_set(array, index, value);
+    lean_dec(index);
+    return result;
+}
+
+extern "C" lean_object * lean_array_pop___boxed(lean_object * type, lean_object * array) {
+    lean_dec(type);
+    return lean_array_pop(array);
+}
+
+extern "C" lean_object * lean_mk_array___boxed(lean_object * type, lean_object * size, lean_object * value) {
+    lean_dec(type);
+    return lean_mk_array(size, value);
+}
+
+extern "C" lean_object * lean_array_swap___boxed(lean_object * type, lean_object * array, lean_object * i, lean_object * j) {
+    lean_dec(type);
+    lean_object * result = lean_array_swap(array, i, j);
+    lean_dec(i);
+    lean_dec(j);
+    return result;
+}
+
 extern "C" lean_object * lean_byte_array_push___boxed(lean_object * array, lean_object * value) {
     uint8_t byte = static_cast<uint8_t>(lean_unbox(value));
     lean_dec(value);
@@ -770,6 +795,10 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     X("Array.uget", "lean_array_uget", lean_array_uget___boxed) \
     X("Array.ugetBorrowed", "lean_array_uget_borrowed", lean_array_uget_borrowed___boxed) \
     X("Array.uset", "lean_array_uset", lean_array_uset___boxed) \
+    X("Array.set!", "lean_array_set", lean_array_set___boxed) \
+    X("Array.pop", "lean_array_pop", lean_array_pop___boxed) \
+    X("Array.replicate", "lean_mk_array", lean_mk_array___boxed) \
+    X("Array.swapIfInBounds", "lean_array_swap", lean_array_swap___boxed) \
     X_CONST("ByteArray.empty", "l_ByteArray_empty", &l_ByteArray_empty) \
     X("ByteArray.push", "lean_byte_array_push", lean_byte_array_push___boxed) \
     X("ByteArray.get!", "lean_byte_array_get", lean_byte_array_get___boxed) \

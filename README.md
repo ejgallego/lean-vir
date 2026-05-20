@@ -77,7 +77,8 @@ surface includes recursion, inductive pattern matching, local list processing,
 standard `List.map`/`List.filter`/`List.foldl`/`List.any`/`List.all`/
 `List.find?`/`List.zip`, partial application, array push/toList, branches over
 comparisons, `Bool`, `Option`, `Prod`, `Sum`, `Except`, standard `Array.map`/
-`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, plus basic
+`Array.foldl`/`Array.any`/`Array.filter`/`Array.find?`, array mutation through
+`Array.replicate`/`Array.set!`/`Array.swapIfInBounds`/`Array.pop`, plus basic
 `String.append`/`String.length`/`String.utf8ByteSize`/`String.getUTF8Byte`/
 `String.Internal.next`/`String.Pos.Raw.get`/`String.Internal.atEnd`/
 `String.decEq`, `UInt8`/`UInt16` `toNat` plus arithmetic/bitwise/shift/
