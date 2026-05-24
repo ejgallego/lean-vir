@@ -417,6 +417,39 @@ function encodeValue(writer, type, value, label) {
     case 15:
       encodeExpr(writer, value, label);
       return;
+    case 16: {
+      const values = normalizeArray(value, label);
+      writer.u32(values.length);
+      values.forEach((item, itemIndex) => {
+        if (typeof item !== "string") throw new Error(`${label}[${itemIndex}] must be a string`);
+        writer.string(item);
+      });
+      return;
+    }
+    case 17: {
+      const values = normalizeArray(value, label);
+      writer.u32(values.length);
+      values.forEach((item, itemIndex) => writer.u32(normalizeUint32(item, `${label}[${itemIndex}]`)));
+      return;
+    }
+    case 18: {
+      const option = normalizeOption(value, label);
+      writer.u8(option.some ? 1 : 0);
+      if (option.some) writer.string(normalizeDecimal(option.value, `${label}.value`, { signed: false }));
+      return;
+    }
+    case 19: {
+      const option = normalizeOption(value, label);
+      writer.u8(option.some ? 1 : 0);
+      if (option.some) writer.string(requireString(option.value, `${label}.value`));
+      return;
+    }
+    case 20: {
+      const pair = normalizeNatPair(value, label);
+      writer.string(normalizeDecimal(pair.fst, `${label}.fst`, { signed: false }));
+      writer.string(normalizeDecimal(pair.snd, `${label}.snd`, { signed: false }));
+      return;
+    }
     default:
       throw new Error(`${label} has unsupported wire tag ${tag}`);
   }
@@ -475,6 +508,25 @@ function decodeCallResult(type, bytes) {
     case 15:
       value = decodeExpr(reader);
       break;
+    case 16: {
+      const len = reader.u32();
+      value = Array.from({ length: len }, () => reader.string());
+      break;
+    }
+    case 17: {
+      const len = reader.u32();
+      value = Array.from({ length: len }, () => reader.u32());
+      break;
+    }
+    case 18:
+      value = reader.u8() === 0 ? null : reader.string();
+      break;
+    case 19:
+      value = reader.u8() === 0 ? null : reader.string();
+      break;
+    case 20:
+      value = { fst: reader.string(), snd: reader.string() };
+      break;
     default:
       throw new Error(`unsupported result wire tag ${expectedTag}`);
   }
@@ -519,6 +571,36 @@ function normalizeArray(value, label) {
     throw new Error(`${label} must be iterable`);
   }
   return Array.from(value);
+}
+
+function hasOwn(value, key) {
+  return Object.prototype.hasOwnProperty.call(value, key);
+}
+
+function normalizeOption(value, label) {
+  if (value == null) return { some: false, value: null };
+  if (typeof value === "object") {
+    if (value.kind === "none") return { some: false, value: null };
+    if (value.kind === "some") return { some: true, value: value.value };
+    if (hasOwn(value, "some")) return { some: true, value: value.some };
+  }
+  return { some: true, value };
+}
+
+function normalizeNatPair(value, label) {
+  if (Array.isArray(value)) {
+    if (value.length !== 2) throw new Error(`${label} pair array must have exactly two elements`);
+    return { fst: value[0], snd: value[1] };
+  }
+  if (value !== null && typeof value === "object") {
+    if (hasOwn(value, "fst") && hasOwn(value, "snd")) {
+      return { fst: value.fst, snd: value.snd };
+    }
+    if (hasOwn(value, "first") && hasOwn(value, "second")) {
+      return { fst: value.first, snd: value.second };
+    }
+  }
+  throw new Error(`${label} must be a pair { fst, snd } or a two-element array`);
 }
 
 function normalizeEnum(value, type, label) {

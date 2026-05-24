@@ -10,6 +10,7 @@ import fibSource from "../../examples/Fib.lean?raw";
 import mergeSortSource from "../../examples/MergeSort.lean?raw";
 import fixtureBasicSource from "../../fixtures/Basic.lean?raw";
 import fixtureExprPrinterSource from "../../fixtures/ExprPrinter.lean?raw";
+import fixtureInterfaceShapesSource from "../../fixtures/InterfaceShapes.lean?raw";
 import fixtureListOptionSource from "../../fixtures/ListOption.lean?raw";
 import fixtureBoundarySource from "../../fixtures/Boundary.lean?raw";
 import fixtureManifest from "../../fixtures/manifest.json";
@@ -59,6 +60,7 @@ const sourceFiles = [
   { path: "examples/MergeSort.lean", source: mergeSortSource },
   { path: "fixtures/Basic.lean", source: fixtureBasicSource },
   { path: "fixtures/ExprPrinter.lean", source: fixtureExprPrinterSource },
+  { path: "fixtures/InterfaceShapes.lean", source: fixtureInterfaceShapesSource },
   { path: "fixtures/ListOption.lean", source: fixtureListOptionSource },
   { path: "fixtures/Boundary.lean", source: fixtureBoundarySource },
 ];

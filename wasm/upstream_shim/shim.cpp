@@ -903,6 +903,12 @@ extern "C" lean_object * lean_uint8_to_nat___boxed(lean_object * a) {
     return result;
 }
 
+extern "C" lean_object * lean_uint8_to_uint32___boxed(lean_object * a) {
+    uint32_t result = static_cast<uint32_t>(lean_unbox(a));
+    lean_dec(a);
+    return lean_box_uint32(result);
+}
+
 extern "C" lean_object * lean_uint8_add___boxed(lean_object * a, lean_object * b) {
     return box_uint8_binary(a, b, lean_uint8_add);
 }
@@ -1198,6 +1204,12 @@ extern "C" lean_object * lean_uint64_to_uint32___boxed(lean_object * a) {
     return lean_box_uint32(result);
 }
 
+extern "C" lean_object * lean_uint64_to_uint8___boxed(lean_object * a) {
+    uint8_t result = static_cast<uint8_t>(lean_unbox_uint64(a));
+    lean_dec(a);
+    return lean_box(result);
+}
+
 extern "C" lean_object * lean_uint64_add___boxed(lean_object * a, lean_object * b) {
     return box_uint64_binary(a, b, lean_uint64_add);
 }
@@ -1472,6 +1484,7 @@ extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_ob
     X("Substring.Raw.Internal.beq", "lean_substring_beq", lean_substring_beq___boxed) \
     X("Lean.Name.beq", "lean_name_eq", lean_name_eq___boxed) \
     X("UInt8.toNat", "lean_uint8_to_nat", lean_uint8_to_nat___boxed) \
+    X("UInt8.toUInt32", "lean_uint8_to_uint32", lean_uint8_to_uint32___boxed) \
     X("UInt8.add", "lean_uint8_add", lean_uint8_add___boxed) \
     X("UInt8.sub", "lean_uint8_sub", lean_uint8_sub___boxed) \
     X("UInt8.mul", "lean_uint8_mul", lean_uint8_mul___boxed) \
@@ -1529,6 +1542,7 @@ extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_ob
     X("UInt64.toNat", "lean_uint64_to_nat", lean_uint64_to_nat___boxed) \
     X("UInt64.toUSize", "lean_uint64_to_usize", lean_uint64_to_usize___boxed) \
     X("UInt64.toUInt32", "lean_uint64_to_uint32", lean_uint64_to_uint32___boxed) \
+    X("UInt64.toUInt8", "lean_uint64_to_uint8", lean_uint64_to_uint8___boxed) \
     X("UInt64.add", "lean_uint64_add", lean_uint64_add___boxed) \
     X("UInt64.sub", "lean_uint64_sub", lean_uint64_sub___boxed) \
     X("UInt64.mul", "lean_uint64_mul", lean_uint64_mul___boxed) \
@@ -1689,8 +1703,13 @@ enum class vir_wire_type : uint8_t {
     ByteArray = 9,
     ArrayNat = 10,
     ArrayUInt32 = 11,
+    ArrayString = 16,
     ListNat = 12,
+    ListUInt32 = 17,
     ListString = 13,
+    OptionNat = 18,
+    OptionString = 19,
+    ProdNatNat = 20,
     SimpleEnum = 14,
     Expr = 15,
 };
@@ -2082,6 +2101,15 @@ static object * decode_argument(vir_reader & r) {
         }
         return array;
     }
+    case vir_wire_type::ArrayString: {
+        uint32_t len = r.u32();
+        object * array = lean_alloc_array(len, len);
+        for (uint32_t i = 0; i < len; i++) {
+            std::string text = r.string();
+            lean_array_set_core(array, i, lean_mk_string_from_bytes(text.data(), text.size()));
+        }
+        return array;
+    }
     case vir_wire_type::ListNat: {
         uint32_t len = r.u32();
         std::vector<object *> values;
@@ -2089,6 +2117,18 @@ static object * decode_argument(vir_reader & r) {
         for (uint32_t i = 0; i < len; i++) {
             std::string text = r.string();
             values.push_back(lean_cstr_to_nat(text.c_str()));
+        }
+        std::reverse(values.begin(), values.end());
+        object * out = mk_list_from_reversed(values);
+        for (object * value : values) lean_dec(value);
+        return out;
+    }
+    case vir_wire_type::ListUInt32: {
+        uint32_t len = r.u32();
+        std::vector<object *> values;
+        values.reserve(len);
+        for (uint32_t i = 0; i < len; i++) {
+            values.push_back(lean_box_uint32(r.u32()));
         }
         std::reverse(values.begin(), values.end());
         object * out = mk_list_from_reversed(values);
@@ -2107,6 +2147,21 @@ static object * decode_argument(vir_reader & r) {
         object * out = mk_list_from_reversed(values);
         for (object * value : values) lean_dec(value);
         return out;
+    }
+    case vir_wire_type::OptionNat: {
+        if (r.u8() == 0) return lean_box(0);
+        std::string text = r.string();
+        return mk_ctor_owned(1, { lean_cstr_to_nat(text.c_str()) });
+    }
+    case vir_wire_type::OptionString: {
+        if (r.u8() == 0) return lean_box(0);
+        std::string text = r.string();
+        return mk_ctor_owned(1, { lean_mk_string_from_bytes(text.data(), text.size()) });
+    }
+    case vir_wire_type::ProdNatNat: {
+        std::string fst = r.string();
+        std::string snd = r.string();
+        return mk_ctor_owned(0, { lean_cstr_to_nat(fst.c_str()), lean_cstr_to_nat(snd.c_str()) });
     }
     case vir_wire_type::SimpleEnum:
         return lean_box(r.u32());
@@ -2146,11 +2201,27 @@ static void encode_list_payload(vir_writer & w, object * value, vir_wire_type el
     for (object * elem : values) {
         if (elem_tag == vir_wire_type::Nat) {
             w.string(nat_to_decimal(elem));
+        } else if (elem_tag == vir_wire_type::UInt32) {
+            w.u32(lean_unbox_uint32(elem));
         } else if (elem_tag == vir_wire_type::String) {
             size_t size = lean_string_size(elem);
             uint32_t len = static_cast<uint32_t>(size == 0 ? 0 : size - 1);
             w.bytes(reinterpret_cast<uint8_t const *>(lean_string_cstr(elem)), len);
         }
+    }
+}
+
+static void encode_option_payload(vir_writer & w, object * value, vir_wire_type elem_tag) {
+    if (lean_is_scalar(value)) {
+        w.u8(0);
+        return;
+    }
+    w.u8(1);
+    object * elem = lean_ctor_get(value, 0);
+    if (elem_tag == vir_wire_type::Nat) {
+        w.string(nat_to_decimal(elem));
+    } else if (elem_tag == vir_wire_type::String) {
+        encode_string_payload(w, elem);
     }
 }
 
@@ -2271,11 +2342,32 @@ static void encode_result(vir_writer & w, vir_wire_type tag, object * value) {
         }
         break;
     }
+    case vir_wire_type::ArrayString: {
+        uint32_t len = static_cast<uint32_t>(lean_array_size(value));
+        w.u32(len);
+        for (uint32_t i = 0; i < len; i++) {
+            encode_string_payload(w, lean_array_get_core(value, i));
+        }
+        break;
+    }
     case vir_wire_type::ListNat:
         encode_list_payload(w, value, vir_wire_type::Nat);
         break;
+    case vir_wire_type::ListUInt32:
+        encode_list_payload(w, value, vir_wire_type::UInt32);
+        break;
     case vir_wire_type::ListString:
         encode_list_payload(w, value, vir_wire_type::String);
+        break;
+    case vir_wire_type::OptionNat:
+        encode_option_payload(w, value, vir_wire_type::Nat);
+        break;
+    case vir_wire_type::OptionString:
+        encode_option_payload(w, value, vir_wire_type::String);
+        break;
+    case vir_wire_type::ProdNatNat:
+        w.string(nat_to_decimal(lean_ctor_get(value, 0)));
+        w.string(nat_to_decimal(lean_ctor_get(value, 1)));
         break;
     case vir_wire_type::SimpleEnum:
         w.u32(static_cast<uint32_t>(lean_is_scalar(value) ? lean_unbox(value) : lean_obj_tag(value)));

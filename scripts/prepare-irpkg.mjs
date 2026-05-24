@@ -29,6 +29,8 @@ const result = spawnSync("lean", ["--run", "tools/GeneratePackage.lean", package
 });
 
 if ((result.status ?? 1) !== 0) {
+  console.error(`error: package generation failed for ${source}`);
+  console.error(`report: ${reportPath}`);
   process.exit(result.status ?? 1);
 }
 

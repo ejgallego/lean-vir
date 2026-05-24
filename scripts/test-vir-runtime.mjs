@@ -45,12 +45,73 @@ assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.appExpr"), {
   fn: { kind: "const", name: "Nat.succ", levels: [] },
   arg: { kind: "lit", literal: { kind: "nat", value: "2" } },
 });
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.sortParamExpr"), {
+  kind: "sort",
+  level: { kind: "succ", of: { kind: "param", name: "u" } },
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.fvarExpr"), {
+  kind: "fvar",
+  name: "x",
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.mvarExpr"), {
+  kind: "mvar",
+  name: "m",
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.lambdaExpr"), {
+  kind: "lam",
+  name: "x",
+  type: { kind: "const", name: "Nat", levels: [] },
+  body: { kind: "bvar", index: "0" },
+  binderInfo: "default",
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.forallExpr"), {
+  kind: "forall",
+  name: "x",
+  type: { kind: "const", name: "Nat", levels: [] },
+  body: { kind: "bvar", index: "0" },
+  binderInfo: "implicit",
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.letExpr"), {
+  kind: "let",
+  name: "x",
+  type: { kind: "const", name: "Nat", levels: [] },
+  value: { kind: "lit", literal: { kind: "nat", value: "2" } },
+  body: { kind: "bvar", index: "0" },
+  nondep: false,
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.stringLitExpr"), {
+  kind: "lit",
+  literal: { kind: "string", value: "hi" },
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.mdataExpr"), {
+  kind: "mdata",
+  expr: { kind: "bvar", index: "0" },
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.projExpr"), {
+  kind: "proj",
+  typeName: "Prod",
+  index: "1",
+  struct: { kind: "const", name: "p", levels: [] },
+});
+assert.equal(runtime.call("Vir.Fixtures.ExprPrinter.exprCoverageScore"), "1232");
 assert.equal(runtime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }), "5");
 assert.equal(runtime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "lit", literal: { kind: "nat", value: 2 } }), "102");
 assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.bumpBVar", { kind: "bvar", index: 4 }), {
   kind: "bvar",
   index: "5",
 });
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", null), "0");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { kind: "some", value: 41 }), "42");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null), "empty");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", "ok"), "ok!");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatScore", { some: 6 }), "17");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSwap", { fst: 2, snd: 9 }), {
+  fst: "9",
+  snd: "2",
+});
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSum", [4, 5]), "9");
 
 const factory = createVirRuntimeFactory({ wasmBytes });
 const first = await factory.createRuntime({ irPackageBytes });

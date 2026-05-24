@@ -50,7 +50,10 @@ The current fixture surface covers:
   `land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`, `Float.scaleB`, and
   `Float.toUInt32`;
 - `Lean.Expr` package closure and structural JS/WASM marshaling for constants,
-  applications, literals, and bound-variable inputs/results;
+  applications, literals, binders, levels, variables, projections, metadata
+  results, and bound-variable inputs/results;
+- manifest-backed `Array String`, `List UInt32`, `Option Nat`,
+  `Option String`, and `Nat × Nat` interface calls;
 - hash/name/substring/pointer-address primitives reached by parser data paths,
   including `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
   `ptrAddrUnsafe`;

@@ -36,6 +36,16 @@ function setStatus(text, ready) {
   statusEl.dataset.ready = String(ready);
 }
 
+function errorMessage(error) {
+  return error instanceof Error ? error.message : String(error);
+}
+
+function showError(error, status = "Failed") {
+  resultOutput.textContent = errorMessage(error);
+  setStatus(status, false);
+  console.error(error);
+}
+
 function assetPathFor(text) {
   if (/^(https?:)?\/\//.test(text) || text.startsWith("/")) {
     return text;
@@ -92,11 +102,27 @@ function inputDefault(input) {
       return "";
     case 15:
       return `{"kind":"const","name":"Nat","levels":[]}`;
+    case 16:
+    case 17:
+      return "[]";
+    case 18:
+    case 19:
+      return "null";
+    case 20:
+      return `{"fst":0,"snd":0}`;
     case 14:
       return input.type?.constructors?.[0]?.jsName ?? "";
     default:
       return "";
   }
+}
+
+function isJsonInputTag(tag) {
+  return tag === 15 || tag === 16 || tag === 17 || tag === 18 || tag === 19 || tag === 20;
+}
+
+function isLegacyArrayInputTag(tag) {
+  return tag === 9 || tag === 10 || tag === 11 || tag === 12 || tag === 13;
 }
 
 function inputFieldId(input, index) {
@@ -121,7 +147,7 @@ function renderInputFields(entry) {
     caption.textContent = `${input.name ?? `input${index + 1}`} : ${input.type?.type ?? "?"}`;
     const field =
       input.type?.wireTag === 14 ? document.createElement("select") :
-      input.type?.wireTag === 15 ? document.createElement("textarea") :
+      isJsonInputTag(input.type?.wireTag) ? document.createElement("textarea") :
       document.createElement("input");
     field.id = inputFieldId(input, index);
     field.dataset.inputIndex = String(index);
@@ -137,7 +163,7 @@ function renderInputFields(entry) {
       field.type = "number";
       field.inputMode = "numeric";
       field.min = "0";
-    } else if (input.type?.wireTag === 15) {
+    } else if (isJsonInputTag(input.type?.wireTag)) {
       field.spellcheck = false;
     } else if (input.type?.wireTag === 2) {
       field.type = "text";
@@ -158,6 +184,11 @@ function renderManifestEntries(manifest) {
   if (manifest?.version !== 1 || !Array.isArray(manifest.exports)) {
     throw new Error("embedded interface manifest must be { version: 1, exports: [...] }");
   }
+  if (Array.isArray(manifest.diagnostics) && manifest.diagnostics.length > 0) {
+    const lines = manifest.diagnostics.map((diagnostic) =>
+      `${diagnostic.name ?? "unknown"}: ${diagnostic.reason ?? "unsupported interface"}`);
+    throw new Error(`package contains unsupported interface exports:\n${lines.join("\n")}`);
+  }
   interfaceEntries = manifest.exports;
   entrySelect.replaceChildren();
   for (const entry of interfaceEntries) {
@@ -169,6 +200,9 @@ function renderManifestEntries(manifest) {
   }
   selectEntryFromQuery();
   renderInputFields(selectedInterfaceEntry());
+  if (interfaceEntries.length === 0) {
+    resultOutput.textContent = "No callable interface exports were found in this package.";
+  }
 }
 
 function parseNatInput(text) {
@@ -262,6 +296,11 @@ function parseInputValue(input, text) {
     case 14:
       return text.trim();
     case 15:
+    case 16:
+    case 17:
+    case 18:
+    case 19:
+    case 20:
       return JSON.parse(text);
     default:
       throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);
@@ -305,7 +344,9 @@ function evaluateEntry(runtime, entry) {
   const values = inputs.map((input, index) => {
     const field = inputFields.querySelector(`[data-input-index='${index}']`);
     const value = parseInputValue(input, field?.value ?? inputDefault(input));
-    if (field && Array.isArray(value)) field.value = value.join(", ");
+    if (field && Array.isArray(value) && isLegacyArrayInputTag(input.type?.wireTag)) {
+      field.value = value.join(", ");
+    }
     return value;
   });
   return runtime.call(entry.entry, ...values);
@@ -313,9 +354,7 @@ function evaluateEntry(runtime, entry) {
 
 loadUrlButton.addEventListener("click", () => {
   loadPackageUrl().catch((error) => {
-    resultOutput.textContent = "error";
-    setStatus("Failed", false);
-    console.error(error);
+    showError(error, "Failed");
   });
 });
 
@@ -323,9 +362,7 @@ packageFile.addEventListener("change", () => {
   const file = packageFile.files?.[0];
   if (!file) return;
   loadPackageFile(file).catch((error) => {
-    resultOutput.textContent = "error";
-    setStatus("Failed", false);
-    console.error(error);
+    showError(error, "Failed");
   });
 });
 
@@ -345,16 +382,12 @@ runEntryButton.addEventListener("click", () => {
     resultOutput.textContent = formatResult(result);
     setStatus("Ready", true);
   } catch (error) {
-    resultOutput.textContent = "error";
-    setStatus("Trap", false);
-    console.error(error);
+    showError(error, "Trap");
   }
 });
 
 packageUrl.value = query.get("package") ?? "vir-demo.irpkg";
 
 loadPackageUrl().catch((error) => {
-  setStatus("Failed", false);
-  resultOutput.textContent = "error";
-  console.error(error);
+  showError(error, "Failed");
 });

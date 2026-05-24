@@ -256,8 +256,34 @@
         "Vir.Fixtures.ExprPrinter.constNatExpr",
         "Vir.Fixtures.ExprPrinter.twoLitExpr",
         "Vir.Fixtures.ExprPrinter.appExpr",
+        "Vir.Fixtures.ExprPrinter.sortParamExpr",
+        "Vir.Fixtures.ExprPrinter.fvarExpr",
+        "Vir.Fixtures.ExprPrinter.mvarExpr",
+        "Vir.Fixtures.ExprPrinter.lambdaExpr",
+        "Vir.Fixtures.ExprPrinter.forallExpr",
+        "Vir.Fixtures.ExprPrinter.letExpr",
+        "Vir.Fixtures.ExprPrinter.stringLitExpr",
+        "Vir.Fixtures.ExprPrinter.mdataExpr",
+        "Vir.Fixtures.ExprPrinter.projExpr",
+        "Vir.Fixtures.ExprPrinter.exprCoverageScore",
         "Vir.Fixtures.ExprPrinter.exprKindScore",
         "Vir.Fixtures.ExprPrinter.bumpBVar"
+      ],
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "interface-shape-score",
+      "source": "fixtures/InterfaceShapes.lean",
+      "entry": "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",
+      "roots": [
+        "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",
+        "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength",
+        "Vir.Fixtures.InterfaceShapes.listUInt32Sum",
+        "Vir.Fixtures.InterfaceShapes.optionNatBump",
+        "Vir.Fixtures.InterfaceShapes.optionStringBang",
+        "Vir.Fixtures.InterfaceShapes.optionNatScore",
+        "Vir.Fixtures.InterfaceShapes.prodNatNatSwap",
+        "Vir.Fixtures.InterfaceShapes.prodNatNatSum"
       ],
       "result": { "type": "Nat" }
     },

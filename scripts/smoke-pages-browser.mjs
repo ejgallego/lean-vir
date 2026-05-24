@@ -378,9 +378,23 @@ try {
       result: "5",
     },
   );
+  await smokeRunner(
+    cdp,
+    server.origin,
+    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_InterfaceShapes_arrayStringTotalLength",
+    {
+      packageName: "vir-demo.irpkg",
+      entry: "Vir_Fixtures_InterfaceShapes_arrayStringTotalLength",
+      entryCountAtLeast: 6,
+      input: "[]",
+      inputTags: ["TEXTAREA"],
+      runInputs: [`["a","bc"]`],
+      result: "3",
+    },
+  );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, local runners, manifest enum runner, and manifest Expr runner");
+  console.log("pages browser smoke ok: landing, local runners, manifest enum runner, manifest Expr runner, and manifest JSON runner");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

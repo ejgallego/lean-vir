@@ -69,8 +69,9 @@ The embedded manifest currently supports:
 - scalar values: `Nat`, `Int`, `Bool`, `String`;
 - fixed-width values: `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - byte data: `ByteArray`;
-- selected homogeneous collections: `Array Nat`, `Array UInt32`, `List Nat`,
-  `List String`;
+- selected homogeneous collections: `Array Nat`, `Array UInt32`,
+  `Array String`, `List Nat`, `List UInt32`, `List String`;
+- selected option/product shapes: `Option Nat`, `Option String`, `Nat × Nat`;
 - nullary inductive enums, represented in JavaScript by generated constructor
   names;
 - `Lean.Expr`, represented as structural JavaScript objects.

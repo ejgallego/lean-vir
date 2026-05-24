@@ -37,9 +37,21 @@ fi
 report=${package%.irpkg}.report.md
 
 if [ "$#" -eq 0 ]; then
-  lean --run tools/GeneratePackage.lean "$package" "$report" --target-all "$source"
+  target_args=(--target-all "$source")
 else
-  lean --run tools/GeneratePackage.lean "$package" "$report" --target "$source" "$@"
+  target_args=(--target "$source" "$@")
 fi
 
+set +e
+lean --run tools/GeneratePackage.lean "$package" "$report" "${target_args[@]}"
+status=$?
+set -e
+if [ "$status" -ne 0 ]; then
+  echo "error: package generation failed for $source" >&2
+  echo "report: $report" >&2
+  exit "$status"
+fi
+
+echo "package: $package"
 echo "report: $report"
+echo "interface: embedded in package"

@@ -58,7 +58,8 @@ const second = await factory.createRuntime({ irPackageBytes });
 
 Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `UInt8`, `UInt16`,
 `UInt32`, `UInt64`, `USize`, `ByteArray`, `Array Nat`, `Array UInt32`,
-`List Nat`, `List String`, nullary inductive enums, and `Lean.Expr`.
+`Array String`, `List Nat`, `List UInt32`, `List String`, `Option Nat`,
+`Option String`, `Nat × Nat`, nullary inductive enums, and `Lean.Expr`.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`.
@@ -67,11 +68,17 @@ Nullary inductive enums are accepted as constructor names, generated JavaScript
 names, or constructor indexes. Results are returned as the constructor's
 generated JavaScript name.
 
+Options are accepted as `null`, `{ kind: "none" }`, `{ kind: "some", value }`,
+`{ some: value }`, or the bare inner value. Option results are returned as
+`null` or the inner value. `Nat × Nat` inputs are accepted as `{ fst, snd }` or
+two-element arrays, and results are returned as `{ fst, snd }`.
+
 `Lean.Expr` values use structural JavaScript objects such as
 `{ kind: "const", name: "Nat", levels: [] }`,
 `{ kind: "app", fn, arg }`, or `{ kind: "bvar", index: 0 }`. Level values use
 the same shape with `kind` values `zero`, `succ`, `max`, `imax`, `param`, and
-`mvar`. Metadata expressions currently round-trip as their inner expression.
+`mvar`. Metadata expression inputs are accepted by decoding their inner
+expression; metadata results preserve a structural `mdata` wrapper.
 
 ## Generate A Local Package
 

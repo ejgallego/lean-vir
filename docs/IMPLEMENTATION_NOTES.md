@@ -35,7 +35,7 @@ receives structural objects for the standard expression constructors, and the
 WASM shim constructs real Lean `Expr` and `Level` runtime objects with computed
 data fields before calling the upstream interpreter. Metadata expression inputs
 are accepted by decoding their inner expression, and metadata results are
-reported as their inner expression.
+reported with a structural `mdata` wrapper.
 
 The browser fixture runner exposes the `fib` and `SortDemo.demoFromArray`
 examples next to the manifest entries. Those two entries opt into the fixture

@@ -65,8 +65,13 @@ inductive InterfaceType where
   | byteArray
   | arrayNat
   | arrayUInt32
+  | arrayString
   | listNat
+  | listUInt32
   | listString
+  | optionNat
+  | optionString
+  | prodNatNat
   | simpleEnum (name : Name) (constructors : Array Name)
   | expr
   deriving BEq, Repr
@@ -825,6 +830,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint8_to_nat"
   },
   {
+    name := `UInt8.toUInt32,
+    params := #[param 1 false .uint8],
+    resultType := .uint32,
+    symbol := "lean_uint8_to_uint32"
+  },
+  {
     name := `UInt8.add,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
@@ -1167,6 +1178,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint64_to_uint32"
   },
   {
+    name := `UInt64.toUInt8,
+    params := #[param 1 false .uint64],
+    resultType := .uint8,
+    symbol := "lean_uint64_to_uint8"
+  },
+  {
     name := `UInt64.add,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
@@ -1478,8 +1495,13 @@ def InterfaceType.label : InterfaceType → String
   | .byteArray => "ByteArray"
   | .arrayNat => "Array Nat"
   | .arrayUInt32 => "Array UInt32"
+  | .arrayString => "Array String"
   | .listNat => "List Nat"
+  | .listUInt32 => "List UInt32"
   | .listString => "List String"
+  | .optionNat => "Option Nat"
+  | .optionString => "Option String"
+  | .prodNatNat => "Nat × Nat"
   | .simpleEnum name _ => name.toString
   | .expr => "Lean.Expr"
 
@@ -1496,8 +1518,13 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .byteArray => 9
   | .arrayNat => 10
   | .arrayUInt32 => 11
+  | .arrayString => 16
   | .listNat => 12
+  | .listUInt32 => 17
   | .listString => 13
+  | .optionNat => 18
+  | .optionString => 19
+  | .prodNatNat => 20
   | .simpleEnum .. => 14
   | .expr => 15
 
@@ -1591,12 +1618,23 @@ def interfaceType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :=
           match simpleInterfaceType? arg with
           | some .nat => some .arrayNat
           | some .uint32 => some .arrayUInt32
+          | some .string => some .arrayString
           | _ => none
       | `List, [arg] =>
           match simpleInterfaceType? arg with
           | some .nat => some .listNat
+          | some .uint32 => some .listUInt32
           | some .string => some .listString
           | _ => none
+      | `Option, [arg] =>
+          match simpleInterfaceType? arg with
+          | some .nat => some .optionNat
+          | some .string => some .optionString
+          | _ => none
+      | `Prod, [lhs, rhs] =>
+          match simpleInterfaceType? lhs, simpleInterfaceType? rhs with
+          | some .nat, some .nat => some .prodNatNat
+          | _, _ => none
       | _, _ => simpleEnumType? env e
 
 def binderArgName (fallback : Nat) (name : Name) : String :=
