@@ -50,6 +50,12 @@ if (typeof exports.vir_package_interface_manifest !== "function") {
 if (typeof exports.vir_package_interface_manifest_size !== "function") {
   throw new Error("vir_package_interface_manifest_size export is missing");
 }
+if (typeof exports.vir_package_decl_count !== "function") {
+  throw new Error("vir_package_decl_count export is missing");
+}
+if (exports.vir_package_decl_count() !== 0) {
+  throw new Error("package declaration provider should be empty before an .irpkg is loaded");
+}
 if (exports.vir_upstream_target_pointer_bytes() !== 4) {
   throw new Error("upstream wasm target layout guard failed");
 }
@@ -90,6 +96,9 @@ try {
   const loadedDecls = exports.vir_load_ir_package(packagePtr, irPackage.byteLength);
   if (loadedDecls === 0) {
     throw new Error("IR package load failed");
+  }
+  if (exports.vir_package_decl_count() !== loadedDecls) {
+    throw new Error("loaded declaration count does not match package provider state");
   }
 } finally {
   exports.vir_free_bytes?.(packagePtr);

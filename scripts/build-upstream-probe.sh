@@ -187,7 +187,6 @@ exports=(
   -Wl,--export=lean_eval_main
   -Wl,--export=lean_run_init
   -Wl,--export=lean_run_mod_init_core
-  -Wl,--export=vir_upstream_shim_fixture_count
   -Wl,--export=vir_upstream_target_pointer_bytes
   -Wl,--export=vir_call
   -Wl,--export=vir_call_result_size
@@ -200,6 +199,7 @@ exports=(
   -Wl,--export=vir_last_package_error_size
   -Wl,--export=vir_package_interface_manifest
   -Wl,--export=vir_package_interface_manifest_size
+  -Wl,--export=vir_package_decl_count
 )
 
 link_stamp="$obj_dir/link-flags.stamp"
@@ -407,8 +407,8 @@ shim_source_count="${#shim_sources[@]}"
   echo
   echo "\`wasm/upstream_shim/shim.cpp\` supplies the minimal host/environment"
   echo "boundary for the strict WASI link. \`wasm/upstream_shim/package_decl_provider.cpp\`"
-  echo "loads \`$generated_package\`, a static declaration closure emitted from typed"
-  echo "\`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`. The current"
+  echo "loads \`$generated_package\`, a single-file declaration package emitted from"
+  echo "typed \`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`. The current"
   echo "Nat and Array demo externs are represented as native extern declarations"
   echo "backed by the small WASI symbol registry in the shim. The browser demos run"
   echo "through the real upstream interpreter."

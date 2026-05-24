@@ -103,6 +103,8 @@ const vir = await createVirRuntime({
 
 ## Current Limits
 
-The runtime uses the static package-backed path. It does not load `.olean`,
-`.ir`, or full Lean module data in the browser. Unsupported requested exports
-fail during package generation instead of being omitted silently.
+The runtime uses the single-file declaration package path. It does not load
+`.olean`, `.ir`, or full Lean module data in the browser. Unsupported requested
+exports fail during package generation instead of being omitted silently, and a
+failed package load clears the runtime's package metadata instead of leaving
+stale declarations callable.

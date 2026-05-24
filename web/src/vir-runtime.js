@@ -122,6 +122,10 @@ export class VirRuntime {
     return this.exports.vir_upstream_target_pointer_bytes?.() ?? null;
   }
 
+  packageDeclCount() {
+    return this.exports.vir_package_decl_count?.() ?? null;
+  }
+
   lastPackageError() {
     const len = this.exports.vir_last_package_error_size?.() ?? 0;
     return len === 0 ? "" : this.readWasmString(this.exports.vir_last_package_error(), len);
@@ -133,16 +137,21 @@ export class VirRuntime {
 
     const packageBytes = asBytes(bytes, "IR package bytes");
     const ptr = this.allocBytes(packageBytes);
+    this.clearPackageMetadata();
     try {
       const count = this.exports.vir_load_ir_package(ptr, packageBytes.byteLength);
       if (count === 0) {
         const detail = this.lastPackageError();
         throw new Error(`IR package load failed${detail ? `: ${detail}` : ""}`);
       }
+      const providerCount = this.packageDeclCount();
+      if (providerCount !== null && providerCount !== count) {
+        throw new Error(`IR package declaration count mismatch: load returned ${count}, provider has ${providerCount}`);
+      }
       this.interfaceManifest = this.readPackageManifest();
       this.rebuildManifestExports();
       this.packageInfo = {
-        count,
+        count: providerCount ?? count,
         byteLength: packageBytes.byteLength,
         interfaceExports: this.interfaceManifest.exports.length,
       };
@@ -150,6 +159,12 @@ export class VirRuntime {
     } finally {
       this.freeBytes(ptr);
     }
+  }
+
+  clearPackageMetadata() {
+    this.packageInfo = null;
+    this.interfaceManifest = null;
+    this.exportsByName = Object.create(null);
   }
 
   readPackageManifest() {

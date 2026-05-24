@@ -18,6 +18,7 @@ const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
 assert.equal(createExportedVirRuntime, createVirRuntime);
 assert.equal(runtime.targetPointerBytes(), 4);
 assert.ok(runtime.packageInfo.count > 0, "expected IR package to load declarations");
+assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.ok(runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib"));
@@ -132,6 +133,13 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.optionExprBump", { k
 });
 
 const factory = createVirRuntimeFactory({ wasmBytes });
+const unloaded = await factory.createRuntime();
+assert.equal(unloaded.packageInfo, null);
+assert.equal(unloaded.packageDeclCount(), 0);
+assert.throws(
+  () => unloaded.call("fib", 8),
+  /interface entry not found: fib/,
+);
 const first = await factory.createRuntime({ irPackageBytes });
 const second = await factory.createRuntime({ irPackageBytes });
 assert.equal(first.call("SortDemo.demo"), "192");
@@ -146,6 +154,21 @@ const badPackage = Uint8Array.from([
 assert.throws(
   () => badPackageRuntime.loadIrPackageBytes(badPackage),
   /invalid IR package magic/,
+);
+assert.equal(badPackageRuntime.packageInfo, null);
+assert.equal(badPackageRuntime.interfaceManifest, null);
+assert.equal(badPackageRuntime.packageDeclCount(), 0);
+
+assert.throws(
+  () => first.loadIrPackageBytes(badPackage),
+  /invalid IR package magic/,
+);
+assert.equal(first.packageInfo, null);
+assert.equal(first.interfaceManifest, null);
+assert.equal(first.packageDeclCount(), 0);
+assert.throws(
+  () => first.call("fib", 8),
+  /interface entry not found: fib/,
 );
 
 assert.throws(

@@ -100,12 +100,13 @@ return `Option decl` values using the same constructor layout:
 This is the critical distinction from the discarded bootstrap runners: the demo
 does not use a parallel C/C++ interpreter schema.
 
-## Static Closure Strategy
+## Package Closure Strategy
 
-For the demo, we will statically load the transitive declaration closure needed
-by the examples rather than loading Lean module data. This keeps `.olean`
-loading, module initialization, and full environment construction out of scope
-while still exercising the real upstream interpreter over real Lean IR objects.
+For the demo, `/dev.html` and the smoke tests load one `.irpkg` file containing
+the transitive declaration closure needed by the exported Lean functions. This
+keeps `.olean` loading, module initialization, and full environment construction
+out of scope while still exercising the real upstream interpreter over real
+Lean IR objects.
 
 The closure is extracted by `tools/GeneratePackage.lean` from real
 `Lean.IR.Decl` values. The generator starts with declarations produced for the

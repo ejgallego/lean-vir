@@ -82,8 +82,10 @@ after the package is loaded.
 
 ## Current Scope
 
-This is still the static package-backed path. It does not load `.olean`, `.ir`,
-or full Lean module data. The package generator elaborates the source with Lean
-4.30-rc2, extracts typed `Lean.IR.Decl` values, and writes the current package
-format. The WASM side decodes that package into real Lean IR objects and serves
-them through `lean_ir_find_env_decl`.
+This is still the single-file declaration package path. It does not load
+`.olean`, `.ir`, or full Lean module data. The package generator elaborates the
+source with Lean 4.30-rc2, extracts typed `Lean.IR.Decl` values, and writes the
+current package format. The WASM side decodes that package into real Lean IR
+objects and serves them through `lean_ir_find_env_decl`. Loading a new package
+replaces the previous provider state; a failed load clears it so stale
+declarations cannot be called accidentally.

@@ -50,6 +50,7 @@ static std::vector<decl_entry> g_entries;
 static std::vector<init_global_entry> g_init_entries;
 static std::string g_interface_manifest;
 static std::string g_last_error;
+static bool g_package_loaded = false;
 
 static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
     object * obj = lean_alloc_ctor(tag, fields.size(), scalar_size);
@@ -605,8 +606,27 @@ private:
     }
 };
 
+static void clear_loaded_package() {
+    for (decl_entry const & entry : g_entries) {
+        lean_dec(entry.name);
+        if (entry.boxed_base) {
+            lean_dec(entry.boxed_base);
+        }
+        lean_dec(entry.decl);
+    }
+    for (init_global_entry const & entry : g_init_entries) {
+        lean_dec(entry.name);
+        lean_dec(entry.init_name);
+    }
+    g_entries.clear();
+    g_init_entries.clear();
+    g_interface_manifest.clear();
+    g_package_loaded = false;
+}
+
 static bool load_package(uint8_t const * data, size_t size) {
     g_last_error.clear();
+    clear_loaded_package();
     if (data == nullptr && size != 0) {
         g_last_error = "IR package pointer is null";
         return false;
@@ -668,6 +688,7 @@ static bool load_package(uint8_t const * data, size_t size) {
     g_entries = std::move(entries);
     g_init_entries = std::move(init_entries);
     g_interface_manifest = std::move(interface_manifest);
+    g_package_loaded = true;
     return true;
 }
 
@@ -718,15 +739,7 @@ static bool run_package_initializers() {
 
 } // namespace
 
-object * mk_static_nat(size_t value) {
-    return lean_usize_to_nat(value);
-}
-
-size_t static_nat_to_usize(object * value) {
-    return lean_usize_of_nat(value);
-}
-
-object * find_static_decl(object * n) {
+object * find_package_decl(object * n) {
     for (decl_entry const & entry : g_entries) {
         if (lean_name_eq(n, entry.name)) {
             return entry.decl;
@@ -735,7 +748,7 @@ object * find_static_decl(object * n) {
     return nullptr;
 }
 
-object * find_static_boxed_decl(object * n) {
+object * find_package_boxed_decl(object * n) {
     for (decl_entry const & entry : g_entries) {
         if (entry.boxed_base && lean_name_eq(n, entry.boxed_base)) {
             return entry.decl;
@@ -744,8 +757,12 @@ object * find_static_boxed_decl(object * n) {
     return nullptr;
 }
 
-uint32_t static_decl_count() {
+uint32_t package_decl_count() {
     return g_entries.size();
+}
+
+bool package_loaded() {
+    return g_package_loaded;
 }
 
 char const * last_package_error() {
@@ -779,9 +796,10 @@ extern "C" uint32_t vir_load_ir_package(uint8_t const * data, uint32_t size) {
         return 0;
     }
     if (!lean::vir::run_package_initializers()) {
+        lean::vir::clear_loaded_package();
         return 0;
     }
-    return lean::vir::static_decl_count();
+    return lean::vir::package_decl_count();
 }
 
 extern "C" char const * vir_last_package_error(void) {
@@ -798,4 +816,8 @@ extern "C" char const * vir_package_interface_manifest(void) {
 
 extern "C" uint32_t vir_package_interface_manifest_size(void) {
     return lean::vir::package_interface_manifest_size();
+}
+
+extern "C" uint32_t vir_package_decl_count(void) {
+    return lean::vir::package_decl_count();
 }

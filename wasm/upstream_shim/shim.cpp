@@ -2847,21 +2847,17 @@ extern "C" lean::obj_res lean_io_eprintln(lean::obj_arg s) {
 extern "C" void lean_io_result_show_error(lean::b_obj_arg) {}
 
 extern "C" lean::object * lean_ir_find_env_decl(lean::object *, lean::object * n) {
-    if (lean::object * decl = lean::vir::find_static_decl(n)) {
+    if (lean::object * decl = lean::vir::find_package_decl(n)) {
         return lean::mk_some(decl);
     }
     return lean_box(0);
 }
 
 extern "C" lean::object * lean_ir_find_env_decl_boxed(lean::object *, lean::object * n) {
-    if (lean::object * decl = lean::vir::find_static_boxed_decl(n)) {
+    if (lean::object * decl = lean::vir::find_package_boxed_decl(n)) {
         return lean::mk_some(decl);
     }
     return lean_box(0);
-}
-
-extern "C" uint32_t vir_upstream_shim_fixture_count(void) {
-    return lean::vir::static_decl_count();
 }
 
 extern "C" uint32_t vir_upstream_target_pointer_bytes(void) {
@@ -2879,6 +2875,10 @@ extern "C" char const * vir_call(
     lean::g_call_error.clear();
     if (request == nullptr && request_len != 0) {
         lean::g_call_error = "call payload pointer is null";
+        return nullptr;
+    }
+    if (!lean::vir::package_loaded()) {
+        lean::g_call_error = "no IR package has been loaded";
         return nullptr;
     }
 
