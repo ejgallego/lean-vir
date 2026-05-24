@@ -26,12 +26,6 @@ if (typeof exports.vir_load_ir_package !== "function") {
 if (!exports.memory) {
   throw new Error("memory export is missing");
 }
-if (typeof exports.vir_upstream_tamagotchi_step !== "function") {
-  throw new Error("vir_upstream_tamagotchi_step export is missing");
-}
-if (typeof exports.vir_upstream_tamagotchi_run_demo !== "function") {
-  throw new Error("vir_upstream_tamagotchi_run_demo export is missing");
-}
 if (typeof exports.vir_last_package_error !== "function") {
   throw new Error("vir_last_package_error export is missing");
 }
@@ -127,55 +121,33 @@ if (repeatedFib !== 127760) {
   throw new Error(`upstream repeated fib: expected 127760, got ${repeatedFib}`);
 }
 
-const mood = {
-  happy: 0,
-  hungry: 1,
-  sleepy: 2,
-  angry: 3,
-  asleep: 4,
-  dead: 5,
-};
-
-const action = {
-  feed: 0,
-  play: 1,
-  nap: 2,
-  wake: 3,
-  ignore: 4,
-};
-
 const stepCases = [
-  [mood.happy, action.ignore, mood.hungry],
-  [mood.hungry, action.feed, mood.happy],
-  [mood.happy, action.play, mood.sleepy],
-  [mood.sleepy, action.nap, mood.asleep],
-  [mood.asleep, action.wake, mood.happy],
-  [mood.hungry, action.ignore, mood.angry],
-  [mood.angry, action.ignore, mood.dead],
+  ["happy", "ignore", "hungry"],
+  ["hungry", "feed", "happy"],
+  ["happy", "play", "sleepy"],
+  ["sleepy", "nap", "asleep"],
+  ["asleep", "wake", "happy"],
+  ["hungry", "ignore", "angry"],
+  ["angry", "ignore", "dead"],
 ];
 
 for (const [current, act, expected] of stepCases) {
-  const actual = exports.vir_upstream_tamagotchi_step(current, act);
+  const actual = runtime.call("Tamagotchi.step", current, act);
   if (actual !== expected) {
     throw new Error(`upstream Tamagotchi.step ${current} ${act}: expected ${expected}, got ${actual}`);
   }
 }
 
-let current = mood.happy;
+let current = "happy";
 const trace = [current];
-for (const act of [action.ignore, action.feed, action.play, action.nap, action.wake, action.ignore, action.ignore]) {
-  current = exports.vir_upstream_tamagotchi_step(current, act);
+for (const act of ["ignore", "feed", "play", "nap", "wake", "ignore", "ignore"]) {
+  current = runtime.call("Tamagotchi.step", current, act);
   trace.push(current);
 }
 
-const expectedTrace = [mood.happy, mood.hungry, mood.happy, mood.sleepy, mood.asleep, mood.happy, mood.hungry, mood.angry];
+const expectedTrace = ["happy", "hungry", "happy", "sleepy", "asleep", "happy", "hungry", "angry"];
 if (trace.join(",") !== expectedTrace.join(",")) {
   throw new Error(`upstream Tamagotchi trace: expected ${expectedTrace}, got ${trace}`);
-}
-
-const runDemo = exports.vir_upstream_tamagotchi_run_demo();
-if (runDemo !== mood.angry) {
-  throw new Error(`upstream Tamagotchi.run demoScript: expected ${mood.angry}, got ${runDemo}`);
 }
 
 const sortChecksum = runtime.call("SortDemo.demo");

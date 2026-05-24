@@ -19,10 +19,15 @@ const demoTargets = [
   },
   {
     source: "examples/Tamagotchi.lean",
-    packageOnly: true,
     roots: [
       "Tamagotchi.step",
       "Tamagotchi.step._boxed",
+    ],
+  },
+  {
+    source: "examples/Tamagotchi.lean",
+    packageOnly: true,
+    roots: [
       "Tamagotchi.run",
       "Tamagotchi.run._boxed",
       "Tamagotchi.trace",

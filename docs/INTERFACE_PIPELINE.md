@@ -70,7 +70,10 @@ The embedded manifest currently supports:
 - fixed-width values: `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - byte data: `ByteArray`;
 - selected homogeneous collections: `Array Nat`, `Array UInt32`, `List Nat`,
-  `List String`.
+  `List String`;
+- nullary inductive enums, represented in JavaScript by generated constructor
+  names;
+- `Lean.Expr`, represented as structural JavaScript objects.
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
@@ -81,7 +84,7 @@ WIT is still the right interface-description model to track, but not yet the
 runtime dependency for this demo path.
 
 The current artifact is a core `wasm32-wasip1` module with a generated manifest
-and a generic byte-payload call export. A real WIT interface would move this
-toward the WebAssembly Component Model and canonical ABI. For now,
-`interfaces/lean-vir.wit` mirrors the generic manifest/call shape as a design
-reference while the browser runtime uses the embedded JSON manifest directly.
+and a generic byte-payload call export. We are not committing this prototype to
+a component-model boundary yet. For now, `interfaces/lean-vir.wit` mirrors the
+generic manifest/call shape as a design reference while the browser runtime
+uses the embedded JSON manifest directly.

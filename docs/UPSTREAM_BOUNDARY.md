@@ -121,7 +121,8 @@ registrations, and the package decoder exposes its last load error for browser
 and smoke-test diagnostics.
 The current explicit native externs cover the small fixture/demo surface for
 `Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
-`Float`, and `String`. This includes the arithmetic and comparison operations
+`Float`, `String`, and the helper externs reached by `Lean.Expr`/`Lean.Level`
+data computation. This includes the arithmetic and comparison operations
 needed by the demos, List/Array/String/ByteArray fixtures, array mutation
 through `Array.emptyWithCapacity`/`Array.getInternal`/`Array.replicate`/
 `Array.set`/`Array.set!`/`Array.swap`/`Array.swapIfInBounds`/`Array.pop`,
@@ -177,6 +178,9 @@ the start index is consumed.
 distinct native stem in the shim because their boxed arities differ, but all
 three wrappers delegate to the same linked runtime helper,
 `lean_string_utf8_set`.
+The shim also owns minimal `Lean.Expr`/`Lean.Level` object construction for the
+generic JavaScript interface path, so structural `Lean.Expr` values can be sent
+from JavaScript without depending on Lean-library exported constructor wrappers.
 
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
 registry. It checks that every `nativeExterns` entry in

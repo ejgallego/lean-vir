@@ -27,6 +27,11 @@ through a fresh WASM interpreter instance backed by the same generated IR
 package. Input-capable entries, currently `fib` and `SortDemo.demoFromArray`,
 render an input control in the fixture source panel.
 
+The package manifest also drives the local `/dev.html` runner. Supported
+browser-call types include primitive scalars, selected list/array shapes,
+nullary inductive enums such as the Tamagotchi state/action types, and
+structural `Lean.Expr` values.
+
 ## Quick Start
 
 ```bash
@@ -135,9 +140,9 @@ real `Lean.IR.Decl` values, packaged with `tools/GeneratePackage.lean`, and
 then compared against Lean's host IR interpreter with
 `interpreter.prefer_native=false`. The current passing surface covers recursive
 functions, inductive pattern matching, common `List`/`Array`/`String`/
-`ByteArray` operations, numeric primitive boundaries, parser setup paths, and
-selected task/ref initialization paths. See `docs/FIXTURE_COVERAGE.md` for the
-detailed boundary list.
+`ByteArray` operations, numeric primitive boundaries, structural `Lean.Expr`
+values, parser setup paths, and selected task/ref initialization paths. See
+`docs/FIXTURE_COVERAGE.md` for the detailed boundary list.
 
 The fixture runner writes `build/fixtures/summary.json` with per-fixture status,
 imported IR declarations, native externs, and missing-boundary diagnostics for

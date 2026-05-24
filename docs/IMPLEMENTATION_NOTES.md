@@ -25,9 +25,17 @@ go through a generic byte-payload WASM export that constructs Lean input objects
 and calls the upstream interpreter by name.
 
 The browser keeps a step-by-step `Tamagotchi.step` automaton as the top-level
-interactive demo over the same upstream interpreter artifact. The automaton
-values are encoded as nullary inductive constructors using the same tagged
-representation that the upstream interpreter expects.
+interactive demo over the same upstream interpreter artifact. The automaton now
+uses the package manifest like any other exported Lean function: its nullary
+inductive `Mood` and `Action` values are auto-discovered as simple enums and
+marshaled through the generic `vir_call` path.
+
+`Lean.Expr` is also part of the current manifest surface. JavaScript sends and
+receives structural objects for the standard expression constructors, and the
+WASM shim constructs real Lean `Expr` and `Level` runtime objects with computed
+data fields before calling the upstream interpreter. Metadata expression inputs
+are accepted by decoding their inner expression, and metadata results are
+reported as their inner expression.
 
 The browser fixture runner exposes the `fib` and `SortDemo.demoFromArray`
 examples next to the manifest entries. Those two entries opt into the fixture

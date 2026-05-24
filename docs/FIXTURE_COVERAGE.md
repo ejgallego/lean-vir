@@ -49,6 +49,8 @@ The current fixture surface covers:
   `shiftLeft`/`shiftRight`, small `Int` arithmetic, `USize` `sub`/`mul`/
   `land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`, `Float.scaleB`, and
   `Float.toUInt32`;
+- `Lean.Expr` package closure and structural JS/WASM marshaling for constants,
+  applications, literals, and bound-variable inputs/results;
 - hash/name/substring/pointer-address primitives reached by parser data paths,
   including `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
   `ptrAddrUnsafe`;

@@ -260,20 +260,39 @@ async function smokeRunner(cdp, origin, url, expected) {
     packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
     entry: document.querySelector("#dev-entry-select")?.value,
     entryCount: document.querySelector("#dev-entry-select")?.options.length,
-    input: document.querySelector("[data-input-index='0']")?.value
+    input: document.querySelector("[data-input-index='0']")?.value,
+    inputs: Array.from(document.querySelectorAll("[data-input-index]")).map((field) => ({
+      value: field.value,
+      tagName: field.tagName
+    }))
   })`);
   assert.ok(before.location.endsWith(url), `unexpected runner URL: ${before.location}`);
   assert.equal(before.packageName, expected.packageName);
   assert.equal(before.entry, expected.entry);
-  assert.equal(before.entryCount, expected.entryCount);
-  assert.equal(before.input, expected.input);
+  if (expected.entryCount !== undefined) {
+    assert.equal(before.entryCount, expected.entryCount);
+  }
+  if (expected.entryCountAtLeast !== undefined) {
+    assert.ok(before.entryCount >= expected.entryCountAtLeast, `expected at least ${expected.entryCountAtLeast} entries, got ${before.entryCount}`);
+  }
+  if (expected.input !== undefined) {
+    assert.equal(before.input, expected.input);
+  }
+  if (expected.inputs !== undefined) {
+    assert.deepEqual(before.inputs.map((input) => input.value).slice(0, expected.inputs.length), expected.inputs);
+  }
+  if (expected.inputTags !== undefined) {
+    assert.deepEqual(before.inputs.map((input) => input.tagName).slice(0, expected.inputTags.length), expected.inputTags);
+  }
 
-  const runInput = expected.runInput === undefined ? "null" : JSON.stringify(expected.runInput);
+  const runInputs = expected.runInputs ?? (expected.runInput === undefined ? null : [expected.runInput]);
   const result = await evaluate(cdp, `new Promise((resolve, reject) => {
     const output = document.querySelector("#dev-result");
-    const runInput = ${runInput};
-    if (runInput !== null) {
-      document.querySelector("[data-input-index='0']").value = runInput;
+    const runInputs = ${JSON.stringify(runInputs)};
+    if (runInputs !== null) {
+      for (const [index, value] of runInputs.entries()) {
+        document.querySelector("[data-input-index='" + index + "']").value = value;
+      }
     }
     output.textContent = "pending";
     document.querySelector("#dev-run-entry").click();
@@ -332,9 +351,36 @@ try {
       result: "30",
     },
   );
+  await smokeRunner(
+    cdp,
+    server.origin,
+    "dev.html?package=vir-demo.irpkg&entry=Tamagotchi_step",
+    {
+      packageName: "vir-demo.irpkg",
+      entry: "Tamagotchi_step",
+      entryCountAtLeast: 6,
+      inputs: ["happy", "feed"],
+      inputTags: ["SELECT", "SELECT"],
+      runInputs: ["happy", "ignore"],
+      result: "hungry",
+    },
+  );
+  await smokeRunner(
+    cdp,
+    server.origin,
+    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_ExprPrinter_exprKindScore",
+    {
+      packageName: "vir-demo.irpkg",
+      entry: "Vir_Fixtures_ExprPrinter_exprKindScore",
+      entryCountAtLeast: 6,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"kind":"bvar","index":4}`],
+      result: "5",
+    },
+  );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, fib runner, and mergesort runner");
+  console.log("pages browser smoke ok: landing, local runners, manifest enum runner, and manifest Expr runner");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

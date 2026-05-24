@@ -69,9 +69,14 @@ Supported v1 types:
 - `Nat`, `Int`, `Bool`, `String`;
 - `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - `ByteArray`;
-- `Array Nat`, `Array UInt32`, `List Nat`, `List String`.
+- `Array Nat`, `Array UInt32`, `List Nat`, `List String`;
+- nullary inductive enums;
+- `Lean.Expr`.
 
 Large exact integer results are returned as decimal strings.
+
+`/dev.html` generates enum select controls and `Lean.Expr` JSON textareas from
+the embedded manifest after the package is loaded.
 
 ## Current Scope
 

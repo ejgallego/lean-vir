@@ -45,6 +45,16 @@ lean_object * lean_string_from_utf8_unchecked(lean_object * bytes);
 lean_object * lean_string_utf8_set(lean_object * str, lean_object * pos, uint32_t c);
 uint8_t lean_string_is_valid_pos(lean_object * str, lean_object * pos);
 lean_object * lean_eval_const(lean_object * env, lean_object * opts, lean_object * c);
+uint64_t lean_level_mk_data(uint64_t h, lean_object * depth, uint8_t has_mvar, uint8_t has_param);
+uint64_t lean_expr_mk_data(
+    uint64_t hash,
+    lean_object * bvar_range,
+    uint32_t approx_depth,
+    uint8_t has_fvar,
+    uint8_t has_expr_mvar,
+    uint8_t has_level_mvar,
+    uint8_t has_level_param);
+uint64_t lean_expr_mk_app_data(uint64_t f_data, uint64_t a_data);
 }
 
 static uint8_t g_vir_io_initializing = 0;
@@ -1044,6 +1054,12 @@ extern "C" lean_object * lean_uint32_to_uint8___boxed(lean_object * a) {
     return lean_box(result);
 }
 
+extern "C" lean_object * lean_uint32_to_uint64___boxed(lean_object * a) {
+    uint64_t result = lean_uint32_to_uint64(lean_unbox_uint32(a));
+    lean_dec(a);
+    return lean_box_uint64(result);
+}
+
 extern "C" lean_object * lean_uint32_add___boxed(lean_object * a, lean_object * b) {
     uint32_t result = lean_uint32_add(lean_unbox_uint32(a), lean_unbox_uint32(b));
     lean_dec(a);
@@ -1176,6 +1192,12 @@ extern "C" lean_object * lean_uint64_to_usize___boxed(lean_object * a) {
     return lean_box_usize(result);
 }
 
+extern "C" lean_object * lean_uint64_to_uint32___boxed(lean_object * a) {
+    uint32_t result = lean_uint64_to_uint32(lean_unbox_uint64(a));
+    lean_dec(a);
+    return lean_box_uint32(result);
+}
+
 extern "C" lean_object * lean_uint64_add___boxed(lean_object * a, lean_object * b) {
     return box_uint64_binary(a, b, lean_uint64_add);
 }
@@ -1253,6 +1275,62 @@ extern "C" lean_object * lean_float_to_uint32___boxed(lean_object * a) {
     uint32_t result = lean_float_to_uint32(lean_unbox_float(a));
     lean_dec(a);
     return lean_box_uint32(result);
+}
+
+extern "C" lean_object * lean_level_mk_data___boxed(
+    lean_object * h,
+    lean_object * depth,
+    lean_object * has_mvar,
+    lean_object * has_param) {
+    uint64_t result = lean_level_mk_data(
+        lean_unbox_uint64(h),
+        depth,
+        static_cast<uint8_t>(lean_unbox(has_mvar)),
+        static_cast<uint8_t>(lean_unbox(has_param)));
+    lean_dec(h);
+    lean_dec(depth);
+    lean_dec(has_mvar);
+    lean_dec(has_param);
+    return lean_box_uint64(result);
+}
+
+extern "C" lean_object * lean_expr_mk_data___boxed(
+    lean_object * hash,
+    lean_object * bvar_range,
+    lean_object * approx_depth,
+    lean_object * has_fvar,
+    lean_object * has_expr_mvar,
+    lean_object * has_level_mvar,
+    lean_object * has_level_param) {
+    uint64_t result = lean_expr_mk_data(
+        lean_unbox_uint64(hash),
+        bvar_range,
+        lean_unbox_uint32(approx_depth),
+        static_cast<uint8_t>(lean_unbox(has_fvar)),
+        static_cast<uint8_t>(lean_unbox(has_expr_mvar)),
+        static_cast<uint8_t>(lean_unbox(has_level_mvar)),
+        static_cast<uint8_t>(lean_unbox(has_level_param)));
+    lean_dec(hash);
+    lean_dec(bvar_range);
+    lean_dec(approx_depth);
+    lean_dec(has_fvar);
+    lean_dec(has_expr_mvar);
+    lean_dec(has_level_mvar);
+    lean_dec(has_level_param);
+    return lean_box_uint64(result);
+}
+
+extern "C" lean_object * lean_expr_mk_app_data___boxed(lean_object * f_data, lean_object * a_data) {
+    uint64_t result = lean_expr_mk_app_data(lean_unbox_uint64(f_data), lean_unbox_uint64(a_data));
+    lean_dec(f_data);
+    lean_dec(a_data);
+    return lean_box_uint64(result);
+}
+
+extern "C" lean_object * lean_expr_data___boxed(lean_object * expr) {
+    uint64_t result = lean_expr_data(expr);
+    lean_dec(expr);
+    return lean_box_uint64(result);
 }
 
 extern "C" lean_object * lean_is_reserved_name___boxed(lean_object * env, lean_object * n) {
@@ -1429,6 +1507,7 @@ extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_ob
     X("UInt32.ofNatLT", "l_UInt32_ofNatLT", l_UInt32_ofNatLT___boxed) \
     X("UInt32.toNat", "lean_uint32_to_nat", lean_uint32_to_nat___boxed) \
     X("UInt32.toUInt8", "lean_uint32_to_uint8", lean_uint32_to_uint8___boxed) \
+    X("UInt32.toUInt64", "lean_uint32_to_uint64", lean_uint32_to_uint64___boxed) \
     X("UInt32.add", "lean_uint32_add", lean_uint32_add___boxed) \
     X("UInt32.sub", "lean_uint32_sub", lean_uint32_sub___boxed) \
     X("UInt32.mul", "lean_uint32_mul", lean_uint32_mul___boxed) \
@@ -1449,6 +1528,7 @@ extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_ob
     X("UInt64.ofNatLT", "l_UInt64_ofNatLT", l_UInt64_ofNatLT___boxed) \
     X("UInt64.toNat", "lean_uint64_to_nat", lean_uint64_to_nat___boxed) \
     X("UInt64.toUSize", "lean_uint64_to_usize", lean_uint64_to_usize___boxed) \
+    X("UInt64.toUInt32", "lean_uint64_to_uint32", lean_uint64_to_uint32___boxed) \
     X("UInt64.add", "lean_uint64_add", lean_uint64_add___boxed) \
     X("UInt64.sub", "lean_uint64_sub", lean_uint64_sub___boxed) \
     X("UInt64.mul", "lean_uint64_mul", lean_uint64_mul___boxed) \
@@ -1466,7 +1546,11 @@ extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_ob
     X("UInt64.decLe", "lean_uint64_dec_le", lean_uint64_dec_le___boxed) \
     X("UInt64.toFloat", "lean_uint64_to_float", lean_uint64_to_float___boxed) \
     X("Float.scaleB", "lean_float_scaleb", lean_float_scaleb___boxed) \
-    X("Float.toUInt32", "lean_float_to_uint32", lean_float_to_uint32___boxed)
+    X("Float.toUInt32", "lean_float_to_uint32", lean_float_to_uint32___boxed) \
+    X("Lean.Level.mkData", "lean_level_mk_data", lean_level_mk_data___boxed) \
+    X("Lean.Expr.mkData", "lean_expr_mk_data", lean_expr_mk_data___boxed) \
+    X("Lean.Expr.mkAppData", "lean_expr_mk_app_data", lean_expr_mk_app_data___boxed) \
+    X("Lean.Expr.data", "lean_expr_data", lean_expr_data___boxed)
 
 struct NativeSymbol {
     char const * lean_name;
@@ -1519,6 +1603,16 @@ static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, un
     return obj;
 }
 
+static object * mk_ctor_owned(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
+    object * obj = lean_alloc_ctor(tag, fields.size(), scalar_size);
+    unsigned idx = 0;
+    for (object * field : fields) {
+        lean_ctor_set(obj, idx, field);
+        idx++;
+    }
+    return obj;
+}
+
 static object * mk_some(object * value) {
     return mk_ctor(1, { value });
 }
@@ -1544,21 +1638,42 @@ static std::string nat_to_decimal(object * value) {
     return mpz_value(value).to_string();
 }
 
-static uint32_t run_tagged_function(name const & fn, unsigned n, object ** args) {
-    elab_environment env(lean_box(0));
-    options opts(lean_box(0));
-    object * result = ir::run_boxed(env, opts, fn, n, args);
-    uint32_t out = static_cast<uint32_t>(lean_obj_tag(result));
-    lean_dec(result);
-    return out;
-}
-
 static object * mk_byte_array(uint8_t const * values, uint32_t len) {
     object * array = lean_alloc_sarray(1, len, len);
     if (len != 0) {
         memcpy(lean_sarray_cptr(array), values, len);
     }
     return array;
+}
+
+static name name_from_dotted(char const * text, size_t len);
+
+extern "C" object * lean_level_mk_succ(obj_arg);
+extern "C" object * lean_level_mk_mvar(obj_arg);
+extern "C" object * lean_level_mk_param(obj_arg);
+extern "C" object * lean_level_mk_max(obj_arg, obj_arg);
+extern "C" object * lean_level_mk_imax(obj_arg, obj_arg);
+
+extern "C" object * lean_expr_mk_bvar(obj_arg);
+extern "C" object * lean_expr_mk_fvar(obj_arg);
+extern "C" object * lean_expr_mk_mvar(obj_arg);
+extern "C" object * lean_expr_mk_sort(obj_arg);
+extern "C" object * lean_expr_mk_const(obj_arg, obj_arg);
+extern "C" object * lean_expr_mk_app(obj_arg, obj_arg);
+extern "C" object * lean_expr_mk_lambda(obj_arg, obj_arg, obj_arg, uint8_t);
+extern "C" object * lean_expr_mk_forall(obj_arg, obj_arg, obj_arg, uint8_t);
+extern "C" object * lean_expr_mk_let(obj_arg, obj_arg, obj_arg, obj_arg, uint8_t);
+extern "C" object * lean_expr_mk_lit(obj_arg);
+extern "C" object * lean_expr_mk_proj(obj_arg, obj_arg, obj_arg);
+
+static object * mk_name_from_dotted_string(std::string const & text) {
+    name n = name_from_dotted(text.data(), text.size());
+    lean_inc(n.raw());
+    return n.raw();
+}
+
+static std::string name_to_string(object * value) {
+    return name(value, true).to_string();
 }
 
 enum class vir_wire_type : uint8_t {
@@ -1576,6 +1691,8 @@ enum class vir_wire_type : uint8_t {
     ArrayUInt32 = 11,
     ListNat = 12,
     ListString = 13,
+    SimpleEnum = 14,
+    Expr = 15,
 };
 
 class vir_reader {
@@ -1708,6 +1825,203 @@ static object * mk_list_from_reversed(std::vector<object *> const & values) {
     return out;
 }
 
+static object * decode_level(vir_reader & r);
+static object * decode_expr(vir_reader & r);
+static void encode_level(vir_writer & w, object * value);
+static void encode_expr_payload(vir_writer & w, object * value);
+
+static object * decode_level_list(vir_reader & r) {
+    uint32_t len = r.u32();
+    std::vector<object *> values;
+    values.reserve(len);
+    for (uint32_t i = 0; i < len; i++) {
+        values.push_back(decode_level(r));
+    }
+    std::reverse(values.begin(), values.end());
+    object * out = mk_list_from_reversed(values);
+    for (object * value : values) lean_dec(value);
+    return out;
+}
+
+static void encode_level_list(vir_writer & w, object * value) {
+    std::vector<object *> values;
+    object * cursor = value;
+    while (!lean_is_scalar(cursor)) {
+        values.push_back(lean_ctor_get(cursor, 0));
+        cursor = lean_ctor_get(cursor, 1);
+    }
+    w.u32(static_cast<uint32_t>(values.size()));
+    for (object * level : values) {
+        encode_level(w, level);
+    }
+}
+
+static object * decode_level(vir_reader & r) {
+    uint8_t tag = r.u8();
+    switch (tag) {
+    case 0:
+        return lean_box(0);
+    case 1:
+        return lean_level_mk_succ(decode_level(r));
+    case 2: {
+        object * lhs = decode_level(r);
+        object * rhs = decode_level(r);
+        return lean_level_mk_max(lhs, rhs);
+    }
+    case 3: {
+        object * lhs = decode_level(r);
+        object * rhs = decode_level(r);
+        return lean_level_mk_imax(lhs, rhs);
+    }
+    case 4: {
+        std::string text = r.string();
+        return lean_level_mk_param(mk_name_from_dotted_string(text));
+    }
+    case 5: {
+        std::string text = r.string();
+        return lean_level_mk_mvar(mk_name_from_dotted_string(text));
+    }
+    default:
+        r.fail("unsupported Lean.Level wire tag " + std::to_string(tag));
+        return lean_box(0);
+    }
+}
+
+static void encode_level(vir_writer & w, object * value) {
+    if (lean_is_scalar(value)) {
+        w.u8(0);
+        return;
+    }
+    level lvl(value, true);
+    switch (lvl.kind()) {
+    case level_kind::Succ:
+        w.u8(1);
+        encode_level(w, succ_of(lvl).raw());
+        break;
+    case level_kind::Max:
+        w.u8(2);
+        encode_level(w, max_lhs(lvl).raw());
+        encode_level(w, max_rhs(lvl).raw());
+        break;
+    case level_kind::IMax:
+        w.u8(3);
+        encode_level(w, imax_lhs(lvl).raw());
+        encode_level(w, imax_rhs(lvl).raw());
+        break;
+    case level_kind::Param:
+        w.u8(4);
+        w.string(param_id(lvl).to_string());
+        break;
+    case level_kind::MVar:
+        w.u8(5);
+        w.string(mvar_id(lvl).to_string());
+        break;
+    case level_kind::Zero:
+        w.u8(0);
+        break;
+    }
+}
+
+static uint8_t expr_scalar_u8(object * value, unsigned object_fields) {
+    if (lean_ctor_num_objs(value) > object_fields) {
+        return static_cast<uint8_t>(lean_unbox(lean_ctor_get(value, object_fields)));
+    }
+    return lean_ctor_get_uint8(value, lean_ctor_num_objs(value) * sizeof(void *) + sizeof(uint64_t));
+}
+
+static object * decode_literal(vir_reader & r) {
+    uint8_t tag = r.u8();
+    switch (tag) {
+    case 0: {
+        std::string text = r.string();
+        return mk_ctor_owned(0, { lean_cstr_to_nat(text.c_str()) });
+    }
+    case 1: {
+        std::string text = r.string();
+        return mk_ctor_owned(1, { lean_mk_string_from_bytes(text.data(), text.size()) });
+    }
+    default:
+        r.fail("unsupported Lean.Literal wire tag " + std::to_string(tag));
+        return mk_ctor_owned(0, { lean_box(0) });
+    }
+}
+
+static void encode_literal(vir_writer & w, object * value) {
+    uint8_t tag = lean_obj_tag(value);
+    w.u8(tag);
+    if (tag == 0) {
+        w.string(nat_to_decimal(lean_ctor_get(value, 0)));
+    } else if (tag == 1) {
+        object * text = lean_ctor_get(value, 0);
+        size_t size = lean_string_size(text);
+        uint32_t len = static_cast<uint32_t>(size == 0 ? 0 : size - 1);
+        w.bytes(reinterpret_cast<uint8_t const *>(lean_string_cstr(text)), len);
+    }
+}
+
+static object * decode_expr(vir_reader & r) {
+    uint8_t tag = r.u8();
+    switch (tag) {
+    case 0: {
+        std::string text = r.string();
+        return lean_expr_mk_bvar(lean_cstr_to_nat(text.c_str()));
+    }
+    case 1: {
+        std::string text = r.string();
+        return lean_expr_mk_fvar(mk_name_from_dotted_string(text));
+    }
+    case 2: {
+        std::string text = r.string();
+        return lean_expr_mk_mvar(mk_name_from_dotted_string(text));
+    }
+    case 3:
+        return lean_expr_mk_sort(decode_level(r));
+    case 4: {
+        object * name = mk_name_from_dotted_string(r.string());
+        object * levels = decode_level_list(r);
+        return lean_expr_mk_const(name, levels);
+    }
+    case 5: {
+        object * fn = decode_expr(r);
+        object * arg = decode_expr(r);
+        return lean_expr_mk_app(fn, arg);
+    }
+    case 6: {
+        object * name = mk_name_from_dotted_string(r.string());
+        object * type = decode_expr(r);
+        object * body = decode_expr(r);
+        return lean_expr_mk_lambda(name, type, body, r.u8());
+    }
+    case 7: {
+        object * name = mk_name_from_dotted_string(r.string());
+        object * type = decode_expr(r);
+        object * body = decode_expr(r);
+        return lean_expr_mk_forall(name, type, body, r.u8());
+    }
+    case 8: {
+        object * name = mk_name_from_dotted_string(r.string());
+        object * type = decode_expr(r);
+        object * value = decode_expr(r);
+        object * body = decode_expr(r);
+        return lean_expr_mk_let(name, type, value, body, r.u8());
+    }
+    case 9:
+        return lean_expr_mk_lit(decode_literal(r));
+    case 10:
+        return decode_expr(r);
+    case 11: {
+        object * type_name = mk_name_from_dotted_string(r.string());
+        std::string idx_text = r.string();
+        object * idx = lean_cstr_to_nat(idx_text.c_str());
+        object * structure = decode_expr(r);
+        return lean_expr_mk_proj(type_name, idx, structure);
+    }
+    default:
+        r.fail("unsupported Lean.Expr wire tag " + std::to_string(tag));
+        return lean_expr_mk_bvar(lean_box(0));
+    }
+}
+
 static object * decode_argument(vir_reader & r) {
     vir_wire_type tag = static_cast<vir_wire_type>(r.u8());
     switch (tag) {
@@ -1794,6 +2108,10 @@ static object * decode_argument(vir_reader & r) {
         for (object * value : values) lean_dec(value);
         return out;
     }
+    case vir_wire_type::SimpleEnum:
+        return lean_box(r.u32());
+    case vir_wire_type::Expr:
+        return decode_expr(r);
     default:
         r.fail("unsupported wire argument tag " + std::to_string(static_cast<uint8_t>(tag)));
         return lean_box(0);
@@ -1833,6 +2151,74 @@ static void encode_list_payload(vir_writer & w, object * value, vir_wire_type el
             uint32_t len = static_cast<uint32_t>(size == 0 ? 0 : size - 1);
             w.bytes(reinterpret_cast<uint8_t const *>(lean_string_cstr(elem)), len);
         }
+    }
+}
+
+static void encode_expr_payload(vir_writer & w, object * value) {
+    expr e(value, true);
+    switch (e.kind()) {
+    case expr_kind::BVar:
+        w.u8(0);
+        w.string(nat_to_decimal(lean_ctor_get(value, 0)));
+        break;
+    case expr_kind::FVar:
+        w.u8(1);
+        w.string(name_to_string(lean_ctor_get(value, 0)));
+        break;
+    case expr_kind::MVar:
+        w.u8(2);
+        w.string(name_to_string(lean_ctor_get(value, 0)));
+        break;
+    case expr_kind::Sort:
+        w.u8(3);
+        encode_level(w, lean_ctor_get(value, 0));
+        break;
+    case expr_kind::Const:
+        w.u8(4);
+        w.string(name_to_string(lean_ctor_get(value, 0)));
+        encode_level_list(w, lean_ctor_get(value, 1));
+        break;
+    case expr_kind::App:
+        w.u8(5);
+        encode_expr_payload(w, lean_ctor_get(value, 0));
+        encode_expr_payload(w, lean_ctor_get(value, 1));
+        break;
+    case expr_kind::Lambda:
+        w.u8(6);
+        w.string(name_to_string(lean_ctor_get(value, 0)));
+        encode_expr_payload(w, lean_ctor_get(value, 1));
+        encode_expr_payload(w, lean_ctor_get(value, 2));
+        w.u8(expr_scalar_u8(value, 3));
+        break;
+    case expr_kind::Pi:
+        w.u8(7);
+        w.string(name_to_string(lean_ctor_get(value, 0)));
+        encode_expr_payload(w, lean_ctor_get(value, 1));
+        encode_expr_payload(w, lean_ctor_get(value, 2));
+        w.u8(expr_scalar_u8(value, 3));
+        break;
+    case expr_kind::Let:
+        w.u8(8);
+        w.string(name_to_string(lean_ctor_get(value, 0)));
+        encode_expr_payload(w, lean_ctor_get(value, 1));
+        encode_expr_payload(w, lean_ctor_get(value, 2));
+        encode_expr_payload(w, lean_ctor_get(value, 3));
+        w.u8(expr_scalar_u8(value, 4));
+        break;
+    case expr_kind::Lit:
+        w.u8(9);
+        encode_literal(w, lean_ctor_get(value, 0));
+        break;
+    case expr_kind::MData:
+        w.u8(10);
+        encode_expr_payload(w, lean_ctor_get(value, 1));
+        break;
+    case expr_kind::Proj:
+        w.u8(11);
+        w.string(name_to_string(lean_ctor_get(value, 0)));
+        w.string(nat_to_decimal(lean_ctor_get(value, 1)));
+        encode_expr_payload(w, lean_ctor_get(value, 2));
+        break;
     }
 }
 
@@ -1891,6 +2277,12 @@ static void encode_result(vir_writer & w, vir_wire_type tag, object * value) {
     case vir_wire_type::ListString:
         encode_list_payload(w, value, vir_wire_type::String);
         break;
+    case vir_wire_type::SimpleEnum:
+        w.u32(static_cast<uint32_t>(lean_is_scalar(value) ? lean_unbox(value) : lean_obj_tag(value)));
+        break;
+    case vir_wire_type::Expr:
+        encode_expr_payload(w, value);
+        break;
     default:
         break;
     }
@@ -1930,6 +2322,340 @@ static name name_from_dotted(char const * text, size_t len) {
 }
 
 } // namespace
+
+static uint64_t vir_mix_hash(uint64_t h, uint64_t k) {
+    return lean_uint64_mix_hash(h, k);
+}
+
+static uint64_t vir_nat_hash(object * n) {
+    return lean_uint64_of_nat(n);
+}
+
+static uint64_t vir_level_mk_data(uint64_t h, uint64_t depth, bool has_mvar, bool has_param) {
+    uint32_t h1 = static_cast<uint32_t>(h);
+    uint64_t d = std::min<uint64_t>(depth, 16777215);
+    return static_cast<uint64_t>(h1)
+        | (static_cast<uint64_t>(has_mvar ? 1 : 0) << 32)
+        | (static_cast<uint64_t>(has_param ? 1 : 0) << 33)
+        | (d << 40);
+}
+
+static uint64_t vir_level_data(object * value) {
+    if (lean_is_scalar(value)) {
+        return vir_level_mk_data(2221, 0, false, false);
+    }
+    return lean_ctor_get_uint64(value, lean_ctor_num_objs(value) * sizeof(void *));
+}
+
+static uint64_t vir_level_hash(object * value) {
+    return static_cast<uint32_t>(vir_level_data(value));
+}
+
+static uint32_t vir_level_depth(object * value) {
+    return static_cast<uint32_t>(vir_level_data(value) >> 40);
+}
+
+static bool vir_level_has_mvar(object * value) {
+    return ((vir_level_data(value) >> 32) & 1) == 1;
+}
+
+static bool vir_level_has_param(object * value) {
+    return ((vir_level_data(value) >> 33) & 1) == 1;
+}
+
+static object * vir_mk_ctor_with_data(
+    unsigned tag,
+    std::initializer_list<object *> fields,
+    uint64_t data,
+    unsigned scalar_extra = 0) {
+    object * obj = lean_alloc_ctor(tag, fields.size(), sizeof(uint64_t) + scalar_extra);
+    unsigned idx = 0;
+    for (object * field : fields) {
+        lean_ctor_set(obj, idx, field);
+        idx++;
+    }
+    lean_ctor_set_uint64(obj, fields.size() * sizeof(void *), data);
+    return obj;
+}
+
+extern "C" uint64_t lean_level_mk_data(uint64_t h, object * depth, uint8_t has_mvar, uint8_t has_param) {
+    return vir_level_mk_data(h, lean_uint64_of_nat(depth), has_mvar != 0, has_param != 0);
+}
+
+extern "C" object * lean_level_mk_succ(obj_arg value) {
+    uint64_t value_data = vir_level_data(value);
+    uint64_t data = vir_level_mk_data(
+        vir_mix_hash(2243, static_cast<uint32_t>(value_data)),
+        vir_level_depth(value) + 1,
+        ((value_data >> 32) & 1) == 1,
+        ((value_data >> 33) & 1) == 1);
+    return vir_mk_ctor_with_data(static_cast<unsigned>(level_kind::Succ), { value }, data);
+}
+
+extern "C" object * lean_level_mk_max(obj_arg lhs, obj_arg rhs) {
+    uint64_t data = vir_level_mk_data(
+        vir_mix_hash(2251, vir_mix_hash(vir_level_hash(lhs), vir_level_hash(rhs))),
+        std::max<uint32_t>(vir_level_depth(lhs), vir_level_depth(rhs)) + 1,
+        vir_level_has_mvar(lhs) || vir_level_has_mvar(rhs),
+        vir_level_has_param(lhs) || vir_level_has_param(rhs));
+    return vir_mk_ctor_with_data(static_cast<unsigned>(level_kind::Max), { lhs, rhs }, data);
+}
+
+extern "C" object * lean_level_mk_imax(obj_arg lhs, obj_arg rhs) {
+    uint64_t data = vir_level_mk_data(
+        vir_mix_hash(2267, vir_mix_hash(vir_level_hash(lhs), vir_level_hash(rhs))),
+        std::max<uint32_t>(vir_level_depth(lhs), vir_level_depth(rhs)) + 1,
+        vir_level_has_mvar(lhs) || vir_level_has_mvar(rhs),
+        vir_level_has_param(lhs) || vir_level_has_param(rhs));
+    return vir_mk_ctor_with_data(static_cast<unsigned>(level_kind::IMax), { lhs, rhs }, data);
+}
+
+extern "C" object * lean_level_mk_param(obj_arg name) {
+    uint64_t data = vir_level_mk_data(vir_mix_hash(2239, lean_name_hash(name)), 0, false, true);
+    return vir_mk_ctor_with_data(static_cast<unsigned>(level_kind::Param), { name }, data);
+}
+
+extern "C" object * lean_level_mk_mvar(obj_arg name) {
+    uint64_t data = vir_level_mk_data(vir_mix_hash(2237, lean_name_hash(name)), 0, true, false);
+    return vir_mk_ctor_with_data(static_cast<unsigned>(level_kind::MVar), { name }, data);
+}
+
+static uint64_t vir_expr_mk_data(
+    uint64_t hash,
+    uint64_t loose_bvar_range,
+    uint32_t approx_depth = 0,
+    bool has_fvar = false,
+    bool has_expr_mvar = false,
+    bool has_level_mvar = false,
+    bool has_level_param = false) {
+    uint32_t h = static_cast<uint32_t>(hash);
+    uint32_t d = std::min<uint32_t>(approx_depth, 255);
+    uint64_t range = std::min<uint64_t>(loose_bvar_range, 1048575);
+    return static_cast<uint64_t>(h)
+        | (static_cast<uint64_t>(d) << 32)
+        | (static_cast<uint64_t>(has_fvar ? 1 : 0) << 40)
+        | (static_cast<uint64_t>(has_expr_mvar ? 1 : 0) << 41)
+        | (static_cast<uint64_t>(has_level_mvar ? 1 : 0) << 42)
+        | (static_cast<uint64_t>(has_level_param ? 1 : 0) << 43)
+        | (range << 44);
+}
+
+static uint64_t vir_expr_data(object * value) {
+    return lean_ctor_get_uint64(value, lean_ctor_num_objs(value) * sizeof(void *));
+}
+
+static uint64_t vir_expr_hash(object * value) {
+    return static_cast<uint32_t>(vir_expr_data(value));
+}
+
+static uint32_t vir_expr_approx_depth_from_data(uint64_t data) {
+    return static_cast<uint32_t>((data >> 32) & 255);
+}
+
+static uint32_t vir_expr_approx_depth(object * value) {
+    return vir_expr_approx_depth_from_data(vir_expr_data(value));
+}
+
+static uint32_t vir_expr_loose_bvar_range_from_data(uint64_t data) {
+    return static_cast<uint32_t>(data >> 44);
+}
+
+static uint32_t vir_expr_loose_bvar_range(object * value) {
+    return vir_expr_loose_bvar_range_from_data(vir_expr_data(value));
+}
+
+static bool vir_expr_has_fvar_from_data(uint64_t data) {
+    return ((data >> 40) & 1) == 1;
+}
+
+static bool vir_expr_has_expr_mvar_from_data(uint64_t data) {
+    return ((data >> 41) & 1) == 1;
+}
+
+static bool vir_expr_has_level_mvar_from_data(uint64_t data) {
+    return ((data >> 42) & 1) == 1;
+}
+
+static bool vir_expr_has_level_param_from_data(uint64_t data) {
+    return ((data >> 43) & 1) == 1;
+}
+
+static uint64_t vir_level_list_hash(object * value) {
+    uint64_t hash = 7;
+    object * cursor = value;
+    while (!lean_is_scalar(cursor)) {
+        hash = vir_mix_hash(hash, vir_level_hash(lean_ctor_get(cursor, 0)));
+        cursor = lean_ctor_get(cursor, 1);
+    }
+    return hash;
+}
+
+static bool vir_level_list_has_mvar(object * value) {
+    object * cursor = value;
+    while (!lean_is_scalar(cursor)) {
+        if (vir_level_has_mvar(lean_ctor_get(cursor, 0))) return true;
+        cursor = lean_ctor_get(cursor, 1);
+    }
+    return false;
+}
+
+static bool vir_level_list_has_param(object * value) {
+    object * cursor = value;
+    while (!lean_is_scalar(cursor)) {
+        if (vir_level_has_param(lean_ctor_get(cursor, 0))) return true;
+        cursor = lean_ctor_get(cursor, 1);
+    }
+    return false;
+}
+
+extern "C" uint64_t lean_expr_mk_data(
+    uint64_t hash,
+    object * bvar_range,
+    uint32_t approx_depth,
+    uint8_t has_fvar,
+    uint8_t has_expr_mvar,
+    uint8_t has_level_mvar,
+    uint8_t has_level_param) {
+    return vir_expr_mk_data(
+        hash,
+        lean_uint64_of_nat(bvar_range),
+        approx_depth,
+        has_fvar != 0,
+        has_expr_mvar != 0,
+        has_level_mvar != 0,
+        has_level_param != 0);
+}
+
+extern "C" uint64_t lean_expr_mk_app_data(uint64_t f_data, uint64_t a_data) {
+    uint32_t depth = std::max(vir_expr_approx_depth_from_data(f_data), vir_expr_approx_depth_from_data(a_data)) + 1;
+    if (depth > 255) depth = 255;
+    uint32_t range = std::max(vir_expr_loose_bvar_range_from_data(f_data), vir_expr_loose_bvar_range_from_data(a_data));
+    uint32_t hash = static_cast<uint32_t>(vir_mix_hash(f_data, a_data));
+    return ((f_data | a_data) & (static_cast<uint64_t>(15) << 40))
+        | static_cast<uint64_t>(hash)
+        | (static_cast<uint64_t>(depth) << 32)
+        | (static_cast<uint64_t>(range) << 44);
+}
+
+extern "C" object * lean_expr_mk_bvar(obj_arg idx) {
+    uint64_t idx_hash = vir_nat_hash(idx);
+    uint64_t data = vir_expr_mk_data(vir_mix_hash(7, idx_hash), idx_hash + 1);
+    return vir_mk_ctor_with_data(static_cast<unsigned>(expr_kind::BVar), { idx }, data);
+}
+
+extern "C" object * lean_expr_mk_fvar(obj_arg name) {
+    uint64_t data = vir_expr_mk_data(vir_mix_hash(13, lean_name_hash(name)), 0, 0, true);
+    return vir_mk_ctor_with_data(static_cast<unsigned>(expr_kind::FVar), { name }, data);
+}
+
+extern "C" object * lean_expr_mk_mvar(obj_arg name) {
+    uint64_t data = vir_expr_mk_data(vir_mix_hash(17, lean_name_hash(name)), 0, 0, false, true);
+    return vir_mk_ctor_with_data(static_cast<unsigned>(expr_kind::MVar), { name }, data);
+}
+
+extern "C" object * lean_expr_mk_sort(obj_arg level) {
+    uint64_t data = vir_expr_mk_data(
+        vir_mix_hash(11, vir_level_hash(level)),
+        0,
+        0,
+        false,
+        false,
+        vir_level_has_mvar(level),
+        vir_level_has_param(level));
+    return vir_mk_ctor_with_data(static_cast<unsigned>(expr_kind::Sort), { level }, data);
+}
+
+extern "C" object * lean_expr_mk_const(obj_arg decl_name, obj_arg levels) {
+    uint64_t data = vir_expr_mk_data(
+        vir_mix_hash(5, vir_mix_hash(lean_name_hash(decl_name), vir_level_list_hash(levels))),
+        0,
+        0,
+        false,
+        false,
+        vir_level_list_has_mvar(levels),
+        vir_level_list_has_param(levels));
+    return vir_mk_ctor_with_data(static_cast<unsigned>(expr_kind::Const), { decl_name, levels }, data);
+}
+
+extern "C" object * lean_expr_mk_app(obj_arg fn, obj_arg arg) {
+    uint64_t data = lean_expr_mk_app_data(vir_expr_data(fn), vir_expr_data(arg));
+    return vir_mk_ctor_with_data(static_cast<unsigned>(expr_kind::App), { fn, arg }, data);
+}
+
+static object * vir_expr_mk_binding(unsigned tag, obj_arg name, obj_arg type, obj_arg body, uint8_t binder_info) {
+    uint64_t type_data = vir_expr_data(type);
+    uint64_t body_data = vir_expr_data(body);
+    uint32_t depth = std::max(vir_expr_approx_depth_from_data(type_data), vir_expr_approx_depth_from_data(body_data)) + 1;
+    uint32_t body_range = vir_expr_loose_bvar_range_from_data(body_data);
+    uint64_t data = vir_expr_mk_data(
+        vir_mix_hash(depth, vir_mix_hash(static_cast<uint32_t>(type_data), static_cast<uint32_t>(body_data))),
+        std::max<uint32_t>(vir_expr_loose_bvar_range_from_data(type_data), body_range == 0 ? 0 : body_range - 1),
+        depth,
+        vir_expr_has_fvar_from_data(type_data) || vir_expr_has_fvar_from_data(body_data),
+        vir_expr_has_expr_mvar_from_data(type_data) || vir_expr_has_expr_mvar_from_data(body_data),
+        vir_expr_has_level_mvar_from_data(type_data) || vir_expr_has_level_mvar_from_data(body_data),
+        vir_expr_has_level_param_from_data(type_data) || vir_expr_has_level_param_from_data(body_data));
+    object * obj = vir_mk_ctor_with_data(tag, { name, type, body }, data, sizeof(uint8_t));
+    lean_ctor_set_uint8(obj, 3 * sizeof(void *) + sizeof(uint64_t), binder_info);
+    return obj;
+}
+
+extern "C" object * lean_expr_mk_lambda(obj_arg name, obj_arg type, obj_arg body, uint8_t binder_info) {
+    return vir_expr_mk_binding(static_cast<unsigned>(expr_kind::Lambda), name, type, body, binder_info);
+}
+
+extern "C" object * lean_expr_mk_forall(obj_arg name, obj_arg type, obj_arg body, uint8_t binder_info) {
+    return vir_expr_mk_binding(static_cast<unsigned>(expr_kind::Pi), name, type, body, binder_info);
+}
+
+extern "C" object * lean_expr_mk_let(obj_arg name, obj_arg type, obj_arg value, obj_arg body, uint8_t nondep) {
+    uint64_t type_data = vir_expr_data(type);
+    uint64_t value_data = vir_expr_data(value);
+    uint64_t body_data = vir_expr_data(body);
+    uint32_t depth = std::max(std::max(
+        vir_expr_approx_depth_from_data(type_data),
+        vir_expr_approx_depth_from_data(value_data)),
+        vir_expr_approx_depth_from_data(body_data)) + 1;
+    uint32_t body_range = vir_expr_loose_bvar_range_from_data(body_data);
+    uint64_t data = vir_expr_mk_data(
+        vir_mix_hash(depth, vir_mix_hash(static_cast<uint32_t>(type_data), vir_mix_hash(static_cast<uint32_t>(value_data), static_cast<uint32_t>(body_data)))),
+        std::max<uint32_t>(
+            std::max<uint32_t>(vir_expr_loose_bvar_range_from_data(type_data), vir_expr_loose_bvar_range_from_data(value_data)),
+            body_range == 0 ? 0 : body_range - 1),
+        depth,
+        vir_expr_has_fvar_from_data(type_data) || vir_expr_has_fvar_from_data(value_data) || vir_expr_has_fvar_from_data(body_data),
+        vir_expr_has_expr_mvar_from_data(type_data) || vir_expr_has_expr_mvar_from_data(value_data) || vir_expr_has_expr_mvar_from_data(body_data),
+        vir_expr_has_level_mvar_from_data(type_data) || vir_expr_has_level_mvar_from_data(value_data) || vir_expr_has_level_mvar_from_data(body_data),
+        vir_expr_has_level_param_from_data(type_data) || vir_expr_has_level_param_from_data(value_data) || vir_expr_has_level_param_from_data(body_data));
+    object * obj = vir_mk_ctor_with_data(static_cast<unsigned>(expr_kind::Let), { name, type, value, body }, data, sizeof(uint8_t));
+    lean_ctor_set_uint8(obj, 4 * sizeof(void *) + sizeof(uint64_t), nondep);
+    return obj;
+}
+
+extern "C" object * lean_expr_mk_lit(obj_arg literal) {
+    uint64_t literal_hash = 0;
+    if (lean_obj_tag(literal) == 0) {
+        literal_hash = vir_nat_hash(lean_ctor_get(literal, 0));
+    } else {
+        literal_hash = lean_string_hash(lean_ctor_get(literal, 0));
+    }
+    uint64_t data = vir_expr_mk_data(vir_mix_hash(3, literal_hash), 0);
+    return vir_mk_ctor_with_data(static_cast<unsigned>(expr_kind::Lit), { literal }, data);
+}
+
+extern "C" object * lean_expr_mk_proj(obj_arg type_name, obj_arg idx, obj_arg structure) {
+    uint64_t structure_data = vir_expr_data(structure);
+    uint32_t depth = vir_expr_approx_depth_from_data(structure_data) + 1;
+    uint64_t data = vir_expr_mk_data(
+        vir_mix_hash(depth, vir_mix_hash(lean_name_hash(type_name), vir_mix_hash(vir_nat_hash(idx), static_cast<uint32_t>(structure_data)))),
+        vir_expr_loose_bvar_range_from_data(structure_data),
+        depth,
+        vir_expr_has_fvar_from_data(structure_data),
+        vir_expr_has_expr_mvar_from_data(structure_data),
+        vir_expr_has_level_mvar_from_data(structure_data),
+        vir_expr_has_level_param_from_data(structure_data));
+    return vir_mk_ctor_with_data(static_cast<unsigned>(expr_kind::Proj), { type_name, idx, structure }, data);
+}
 
 extern "C" obj_res lean_name_mk_string(obj_arg prefix, obj_arg suffix) {
     object * obj = mk_ctor(static_cast<unsigned>(name_kind::STRING), { prefix, suffix }, sizeof(uint64_t));
@@ -2071,27 +2797,6 @@ extern "C" uint32_t vir_upstream_shim_fixture_count(void) {
 
 extern "C" uint32_t vir_upstream_target_pointer_bytes(void) {
     return sizeof(void *);
-}
-
-extern "C" uint32_t vir_upstream_tamagotchi_step(uint32_t mood, uint32_t action) {
-    lean::ensure_ir_interpreter_initialized();
-    lean::object * mood_obj = lean_box(mood);
-    lean::object * action_obj = lean_box(action);
-    lean::object * args[] = { mood_obj, action_obj };
-    return lean::run_tagged_function(lean::name({ "Tamagotchi", "step" }), 2, args);
-}
-
-extern "C" uint32_t vir_upstream_tamagotchi_run_demo(void) {
-    lean::ensure_ir_interpreter_initialized();
-    lean::elab_environment env(lean_box(0));
-    lean::options opts(lean_box(0));
-    lean::object * script = lean::ir::run_boxed(env, opts, lean::name({ "Tamagotchi", "demoScript" }), 0, nullptr);
-    lean::object * initial = lean_box(0);
-    lean::object * args[] = { initial, script };
-    lean::object * result = lean::ir::run_boxed(env, opts, lean::name({ "Tamagotchi", "run" }), 2, args);
-    uint32_t out = static_cast<uint32_t>(lean_obj_tag(result));
-    lean_dec(result);
-    return out;
 }
 
 extern "C" char const * vir_call(

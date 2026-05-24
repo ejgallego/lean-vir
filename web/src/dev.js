@@ -90,6 +90,10 @@ function inputDefault(input) {
     case 12:
     case 13:
       return "";
+    case 15:
+      return `{"kind":"const","name":"Nat","levels":[]}`;
+    case 14:
+      return input.type?.constructors?.[0]?.jsName ?? "";
     default:
       return "";
   }
@@ -115,20 +119,35 @@ function renderInputFields(entry) {
     label.className = "dev-field";
     const caption = document.createElement("span");
     caption.textContent = `${input.name ?? `input${index + 1}`} : ${input.type?.type ?? "?"}`;
-    const field = document.createElement("input");
+    const field =
+      input.type?.wireTag === 14 ? document.createElement("select") :
+      input.type?.wireTag === 15 ? document.createElement("textarea") :
+      document.createElement("input");
     field.id = inputFieldId(input, index);
-    field.value = inputDefault(input);
     field.dataset.inputIndex = String(index);
-    if (input.type?.wireTag === 0 || input.type?.wireTag === 4 || input.type?.wireTag === 5 || input.type?.wireTag === 6) {
+    if (input.type?.wireTag === 14) {
+      for (const ctor of input.type?.constructors ?? []) {
+        const option = document.createElement("option");
+        option.value = ctor.jsName ?? ctor.name;
+        option.textContent = ctor.jsName ?? ctor.name;
+        field.append(option);
+      }
+      field.value = inputDefault(input);
+    } else if (input.type?.wireTag === 0 || input.type?.wireTag === 4 || input.type?.wireTag === 5 || input.type?.wireTag === 6) {
       field.type = "number";
       field.inputMode = "numeric";
       field.min = "0";
+    } else if (input.type?.wireTag === 15) {
+      field.spellcheck = false;
     } else if (input.type?.wireTag === 2) {
       field.type = "text";
       field.inputMode = "text";
     } else {
       field.type = "text";
       field.inputMode = "text";
+    }
+    if (input.type?.wireTag !== 14) {
+      field.value = inputDefault(input);
     }
     label.append(caption, field);
     inputFields.append(label);
@@ -240,9 +259,19 @@ function parseInputValue(input, text) {
       return parseUInt32ArrayInput(text);
     case 13:
       return parseStringListInput(text);
+    case 14:
+      return text.trim();
+    case 15:
+      return JSON.parse(text);
     default:
       throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);
   }
+}
+
+function formatResult(value) {
+  if (value instanceof Uint8Array) return Array.from(value).join(", ");
+  if (value !== null && typeof value === "object") return JSON.stringify(value, null, 2);
+  return String(value);
 }
 
 async function loadIrPackageBytes(label, bytes) {
@@ -313,7 +342,7 @@ runEntryButton.addEventListener("click", () => {
       throw new Error("no interface entry selected");
     }
     const result = evaluateEntry(runtime, entry);
-    resultOutput.textContent = result instanceof Uint8Array ? Array.from(result).join(", ") : String(result);
+    resultOutput.textContent = formatResult(result);
     setStatus("Ready", true);
   } catch (error) {
     resultOutput.textContent = "error";

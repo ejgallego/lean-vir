@@ -67,6 +67,8 @@ inductive InterfaceType where
   | arrayUInt32
   | listNat
   | listString
+  | simpleEnum (name : Name) (constructors : Array Name)
+  | expr
   deriving BEq, Repr
 
 structure InterfaceArg where
@@ -99,7 +101,12 @@ def defaultTargets : Array Target := #[
     source := "examples/Tamagotchi.lean",
     roots := #[
       `Tamagotchi.step,
-      `Tamagotchi.step._boxed,
+      `Tamagotchi.step._boxed
+    ]
+  },
+  {
+    source := "examples/Tamagotchi.lean",
+    roots := #[
       `Tamagotchi.run,
       `Tamagotchi.run._boxed,
       `Tamagotchi.trace,
@@ -1028,6 +1035,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint32_to_uint8"
   },
   {
+    name := `UInt32.toUInt64,
+    params := #[param 1 false .uint32],
+    resultType := .uint64,
+    symbol := "lean_uint32_to_uint64"
+  },
+  {
     name := `UInt32.add,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
@@ -1148,6 +1161,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint64_to_usize"
   },
   {
+    name := `UInt64.toUInt32,
+    params := #[param 1 false .uint64],
+    resultType := .uint32,
+    symbol := "lean_uint64_to_uint32"
+  },
+  {
     name := `UInt64.add,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
@@ -1254,6 +1273,38 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .float],
     resultType := .uint32,
     symbol := "lean_float_to_uint32"
+  },
+  {
+    name := `Lean.Level.mkData,
+    params := #[param 1 false .uint64, param 2 false .tobject, param 3 false .uint8, param 4 false .uint8],
+    resultType := .uint64,
+    symbol := "lean_level_mk_data"
+  },
+  {
+    name := `Lean.Expr.mkData,
+    params := #[
+      param 1 false .uint64,
+      param 2 false .tobject,
+      param 3 false .uint32,
+      param 4 false .uint8,
+      param 5 false .uint8,
+      param 6 false .uint8,
+      param 7 false .uint8
+    ],
+    resultType := .uint64,
+    symbol := "lean_expr_mk_data"
+  },
+  {
+    name := `Lean.Expr.mkAppData,
+    params := #[param 1 false .uint64, param 2 false .uint64],
+    resultType := .uint64,
+    symbol := "lean_expr_mk_app_data"
+  },
+  {
+    name := `Lean.Expr.data,
+    params := #[param 1 true .tobject],
+    resultType := .uint64,
+    symbol := "lean_expr_data"
   }
 ]
 
@@ -1266,7 +1317,7 @@ def isUnsupportedInitGlobal : Decl -> Bool
 
 def primitiveNamespaces : List String :=
   [
-    "Array", "Bool", "ByteArray", "Char", "Float", "Float32", "IO", "Int",
+    "Array", "Bool", "ByteArray", "Char", "Float", "Float32", "IO", "Int", "Lean",
     "Nat", "Ptr", "ST", "String", "UInt8", "UInt16", "UInt32", "UInt64",
     "USize"
   ]
@@ -1429,6 +1480,8 @@ def InterfaceType.label : InterfaceType → String
   | .arrayUInt32 => "Array UInt32"
   | .listNat => "List Nat"
   | .listString => "List String"
+  | .simpleEnum name _ => name.toString
+  | .expr => "Lean.Expr"
 
 def InterfaceType.wireTag : InterfaceType → Nat
   | .nat => 0
@@ -1445,9 +1498,50 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .arrayUInt32 => 11
   | .listNat => 12
   | .listString => 13
+  | .simpleEnum .. => 14
+  | .expr => 15
+
+def jsonEscape (text : String) : String :=
+  text.foldl (fun out c =>
+    match c with
+    | '"' => out ++ "\\\""
+    | '\\' => out ++ "\\\\"
+    | '\n' => out ++ "\\n"
+    | '\r' => out ++ "\\r"
+    | '\t' => out ++ "\\t"
+    | _ => out.push c) ""
+
+def jsonString (text : String) : String :=
+  "\"" ++ jsonEscape text ++ "\""
+
+def jsonArray (items : Array String) : String :=
+  "[" ++ ",".intercalate items.toList ++ "]"
+
+def ctorShortName (inductiveName ctorName : Name) : String :=
+  let prefixText := inductiveName.toString ++ "."
+  let text := ctorName.toString
+  if text.startsWith prefixText then
+    (text.drop prefixText.length).toString
+  else
+    text
 
 def InterfaceType.toJson (ty : InterfaceType) : String :=
-  "{\"type\":\"" ++ ty.label ++ "\",\"wireTag\":" ++ toString ty.wireTag ++ "}"
+  match ty with
+  | .simpleEnum name constructors =>
+      let ctorJson := constructors.mapIdx fun idx ctor =>
+        "{"
+        ++ "\"name\":" ++ jsonString ctor.toString ++ ","
+        ++ "\"jsName\":" ++ jsonString (ctorShortName name ctor) ++ ","
+        ++ "\"tag\":" ++ toString idx
+        ++ "}"
+      "{"
+      ++ "\"type\":\"" ++ jsonEscape ty.label ++ "\","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"simpleEnum\","
+      ++ "\"constructors\":" ++ jsonArray ctorJson
+      ++ "}"
+  | _ =>
+      "{\"type\":\"" ++ ty.label ++ "\",\"wireTag\":" ++ toString ty.wireTag ++ "}"
 
 partial def stripMData : Lean.Expr → Lean.Expr
   | .mdata _ e => stripMData e
@@ -1470,9 +1564,23 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `UInt64 => some .uint64
   | some `USize => some .usize
   | some `ByteArray => some .byteArray
+  | some `Lean.Expr => some .expr
   | _ => none
 
-def interfaceType? (e : Lean.Expr) : Option InterfaceType :=
+def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType := do
+  let name <- constName? e
+  let .inductInfo info <- env.find? name | none
+  if info.numParams != 0 || info.numIndices != 0 || info.isRec || info.ctors.isEmpty then
+    none
+  else
+    let ctors := info.ctors.toArray
+    let allNullary := ctors.all fun ctor =>
+      match env.find? ctor with
+      | some (.ctorInfo ctorInfo) => ctorInfo.induct == name && ctorInfo.numFields == 0
+      | _ => false
+    if allNullary then some (.simpleEnum name ctors) else none
+
+def interfaceType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :=
   match simpleInterfaceType? e with
   | some ty => some ty
   | none =>
@@ -1489,7 +1597,7 @@ def interfaceType? (e : Lean.Expr) : Option InterfaceType :=
           | some .nat => some .listNat
           | some .string => some .listString
           | _ => none
-      | _, _ => none
+      | _, _ => simpleEnumType? env e
 
 def binderArgName (fallback : Nat) (name : Name) : String :=
   let candidate := name.toString
@@ -1498,20 +1606,20 @@ def binderArgName (fallback : Nat) (name : Name) : String :=
   else
     candidate
 
-partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args : Array InterfaceArg := #[]) :
+partial def interfaceSignature? (env : Environment) (type : Lean.Expr) (argIndex : Nat := 1) (args : Array InterfaceArg := #[]) :
     Except String (Array InterfaceArg × InterfaceType) :=
   match stripMData type with
   | .forallE name domain body binderInfo =>
       if binderInfo != .default then
         throw s!"unsupported implicit/instance argument `{name}`"
       else
-        match interfaceType? domain with
+        match interfaceType? env domain with
         | none => throw s!"unsupported argument type `{domain}`"
         | some argType =>
             let arg := { name := binderArgName argIndex name, type := argType }
-            interfaceSignature? body (argIndex + 1) (args.push arg)
+            interfaceSignature? env body (argIndex + 1) (args.push arg)
   | result =>
-      match interfaceType? result with
+      match interfaceType? env result with
       | none => throw s!"unsupported result type `{result}`"
       | some resultType => return (args, resultType)
 
@@ -1571,7 +1679,7 @@ def interfaceExportFor (env : Environment) (source : String) (name : Name) :
         if !isInterfaceDeclInfo info then
           throw { name, source, reason := "declaration is not a compiled definition" }
         else
-          match interfaceSignature? info.type with
+          match interfaceSignature? env info.type with
           | .ok (args, result) =>
               let jsName := jsNameFor name
               return { id := jsName, jsName, entry := name, source, args, result }
@@ -1599,22 +1707,6 @@ def collectInterfaceManifest (targets : Array Target) (index : DeclIndex) : Inte
                 { manifest with exports := manifest.exports.push entry }
           | .error diagnostic =>
               { manifest with diagnostics := manifest.diagnostics.push diagnostic }) manifest) {}
-
-def jsonEscape (text : String) : String :=
-  text.foldl (fun out c =>
-    match c with
-    | '"' => out ++ "\\\""
-    | '\\' => out ++ "\\\\"
-    | '\n' => out ++ "\\n"
-    | '\r' => out ++ "\\r"
-    | '\t' => out ++ "\\t"
-    | _ => out.push c) ""
-
-def jsonString (text : String) : String :=
-  "\"" ++ jsonEscape text ++ "\""
-
-def jsonArray (items : Array String) : String :=
-  "[" ++ ",".intercalate items.toList ++ "]"
 
 def InterfaceArg.toJson (arg : InterfaceArg) : String :=
   "{"

@@ -248,6 +248,20 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "expr-sample-score",
+      "source": "fixtures/ExprPrinter.lean",
+      "entry": "Vir.Fixtures.ExprPrinter.sampleScore",
+      "roots": [
+        "Vir.Fixtures.ExprPrinter.sampleScore",
+        "Vir.Fixtures.ExprPrinter.constNatExpr",
+        "Vir.Fixtures.ExprPrinter.twoLitExpr",
+        "Vir.Fixtures.ExprPrinter.appExpr",
+        "Vir.Fixtures.ExprPrinter.exprKindScore",
+        "Vir.Fixtures.ExprPrinter.bumpBVar"
+      ],
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-parser-input-context",
       "source": "fixtures/LeanParser.lean",
       "entry": "Vir.Fixtures.LeanParser.upstreamParserInputContextScore",

@@ -29,6 +29,28 @@ assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
+assert.equal(runtime.call("Tamagotchi.step", "happy", "ignore"), "hungry");
+assert.equal(runtime.call("Tamagotchi.step", "hungry", "feed"), "happy");
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.constNatExpr"), {
+  kind: "const",
+  name: "Nat",
+  levels: [],
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.twoLitExpr"), {
+  kind: "lit",
+  literal: { kind: "nat", value: "2" },
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.appExpr"), {
+  kind: "app",
+  fn: { kind: "const", name: "Nat.succ", levels: [] },
+  arg: { kind: "lit", literal: { kind: "nat", value: "2" } },
+});
+assert.equal(runtime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }), "5");
+assert.equal(runtime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "lit", literal: { kind: "nat", value: 2 } }), "102");
+assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.bumpBVar", { kind: "bvar", index: 4 }), {
+  kind: "bvar",
+  index: "5",
+});
 
 const factory = createVirRuntimeFactory({ wasmBytes });
 const first = await factory.createRuntime({ irPackageBytes });

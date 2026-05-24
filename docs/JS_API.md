@@ -25,6 +25,8 @@ console.log(vir.exportsByName.SortDemo_demo());
 console.log(vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]));
 console.log(vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
 console.log(vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
+console.log(vir.call("Tamagotchi.step", "happy", "ignore"));
+console.log(vir.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }));
 ```
 
 There is also a minimal browser page at `/runtime-example.html` that imports the
@@ -56,10 +58,20 @@ const second = await factory.createRuntime({ irPackageBytes });
 
 Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `UInt8`, `UInt16`,
 `UInt32`, `UInt64`, `USize`, `ByteArray`, `Array Nat`, `Array UInt32`,
-`List Nat`, and `List String`.
+`List Nat`, `List String`, nullary inductive enums, and `Lean.Expr`.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`.
+
+Nullary inductive enums are accepted as constructor names, generated JavaScript
+names, or constructor indexes. Results are returned as the constructor's
+generated JavaScript name.
+
+`Lean.Expr` values use structural JavaScript objects such as
+`{ kind: "const", name: "Nat", levels: [] }`,
+`{ kind: "app", fn, arg }`, or `{ kind: "bvar", index: 0 }`. Level values use
+the same shape with `kind` values `zero`, `succ`, `max`, `imax`, `param`, and
+`mvar`. Metadata expressions currently round-trip as their inner expression.
 
 ## Generate A Local Package
 
