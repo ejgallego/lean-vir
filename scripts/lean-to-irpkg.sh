@@ -10,7 +10,7 @@ cd "$(dirname "$0")/.."
 
 usage() {
   echo "usage: scripts/lean-to-irpkg.sh <source.lean> [package.irpkg] [root ...]" >&2
-  echo "       when roots are omitted, all IR declarations from the source are packaged" >&2
+  echo "       when roots are omitted, public source definitions become exports" >&2
 }
 
 if [ "$#" -lt 1 ]; then

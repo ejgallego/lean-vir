@@ -19,6 +19,7 @@ const demoTargets = [
   },
   {
     source: "examples/Tamagotchi.lean",
+    packageOnly: true,
     roots: [
       "Tamagotchi.step",
       "Tamagotchi.step._boxed",
@@ -33,6 +34,13 @@ const demoTargets = [
     source: "examples/MergeSort.lean",
     roots: ["SortDemo.demo", "SortDemo.demoFromArray"],
   },
+  {
+    source: "fixtures/Basic.lean",
+    roots: [
+      "Vir.Fixtures.Basic.stringUtf8RoundtripScore",
+      "Vir.Fixtures.Basic.byteArrayInputScore",
+    ],
+  },
 ];
 
 function rootsFor(fixture) {
@@ -46,9 +54,10 @@ function addTarget(targets, source, roots) {
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const targets = new Map();
+const packageTargets = new Map();
 
 for (const target of demoTargets) {
-  addTarget(targets, target.source, target.roots);
+  addTarget(target.packageOnly ? packageTargets : targets, target.source, target.roots);
 }
 
 for (const fixture of manifest.fixtures ?? []) {
@@ -58,6 +67,9 @@ for (const fixture of manifest.fixtures ?? []) {
 const targetArgs = [];
 for (const [source, roots] of targets) {
   targetArgs.push("--target", source, ...new Set(roots));
+}
+for (const [source, roots] of packageTargets) {
+  targetArgs.push("--package-target", source, ...new Set(roots));
 }
 
 const result = spawnSync(

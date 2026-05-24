@@ -16,8 +16,8 @@ The generated report is written to `build/upstream-probe/boundary.md`.
 Current status: the strict `wasm32-wasip1` link succeeds with the real upstream
 `ir_interpreter.cpp`, the linked Lean runtime subset, and
 `wasm/upstream_shim/`. The demo closure is supplied through a package-backed
-provider as real Lean IR declaration objects, and the exported demo functions
-execute that closure through the real upstream interpreter.
+provider as real Lean IR declaration objects, and manifest-supported browser
+calls execute that closure through the real upstream interpreter via `vir_call`.
 
 ## Policy
 
@@ -67,6 +67,8 @@ Together they supply:
 - small WASI/platform stubs for dynamic symbol lookup, C++ exception throwing,
   trace/time/options hooks, and the few environment helpers pulled in by the
   interpreter.
+- the generic `vir_call` package interface used by the JavaScript runtime for
+  manifest-supported functions.
 - name construction primitives needed by `src/util/name.cpp`.
 
 The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
@@ -139,8 +141,8 @@ arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
 comparison operations, `UInt32.ofNat`/`toNat`/`toUInt8` plus arithmetic,
 bitwise, shift, and comparison operations, `UInt64.ofNat`/`ofNatLT`/`toNat`/
 `toUSize`/`toFloat` plus arithmetic, bitwise, shift, and comparison operations
-including a wide `UInt64.toNat` fixture returned through
-`vir_eval_const_nat_string`, package-backed `Nat` literals wider than 32 bits,
+including a wide `UInt64.toNat` fixture returned through the manifest-driven
+`vir_call` path, package-backed `Nat` literals wider than 32 bits,
 `USize` `sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
 `ByteArray.mk`/`ByteArray.get`, and
 `Float.scaleB`/`toUInt32`. Parser-adjacent hash/name/substring/pointer-address

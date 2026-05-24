@@ -1,9 +1,8 @@
 # JavaScript Runtime API
 
-`web/src/vir-runtime.js` is a small ES module wrapper around the WASM exports.
-It loads `vir-upstream.wasm`, loads an `.irpkg`, and exposes the currently
-supported `Nat`-returning entry shapes without requiring callers to manage WASM
-memory.
+`web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a manifest-bearing
+`.irpkg`, and exposes its Lean declarations through a generic JavaScript call
+API without requiring callers to manage WASM memory.
 
 The module is also exposed through the package entry point:
 
@@ -21,15 +20,15 @@ const vir = await createVirRuntime({
   irPackageUrl: "vir-demo.irpkg",
 });
 
-console.log(vir.evalConstNat("SortDemo.demo"));
-console.log(vir.evalNatToNat("fib", 12));
-console.log(vir.evalNatArrayToNat("SortDemo.demoFromArray", [4, 1, 3, 2]));
-console.log(vir.evalStringToNat("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
-console.log(vir.evalByteArrayToNat("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
+console.log(vir.call("fib", 12));
+console.log(vir.exportsByName.SortDemo_demo());
+console.log(vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]));
+console.log(vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
+console.log(vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
 ```
 
 There is also a minimal browser page at `/runtime-example.html` that imports the
-runtime directly and prints the calls above.
+runtime directly and prints sample calls.
 
 ## Reusing The Compiled Module
 
@@ -46,17 +45,21 @@ const first = await factory.createRuntime({ irPackageBytes });
 const second = await factory.createRuntime({ irPackageBytes });
 ```
 
-## Supported Calls
+## Calls And Manifest
 
-- `vir.evalConstNat(name)` for `() -> Nat`.
-- `vir.evalNatToNat(name, value)` for `Nat -> Nat`.
-- `vir.evalNatArrayToNat(name, values)` for `Array Nat -> Nat`.
-- `vir.evalStringToNat(name, value)` for `String -> Nat`.
-- `vir.evalByteArrayToNat(name, values)` for `ByteArray -> Nat`.
+- `vir.interfaceManifest` is the embedded package manifest.
+- `vir.call(name, ...args)` accepts a manifest `id`, `jsName`, or Lean
+  declaration name.
+- `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
+  methods.
+- `vir.packageInfo.interfaceExports` reports the number of generated exports.
 
-All results are returned as decimal strings so large `Nat` results are not
-truncated to JavaScript's safe integer range. Raw WASM exports remain available
-as `vir.exports` for demo-specific calls that do not have a generic wrapper yet.
+Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `UInt8`, `UInt16`,
+`UInt32`, `UInt64`, `USize`, `ByteArray`, `Array Nat`, `Array UInt32`,
+`List Nat`, and `List String`.
+
+Large exact integer values are returned as decimal strings. ByteArray results
+are returned as `Uint8Array`.
 
 ## Generate A Local Package
 
@@ -64,12 +67,6 @@ Generate a package from one Lean file and one or more root declarations:
 
 ```bash
 npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
-```
-
-Or package every declaration emitted by that file:
-
-```bash
-npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
 ```
 
 Serve the generated `.irpkg` next to `vir-upstream.wasm`, or upload it through
@@ -86,6 +83,5 @@ const vir = await createVirRuntime({
 ## Current Limits
 
 The runtime uses the static package-backed path. It does not load `.olean`,
-`.ir`, or full Lean module data in the browser. Only the generic entry shapes
-listed above are wrapped today; additional input or result types need matching
-WASM exports in `wasm/upstream_shim/shim.cpp`.
+`.ir`, or full Lean module data in the browser. Unsupported requested exports
+fail during package generation instead of being omitted silently.

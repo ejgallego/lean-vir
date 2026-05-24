@@ -11,8 +11,11 @@ Author: Emilio J. Gallego Arias
 #include <stdlib.h>
 #include <string.h>
 
+#include <algorithm>
 #include <initializer_list>
+#include <limits>
 #include <string>
+#include <vector>
 
 #include "kernel/environment.h"
 #include "kernel/expr.h"
@@ -1534,32 +1537,12 @@ static void ensure_ir_interpreter_initialized() {
     }
 }
 
-static uint32_t run_nat_function(name const & fn, unsigned n, object ** args) {
-    elab_environment env(lean_box(0));
-    options opts(lean_box(0));
-    object * result = ir::run_boxed(env, opts, fn, n, args);
-    uint32_t out = static_cast<uint32_t>(vir::static_nat_to_usize(result));
-    lean_dec(result);
-    return out;
-}
-
 static std::string nat_to_decimal(object * value) {
     if (lean_is_scalar(value)) {
         return std::to_string(lean_unbox(value));
     }
     return mpz_value(value).to_string();
 }
-
-static std::string run_nat_function_string(name const & fn, unsigned n, object ** args) {
-    elab_environment env(lean_box(0));
-    options opts(lean_box(0));
-    object * result = ir::run_boxed(env, opts, fn, n, args);
-    std::string out = nat_to_decimal(result);
-    lean_dec(result);
-    return out;
-}
-
-static std::string g_eval_const_nat_string;
 
 static uint32_t run_tagged_function(name const & fn, unsigned n, object ** args) {
     elab_environment env(lean_box(0));
@@ -1570,18 +1553,6 @@ static uint32_t run_tagged_function(name const & fn, unsigned n, object ** args)
     return out;
 }
 
-static object * mk_nat_array(uint32_t const * values, uint32_t len) {
-    object * array = lean_alloc_array(len, len);
-    for (uint32_t i = 0; i < len; i++) {
-        lean_array_set_core(array, i, vir::mk_static_nat(values[i]));
-    }
-    return array;
-}
-
-static object * mk_string_from_bytes(char const * text, uint32_t len) {
-    return lean::mk_string(std::string(text, len));
-}
-
 static object * mk_byte_array(uint8_t const * values, uint32_t len) {
     object * array = lean_alloc_sarray(1, len, len);
     if (len != 0) {
@@ -1589,6 +1560,344 @@ static object * mk_byte_array(uint8_t const * values, uint32_t len) {
     }
     return array;
 }
+
+enum class vir_wire_type : uint8_t {
+    Nat = 0,
+    Int = 1,
+    Bool = 2,
+    String = 3,
+    UInt8 = 4,
+    UInt16 = 5,
+    UInt32 = 6,
+    UInt64 = 7,
+    USize = 8,
+    ByteArray = 9,
+    ArrayNat = 10,
+    ArrayUInt32 = 11,
+    ListNat = 12,
+    ListString = 13,
+};
+
+class vir_reader {
+    uint8_t const * m_data;
+    uint32_t m_size;
+    uint32_t m_pos = 0;
+    std::string m_error;
+
+public:
+    bool ok = true;
+
+    vir_reader(uint8_t const * data, uint32_t size):
+        m_data(data),
+        m_size(size) {
+    }
+
+    std::string const & error() const {
+        return m_error;
+    }
+
+    uint8_t u8() {
+        if (!ok) return 0;
+        if (m_pos >= m_size) {
+            fail("unexpected end of call payload");
+            return 0;
+        }
+        return m_data[m_pos++];
+    }
+
+    uint32_t u32() {
+        uint32_t b0 = u8();
+        uint32_t b1 = u8();
+        uint32_t b2 = u8();
+        uint32_t b3 = u8();
+        return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
+    }
+
+    std::string string() {
+        uint32_t len = u32();
+        if (!ok) return std::string();
+        if (len > m_size - m_pos) {
+            fail("string length exceeds remaining call payload");
+            return std::string();
+        }
+        std::string out(reinterpret_cast<char const *>(m_data + m_pos), len);
+        m_pos += len;
+        return out;
+    }
+
+    std::vector<uint8_t> bytes() {
+        uint32_t len = u32();
+        if (!ok) return {};
+        if (len > m_size - m_pos) {
+            fail("byte array length exceeds remaining call payload");
+            return {};
+        }
+        std::vector<uint8_t> out(m_data + m_pos, m_data + m_pos + len);
+        m_pos += len;
+        return out;
+    }
+
+    bool at_end() const {
+        return m_pos == m_size;
+    }
+
+    void fail(std::string const & message) {
+        if (ok) {
+            ok = false;
+            m_error = message;
+        }
+    }
+};
+
+class vir_writer {
+    std::string m_bytes;
+
+public:
+    void u8(uint8_t value) {
+        m_bytes.push_back(static_cast<char>(value));
+    }
+
+    void u32(uint32_t value) {
+        m_bytes.push_back(static_cast<char>(value & 0xff));
+        m_bytes.push_back(static_cast<char>((value >> 8) & 0xff));
+        m_bytes.push_back(static_cast<char>((value >> 16) & 0xff));
+        m_bytes.push_back(static_cast<char>((value >> 24) & 0xff));
+    }
+
+    void string(std::string const & value) {
+        u32(static_cast<uint32_t>(value.size()));
+        m_bytes.append(value);
+    }
+
+    void bytes(uint8_t const * ptr, uint32_t len) {
+        u32(len);
+        if (len != 0) {
+            m_bytes.append(reinterpret_cast<char const *>(ptr), len);
+        }
+    }
+
+    std::string take() {
+        return std::move(m_bytes);
+    }
+};
+
+static bool parse_u64(std::string const & text, uint64_t & out) {
+    if (text.empty()) return false;
+    uint64_t value = 0;
+    for (char c : text) {
+        if (c < '0' || c > '9') return false;
+        uint64_t digit = static_cast<uint64_t>(c - '0');
+        if (value > (std::numeric_limits<uint64_t>::max() - digit) / 10) {
+            return false;
+        }
+        value = value * 10 + digit;
+    }
+    out = value;
+    return true;
+}
+
+static object * mk_list_from_reversed(std::vector<object *> const & values) {
+    object * out = lean_box(0);
+    for (object * value : values) {
+        object * cons = lean_alloc_ctor(1, 2, 0);
+        lean_inc(value);
+        lean_ctor_set(cons, 0, value);
+        lean_ctor_set(cons, 1, out);
+        out = cons;
+    }
+    return out;
+}
+
+static object * decode_argument(vir_reader & r) {
+    vir_wire_type tag = static_cast<vir_wire_type>(r.u8());
+    switch (tag) {
+    case vir_wire_type::Nat: {
+        std::string text = r.string();
+        return lean_cstr_to_nat(text.c_str());
+    }
+    case vir_wire_type::Int: {
+        std::string text = r.string();
+        return lean_cstr_to_int(text.c_str());
+    }
+    case vir_wire_type::Bool:
+        return lean_box(r.u8() ? 1 : 0);
+    case vir_wire_type::String: {
+        std::string text = r.string();
+        return lean_mk_string_from_bytes(text.data(), text.size());
+    }
+    case vir_wire_type::UInt8:
+        return lean_box(r.u8());
+    case vir_wire_type::UInt16:
+        return lean_box(static_cast<uint16_t>(r.u32()));
+    case vir_wire_type::UInt32:
+        return lean_box_uint32(r.u32());
+    case vir_wire_type::UInt64: {
+        uint64_t value = 0;
+        if (!parse_u64(r.string(), value)) {
+            r.fail("invalid UInt64 decimal argument");
+            return lean_box_uint64(0);
+        }
+        return lean_box_uint64(value);
+    }
+    case vir_wire_type::USize: {
+        uint64_t value = 0;
+        if (!parse_u64(r.string(), value) || value > std::numeric_limits<size_t>::max()) {
+            r.fail("invalid USize decimal argument");
+            return lean_box_usize(0);
+        }
+        return lean_box_usize(static_cast<size_t>(value));
+    }
+    case vir_wire_type::ByteArray: {
+        std::vector<uint8_t> values = r.bytes();
+        return mk_byte_array(values.data(), static_cast<uint32_t>(values.size()));
+    }
+    case vir_wire_type::ArrayNat: {
+        uint32_t len = r.u32();
+        object * array = lean_alloc_array(len, len);
+        for (uint32_t i = 0; i < len; i++) {
+            std::string text = r.string();
+            lean_array_set_core(array, i, lean_cstr_to_nat(text.c_str()));
+        }
+        return array;
+    }
+    case vir_wire_type::ArrayUInt32: {
+        uint32_t len = r.u32();
+        object * array = lean_alloc_array(len, len);
+        for (uint32_t i = 0; i < len; i++) {
+            lean_array_set_core(array, i, lean_box_uint32(r.u32()));
+        }
+        return array;
+    }
+    case vir_wire_type::ListNat: {
+        uint32_t len = r.u32();
+        std::vector<object *> values;
+        values.reserve(len);
+        for (uint32_t i = 0; i < len; i++) {
+            std::string text = r.string();
+            values.push_back(lean_cstr_to_nat(text.c_str()));
+        }
+        std::reverse(values.begin(), values.end());
+        object * out = mk_list_from_reversed(values);
+        for (object * value : values) lean_dec(value);
+        return out;
+    }
+    case vir_wire_type::ListString: {
+        uint32_t len = r.u32();
+        std::vector<object *> values;
+        values.reserve(len);
+        for (uint32_t i = 0; i < len; i++) {
+            std::string text = r.string();
+            values.push_back(lean_mk_string_from_bytes(text.data(), text.size()));
+        }
+        std::reverse(values.begin(), values.end());
+        object * out = mk_list_from_reversed(values);
+        for (object * value : values) lean_dec(value);
+        return out;
+    }
+    default:
+        r.fail("unsupported wire argument tag " + std::to_string(static_cast<uint8_t>(tag)));
+        return lean_box(0);
+    }
+}
+
+static std::string int_to_decimal(object * value) {
+    if (lean_is_scalar(value)) {
+        return std::to_string(lean_scalar_to_int(value));
+    }
+    return mpz_value(value).to_string();
+}
+
+static void encode_nat_payload(vir_writer & w, object * value) {
+    w.string(nat_to_decimal(value));
+}
+
+static void encode_string_payload(vir_writer & w, object * value) {
+    size_t size = lean_string_size(value);
+    uint32_t len = static_cast<uint32_t>(size == 0 ? 0 : size - 1);
+    w.bytes(reinterpret_cast<uint8_t const *>(lean_string_cstr(value)), len);
+}
+
+static void encode_list_payload(vir_writer & w, object * value, vir_wire_type elem_tag) {
+    std::vector<object *> values;
+    object * cursor = value;
+    while (!lean_is_scalar(cursor)) {
+        values.push_back(lean_ctor_get(cursor, 0));
+        cursor = lean_ctor_get(cursor, 1);
+    }
+    w.u32(static_cast<uint32_t>(values.size()));
+    for (object * elem : values) {
+        if (elem_tag == vir_wire_type::Nat) {
+            w.string(nat_to_decimal(elem));
+        } else if (elem_tag == vir_wire_type::String) {
+            size_t size = lean_string_size(elem);
+            uint32_t len = static_cast<uint32_t>(size == 0 ? 0 : size - 1);
+            w.bytes(reinterpret_cast<uint8_t const *>(lean_string_cstr(elem)), len);
+        }
+    }
+}
+
+static void encode_result(vir_writer & w, vir_wire_type tag, object * value) {
+    w.u8(static_cast<uint8_t>(tag));
+    switch (tag) {
+    case vir_wire_type::Nat:
+        encode_nat_payload(w, value);
+        break;
+    case vir_wire_type::Int:
+        w.string(int_to_decimal(value));
+        break;
+    case vir_wire_type::Bool:
+        w.u8(lean_unbox(value) ? 1 : 0);
+        break;
+    case vir_wire_type::String:
+        encode_string_payload(w, value);
+        break;
+    case vir_wire_type::UInt8:
+        w.u8(static_cast<uint8_t>(lean_unbox(value)));
+        break;
+    case vir_wire_type::UInt16:
+        w.u32(static_cast<uint32_t>(lean_unbox(value)));
+        break;
+    case vir_wire_type::UInt32:
+        w.u32(lean_unbox_uint32(value));
+        break;
+    case vir_wire_type::UInt64:
+        w.string(std::to_string(lean_unbox_uint64(value)));
+        break;
+    case vir_wire_type::USize:
+        w.string(std::to_string(lean_unbox_usize(value)));
+        break;
+    case vir_wire_type::ByteArray:
+        w.bytes(lean_sarray_cptr(value), static_cast<uint32_t>(lean_sarray_size(value)));
+        break;
+    case vir_wire_type::ArrayNat: {
+        uint32_t len = static_cast<uint32_t>(lean_array_size(value));
+        w.u32(len);
+        for (uint32_t i = 0; i < len; i++) {
+            w.string(nat_to_decimal(lean_array_get_core(value, i)));
+        }
+        break;
+    }
+    case vir_wire_type::ArrayUInt32: {
+        uint32_t len = static_cast<uint32_t>(lean_array_size(value));
+        w.u32(len);
+        for (uint32_t i = 0; i < len; i++) {
+            w.u32(lean_unbox_uint32(lean_array_get_core(value, i)));
+        }
+        break;
+    }
+    case vir_wire_type::ListNat:
+        encode_list_payload(w, value, vir_wire_type::Nat);
+        break;
+    case vir_wire_type::ListString:
+        encode_list_payload(w, value, vir_wire_type::String);
+        break;
+    default:
+        break;
+    }
+}
+
+static std::string g_call_result;
+static std::string g_call_error;
 
 static char const * known_symbol_stem(name const & n) {
     std::string dotted = n.to_string();
@@ -1764,27 +2073,6 @@ extern "C" uint32_t vir_upstream_target_pointer_bytes(void) {
     return sizeof(void *);
 }
 
-extern "C" uint32_t vir_upstream_fib(uint32_t n) {
-    lean::ensure_ir_interpreter_initialized();
-    lean::object * arg = lean::vir::mk_static_nat(n);
-    lean::object * args[] = { arg };
-    return lean::run_nat_function(lean::name("fib"), 1, args);
-}
-
-extern "C" uint32_t vir_upstream_fib_repeated(uint32_t iterations, uint32_t n) {
-    lean::ensure_ir_interpreter_initialized();
-    lean::name fn("fib");
-    lean::object * arg = lean::vir::mk_static_nat(n);
-    uint32_t acc = 0;
-    for (uint32_t i = 0; i < iterations; i++) {
-        lean_inc(arg);
-        lean::object * args[] = { arg };
-        acc += lean::run_nat_function(fn, 1, args);
-    }
-    lean_dec(arg);
-    return acc;
-}
-
 extern "C" uint32_t vir_upstream_tamagotchi_step(uint32_t mood, uint32_t action) {
     lean::ensure_ir_interpreter_initialized();
     lean::object * mood_obj = lean_box(mood);
@@ -1806,106 +2094,61 @@ extern "C" uint32_t vir_upstream_tamagotchi_run_demo(void) {
     return out;
 }
 
-extern "C" uint32_t vir_eval_const_nat(char const * name_text, uint32_t name_len) {
-    lean::ensure_ir_interpreter_initialized();
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
-    return lean::run_nat_function(fn, 0, nullptr);
-}
-
-extern "C" char const * vir_eval_const_nat_string(char const * name_text, uint32_t name_len) {
-    lean::ensure_ir_interpreter_initialized();
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
-    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 0, nullptr);
-    return lean::g_eval_const_nat_string.c_str();
-}
-
-extern "C" char const * vir_eval_nat_to_nat_string(char const * name_text, uint32_t name_len, uint32_t value) {
-    lean::ensure_ir_interpreter_initialized();
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
-    lean::object * arg = lean::vir::mk_static_nat(value);
-    lean::object * args[] = { arg };
-    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 1, args);
-    return lean::g_eval_const_nat_string.c_str();
-}
-
-extern "C" char const * vir_eval_nat_array_to_nat_string(
+extern "C" char const * vir_call(
     char const * name_text,
     uint32_t name_len,
-    uint32_t const * values,
-    uint32_t len) {
-    if (values == nullptr && len != 0) {
-        lean::g_eval_const_nat_string = "0";
-        return lean::g_eval_const_nat_string.c_str();
+    uint8_t const * request,
+    uint32_t request_len,
+    uint8_t result_tag) {
+    lean::g_call_result.clear();
+    lean::g_call_error.clear();
+    if (request == nullptr && request_len != 0) {
+        lean::g_call_error = "call payload pointer is null";
+        return nullptr;
     }
+
+    lean::vir_reader reader(request, request_len);
+    uint32_t argc = reader.u32();
+    std::vector<lean::object *> args;
+    args.reserve(argc);
+    for (uint32_t i = 0; i < argc; i++) {
+        args.push_back(lean::decode_argument(reader));
+    }
+    if (!reader.ok) {
+        lean::g_call_error = reader.error();
+        for (lean::object * arg : args) {
+            lean_dec(arg);
+        }
+        return nullptr;
+    }
+    if (!reader.at_end()) {
+        lean::g_call_error = "trailing bytes after call payload";
+        for (lean::object * arg : args) {
+            lean_dec(arg);
+        }
+        return nullptr;
+    }
+
     lean::ensure_ir_interpreter_initialized();
     lean::name fn = lean::name_from_dotted(name_text, name_len);
-    lean::object * input = lean::mk_nat_array(values, len);
-    lean::object * args[] = { input };
-    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 1, args);
-    return lean::g_eval_const_nat_string.c_str();
+    lean::elab_environment env(lean_box(0));
+    lean::options opts(lean_box(0));
+    lean::object * result = lean::ir::run_boxed(env, opts, fn, args.size(), args.data());
+    lean::vir_writer writer;
+    lean::encode_result(writer, static_cast<lean::vir_wire_type>(result_tag), result);
+    lean_dec(result);
+    lean::g_call_result = writer.take();
+    return lean::g_call_result.data();
 }
 
-extern "C" char const * vir_eval_string_to_nat_string(
-    char const * name_text,
-    uint32_t name_len,
-    char const * value,
-    uint32_t value_len) {
-    if (value == nullptr && value_len != 0) {
-        lean::g_eval_const_nat_string = "0";
-        return lean::g_eval_const_nat_string.c_str();
-    }
-    lean::ensure_ir_interpreter_initialized();
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
-    lean::object * input = lean::mk_string_from_bytes(value, value_len);
-    lean::object * args[] = { input };
-    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 1, args);
-    return lean::g_eval_const_nat_string.c_str();
+extern "C" uint32_t vir_call_result_size(void) {
+    return static_cast<uint32_t>(lean::g_call_result.size());
 }
 
-extern "C" char const * vir_eval_byte_array_to_nat_string(
-    char const * name_text,
-    uint32_t name_len,
-    uint8_t const * values,
-    uint32_t len) {
-    if (values == nullptr && len != 0) {
-        lean::g_eval_const_nat_string = "0";
-        return lean::g_eval_const_nat_string.c_str();
-    }
-    lean::ensure_ir_interpreter_initialized();
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
-    lean::object * input = lean::mk_byte_array(values, len);
-    lean::object * args[] = { input };
-    lean::g_eval_const_nat_string = lean::run_nat_function_string(fn, 1, args);
-    return lean::g_eval_const_nat_string.c_str();
+extern "C" char const * vir_call_error(void) {
+    return lean::g_call_error.c_str();
 }
 
-extern "C" uint32_t vir_eval_const_nat_string_size(void) {
-    return static_cast<uint32_t>(lean::g_eval_const_nat_string.size());
-}
-
-extern "C" uint32_t vir_sort_checksum(uint32_t const * values, uint32_t len) {
-    if (values == nullptr && len != 0) {
-        return 0;
-    }
-    lean::ensure_ir_interpreter_initialized();
-    lean::object * input = lean::mk_nat_array(values, len);
-    lean::object * args[] = { input };
-    return lean::run_nat_function(lean::name({ "SortDemo", "demoFromArray" }), 1, args);
-}
-
-extern "C" uint32_t vir_sort_checksum_repeated(uint32_t const * values, uint32_t len, uint32_t iterations) {
-    if (values == nullptr && len != 0) {
-        return 0;
-    }
-    lean::ensure_ir_interpreter_initialized();
-    lean::name fn({ "SortDemo", "demoFromArray" });
-    lean::object * input = lean::mk_nat_array(values, len);
-    uint32_t acc = 0;
-    for (uint32_t i = 0; i < iterations; i++) {
-        lean_inc(input);
-        lean::object * args[] = { input };
-        acc += lean::run_nat_function(fn, 1, args);
-    }
-    lean_dec(input);
-    return acc;
+extern "C" uint32_t vir_call_error_size(void) {
+    return static_cast<uint32_t>(lean::g_call_error.size());
 }

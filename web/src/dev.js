@@ -15,11 +15,6 @@ const ptrWidth = document.querySelector("#dev-ptr-width");
 const packageUrl = document.querySelector("#dev-package-url");
 const packageFile = document.querySelector("#dev-package-file");
 const loadUrlButton = document.querySelector("#dev-load-url");
-const specUrl = document.querySelector("#dev-spec-url");
-const specFile = document.querySelector("#dev-spec-file");
-const loadSpecUrlButton = document.querySelector("#dev-load-spec-url");
-const inputSpecText = document.querySelector("#dev-input-spec");
-const applySpecButton = document.querySelector("#dev-apply-spec");
 const entrySelect = document.querySelector("#dev-entry-select");
 const inputFields = document.querySelector("#dev-input-fields");
 const runEntryButton = document.querySelector("#dev-run-entry");
@@ -29,72 +24,7 @@ const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BAS
 const query = new URLSearchParams(window.location.search);
 
 let runtime = null;
-let inputSpec = null;
-
-const defaultInputSpec = {
-  version: 1,
-  entries: [
-    {
-      id: "demo-constant",
-      entry: "SortDemo.demo",
-      result: { type: "Nat" },
-      inputs: [],
-    },
-    {
-      id: "fib",
-      entry: "fib",
-      result: { type: "Nat" },
-      inputs: [
-        {
-          name: "n",
-          type: "Nat",
-          defaultValue: "8",
-          min: 0,
-          max: 17,
-        },
-      ],
-    },
-    {
-      id: "sort-array",
-      entry: "SortDemo.demoFromArray",
-      result: { type: "Nat" },
-      inputs: [
-        {
-          name: "values",
-          type: "Array Nat",
-          defaultValue: "7, 3, 9, 1, 4, 1, 5, 2",
-          maxItems: 16,
-          maxValue: 9999,
-        },
-      ],
-    },
-    {
-      id: "string-score",
-      entry: "Vir.Fixtures.Basic.stringUtf8RoundtripScore",
-      result: { type: "Nat" },
-      inputs: [
-        {
-          name: "text",
-          type: "String",
-          defaultValue: "Aé∀Z",
-        },
-      ],
-    },
-    {
-      id: "bytearray-score",
-      entry: "Vir.Fixtures.Basic.byteArrayInputScore",
-      result: { type: "Nat" },
-      inputs: [
-        {
-          name: "bytes",
-          type: "ByteArray",
-          defaultValue: "65, 66, 67",
-          maxItems: 1024,
-        },
-      ],
-    },
-  ],
-};
+let interfaceEntries = [];
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -115,7 +45,10 @@ function assetPathFor(text) {
 
 function resetPackageState() {
   runtime = null;
+  interfaceEntries = [];
   runEntryButton.disabled = true;
+  entrySelect.replaceChildren();
+  inputFields.replaceChildren();
   resultOutput.textContent = "...";
   packageName.textContent = "...";
   packageSize.textContent = "...";
@@ -123,39 +56,43 @@ function resetPackageState() {
   ptrWidth.textContent = "...";
 }
 
-function normalizeInputSpec(spec) {
-  if (spec?.version !== 1 || !Array.isArray(spec.entries)) {
-    throw new Error("input spec must be { version: 1, entries: [...] }");
-  }
-  return {
-    version: 1,
-    entries: spec.entries.map((entry, index) => {
-      if (!entry.entry || typeof entry.entry !== "string") {
-        throw new Error(`input spec entry ${index} is missing an entry name`);
-      }
-      return {
-        id: entry.id ?? entry.entry,
-        entry: entry.entry,
-        result: entry.result ?? { type: "Nat" },
-        inputs: entry.inputs ?? [],
-      };
-    }),
-  };
-}
-
-function selectedSpecEntry() {
-  return inputSpec?.entries.find((entry) => entry.id === entrySelect.value) ?? null;
+function selectedInterfaceEntry() {
+  return interfaceEntries.find((entry) => entry.id === entrySelect.value) ?? null;
 }
 
 function selectEntryFromQuery() {
   const entryId = query.get("entry");
-  if (entryId && inputSpec?.entries.some((entry) => entry.id === entryId)) {
-    entrySelect.value = entryId;
+  if (!entryId) return;
+  const match = interfaceEntries.find((entry) =>
+    entry.id === entryId || entry.jsName === entryId || entry.entry === entryId);
+  if (match) {
+    entrySelect.value = match.id;
   }
 }
 
 function inputDefault(input) {
-  return input.defaultValue ?? input.default ?? "";
+  switch (input.type?.wireTag) {
+    case 0:
+    case 1:
+    case 4:
+    case 5:
+    case 6:
+    case 7:
+    case 8:
+      return "0";
+    case 2:
+      return "false";
+    case 3:
+      return "";
+    case 9:
+    case 10:
+    case 11:
+    case 12:
+    case 13:
+      return "";
+    default:
+      return "";
+  }
 }
 
 function inputFieldId(input, index) {
@@ -164,7 +101,7 @@ function inputFieldId(input, index) {
 
 function renderInputFields(entry) {
   inputFields.replaceChildren();
-  const inputs = entry?.inputs ?? [];
+  const inputs = entry?.args ?? [];
   if (inputs.length === 0) {
     const empty = document.createElement("p");
     empty.className = "dev-input-empty";
@@ -177,18 +114,18 @@ function renderInputFields(entry) {
     const label = document.createElement("label");
     label.className = "dev-field";
     const caption = document.createElement("span");
-    caption.textContent = `${input.name ?? `input${index + 1}`} : ${input.type}`;
+    caption.textContent = `${input.name ?? `input${index + 1}`} : ${input.type?.type ?? "?"}`;
     const field = document.createElement("input");
     field.id = inputFieldId(input, index);
     field.value = inputDefault(input);
     field.dataset.inputIndex = String(index);
-    if (input.type === "Nat") {
+    if (input.type?.wireTag === 0 || input.type?.wireTag === 4 || input.type?.wireTag === 5 || input.type?.wireTag === 6) {
       field.type = "number";
       field.inputMode = "numeric";
-      field.min = String(input.min ?? 0);
-      if (input.max !== undefined) {
-        field.max = String(input.max);
-      }
+      field.min = "0";
+    } else if (input.type?.wireTag === 2) {
+      field.type = "text";
+      field.inputMode = "text";
     } else {
       field.type = "text";
       field.inputMode = "text";
@@ -198,59 +135,70 @@ function renderInputFields(entry) {
   }
 }
 
-function renderInputSpec(spec) {
-  inputSpec = normalizeInputSpec(spec);
-  inputSpecText.value = JSON.stringify(inputSpec, null, 2);
+function renderManifestEntries(manifest) {
+  if (manifest?.version !== 1 || !Array.isArray(manifest.exports)) {
+    throw new Error("embedded interface manifest must be { version: 1, exports: [...] }");
+  }
+  interfaceEntries = manifest.exports;
   entrySelect.replaceChildren();
-  for (const entry of inputSpec.entries) {
+  for (const entry of interfaceEntries) {
     const option = document.createElement("option");
     option.value = entry.id;
-    option.textContent = `${entry.id} -> ${entry.entry}`;
+    const signature = `${entry.args.map((arg) => arg.type?.type ?? "?").join(", ") || "()"} -> ${entry.result?.type ?? "?"}`;
+    option.textContent = `${entry.jsName} / ${signature}`;
     entrySelect.append(option);
   }
   selectEntryFromQuery();
-  renderInputFields(selectedSpecEntry());
+  renderInputFields(selectedInterfaceEntry());
 }
 
-function parseNatInput(text, input) {
+function parseNatInput(text) {
   const trimmed = text.trim();
   if (!/^\d+$/.test(trimmed)) {
     throw new Error(`invalid Nat literal: ${text}`);
   }
-  const value = Number(trimmed);
-  if (!Number.isSafeInteger(value)) {
-    throw new Error(`invalid Nat literal: ${text}`);
-  }
-  const min = input.min ?? 0;
-  const max = input.max ?? Number.MAX_SAFE_INTEGER;
-  return Math.max(min, Math.min(max, value));
+  return trimmed;
 }
 
-function parseNatArrayInput(text, input) {
-  const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
-  const maxItems = input.maxItems ?? 1024;
-  const maxValue = input.maxValue ?? Number.MAX_SAFE_INTEGER;
-  if (parts.length > maxItems) {
-    throw new Error(`Array Nat input is capped at ${maxItems} items`);
+function parseIntInput(text) {
+  const trimmed = text.trim();
+  if (!/^-?\d+$/.test(trimmed)) {
+    throw new Error(`invalid Int literal: ${text}`);
   }
+  return trimmed;
+}
+
+function parseNatArrayInput(text) {
+  const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
   return parts.map((part) => {
     if (!/^\d+$/.test(part)) {
       throw new Error(`invalid Nat literal: ${part}`);
     }
+    return part;
+  });
+}
+
+function parseStringListInput(text) {
+  if (text.trim() === "") return [];
+  return text.split(",").map((part) => part.trim());
+}
+
+function parseUInt32ArrayInput(text) {
+  const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
+  return parts.map((part) => {
+    if (!/^\d+$/.test(part)) {
+      throw new Error(`invalid UInt32 literal: ${part}`);
+    }
     const value = Number(part);
-    if (!Number.isSafeInteger(value) || value > maxValue) {
-      throw new Error(`Array Nat value is capped at ${maxValue}`);
+    if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) {
+      throw new Error("UInt32 values must be in 0..4294967295");
     }
     return value;
   });
 }
 
-function parseByteArrayInput(text, input) {
+function parseByteArrayInput(text) {
   const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
-  const maxItems = input.maxItems ?? 1024;
-  if (parts.length > maxItems) {
-    throw new Error(`ByteArray input is capped at ${maxItems} items`);
-  }
   return parts.map((part) => {
     if (!/^\d+$/.test(part)) {
       throw new Error(`invalid byte literal: ${part}`);
@@ -263,13 +211,48 @@ function parseByteArrayInput(text, input) {
   });
 }
 
+function parseInputValue(input, text) {
+  switch (input.type?.wireTag) {
+    case 0:
+    case 7:
+    case 8:
+      return parseNatInput(text);
+    case 1:
+      return parseIntInput(text);
+    case 2:
+      if (text.trim() === "true") return true;
+      if (text.trim() === "false") return false;
+      throw new Error(`invalid Bool literal: ${text}`);
+    case 3:
+      return text;
+    case 4:
+    case 5:
+    case 6: {
+      const value = Number(parseNatInput(text));
+      return value;
+    }
+    case 9:
+      return parseByteArrayInput(text);
+    case 10:
+    case 12:
+      return parseNatArrayInput(text);
+    case 11:
+      return parseUInt32ArrayInput(text);
+    case 13:
+      return parseStringListInput(text);
+    default:
+      throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);
+  }
+}
+
 async function loadIrPackageBytes(label, bytes) {
   runtime = await runtimeFactory.createRuntime({ irPackageBytes: bytes });
   packageName.textContent = label;
   packageSize.textContent = formatBytes(runtime.packageInfo.byteLength);
   declCount.textContent = String(runtime.packageInfo.count);
   ptrWidth.textContent = `${runtime.targetPointerBytes()} bytes`;
-  runEntryButton.disabled = false;
+  renderManifestEntries(runtime.interfaceManifest);
+  runEntryButton.disabled = interfaceEntries.length === 0;
   setStatus("Ready", true);
 }
 
@@ -288,56 +271,15 @@ async function loadPackageFile(file) {
   await loadIrPackageBytes(file.name, bytes);
 }
 
-async function loadSpecUrl() {
-  const label = specUrl.value.trim();
-  if (!label) return;
-  setStatus("Loading Spec", false);
-  const bytes = await fetchBytes(assetPathFor(label));
-  renderInputSpec(JSON.parse(new TextDecoder().decode(bytes)));
-  setStatus(runtime === null ? "No package" : "Ready", runtime !== null);
-}
-
-async function loadSpecFile(file) {
-  setStatus("Loading Spec", false);
-  const text = await file.text();
-  renderInputSpec(JSON.parse(text));
-  setStatus(runtime === null ? "No package" : "Ready", runtime !== null);
-}
-
 function evaluateEntry(runtime, entry) {
-  if (entry.result?.type !== "Nat") {
-    throw new Error(`unsupported result type: ${entry.result?.type}`);
-  }
-  const inputs = entry.inputs ?? [];
-  if (inputs.length === 0) {
-    return runtime.evalConstNat(entry.entry);
-  }
-  if (inputs.length !== 1) {
-    throw new Error("the developer runner currently supports zero or one input");
-  }
-
-  const input = inputs[0];
-  const field = inputFields.querySelector("[data-input-index='0']");
-  const text = field?.value ?? inputDefault(input);
-  if (input.type === "Nat") {
-    const value = parseNatInput(text, input);
-    if (field) field.value = String(value);
-    return runtime.evalNatToNat(entry.entry, value);
-  }
-  if (input.type === "Array Nat") {
-    const values = parseNatArrayInput(text, input);
-    if (field) field.value = values.join(", ");
-    return runtime.evalNatArrayToNat(entry.entry, values);
-  }
-  if (input.type === "String") {
-    return runtime.evalStringToNat(entry.entry, text);
-  }
-  if (input.type === "ByteArray") {
-    const values = parseByteArrayInput(text, input);
-    if (field) field.value = values.join(", ");
-    return runtime.evalByteArrayToNat(entry.entry, values);
-  }
-  throw new Error(`unsupported input type: ${input.type}`);
+  const inputs = entry.args ?? [];
+  const values = inputs.map((input, index) => {
+    const field = inputFields.querySelector(`[data-input-index='${index}']`);
+    const value = parseInputValue(input, field?.value ?? inputDefault(input));
+    if (field && Array.isArray(value)) field.value = value.join(", ");
+    return value;
+  });
+  return runtime.call(entry.entry, ...values);
 }
 
 loadUrlButton.addEventListener("click", () => {
@@ -358,49 +300,20 @@ packageFile.addEventListener("change", () => {
   });
 });
 
-loadSpecUrlButton.addEventListener("click", () => {
-  loadSpecUrl().catch((error) => {
-    resultOutput.textContent = "spec error";
-    setStatus("Spec Error", false);
-    console.error(error);
-  });
-});
-
-specFile.addEventListener("change", () => {
-  const file = specFile.files?.[0];
-  if (!file) return;
-  loadSpecFile(file).catch((error) => {
-    resultOutput.textContent = "spec error";
-    setStatus("Spec Error", false);
-    console.error(error);
-  });
-});
-
-applySpecButton.addEventListener("click", () => {
-  try {
-    renderInputSpec(JSON.parse(inputSpecText.value));
-    resultOutput.textContent = "...";
-    setStatus(runtime === null ? "No package" : "Ready", runtime !== null);
-  } catch (error) {
-    resultOutput.textContent = "spec error";
-    setStatus("Spec Error", false);
-    console.error(error);
-  }
-});
-
 entrySelect.addEventListener("change", () => {
-  renderInputFields(selectedSpecEntry());
+  renderInputFields(selectedInterfaceEntry());
   resultOutput.textContent = "...";
 });
 
 runEntryButton.addEventListener("click", () => {
   if (runtime === null) return;
   try {
-    const entry = selectedSpecEntry();
+    const entry = selectedInterfaceEntry();
     if (entry === null) {
-      throw new Error("no input spec entry selected");
+      throw new Error("no interface entry selected");
     }
-    resultOutput.textContent = evaluateEntry(runtime, entry);
+    const result = evaluateEntry(runtime, entry);
+    resultOutput.textContent = result instanceof Uint8Array ? Array.from(result).join(", ") : String(result);
     setStatus("Ready", true);
   } catch (error) {
     resultOutput.textContent = "error";
@@ -410,14 +323,6 @@ runEntryButton.addEventListener("click", () => {
 });
 
 packageUrl.value = query.get("package") ?? "vir-demo.irpkg";
-specUrl.value = query.get("spec") ?? "";
-renderInputSpec(defaultInputSpec);
-
-if (query.has("spec")) {
-  loadSpecUrl().catch((error) => {
-    console.warn(error);
-  });
-}
 
 loadPackageUrl().catch((error) => {
   setStatus("Failed", false);

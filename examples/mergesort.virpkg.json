@@ -3,30 +3,5 @@
   "source": "examples/MergeSort.lean",
   "package": "web/public/local-mergesort.irpkg",
   "report": "build/generated/local-mergesort.report.md",
-  "roots": ["SortDemo.demo", "SortDemo.demoFromArray"],
-  "inputSpec": {
-    "path": "web/public/local-mergesort.input.json",
-    "entries": [
-      {
-        "id": "demo",
-        "entry": "SortDemo.demo",
-        "result": { "type": "Nat" },
-        "inputs": []
-      },
-      {
-        "id": "sort-array",
-        "entry": "SortDemo.demoFromArray",
-        "result": { "type": "Nat" },
-        "inputs": [
-          {
-            "name": "values",
-            "type": "Array Nat",
-            "defaultValue": "7, 3, 9, 1, 4, 1, 5, 2",
-            "maxItems": 16,
-            "maxValue": 9999
-          }
-        ]
-      }
-    ]
-  }
+  "roots": ["SortDemo.demo", "SortDemo.demoFromArray"]
 }

@@ -7,6 +7,8 @@ Author: Emilio J. Gallego Arias
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 
+import { createVirRuntime } from "../web/src/vir-runtime.js";
+
 const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
 const buildDir = new URL("../build/fixtures/", import.meta.url);
@@ -145,65 +147,7 @@ async function hostOracle(fixture) {
 async function instantiateWasm(packagePath) {
   const wasm = await readFile(wasmPath);
   const irPackage = await readFile(packagePath);
-  const mod = new WebAssembly.Module(wasm);
-  const imports = {};
-
-  for (const spec of WebAssembly.Module.imports(mod)) {
-    imports[spec.module] ??= {};
-    if (spec.kind === "function") {
-      imports[spec.module][spec.name] = (...args) => {
-        if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
-          throw new Error(`WASI proc_exit(${args[0]})`);
-        }
-        return 0;
-      };
-    }
-  }
-
-  const { exports } = await WebAssembly.instantiate(mod, imports);
-  exports.__wasm_call_ctors?.();
-
-  const ptr = exports.vir_alloc_bytes(irPackage.byteLength);
-  try {
-    new Uint8Array(exports.memory.buffer, ptr, irPackage.byteLength).set(irPackage);
-    const loaded = exports.vir_load_ir_package(ptr, irPackage.byteLength);
-    if (loaded === 0) {
-      throw new Error(`IR package load failed: ${lastPackageError(exports)}`);
-    }
-  } finally {
-    exports.vir_free_bytes?.(ptr);
-  }
-
-  return exports;
-}
-
-function readWasmString(exports, ptr, len) {
-  return new TextDecoder().decode(new Uint8Array(exports.memory.buffer, ptr, len));
-}
-
-function lastPackageError(exports) {
-  const len = exports.vir_last_package_error_size?.() ?? 0;
-  if (len === 0) return "";
-  return readWasmString(exports, exports.vir_last_package_error(), len);
-}
-
-function evalConstNat(exports, name) {
-  const bytes = new TextEncoder().encode(name);
-  const ptr = exports.vir_alloc_bytes(bytes.byteLength);
-  try {
-    new Uint8Array(exports.memory.buffer, ptr, bytes.byteLength).set(bytes);
-    if (
-      typeof exports.vir_eval_const_nat_string === "function" &&
-      typeof exports.vir_eval_const_nat_string_size === "function"
-    ) {
-      const resultPtr = exports.vir_eval_const_nat_string(ptr, bytes.byteLength);
-      const resultLen = exports.vir_eval_const_nat_string_size();
-      return readWasmString(exports, resultPtr, resultLen);
-    }
-    return String(exports.vir_eval_const_nat(ptr, bytes.byteLength));
-  } finally {
-    exports.vir_free_bytes?.(ptr);
-  }
+  return createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
 }
 
 async function generatePackage(fixture) {
@@ -259,8 +203,8 @@ async function runFixture(fixture) {
     };
   }
 
-  const exports = await instantiateWasm(generated.packagePath);
-  const wasm = evalConstNat(exports, fixture.entry);
+  const runtime = await instantiateWasm(generated.packagePath);
+  const wasm = runtime.call(fixture.entry);
   if (expectedStatus === "unsupported") {
     return {
       status: "failed",

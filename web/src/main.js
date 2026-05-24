@@ -361,7 +361,7 @@ function runInputFixture(runtime, fixture) {
     if (fixture.id === selectedFixtureId) {
       fixtureInput.value = String(n);
     }
-    return runtime.evalNatToNat(fixture.entry, n);
+    return runtime.call(fixture.entry, n);
   }
 
   if (fixture.runner === "sort") {
@@ -372,7 +372,7 @@ function runInputFixture(runtime, fixture) {
       fixtureInput.value = normalized;
     }
     const sorted = [...values].sort((a, b) => a - b);
-    return `checksum ${runtime.evalNatArrayToNat(fixture.entry, values)} / [${sorted.join(", ")}]`;
+    return `checksum ${runtime.call(fixture.entry, values)} / [${sorted.join(", ")}]`;
   }
 
   return null;
@@ -382,7 +382,7 @@ function evaluateFixture(runtime, fixture) {
   if (fixture.runner) {
     return runInputFixture(runtime, fixture);
   }
-  return runtime.evalConstNat(fixture.entry);
+  return runtime.call(fixture.entry);
 }
 
 async function runFixture(fixture) {

@@ -248,8 +248,8 @@ async function smokeLanding(cdp, origin) {
   })`);
   assert.equal(state.packageName, "vir-demo.irpkg");
   assert.equal(state.mood, "happy");
-  assert.ok(state.links.includes("dev.html?package=local-fib.irpkg&spec=local-fib.input.json&entry=fib"));
-  assert.ok(state.links.includes("dev.html?package=local-mergesort.irpkg&spec=local-mergesort.input.json&entry=sort-array"));
+  assert.ok(state.links.includes("dev.html?package=local-fib.irpkg&entry=fib"));
+  assert.ok(state.links.includes("dev.html?package=local-mergesort.irpkg&entry=SortDemo_demoFromArray"));
 }
 
 async function smokeRunner(cdp, origin, url, expected) {
@@ -309,24 +309,25 @@ try {
   await smokeRunner(
     cdp,
     server.origin,
-    "dev.html?package=local-fib.irpkg&spec=local-fib.input.json&entry=fib",
+    "dev.html?package=local-fib.irpkg&entry=fib",
     {
       packageName: "local-fib.irpkg",
       entry: "fib",
       entryCount: 1,
-      input: "12",
+      input: "0",
+      runInput: "12",
       result: "144",
     },
   );
   await smokeRunner(
     cdp,
     server.origin,
-    "dev.html?package=local-mergesort.irpkg&spec=local-mergesort.input.json&entry=sort-array",
+    "dev.html?package=local-mergesort.irpkg&entry=SortDemo_demoFromArray",
     {
       packageName: "local-mergesort.irpkg",
-      entry: "sort-array",
+      entry: "SortDemo_demoFromArray",
       entryCount: 2,
-      input: "7, 3, 9, 1, 4, 1, 5, 2",
+      input: "",
       runInput: "4, 1, 3, 2",
       result: "30",
     },

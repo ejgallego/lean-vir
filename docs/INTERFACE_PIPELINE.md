@@ -1,6 +1,6 @@
 # Interface Pipeline
 
-The developer path is now config-driven:
+The developer path is package-driven:
 
 ```bash
 npm run prepare:irpkg -- examples/fib.virpkg.json
@@ -10,18 +10,14 @@ That command:
 
 1. elaborates the configured Lean source with Lean 4.30-rc2;
 2. extracts the requested IR declaration closure into an `.irpkg`;
-3. writes the package report;
-4. writes a browser input spec next to the package when `inputSpec.path` is set.
+3. embeds a generated JavaScript interface manifest in the package;
+4. writes the package report next to the generated artifact.
 
-The generated package and input spec can then be loaded in `/dev.html` by URL:
+The generated `.irpkg` is the only browser artifact needed by `/dev.html`.
+After the package is loaded, the runner reads the embedded manifest and creates
+the UI entries automatically.
 
-```text
-Package URL: local-fib.irpkg
-Spec URL:    local-fib.input.json
-```
-
-`web/public/*.irpkg` and `web/public/*.input.json` are generated local assets and
-are ignored by git.
+`web/public/*.irpkg` files are generated local assets and are ignored by git.
 
 ## Pages Landing
 
@@ -32,23 +28,21 @@ npm run build:site
 ```
 
 That script first builds the upstream WASM demo, then runs `npm run
-prepare:pages` to generate the URL-loadable sample package/spec pairs:
+prepare:pages` to generate URL-loadable sample packages:
 
 - `local-fib.irpkg`
-- `local-fib.input.json`
 - `local-mergesort.irpkg`
-- `local-mergesort.input.json`
 
-Vite then copies those generated assets into `web/dist/` alongside `index.html`
+Vite copies those generated packages into `web/dist/` alongside `index.html`
 and `dev.html`. The landing page links directly to `/dev.html` with query
 parameters such as:
 
 ```text
-dev.html?package=local-fib.irpkg&spec=local-fib.input.json&entry=fib
+dev.html?package=local-fib.irpkg&entry=fib
 ```
 
-The package runner accepts `package`, `spec`, and `entry` query parameters so a
-generated package can be opened with the right input spec and selected entry.
+The package runner accepts `package` and `entry` query parameters. `entry` may
+be a manifest `id`, `jsName`, or Lean declaration name.
 
 ## Config Shape
 
@@ -58,61 +52,36 @@ generated package can be opened with the right input spec and selected entry.
   "source": "examples/Fib.lean",
   "package": "web/public/local-fib.irpkg",
   "report": "build/generated/local-fib.report.md",
-  "roots": ["fib"],
-  "inputSpec": {
-    "path": "web/public/local-fib.input.json",
-    "entries": [
-      {
-        "id": "fib",
-        "entry": "fib",
-        "result": { "type": "Nat" },
-        "inputs": [
-          {
-            "name": "n",
-            "type": "Nat",
-            "defaultValue": "12",
-            "min": 0,
-            "max": 17
-          }
-        ]
-      }
-    ]
-  }
+  "roots": ["fib"]
 }
 ```
 
-If `roots` is omitted or empty, `prepare:irpkg` packages every IR declaration
-emitted by the source, using the generator's `--target-all` mode. Explicit roots
-are preferred for stable demos and size-sensitive experiments.
+If `roots` is omitted or empty, `prepare:irpkg` uses `--target-all`, packages
+the declarations emitted by the source, and treats public source definitions as
+interface exports. Unsupported public exports fail loudly with diagnostics in
+the report. Explicit roots are preferred for stable demos and size-sensitive
+experiments.
 
 ## Supported Interface Surface
 
-The current browser interface supports:
+The embedded manifest currently supports:
 
-- `() -> Nat`;
-- `Nat -> Nat`;
-- `Array Nat -> Nat`.
+- scalar values: `Nat`, `Int`, `Bool`, `String`;
+- fixed-width values: `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
+- byte data: `ByteArray`;
+- selected homogeneous collections: `Array Nat`, `Array UInt32`, `List Nat`,
+  `List String`.
 
-All results are returned to JavaScript as decimal strings. This avoids truncating
-large Lean `Nat` values to JavaScript numbers.
+Large exact integer values are returned to JavaScript as decimal strings to
+avoid truncating them to JavaScript numbers.
 
 ## WIT Direction
 
-WIT is the right interface-description model to track, but not yet the right
+WIT is still the right interface-description model to track, but not yet the
 runtime dependency for this demo path.
 
-The current artifact is a core `wasm32-wasip1` module with hand-written JS
-marshalling over exported functions. A real WIT interface would move this toward
-the WebAssembly Component Model, where interfaces are described in WIT and use
-the Component Model's canonical ABI. That is a better long-term shape for typed
-calls, strings, lists, and future multi-language hosts.
-
-For now, the repo keeps a draft WIT contract in `interfaces/lean-vir.wit`, but
-does not build a component from it. The JSON input spec remains the source of
-truth for the browser developer UI because it works directly with the current
-core WASM artifact. The practical migration path is:
-
-1. keep extending the JSON spec with WIT-like types;
-2. keep the JS runtime wrapper as the compatibility layer over core WASM;
-3. once component tooling is worth adding, generate or validate the JSON spec
-   against the WIT world and add a component build as a second artifact.
+The current artifact is a core `wasm32-wasip1` module with a generated manifest
+and a generic byte-payload call export. A real WIT interface would move this
+toward the WebAssembly Component Model and canonical ABI. For now,
+`interfaces/lean-vir.wit` mirrors the generic manifest/call shape as a design
+reference while the browser runtime uses the embedded JSON manifest directly.

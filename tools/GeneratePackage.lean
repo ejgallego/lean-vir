@@ -20,6 +20,7 @@ structure Target where
   source : System.FilePath
   roots : Array Name
   includeAll : Bool := false
+  packageOnly : Bool := false
 
 structure LoadedDecl where
   source : String
@@ -51,6 +52,44 @@ structure Closure where
   missingExterns : Array Name := #[]
   unsupportedInitGlobals : Array Name := #[]
 
+inductive InterfaceType where
+  | nat
+  | int
+  | bool
+  | string
+  | uint8
+  | uint16
+  | uint32
+  | uint64
+  | usize
+  | byteArray
+  | arrayNat
+  | arrayUInt32
+  | listNat
+  | listString
+  deriving BEq, Repr
+
+structure InterfaceArg where
+  name : String
+  type : InterfaceType
+
+structure InterfaceExport where
+  id : String
+  jsName : String
+  entry : Name
+  source : String
+  args : Array InterfaceArg
+  result : InterfaceType
+
+structure InterfaceDiagnostic where
+  name : Name
+  source : String
+  reason : String
+
+structure InterfaceManifest where
+  exports : Array InterfaceExport := #[]
+  diagnostics : Array InterfaceDiagnostic := #[]
+
 def defaultTargets : Array Target := #[
   {
     source := "examples/Fib.lean",
@@ -66,7 +105,8 @@ def defaultTargets : Array Target := #[
       `Tamagotchi.trace,
       `Tamagotchi.trace._boxed,
       `Tamagotchi.demoScript
-    ]
+    ],
+    packageOnly := true
   },
   {
     source := "examples/MergeSort.lean",
@@ -1366,6 +1406,247 @@ def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
   targets.foldl (fun state target =>
     (rootsForTarget index target).foldl (fun state root => collectName index root state) state) {}
 
+def DeclIndex.envForSource? (index : DeclIndex) (source : String) : Option Environment :=
+  index.envs.findSome? fun (candidate, env) =>
+    if candidate == source then some env else none
+
+def boxedBaseName? : Name -> Option Name
+  | .str pre "_boxed" => some pre
+  | _ => none
+
+def InterfaceType.label : InterfaceType → String
+  | .nat => "Nat"
+  | .int => "Int"
+  | .bool => "Bool"
+  | .string => "String"
+  | .uint8 => "UInt8"
+  | .uint16 => "UInt16"
+  | .uint32 => "UInt32"
+  | .uint64 => "UInt64"
+  | .usize => "USize"
+  | .byteArray => "ByteArray"
+  | .arrayNat => "Array Nat"
+  | .arrayUInt32 => "Array UInt32"
+  | .listNat => "List Nat"
+  | .listString => "List String"
+
+def InterfaceType.wireTag : InterfaceType → Nat
+  | .nat => 0
+  | .int => 1
+  | .bool => 2
+  | .string => 3
+  | .uint8 => 4
+  | .uint16 => 5
+  | .uint32 => 6
+  | .uint64 => 7
+  | .usize => 8
+  | .byteArray => 9
+  | .arrayNat => 10
+  | .arrayUInt32 => 11
+  | .listNat => 12
+  | .listString => 13
+
+def InterfaceType.toJson (ty : InterfaceType) : String :=
+  "{\"type\":\"" ++ ty.label ++ "\",\"wireTag\":" ++ toString ty.wireTag ++ "}"
+
+partial def stripMData : Lean.Expr → Lean.Expr
+  | .mdata _ e => stripMData e
+  | e => e
+
+def constName? (e : Lean.Expr) : Option Name :=
+  match stripMData e with
+  | .const n _ => some n
+  | _ => none
+
+def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
+  match constName? e with
+  | some `Nat => some .nat
+  | some `Int => some .int
+  | some `Bool => some .bool
+  | some `String => some .string
+  | some `UInt8 => some .uint8
+  | some `UInt16 => some .uint16
+  | some `UInt32 => some .uint32
+  | some `UInt64 => some .uint64
+  | some `USize => some .usize
+  | some `ByteArray => some .byteArray
+  | _ => none
+
+def interfaceType? (e : Lean.Expr) : Option InterfaceType :=
+  match simpleInterfaceType? e with
+  | some ty => some ty
+  | none =>
+      let e := stripMData e
+      let (fn, args) := e.getAppFnArgs
+      match fn, Array.toList args with
+      | `Array, [arg] =>
+          match simpleInterfaceType? arg with
+          | some .nat => some .arrayNat
+          | some .uint32 => some .arrayUInt32
+          | _ => none
+      | `List, [arg] =>
+          match simpleInterfaceType? arg with
+          | some .nat => some .listNat
+          | some .string => some .listString
+          | _ => none
+      | _, _ => none
+
+def binderArgName (fallback : Nat) (name : Name) : String :=
+  let candidate := name.toString
+  if name.isAnonymous || candidate.startsWith "_" || candidate.contains '_' then
+    s!"arg{fallback}"
+  else
+    candidate
+
+partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args : Array InterfaceArg := #[]) :
+    Except String (Array InterfaceArg × InterfaceType) :=
+  match stripMData type with
+  | .forallE name domain body binderInfo =>
+      if binderInfo != .default then
+        throw s!"unsupported implicit/instance argument `{name}`"
+      else
+        match interfaceType? domain with
+        | none => throw s!"unsupported argument type `{domain}`"
+        | some argType =>
+            let arg := { name := binderArgName argIndex name, type := argType }
+            interfaceSignature? body (argIndex + 1) (args.push arg)
+  | result =>
+      match interfaceType? result with
+      | none => throw s!"unsupported result type `{result}`"
+      | some resultType => return (args, resultType)
+
+def isInterfaceDeclInfo : ConstantInfo → Bool
+  | .defnInfo _ => true
+  | .opaqueInfo _ => true
+  | _ => false
+
+def isGeneratedAuxName (n : Name) : Bool :=
+  match boxedBaseName? n with
+  | some _ => true
+  | none =>
+      let text := n.toString
+      (text.splitOn "._").length > 1
+
+def sourceDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
+  index.sourceDecls.findSome? (fun (source, names) =>
+    if source == target.source.toString then some names else none) |>.getD #[]
+
+def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
+  match index.envForSource? target.source.toString with
+  | none => #[]
+  | some env =>
+      sourceDeclNamesFor index target |>.filter fun n =>
+        !isPrivateName n &&
+        !isGeneratedAuxName n &&
+        match env.find? n with
+        | some info => isInterfaceDeclInfo info
+        | none => false
+
+def exportCandidatesFor (index : DeclIndex) (target : Target) : Array Name :=
+  if target.packageOnly then
+    #[]
+  else if target.includeAll then
+    publicSourceDeclsFor index target
+  else
+    target.roots.foldl (fun acc root =>
+      let n := (boxedBaseName? root).getD root
+      if acc.contains n then acc else acc.push n) #[]
+
+def sanitizeJsNameChar (c : Char) : Char :=
+  if c.isAlphanum || c == '_' then c else '_'
+
+def jsNameFor (n : Name) : String :=
+  let text := n.toString
+  let sanitized := text.map sanitizeJsNameChar
+  if sanitized.isEmpty then "entry" else sanitized
+
+def interfaceExportFor (env : Environment) (source : String) (name : Name) :
+    Except InterfaceDiagnostic InterfaceExport :=
+  if isPrivateName name then
+    throw { name, source, reason := "private declarations are not exported" }
+  else
+    match env.find? name with
+    | none => throw { name, source, reason := "missing elaborated Lean declaration" }
+    | some info =>
+        if !isInterfaceDeclInfo info then
+          throw { name, source, reason := "declaration is not a compiled definition" }
+        else
+          match interfaceSignature? info.type with
+          | .ok (args, result) =>
+              let jsName := jsNameFor name
+              return { id := jsName, jsName, entry := name, source, args, result }
+          | .error reason =>
+              throw { name, source, reason }
+
+def collectInterfaceManifest (targets : Array Target) (index : DeclIndex) : InterfaceManifest :=
+  targets.foldl (fun manifest target =>
+    let source := target.source.toString
+    match index.envForSource? source with
+    | none =>
+        let diagnostics := manifest.diagnostics.push {
+          name := .anonymous,
+          source,
+          reason := "source environment was not loaded"
+        }
+        { manifest with diagnostics }
+    | some env =>
+        (exportCandidatesFor index target).foldl (fun manifest name =>
+          match interfaceExportFor env source name with
+          | .ok entry =>
+              if manifest.exports.any (fun existing => existing.entry == entry.entry) then
+                manifest
+              else
+                { manifest with exports := manifest.exports.push entry }
+          | .error diagnostic =>
+              { manifest with diagnostics := manifest.diagnostics.push diagnostic }) manifest) {}
+
+def jsonEscape (text : String) : String :=
+  text.foldl (fun out c =>
+    match c with
+    | '"' => out ++ "\\\""
+    | '\\' => out ++ "\\\\"
+    | '\n' => out ++ "\\n"
+    | '\r' => out ++ "\\r"
+    | '\t' => out ++ "\\t"
+    | _ => out.push c) ""
+
+def jsonString (text : String) : String :=
+  "\"" ++ jsonEscape text ++ "\""
+
+def jsonArray (items : Array String) : String :=
+  "[" ++ ",".intercalate items.toList ++ "]"
+
+def InterfaceArg.toJson (arg : InterfaceArg) : String :=
+  "{"
+  ++ "\"name\":" ++ jsonString arg.name ++ ","
+  ++ "\"type\":" ++ arg.type.toJson
+  ++ "}"
+
+def InterfaceExport.toJson (entry : InterfaceExport) : String :=
+  "{"
+  ++ "\"id\":" ++ jsonString entry.id ++ ","
+  ++ "\"jsName\":" ++ jsonString entry.jsName ++ ","
+  ++ "\"entry\":" ++ jsonString entry.entry.toString ++ ","
+  ++ "\"source\":" ++ jsonString entry.source ++ ","
+  ++ "\"args\":" ++ jsonArray (entry.args.map InterfaceArg.toJson) ++ ","
+  ++ "\"result\":" ++ entry.result.toJson
+  ++ "}"
+
+def InterfaceDiagnostic.toJson (diagnostic : InterfaceDiagnostic) : String :=
+  "{"
+  ++ "\"name\":" ++ jsonString diagnostic.name.toString ++ ","
+  ++ "\"source\":" ++ jsonString diagnostic.source ++ ","
+  ++ "\"reason\":" ++ jsonString diagnostic.reason
+  ++ "}"
+
+def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
+  "{"
+  ++ "\"version\":1,"
+  ++ "\"artifact\":\"lean-vir-ir-package\","
+  ++ "\"exports\":" ++ jsonArray (manifest.exports.map InterfaceExport.toJson) ++ ","
+  ++ "\"diagnostics\":" ++ jsonArray (manifest.diagnostics.map InterfaceDiagnostic.toJson)
+  ++ "}"
+
 abbrev EmitM := StateT ByteArray (Except String)
 
 def maxU32 : Nat := 4294967295
@@ -1500,10 +1781,6 @@ def emitParam (p : Param) : EmitM Unit :=
 def emitBody (body : FnBody) : EmitM Unit :=
   emitAlt.emitBody body
 
-def boxedBaseName? : Name -> Option Name
-  | .str pre "_boxed" => some pre
-  | _ => none
-
 def emitEntryHeader (name : Name) : EmitM Unit := do
   emitName name
   match boxedBaseName? name with
@@ -1536,19 +1813,20 @@ def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
     emitName entry.name
     emitName entry.initName
 
-def emitPackageM (closure : Closure) : EmitM Unit := do
+def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit := do
   emitString "lean-vir-ir-package"
-  emitU32 3
+  emitU32 4
   emitU32 (closure.decls.size + closure.externs.size)
   closure.decls.forM emitDeclEntry
   closure.externs.forM emitExternEntry
   emitArray closure.initGlobals emitInitGlobal
+  emitString manifest.toJson
 
-def emitPackage (closure : Closure) : Except String ByteArray := do
-  let (_, bytes) <- (emitPackageM closure).run ByteArray.empty
+def emitPackage (closure : Closure) (manifest : InterfaceManifest) : Except String ByteArray := do
+  let (_, bytes) <- (emitPackageM closure manifest).run ByteArray.empty
   return bytes
 
-def reportFor (targets : Array Target) (closure : Closure) : String :=
+def reportFor (targets : Array Target) (closure : Closure) (manifest : InterfaceManifest) : String :=
   let roots :=
     targets.foldl (fun acc target =>
       if target.includeAll then
@@ -1572,11 +1850,19 @@ def reportFor (targets : Array Target) (closure : Closure) : String :=
     if closure.missingExterns.isEmpty then #["None."] else closure.missingExterns.map fun n => s!"- `{n}`"
   let unsupportedInitGlobalLines :=
     if closure.unsupportedInitGlobals.isEmpty then #["None."] else closure.unsupportedInitGlobals.map fun n => s!"- `{n}`"
+  let interfaceExportLines :=
+    if manifest.exports.isEmpty then #["None."] else manifest.exports.map fun entry =>
+      let args := entry.args.map (fun arg => s!"{arg.name} : {arg.type.label}")
+      s!"- `{entry.entry}` as `{entry.jsName}` : ({", ".intercalate args.toList}) -> {entry.result.label}"
+  let interfaceDiagnosticLines :=
+    if manifest.diagnostics.isEmpty then #["None."] else manifest.diagnostics.map fun diagnostic =>
+      s!"- `{diagnostic.name}` from `{diagnostic.source}`: {diagnostic.reason}"
   "# Generated IR Package Report\n\n"
   ++ "Generated by `tools/GeneratePackage.lean` from typed `Lean.IR.Decl` values.\n\n"
   ++ s!"Loaded declarations: {closure.decls.size}\n\n"
   ++ s!"Native extern declarations: {closure.externs.size}\n\n"
   ++ s!"Initializer globals: {closure.initGlobals.size}\n\n"
+  ++ s!"Interface exports: {manifest.exports.size}\n\n"
   ++ "## Roots\n\n"
   ++ "\n".intercalate (roots.map (fun n => s!"- `{n}`")).toList ++ "\n\n"
   ++ "## Loaded IR Declarations\n\n"
@@ -1590,7 +1876,11 @@ def reportFor (targets : Array Target) (closure : Closure) : String :=
   ++ "## Missing Native Extern Registrations\n\n"
   ++ "\n".intercalate missingExternLines.toList ++ "\n\n"
   ++ "## Unsupported Init Globals\n\n"
-  ++ "\n".intercalate unsupportedInitGlobalLines.toList ++ "\n"
+  ++ "\n".intercalate unsupportedInitGlobalLines.toList ++ "\n\n"
+  ++ "## Interface Exports\n\n"
+  ++ "\n".intercalate interfaceExportLines.toList ++ "\n\n"
+  ++ "## Interface Diagnostics\n\n"
+  ++ "\n".intercalate interfaceDiagnosticLines.toList ++ "\n"
 
 def readTextFile? (path : System.FilePath) : IO (Option String) := do
   try
@@ -1619,9 +1909,10 @@ def writeBinFile (path : System.FilePath) (content : ByteArray) : IO Unit := do
 unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath) : IO UInt32 := do
   let index <- loadDeclIndex targets
   let closure := collectClosure targets index
-  let report := reportFor targets closure
+  let manifest := collectInterfaceManifest targets index
+  let report := reportFor targets closure manifest
   writeTextFile reportPath report
-  if !closure.missingDecls.isEmpty || !closure.missingExterns.isEmpty || !closure.unsupportedInitGlobals.isEmpty then
+  if !closure.missingDecls.isEmpty || !closure.missingExterns.isEmpty || !closure.unsupportedInitGlobals.isEmpty || !manifest.diagnostics.isEmpty then
     if !closure.missingDecls.isEmpty then
       IO.eprintln "missing IR declarations:"
       for name in closure.missingDecls do
@@ -1634,9 +1925,13 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.eprintln "unsupported initializer globals:"
       for name in closure.unsupportedInitGlobals do
         IO.eprintln s!"  - {name}"
+    if !manifest.diagnostics.isEmpty then
+      IO.eprintln "unsupported interface exports:"
+      for diagnostic in manifest.diagnostics do
+        IO.eprintln s!"  - {diagnostic.name}: {diagnostic.reason}"
     IO.eprintln s!"see {reportPath}"
     return 1
-  match emitPackage closure with
+  match emitPackage closure manifest with
   | .ok bytes =>
       writeBinFile packagePath bytes
       IO.println s!"wrote {packagePath}"
@@ -1655,6 +1950,7 @@ def nameFromDotted (text : String) : Name :=
 partial def takeTargetRoots : List String -> List String -> List String × List String
   | [], roots => (roots.reverse, [])
   | "--target" :: rest, roots => (roots.reverse, "--target" :: rest)
+  | "--package-target" :: rest, roots => (roots.reverse, "--package-target" :: rest)
   | "--target-all" :: rest, roots => (roots.reverse, "--target-all" :: rest)
   | root :: rest, roots => takeTargetRoots rest (root :: roots)
 
@@ -1667,11 +1963,18 @@ partial def parseTargets : List String -> Except String (Array Vir.GeneratePacka
       let target : Vir.GeneratePackage.Target :=
         { source := source, roots := roots.toArray.map nameFromDotted }
       return (#[target] ++ (← parseTargets rest))
+  | "--package-target" :: source :: rest => do
+      let (roots, rest) := takeTargetRoots rest []
+      if roots.isEmpty then
+        throw s!"package target `{source}` has no roots"
+      let target : Vir.GeneratePackage.Target :=
+        { source := source, roots := roots.toArray.map nameFromDotted, packageOnly := true }
+      return (#[target] ++ (← parseTargets rest))
   | "--target-all" :: source :: rest => do
       let target : Vir.GeneratePackage.Target :=
         { source := source, roots := #[], includeAll := true }
       return (#[target] ++ (← parseTargets rest))
-  | arg :: _ => throw s!"expected `--target` or `--target-all`, got `{arg}`"
+  | arg :: _ => throw s!"expected `--target`, `--package-target`, or `--target-all`, got `{arg}`"
 
 unsafe def main (args : List String) : IO UInt32 := do
   match args with
@@ -1684,5 +1987,5 @@ unsafe def main (args : List String) : IO UInt32 := do
           IO.eprintln err
           return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--target <source.lean> <root>... | --target-all <source.lean>]..."
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--target <source.lean> <root>... | --package-target <source.lean> <root>... | --target-all <source.lean>]..."
       return 2

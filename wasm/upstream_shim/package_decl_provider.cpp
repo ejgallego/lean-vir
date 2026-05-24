@@ -48,6 +48,7 @@ struct init_global_entry {
 
 static std::vector<decl_entry> g_entries;
 static std::vector<init_global_entry> g_init_entries;
+static std::string g_interface_manifest;
 static std::string g_last_error;
 
 static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
@@ -623,7 +624,7 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "invalid IR package magic `" + magic + "`";
         return false;
     }
-    if (version != 1 && version != 2 && version != 3) {
+    if (version != 1 && version != 2 && version != 3 && version != 4) {
         g_last_error = "unsupported IR package version " + std::to_string(version);
         return false;
     }
@@ -648,6 +649,14 @@ static bool load_package(uint8_t const * data, size_t size) {
             init_entries.push_back({ n, init_name });
         }
     }
+    std::string interface_manifest;
+    if (version >= 4) {
+        interface_manifest = r.string();
+        if (interface_manifest.empty()) {
+            g_last_error = "IR package is missing an embedded interface manifest";
+            return false;
+        }
+    }
     if (!r.ok) {
         g_last_error = r.error();
         return false;
@@ -658,6 +667,7 @@ static bool load_package(uint8_t const * data, size_t size) {
     }
     g_entries = std::move(entries);
     g_init_entries = std::move(init_entries);
+    g_interface_manifest = std::move(interface_manifest);
     return true;
 }
 
@@ -746,6 +756,14 @@ uint32_t last_package_error_size() {
     return static_cast<uint32_t>(g_last_error.size());
 }
 
+char const * package_interface_manifest() {
+    return g_interface_manifest.c_str();
+}
+
+uint32_t package_interface_manifest_size() {
+    return static_cast<uint32_t>(g_interface_manifest.size());
+}
+
 } // namespace lean::vir
 
 extern "C" void * vir_alloc_bytes(uint32_t size) {
@@ -772,4 +790,12 @@ extern "C" char const * vir_last_package_error(void) {
 
 extern "C" uint32_t vir_last_package_error_size(void) {
     return lean::vir::last_package_error_size();
+}
+
+extern "C" char const * vir_package_interface_manifest(void) {
+    return lean::vir::package_interface_manifest();
+}
+
+extern "C" uint32_t vir_package_interface_manifest_size(void) {
+    return lean::vir::package_interface_manifest_size();
 }

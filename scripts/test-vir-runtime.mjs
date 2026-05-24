@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { readFile } from "node:fs/promises";
+import { spawnSync } from "node:child_process";
 
 import { createVirRuntime as createExportedVirRuntime } from "lean-vir";
 import { createVirRuntime, createVirRuntimeFactory } from "../web/src/vir-runtime.js";
@@ -18,17 +19,22 @@ assert.equal(createExportedVirRuntime, createVirRuntime);
 assert.equal(runtime.targetPointerBytes(), 4);
 assert.ok(runtime.packageInfo.count > 0, "expected IR package to load declarations");
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
-assert.equal(runtime.evalConstNat("SortDemo.demo"), "192");
-assert.equal(runtime.evalNatToNat("fib", 12), "144");
-assert.equal(runtime.evalNatArrayToNat("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
-assert.equal(runtime.evalStringToNat("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
-assert.equal(runtime.evalByteArrayToNat("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
+assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
+assert.ok(runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib"));
+assert.equal(runtime.call("fib", 12), "144");
+assert.equal(runtime.exportsByName.fib(12), "144");
+assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
+assert.equal(runtime.call("SortDemo.demo"), "192");
+assert.equal(runtime.call("fib", 12), "144");
+assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
+assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
+assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
 
 const factory = createVirRuntimeFactory({ wasmBytes });
 const first = await factory.createRuntime({ irPackageBytes });
 const second = await factory.createRuntime({ irPackageBytes });
-assert.equal(first.evalConstNat("SortDemo.demo"), "192");
-assert.equal(second.evalNatToNat("fib", 8), "21");
+assert.equal(first.call("SortDemo.demo"), "192");
+assert.equal(second.call("fib", 8), "21");
 
 const badPackageRuntime = await factory.createRuntime();
 const badPackage = Uint8Array.from([
@@ -42,9 +48,25 @@ assert.throws(
 );
 
 assert.throws(
-  () => runtime.evalNatToNat("fib", -1),
-  /value must be an integer in 0\.\.4294967295/,
+  () => runtime.call("fib", -1),
+  /fib argument arg1 must be non-negative/,
 );
+
+const unsupportedAll = spawnSync(
+  "lean",
+  [
+    "--run",
+    "tools/GeneratePackage.lean",
+    "/tmp/vir-unsupported-interface.irpkg",
+    "/tmp/vir-unsupported-interface.report.md",
+    "--target-all",
+    "examples/MergeSort.lean",
+  ],
+  { encoding: "utf8" },
+);
+assert.notEqual(unsupportedAll.status, 0);
+assert.match(unsupportedAll.stderr, /unsupported interface exports/);
+assert.match(unsupportedAll.stderr, /SortDemo\.split/);
 
 console.log(
   `vir runtime smoke ok: ${runtime.packageInfo.count} declarations, SortDemo.demo = 192, fib 12 = 144`,

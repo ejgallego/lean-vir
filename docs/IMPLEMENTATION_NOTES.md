@@ -17,12 +17,12 @@ preserving the future replacement point for generated module data or a real
 environment loader.
 
 The same package encoder also supports focused developer packages through
-`scripts/lean-to-irpkg.sh`. That utility accepts explicit roots or packages every
-IR declaration emitted for a single Lean file. The `/dev.html` Vite entry point
-loads a served or uploaded `.irpkg` into a fresh WASM instance. Its input spec
-currently supports `() -> Nat`, `Nat -> Nat`, `Array Nat -> Nat`,
-`String -> Nat`, and `ByteArray -> Nat`, backed by narrow WASM exports that
-construct the Lean input object and call the upstream interpreter by name.
+`scripts/lean-to-irpkg.sh`. That utility accepts explicit roots or packages
+public source definitions for a single Lean file. The `/dev.html` Vite entry
+point loads a served or uploaded `.irpkg` into a fresh WASM instance, reads the
+embedded interface manifest, and generates controls from that manifest. Calls
+go through a generic byte-payload WASM export that constructs Lean input objects
+and calls the upstream interpreter by name.
 
 The browser keeps a step-by-step `Tamagotchi.step` automaton as the top-level
 interactive demo over the same upstream interpreter artifact. The automaton
@@ -32,8 +32,8 @@ representation that the upstream interpreter expects.
 The browser fixture runner exposes the `fib` and `SortDemo.demoFromArray`
 examples next to the manifest entries. Those two entries opt into the fixture
 input panel: `fib` accepts a bounded `Nat`, while the sort entry accepts
-browser-provided `UInt32` values, builds a Lean array object through a narrow
-WASM export, and calls the real interpreter on the Lean entry point.
+browser-provided `UInt32` values and calls the real interpreter on the Lean
+entry point through the manifest-driven runtime wrapper.
 
 The browser fixture runner evaluates demo and manifest entries with fresh WASM
 instances. That avoids retaining interpreter caches across a long run while

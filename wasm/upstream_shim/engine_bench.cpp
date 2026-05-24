@@ -6,13 +6,21 @@ Author: Emilio J. Gallego Arias
 
 #include <stdint.h>
 #include <stdio.h>
+#include <string.h>
 #include <time.h>
 
 extern "C" uint32_t vir_load_ir_package(uint8_t const * data, uint32_t size);
 extern "C" uint32_t vir_last_package_error_size(void);
 extern "C" char const * vir_last_package_error(void);
-extern "C" uint32_t vir_upstream_fib_repeated(uint32_t iterations, uint32_t n);
-extern "C" uint32_t vir_sort_checksum_repeated(uint32_t const * values, uint32_t len, uint32_t iterations);
+extern "C" char const * vir_call(
+    char const * name_text,
+    uint32_t name_len,
+    uint8_t const * request,
+    uint32_t request_len,
+    uint8_t result_tag);
+extern "C" uint32_t vir_call_result_size(void);
+extern "C" char const * vir_call_error(void);
+extern "C" uint32_t vir_call_error_size(void);
 
 #include "vir_demo_package.inc"
 
@@ -30,12 +38,95 @@ static void print_sample(char const * label, uint32_t iterations, uint32_t check
         static_cast<unsigned long long>(elapsed_ns));
 }
 
+static void write_u32(uint8_t *& cursor, uint32_t value) {
+    *cursor++ = static_cast<uint8_t>(value & 0xff);
+    *cursor++ = static_cast<uint8_t>((value >> 8) & 0xff);
+    *cursor++ = static_cast<uint8_t>((value >> 16) & 0xff);
+    *cursor++ = static_cast<uint8_t>((value >> 24) & 0xff);
+}
+
+static uint32_t read_u32(uint8_t const * cursor) {
+    return static_cast<uint32_t>(cursor[0]) |
+        (static_cast<uint32_t>(cursor[1]) << 8) |
+        (static_cast<uint32_t>(cursor[2]) << 16) |
+        (static_cast<uint32_t>(cursor[3]) << 24);
+}
+
+static void write_decimal(uint8_t *& cursor, uint32_t value) {
+    char text[16];
+    int len = snprintf(text, sizeof(text), "%u", value);
+    write_u32(cursor, static_cast<uint32_t>(len));
+    memcpy(cursor, text, static_cast<size_t>(len));
+    cursor += len;
+}
+
+static uint32_t parse_nat_result(char const * data, uint32_t len) {
+    if (data == nullptr || len < 5 || static_cast<uint8_t>(data[0]) != 0) {
+        fprintf(stderr, "invalid Nat result payload\n");
+        return 0;
+    }
+    uint8_t const * bytes = reinterpret_cast<uint8_t const *>(data);
+    uint32_t text_len = read_u32(bytes + 1);
+    if (text_len > len - 5) {
+        fprintf(stderr, "invalid Nat result length\n");
+        return 0;
+    }
+    uint32_t value = 0;
+    for (uint32_t i = 0; i < text_len; i++) {
+        char c = data[5 + i];
+        if (c < '0' || c > '9') {
+            fprintf(stderr, "invalid Nat result digit\n");
+            return 0;
+        }
+        value = value * 10 + static_cast<uint32_t>(c - '0');
+    }
+    return value;
+}
+
+static uint32_t call_nat(char const * name, uint8_t const * payload, uint32_t payload_len) {
+    char const * result = vir_call(name, static_cast<uint32_t>(strlen(name)), payload, payload_len, 0);
+    if (result == nullptr) {
+        uint32_t error_len = vir_call_error_size();
+        fprintf(stderr, "vir_call(%s) failed", name);
+        if (error_len != 0) {
+            fprintf(stderr, ": %.*s", static_cast<int>(error_len), vir_call_error());
+        }
+        fprintf(stderr, "\n");
+        return 0;
+    }
+    return parse_nat_result(result, vir_call_result_size());
+}
+
+static uint32_t call_fib(uint32_t input) {
+    uint8_t payload[4 + 1 + 4 + 16];
+    uint8_t * cursor = payload;
+    write_u32(cursor, 1);
+    *cursor++ = 0;
+    write_decimal(cursor, input);
+    return call_nat("fib", payload, static_cast<uint32_t>(cursor - payload));
+}
+
+static uint32_t call_sort(uint32_t const * input, uint32_t len) {
+    uint8_t payload[4 + 1 + 4 + 64 * (4 + 16)];
+    uint8_t * cursor = payload;
+    write_u32(cursor, 1);
+    *cursor++ = 10;
+    write_u32(cursor, len);
+    for (uint32_t i = 0; i < len; i++) {
+        write_decimal(cursor, input[i]);
+    }
+    return call_nat("SortDemo.demoFromArray", payload, static_cast<uint32_t>(cursor - payload));
+}
+
 static void bench_fib() {
     constexpr uint32_t iterations = 80;
     constexpr uint32_t input = 17;
     for (unsigned sample = 0; sample < 7; sample++) {
         uint64_t start = monotonic_nanos();
-        uint32_t checksum = vir_upstream_fib_repeated(iterations, input);
+        uint32_t checksum = 0;
+        for (uint32_t i = 0; i < iterations; i++) {
+            checksum += call_fib(input);
+        }
         uint64_t stop = monotonic_nanos();
         print_sample("fib", iterations, checksum, stop - start);
     }
@@ -46,7 +137,10 @@ static void bench_sort() {
     uint32_t input[] = { 7, 3, 9, 1, 4, 1, 5, 2, 8, 6, 0, 10, 12, 11, 13, 14 };
     for (unsigned sample = 0; sample < 7; sample++) {
         uint64_t start = monotonic_nanos();
-        uint32_t checksum = vir_sort_checksum_repeated(input, 16, iterations);
+        uint32_t checksum = 0;
+        for (uint32_t i = 0; i < iterations; i++) {
+            checksum += call_sort(input, 16);
+        }
         uint64_t stop = monotonic_nanos();
         print_sample("sort", iterations, checksum, stop - start);
     }
