@@ -57,9 +57,9 @@ const second = await factory.createRuntime({ irPackageBytes });
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
 
 Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `UInt8`, `UInt16`,
-`UInt32`, `UInt64`, `USize`, `ByteArray`, `Array Nat`, `Array UInt32`,
-`Array String`, `List Nat`, `List UInt32`, `List String`, `Option Nat`,
-`Option String`, `Nat × Nat`, nullary inductive enums, and `Lean.Expr`.
+`UInt32`, `UInt64`, `USize`, `ByteArray`, recursive `Array α`, `List α`,
+`Option α`, and `α × β` shapes over supported types, nullary inductive enums,
+and `Lean.Expr`.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`.
@@ -70,8 +70,10 @@ generated JavaScript name.
 
 Options are accepted as `null`, `{ kind: "none" }`, `{ kind: "some", value }`,
 `{ some: value }`, or the bare inner value. Option results are returned as
-`null` or the inner value. `Nat × Nat` inputs are accepted as `{ fst, snd }` or
-two-element arrays, and results are returned as `{ fst, snd }`.
+`null` or the inner value. Product inputs are accepted as `{ fst, snd }` or
+two-element arrays, and results are returned as `{ fst, snd }`. These shapes can
+be nested, for example `Option (Array Nat)`, `List (Nat × String)`, and
+`Array Lean.Expr`.
 
 `Lean.Expr` values use structural JavaScript objects such as
 `{ kind: "const", name: "Nat", levels: [] }`,

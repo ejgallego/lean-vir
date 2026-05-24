@@ -350,12 +350,51 @@ function encodeCallPayload(entry, args) {
   entry.args.forEach((arg, index) => {
     encodeValue(writer, arg.type, args[index], `${entry.entry} argument ${arg.name}`);
   });
+  encodeTypeDescriptor(writer, entry.result, `${entry.entry} result`);
   return writer.take();
 }
 
 function encodeValue(writer, type, value, label) {
+  encodeTypeDescriptor(writer, type, label);
+  encodeValuePayload(writer, type, value, label);
+}
+
+function encodeTypeDescriptor(writer, type, label) {
   const tag = requireWireTag(type, label);
   writer.u8(tag);
+  switch (tag) {
+    case 16:
+    case 17:
+    case 18:
+      encodeTypeDescriptor(writer, requireTypeField(type, "element", label), `${label}.element`);
+      return;
+    case 19:
+      encodeTypeDescriptor(writer, requireTypeField(type, "fst", label), `${label}.fst`);
+      encodeTypeDescriptor(writer, requireTypeField(type, "snd", label), `${label}.snd`);
+      return;
+    default:
+      return;
+  }
+}
+
+function decodeTypeDescriptor(reader) {
+  const tag = reader.u8();
+  switch (tag) {
+    case 16:
+      return { wireTag: tag, element: decodeTypeDescriptor(reader) };
+    case 17:
+      return { wireTag: tag, element: decodeTypeDescriptor(reader) };
+    case 18:
+      return { wireTag: tag, element: decodeTypeDescriptor(reader) };
+    case 19:
+      return { wireTag: tag, fst: decodeTypeDescriptor(reader), snd: decodeTypeDescriptor(reader) };
+    default:
+      return { wireTag: tag };
+  }
+}
+
+function encodeValuePayload(writer, type, value, label) {
+  const tag = requireWireTag(type, label);
   switch (tag) {
     case 0:
       writer.string(normalizeDecimal(value, label, { signed: false }));
@@ -420,34 +459,29 @@ function encodeValue(writer, type, value, label) {
     case 16: {
       const values = normalizeArray(value, label);
       writer.u32(values.length);
-      values.forEach((item, itemIndex) => {
-        if (typeof item !== "string") throw new Error(`${label}[${itemIndex}] must be a string`);
-        writer.string(item);
-      });
+      const elementType = requireTypeField(type, "element", label);
+      values.forEach((item, itemIndex) => encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`));
       return;
     }
     case 17: {
       const values = normalizeArray(value, label);
       writer.u32(values.length);
-      values.forEach((item, itemIndex) => writer.u32(normalizeUint32(item, `${label}[${itemIndex}]`)));
+      const elementType = requireTypeField(type, "element", label);
+      values.forEach((item, itemIndex) => encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`));
       return;
     }
     case 18: {
       const option = normalizeOption(value, label);
       writer.u8(option.some ? 1 : 0);
-      if (option.some) writer.string(normalizeDecimal(option.value, `${label}.value`, { signed: false }));
+      if (option.some) {
+        encodeValuePayload(writer, requireTypeField(type, "element", label), option.value, `${label}.value`);
+      }
       return;
     }
     case 19: {
-      const option = normalizeOption(value, label);
-      writer.u8(option.some ? 1 : 0);
-      if (option.some) writer.string(requireString(option.value, `${label}.value`));
-      return;
-    }
-    case 20: {
-      const pair = normalizeNatPair(value, label);
-      writer.string(normalizeDecimal(pair.fst, `${label}.fst`, { signed: false }));
-      writer.string(normalizeDecimal(pair.snd, `${label}.snd`, { signed: false }));
+      const pair = normalizePair(value, label);
+      encodeValuePayload(writer, requireTypeField(type, "fst", label), pair.fst, `${label}.fst`);
+      encodeValuePayload(writer, requireTypeField(type, "snd", label), pair.snd, `${label}.snd`);
       return;
     }
     default:
@@ -456,12 +490,18 @@ function encodeValue(writer, type, value, label) {
 }
 
 function decodeCallResult(type, bytes) {
-  const expectedTag = requireWireTag(type, "result");
   const reader = new BinaryReader(bytes);
-  const actualTag = reader.u8();
-  if (actualTag !== expectedTag) {
-    throw new Error(`result wire tag mismatch: expected ${expectedTag}, got ${actualTag}`);
+  const actualType = decodeTypeDescriptor(reader);
+  if (!sameWireType(type, actualType)) {
+    throw new Error(`result wire type mismatch: expected ${type.type ?? requireWireTag(type, "result")}, got tag ${actualType.wireTag}`);
   }
+  const value = decodeValuePayload(reader, type);
+  reader.requireEnd();
+  return value;
+}
+
+function decodeValuePayload(reader, type) {
+  const expectedTag = requireWireTag(type, "result");
   let value;
   switch (expectedTag) {
     case 0:
@@ -510,27 +550,28 @@ function decodeCallResult(type, bytes) {
       break;
     case 16: {
       const len = reader.u32();
-      value = Array.from({ length: len }, () => reader.string());
+      const elementType = requireTypeField(type, "element", "result");
+      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType));
       break;
     }
     case 17: {
       const len = reader.u32();
-      value = Array.from({ length: len }, () => reader.u32());
+      const elementType = requireTypeField(type, "element", "result");
+      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType));
       break;
     }
     case 18:
-      value = reader.u8() === 0 ? null : reader.string();
+      value = reader.u8() === 0 ? null : decodeValuePayload(reader, requireTypeField(type, "element", "result"));
       break;
     case 19:
-      value = reader.u8() === 0 ? null : reader.string();
-      break;
-    case 20:
-      value = { fst: reader.string(), snd: reader.string() };
+      value = {
+        fst: decodeValuePayload(reader, requireTypeField(type, "fst", "result")),
+        snd: decodeValuePayload(reader, requireTypeField(type, "snd", "result")),
+      };
       break;
     default:
       throw new Error(`unsupported result wire tag ${expectedTag}`);
   }
-  reader.requireEnd();
   return value;
 }
 
@@ -539,6 +580,29 @@ function requireWireTag(type, label) {
     throw new Error(`${label} is missing a manifest wireTag`);
   }
   return type.wireTag;
+}
+
+function requireTypeField(type, field, label) {
+  const child = type?.[field];
+  if (!child || !Number.isInteger(child.wireTag)) {
+    throw new Error(`${label} is missing manifest type field ${field}`);
+  }
+  return child;
+}
+
+function sameWireType(expected, actual) {
+  if (requireWireTag(expected, "expected result") !== actual?.wireTag) return false;
+  switch (expected.wireTag) {
+    case 16:
+    case 17:
+    case 18:
+      return sameWireType(requireTypeField(expected, "element", "expected result"), actual.element);
+    case 19:
+      return sameWireType(requireTypeField(expected, "fst", "expected result"), actual.fst) &&
+        sameWireType(requireTypeField(expected, "snd", "expected result"), actual.snd);
+    default:
+      return true;
+  }
 }
 
 function normalizeDecimal(value, label, { signed }) {
@@ -587,7 +651,7 @@ function normalizeOption(value, label) {
   return { some: true, value };
 }
 
-function normalizeNatPair(value, label) {
+function normalizePair(value, label) {
   if (Array.isArray(value)) {
     if (value.length !== 2) throw new Error(`${label} pair array must have exactly two elements`);
     return { fst: value[0], snd: value[1] };

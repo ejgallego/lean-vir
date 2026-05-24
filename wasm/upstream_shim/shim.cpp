@@ -1701,17 +1701,17 @@ enum class vir_wire_type : uint8_t {
     UInt64 = 7,
     USize = 8,
     ByteArray = 9,
-    ArrayNat = 10,
-    ArrayUInt32 = 11,
-    ArrayString = 16,
-    ListNat = 12,
-    ListUInt32 = 17,
-    ListString = 13,
-    OptionNat = 18,
-    OptionString = 19,
-    ProdNatNat = 20,
+    Array = 16,
+    List = 17,
+    Option = 18,
+    Prod = 19,
     SimpleEnum = 14,
     Expr = 15,
+};
+
+struct vir_type {
+    vir_wire_type tag;
+    std::vector<vir_type> args;
 };
 
 class vir_reader {
@@ -1848,6 +1848,69 @@ static object * decode_level(vir_reader & r);
 static object * decode_expr(vir_reader & r);
 static void encode_level(vir_writer & w, object * value);
 static void encode_expr_payload(vir_writer & w, object * value);
+
+static bool is_known_wire_type(vir_wire_type tag) {
+    switch (tag) {
+    case vir_wire_type::Nat:
+    case vir_wire_type::Int:
+    case vir_wire_type::Bool:
+    case vir_wire_type::String:
+    case vir_wire_type::UInt8:
+    case vir_wire_type::UInt16:
+    case vir_wire_type::UInt32:
+    case vir_wire_type::UInt64:
+    case vir_wire_type::USize:
+    case vir_wire_type::ByteArray:
+    case vir_wire_type::Array:
+    case vir_wire_type::List:
+    case vir_wire_type::Option:
+    case vir_wire_type::Prod:
+    case vir_wire_type::SimpleEnum:
+    case vir_wire_type::Expr:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static vir_type decode_type(vir_reader & r) {
+    vir_type type { static_cast<vir_wire_type>(r.u8()), {} };
+    if (!is_known_wire_type(type.tag)) {
+        r.fail("unsupported wire type tag " + std::to_string(static_cast<uint8_t>(type.tag)));
+        return { vir_wire_type::Nat, {} };
+    }
+    switch (type.tag) {
+    case vir_wire_type::Array:
+    case vir_wire_type::List:
+    case vir_wire_type::Option:
+        type.args.push_back(decode_type(r));
+        break;
+    case vir_wire_type::Prod:
+        type.args.push_back(decode_type(r));
+        type.args.push_back(decode_type(r));
+        break;
+    default:
+        break;
+    }
+    return type;
+}
+
+static void encode_type(vir_writer & w, vir_type const & type) {
+    w.u8(static_cast<uint8_t>(type.tag));
+    switch (type.tag) {
+    case vir_wire_type::Array:
+    case vir_wire_type::List:
+    case vir_wire_type::Option:
+        encode_type(w, type.args[0]);
+        break;
+    case vir_wire_type::Prod:
+        encode_type(w, type.args[0]);
+        encode_type(w, type.args[1]);
+        break;
+    default:
+        break;
+    }
+}
 
 static object * decode_level_list(vir_reader & r) {
     uint32_t len = r.u32();
@@ -2041,9 +2104,8 @@ static object * decode_expr(vir_reader & r) {
     }
 }
 
-static object * decode_argument(vir_reader & r) {
-    vir_wire_type tag = static_cast<vir_wire_type>(r.u8());
-    switch (tag) {
+static object * decode_value(vir_reader & r, vir_type const & type) {
+    switch (type.tag) {
     case vir_wire_type::Nat: {
         std::string text = r.string();
         return lean_cstr_to_nat(text.c_str());
@@ -2084,93 +2146,49 @@ static object * decode_argument(vir_reader & r) {
         std::vector<uint8_t> values = r.bytes();
         return mk_byte_array(values.data(), static_cast<uint32_t>(values.size()));
     }
-    case vir_wire_type::ArrayNat: {
+    case vir_wire_type::Array: {
         uint32_t len = r.u32();
         object * array = lean_alloc_array(len, len);
         for (uint32_t i = 0; i < len; i++) {
-            std::string text = r.string();
-            lean_array_set_core(array, i, lean_cstr_to_nat(text.c_str()));
+            lean_array_set_core(array, i, decode_value(r, type.args[0]));
         }
         return array;
     }
-    case vir_wire_type::ArrayUInt32: {
-        uint32_t len = r.u32();
-        object * array = lean_alloc_array(len, len);
-        for (uint32_t i = 0; i < len; i++) {
-            lean_array_set_core(array, i, lean_box_uint32(r.u32()));
-        }
-        return array;
-    }
-    case vir_wire_type::ArrayString: {
-        uint32_t len = r.u32();
-        object * array = lean_alloc_array(len, len);
-        for (uint32_t i = 0; i < len; i++) {
-            std::string text = r.string();
-            lean_array_set_core(array, i, lean_mk_string_from_bytes(text.data(), text.size()));
-        }
-        return array;
-    }
-    case vir_wire_type::ListNat: {
+    case vir_wire_type::List: {
         uint32_t len = r.u32();
         std::vector<object *> values;
         values.reserve(len);
         for (uint32_t i = 0; i < len; i++) {
-            std::string text = r.string();
-            values.push_back(lean_cstr_to_nat(text.c_str()));
+            values.push_back(decode_value(r, type.args[0]));
         }
         std::reverse(values.begin(), values.end());
         object * out = mk_list_from_reversed(values);
         for (object * value : values) lean_dec(value);
         return out;
     }
-    case vir_wire_type::ListUInt32: {
-        uint32_t len = r.u32();
-        std::vector<object *> values;
-        values.reserve(len);
-        for (uint32_t i = 0; i < len; i++) {
-            values.push_back(lean_box_uint32(r.u32()));
-        }
-        std::reverse(values.begin(), values.end());
-        object * out = mk_list_from_reversed(values);
-        for (object * value : values) lean_dec(value);
-        return out;
-    }
-    case vir_wire_type::ListString: {
-        uint32_t len = r.u32();
-        std::vector<object *> values;
-        values.reserve(len);
-        for (uint32_t i = 0; i < len; i++) {
-            std::string text = r.string();
-            values.push_back(lean_mk_string_from_bytes(text.data(), text.size()));
-        }
-        std::reverse(values.begin(), values.end());
-        object * out = mk_list_from_reversed(values);
-        for (object * value : values) lean_dec(value);
-        return out;
-    }
-    case vir_wire_type::OptionNat: {
+    case vir_wire_type::Option: {
         if (r.u8() == 0) return lean_box(0);
-        std::string text = r.string();
-        return mk_ctor_owned(1, { lean_cstr_to_nat(text.c_str()) });
+        return mk_ctor_owned(1, { decode_value(r, type.args[0]) });
     }
-    case vir_wire_type::OptionString: {
-        if (r.u8() == 0) return lean_box(0);
-        std::string text = r.string();
-        return mk_ctor_owned(1, { lean_mk_string_from_bytes(text.data(), text.size()) });
-    }
-    case vir_wire_type::ProdNatNat: {
-        std::string fst = r.string();
-        std::string snd = r.string();
-        return mk_ctor_owned(0, { lean_cstr_to_nat(fst.c_str()), lean_cstr_to_nat(snd.c_str()) });
+    case vir_wire_type::Prod: {
+        object * fst = decode_value(r, type.args[0]);
+        object * snd = decode_value(r, type.args[1]);
+        return mk_ctor_owned(0, { fst, snd });
     }
     case vir_wire_type::SimpleEnum:
         return lean_box(r.u32());
     case vir_wire_type::Expr:
         return decode_expr(r);
     default:
-        r.fail("unsupported wire argument tag " + std::to_string(static_cast<uint8_t>(tag)));
+        r.fail("unsupported wire argument tag " + std::to_string(static_cast<uint8_t>(type.tag)));
         return lean_box(0);
     }
+}
+
+static object * decode_argument(vir_reader & r) {
+    vir_type type = decode_type(r);
+    if (!r.ok) return lean_box(0);
+    return decode_value(r, type);
 }
 
 static std::string int_to_decimal(object * value) {
@@ -2188,41 +2206,6 @@ static void encode_string_payload(vir_writer & w, object * value) {
     size_t size = lean_string_size(value);
     uint32_t len = static_cast<uint32_t>(size == 0 ? 0 : size - 1);
     w.bytes(reinterpret_cast<uint8_t const *>(lean_string_cstr(value)), len);
-}
-
-static void encode_list_payload(vir_writer & w, object * value, vir_wire_type elem_tag) {
-    std::vector<object *> values;
-    object * cursor = value;
-    while (!lean_is_scalar(cursor)) {
-        values.push_back(lean_ctor_get(cursor, 0));
-        cursor = lean_ctor_get(cursor, 1);
-    }
-    w.u32(static_cast<uint32_t>(values.size()));
-    for (object * elem : values) {
-        if (elem_tag == vir_wire_type::Nat) {
-            w.string(nat_to_decimal(elem));
-        } else if (elem_tag == vir_wire_type::UInt32) {
-            w.u32(lean_unbox_uint32(elem));
-        } else if (elem_tag == vir_wire_type::String) {
-            size_t size = lean_string_size(elem);
-            uint32_t len = static_cast<uint32_t>(size == 0 ? 0 : size - 1);
-            w.bytes(reinterpret_cast<uint8_t const *>(lean_string_cstr(elem)), len);
-        }
-    }
-}
-
-static void encode_option_payload(vir_writer & w, object * value, vir_wire_type elem_tag) {
-    if (lean_is_scalar(value)) {
-        w.u8(0);
-        return;
-    }
-    w.u8(1);
-    object * elem = lean_ctor_get(value, 0);
-    if (elem_tag == vir_wire_type::Nat) {
-        w.string(nat_to_decimal(elem));
-    } else if (elem_tag == vir_wire_type::String) {
-        encode_string_payload(w, elem);
-    }
 }
 
 static void encode_expr_payload(vir_writer & w, object * value) {
@@ -2293,9 +2276,8 @@ static void encode_expr_payload(vir_writer & w, object * value) {
     }
 }
 
-static void encode_result(vir_writer & w, vir_wire_type tag, object * value) {
-    w.u8(static_cast<uint8_t>(tag));
-    switch (tag) {
+static void encode_value_payload(vir_writer & w, vir_type const & type, object * value) {
+    switch (type.tag) {
     case vir_wire_type::Nat:
         encode_nat_payload(w, value);
         break;
@@ -2326,48 +2308,38 @@ static void encode_result(vir_writer & w, vir_wire_type tag, object * value) {
     case vir_wire_type::ByteArray:
         w.bytes(lean_sarray_cptr(value), static_cast<uint32_t>(lean_sarray_size(value)));
         break;
-    case vir_wire_type::ArrayNat: {
+    case vir_wire_type::Array: {
         uint32_t len = static_cast<uint32_t>(lean_array_size(value));
         w.u32(len);
         for (uint32_t i = 0; i < len; i++) {
-            w.string(nat_to_decimal(lean_array_get_core(value, i)));
+            encode_value_payload(w, type.args[0], lean_array_get_core(value, i));
         }
         break;
     }
-    case vir_wire_type::ArrayUInt32: {
-        uint32_t len = static_cast<uint32_t>(lean_array_size(value));
-        w.u32(len);
-        for (uint32_t i = 0; i < len; i++) {
-            w.u32(lean_unbox_uint32(lean_array_get_core(value, i)));
+    case vir_wire_type::List: {
+        std::vector<object *> values;
+        object * cursor = value;
+        while (!lean_is_scalar(cursor)) {
+            values.push_back(lean_ctor_get(cursor, 0));
+            cursor = lean_ctor_get(cursor, 1);
+        }
+        w.u32(static_cast<uint32_t>(values.size()));
+        for (object * elem : values) {
+            encode_value_payload(w, type.args[0], elem);
         }
         break;
     }
-    case vir_wire_type::ArrayString: {
-        uint32_t len = static_cast<uint32_t>(lean_array_size(value));
-        w.u32(len);
-        for (uint32_t i = 0; i < len; i++) {
-            encode_string_payload(w, lean_array_get_core(value, i));
+    case vir_wire_type::Option:
+        if (lean_is_scalar(value)) {
+            w.u8(0);
+        } else {
+            w.u8(1);
+            encode_value_payload(w, type.args[0], lean_ctor_get(value, 0));
         }
         break;
-    }
-    case vir_wire_type::ListNat:
-        encode_list_payload(w, value, vir_wire_type::Nat);
-        break;
-    case vir_wire_type::ListUInt32:
-        encode_list_payload(w, value, vir_wire_type::UInt32);
-        break;
-    case vir_wire_type::ListString:
-        encode_list_payload(w, value, vir_wire_type::String);
-        break;
-    case vir_wire_type::OptionNat:
-        encode_option_payload(w, value, vir_wire_type::Nat);
-        break;
-    case vir_wire_type::OptionString:
-        encode_option_payload(w, value, vir_wire_type::String);
-        break;
-    case vir_wire_type::ProdNatNat:
-        w.string(nat_to_decimal(lean_ctor_get(value, 0)));
-        w.string(nat_to_decimal(lean_ctor_get(value, 1)));
+    case vir_wire_type::Prod:
+        encode_value_payload(w, type.args[0], lean_ctor_get(value, 0));
+        encode_value_payload(w, type.args[1], lean_ctor_get(value, 1));
         break;
     case vir_wire_type::SimpleEnum:
         w.u32(static_cast<uint32_t>(lean_is_scalar(value) ? lean_unbox(value) : lean_obj_tag(value)));
@@ -2378,6 +2350,11 @@ static void encode_result(vir_writer & w, vir_wire_type tag, object * value) {
     default:
         break;
     }
+}
+
+static void encode_result(vir_writer & w, vir_type const & type, object * value) {
+    encode_type(w, type);
+    encode_value_payload(w, type, value);
 }
 
 static std::string g_call_result;
@@ -2897,6 +2874,7 @@ extern "C" char const * vir_call(
     uint8_t const * request,
     uint32_t request_len,
     uint8_t result_tag) {
+    (void) result_tag;
     lean::g_call_result.clear();
     lean::g_call_error.clear();
     if (request == nullptr && request_len != 0) {
@@ -2911,6 +2889,7 @@ extern "C" char const * vir_call(
     for (uint32_t i = 0; i < argc; i++) {
         args.push_back(lean::decode_argument(reader));
     }
+    lean::vir_type result_type = lean::decode_type(reader);
     if (!reader.ok) {
         lean::g_call_error = reader.error();
         for (lean::object * arg : args) {
@@ -2932,7 +2911,7 @@ extern "C" char const * vir_call(
     lean::options opts(lean_box(0));
     lean::object * result = lean::ir::run_boxed(env, opts, fn, args.size(), args.data());
     lean::vir_writer writer;
-    lean::encode_result(writer, static_cast<lean::vir_wire_type>(result_tag), result);
+    lean::encode_result(writer, result_type, result);
     lean_dec(result);
     lean::g_call_result = writer.take();
     return lean::g_call_result.data();

@@ -21,8 +21,9 @@ The same package encoder also supports focused developer packages through
 public source definitions for a single Lean file. The `/dev.html` Vite entry
 point loads a served or uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls
-go through a generic byte-payload WASM export that constructs Lean input objects
-and calls the upstream interpreter by name.
+go through a generic byte-payload WASM export that carries recursive type
+descriptors, constructs Lean input objects, and calls the upstream interpreter
+by name.
 
 The browser keeps a step-by-step `Tamagotchi.step` automaton as the top-level
 interactive demo over the same upstream interpreter artifact. The automaton now

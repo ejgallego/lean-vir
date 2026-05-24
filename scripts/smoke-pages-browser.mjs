@@ -346,8 +346,8 @@ try {
       packageName: "local-mergesort.irpkg",
       entry: "SortDemo_demoFromArray",
       entryCount: 2,
-      input: "",
-      runInput: "4, 1, 3, 2",
+      input: "[]",
+      runInput: "[4, 1, 3, 2]",
       result: "30",
     },
   );

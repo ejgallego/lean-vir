@@ -59,19 +59,18 @@ dev.html?package=local-fib.irpkg&entry=fib
 ## Runtime Interface
 
 The manifest describes each export with its Lean declaration name, JavaScript
-name, argument types, result type, and wire tags. JavaScript validates inputs
-against that manifest and sends a compact byte payload through the generic
-`vir_call` WASM export. WASM constructs Lean runtime objects, calls the upstream
-IR interpreter, and encodes the result bytes for JavaScript.
+name, argument types, result type, and recursive type tree. JavaScript validates
+inputs against that manifest and sends a compact byte payload through the
+generic `vir_call` WASM export. WASM constructs Lean runtime objects, calls the
+upstream IR interpreter, and encodes the result bytes for JavaScript.
 
 Supported v1 types:
 
 - `Nat`, `Int`, `Bool`, `String`;
 - `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - `ByteArray`;
-- `Array Nat`, `Array UInt32`, `Array String`;
-- `List Nat`, `List UInt32`, `List String`;
-- `Option Nat`, `Option String`, `Nat × Nat`;
+- recursive `Array α`, `List α`, `Option α`, and `α × β` shapes over
+  supported types;
 - nullary inductive enums;
 - `Lean.Expr`.
 

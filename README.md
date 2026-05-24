@@ -28,9 +28,9 @@ package. Input-capable entries, currently `fib` and `SortDemo.demoFromArray`,
 render an input control in the fixture source panel.
 
 The package manifest also drives the local `/dev.html` runner. Supported
-browser-call types include primitive scalars, selected list/array/option/product
-shapes, nullary inductive enums such as the Tamagotchi state/action types, and
-structural `Lean.Expr` values.
+browser-call types include primitive scalars, recursive list/array/option/product
+shapes over supported element types, nullary inductive enums such as the
+Tamagotchi state/action types, and structural `Lean.Expr` values.
 
 ## Quick Start
 
@@ -140,7 +140,7 @@ real `Lean.IR.Decl` values, packaged with `tools/GeneratePackage.lean`, and
 then compared against Lean's host IR interpreter with
 `interpreter.prefer_native=false`. The current passing surface covers recursive
 functions, inductive pattern matching, common `List`/`Array`/`String`/
-`ByteArray` operations, numeric primitive boundaries, manifest-backed
+`ByteArray` operations, numeric primitive boundaries, nested manifest-backed
 collection/option/product calls, structural `Lean.Expr` values, parser setup
 paths, and selected task/ref initialization paths. See
 `docs/FIXTURE_COVERAGE.md` for the detailed boundary list.

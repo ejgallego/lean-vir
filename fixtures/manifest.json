@@ -283,7 +283,12 @@
         "Vir.Fixtures.InterfaceShapes.optionStringBang",
         "Vir.Fixtures.InterfaceShapes.optionNatScore",
         "Vir.Fixtures.InterfaceShapes.prodNatNatSwap",
-        "Vir.Fixtures.InterfaceShapes.prodNatNatSum"
+        "Vir.Fixtures.InterfaceShapes.prodNatNatSum",
+        "Vir.Fixtures.InterfaceShapes.optionArrayNatSum",
+        "Vir.Fixtures.InterfaceShapes.listProdNatStringScore",
+        "Vir.Fixtures.InterfaceShapes.prodStringNatSwap",
+        "Vir.Fixtures.InterfaceShapes.arrayExprKindScore",
+        "Vir.Fixtures.InterfaceShapes.optionExprBump"
       ],
       "result": { "type": "Nat" }
     },

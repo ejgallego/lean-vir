@@ -112,6 +112,24 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSwap", { f
   snd: "2",
 });
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSum", [4, 5]), "9");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", [4, 5, 6]), "15");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", null), "0");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listProdNatStringScore", [
+  { fst: 4, snd: "ab" },
+  [5, "c"],
+]), "12");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.prodStringNatSwap", { fst: "ok", snd: 6 }), {
+  fst: "7",
+  snd: "ok!",
+});
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayExprKindScore", [
+  { kind: "const", name: "Nat", levels: [] },
+  { kind: "bvar", index: 2 },
+]), "13");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.optionExprBump", { kind: "bvar", index: 6 }), {
+  kind: "bvar",
+  index: "7",
+});
 
 const factory = createVirRuntimeFactory({ wasmBytes });
 const first = await factory.createRuntime({ irPackageBytes });
@@ -143,13 +161,13 @@ const unsupportedAll = spawnSync(
     "/tmp/vir-unsupported-interface.irpkg",
     "/tmp/vir-unsupported-interface.report.md",
     "--target-all",
-    "examples/MergeSort.lean",
+    "fixtures/ListOption.lean",
   ],
   { encoding: "utf8" },
 );
 assert.notEqual(unsupportedAll.status, 0);
 assert.match(unsupportedAll.stderr, /unsupported interface exports/);
-assert.match(unsupportedAll.stderr, /SortDemo\.split/);
+assert.match(unsupportedAll.stderr, /Vir\.Fixtures\.ListOption\.classifySum/);
 
 console.log(
   `vir runtime smoke ok: ${runtime.packageInfo.count} declarations, SortDemo.demo = 192, fib 12 = 144`,

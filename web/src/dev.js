@@ -81,7 +81,12 @@ function selectEntryFromQuery() {
 }
 
 function inputDefault(input) {
-  switch (input.type?.wireTag) {
+  const value = defaultValueForType(input.type);
+  return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function defaultValueForType(type) {
+  switch (type?.wireTag) {
     case 0:
     case 1:
     case 4:
@@ -89,36 +94,34 @@ function inputDefault(input) {
     case 6:
     case 7:
     case 8:
-      return "0";
+      return 0;
     case 2:
-      return "false";
+      return false;
     case 3:
       return "";
     case 9:
-    case 10:
-    case 11:
-    case 12:
-    case 13:
-      return "";
+      return [];
     case 15:
-      return `{"kind":"const","name":"Nat","levels":[]}`;
+      return { kind: "const", name: "Nat", levels: [] };
     case 16:
     case 17:
-      return "[]";
+      return [];
     case 18:
+      return null;
     case 19:
-      return "null";
-    case 20:
-      return `{"fst":0,"snd":0}`;
+      return {
+        fst: defaultValueForType(type?.fst),
+        snd: defaultValueForType(type?.snd),
+      };
     case 14:
-      return input.type?.constructors?.[0]?.jsName ?? "";
+      return type?.constructors?.[0]?.jsName ?? "";
     default:
       return "";
   }
 }
 
 function isJsonInputTag(tag) {
-  return tag === 15 || tag === 16 || tag === 17 || tag === 18 || tag === 19 || tag === 20;
+  return tag === 15 || tag === 16 || tag === 17 || tag === 18 || tag === 19;
 }
 
 function isLegacyArrayInputTag(tag) {
@@ -300,7 +303,6 @@ function parseInputValue(input, text) {
     case 17:
     case 18:
     case 19:
-    case 20:
       return JSON.parse(text);
     default:
       throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);

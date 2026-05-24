@@ -52,8 +52,9 @@ The current fixture surface covers:
 - `Lean.Expr` package closure and structural JS/WASM marshaling for constants,
   applications, literals, binders, levels, variables, projections, metadata
   results, and bound-variable inputs/results;
-- manifest-backed `Array String`, `List UInt32`, `Option Nat`,
-  `Option String`, and `Nat × Nat` interface calls;
+- manifest-backed recursive interface calls including `Array String`,
+  `List UInt32`, `Option Nat`, `Option String`, `Nat × Nat`,
+  `Option (Array Nat)`, `List (Nat × String)`, and `Array Lean.Expr`;
 - hash/name/substring/pointer-address primitives reached by parser data paths,
   including `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
   `ptrAddrUnsafe`;

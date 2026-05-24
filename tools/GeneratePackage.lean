@@ -63,15 +63,10 @@ inductive InterfaceType where
   | uint64
   | usize
   | byteArray
-  | arrayNat
-  | arrayUInt32
-  | arrayString
-  | listNat
-  | listUInt32
-  | listString
-  | optionNat
-  | optionString
-  | prodNatNat
+  | array (element : InterfaceType)
+  | list (element : InterfaceType)
+  | option (element : InterfaceType)
+  | prod (fst snd : InterfaceType)
   | simpleEnum (name : Name) (constructors : Array Name)
   | expr
   deriving BEq, Repr
@@ -1493,15 +1488,10 @@ def InterfaceType.label : InterfaceType → String
   | .uint64 => "UInt64"
   | .usize => "USize"
   | .byteArray => "ByteArray"
-  | .arrayNat => "Array Nat"
-  | .arrayUInt32 => "Array UInt32"
-  | .arrayString => "Array String"
-  | .listNat => "List Nat"
-  | .listUInt32 => "List UInt32"
-  | .listString => "List String"
-  | .optionNat => "Option Nat"
-  | .optionString => "Option String"
-  | .prodNatNat => "Nat × Nat"
+  | .array element => s!"Array {element.label}"
+  | .list element => s!"List {element.label}"
+  | .option element => s!"Option {element.label}"
+  | .prod fst snd => s!"{fst.label} × {snd.label}"
   | .simpleEnum name _ => name.toString
   | .expr => "Lean.Expr"
 
@@ -1516,15 +1506,10 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .uint64 => 7
   | .usize => 8
   | .byteArray => 9
-  | .arrayNat => 10
-  | .arrayUInt32 => 11
-  | .arrayString => 16
-  | .listNat => 12
-  | .listUInt32 => 17
-  | .listString => 13
-  | .optionNat => 18
-  | .optionString => 19
-  | .prodNatNat => 20
+  | .array .. => 16
+  | .list .. => 17
+  | .option .. => 18
+  | .prod .. => 19
   | .simpleEnum .. => 14
   | .expr => 15
 
@@ -1554,6 +1539,35 @@ def ctorShortName (inductiveName ctorName : Name) : String :=
 
 def InterfaceType.toJson (ty : InterfaceType) : String :=
   match ty with
+  | .array element =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"array\","
+      ++ "\"element\":" ++ element.toJson
+      ++ "}"
+  | .list element =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"list\","
+      ++ "\"element\":" ++ element.toJson
+      ++ "}"
+  | .option element =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"option\","
+      ++ "\"element\":" ++ element.toJson
+      ++ "}"
+  | .prod fst snd =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"prod\","
+      ++ "\"fst\":" ++ fst.toJson ++ ","
+      ++ "\"snd\":" ++ snd.toJson
+      ++ "}"
   | .simpleEnum name constructors =>
       let ctorJson := constructors.mapIdx fun idx ctor =>
         "{"
@@ -1607,7 +1621,7 @@ def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :
       | _ => false
     if allNullary then some (.simpleEnum name ctors) else none
 
-def interfaceType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :=
+partial def interfaceType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :=
   match simpleInterfaceType? e with
   | some ty => some ty
   | none =>
@@ -1615,25 +1629,14 @@ def interfaceType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :=
       let (fn, args) := e.getAppFnArgs
       match fn, Array.toList args with
       | `Array, [arg] =>
-          match simpleInterfaceType? arg with
-          | some .nat => some .arrayNat
-          | some .uint32 => some .arrayUInt32
-          | some .string => some .arrayString
-          | _ => none
+          interfaceType? env arg |>.map .array
       | `List, [arg] =>
-          match simpleInterfaceType? arg with
-          | some .nat => some .listNat
-          | some .uint32 => some .listUInt32
-          | some .string => some .listString
-          | _ => none
+          interfaceType? env arg |>.map .list
       | `Option, [arg] =>
-          match simpleInterfaceType? arg with
-          | some .nat => some .optionNat
-          | some .string => some .optionString
-          | _ => none
+          interfaceType? env arg |>.map .option
       | `Prod, [lhs, rhs] =>
-          match simpleInterfaceType? lhs, simpleInterfaceType? rhs with
-          | some .nat, some .nat => some .prodNatNat
+          match interfaceType? env lhs, interfaceType? env rhs with
+          | some lhsTy, some rhsTy => some (.prod lhsTy rhsTy)
           | _, _ => none
       | _, _ => simpleEnumType? env e
 

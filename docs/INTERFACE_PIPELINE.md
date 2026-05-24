@@ -69,15 +69,19 @@ The embedded manifest currently supports:
 - scalar values: `Nat`, `Int`, `Bool`, `String`;
 - fixed-width values: `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - byte data: `ByteArray`;
-- selected homogeneous collections: `Array Nat`, `Array UInt32`,
-  `Array String`, `List Nat`, `List UInt32`, `List String`;
-- selected option/product shapes: `Option Nat`, `Option String`, `Nat × Nat`;
+- recursive collections: `Array α` and `List α` for supported `α`;
+- recursive option/product shapes: `Option α` and `α × β` for supported
+  `α` and `β`;
 - nullary inductive enums, represented in JavaScript by generated constructor
   names;
 - `Lean.Expr`, represented as structural JavaScript objects.
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
+
+The recursive type tree is embedded in the JSON manifest and sent as a compact
+internal descriptor in each `vir_call` payload. This is intentionally still an
+internal package ABI, not a committed component-model boundary.
 
 ## WIT Direction
 
