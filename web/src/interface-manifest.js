@@ -11,7 +11,7 @@ export const INTERFACE_MANIFEST_SHAPE_ERROR =
 
 const SUPPORTED_WIRE_TAGS = new Set([
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
-  14, 15, 16, 17, 18, 19, 20,
+  14, 15, 16, 17, 18, 19, 20, 21,
 ]);
 
 function isRecord(value) {
@@ -114,6 +114,9 @@ export function validateInterfaceType(type, label = "interface type") {
       break;
     case 20:
       validateStructureType(type, label);
+      break;
+    case 21:
+      validateTaggedUnionType(type, label);
       break;
     default:
       break;
@@ -218,6 +221,36 @@ function validateStructureFieldLayout(layout, structureType, label) {
   }
 }
 
+function validateTaggedUnionType(type, label) {
+  if (type.kind !== "taggedUnion") {
+    throw new Error(`${label}.kind must be taggedUnion`);
+  }
+  requireString(type.name, `${label}.name`);
+  if (!Array.isArray(type.constructors) || type.constructors.length === 0) {
+    throw new Error(`${label}.constructors must be a non-empty array`);
+  }
+  const names = new Set();
+  const jsNames = new Set();
+  type.constructors.forEach((ctor, index) => {
+    const ctorLabel = `${label}.constructors[${index}]`;
+    if (!isRecord(ctor)) {
+      throw new Error(`${ctorLabel} must be an object`);
+    }
+    requireString(ctor.name, `${ctorLabel}.name`);
+    requireString(ctor.jsName, `${ctorLabel}.jsName`);
+    if (ctor.tag !== index) {
+      throw new Error(`${ctorLabel}.tag must be ${index}`);
+    }
+    requireUnique(names, ctor.name, `${ctorLabel}.name`);
+    requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`);
+    requireNonNegativeInteger(ctor.objectFieldCount, `${ctorLabel}.objectFieldCount`);
+    requireNonNegativeInteger(ctor.usizeFieldCount, `${ctorLabel}.usizeFieldCount`);
+    requireNonNegativeInteger(ctor.scalarByteSize, `${ctorLabel}.scalarByteSize`);
+    validateStructureFieldLayout(ctor.layout, ctor, `${ctorLabel}.layout`);
+    validateInterfaceType(ctor.type, `${ctorLabel}.type`);
+  });
+}
+
 function validateFlattenedStructureFields(type, label) {
   const names = new Set();
   type.fields.forEach((field, index) => {
@@ -269,6 +302,8 @@ export function formatInterfaceType(type) {
       return `Prod<${formatInterfaceType(type.fst)}, ${formatInterfaceType(type.snd)}>`;
     case 20:
       return type.type ?? type.name ?? "Structure";
+    case 21:
+      return type.type ?? type.name ?? "TaggedUnion";
     default:
       return type?.type ?? `wireTag ${type?.wireTag ?? "?"}`;
   }

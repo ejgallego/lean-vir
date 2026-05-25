@@ -88,8 +88,8 @@ The embedded manifest currently supports:
 - fixed-width values: `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - byte data: `ByteArray`;
 - recursive collections: `Array α` and `List α` for supported `α`;
-- recursive option/product shapes: `Option α` and `α × β` for supported
-  `α` and `β`;
+- recursive option/product/tagged-union shapes: `Option α`, `α × β`,
+  `Sum α β`, and `Except ε α` for supported parameters;
 - non-indexed user-defined structures over manifest-supported fields, including
   parameterized instances such as `Box Nat` and `Tagged (Array String)`,
   direct `Bool`, `UInt*`, `USize`, and enum fields, single-field wrappers over
@@ -119,6 +119,12 @@ One-field wrappers whose only runtime field is a direct scalar, for example
 while keeping the JavaScript object shape.
 Wrappers over `UInt64` are rejected with the same explicit boundary diagnostic
 as direct top-level `UInt64`.
+
+`Sum` and `Except` use manifest-backed tagged-union metadata. JavaScript sends
+objects such as `{ "kind": "inl", "value": 4 }` or `{ "ok": value }`; results
+come back as `{ kind, value }` objects using generated constructor names. The
+manifest records each constructor payload layout so direct scalar payloads are
+written into the same constructor scalar slots as compiled Lean code.
 
 The recursive type tree is embedded in the JSON manifest and sent as a compact
 internal descriptor in each `vir_call` payload. This is intentionally still an

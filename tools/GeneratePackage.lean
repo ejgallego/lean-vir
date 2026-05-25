@@ -77,6 +77,8 @@ inductive InterfaceType where
   | option (element : InterfaceType)
   | prod (fst snd : InterfaceType)
   | simpleEnum (name : Name) (constructors : Array Name)
+  | taggedUnion (name : Name) (label : String)
+      (constructors : Array (Name × String × InterfaceType × StructureFieldLayout × Nat × Nat × Nat))
   | structure (name : Name) (label : String) (trivialField? : Option Nat)
       (objectFields usizeFields scalarBytes : Nat)
       (fields : Array (String × InterfaceType × StructureFieldLayout × Bool))
@@ -1523,6 +1525,7 @@ def InterfaceType.label : InterfaceType → String
   | .option element => s!"Option {element.label}"
   | .prod fst snd => s!"{fst.label} × {snd.label}"
   | .simpleEnum name _ => name.toString
+  | .taggedUnion _ label _ => label
   | .structure _ label .. => label
   | .expr => "Lean.Expr"
 
@@ -1542,6 +1545,7 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .option .. => 18
   | .prod .. => 19
   | .simpleEnum .. => 14
+  | .taggedUnion .. => 21
   | .structure .. => 20
   | .expr => 15
 
@@ -1640,6 +1644,25 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ "\"type\":\"" ++ jsonEscape ty.label ++ "\","
       ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
       ++ "\"kind\":\"simpleEnum\","
+      ++ "\"constructors\":" ++ jsonArray ctorJson
+      ++ "}"
+  | .taggedUnion name _ constructors =>
+      let ctorJson := constructors.mapIdx fun idx (ctorName, jsName, fieldType, fieldLayout, objectFields, usizeFields, scalarBytes) =>
+        "{"
+        ++ "\"name\":" ++ jsonString ctorName.toString ++ ","
+        ++ "\"jsName\":" ++ jsonString jsName ++ ","
+        ++ "\"tag\":" ++ toString idx ++ ","
+        ++ "\"type\":" ++ fieldType.toJson ++ ","
+        ++ "\"layout\":" ++ fieldLayout.toJson ++ ","
+        ++ "\"objectFieldCount\":" ++ toString objectFields ++ ","
+        ++ "\"usizeFieldCount\":" ++ toString usizeFields ++ ","
+        ++ "\"scalarByteSize\":" ++ toString scalarBytes
+        ++ "}"
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"taggedUnion\","
+      ++ "\"name\":" ++ jsonString name.toString ++ ","
       ++ "\"constructors\":" ++ jsonArray ctorJson
       ++ "}"
   | .structure name _ trivialField? objectFields usizeFields scalarBytes fields =>
@@ -1760,6 +1783,33 @@ def structureSeenContains (seen : StructureSeen) (name : Name) (key : String) : 
 
 mutual
 
+partial def taggedUnionType (seenStructures : StructureSeen) (name : Name) (label : String)
+    (constructors : Array (Name × String × Lean.Expr)) : CoreM (Except String InterfaceType) := do
+  let mut variants := #[]
+  for (ctorName, jsName, fieldExpr) in constructors do
+    let layout ←
+      try
+        Lean.Compiler.LCNF.getCtorLayout ctorName
+      catch _ =>
+        return .error s!"could not compute runtime layout for constructor `{ctorName}`"
+    if layout.fieldInfo.size != 1 then
+      return .error s!"constructor `{ctorName}` must have exactly one runtime field"
+    let some fieldLayout := structureFieldLayout? layout.fieldInfo[0]!
+      | return .error s!"constructor `{ctorName}` has erased or void runtime layout"
+    match ← interfaceType fieldExpr seenStructures with
+    | .ok fieldType =>
+        variants := variants.push (
+          ctorName,
+          jsName,
+          fieldType,
+          fieldLayout,
+          layout.ctorInfo.size,
+          layout.ctorInfo.usize,
+          layout.ctorInfo.ssize)
+    | .error reason =>
+        return .error s!"constructor `{ctorName}` has unsupported payload type `{fieldExpr}`: {reason}"
+  return .ok (.taggedUnion name label variants)
+
 partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
   let e := stripMData e
   let (name, args) := e.getAppFnArgs
@@ -1849,6 +1899,16 @@ partial def interfaceType (e : Lean.Expr) (seenStructures : StructureSeen := #[]
               match ← interfaceType rhs seenStructures with
               | .error reason => return .error s!"unsupported Prod snd type: {reason}"
               | .ok rhsTy => return .ok (.prod lhsTy rhsTy)
+      | `Sum, [lhs, rhs] =>
+          taggedUnionType seenStructures `Sum (exprTypeLabel e) #[
+            (`Sum.inl, "inl", lhs),
+            (`Sum.inr, "inr", rhs)
+          ]
+      | `Except, [err, ok] =>
+          taggedUnionType seenStructures `Except (exprTypeLabel e) #[
+            (`Except.error, "error", err),
+            (`Except.ok, "ok", ok)
+          ]
       | _, _ =>
           let env ← getEnv
           match simpleEnumType? env e with

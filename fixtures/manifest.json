@@ -41,12 +41,21 @@
       "id": "nested-option-sum",
       "source": "fixtures/ListOption.lean",
       "entry": "Vir.Fixtures.ListOption.nestedOptionSumScore",
+      "roots": [
+        "Vir.Fixtures.ListOption.nestedOptionSumScore",
+        "Vir.Fixtures.ListOption.classifySum",
+        "Vir.Fixtures.ListOption.sumScore"
+      ],
       "result": { "type": "Nat" }
     },
     {
       "id": "except-option-sum",
       "source": "fixtures/ListOption.lean",
       "entry": "Vir.Fixtures.ListOption.exceptOptionSumScore",
+      "roots": [
+        "Vir.Fixtures.ListOption.exceptOptionSumScore",
+        "Vir.Fixtures.ListOption.classifyExcept"
+      ],
       "result": { "type": "Nat" }
     },
     {

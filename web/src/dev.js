@@ -125,6 +125,8 @@ function defaultValueForType(type) {
       };
     case 20:
       return defaultStructureValue(type);
+    case 21:
+      return defaultTaggedUnionValue(type);
     case 14:
       return type?.constructors?.[0]?.jsName ?? "";
     default:
@@ -144,8 +146,17 @@ function defaultStructureValue(type) {
   return value;
 }
 
+function defaultTaggedUnionValue(type) {
+  const ctor = type?.constructors?.[0];
+  if (!ctor) return { kind: "", value: null };
+  return {
+    kind: ctor.jsName ?? ctor.name,
+    value: defaultValueForType(ctor.type),
+  };
+}
+
 function isJsonInputTag(tag) {
-  return tag === 15 || tag === 16 || tag === 17 || tag === 18 || tag === 19 || tag === 20;
+  return tag === 15 || tag === 16 || tag === 17 || tag === 18 || tag === 19 || tag === 20 || tag === 21;
 }
 
 function inputFieldId(input, index) {
@@ -307,6 +318,7 @@ function parseInputValue(input, text) {
     case 18:
     case 19:
     case 20:
+    case 21:
       return JSON.parse(text);
     default:
       throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);

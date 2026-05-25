@@ -65,9 +65,10 @@ The current fixture surface covers:
   results, and bound-variable inputs/results;
 - manifest-backed recursive interface calls including `Array String`,
   `List UInt32`, `Option Nat`, `Option String`, `Nat × Nat`,
-  `Option (Array Nat)`, `List (Nat × String)`, non-indexed user-defined
-  structures with object, scalar, `USize`, enum, parameterized, scalar-only
-  trivial wrapper, and inherited parent fields, and `Array Lean.Expr`;
+  `Option (Array Nat)`, `List (Nat × String)`, `Sum Nat Nat`,
+  `Except Nat (Option (Sum Nat Nat))`, non-indexed user-defined structures
+  with object, scalar, `USize`, enum, parameterized, scalar-only trivial
+  wrapper, and inherited parent fields, and `Array Lean.Expr`;
 - hash/name/substring/pointer-address primitives reached by parser data paths,
   including `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
   `ptrAddrUnsafe`;

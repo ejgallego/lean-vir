@@ -125,6 +125,15 @@ assertInvalidManifest((manifest) => {
 }, /constructors\[1\]\.tag must be 1/);
 assertInvalidManifest((manifest) => {
   manifest.exports[0].result = {
+    type: "Sum Nat Nat",
+    wireTag: 21,
+    kind: "taggedUnion",
+    name: "Sum",
+    constructors: [],
+  };
+}, /constructors must be a non-empty array/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
     type: "Box Nat",
     wireTag: 20,
     kind: "structure",
@@ -318,6 +327,27 @@ assert.equal(runtime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "lit
 assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.bumpBVar", { kind: "bvar", index: 4 }), {
   kind: "bvar",
   index: "5",
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 0), {
+  kind: "inl",
+  value: "10",
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 4), {
+  kind: "inr",
+  value: "4",
+});
+assert.equal(runtime.call("Vir.Fixtures.ListOption.sumScore", { kind: "inr", value: 7 }), "70");
+assert.equal(runtime.call("Vir.Fixtures.ListOption.sumScore", { inl: 12 }), "12");
+assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 0), {
+  kind: "error",
+  value: "90",
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 5), {
+  kind: "ok",
+  value: {
+    kind: "inr",
+    value: "5",
+  },
 });
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
@@ -603,6 +633,16 @@ try {
     "def freshBump (n : Nat) : Nat := n + 7",
     "def freshSum (xs : Array Nat) : Nat := xs.foldl (fun acc n => acc + n) 0",
     "def freshPairSum (p : Nat × Nat) : Nat := p.fst + p.snd",
+    "def freshClassifySum (n : Nat) : Sum Nat String :=",
+    "  if n < 3 then .inl (n + 10) else .inr (toString n)",
+    "",
+    "def freshSumScore : Sum Nat String → Nat",
+    "  | .inl n => n",
+    "  | .inr text => text.length + 20",
+    "",
+    "def freshClassifyExcept (n : Nat) : Except String Nat :=",
+    "  if n = 0 then .error \"zero\" else .ok (n + 1)",
+    "",
     "def freshBoxBump (box : FreshBox) : FreshBox :=",
     "  { box with",
     "    value := box.value + box.label.length",
@@ -648,9 +688,12 @@ try {
   assert.deepEqual(freshEntries, [
     "freshBoxBump",
     "freshBump",
+    "freshClassifyExcept",
+    "freshClassifySum",
     "freshPairSum",
     "freshScalarBoxBump",
     "freshSum",
+    "freshSumScore",
     "freshWrapBoxBump",
     "freshWrapUInt32Bump",
   ]);
@@ -665,6 +708,23 @@ try {
   assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
   assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");
   assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), "15");
+  assert.deepEqual(freshRuntime.call("freshClassifySum", 2), {
+    kind: "inl",
+    value: "12",
+  });
+  assert.deepEqual(freshRuntime.call("freshClassifySum", 5), {
+    kind: "inr",
+    value: "5",
+  });
+  assert.equal(freshRuntime.call("freshSumScore", { kind: "inr", value: "lean" }), "24");
+  assert.deepEqual(freshRuntime.call("freshClassifyExcept", 0), {
+    kind: "error",
+    value: "zero",
+  });
+  assert.deepEqual(freshRuntime.call("freshClassifyExcept", 6), {
+    kind: "ok",
+    value: "7",
+  });
   assert.deepEqual(freshRuntime.call("freshBoxBump", {
     label: "abc",
     value: 4,
@@ -752,22 +812,6 @@ try {
 } finally {
   await rm(freshDir, { recursive: true, force: true });
 }
-
-const unsupportedAll = spawnSync(
-  "lean",
-  [
-    "--run",
-    "tools/GeneratePackage.lean",
-    "/tmp/vir-unsupported-interface.irpkg",
-    "/tmp/vir-unsupported-interface.report.md",
-    "--target-all",
-    "fixtures/ListOption.lean",
-  ],
-  { encoding: "utf8" },
-);
-assert.notEqual(unsupportedAll.status, 0);
-assert.match(unsupportedAll.stderr, /unsupported interface exports/);
-assert.match(unsupportedAll.stderr, /Vir\.Fixtures\.ListOption\.classifySum/);
 
 console.log(
   `vir runtime smoke ok: ${runtime.packageInfo.count} declarations, SortDemo.demo = 192, fib 12 = 144`,

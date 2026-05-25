@@ -99,8 +99,8 @@ Supported v1 types:
 - `Nat`, `Int`, `Bool`, `String`;
 - `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - `ByteArray`;
-- recursive `Array α`, `List α`, `Option α`, and `α × β` shapes over
-  supported types;
+- recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and
+  `Except ε α` shapes over supported types;
 - non-indexed user-defined structures over manifest-supported fields, including
   parameterized instances, direct scalar fields, direct scalar wrappers, and
   inherited parent fields, represented as JavaScript objects with parent fields

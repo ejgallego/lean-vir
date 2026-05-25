@@ -417,6 +417,18 @@ function encodeTypeDescriptor(writer, type, label) {
       });
       return;
     }
+    case 21: {
+      const constructors = requireTaggedUnionConstructors(type, label);
+      writer.u32(constructors.length);
+      constructors.forEach((ctor) => {
+        writer.u32(requireStructureCount(ctor, "objectFieldCount", `${label}.${ctor.jsName}`));
+        writer.u32(requireStructureCount(ctor, "usizeFieldCount", `${label}.${ctor.jsName}`));
+        writer.u32(requireStructureCount(ctor, "scalarByteSize", `${label}.${ctor.jsName}`));
+        encodeStructureFieldLayout(writer, ctor.layout, `${label}.${ctor.jsName}`);
+        encodeTypeDescriptor(writer, ctor.type, `${label}.${ctor.jsName}`);
+      });
+      return;
+    }
     default:
       return;
   }
@@ -446,6 +458,19 @@ function decodeTypeDescriptor(reader) {
         scalarByteSize,
         ...(trivialFieldIndex === null ? {} : { trivialFieldIndex }),
         fields: Array.from({ length: len }, () => ({
+          layout: decodeStructureFieldLayout(reader),
+          type: decodeTypeDescriptor(reader),
+        })),
+      };
+    }
+    case 21: {
+      const len = reader.u32();
+      return {
+        wireTag: tag,
+        constructors: Array.from({ length: len }, () => ({
+          objectFieldCount: reader.u32(),
+          usizeFieldCount: reader.u32(),
+          scalarByteSize: reader.u32(),
           layout: decodeStructureFieldLayout(reader),
           type: decodeTypeDescriptor(reader),
         })),
@@ -530,6 +555,12 @@ function encodeValuePayload(writer, type, value, label) {
         encodeValuePayload(writer, field.type, record[field.name], `${label}.${field.name}`));
       return;
     }
+    case 21: {
+      const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
+      writer.u32(index);
+      encodeValuePayload(writer, ctor.type, payload, `${label}.${ctor.jsName}`);
+      return;
+    }
     default:
       throw new Error(`${label} has unsupported wire tag ${tag}`);
   }
@@ -605,6 +636,15 @@ function decodeValuePayload(reader, type) {
         value[field.name] = decodeValuePayload(reader, field.type);
       }
       value = flattenStructureSubobjects(type, value);
+      break;
+    }
+    case 21: {
+      const index = reader.u32();
+      const ctor = taggedUnionConstructorAt(type, index, "result");
+      value = {
+        kind: ctor.jsName,
+        value: decodeValuePayload(reader, ctor.type),
+      };
       break;
     }
     default:
@@ -733,6 +773,18 @@ function sameWireType(expected, actual) {
         sameStructureFieldLayout(field.layout, actual.fields[index]?.layout) &&
         sameWireType(field.type, actual.fields[index]?.type));
     }
+    case 21: {
+      const constructors = requireTaggedUnionConstructors(expected, "expected result");
+      if (!Array.isArray(actual?.constructors) || constructors.length !== actual.constructors.length) return false;
+      return constructors.every((ctor, index) => {
+        const actualCtor = actual.constructors[index];
+        return requireStructureCount(ctor, "objectFieldCount", "expected result") === actualCtor?.objectFieldCount &&
+          requireStructureCount(ctor, "usizeFieldCount", "expected result") === actualCtor?.usizeFieldCount &&
+          requireStructureCount(ctor, "scalarByteSize", "expected result") === actualCtor?.scalarByteSize &&
+          sameStructureFieldLayout(ctor.layout, actualCtor?.layout) &&
+          sameWireType(ctor.type, actualCtor?.type);
+      });
+    }
     default:
       return true;
   }
@@ -859,6 +911,73 @@ function flattenedSubobjectFieldsPresent(value, type) {
     }
   }
   return false;
+}
+
+function requireTaggedUnionConstructors(type, label) {
+  if (!Array.isArray(type?.constructors) || type.constructors.length === 0) {
+    throw new Error(`${label} is missing manifest tagged-union constructors`);
+  }
+  for (const ctor of type.constructors) {
+    if (typeof ctor?.name !== "string" ||
+        typeof ctor?.jsName !== "string" ||
+        !ctor.type ||
+        !Number.isInteger(ctor.type.wireTag)) {
+      throw new Error(`${label} has an invalid manifest tagged-union constructor`);
+    }
+    requireStructureCount(ctor, "objectFieldCount", `${label}.${ctor.jsName}`);
+    requireStructureCount(ctor, "usizeFieldCount", `${label}.${ctor.jsName}`);
+    requireStructureCount(ctor, "scalarByteSize", `${label}.${ctor.jsName}`);
+    requireStructureFieldLayout(ctor.layout, `${label}.${ctor.jsName}`);
+  }
+  return type.constructors;
+}
+
+function taggedUnionConstructorAt(type, index, label) {
+  const constructors = requireTaggedUnionConstructors(type, label);
+  if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
+    throw new Error(`${label} tagged-union constructor index is out of range`);
+  }
+  return constructors[index];
+}
+
+function findTaggedUnionConstructor(type, text) {
+  const constructors = requireTaggedUnionConstructors(type, "tagged union");
+  const index = constructors.findIndex((ctor) => ctor.name === text || ctor.jsName === text);
+  return index < 0 ? null : { index, ctor: constructors[index] };
+}
+
+function normalizeTaggedUnion(value, type, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be a tagged-union object`);
+  }
+  if (hasOwn(value, "tag")) {
+    const ctor = taggedUnionConstructorAt(type, value.tag, label);
+    if (!hasOwn(value, "value")) {
+      throw new Error(`${label}.${ctor.jsName} is missing value`);
+    }
+    return { index: value.tag, ctor, payload: value.value };
+  }
+  const text =
+    typeof value.kind === "string" ? value.kind :
+    typeof value.name === "string" ? value.name :
+    typeof value.jsName === "string" ? value.jsName :
+    hasOwn(value, "constructor") && typeof value.constructor === "string" ? value.constructor :
+    null;
+  if (text !== null) {
+    const match = findTaggedUnionConstructor(type, text);
+    if (match === null) {
+      throw new Error(`${label} has unknown tagged-union constructor ${text}`);
+    }
+    if (!hasOwn(value, "value")) {
+      throw new Error(`${label}.${match.ctor.jsName} is missing value`);
+    }
+    return { ...match, payload: value.value };
+  }
+  for (const [index, ctor] of requireTaggedUnionConstructors(type, label).entries()) {
+    if (hasOwn(value, ctor.jsName)) return { index, ctor, payload: value[ctor.jsName] };
+    if (hasOwn(value, ctor.name)) return { index, ctor, payload: value[ctor.name] };
+  }
+  throw new Error(`${label} must specify a tagged-union constructor`);
 }
 
 function normalizeEnum(value, type, label) {

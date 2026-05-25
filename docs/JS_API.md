@@ -61,9 +61,9 @@ const second = await factory.createRuntime({ irPackageBytes });
 
 Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `UInt8`, `UInt16`,
 `UInt32`, `UInt64`, `USize`, `ByteArray`, recursive `Array α`, `List α`,
-`Option α`, and `α × β` shapes over supported types, non-indexed
-user-defined structures including parameterized instances, nullary inductive
-enums, and `Lean.Expr`.
+`Option α`, `α × β`, `Sum α β`, and `Except ε α` shapes over supported types,
+non-indexed user-defined structures including parameterized instances, nullary
+inductive enums, and `Lean.Expr`.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`.
@@ -78,15 +78,18 @@ generated JavaScript name.
 Options are accepted as `null`, `{ kind: "none" }`, `{ kind: "some", value }`,
 `{ some: value }`, or the bare inner value. Option results are returned as
 `null` or the inner value. Product inputs are accepted as `{ fst, snd }` or
-two-element arrays, and results are returned as `{ fst, snd }`. Non-indexed
+two-element arrays, and results are returned as `{ fst, snd }`.
+`Sum`/`Except` inputs are accepted as `{ kind, value }`, `{ tag, value }`, or
+single-constructor-key objects such as `{ inl: 4 }` and `{ ok: value }`;
+results are returned as `{ kind, value }`. Non-indexed
 structures, including parameterized instances like `Box Nat` and
 `Tagged (Array String)`, are accepted and returned as objects keyed by their
 Lean field names; inherited parent fields are accepted and returned as flattened
 object keys. Direct `Bool`, `UInt*`, `USize`, and enum fields, including
 single-field wrappers such as `Box UInt32`, use the same JS values as standalone
 arguments/results. These shapes can be nested, for example `Option (Array Nat)`,
-`List (Nat × String)`, a structure containing another structure, and
-`Array Lean.Expr`.
+`List (Nat × String)`, `Except String (Option (Sum Nat Nat))`, a structure
+containing another structure, and `Array Lean.Expr`.
 
 `Lean.Expr` values use structural JavaScript objects such as
 `{ kind: "const", name: "Nat", levels: [] }`,

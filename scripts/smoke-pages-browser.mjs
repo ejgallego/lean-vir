@@ -350,7 +350,7 @@ async function smokeRunnerFailure(cdp, origin, url, expected) {
 
 function expectedInputTag(type) {
   if (type?.wireTag === 14) return "SELECT";
-  if ([15, 16, 17, 18, 19, 20].includes(type?.wireTag)) return "TEXTAREA";
+  if ([15, 16, 17, 18, 19, 20, 21].includes(type?.wireTag)) return "TEXTAREA";
   return "INPUT";
 }
 
@@ -491,6 +491,21 @@ try {
       inputTags: ["TEXTAREA"],
       runInputs: [`["a","bc"]`],
       result: "3",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ListOption.classifySum", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["4"],
+      result: `{
+  "kind": "inr",
+  "value": "4"
+}`,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ListOption.sumScore", {
+      input: `{"kind":"inl","value":0}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"kind":"inr","value":7}`],
+      result: "70",
     }),
     await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint32Bump", {
       input: "0",
