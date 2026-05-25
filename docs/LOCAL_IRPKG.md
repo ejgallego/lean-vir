@@ -132,3 +132,10 @@ current package format. The WASM side decodes that package into real Lean IR
 objects and serves them through `lean_ir_find_env_decl`. Loading a new package
 replaces the previous provider state; a failed load clears it so stale
 declarations cannot be called accidentally.
+
+The current JS-call boundary routes scalar cases that cannot safely fit the
+generic wasm32 `object*` lane through Lean's generated `_boxed` wrappers. The
+more faithful long-term path is a typed call bridge that reads the exported
+declaration's `Lean.IR` signature and passes each argument/result in the native
+IR lane (`object`, integer, `USize`, `Float`, `Float32`, erased, or void),
+falling back to `_boxed` only when the typed lane bridge is incomplete.
