@@ -72,6 +72,14 @@ npm run generate:irpkg -- <source.lean> [package.irpkg] [root ...]
 
 It prints the same metadata that is embedded in the package.
 
+To inspect a generated package without starting the browser, run:
+
+```bash
+npm run inspect:irpkg -- <package.irpkg>
+```
+
+Add `--json` to emit the parsed package header and full embedded manifest.
+
 ## Supported Interface Surface
 
 The embedded manifest currently supports:

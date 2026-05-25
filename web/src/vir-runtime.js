@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { validateInterfaceManifest } from "./interface-manifest.js";
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 
@@ -182,10 +184,7 @@ export class VirRuntime {
     }
     const text = this.readWasmString(this.exports.vir_package_interface_manifest(), len);
     const manifest = JSON.parse(text);
-    if (manifest?.version !== 1 || typeof manifest.metadata !== "object" || !Array.isArray(manifest.exports)) {
-      throw new Error("embedded interface manifest must be { version: 1, metadata: {...}, exports: [...] }");
-    }
-    return manifest;
+    return validateInterfaceManifest(manifest);
   }
 
   rebuildManifestExports() {

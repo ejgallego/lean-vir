@@ -7,12 +7,14 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer as createNetServer } from "node:net";
+
+import { encodeInvalidMagicPackage, readIrPackageInfo, replaceIrPackageManifest } from "./irpkg-format.mjs";
 
 const distRoot = fileURLToPath(new URL("../web/dist/", import.meta.url));
 const basePath = "/lean-vir/";
@@ -222,14 +224,18 @@ async function evaluate(cdp, expression) {
 }
 
 async function waitForReady(cdp) {
+  return waitForStatus(cdp, "Ready");
+}
+
+async function waitForStatus(cdp, expected) {
   return evaluate(cdp, `new Promise((resolve, reject) => {
     const deadline = Date.now() + 15000;
     const poll = () => {
       const status = document.querySelector("#status")?.textContent?.trim();
-      if (status === "Ready") {
+      if (status === ${JSON.stringify(expected)}) {
         resolve(status);
       } else if (Date.now() > deadline) {
-        reject(new Error("page did not become Ready; last status: " + status));
+        reject(new Error("page did not become ${expected}; last status: " + status));
       } else {
         setTimeout(poll, 100);
       }
@@ -320,6 +326,55 @@ async function smokeRunner(cdp, origin, url, expected) {
   assert.equal(result, expected.result);
 }
 
+async function smokeRunnerFailure(cdp, origin, url, expected) {
+  await navigate(cdp, `${origin}${basePath}${url}`);
+  await waitForStatus(cdp, "Failed");
+  const state = await evaluate(cdp, `({
+    packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+    status: document.querySelector("#status")?.textContent?.trim(),
+    result: document.querySelector("#dev-result")?.textContent?.trim(),
+    entryCount: document.querySelector("#dev-entry-select")?.options.length,
+    runDisabled: document.querySelector("#dev-run-entry")?.disabled,
+    exports: document.querySelector("#dev-export-count")?.textContent?.trim()
+  })`);
+  assert.equal(state.status, "Failed");
+  assert.match(state.result, expected.result);
+  assert.equal(state.runDisabled, true);
+  if (expected.packageName !== undefined) {
+    assert.equal(state.packageName, expected.packageName);
+  }
+  if (expected.entryCount !== undefined) {
+    assert.equal(state.entryCount, expected.entryCount);
+  }
+  if (expected.exports !== undefined) {
+    assert.equal(state.exports, expected.exports);
+  }
+}
+
+async function prepareNegativePackages() {
+  await writeFile(resolve(distRoot, "bad-magic.irpkg"), encodeInvalidMagicPackage());
+
+  const fibBytes = await readFile(resolve(distRoot, "local-fib.irpkg"));
+  const fibInfo = readIrPackageInfo(fibBytes);
+  const manifest = {
+    ...fibInfo.manifest,
+    diagnostics: [
+      ...(Array.isArray(fibInfo.manifest.diagnostics) ? fibInfo.manifest.diagnostics : []),
+      {
+        name: "BrowserSmoke.unsupported",
+        source: "scripts/smoke-pages-browser.mjs",
+        reason: "unsupported interface export smoke fixture",
+      },
+    ],
+  };
+  await writeFile(
+    resolve(distRoot, "unsupported-interface.irpkg"),
+    replaceIrPackageManifest(fibBytes, manifest),
+  );
+}
+
+await prepareNegativePackages();
+
 const server = await serveDist();
 const debugPort = await freePort();
 const chromium = await launchChromium(debugPort);
@@ -400,9 +455,30 @@ try {
       result: "3",
     },
   );
+  await smokeRunnerFailure(
+    cdp,
+    server.origin,
+    "dev.html?package=bad-magic.irpkg",
+    {
+      packageName: "...",
+      entryCount: 0,
+      exports: "...",
+      result: /IR package load failed: invalid IR package magic `not-lean-vir`/,
+    },
+  );
+  await smokeRunnerFailure(
+    cdp,
+    server.origin,
+    "dev.html?package=unsupported-interface.irpkg",
+    {
+      packageName: "unsupported-interface.irpkg",
+      entryCount: 0,
+      result: /package contains unsupported interface exports:[\s\S]*BrowserSmoke\.unsupported/,
+    },
+  );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, local runners, manifest enum runner, manifest Expr runner, and manifest JSON runner");
+  console.log("pages browser smoke ok: landing, local runners, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

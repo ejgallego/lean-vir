@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import "./style.css";
+import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "./interface-manifest.js";
 import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
 
 const statusEl = document.querySelector("#status");
@@ -156,7 +157,7 @@ function renderInputFields(entry) {
     const label = document.createElement("label");
     label.className = "dev-field";
     const caption = document.createElement("span");
-    caption.textContent = `${input.name ?? `input${index + 1}`} : ${input.type?.type ?? "?"}`;
+    caption.textContent = `${input.name ?? `input${index + 1}`} : ${formatInterfaceType(input.type)}`;
     const field =
       input.type?.wireTag === 14 ? document.createElement("select") :
       isJsonInputTag(input.type?.wireTag) ? document.createElement("textarea") :
@@ -193,11 +194,10 @@ function renderInputFields(entry) {
 }
 
 function renderManifestEntries(manifest) {
-  if (manifest?.version !== 1 || typeof manifest.metadata !== "object" || !Array.isArray(manifest.exports)) {
-    throw new Error("embedded interface manifest must be { version: 1, metadata: {...}, exports: [...] }");
-  }
-  if (Array.isArray(manifest.diagnostics) && manifest.diagnostics.length > 0) {
-    const lines = manifest.diagnostics.map((diagnostic) =>
+  validateInterfaceManifest(manifest);
+  const diagnostics = manifestDiagnostics(manifest);
+  if (diagnostics.length > 0) {
+    const lines = diagnostics.map((diagnostic) =>
       `${diagnostic.name ?? "unknown"}: ${diagnostic.reason ?? "unsupported interface"}`);
     throw new Error(`package contains unsupported interface exports:\n${lines.join("\n")}`);
   }
@@ -206,7 +206,7 @@ function renderManifestEntries(manifest) {
   for (const entry of interfaceEntries) {
     const option = document.createElement("option");
     option.value = entry.id;
-    const signature = `${entry.args.map((arg) => arg.type?.type ?? "?").join(", ") || "()"} -> ${entry.result?.type ?? "?"}`;
+    const signature = `${entry.args.map((arg) => formatInterfaceType(arg.type)).join(", ") || "()"} -> ${formatInterfaceType(entry.result)}`;
     option.textContent = `${entry.jsName} / ${signature}`;
     entrySelect.append(option);
   }

@@ -62,6 +62,13 @@ The command prints the package path, report path, package format, Lean
 toolchain, declaration count, interface exports, source targets, and resolved
 roots. The same metadata is embedded in the package manifest.
 
+Inspect a package without starting the browser:
+
+```bash
+npm run inspect:irpkg -- build/generated/local.irpkg
+npm run inspect:irpkg -- --json build/generated/local.irpkg
+```
+
 Then run `npm run dev` and open `/dev.html`. The developer entry point can load
 a served package URL such as `vir-demo.irpkg` or an uploaded `.irpkg` file, read
 the embedded interface manifest, show the loaded package metadata, and generate

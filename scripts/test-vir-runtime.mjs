@@ -32,6 +32,23 @@ assert.ok(runtime.packageMetadata.targets.some((target) => target.source === "ex
 assert.ok(runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib"));
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
+
+const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/vir-demo.irpkg"], {
+  encoding: "utf8",
+});
+assert.equal(inspected.status, 0, inspected.stderr || inspected.stdout);
+assert.match(inspected.stdout, /package: build\/generated\/vir-demo\.irpkg/);
+assert.match(inspected.stdout, new RegExp(`exports: ${runtime.interfaceManifest.exports.length}`));
+assert.match(inspected.stdout, /fib\(arg1: Nat\) -> Nat \[fib\]/);
+
+const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "build/generated/vir-demo.irpkg"], {
+  encoding: "utf8",
+});
+assert.equal(inspectedJson.status, 0, inspectedJson.stderr || inspectedJson.stdout);
+const inspectedInfo = JSON.parse(inspectedJson.stdout);
+assert.equal(inspectedInfo.package.version, 4);
+assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
+assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");
@@ -220,6 +237,13 @@ try {
 
   const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
   assert.deepEqual(freshEntries, ["freshBump", "freshPairSum", "freshSum"]);
+  const freshInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", freshPackage], {
+    encoding: "utf8",
+  });
+  assert.equal(freshInspect.status, 0, freshInspect.stderr || freshInspect.stdout);
+  const freshInfo = JSON.parse(freshInspect.stdout);
+  assert.equal(freshInfo.manifest.metadata.targets[0].source, freshSource);
+  assert.deepEqual(freshInfo.manifest.exports.map((entry) => entry.entry).sort(), freshEntries);
   assert.equal(freshRuntime.call("freshBump", 35), "42");
   assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
   assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");

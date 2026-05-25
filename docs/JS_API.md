@@ -104,6 +104,12 @@ declaration count, interface export count, and target roots. The same summary
 is embedded in the manifest metadata so JavaScript and `/dev.html` can show
 exactly what was loaded.
 
+Inspect the embedded manifest without loading the browser:
+
+```bash
+npm run inspect:irpkg -- build/generated/fib.irpkg
+```
+
 Serve the generated `.irpkg` next to `vir-upstream.wasm`, or upload it through
 `/dev.html` while iterating locally. The runtime only needs URLs or bytes for
 the two assets:

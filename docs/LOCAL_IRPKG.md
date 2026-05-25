@@ -41,6 +41,22 @@ targets, and resolved roots. The same data is embedded in
 If a requested export cannot be packaged or mapped to the supported JavaScript
 interface surface, generation exits nonzero and points at the report.
 
+## Inspect A Package
+
+Inspect a generated package without starting the browser:
+
+```bash
+npm run inspect:irpkg -- build/generated/local.irpkg
+```
+
+The inspector reads the embedded manifest from the `.irpkg` itself and prints
+the package format, declaration count, metadata, source targets, exports,
+argument/result types, and diagnostics. Use `--json` for bug reports or tooling:
+
+```bash
+npm run inspect:irpkg -- --json build/generated/local.irpkg
+```
+
 ## Load The Package
 
 Start the local server:
