@@ -9,6 +9,13 @@ For the config-driven path, see `docs/INTERFACE_PIPELINE.md`.
 
 ## Generate A Package
 
+This is the golden local path from one Lean source file to one browser-loadable
+package:
+
+```bash
+npm run generate:irpkg -- <source.lean> [package.irpkg] [root ...]
+```
+
 Package the transitive closure for one or more explicit exports:
 
 ```bash
@@ -26,6 +33,11 @@ next to the package, for example `build/generated/local.report.md`. The report
 lists roots, packaged declarations, native externs, initializer globals,
 interface exports, and any loud diagnostics.
 
+On success, the command prints a package summary: package format, Lean
+toolchain, generation time, total declarations, interface exports, source
+targets, and resolved roots. The same data is embedded in
+`manifest.metadata`.
+
 If a requested export cannot be packaged or mapped to the supported JavaScript
 interface surface, generation exits nonzero and points at the report.
 
@@ -39,7 +51,8 @@ npm run dev
 
 Open `/dev.html`. The page creates a fresh WASM instance, loads the selected
 `.irpkg`, reads the embedded interface manifest, and generates entry controls
-from that manifest.
+from that manifest. The header also shows the package metadata, including
+source targets, toolchain, generation time, declaration count, and export count.
 
 There are two package loading paths:
 
@@ -58,11 +71,12 @@ dev.html?package=local-fib.irpkg&entry=fib
 
 ## Runtime Interface
 
-The manifest describes each export with its Lean declaration name, JavaScript
-name, argument types, result type, and recursive type tree. JavaScript validates
-inputs against that manifest and sends a compact byte payload through the
-generic `vir_call` WASM export. WASM constructs Lean runtime objects, calls the
-upstream IR interpreter, and encodes the result bytes for JavaScript.
+The manifest includes package metadata plus one entry per export with its Lean
+declaration name, JavaScript name, argument types, result type, and recursive
+type tree. JavaScript validates inputs against that manifest and sends a
+compact byte payload through the generic `vir_call` WASM export. WASM
+constructs Lean runtime objects, calls the upstream IR interpreter, and encodes
+the result bytes for JavaScript.
 
 Supported v1 types:
 

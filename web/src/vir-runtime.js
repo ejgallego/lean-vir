@@ -106,6 +106,7 @@ export class VirRuntime {
     this.module = module;
     this.packageInfo = packageInfo;
     this.interfaceManifest = null;
+    this.packageMetadata = null;
     this.exportsByName = Object.create(null);
 
     if (!this.exports.memory) {
@@ -114,6 +115,7 @@ export class VirRuntime {
     if (typeof this.exports.vir_package_interface_manifest_size === "function" &&
         this.exports.vir_package_interface_manifest_size() !== 0) {
       this.interfaceManifest = this.readPackageManifest();
+      this.packageMetadata = this.interfaceManifest.metadata;
       this.rebuildManifestExports();
     }
   }
@@ -149,11 +151,13 @@ export class VirRuntime {
         throw new Error(`IR package declaration count mismatch: load returned ${count}, provider has ${providerCount}`);
       }
       this.interfaceManifest = this.readPackageManifest();
+      this.packageMetadata = this.interfaceManifest.metadata;
       this.rebuildManifestExports();
       this.packageInfo = {
         count: providerCount ?? count,
         byteLength: packageBytes.byteLength,
         interfaceExports: this.interfaceManifest.exports.length,
+        metadata: this.packageMetadata,
       };
       return this.packageInfo;
     } finally {
@@ -164,6 +168,7 @@ export class VirRuntime {
   clearPackageMetadata() {
     this.packageInfo = null;
     this.interfaceManifest = null;
+    this.packageMetadata = null;
     this.exportsByName = Object.create(null);
   }
 
@@ -177,8 +182,8 @@ export class VirRuntime {
     }
     const text = this.readWasmString(this.exports.vir_package_interface_manifest(), len);
     const manifest = JSON.parse(text);
-    if (manifest?.version !== 1 || !Array.isArray(manifest.exports)) {
-      throw new Error("embedded interface manifest must be { version: 1, exports: [...] }");
+    if (manifest?.version !== 1 || typeof manifest.metadata !== "object" || !Array.isArray(manifest.exports)) {
+      throw new Error("embedded interface manifest must be { version: 1, metadata: {...}, exports: [...] }");
     }
     return manifest;
   }

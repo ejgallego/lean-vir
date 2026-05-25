@@ -125,7 +125,7 @@ h2 {
   grid-template-columns: repeat(4, minmax(82px, auto));
   gap: 1px;
   min-width: 0;
-  max-width: 640px;
+  max-width: 760px;
   border: 1px solid #d9ded2;
   background: #d9ded2;
 }

@@ -50,6 +50,9 @@ const second = await factory.createRuntime({ irPackageBytes });
 ## Calls And Manifest
 
 - `vir.interfaceManifest` is the embedded package manifest.
+- `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
+  package format version, Lean toolchain, generation time, source targets, and
+  resolved roots.
 - `vir.call(name, ...args)` accepts a manifest `id`, `jsName`, or Lean
   declaration name.
 - `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
@@ -89,6 +92,17 @@ Generate a package from one Lean file and one or more root declarations:
 ```bash
 npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
 ```
+
+Omit roots to auto-discover public source definitions:
+
+```bash
+npm run generate:irpkg -- examples/Fib.lean build/generated/fib.irpkg
+```
+
+The command prints the package path, report path, package format, toolchain,
+declaration count, interface export count, and target roots. The same summary
+is embedded in the manifest metadata so JavaScript and `/dev.html` can show
+exactly what was loaded.
 
 Serve the generated `.irpkg` next to `vir-upstream.wasm`, or upload it through
 `/dev.html` while iterating locally. The runtime only needs URLs or bytes for

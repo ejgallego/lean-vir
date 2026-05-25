@@ -11,7 +11,11 @@ const statusEl = document.querySelector("#status");
 const packageName = document.querySelector("#dev-package-name");
 const packageSize = document.querySelector("#dev-package-size");
 const declCount = document.querySelector("#dev-decl-count");
+const exportCount = document.querySelector("#dev-export-count");
 const ptrWidth = document.querySelector("#dev-ptr-width");
+const sourceTargets = document.querySelector("#dev-source-targets");
+const toolchain = document.querySelector("#dev-toolchain");
+const generatedAt = document.querySelector("#dev-generated-at");
 const packageUrl = document.querySelector("#dev-package-url");
 const packageFile = document.querySelector("#dev-package-file");
 const loadUrlButton = document.querySelector("#dev-load-url");
@@ -63,7 +67,12 @@ function resetPackageState() {
   packageName.textContent = "...";
   packageSize.textContent = "...";
   declCount.textContent = "...";
+  exportCount.textContent = "...";
   ptrWidth.textContent = "...";
+  sourceTargets.textContent = "...";
+  sourceTargets.removeAttribute("title");
+  toolchain.textContent = "...";
+  generatedAt.textContent = "...";
 }
 
 function selectedInterfaceEntry() {
@@ -184,8 +193,8 @@ function renderInputFields(entry) {
 }
 
 function renderManifestEntries(manifest) {
-  if (manifest?.version !== 1 || !Array.isArray(manifest.exports)) {
-    throw new Error("embedded interface manifest must be { version: 1, exports: [...] }");
+  if (manifest?.version !== 1 || typeof manifest.metadata !== "object" || !Array.isArray(manifest.exports)) {
+    throw new Error("embedded interface manifest must be { version: 1, metadata: {...}, exports: [...] }");
   }
   if (Array.isArray(manifest.diagnostics) && manifest.diagnostics.length > 0) {
     const lines = manifest.diagnostics.map((diagnostic) =>
@@ -206,6 +215,26 @@ function renderManifestEntries(manifest) {
   if (interfaceEntries.length === 0) {
     resultOutput.textContent = "No callable interface exports were found in this package.";
   }
+}
+
+function renderPackageMetadata(metadata) {
+  const targets = Array.isArray(metadata?.targets) ? metadata.targets : [];
+  const compactTargets = targets.map((target) => {
+    const roots = Array.isArray(target.resolvedRoots) ? target.resolvedRoots.length : 0;
+    return `${target.source ?? "unknown"} [${target.mode ?? "?"}: ${roots} roots]`;
+  });
+  const fullTargets = targets.map((target) => {
+    const roots = Array.isArray(target.resolvedRoots) && target.resolvedRoots.length > 0
+      ? target.resolvedRoots.join(", ")
+      : "(none)";
+    return `${target.source ?? "unknown"} [${target.mode ?? "?"}] roots: ${roots}`;
+  });
+
+  exportCount.textContent = String(runtime.packageInfo.interfaceExports);
+  sourceTargets.textContent = compactTargets.join(" / ") || "unknown";
+  sourceTargets.title = fullTargets.join("\n");
+  toolchain.textContent = metadata?.leanToolchain ?? metadata?.leanVersion ?? "unknown";
+  generatedAt.textContent = metadata?.generatedAt ?? "unknown";
 }
 
 function parseNatInput(text) {
@@ -322,6 +351,7 @@ async function loadIrPackageBytes(label, bytes) {
   declCount.textContent = String(runtime.packageInfo.count);
   ptrWidth.textContent = `${runtime.targetPointerBytes()} bytes`;
   renderManifestEntries(runtime.interfaceManifest);
+  renderPackageMetadata(runtime.packageMetadata);
   runEntryButton.disabled = interfaceEntries.length === 0;
   setStatus("Ready", true);
 }

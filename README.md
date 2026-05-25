@@ -58,9 +58,14 @@ Omit the root names to package public source definitions from the file:
 npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
 ```
 
-Then run `npm run dev` and open `/dev.html`. The developer entry point can load a
-served package URL such as `vir-demo.irpkg` or an uploaded `.irpkg` file, read
-the embedded interface manifest, and generate runnable controls automatically.
+The command prints the package path, report path, package format, Lean
+toolchain, declaration count, interface exports, source targets, and resolved
+roots. The same metadata is embedded in the package manifest.
+
+Then run `npm run dev` and open `/dev.html`. The developer entry point can load
+a served package URL such as `vir-demo.irpkg` or an uploaded `.irpkg` file, read
+the embedded interface manifest, show the loaded package metadata, and generate
+runnable controls automatically.
 
 The browser-facing runtime wrapper is exported from `web/src/vir-runtime.js` and
 documented in `docs/JS_API.md`. A minimal page that imports the wrapper directly

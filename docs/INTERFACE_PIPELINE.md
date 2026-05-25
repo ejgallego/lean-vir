@@ -10,12 +10,14 @@ That command:
 
 1. elaborates the configured Lean source with Lean 4.30-rc2;
 2. extracts the requested IR declaration closure into an `.irpkg`;
-3. embeds a generated JavaScript interface manifest in the package;
+3. embeds a generated JavaScript interface manifest and package metadata in
+   the package;
 4. writes the package report next to the generated artifact.
 
 The generated `.irpkg` is the only browser artifact needed by `/dev.html`.
 After the package is loaded, the runner reads the embedded manifest and creates
-the UI entries automatically.
+the UI entries automatically. The manifest metadata records the package format,
+Lean toolchain, generation time, source targets, and resolved roots.
 
 `web/public/*.irpkg` files are generated local assets and are ignored by git.
 
@@ -61,6 +63,14 @@ the declarations emitted by the source, and treats public source definitions as
 interface exports. Unsupported public exports fail loudly with diagnostics in
 the report. Explicit roots are preferred for stable demos and size-sensitive
 experiments.
+
+For ad hoc local files, use the direct CLI:
+
+```bash
+npm run generate:irpkg -- <source.lean> [package.irpkg] [root ...]
+```
+
+It prints the same metadata that is embedded in the package.
 
 ## Supported Interface Surface
 

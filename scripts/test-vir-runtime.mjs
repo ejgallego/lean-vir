@@ -5,8 +5,10 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
-import { readFile } from "node:fs/promises";
+import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 import { createVirRuntime as createExportedVirRuntime } from "lean-vir";
 import { createVirRuntime, createVirRuntimeFactory } from "../web/src/vir-runtime.js";
@@ -21,6 +23,12 @@ assert.ok(runtime.packageInfo.count > 0, "expected IR package to load declaratio
 assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
+assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
+assert.equal(runtime.packageMetadata.packageFormatVersion, 4);
+assert.equal(runtime.packageMetadata.manifestVersion, 1);
+assert.match(runtime.packageMetadata.leanToolchain, /leanprover\/lean4/);
+assert.ok(runtime.packageMetadata.generatedAt.length > 0);
+assert.ok(runtime.packageMetadata.targets.some((target) => target.source === "examples/Fib.lean"));
 assert.ok(runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib"));
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
@@ -157,6 +165,7 @@ assert.throws(
 );
 assert.equal(badPackageRuntime.packageInfo, null);
 assert.equal(badPackageRuntime.interfaceManifest, null);
+assert.equal(badPackageRuntime.packageMetadata, null);
 assert.equal(badPackageRuntime.packageDeclCount(), 0);
 
 assert.throws(
@@ -165,6 +174,7 @@ assert.throws(
 );
 assert.equal(first.packageInfo, null);
 assert.equal(first.interfaceManifest, null);
+assert.equal(first.packageMetadata, null);
 assert.equal(first.packageDeclCount(), 0);
 assert.throws(
   () => first.call("fib", 8),
@@ -175,6 +185,48 @@ assert.throws(
   () => runtime.call("fib", -1),
   /fib argument arg1 must be non-negative/,
 );
+
+const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-fresh-"));
+try {
+  const freshSource = join(freshDir, "FreshUser.lean");
+  const freshPackage = join(freshDir, "fresh.irpkg");
+  await writeFile(freshSource, [
+    "def freshBump (n : Nat) : Nat := n + 7",
+    "def freshSum (xs : Array Nat) : Nat := xs.foldl (fun acc n => acc + n) 0",
+    "def freshPairSum (p : Nat × Nat) : Nat := p.fst + p.snd",
+    "",
+  ].join("\n"));
+
+  const generated = spawnSync(
+    "bash",
+    ["scripts/lean-to-irpkg.sh", freshSource, freshPackage],
+    { encoding: "utf8" },
+  );
+  assert.equal(generated.status, 0, generated.stderr || generated.stdout);
+  assert.match(generated.stdout, /mode:\s+auto-discover public definitions/);
+  assert.match(generated.stdout, /local package ready/);
+
+  const freshRuntime = await factory.createRuntime({ irPackageBytes: await readFile(freshPackage) });
+  const freshManifest = freshRuntime.interfaceManifest;
+  assert.equal(freshManifest.metadata.packageFormatVersion, 4);
+  assert.equal(freshManifest.metadata.manifestVersion, 1);
+  assert.match(freshManifest.metadata.leanToolchain, /leanprover\/lean4/);
+  assert.ok(freshManifest.metadata.generatedAt.length > 0);
+  assert.equal(freshManifest.metadata.targets.length, 1);
+  assert.equal(freshManifest.metadata.targets[0].source, freshSource);
+  assert.equal(freshManifest.metadata.targets[0].mode, "all");
+  assert.deepEqual(freshManifest.metadata.targets[0].roots, []);
+  assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"));
+
+  const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
+  assert.deepEqual(freshEntries, ["freshBump", "freshPairSum", "freshSum"]);
+  assert.equal(freshRuntime.call("freshBump", 35), "42");
+  assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
+  assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");
+  assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), "15");
+} finally {
+  await rm(freshDir, { recursive: true, force: true });
+}
 
 const unsupportedAll = spawnSync(
   "lean",

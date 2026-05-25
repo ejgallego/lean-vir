@@ -9,9 +9,23 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 
 usage() {
-  echo "usage: scripts/lean-to-irpkg.sh <source.lean> [package.irpkg] [root ...]" >&2
-  echo "       when roots are omitted, public source definitions become exports" >&2
+  cat >&2 <<'EOF'
+usage: scripts/lean-to-irpkg.sh <source.lean> [package.irpkg] [root ...]
+
+Generate one manifest-bearing .irpkg from one Lean source file.
+When roots are omitted, public source definitions are auto-discovered and
+become JavaScript-callable exports if their types are supported.
+
+examples:
+  npm run generate:irpkg -- examples/Fib.lean build/generated/fib.irpkg
+  npm run generate:irpkg -- examples/MergeSort.lean build/generated/sort.irpkg SortDemo.demo
+EOF
 }
+
+if [ "${1:-}" = "--help" ] || [ "${1:-}" = "-h" ]; then
+  usage
+  exit 0
+fi
 
 if [ "$#" -lt 1 ]; then
   usage
@@ -38,20 +52,41 @@ report=${package%.irpkg}.report.md
 
 if [ "$#" -eq 0 ]; then
   target_args=(--target-all "$source")
+  mode="auto-discover public definitions"
 else
   target_args=(--target "$source" "$@")
+  mode="explicit roots: $*"
 fi
+
+echo "generating Lean IR package"
+echo "source:  $source"
+echo "package: $package"
+echo "report:  $report"
+echo "mode:    $mode"
 
 set +e
 lean --run tools/GeneratePackage.lean "$package" "$report" "${target_args[@]}"
 status=$?
 set -e
 if [ "$status" -ne 0 ]; then
-  echo "error: package generation failed for $source" >&2
-  echo "report: $report" >&2
+  echo "error: package generation failed" >&2
+  echo "source:  $source" >&2
+  echo "package: $package" >&2
+  echo "report:  $report" >&2
+  echo "the report contains the exact missing declarations or unsupported interface exports" >&2
   exit "$status"
 fi
 
-echo "package: $package"
-echo "report: $report"
+echo "local package ready"
+echo "package:   $package"
+echo "report:    $report"
 echo "interface: embedded in package"
+case "$package" in
+  web/public/*)
+    echo "runner:    npm run dev -- --port 5173"
+    echo "url:       /dev.html?package=${package#web/public/}"
+    ;;
+  *)
+    echo "runner:    npm run dev -- --port 5173, then upload this .irpkg in /dev.html"
+    ;;
+esac

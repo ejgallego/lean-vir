@@ -258,6 +258,10 @@ async function smokeRunner(cdp, origin, url, expected) {
   const before = await evaluate(cdp, `({
     location: window.location.href,
     packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+    exports: document.querySelector("#dev-export-count")?.textContent?.trim(),
+    sourceTargets: document.querySelector("#dev-source-targets")?.textContent?.trim(),
+    toolchain: document.querySelector("#dev-toolchain")?.textContent?.trim(),
+    generatedAt: document.querySelector("#dev-generated-at")?.textContent?.trim(),
     entry: document.querySelector("#dev-entry-select")?.value,
     entryCount: document.querySelector("#dev-entry-select")?.options.length,
     input: document.querySelector("[data-input-index='0']")?.value,
@@ -268,6 +272,10 @@ async function smokeRunner(cdp, origin, url, expected) {
   })`);
   assert.ok(before.location.endsWith(url), `unexpected runner URL: ${before.location}`);
   assert.equal(before.packageName, expected.packageName);
+  assert.ok(/^\d+$/.test(before.exports), `expected export count, got ${before.exports}`);
+  assert.notEqual(before.sourceTargets, "...");
+  assert.match(before.toolchain, /leanprover\/lean4/);
+  assert.notEqual(before.generatedAt, "...");
   assert.equal(before.entry, expected.entry);
   if (expected.entryCount !== undefined) {
     assert.equal(before.entryCount, expected.entryCount);
