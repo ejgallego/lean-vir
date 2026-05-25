@@ -348,6 +348,57 @@ async function smokeRunnerFailure(cdp, origin, url, expected) {
   }
 }
 
+function expectedInputTag(type) {
+  if (type?.wireTag === 14) return "SELECT";
+  if ([15, 16, 17, 18, 19, 20].includes(type?.wireTag)) return "TEXTAREA";
+  return "INPUT";
+}
+
+async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
+  const info = await packageInfoFor(packageFile);
+  await navigate(cdp, `${origin}${basePath}dev.html?package=${encodeURIComponent(packageFile)}`);
+  await waitForReady(cdp);
+  const state = await evaluate(cdp, `(() => {
+    const select = document.querySelector("#dev-entry-select");
+    return {
+      options: Array.from(select.options).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+      })),
+      packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+    };
+  })()`);
+  assert.equal(state.packageName, packageFile);
+  assert.deepEqual(
+    state.options.map((option) => option.value),
+    info.manifest.exports.map((entry) => entry.id),
+  );
+  for (const [index, entry] of info.manifest.exports.entries()) {
+    assert.ok(state.options[index].text.includes(entry.jsName), `missing ${entry.jsName} in option label`);
+  }
+
+  const expectedControls = info.manifest.exports.map((entry) => ({
+    id: entry.id,
+    inputTags: entry.args.map((arg) => expectedInputTag(arg.type)),
+    enumOptionCounts: entry.args.map((arg) =>
+      arg.type?.wireTag === 14 ? (arg.type.constructors ?? []).length : null),
+  }));
+  const renderedControls = await evaluate(cdp, `(() => {
+    const select = document.querySelector("#dev-entry-select");
+    return ${JSON.stringify(expectedControls)}.map((expected) => {
+      select.value = expected.id;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return {
+        id: select.value,
+        inputTags: Array.from(document.querySelectorAll("[data-input-index]")).map((field) => field.tagName),
+        enumOptionCounts: Array.from(document.querySelectorAll("[data-input-index]")).map((field) =>
+          field.tagName === "SELECT" ? field.options.length : null),
+      };
+    });
+  })()`);
+  assert.deepEqual(renderedControls, expectedControls);
+}
+
 async function prepareNegativePackages() {
   await writeFile(resolve(distRoot, "bad-magic.irpkg"), encodeInvalidMagicPackage());
 
@@ -410,6 +461,7 @@ try {
   await cdp.send("Runtime.enable");
 
   await smokeLanding(cdp, server.origin);
+  await smokeManifestDrivenEntryList(cdp, server.origin, "vir-demo.irpkg");
   const runnerCases = [
     await runnerCaseFromManifest("local-fib.irpkg", "fib", {
       entryCount: 1,
@@ -489,7 +541,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, local runners, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
+  console.log("pages browser smoke ok: landing, manifest-driven entry list, local runners, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {
