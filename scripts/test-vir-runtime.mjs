@@ -231,6 +231,50 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsBump", p
   note: "ok!",
 });
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsScore", profileStatsInput), "6549");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxNatBump", { value: 41 }), {
+  value: "42",
+});
+const boxNatEntry = runtime.interfaceManifest.exports.find(
+  (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.boxNatBump",
+);
+assert.equal(boxNatEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box Nat");
+assert.equal(boxNatEntry.args[0].type.trivialFieldIndex, 0);
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.nestedBoxNatBump", {
+  value: { value: 4 },
+}), {
+  value: { value: "5" },
+});
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.taggedArrayScore", {
+  label: "ab",
+  payload: ["x", "yz"],
+}), "5");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.taggedProfileBump", {
+  label: "profile",
+  payload: {
+    nickname: "lean",
+    points: 4,
+    tags: ["ir", "wasm"],
+  },
+}), {
+  label: "profile!",
+  payload: {
+    nickname: "lean!",
+    points: "6",
+    tags: ["ir", "wasm"],
+  },
+});
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.meteredBoxBump", {
+  active: false,
+  count: 3,
+  payload: { value: 4 },
+}), {
+  active: true,
+  count: 4,
+  payload: { value: "7" },
+});
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.boxExprKindScore", {
+  value: { kind: "const", name: "Nat", levels: [] },
+}), "10");
 assert.throws(
   () => runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
     nickname: "lean",
@@ -302,6 +346,10 @@ try {
     "  quota : USize",
     "  mode : FreshMode",
     "",
+    "structure FreshWrap (α : Type) where",
+    "  label : String",
+    "  payload : α",
+    "",
     "def freshBump (n : Nat) : Nat := n + 7",
     "def freshSum (xs : Array Nat) : Nat := xs.foldl (fun acc n => acc + n) 0",
     "def freshPairSum (p : Nat × Nat) : Nat := p.fst + p.snd",
@@ -312,6 +360,12 @@ try {
     "    hits := box.hits + 1",
     "    quota := box.quota + 2",
     "    mode := .hot }",
+    "",
+    "def freshWrapBoxBump (wrap : FreshWrap FreshBox) : FreshWrap FreshBox :=",
+    "  { label := wrap.label ++ \"!\", payload := freshBoxBump wrap.payload }",
+    "",
+    "def freshWrapUInt32Bump (wrap : FreshWrap UInt32) : FreshWrap UInt32 :=",
+    "  { label := wrap.label ++ \"!\", payload := wrap.payload + 1 }",
     "",
   ].join("\n"));
 
@@ -337,7 +391,14 @@ try {
   assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"));
 
   const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
-  assert.deepEqual(freshEntries, ["freshBoxBump", "freshBump", "freshPairSum", "freshSum"]);
+  assert.deepEqual(freshEntries, [
+    "freshBoxBump",
+    "freshBump",
+    "freshPairSum",
+    "freshSum",
+    "freshWrapBoxBump",
+    "freshWrapUInt32Bump",
+  ]);
   const freshInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", freshPackage], {
     encoding: "utf8",
   });
@@ -364,6 +425,38 @@ try {
     quota: "10",
     mode: "hot",
   });
+  const freshWrapUInt32Entry = freshManifest.exports.find((entry) => entry.entry === "freshWrapUInt32Bump");
+  assert.equal(freshWrapUInt32Entry.args[0].type.type, "FreshWrap UInt32");
+  assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].type.wireTag, 6);
+  assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].layout.kind, "object");
+  assert.deepEqual(freshRuntime.call("freshWrapUInt32Bump", {
+    label: "u",
+    payload: 9,
+  }), {
+    label: "u!",
+    payload: 10,
+  });
+  assert.deepEqual(freshRuntime.call("freshWrapBoxBump", {
+    label: "box",
+    payload: {
+      label: "abc",
+      value: 4,
+      enabled: false,
+      hits: 7,
+      quota: 8,
+      mode: "cold",
+    },
+  }), {
+    label: "box!",
+    payload: {
+      label: "abc",
+      value: "7",
+      enabled: true,
+      hits: 8,
+      quota: "10",
+      mode: "hot",
+    },
+  });
 
   const unsupportedStructureSource = join(freshDir, "UnsupportedStructure.lean");
   const unsupportedStructurePackage = join(freshDir, "unsupported-structure.irpkg");
@@ -372,7 +465,11 @@ try {
     "structure BadCounter where",
     "  callback : Nat → Nat",
     "",
+    "structure ScalarBox (α : Type) where",
+    "  value : α",
+    "",
     "def badCounterIdentity (box : BadCounter) : BadCounter := box",
+    "def scalarBoxUInt32Identity (box : ScalarBox UInt32) : ScalarBox UInt32 := box",
     "",
   ].join("\n"));
   const unsupportedStructure = spawnSync(
@@ -391,6 +488,8 @@ try {
   assert.match(unsupportedStructure.stderr, /unsupported interface exports/);
   assert.match(unsupportedStructure.stderr, /badCounterIdentity/);
   assert.match(unsupportedStructure.stderr, /field `callback`/);
+  assert.match(unsupportedStructure.stderr, /scalarBoxUInt32Identity/);
+  assert.match(unsupportedStructure.stderr, /single-field structure `ScalarBox` with direct scalar field `value`/);
 } finally {
   await rm(freshDir, { recursive: true, force: true });
 }

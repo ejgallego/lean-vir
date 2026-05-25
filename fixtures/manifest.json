@@ -294,7 +294,13 @@
         "Vir.Fixtures.InterfaceShapes.profileSummary",
         "Vir.Fixtures.InterfaceShapes.profileEnvelopeScore",
         "Vir.Fixtures.InterfaceShapes.profileStatsBump",
-        "Vir.Fixtures.InterfaceShapes.profileStatsScore"
+        "Vir.Fixtures.InterfaceShapes.profileStatsScore",
+        "Vir.Fixtures.InterfaceShapes.boxNatBump",
+        "Vir.Fixtures.InterfaceShapes.nestedBoxNatBump",
+        "Vir.Fixtures.InterfaceShapes.taggedArrayScore",
+        "Vir.Fixtures.InterfaceShapes.taggedProfileBump",
+        "Vir.Fixtures.InterfaceShapes.meteredBoxBump",
+        "Vir.Fixtures.InterfaceShapes.boxExprKindScore"
       ],
       "result": { "type": "Nat" }
     },

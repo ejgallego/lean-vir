@@ -1730,6 +1730,7 @@ struct vir_type {
     uint32_t object_fields = 0;
     uint32_t usize_fields = 0;
     uint32_t scalar_bytes = 0;
+    uint32_t trivial_field = UINT32_MAX;
 };
 
 class vir_reader {
@@ -1943,12 +1944,16 @@ static vir_type decode_type(vir_reader & r) {
         type.object_fields = r.u32();
         type.usize_fields = r.u32();
         type.scalar_bytes = r.u32();
+        type.trivial_field = r.u32();
         uint32_t field_count = r.u32();
         type.args.reserve(field_count);
         type.field_layouts.reserve(field_count);
         for (uint32_t i = 0; i < field_count; i++) {
             type.field_layouts.push_back(decode_field_layout(r));
             type.args.push_back(decode_type(r));
+        }
+        if (type.trivial_field != UINT32_MAX && type.trivial_field >= field_count) {
+            r.fail("structure trivial field index is out of range");
         }
         break;
     }
@@ -1974,6 +1979,7 @@ static void encode_type(vir_writer & w, vir_type const & type) {
         w.u32(type.object_fields);
         w.u32(type.usize_fields);
         w.u32(type.scalar_bytes);
+        w.u32(type.trivial_field);
         w.u32(static_cast<uint32_t>(type.args.size()));
         for (size_t i = 0; i < type.args.size(); i++) {
             encode_field_layout(w, type.field_layouts[i]);
@@ -2294,6 +2300,9 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
         return mk_ctor_owned(0, { fst, snd });
     }
     case vir_wire_type::Structure: {
+        if (type.trivial_field != UINT32_MAX) {
+            return decode_value(r, type.args[type.trivial_field]);
+        }
         object * obj = lean_alloc_ctor(
             0,
             type.object_fields,
@@ -2537,6 +2546,10 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
         encode_value_payload(w, type.args[1], lean_ctor_get(value, 1));
         break;
     case vir_wire_type::Structure:
+        if (type.trivial_field != UINT32_MAX) {
+            encode_value_payload(w, type.args[type.trivial_field], value);
+            break;
+        }
         for (size_t i = 0; i < type.args.size(); i++) {
             bool borrowed = false;
             object * field = structure_field_as_object(type, type.args[i], type.field_layouts[i], value, borrowed);

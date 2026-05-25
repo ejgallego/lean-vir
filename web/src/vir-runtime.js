@@ -396,6 +396,7 @@ function encodeTypeDescriptor(writer, type, label) {
       writer.u32(requireStructureCount(type, "objectFieldCount", label));
       writer.u32(requireStructureCount(type, "usizeFieldCount", label));
       writer.u32(requireStructureCount(type, "scalarByteSize", label));
+      writer.u32(requireStructureTrivialFieldIndex(type, label));
       writer.u32(fields.length);
       fields.forEach((field) => {
         encodeStructureFieldLayout(writer, field.layout, `${label}.${field.name}`);
@@ -423,12 +424,14 @@ function decodeTypeDescriptor(reader) {
       const objectFieldCount = reader.u32();
       const usizeFieldCount = reader.u32();
       const scalarByteSize = reader.u32();
+      const trivialFieldIndex = decodeStructureTrivialFieldIndex(reader.u32());
       const len = reader.u32();
       return {
         wireTag: tag,
         objectFieldCount,
         usizeFieldCount,
         scalarByteSize,
+        ...(trivialFieldIndex === null ? {} : { trivialFieldIndex }),
         fields: Array.from({ length: len }, () => ({
           layout: decodeStructureFieldLayout(reader),
           type: decodeTypeDescriptor(reader),
@@ -659,6 +662,26 @@ function requireStructureCount(type, field, label) {
   return value;
 }
 
+function requireStructureTrivialFieldIndex(type, label) {
+  const value = type?.trivialFieldIndex;
+  const fields = requireStructureFields(type, label);
+  return normalizeStructureTrivialFieldIndex(value, fields.length, label);
+}
+
+function normalizeStructureTrivialFieldIndex(value, fieldCount, label) {
+  if (value === undefined || value === null) {
+    return 0xffffffff;
+  }
+  if (!Number.isInteger(value) || value < 0 || value >= fieldCount) {
+    throw new Error(`${label} has invalid manifest structure trivialFieldIndex`);
+  }
+  return value;
+}
+
+function decodeStructureTrivialFieldIndex(value) {
+  return value === 0xffffffff ? null : value;
+}
+
 function encodeStructureFieldLayout(writer, layout, label) {
   const checked = requireStructureFieldLayout(layout, label);
   writer.u8(checked.tag);
@@ -724,12 +747,14 @@ function sameWireType(expected, actual) {
         sameWireType(requireTypeField(expected, "snd", "expected result"), actual.snd);
     case 20: {
       const fields = requireStructureFields(expected, "expected result");
+      if (!Array.isArray(actual?.fields) || fields.length !== actual.fields.length) return false;
       if (requireStructureCount(expected, "objectFieldCount", "expected result") !== actual?.objectFieldCount ||
           requireStructureCount(expected, "usizeFieldCount", "expected result") !== actual?.usizeFieldCount ||
-          requireStructureCount(expected, "scalarByteSize", "expected result") !== actual?.scalarByteSize) {
+          requireStructureCount(expected, "scalarByteSize", "expected result") !== actual?.scalarByteSize ||
+          requireStructureTrivialFieldIndex(expected, "expected result") !==
+            normalizeStructureTrivialFieldIndex(actual?.trivialFieldIndex, actual.fields.length, "actual result")) {
         return false;
       }
-      if (!Array.isArray(actual?.fields) || fields.length !== actual.fields.length) return false;
       return fields.every((field, index) =>
         sameStructureFieldLayout(field.layout, actual.fields[index]?.layout) &&
         sameWireType(field.type, actual.fields[index]?.type));

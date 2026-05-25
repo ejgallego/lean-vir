@@ -23,6 +23,8 @@ inductive StructureFieldLayout where
   | scalar (size offset : Nat)
   deriving BEq, Repr
 
+abbrev StructureSeen := Array (Name × String)
+
 structure Target where
   source : System.FilePath
   roots : Array Name
@@ -75,7 +77,8 @@ inductive InterfaceType where
   | option (element : InterfaceType)
   | prod (fst snd : InterfaceType)
   | simpleEnum (name : Name) (constructors : Array Name)
-  | structure (name : Name) (objectFields usizeFields scalarBytes : Nat)
+  | structure (name : Name) (label : String) (trivialField? : Option Nat)
+      (objectFields usizeFields scalarBytes : Nat)
       (fields : Array (String × InterfaceType × StructureFieldLayout))
   | expr
   deriving BEq, Repr
@@ -1520,7 +1523,7 @@ def InterfaceType.label : InterfaceType → String
   | .option element => s!"Option {element.label}"
   | .prod fst snd => s!"{fst.label} × {snd.label}"
   | .simpleEnum name _ => name.toString
-  | .structure name .. => name.toString
+  | .structure _ label .. => label
   | .expr => "Lean.Expr"
 
 def InterfaceType.wireTag : InterfaceType → Nat
@@ -1541,6 +1544,16 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .simpleEnum .. => 14
   | .structure .. => 20
   | .expr => 15
+
+def InterfaceType.hasDirectScalarRuntime : InterfaceType → Bool
+  | .bool
+  | .uint8
+  | .uint16
+  | .uint32
+  | .uint64
+  | .usize
+  | .simpleEnum .. => true
+  | _ => false
 
 def jsonEscape (text : String) : String :=
   text.foldl (fun out c =>
@@ -1631,13 +1644,17 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ "\"kind\":\"simpleEnum\","
       ++ "\"constructors\":" ++ jsonArray ctorJson
       ++ "}"
-  | .structure name objectFields usizeFields scalarBytes fields =>
+  | .structure name _ trivialField? objectFields usizeFields scalarBytes fields =>
       let fieldJson := fields.map fun (fieldName, fieldType, fieldLayout) =>
         "{"
         ++ "\"name\":" ++ jsonString fieldName ++ ","
         ++ "\"type\":" ++ fieldType.toJson ++ ","
         ++ "\"layout\":" ++ fieldLayout.toJson
         ++ "}"
+      let trivialFieldJson :=
+        match trivialField? with
+        | some idx => "\"trivialFieldIndex\":" ++ toString idx ++ ","
+        | none => ""
       "{"
       ++ "\"type\":" ++ jsonString ty.label ++ ","
       ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
@@ -1646,6 +1663,7 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ "\"objectFieldCount\":" ++ toString objectFields ++ ","
       ++ "\"usizeFieldCount\":" ++ toString usizeFields ++ ","
       ++ "\"scalarByteSize\":" ++ toString scalarBytes ++ ","
+      ++ trivialFieldJson
       ++ "\"fields\":" ++ jsonArray fieldJson
       ++ "}"
   | _ =>
@@ -1688,8 +1706,47 @@ def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :
       | _ => false
     if allNullary then some (.simpleEnum name ctors) else none
 
-def projectionFieldType? (projType : Lean.Expr) : Option Lean.Expr :=
-  match stripMData projType with
+partial def exprTypeLabel (e : Lean.Expr) : String :=
+  match simpleInterfaceType? e with
+  | some ty => ty.label
+  | none =>
+      let e := stripMData e
+      let (fn, args) := e.getAppFnArgs
+      match fn, Array.toList args with
+      | `Array, [arg] => s!"Array {typeArgLabel arg}"
+      | `List, [arg] => s!"List {typeArgLabel arg}"
+      | `Option, [arg] => s!"Option {typeArgLabel arg}"
+      | `Prod, [lhs, rhs] => s!"{exprTypeLabel lhs} × {exprTypeLabel rhs}"
+      | _, [] =>
+          if fn.isAnonymous then toString e else fn.toString
+      | _, args =>
+          if fn.isAnonymous then
+            toString e
+          else
+            fn.toString ++ " " ++ " ".intercalate (args.map typeArgLabel)
+where
+  typeArgLabel (e : Lean.Expr) : String :=
+    let label := exprTypeLabel e
+    if label.contains ' ' || label.contains '×' then
+      "(" ++ label ++ ")"
+    else
+      label
+
+partial def instantiateForallPrefix? (type : Lean.Expr) (args : Array Lean.Expr) : Option Lean.Expr :=
+  let rec go (idx : Nat) (type : Lean.Expr) : Option Lean.Expr :=
+    if h : idx < args.size then
+      match stripMData type with
+      | .forallE _ _ body _ => go (idx + 1) (body.instantiate1 args[idx])
+      | _ => none
+    else
+      some type
+  go 0 type
+
+def projectionFieldType? (numParams : Nat) (params : Array Lean.Expr) (projType : Lean.Expr) : Option Lean.Expr := do
+  if params.size != numParams then
+    none
+  let instantiated ← instantiateForallPrefix? projType params
+  match stripMData instantiated with
   | .forallE _ _ body _ => some body
   | _ => none
 
@@ -1699,12 +1756,18 @@ def structureFieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option Structur
   | .scalar size offset _ => some (.scalar size offset)
   | .erased | .void => none
 
+def structureSeenContains (seen : StructureSeen) (name : Name) (key : String) : Bool :=
+  seen.any fun (seenName, seenKey) => seenName == name && seenKey == key
+
 mutual
 
-partial def structureType (seenStructures : NameSet) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
-  let some name := constName? e
-    | return .error s!"unsupported type `{e}`"
-  if seenStructures.contains name then
+partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
+  let e := stripMData e
+  let (name, args) := e.getAppFnArgs
+  if name.isAnonymous then
+    return .error s!"unsupported type `{e}`"
+  let seenKey := toString e
+  if structureSeenContains seenStructures name seenKey then
     return .error s!"recursive structure `{name}` is not supported"
   else
     let env ← getEnv
@@ -1712,8 +1775,10 @@ partial def structureType (seenStructures : NameSet) (e : Lean.Expr) : CoreM (Ex
       | return .error s!"unsupported type `{e}`"
     let some structInfo := getStructureInfo? env name
       | return .error s!"unsupported type `{e}`"
-    if indInfo.numParams != 0 || indInfo.numIndices != 0 then
-      return .error s!"parameterized structure `{name}` is not supported"
+    if indInfo.numIndices != 0 then
+      return .error s!"indexed structure `{name}` is not supported"
+    else if args.size != indInfo.numParams then
+      return .error s!"structure `{name}` expects {indInfo.numParams} parameter(s), got {args.size}"
     else if indInfo.isRec then
       return .error s!"recursive structure `{name}` is not supported"
     else if indInfo.ctors.length != 1 then
@@ -1729,9 +1794,11 @@ partial def structureType (seenStructures : NameSet) (e : Lean.Expr) : CoreM (Ex
           Lean.Compiler.LCNF.getCtorLayout ctorName
         catch _ =>
           return .error s!"could not compute runtime layout for structure `{name}`"
+      let trivialField? :=
+        (← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx)
       if layout.fieldInfo.size != structInfo.fieldNames.size then
         return .error s!"runtime layout for structure `{name}` does not match its field count"
-      let nextSeen := seenStructures.insert name
+      let nextSeen := seenStructures.push (name, seenKey)
       let mut fields := #[]
       for h : idx in *...structInfo.fieldNames.size do
         let fieldName := structInfo.fieldNames[idx]
@@ -1741,16 +1808,24 @@ partial def structureType (seenStructures : NameSet) (e : Lean.Expr) : CoreM (Ex
           | return .error s!"field `{fieldName}` of structure `{name}` is missing a projection function"
         let some info := env.find? projName
           | return .error s!"field `{fieldName}` of structure `{name}` has no projection declaration"
-        let some fieldExpr := projectionFieldType? info.type
+        let some fieldExpr := projectionFieldType? indInfo.numParams args info.type
           | return .error s!"field `{fieldName}` of structure `{name}` has invalid projection type `{info.type}`"
         match ← interfaceType fieldExpr nextSeen with
         | .ok fieldType =>
             fields := fields.push (fieldName.toString, fieldType, fieldLayout)
         | .error reason =>
             return .error s!"field `{fieldName}` of structure `{name}` has unsupported type `{fieldExpr}`: {reason}"
-      return .ok (.structure name layout.ctorInfo.size layout.ctorInfo.usize layout.ctorInfo.ssize fields)
+      match trivialField? with
+      | some idx =>
+          match fields[idx]? with
+          | some (fieldName, fieldType, _) =>
+              if fieldType.hasDirectScalarRuntime then
+                return .error s!"single-field structure `{name}` with direct scalar field `{fieldName}` is not supported at the boxed interpreter boundary"
+          | none => pure ()
+      | none => pure ()
+      return .ok (.structure name (exprTypeLabel e) trivialField? layout.ctorInfo.size layout.ctorInfo.usize layout.ctorInfo.ssize fields)
 
-partial def interfaceType (e : Lean.Expr) (seenStructures : NameSet := {}) : CoreM (Except String InterfaceType) := do
+partial def interfaceType (e : Lean.Expr) (seenStructures : StructureSeen := #[]) : CoreM (Except String InterfaceType) := do
   match simpleInterfaceType? e with
   | some ty => return .ok ty
   | none =>

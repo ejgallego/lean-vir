@@ -477,6 +477,21 @@ try {
 }`,
     },
   );
+  await smokeRunner(
+    cdp,
+    server.origin,
+    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_InterfaceShapes_boxNatBump",
+    {
+      packageName: "vir-demo.irpkg",
+      entry: "Vir_Fixtures_InterfaceShapes_boxNatBump",
+      entryCountAtLeast: 6,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"value":41}`],
+      result: `{
+  "value": "42"
+}`,
+    },
+  );
   await smokeRunnerFailure(
     cdp,
     server.origin,

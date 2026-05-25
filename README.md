@@ -29,9 +29,10 @@ render an input control in the fixture source panel.
 
 The package manifest also drives the local `/dev.html` runner. Supported
 browser-call types include primitive scalars, recursive list/array/option/product
-shapes over supported element types, plain user-defined structures with direct
-scalar fields, nullary inductive enums such as the Tamagotchi state/action
-types, and structural `Lean.Expr` values.
+shapes over supported element types, non-indexed user-defined structures
+including parameterized instances such as `Box Nat`, direct scalar fields,
+nullary inductive enums such as the Tamagotchi state/action types, and
+structural `Lean.Expr` values.
 
 ## Quick Start
 

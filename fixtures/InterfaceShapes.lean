@@ -86,6 +86,18 @@ structure ProfileStats where
   tier : ProfileTier
   note : String
 
+structure Box (α : Type) where
+  value : α
+
+structure Tagged (α : Type) where
+  label : String
+  payload : α
+
+structure Metered (α : Type) where
+  active : Bool
+  count : UInt32
+  payload : α
+
 def profileBump (profile : Profile) : Profile :=
   { profile with
     nickname := profile.nickname ++ "!"
@@ -128,6 +140,33 @@ def profileStatsScore (stats : ProfileStats) : Nat :=
     + tierScore stats.tier
     + stats.note.length
 
+def boxNatBump (box : Box Nat) : Box Nat :=
+  { value := box.value + 1 }
+
+def nestedBoxNatBump (box : Box (Box Nat)) : Box (Box Nat) :=
+  { value := { value := box.value.value + 1 } }
+
+def taggedArrayScore (tagged : Tagged (Array String)) : Nat :=
+  tagged.label.length + tagged.payload.foldl (fun acc value => acc + value.length) 0
+
+def taggedProfileBump (tagged : Tagged Profile) : Tagged Profile :=
+  { label := tagged.label ++ "!"
+    payload := profileBump tagged.payload }
+
+def meteredBoxBump (metered : Metered (Box Nat)) : Metered (Box Nat) :=
+  {
+    active := !metered.active
+    count := metered.count + 1
+    payload := { value := metered.payload.value + metered.count.toNat }
+  }
+
+def boxExprKindScore (box : Box Expr) : Nat :=
+  match box.value with
+  | .bvar idx => idx + 1
+  | .const .. => 10
+  | .lit (.natVal n) => n + 20
+  | _ => 100
+
 def interfaceShapeScore : Nat :=
   arrayStringTotalLength #["a", "bc"]
     + listUInt32Sum [1, 2, 3]
@@ -147,5 +186,9 @@ def interfaceShapeScore : Nat :=
       tier := .pro,
       note := "ok"
     }
+    + (boxNatBump { value := 4 }).value
+    + taggedArrayScore { label := "tags", payload := #["a", "bc"] }
+    + (meteredBoxBump { active := true, count := 3, payload := { value := 4 } }).payload.value
+    + boxExprKindScore { value := .bvar 2 }
 
 end Vir.Fixtures.InterfaceShapes

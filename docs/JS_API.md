@@ -74,12 +74,13 @@ generated JavaScript name.
 Options are accepted as `null`, `{ kind: "none" }`, `{ kind: "some", value }`,
 `{ some: value }`, or the bare inner value. Option results are returned as
 `null` or the inner value. Product inputs are accepted as `{ fst, snd }` or
-two-element arrays, and results are returned as `{ fst, snd }`. Plain structures
-are accepted and returned as objects keyed by their Lean field names; direct
-`Bool`, `UInt*`, `USize`, and enum fields use the same JS values as standalone
-arguments/results. These shapes can be nested, for example `Option (Array Nat)`,
-`List (Nat × String)`, a structure containing another structure, and
-`Array Lean.Expr`.
+two-element arrays, and results are returned as `{ fst, snd }`. Non-indexed
+structures, including parameterized instances like `Box Nat` and
+`Tagged (Array String)`, are accepted and returned as objects keyed by their
+Lean field names; direct `Bool`, `UInt*`, `USize`, and enum fields use the same
+JS values as standalone arguments/results. These shapes can be nested, for
+example `Option (Array Nat)`, `List (Nat × String)`, a structure containing
+another structure, and `Array Lean.Expr`.
 
 `Lean.Expr` values use structural JavaScript objects such as
 `{ kind: "const", name: "Nat", levels: [] }`,
