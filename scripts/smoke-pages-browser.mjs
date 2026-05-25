@@ -455,6 +455,26 @@ try {
       result: "3",
     },
   );
+  await smokeRunner(
+    cdp,
+    server.origin,
+    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileBump",
+    {
+      packageName: "vir-demo.irpkg",
+      entry: "Vir_Fixtures_InterfaceShapes_profileBump",
+      entryCountAtLeast: 6,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"nickname":"lean","points":4,"tags":["ir","wasm"]}`],
+      result: `{
+  "nickname": "lean!",
+  "points": "6",
+  "tags": [
+    "ir",
+    "wasm"
+  ]
+}`,
+    },
+  );
   await smokeRunnerFailure(
     cdp,
     server.origin,

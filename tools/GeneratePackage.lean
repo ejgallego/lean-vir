@@ -68,6 +68,7 @@ inductive InterfaceType where
   | option (element : InterfaceType)
   | prod (fst snd : InterfaceType)
   | simpleEnum (name : Name) (constructors : Array Name)
+  | structure (name : Name) (fields : Array (String × InterfaceType))
   | expr
   deriving BEq, Repr
 
@@ -1511,6 +1512,7 @@ def InterfaceType.label : InterfaceType → String
   | .option element => s!"Option {element.label}"
   | .prod fst snd => s!"{fst.label} × {snd.label}"
   | .simpleEnum name _ => name.toString
+  | .structure name _ => name.toString
   | .expr => "Lean.Expr"
 
 def InterfaceType.wireTag : InterfaceType → Nat
@@ -1529,6 +1531,7 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .option .. => 18
   | .prod .. => 19
   | .simpleEnum .. => 14
+  | .structure .. => 20
   | .expr => 15
 
 def jsonEscape (text : String) : String :=
@@ -1558,7 +1561,7 @@ def ctorShortName (inductiveName ctorName : Name) : String :=
   else
     text
 
-def InterfaceType.toJson (ty : InterfaceType) : String :=
+partial def InterfaceType.toJson (ty : InterfaceType) : String :=
   match ty with
   | .array element =>
       "{"
@@ -1602,6 +1605,19 @@ def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ "\"kind\":\"simpleEnum\","
       ++ "\"constructors\":" ++ jsonArray ctorJson
       ++ "}"
+  | .structure name fields =>
+      let fieldJson := fields.map fun (fieldName, fieldType) =>
+        "{"
+        ++ "\"name\":" ++ jsonString fieldName ++ ","
+        ++ "\"type\":" ++ fieldType.toJson
+        ++ "}"
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"structure\","
+      ++ "\"name\":" ++ jsonString name.toString ++ ","
+      ++ "\"fields\":" ++ jsonArray fieldJson
+      ++ "}"
   | _ =>
       "{\"type\":\"" ++ ty.label ++ "\",\"wireTag\":" ++ toString ty.wireTag ++ "}"
 
@@ -1642,7 +1658,41 @@ def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :
       | _ => false
     if allNullary then some (.simpleEnum name ctors) else none
 
-partial def interfaceType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :=
+partial def forallResultType : Lean.Expr → Lean.Expr
+  | .forallE _ _ body _ => forallResultType body
+  | e => e
+
+partial def InterfaceType.isStructureFieldSupported : InterfaceType → Bool
+  | .bool | .uint8 | .uint16 | .uint32 | .uint64 | .usize => false
+  | .array _ | .list _ | .option _ => true
+  | .prod fst snd => fst.isStructureFieldSupported && snd.isStructureFieldSupported
+  | .structure _ fields => fields.all fun (_, fieldType) => fieldType.isStructureFieldSupported
+  | _ => true
+
+mutual
+
+partial def structureType? (env : Environment) (seenStructures : NameSet) (e : Lean.Expr) : Option InterfaceType := do
+  let name <- constName? e
+  if seenStructures.contains name then
+    none
+  else
+    let .inductInfo indInfo <- env.find? name | none
+    let structInfo <- getStructureInfo? env name
+    if indInfo.numParams != 0 || indInfo.numIndices != 0 || indInfo.isRec || indInfo.ctors.length != 1 || !structInfo.parentInfo.isEmpty then
+      none
+    else
+      let nextSeen := seenStructures.insert name
+      let fields <- structInfo.fieldNames.mapIdxM fun idx fieldName => do
+        let projName <- structInfo.getProjFn? idx
+        let info <- env.find? projName
+        let fieldType <- interfaceType? env (forallResultType info.type) nextSeen
+        if fieldType.isStructureFieldSupported then
+          some (fieldName.toString, fieldType)
+        else
+          none
+      if fields.isEmpty then none else some (.structure name fields)
+
+partial def interfaceType? (env : Environment) (e : Lean.Expr) (seenStructures : NameSet := {}) : Option InterfaceType :=
   match simpleInterfaceType? e with
   | some ty => some ty
   | none =>
@@ -1650,16 +1700,21 @@ partial def interfaceType? (env : Environment) (e : Lean.Expr) : Option Interfac
       let (fn, args) := e.getAppFnArgs
       match fn, Array.toList args with
       | `Array, [arg] =>
-          interfaceType? env arg |>.map .array
+          interfaceType? env arg seenStructures |>.map .array
       | `List, [arg] =>
-          interfaceType? env arg |>.map .list
+          interfaceType? env arg seenStructures |>.map .list
       | `Option, [arg] =>
-          interfaceType? env arg |>.map .option
+          interfaceType? env arg seenStructures |>.map .option
       | `Prod, [lhs, rhs] =>
-          match interfaceType? env lhs, interfaceType? env rhs with
+          match interfaceType? env lhs seenStructures, interfaceType? env rhs seenStructures with
           | some lhsTy, some rhsTy => some (.prod lhsTy rhsTy)
           | _, _ => none
-      | _, _ => simpleEnumType? env e
+      | _, _ =>
+          match simpleEnumType? env e with
+          | some ty => some ty
+          | none => structureType? env seenStructures e
+
+end
 
 def binderArgName (fallback : Nat) (name : Name) : String :=
   let candidate := name.toString

@@ -288,7 +288,11 @@
         "Vir.Fixtures.InterfaceShapes.listProdNatStringScore",
         "Vir.Fixtures.InterfaceShapes.prodStringNatSwap",
         "Vir.Fixtures.InterfaceShapes.arrayExprKindScore",
-        "Vir.Fixtures.InterfaceShapes.optionExprBump"
+        "Vir.Fixtures.InterfaceShapes.optionExprBump",
+        "Vir.Fixtures.InterfaceShapes.profileBump",
+        "Vir.Fixtures.InterfaceShapes.profileScore",
+        "Vir.Fixtures.InterfaceShapes.profileSummary",
+        "Vir.Fixtures.InterfaceShapes.profileEnvelopeScore"
       ],
       "result": { "type": "Nat" }
     },

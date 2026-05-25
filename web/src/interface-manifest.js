@@ -45,6 +45,8 @@ export function formatInterfaceType(type) {
       return `Option<${formatInterfaceType(type.element)}>`;
     case 19:
       return `Prod<${formatInterfaceType(type.fst)}, ${formatInterfaceType(type.snd)}>`;
+    case 20:
+      return type.name ?? type.type ?? "Structure";
     default:
       return type?.type ?? `wireTag ${type?.wireTag ?? "?"}`;
   }

@@ -101,14 +101,16 @@ Supported v1 types:
 - `ByteArray`;
 - recursive `Array α`, `List α`, `Option α`, and `α × β` shapes over
   supported types;
+- plain non-parameterized structures over manifest-supported object-backed
+  fields, represented as JavaScript objects keyed by Lean field name;
 - nullary inductive enums;
 - `Lean.Expr`.
 
 Large exact integer results are returned as decimal strings.
 
 `/dev.html` generates enum select controls and JSON textareas for structural
-`Lean.Expr` and manifest-supported compound values from the embedded manifest
-after the package is loaded.
+`Lean.Expr`, user-defined structures, and manifest-supported compound values
+from the embedded manifest after the package is loaded.
 
 ## Current Scope
 

@@ -1705,6 +1705,7 @@ enum class vir_wire_type : uint8_t {
     List = 17,
     Option = 18,
     Prod = 19,
+    Structure = 20,
     SimpleEnum = 14,
     Expr = 15,
 };
@@ -1865,6 +1866,7 @@ static bool is_known_wire_type(vir_wire_type tag) {
     case vir_wire_type::List:
     case vir_wire_type::Option:
     case vir_wire_type::Prod:
+    case vir_wire_type::Structure:
     case vir_wire_type::SimpleEnum:
     case vir_wire_type::Expr:
         return true;
@@ -1889,6 +1891,14 @@ static vir_type decode_type(vir_reader & r) {
         type.args.push_back(decode_type(r));
         type.args.push_back(decode_type(r));
         break;
+    case vir_wire_type::Structure: {
+        uint32_t field_count = r.u32();
+        type.args.reserve(field_count);
+        for (uint32_t i = 0; i < field_count; i++) {
+            type.args.push_back(decode_type(r));
+        }
+        break;
+    }
     default:
         break;
     }
@@ -1906,6 +1916,12 @@ static void encode_type(vir_writer & w, vir_type const & type) {
     case vir_wire_type::Prod:
         encode_type(w, type.args[0]);
         encode_type(w, type.args[1]);
+        break;
+    case vir_wire_type::Structure:
+        w.u32(static_cast<uint32_t>(type.args.size()));
+        for (vir_type const & field : type.args) {
+            encode_type(w, field);
+        }
         break;
     default:
         break;
@@ -2175,6 +2191,13 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
         object * snd = decode_value(r, type.args[1]);
         return mk_ctor_owned(0, { fst, snd });
     }
+    case vir_wire_type::Structure: {
+        object * obj = lean_alloc_ctor(0, type.args.size(), 0);
+        for (size_t i = 0; i < type.args.size(); i++) {
+            lean_ctor_set(obj, static_cast<unsigned>(i), decode_value(r, type.args[i]));
+        }
+        return obj;
+    }
     case vir_wire_type::SimpleEnum:
         return lean_box(r.u32());
     case vir_wire_type::Expr:
@@ -2340,6 +2363,11 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
     case vir_wire_type::Prod:
         encode_value_payload(w, type.args[0], lean_ctor_get(value, 0));
         encode_value_payload(w, type.args[1], lean_ctor_get(value, 1));
+        break;
+    case vir_wire_type::Structure:
+        for (size_t i = 0; i < type.args.size(); i++) {
+            encode_value_payload(w, type.args[i], lean_ctor_get(value, static_cast<unsigned>(i)));
+        }
         break;
     case vir_wire_type::SimpleEnum:
         w.u32(static_cast<uint32_t>(lean_is_scalar(value) ? lean_unbox(value) : lean_obj_tag(value)));

@@ -123,6 +123,8 @@ function defaultValueForType(type) {
         fst: defaultValueForType(type?.fst),
         snd: defaultValueForType(type?.snd),
       };
+    case 20:
+      return Object.fromEntries((type?.fields ?? []).map((field) => [field.name, defaultValueForType(field.type)]));
     case 14:
       return type?.constructors?.[0]?.jsName ?? "";
     default:
@@ -131,7 +133,7 @@ function defaultValueForType(type) {
 }
 
 function isJsonInputTag(tag) {
-  return tag === 15 || tag === 16 || tag === 17 || tag === 18 || tag === 19;
+  return tag === 15 || tag === 16 || tag === 17 || tag === 18 || tag === 19 || tag === 20;
 }
 
 function isLegacyArrayInputTag(tag) {
@@ -332,6 +334,7 @@ function parseInputValue(input, text) {
     case 17:
     case 18:
     case 19:
+    case 20:
       return JSON.parse(text);
     default:
       throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);

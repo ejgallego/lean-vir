@@ -391,6 +391,12 @@ function encodeTypeDescriptor(writer, type, label) {
       encodeTypeDescriptor(writer, requireTypeField(type, "fst", label), `${label}.fst`);
       encodeTypeDescriptor(writer, requireTypeField(type, "snd", label), `${label}.snd`);
       return;
+    case 20: {
+      const fields = requireStructureFields(type, label);
+      writer.u32(fields.length);
+      fields.forEach((field) => encodeTypeDescriptor(writer, field.type, `${label}.${field.name}`));
+      return;
+    }
     default:
       return;
   }
@@ -407,6 +413,10 @@ function decodeTypeDescriptor(reader) {
       return { wireTag: tag, element: decodeTypeDescriptor(reader) };
     case 19:
       return { wireTag: tag, fst: decodeTypeDescriptor(reader), snd: decodeTypeDescriptor(reader) };
+    case 20: {
+      const len = reader.u32();
+      return { wireTag: tag, fields: Array.from({ length: len }, () => ({ type: decodeTypeDescriptor(reader) })) };
+    }
     default:
       return { wireTag: tag };
   }
@@ -503,6 +513,13 @@ function encodeValuePayload(writer, type, value, label) {
       encodeValuePayload(writer, requireTypeField(type, "snd", label), pair.snd, `${label}.snd`);
       return;
     }
+    case 20: {
+      const fields = requireStructureFields(type, label);
+      const record = normalizeStructure(value, fields, label);
+      fields.forEach((field) =>
+        encodeValuePayload(writer, field.type, record[field.name], `${label}.${field.name}`));
+      return;
+    }
     default:
       throw new Error(`${label} has unsupported wire tag ${tag}`);
   }
@@ -588,6 +605,13 @@ function decodeValuePayload(reader, type) {
         snd: decodeValuePayload(reader, requireTypeField(type, "snd", "result")),
       };
       break;
+    case 20: {
+      value = {};
+      for (const field of requireStructureFields(type, "result")) {
+        value[field.name] = decodeValuePayload(reader, field.type);
+      }
+      break;
+    }
     default:
       throw new Error(`unsupported result wire tag ${expectedTag}`);
   }
@@ -609,6 +633,18 @@ function requireTypeField(type, field, label) {
   return child;
 }
 
+function requireStructureFields(type, label) {
+  if (!Array.isArray(type?.fields)) {
+    throw new Error(`${label} is missing manifest structure fields`);
+  }
+  for (const field of type.fields) {
+    if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
+      throw new Error(`${label} has an invalid manifest structure field`);
+    }
+  }
+  return type.fields;
+}
+
 function sameWireType(expected, actual) {
   if (requireWireTag(expected, "expected result") !== actual?.wireTag) return false;
   switch (expected.wireTag) {
@@ -619,6 +655,11 @@ function sameWireType(expected, actual) {
     case 19:
       return sameWireType(requireTypeField(expected, "fst", "expected result"), actual.fst) &&
         sameWireType(requireTypeField(expected, "snd", "expected result"), actual.snd);
+    case 20: {
+      const fields = requireStructureFields(expected, "expected result");
+      if (!Array.isArray(actual?.fields) || fields.length !== actual.fields.length) return false;
+      return fields.every((field, index) => sameWireType(field.type, actual.fields[index]?.type));
+    }
     default:
       return true;
   }
@@ -684,6 +725,18 @@ function normalizePair(value, label) {
     }
   }
   throw new Error(`${label} must be a pair { fst, snd } or a two-element array`);
+}
+
+function normalizeStructure(value, fields, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  for (const field of fields) {
+    if (!hasOwn(value, field.name)) {
+      throw new Error(`${label} is missing field ${field.name}`);
+    }
+  }
+  return value;
 }
 
 function normalizeEnum(value, type, label) {

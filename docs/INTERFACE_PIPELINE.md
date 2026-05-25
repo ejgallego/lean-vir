@@ -90,6 +90,8 @@ The embedded manifest currently supports:
 - recursive collections: `Array α` and `List α` for supported `α`;
 - recursive option/product shapes: `Option α` and `α × β` for supported
   `α` and `β`;
+- plain non-parameterized structures over manifest-supported object-backed
+  fields, represented as JavaScript objects;
 - nullary inductive enums, represented in JavaScript by generated constructor
   names;
 - `Lean.Expr`, represented as structural JavaScript objects.

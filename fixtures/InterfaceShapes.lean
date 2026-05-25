@@ -52,6 +52,41 @@ def optionExprBump : Option Expr → Option Expr
   | some (.bvar idx) => some (.bvar (idx + 1))
   | some expr => some expr
 
+structure Profile where
+  nickname : String
+  points : Nat
+  tags : List String
+
+structure ProfileSummary where
+  label : String
+  total : Nat
+  bonus : Option Nat
+
+structure ProfileEnvelope where
+  profile : Profile
+  summary : ProfileSummary
+
+def profileBump (profile : Profile) : Profile :=
+  { profile with
+    nickname := profile.nickname ++ "!"
+    points := profile.points + profile.tags.length }
+
+def profileScore (profile : Profile) : Nat :=
+  profile.points + profile.nickname.length + profile.tags.foldl (fun acc tag => acc + tag.length) 0
+
+def profileSummary (profile : Profile) : ProfileSummary :=
+  {
+    label := profile.nickname ++ ":" ++ toString profile.tags.length
+    total := profileScore profile
+    bonus := some (profile.points + 10)
+  }
+
+def profileEnvelopeScore (envelope : ProfileEnvelope) : Nat :=
+  profileScore envelope.profile
+    + envelope.summary.total
+    + envelope.summary.label.length
+    + envelope.summary.bonus.getD 0
+
 def interfaceShapeScore : Nat :=
   arrayStringTotalLength #["a", "bc"]
     + listUInt32Sum [1, 2, 3]
@@ -60,5 +95,6 @@ def interfaceShapeScore : Nat :=
     + optionArrayNatSum (some #[1, 2, 3])
     + listProdNatStringScore [(4, "ab"), (5, "c")]
     + arrayExprKindScore #[.const `Nat [], .bvar 2]
+    + profileScore { nickname := "lean", points := 4, tags := ["ir", "wasm"] }
 
 end Vir.Fixtures.InterfaceShapes

@@ -61,8 +61,8 @@ const second = await factory.createRuntime({ irPackageBytes });
 
 Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `UInt8`, `UInt16`,
 `UInt32`, `UInt64`, `USize`, `ByteArray`, recursive `Array α`, `List α`,
-`Option α`, and `α × β` shapes over supported types, nullary inductive enums,
-and `Lean.Expr`.
+`Option α`, and `α × β` shapes over supported types, plain user-defined
+structures, nullary inductive enums, and `Lean.Expr`.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`.
@@ -74,9 +74,10 @@ generated JavaScript name.
 Options are accepted as `null`, `{ kind: "none" }`, `{ kind: "some", value }`,
 `{ some: value }`, or the bare inner value. Option results are returned as
 `null` or the inner value. Product inputs are accepted as `{ fst, snd }` or
-two-element arrays, and results are returned as `{ fst, snd }`. These shapes can
-be nested, for example `Option (Array Nat)`, `List (Nat × String)`, and
-`Array Lean.Expr`.
+two-element arrays, and results are returned as `{ fst, snd }`. Plain structures
+are accepted and returned as objects keyed by their Lean field names. These
+shapes can be nested, for example `Option (Array Nat)`, `List (Nat × String)`,
+a structure containing another structure, and `Array Lean.Expr`.
 
 `Lean.Expr` values use structural JavaScript objects such as
 `{ kind: "const", name: "Nat", levels: [] }`,

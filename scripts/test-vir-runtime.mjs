@@ -156,6 +156,48 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.optionExprBump", { k
   kind: "bvar",
   index: "7",
 });
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileBump", {
+  nickname: "lean",
+  points: 4,
+  tags: ["ir", "wasm"],
+}), {
+  nickname: "lean!",
+  points: "6",
+  tags: ["ir", "wasm"],
+});
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
+  nickname: "lean",
+  points: 4,
+  tags: ["ir", "wasm"],
+}), "14");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileSummary", {
+  nickname: "lean",
+  points: 4,
+  tags: ["ir", "wasm"],
+}), {
+  label: "lean:2",
+  total: "14",
+  bonus: "14",
+});
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore", {
+  profile: {
+    nickname: "lean",
+    points: 4,
+    tags: ["ir", "wasm"],
+  },
+  summary: {
+    label: "lean:2",
+    total: 14,
+    bonus: 14,
+  },
+}), "48");
+assert.throws(
+  () => runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
+    nickname: "lean",
+    points: 4,
+  }),
+  /profileScore argument profile is missing field tags/,
+);
 
 const factory = createVirRuntimeFactory({ wasmBytes });
 const unloaded = await factory.createRuntime();
@@ -208,9 +250,14 @@ try {
   const freshSource = join(freshDir, "FreshUser.lean");
   const freshPackage = join(freshDir, "fresh.irpkg");
   await writeFile(freshSource, [
+    "structure FreshBox where",
+    "  label : String",
+    "  value : Nat",
+    "",
     "def freshBump (n : Nat) : Nat := n + 7",
     "def freshSum (xs : Array Nat) : Nat := xs.foldl (fun acc n => acc + n) 0",
     "def freshPairSum (p : Nat × Nat) : Nat := p.fst + p.snd",
+    "def freshBoxBump (box : FreshBox) : FreshBox := { box with value := box.value + box.label.length }",
     "",
   ].join("\n"));
 
@@ -236,7 +283,7 @@ try {
   assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"));
 
   const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
-  assert.deepEqual(freshEntries, ["freshBump", "freshPairSum", "freshSum"]);
+  assert.deepEqual(freshEntries, ["freshBoxBump", "freshBump", "freshPairSum", "freshSum"]);
   const freshInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", freshPackage], {
     encoding: "utf8",
   });
@@ -248,6 +295,36 @@ try {
   assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
   assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");
   assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), "15");
+  assert.deepEqual(freshRuntime.call("freshBoxBump", { label: "abc", value: 4 }), {
+    label: "abc",
+    value: "7",
+  });
+
+  const unsupportedStructureSource = join(freshDir, "UnsupportedStructure.lean");
+  const unsupportedStructurePackage = join(freshDir, "unsupported-structure.irpkg");
+  const unsupportedStructureReport = join(freshDir, "unsupported-structure.report.md");
+  await writeFile(unsupportedStructureSource, [
+    "structure BadCounter where",
+    "  count : UInt32",
+    "",
+    "def badCounterIdentity (box : BadCounter) : BadCounter := box",
+    "",
+  ].join("\n"));
+  const unsupportedStructure = spawnSync(
+    "lean",
+    [
+      "--run",
+      "tools/GeneratePackage.lean",
+      unsupportedStructurePackage,
+      unsupportedStructureReport,
+      "--target-all",
+      unsupportedStructureSource,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.notEqual(unsupportedStructure.status, 0);
+  assert.match(unsupportedStructure.stderr, /unsupported interface exports/);
+  assert.match(unsupportedStructure.stderr, /badCounterIdentity/);
 } finally {
   await rm(freshDir, { recursive: true, force: true });
 }
