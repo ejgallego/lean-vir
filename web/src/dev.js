@@ -148,10 +148,6 @@ function isJsonInputTag(tag) {
   return tag === 15 || tag === 16 || tag === 17 || tag === 18 || tag === 19 || tag === 20;
 }
 
-function isLegacyArrayInputTag(tag) {
-  return tag === 9 || tag === 10 || tag === 11 || tag === 12 || tag === 13;
-}
-
 function inputFieldId(input, index) {
   return `dev-entry-input-${index}-${input.name ?? "input"}`;
 }
@@ -267,35 +263,6 @@ function parseIntInput(text) {
   return trimmed;
 }
 
-function parseNatArrayInput(text) {
-  const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
-  return parts.map((part) => {
-    if (!/^\d+$/.test(part)) {
-      throw new Error(`invalid Nat literal: ${part}`);
-    }
-    return part;
-  });
-}
-
-function parseStringListInput(text) {
-  if (text.trim() === "") return [];
-  return text.split(",").map((part) => part.trim());
-}
-
-function parseUInt32ArrayInput(text) {
-  const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
-  return parts.map((part) => {
-    if (!/^\d+$/.test(part)) {
-      throw new Error(`invalid UInt32 literal: ${part}`);
-    }
-    const value = Number(part);
-    if (!Number.isInteger(value) || value < 0 || value > 0xffffffff) {
-      throw new Error("UInt32 values must be in 0..4294967295");
-    }
-    return value;
-  });
-}
-
 function parseByteArrayInput(text) {
   const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
   return parts.map((part) => {
@@ -332,13 +299,6 @@ function parseInputValue(input, text) {
     }
     case 9:
       return parseByteArrayInput(text);
-    case 10:
-    case 12:
-      return parseNatArrayInput(text);
-    case 11:
-      return parseUInt32ArrayInput(text);
-    case 13:
-      return parseStringListInput(text);
     case 14:
       return text.trim();
     case 15:
@@ -391,7 +351,7 @@ function evaluateEntry(runtime, entry) {
   const values = inputs.map((input, index) => {
     const field = inputFields.querySelector(`[data-input-index='${index}']`);
     const value = parseInputValue(input, field?.value ?? inputDefault(input));
-    if (field && Array.isArray(value) && isLegacyArrayInputTag(input.type?.wireTag)) {
+    if (field && input.type?.wireTag === 9) {
       field.value = value.join(", ");
     }
     return value;

@@ -107,7 +107,7 @@ assert.ok(runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib
 assertManifestTypeDescriptorsRoundTrip(runtime.interfaceManifest);
 assert.equal(validateInterfaceManifest(structuredClone(validManifestShape)).exports[0].entry, "ok");
 assertInvalidManifest((manifest) => {
-  manifest.exports[0].result = { type: "LegacyNatArray", wireTag: 10 };
+  manifest.exports[0].result = { type: "UnsupportedTag10", wireTag: 10 };
 }, /result\.wireTag is not supported/);
 assertInvalidManifest((manifest) => {
   manifest.exports[0].args[0].type = { type: "Array Nat", wireTag: 16 };

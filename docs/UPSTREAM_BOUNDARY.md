@@ -221,7 +221,7 @@ remove if we want parser loading to behave exactly like a full Lean runtime.
 ## Future Loading Path
 
 The current loader is intentionally demo-specific: it decodes the package format
-emitted by `tools/GeneratePackage.lean`. The next compatibility step is to make
-the package format match Lean's generated `.ir` or module data more closely, so
-the same stable `vir_load_ir_package(ptr, len)` boundary can load artifacts
-produced by Lean itself.
+emitted by `tools/GeneratePackage.lean`. A future loading step is to make the
+package format match Lean's generated `.ir` or module data more closely, so the
+same stable `vir_load_ir_package(ptr, len)` boundary can load artifacts produced
+by Lean itself.

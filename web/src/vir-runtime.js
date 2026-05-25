@@ -489,30 +489,6 @@ function encodeValuePayload(writer, type, value, label) {
     case 9:
       writer.bytesValue(asByteArrayBytes(value));
       return;
-    case 10:
-    case 12: {
-      const values = normalizeArray(value, label);
-      writer.u32(values.length);
-      values.forEach((item, itemIndex) => {
-        writer.string(normalizeDecimal(item, `${label}[${itemIndex}]`, { signed: false }));
-      });
-      return;
-    }
-    case 11: {
-      const values = normalizeArray(value, label);
-      writer.u32(values.length);
-      values.forEach((item, itemIndex) => writer.u32(normalizeUint32(item, `${label}[${itemIndex}]`)));
-      return;
-    }
-    case 13: {
-      const values = normalizeArray(value, label);
-      writer.u32(values.length);
-      values.forEach((item, itemIndex) => {
-        if (typeof item !== "string") throw new Error(`${label}[${itemIndex}] must be a string`);
-        writer.string(item);
-      });
-      return;
-    }
     case 14:
       writer.u32(normalizeEnum(value, type, label));
       return;
@@ -596,22 +572,6 @@ function decodeValuePayload(reader, type) {
     case 9:
       value = reader.bytesValue();
       break;
-    case 10:
-    case 12: {
-      const len = reader.u32();
-      value = Array.from({ length: len }, () => reader.string());
-      break;
-    }
-    case 11: {
-      const len = reader.u32();
-      value = Array.from({ length: len }, () => reader.u32());
-      break;
-    }
-    case 13: {
-      const len = reader.u32();
-      value = Array.from({ length: len }, () => reader.string());
-      break;
-    }
     case 14:
       value = enumValue(type, reader.u32());
       break;
