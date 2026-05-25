@@ -267,6 +267,7 @@ async function smokeLanding(cdp, origin) {
         action: document.querySelector("#pet-action-display")?.textContent?.trim(),
         trace: document.querySelector("#pet-trace-display")?.textContent?.trim(),
         deviceMood: document.querySelector("#pet-device")?.dataset.mood,
+        deviceTrace: document.querySelector("#pet-device")?.dataset.trace,
         status: document.querySelector("#status")?.textContent?.trim()
       };
       if (state.mood === "hungry") {
@@ -284,6 +285,7 @@ async function smokeLanding(cdp, origin) {
     action: "ignore",
     trace: "happy -> hungry",
     deviceMood: "hungry",
+    deviceTrace: "happy,hungry",
     status: "Ready",
   });
 }

@@ -25,8 +25,11 @@ const demoTargets = [
       "Tamagotchi.nextState",
       "Tamagotchi.uiReset",
       "Tamagotchi.uiReset._boxed",
+      "Tamagotchi.uiResetFromDom",
       "Tamagotchi.uiStep",
       "Tamagotchi.uiStep._boxed",
+      "Tamagotchi.uiStepFromDom",
+      "Tamagotchi.uiStepFromDom._boxed",
     ],
   },
   {

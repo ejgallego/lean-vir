@@ -11,7 +11,7 @@ export const INTERFACE_MANIFEST_SHAPE_ERROR =
 
 const SUPPORTED_WIRE_TAGS = new Set([
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-  14, 15, 16, 17, 18, 19, 20, 21,
+  14, 15, 16, 17, 18, 19, 20, 21, 22,
 ]);
 
 function isRecord(value) {
@@ -293,7 +293,7 @@ export function manifestDiagnostics(manifest) {
 
 export function formatInterfaceType(type) {
   switch (type?.wireTag) {
-    case 21:
+    case 22:
       return "Unit";
     case 14:
       return type.type ?? "Enum";

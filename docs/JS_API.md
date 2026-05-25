@@ -137,6 +137,8 @@ The first library surface is:
 - `Lean.Vir.Browser.Document.setTextContent : @& String -> @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.getAttribute : @& String -> @& String -> IO (Option String)`
 - `Lean.Vir.Browser.Document.setAttribute : @& String -> @& String -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Document.getChecked : @& String -> IO Bool`
+- `Lean.Vir.Browser.Document.setChecked : @& String -> Bool -> IO Unit`
 
 The built-in `common.*` and `browser.*` targets do not require a `hostBindings`
 option:
@@ -152,12 +154,13 @@ console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 
 `Lean.Vir.Browser.Console.log` maps to `console.log`, title calls map to
 `document.title`, and selector-based document calls use `querySelector`,
-`textContent`, `getAttribute`, and `setAttribute` when the runtime is created
-in a browser. The browser runtime requires `globalThis.document` for
+`textContent`, `getAttribute`, `setAttribute`, and `HTMLInputElement.checked`
+when the runtime is created in a browser. The browser runtime requires
+`globalThis.document` for
 `browser.document.*` targets. In Node, use `lean-vir/vir-runtime-node` or pass
 explicit `hostBindings`; the Node wrapper provides virtual document state for
-title, text-content, and attribute calls. See MDN for the underlying browser
-APIs:
+title, text-content, attribute, and checked-property calls. See MDN for the
+underlying browser APIs:
 
 - [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
 - [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
@@ -165,6 +168,7 @@ APIs:
 - [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
 - [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
 - [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
+- [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
 
 Custom imports can be declared directly:
 

@@ -35,6 +35,15 @@ def Mood.label : Mood → String
   | asleep => "asleep"
   | dead => "dead"
 
+def Mood.fromString? : String → Option Mood
+  | "happy" => some happy
+  | "hungry" => some hungry
+  | "sleepy" => some sleepy
+  | "angry" => some angry
+  | "asleep" => some asleep
+  | "dead" => some dead
+  | _ => none
+
 def Action.label : Action → String
   | feed => "feed"
   | play => "play"
@@ -98,6 +107,15 @@ def traceLabel : List Mood → String
   | [mood] => mood.label
   | mood :: rest => mood.label ++ " -> " ++ traceLabel rest
 
+def traceAttr (trace : List Mood) : String :=
+  ",".intercalate (trace.map Mood.label)
+
+def traceFromAttr (attr : String) : List Mood :=
+  attr.splitOn "," |>.filterMap Mood.fromString?
+
+def artworkFromChecked (checked : Bool) : String :=
+  if checked then "octopus" else "pet"
+
 def artLabel (artwork : String) : String :=
   if artwork == "octopus" then "Octopus" else "Virtual pet"
 
@@ -108,14 +126,32 @@ def render (state : PetState) (actionLabel : String) : IO Unit := do
   Lean.Vir.Browser.Document.setTextContent "#pet-trace-display" (traceLabel state.trace)
   Lean.Vir.Browser.Document.setAttribute "#pet-device" "data-mood" moodLabel
   Lean.Vir.Browser.Document.setAttribute "#pet-device" "data-art" state.artwork
+  Lean.Vir.Browser.Document.setAttribute "#pet-device" "data-trace" (traceAttr state.trace)
   Lean.Vir.Browser.Document.setAttribute "#pet-device" "aria-label" s!"{artLabel state.artwork} mood {moodLabel}"
+  Lean.Vir.Browser.Document.setChecked "#pet-art-toggle" (state.artwork == "octopus")
   Lean.Vir.Browser.Document.setTextContent "#status" "Ready"
   Lean.Vir.Browser.Document.setAttribute "#status" "data-ready" "true"
+
+def stateFromDom : IO PetState := do
+  let currentAttr ← Lean.Vir.Browser.Document.getAttribute "#pet-device" "data-mood"
+  let traceAttrValue ← Lean.Vir.Browser.Document.getAttribute "#pet-device" "data-trace"
+  let checked ← Lean.Vir.Browser.Document.getChecked "#pet-art-toggle"
+  let current := currentAttr.bind Mood.fromString? |>.getD happy
+  let trace := traceAttrValue.map traceFromAttr |>.getD [current]
+  pure {
+    mood := current,
+    trace := if trace.isEmpty then [current] else trace,
+    artwork := artworkFromChecked checked
+  }
 
 def uiReset (artwork : String) : IO PetState := do
   let state := initialState artwork
   render state "..."
   pure state
+
+def uiResetFromDom : IO PetState := do
+  let checked ← Lean.Vir.Browser.Document.getChecked "#pet-art-toggle"
+  uiReset (artworkFromChecked checked)
 
 @[inline] def nextState (current : Mood) (trace : List Mood) (artwork : String) (action : Action) : PetState :=
   let mood := step current action
@@ -123,6 +159,12 @@ def uiReset (artwork : String) : IO PetState := do
 
 def uiStep (current : Mood) (trace : List Mood) (artwork : String) (action : Action) : IO PetState := do
   let next := nextState current trace artwork action
+  render next action.label
+  pure next
+
+def uiStepFromDom (action : Action) : IO PetState := do
+  let current ← stateFromDom
+  let next := nextState current.mood current.trace current.artwork action
   render next action.label
   pure next
 

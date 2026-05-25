@@ -634,6 +634,20 @@ public:
             }
             break;
         }
+        case 21: {
+            uint32_t variant_count = u32();
+            for (uint32_t i = 0; i < variant_count; i++) {
+                u32(); // object field count
+                u32(); // usize field count
+                u32(); // scalar byte size
+                u8();  // field layout tag
+                u32(); // object/usize index
+                u32(); // scalar size
+                u32(); // scalar offset
+                interface_type();
+            }
+            break;
+        }
         case 0:
         case 1:
         case 2:
@@ -646,7 +660,7 @@ public:
         case 9:
         case 14:
         case 15:
-        case 21:
+        case 22:
             break;
         default:
             fail("unsupported interface type tag " + std::to_string(tag));

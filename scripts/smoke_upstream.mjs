@@ -191,8 +191,8 @@ if (genericByteArrayScore !== "136") {
 }
 
 const hostRuntime = await createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
-if (hostRuntime.packageInfo.hostImports !== 4) {
-  throw new Error(`expected 4 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+if (hostRuntime.packageInfo.hostImports !== 7) {
+  throw new Error(`expected 7 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
 }
 const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
 if (hostTitle !== "Lean VIR host: smoke") {
@@ -206,6 +206,11 @@ if (petNext.mood !== "hungry" || petNext.trace.join(" -> ") !== "happy -> hungry
 const petStep = hostRuntime.call("Tamagotchi.uiStep", petReset.mood, petReset.trace, petReset.artwork, "ignore");
 if (petStep.mood !== "hungry" || petStep.trace.join(" -> ") !== "happy -> hungry") {
   throw new Error(`Lean Tamagotchi browser step failed: ${JSON.stringify(petStep)}`);
+}
+const petDomReset = hostRuntime.call("Tamagotchi.uiResetFromDom");
+const petDomStep = hostRuntime.call("Tamagotchi.uiStepFromDom", "ignore");
+if (petDomReset.mood !== "happy" || petDomStep.mood !== "hungry" || petDomStep.trace.join(" -> ") !== "happy -> hungry") {
+  throw new Error(`Lean Tamagotchi DOM-driven step failed: ${JSON.stringify({ petDomReset, petDomStep })}`);
 }
 
 let repeatedSortChecksum = 0;

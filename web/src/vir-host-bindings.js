@@ -43,6 +43,14 @@ export function createBrowserDocumentHostBindings() {
       }
       return undefined;
     },
+    "browser.document.getChecked": (selector) => queryDocumentElement(selector)?.checked === true,
+    "browser.document.setChecked": (selector, checked) => {
+      const element = queryDocumentElement(selector);
+      if (element) {
+        element.checked = checked;
+      }
+      return undefined;
+    },
   };
 }
 
@@ -81,6 +89,11 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       virtualElementState(state, selector).attributes.set(name, value);
       return undefined;
     },
+    "browser.document.getChecked": (selector) => virtualElementState(state, selector).checked === true,
+    "browser.document.setChecked": (selector, checked) => {
+      virtualElementState(state, selector).checked = checked;
+      return undefined;
+    },
   };
 }
 
@@ -108,7 +121,7 @@ function queryDocumentElement(selector) {
 function virtualElementState(state, selector) {
   let element = state.elements.get(selector);
   if (element === undefined) {
-    element = { textContent: "", attributes: new Map() };
+    element = { textContent: "", attributes: new Map(), checked: false };
     state.elements.set(selector, element);
   }
   return element;

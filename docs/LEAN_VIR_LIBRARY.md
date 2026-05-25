@@ -142,11 +142,14 @@ Node-like environments:
 - `Lean.Vir.Browser.Document.setTextContent : @& String -> @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.getAttribute : @& String -> @& String -> IO (Option String)`
 - `Lean.Vir.Browser.Document.setAttribute : @& String -> @& String -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Document.getChecked : @& String -> IO Bool`
+- `Lean.Vir.Browser.Document.setChecked : @& String -> Bool -> IO Unit`
 
 The browser runtime bindings use standard browser APIs and require
 `globalThis.document` for document calls. In non-browser runtimes, use
 `lean-vir/vir-runtime-node` or pass explicit `hostBindings`; the Node wrapper
-keeps virtual document state for title, text-content, and attribute APIs.
+keeps virtual document state for title, text-content, attribute, and
+checked-property APIs.
 
 External references:
 
@@ -156,6 +159,7 @@ External references:
 - [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
 - [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
 - [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
+- [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
 
 ## Example
 

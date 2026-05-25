@@ -1696,7 +1696,7 @@ static std::string name_to_string(object * value) {
 }
 
 enum class vir_wire_type : uint8_t {
-    Unit = 21,
+    Unit = 22,
     Nat = 0,
     Int = 1,
     Bool = 2,

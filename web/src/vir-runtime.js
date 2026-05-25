@@ -613,7 +613,7 @@ function decodeTypeDescriptor(reader) {
 function encodeValuePayload(writer, type, value, label) {
   const tag = requireWireTag(type, label);
   switch (tag) {
-    case 21:
+    case 22:
       if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
       return;
     case 0:
@@ -747,7 +747,7 @@ function decodeValuePayload(reader, type) {
   const expectedTag = requireWireTag(type, "result");
   let value;
   switch (expectedTag) {
-    case 21:
+    case 22:
       value = undefined;
       break;
     case 0:

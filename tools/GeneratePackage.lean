@@ -1597,7 +1597,7 @@ def InterfaceType.label : InterfaceType → String
   | .expr => "Lean.Expr"
 
 def InterfaceType.wireTag : InterfaceType → Nat
-  | .unit => 21
+  | .unit => 22
   | .nat => 0
   | .int => 1
   | .bool => 2
@@ -2466,13 +2466,36 @@ partial def emitInterfaceType (type : InterfaceType) : EmitM Unit := do
   | .prod fst snd =>
       emitInterfaceType fst
       emitInterfaceType snd
+  | .taggedUnion _ _ constructors =>
+      emitU32 constructors.size
+      constructors.forM fun (_, _, fieldType, layout, objectFields, usizeFields, scalarBytes) => do
+        emitU32 objectFields
+        emitU32 usizeFields
+        emitU32 scalarBytes
+        match layout with
+        | .object index =>
+            emitU8 0
+            emitU32 index
+            emitU32 0
+            emitU32 0
+        | .usize index =>
+            emitU8 1
+            emitU32 index
+            emitU32 0
+            emitU32 0
+        | .scalar size offset =>
+            emitU8 2
+            emitU32 0
+            emitU32 size
+            emitU32 offset
+        emitInterfaceType fieldType
   | .structure _ _ trivialField? objectFields usizeFields scalarBytes fields =>
       emitU32 objectFields
       emitU32 usizeFields
       emitU32 scalarBytes
       emitU32 (trivialField?.getD 0xffffffff)
       emitU32 fields.size
-      fields.forM fun (_, fieldType, layout) => do
+      fields.forM fun (_, fieldType, layout, _) => do
         match layout with
         | .object index =>
             emitU8 0

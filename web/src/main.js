@@ -17,11 +17,8 @@ import fixtureBoundarySource from "../../fixtures/Boundary.lean?raw";
 import fixtureManifest from "../../fixtures/manifest.json";
 
 const statusEl = document.querySelector("#status");
-const petDevice = document.querySelector("#pet-device");
 const petArtToggle = document.querySelector("#pet-art-toggle");
 const petMoodDisplay = document.querySelector("#pet-mood-display");
-const petActionDisplay = document.querySelector("#pet-action-display");
-const petTraceDisplay = document.querySelector("#pet-trace-display");
 const petActionButtons = document.querySelectorAll("[data-action]");
 const petResetButton = document.querySelector("#pet-reset-button");
 const wasmTarget = document.querySelector("#wasm-target");
@@ -54,7 +51,6 @@ const maxSortValue = 9999;
 const wasmFile = "vir-upstream.wasm";
 const irPackageFile = "vir-demo.irpkg";
 const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
-const moods = ["happy", "hungry", "sleepy", "angry", "asleep", "dead"];
 const actions = ["feed", "play", "nap", "wake", "ignore"];
 const sourceFiles = [
   { path: "examples/Fib.lean", source: fibSource },
@@ -128,15 +124,11 @@ let irPackageBytesPromise = null;
 let runtime = null;
 let currentFixtureFilter = "all";
 let selectedFixtureId = null;
-let petMood = "happy";
-let petTrace = [petMood];
-let petArtwork = petArtToggle.checked ? "octopus" : "pet";
 
 function applyPetState(state) {
-  petMood = moods.includes(state?.mood) ? state.mood : "happy";
-  petTrace = Array.isArray(state?.trace) ? state.trace : [petMood];
-  petArtwork = typeof state?.artwork === "string" ? state.artwork : petArtwork;
-  petArtToggle.checked = petArtwork === "octopus";
+  if (typeof state?.artwork === "string") {
+    petArtToggle.checked = state.artwork === "octopus";
+  }
 }
 
 function demoPackageBytes() {
@@ -169,19 +161,10 @@ function setTrap(error) {
   console.error(error);
 }
 
-function renderPet() {
-  const mood = moods.includes(petMood) ? petMood : "?";
-  petMoodDisplay.textContent = mood;
-  petDevice.dataset.mood = mood;
-  petDevice.dataset.art = petArtwork;
-  petDevice.setAttribute("aria-label", `${petArtwork === "octopus" ? "Octopus" : "Virtual pet"} mood ${mood}`);
-  petTraceDisplay.textContent = petTrace.map((mood) => moods.includes(mood) ? mood : "?").join(" -> ");
-}
-
 function stepPet(runtime, actionName) {
   if (!actions.includes(actionName)) return;
   try {
-    applyPetState(runtime.call("Tamagotchi.uiStep", petMood, petTrace, petArtwork, actionName));
+    applyPetState(runtime.call("Tamagotchi.uiStepFromDom", actionName));
     setReady();
   } catch (error) {
     petMoodDisplay.textContent = "error";
@@ -190,16 +173,9 @@ function stepPet(runtime, actionName) {
 }
 
 function resetPet() {
-  if (runtime === null) {
-    petMood = "happy";
-    petTrace = [petMood];
-    petActionDisplay.textContent = "...";
-    renderPet();
-    setReady();
-    return;
-  }
+  if (runtime === null) return;
   try {
-    applyPetState(runtime.call("Tamagotchi.uiReset", petArtwork));
+    applyPetState(runtime.call("Tamagotchi.uiResetFromDom"));
     setReady();
   } catch (error) {
     petMoodDisplay.textContent = "error";
@@ -481,7 +457,6 @@ fixtureRunSelectedButton.addEventListener("click", () => {
   }
 });
 petArtToggle.addEventListener("change", () => {
-  petArtwork = petArtToggle.checked ? "octopus" : "pet";
   resetPet();
 });
 
