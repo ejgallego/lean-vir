@@ -102,8 +102,9 @@ Supported v1 types:
 - recursive `Array α`, `List α`, `Option α`, and `α × β` shapes over
   supported types;
 - non-indexed user-defined structures over manifest-supported fields, including
-  parameterized instances and direct scalar fields, represented as JavaScript
-  objects keyed by Lean field name;
+  parameterized instances, direct scalar fields, and inherited parent fields,
+  represented as JavaScript objects with parent fields flattened into ordinary
+  keys;
 - nullary inductive enums;
 - `Lean.Expr`.
 

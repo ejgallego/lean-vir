@@ -513,6 +513,21 @@ try {
   "value": "42"
 }`,
     }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.extendedProfileBump", {
+      input: `{"nickname":"","active":false,"visits":0,"score":0,"tags":[]}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"nickname":"lean","active":true,"visits":5,"score":7,"tags":["ir"]}`],
+      result: `{
+  "nickname": "lean!",
+  "active": false,
+  "visits": 6,
+  "score": "8",
+  "tags": [
+    "ir",
+    "extended"
+  ]
+}`,
+    }),
   ];
 
   for (const { url, expected } of runnerCases) {

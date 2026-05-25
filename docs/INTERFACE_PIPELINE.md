@@ -92,8 +92,8 @@ The embedded manifest currently supports:
   `α` and `β`;
 - non-indexed user-defined structures over manifest-supported fields, including
   parameterized instances such as `Box Nat` and `Tagged (Array String)`,
-  direct `Bool`, `UInt*`, `USize`, and enum fields, represented as JavaScript
-  objects;
+  direct `Bool`, `UInt*`, `USize`, and enum fields, and inherited parent fields
+  represented as flattened JavaScript object keys;
 - nullary inductive enums, represented in JavaScript by generated constructor
   names;
 - `Lean.Expr`, represented as structural JavaScript objects.
@@ -105,6 +105,9 @@ For structures, the manifest records Lean constructor layout metadata alongside
 the applied Lean type label, field names, and instantiated field types. The JS
 runtime sends that layout to the WASM shim so direct scalar fields are written
 to the same object, `USize`, and scalar slots that compiled Lean code expects.
+Parent structure fields remain explicit subobjects in the manifest so the
+runtime layout matches Lean, but the JS API accepts and returns inherited fields
+as flattened object keys.
 One-field wrappers whose only runtime field is a direct scalar, for example
 `Box UInt32`, are rejected during package generation until that boxed-boundary
 shape is modeled explicitly.

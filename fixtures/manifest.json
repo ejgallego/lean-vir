@@ -300,7 +300,9 @@
         "Vir.Fixtures.InterfaceShapes.taggedArrayScore",
         "Vir.Fixtures.InterfaceShapes.taggedProfileBump",
         "Vir.Fixtures.InterfaceShapes.meteredBoxBump",
-        "Vir.Fixtures.InterfaceShapes.boxExprKindScore"
+        "Vir.Fixtures.InterfaceShapes.boxExprKindScore",
+        "Vir.Fixtures.InterfaceShapes.extendedProfileBump",
+        "Vir.Fixtures.InterfaceShapes.extendedProfileScore"
       ],
       "result": { "type": "Nat" }
     },

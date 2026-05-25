@@ -644,6 +644,7 @@ function decodeValuePayload(reader, type) {
       for (const field of requireStructureFields(type, "result")) {
         value[field.name] = decodeValuePayload(reader, field.type);
       }
+      value = flattenStructureSubobjects(type, value);
       break;
     }
     default:
@@ -852,12 +853,52 @@ function normalizeStructure(value, fields, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be an object`);
   }
+  const normalized = {};
   for (const field of fields) {
-    if (!hasOwn(value, field.name)) {
+    if (hasOwn(value, field.name)) {
+      if (field.subobject === true && flattenedSubobjectFieldsPresent(value, field.type)) {
+        throw new Error(`${label} mixes ${field.name} with flattened inherited fields`);
+      }
+      normalized[field.name] = value[field.name];
+    } else if (field.subobject === true) {
+      normalized[field.name] = normalizeStructure(
+        value,
+        requireStructureFields(field.type, `${label}.${field.name}`),
+        `${label}.${field.name}`,
+      );
+    } else {
       throw new Error(`${label} is missing field ${field.name}`);
     }
   }
-  return value;
+  return normalized;
+}
+
+function flattenStructureSubobjects(type, value) {
+  const fields = requireStructureFields(type, "result");
+  const flattened = {};
+  for (const field of fields) {
+    if (field.subobject === true) {
+      const subobject = value[field.name];
+      if (subobject === null || typeof subobject !== "object" || Array.isArray(subobject)) {
+        throw new Error(`result.${field.name} subobject must decode to an object`);
+      }
+      Object.assign(flattened, subobject);
+    } else {
+      flattened[field.name] = value[field.name];
+    }
+  }
+  return flattened;
+}
+
+function flattenedSubobjectFieldsPresent(value, type) {
+  for (const field of requireStructureFields(type, "subobject")) {
+    if (field.subobject === true) {
+      if (flattenedSubobjectFieldsPresent(value, field.type)) return true;
+    } else if (hasOwn(value, field.name)) {
+      return true;
+    }
+  }
+  return false;
 }
 
 function normalizeEnum(value, type, label) {

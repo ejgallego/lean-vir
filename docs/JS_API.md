@@ -78,10 +78,11 @@ Options are accepted as `null`, `{ kind: "none" }`, `{ kind: "some", value }`,
 two-element arrays, and results are returned as `{ fst, snd }`. Non-indexed
 structures, including parameterized instances like `Box Nat` and
 `Tagged (Array String)`, are accepted and returned as objects keyed by their
-Lean field names; direct `Bool`, `UInt*`, `USize`, and enum fields use the same
-JS values as standalone arguments/results. These shapes can be nested, for
-example `Option (Array Nat)`, `List (Nat × String)`, a structure containing
-another structure, and `Array Lean.Expr`.
+Lean field names; inherited parent fields are accepted and returned as flattened
+object keys. Direct `Bool`, `UInt*`, `USize`, and enum fields use the same JS
+values as standalone arguments/results. These shapes can be nested, for example
+`Option (Array Nat)`, `List (Nat × String)`, a structure containing another
+structure, and `Array Lean.Expr`.
 
 `Lean.Expr` values use structural JavaScript objects such as
 `{ kind: "const", name: "Nat", levels: [] }`,

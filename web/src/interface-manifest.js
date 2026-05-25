@@ -171,9 +171,21 @@ function validateStructureType(type, label) {
     }
     requireString(field.name, `${fieldLabel}.name`);
     requireUnique(names, field.name, `${fieldLabel}.name`);
+    if (field.subobject !== undefined && typeof field.subobject !== "boolean") {
+      throw new Error(`${fieldLabel}.subobject must be a boolean`);
+    }
     validateStructureFieldLayout(field.layout, type, `${fieldLabel}.layout`);
     validateInterfaceType(field.type, `${fieldLabel}.type`);
+    if (field.subobject === true) {
+      if (field.type?.wireTag !== 20) {
+        throw new Error(`${fieldLabel}.subobject field type must be a structure`);
+      }
+      if (field.layout?.kind !== "object") {
+        throw new Error(`${fieldLabel}.subobject field layout must be object`);
+      }
+    }
   });
+  validateFlattenedStructureFields(type, label);
 }
 
 function validateStructureFieldLayout(layout, structureType, label) {
@@ -204,6 +216,39 @@ function validateStructureFieldLayout(layout, structureType, label) {
     default:
       throw new Error(`${label}.kind is not supported`);
   }
+}
+
+function validateFlattenedStructureFields(type, label) {
+  const names = new Set();
+  type.fields.forEach((field, index) => {
+    const fieldLabel = `${label}.fields[${index}]`;
+    if (field.subobject === true) {
+      for (const name of flattenedStructureFieldNames(field.type)) {
+        requireUniqueStructureField(names, name, `${fieldLabel}.subobject.${name}`);
+      }
+    } else {
+      requireUniqueStructureField(names, field.name, `${fieldLabel}.name`);
+    }
+  });
+}
+
+function flattenedStructureFieldNames(type) {
+  const names = [];
+  for (const field of type?.fields ?? []) {
+    if (field.subobject === true) {
+      names.push(...flattenedStructureFieldNames(field.type));
+    } else {
+      names.push(field.name);
+    }
+  }
+  return names;
+}
+
+function requireUniqueStructureField(seen, value, label) {
+  if (seen.has(value)) {
+    throw new Error(`${label} duplicates another flattened structure field`);
+  }
+  seen.add(value);
 }
 
 export function manifestDiagnostics(manifest) {

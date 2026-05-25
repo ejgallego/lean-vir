@@ -79,7 +79,7 @@ inductive InterfaceType where
   | simpleEnum (name : Name) (constructors : Array Name)
   | structure (name : Name) (label : String) (trivialField? : Option Nat)
       (objectFields usizeFields scalarBytes : Nat)
-      (fields : Array (String × InterfaceType × StructureFieldLayout))
+      (fields : Array (String × InterfaceType × StructureFieldLayout × Bool))
   | expr
   deriving BEq, Repr
 
@@ -1645,11 +1645,12 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ "\"constructors\":" ++ jsonArray ctorJson
       ++ "}"
   | .structure name _ trivialField? objectFields usizeFields scalarBytes fields =>
-      let fieldJson := fields.map fun (fieldName, fieldType, fieldLayout) =>
+      let fieldJson := fields.map fun (fieldName, fieldType, fieldLayout, isSubobject) =>
         "{"
         ++ "\"name\":" ++ jsonString fieldName ++ ","
         ++ "\"type\":" ++ fieldType.toJson ++ ","
         ++ "\"layout\":" ++ fieldLayout.toJson
+        ++ (if isSubobject then ",\"subobject\":true" else "")
         ++ "}"
       let trivialFieldJson :=
         match trivialField? with
@@ -1783,8 +1784,6 @@ partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : Cor
       return .error s!"recursive structure `{name}` is not supported"
     else if indInfo.ctors.length != 1 then
       return .error s!"structure `{name}` must have exactly one constructor"
-    else if !structInfo.parentInfo.isEmpty then
-      return .error s!"structure `{name}` with parent fields is not supported"
     else if structInfo.fieldNames.isEmpty then
       return .error s!"empty structure `{name}` is not supported"
     else
@@ -1802,6 +1801,7 @@ partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : Cor
       let mut fields := #[]
       for h : idx in *...structInfo.fieldNames.size do
         let fieldName := structInfo.fieldNames[idx]
+        let isSubobject := (isSubobjectField? env name fieldName).isSome
         let some fieldLayout := structureFieldLayout? layout.fieldInfo[idx]!
           | return .error s!"field `{fieldName}` of structure `{name}` has erased or void runtime layout"
         let some projName := structInfo.getProjFn? idx
@@ -1812,13 +1812,13 @@ partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : Cor
           | return .error s!"field `{fieldName}` of structure `{name}` has invalid projection type `{info.type}`"
         match ← interfaceType fieldExpr nextSeen with
         | .ok fieldType =>
-            fields := fields.push (fieldName.toString, fieldType, fieldLayout)
+            fields := fields.push (fieldName.toString, fieldType, fieldLayout, isSubobject)
         | .error reason =>
             return .error s!"field `{fieldName}` of structure `{name}` has unsupported type `{fieldExpr}`: {reason}"
       match trivialField? with
       | some idx =>
           match fields[idx]? with
-          | some (fieldName, fieldType, _) =>
+          | some (fieldName, fieldType, _, _) =>
               if fieldType.hasDirectScalarRuntime then
                 return .error s!"single-field structure `{name}` with direct scalar field `{fieldName}` is not supported at the boxed interpreter boundary"
           | none => pure ()

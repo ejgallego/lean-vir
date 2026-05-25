@@ -98,6 +98,15 @@ structure Metered (α : Type) where
   count : UInt32
   payload : α
 
+structure ProfileBase where
+  nickname : String
+  active : Bool
+  visits : UInt32
+
+structure ExtendedProfile extends ProfileBase where
+  score : Nat
+  tags : Array String
+
 def profileBump (profile : Profile) : Profile :=
   { profile with
     nickname := profile.nickname ++ "!"
@@ -167,6 +176,21 @@ def boxExprKindScore (box : Box Expr) : Nat :=
   | .lit (.natVal n) => n + 20
   | _ => 100
 
+def extendedProfileBump (profile : ExtendedProfile) : ExtendedProfile :=
+  { profile with
+    nickname := profile.nickname ++ "!"
+    active := !profile.active
+    visits := profile.visits + 1
+    score := profile.score + profile.tags.size
+    tags := profile.tags.push "extended" }
+
+def extendedProfileScore (profile : ExtendedProfile) : Nat :=
+  profile.nickname.length
+    + (if profile.active then 100 else 0)
+    + profile.visits.toNat
+    + profile.score
+    + profile.tags.foldl (fun acc tag => acc + tag.length) 0
+
 def interfaceShapeScore : Nat :=
   arrayStringTotalLength #["a", "bc"]
     + listUInt32Sum [1, 2, 3]
@@ -190,5 +214,12 @@ def interfaceShapeScore : Nat :=
     + taggedArrayScore { label := "tags", payload := #["a", "bc"] }
     + (meteredBoxBump { active := true, count := 3, payload := { value := 4 } }).payload.value
     + boxExprKindScore { value := .bvar 2 }
+    + extendedProfileScore {
+      nickname := "lean",
+      active := true,
+      visits := 5,
+      score := 7,
+      tags := #["ir"]
+    }
 
 end Vir.Fixtures.InterfaceShapes

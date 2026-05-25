@@ -124,12 +124,24 @@ function defaultValueForType(type) {
         snd: defaultValueForType(type?.snd),
       };
     case 20:
-      return Object.fromEntries((type?.fields ?? []).map((field) => [field.name, defaultValueForType(field.type)]));
+      return defaultStructureValue(type);
     case 14:
       return type?.constructors?.[0]?.jsName ?? "";
     default:
       return "";
   }
+}
+
+function defaultStructureValue(type) {
+  const value = {};
+  for (const field of type?.fields ?? []) {
+    if (field.subobject === true) {
+      Object.assign(value, defaultValueForType(field.type));
+    } else {
+      value[field.name] = defaultValueForType(field.type);
+    }
+  }
+  return value;
 }
 
 function isJsonInputTag(tag) {

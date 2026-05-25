@@ -184,6 +184,45 @@ assertInvalidManifest((manifest) => {
 assertInvalidManifest((manifest) => {
   manifest.exports.push(structuredClone(manifest.exports[0]));
 }, /entry duplicates another interface export/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Child",
+    wireTag: 20,
+    kind: "structure",
+    name: "Child",
+    objectFieldCount: 2,
+    usizeFieldCount: 0,
+    scalarByteSize: 0,
+    fields: [
+      {
+        name: "toParent",
+        subobject: true,
+        type: {
+          type: "Parent",
+          wireTag: 20,
+          kind: "structure",
+          name: "Parent",
+          objectFieldCount: 1,
+          usizeFieldCount: 0,
+          scalarByteSize: 0,
+          fields: [
+            {
+              name: "value",
+              type: { type: "Nat", wireTag: 0 },
+              layout: { kind: "object", index: 0 },
+            },
+          ],
+        },
+        layout: { kind: "object", index: 0 },
+      },
+      {
+        name: "value",
+        type: { type: "Nat", wireTag: 0 },
+        layout: { kind: "object", index: 1 },
+      },
+    ],
+  };
+}, /fields\[1\]\.name duplicates another flattened structure field/);
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
 
@@ -429,6 +468,35 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.meteredBoxBump", {
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.boxExprKindScore", {
   value: { kind: "const", name: "Nat", levels: [] },
 }), "10");
+const extendedProfileInput = {
+  nickname: "lean",
+  active: true,
+  visits: 5,
+  score: 7,
+  tags: ["ir"],
+};
+const extendedProfileEntry = runtime.interfaceManifest.exports.find(
+  (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.extendedProfileBump",
+);
+assert.deepEqual(
+  extendedProfileEntry.args[0].type.fields.map((field) => [field.name, field.subobject === true]),
+  [["toProfileBase", true], ["score", false], ["tags", false]],
+);
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.extendedProfileBump", extendedProfileInput), {
+  nickname: "lean!",
+  active: false,
+  visits: 6,
+  score: "8",
+  tags: ["ir", "extended"],
+});
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.extendedProfileScore", extendedProfileInput), "118");
+assert.throws(
+  () => runtime.call("Vir.Fixtures.InterfaceShapes.extendedProfileScore", {
+    toProfileBase: { nickname: "nested", active: true, visits: 1 },
+    ...extendedProfileInput,
+  }),
+  /mixes toProfileBase with flattened inherited fields/,
+);
 assert.throws(
   () => runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
     nickname: "lean",
@@ -620,12 +688,6 @@ try {
     "structure ScalarBox (α : Type) where",
     "  value : α",
     "",
-    "structure ParentBase where",
-    "  base : Nat",
-    "",
-    "structure ChildBox extends ParentBase where",
-    "  extra : Nat",
-    "",
     "structure RecursiveBox where",
     "  next : Option RecursiveBox",
     "",
@@ -634,7 +696,6 @@ try {
     "",
     "def badCounterIdentity (box : BadCounter) : BadCounter := box",
     "def scalarBoxUInt32Identity (box : ScalarBox UInt32) : ScalarBox UInt32 := box",
-    "def childBoxIdentity (box : ChildBox) : ChildBox := box",
     "def recursiveBoxIdentity (box : RecursiveBox) : RecursiveBox := box",
     "def indexedBoxIdentity (box : IndexedBox 3) : IndexedBox 3 := box",
     "def implicitBump {offset : Nat} (n : Nat) : Nat := n + offset",
@@ -644,8 +705,6 @@ try {
     /field `callback`/,
     /scalarBoxUInt32Identity/,
     /single-field structure `ScalarBox` with direct scalar field `value`/,
-    /childBoxIdentity/,
-    /structure `ChildBox` with parent fields is not supported/,
     /recursiveBoxIdentity/,
     /recursive structure `RecursiveBox` is not supported/,
     /indexedBoxIdentity/,

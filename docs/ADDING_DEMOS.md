@@ -80,7 +80,8 @@ should fail during package generation until their interface type is implemented.
 
 The current generic interface covers primitive scalars, byte arrays, recursive
 `Array`/`List`/`Option`/`Prod` shapes, non-indexed user-defined structures
-including parameterized instances, nullary inductive enums, and structural
-`Lean.Expr` values. For enums, no per-demo code is needed: the generator records
-the constructor list in the package manifest and `/dev.html` renders a select
-control from that manifest after the package is loaded.
+including parameterized instances and inherited parent fields, nullary inductive
+enums, and structural `Lean.Expr` values. For enums, no per-demo code is needed:
+the generator records the constructor list in the package manifest and
+`/dev.html` renders a select control from that manifest after the package is
+loaded.
