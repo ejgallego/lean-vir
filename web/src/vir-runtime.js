@@ -378,6 +378,19 @@ function encodeValue(writer, type, value, label) {
   encodeValuePayload(writer, type, value, label);
 }
 
+export function roundTripInterfaceTypeDescriptor(type, label = "interface type") {
+  const writer = new BinaryWriter();
+  encodeTypeDescriptor(writer, type, label);
+  const reader = new BinaryReader(writer.take());
+  const decoded = decodeTypeDescriptor(reader);
+  reader.requireEnd();
+  return decoded;
+}
+
+export function sameInterfaceWireType(expected, actual) {
+  return sameWireType(expected, actual);
+}
+
 function encodeTypeDescriptor(writer, type, label) {
   const tag = requireWireTag(type, label);
   writer.u8(tag);

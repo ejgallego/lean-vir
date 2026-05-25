@@ -61,8 +61,9 @@ const second = await factory.createRuntime({ irPackageBytes });
 
 Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `UInt8`, `UInt16`,
 `UInt32`, `UInt64`, `USize`, `ByteArray`, recursive `Array α`, `List α`,
-`Option α`, and `α × β` shapes over supported types, plain user-defined
-structures, nullary inductive enums, and `Lean.Expr`.
+`Option α`, and `α × β` shapes over supported types, non-indexed
+user-defined structures including parameterized instances, nullary inductive
+enums, and `Lean.Expr`.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`.
@@ -88,6 +89,11 @@ another structure, and `Array Lean.Expr`.
 the same shape with `kind` values `zero`, `succ`, `max`, `imax`, `param`, and
 `mvar`. Metadata expression inputs are accepted by decoding their inner
 expression; metadata results preserve a structural `mdata` wrapper.
+
+Package loading validates the embedded interface manifest before any generated
+entry is exposed. Malformed type trees, invalid structure layouts, unsupported
+wire tags, duplicate export names, and bad enum constructor metadata are
+reported as package-load errors.
 
 ## Generate A Local Package
 

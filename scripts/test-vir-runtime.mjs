@@ -11,7 +11,55 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { createVirRuntime as createExportedVirRuntime } from "lean-vir";
-import { createVirRuntime, createVirRuntimeFactory } from "../web/src/vir-runtime.js";
+import {
+  createVirRuntime,
+  createVirRuntimeFactory,
+  roundTripInterfaceTypeDescriptor,
+  sameInterfaceWireType,
+} from "../web/src/vir-runtime.js";
+import {
+  INTERFACE_MANIFEST_ARTIFACT,
+  validateInterfaceManifest,
+} from "../web/src/interface-manifest.js";
+
+function assertManifestTypeDescriptorsRoundTrip(manifest) {
+  for (const entry of manifest.exports) {
+    for (const arg of entry.args) {
+      const decoded = roundTripInterfaceTypeDescriptor(arg.type, `${entry.entry} argument ${arg.name}`);
+      assert.ok(
+        sameInterfaceWireType(arg.type, decoded),
+        `${entry.entry} argument ${arg.name} descriptor should round-trip`,
+      );
+    }
+    const decoded = roundTripInterfaceTypeDescriptor(entry.result, `${entry.entry} result`);
+    assert.ok(
+      sameInterfaceWireType(entry.result, decoded),
+      `${entry.entry} result descriptor should round-trip`,
+    );
+  }
+}
+
+const validManifestShape = {
+  artifact: INTERFACE_MANIFEST_ARTIFACT,
+  version: 1,
+  metadata: {},
+  exports: [
+    {
+      id: "ok",
+      jsName: "ok",
+      entry: "ok",
+      source: "Ok.lean",
+      args: [{ name: "arg1", type: { type: "Nat", wireTag: 0 } }],
+      result: { type: "Nat", wireTag: 0 },
+    },
+  ],
+};
+
+function assertInvalidManifest(mutator, pattern) {
+  const manifest = structuredClone(validManifestShape);
+  mutator(manifest);
+  assert.throws(() => validateInterfaceManifest(manifest), pattern);
+}
 
 const wasmBytes = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const irPackageBytes = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
@@ -30,6 +78,86 @@ assert.match(runtime.packageMetadata.leanToolchain, /leanprover\/lean4/);
 assert.ok(runtime.packageMetadata.generatedAt.length > 0);
 assert.ok(runtime.packageMetadata.targets.some((target) => target.source === "examples/Fib.lean"));
 assert.ok(runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib"));
+assertManifestTypeDescriptorsRoundTrip(runtime.interfaceManifest);
+assert.equal(validateInterfaceManifest(structuredClone(validManifestShape)).exports[0].entry, "ok");
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = { type: "LegacyNatArray", wireTag: 10 };
+}, /result\.wireTag is not supported/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].args[0].type = { type: "Array Nat", wireTag: 16 };
+}, /args\[0\]\.type\.element must be an object/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Mode",
+    wireTag: 14,
+    kind: "simpleEnum",
+    constructors: [
+      { name: "Mode.cold", jsName: "cold", tag: 0 },
+      { name: "Mode.hot", jsName: "hot", tag: 2 },
+    ],
+  };
+}, /constructors\[1\]\.tag must be 1/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Box Nat",
+    wireTag: 20,
+    kind: "structure",
+    name: "Box",
+    objectFieldCount: 1,
+    usizeFieldCount: 0,
+    scalarByteSize: 0,
+    trivialFieldIndex: 1,
+    fields: [
+      {
+        name: "value",
+        type: { type: "Nat", wireTag: 0 },
+        layout: { kind: "object", index: 0 },
+      },
+    ],
+  };
+}, /trivialFieldIndex is out of range/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Box Nat",
+    wireTag: 20,
+    kind: "structure",
+    name: "Box",
+    objectFieldCount: 0,
+    usizeFieldCount: 0,
+    scalarByteSize: 0,
+    fields: [
+      {
+        name: "value",
+        type: { type: "Nat", wireTag: 0 },
+        layout: { kind: "object", index: 0 },
+      },
+    ],
+  };
+}, /layout\.index is outside objectFieldCount/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "ScalarBox",
+    wireTag: 20,
+    kind: "structure",
+    name: "ScalarBox",
+    objectFieldCount: 0,
+    usizeFieldCount: 0,
+    scalarByteSize: 1,
+    fields: [
+      {
+        name: "flag",
+        type: { type: "Bool", wireTag: 2 },
+        layout: { kind: "scalar", size: 1, offset: 1 },
+      },
+    ],
+  };
+}, /layout is outside scalarByteSize/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].args[0].type.type = "";
+}, /args\[0\]\.type\.type must be a non-empty string/);
+assertInvalidManifest((manifest) => {
+  manifest.exports.push(structuredClone(manifest.exports[0]));
+}, /entry duplicates another interface export/);
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
 
@@ -389,6 +517,7 @@ try {
   assert.equal(freshManifest.metadata.targets[0].mode, "all");
   assert.deepEqual(freshManifest.metadata.targets[0].roots, []);
   assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"));
+  assertManifestTypeDescriptorsRoundTrip(freshManifest);
 
   const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
   assert.deepEqual(freshEntries, [

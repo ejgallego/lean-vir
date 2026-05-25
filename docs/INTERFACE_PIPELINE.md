@@ -113,6 +113,14 @@ The recursive type tree is embedded in the JSON manifest and sent as a compact
 internal descriptor in each `vir_call` payload. This is intentionally still an
 internal package ABI, not a committed component-model boundary.
 
+Package loading validates every exported argument/result type before exposing
+the manifest to the UI or JS caller. The validator rejects unsupported wire
+tags, malformed recursive children, invalid enum constructors, inconsistent
+structure field layouts, bad `trivialFieldIndex` values, and duplicate export
+names. Runtime tests also round-trip every generated export type through the
+compact descriptor encoder/decoder so descriptor drift fails before a call
+enters WASM.
+
 ## WIT Direction
 
 WIT is still the right interface-description model to track, but not yet the
