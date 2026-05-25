@@ -13,6 +13,84 @@ Package generation commands run that step automatically and add
 `build/lean-lib` to `LEAN_PATH`, so local `.lean` sources can import the
 modules below.
 
+## User Workflow
+
+For the built-in browser and common host imports, the Lean code is the only
+piece users need to write. The JavaScript runtime already provides default
+bindings for `common.*` and `browser.*` targets.
+
+1. Import the Lean module that provides the host import.
+
+   ```lean
+   import Lean.Vir.Browser
+   ```
+
+2. Write an exported Lean declaration that calls the host import.
+
+   ```lean
+   def titleHandshake (label : String) : IO String := do
+     let title := "Lean VIR host: " ++ label
+     Lean.Vir.Browser.Document.setTitle title
+     Lean.Vir.Browser.Document.getTitle
+   ```
+
+3. Generate a package with that declaration as a root.
+
+   ```bash
+   npm run generate:irpkg -- MyDemo.lean web/public/my-demo.irpkg titleHandshake
+   ```
+
+   The command builds `Lean.Vir.*`, adds `build/lean-lib` to `LEAN_PATH`, writes
+   the `.irpkg`, and writes a report next to it. The report should list the
+   JavaScript host imports collected from the package.
+
+4. Load the package in `/dev.html`. If it was written under `web/public/`, use a
+   package URL. Otherwise, upload the generated `.irpkg` from the page.
+
+   ```text
+   dev.html?package=my-demo.irpkg&entry=titleHandshake
+   ```
+
+For custom JavaScript functions, declare the host import in Lean and bind the
+same target string in JavaScript.
+
+```lean
+import Lean.Vir.Host
+
+@[vir_js "demo.bumpNat"]
+opaque jsBumpNat (n : Nat) : Nat
+
+def bumpViaJs (n : Nat) : Nat :=
+  jsBumpNat n
+```
+
+Generate a package with `bumpViaJs` as a root:
+
+```bash
+npm run generate:irpkg -- MyCustom.lean web/public/custom.irpkg bumpViaJs
+```
+
+Then provide the matching JavaScript binding when creating the runtime:
+
+```js
+const vir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "custom.irpkg",
+  hostBindings: {
+    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
+  },
+});
+
+vir.call("bumpViaJs", 41);
+```
+
+When checking a Lean file outside package generation, use the same library path:
+
+```bash
+npm run build:lean-lib
+LEAN_PATH="build/lean-lib${LEAN_PATH:+:$LEAN_PATH}" lean MyDemo.lean
+```
+
 ## Modules
 
 `Lean.Vir.Host` provides the low-level `@[vir_js "..."]` attribute.
@@ -104,3 +182,16 @@ dispatches them through `env.vir_js_call`.
 
 This keeps general native symbol lookup closed while allowing declarations in a
 package to call explicitly declared JavaScript bindings.
+
+## Troubleshooting
+
+If package generation fails, inspect the generated report:
+
+- `JavaScript Host Imports` should list the imported declarations and targets.
+- `Interface Diagnostics` points out unsupported argument or result types.
+- `Missing Native Extern Registrations` is unrelated to `@[vir_js]`; it means
+  the normal Lean IR closure reached an unsupported native runtime primitive.
+
+If a host import is missing at runtime, check that the manifest target string
+matches the key in `hostBindings`. If a binding returns a `Promise`, the v1
+runtime rejects the call because host imports are synchronous.

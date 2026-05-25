@@ -9,13 +9,32 @@ import Lean.Compiler.ExternAttr
 
 open Lean
 
+/--
+Marks an opaque Lean declaration as a JavaScript host import for VIR package
+generation.
+
+The string parameter is the JavaScript target name that the VIR runtime resolves
+through `hostBindings`, for example:
+
+```lean
+@[vir_js "demo.bumpNat"]
+opaque jsBumpNat (n : Nat) : Nat
+```
+
+The declaration is not implemented by Lean itself. It is callable when the
+declaration is packaged into a `.irpkg` and executed through the VIR JavaScript
+runtime.
+-/
 syntax (name := vir_js) "vir_js " str : attr
 
 namespace Lean.Vir
 
+/-- Prefix used internally to encode `@[vir_js]` targets in Lean extern metadata. -/
 def jsExternPrefix : String := "__vir_js:"
 
+/-- Metadata stored for a declaration marked with `@[vir_js]`. -/
 structure JsImport where
+  /-- JavaScript host target name, such as `"browser.document.getTitle"`. -/
   target : String
   deriving Inhabited
 
@@ -50,6 +69,10 @@ initialize virJsAttr : ParametricAttribute Lean.Vir.JsImport ←
 
 namespace Lean.Vir
 
+/--
+Returns the JavaScript host import metadata for `declName`, if the declaration
+was marked with `@[vir_js]` in `env`.
+-/
 def getJsImport? (env : Environment) (declName : Name) : Option JsImport :=
   _root_.virJsAttr.getParam? env declName
 
