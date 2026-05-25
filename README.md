@@ -15,8 +15,10 @@ runtime subset, and serves generated artifacts:
 
 ## Browser Demo
 
-The browser page keeps `Tamagotchi.step` as the main interactive demo, driven
-one action at a time through the upstream interpreter.
+The browser page keeps Tamagotchi as the main interactive demo. Button events
+still originate in JavaScript, but each reset/action calls Lean entrypoints that
+compute the next state and render the UI through `Lean.Vir.Browser` host
+imports.
 
 The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
 `examples/MergeSort.lean`.
@@ -90,8 +92,10 @@ the embedded interface manifest, show the loaded package metadata, and generate
 runnable controls automatically.
 
 The browser-facing runtime wrapper is exported from `web/src/vir-runtime.js` and
-documented in `docs/JS_API.md`. A minimal page that imports the wrapper directly
-is available at `/runtime-example.html` when running `npm run dev`.
+documented in `docs/JS_API.md`. Node smoke tests that need document calls use
+`web/src/vir-runtime-node.js`, which composes the same runtime with virtual
+document host bindings. A minimal page that imports the browser wrapper
+directly is available at `/runtime-example.html` when running `npm run dev`.
 
 For the config-driven path that writes a manifest-bearing package:
 

@@ -10,6 +10,13 @@ The module is also exposed through the package entry point:
 import { createVirRuntime } from "lean-vir";
 ```
 
+Node tests and command-line tools that need `Lean.Vir.Browser.Document` calls
+can import the Node wrapper:
+
+```js
+import { createVirRuntime } from "lean-vir/vir-runtime-node";
+```
+
 ## Browser Usage
 
 ```js
@@ -126,6 +133,10 @@ The first library surface is:
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.getTitle : IO String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
+- `Lean.Vir.Browser.Document.getTextContent : @& String -> IO String`
+- `Lean.Vir.Browser.Document.setTextContent : @& String -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Document.getAttribute : @& String -> @& String -> IO (Option String)`
+- `Lean.Vir.Browser.Document.setAttribute : @& String -> @& String -> @& String -> IO Unit`
 
 The built-in `common.*` and `browser.*` targets do not require a `hostBindings`
 option:
@@ -139,13 +150,21 @@ const vir = await createVirRuntime({
 console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 ```
 
-`Lean.Vir.Browser.Console.log` maps to `console.log`, and
-`Lean.Vir.Browser.Document.getTitle` / `setTitle` map to `document.title` when
-the runtime is created in a browser. In non-browser runtimes they use a virtual
-document title kept by the runtime. See MDN for the underlying browser APIs:
+`Lean.Vir.Browser.Console.log` maps to `console.log`, title calls map to
+`document.title`, and selector-based document calls use `querySelector`,
+`textContent`, `getAttribute`, and `setAttribute` when the runtime is created
+in a browser. The browser runtime requires `globalThis.document` for
+`browser.document.*` targets. In Node, use `lean-vir/vir-runtime-node` or pass
+explicit `hostBindings`; the Node wrapper provides virtual document state for
+title, text-content, and attribute calls. See MDN for the underlying browser
+APIs:
 
 - [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
 - [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
+- [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector)
+- [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
+- [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
+- [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
 
 Custom imports can be declared directly:
 

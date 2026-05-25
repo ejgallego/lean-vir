@@ -10,14 +10,18 @@ import { spawnSync } from "node:child_process";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { createVirRuntime as createExportedVirRuntime } from "lean-vir";
+import { createVirRuntime as createExportedBrowserVirRuntime } from "lean-vir";
+import { createVirRuntime as createExportedNodeVirRuntime } from "lean-vir/vir-runtime-node";
 import {
   createVirImports,
-  createVirRuntime,
-  createVirRuntimeFactory,
+  createVirRuntime as createBrowserVirRuntime,
   roundTripInterfaceTypeDescriptor,
   sameInterfaceWireType,
 } from "../web/src/vir-runtime.js";
+import {
+  createVirRuntime,
+  createVirRuntimeFactory,
+} from "../web/src/vir-runtime-node.js";
 import {
   INTERFACE_MANIFEST_ARTIFACT,
   validateInterfaceManifest,
@@ -97,13 +101,14 @@ assert.throws(
 );
 
 const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
-assert.equal(createExportedVirRuntime, createVirRuntime);
+assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
+assert.equal(createExportedNodeVirRuntime, createVirRuntime);
 assert.equal(runtime.targetPointerBytes(), 4);
 assert.ok(runtime.packageInfo.count > 0, "expected IR package to load declarations");
 assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
-assert.equal(runtime.packageInfo.hostImports, 2);
+assert.equal(runtime.packageInfo.hostImports, 4);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -241,11 +246,34 @@ assertInvalidManifest((manifest) => {
 }, /fields\[1\]\.name duplicates another flattened structure field/);
 assert.deepEqual(runtime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), [
   "browser.document.getTitle",
+  "browser.document.setAttribute",
+  "browser.document.setTextContent",
   "browser.document.setTitle",
 ]);
+const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes });
+assert.throws(
+  () => browserRuntime.call("HostInterop.titleHandshake", "node"),
+  /browser\.document host binding requires globalThis\.document/,
+);
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
 assert.equal(runtime.call("HostInterop.titleHandshake", "runtime smoke"), "Lean VIR host: runtime smoke");
+const petReset = runtime.call("Tamagotchi.uiReset", "pet");
+assert.deepEqual(petReset, {
+  mood: "happy",
+  trace: ["happy"],
+  artwork: "pet",
+});
+assert.deepEqual(runtime.call("Tamagotchi.nextState", petReset.mood, petReset.trace, petReset.artwork, "ignore"), {
+  mood: "hungry",
+  trace: ["happy", "hungry"],
+  artwork: "pet",
+});
+assert.deepEqual(runtime.call("Tamagotchi.uiStep", petReset.mood, petReset.trace, petReset.artwork, "ignore"), {
+  mood: "hungry",
+  trace: ["happy", "hungry"],
+  artwork: "pet",
+});
 
 const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/vir-demo.irpkg"], {
   encoding: "utf8",
@@ -253,7 +281,7 @@ const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generat
 assert.equal(inspected.status, 0, inspected.stderr || inspected.stdout);
 assert.match(inspected.stdout, /package: build\/generated\/vir-demo\.irpkg/);
 assert.match(inspected.stdout, new RegExp(`exports: ${runtime.interfaceManifest.exports.length}`));
-assert.match(inspected.stdout, /host imports: 2/);
+assert.match(inspected.stdout, /host imports: 4/);
 assert.match(inspected.stdout, /fib\(arg1: Nat\) -> Nat \[fib\]/);
 
 const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "build/generated/vir-demo.irpkg"], {
@@ -264,7 +292,7 @@ const inspectedInfo = JSON.parse(inspectedJson.stdout);
 assert.equal(inspectedInfo.package.version, 5);
 assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
 assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
-assert.equal(inspectedInfo.manifest.hostImports.length, 2);
+assert.equal(inspectedInfo.manifest.hostImports.length, 4);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");
@@ -898,6 +926,13 @@ try {
     "  Lean.Vir.Browser.Document.setTitle s",
     "  Lean.Vir.Browser.Document.getTitle",
     "",
+    "def freshElementRoundtrip (s : String) : IO (String × Option String) := do",
+    "  Lean.Vir.Browser.Document.setTextContent \"#fresh\" s",
+    "  Lean.Vir.Browser.Document.setAttribute \"#fresh\" \"data-fresh\" (s ++ \"!\")",
+    "  let text ← Lean.Vir.Browser.Document.getTextContent \"#fresh\"",
+    "  let attr ← Lean.Vir.Browser.Document.getAttribute \"#fresh\" \"data-fresh\"",
+    "  pure (text, attr)",
+    "",
   ].join("\n"));
 
   const hostGenerated = spawnSync(
@@ -907,20 +942,36 @@ try {
   );
   assert.equal(hostGenerated.status, 0, hostGenerated.stderr || hostGenerated.stdout);
   const hostRuntime = await factory.createRuntime({ irPackageBytes: await readFile(hostPackage) });
-  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 3);
+  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 7);
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
   assert.equal(hostRuntime.call("freshTitleRoundtrip", "Lean.Vir"), "Lean.Vir");
+  assert.deepEqual(hostRuntime.call("freshElementRoundtrip", "element"), {
+    fst: "element",
+    snd: "element!",
+  });
 
   const customHostSource = join(freshDir, "FreshCustomHost.lean");
   const customHostPackage = join(freshDir, "custom-host.irpkg");
   await writeFile(customHostSource, [
     "import Lean.Vir.Host",
     "",
+    "structure HostCounter where",
+    "  label : String",
+    "  value : Nat",
+    "  enabled : Bool",
+    "deriving Inhabited",
+    "",
     "@[vir_js \"test.bumpNat\"]",
     "opaque jsBumpNat (n : Nat) : Nat",
     "",
+    "@[vir_js \"test.bumpCounter\"]",
+    "opaque jsBumpCounter (counter : HostCounter) : HostCounter",
+    "",
     "def freshCustomBump (n : Nat) : Nat :=",
     "  jsBumpNat n",
+    "",
+    "def freshCustomCounter (counter : HostCounter) : HostCounter :=",
+    "  jsBumpCounter counter",
     "",
   ].join("\n"));
   const customGenerated = spawnSync(
@@ -932,17 +983,35 @@ try {
   const customFactory = createVirRuntimeFactory({
     wasmBytes,
     hostBindings: {
+      "test.bumpCounter": (counter) => ({
+        label: `${counter.label}!`,
+        value: (BigInt(counter.value) + 1n).toString(),
+        enabled: !counter.enabled,
+      }),
       "test.bumpNat": (n) => (BigInt(n) + 1n).toString(),
     },
   });
   const customRuntime = await customFactory.createRuntime({ irPackageBytes: await readFile(customHostPackage) });
-  assert.equal(customRuntime.interfaceManifest.hostImports[0].target, "test.bumpNat");
+  assert.deepEqual(customRuntime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), [
+    "test.bumpCounter",
+    "test.bumpNat",
+  ]);
   assert.equal(customRuntime.call("freshCustomBump", 41), "42");
+  assert.deepEqual(customRuntime.call("freshCustomCounter", {
+    label: "count",
+    value: 4,
+    enabled: true,
+  }), {
+    label: "count!",
+    value: "5",
+    enabled: false,
+  });
 
   const objectImportFactory = createVirRuntimeFactory({
     wasmBytes,
     imports: {},
     hostBindings: {
+      "test.bumpCounter": (counter) => counter,
       "test.bumpNat": (n) => (BigInt(n) + 2n).toString(),
     },
   });

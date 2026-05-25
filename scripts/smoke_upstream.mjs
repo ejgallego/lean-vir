@@ -6,7 +6,8 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
-import { createVirImports, createVirRuntime, VirRuntime } from "../web/src/vir-runtime.js";
+import { createVirImports, VirRuntime } from "../web/src/vir-runtime.js";
+import { createVirRuntime } from "../web/src/vir-runtime-node.js";
 
 const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const irPackage = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
@@ -190,12 +191,21 @@ if (genericByteArrayScore !== "136") {
 }
 
 const hostRuntime = await createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
-if (hostRuntime.packageInfo.hostImports < 2) {
-  throw new Error(`expected stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+if (hostRuntime.packageInfo.hostImports !== 4) {
+  throw new Error(`expected 4 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
 }
 const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
 if (hostTitle !== "Lean VIR host: smoke") {
   throw new Error(`Lean to JavaScript host title: expected Lean VIR host: smoke, got ${hostTitle}`);
+}
+const petReset = hostRuntime.call("Tamagotchi.uiReset", "pet");
+const petNext = hostRuntime.call("Tamagotchi.nextState", petReset.mood, petReset.trace, petReset.artwork, "ignore");
+if (petNext.mood !== "hungry" || petNext.trace.join(" -> ") !== "happy -> hungry") {
+  throw new Error(`Lean Tamagotchi state step failed: ${JSON.stringify(petNext)}`);
+}
+const petStep = hostRuntime.call("Tamagotchi.uiStep", petReset.mood, petReset.trace, petReset.artwork, "ignore");
+if (petStep.mood !== "hungry" || petStep.trace.join(" -> ") !== "happy -> hungry") {
+  throw new Error(`Lean Tamagotchi browser step failed: ${JSON.stringify(petStep)}`);
 }
 
 let repeatedSortChecksum = 0;

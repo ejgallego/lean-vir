@@ -1597,7 +1597,7 @@ def InterfaceType.label : InterfaceType → String
   | .expr => "Lean.Expr"
 
 def InterfaceType.wireTag : InterfaceType → Nat
-  | .unit => 20
+  | .unit => 21
   | .nat => 0
   | .int => 1
   | .bool => 2
@@ -2156,15 +2156,15 @@ def collectHostImports (index : DeclIndex) (closure : Closure) : IO (Array HostI
   for loaded in closure.decls do
     if isVirJsDecl loaded.decl && !seen.contains loaded.decl.name then
       seen := seen.insert loaded.decl.name
-      match index.envForSource? loaded.source with
+      match index.constInfo? loaded.decl.name with
       | none =>
           diagnostics := diagnostics.push {
             name := loaded.decl.name,
             source := loaded.source,
             reason := "source environment was not loaded"
           }
-      | some env =>
-          match ← runCoreForSource loaded.source env (hostImportFor imports.size loaded) with
+      | some (source, env, _) =>
+          match ← runCoreForSource source env (hostImportFor imports.size loaded) with
           | .ok hostImport => imports := imports.push hostImport
           | .error diagnostic => diagnostics := diagnostics.push diagnostic
   return (imports, diagnostics)
@@ -2466,6 +2466,30 @@ partial def emitInterfaceType (type : InterfaceType) : EmitM Unit := do
   | .prod fst snd =>
       emitInterfaceType fst
       emitInterfaceType snd
+  | .structure _ _ trivialField? objectFields usizeFields scalarBytes fields =>
+      emitU32 objectFields
+      emitU32 usizeFields
+      emitU32 scalarBytes
+      emitU32 (trivialField?.getD 0xffffffff)
+      emitU32 fields.size
+      fields.forM fun (_, fieldType, layout) => do
+        match layout with
+        | .object index =>
+            emitU8 0
+            emitU32 index
+            emitU32 0
+            emitU32 0
+        | .usize index =>
+            emitU8 1
+            emitU32 index
+            emitU32 0
+            emitU32 0
+        | .scalar size offset =>
+            emitU8 2
+            emitU32 0
+            emitU32 size
+            emitU32 offset
+        emitInterfaceType fieldType
   | _ => pure ()
 
 def emitHostImport (entry : HostImport) : EmitM Unit := do

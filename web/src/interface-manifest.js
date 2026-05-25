@@ -293,7 +293,7 @@ export function manifestDiagnostics(manifest) {
 
 export function formatInterfaceType(type) {
   switch (type?.wireTag) {
-    case 20:
+    case 21:
       return "Unit";
     case 14:
       return type.type ?? "Enum";

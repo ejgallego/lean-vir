@@ -62,6 +62,15 @@ const vir = await createVirRuntime({
 vir.call("titleHandshake", "browser handshake");
 ```
 
+In Node tests or command-line tools, import the Node wrapper instead:
+
+```js
+import { createVirRuntime } from "lean-vir/vir-runtime-node";
+```
+
+That wrapper uses the same runtime and installs virtual document bindings for
+`Lean.Vir.Browser.Document`.
+
 Pass `hostBindings` only for custom targets or to override one of the default
 bindings. If a package imports both built-in and custom targets, the custom map
 can contain just the custom entries; unresolved keys still fall through to the
@@ -129,15 +138,24 @@ Node-like environments:
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.getTitle : IO String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
+- `Lean.Vir.Browser.Document.getTextContent : @& String -> IO String`
+- `Lean.Vir.Browser.Document.setTextContent : @& String -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Document.getAttribute : @& String -> @& String -> IO (Option String)`
+- `Lean.Vir.Browser.Document.setAttribute : @& String -> @& String -> @& String -> IO Unit`
 
-The default runtime bindings use standard browser APIs when a browser
-`document` is present. In non-browser runtimes, `Document.getTitle` and
-`Document.setTitle` use a virtual document title stored by the VIR runtime.
+The browser runtime bindings use standard browser APIs and require
+`globalThis.document` for document calls. In non-browser runtimes, use
+`lean-vir/vir-runtime-node` or pass explicit `hostBindings`; the Node wrapper
+keeps virtual document state for title, text-content, and attribute APIs.
 
 External references:
 
 - [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
 - [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
+- [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector)
+- [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
+- [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
+- [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
 
 ## Example
 

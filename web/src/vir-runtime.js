@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { validateInterfaceManifest } from "./interface-manifest.js";
+import { createBrowserHostBindings } from "./vir-host-bindings.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -70,6 +71,7 @@ export class VirRuntimeFactory {
     fetchBytes: loadBytes = fetchBytes,
     imports = null,
     hostBindings = null,
+    defaultHostBindings = createBrowserHostBindings(),
   } = {}) {
     this.wasmBytes = wasmBytes;
     this.wasmModule = wasmModule;
@@ -77,6 +79,7 @@ export class VirRuntimeFactory {
     this.fetchBytes = loadBytes;
     this.imports = imports;
     this.hostBindings = hostBindings;
+    this.defaultHostBindings = defaultHostBindings;
   }
 
   async module() {
@@ -95,7 +98,10 @@ export class VirRuntimeFactory {
 
   async instantiate() {
     const module = await this.module();
-    const hostState = new VirHostState({ hostBindings: this.hostBindings });
+    const hostState = new VirHostState({
+      hostBindings: this.hostBindings,
+      defaultHostBindings: this.defaultHostBindings,
+    });
     const imports =
       typeof this.imports === "function"
         ? this.imports(module, hostState)
@@ -117,14 +123,13 @@ export class VirRuntimeFactory {
 }
 
 class VirHostState {
-  constructor({ hostBindings = null } = {}) {
+  constructor({ hostBindings = null, defaultHostBindings = createBrowserHostBindings() } = {}) {
     this.exports = null;
     this.manifest = null;
     this.hostImports = [];
     this.userBindings = hostBindings;
     this.lastResultSize = 0;
-    this.virtualDocumentTitle = "";
-    this.defaultBindings = createDefaultHostBindings(this);
+    this.defaultBindings = defaultHostBindings;
   }
 
   attach(exports) {
@@ -472,25 +477,6 @@ function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
 }
 
-function createDefaultHostBindings(state) {
-  return {
-    "common.echoString": (value) => value,
-    "common.addNat": (lhs, rhs) => (BigInt(lhs) + BigInt(rhs)).toString(),
-    "browser.console.log": (message) => {
-      console.log(message);
-      return undefined;
-    },
-    "browser.document.getTitle": () => globalThis.document?.title ?? state.virtualDocumentTitle,
-    "browser.document.setTitle": (title) => {
-      if (globalThis.document) {
-        globalThis.document.title = title;
-      }
-      state.virtualDocumentTitle = title;
-      return undefined;
-    },
-  };
-}
-
 function lookupHostBinding(target, userBindings, defaultBindings) {
   if (userBindings instanceof Map && userBindings.has(target)) {
     return userBindings.get(target);
@@ -627,7 +613,7 @@ function decodeTypeDescriptor(reader) {
 function encodeValuePayload(writer, type, value, label) {
   const tag = requireWireTag(type, label);
   switch (tag) {
-    case 20:
+    case 21:
       if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
       return;
     case 0:
@@ -761,7 +747,7 @@ function decodeValuePayload(reader, type) {
   const expectedTag = requireWireTag(type, "result");
   let value;
   switch (expectedTag) {
-    case 20:
+    case 21:
       value = undefined;
       break;
     case 0:

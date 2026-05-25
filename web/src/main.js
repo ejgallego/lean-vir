@@ -132,6 +132,13 @@ let petMood = "happy";
 let petTrace = [petMood];
 let petArtwork = petArtToggle.checked ? "octopus" : "pet";
 
+function applyPetState(state) {
+  petMood = moods.includes(state?.mood) ? state.mood : "happy";
+  petTrace = Array.isArray(state?.trace) ? state.trace : [petMood];
+  petArtwork = typeof state?.artwork === "string" ? state.artwork : petArtwork;
+  petArtToggle.checked = petArtwork === "octopus";
+}
+
 function demoPackageBytes() {
   irPackageBytesPromise ??= fetchBytes(`${import.meta.env.BASE_URL}${irPackageFile}`);
   return irPackageBytesPromise;
@@ -173,11 +180,8 @@ function renderPet() {
 
 function stepPet(runtime, actionName) {
   if (!actions.includes(actionName)) return;
-  petActionDisplay.textContent = actionName;
   try {
-    petMood = runtime.call("Tamagotchi.step", petMood, actionName);
-    petTrace.push(petMood);
-    renderPet();
+    applyPetState(runtime.call("Tamagotchi.uiStep", petMood, petTrace, petArtwork, actionName));
     setReady();
   } catch (error) {
     petMoodDisplay.textContent = "error";
@@ -186,11 +190,21 @@ function stepPet(runtime, actionName) {
 }
 
 function resetPet() {
-  petMood = "happy";
-  petTrace = [petMood];
-  petActionDisplay.textContent = "...";
-  renderPet();
-  setReady();
+  if (runtime === null) {
+    petMood = "happy";
+    petTrace = [petMood];
+    petActionDisplay.textContent = "...";
+    renderPet();
+    setReady();
+    return;
+  }
+  try {
+    applyPetState(runtime.call("Tamagotchi.uiReset", petArtwork));
+    setReady();
+  } catch (error) {
+    petMoodDisplay.textContent = "error";
+    setTrap(error);
+  }
 }
 
 function parseSortInput(text) {
@@ -468,7 +482,7 @@ fixtureRunSelectedButton.addEventListener("click", () => {
 });
 petArtToggle.addEventListener("change", () => {
   petArtwork = petArtToggle.checked ? "octopus" : "pet";
-  renderPet();
+  resetPet();
 });
 
 renderFixtureSummary();

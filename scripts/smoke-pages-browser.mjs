@@ -257,6 +257,35 @@ async function smokeLanding(cdp, origin) {
   assert.ok(state.links.includes("dev.html?package=local-fib.irpkg&entry=fib"));
   assert.ok(state.links.includes("dev.html?package=local-mergesort.irpkg&entry=SortDemo_demoFromArray"));
   assert.ok(state.links.includes("dev.html?package=vir-demo.irpkg&entry=HostInterop_titleHandshake"));
+
+  const stepped = await evaluate(cdp, `new Promise((resolve, reject) => {
+    document.querySelector("[data-action='ignore']").click();
+    const deadline = Date.now() + 5000;
+    const poll = () => {
+      const state = {
+        mood: document.querySelector("#pet-mood-display")?.textContent?.trim(),
+        action: document.querySelector("#pet-action-display")?.textContent?.trim(),
+        trace: document.querySelector("#pet-trace-display")?.textContent?.trim(),
+        deviceMood: document.querySelector("#pet-device")?.dataset.mood,
+        status: document.querySelector("#status")?.textContent?.trim()
+      };
+      if (state.mood === "hungry") {
+        resolve(state);
+      } else if (Date.now() > deadline) {
+        reject(new Error("Lean Tamagotchi step did not update the page"));
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  })`);
+  assert.deepEqual(stepped, {
+    mood: "hungry",
+    action: "ignore",
+    trace: "happy -> hungry",
+    deviceMood: "hungry",
+    status: "Ready",
+  });
 }
 
 async function smokeRunner(cdp, origin, url, expected) {
@@ -322,6 +351,10 @@ async function smokeRunner(cdp, origin, url, expected) {
     poll();
   })`);
   assert.equal(result, expected.result);
+  if (expected.documentTitle !== undefined) {
+    const title = await evaluate(cdp, "document.title");
+    assert.equal(title, expected.documentTitle);
+  }
 }
 
 async function smokeRunnerFailure(cdp, origin, url, expected) {
@@ -480,6 +513,7 @@ try {
       input: "",
       runInput: "pages smoke",
       result: "Lean VIR host: pages smoke",
+      documentTitle: "Lean VIR host: pages smoke",
     }),
     await runnerCaseFromManifest("vir-demo.irpkg", "Tamagotchi.step", {
       inputs: ["happy", "feed"],
