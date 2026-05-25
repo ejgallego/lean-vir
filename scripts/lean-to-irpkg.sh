@@ -64,8 +64,10 @@ echo "package: $package"
 echo "report:  $report"
 echo "mode:    $mode"
 
+scripts/build-lean-lib.sh
+
 set +e
-lean --run tools/GeneratePackage.lean "$package" "$report" "${target_args[@]}"
+LEAN_PATH="build/lean-lib${LEAN_PATH:+:$LEAN_PATH}" lean --run tools/GeneratePackage.lean "$package" "$report" "${target_args[@]}"
 status=$?
 set -e
 if [ "$status" -ne 0 ]; then

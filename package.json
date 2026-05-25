@@ -10,6 +10,7 @@
   },
   "scripts": {
     "fetch:lean": "bash scripts/fetch-lean-source.sh",
+    "build:lean-lib": "bash scripts/build-lean-lib.sh",
     "install:wasi": "bash scripts/install-wasi-sdk.sh",
     "install:engines": "bash scripts/install-wasm-engines.sh",
     "generate:package": "bash scripts/generate-ir-package.sh",

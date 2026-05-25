@@ -31,12 +31,15 @@ npm run generate:irpkg -- examples/Fib.lean build/generated/local.irpkg
 Both commands write an `.irpkg` with an embedded interface manifest and a report
 next to the package, for example `build/generated/local.report.md`. The report
 lists roots, packaged declarations, native externs, initializer globals,
-interface exports, and any loud diagnostics.
+interface exports, JavaScript host imports, and any loud diagnostics.
 
 On success, the command prints a package summary: package format, Lean
-toolchain, generation time, total declarations, interface exports, source
-targets, and resolved roots. The same data is embedded in
+toolchain, generation time, total declarations, interface exports, JavaScript
+host imports, source targets, and resolved roots. The same data is embedded in
 `manifest.metadata`.
+
+Local package generation also builds `build/lean-lib`, which provides the
+project-owned `Lean.Vir.*` modules for host import declarations.
 
 If a requested export cannot be packaged or mapped to the supported JavaScript
 interface surface, generation exits nonzero and points at the report.
@@ -51,7 +54,8 @@ npm run inspect:irpkg -- build/generated/local.irpkg
 
 The inspector reads the embedded manifest from the `.irpkg` itself and prints
 the package format, declaration count, metadata, source targets, exports,
-argument/result types, and diagnostics. Use `--json` for bug reports or tooling:
+host imports, argument/result types, and diagnostics. Use `--json` for bug
+reports or tooling:
 
 ```bash
 npm run inspect:irpkg -- --json build/generated/local.irpkg
@@ -89,13 +93,17 @@ dev.html?package=local-fib.irpkg&entry=fib
 
 The manifest includes package metadata plus one entry per export with its Lean
 declaration name, JavaScript name, argument types, result type, and recursive
-type tree. JavaScript validates inputs against that manifest and sends a
+type tree. It also includes `hostImports` for Lean declarations marked with
+`@[vir_js "..."]`. JavaScript validates inputs against that manifest and sends a
 compact byte payload through the generic `vir_call` WASM export. WASM
 constructs Lean runtime objects, calls the upstream IR interpreter, and encodes
-the result bytes for JavaScript.
+the result bytes for JavaScript. When interpreted Lean code reaches a host
+import, the shim calls the runtime's `env.vir_js_call` import and decodes the
+synchronous result back into Lean.
 
 Supported v1 types:
 
+- `Unit`;
 - `Nat`, `Int`, `Bool`, `String`;
 - `Float`, `Float32`;
 - `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
@@ -114,6 +122,10 @@ Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them use the
 generated Lean `_boxed` declarations automatically. If a requested export needs
 one and the compiler did not produce it, package generation fails with an
 explicit wasm32 boundary diagnostic.
+
+Pure functions and `IO α` actions are supported on both exported entrypoints and
+host imports. Host imports are currently synchronous, with at most 16 imported
+declarations and IR arity at most 6.
 
 `/dev.html` generates enum select controls and JSON textareas for structural
 `Lean.Expr`, user-defined structures, and manifest-supported compound values

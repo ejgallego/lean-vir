@@ -5,12 +5,14 @@ interface runtime {
     decls: u32,
     bytes: u32,
     interface-exports: u32,
+    host-imports: u32,
   }
 
   record call-request {
     entry: string,
     payload: list<u8>,
     result-wire-tag: u8,
+    effect: u8,
   }
 
   record call-output {

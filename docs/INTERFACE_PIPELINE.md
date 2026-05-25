@@ -10,8 +10,8 @@ That command:
 
 1. elaborates the configured Lean source with Lean 4.30-rc2;
 2. extracts the requested IR declaration closure into an `.irpkg`;
-3. embeds a generated JavaScript interface manifest and package metadata in
-   the package;
+3. embeds a generated JavaScript interface manifest, JavaScript host import
+   table, and package metadata in the package;
 4. writes the package report next to the generated artifact.
 
 The generated `.irpkg` is the only browser artifact needed by `/dev.html`.
@@ -84,6 +84,7 @@ Add `--json` to emit the parsed package header and full embedded manifest.
 
 The embedded manifest currently supports:
 
+- `Unit`;
 - scalar values: `Nat`, `Int`, `Bool`, `String`, `Float`, `Float32`;
 - fixed-width values: `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - byte data: `ByteArray`;
@@ -122,6 +123,13 @@ objects such as `{ "kind": "inl", "value": 4 }` or `{ "ok": value }`; results
 come back as `{ kind, value }` objects using generated constructor names. The
 manifest records each constructor payload layout so direct scalar payloads are
 written into the same constructor scalar slots as compiled Lean code.
+
+Entry points and host imports can be pure functions or `IO α` actions. For
+Lean-to-JavaScript calls, import `Lean.Vir.Host` and mark an opaque declaration
+with `@[vir_js "target.name"]`, or use the starter declarations in
+`Lean.Vir.Common` and `Lean.Vir.Browser`. The manifest records each host import
+under `hostImports` with its slot, Lean name, JavaScript target, generated WASM
+symbol, arguments, result type, and effect.
 
 The recursive type tree is embedded in the JSON manifest and sent as a compact
 internal descriptor in each `vir_call` payload. This is intentionally still an

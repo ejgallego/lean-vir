@@ -69,6 +69,9 @@ Together they supply:
   interpreter.
 - the generic `vir_call` package interface used by the JavaScript runtime for
   manifest-supported functions.
+- package-scoped JavaScript host import trampolines for declarations marked
+  with `@[vir_js "..."]`, routed through `env.vir_js_call` and
+  `env.vir_js_call_result_size`.
 - name construction primitives needed by `src/util/name.cpp`.
 
 The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
@@ -182,6 +185,13 @@ three wrappers delegate to the same linked runtime helper,
 The shim also owns minimal `Lean.Expr`/`Lean.Level` object construction for the
 generic JavaScript interface path, so structural `Lean.Expr` values can be sent
 from JavaScript without depending on Lean-library exported constructor wrappers.
+
+JavaScript host imports deliberately do not widen the native extern policy.
+`tools/GeneratePackage.lean` encodes `@[vir_js "..."]` extern declarations into
+the package manifest and assigns each one a finite trampoline symbol. The shim
+recognizes only those package-provided symbols, calls the single imported
+`env.vir_js_call` dispatcher, and still rejects unrelated dynamic symbol
+lookup.
 
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
 registry. It checks that every `nativeExterns` entry in

@@ -72,12 +72,25 @@ for (const [source, roots] of packageTargets) {
   targetArgs.push("--package-target", source, ...new Set(roots));
 }
 
+const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if ((libResult.status ?? 1) !== 0) {
+  process.exit(libResult.status ?? 1);
+}
+
 const result = spawnSync(
   "lean",
   ["--run", "tools/GeneratePackage.lean", packagePath, reportPath, ...targetArgs],
   {
     cwd: root,
     stdio: "inherit",
+    env: {
+      ...process.env,
+      LEAN_PATH: process.env.LEAN_PATH ? `build/lean-lib:${process.env.LEAN_PATH}` : "build/lean-lib",
+    },
   },
 );
 

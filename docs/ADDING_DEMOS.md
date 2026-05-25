@@ -13,6 +13,8 @@ and the browser loads that package without rebuilding the upstream interpreter.
 3. Run `npm run check:package`.
 4. Inspect `build/generated/ir-provider-report.md`.
 5. Run `npm run check:boundary-registry` if you add or change a native extern.
+   This is not needed for `@[vir_js "..."]` host imports; those appear in the
+   report's JavaScript host import section instead of the native registry.
 6. Run `npm test`.
 7. Update `web/` only if the demo needs new UI.
 
@@ -58,6 +60,10 @@ The generated report has separate sections for the two common failure modes:
   supported JavaScript interface surface. This is a loud failure; explicitly
   exclude or keep such declarations package-only if they are internal support
   roots.
+- `JavaScript Host Imports`: package-scoped Lean-to-JavaScript imports collected
+  from `@[vir_js "..."]` declarations. Each row shows the Lean name, JavaScript
+  target, trampoline symbol, argument types, result type, and whether the import
+  is `IO`.
 
 If the package generator reaches an unsupported IR shape, it reports the
 declaration being encoded and the unsupported package field. That usually means
@@ -78,12 +84,19 @@ in `wasm/upstream_shim/shim.cpp`. Keep the Lean declaration itself in
 per-shape WASM exports for manifest-supported declarations; unsupported entries
 should fail during package generation until their interface type is implemented.
 
-The current generic interface covers primitive scalars, byte arrays, recursive
-`Array`/`List`/`Option`/`Prod`/`Sum`/`Except` shapes, non-indexed user-defined
-structures including parameterized instances, direct scalar wrappers, and
-inherited parent fields, nullary inductive enums, and structural `Lean.Expr`
-values. For enums, no per-demo code is needed: the generator records the
-constructor list in the package manifest and `/dev.html` renders a select
+The current generic interface covers `Unit`, primitive scalars, byte arrays,
+recursive `Array`/`List`/`Option`/`Prod`/`Sum`/`Except` shapes, non-indexed
+user-defined structures including parameterized instances, direct scalar
+wrappers, inherited parent fields, nullary inductive enums, and structural
+`Lean.Expr` values. For enums, no per-demo code is needed: the generator records
+the constructor list in the package manifest and `/dev.html` renders a select
 control from that manifest after the package is loaded. For `Sum` and `Except`,
 the manifest records constructor payload layouts and `/dev.html` renders JSON
 inputs.
+
+Lean code can call JavaScript by importing `Lean.Vir.Common`,
+`Lean.Vir.Browser`, or `Lean.Vir.Host` and adding an opaque declaration marked
+with `@[vir_js "target.name"]`. Bind new targets in `hostBindings` when creating
+the browser runtime. The v1 host boundary is synchronous; async browser APIs
+need an explicit callback/polling design until the runtime grows an async
+boundary.

@@ -49,6 +49,9 @@ export function validateInterfaceManifest(manifest) {
   if (manifest.diagnostics !== undefined && !Array.isArray(manifest.diagnostics)) {
     throw new Error("embedded interface manifest diagnostics must be an array");
   }
+  if (manifest.hostImports !== undefined && !Array.isArray(manifest.hostImports)) {
+    throw new Error("embedded interface manifest hostImports must be an array");
+  }
   validateManifestExports(manifest.exports);
   return manifest;
 }
@@ -290,6 +293,8 @@ export function manifestDiagnostics(manifest) {
 
 export function formatInterfaceType(type) {
   switch (type?.wireTag) {
+    case 20:
+      return "Unit";
     case 14:
       return type.type ?? "Enum";
     case 16:

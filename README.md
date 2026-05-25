@@ -28,13 +28,14 @@ package. Input-capable entries, currently `fib` and `SortDemo.demoFromArray`,
 render an input control in the fixture source panel.
 
 The package manifest also drives the local `/dev.html` runner. Supported
-browser-call types include primitive scalars, recursive list/array/option/product
-and `Sum`/`Except` shapes over supported element types, non-indexed
-user-defined structures including parameterized instances such as `Box Nat`,
-direct scalar fields, single-field wrappers over direct scalar fields,
-inherited parent fields flattened as JavaScript object keys, nullary inductive
-enums such as the Tamagotchi state/action types, and structural `Lean.Expr`
-values.
+browser-call types include `Unit`, primitive scalars, recursive
+list/array/option/product and `Sum`/`Except` shapes over supported element
+types, non-indexed user-defined structures including parameterized instances
+such as `Box Nat`, direct scalar fields, single-field wrappers over direct
+scalar fields, inherited parent fields flattened as JavaScript object keys,
+nullary inductive enums such as the Tamagotchi state/action types, and
+structural `Lean.Expr` values. Manifest entries can also record synchronous
+JavaScript host imports called by Lean declarations.
 Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them use the
 generated Lean `_boxed` declarations automatically; package generation fails
 loudly if a requested export needs one and it is missing.
@@ -66,8 +67,13 @@ npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
 ```
 
 The command prints the package path, report path, package format, Lean
-toolchain, declaration count, interface exports, source targets, and resolved
-roots. The same metadata is embedded in the package manifest.
+toolchain, declaration count, interface exports, JavaScript host imports, source
+targets, and resolved roots. The same metadata is embedded in the package
+manifest.
+
+Local package generation first builds the small project-owned Lean library under
+`build/lean-lib`, so test sources can import `Lean.Vir.Common`,
+`Lean.Vir.Browser`, or `Lean.Vir.Host`.
 
 Inspect a package without starting the browser:
 
@@ -121,6 +127,8 @@ and deploys the static site artifact.
 
 - `wasm/upstream_shim/` supplies the current WASI boundary for Lean's real
   upstream interpreter.
+- `Lean/Vir/` supplies the Lean-side JavaScript host import attribute and the
+  first small common/browser import modules.
 - `tools/GeneratePackage.lean` elaborates the demo and fixture Lean sources,
   walks the typed `Lean.IR.Decl` closure, and emits
   `build/generated/vir-demo.irpkg`.
@@ -136,6 +144,8 @@ and deploys the static site artifact.
 - `scripts/build-upstream-probe.sh` compiles and links the upstream
   interpreter, writes `build/upstream-probe/boundary.md`, and copies the strict
   artifact to `web/public/vir-upstream.wasm`.
+- `scripts/build-lean-lib.sh` compiles the local `Lean.Vir` modules to
+  `build/lean-lib` for package generation.
 - `scripts/lean-to-irpkg.sh` generates a local `.irpkg` from a `.lean` file,
   either for explicit roots or public source definitions.
 - `scripts/prepare-irpkg.mjs` generates a configured package for `/dev.html`
@@ -184,6 +194,11 @@ agree on the explicit native extern surface.
 `npm test` runs this check before rebuilding the upstream smoke artifact and
 running the fixture suite.
 
+`@[vir_js "..."]` host imports are separate from the native extern registry.
+They are package-scoped declarations, appear in the embedded manifest, and are
+routed through the WASM `env.vir_js_call` import installed by
+`web/src/vir-runtime.js`.
+
 The build caches the upstream interpreter, Lean runtime, support, and shim
 objects under `build/upstream-probe/obj`. Updating the Lean examples regenerates
 the IR package asset, but does not recompile or relink `ir_interpreter.cpp`
@@ -193,6 +208,7 @@ unless the upstream source, compiler flags, runtime overlay, or shim changes.
 
 `npm run build:demo` writes:
 
+- `build/lean-lib/`
 - `build/upstream-probe/ir_interpreter.strict.wasm`
 - `build/upstream-probe/boundary.md`
 - `build/generated/vir-demo.irpkg`

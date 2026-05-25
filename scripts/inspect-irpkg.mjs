@@ -69,7 +69,17 @@ function printText(info) {
     const args = (entry.args ?? [])
       .map((arg) => `${arg.name ?? "arg"}: ${formatInterfaceType(arg.type)}`)
       .join(", ");
-    console.log(`  - ${entry.jsName ?? entry.entry}(${args}) -> ${formatInterfaceType(entry.result)} [${entry.entry}]`);
+    const effect = entry.effect === "io" ? " IO" : "";
+    console.log(`  - ${entry.jsName ?? entry.entry}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.entry}]`);
+  }
+  const hostImports = Array.isArray(info.manifest.hostImports) ? info.manifest.hostImports : [];
+  console.log(`host imports: ${hostImports.length}`);
+  for (const entry of hostImports) {
+    const args = (entry.args ?? [])
+      .map((arg) => `${arg.name ?? "arg"}: ${formatInterfaceType(arg.type)}`)
+      .join(", ");
+    const effect = entry.effect === "io" ? " IO" : "";
+    console.log(`  - #${entry.slot} ${entry.name}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.target}]`);
   }
   console.log(`diagnostics: ${diagnostics.length}`);
   for (const diagnostic of diagnostics) {

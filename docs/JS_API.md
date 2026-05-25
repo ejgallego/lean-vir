@@ -58,12 +58,15 @@ const second = await factory.createRuntime({ irPackageBytes });
 - `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
   methods.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
+- `vir.packageInfo.hostImports` reports the number of JavaScript host imports.
 
-Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `Float`, `Float32`,
-`UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`, recursive
-`Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α` shapes
-over supported types, non-indexed user-defined structures including
-parameterized instances, nullary inductive enums, and `Lean.Expr`.
+Supported v1 types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
+`Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
+recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α`
+shapes over supported types, non-indexed user-defined structures including
+parameterized instances, nullary inductive enums, and `Lean.Expr`. Exported
+Lean entrypoints and host imports may be pure or `IO α`; `IO` failures
+currently surface as call failures.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
@@ -102,6 +105,62 @@ entry is exposed. Malformed type trees, invalid structure layouts, unsupported
 wire tags, duplicate export names, and bad enum constructor metadata are
 reported as package-load errors.
 
+## Lean To JavaScript Host Imports
+
+Lean sources can call synchronous JavaScript functions through declarations
+marked with `@[vir_js "..."]`. Import one of the provided modules:
+
+```lean
+import Lean.Vir.Browser
+
+def titleRoundtrip (title : String) : IO String := do
+  Lean.Vir.Browser.Document.setTitle title
+  Lean.Vir.Browser.Document.getTitle
+```
+
+The first library surface is:
+
+- `Lean.Vir.Common.echoString : @& String -> String`
+- `Lean.Vir.Common.addNat : Nat -> Nat -> Nat`
+- `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
+- `Lean.Vir.Browser.Document.getTitle : IO String`
+- `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
+
+Custom imports can be declared directly:
+
+```lean
+import Lean.Vir.Host
+
+@[vir_js "demo.bumpNat"]
+opaque jsBumpNat (n : Nat) : Nat
+
+def bumpFromJs (n : Nat) : Nat :=
+  jsBumpNat n
+```
+
+Bind custom targets when constructing the runtime. User bindings override the
+default `common.*` and `browser.*` bindings:
+
+```js
+const vir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "custom.irpkg",
+  hostBindings: {
+    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
+  },
+});
+
+console.log(vir.call("bumpFromJs", 41)); // "42"
+```
+
+Bindings receive decoded JavaScript values and return a value matching the Lean
+result type. `Unit` returns use `undefined` or `null`. Host imports are
+synchronous in v1; returning a `Promise` is an error. Object-style `imports`
+factory options are treated as overrides on top of the generated import table.
+If you provide a custom `imports` function to `createVirRuntimeFactory`, call
+`createVirImports(module, overrides, hostState)` or otherwise install
+`env.vir_js_call` and `env.vir_js_call_result_size`.
+
 ## Trust Boundary
 
 The current `.irpkg` loader is intended for generated project artifacts and
@@ -138,9 +197,9 @@ npm run generate:irpkg -- examples/Fib.lean build/generated/fib.irpkg
 ```
 
 The command prints the package path, report path, package format, toolchain,
-declaration count, interface export count, and target roots. The same summary
-is embedded in the manifest metadata so JavaScript and `/dev.html` can show
-exactly what was loaded.
+declaration count, interface export count, JavaScript host import count, and
+target roots. The same summary is embedded in the manifest metadata so
+JavaScript and `/dev.html` can show exactly what was loaded.
 
 Inspect the embedded manifest without loading the browser:
 
@@ -165,4 +224,6 @@ The runtime uses the single-file declaration package path. It does not load
 `.olean`, `.ir`, or full Lean module data in the browser. Unsupported requested
 exports fail during package generation instead of being omitted silently, and a
 failed package load clears the runtime's package metadata instead of leaving
-stale declarations callable.
+stale declarations callable. JavaScript host imports are sync-only and limited
+to 16 imported declarations with IR arity at most 6; async host calls will need
+a later Promise/JSPI-shaped boundary.

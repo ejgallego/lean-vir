@@ -46,8 +46,18 @@ struct init_global_entry {
     object * init_name;
 };
 
+struct host_import_entry {
+    object * name;
+    std::string target;
+    std::string symbol;
+    uint32_t arity;
+    bool is_io;
+    std::string signature;
+};
+
 static std::vector<decl_entry> g_entries;
 static std::vector<init_global_entry> g_init_entries;
+static std::vector<host_import_entry> g_host_imports;
 static std::string g_interface_manifest;
 static std::string g_last_error;
 static bool g_package_loaded = false;
@@ -278,6 +288,13 @@ public:
 
     size_t pos() const {
         return m_pos;
+    }
+
+    std::string bytes_from(size_t start, size_t end) const {
+        if (start > end || end > m_size) {
+            return std::string();
+        }
+        return std::string(reinterpret_cast<char const *>(m_data + start), end - start);
     }
 
     void set_version(uint32_t version) {
@@ -590,6 +607,54 @@ public:
         return mk_extern_decl(fn, ps, result_type);
     }
 
+    void interface_type() {
+        uint8_t tag = u8();
+        switch (tag) {
+        case 16:
+        case 17:
+        case 18:
+            interface_type();
+            break;
+        case 19:
+            interface_type();
+            interface_type();
+            break;
+        case 0:
+        case 1:
+        case 2:
+        case 3:
+        case 4:
+        case 5:
+        case 6:
+        case 7:
+        case 8:
+        case 9:
+        case 14:
+        case 15:
+        case 20:
+            break;
+        default:
+            fail("unsupported interface type tag " + std::to_string(tag));
+            break;
+        }
+    }
+
+    host_import_entry host_import() {
+        object * n = name();
+        std::string target = string();
+        std::string symbol = string();
+        uint32_t arity = u32();
+        bool is_io = boolean();
+        size_t signature_start = pos();
+        uint32_t argc = u32();
+        for (uint32_t i = 0; i < argc; i++) {
+            interface_type();
+        }
+        interface_type();
+        size_t signature_end = pos();
+        return { n, target, symbol, arity, is_io, bytes_from(signature_start, signature_end) };
+    }
+
 private:
     std::string m_error;
     uint32_t m_version = 1;
@@ -618,8 +683,12 @@ static void clear_loaded_package() {
         lean_dec(entry.name);
         lean_dec(entry.init_name);
     }
+    for (host_import_entry const & entry : g_host_imports) {
+        lean_dec(entry.name);
+    }
     g_entries.clear();
     g_init_entries.clear();
+    g_host_imports.clear();
     g_interface_manifest.clear();
     g_package_loaded = false;
 }
@@ -644,7 +713,7 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "invalid IR package magic `" + magic + "`";
         return false;
     }
-    if (version != 1 && version != 2 && version != 3 && version != 4) {
+    if (version != 1 && version != 2 && version != 3 && version != 4 && version != 5) {
         g_last_error = "unsupported IR package version " + std::to_string(version);
         return false;
     }
@@ -669,6 +738,14 @@ static bool load_package(uint8_t const * data, size_t size) {
             init_entries.push_back({ n, init_name });
         }
     }
+    std::vector<host_import_entry> host_imports;
+    if (version >= 5) {
+        uint32_t host_import_count = r.u32();
+        host_imports.reserve(host_import_count);
+        for (uint32_t i = 0; i < host_import_count; i++) {
+            host_imports.push_back(r.host_import());
+        }
+    }
     std::string interface_manifest;
     if (version >= 4) {
         interface_manifest = r.string();
@@ -687,6 +764,7 @@ static bool load_package(uint8_t const * data, size_t size) {
     }
     g_entries = std::move(entries);
     g_init_entries = std::move(init_entries);
+    g_host_imports = std::move(host_imports);
     g_interface_manifest = std::move(interface_manifest);
     g_package_loaded = true;
     return true;
@@ -755,6 +833,56 @@ object * find_package_boxed_decl(object * n) {
         }
     }
     return nullptr;
+}
+
+char const * find_host_import_symbol(object * n) {
+    for (host_import_entry const & entry : g_host_imports) {
+        if (lean_name_eq(n, entry.name)) {
+            return entry.symbol.c_str();
+        }
+    }
+    return nullptr;
+}
+
+int32_t host_import_slot_for_symbol(char const * symbol) {
+    if (symbol == nullptr) {
+        return -1;
+    }
+    for (size_t i = 0; i < g_host_imports.size(); i++) {
+        std::string boxed = g_host_imports[i].symbol + "___boxed";
+        if (g_host_imports[i].symbol == symbol || boxed == symbol) {
+            return static_cast<int32_t>(i);
+        }
+    }
+    return -1;
+}
+
+uint32_t host_import_arity(uint32_t slot) {
+    if (slot >= g_host_imports.size()) {
+        return 0;
+    }
+    return g_host_imports[slot].arity;
+}
+
+char const * host_import_signature(uint32_t slot) {
+    if (slot >= g_host_imports.size()) {
+        return nullptr;
+    }
+    return g_host_imports[slot].signature.data();
+}
+
+uint32_t host_import_signature_size(uint32_t slot) {
+    if (slot >= g_host_imports.size()) {
+        return 0;
+    }
+    return static_cast<uint32_t>(g_host_imports[slot].signature.size());
+}
+
+bool host_import_is_io(uint32_t slot) {
+    if (slot >= g_host_imports.size()) {
+        return false;
+    }
+    return g_host_imports[slot].is_io;
 }
 
 uint32_t package_decl_count() {

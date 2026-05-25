@@ -48,6 +48,7 @@ import_section="$out/import-section.txt"
 env_imports="$out/env-imports.txt"
 wasi_imports="$out/wasi-imports.txt"
 unresolved="$out/unresolved-symbols.txt"
+allowed_undefined="$out/allowed-js-imports.txt"
 report="$out/boundary.md"
 generated_package="build/generated/vir-demo.irpkg"
 generated_provider_report="build/generated/ir-provider-report.md"
@@ -57,6 +58,11 @@ mkdir -p "$out"
 mkdir -p "$obj_dir"
 mkdir -p "$overlay_include/lean"
 mkdir -p web/public
+
+cat > "$allowed_undefined" <<'EOF'
+vir_js_call
+vir_js_call_result_size
+EOF
 
 npm run --silent generate:package
 if ! cmp -s "$generated_package" "$demo_package"; then
@@ -210,6 +216,7 @@ link_stamp_tmp="$link_stamp.tmp"
   printf 'stack_size=%s\n' "$wasm_stack_size"
   printf 'link_flag=%s\n' "${link_flags[@]}"
   printf 'export=%s\n' "${exports[@]}"
+  printf 'allowed_undefined=%s\n' "$(cat "$allowed_undefined")"
 } > "$link_stamp_tmp"
 if ! cmp -s "$link_stamp_tmp" "$link_stamp"; then
   mv "$link_stamp_tmp" "$link_stamp"
@@ -241,6 +248,7 @@ if [ "$needs_link" = "1" ]; then
   echo "link $strict_wasm"
   "$cxx" "--target=$target" "${link_objects[@]}" \
     "${link_flags[@]}" \
+    "-Wl,--allow-undefined-file=$allowed_undefined" \
     -Wl,--error-limit=0 \
     "${exports[@]}" \
     -o "$strict_wasm" > "$strict_log" 2>&1 || strict_status=$?
