@@ -108,7 +108,8 @@ reported as package-load errors.
 ## Lean To JavaScript Host Imports
 
 Lean sources can call synchronous JavaScript functions through declarations
-marked with `@[vir_js "..."]`. Import one of the provided modules:
+marked with `@[vir_js "..."]`. See `docs/LEAN_VIR_LIBRARY.md` for the
+Lean-side API reference. Import one of the provided modules:
 
 ```lean
 import Lean.Vir.Browser

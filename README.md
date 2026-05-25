@@ -139,6 +139,8 @@ and deploys the static site artifact.
 - `docs/LOCAL_IRPKG.md` documents the focused `.lean` to `.irpkg` workflow and
   `/dev.html` package runner.
 - `docs/JS_API.md` documents the browser-facing JavaScript runtime wrapper.
+- `docs/LEAN_VIR_LIBRARY.md` documents the Lean-side `Lean.Vir.*` host import
+  library.
 - `docs/INTERFACE_PIPELINE.md` documents the config-driven package plus
   embedded interface pipeline and the current WIT direction.
 - `docs/FIXTURE_COVERAGE.md` records the current fixture and boundary coverage
