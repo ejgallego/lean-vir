@@ -17,6 +17,10 @@ Those negative cases cover function fields, scalar-only trivial wrappers,
 parent structures, recursive structures, indexed inductive families, and
 implicit arguments.
 
+The browser smoke resolves dev-runner entries from each package's embedded
+manifest, so UI coverage follows generated entry ids and export counts rather
+than a separate hand-maintained list of JavaScript names.
+
 ## Current Passing Surface
 
 The current fixture surface covers:

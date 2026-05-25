@@ -286,9 +286,6 @@ async function smokeRunner(cdp, origin, url, expected) {
   if (expected.entryCount !== undefined) {
     assert.equal(before.entryCount, expected.entryCount);
   }
-  if (expected.entryCountAtLeast !== undefined) {
-    assert.ok(before.entryCount >= expected.entryCountAtLeast, `expected at least ${expected.entryCountAtLeast} entries, got ${before.entryCount}`);
-  }
   if (expected.input !== undefined) {
     assert.equal(before.input, expected.input);
   }
@@ -373,6 +370,31 @@ async function prepareNegativePackages() {
   );
 }
 
+const packageInfoCache = new Map();
+
+async function packageInfoFor(packageFile) {
+  if (!packageInfoCache.has(packageFile)) {
+    packageInfoCache.set(packageFile, readIrPackageInfo(await readFile(resolve(distRoot, packageFile))));
+  }
+  return packageInfoCache.get(packageFile);
+}
+
+async function runnerCaseFromManifest(packageFile, entryName, expected) {
+  const info = await packageInfoFor(packageFile);
+  const entry = info.manifest.exports.find((candidate) =>
+    candidate.entry === entryName || candidate.id === entryName || candidate.jsName === entryName);
+  assert.ok(entry, `${packageFile} manifest does not export ${entryName}`);
+  return {
+    url: `dev.html?package=${encodeURIComponent(packageFile)}&entry=${encodeURIComponent(entry.id)}`,
+    expected: {
+      packageName: packageFile,
+      entry: entry.id,
+      entryCount: info.manifest.exports.length,
+      ...expected,
+    },
+  };
+}
+
 await prepareNegativePackages();
 
 const server = await serveDist();
@@ -388,81 +410,37 @@ try {
   await cdp.send("Runtime.enable");
 
   await smokeLanding(cdp, server.origin);
-  await smokeRunner(
-    cdp,
-    server.origin,
-    "dev.html?package=local-fib.irpkg&entry=fib",
-    {
-      packageName: "local-fib.irpkg",
-      entry: "fib",
+  const runnerCases = [
+    await runnerCaseFromManifest("local-fib.irpkg", "fib", {
       entryCount: 1,
       input: "0",
       runInput: "12",
       result: "144",
-    },
-  );
-  await smokeRunner(
-    cdp,
-    server.origin,
-    "dev.html?package=local-mergesort.irpkg&entry=SortDemo_demoFromArray",
-    {
-      packageName: "local-mergesort.irpkg",
-      entry: "SortDemo_demoFromArray",
+    }),
+    await runnerCaseFromManifest("local-mergesort.irpkg", "SortDemo.demoFromArray", {
       entryCount: 2,
       input: "[]",
       runInput: "[4, 1, 3, 2]",
       result: "30",
-    },
-  );
-  await smokeRunner(
-    cdp,
-    server.origin,
-    "dev.html?package=vir-demo.irpkg&entry=Tamagotchi_step",
-    {
-      packageName: "vir-demo.irpkg",
-      entry: "Tamagotchi_step",
-      entryCountAtLeast: 6,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Tamagotchi.step", {
       inputs: ["happy", "feed"],
       inputTags: ["SELECT", "SELECT"],
       runInputs: ["happy", "ignore"],
       result: "hungry",
-    },
-  );
-  await smokeRunner(
-    cdp,
-    server.origin,
-    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_ExprPrinter_exprKindScore",
-    {
-      packageName: "vir-demo.irpkg",
-      entry: "Vir_Fixtures_ExprPrinter_exprKindScore",
-      entryCountAtLeast: 6,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ExprPrinter.exprKindScore", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"kind":"bvar","index":4}`],
       result: "5",
-    },
-  );
-  await smokeRunner(
-    cdp,
-    server.origin,
-    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_InterfaceShapes_arrayStringTotalLength",
-    {
-      packageName: "vir-demo.irpkg",
-      entry: "Vir_Fixtures_InterfaceShapes_arrayStringTotalLength",
-      entryCountAtLeast: 6,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", {
       input: "[]",
       inputTags: ["TEXTAREA"],
       runInputs: [`["a","bc"]`],
       result: "3",
-    },
-  );
-  await smokeRunner(
-    cdp,
-    server.origin,
-    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump",
-    {
-      packageName: "vir-demo.irpkg",
-      entry: "Vir_Fixtures_InterfaceShapes_profileStatsBump",
-      entryCountAtLeast: 6,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.profileStatsBump", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"enabled":true,"level":2,"score16":30,"visits":400,"quota":5,"checksum":6000,"tier":"pro","note":"ok"}`],
       result: `{
@@ -475,23 +453,19 @@ try {
   "tier": "elite",
   "note": "ok!"
 }`,
-    },
-  );
-  await smokeRunner(
-    cdp,
-    server.origin,
-    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_InterfaceShapes_boxNatBump",
-    {
-      packageName: "vir-demo.irpkg",
-      entry: "Vir_Fixtures_InterfaceShapes_boxNatBump",
-      entryCountAtLeast: 6,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.boxNatBump", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"value":41}`],
       result: `{
   "value": "42"
 }`,
-    },
-  );
+    }),
+  ];
+
+  for (const { url, expected } of runnerCases) {
+    await smokeRunner(cdp, server.origin, url, expected);
+  }
   await smokeRunnerFailure(
     cdp,
     server.origin,
