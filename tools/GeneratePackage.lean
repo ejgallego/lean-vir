@@ -66,6 +66,8 @@ inductive InterfaceType where
   | int
   | bool
   | string
+  | float
+  | float32
   | uint8
   | uint16
   | uint32
@@ -127,22 +129,19 @@ structure InterfaceManifest where
 def defaultTargets : Array Target := #[
   {
     source := "examples/Fib.lean",
-    roots := #[`fib, `fib._boxed]
+    roots := #[`fib]
   },
   {
     source := "examples/Tamagotchi.lean",
     roots := #[
-      `Tamagotchi.step,
-      `Tamagotchi.step._boxed
+      `Tamagotchi.step
     ]
   },
   {
     source := "examples/Tamagotchi.lean",
     roots := #[
       `Tamagotchi.run,
-      `Tamagotchi.run._boxed,
       `Tamagotchi.trace,
-      `Tamagotchi.trace._boxed,
       `Tamagotchi.demoScript
     ],
     packageOnly := true
@@ -1497,23 +1496,40 @@ def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   else
     target.roots
 
+def boxedBaseName? : Name -> Option Name
+  | .str pre "_boxed" => some pre
+  | _ => none
+
+def boxedName (name : Name) : Name :=
+  .str name "_boxed"
+
+def resolvedRootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
+  rootsForTarget index target |>.foldl (fun roots root =>
+    let roots := if roots.contains root then roots else roots.push root
+    match boxedBaseName? root with
+    | some _ => roots
+    | none =>
+        let boxed := boxedName root
+        if (index.find? boxed).isSome && !roots.contains boxed then
+          roots.push boxed
+        else
+          roots) #[]
+
 def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
   targets.foldl (fun state target =>
-    (rootsForTarget index target).foldl (fun state root => collectName index root state) state) {}
+    (resolvedRootsForTarget index target).foldl (fun state root => collectName index root state) state) {}
 
 def DeclIndex.envForSource? (index : DeclIndex) (source : String) : Option Environment :=
   index.envs.findSome? fun (candidate, env) =>
     if candidate == source then some env else none
-
-def boxedBaseName? : Name -> Option Name
-  | .str pre "_boxed" => some pre
-  | _ => none
 
 def InterfaceType.label : InterfaceType → String
   | .nat => "Nat"
   | .int => "Int"
   | .bool => "Bool"
   | .string => "String"
+  | .float => "Float"
+  | .float32 => "Float32"
   | .uint8 => "UInt8"
   | .uint16 => "UInt16"
   | .uint32 => "UInt32"
@@ -1534,6 +1550,8 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .int => 1
   | .bool => 2
   | .string => 3
+  | .float => 10
+  | .float32 => 11
   | .uint8 => 4
   | .uint16 => 5
   | .uint32 => 6
@@ -1549,13 +1567,13 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .structure .. => 20
   | .expr => 15
 
-def InterfaceType.hasUnsupportedTrivialBoundary : InterfaceType → Bool
-  | .uint64 => true
+partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
+  | .float | .float32 | .uint64 => true
+  | .structure _ _ (some idx) _ _ _ fields =>
+      match fields[idx]? with
+      | some (_, fieldType, _, _) => fieldType.needsBoxedCallBoundary
+      | none => false
   | _ => false
-
-def InterfaceType.unsupportedTopLevelBoundary? : InterfaceType → Option String
-  | .uint64 => some "top-level UInt64 is not supported at the wasm32 boxed interpreter boundary"
-  | _ => none
 
 def jsonEscape (text : String) : String :=
   text.foldl (fun out c =>
@@ -1706,6 +1724,8 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `Int => some .int
   | some `Bool => some .bool
   | some `String => some .string
+  | some `Float => some .float
+  | some `Float32 => some .float32
   | some `UInt8 => some .uint8
   | some `UInt16 => some .uint16
   | some `UInt32 => some .uint32
@@ -1863,14 +1883,6 @@ partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : Cor
             fields := fields.push (fieldName.toString, fieldType, fieldLayout, isSubobject)
         | .error reason =>
             return .error s!"field `{fieldName}` of structure `{name}` has unsupported type `{fieldExpr}`: {reason}"
-      match trivialField? with
-      | some idx =>
-          match fields[idx]? with
-          | some (fieldName, fieldType, _, _) =>
-              if fieldType.hasUnsupportedTrivialBoundary then
-                return .error s!"single-field structure `{name}` with `{fieldType.label}` field `{fieldName}` is not supported at the boxed interpreter boundary"
-          | none => pure ()
-      | none => pure ()
       return .ok (.structure name (exprTypeLabel e) trivialField? layout.ctorInfo.size layout.ctorInfo.usize layout.ctorInfo.ssize fields)
 
 partial def interfaceType (e : Lean.Expr) (seenStructures : StructureSeen := #[]) : CoreM (Except String InterfaceType) := do
@@ -1934,18 +1946,12 @@ partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args :
         match ← interfaceType domain with
         | .error reason => return .error s!"unsupported argument type `{domain}`: {reason}"
         | .ok argType =>
-            match argType.unsupportedTopLevelBoundary? with
-            | some reason => return .error s!"unsupported argument type `{domain}`: {reason}"
-            | none =>
-                let arg := { name := binderArgName argIndex name, type := argType }
-                interfaceSignature? body (argIndex + 1) (args.push arg)
+            let arg := { name := binderArgName argIndex name, type := argType }
+            interfaceSignature? body (argIndex + 1) (args.push arg)
   | result =>
       match ← interfaceType result with
       | .error reason => return .error s!"unsupported result type `{result}`: {reason}"
-      | .ok resultType =>
-          match resultType.unsupportedTopLevelBoundary? with
-          | some reason => return .error s!"unsupported result type `{result}`: {reason}"
-          | none => return .ok (args, resultType)
+      | .ok resultType => return .ok (args, resultType)
 
 def isInterfaceDeclInfo : ConstantInfo → Bool
   | .defnInfo _ => true
@@ -2000,7 +2006,13 @@ def jsNameFor (n : Name) : String :=
   let sanitized := text.map sanitizeJsNameChar
   if sanitized.isEmpty then "entry" else sanitized
 
-def interfaceExportFor (source : String) (name : Name) :
+def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : InterfaceType) : Bool :=
+  args.any (fun arg => arg.type.needsBoxedCallBoundary) || result.needsBoxedCallBoundary
+
+def boxedBoundaryDiagnostic (name : Name) : String :=
+  s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
+
+def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except InterfaceDiagnostic InterfaceExport) := do
   if isPrivateName name then
     return .error { name, source, reason := "private declarations are not exported" }
@@ -2014,8 +2026,11 @@ def interfaceExportFor (source : String) (name : Name) :
         else
           match ← interfaceSignature? info.type with
           | .ok (args, result) =>
-              let jsName := jsNameFor name
-              return .ok { id := jsName, jsName, entry := name, source, args, result }
+              if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
+                return .error { name, source, reason := boxedBoundaryDiagnostic name }
+              else
+                let jsName := jsNameFor name
+                return .ok { id := jsName, jsName, entry := name, source, args, result }
           | .error reason =>
               return .error { name, source, reason }
 
@@ -2028,7 +2043,7 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
     source := target.source.toString
     mode := mode
     roots := target.roots
-    resolvedRoots := rootsForTarget index target
+    resolvedRoots := resolvedRootsForTarget index target
     packageOnly := target.packageOnly
   }
 
@@ -2062,7 +2077,7 @@ def collectInterfaceManifest (metadata : PackageMetadata) (targets : Array Targe
         } }
     | some env =>
         for name in exportCandidatesFor index target do
-          match ← runCoreForSource source env (interfaceExportFor source name) with
+          match ← runCoreForSource source env (interfaceExportFor index source name) with
           | .ok entry =>
               if !manifest.exports.any (fun existing => existing.entry == entry.entry) then
                 manifest := { manifest with exports := manifest.exports.push entry }

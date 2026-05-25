@@ -13,6 +13,18 @@ def listUInt32Sum (xs : List UInt32) : Nat :=
 def uint32Bump (value : UInt32) : UInt32 :=
   value + 1
 
+def uint64Bump (value : UInt64) : UInt64 :=
+  value + 1
+
+def floatScale (value : Float) : Float :=
+  Float.scaleB value (2 : Int)
+
+def floatScore (value : Float) : Nat :=
+  value.toUInt32.toNat + 1
+
+def float32Roundtrip (value : Float32) : Float32 :=
+  value
+
 def optionNatBump : Option Nat → Option Nat
   | none => some 0
   | some value => some (value + 1)
@@ -95,6 +107,9 @@ structure Box (α : Type) where
 structure UInt32Box where
   value : UInt32
 
+structure UInt64Box where
+  value : UInt64
+
 structure Tagged (α : Type) where
   label : String
   payload : α
@@ -161,7 +176,13 @@ def boxNatBump (box : Box Nat) : Box Nat :=
 def boxUInt32Bump (box : Box UInt32) : Box UInt32 :=
   { value := box.value + 1 }
 
+def boxUInt64Bump (box : Box UInt64) : Box UInt64 :=
+  { value := box.value + 1 }
+
 def uint32BoxBump (box : UInt32Box) : UInt32Box :=
+  { value := box.value + 1 }
+
+def uint64BoxBump (box : UInt64Box) : UInt64Box :=
   { value := box.value + 1 }
 
 def nestedBoxNatBump (box : Box (Box Nat)) : Box (Box Nat) :=
@@ -208,6 +229,9 @@ def interfaceShapeScore : Nat :=
     + listUInt32Sum [1, 2, 3]
     + optionNatScore none
     + (uint32Bump 4).toNat
+    + (uint64Bump 4).toNat
+    + (floatScale 1.5).toUInt32.toNat
+    + floatScore 3.25
     + prodNatNatSum (4, 5)
     + optionArrayNatSum (some #[1, 2, 3])
     + listProdNatStringScore [(4, "ab"), (5, "c")]
@@ -225,7 +249,9 @@ def interfaceShapeScore : Nat :=
     }
     + (boxNatBump { value := 4 }).value
     + (boxUInt32Bump { value := 4 }).value.toNat
+    + (boxUInt64Bump { value := 4 }).value.toNat
     + (uint32BoxBump { value := 4 }).value.toNat
+    + (uint64BoxBump { value := 4 }).value.toNat
     + taggedArrayScore { label := "tags", payload := #["a", "bc"] }
     + (meteredBoxBump { active := true, count := 3, payload := { value := 4 } }).payload.value
     + boxExprKindScore { value := .bvar 2 }

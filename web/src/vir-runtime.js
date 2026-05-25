@@ -300,12 +300,28 @@ class BinaryWriter {
     );
   }
 
+  rawBytes(bytes) {
+    for (const byte of bytes) {
+      this.u8(byte);
+    }
+  }
+
+  f64(value) {
+    const buffer = new ArrayBuffer(8);
+    new DataView(buffer).setFloat64(0, value, true);
+    this.rawBytes(new Uint8Array(buffer));
+  }
+
+  f32(value) {
+    const buffer = new ArrayBuffer(4);
+    new DataView(buffer).setFloat32(0, value, true);
+    this.rawBytes(new Uint8Array(buffer));
+  }
+
   bytesValue(bytes) {
     const view = asBytes(bytes, "bytes");
     this.u32(view.byteLength);
-    for (const byte of view) {
-      this.u8(byte);
-    }
+    this.rawBytes(view);
   }
 
   string(value) {
@@ -338,14 +354,30 @@ class BinaryReader {
     return (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) >>> 0;
   }
 
-  bytesValue() {
-    const len = this.u32();
+  rawBytes(len) {
     if (len > this.bytes.byteLength - this.offset) {
       throw new Error("result byte length exceeds payload");
     }
     const out = this.bytes.slice(this.offset, this.offset + len);
     this.offset += len;
     return out;
+  }
+
+  f64() {
+    const buffer = new ArrayBuffer(8);
+    new Uint8Array(buffer).set(this.rawBytes(8));
+    return new DataView(buffer).getFloat64(0, true);
+  }
+
+  f32() {
+    const buffer = new ArrayBuffer(4);
+    new Uint8Array(buffer).set(this.rawBytes(4));
+    return new DataView(buffer).getFloat32(0, true);
+  }
+
+  bytesValue() {
+    const len = this.u32();
+    return this.rawBytes(len);
   }
 
   string() {
@@ -514,6 +546,12 @@ function encodeValuePayload(writer, type, value, label) {
     case 9:
       writer.bytesValue(asByteArrayBytes(value));
       return;
+    case 10:
+      writer.f64(normalizeFloat(value, label));
+      return;
+    case 11:
+      writer.f32(normalizeFloat(value, label));
+      return;
     case 14:
       writer.u32(normalizeEnum(value, type, label));
       return;
@@ -602,6 +640,12 @@ function decodeValuePayload(reader, type) {
       break;
     case 9:
       value = reader.bytesValue();
+      break;
+    case 10:
+      value = reader.f64();
+      break;
+    case 11:
+      value = reader.f32();
       break;
     case 14:
       value = enumValue(type, reader.u32());
@@ -815,6 +859,27 @@ function normalizeDecimal(value, label, { signed }) {
     return value.trim();
   }
   throw new Error(`${label} must be an integer, BigInt, or decimal string`);
+}
+
+function normalizeFloat(value, label) {
+  if (typeof value === "number") {
+    return value;
+  }
+  if (typeof value === "string") {
+    const trimmed = value.trim();
+    if (trimmed.length === 0) {
+      throw new Error(`${label} must be a number`);
+    }
+    if (/^[+-]?nan$/i.test(trimmed)) {
+      return Number.NaN;
+    }
+    const parsed = Number(trimmed);
+    if (Number.isNaN(parsed)) {
+      throw new Error(`${label} must be a number`);
+    }
+    return parsed;
+  }
+  throw new Error(`${label} must be a number`);
 }
 
 function normalizeInteger(value, label, min, max) {

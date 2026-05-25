@@ -1701,6 +1701,8 @@ enum class vir_wire_type : uint8_t {
     UInt64 = 7,
     USize = 8,
     ByteArray = 9,
+    Float = 10,
+    Float32 = 11,
     Array = 16,
     List = 17,
     Option = 18,
@@ -1777,6 +1779,26 @@ public:
         return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
     }
 
+    uint64_t u64() {
+        uint64_t lo = u32();
+        uint64_t hi = u32();
+        return lo | (hi << 32);
+    }
+
+    double f64() {
+        uint64_t bits = u64();
+        double value = 0.0;
+        memcpy(&value, &bits, sizeof(value));
+        return value;
+    }
+
+    float f32() {
+        uint32_t bits = u32();
+        float value = 0.0f;
+        memcpy(&value, &bits, sizeof(value));
+        return value;
+    }
+
     std::string string() {
         uint32_t len = u32();
         if (!ok) return std::string();
@@ -1826,6 +1848,23 @@ public:
         m_bytes.push_back(static_cast<char>((value >> 8) & 0xff));
         m_bytes.push_back(static_cast<char>((value >> 16) & 0xff));
         m_bytes.push_back(static_cast<char>((value >> 24) & 0xff));
+    }
+
+    void u64(uint64_t value) {
+        u32(static_cast<uint32_t>(value & 0xffffffff));
+        u32(static_cast<uint32_t>(value >> 32));
+    }
+
+    void f64(double value) {
+        uint64_t bits = 0;
+        memcpy(&bits, &value, sizeof(bits));
+        u64(bits);
+    }
+
+    void f32(float value) {
+        uint32_t bits = 0;
+        memcpy(&bits, &value, sizeof(bits));
+        u32(bits);
     }
 
     void string(std::string const & value) {
@@ -1889,6 +1928,8 @@ static bool is_known_wire_type(vir_wire_type tag) {
     case vir_wire_type::UInt64:
     case vir_wire_type::USize:
     case vir_wire_type::ByteArray:
+    case vir_wire_type::Float:
+    case vir_wire_type::Float32:
     case vir_wire_type::Array:
     case vir_wire_type::List:
     case vir_wire_type::Option:
@@ -2265,6 +2306,12 @@ static void set_scalar_field(
     case vir_wire_type::UInt64:
         lean_ctor_set_uint64(obj, offset, lean_unbox_uint64(field_value));
         break;
+    case vir_wire_type::Float:
+        lean_ctor_set_float(obj, offset, lean_unbox_float(field_value));
+        break;
+    case vir_wire_type::Float32:
+        lean_ctor_set_float32(obj, offset, lean_unbox_float32(field_value));
+        break;
     default:
         r.fail("structure scalar field has non-scalar wire type");
         break;
@@ -2323,6 +2370,10 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
         std::vector<uint8_t> values = r.bytes();
         return mk_byte_array(values.data(), static_cast<uint32_t>(values.size()));
     }
+    case vir_wire_type::Float:
+        return lean_box_float(r.f64());
+    case vir_wire_type::Float32:
+        return lean_box_float32(r.f32());
     case vir_wire_type::Array: {
         uint32_t len = r.u32();
         object * array = lean_alloc_array(len, len);
@@ -2459,12 +2510,15 @@ static bool is_unboxed_call_boundary_type(vir_type const & type, vir_type const 
     return false;
 }
 
-static bool is_unsupported_wasm32_call_boundary_type(vir_type const & type) {
-    if (type.tag == vir_wire_type::UInt64) {
+static bool needs_boxed_wasm32_call_boundary_type(vir_type const & type) {
+    if (
+        type.tag == vir_wire_type::Float ||
+        type.tag == vir_wire_type::Float32 ||
+        type.tag == vir_wire_type::UInt64) {
         return true;
     }
     if (type.tag == vir_wire_type::Structure && type.trivial_field != UINT32_MAX) {
-        return type.args[type.trivial_field].tag == vir_wire_type::UInt64;
+        return needs_boxed_wasm32_call_boundary_type(type.args[type.trivial_field]);
     }
     return false;
 }
@@ -2517,8 +2571,8 @@ static void encode_unboxed_call_result(vir_writer & w, vir_type const & type, ob
 static vir_arg decode_argument(vir_reader & r, bool has_boxed_decl) {
     vir_type type = decode_type(r);
     if (!r.ok) return { lean_box(0), true };
-    if (is_unsupported_wasm32_call_boundary_type(type)) {
-        r.fail("UInt64 top-level and trivial structure arguments are not supported at the wasm32 boxed interpreter boundary");
+    if (!has_boxed_decl && needs_boxed_wasm32_call_boundary_type(type)) {
+        r.fail("top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary");
         return { lean_box(0), true };
     }
     vir_type const * unboxed_type = nullptr;
@@ -2629,6 +2683,10 @@ static object * scalar_field_as_object(
         return lean_box_uint32(lean_ctor_get_uint32(value, offset));
     case vir_wire_type::UInt64:
         return lean_box_uint64(lean_ctor_get_uint64(value, offset));
+    case vir_wire_type::Float:
+        return lean_box_float(lean_ctor_get_float(value, offset));
+    case vir_wire_type::Float32:
+        return lean_box_float32(lean_ctor_get_float32(value, offset));
     case vir_wire_type::SimpleEnum:
         if (layout.size == 1) return lean_box(lean_ctor_get_uint8(value, offset));
         if (layout.size == 2) return lean_box(lean_ctor_get_uint16(value, offset));
@@ -2726,6 +2784,12 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
         break;
     case vir_wire_type::ByteArray:
         w.bytes(lean_sarray_cptr(value), static_cast<uint32_t>(lean_sarray_size(value)));
+        break;
+    case vir_wire_type::Float:
+        w.f64(lean_unbox_float(value));
+        break;
+    case vir_wire_type::Float32:
+        w.f32(lean_unbox_float32(value));
         break;
     case vir_wire_type::Array: {
         uint32_t len = static_cast<uint32_t>(lean_array_size(value));
@@ -3357,8 +3421,8 @@ extern "C" char const * vir_call(
         }
         return nullptr;
     }
-    if (lean::is_unsupported_wasm32_call_boundary_type(result_type)) {
-        lean::g_call_error = "UInt64 top-level and trivial structure results are not supported at the wasm32 boxed interpreter boundary";
+    if (!has_boxed_decl && lean::needs_boxed_wasm32_call_boundary_type(result_type)) {
+        lean::g_call_error = "top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary";
         for (lean::vir_arg const & arg : decoded_args) {
             if (arg.owned) lean_dec(arg.value);
         }

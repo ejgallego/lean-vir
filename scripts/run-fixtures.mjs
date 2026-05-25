@@ -5,7 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
+import { spawn } from "node:child_process";
+import { availableParallelism } from "node:os";
 
 import { createVirRuntime } from "../web/src/vir-runtime.js";
 
@@ -14,19 +15,44 @@ const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
 const buildDir = new URL("../build/fixtures/", import.meta.url);
 const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
 const summaryPath = new URL("summary.json", buildDir);
+const sourceCache = new Map();
+let cachedWasmBytes = null;
 
 function run(cmd, args, options = {}) {
-  const result = spawnSync(cmd, args, {
-    cwd: root,
-    encoding: "utf8",
-    stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
+  return new Promise((resolve) => {
+    const child = spawn(cmd, args, {
+      cwd: root,
+      stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
+    });
+    let stdout = "";
+    let stderr = "";
+    if (options.capture) {
+      child.stdout.setEncoding("utf8");
+      child.stderr.setEncoding("utf8");
+      child.stdout.on("data", (chunk) => {
+        stdout += chunk;
+      });
+      child.stderr.on("data", (chunk) => {
+        stderr += chunk;
+      });
+    }
+    child.on("error", (error) => {
+      resolve({
+        ok: false,
+        status: null,
+        stdout,
+        stderr: stderr || String(error),
+      });
+    });
+    child.on("close", (status) => {
+      resolve({
+        ok: status === 0,
+        status,
+        stdout,
+        stderr,
+      });
+    });
   });
-  return {
-    ok: result.status === 0,
-    status: result.status,
-    stdout: result.stdout ?? "",
-    stderr: result.stderr ?? "",
-  };
 }
 
 function requireOk(result, command) {
@@ -121,7 +147,7 @@ async function hostOracle(fixture) {
   if (fixture.result?.type !== "Nat") {
     throw new Error(`${fixture.id}: unsupported host result type ${fixture.result?.type}`);
   }
-  const source = await readFile(new URL(`../${fixture.source}`, import.meta.url), "utf8");
+  const source = await fixtureSource(fixture.source);
   const mainDecl = fixture.unsafe ? "unsafe def main : IO UInt32 := do" : "def main : IO UInt32 := do";
   const hostSource = [
     source,
@@ -134,7 +160,7 @@ async function hostOracle(fixture) {
   ].join("\n");
   const hostPath = new URL(`${sanitizeId(fixture.id)}.host.lean`, buildDir);
   await writeFile(hostPath, hostSource);
-  const result = run("lean", ["--run", hostPath.pathname], { capture: true });
+  const result = await run("lean", ["--run", hostPath.pathname], { capture: true });
   requireOk(result, `host oracle ${fixture.id}`);
   const lines = result.stdout.trim().split("\n").filter(Boolean);
   const value = lines.at(-1);
@@ -144,8 +170,20 @@ async function hostOracle(fixture) {
   return value;
 }
 
+async function fixtureSource(source) {
+  if (!sourceCache.has(source)) {
+    sourceCache.set(source, readFile(new URL(`../${source}`, import.meta.url), "utf8"));
+  }
+  return sourceCache.get(source);
+}
+
+async function upstreamWasmBytes() {
+  cachedWasmBytes ??= readFile(wasmPath);
+  return cachedWasmBytes;
+}
+
 async function instantiateWasm(packagePath) {
-  const wasm = await readFile(wasmPath);
+  const wasm = await upstreamWasmBytes();
   const irPackage = await readFile(packagePath);
   return createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
 }
@@ -163,7 +201,7 @@ async function generatePackage(fixture) {
     fixture.source,
     ...rootsFor(fixture),
   ];
-  const result = run("lean", args, { capture: true });
+  const result = await run("lean", args, { capture: true });
   const report = await readFile(reportPath, "utf8").catch(() => "");
   const diagnostics = packageDiagnostics(report);
   if (!result.ok) {
@@ -230,12 +268,33 @@ async function runFixture(fixture) {
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 await mkdir(buildDir, { recursive: true });
-requireOk(run("npm", ["run", "--silent", "build:demo"]), "npm run build:demo");
+requireOk(await run("npm", ["run", "--silent", "build:demo"]), "npm run build:demo");
 
-const results = [];
-for (const fixture of manifest.fixtures) {
-  results.push(await runFixture(fixture));
+function fixtureJobCount(total) {
+  const configured = Number.parseInt(process.env.VIR_FIXTURE_JOBS ?? "", 10);
+  if (Number.isInteger(configured) && configured > 0) {
+    return Math.min(configured, total);
+  }
+  return Math.min(Math.max(1, Math.floor(availableParallelism() / 2)), total);
 }
+
+async function mapWithLimit(items, limit, fn) {
+  const results = new Array(items.length);
+  let next = 0;
+  async function worker() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await fn(items[index], index);
+    }
+  }
+  await Promise.all(Array.from({ length: limit }, () => worker()));
+  return results;
+}
+
+const jobs = fixtureJobCount(manifest.fixtures.length);
+console.log(`fixture jobs: ${jobs}`);
+const results = await mapWithLimit(manifest.fixtures, jobs, runFixture);
 
 let passed = 0;
 let unsupported = 0;

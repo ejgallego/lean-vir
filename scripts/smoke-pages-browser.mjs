@@ -513,6 +513,24 @@ try {
       runInputs: ["41"],
       result: "42",
     }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint64Bump", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["18446744073709551615"],
+      result: "0",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.floatScale", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["1.5"],
+      result: "6",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.float32Roundtrip", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["1.25"],
+      result: "1.25",
+    }),
     await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.profileStatsBump", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"enabled":true,"level":2,"score16":30,"visits":400,"quota":5,"checksum":6000,"tier":"pro","note":"ok"}`],

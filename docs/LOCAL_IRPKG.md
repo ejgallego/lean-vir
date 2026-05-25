@@ -97,6 +97,7 @@ the result bytes for JavaScript.
 Supported v1 types:
 
 - `Nat`, `Int`, `Bool`, `String`;
+- `Float`, `Float32`;
 - `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - `ByteArray`;
 - recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and
@@ -109,9 +110,10 @@ Supported v1 types:
 - `Lean.Expr`.
 
 Large exact integer results are returned as decimal strings.
-Direct top-level `UInt64` arguments/results currently fail package generation
-with an explicit wasm32 boxed-boundary diagnostic. `UInt64` remains supported
-inside structures and manifest-supported compound values.
+Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them use the
+generated Lean `_boxed` declarations automatically. If a requested export needs
+one and the compiler did not produce it, package generation fails with an
+explicit wasm32 boundary diagnostic.
 
 `/dev.html` generates enum select controls and JSON textareas for structural
 `Lean.Expr`, user-defined structures, and manifest-supported compound values
@@ -120,8 +122,6 @@ from the embedded manifest after the package is loaded.
 One-field wrappers whose only runtime field is a direct scalar, such as
 `Box UInt32`, are exported with the same JavaScript object shape as other
 single-field structures.
-The same direct top-level `UInt64` limitation applies to scalar-only wrappers
-over `UInt64`.
 
 ## Current Scope
 

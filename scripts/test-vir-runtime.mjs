@@ -107,7 +107,7 @@ assert.ok(runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib
 assertManifestTypeDescriptorsRoundTrip(runtime.interfaceManifest);
 assert.equal(validateInterfaceManifest(structuredClone(validManifestShape)).exports[0].entry, "ok");
 assertInvalidManifest((manifest) => {
-  manifest.exports[0].result = { type: "UnsupportedTag10", wireTag: 10 };
+  manifest.exports[0].result = { type: "UnsupportedTag13", wireTag: 13 };
 }, /result\.wireTag is not supported/);
 assertInvalidManifest((manifest) => {
   manifest.exports[0].args[0].type = { type: "Array Nat", wireTag: 16 };
@@ -352,6 +352,20 @@ assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 5), {
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint32Bump", 41), 42);
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint64Bump", "18446744073709551615"), "0");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScale", 1.5), 6);
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScore", 3.25), "4");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.float32Roundtrip", 1.25), 1.25);
+const floatScaleEntry = runtime.interfaceManifest.exports.find(
+  (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.floatScale",
+);
+assert.equal(floatScaleEntry.args[0].type.wireTag, 10);
+assert.equal(floatScaleEntry.result.wireTag, 10);
+const float32Entry = runtime.interfaceManifest.exports.find(
+  (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.float32Roundtrip",
+);
+assert.equal(float32Entry.args[0].type.wireTag, 11);
+assert.equal(float32Entry.result.wireTag, 11);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", null), "0");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { kind: "some", value: 41 }), "42");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null), "empty");
@@ -475,6 +489,18 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
 }), {
   value: 42,
 });
+const boxUInt64Entry = runtime.interfaceManifest.exports.find(
+  (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.boxUInt64Bump",
+);
+assert.equal(boxUInt64Entry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box UInt64");
+assert.equal(boxUInt64Entry.args[0].type.trivialFieldIndex, 0);
+assert.equal(boxUInt64Entry.args[0].type.fields[0].type.wireTag, 7);
+assert.equal(boxUInt64Entry.args[0].type.fields[0].layout.kind, "object");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt64Bump", {
+  value: "18446744073709551615",
+}), {
+  value: "0",
+});
 const uint32BoxEntry = runtime.interfaceManifest.exports.find(
   (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.uint32BoxBump",
 );
@@ -486,6 +512,18 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
   value: 41,
 }), {
   value: 42,
+});
+const uint64BoxEntry = runtime.interfaceManifest.exports.find(
+  (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.uint64BoxBump",
+);
+assert.equal(uint64BoxEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.UInt64Box");
+assert.equal(uint64BoxEntry.args[0].type.trivialFieldIndex, 0);
+assert.equal(uint64BoxEntry.args[0].type.fields[0].type.wireTag, 7);
+assert.equal(uint64BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint64BoxBump", {
+  value: "18446744073709551615",
+}), {
+  value: "0",
 });
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.nestedBoxNatBump", {
   value: { value: 4 },
@@ -630,9 +668,15 @@ try {
     "structure FreshScalarBox where",
     "  value : UInt32",
     "",
+    "structure FreshUInt64Box where",
+    "  value : UInt64",
+    "",
     "def freshBump (n : Nat) : Nat := n + 7",
     "def freshSum (xs : Array Nat) : Nat := xs.foldl (fun acc n => acc + n) 0",
     "def freshPairSum (p : Nat × Nat) : Nat := p.fst + p.snd",
+    "def freshUInt64Bump (n : UInt64) : UInt64 := n + 1",
+    "def freshFloatScale (n : Float) : Float := Float.scaleB n (1 : Int)",
+    "def freshFloat32Roundtrip (n : Float32) : Float32 := n",
     "def freshClassifySum (n : Nat) : Sum Nat String :=",
     "  if n < 3 then .inl (n + 10) else .inr (toString n)",
     "",
@@ -658,6 +702,9 @@ try {
     "  { label := wrap.label ++ \"!\", payload := wrap.payload + 1 }",
     "",
     "def freshScalarBoxBump (box : FreshScalarBox) : FreshScalarBox :=",
+    "  { value := box.value + 1 }",
+    "",
+    "def freshUInt64BoxBump (box : FreshUInt64Box) : FreshUInt64Box :=",
     "  { value := box.value + 1 }",
     "",
   ].join("\n"));
@@ -690,13 +737,19 @@ try {
     "freshBump",
     "freshClassifyExcept",
     "freshClassifySum",
+    "freshFloat32Roundtrip",
+    "freshFloatScale",
     "freshPairSum",
     "freshScalarBoxBump",
     "freshSum",
     "freshSumScore",
+    "freshUInt64BoxBump",
+    "freshUInt64Bump",
     "freshWrapBoxBump",
     "freshWrapUInt32Bump",
   ]);
+  assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshUInt64Bump._boxed"));
+  assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshFloatScale._boxed"));
   const freshInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", freshPackage], {
     encoding: "utf8",
   });
@@ -708,6 +761,9 @@ try {
   assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
   assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");
   assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), "15");
+  assert.equal(freshRuntime.call("freshUInt64Bump", "18446744073709551615"), "0");
+  assert.equal(freshRuntime.call("freshFloatScale", 2.5), 5);
+  assert.equal(freshRuntime.call("freshFloat32Roundtrip", 1.25), 1.25);
   assert.deepEqual(freshRuntime.call("freshClassifySum", 2), {
     kind: "inl",
     value: "12",
@@ -759,6 +815,15 @@ try {
   }), {
     value: 10,
   });
+  const freshUInt64BoxEntry = freshManifest.exports.find((entry) => entry.entry === "freshUInt64BoxBump");
+  assert.equal(freshUInt64BoxEntry.args[0].type.trivialFieldIndex, 0);
+  assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].type.wireTag, 7);
+  assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
+  assert.deepEqual(freshRuntime.call("freshUInt64BoxBump", {
+    value: "18446744073709551615",
+  }), {
+    value: "0",
+  });
   assert.deepEqual(freshRuntime.call("freshWrapBoxBump", {
     label: "box",
     payload: {
@@ -795,7 +860,6 @@ try {
     "def recursiveBoxIdentity (box : RecursiveBox) : RecursiveBox := box",
     "def indexedBoxIdentity (box : IndexedBox 3) : IndexedBox 3 := box",
     "def implicitBump {offset : Nat} (n : Nat) : Nat := n + offset",
-    "def uint64Identity (n : UInt64) : UInt64 := n + 1",
     "",
   ], [
     /badCounterIdentity/,
@@ -806,8 +870,6 @@ try {
     /unsupported type `IndexedBox/,
     /implicitBump/,
     /unsupported implicit\/instance argument `offset`/,
-    /uint64Identity/,
-    /top-level UInt64 is not supported/,
   ]);
 } finally {
   await rm(freshDir, { recursive: true, force: true });

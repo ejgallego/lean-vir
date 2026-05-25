@@ -84,7 +84,7 @@ Add `--json` to emit the parsed package header and full embedded manifest.
 
 The embedded manifest currently supports:
 
-- scalar values: `Nat`, `Int`, `Bool`, `String`;
+- scalar values: `Nat`, `Int`, `Bool`, `String`, `Float`, `Float32`;
 - fixed-width values: `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
 - byte data: `ByteArray`;
 - recursive collections: `Array α` and `List α` for supported `α`;
@@ -92,20 +92,19 @@ The embedded manifest currently supports:
   `Sum α β`, and `Except ε α` for supported parameters;
 - non-indexed user-defined structures over manifest-supported fields, including
   parameterized instances such as `Box Nat` and `Tagged (Array String)`,
-  direct `Bool`, `UInt*`, `USize`, and enum fields, single-field wrappers over
-  direct scalar fields, and inherited parent fields represented as flattened
-  JavaScript object keys;
+  direct `Bool`, `UInt*`, `USize`, `Float`, `Float32`, and enum fields,
+  single-field wrappers over direct scalar fields, and inherited parent fields
+  represented as flattened JavaScript object keys;
 - nullary inductive enums, represented in JavaScript by generated constructor
   names;
 - `Lean.Expr`, represented as structural JavaScript objects.
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
-Direct top-level `UInt64` arguments/results are rejected for now because the
-current wasm32 boxed interpreter entry point cannot carry a raw 64-bit scalar in
-its `object*` call slot. `UInt64` remains supported inside structures and
-manifest-supported compound values where Lean stores it in boxed/object or
-constructor scalar slots.
+Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them require
+the generated Lean `_boxed` declaration at the wasm32 interpreter boundary. The
+package generator auto-includes that companion for requested roots and reports a
+diagnostic instead of producing a partial package if the companion is missing.
 
 For structures, the manifest records Lean constructor layout metadata alongside
 the applied Lean type label, field names, and instantiated field types. The JS
@@ -117,8 +116,6 @@ as flattened object keys.
 One-field wrappers whose only runtime field is a direct scalar, for example
 `Box UInt32`, use the same `trivialFieldIndex` path as object-field wrappers
 while keeping the JavaScript object shape.
-Wrappers over `UInt64` are rejected with the same explicit boundary diagnostic
-as direct top-level `UInt64`.
 
 `Sum` and `Except` use manifest-backed tagged-union metadata. JavaScript sends
 objects such as `{ "kind": "inl", "value": 4 }` or `{ "ok": value }`; results

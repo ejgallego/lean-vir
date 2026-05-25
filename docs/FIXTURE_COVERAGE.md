@@ -5,6 +5,9 @@ Each fixture is Lean source under `fixtures/`, elaborated by Lean 4.30-rc2 into
 real `Lean.IR.Decl` values, packaged with `tools/GeneratePackage.lean`, and
 then compared against Lean's host IR interpreter with
 `interpreter.prefer_native=false`.
+The runner schedules fixtures in parallel using half of Node's reported
+`availableParallelism()` by default; set `VIR_FIXTURE_JOBS=1` for serial
+debugging or another positive value to pin the worker count.
 
 Known unsupported fixtures can be tracked in `fixtures/manifest.json` so
 boundary gaps remain explicit. The runner writes `build/fixtures/summary.json`
@@ -14,7 +17,7 @@ missing-boundary diagnostics for CI and boundary debugging.
 The runtime smoke also generates temporary packages with intentionally
 unsupported interface exports and asserts that package generation fails loudly.
 Those negative cases cover function fields, recursive structures, indexed
-inductive families, implicit arguments, and direct top-level `UInt64` exports.
+inductive families, and implicit arguments.
 
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather
@@ -68,7 +71,8 @@ The current fixture surface covers:
   `Option (Array Nat)`, `List (Nat × String)`, `Sum Nat Nat`,
   `Except Nat (Option (Sum Nat Nat))`, non-indexed user-defined structures
   with object, scalar, `USize`, enum, parameterized, scalar-only trivial
-  wrapper, and inherited parent fields, and `Array Lean.Expr`;
+  wrapper, `UInt64` trivial wrapper, and inherited parent fields, direct
+  top-level `UInt64`, `Float`, `Float32`, and `Array Lean.Expr`;
 - hash/name/substring/pointer-address primitives reached by parser data paths,
   including `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
   `ptrAddrUnsafe`;

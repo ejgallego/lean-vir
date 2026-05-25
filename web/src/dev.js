@@ -104,6 +104,8 @@ function defaultValueForType(type) {
     case 6:
     case 7:
     case 8:
+    case 10:
+    case 11:
       return 0;
     case 2:
       return false;
@@ -197,6 +199,9 @@ function renderInputFields(entry) {
       field.type = "number";
       field.inputMode = "numeric";
       field.min = "0";
+    } else if (input.type?.wireTag === 10 || input.type?.wireTag === 11) {
+      field.type = "text";
+      field.inputMode = "decimal";
     } else if (isJsonInputTag(input.type?.wireTag)) {
       field.spellcheck = false;
     } else if (input.type?.wireTag === 2) {
@@ -288,6 +293,21 @@ function parseByteArrayInput(text) {
   });
 }
 
+function parseFloatInput(text) {
+  const trimmed = text.trim();
+  if (trimmed.length === 0) {
+    throw new Error("invalid Float literal: empty input");
+  }
+  if (/^[+-]?nan$/i.test(trimmed)) {
+    return Number.NaN;
+  }
+  const value = Number(trimmed);
+  if (Number.isNaN(value)) {
+    throw new Error(`invalid Float literal: ${text}`);
+  }
+  return value;
+}
+
 function parseInputValue(input, text) {
   switch (input.type?.wireTag) {
     case 0:
@@ -310,6 +330,9 @@ function parseInputValue(input, text) {
     }
     case 9:
       return parseByteArrayInput(text);
+    case 10:
+    case 11:
+      return parseFloatInput(text);
     case 14:
       return text.trim();
     case 15:

@@ -15,23 +15,18 @@ const reportPath = process.argv[3] ?? "build/generated/ir-provider-report.md";
 const demoTargets = [
   {
     source: "examples/Fib.lean",
-    roots: ["fib", "fib._boxed"],
+    roots: ["fib"],
   },
   {
     source: "examples/Tamagotchi.lean",
-    roots: [
-      "Tamagotchi.step",
-      "Tamagotchi.step._boxed",
-    ],
+    roots: ["Tamagotchi.step"],
   },
   {
     source: "examples/Tamagotchi.lean",
     packageOnly: true,
     roots: [
       "Tamagotchi.run",
-      "Tamagotchi.run._boxed",
       "Tamagotchi.trace",
-      "Tamagotchi.trace._boxed",
       "Tamagotchi.demoScript",
     ],
   },
