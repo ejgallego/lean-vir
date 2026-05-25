@@ -191,6 +191,46 @@ assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore", {
     bonus: 14,
   },
 }), "48");
+const profileStatsInput = {
+  enabled: true,
+  level: 2,
+  score16: 30,
+  visits: 400,
+  quota: 5,
+  checksum: 6000,
+  tier: "pro",
+  note: "ok",
+};
+const profileStatsEntry = runtime.interfaceManifest.exports.find(
+  (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.profileStatsBump",
+);
+assert.equal(profileStatsEntry.args[0].type.objectFieldCount, 1);
+assert.equal(profileStatsEntry.args[0].type.usizeFieldCount, 1);
+assert.equal(profileStatsEntry.args[0].type.scalarByteSize, 17);
+assert.deepEqual(
+  profileStatsEntry.args[0].type.fields.map((field) => [field.name, field.layout.kind]),
+  [
+    ["enabled", "scalar"],
+    ["level", "scalar"],
+    ["score16", "scalar"],
+    ["visits", "scalar"],
+    ["quota", "usize"],
+    ["checksum", "scalar"],
+    ["tier", "scalar"],
+    ["note", "object"],
+  ],
+);
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsBump", profileStatsInput), {
+  enabled: false,
+  level: 3,
+  score16: 32,
+  visits: 403,
+  quota: "9",
+  checksum: "6005",
+  tier: "elite",
+  note: "ok!",
+});
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsScore", profileStatsInput), "6549");
 assert.throws(
   () => runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
     nickname: "lean",
@@ -250,14 +290,28 @@ try {
   const freshSource = join(freshDir, "FreshUser.lean");
   const freshPackage = join(freshDir, "fresh.irpkg");
   await writeFile(freshSource, [
+    "inductive FreshMode where",
+    "  | cold",
+    "  | hot",
+    "",
     "structure FreshBox where",
     "  label : String",
     "  value : Nat",
+    "  enabled : Bool",
+    "  hits : UInt32",
+    "  quota : USize",
+    "  mode : FreshMode",
     "",
     "def freshBump (n : Nat) : Nat := n + 7",
     "def freshSum (xs : Array Nat) : Nat := xs.foldl (fun acc n => acc + n) 0",
     "def freshPairSum (p : Nat × Nat) : Nat := p.fst + p.snd",
-    "def freshBoxBump (box : FreshBox) : FreshBox := { box with value := box.value + box.label.length }",
+    "def freshBoxBump (box : FreshBox) : FreshBox :=",
+    "  { box with",
+    "    value := box.value + box.label.length",
+    "    enabled := !box.enabled",
+    "    hits := box.hits + 1",
+    "    quota := box.quota + 2",
+    "    mode := .hot }",
     "",
   ].join("\n"));
 
@@ -295,9 +349,20 @@ try {
   assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
   assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");
   assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), "15");
-  assert.deepEqual(freshRuntime.call("freshBoxBump", { label: "abc", value: 4 }), {
+  assert.deepEqual(freshRuntime.call("freshBoxBump", {
+    label: "abc",
+    value: 4,
+    enabled: false,
+    hits: 7,
+    quota: 8,
+    mode: "cold",
+  }), {
     label: "abc",
     value: "7",
+    enabled: true,
+    hits: 8,
+    quota: "10",
+    mode: "hot",
   });
 
   const unsupportedStructureSource = join(freshDir, "UnsupportedStructure.lean");
@@ -305,7 +370,7 @@ try {
   const unsupportedStructureReport = join(freshDir, "unsupported-structure.report.md");
   await writeFile(unsupportedStructureSource, [
     "structure BadCounter where",
-    "  count : UInt32",
+    "  callback : Nat → Nat",
     "",
     "def badCounterIdentity (box : BadCounter) : BadCounter := box",
     "",
@@ -325,6 +390,7 @@ try {
   assert.notEqual(unsupportedStructure.status, 0);
   assert.match(unsupportedStructure.stderr, /unsupported interface exports/);
   assert.match(unsupportedStructure.stderr, /badCounterIdentity/);
+  assert.match(unsupportedStructure.stderr, /field `callback`/);
 } finally {
   await rm(freshDir, { recursive: true, force: true });
 }

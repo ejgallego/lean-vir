@@ -393,8 +393,14 @@ function encodeTypeDescriptor(writer, type, label) {
       return;
     case 20: {
       const fields = requireStructureFields(type, label);
+      writer.u32(requireStructureCount(type, "objectFieldCount", label));
+      writer.u32(requireStructureCount(type, "usizeFieldCount", label));
+      writer.u32(requireStructureCount(type, "scalarByteSize", label));
       writer.u32(fields.length);
-      fields.forEach((field) => encodeTypeDescriptor(writer, field.type, `${label}.${field.name}`));
+      fields.forEach((field) => {
+        encodeStructureFieldLayout(writer, field.layout, `${label}.${field.name}`);
+        encodeTypeDescriptor(writer, field.type, `${label}.${field.name}`);
+      });
       return;
     }
     default:
@@ -414,8 +420,20 @@ function decodeTypeDescriptor(reader) {
     case 19:
       return { wireTag: tag, fst: decodeTypeDescriptor(reader), snd: decodeTypeDescriptor(reader) };
     case 20: {
+      const objectFieldCount = reader.u32();
+      const usizeFieldCount = reader.u32();
+      const scalarByteSize = reader.u32();
       const len = reader.u32();
-      return { wireTag: tag, fields: Array.from({ length: len }, () => ({ type: decodeTypeDescriptor(reader) })) };
+      return {
+        wireTag: tag,
+        objectFieldCount,
+        usizeFieldCount,
+        scalarByteSize,
+        fields: Array.from({ length: len }, () => ({
+          layout: decodeStructureFieldLayout(reader),
+          type: decodeTypeDescriptor(reader),
+        })),
+      };
     }
     default:
       return { wireTag: tag };
@@ -633,6 +651,54 @@ function requireTypeField(type, field, label) {
   return child;
 }
 
+function requireStructureCount(type, field, label) {
+  const value = type?.[field];
+  if (!Number.isInteger(value) || value < 0) {
+    throw new Error(`${label} has invalid manifest structure ${field}`);
+  }
+  return value;
+}
+
+function encodeStructureFieldLayout(writer, layout, label) {
+  const checked = requireStructureFieldLayout(layout, label);
+  writer.u8(checked.tag);
+  writer.u32(checked.index ?? 0);
+  writer.u32(checked.size ?? 0);
+  writer.u32(checked.offset ?? 0);
+}
+
+function decodeStructureFieldLayout(reader) {
+  const tag = reader.u8();
+  const index = reader.u32();
+  const size = reader.u32();
+  const offset = reader.u32();
+  switch (tag) {
+    case 0:
+      return { kind: "object", index };
+    case 1:
+      return { kind: "usize", index };
+    case 2:
+      return { kind: "scalar", size, offset };
+    default:
+      throw new Error(`unsupported result structure field layout tag ${tag}`);
+  }
+}
+
+function requireStructureFieldLayout(layout, label) {
+  if (layout?.kind === "object" && Number.isInteger(layout.index) && layout.index >= 0) {
+    return { tag: 0, index: layout.index };
+  }
+  if (layout?.kind === "usize" && Number.isInteger(layout.index) && layout.index >= 0) {
+    return { tag: 1, index: layout.index };
+  }
+  if (layout?.kind === "scalar" &&
+      Number.isInteger(layout.size) && layout.size > 0 &&
+      Number.isInteger(layout.offset) && layout.offset >= 0) {
+    return { tag: 2, size: layout.size, offset: layout.offset };
+  }
+  throw new Error(`${label} has an invalid manifest structure field layout`);
+}
+
 function requireStructureFields(type, label) {
   if (!Array.isArray(type?.fields)) {
     throw new Error(`${label} is missing manifest structure fields`);
@@ -641,6 +707,7 @@ function requireStructureFields(type, label) {
     if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
       throw new Error(`${label} has an invalid manifest structure field`);
     }
+    requireStructureFieldLayout(field.layout, `${label}.${field.name}`);
   }
   return type.fields;
 }
@@ -657,12 +724,28 @@ function sameWireType(expected, actual) {
         sameWireType(requireTypeField(expected, "snd", "expected result"), actual.snd);
     case 20: {
       const fields = requireStructureFields(expected, "expected result");
+      if (requireStructureCount(expected, "objectFieldCount", "expected result") !== actual?.objectFieldCount ||
+          requireStructureCount(expected, "usizeFieldCount", "expected result") !== actual?.usizeFieldCount ||
+          requireStructureCount(expected, "scalarByteSize", "expected result") !== actual?.scalarByteSize) {
+        return false;
+      }
       if (!Array.isArray(actual?.fields) || fields.length !== actual.fields.length) return false;
-      return fields.every((field, index) => sameWireType(field.type, actual.fields[index]?.type));
+      return fields.every((field, index) =>
+        sameStructureFieldLayout(field.layout, actual.fields[index]?.layout) &&
+        sameWireType(field.type, actual.fields[index]?.type));
     }
     default:
       return true;
   }
+}
+
+function sameStructureFieldLayout(expected, actual) {
+  const lhs = requireStructureFieldLayout(expected, "expected result field");
+  const rhs = requireStructureFieldLayout(actual, "actual result field");
+  return lhs.tag === rhs.tag &&
+    (lhs.index ?? 0) === (rhs.index ?? 0) &&
+    (lhs.size ?? 0) === (rhs.size ?? 0) &&
+    (lhs.offset ?? 0) === (rhs.offset ?? 0);
 }
 
 function normalizeDecimal(value, label, { signed }) {

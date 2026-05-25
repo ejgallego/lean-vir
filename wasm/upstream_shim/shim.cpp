@@ -1710,9 +1710,26 @@ enum class vir_wire_type : uint8_t {
     Expr = 15,
 };
 
+enum class vir_field_layout_kind : uint8_t {
+    Object = 0,
+    USize = 1,
+    Scalar = 2,
+};
+
+struct vir_field_layout {
+    vir_field_layout_kind kind;
+    uint32_t index;
+    uint32_t size;
+    uint32_t offset;
+};
+
 struct vir_type {
     vir_wire_type tag;
     std::vector<vir_type> args;
+    std::vector<vir_field_layout> field_layouts;
+    uint32_t object_fields = 0;
+    uint32_t usize_fields = 0;
+    uint32_t scalar_bytes = 0;
 };
 
 class vir_reader {
@@ -1875,6 +1892,37 @@ static bool is_known_wire_type(vir_wire_type tag) {
     }
 }
 
+static bool is_known_field_layout(vir_field_layout_kind kind) {
+    switch (kind) {
+    case vir_field_layout_kind::Object:
+    case vir_field_layout_kind::USize:
+    case vir_field_layout_kind::Scalar:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static vir_field_layout decode_field_layout(vir_reader & r) {
+    vir_field_layout layout {
+        static_cast<vir_field_layout_kind>(r.u8()),
+        r.u32(),
+        r.u32(),
+        r.u32(),
+    };
+    if (!is_known_field_layout(layout.kind)) {
+        r.fail("unsupported structure field layout tag " + std::to_string(static_cast<uint8_t>(layout.kind)));
+    }
+    return layout;
+}
+
+static void encode_field_layout(vir_writer & w, vir_field_layout const & layout) {
+    w.u8(static_cast<uint8_t>(layout.kind));
+    w.u32(layout.index);
+    w.u32(layout.size);
+    w.u32(layout.offset);
+}
+
 static vir_type decode_type(vir_reader & r) {
     vir_type type { static_cast<vir_wire_type>(r.u8()), {} };
     if (!is_known_wire_type(type.tag)) {
@@ -1892,9 +1940,14 @@ static vir_type decode_type(vir_reader & r) {
         type.args.push_back(decode_type(r));
         break;
     case vir_wire_type::Structure: {
+        type.object_fields = r.u32();
+        type.usize_fields = r.u32();
+        type.scalar_bytes = r.u32();
         uint32_t field_count = r.u32();
         type.args.reserve(field_count);
+        type.field_layouts.reserve(field_count);
         for (uint32_t i = 0; i < field_count; i++) {
+            type.field_layouts.push_back(decode_field_layout(r));
             type.args.push_back(decode_type(r));
         }
         break;
@@ -1918,9 +1971,13 @@ static void encode_type(vir_writer & w, vir_type const & type) {
         encode_type(w, type.args[1]);
         break;
     case vir_wire_type::Structure:
+        w.u32(type.object_fields);
+        w.u32(type.usize_fields);
+        w.u32(type.scalar_bytes);
         w.u32(static_cast<uint32_t>(type.args.size()));
-        for (vir_type const & field : type.args) {
-            encode_type(w, field);
+        for (size_t i = 0; i < type.args.size(); i++) {
+            encode_field_layout(w, type.field_layouts[i]);
+            encode_type(w, type.args[i]);
         }
         break;
     default:
@@ -2120,6 +2177,51 @@ static object * decode_expr(vir_reader & r) {
     }
 }
 
+static uint32_t structure_scalar_base(vir_type const & type) {
+    return (type.object_fields + type.usize_fields) * sizeof(void *);
+}
+
+static void set_structure_scalar_field(
+    vir_reader & r,
+    object * obj,
+    vir_type const & structure_type,
+    vir_type const & field_type,
+    vir_field_layout const & layout,
+    object * field_value) {
+    uint32_t offset = structure_scalar_base(structure_type) + layout.offset;
+    switch (field_type.tag) {
+    case vir_wire_type::Bool:
+    case vir_wire_type::UInt8:
+    case vir_wire_type::SimpleEnum:
+        if (layout.size == 1) {
+            lean_ctor_set_uint8(obj, offset, static_cast<uint8_t>(lean_unbox(field_value)));
+            break;
+        }
+        if (layout.size == 2) {
+            lean_ctor_set_uint16(obj, offset, static_cast<uint16_t>(lean_unbox(field_value)));
+            break;
+        }
+        if (layout.size == 4) {
+            lean_ctor_set_uint32(obj, offset, static_cast<uint32_t>(lean_unbox(field_value)));
+            break;
+        }
+        r.fail("unsupported structure enum scalar size " + std::to_string(layout.size));
+        break;
+    case vir_wire_type::UInt16:
+        lean_ctor_set_uint16(obj, offset, static_cast<uint16_t>(lean_unbox(field_value)));
+        break;
+    case vir_wire_type::UInt32:
+        lean_ctor_set_uint32(obj, offset, lean_unbox_uint32(field_value));
+        break;
+    case vir_wire_type::UInt64:
+        lean_ctor_set_uint64(obj, offset, lean_unbox_uint64(field_value));
+        break;
+    default:
+        r.fail("structure scalar field has non-scalar wire type");
+        break;
+    }
+}
+
 static object * decode_value(vir_reader & r, vir_type const & type) {
     switch (type.tag) {
     case vir_wire_type::Nat: {
@@ -2192,9 +2294,31 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
         return mk_ctor_owned(0, { fst, snd });
     }
     case vir_wire_type::Structure: {
-        object * obj = lean_alloc_ctor(0, type.args.size(), 0);
+        object * obj = lean_alloc_ctor(
+            0,
+            type.object_fields,
+            type.usize_fields * sizeof(size_t) + type.scalar_bytes);
         for (size_t i = 0; i < type.args.size(); i++) {
-            lean_ctor_set(obj, static_cast<unsigned>(i), decode_value(r, type.args[i]));
+            vir_type const & field_type = type.args[i];
+            vir_field_layout const & layout = type.field_layouts[i];
+            object * field_value = decode_value(r, field_type);
+            switch (layout.kind) {
+            case vir_field_layout_kind::Object:
+                lean_ctor_set(obj, layout.index, field_value);
+                break;
+            case vir_field_layout_kind::USize:
+                if (field_type.tag != vir_wire_type::USize) {
+                    r.fail("structure usize field has non-USize wire type");
+                } else {
+                    lean_ctor_set_usize(obj, layout.index, lean_unbox_usize(field_value));
+                }
+                lean_dec(field_value);
+                break;
+            case vir_field_layout_kind::Scalar:
+                set_structure_scalar_field(r, obj, type, field_type, layout, field_value);
+                lean_dec(field_value);
+                break;
+            }
         }
         return obj;
     }
@@ -2299,6 +2423,54 @@ static void encode_expr_payload(vir_writer & w, object * value) {
     }
 }
 
+static object * structure_scalar_field_as_object(
+    vir_type const & structure_type,
+    vir_type const & field_type,
+    vir_field_layout const & layout,
+    object * value) {
+    uint32_t offset = structure_scalar_base(structure_type) + layout.offset;
+    switch (field_type.tag) {
+    case vir_wire_type::Bool:
+    case vir_wire_type::UInt8:
+        return lean_box(lean_ctor_get_uint8(value, offset));
+    case vir_wire_type::UInt16:
+        return lean_box(lean_ctor_get_uint16(value, offset));
+    case vir_wire_type::UInt32:
+        return lean_box_uint32(lean_ctor_get_uint32(value, offset));
+    case vir_wire_type::UInt64:
+        return lean_box_uint64(lean_ctor_get_uint64(value, offset));
+    case vir_wire_type::SimpleEnum:
+        if (layout.size == 1) return lean_box(lean_ctor_get_uint8(value, offset));
+        if (layout.size == 2) return lean_box(lean_ctor_get_uint16(value, offset));
+        if (layout.size == 4) return lean_box(lean_ctor_get_uint32(value, offset));
+        if (layout.size == 8) return lean_box_uint64(lean_ctor_get_uint64(value, offset));
+        return lean_box(0);
+    default:
+        return lean_box(0);
+    }
+}
+
+static object * structure_field_as_object(
+    vir_type const & structure_type,
+    vir_type const & field_type,
+    vir_field_layout const & layout,
+    object * value,
+    bool & borrowed) {
+    switch (layout.kind) {
+    case vir_field_layout_kind::Object:
+        borrowed = true;
+        return lean_ctor_get(value, layout.index);
+    case vir_field_layout_kind::USize:
+        borrowed = false;
+        return lean_box_usize(lean_ctor_get_usize(value, layout.index));
+    case vir_field_layout_kind::Scalar:
+        borrowed = false;
+        return structure_scalar_field_as_object(structure_type, field_type, layout, value);
+    }
+    borrowed = false;
+    return lean_box(0);
+}
+
 static void encode_value_payload(vir_writer & w, vir_type const & type, object * value) {
     switch (type.tag) {
     case vir_wire_type::Nat:
@@ -2366,7 +2538,10 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
         break;
     case vir_wire_type::Structure:
         for (size_t i = 0; i < type.args.size(); i++) {
-            encode_value_payload(w, type.args[i], lean_ctor_get(value, static_cast<unsigned>(i)));
+            bool borrowed = false;
+            object * field = structure_field_as_object(type, type.args[i], type.field_layouts[i], value, borrowed);
+            encode_value_payload(w, type.args[i], field);
+            if (!borrowed) lean_dec(field);
         }
         break;
     case vir_wire_type::SimpleEnum:

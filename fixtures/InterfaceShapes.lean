@@ -66,6 +66,26 @@ structure ProfileEnvelope where
   profile : Profile
   summary : ProfileSummary
 
+inductive ProfileTier where
+  | basic
+  | pro
+  | elite
+
+def tierScore : ProfileTier → Nat
+  | .basic => 1
+  | .pro => 10
+  | .elite => 100
+
+structure ProfileStats where
+  enabled : Bool
+  level : UInt8
+  score16 : UInt16
+  visits : UInt32
+  quota : USize
+  checksum : UInt64
+  tier : ProfileTier
+  note : String
+
 def profileBump (profile : Profile) : Profile :=
   { profile with
     nickname := profile.nickname ++ "!"
@@ -87,6 +107,27 @@ def profileEnvelopeScore (envelope : ProfileEnvelope) : Nat :=
     + envelope.summary.label.length
     + envelope.summary.bonus.getD 0
 
+def profileStatsBump (stats : ProfileStats) : ProfileStats :=
+  { stats with
+    enabled := !stats.enabled
+    level := stats.level + 1
+    score16 := stats.score16 + 2
+    visits := stats.visits + 3
+    quota := stats.quota + 4
+    checksum := stats.checksum + 5
+    tier := .elite
+    note := stats.note ++ "!" }
+
+def profileStatsScore (stats : ProfileStats) : Nat :=
+  (if stats.enabled then 100 else 0)
+    + stats.level.toNat
+    + stats.score16.toNat
+    + stats.visits.toNat
+    + stats.quota.toNat
+    + stats.checksum.toNat
+    + tierScore stats.tier
+    + stats.note.length
+
 def interfaceShapeScore : Nat :=
   arrayStringTotalLength #["a", "bc"]
     + listUInt32Sum [1, 2, 3]
@@ -96,5 +137,15 @@ def interfaceShapeScore : Nat :=
     + listProdNatStringScore [(4, "ab"), (5, "c")]
     + arrayExprKindScore #[.const `Nat [], .bvar 2]
     + profileScore { nickname := "lean", points := 4, tags := ["ir", "wasm"] }
+    + profileStatsScore {
+      enabled := true,
+      level := 2,
+      score16 := 30,
+      visits := 400,
+      quota := 5,
+      checksum := 6000,
+      tier := .pro,
+      note := "ok"
+    }
 
 end Vir.Fixtures.InterfaceShapes

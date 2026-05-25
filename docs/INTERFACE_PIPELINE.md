@@ -90,14 +90,20 @@ The embedded manifest currently supports:
 - recursive collections: `Array α` and `List α` for supported `α`;
 - recursive option/product shapes: `Option α` and `α × β` for supported
   `α` and `β`;
-- plain non-parameterized structures over manifest-supported object-backed
-  fields, represented as JavaScript objects;
+- plain non-parameterized structures over manifest-supported fields, including
+  direct `Bool`, `UInt*`, `USize`, and enum fields, represented as JavaScript
+  objects;
 - nullary inductive enums, represented in JavaScript by generated constructor
   names;
 - `Lean.Expr`, represented as structural JavaScript objects.
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
+
+For structures, the manifest records Lean constructor layout metadata alongside
+field names and field types. The JS runtime sends that layout to the WASM shim
+so direct scalar fields are written to the same object, `USize`, and scalar slots
+that compiled Lean code expects.
 
 The recursive type tree is embedded in the JSON manifest and sent as a compact
 internal descriptor in each `vir_call` payload. This is intentionally still an

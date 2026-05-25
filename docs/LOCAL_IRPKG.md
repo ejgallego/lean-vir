@@ -101,8 +101,9 @@ Supported v1 types:
 - `ByteArray`;
 - recursive `Array α`, `List α`, `Option α`, and `α × β` shapes over
   supported types;
-- plain non-parameterized structures over manifest-supported object-backed
-  fields, represented as JavaScript objects keyed by Lean field name;
+- plain non-parameterized structures over manifest-supported fields, including
+  direct scalar fields, represented as JavaScript objects keyed by Lean field
+  name;
 - nullary inductive enums;
 - `Lean.Expr`.
 

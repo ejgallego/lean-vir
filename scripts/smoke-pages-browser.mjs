@@ -458,20 +458,22 @@ try {
   await smokeRunner(
     cdp,
     server.origin,
-    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileBump",
+    "dev.html?package=vir-demo.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump",
     {
       packageName: "vir-demo.irpkg",
-      entry: "Vir_Fixtures_InterfaceShapes_profileBump",
+      entry: "Vir_Fixtures_InterfaceShapes_profileStatsBump",
       entryCountAtLeast: 6,
       inputTags: ["TEXTAREA"],
-      runInputs: [`{"nickname":"lean","points":4,"tags":["ir","wasm"]}`],
+      runInputs: [`{"enabled":true,"level":2,"score16":30,"visits":400,"quota":5,"checksum":6000,"tier":"pro","note":"ok"}`],
       result: `{
-  "nickname": "lean!",
-  "points": "6",
-  "tags": [
-    "ir",
-    "wasm"
-  ]
+  "enabled": false,
+  "level": 3,
+  "score16": 32,
+  "visits": 403,
+  "quota": "9",
+  "checksum": "6005",
+  "tier": "elite",
+  "note": "ok!"
 }`,
     },
   );

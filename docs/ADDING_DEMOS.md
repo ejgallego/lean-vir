@@ -79,7 +79,8 @@ per-shape WASM exports for manifest-supported declarations; unsupported entries
 should fail during package generation until their interface type is implemented.
 
 The current generic interface covers primitive scalars, byte arrays, recursive
-`Array`/`List`/`Option`/`Prod` shapes, plain user-defined structures, nullary
-inductive enums, and structural `Lean.Expr` values. For enums, no per-demo code is needed: the
-generator records the constructor list in the package manifest and `/dev.html`
-renders a select control from that manifest after the package is loaded.
+`Array`/`List`/`Option`/`Prod` shapes, plain user-defined structures with direct
+scalar fields, nullary inductive enums, and structural `Lean.Expr` values. For
+enums, no per-demo code is needed: the generator records the constructor list in
+the package manifest and `/dev.html` renders a select control from that manifest
+after the package is loaded.

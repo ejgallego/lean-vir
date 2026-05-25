@@ -9,12 +9,19 @@ import Lean.Elab.Frontend
 import Lean.Compiler.IR.CompilerM
 import Lean.Compiler.InitAttr
 import Lean.Compiler.LCNF.Main
+import Lean.Compiler.LCNF.ToImpureType
 
 open Lean
 
 namespace Vir.GeneratePackage
 
 open Lean.IR
+
+inductive StructureFieldLayout where
+  | object (index : Nat)
+  | usize (index : Nat)
+  | scalar (size offset : Nat)
+  deriving BEq, Repr
 
 structure Target where
   source : System.FilePath
@@ -68,7 +75,8 @@ inductive InterfaceType where
   | option (element : InterfaceType)
   | prod (fst snd : InterfaceType)
   | simpleEnum (name : Name) (constructors : Array Name)
-  | structure (name : Name) (fields : Array (String × InterfaceType))
+  | structure (name : Name) (objectFields usizeFields scalarBytes : Nat)
+      (fields : Array (String × InterfaceType × StructureFieldLayout))
   | expr
   deriving BEq, Repr
 
@@ -1512,7 +1520,7 @@ def InterfaceType.label : InterfaceType → String
   | .option element => s!"Option {element.label}"
   | .prod fst snd => s!"{fst.label} × {snd.label}"
   | .simpleEnum name _ => name.toString
-  | .structure name _ => name.toString
+  | .structure name .. => name.toString
   | .expr => "Lean.Expr"
 
 def InterfaceType.wireTag : InterfaceType → Nat
@@ -1561,6 +1569,24 @@ def ctorShortName (inductiveName ctorName : Name) : String :=
   else
     text
 
+def StructureFieldLayout.toJson : StructureFieldLayout → String
+  | .object index =>
+      "{"
+      ++ "\"kind\":\"object\","
+      ++ "\"index\":" ++ toString index
+      ++ "}"
+  | .usize index =>
+      "{"
+      ++ "\"kind\":\"usize\","
+      ++ "\"index\":" ++ toString index
+      ++ "}"
+  | .scalar size offset =>
+      "{"
+      ++ "\"kind\":\"scalar\","
+      ++ "\"size\":" ++ toString size ++ ","
+      ++ "\"offset\":" ++ toString offset
+      ++ "}"
+
 partial def InterfaceType.toJson (ty : InterfaceType) : String :=
   match ty with
   | .array element =>
@@ -1605,17 +1631,21 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ "\"kind\":\"simpleEnum\","
       ++ "\"constructors\":" ++ jsonArray ctorJson
       ++ "}"
-  | .structure name fields =>
-      let fieldJson := fields.map fun (fieldName, fieldType) =>
+  | .structure name objectFields usizeFields scalarBytes fields =>
+      let fieldJson := fields.map fun (fieldName, fieldType, fieldLayout) =>
         "{"
         ++ "\"name\":" ++ jsonString fieldName ++ ","
-        ++ "\"type\":" ++ fieldType.toJson
+        ++ "\"type\":" ++ fieldType.toJson ++ ","
+        ++ "\"layout\":" ++ fieldLayout.toJson
         ++ "}"
       "{"
       ++ "\"type\":" ++ jsonString ty.label ++ ","
       ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
       ++ "\"kind\":\"structure\","
       ++ "\"name\":" ++ jsonString name.toString ++ ","
+      ++ "\"objectFieldCount\":" ++ toString objectFields ++ ","
+      ++ "\"usizeFieldCount\":" ++ toString usizeFields ++ ","
+      ++ "\"scalarByteSize\":" ++ toString scalarBytes ++ ","
       ++ "\"fields\":" ++ jsonArray fieldJson
       ++ "}"
   | _ =>
@@ -1658,61 +1688,99 @@ def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType :
       | _ => false
     if allNullary then some (.simpleEnum name ctors) else none
 
-partial def forallResultType : Lean.Expr → Lean.Expr
-  | .forallE _ _ body _ => forallResultType body
-  | e => e
+def projectionFieldType? (projType : Lean.Expr) : Option Lean.Expr :=
+  match stripMData projType with
+  | .forallE _ _ body _ => some body
+  | _ => none
 
-partial def InterfaceType.isStructureFieldSupported : InterfaceType → Bool
-  | .bool | .uint8 | .uint16 | .uint32 | .uint64 | .usize => false
-  | .array _ | .list _ | .option _ => true
-  | .prod fst snd => fst.isStructureFieldSupported && snd.isStructureFieldSupported
-  | .structure _ fields => fields.all fun (_, fieldType) => fieldType.isStructureFieldSupported
-  | _ => true
+def structureFieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option StructureFieldLayout
+  | .object index _ => some (.object index)
+  | .usize index => some (.usize index)
+  | .scalar size offset _ => some (.scalar size offset)
+  | .erased | .void => none
 
 mutual
 
-partial def structureType? (env : Environment) (seenStructures : NameSet) (e : Lean.Expr) : Option InterfaceType := do
-  let name <- constName? e
+partial def structureType (seenStructures : NameSet) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
+  let some name := constName? e
+    | return .error s!"unsupported type `{e}`"
   if seenStructures.contains name then
-    none
+    return .error s!"recursive structure `{name}` is not supported"
   else
-    let .inductInfo indInfo <- env.find? name | none
-    let structInfo <- getStructureInfo? env name
-    if indInfo.numParams != 0 || indInfo.numIndices != 0 || indInfo.isRec || indInfo.ctors.length != 1 || !structInfo.parentInfo.isEmpty then
-      none
+    let env ← getEnv
+    let some (.inductInfo indInfo) := env.find? name
+      | return .error s!"unsupported type `{e}`"
+    let some structInfo := getStructureInfo? env name
+      | return .error s!"unsupported type `{e}`"
+    if indInfo.numParams != 0 || indInfo.numIndices != 0 then
+      return .error s!"parameterized structure `{name}` is not supported"
+    else if indInfo.isRec then
+      return .error s!"recursive structure `{name}` is not supported"
+    else if indInfo.ctors.length != 1 then
+      return .error s!"structure `{name}` must have exactly one constructor"
+    else if !structInfo.parentInfo.isEmpty then
+      return .error s!"structure `{name}` with parent fields is not supported"
+    else if structInfo.fieldNames.isEmpty then
+      return .error s!"empty structure `{name}` is not supported"
     else
+      let ctorName := indInfo.ctors.head!
+      let layout ←
+        try
+          Lean.Compiler.LCNF.getCtorLayout ctorName
+        catch _ =>
+          return .error s!"could not compute runtime layout for structure `{name}`"
+      if layout.fieldInfo.size != structInfo.fieldNames.size then
+        return .error s!"runtime layout for structure `{name}` does not match its field count"
       let nextSeen := seenStructures.insert name
-      let fields <- structInfo.fieldNames.mapIdxM fun idx fieldName => do
-        let projName <- structInfo.getProjFn? idx
-        let info <- env.find? projName
-        let fieldType <- interfaceType? env (forallResultType info.type) nextSeen
-        if fieldType.isStructureFieldSupported then
-          some (fieldName.toString, fieldType)
-        else
-          none
-      if fields.isEmpty then none else some (.structure name fields)
+      let mut fields := #[]
+      for h : idx in *...structInfo.fieldNames.size do
+        let fieldName := structInfo.fieldNames[idx]
+        let some fieldLayout := structureFieldLayout? layout.fieldInfo[idx]!
+          | return .error s!"field `{fieldName}` of structure `{name}` has erased or void runtime layout"
+        let some projName := structInfo.getProjFn? idx
+          | return .error s!"field `{fieldName}` of structure `{name}` is missing a projection function"
+        let some info := env.find? projName
+          | return .error s!"field `{fieldName}` of structure `{name}` has no projection declaration"
+        let some fieldExpr := projectionFieldType? info.type
+          | return .error s!"field `{fieldName}` of structure `{name}` has invalid projection type `{info.type}`"
+        match ← interfaceType fieldExpr nextSeen with
+        | .ok fieldType =>
+            fields := fields.push (fieldName.toString, fieldType, fieldLayout)
+        | .error reason =>
+            return .error s!"field `{fieldName}` of structure `{name}` has unsupported type `{fieldExpr}`: {reason}"
+      return .ok (.structure name layout.ctorInfo.size layout.ctorInfo.usize layout.ctorInfo.ssize fields)
 
-partial def interfaceType? (env : Environment) (e : Lean.Expr) (seenStructures : NameSet := {}) : Option InterfaceType :=
+partial def interfaceType (e : Lean.Expr) (seenStructures : NameSet := {}) : CoreM (Except String InterfaceType) := do
   match simpleInterfaceType? e with
-  | some ty => some ty
+  | some ty => return .ok ty
   | none =>
       let e := stripMData e
       let (fn, args) := e.getAppFnArgs
       match fn, Array.toList args with
       | `Array, [arg] =>
-          interfaceType? env arg seenStructures |>.map .array
+          match ← interfaceType arg seenStructures with
+          | .ok ty => return .ok (.array ty)
+          | .error reason => return .error s!"unsupported Array element type: {reason}"
       | `List, [arg] =>
-          interfaceType? env arg seenStructures |>.map .list
+          match ← interfaceType arg seenStructures with
+          | .ok ty => return .ok (.list ty)
+          | .error reason => return .error s!"unsupported List element type: {reason}"
       | `Option, [arg] =>
-          interfaceType? env arg seenStructures |>.map .option
+          match ← interfaceType arg seenStructures with
+          | .ok ty => return .ok (.option ty)
+          | .error reason => return .error s!"unsupported Option element type: {reason}"
       | `Prod, [lhs, rhs] =>
-          match interfaceType? env lhs seenStructures, interfaceType? env rhs seenStructures with
-          | some lhsTy, some rhsTy => some (.prod lhsTy rhsTy)
-          | _, _ => none
+          match ← interfaceType lhs seenStructures with
+          | .error reason => return .error s!"unsupported Prod fst type: {reason}"
+          | .ok lhsTy =>
+              match ← interfaceType rhs seenStructures with
+              | .error reason => return .error s!"unsupported Prod snd type: {reason}"
+              | .ok rhsTy => return .ok (.prod lhsTy rhsTy)
       | _, _ =>
+          let env ← getEnv
           match simpleEnumType? env e with
-          | some ty => some ty
-          | none => structureType? env seenStructures e
+          | some ty => return .ok ty
+          | none => structureType seenStructures e
 
 end
 
@@ -1723,22 +1791,22 @@ def binderArgName (fallback : Nat) (name : Name) : String :=
   else
     candidate
 
-partial def interfaceSignature? (env : Environment) (type : Lean.Expr) (argIndex : Nat := 1) (args : Array InterfaceArg := #[]) :
-    Except String (Array InterfaceArg × InterfaceType) :=
+partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args : Array InterfaceArg := #[]) :
+    CoreM (Except String (Array InterfaceArg × InterfaceType)) := do
   match stripMData type with
   | .forallE name domain body binderInfo =>
       if binderInfo != .default then
-        throw s!"unsupported implicit/instance argument `{name}`"
+        return .error s!"unsupported implicit/instance argument `{name}`"
       else
-        match interfaceType? env domain with
-        | none => throw s!"unsupported argument type `{domain}`"
-        | some argType =>
+        match ← interfaceType domain with
+        | .error reason => return .error s!"unsupported argument type `{domain}`: {reason}"
+        | .ok argType =>
             let arg := { name := binderArgName argIndex name, type := argType }
-            interfaceSignature? env body (argIndex + 1) (args.push arg)
+            interfaceSignature? body (argIndex + 1) (args.push arg)
   | result =>
-      match interfaceType? env result with
-      | none => throw s!"unsupported result type `{result}`"
-      | some resultType => return (args, resultType)
+      match ← interfaceType result with
+      | .error reason => return .error s!"unsupported result type `{result}`: {reason}"
+      | .ok resultType => return .ok (args, resultType)
 
 def isInterfaceDeclInfo : ConstantInfo → Bool
   | .defnInfo _ => true
@@ -1750,7 +1818,15 @@ def isGeneratedAuxName (n : Name) : Bool :=
   | some _ => true
   | none =>
       let text := n.toString
-      (text.splitOn "._").length > 1
+      (text.splitOn "._").length > 1 ||
+        text.endsWith ".elim" ||
+        text.endsWith ".ctorElim" ||
+        text.endsWith ".rec" ||
+        text.endsWith ".casesOn" ||
+        text.endsWith ".ctorIdx" ||
+        text.endsWith ".toCtorIdx" ||
+        text.endsWith ".noConfusion" ||
+        text.endsWith ".noConfusionType"
 
 def sourceDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
   index.sourceDecls.findSome? (fun (source, names) =>
@@ -1785,23 +1861,24 @@ def jsNameFor (n : Name) : String :=
   let sanitized := text.map sanitizeJsNameChar
   if sanitized.isEmpty then "entry" else sanitized
 
-def interfaceExportFor (env : Environment) (source : String) (name : Name) :
-    Except InterfaceDiagnostic InterfaceExport :=
+def interfaceExportFor (source : String) (name : Name) :
+    CoreM (Except InterfaceDiagnostic InterfaceExport) := do
   if isPrivateName name then
-    throw { name, source, reason := "private declarations are not exported" }
+    return .error { name, source, reason := "private declarations are not exported" }
   else
+    let env ← getEnv
     match env.find? name with
-    | none => throw { name, source, reason := "missing elaborated Lean declaration" }
+    | none => return .error { name, source, reason := "missing elaborated Lean declaration" }
     | some info =>
         if !isInterfaceDeclInfo info then
-          throw { name, source, reason := "declaration is not a compiled definition" }
+          return .error { name, source, reason := "declaration is not a compiled definition" }
         else
-          match interfaceSignature? env info.type with
+          match ← interfaceSignature? info.type with
           | .ok (args, result) =>
               let jsName := jsNameFor name
-              return { id := jsName, jsName, entry := name, source, args, result }
+              return .ok { id := jsName, jsName, entry := name, source, args, result }
           | .error reason =>
-              throw { name, source, reason }
+              return .error { name, source, reason }
 
 def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetadata :=
   let mode :=
@@ -1828,27 +1905,31 @@ def collectPackageMetadata (generatedAt : String) (targets : Array Target) (inde
     targets := targets.map (targetMetadataFor index)
   }
 
-def collectInterfaceManifest (metadata : PackageMetadata) (targets : Array Target) (index : DeclIndex) : InterfaceManifest :=
-  targets.foldl (fun manifest target =>
+def runCoreForSource (source : String) (env : Environment) (x : CoreM α) : IO α :=
+  x.toIO'
+    { fileName := source, fileMap := default }
+    { env := env }
+
+def collectInterfaceManifest (metadata : PackageMetadata) (targets : Array Target) (index : DeclIndex) : IO InterfaceManifest := do
+  let mut manifest : InterfaceManifest := { metadata := metadata }
+  for target in targets do
     let source := target.source.toString
     match index.envForSource? source with
     | none =>
-        let diagnostics := manifest.diagnostics.push {
+        manifest := { manifest with diagnostics := manifest.diagnostics.push {
           name := .anonymous,
           source,
           reason := "source environment was not loaded"
-        }
-        { manifest with diagnostics }
+        } }
     | some env =>
-        (exportCandidatesFor index target).foldl (fun manifest name =>
-          match interfaceExportFor env source name with
+        for name in exportCandidatesFor index target do
+          match ← runCoreForSource source env (interfaceExportFor source name) with
           | .ok entry =>
-              if manifest.exports.any (fun existing => existing.entry == entry.entry) then
-                manifest
-              else
-                { manifest with exports := manifest.exports.push entry }
+              if !manifest.exports.any (fun existing => existing.entry == entry.entry) then
+                manifest := { manifest with exports := manifest.exports.push entry }
           | .error diagnostic =>
-              { manifest with diagnostics := manifest.diagnostics.push diagnostic }) manifest) { metadata := metadata }
+              manifest := { manifest with diagnostics := manifest.diagnostics.push diagnostic }
+  return manifest
 
 def InterfaceArg.toJson (arg : InterfaceArg) : String :=
   "{"
@@ -2191,7 +2272,7 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
   let index <- loadDeclIndex targets
   let closure := collectClosure targets index
   let metadata := collectPackageMetadata (← generatedAtUtc) targets index
-  let manifest := collectInterfaceManifest metadata targets index
+  let manifest ← collectInterfaceManifest metadata targets index
   let report := reportFor targets closure manifest
   writeTextFile reportPath report
   if !closure.missingDecls.isEmpty || !closure.missingExterns.isEmpty || !closure.unsupportedInitGlobals.isEmpty || !manifest.diagnostics.isEmpty then
