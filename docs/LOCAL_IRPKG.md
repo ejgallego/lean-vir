@@ -102,21 +102,26 @@ Supported v1 types:
 - recursive `Array α`, `List α`, `Option α`, and `α × β` shapes over
   supported types;
 - non-indexed user-defined structures over manifest-supported fields, including
-  parameterized instances, direct scalar fields, and inherited parent fields,
-  represented as JavaScript objects with parent fields flattened into ordinary
-  keys;
+  parameterized instances, direct scalar fields, direct scalar wrappers, and
+  inherited parent fields, represented as JavaScript objects with parent fields
+  flattened into ordinary keys;
 - nullary inductive enums;
 - `Lean.Expr`.
 
 Large exact integer results are returned as decimal strings.
+Direct top-level `UInt64` arguments/results currently fail package generation
+with an explicit wasm32 boxed-boundary diagnostic. `UInt64` remains supported
+inside structures and manifest-supported compound values.
 
 `/dev.html` generates enum select controls and JSON textareas for structural
 `Lean.Expr`, user-defined structures, and manifest-supported compound values
 from the embedded manifest after the package is loaded.
 
 One-field wrappers whose only runtime field is a direct scalar, such as
-`Box UInt32`, currently fail package generation with an explicit diagnostic
-instead of being exported with an ambiguous boxed-boundary representation.
+`Box UInt32`, are exported with the same JavaScript object shape as other
+single-field structures.
+The same direct top-level `UInt64` limitation applies to scalar-only wrappers
+over `UInt64`.
 
 ## Current Scope
 

@@ -67,6 +67,9 @@ enums, and `Lean.Expr`.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`.
+Direct top-level `UInt64` arguments/results currently fail package generation
+with an explicit wasm32 boundary diagnostic; nested `UInt64` fields and
+compound values remain supported.
 
 Nullary inductive enums are accepted as constructor names, generated JavaScript
 names, or constructor indexes. Results are returned as the constructor's
@@ -79,10 +82,11 @@ two-element arrays, and results are returned as `{ fst, snd }`. Non-indexed
 structures, including parameterized instances like `Box Nat` and
 `Tagged (Array String)`, are accepted and returned as objects keyed by their
 Lean field names; inherited parent fields are accepted and returned as flattened
-object keys. Direct `Bool`, `UInt*`, `USize`, and enum fields use the same JS
-values as standalone arguments/results. These shapes can be nested, for example
-`Option (Array Nat)`, `List (Nat × String)`, a structure containing another
-structure, and `Array Lean.Expr`.
+object keys. Direct `Bool`, `UInt*`, `USize`, and enum fields, including
+single-field wrappers such as `Box UInt32`, use the same JS values as standalone
+arguments/results. These shapes can be nested, for example `Option (Array Nat)`,
+`List (Nat × String)`, a structure containing another structure, and
+`Array Lean.Expr`.
 
 `Lean.Expr` values use structural JavaScript objects such as
 `{ kind: "const", name: "Nat", levels: [] }`,

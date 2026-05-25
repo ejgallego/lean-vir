@@ -13,8 +13,8 @@ missing-boundary diagnostics for CI and boundary debugging.
 
 The runtime smoke also generates temporary packages with intentionally
 unsupported interface exports and asserts that package generation fails loudly.
-Those negative cases cover function fields, scalar-only trivial wrappers,
-recursive structures, indexed inductive families, and implicit arguments.
+Those negative cases cover function fields, recursive structures, indexed
+inductive families, implicit arguments, and direct top-level `UInt64` exports.
 
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather
@@ -66,8 +66,8 @@ The current fixture surface covers:
 - manifest-backed recursive interface calls including `Array String`,
   `List UInt32`, `Option Nat`, `Option String`, `Nat × Nat`,
   `Option (Array Nat)`, `List (Nat × String)`, non-indexed user-defined
-  structures with object, scalar, `USize`, enum, parameterized, and inherited
-  parent fields, and `Array Lean.Expr`;
+  structures with object, scalar, `USize`, enum, parameterized, scalar-only
+  trivial wrapper, and inherited parent fields, and `Array Lean.Expr`;
 - hash/name/substring/pointer-address primitives reached by parser data paths,
   including `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
   `ptrAddrUnsafe`;

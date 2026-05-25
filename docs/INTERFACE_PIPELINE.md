@@ -92,14 +92,20 @@ The embedded manifest currently supports:
   `α` and `β`;
 - non-indexed user-defined structures over manifest-supported fields, including
   parameterized instances such as `Box Nat` and `Tagged (Array String)`,
-  direct `Bool`, `UInt*`, `USize`, and enum fields, and inherited parent fields
-  represented as flattened JavaScript object keys;
+  direct `Bool`, `UInt*`, `USize`, and enum fields, single-field wrappers over
+  direct scalar fields, and inherited parent fields represented as flattened
+  JavaScript object keys;
 - nullary inductive enums, represented in JavaScript by generated constructor
   names;
 - `Lean.Expr`, represented as structural JavaScript objects.
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
+Direct top-level `UInt64` arguments/results are rejected for now because the
+current wasm32 boxed interpreter entry point cannot carry a raw 64-bit scalar in
+its `object*` call slot. `UInt64` remains supported inside structures and
+manifest-supported compound values where Lean stores it in boxed/object or
+constructor scalar slots.
 
 For structures, the manifest records Lean constructor layout metadata alongside
 the applied Lean type label, field names, and instantiated field types. The JS
@@ -109,8 +115,10 @@ Parent structure fields remain explicit subobjects in the manifest so the
 runtime layout matches Lean, but the JS API accepts and returns inherited fields
 as flattened object keys.
 One-field wrappers whose only runtime field is a direct scalar, for example
-`Box UInt32`, are rejected during package generation until that boxed-boundary
-shape is modeled explicitly.
+`Box UInt32`, use the same `trivialFieldIndex` path as object-field wrappers
+while keeping the JavaScript object shape.
+Wrappers over `UInt64` are rejected with the same explicit boundary diagnostic
+as direct top-level `UInt64`.
 
 The recursive type tree is embedded in the JSON manifest and sent as a compact
 internal descriptor in each `vir_call` payload. This is intentionally still an

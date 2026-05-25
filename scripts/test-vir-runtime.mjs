@@ -321,6 +321,7 @@ assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.bumpBVar", { kind: "bvar
 });
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint32Bump", 41), 42);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", null), "0");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { kind: "some", value: 41 }), "42");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null), "empty");
@@ -432,6 +433,30 @@ const boxNatEntry = runtime.interfaceManifest.exports.find(
 );
 assert.equal(boxNatEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box Nat");
 assert.equal(boxNatEntry.args[0].type.trivialFieldIndex, 0);
+const boxUInt32Entry = runtime.interfaceManifest.exports.find(
+  (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.boxUInt32Bump",
+);
+assert.equal(boxUInt32Entry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box UInt32");
+assert.equal(boxUInt32Entry.args[0].type.trivialFieldIndex, 0);
+assert.equal(boxUInt32Entry.args[0].type.fields[0].type.wireTag, 6);
+assert.equal(boxUInt32Entry.args[0].type.fields[0].layout.kind, "object");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
+  value: 41,
+}), {
+  value: 42,
+});
+const uint32BoxEntry = runtime.interfaceManifest.exports.find(
+  (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.uint32BoxBump",
+);
+assert.equal(uint32BoxEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.UInt32Box");
+assert.equal(uint32BoxEntry.args[0].type.trivialFieldIndex, 0);
+assert.equal(uint32BoxEntry.args[0].type.fields[0].type.wireTag, 6);
+assert.equal(uint32BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
+  value: 41,
+}), {
+  value: 42,
+});
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.nestedBoxNatBump", {
   value: { value: 4 },
 }), {
@@ -572,6 +597,9 @@ try {
     "  label : String",
     "  payload : α",
     "",
+    "structure FreshScalarBox where",
+    "  value : UInt32",
+    "",
     "def freshBump (n : Nat) : Nat := n + 7",
     "def freshSum (xs : Array Nat) : Nat := xs.foldl (fun acc n => acc + n) 0",
     "def freshPairSum (p : Nat × Nat) : Nat := p.fst + p.snd",
@@ -588,6 +616,9 @@ try {
     "",
     "def freshWrapUInt32Bump (wrap : FreshWrap UInt32) : FreshWrap UInt32 :=",
     "  { label := wrap.label ++ \"!\", payload := wrap.payload + 1 }",
+    "",
+    "def freshScalarBoxBump (box : FreshScalarBox) : FreshScalarBox :=",
+    "  { value := box.value + 1 }",
     "",
   ].join("\n"));
 
@@ -618,6 +649,7 @@ try {
     "freshBoxBump",
     "freshBump",
     "freshPairSum",
+    "freshScalarBoxBump",
     "freshSum",
     "freshWrapBoxBump",
     "freshWrapUInt32Bump",
@@ -659,6 +691,14 @@ try {
     label: "u!",
     payload: 10,
   });
+  const freshScalarBoxEntry = freshManifest.exports.find((entry) => entry.entry === "freshScalarBoxBump");
+  assert.equal(freshScalarBoxEntry.args[0].type.trivialFieldIndex, 0);
+  assert.equal(freshScalarBoxEntry.args[0].type.fields[0].layout.kind, "scalar");
+  assert.deepEqual(freshRuntime.call("freshScalarBoxBump", {
+    value: 9,
+  }), {
+    value: 10,
+  });
   assert.deepEqual(freshRuntime.call("freshWrapBoxBump", {
     label: "box",
     payload: {
@@ -685,9 +725,6 @@ try {
     "structure BadCounter where",
     "  callback : Nat → Nat",
     "",
-    "structure ScalarBox (α : Type) where",
-    "  value : α",
-    "",
     "structure RecursiveBox where",
     "  next : Option RecursiveBox",
     "",
@@ -695,22 +732,22 @@ try {
     "  | mk {n : Nat} (value : Nat) : IndexedBox n",
     "",
     "def badCounterIdentity (box : BadCounter) : BadCounter := box",
-    "def scalarBoxUInt32Identity (box : ScalarBox UInt32) : ScalarBox UInt32 := box",
     "def recursiveBoxIdentity (box : RecursiveBox) : RecursiveBox := box",
     "def indexedBoxIdentity (box : IndexedBox 3) : IndexedBox 3 := box",
     "def implicitBump {offset : Nat} (n : Nat) : Nat := n + offset",
+    "def uint64Identity (n : UInt64) : UInt64 := n + 1",
     "",
   ], [
     /badCounterIdentity/,
     /field `callback`/,
-    /scalarBoxUInt32Identity/,
-    /single-field structure `ScalarBox` with direct scalar field `value`/,
     /recursiveBoxIdentity/,
     /recursive structure `RecursiveBox` is not supported/,
     /indexedBoxIdentity/,
     /unsupported type `IndexedBox/,
     /implicitBump/,
     /unsupported implicit\/instance argument `offset`/,
+    /uint64Identity/,
+    /top-level UInt64 is not supported/,
   ]);
 } finally {
   await rm(freshDir, { recursive: true, force: true });

@@ -10,6 +10,9 @@ def arrayStringTotalLength (xs : Array String) : Nat :=
 def listUInt32Sum (xs : List UInt32) : Nat :=
   xs.foldl (fun acc value => acc + value.toNat) 0
 
+def uint32Bump (value : UInt32) : UInt32 :=
+  value + 1
+
 def optionNatBump : Option Nat → Option Nat
   | none => some 0
   | some value => some (value + 1)
@@ -89,6 +92,9 @@ structure ProfileStats where
 structure Box (α : Type) where
   value : α
 
+structure UInt32Box where
+  value : UInt32
+
 structure Tagged (α : Type) where
   label : String
   payload : α
@@ -152,6 +158,12 @@ def profileStatsScore (stats : ProfileStats) : Nat :=
 def boxNatBump (box : Box Nat) : Box Nat :=
   { value := box.value + 1 }
 
+def boxUInt32Bump (box : Box UInt32) : Box UInt32 :=
+  { value := box.value + 1 }
+
+def uint32BoxBump (box : UInt32Box) : UInt32Box :=
+  { value := box.value + 1 }
+
 def nestedBoxNatBump (box : Box (Box Nat)) : Box (Box Nat) :=
   { value := { value := box.value.value + 1 } }
 
@@ -195,6 +207,7 @@ def interfaceShapeScore : Nat :=
   arrayStringTotalLength #["a", "bc"]
     + listUInt32Sum [1, 2, 3]
     + optionNatScore none
+    + (uint32Bump 4).toNat
     + prodNatNatSum (4, 5)
     + optionArrayNatSum (some #[1, 2, 3])
     + listProdNatStringScore [(4, "ab"), (5, "c")]
@@ -211,6 +224,8 @@ def interfaceShapeScore : Nat :=
       note := "ok"
     }
     + (boxNatBump { value := 4 }).value
+    + (boxUInt32Bump { value := 4 }).value.toNat
+    + (uint32BoxBump { value := 4 }).value.toNat
     + taggedArrayScore { label := "tags", payload := #["a", "bc"] }
     + (meteredBoxBump { active := true, count := 3, payload := { value := 4 } }).payload.value
     + boxExprKindScore { value := .bvar 2 }

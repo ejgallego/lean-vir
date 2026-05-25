@@ -1733,6 +1733,11 @@ struct vir_type {
     uint32_t trivial_field = UINT32_MAX;
 };
 
+struct vir_arg {
+    object * value = nullptr;
+    bool owned = true;
+};
+
 class vir_reader {
     uint8_t const * m_data;
     uint32_t m_size;
@@ -2341,10 +2346,100 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
     }
 }
 
-static object * decode_argument(vir_reader & r) {
+static bool is_unboxed_call_boundary_type(vir_type const & type) {
+    switch (type.tag) {
+    case vir_wire_type::UInt8:
+    case vir_wire_type::UInt16:
+    case vir_wire_type::UInt32:
+    case vir_wire_type::USize:
+        return true;
+    default:
+        return false;
+    }
+}
+
+static bool is_unboxed_call_boundary_type(vir_type const & type, vir_type const ** field_type) {
+    if (is_unboxed_call_boundary_type(type)) {
+        *field_type = &type;
+        return true;
+    }
+    if (type.tag == vir_wire_type::Structure && type.trivial_field != UINT32_MAX) {
+        vir_type const & trivial_type = type.args[type.trivial_field];
+        if (is_unboxed_call_boundary_type(trivial_type)) {
+            *field_type = &trivial_type;
+            return true;
+        }
+    }
+    return false;
+}
+
+static bool is_unsupported_wasm32_call_boundary_type(vir_type const & type) {
+    if (type.tag == vir_wire_type::UInt64) {
+        return true;
+    }
+    if (type.tag == vir_wire_type::Structure && type.trivial_field != UINT32_MAX) {
+        return type.args[type.trivial_field].tag == vir_wire_type::UInt64;
+    }
+    return false;
+}
+
+static object * decode_unboxed_call_argument(vir_reader & r, vir_type const & type) {
+    uintptr_t value = 0;
+    switch (type.tag) {
+    case vir_wire_type::UInt8:
+        value = r.u8();
+        break;
+    case vir_wire_type::UInt16:
+    case vir_wire_type::UInt32:
+        value = r.u32();
+        break;
+    case vir_wire_type::USize: {
+        uint64_t parsed = 0;
+        if (!parse_u64(r.string(), parsed) || parsed > std::numeric_limits<uintptr_t>::max()) {
+            r.fail("invalid USize trivial structure argument");
+            return nullptr;
+        }
+        value = static_cast<uintptr_t>(parsed);
+        break;
+    }
+    default:
+        lean_unreachable();
+    }
+    return reinterpret_cast<object *>(value);
+}
+
+static void encode_unboxed_call_result(vir_writer & w, vir_type const & type, object * value) {
+    uintptr_t raw = reinterpret_cast<uintptr_t>(value);
+    switch (type.tag) {
+    case vir_wire_type::UInt8:
+        w.u8(static_cast<uint8_t>(raw));
+        break;
+    case vir_wire_type::UInt16:
+        w.u32(static_cast<uint16_t>(raw));
+        break;
+    case vir_wire_type::UInt32:
+        w.u32(static_cast<uint32_t>(raw));
+        break;
+    case vir_wire_type::USize:
+        w.string(std::to_string(raw));
+        break;
+    default:
+        lean_unreachable();
+    }
+}
+
+static vir_arg decode_argument(vir_reader & r, bool has_boxed_decl) {
     vir_type type = decode_type(r);
-    if (!r.ok) return lean_box(0);
-    return decode_value(r, type);
+    if (!r.ok) return { lean_box(0), true };
+    if (is_unsupported_wasm32_call_boundary_type(type)) {
+        r.fail("UInt64 top-level and trivial structure arguments are not supported at the wasm32 boxed interpreter boundary");
+        return { lean_box(0), true };
+    }
+    vir_type const * unboxed_type = nullptr;
+    if (!has_boxed_decl && is_unboxed_call_boundary_type(type, &unboxed_type)) {
+        return { decode_unboxed_call_argument(r, *unboxed_type), false };
+    }
+    return { decode_value(r, type), true };
 }
 
 static std::string int_to_decimal(object * value) {
@@ -2568,9 +2663,19 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
     }
 }
 
-static void encode_result(vir_writer & w, vir_type const & type, object * value) {
+static void encode_result(vir_writer & w, vir_type const & type, object * value, bool has_boxed_decl) {
     encode_type(w, type);
-    encode_value_payload(w, type, value);
+    vir_type const * unboxed_type = nullptr;
+    if (!has_boxed_decl && is_unboxed_call_boundary_type(type, &unboxed_type)) {
+        encode_unboxed_call_result(w, *unboxed_type, value);
+    } else {
+        encode_value_payload(w, type, value);
+    }
+}
+
+static bool call_result_is_owned(vir_type const & type, bool has_boxed_decl) {
+    vir_type const * unboxed_type = nullptr;
+    return has_boxed_decl || !is_unboxed_call_boundary_type(type, &unboxed_type);
 }
 
 static std::string g_call_result;
@@ -3098,37 +3203,51 @@ extern "C" char const * vir_call(
         return nullptr;
     }
 
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    bool has_boxed_decl = lean::vir::find_package_boxed_decl(fn.to_obj_arg()) != nullptr;
+
     lean::vir_reader reader(request, request_len);
     uint32_t argc = reader.u32();
+    std::vector<lean::vir_arg> decoded_args;
     std::vector<lean::object *> args;
+    decoded_args.reserve(argc);
     args.reserve(argc);
     for (uint32_t i = 0; i < argc; i++) {
-        args.push_back(lean::decode_argument(reader));
+        decoded_args.push_back(lean::decode_argument(reader, has_boxed_decl));
+        args.push_back(decoded_args.back().value);
     }
     lean::vir_type result_type = lean::decode_type(reader);
     if (!reader.ok) {
         lean::g_call_error = reader.error();
-        for (lean::object * arg : args) {
-            lean_dec(arg);
+        for (lean::vir_arg const & arg : decoded_args) {
+            if (arg.owned) lean_dec(arg.value);
+        }
+        return nullptr;
+    }
+    if (lean::is_unsupported_wasm32_call_boundary_type(result_type)) {
+        lean::g_call_error = "UInt64 top-level and trivial structure results are not supported at the wasm32 boxed interpreter boundary";
+        for (lean::vir_arg const & arg : decoded_args) {
+            if (arg.owned) lean_dec(arg.value);
         }
         return nullptr;
     }
     if (!reader.at_end()) {
         lean::g_call_error = "trailing bytes after call payload";
-        for (lean::object * arg : args) {
-            lean_dec(arg);
+        for (lean::vir_arg const & arg : decoded_args) {
+            if (arg.owned) lean_dec(arg.value);
         }
         return nullptr;
     }
 
     lean::ensure_ir_interpreter_initialized();
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
     lean::elab_environment env(lean_box(0));
     lean::options opts(lean_box(0));
     lean::object * result = lean::ir::run_boxed(env, opts, fn, args.size(), args.data());
     lean::vir_writer writer;
-    lean::encode_result(writer, result_type, result);
-    lean_dec(result);
+    lean::encode_result(writer, result_type, result, has_boxed_decl);
+    if (lean::call_result_is_owned(result_type, has_boxed_decl)) {
+        lean_dec(result);
+    }
     lean::g_call_result = writer.take();
     return lean::g_call_result.data();
 }

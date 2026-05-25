@@ -1545,15 +1545,13 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .structure .. => 20
   | .expr => 15
 
-def InterfaceType.hasDirectScalarRuntime : InterfaceType → Bool
-  | .bool
-  | .uint8
-  | .uint16
-  | .uint32
-  | .uint64
-  | .usize
-  | .simpleEnum .. => true
+def InterfaceType.hasUnsupportedTrivialBoundary : InterfaceType → Bool
+  | .uint64 => true
   | _ => false
+
+def InterfaceType.unsupportedTopLevelBoundary? : InterfaceType → Option String
+  | .uint64 => some "top-level UInt64 is not supported at the wasm32 boxed interpreter boundary"
+  | _ => none
 
 def jsonEscape (text : String) : String :=
   text.foldl (fun out c =>
@@ -1819,8 +1817,8 @@ partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : Cor
       | some idx =>
           match fields[idx]? with
           | some (fieldName, fieldType, _, _) =>
-              if fieldType.hasDirectScalarRuntime then
-                return .error s!"single-field structure `{name}` with direct scalar field `{fieldName}` is not supported at the boxed interpreter boundary"
+              if fieldType.hasUnsupportedTrivialBoundary then
+                return .error s!"single-field structure `{name}` with `{fieldType.label}` field `{fieldName}` is not supported at the boxed interpreter boundary"
           | none => pure ()
       | none => pure ()
       return .ok (.structure name (exprTypeLabel e) trivialField? layout.ctorInfo.size layout.ctorInfo.usize layout.ctorInfo.ssize fields)
@@ -1876,12 +1874,18 @@ partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args :
         match ← interfaceType domain with
         | .error reason => return .error s!"unsupported argument type `{domain}`: {reason}"
         | .ok argType =>
-            let arg := { name := binderArgName argIndex name, type := argType }
-            interfaceSignature? body (argIndex + 1) (args.push arg)
+            match argType.unsupportedTopLevelBoundary? with
+            | some reason => return .error s!"unsupported argument type `{domain}`: {reason}"
+            | none =>
+                let arg := { name := binderArgName argIndex name, type := argType }
+                interfaceSignature? body (argIndex + 1) (args.push arg)
   | result =>
       match ← interfaceType result with
       | .error reason => return .error s!"unsupported result type `{result}`: {reason}"
-      | .ok resultType => return .ok (args, resultType)
+      | .ok resultType =>
+          match resultType.unsupportedTopLevelBoundary? with
+          | some reason => return .error s!"unsupported result type `{result}`: {reason}"
+          | none => return .ok (args, resultType)
 
 def isInterfaceDeclInfo : ConstantInfo → Bool
   | .defnInfo _ => true

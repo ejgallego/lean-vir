@@ -492,6 +492,12 @@ try {
       runInputs: [`["a","bc"]`],
       result: "3",
     }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint32Bump", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["41"],
+      result: "42",
+    }),
     await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.profileStatsBump", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"enabled":true,"level":2,"score16":30,"visits":400,"quota":5,"checksum":6000,"tier":"pro","note":"ok"}`],
@@ -511,6 +517,22 @@ try {
       runInputs: [`{"value":41}`],
       result: `{
   "value": "42"
+}`,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
+      input: `{"value":0}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"value":41}`],
+      result: `{
+  "value": 42
+}`,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
+      input: `{"value":0}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"value":41}`],
+      result: `{
+  "value": 42
 }`,
     }),
     await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.extendedProfileBump", {
