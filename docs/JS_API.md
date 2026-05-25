@@ -127,6 +127,26 @@ The first library surface is:
 - `Lean.Vir.Browser.Document.getTitle : IO String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
 
+The built-in `common.*` and `browser.*` targets do not require a `hostBindings`
+option:
+
+```js
+const vir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "vir-demo.irpkg",
+});
+
+console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
+```
+
+`Lean.Vir.Browser.Console.log` maps to `console.log`, and
+`Lean.Vir.Browser.Document.getTitle` / `setTitle` map to `document.title` when
+the runtime is created in a browser. In non-browser runtimes they use a virtual
+document title kept by the runtime. See MDN for the underlying browser APIs:
+
+- [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
+- [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
+
 Custom imports can be declared directly:
 
 ```lean

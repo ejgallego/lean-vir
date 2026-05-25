@@ -51,6 +51,22 @@ bindings for `common.*` and `browser.*` targets.
    dev.html?package=my-demo.irpkg&entry=titleHandshake
    ```
 
+No extra `createVirRuntime` option is needed for the built-in browser imports:
+
+```js
+const vir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "my-demo.irpkg",
+});
+
+vir.call("titleHandshake", "browser handshake");
+```
+
+Pass `hostBindings` only for custom targets or to override one of the default
+bindings. If a package imports both built-in and custom targets, the custom map
+can contain just the custom entries; unresolved keys still fall through to the
+default bindings.
+
 For custom JavaScript functions, declare the host import in Lean and bind the
 same target string in JavaScript.
 
@@ -113,6 +129,15 @@ Node-like environments:
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.getTitle : IO String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
+
+The default runtime bindings use standard browser APIs when a browser
+`document` is present. In non-browser runtimes, `Document.getTitle` and
+`Document.setTitle` use a virtual document title stored by the VIR runtime.
+
+External references:
+
+- [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
+- [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
 
 ## Example
 
