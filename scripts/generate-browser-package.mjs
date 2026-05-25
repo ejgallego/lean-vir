@@ -35,6 +35,10 @@ const demoTargets = [
     roots: ["SortDemo.demo", "SortDemo.demoFromArray"],
   },
   {
+    source: "examples/HostInterop.lean",
+    roots: ["HostInterop.titleHandshake"],
+  },
+  {
     source: "fixtures/Basic.lean",
     roots: [
       "Vir.Fixtures.Basic.stringUtf8RoundtripScore",

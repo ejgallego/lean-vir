@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import "./style.css";
 import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
 import fibSource from "../../examples/Fib.lean?raw";
+import hostInteropSource from "../../examples/HostInterop.lean?raw";
 import mergeSortSource from "../../examples/MergeSort.lean?raw";
 import fixtureBasicSource from "../../fixtures/Basic.lean?raw";
 import fixtureExprPrinterSource from "../../fixtures/ExprPrinter.lean?raw";
@@ -57,6 +58,7 @@ const moods = ["happy", "hungry", "sleepy", "angry", "asleep", "dead"];
 const actions = ["feed", "play", "nap", "wake", "ignore"];
 const sourceFiles = [
   { path: "examples/Fib.lean", source: fibSource },
+  { path: "examples/HostInterop.lean", source: hostInteropSource },
   { path: "examples/MergeSort.lean", source: mergeSortSource },
   { path: "fixtures/Basic.lean", source: fixtureBasicSource },
   { path: "fixtures/ExprPrinter.lean", source: fixtureExprPrinterSource },
@@ -93,6 +95,20 @@ const demoFixtures = [
       label: "Array",
       defaultValue: "7, 3, 9, 1, 4, 1, 5, 2",
       hint: `Nat array, up to ${maxSortItems} items`,
+    },
+  },
+  {
+    id: "host-title",
+    source: "examples/HostInterop.lean",
+    entry: "HostInterop.titleHandshake",
+    group: "demo",
+    runner: "hostTitle",
+    result: { type: "String" },
+    input: {
+      kind: "string",
+      label: "Title",
+      defaultValue: "browser handshake",
+      hint: "String passed from Lean to the browser document title",
     },
   },
 ];
@@ -256,6 +272,10 @@ function setFixtureInputAttributes(fixture) {
     fixtureInput.min = "0";
     fixtureInput.max = String(fixture.input.max ?? maxFibInput);
     fixtureInput.inputMode = "numeric";
+  } else if (fixture.input.kind === "string") {
+    fixtureInput.removeAttribute("min");
+    fixtureInput.removeAttribute("max");
+    fixtureInput.inputMode = "text";
   } else {
     fixtureInput.removeAttribute("min");
     fixtureInput.removeAttribute("max");
@@ -376,6 +396,10 @@ function runInputFixture(runtime, fixture) {
     }
     const sorted = [...values].sort((a, b) => a - b);
     return `checksum ${runtime.call(fixture.entry, values)} / [${sorted.join(", ")}]`;
+  }
+
+  if (fixture.runner === "hostTitle") {
+    return runtime.call(fixture.entry, fixtureInputValue(fixture));
   }
 
   return null;

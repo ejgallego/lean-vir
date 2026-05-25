@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
-import { createVirImports, VirRuntime } from "../web/src/vir-runtime.js";
+import { createVirImports, createVirRuntime, VirRuntime } from "../web/src/vir-runtime.js";
 
 const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const irPackage = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
@@ -187,6 +187,15 @@ if (genericStringScore !== "1381") {
 const genericByteArrayScore = runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]);
 if (genericByteArrayScore !== "136") {
   throw new Error(`generic ByteArray input: expected 136, got ${genericByteArrayScore}`);
+}
+
+const hostRuntime = await createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
+if (hostRuntime.packageInfo.hostImports < 2) {
+  throw new Error(`expected stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+}
+const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
+if (hostTitle !== "Lean VIR host: smoke") {
+  throw new Error(`Lean to JavaScript host title: expected Lean VIR host: smoke, got ${hostTitle}`);
 }
 
 let repeatedSortChecksum = 0;

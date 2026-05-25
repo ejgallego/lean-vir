@@ -103,7 +103,7 @@ assert.ok(runtime.packageInfo.count > 0, "expected IR package to load declaratio
 assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
-assert.equal(runtime.packageInfo.hostImports, 0);
+assert.equal(runtime.packageInfo.hostImports, 2);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -239,8 +239,13 @@ assertInvalidManifest((manifest) => {
     ],
   };
 }, /fields\[1\]\.name duplicates another flattened structure field/);
+assert.deepEqual(runtime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), [
+  "browser.document.getTitle",
+  "browser.document.setTitle",
+]);
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
+assert.equal(runtime.call("HostInterop.titleHandshake", "runtime smoke"), "Lean VIR host: runtime smoke");
 
 const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/vir-demo.irpkg"], {
   encoding: "utf8",
@@ -248,6 +253,7 @@ const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generat
 assert.equal(inspected.status, 0, inspected.stderr || inspected.stdout);
 assert.match(inspected.stdout, /package: build\/generated\/vir-demo\.irpkg/);
 assert.match(inspected.stdout, new RegExp(`exports: ${runtime.interfaceManifest.exports.length}`));
+assert.match(inspected.stdout, /host imports: 2/);
 assert.match(inspected.stdout, /fib\(arg1: Nat\) -> Nat \[fib\]/);
 
 const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "build/generated/vir-demo.irpkg"], {
@@ -258,6 +264,7 @@ const inspectedInfo = JSON.parse(inspectedJson.stdout);
 assert.equal(inspectedInfo.package.version, 5);
 assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
 assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
+assert.equal(inspectedInfo.manifest.hostImports.length, 2);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");

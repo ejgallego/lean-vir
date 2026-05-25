@@ -36,6 +36,7 @@ const devHtml = await assertHtmlAssetLinks("dev.html");
 assertLink(indexHtml, "dev.html");
 assertLink(indexHtml, "dev.html?package=local-fib.irpkg&amp;entry=fib");
 assertLink(indexHtml, "dev.html?package=local-mergesort.irpkg&amp;entry=SortDemo_demoFromArray");
+assertLink(indexHtml, "dev.html?package=vir-demo.irpkg&amp;entry=HostInterop_titleHandshake");
 assertLink(indexHtml, "dev.html?package=vir-demo.irpkg&amp;entry=SortDemo_demoFromArray");
 assert.ok(devHtml.includes("dev-package-url"), "dev.html should contain package runner controls");
 

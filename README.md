@@ -24,8 +24,10 @@ The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
 The page also includes a fixture browser for the demo entries plus
 `fixtures/manifest.json`. Each entry can show its Lean source file and run
 through a fresh WASM interpreter instance backed by the same generated IR
-package. Input-capable entries, currently `fib` and `SortDemo.demoFromArray`,
-render an input control in the fixture source panel.
+package. Input-capable entries, currently `fib`, `SortDemo.demoFromArray`, and
+`HostInterop.titleHandshake`, render an input control in the fixture source
+panel. `HostInterop.titleHandshake` demonstrates Lean `IO` calling a browser
+JavaScript binding by setting and reading `document.title`.
 
 The package manifest also drives the local `/dev.html` runner. Supported
 browser-call types include `Unit`, primitive scalars, recursive

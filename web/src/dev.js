@@ -232,7 +232,8 @@ function renderManifestEntries(manifest) {
   for (const entry of interfaceEntries) {
     const option = document.createElement("option");
     option.value = entry.id;
-    const signature = `${entry.args.map((arg) => formatInterfaceType(arg.type)).join(", ") || "()"} -> ${formatInterfaceType(entry.result)}`;
+    const effect = entry.effect === "io" ? "IO " : "";
+    const signature = `${entry.args.map((arg) => formatInterfaceType(arg.type)).join(", ") || "()"} -> ${effect}${formatInterfaceType(entry.result)}`;
     option.textContent = `${entry.jsName} / ${signature}`;
     entrySelect.append(option);
   }

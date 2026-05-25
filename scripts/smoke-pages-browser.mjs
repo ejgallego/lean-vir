@@ -256,6 +256,7 @@ async function smokeLanding(cdp, origin) {
   assert.equal(state.mood, "happy");
   assert.ok(state.links.includes("dev.html?package=local-fib.irpkg&entry=fib"));
   assert.ok(state.links.includes("dev.html?package=local-mergesort.irpkg&entry=SortDemo_demoFromArray"));
+  assert.ok(state.links.includes("dev.html?package=vir-demo.irpkg&entry=HostInterop_titleHandshake"));
 }
 
 async function smokeRunner(cdp, origin, url, expected) {
@@ -475,6 +476,11 @@ try {
       runInput: "[4, 1, 3, 2]",
       result: "30",
     }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "HostInterop.titleHandshake", {
+      input: "",
+      runInput: "pages smoke",
+      result: "Lean VIR host: pages smoke",
+    }),
     await runnerCaseFromManifest("vir-demo.irpkg", "Tamagotchi.step", {
       inputs: ["happy", "feed"],
       inputTags: ["SELECT", "SELECT"],
@@ -611,7 +617,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, manifest-driven entry list, local runners, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
+  console.log("pages browser smoke ok: landing, manifest-driven entry list, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {
