@@ -11,6 +11,12 @@ boundary gaps remain explicit. The runner writes `build/fixtures/summary.json`
 with per-fixture status, imported IR declarations, native externs, and
 missing-boundary diagnostics for CI and boundary debugging.
 
+The runtime smoke also generates temporary packages with intentionally
+unsupported interface exports and asserts that package generation fails loudly.
+Those negative cases cover function fields, scalar-only trivial wrappers,
+parent structures, recursive structures, indexed inductive families, and
+implicit arguments.
+
 ## Current Passing Surface
 
 The current fixture surface covers:

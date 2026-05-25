@@ -61,6 +61,32 @@ function assertInvalidManifest(mutator, pattern) {
   assert.throws(() => validateInterfaceManifest(manifest), pattern);
 }
 
+async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns) {
+  const source = join(dir, `${stem}.lean`);
+  const packagePath = join(dir, `${stem}.irpkg`);
+  const reportPath = join(dir, `${stem}.report.md`);
+  await writeFile(source, lines.join("\n"));
+  const generated = spawnSync(
+    "lean",
+    [
+      "--run",
+      "tools/GeneratePackage.lean",
+      packagePath,
+      reportPath,
+      "--target-all",
+      source,
+    ],
+    { encoding: "utf8" },
+  );
+  assert.notEqual(generated.status, 0, `${stem} unexpectedly generated successfully`);
+  assert.match(generated.stderr, /unsupported interface exports/);
+  const report = await readFile(reportPath, "utf8");
+  for (const pattern of patterns) {
+    assert.match(generated.stderr, pattern);
+    assert.match(report, pattern);
+  }
+}
+
 const wasmBytes = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const irPackageBytes = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
 
@@ -587,38 +613,46 @@ try {
     },
   });
 
-  const unsupportedStructureSource = join(freshDir, "UnsupportedStructure.lean");
-  const unsupportedStructurePackage = join(freshDir, "unsupported-structure.irpkg");
-  const unsupportedStructureReport = join(freshDir, "unsupported-structure.report.md");
-  await writeFile(unsupportedStructureSource, [
+  await assertUnsupportedInterfaceSource(freshDir, "UnsupportedInterfaces", [
     "structure BadCounter where",
     "  callback : Nat → Nat",
     "",
     "structure ScalarBox (α : Type) where",
     "  value : α",
     "",
+    "structure ParentBase where",
+    "  base : Nat",
+    "",
+    "structure ChildBox extends ParentBase where",
+    "  extra : Nat",
+    "",
+    "structure RecursiveBox where",
+    "  next : Option RecursiveBox",
+    "",
+    "inductive IndexedBox : Nat → Type where",
+    "  | mk {n : Nat} (value : Nat) : IndexedBox n",
+    "",
     "def badCounterIdentity (box : BadCounter) : BadCounter := box",
     "def scalarBoxUInt32Identity (box : ScalarBox UInt32) : ScalarBox UInt32 := box",
+    "def childBoxIdentity (box : ChildBox) : ChildBox := box",
+    "def recursiveBoxIdentity (box : RecursiveBox) : RecursiveBox := box",
+    "def indexedBoxIdentity (box : IndexedBox 3) : IndexedBox 3 := box",
+    "def implicitBump {offset : Nat} (n : Nat) : Nat := n + offset",
     "",
-  ].join("\n"));
-  const unsupportedStructure = spawnSync(
-    "lean",
-    [
-      "--run",
-      "tools/GeneratePackage.lean",
-      unsupportedStructurePackage,
-      unsupportedStructureReport,
-      "--target-all",
-      unsupportedStructureSource,
-    ],
-    { encoding: "utf8" },
-  );
-  assert.notEqual(unsupportedStructure.status, 0);
-  assert.match(unsupportedStructure.stderr, /unsupported interface exports/);
-  assert.match(unsupportedStructure.stderr, /badCounterIdentity/);
-  assert.match(unsupportedStructure.stderr, /field `callback`/);
-  assert.match(unsupportedStructure.stderr, /scalarBoxUInt32Identity/);
-  assert.match(unsupportedStructure.stderr, /single-field structure `ScalarBox` with direct scalar field `value`/);
+  ], [
+    /badCounterIdentity/,
+    /field `callback`/,
+    /scalarBoxUInt32Identity/,
+    /single-field structure `ScalarBox` with direct scalar field `value`/,
+    /childBoxIdentity/,
+    /structure `ChildBox` with parent fields is not supported/,
+    /recursiveBoxIdentity/,
+    /recursive structure `RecursiveBox` is not supported/,
+    /indexedBoxIdentity/,
+    /unsupported type `IndexedBox/,
+    /implicitBump/,
+    /unsupported implicit\/instance argument `offset`/,
+  ]);
 } finally {
   await rm(freshDir, { recursive: true, force: true });
 }
