@@ -153,6 +153,15 @@ The package-backed provider is isolated behind `decl_provider.h` so a future
 provider can become more faithful without changing the upstream interpreter or
 platform shim.
 
+The current `.irpkg` path is a trusted-artifact boundary. Generated demo
+packages and local developer packages are validated before use, but malformed or
+hostile package contents are not treated as a hardened public input format. The
+WASM sandbox contains execution, while a bad package can still trap the demo
+interpreter, consume the small WASM memory budget, hang the tab, or confuse ABI
+decoding if its manifest lies about declaration types or runtime layouts. See
+`docs/JS_API.md` and `docs/INTERFACE_PIPELINE.md` for the current trust boundary
+and the planned hardening path.
+
 `npm run test:fixtures` runs the upstream-backed conformance fixture surface.
 Each fixture is Lean source under `fixtures/`, elaborated by Lean 4.30-rc2 into
 real `Lean.IR.Decl` values, packaged with `tools/GeneratePackage.lean`, and

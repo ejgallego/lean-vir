@@ -102,6 +102,27 @@ entry is exposed. Malformed type trees, invalid structure layouts, unsupported
 wire tags, duplicate export names, and bad enum constructor metadata are
 reported as package-load errors.
 
+## Trust Boundary
+
+The current `.irpkg` loader is intended for generated project artifacts and
+local developer experiments. It treats the package bytes and the embedded
+interface manifest as trusted inputs: the manifest describes the Lean
+declarations, runtime layouts, and JavaScript-callable ABI that the WASM shim
+uses when it builds Lean objects and decodes results.
+
+The browser's WASM sandbox still contains the loaded code, but it does not make
+malformed or hostile packages a supported public input format. A bad package may
+trap the interpreter, exhaust the small demo memory budget, hang the current
+tab, or produce invalid results if its manifest lies about declaration types or
+runtime layouts. The hosted `/dev.html` runner is therefore a convenience tool
+for trusted packages, not a hardened service for arbitrary third-party
+packages.
+
+Before treating `.irpkg` files as untrusted user content, the runtime should
+move ABI lookup into the package provider, validate layouts in the WASM shim,
+add package size and descriptor-depth limits, and run calls in a recoverable
+worker context.
+
 ## Generate A Local Package
 
 Generate a package from one Lean file and one or more root declarations:
