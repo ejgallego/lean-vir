@@ -10,8 +10,26 @@ import { createVirImports, VirRuntime } from "../web/src/vir-runtime.js";
 import { createVirRuntime } from "../web/src/vir-runtime-node.js";
 
 const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
-const irPackage = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
 const fixtureManifest = JSON.parse(await readFile(new URL("../fixtures/manifest.json", import.meta.url), "utf8"));
+const browserPackages = JSON.parse(await readFile(new URL("../fixtures/browser-packages.json", import.meta.url), "utf8"));
+const packageBytesByFile = new Map();
+for (const spec of browserPackages.packages ?? []) {
+  packageBytesByFile.set(spec.file, await readFile(new URL(`../web/public/${spec.file}`, import.meta.url)));
+}
+const packageFileByFixtureSource = new Map();
+for (const spec of browserPackages.packages ?? []) {
+  for (const source of spec.fixtureSources ?? []) {
+    packageFileByFixtureSource.set(source, spec.file);
+  }
+}
+const defaultPackageFile =
+  (browserPackages.packages ?? []).find((spec) => spec.id === browserPackages.defaultPackage)?.file
+    ?? "fixtures-basic.irpkg";
+const hostPackageFile =
+  (browserPackages.packages ?? []).find((spec) => spec.id === browserPackages.hostPackage)?.file
+    ?? "demo-host.irpkg";
+const irPackage = packageBytesByFile.get(defaultPackageFile);
+const hostPackage = packageBytesByFile.get(hostPackageFile);
 const mod = new WebAssembly.Module(wasm);
 const imports = createVirImports(mod);
 
@@ -131,35 +149,6 @@ if (repeatedFib !== 127760) {
   throw new Error(`upstream repeated fib: expected 127760, got ${repeatedFib}`);
 }
 
-const stepCases = [
-  ["happy", "ignore", "hungry"],
-  ["hungry", "feed", "happy"],
-  ["happy", "play", "sleepy"],
-  ["sleepy", "nap", "asleep"],
-  ["asleep", "wake", "happy"],
-  ["hungry", "ignore", "angry"],
-  ["angry", "ignore", "dead"],
-];
-
-for (const [current, act, expected] of stepCases) {
-  const actual = runtime.call("Tamagotchi.step", current, act);
-  if (actual !== expected) {
-    throw new Error(`upstream Tamagotchi.step ${current} ${act}: expected ${expected}, got ${actual}`);
-  }
-}
-
-let current = "happy";
-const trace = [current];
-for (const act of ["ignore", "feed", "play", "nap", "wake", "ignore", "ignore"]) {
-  current = runtime.call("Tamagotchi.step", current, act);
-  trace.push(current);
-}
-
-const expectedTrace = ["happy", "hungry", "happy", "sleepy", "asleep", "happy", "hungry", "angry"];
-if (trace.join(",") !== expectedTrace.join(",")) {
-  throw new Error(`upstream Tamagotchi trace: expected ${expectedTrace}, got ${trace}`);
-}
-
 const sortChecksum = runtime.call("SortDemo.demo");
 if (sortChecksum !== "192") {
   throw new Error(`upstream SortDemo.demo: expected 192, got ${sortChecksum}`);
@@ -190,7 +179,7 @@ if (genericByteArrayScore !== "136") {
   throw new Error(`generic ByteArray input: expected 136, got ${genericByteArrayScore}`);
 }
 
-const hostRuntime = await createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
+const hostRuntime = await createVirRuntime({ wasmBytes: wasm, irPackageBytes: hostPackage });
 if (hostRuntime.packageInfo.hostImports !== 9) {
   throw new Error(`expected 9 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
 }
@@ -199,10 +188,6 @@ if (hostTitle !== "Lean VIR host: smoke") {
   throw new Error(`Lean to JavaScript host title: expected Lean VIR host: smoke, got ${hostTitle}`);
 }
 const petReset = hostRuntime.call("Tamagotchi.uiReset", "pet");
-const petNext = hostRuntime.call("Tamagotchi.nextState", petReset.mood, petReset.trace, petReset.artwork, "ignore");
-if (petNext.mood !== "hungry" || petNext.trace.join(" -> ") !== "happy -> hungry") {
-  throw new Error(`Lean Tamagotchi state step failed: ${JSON.stringify(petNext)}`);
-}
 const petStep = hostRuntime.call("Tamagotchi.uiStep", petReset.mood, petReset.trace, petReset.artwork, "ignore");
 if (petStep.mood !== "hungry" || petStep.trace.join(" -> ") !== "happy -> hungry") {
   throw new Error(`Lean Tamagotchi browser step failed: ${JSON.stringify(petStep)}`);
@@ -211,6 +196,10 @@ const petDomReset = hostRuntime.call("Tamagotchi.uiResetFromDom");
 const petDomStep = hostRuntime.call("Tamagotchi.uiStepFromDom", "ignore");
 if (petDomReset.mood !== "happy" || petDomStep.mood !== "hungry" || petDomStep.trace.join(" -> ") !== "happy -> hungry") {
   throw new Error(`Lean Tamagotchi DOM-driven step failed: ${JSON.stringify({ petDomReset, petDomStep })}`);
+}
+
+function packageForFixture(fixture) {
+  return packageBytesByFile.get(packageFileByFixtureSource.get(fixture.source) ?? defaultPackageFile);
 }
 
 let repeatedSortChecksum = 0;
@@ -229,10 +218,11 @@ for (const fixture of fixtureManifest.fixtures ?? []) {
   try {
     const { exports: fixtureExports } = await WebAssembly.instantiate(mod, imports);
     fixtureExports.__wasm_call_ctors?.();
-    const fixturePackagePtr = fixtureExports.vir_alloc_bytes(irPackage.byteLength);
+    const fixturePackage = packageForFixture(fixture);
+    const fixturePackagePtr = fixtureExports.vir_alloc_bytes(fixturePackage.byteLength);
     try {
-      new Uint8Array(fixtureExports.memory.buffer, fixturePackagePtr, irPackage.byteLength).set(irPackage);
-      const loadedDecls = fixtureExports.vir_load_ir_package(fixturePackagePtr, irPackage.byteLength);
+      new Uint8Array(fixtureExports.memory.buffer, fixturePackagePtr, fixturePackage.byteLength).set(fixturePackage);
+      const loadedDecls = fixtureExports.vir_load_ir_package(fixturePackagePtr, fixturePackage.byteLength);
       if (loadedDecls === 0) {
         throw new Error("IR package load failed");
       }
@@ -250,5 +240,5 @@ for (const fixture of fixtureManifest.fixtures ?? []) {
 }
 
 console.log(
-  `upstream smoke ok: fib 17 = 1597, Tamagotchi ends angry, editable SortDemo works, ${fixtureManifest.fixtures.length} fixtures run`,
+  `upstream smoke ok: fib 17 = 1597, Lean DOM Tamagotchi works, editable SortDemo works, ${fixtureManifest.fixtures.length} fixtures run`,
 );

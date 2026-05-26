@@ -19,9 +19,6 @@ Author: Emilio J. Gallego Arias
             <h1>IR Interpreter Demo</h1>
             <nav class="topbar-links" aria-label="Demo pages">
               <a href="dev.html">Package Runner</a>
-              <a href="dev.html?package=local-fib.irpkg&amp;entry=fib">
-                Fib Package
-              </a>
             </nav>
           </div>
           <div class="runtime-summary" aria-label="Runtime summary">
@@ -57,12 +54,12 @@ Author: Emilio J. Gallego Arias
           </div>
         </header>
 
-        <section class="pet-demo" aria-label="Tamagotchi automaton demo">
+        <section class="pet-demo" aria-label="Lean DOM Tamagotchi demo">
           <div class="pet-state-card">
             <div class="pet-card-heading">
               <div>
                 <p class="eyebrow">Interactive demo</p>
-                <h2>Tamagotchi.step</h2>
+                <h2>Lean DOM Tamagotchi</h2>
               </div>
               <label class="art-switch" for="pet-art-toggle">
                 <input id="pet-art-toggle" type="checkbox" checked />
@@ -131,8 +128,8 @@ Author: Emilio J. Gallego Arias
         <section class="pipeline-panel" aria-labelledby="pipeline-title">
           <div class="section-heading">
             <div>
-              <p class="eyebrow">Generated interface</p>
-              <h2 id="pipeline-title">Local package runners</h2>
+              <p class="eyebrow">Focused packages</p>
+              <h2 id="pipeline-title">Runner shortcuts</h2>
             </div>
           </div>
           <div class="pipeline-grid">
@@ -152,15 +149,15 @@ Author: Emilio J. Gallego Arias
               <span>Array Nat -&gt; Nat</span>
               <small>local-mergesort.irpkg</small>
             </a>
-            <a class="pipeline-item" href="dev.html?package=vir-demo.irpkg&amp;entry=HostInterop_titleHandshake">
+            <a class="pipeline-item" href="dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake">
               <strong>host call</strong>
               <span>Lean IO -&gt; browser JS</span>
-              <small>vir-demo.irpkg</small>
+              <small>demo-host.irpkg</small>
             </a>
-            <a class="pipeline-item" href="dev.html?package=vir-demo.irpkg&amp;entry=SortDemo_demoFromArray">
-              <strong>demo bundle</strong>
-              <span>fixture package</span>
-              <small>vir-demo.irpkg</small>
+            <a class="pipeline-item" href="dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump">
+              <strong>structured input</strong>
+              <span>JSON -&gt; Lean structure</span>
+              <small>fixtures-basic.irpkg</small>
             </a>
           </div>
         </section>
@@ -193,6 +190,7 @@ Author: Emilio J. Gallego Arias
               <button type="button" data-fixture-filter="fixtures/Basic.lean">Basic</button>
               <button type="button" data-fixture-filter="fixtures/InterfaceShapes.lean">Interfaces</button>
               <button type="button" data-fixture-filter="fixtures/ListOption.lean">List/Option</button>
+              <button type="button" data-fixture-filter="fixtures/ExprPrinter.lean">Lean</button>
               <button type="button" data-fixture-filter="fixtures/Boundary.lean">Boundary</button>
             </div>
             <button id="fixture-run-visible" class="fixture-run-visible" type="button" disabled>

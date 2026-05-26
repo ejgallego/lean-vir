@@ -2,7 +2,7 @@
 
 The demo goal is to compile Lean's real `src/library/ir_interpreter.cpp` for
 `wasm32-wasip1` and then supply only the runtime and environment surface needed
-for small browser examples such as `fib`, `Tamagotchi.step`, and
+for small browser examples such as `fib`, the Lean-rendered DOM Tamagotchi, and
 `SortDemo.demoFromArray`.
 
 Run the boundary probe with:
@@ -53,17 +53,18 @@ The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
 
 - `shim.cpp` owns WASI/platform stubs and the exported Lean C hooks.
-- `tools/GeneratePackage.lean` owns extraction of the demo declaration closure
-  from typed `Lean.IR.Decl` values into `build/generated/vir-demo.irpkg`.
+- `tools/GeneratePackage.lean` owns extraction of the demo declaration closures
+  from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
+  packages.
 - `decl_provider.h` is the replacement point for a future module-backed
   provider.
 
 Together they supply:
 
 - `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` for the generated
-  demo closure, including `fib`, `Tamagotchi.step`, `Tamagotchi.run`,
-  `Tamagotchi.trace`, `Tamagotchi.demoScript`, `SortDemo.demoFromArray`, and
-  their current dependencies.
+  package closures, including `fib`, `SortDemo.demoFromArray`, the
+  `Lean.Vir.Browser`-backed Tamagotchi UI entrypoints, and the fixture
+  dependencies.
 - small WASI/platform stubs for dynamic symbol lookup, C++ exception throwing,
   trace/time/options hooks, and the few environment helpers pulled in by the
   interpreter.
@@ -80,10 +81,10 @@ not include vendored mimalloc sources for a WASI rebuild, so this selects Lean's
 ordinary allocator path while still compiling Lean's real runtime code.
 
 The build compiles stable sources into cached objects under
-`build/upstream-probe/obj`. Example edits regenerate `web/public/vir-demo.irpkg`
-without recompiling or relinking the WASM artifact. The artifact is relinked
-only when stable objects, link flags, the Lean source commit, or the runtime
-config overlay change.
+`build/upstream-probe/obj`. Example edits regenerate the relevant
+`web/public/*.irpkg` package without recompiling or relinking the WASM artifact.
+The artifact is relinked only when stable objects, link flags, the Lean source
+commit, or the runtime config overlay change.
 
 ## Real IR Declarations
 
@@ -105,11 +106,11 @@ does not use a parallel C/C++ interpreter schema.
 
 ## Package Closure Strategy
 
-For the demo, `/dev.html` and the smoke tests load one `.irpkg` file containing
-the transitive declaration closure needed by the exported Lean functions. This
-keeps `.olean` loading, module initialization, and full environment construction
-out of scope while still exercising the real upstream interpreter over real
-Lean IR objects.
+For the demo, `/dev.html` and the smoke tests load focused `.irpkg` files
+containing the transitive declaration closure needed by each exported Lean
+surface. This keeps `.olean` loading, module initialization, and full
+environment construction out of scope while still exercising the real upstream
+interpreter over real Lean IR objects.
 
 The closure is extracted by `tools/GeneratePackage.lean` from real
 `Lean.IR.Decl` values. The generator starts with declarations produced for the

@@ -178,10 +178,10 @@ def titleHandshake (label : String) : IO String := do
 end HostInterop
 ```
 
-This example is included in the stock demo package. In the browser runner:
+This example is included in the stock host package. In the browser runner:
 
 ```text
-dev.html?package=vir-demo.irpkg&entry=HostInterop_titleHandshake
+dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake
 ```
 
 ## Binding Contract

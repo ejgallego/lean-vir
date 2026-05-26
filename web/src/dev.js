@@ -25,6 +25,7 @@ const inputFields = document.querySelector("#dev-input-fields");
 const runEntryButton = document.querySelector("#dev-run-entry");
 const resultOutput = document.querySelector("#dev-result");
 const wasmFile = "vir-upstream.wasm";
+const defaultPackageUrl = "fixtures-basic.irpkg";
 const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
 const query = new URLSearchParams(window.location.search);
 
@@ -370,7 +371,7 @@ async function loadIrPackageBytes(label, bytes) {
 async function loadPackageUrl() {
   resetPackageState();
   setStatus("Loading", false);
-  const label = packageUrl.value.trim() || "vir-demo.irpkg";
+  const label = packageUrl.value.trim() || defaultPackageUrl;
   const bytes = await fetchBytes(assetPathFor(label));
   await loadIrPackageBytes(label, bytes);
 }
@@ -429,7 +430,7 @@ runEntryButton.addEventListener("click", () => {
   }
 });
 
-packageUrl.value = query.get("package") ?? "vir-demo.irpkg";
+packageUrl.value = query.get("package") ?? defaultPackageUrl;
 
 loadPackageUrl().catch((error) => {
   showError(error, "Failed");

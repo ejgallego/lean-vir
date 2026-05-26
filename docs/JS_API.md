@@ -24,7 +24,15 @@ import { createVirRuntime } from "./src/vir-runtime.js";
 
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "vir-demo.irpkg",
+  irPackageUrl: "fixtures-basic.irpkg",
+});
+const hostVir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "demo-host.irpkg",
+});
+const leanVir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "fixtures-lean.irpkg",
 });
 
 console.log(vir.call("fib", 12));
@@ -32,8 +40,8 @@ console.log(vir.exportsByName.SortDemo_demo());
 console.log(vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]));
 console.log(vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
 console.log(vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
-console.log(vir.call("Tamagotchi.step", "happy", "ignore"));
-console.log(vir.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }));
+console.log(hostVir.call("HostInterop.titleHandshake", "browser handshake"));
+console.log(leanVir.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }));
 ```
 
 There is also a minimal browser page at `/runtime-example.html` that imports the
@@ -48,7 +56,7 @@ WASM module:
 import { createVirRuntimeFactory, fetchBytes } from "./src/vir-runtime.js";
 
 const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
-const irPackageBytes = await fetchBytes("vir-demo.irpkg");
+const irPackageBytes = await fetchBytes("fixtures-basic.irpkg");
 
 const first = await factory.createRuntime({ irPackageBytes });
 const second = await factory.createRuntime({ irPackageBytes });
@@ -148,7 +156,7 @@ option:
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "vir-demo.irpkg",
+  irPackageUrl: "demo-host.irpkg",
 });
 
 console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));

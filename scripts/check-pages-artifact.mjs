@@ -36,13 +36,16 @@ const devHtml = await assertHtmlAssetLinks("dev.html");
 assertLink(indexHtml, "dev.html");
 assertLink(indexHtml, "dev.html?package=local-fib.irpkg&amp;entry=fib");
 assertLink(indexHtml, "dev.html?package=local-mergesort.irpkg&amp;entry=SortDemo_demoFromArray");
-assertLink(indexHtml, "dev.html?package=vir-demo.irpkg&amp;entry=HostInterop_titleHandshake");
-assertLink(indexHtml, "dev.html?package=vir-demo.irpkg&amp;entry=SortDemo_demoFromArray");
+assertLink(indexHtml, "dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake");
+assertLink(indexHtml, "dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump");
 assert.ok(devHtml.includes("dev-package-url"), "dev.html should contain package runner controls");
 
 await assertFile("vir-upstream.wasm", 1024);
-await assertFile("vir-demo.irpkg", 1024);
+await assertFile("fixtures-basic.irpkg", 1024);
+await assertFile("demo-host.irpkg", 1024);
+await assertFile("fixtures-lean.irpkg", 1024);
+await assertFile("fixtures-boundary.irpkg", 1024);
 await assertFile("local-fib.irpkg", 128);
 await assertFile("local-mergesort.irpkg", 128);
 
-console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, wasm, and manifest-bearing packages`);
+console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, wasm, and focused manifest packages`);

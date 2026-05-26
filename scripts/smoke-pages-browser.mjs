@@ -252,11 +252,15 @@ async function smokeLanding(cdp, origin) {
     links: Array.from(document.querySelectorAll(".pipeline-item")).map((link) => link.getAttribute("href")),
     mood: document.querySelector("#pet-mood-display")?.textContent?.trim()
   })`);
-  assert.equal(state.packageName, "vir-demo.irpkg");
+  assert.equal(
+    state.packageName,
+    "fixtures-basic.irpkg, demo-host.irpkg, fixtures-lean.irpkg, fixtures-boundary.irpkg",
+  );
   assert.equal(state.mood, "happy");
   assert.ok(state.links.includes("dev.html?package=local-fib.irpkg&entry=fib"));
   assert.ok(state.links.includes("dev.html?package=local-mergesort.irpkg&entry=SortDemo_demoFromArray"));
-  assert.ok(state.links.includes("dev.html?package=vir-demo.irpkg&entry=HostInterop_titleHandshake"));
+  assert.ok(state.links.includes("dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake"));
+  assert.ok(state.links.includes("dev.html?package=fixtures-basic.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump"));
 
   const stepped = await evaluate(cdp, `new Promise((resolve, reject) => {
     document.querySelector("[data-action='ignore']").click();
@@ -497,7 +501,10 @@ try {
   await cdp.send("Runtime.enable");
 
   await smokeLanding(cdp, server.origin);
-  await smokeManifestDrivenEntryList(cdp, server.origin, "vir-demo.irpkg");
+  await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-basic.irpkg");
+  await smokeManifestDrivenEntryList(cdp, server.origin, "demo-host.irpkg");
+  await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-lean.irpkg");
+  await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-boundary.irpkg");
   const runnerCases = [
     await runnerCaseFromManifest("local-fib.irpkg", "fib", {
       entryCount: 1,
@@ -511,30 +518,36 @@ try {
       runInput: "[4, 1, 3, 2]",
       result: "30",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "HostInterop.titleHandshake", {
+    await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.titleHandshake", {
       input: "",
       runInput: "pages smoke",
       result: "Lean VIR host: pages smoke",
       documentTitle: "Lean VIR host: pages smoke",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Tamagotchi.step", {
-      inputs: ["happy", "feed"],
-      inputTags: ["SELECT", "SELECT"],
-      runInputs: ["happy", "ignore"],
-      result: "hungry",
+    await runnerCaseFromManifest("demo-host.irpkg", "Tamagotchi.uiStep", {
+      inputTags: ["SELECT", "TEXTAREA", "INPUT", "SELECT"],
+      runInputs: ["happy", `["happy"]`, "pet", "ignore"],
+      result: `{
+  "mood": "hungry",
+  "trace": [
+    "happy",
+    "hungry"
+  ],
+  "artwork": "pet"
+}`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ExprPrinter.exprKindScore", {
+    await runnerCaseFromManifest("fixtures-lean.irpkg", "Vir.Fixtures.ExprPrinter.exprKindScore", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"kind":"bvar","index":4}`],
       result: "5",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", {
       input: "[]",
       inputTags: ["TEXTAREA"],
       runInputs: [`["a","bc"]`],
       result: "3",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ListOption.classifySum", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.ListOption.classifySum", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["4"],
@@ -543,37 +556,37 @@ try {
   "value": "4"
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ListOption.sumScore", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.ListOption.sumScore", {
       input: `{"kind":"inl","value":0}`,
       inputTags: ["TEXTAREA"],
       runInputs: [`{"kind":"inr","value":7}`],
       result: "70",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint32Bump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.uint32Bump", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["41"],
       result: "42",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint64Bump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.uint64Bump", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["18446744073709551615"],
       result: "0",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.floatScale", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.floatScale", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["1.5"],
       result: "6",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.float32Roundtrip", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.float32Roundtrip", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["1.25"],
       result: "1.25",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.profileStatsBump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.profileStatsBump", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"enabled":true,"level":2,"score16":30,"visits":400,"quota":5,"checksum":6000,"tier":"pro","note":"ok"}`],
       result: `{
@@ -587,14 +600,14 @@ try {
   "note": "ok!"
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.boxNatBump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.boxNatBump", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"value":41}`],
       result: `{
   "value": "42"
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
       input: `{"value":0}`,
       inputTags: ["TEXTAREA"],
       runInputs: [`{"value":41}`],
@@ -602,7 +615,7 @@ try {
   "value": 42
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
       input: `{"value":0}`,
       inputTags: ["TEXTAREA"],
       runInputs: [`{"value":41}`],
@@ -610,7 +623,7 @@ try {
   "value": 42
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.extendedProfileBump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.extendedProfileBump", {
       input: `{"nickname":"","active":false,"visits":0,"score":0,"tags":[]}`,
       inputTags: ["TEXTAREA"],
       runInputs: [`{"nickname":"lean","active":true,"visits":5,"score":7,"tags":["ir"]}`],
@@ -624,6 +637,9 @@ try {
     "extended"
   ]
 }`,
+    }),
+    await runnerCaseFromManifest("fixtures-boundary.irpkg", "Vir.Fixtures.Boundary.floatScaleScore", {
+      result: "6",
     }),
   ];
 

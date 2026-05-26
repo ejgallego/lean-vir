@@ -14,7 +14,11 @@ import fixtureExprPrinterSource from "../../fixtures/ExprPrinter.lean?raw";
 import fixtureInterfaceShapesSource from "../../fixtures/InterfaceShapes.lean?raw";
 import fixtureListOptionSource from "../../fixtures/ListOption.lean?raw";
 import fixtureBoundarySource from "../../fixtures/Boundary.lean?raw";
+import fixtureLeanParserSource from "../../fixtures/LeanParser.lean?raw";
+import fixtureLeanParserHeaderSource from "../../fixtures/LeanParserHeader.lean?raw";
+import fixtureTaskSource from "../../fixtures/Task.lean?raw";
 import fixtureManifest from "../../fixtures/manifest.json";
+import browserPackages from "../../fixtures/browser-packages.json";
 
 const statusEl = document.querySelector("#status");
 const petArtToggle = document.querySelector("#pet-art-toggle");
@@ -49,8 +53,17 @@ const maxFibInput = 17;
 const maxSortItems = 16;
 const maxSortValue = 9999;
 const wasmFile = "vir-upstream.wasm";
-const irPackageFile = "vir-demo.irpkg";
 const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
+const packageSpecs = browserPackages.packages ?? [];
+const packageById = new Map(packageSpecs.map((spec) => [spec.id, spec]));
+const defaultPackageFile = packageById.get(browserPackages.defaultPackage)?.file ?? "fixtures-basic.irpkg";
+const hostPackageFile = packageById.get(browserPackages.hostPackage)?.file ?? "demo-host.irpkg";
+const packageFileByFixtureSource = new Map();
+for (const spec of packageSpecs) {
+  for (const source of spec.fixtureSources ?? []) {
+    packageFileByFixtureSource.set(source, spec.file);
+  }
+}
 const actions = ["feed", "play", "nap", "wake", "ignore"];
 const sourceFiles = [
   { path: "examples/Fib.lean", source: fibSource },
@@ -61,6 +74,9 @@ const sourceFiles = [
   { path: "fixtures/InterfaceShapes.lean", source: fixtureInterfaceShapesSource },
   { path: "fixtures/ListOption.lean", source: fixtureListOptionSource },
   { path: "fixtures/Boundary.lean", source: fixtureBoundarySource },
+  { path: "fixtures/LeanParser.lean", source: fixtureLeanParserSource },
+  { path: "fixtures/LeanParserHeader.lean", source: fixtureLeanParserHeaderSource },
+  { path: "fixtures/Task.lean", source: fixtureTaskSource },
 ];
 const sourceByPath = new Map(sourceFiles.map((source) => [source.path, source.source]));
 const demoFixtures = [
@@ -68,6 +84,7 @@ const demoFixtures = [
     id: "fib",
     source: "examples/Fib.lean",
     entry: "fib",
+    packageFile: defaultPackageFile,
     group: "demo",
     runner: "fib",
     result: { type: "Nat" },
@@ -83,6 +100,7 @@ const demoFixtures = [
     id: "sort-array",
     source: "examples/MergeSort.lean",
     entry: "SortDemo.demoFromArray",
+    packageFile: defaultPackageFile,
     group: "demo",
     runner: "sort",
     result: { type: "Nat" },
@@ -97,6 +115,7 @@ const demoFixtures = [
     id: "host-title",
     source: "examples/HostInterop.lean",
     entry: "HostInterop.titleHandshake",
+    packageFile: hostPackageFile,
     group: "demo",
     runner: "hostTitle",
     result: { type: "String" },
@@ -107,9 +126,40 @@ const demoFixtures = [
       hint: "String passed from Lean to the browser document title",
     },
   },
+  {
+    id: "string-roundtrip",
+    source: "fixtures/Basic.lean",
+    entry: "Vir.Fixtures.Basic.stringUtf8RoundtripScore",
+    packageFile: defaultPackageFile,
+    group: "demo",
+    runner: "singleString",
+    result: { type: "Nat" },
+    input: {
+      kind: "string",
+      label: "String",
+      defaultValue: "Aé∀Z",
+      hint: "String -> Nat score through Lean UTF-8 operations",
+    },
+  },
+  {
+    id: "bytearray-score",
+    source: "fixtures/Basic.lean",
+    entry: "Vir.Fixtures.Basic.byteArrayInputScore",
+    packageFile: defaultPackageFile,
+    group: "demo",
+    runner: "byteArray",
+    result: { type: "Nat" },
+    input: {
+      kind: "byteArray",
+      label: "Bytes",
+      defaultValue: "65, 66, 67",
+      hint: "ByteArray values, each in 0..255",
+    },
+  },
 ];
 const manifestFixtures = (fixtureManifest.fixtures ?? []).map((fixture) => ({
   ...fixture,
+  packageFile: packageFileByFixtureSource.get(fixture.source) ?? defaultPackageFile,
   group: "manifest",
 }));
 const fixtures = [...demoFixtures, ...manifestFixtures];
@@ -120,8 +170,9 @@ const fixtureInputs = new Map(
     .filter((fixture) => fixture.input)
     .map((fixture) => [fixture.id, fixture.input.defaultValue ?? ""]),
 );
-let irPackageBytesPromise = null;
-let runtime = null;
+const packageBytesPromises = new Map();
+const runtimePromises = new Map();
+let hostRuntime = null;
 let currentFixtureFilter = "all";
 let selectedFixtureId = null;
 
@@ -131,13 +182,21 @@ function applyPetState(state) {
   }
 }
 
-function demoPackageBytes() {
-  irPackageBytesPromise ??= fetchBytes(`${import.meta.env.BASE_URL}${irPackageFile}`);
-  return irPackageBytesPromise;
+function packageBytes(packageFile) {
+  if (!packageBytesPromises.has(packageFile)) {
+    packageBytesPromises.set(packageFile, fetchBytes(`${import.meta.env.BASE_URL}${packageFile}`));
+  }
+  return packageBytesPromises.get(packageFile);
 }
 
-async function createDemoRuntime() {
-  return runtimeFactory.createRuntime({ irPackageBytes: await demoPackageBytes() });
+function runtimeForPackage(packageFile) {
+  if (!runtimePromises.has(packageFile)) {
+    runtimePromises.set(
+      packageFile,
+      packageBytes(packageFile).then((irPackageBytes) => runtimeFactory.createRuntime({ irPackageBytes })),
+    );
+  }
+  return runtimePromises.get(packageFile);
 }
 
 function formatBytes(bytes) {
@@ -173,9 +232,9 @@ function stepPet(runtime, actionName) {
 }
 
 function resetPet() {
-  if (runtime === null) return;
+  if (hostRuntime === null) return;
   try {
-    applyPetState(runtime.call("Tamagotchi.uiResetFromDom"));
+    applyPetState(hostRuntime.call("Tamagotchi.uiResetFromDom"));
     setReady();
   } catch (error) {
     petMoodDisplay.textContent = "error";
@@ -195,6 +254,19 @@ function parseSortInput(text) {
     const value = Number(part);
     if (!Number.isSafeInteger(value) || value > maxSortValue) {
       throw new Error(`sort input value is capped at ${maxSortValue}`);
+    }
+    return value;
+  });
+}
+
+function parseByteArrayInput(text) {
+  return text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean).map((part) => {
+    if (!/^\d+$/.test(part)) {
+      throw new Error(`invalid byte literal: ${part}`);
+    }
+    const value = Number(part);
+    if (!Number.isInteger(value) || value < 0 || value > 255) {
+      throw new Error(`ByteArray values must be in 0..255`);
     }
     return value;
   });
@@ -313,8 +385,11 @@ function renderFixtureList(sourceFilter = "all") {
     title.textContent = fixture.id;
 
     const meta = document.createElement("small");
+    const packageLabel = fixture.packageFile ?? defaultPackageFile;
     meta.textContent =
-      fixture.group === "demo" ? `demo / ${sourceLabel(fixture.source)}` : sourceLabel(fixture.source);
+      fixture.group === "demo"
+        ? `demo / ${sourceLabel(fixture.source)} / ${packageLabel}`
+        : `${sourceLabel(fixture.source)} / ${packageLabel}`;
 
     item.append(title, meta);
     fixtureList.append(item);
@@ -342,7 +417,7 @@ function visibleFixtures() {
 }
 
 function updateFixtureRunControls() {
-  const enabled = runtime !== null;
+  const enabled = hostRuntime !== null;
   fixtureRunVisibleButton.disabled = !enabled;
   fixtureRunSelectedButton.disabled = !enabled || selectedFixtureId === null;
 }
@@ -392,6 +467,20 @@ function runInputFixture(runtime, fixture) {
     return runtime.call(fixture.entry, fixtureInputValue(fixture));
   }
 
+  if (fixture.runner === "singleString") {
+    return runtime.call(fixture.entry, fixtureInputValue(fixture));
+  }
+
+  if (fixture.runner === "byteArray") {
+    const bytes = parseByteArrayInput(fixtureInputValue(fixture));
+    const normalized = bytes.join(", ");
+    fixtureInputs.set(fixture.id, normalized);
+    if (fixture.id === selectedFixtureId) {
+      fixtureInput.value = normalized;
+    }
+    return runtime.call(fixture.entry, bytes);
+  }
+
   return null;
 }
 
@@ -403,11 +492,11 @@ function evaluateFixture(runtime, fixture) {
 }
 
 async function runFixture(fixture) {
-  if (runtime === null) return null;
+  if (hostRuntime === null) return null;
   fixtureRunStatus.textContent = `Running ${fixture.id}`;
   setFixtureResult(fixture, "running");
   try {
-    const fixtureRuntime = await createDemoRuntime();
+    const fixtureRuntime = await runtimeForPackage(fixture.packageFile ?? defaultPackageFile);
     const result = evaluateFixture(fixtureRuntime, fixture);
     setFixtureResult(fixture, result);
     fixtureRunStatus.textContent = `${fixture.id}: ${result}`;
@@ -422,7 +511,7 @@ async function runFixture(fixture) {
 }
 
 async function runVisibleFixtures() {
-  if (runtime === null) return;
+  if (hostRuntime === null) return;
   const selected = visibleFixtures();
   let passed = 0;
   let failed = 0;
@@ -465,28 +554,32 @@ renderFixtureList();
 selectFixture(fixtures[0]);
 
 try {
-  runtime = await createDemoRuntime();
-  const packageInfo = runtime.packageInfo;
-  const pointerBytes = runtime.targetPointerBytes();
+  const packageFiles = packageSpecs.map((spec) => spec.file);
+  const runtimes = await Promise.all(packageFiles.map((file) => runtimeForPackage(file)));
+  hostRuntime = await runtimeForPackage(hostPackageFile);
+  const primaryRuntime = await runtimeForPackage(defaultPackageFile);
+  const totalPackageBytes = runtimes.reduce((sum, candidate) => sum + candidate.packageInfo.byteLength, 0);
+  const totalDeclCount = runtimes.reduce((sum, candidate) => sum + candidate.packageInfo.count, 0);
+  const pointerBytes = primaryRuntime.targetPointerBytes();
 
   wasmTarget.textContent = "wasm32-wasip1";
   linkStatus.textContent = "strict";
-  packageName.textContent = irPackageFile;
-  packageSize.textContent = formatBytes(packageInfo.byteLength);
+  packageName.textContent = packageFiles.join(", ");
+  packageSize.textContent = formatBytes(totalPackageBytes);
   ptrWidth.textContent = `${pointerBytes} bytes`;
-  declCount.textContent = String(packageInfo.count);
+  declCount.textContent = String(totalDeclCount);
   layoutGuard.textContent = pointerBytes === 4 ? "pass" : "fail";
   fixtureRunStatus.textContent = "Ready";
   updateFixtureRunControls();
   setReady();
 
   for (const button of petActionButtons) {
-    button.addEventListener("click", () => stepPet(runtime, button.dataset.action));
+    button.addEventListener("click", () => stepPet(hostRuntime, button.dataset.action));
   }
   petResetButton.addEventListener("click", resetPet);
   resetPet();
 } catch (error) {
-  runtime = null;
+  hostRuntime = null;
   statusEl.textContent = "Failed";
   statusEl.dataset.ready = "false";
   fixtureRunStatus.textContent = "Unavailable";

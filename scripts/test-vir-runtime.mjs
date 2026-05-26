@@ -93,7 +93,9 @@ async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns) {
 }
 
 const wasmBytes = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
-const irPackageBytes = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
+const irPackageBytes = await readFile(new URL("../web/public/fixtures-basic.irpkg", import.meta.url));
+const hostPackageBytes = await readFile(new URL("../web/public/demo-host.irpkg", import.meta.url));
+const leanPackageBytes = await readFile(new URL("../web/public/fixtures-lean.irpkg", import.meta.url));
 const hostlessImports = createVirImports(new WebAssembly.Module(wasmBytes));
 assert.throws(
   () => hostlessImports.env.vir_js_call(0, 0, 0),
@@ -101,6 +103,8 @@ assert.throws(
 );
 
 const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
+const hostRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
+const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
 assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
 assert.equal(createExportedNodeVirRuntime, createVirRuntime);
 assert.equal(runtime.targetPointerBytes(), 4);
@@ -108,7 +112,8 @@ assert.ok(runtime.packageInfo.count > 0, "expected IR package to load declaratio
 assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
-assert.equal(runtime.packageInfo.hostImports, 9);
+assert.equal(runtime.packageInfo.hostImports, 0);
+assert.equal(hostRuntime.packageInfo.hostImports, 9);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -117,6 +122,8 @@ assert.ok(runtime.packageMetadata.generatedAt.length > 0);
 assert.ok(runtime.packageMetadata.targets.some((target) => target.source === "examples/Fib.lean"));
 assert.ok(runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib"));
 assertManifestTypeDescriptorsRoundTrip(runtime.interfaceManifest);
+assertManifestTypeDescriptorsRoundTrip(hostRuntime.interfaceManifest);
+assertManifestTypeDescriptorsRoundTrip(leanRuntime.interfaceManifest);
 assert.equal(validateInterfaceManifest(structuredClone(validManifestShape)).exports[0].entry, "ok");
 assertInvalidManifest((manifest) => {
   manifest.exports[0].result = { type: "UnsupportedTag13", wireTag: 13 };
@@ -244,7 +251,7 @@ assertInvalidManifest((manifest) => {
     ],
   };
 }, /fields\[1\]\.name duplicates another flattened structure field/);
-assert.deepEqual(runtime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), [
+assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), [
   "browser.document.getTitle",
   "browser.document.querySelector",
   "browser.document.setTitle",
@@ -255,51 +262,46 @@ assert.deepEqual(runtime.interfaceManifest.hostImports.map((entry) => entry.targ
   "browser.htmlInputElement.getChecked",
   "browser.htmlInputElement.setChecked",
 ]);
-const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes });
+const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
 assert.throws(
   () => browserRuntime.call("HostInterop.titleHandshake", "node"),
   /browser\.document host binding requires globalThis\.document/,
 );
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
-assert.equal(runtime.call("HostInterop.titleHandshake", "runtime smoke"), "Lean VIR host: runtime smoke");
-const petReset = runtime.call("Tamagotchi.uiReset", "pet");
+assert.equal(hostRuntime.call("HostInterop.titleHandshake", "runtime smoke"), "Lean VIR host: runtime smoke");
+const petReset = hostRuntime.call("Tamagotchi.uiReset", "pet");
 assert.deepEqual(petReset, {
   mood: "happy",
   trace: ["happy"],
   artwork: "pet",
 });
-assert.deepEqual(runtime.call("Tamagotchi.nextState", petReset.mood, petReset.trace, petReset.artwork, "ignore"), {
+assert.deepEqual(hostRuntime.call("Tamagotchi.uiStep", petReset.mood, petReset.trace, petReset.artwork, "ignore"), {
   mood: "hungry",
   trace: ["happy", "hungry"],
   artwork: "pet",
 });
-assert.deepEqual(runtime.call("Tamagotchi.uiStep", petReset.mood, petReset.trace, petReset.artwork, "ignore"), {
-  mood: "hungry",
-  trace: ["happy", "hungry"],
-  artwork: "pet",
-});
-assert.deepEqual(runtime.call("Tamagotchi.uiResetFromDom"), {
+assert.deepEqual(hostRuntime.call("Tamagotchi.uiResetFromDom"), {
   mood: "happy",
   trace: ["happy"],
   artwork: "pet",
 });
-assert.deepEqual(runtime.call("Tamagotchi.uiStepFromDom", "ignore"), {
+assert.deepEqual(hostRuntime.call("Tamagotchi.uiStepFromDom", "ignore"), {
   mood: "hungry",
   trace: ["happy", "hungry"],
   artwork: "pet",
 });
 
-const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/vir-demo.irpkg"], {
+const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/fixtures-basic.irpkg"], {
   encoding: "utf8",
 });
 assert.equal(inspected.status, 0, inspected.stderr || inspected.stdout);
-assert.match(inspected.stdout, /package: build\/generated\/vir-demo\.irpkg/);
+assert.match(inspected.stdout, /package: build\/generated\/fixtures-basic\.irpkg/);
 assert.match(inspected.stdout, new RegExp(`exports: ${runtime.interfaceManifest.exports.length}`));
-assert.match(inspected.stdout, /host imports: 9/);
+assert.match(inspected.stdout, /host imports: 0/);
 assert.match(inspected.stdout, /fib\(arg1: Nat\) -> Nat \[fib\]/);
 
-const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "build/generated/vir-demo.irpkg"], {
+const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "build/generated/fixtures-basic.irpkg"], {
   encoding: "utf8",
 });
 assert.equal(inspectedJson.status, 0, inspectedJson.stderr || inspectedJson.stdout);
@@ -307,56 +309,54 @@ const inspectedInfo = JSON.parse(inspectedJson.stdout);
 assert.equal(inspectedInfo.package.version, 5);
 assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
 assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
-assert.equal(inspectedInfo.manifest.hostImports.length, 9);
+assert.equal(inspectedInfo.manifest.hostImports.length, 0);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
-assert.equal(runtime.call("Tamagotchi.step", "happy", "ignore"), "hungry");
-assert.equal(runtime.call("Tamagotchi.step", "hungry", "feed"), "happy");
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.constNatExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.constNatExpr"), {
   kind: "const",
   name: "Nat",
   levels: [],
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.twoLitExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.twoLitExpr"), {
   kind: "lit",
   literal: { kind: "nat", value: "2" },
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.appExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.appExpr"), {
   kind: "app",
   fn: { kind: "const", name: "Nat.succ", levels: [] },
   arg: { kind: "lit", literal: { kind: "nat", value: "2" } },
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.sortParamExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.sortParamExpr"), {
   kind: "sort",
   level: { kind: "succ", of: { kind: "param", name: "u" } },
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.fvarExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.fvarExpr"), {
   kind: "fvar",
   name: "x",
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.mvarExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.mvarExpr"), {
   kind: "mvar",
   name: "m",
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.lambdaExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.lambdaExpr"), {
   kind: "lam",
   name: "x",
   type: { kind: "const", name: "Nat", levels: [] },
   body: { kind: "bvar", index: "0" },
   binderInfo: "default",
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.forallExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.forallExpr"), {
   kind: "forall",
   name: "x",
   type: { kind: "const", name: "Nat", levels: [] },
   body: { kind: "bvar", index: "0" },
   binderInfo: "implicit",
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.letExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.letExpr"), {
   kind: "let",
   name: "x",
   type: { kind: "const", name: "Nat", levels: [] },
@@ -364,24 +364,24 @@ assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.letExpr"), {
   body: { kind: "bvar", index: "0" },
   nondep: false,
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.stringLitExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.stringLitExpr"), {
   kind: "lit",
   literal: { kind: "string", value: "hi" },
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.mdataExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.mdataExpr"), {
   kind: "mdata",
   expr: { kind: "bvar", index: "0" },
 });
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.projExpr"), {
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.projExpr"), {
   kind: "proj",
   typeName: "Prod",
   index: "1",
   struct: { kind: "const", name: "p", levels: [] },
 });
-assert.equal(runtime.call("Vir.Fixtures.ExprPrinter.exprCoverageScore"), "1232");
-assert.equal(runtime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }), "5");
-assert.equal(runtime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "lit", literal: { kind: "nat", value: 2 } }), "102");
-assert.deepEqual(runtime.call("Vir.Fixtures.ExprPrinter.bumpBVar", { kind: "bvar", index: 4 }), {
+assert.equal(leanRuntime.call("Vir.Fixtures.ExprPrinter.exprCoverageScore"), "1232");
+assert.equal(leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }), "5");
+assert.equal(leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "lit", literal: { kind: "nat", value: 2 } }), "102");
+assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", { kind: "bvar", index: 4 }), {
   kind: "bvar",
   index: "5",
 });
