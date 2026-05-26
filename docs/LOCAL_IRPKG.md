@@ -1,27 +1,42 @@
 # Local IR Packages
 
-The browser demo normally loads focused packages from `web/public/`, including
-`fixtures-basic.irpkg`, `demo-host.irpkg`, `pretty-printer.irpkg`,
-`fixtures-lean.irpkg`, and `fixtures-boundary.irpkg`. They are generated from
-the demo examples plus the fixture manifest. For focused development, use the
-local package utility to generate a smaller package from one Lean file and load
-it in `/dev.html`.
+The local package path takes one Lean source file, packages one or more exported
+declarations into a `.irpkg`, and loads that package in `/dev.html`. The browser
+runner reads the embedded manifest and renders entry controls automatically.
 
-For the config-driven path, see `docs/INTERFACE_PIPELINE.md`.
+The browser demo also loads generated focused packages from `web/public/`,
+including `fixtures-basic.irpkg`, `demo-host.irpkg`, `pretty-printer.irpkg`,
+`fixtures-lean.irpkg`, and `fixtures-boundary.irpkg`.
+
+For calling packaged Lean declarations from JavaScript, see
+`docs/CALL_LEAN_FROM_JS.md`. For the config-driven path, see
+`docs/INTERFACE_PIPELINE.md`.
 
 ## Generate A Package
 
-This is the golden local path from one Lean source file to one browser-loadable
-package:
+Generate the bundled quickstart package:
+
+```bash
+npm run quickstart
+```
+
+Then run the local server and open the printed URL:
+
+```bash
+npm run dev -- --port 5173
+```
+
+The general command shape is:
 
 ```bash
 npm run generate:irpkg -- <source.lean> [package.irpkg] [root ...]
 ```
 
-Package the transitive closure for one or more explicit exports:
+Package the transitive closure for one or more explicit exports. This is the
+core "one Lean file, N browser entries" path:
 
 ```bash
-npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
+npm run generate:irpkg -- examples/Quickstart.lean web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose Quickstart.classify Quickstart.validateName
 ```
 
 Package public source definitions by omitting roots:
@@ -79,7 +94,7 @@ source targets, toolchain, generation time, declaration count, and export count.
 There are three package loading paths:
 
 - Choose a package preset, which covers the generated focused browser packages
-  and the prepared local fib/mergesort packages.
+  and the prepared local quickstart/fib/mergesort packages.
 - Upload a package file, which is the simplest way to test packages under
   `build/generated/`.
 - Load a package URL, which is relative to Vite's served assets. For example,
@@ -88,7 +103,7 @@ There are three package loading paths:
 The package runner accepts URL parameters:
 
 ```text
-dev.html?package=local-fib.irpkg&entry=fib
+dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
 ```
 
 `entry` may be a manifest `id`, `jsName`, or Lean declaration name.

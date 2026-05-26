@@ -59,7 +59,7 @@ Author: Emilio J. Gallego Arias
           <div class="section-heading">
             <div>
               <p class="eyebrow">Local package</p>
-              <h2 id="dev-package-title">Load IR package</h2>
+              <h2 id="dev-package-title">Load Package</h2>
             </div>
           </div>
           <div class="dev-runner-grid">
@@ -68,12 +68,12 @@ Author: Emilio J. Gallego Arias
               <select id="dev-package-preset"></select>
             </label>
             <label class="dev-field">
-              <span>Package URL</span>
+              <span>Served package URL</span>
               <input id="dev-package-url" type="text" value="fixtures-basic.irpkg" />
             </label>
-            <button id="dev-load-url" type="button">Load URL</button>
+            <button id="dev-load-url" type="button">Load</button>
             <label class="dev-field">
-              <span>Package file</span>
+              <span>Upload .irpkg</span>
               <input id="dev-package-file" type="file" accept=".irpkg,application/octet-stream" />
             </label>
           </div>
@@ -95,6 +95,20 @@ Author: Emilio J. Gallego Arias
             <button id="dev-run-entry" type="button" disabled>Run</button>
             <output id="dev-result">...</output>
           </div>
+        </section>
+
+        <section class="dev-runner dev-help" aria-labelledby="dev-command-title">
+          <details>
+            <summary>
+              <span class="eyebrow">Package your own file</span>
+              <strong id="dev-command-title">Command shape</strong>
+            </summary>
+            <div class="dev-command-grid">
+              <pre><code>npm run generate:irpkg -- path/File.lean web/public/local.irpkg Namespace.entry1 Namespace.entry2</code></pre>
+              <pre><code>npm run dev -- --port 5173
+http://127.0.0.1:5173/dev.html?package=local.irpkg</code></pre>
+            </div>
+          </details>
         </section>
       </section>
     </main>

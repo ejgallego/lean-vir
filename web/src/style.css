@@ -49,6 +49,7 @@ textarea {
 
 .topbar-title {
   flex: 0 1 320px;
+  min-width: 220px;
 }
 
 .topbar-links {
@@ -99,17 +100,19 @@ h2 {
 }
 
 .status {
-  display: flex;
+  display: inline-flex;
   align-items: center;
   justify-content: center;
   min-width: 104px;
   min-height: 36px;
   padding: 0 12px;
+  border: 0;
+  border-radius: 0;
   background: #ffffff;
   color: #4c5d52;
   text-align: center;
   font-size: 0.82rem;
-  font-weight: 700;
+  font-weight: 800;
 }
 
 .status[data-ready="true"] {
@@ -1135,10 +1138,13 @@ h2 {
   margin-top: 28px;
 }
 
+.dev-help {
+  margin-top: 22px;
+}
+
 .dev-runner-grid,
 .dev-eval-row {
   display: grid;
-  align-items: end;
   gap: 12px;
   margin-top: 16px;
   padding: 16px;
@@ -1147,10 +1153,58 @@ h2 {
 }
 
 .dev-runner-grid {
+  align-items: end;
   grid-template-columns: minmax(180px, 0.85fr) minmax(220px, 1fr) minmax(112px, auto) minmax(180px, 0.85fr);
 }
 
+.dev-help details {
+  border-top: 1px solid #d9ded2;
+  padding-top: 14px;
+}
+
+.dev-help summary {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  color: #263d2c;
+  cursor: pointer;
+  list-style-position: inside;
+}
+
+.dev-help summary .eyebrow {
+  margin: 0;
+}
+
+.dev-help summary strong {
+  font-size: 0.9rem;
+}
+
+.dev-command-grid {
+  display: grid;
+  gap: 8px;
+  margin-top: 12px;
+}
+
+.dev-command-grid pre {
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+  padding: 11px 12px;
+}
+
+.dev-command-grid code {
+  color: #17201a;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: pre;
+}
+
 .dev-eval-row {
+  align-items: start;
   grid-template-columns: minmax(220px, 0.75fr) minmax(260px, 1fr) minmax(112px, auto) minmax(160px, 0.45fr);
 }
 
@@ -1174,6 +1228,14 @@ h2 {
   border: 1px solid #d9ded2;
   background: #ffffff;
   padding: 8px 10px;
+}
+
+.dev-field input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  margin-top: 12px;
+  accent-color: #263d2c;
 }
 
 .dev-field select,
@@ -1460,6 +1522,7 @@ h2 {
   }
 
   .runtime-summary {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
     max-width: none;
   }
@@ -1507,13 +1570,16 @@ h2 {
     align-items: flex-start;
   }
 
+  .topbar {
+    flex-direction: column;
+  }
+
   .section-heading {
     align-items: flex-start;
     flex-direction: column;
   }
 
   .runtime-summary {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
     width: 100%;
   }
 

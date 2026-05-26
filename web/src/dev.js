@@ -36,6 +36,7 @@ const packageLabels = new Map([
   ["pretty-printer.irpkg", "Std.Format.pretty component package"],
   ["fixtures-lean.irpkg", "Lean Expr, parser, Task"],
   ["fixtures-boundary.irpkg", "Numeric and runtime boundaries"],
+  ["local-quickstart.irpkg", "Four small exports from one Lean file"],
   ["local-fib.irpkg", "Focused fib package"],
   ["local-mergesort.irpkg", "Focused mergesort package"],
 ]);
@@ -44,6 +45,7 @@ const packagePresets = [
     file: spec.file,
     label: packageLabels.get(spec.file) ?? spec.id,
   })),
+  { file: "local-quickstart.irpkg", label: packageLabels.get("local-quickstart.irpkg") },
   { file: "local-fib.irpkg", label: packageLabels.get("local-fib.irpkg") },
   { file: "local-mergesort.irpkg", label: packageLabels.get("local-mergesort.irpkg") },
 ];
@@ -54,6 +56,7 @@ let requestedAutoRun = query.get("run") === "1";
 
 let runtime = null;
 let interfaceEntries = [];
+let currentPackageQuery = null;
 
 function formatBytes(bytes) {
   if (bytes < 1024) return `${bytes} B`;
@@ -85,6 +88,7 @@ function assetPathFor(text) {
 function resetPackageState() {
   runtime = null;
   interfaceEntries = [];
+  currentPackageQuery = null;
   runEntryButton.disabled = true;
   entrySelect.replaceChildren();
   inputFields.replaceChildren();
@@ -137,6 +141,13 @@ function syncPackagePreset() {
 function inputDefault(input) {
   const value = defaultValueForType(input.type);
   return typeof value === "string" ? value : JSON.stringify(value);
+}
+
+function parseBoolText(text) {
+  if (text === true || text === false) return text;
+  if (String(text).trim() === "true") return true;
+  if (String(text).trim() === "false") return false;
+  return false;
 }
 
 function defaultValueForType(type) {
@@ -249,13 +260,14 @@ function renderInputFields(entry) {
     } else if (isJsonInputTag(input.type?.wireTag)) {
       field.spellcheck = false;
     } else if (input.type?.wireTag === 2) {
-      field.type = "text";
-      field.inputMode = "text";
+      label.classList.add("dev-checkbox-field");
+      field.type = "checkbox";
+      field.checked = parseBoolText(inputOverride(entry, input, index) ?? inputDefault(input));
     } else {
       field.type = "text";
       field.inputMode = "text";
     }
-    if (input.type?.wireTag !== 14) {
+    if (input.type?.wireTag !== 14 && input.type?.wireTag !== 2) {
       field.value = inputOverride(entry, input, index) ?? inputDefault(input);
     }
     label.append(caption, field);
@@ -301,6 +313,23 @@ function renderManifestEntries(manifest) {
   if (interfaceEntries.length === 0) {
     resultOutput.textContent = "No callable interface exports were found in this package.";
   }
+}
+
+function entryUrl(entry) {
+  const url = new URL(window.location.href);
+  url.search = "";
+  if (currentPackageQuery !== null) {
+    url.searchParams.set("package", currentPackageQuery);
+  }
+  url.searchParams.set("entry", entry.id);
+  return url;
+}
+
+function updateLocationForSelectedEntry() {
+  if (currentPackageQuery === null) return;
+  const entry = selectedInterfaceEntry();
+  if (entry === null) return;
+  window.history.replaceState(null, "", entryUrl(entry));
 }
 
 function renderPackageMetadata(metadata) {
@@ -368,7 +397,8 @@ function parseFloatInput(text) {
   return value;
 }
 
-function parseInputValue(input, text) {
+function parseInputValue(input, field) {
+  const text = field?.value ?? inputDefault(input);
   switch (input.type?.wireTag) {
     case 0:
     case 7:
@@ -377,8 +407,9 @@ function parseInputValue(input, text) {
     case 1:
       return parseIntInput(text);
     case 2:
-      if (text.trim() === "true") return true;
-      if (text.trim() === "false") return false;
+      if (field?.type === "checkbox") return Boolean(field.checked);
+      if (String(text).trim() === "true") return true;
+      if (String(text).trim() === "false") return false;
       throw new Error(`invalid Bool literal: ${text}`);
     case 3:
       return text;
@@ -420,7 +451,8 @@ function renderResult(value) {
   resultOutput.dataset.multiline = String(text.includes("\n"));
 }
 
-async function loadIrPackageBytes(label, bytes) {
+async function loadIrPackageBytes(label, bytes, packageQuery = null) {
+  currentPackageQuery = packageQuery;
   runtime = await runtimeFactory.createRuntime({ irPackageBytes: bytes });
   syncPackagePreset();
   packageName.textContent = label;
@@ -431,6 +463,7 @@ async function loadIrPackageBytes(label, bytes) {
   renderPackageMetadata(runtime.packageMetadata);
   runEntryButton.disabled = interfaceEntries.length === 0;
   setStatus("Ready", true);
+  updateLocationForSelectedEntry();
   if (requestedAutoRun) {
     requestedAutoRun = false;
     const entry = selectedInterfaceEntry();
@@ -445,7 +478,7 @@ async function loadPackageUrl() {
   setStatus("Loading", false);
   const label = packageUrl.value.trim() || defaultPackageUrl;
   const bytes = await fetchBytes(assetPathFor(label));
-  await loadIrPackageBytes(label, bytes);
+  await loadIrPackageBytes(label, bytes, label);
 }
 
 async function loadPackageFile(file) {
@@ -459,7 +492,7 @@ function evaluateEntry(runtime, entry) {
   const inputs = entry.args ?? [];
   const values = inputs.map((input, index) => {
     const field = inputFields.querySelector(`[data-input-index='${index}']`);
-    const value = parseInputValue(input, field?.value ?? inputDefault(input));
+    const value = parseInputValue(input, field);
     if (field && input.type?.wireTag === 9) {
       field.value = value.join(", ");
     }
@@ -497,6 +530,7 @@ entrySelect.addEventListener("change", () => {
   renderInputFields(selectedInterfaceEntry());
   resultOutput.textContent = "...";
   resultOutput.dataset.multiline = "false";
+  updateLocationForSelectedEntry();
 });
 
 runEntryButton.addEventListener("click", () => {

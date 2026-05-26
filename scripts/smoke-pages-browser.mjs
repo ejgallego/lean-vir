@@ -264,16 +264,18 @@ async function smokeLanding(cdp, origin) {
   );
   assert.equal(state.mood, "happy");
   assert.deepEqual(state.packageItems.map((item) => item.href), [
+    "dev.html?package=local-quickstart.irpkg&entry=Quickstart.total",
     "dev.html?package=fixtures-basic.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump",
     "dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake",
     "format.html?case=list&width=12",
     "dev.html?package=fixtures-lean.irpkg&entry=Vir_Fixtures_ExprPrinter_exprKindScore",
     "dev.html?package=fixtures-boundary.irpkg&entry=Vir_Fixtures_Boundary_floatScaleScore",
   ]);
-  assert.ok(state.packageItems[0].text.includes("Basic, list/option, interface shapes"));
-  assert.ok(state.packageItems[1].text.includes("Browser host calls and DOM Tamagotchi"));
-  assert.ok(state.packageItems[2].text.includes("Std.Format.pretty component package"));
-  assert.ok(state.packageItems[3].text.includes("Lean Expr, parser, Task"));
+  assert.ok(state.packageItems[0].text.includes("Four small exports from one Lean file"));
+  assert.ok(state.packageItems[1].text.includes("Basic, list/option, interface shapes"));
+  assert.ok(state.packageItems[2].text.includes("Browser host calls and DOM Tamagotchi"));
+  assert.ok(state.packageItems[3].text.includes("Std.Format.pretty component package"));
+  assert.ok(state.packageItems[4].text.includes("Lean Expr, parser, Task"));
   assert.equal(state.name, "Octi");
   assert.equal(state.care, "3/5");
   assert.equal(state.turns, "0");
@@ -395,6 +397,7 @@ async function smokePackagePreset(cdp, origin) {
     "pretty-printer.irpkg",
     "fixtures-lean.irpkg",
     "fixtures-boundary.irpkg",
+    "local-quickstart.irpkg",
     "local-fib.irpkg",
     "local-mergesort.irpkg",
     "",
@@ -445,6 +448,8 @@ async function smokeRunner(cdp, origin, url, expected) {
     input: document.querySelector("[data-input-index='0']")?.value,
     inputs: Array.from(document.querySelectorAll("[data-input-index]")).map((field) => ({
       value: field.value,
+      checked: field.checked,
+      type: field.type,
       tagName: field.tagName
     }))
   })`);
@@ -474,7 +479,12 @@ async function smokeRunner(cdp, origin, url, expected) {
     const runInputs = ${JSON.stringify(runInputs)};
     if (runInputs !== null) {
       for (const [index, value] of runInputs.entries()) {
-        document.querySelector("[data-input-index='" + index + "']").value = value;
+        const field = document.querySelector("[data-input-index='" + index + "']");
+        if (field.type === "checkbox") {
+          field.checked = value === true || value === "true";
+        } else {
+          field.value = value;
+        }
       }
     }
     output.textContent = "pending";
@@ -645,6 +655,13 @@ try {
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-lean.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-boundary.irpkg");
   const runnerCases = [
+    await runnerCaseFromManifest("local-quickstart.irpkg", "Quickstart.total", {
+      entryCount: 6,
+      input: "[]",
+      inputTags: ["TEXTAREA"],
+      runInputs: ["[2,3,5,8]"],
+      result: "18",
+    }),
     await runnerCaseFromManifest("local-fib.irpkg", "fib", {
       entryCount: 1,
       input: "0",
