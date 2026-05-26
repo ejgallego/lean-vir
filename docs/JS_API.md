@@ -133,12 +133,14 @@ The first library surface is:
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.getTitle : IO String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
-- `Lean.Vir.Browser.Document.getTextContent : @& String -> IO String`
-- `Lean.Vir.Browser.Document.setTextContent : @& String -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Document.getAttribute : @& String -> @& String -> IO (Option String)`
-- `Lean.Vir.Browser.Document.setAttribute : @& String -> @& String -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Document.getChecked : @& String -> IO Bool`
-- `Lean.Vir.Browser.Document.setChecked : @& String -> Bool -> IO Unit`
+- `Lean.Vir.Browser.Document.querySelector : @& String -> IO (Option Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Browser.Element -> IO String`
+- `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
+- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Browser.Element -> @& String -> @& String -> IO Unit`
+- `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Browser.Element -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
+- `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Browser.HTMLInputElement -> IO Bool`
+- `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Browser.HTMLInputElement -> Bool -> IO Unit`
 
 The built-in `common.*` and `browser.*` targets do not require a `hostBindings`
 option:
@@ -153,14 +155,13 @@ console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 ```
 
 `Lean.Vir.Browser.Console.log` maps to `console.log`, title calls map to
-`document.title`, and selector-based document calls use `querySelector`,
-`textContent`, `getAttribute`, `setAttribute`, and `HTMLInputElement.checked`
-when the runtime is created in a browser. The browser runtime requires
-`globalThis.document` for
-`browser.document.*` targets. In Node, use `lean-vir/vir-runtime-node` or pass
-explicit `hostBindings`; the Node wrapper provides virtual document state for
-title, text-content, attribute, and checked-property calls. See MDN for the
-underlying browser APIs:
+`document.title`, `Document.querySelector` returns an opaque element resource,
+`Element` calls use DOM element properties/methods, and `HTMLInputElement`
+calls first narrow an element before reading or writing `checked`. The browser
+runtime requires `globalThis.document` for `browser.document.*` targets. In
+Node, use `lean-vir/vir-runtime-node` or pass explicit `hostBindings`; the Node
+wrapper provides virtual document and element state for these built-in browser
+targets. See MDN for the underlying browser APIs:
 
 - [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
 - [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)

@@ -19,17 +19,13 @@ const demoTargets = [
   },
   {
     source: "examples/Tamagotchi.lean",
-    // IO exports need boxed wrappers until the typed bridge can pass the world token.
     roots: [
       "Tamagotchi.step",
       "Tamagotchi.nextState",
       "Tamagotchi.uiReset",
-      "Tamagotchi.uiReset._boxed",
       "Tamagotchi.uiResetFromDom",
       "Tamagotchi.uiStep",
-      "Tamagotchi.uiStep._boxed",
       "Tamagotchi.uiStepFromDom",
-      "Tamagotchi.uiStepFromDom._boxed",
     ],
   },
   {

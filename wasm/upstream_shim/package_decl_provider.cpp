@@ -661,6 +661,7 @@ public:
         case 14:
         case 15:
         case 22:
+        case 23:
             break;
         default:
             fail("unsupported interface type tag " + std::to_string(tag));

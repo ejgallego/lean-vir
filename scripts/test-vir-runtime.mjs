@@ -108,7 +108,7 @@ assert.ok(runtime.packageInfo.count > 0, "expected IR package to load declaratio
 assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
-assert.equal(runtime.packageInfo.hostImports, 7);
+assert.equal(runtime.packageInfo.hostImports, 9);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -245,13 +245,15 @@ assertInvalidManifest((manifest) => {
   };
 }, /fields\[1\]\.name duplicates another flattened structure field/);
 assert.deepEqual(runtime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), [
-  "browser.document.getAttribute",
-  "browser.document.getChecked",
   "browser.document.getTitle",
-  "browser.document.setAttribute",
-  "browser.document.setChecked",
-  "browser.document.setTextContent",
+  "browser.document.querySelector",
   "browser.document.setTitle",
+  "browser.element.getAttribute",
+  "browser.element.setAttribute",
+  "browser.element.setTextContent",
+  "browser.htmlInputElement.fromElement",
+  "browser.htmlInputElement.getChecked",
+  "browser.htmlInputElement.setChecked",
 ]);
 const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes });
 assert.throws(
@@ -294,7 +296,7 @@ const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generat
 assert.equal(inspected.status, 0, inspected.stderr || inspected.stdout);
 assert.match(inspected.stdout, /package: build\/generated\/vir-demo\.irpkg/);
 assert.match(inspected.stdout, new RegExp(`exports: ${runtime.interfaceManifest.exports.length}`));
-assert.match(inspected.stdout, /host imports: 7/);
+assert.match(inspected.stdout, /host imports: 9/);
 assert.match(inspected.stdout, /fib\(arg1: Nat\) -> Nat \[fib\]/);
 
 const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "build/generated/vir-demo.irpkg"], {
@@ -305,7 +307,7 @@ const inspectedInfo = JSON.parse(inspectedJson.stdout);
 assert.equal(inspectedInfo.package.version, 5);
 assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
 assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
-assert.equal(inspectedInfo.manifest.hostImports.length, 7);
+assert.equal(inspectedInfo.manifest.hostImports.length, 9);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");
@@ -940,11 +942,14 @@ try {
     "  Lean.Vir.Browser.Document.getTitle",
     "",
     "def freshElementRoundtrip (s : String) : IO (String × Option String) := do",
-    "  Lean.Vir.Browser.Document.setTextContent \"#fresh\" s",
-    "  Lean.Vir.Browser.Document.setAttribute \"#fresh\" \"data-fresh\" (s ++ \"!\")",
-    "  let text ← Lean.Vir.Browser.Document.getTextContent \"#fresh\"",
-    "  let attr ← Lean.Vir.Browser.Document.getAttribute \"#fresh\" \"data-fresh\"",
-    "  pure (text, attr)",
+    "  match ← Lean.Vir.Browser.Document.querySelector \"#fresh\" with",
+    "  | none => pure (\"\", none)",
+    "  | some fresh =>",
+    "      Lean.Vir.Browser.Element.setTextContent fresh s",
+    "      Lean.Vir.Browser.Element.setAttribute fresh \"data-fresh\" (s ++ \"!\")",
+    "      let text ← Lean.Vir.Browser.Element.getTextContent fresh",
+    "      let attr ← Lean.Vir.Browser.Element.getAttribute fresh \"data-fresh\"",
+    "      pure (text, attr)",
     "",
   ].join("\n"));
 
@@ -955,7 +960,7 @@ try {
   );
   assert.equal(hostGenerated.status, 0, hostGenerated.stderr || hostGenerated.stdout);
   const hostRuntime = await factory.createRuntime({ irPackageBytes: await readFile(hostPackage) });
-  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 7);
+  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 8);
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
   assert.equal(hostRuntime.call("freshTitleRoundtrip", "Lean.Vir"), "Lean.Vir");
   assert.deepEqual(hostRuntime.call("freshElementRoundtrip", "element"), {

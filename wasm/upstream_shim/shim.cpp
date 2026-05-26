@@ -1715,6 +1715,7 @@ enum class vir_wire_type : uint8_t {
     Prod = 19,
     Structure = 20,
     TaggedUnion = 21,
+    Resource = 23,
     SimpleEnum = 14,
     Expr = 15,
 };
@@ -1944,6 +1945,7 @@ static bool is_known_wire_type(vir_wire_type tag) {
     case vir_wire_type::Structure:
     case vir_wire_type::TaggedUnion:
     case vir_wire_type::SimpleEnum:
+    case vir_wire_type::Resource:
     case vir_wire_type::Expr:
         return true;
     default:
@@ -2358,6 +2360,8 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
     case vir_wire_type::UInt16:
         return lean_box(static_cast<uint16_t>(r.u32()));
     case vir_wire_type::UInt32:
+        return lean_box_uint32(r.u32());
+    case vir_wire_type::Resource:
         return lean_box_uint32(r.u32());
     case vir_wire_type::UInt64: {
         uint64_t value = 0;
@@ -2787,6 +2791,9 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
         w.u32(static_cast<uint32_t>(lean_unbox(value)));
         break;
     case vir_wire_type::UInt32:
+        w.u32(lean_unbox_uint32(value));
+        break;
+    case vir_wire_type::Resource:
         w.u32(lean_unbox_uint32(value));
         break;
     case vir_wire_type::UInt64:

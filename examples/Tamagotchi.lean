@@ -119,23 +119,57 @@ def artworkFromChecked (checked : Bool) : String :=
 def artLabel (artwork : String) : String :=
   if artwork == "octopus" then "Octopus" else "Virtual pet"
 
+def withElement (selector : String) (f : Lean.Vir.Browser.Element → IO Unit) : IO Unit := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure ()
+  | some element => f element
+
+def setText (selector text : String) : IO Unit :=
+  withElement selector fun element =>
+    Lean.Vir.Browser.Element.setTextContent element text
+
+def getAttribute (selector name : String) : IO (Option String) := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure none
+  | some element => Lean.Vir.Browser.Element.getAttribute element name
+
+def setAttribute (selector name value : String) : IO Unit :=
+  withElement selector fun element =>
+    Lean.Vir.Browser.Element.setAttribute element name value
+
+def getChecked (selector : String) : IO Bool := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure false
+  | some element =>
+      match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
+      | none => pure false
+      | some input => Lean.Vir.Browser.HTMLInputElement.getChecked input
+
+def setChecked (selector : String) (checked : Bool) : IO Unit := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure ()
+  | some element =>
+      match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
+      | none => pure ()
+      | some input => Lean.Vir.Browser.HTMLInputElement.setChecked input checked
+
 def render (state : PetState) (actionLabel : String) : IO Unit := do
   let moodLabel := state.mood.label
-  Lean.Vir.Browser.Document.setTextContent "#pet-mood-display" moodLabel
-  Lean.Vir.Browser.Document.setTextContent "#pet-action-display" actionLabel
-  Lean.Vir.Browser.Document.setTextContent "#pet-trace-display" (traceLabel state.trace)
-  Lean.Vir.Browser.Document.setAttribute "#pet-device" "data-mood" moodLabel
-  Lean.Vir.Browser.Document.setAttribute "#pet-device" "data-art" state.artwork
-  Lean.Vir.Browser.Document.setAttribute "#pet-device" "data-trace" (traceAttr state.trace)
-  Lean.Vir.Browser.Document.setAttribute "#pet-device" "aria-label" s!"{artLabel state.artwork} mood {moodLabel}"
-  Lean.Vir.Browser.Document.setChecked "#pet-art-toggle" (state.artwork == "octopus")
-  Lean.Vir.Browser.Document.setTextContent "#status" "Ready"
-  Lean.Vir.Browser.Document.setAttribute "#status" "data-ready" "true"
+  setText "#pet-mood-display" moodLabel
+  setText "#pet-action-display" actionLabel
+  setText "#pet-trace-display" (traceLabel state.trace)
+  setAttribute "#pet-device" "data-mood" moodLabel
+  setAttribute "#pet-device" "data-art" state.artwork
+  setAttribute "#pet-device" "data-trace" (traceAttr state.trace)
+  setAttribute "#pet-device" "aria-label" s!"{artLabel state.artwork} mood {moodLabel}"
+  setChecked "#pet-art-toggle" (state.artwork == "octopus")
+  setText "#status" "Ready"
+  setAttribute "#status" "data-ready" "true"
 
 def stateFromDom : IO PetState := do
-  let currentAttr ← Lean.Vir.Browser.Document.getAttribute "#pet-device" "data-mood"
-  let traceAttrValue ← Lean.Vir.Browser.Document.getAttribute "#pet-device" "data-trace"
-  let checked ← Lean.Vir.Browser.Document.getChecked "#pet-art-toggle"
+  let currentAttr ← getAttribute "#pet-device" "data-mood"
+  let traceAttrValue ← getAttribute "#pet-device" "data-trace"
+  let checked ← getChecked "#pet-art-toggle"
   let current := currentAttr.bind Mood.fromString? |>.getD happy
   let trace := traceAttrValue.map traceFromAttr |>.getD [current]
   pure {
@@ -150,7 +184,7 @@ def uiReset (artwork : String) : IO PetState := do
   pure state
 
 def uiResetFromDom : IO PetState := do
-  let checked ← Lean.Vir.Browser.Document.getChecked "#pet-art-toggle"
+  let checked ← getChecked "#pet-art-toggle"
   uiReset (artworkFromChecked checked)
 
 @[inline] def nextState (current : Mood) (trace : List Mood) (artwork : String) (action : Action) : PetState :=

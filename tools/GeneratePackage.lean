@@ -85,6 +85,7 @@ inductive InterfaceType where
   | structure (name : Name) (label : String) (trivialField? : Option Nat)
       (objectFields usizeFields scalarBytes : Nat)
       (fields : Array (String × InterfaceType × StructureFieldLayout × Bool))
+  | resource (name : Name) (label : String)
   | expr
   deriving BEq, Repr
 
@@ -1594,6 +1595,7 @@ def InterfaceType.label : InterfaceType → String
   | .simpleEnum name _ => name.toString
   | .taggedUnion _ label _ => label
   | .structure _ label .. => label
+  | .resource _ label => label
   | .expr => "Lean.Expr"
 
 def InterfaceType.wireTag : InterfaceType → Nat
@@ -1617,6 +1619,7 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .simpleEnum .. => 14
   | .taggedUnion .. => 21
   | .structure .. => 20
+  | .resource .. => 23
   | .expr => 15
 
 partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
@@ -1758,6 +1761,13 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ trivialFieldJson
       ++ "\"fields\":" ++ jsonArray fieldJson
       ++ "}"
+  | .resource name _ =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"resource\","
+      ++ "\"name\":" ++ jsonString name.toString
+      ++ "}"
   | _ =>
       "{\"type\":\"" ++ ty.label ++ "\",\"wireTag\":" ++ toString ty.wireTag ++ "}"
 
@@ -1786,6 +1796,8 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `USize => some .usize
   | some `ByteArray => some .byteArray
   | some `Lean.Expr => some .expr
+  | some `Lean.Vir.Browser.Element => some (.resource `Lean.Vir.Browser.Element "Element")
+  | some `Lean.Vir.Browser.HTMLInputElement => some (.resource `Lean.Vir.Browser.HTMLInputElement "HTMLInputElement")
   | _ => none
 
 def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType := do

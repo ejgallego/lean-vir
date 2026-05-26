@@ -68,8 +68,9 @@ In Node tests or command-line tools, import the Node wrapper instead:
 import { createVirRuntime } from "lean-vir/vir-runtime-node";
 ```
 
-That wrapper uses the same runtime and installs virtual document bindings for
-`Lean.Vir.Browser.Document`.
+That wrapper uses the same runtime and installs virtual browser bindings for
+`Lean.Vir.Browser.Document`, `Lean.Vir.Browser.Element`, and
+`Lean.Vir.Browser.HTMLInputElement`.
 
 Pass `hostBindings` only for custom targets or to override one of the default
 bindings. If a package imports both built-in and custom targets, the custom map
@@ -138,18 +139,19 @@ Node-like environments:
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.getTitle : IO String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
-- `Lean.Vir.Browser.Document.getTextContent : @& String -> IO String`
-- `Lean.Vir.Browser.Document.setTextContent : @& String -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Document.getAttribute : @& String -> @& String -> IO (Option String)`
-- `Lean.Vir.Browser.Document.setAttribute : @& String -> @& String -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Document.getChecked : @& String -> IO Bool`
-- `Lean.Vir.Browser.Document.setChecked : @& String -> Bool -> IO Unit`
+- `Lean.Vir.Browser.Document.querySelector : @& String -> IO (Option Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Browser.Element -> IO String`
+- `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
+- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Browser.Element -> @& String -> @& String -> IO Unit`
+- `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Browser.Element -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
+- `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Browser.HTMLInputElement -> IO Bool`
+- `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Browser.HTMLInputElement -> Bool -> IO Unit`
 
 The browser runtime bindings use standard browser APIs and require
 `globalThis.document` for document calls. In non-browser runtimes, use
 `lean-vir/vir-runtime-node` or pass explicit `hostBindings`; the Node wrapper
-keeps virtual document state for title, text-content, attribute, and
-checked-property APIs.
+keeps virtual document and element state for the built-in browser APIs.
 
 External references:
 
@@ -215,6 +217,7 @@ entrypoints:
 - `ByteArray`
 - `Array α`, `List α`, `Option α`, and `α × β` over supported types
 - nullary inductive enums
+- opaque `Lean.Vir.Browser` resource handles
 - `Lean.Expr`
 
 Imports may be pure functions or `IO α` actions. The v1 host boundary is

@@ -616,6 +616,9 @@ function encodeValuePayload(writer, type, value, label) {
     case 22:
       if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
       return;
+    case 23:
+      writer.u32(normalizeResourceHandle(value, label));
+      return;
     case 0:
       writer.string(normalizeDecimal(value, label, { signed: false }));
       return;
@@ -749,6 +752,9 @@ function decodeValuePayload(reader, type) {
   switch (expectedTag) {
     case 22:
       value = undefined;
+      break;
+    case 23:
+      value = { handle: reader.u32() };
       break;
     case 0:
     case 1:
@@ -1018,6 +1024,14 @@ function normalizeInteger(value, label, min, max) {
     throw new Error(`${label} must be an integer in ${min}..${max}`);
   }
   return value;
+}
+
+function normalizeResourceHandle(value, label) {
+  const handle = typeof value === "number" ? value : value?.handle;
+  if (!Number.isInteger(handle) || handle <= 0 || handle > 0xffffffff) {
+    throw new Error(`${label} must be a live resource handle`);
+  }
+  return handle;
 }
 
 function normalizeArray(value, label) {

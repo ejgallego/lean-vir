@@ -191,8 +191,8 @@ if (genericByteArrayScore !== "136") {
 }
 
 const hostRuntime = await createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
-if (hostRuntime.packageInfo.hostImports !== 7) {
-  throw new Error(`expected 7 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+if (hostRuntime.packageInfo.hostImports !== 9) {
+  throw new Error(`expected 9 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
 }
 const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
 if (hostTitle !== "Lean VIR host: smoke") {
