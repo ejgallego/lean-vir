@@ -1150,6 +1150,31 @@ h2 {
   grid-template-columns: minmax(180px, 0.85fr) minmax(220px, 1fr) minmax(112px, auto) minmax(180px, 0.85fr);
 }
 
+.dev-command-grid {
+  display: grid;
+  gap: 1px;
+  margin-top: 16px;
+  border: 1px solid #d9ded2;
+  background: #d9ded2;
+}
+
+.dev-command-grid pre {
+  min-width: 0;
+  margin: 0;
+  overflow: auto;
+  background: #ffffff;
+  padding: 13px 14px;
+}
+
+.dev-command-grid code {
+  color: #17201a;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.78rem;
+  font-weight: 800;
+  line-height: 1.5;
+  white-space: pre;
+}
+
 .dev-eval-row {
   grid-template-columns: minmax(220px, 0.75fr) minmax(260px, 1fr) minmax(112px, auto) minmax(160px, 0.45fr);
 }
@@ -1174,6 +1199,14 @@ h2 {
   border: 1px solid #d9ded2;
   background: #ffffff;
   padding: 8px 10px;
+}
+
+.dev-field input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  margin-top: 12px;
+  accent-color: #263d2c;
 }
 
 .dev-field select,
@@ -1209,6 +1242,38 @@ h2 {
   background: #f6f7f2;
   color: #5f6f64;
   font-weight: 800;
+}
+
+.dev-entry-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.dev-entry-links[hidden] {
+  display: none;
+}
+
+.dev-entry-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  border: 1px solid #bdc8bb;
+  background: #ffffff;
+  color: #263d2c;
+  padding: 0 10px;
+  text-decoration: none;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.dev-entry-links a:hover,
+.dev-entry-links a[aria-current="true"] {
+  border-color: #516f88;
+  color: #20384a;
+  background: #e8eff4;
 }
 
 .dev-runner button {

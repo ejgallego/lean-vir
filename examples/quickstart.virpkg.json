@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "source": "examples/Quickstart.lean",
+  "package": "web/public/local-quickstart.irpkg",
+  "report": "build/generated/local-quickstart.report.md",
+  "roots": [
+    "Quickstart.double",
+    "Quickstart.greet",
+    "Quickstart.total",
+    "Quickstart.choose"
+  ]
+}

@@ -33,6 +33,7 @@ That script first builds the upstream WASM demo, then runs `npm run
 prepare:pages` to generate URL-loadable sample packages:
 
 - `local-fib.irpkg`
+- `local-quickstart.irpkg`
 - `local-mergesort.irpkg`
 
 Vite copies those generated packages into `web/dist/` alongside `index.html`,
