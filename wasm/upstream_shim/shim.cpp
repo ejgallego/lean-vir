@@ -2952,6 +2952,7 @@ static void encode_result(vir_writer & w, vir_type const & type, object * value)
 
 static std::string g_call_result;
 static std::string g_call_error;
+static std::string g_call_mode;
 
 static char const * known_symbol_stem(name const & n) {
     std::string dotted = n.to_string();
@@ -3499,6 +3500,7 @@ static char const * vir_call_boxed(
     lean::encode_result(writer, result_type, result);
     lean_dec(result);
     lean::g_call_result = writer.take();
+    lean::g_call_mode = "boxed-fallback";
     return lean::g_call_result.data();
 }
 
@@ -3552,6 +3554,7 @@ static char const * vir_call_typed(
         lean_dec(result.object_value);
     }
     lean::g_call_result = writer.take();
+    lean::g_call_mode = "typed";
     return lean::g_call_result.data();
 }
 
@@ -3564,6 +3567,7 @@ extern "C" char const * vir_call(
     (void) result_tag;
     lean::g_call_result.clear();
     lean::g_call_error.clear();
+    lean::g_call_mode.clear();
     if (request == nullptr && request_len != 0) {
         lean::g_call_error = "call payload pointer is null";
         return nullptr;
@@ -3575,6 +3579,7 @@ extern "C" char const * vir_call(
 
     lean::name fn = lean::name_from_dotted(name_text, name_len);
     bool has_boxed_decl = lean::vir::find_package_boxed_decl(fn.to_obj_arg()) != nullptr;
+    bool has_native_boxed_symbol = lean::known_symbol_stem(fn) != nullptr;
 
     try {
         bool typed_unsupported = false;
@@ -3584,7 +3589,8 @@ extern "C" char const * vir_call(
         if (!typed_unsupported) {
             return nullptr;
         }
-        if (!has_boxed_decl) {
+        if (!has_boxed_decl && !has_native_boxed_symbol) {
+            lean::g_call_mode = "unsupported";
             lean::g_call_error = std::string("typed IR call bridge could not represent `") + fn.to_string() + "` and no boxed fallback is packaged";
             return nullptr;
         }
@@ -3605,4 +3611,12 @@ extern "C" char const * vir_call_error(void) {
 
 extern "C" uint32_t vir_call_error_size(void) {
     return static_cast<uint32_t>(lean::g_call_error.size());
+}
+
+extern "C" char const * vir_last_call_mode(void) {
+    return lean::g_call_mode.c_str();
+}
+
+extern "C" uint32_t vir_last_call_mode_size(void) {
+    return static_cast<uint32_t>(lean::g_call_mode.size());
 }

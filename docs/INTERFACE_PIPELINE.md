@@ -109,6 +109,10 @@ packaged when the Lean IR closure references them internally, but they are no
 longer added just to make an export callable. If the typed bridge cannot
 represent a declaration and no boxed fallback is available, the call fails
 loudly instead of silently omitting or partially compiling the export.
+Declared native extern roots have no interpreted body, so they intentionally
+fall through to `run_boxed` when the shim knows their native symbol. The JS
+runtime reports the most recent successful or failed call path through
+`lastCallMode()`: `typed`, `boxed-fallback`, or `unsupported`.
 
 For structures, the manifest records Lean constructor layout metadata alongside
 the applied Lean type label, field names, and instantiated field types. The JS

@@ -37,7 +37,10 @@ enums such as the Tamagotchi state/action types, and structural `Lean.Expr`
 values.
 Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them are
 called through the typed IR bridge, so the package generator no longer adds
-export-only `_boxed` companions.
+export-only `_boxed` companions. Declared native extern roots still use the
+boxed fallback path when they are present in the shim's native symbol table, and
+the JS runtime exposes `lastCallMode()` for diagnostics (`typed`,
+`boxed-fallback`, or `unsupported`).
 
 ## Quick Start
 

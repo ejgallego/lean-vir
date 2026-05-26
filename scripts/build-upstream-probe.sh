@@ -130,6 +130,20 @@ common_flags=(
 )
 
 typed_tmp="$typed_upstream.tmp"
+require_typed_overlay_shape() {
+  local pattern="$1"
+  local description="$2"
+  if ! grep -Fq "$pattern" "$upstream_source"; then
+    echo "error: Lean IR interpreter shape changed: missing $description required by typed call overlay" >&2
+    echo "       expected pattern: $pattern" >&2
+    exit 1
+  fi
+}
+require_typed_overlay_shape "class interpreter {" "interpreter class"
+require_typed_overlay_shape "symbol_cache_entry lookup_symbol(name const & fn)" "interpreter::lookup_symbol"
+require_typed_overlay_shape "object * call_boxed(name const & fn, unsigned n, object ** args)" "interpreter::call_boxed"
+require_typed_overlay_shape "value eval_body(fn_body const & b0)" "interpreter::eval_body"
+require_typed_overlay_shape "static inline T with_interpreter" "interpreter::with_interpreter"
 # Keep the pinned upstream interpreter source unchanged. The generated overlay
 # only opens the interpreter internals inside the build tree so the shim can
 # call package declarations with real IR lanes instead of object-pointer slots.
@@ -147,6 +161,10 @@ awk '
   }
   { print }
   END {
+    if (opened != 1) {
+      print "error: failed to open Lean IR interpreter class in typed call overlay" > "/dev/stderr"
+      exit 1
+    }
     print ""
     print "#include \"typed_ir_call.h\""
     print "#include \"typed_ir_call.inc\""
@@ -236,6 +254,8 @@ exports=(
   -Wl,--export=vir_call_result_size
   -Wl,--export=vir_call_error
   -Wl,--export=vir_call_error_size
+  -Wl,--export=vir_last_call_mode
+  -Wl,--export=vir_last_call_mode_size
   -Wl,--export=vir_alloc_bytes
   -Wl,--export=vir_free_bytes
   -Wl,--export=vir_load_ir_package
