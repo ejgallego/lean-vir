@@ -35,7 +35,7 @@ Generate a browser-loadable package from one Lean file. List as many exports as
 you want after the output package path:
 
 ```bash
-npm run generate:irpkg -- examples/Quickstart.lean web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose
+npm run generate:irpkg -- examples/Quickstart.lean web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose Quickstart.classify Quickstart.validateName
 ```
 
 Run the local server:
@@ -132,7 +132,9 @@ For repeatable packages, put the source, output, report, and roots in a config:
     "Quickstart.double",
     "Quickstart.greet",
     "Quickstart.total",
-    "Quickstart.choose"
+    "Quickstart.choose",
+    "Quickstart.classify",
+    "Quickstart.validateName"
   ]
 }
 ```
@@ -162,22 +164,7 @@ The hosted demo is deployed from `main`:
 
 https://ejgallego.github.io/lean-vir/
 
-## Repository Map
-
-- `examples/` contains small Lean browser examples.
-- `fixtures/` contains conformance fixtures used by the test suite.
-- `Lean/Vir/` provides Lean-side helper modules for browser and host imports.
-- `tools/GeneratePackage.lean` elaborates Lean sources and emits `.irpkg`
-  packages.
-- `scripts/lean-to-irpkg.sh` is the direct Lean-file-to-package command used by
-  `npm run generate:irpkg`.
-- `scripts/prepare-irpkg.mjs` generates packages from JSON configs.
-- `wasm/upstream_shim/` contains the WASI boundary around Lean's upstream
-  `src/library/ir_interpreter.cpp`.
-- `web/` contains the browser harness. `/dev.html` is the manifest-driven
-  package runner.
-
-Useful docs:
+## Where To Go Next
 
 - `docs/LOCAL_IRPKG.md` for the full local package workflow.
 - `docs/CALL_LEAN_FROM_JS.md` for calling exported Lean declarations from app
@@ -188,6 +175,7 @@ Useful docs:
 - `docs/LEAN_VIR_LIBRARY.md` for Lean-side host import helpers.
 - `docs/ADDING_DEMOS.md` for adding examples to the built-in demo packages.
 - `docs/FIXTURE_COVERAGE.md` for the current fixture and boundary surface.
+- `docs/IMPLEMENTATION_NOTES.md` for maintainer-facing implementation details.
 
 ## Development Commands
 
@@ -216,18 +204,9 @@ This is a focused browser harness, not a full Lean-in-the-browser distribution.
 It packages declarations from Lean source files; it does not load `.olean`,
 `.ir`, or full Lean module data in the browser.
 
-The upstream interpreter file
-`third_party/lean4-src/src/library/ir_interpreter.cpp` stays unmodified. The
-current package-backed declaration provider is isolated behind
-`wasm/upstream_shim/decl_provider.h` so future module-backed loading can replace
-that provider without changing the upstream interpreter or platform shim.
-
 The `.irpkg` format is a trusted local artifact boundary. Generated demo
 packages and local developer packages are validated before use, but arbitrary
-hostile package contents are not treated as hardened public input. A bad package
-can still trap the interpreter, consume the small WASM memory budget, hang the
-tab, or confuse ABI decoding if its manifest lies about declaration types or
-runtime layouts.
+hostile package contents are not treated as hardened public input.
 
 ## Generated Artifacts
 

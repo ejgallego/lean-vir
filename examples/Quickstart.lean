@@ -21,9 +21,23 @@ def choose (flag : Bool) : Option String :=
   else
     none
 
+def classify (n : Nat) : Sum String Nat :=
+  if n = 0 then
+    .inl "zero"
+  else
+    .inr (n + 1)
+
+def validateName (name : String) : Except String String :=
+  if name.length = 0 then
+    .error "empty name"
+  else
+    .ok (greet name)
+
 #eval double 21
 #eval greet "Lean"
 #eval total #[2, 3, 5, 8]
 #eval choose true
+#eval classify 4
+#eval validateName "Lean"
 
 end Quickstart

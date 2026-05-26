@@ -36,7 +36,7 @@ Package the transitive closure for one or more explicit exports. This is the
 core "one Lean file, N browser entries" path:
 
 ```bash
-npm run generate:irpkg -- examples/Quickstart.lean web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose
+npm run generate:irpkg -- examples/Quickstart.lean web/public/local-quickstart.irpkg Quickstart.double Quickstart.greet Quickstart.total Quickstart.choose Quickstart.classify Quickstart.validateName
 ```
 
 Package public source definitions by omitting roots:

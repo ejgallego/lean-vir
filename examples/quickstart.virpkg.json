@@ -7,6 +7,8 @@
     "Quickstart.double",
     "Quickstart.greet",
     "Quickstart.total",
-    "Quickstart.choose"
+    "Quickstart.choose",
+    "Quickstart.classify",
+    "Quickstart.validateName"
   ]
 }

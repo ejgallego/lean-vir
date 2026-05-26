@@ -25,6 +25,18 @@ def total (values : Array Nat) : Nat :=
 def greeting (name : String) : String :=
   "Hello, " ++ name
 
+def classify (n : Nat) : Sum String Nat :=
+  if n = 0 then
+    .inl "zero"
+  else
+    .inr (n + 1)
+
+def validateName (name : String) : Except String String :=
+  if name.length = 0 then
+    .error "empty name"
+  else
+    .ok (greeting name)
+
 end MyApp
 ```
 
@@ -40,7 +52,7 @@ Then generate a package. Put it under `web/public/` if you want Vite to serve it
 by URL:
 
 ```bash
-npm run generate:irpkg -- MyApp.lean web/public/my-app.irpkg MyApp.total MyApp.greeting
+npm run generate:irpkg -- MyApp.lean web/public/my-app.irpkg MyApp.total MyApp.greeting MyApp.classify MyApp.validateName
 ```
 
 The final arguments are Lean declaration names. You can list one export or many
@@ -76,9 +88,13 @@ const vir = await createVirRuntime({
 
 const total = vir.call("MyApp.total", [2, 3, 5, 8]);
 const greeting = vir.call("MyApp.greeting", "Lean");
+const classified = vir.call("MyApp.classify", 4);
+const validated = vir.call("MyApp.validateName", "Lean");
 
 console.log(total);    // "18"
 console.log(greeting); // "Hello, Lean"
+console.log(classified); // { kind: "inr", value: "5" }
+console.log(validated);  // { kind: "ok", value: "Hello, Lean" }
 ```
 
 `vir.call(name, ...args)` accepts the Lean declaration name, manifest `id`, or
@@ -89,6 +105,47 @@ You can also call generated methods by JavaScript name:
 ```js
 console.log(vir.exportsByName.MyApp_total([2, 3, 5, 8]));
 ```
+
+## Sum And Except Values
+
+Lean `Sum alpha beta` and `Except error ok` are represented as tagged objects.
+
+For inputs, use `{ kind, value }`:
+
+```js
+vir.call("MyApp.useSum", { kind: "inl", value: "zero" });
+vir.call("MyApp.useSum", { kind: "inr", value: 5 });
+vir.call("MyApp.useExcept", { kind: "error", value: "bad input" });
+vir.call("MyApp.useExcept", { kind: "ok", value: "good input" });
+```
+
+Single-constructor-key objects are also accepted:
+
+```js
+vir.call("MyApp.useSum", { inr: 5 });
+vir.call("MyApp.useExcept", { ok: "good input" });
+```
+
+Results come back as `{ kind, value }`:
+
+```js
+vir.call("MyApp.classify", 0);
+// { kind: "inl", value: "zero" }
+
+vir.call("MyApp.classify", 4);
+// { kind: "inr", value: "5" }
+
+vir.call("MyApp.validateName", "");
+// { kind: "error", value: "empty name" }
+
+vir.call("MyApp.validateName", "Lean");
+// { kind: "ok", value: "Hello, Lean" }
+```
+
+Payload-carrying sum types currently use Lean's built-in `Sum` and `Except`
+interface support. Custom nullary inductives are supported as enums. General
+custom inductives with payloads are not part of the stable user-facing interface
+yet.
 
 ## 4. Serve The Artifacts In Your App
 
@@ -125,6 +182,7 @@ Common Lean values map to JavaScript values like this:
 - `Option alpha` accepts `null` for `none` and a bare value for `some`. Results are
   `null` or the inner value.
 - Products use `{ fst, snd }` or two-element arrays.
+- `Sum` and `Except` use `{ kind, value }` tagged objects.
 - Structures use JavaScript objects keyed by Lean field name.
 - Nullary inductive enums use generated constructor names.
 - `ByteArray` inputs accept byte arrays or byte-like JavaScript arrays; results

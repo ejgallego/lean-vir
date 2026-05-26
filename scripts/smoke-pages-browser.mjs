@@ -656,7 +656,7 @@ try {
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-boundary.irpkg");
   const runnerCases = [
     await runnerCaseFromManifest("local-quickstart.irpkg", "Quickstart.total", {
-      entryCount: 4,
+      entryCount: 6,
       input: "[]",
       inputTags: ["TEXTAREA"],
       runInputs: ["[2,3,5,8]"],
