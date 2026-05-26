@@ -68,7 +68,7 @@ parameterized instances, nullary inductive enums, and `Lean.Expr`.
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
 numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
-use generated Lean `_boxed` declarations automatically.
+use the typed IR bridge and do not require export-only `_boxed` companions.
 
 Nullary inductive enums are accepted as constructor names, generated JavaScript
 names, or constructor indexes. Results are returned as the constructor's

@@ -37,9 +37,12 @@ target="${WASI_TARGET:-wasm32-wasip1}"
 wasm_opt_level="${VIR_WASM_OPT_LEVEL:--O3}"
 wasm_initial_memory="${VIR_WASM_INITIAL_MEMORY:-4194304}"
 wasm_stack_size="${VIR_WASM_STACK_SIZE:-1048576}"
-upstream="$src/src/library/ir_interpreter.cpp"
+upstream_source="$src/src/library/ir_interpreter.cpp"
 overlay_include="$out/include"
 obj_dir="$out/obj"
+typed_upstream="$out/ir_interpreter.typed.cpp"
+typed_bridge_header="wasm/upstream_shim/typed_ir_call.h"
+typed_bridge_impl="wasm/upstream_shim/typed_ir_call.inc"
 wasm="$out/ir_interpreter.allow-undefined.wasm"
 strict_wasm="$out/ir_interpreter.strict.wasm"
 demo_wasm="web/public/vir-upstream.wasm"
@@ -126,6 +129,41 @@ common_flags=(
   -fdata-sections
 )
 
+typed_tmp="$typed_upstream.tmp"
+# Keep the pinned upstream interpreter source unchanged. The generated overlay
+# only opens the interpreter internals inside the build tree so the shim can
+# call package declarations with real IR lanes instead of object-pointer slots.
+awk '
+  BEGIN { opened = 0 }
+  $0 == "class interpreter {" && opened == 0 {
+    print
+    print "public:"
+    opened = 1
+    next
+  }
+  $0 == "private:" {
+    print "public:"
+    next
+  }
+  { print }
+  END {
+    print ""
+    print "#include \"typed_ir_call.h\""
+    print "#include \"typed_ir_call.inc\""
+  }
+' "$upstream_source" > "$typed_tmp"
+if ! grep -q '#include "typed_ir_call.inc"' "$typed_tmp"; then
+  echo "error: failed to generate typed IR interpreter overlay" >&2
+  exit 1
+fi
+if ! cmp -s "$typed_tmp" "$typed_upstream"; then
+  mv "$typed_tmp" "$typed_upstream"
+else
+  rm "$typed_tmp"
+fi
+
+upstream="$typed_upstream"
+
 compile_stamp="$obj_dir/compile-flags.stamp"
 compile_stamp_tmp="$compile_stamp.tmp"
 {
@@ -134,6 +172,8 @@ compile_stamp_tmp="$compile_stamp.tmp"
   printf 'lean_source_commit=%s\n' "$src_commit"
   printf 'wasi_target=%s\n' "$target"
   printf 'opt_level=%s\n' "$wasm_opt_level"
+  printf 'typed_bridge_header=%s\n' "$typed_bridge_header"
+  printf 'typed_bridge_impl=%s\n' "$typed_bridge_impl"
   printf 'flag=%s\n' "${common_flags[@]}"
 } > "$compile_stamp_tmp"
 if ! cmp -s "$compile_stamp_tmp" "$compile_stamp"; then
@@ -161,6 +201,9 @@ compile_one() {
 
 upstream_obj="$obj_dir/ir_interpreter.o"
 stable_objects=("$upstream_obj")
+if [ -f "$upstream_obj" ] && { [ "$typed_bridge_header" -nt "$upstream_obj" ] || [ "$typed_bridge_impl" -nt "$upstream_obj" ]; }; then
+  rm -f "$upstream_obj"
+fi
 compile_one "$upstream" "$upstream_obj"
 
 for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]}"; do
@@ -188,6 +231,7 @@ exports=(
   -Wl,--export=lean_run_init
   -Wl,--export=lean_run_mod_init_core
   -Wl,--export=vir_upstream_target_pointer_bytes
+  -Wl,--export=vir_typed_call_bridge_available
   -Wl,--export=vir_call
   -Wl,--export=vir_call_result_size
   -Wl,--export=vir_call_error
@@ -301,7 +345,8 @@ shim_source_count="${#shim_sources[@]}"
   echo "- Lean source: \`$src\`"
   echo "- Lean source commit: \`$src_commit\`"
   echo "- Lean include prefix: \`$lean_prefix\`"
-  echo "- Upstream file: \`$upstream\`"
+  echo "- Upstream file: \`$upstream_source\`"
+  echo "- Generated typed-call overlay: \`$typed_upstream\`"
   echo "- WASI target: \`$target\`"
   echo "- WASM optimization level: \`$wasm_opt_level\`"
   echo "- Compiler: \`$cxx\`"
@@ -399,6 +444,7 @@ shim_source_count="${#shim_sources[@]}"
   echo "## Demo Policy"
   echo
   echo "- Keep \`src/library/ir_interpreter.cpp\` unmodified."
+  echo "- Expose downstream-only typed call hooks through the generated overlay, not by editing upstream."
   echo "- Provide real Lean IR declaration objects through \`lean_ir_find_env_decl\`."
   echo "- Stub only runtime/library pieces that the current demo paths do not execute."
   echo "- Keep general native symbol lookup unsupported; register only demo externs explicitly."

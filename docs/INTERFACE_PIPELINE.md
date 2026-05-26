@@ -101,17 +101,14 @@ The embedded manifest currently supports:
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
-Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them require
-the generated Lean `_boxed` declaration at the wasm32 interpreter boundary. The
-package generator auto-includes that companion for requested roots and reports a
-diagnostic instead of producing a partial package if the companion is missing.
-This is the current correctness-first boundary, not the most direct Lean IR
-calling path. A more faithful future bridge should inspect each export's
-`Lean.IR` parameter/result types and pass a typed call frame with native object,
-integer, `USize`, `Float`, `Float32`, erased, and void lanes. That typed bridge
-would call the actual IR declaration when every lane is supported, use `_boxed`
-only as the fallback/wrapper path, and fail loudly when neither path can be
-represented.
+The WASM shim prefers the typed IR bridge for JavaScript calls. It decodes each
+manifest argument into the corresponding Lean IR lane (`object`, integer,
+`USize`, `Float`, or `Float32`) and calls the actual package declaration instead
+of requiring the generated `_boxed` wrapper. `_boxed` declarations may still be
+packaged when the Lean IR closure references them internally, but they are no
+longer added just to make an export callable. If the typed bridge cannot
+represent a declaration and no boxed fallback is available, the call fails
+loudly instead of silently omitting or partially compiling the export.
 
 For structures, the manifest records Lean constructor layout metadata alongside
 the applied Lean type label, field names, and instantiated field types. The JS

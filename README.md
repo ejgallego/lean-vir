@@ -35,9 +35,9 @@ direct scalar fields, single-field wrappers over direct scalar fields,
 inherited parent fields flattened as JavaScript object keys, nullary inductive
 enums such as the Tamagotchi state/action types, and structural `Lean.Expr`
 values.
-Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them use the
-generated Lean `_boxed` declarations automatically; package generation fails
-loudly if a requested export needs one and it is missing.
+Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them are
+called through the typed IR bridge, so the package generator no longer adds
+export-only `_boxed` companions.
 
 ## Quick Start
 

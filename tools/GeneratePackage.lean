@@ -1489,31 +1489,23 @@ partial def collectName (index : DeclIndex) (name : Name) (state : Closure) : Cl
               let state := { state with decls := state.decls.push loaded }
               refsOfDecl loaded.decl |>.foldl (fun state dep => collectName index dep state) state
 
-def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
-  if target.includeAll then
-    index.sourceDecls.findSome? (fun (source, names) =>
-      if source == target.source.toString then some names else none) |>.getD #[]
-  else
-    target.roots
-
 def boxedBaseName? : Name -> Option Name
   | .str pre "_boxed" => some pre
   | _ => none
 
-def boxedName (name : Name) : Name :=
-  .str name "_boxed"
+def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
+  if target.includeAll then
+    index.sourceDecls.findSome? (fun (source, names) =>
+      if source == target.source.toString then
+        some <| names.filter fun n => (boxedBaseName? n).isNone
+      else
+        none) |>.getD #[]
+  else
+    target.roots
 
 def resolvedRootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   rootsForTarget index target |>.foldl (fun roots root =>
-    let roots := if roots.contains root then roots else roots.push root
-    match boxedBaseName? root with
-    | some _ => roots
-    | none =>
-        let boxed := boxedName root
-        if (index.find? boxed).isSome && !roots.contains boxed then
-          roots.push boxed
-        else
-          roots) #[]
+    if roots.contains root then roots else roots.push root) #[]
 
 def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
   targets.foldl (fun state target =>
@@ -1566,14 +1558,6 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .taggedUnion .. => 21
   | .structure .. => 20
   | .expr => 15
-
-partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
-  | .float | .float32 | .uint64 => true
-  | .structure _ _ (some idx) _ _ _ fields =>
-      match fields[idx]? with
-      | some (_, fieldType, _, _) => fieldType.needsBoxedCallBoundary
-      | none => false
-  | _ => false
 
 def jsonEscape (text : String) : String :=
   text.foldl (fun out c =>
@@ -2006,13 +1990,7 @@ def jsNameFor (n : Name) : String :=
   let sanitized := text.map sanitizeJsNameChar
   if sanitized.isEmpty then "entry" else sanitized
 
-def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : InterfaceType) : Bool :=
-  args.any (fun arg => arg.type.needsBoxedCallBoundary) || result.needsBoxedCallBoundary
-
-def boxedBoundaryDiagnostic (name : Name) : String :=
-  s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
-
-def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
+def interfaceExportFor (_index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except InterfaceDiagnostic InterfaceExport) := do
   if isPrivateName name then
     return .error { name, source, reason := "private declarations are not exported" }
@@ -2026,11 +2004,8 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
         else
           match ← interfaceSignature? info.type with
           | .ok (args, result) =>
-              if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
-                return .error { name, source, reason := boxedBoundaryDiagnostic name }
-              else
-                let jsName := jsNameFor name
-                return .ok { id := jsName, jsName, entry := name, source, args, result }
+              let jsName := jsNameFor name
+              return .ok { id := jsName, jsName, entry := name, source, args, result }
           | .error reason =>
               return .error { name, source, reason }
 

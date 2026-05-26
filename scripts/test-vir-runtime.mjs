@@ -748,8 +748,8 @@ try {
     "freshWrapBoxBump",
     "freshWrapUInt32Bump",
   ]);
-  assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshUInt64Bump._boxed"));
-  assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshFloatScale._boxed"));
+  assert.ok(!freshManifest.metadata.targets[0].resolvedRoots.includes("freshUInt64Bump._boxed"));
+  assert.ok(!freshManifest.metadata.targets[0].resolvedRoots.includes("freshFloatScale._boxed"));
   const freshInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", freshPackage], {
     encoding: "utf8",
   });
