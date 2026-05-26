@@ -26,7 +26,6 @@ const entrySelect = document.querySelector("#dev-entry-select");
 const inputFields = document.querySelector("#dev-input-fields");
 const runEntryButton = document.querySelector("#dev-run-entry");
 const resultOutput = document.querySelector("#dev-result");
-const entryLinks = document.querySelector("#dev-entry-links");
 const wasmFile = "vir-upstream.wasm";
 const packageSpecs = browserPackages.packages ?? [];
 const packageById = new Map(packageSpecs.map((spec) => [spec.id, spec]));
@@ -93,8 +92,6 @@ function resetPackageState() {
   runEntryButton.disabled = true;
   entrySelect.replaceChildren();
   inputFields.replaceChildren();
-  entryLinks.replaceChildren();
-  entryLinks.hidden = true;
   resultOutput.textContent = "...";
   packageName.textContent = "...";
   packageSize.textContent = "...";
@@ -312,14 +309,13 @@ function renderManifestEntries(manifest) {
     entrySelect.append(option);
   }
   selectEntryFromQuery();
-  renderEntryLinks();
   renderInputFields(selectedInterfaceEntry());
   if (interfaceEntries.length === 0) {
     resultOutput.textContent = "No callable interface exports were found in this package.";
   }
 }
 
-function entryLinkUrl(entry) {
+function entryUrl(entry) {
   const url = new URL(window.location.href);
   url.search = "";
   if (currentPackageQuery !== null) {
@@ -329,39 +325,11 @@ function entryLinkUrl(entry) {
   return url;
 }
 
-function renderEntryLinks() {
-  entryLinks.replaceChildren();
-  if (currentPackageQuery === null || interfaceEntries.length === 0) {
-    entryLinks.hidden = true;
-    return;
-  }
-  entryLinks.hidden = false;
-  for (const entry of interfaceEntries) {
-    const link = document.createElement("a");
-    link.href = entryLinkUrl(entry).toString();
-    link.textContent = entry.jsName;
-    link.title = entry.entry;
-    if (entry.id === entrySelect.value) {
-      link.setAttribute("aria-current", "true");
-    }
-    link.addEventListener("click", (event) => {
-      event.preventDefault();
-      entrySelect.value = entry.id;
-      renderInputFields(selectedInterfaceEntry());
-      resultOutput.textContent = "...";
-      resultOutput.dataset.multiline = "false";
-      updateLocationForSelectedEntry();
-      renderEntryLinks();
-    });
-    entryLinks.append(link);
-  }
-}
-
 function updateLocationForSelectedEntry() {
   if (currentPackageQuery === null) return;
   const entry = selectedInterfaceEntry();
   if (entry === null) return;
-  window.history.replaceState(null, "", entryLinkUrl(entry));
+  window.history.replaceState(null, "", entryUrl(entry));
 }
 
 function renderPackageMetadata(metadata) {
@@ -563,7 +531,6 @@ entrySelect.addEventListener("change", () => {
   resultOutput.textContent = "...";
   resultOutput.dataset.multiline = "false";
   updateLocationForSelectedEntry();
-  renderEntryLinks();
 });
 
 runEntryButton.addEventListener("click", () => {
