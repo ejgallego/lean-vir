@@ -11,7 +11,7 @@ export const INTERFACE_MANIFEST_SHAPE_ERROR =
 
 const SUPPORTED_WIRE_TAGS = new Set([
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-  14, 15, 16, 17, 18, 19, 20, 21,
+  14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
 ]);
 
 function isRecord(value) {
@@ -48,6 +48,9 @@ export function validateInterfaceManifest(manifest) {
   }
   if (manifest.diagnostics !== undefined && !Array.isArray(manifest.diagnostics)) {
     throw new Error("embedded interface manifest diagnostics must be an array");
+  }
+  if (manifest.hostImports !== undefined && !Array.isArray(manifest.hostImports)) {
+    throw new Error("embedded interface manifest hostImports must be an array");
   }
   validateManifestExports(manifest.exports);
   return manifest;
@@ -117,6 +120,9 @@ export function validateInterfaceType(type, label = "interface type") {
       break;
     case 21:
       validateTaggedUnionType(type, label);
+      break;
+    case 23:
+      validateResourceType(type, label);
       break;
     default:
       break;
@@ -251,6 +257,13 @@ function validateTaggedUnionType(type, label) {
   });
 }
 
+function validateResourceType(type, label) {
+  if (type.kind !== "resource") {
+    throw new Error(`${label}.kind must be resource`);
+  }
+  requireString(type.name, `${label}.name`);
+}
+
 function validateFlattenedStructureFields(type, label) {
   const names = new Set();
   type.fields.forEach((field, index) => {
@@ -290,6 +303,8 @@ export function manifestDiagnostics(manifest) {
 
 export function formatInterfaceType(type) {
   switch (type?.wireTag) {
+    case 22:
+      return "Unit";
     case 14:
       return type.type ?? "Enum";
     case 16:
@@ -304,6 +319,8 @@ export function formatInterfaceType(type) {
       return type.type ?? type.name ?? "Structure";
     case 21:
       return type.type ?? type.name ?? "TaggedUnion";
+    case 23:
+      return type.type ?? type.name ?? "Resource";
     default:
       return type?.type ?? `wireTag ${type?.wireTag ?? "?"}`;
   }

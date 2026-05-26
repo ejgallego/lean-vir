@@ -10,6 +10,13 @@ The module is also exposed through the package entry point:
 import { createVirRuntime } from "lean-vir";
 ```
 
+Node tests and command-line tools that need `Lean.Vir.Browser.Document` calls
+can import the Node wrapper:
+
+```js
+import { createVirRuntime } from "lean-vir/vir-runtime-node";
+```
+
 ## Browser Usage
 
 ```js
@@ -17,7 +24,15 @@ import { createVirRuntime } from "./src/vir-runtime.js";
 
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "vir-demo.irpkg",
+  irPackageUrl: "fixtures-basic.irpkg",
+});
+const hostVir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "demo-host.irpkg",
+});
+const leanVir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "fixtures-lean.irpkg",
 });
 
 console.log(vir.call("fib", 12));
@@ -25,8 +40,8 @@ console.log(vir.exportsByName.SortDemo_demo());
 console.log(vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]));
 console.log(vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
 console.log(vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
-console.log(vir.call("Tamagotchi.step", "happy", "ignore"));
-console.log(vir.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }));
+console.log(hostVir.call("HostInterop.titleHandshake", "browser handshake"));
+console.log(leanVir.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }));
 ```
 
 There is also a minimal browser page at `/runtime-example.html` that imports the
@@ -41,7 +56,7 @@ WASM module:
 import { createVirRuntimeFactory, fetchBytes } from "./src/vir-runtime.js";
 
 const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
-const irPackageBytes = await fetchBytes("vir-demo.irpkg");
+const irPackageBytes = await fetchBytes("fixtures-basic.irpkg");
 
 const first = await factory.createRuntime({ irPackageBytes });
 const second = await factory.createRuntime({ irPackageBytes });
@@ -58,12 +73,15 @@ const second = await factory.createRuntime({ irPackageBytes });
 - `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
   methods.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
+- `vir.packageInfo.hostImports` reports the number of JavaScript host imports.
 
-Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `Float`, `Float32`,
-`UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`, recursive
-`Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α` shapes
-over supported types, non-indexed user-defined structures including
-parameterized instances, nullary inductive enums, and `Lean.Expr`.
+Supported v1 types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
+`Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
+recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α`
+shapes over supported types, non-indexed user-defined structures including
+parameterized instances, nullary inductive enums, and `Lean.Expr`. Exported
+Lean entrypoints and host imports may be pure or `IO α`; `IO` failures
+currently surface as call failures.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
@@ -102,6 +120,117 @@ entry is exposed. Malformed type trees, invalid structure layouts, unsupported
 wire tags, duplicate export names, and bad enum constructor metadata are
 reported as package-load errors.
 
+## Lean To JavaScript Host Imports
+
+Lean sources can call synchronous JavaScript functions through declarations
+marked with `@[vir_js "..."]`. See `docs/LEAN_VIR_LIBRARY.md` for the
+Lean-side API reference. Import one of the provided modules:
+
+```lean
+import Lean.Vir.Browser
+
+def titleRoundtrip (title : String) : IO String := do
+  Lean.Vir.Browser.Document.setTitle title
+  Lean.Vir.Browser.Document.getTitle
+```
+
+The first library surface is:
+
+- `Lean.Vir.Common.echoString : @& String -> String`
+- `Lean.Vir.Common.addNat : Nat -> Nat -> Nat`
+- `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
+- `Lean.Vir.Browser.Document.getTitle : IO String`
+- `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
+- `Lean.Vir.Browser.Document.querySelector : @& String -> IO (Option Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Browser.Element -> IO String`
+- `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
+- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Browser.Element -> @& String -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Browser.Element -> @& String -> @& String -> Option String -> IO Lean.Vir.Browser.EventListener`
+- `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Browser.EventListener -> IO Unit`
+- `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Browser.Element -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
+- `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Browser.HTMLInputElement -> IO Bool`
+- `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Browser.HTMLInputElement -> Bool -> IO Unit`
+- `Lean.Vir.Browser.HTMLInputElement.getValue : @& Lean.Vir.Browser.HTMLInputElement -> IO String`
+- `Lean.Vir.Browser.HTMLInputElement.setValue : @& Lean.Vir.Browser.HTMLInputElement -> @& String -> IO Unit`
+
+The built-in `common.*` and `browser.*` targets do not require a `hostBindings`
+option:
+
+```js
+const vir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "demo-host.irpkg",
+});
+
+console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
+```
+
+`Lean.Vir.Browser.Console.log` maps to `console.log`, title calls map to
+`document.title`, `Document.querySelector` returns an opaque element resource,
+`Element` calls use DOM element properties/methods, event listeners call back
+into exported Lean entrypoints with an opaque `Event` resource, and
+`HTMLInputElement` calls first narrow an element before reading or writing
+`checked` and `value`.
+The browser runtime requires `globalThis.document` for `browser.document.*`
+targets. In Node, use `lean-vir/vir-runtime-node` or pass explicit
+`hostBindings`; the Node wrapper provides virtual document and element state for
+these built-in browser targets. No extra `createVirRuntime` option is needed for
+the built-in `common.*` or `browser.*` imports. See MDN for the underlying
+browser APIs:
+
+- [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
+- [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
+- [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector)
+- [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
+- [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
+- [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
+- [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event)
+- [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
+- [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
+- [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
+- [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value)
+
+Custom imports can be declared directly:
+
+```lean
+import Lean.Vir.Host
+
+@[vir_js "demo.bumpNat"]
+opaque jsBumpNat (n : Nat) : Nat
+
+def bumpFromJs (n : Nat) : Nat :=
+  jsBumpNat n
+```
+
+Bind custom targets when constructing the runtime. User bindings override the
+default `common.*` and `browser.*` bindings:
+
+```js
+const vir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "custom.irpkg",
+  hostBindings: {
+    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
+  },
+});
+
+console.log(vir.call("bumpFromJs", 41)); // "42"
+```
+
+Bindings receive decoded JavaScript values and return a value matching the Lean
+result type. `Unit` returns use `undefined` or `null`. Host imports are
+synchronous in v1; returning a `Promise` is an error. Object-style `imports`
+factory options are treated as overrides on top of the generated import table.
+If you provide a custom `imports` function to `createVirRuntimeFactory`, call
+`createVirImports(module, overrides, hostState)` or otherwise install
+`env.vir_js_call` and `env.vir_js_call_result_size`.
+
+The v1 event listener binding is intentionally narrow: it registers an exported
+Lean entrypoint by name, passes an opaque event resource during the callback,
+and does not marshal Lean closures. The v2 work is tracked in
+`docs/EVENT_CALLBACK_ROADMAP.md`.
+
 ## Trust Boundary
 
 The current `.irpkg` loader is intended for generated project artifacts and
@@ -138,9 +267,9 @@ npm run generate:irpkg -- examples/Fib.lean build/generated/fib.irpkg
 ```
 
 The command prints the package path, report path, package format, toolchain,
-declaration count, interface export count, and target roots. The same summary
-is embedded in the manifest metadata so JavaScript and `/dev.html` can show
-exactly what was loaded.
+declaration count, interface export count, JavaScript host import count, and
+target roots. The same summary is embedded in the manifest metadata so
+JavaScript and `/dev.html` can show exactly what was loaded.
 
 Inspect the embedded manifest without loading the browser:
 
@@ -165,4 +294,6 @@ The runtime uses the single-file declaration package path. It does not load
 `.olean`, `.ir`, or full Lean module data in the browser. Unsupported requested
 exports fail during package generation instead of being omitted silently, and a
 failed package load clears the runtime's package metadata instead of leaving
-stale declarations callable.
+stale declarations callable. JavaScript host imports are sync-only and limited
+to 16 imported declarations with IR arity at most 6; async host calls will need
+a later Promise/JSPI-shaped boundary.

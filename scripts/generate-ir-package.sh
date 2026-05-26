@@ -8,7 +8,4 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-package="build/generated/vir-demo.irpkg"
-report="build/generated/ir-provider-report.md"
-
-node scripts/generate-browser-package.mjs "$package" "$report"
+node scripts/generate-browser-package.mjs

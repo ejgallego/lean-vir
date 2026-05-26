@@ -8,7 +8,7 @@ set -euo pipefail
 
 cd "$(dirname "$0")/.."
 
-report="build/generated/ir-provider-report.md"
+report="build/generated/fixtures-basic.report.md"
 
 set +e
 npm run --silent generate:package
@@ -30,5 +30,8 @@ fi
 
 echo
 echo "IR package generation succeeded."
-echo "Package: build/generated/vir-demo.irpkg"
-echo "Report:  $report"
+echo "Packages:"
+for package in build/generated/fixtures-basic.irpkg build/generated/demo-host.irpkg build/generated/fixtures-lean.irpkg build/generated/fixtures-boundary.irpkg; do
+  echo "  $package"
+done
+echo "Primary report: $report"

@@ -55,6 +55,8 @@ uint64_t lean_expr_mk_data(
     uint8_t has_level_mvar,
     uint8_t has_level_param);
 uint64_t lean_expr_mk_app_data(uint64_t f_data, uint64_t a_data);
+char const * vir_js_call(uint32_t slot, uint8_t const * request, uint32_t request_len);
+uint32_t vir_js_call_result_size(void);
 }
 
 static uint8_t g_vir_io_initializing = 0;
@@ -1589,6 +1591,9 @@ extern "C" void * dlsym(void *, char const * sym) {
             return entry.address;
         }
     }
+    if (void * host_import = lean::vir::host_import_trampoline(sym)) {
+        return host_import;
+    }
     return nullptr;
 }
 
@@ -1691,6 +1696,7 @@ static std::string name_to_string(object * value) {
 }
 
 enum class vir_wire_type : uint8_t {
+    Unit = 22,
     Nat = 0,
     Int = 1,
     Bool = 2,
@@ -1709,6 +1715,7 @@ enum class vir_wire_type : uint8_t {
     Prod = 19,
     Structure = 20,
     TaggedUnion = 21,
+    Resource = 23,
     SimpleEnum = 14,
     Expr = 15,
 };
@@ -1918,6 +1925,7 @@ static void encode_expr_payload(vir_writer & w, object * value);
 
 static bool is_known_wire_type(vir_wire_type tag) {
     switch (tag) {
+    case vir_wire_type::Unit:
     case vir_wire_type::Nat:
     case vir_wire_type::Int:
     case vir_wire_type::Bool:
@@ -1937,6 +1945,7 @@ static bool is_known_wire_type(vir_wire_type tag) {
     case vir_wire_type::Structure:
     case vir_wire_type::TaggedUnion:
     case vir_wire_type::SimpleEnum:
+    case vir_wire_type::Resource:
     case vir_wire_type::Expr:
         return true;
     default:
@@ -2330,6 +2339,8 @@ static void set_structure_scalar_field(
 
 static object * decode_value(vir_reader & r, vir_type const & type) {
     switch (type.tag) {
+    case vir_wire_type::Unit:
+        return lean_box(0);
     case vir_wire_type::Nat: {
         std::string text = r.string();
         return lean_cstr_to_nat(text.c_str());
@@ -2349,6 +2360,8 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
     case vir_wire_type::UInt16:
         return lean_box(static_cast<uint16_t>(r.u32()));
     case vir_wire_type::UInt32:
+        return lean_box_uint32(r.u32());
+    case vir_wire_type::Resource:
         return lean_box_uint32(r.u32());
     case vir_wire_type::UInt64: {
         uint64_t value = 0;
@@ -2755,6 +2768,10 @@ static object * tagged_union_field_as_object(
 
 static void encode_value_payload(vir_writer & w, vir_type const & type, object * value) {
     switch (type.tag) {
+    case vir_wire_type::Unit:
+        (void)w;
+        (void)value;
+        break;
     case vir_wire_type::Nat:
         encode_nat_payload(w, value);
         break;
@@ -2774,6 +2791,9 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
         w.u32(static_cast<uint32_t>(lean_unbox(value)));
         break;
     case vir_wire_type::UInt32:
+        w.u32(lean_unbox_uint32(value));
+        break;
+    case vir_wire_type::Resource:
         w.u32(lean_unbox_uint32(value));
         break;
     case vir_wire_type::UInt64:
@@ -2875,10 +2895,192 @@ static bool call_result_is_owned(vir_type const & type, bool has_boxed_decl) {
     return has_boxed_decl || !is_unboxed_call_boundary_type(type, &unboxed_type);
 }
 
+static bool same_wire_type(vir_type const & lhs, vir_type const & rhs) {
+    if (lhs.tag != rhs.tag || lhs.args.size() != rhs.args.size()) {
+        return false;
+    }
+    for (size_t i = 0; i < lhs.args.size(); i++) {
+        if (!same_wire_type(lhs.args[i], rhs.args[i])) {
+            return false;
+        }
+    }
+    return true;
+}
+
+struct host_signature {
+    bool ok = false;
+    std::string error;
+    std::vector<vir_type> args;
+    vir_type result { vir_wire_type::Unit, {} };
+};
+
+static host_signature decode_host_signature(uint32_t slot) {
+    char const * data = vir::host_import_signature(slot);
+    uint32_t size = vir::host_import_signature_size(slot);
+    if (data == nullptr) {
+        return { false, "missing JavaScript import signature", {}, { vir_wire_type::Unit, {} } };
+    }
+    vir_reader reader(reinterpret_cast<uint8_t const *>(data), size);
+    uint32_t argc = reader.u32();
+    std::vector<vir_type> args;
+    args.reserve(argc);
+    for (uint32_t i = 0; i < argc; i++) {
+        args.push_back(decode_type(reader));
+    }
+    vir_type result = decode_type(reader);
+    if (!reader.ok) {
+        return { false, reader.error(), {}, { vir_wire_type::Unit, {} } };
+    }
+    if (!reader.at_end()) {
+        return { false, "trailing bytes after JavaScript import signature", {}, { vir_wire_type::Unit, {} } };
+    }
+    return { true, "", args, result };
+}
+
+static object * decode_host_result(vir_type const & expected, char const * bytes, uint32_t size) {
+    vir_reader reader(reinterpret_cast<uint8_t const *>(bytes), size);
+    vir_type actual = decode_type(reader);
+    if (!reader.ok) {
+        return lean_box(0);
+    }
+    if (!same_wire_type(expected, actual)) {
+        reader.fail("JavaScript import result type mismatch");
+        return lean_box(0);
+    }
+    object * value = decode_value(reader, expected);
+    if (!reader.ok || !reader.at_end()) {
+        lean_dec(value);
+        return lean_box(0);
+    }
+    return value;
+}
+
+static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
+    host_signature signature = decode_host_signature(slot);
+    if (!signature.ok) {
+        for (uint32_t i = 0; i < argc; i++) {
+            lean_dec(args[i]);
+        }
+        return vir::host_import_is_io(slot) ? lean_io_result_mk_ok(lean_box(0)) : lean_box(0);
+    }
+    vir_writer request;
+    request.u32(static_cast<uint32_t>(signature.args.size()));
+    for (size_t i = 0; i < signature.args.size(); i++) {
+        encode_type(request, signature.args[i]);
+        encode_value_payload(request, signature.args[i], args[i]);
+    }
+    encode_type(request, signature.result);
+    std::string request_bytes = request.take();
+    char const * result_bytes = vir_js_call(
+        slot,
+        reinterpret_cast<uint8_t const *>(request_bytes.data()),
+        static_cast<uint32_t>(request_bytes.size()));
+    uint32_t result_size = vir_js_call_result_size();
+    object * value = decode_host_result(signature.result, result_bytes, result_size);
+    if (result_bytes != nullptr) {
+        vir_free_bytes(const_cast<char *>(result_bytes));
+    }
+    for (uint32_t i = 0; i < argc; i++) {
+        lean_dec(args[i]);
+    }
+    if (vir::host_import_is_io(slot)) {
+        return lean_io_result_mk_ok(value);
+    }
+    return value;
+}
+
+#define VIR_JS_TRAMPOLINES_FOR_SLOT(SLOT) \
+extern "C" object * vir_js_import_slot_##SLOT##_0(void) { \
+    return call_js_import(SLOT, 0, nullptr); \
+} \
+extern "C" object * vir_js_import_slot_##SLOT##_1(object * a0) { \
+    object * args[] = { a0 }; \
+    return call_js_import(SLOT, 1, args); \
+} \
+extern "C" object * vir_js_import_slot_##SLOT##_2(object * a0, object * a1) { \
+    object * args[] = { a0, a1 }; \
+    return call_js_import(SLOT, 2, args); \
+} \
+extern "C" object * vir_js_import_slot_##SLOT##_3(object * a0, object * a1, object * a2) { \
+    object * args[] = { a0, a1, a2 }; \
+    return call_js_import(SLOT, 3, args); \
+} \
+extern "C" object * vir_js_import_slot_##SLOT##_4(object * a0, object * a1, object * a2, object * a3) { \
+    object * args[] = { a0, a1, a2, a3 }; \
+    return call_js_import(SLOT, 4, args); \
+} \
+extern "C" object * vir_js_import_slot_##SLOT##_5(object * a0, object * a1, object * a2, object * a3, object * a4) { \
+    object * args[] = { a0, a1, a2, a3, a4 }; \
+    return call_js_import(SLOT, 5, args); \
+} \
+extern "C" object * vir_js_import_slot_##SLOT##_6(object * a0, object * a1, object * a2, object * a3, object * a4, object * a5) { \
+    object * args[] = { a0, a1, a2, a3, a4, a5 }; \
+    return call_js_import(SLOT, 6, args); \
+}
+
+VIR_JS_TRAMPOLINES_FOR_SLOT(0)
+VIR_JS_TRAMPOLINES_FOR_SLOT(1)
+VIR_JS_TRAMPOLINES_FOR_SLOT(2)
+VIR_JS_TRAMPOLINES_FOR_SLOT(3)
+VIR_JS_TRAMPOLINES_FOR_SLOT(4)
+VIR_JS_TRAMPOLINES_FOR_SLOT(5)
+VIR_JS_TRAMPOLINES_FOR_SLOT(6)
+VIR_JS_TRAMPOLINES_FOR_SLOT(7)
+VIR_JS_TRAMPOLINES_FOR_SLOT(8)
+VIR_JS_TRAMPOLINES_FOR_SLOT(9)
+VIR_JS_TRAMPOLINES_FOR_SLOT(10)
+VIR_JS_TRAMPOLINES_FOR_SLOT(11)
+VIR_JS_TRAMPOLINES_FOR_SLOT(12)
+VIR_JS_TRAMPOLINES_FOR_SLOT(13)
+VIR_JS_TRAMPOLINES_FOR_SLOT(14)
+VIR_JS_TRAMPOLINES_FOR_SLOT(15)
+
+#undef VIR_JS_TRAMPOLINES_FOR_SLOT
+
+#define VIR_JS_TRAMPOLINE_CASE(SLOT, ARITY) \
+    if (slot == SLOT && arity == ARITY) { \
+        return reinterpret_cast<void *>(vir_js_import_slot_##SLOT##_##ARITY); \
+    }
+
+#define VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(SLOT) \
+    VIR_JS_TRAMPOLINE_CASE(SLOT, 0) \
+    VIR_JS_TRAMPOLINE_CASE(SLOT, 1) \
+    VIR_JS_TRAMPOLINE_CASE(SLOT, 2) \
+    VIR_JS_TRAMPOLINE_CASE(SLOT, 3) \
+    VIR_JS_TRAMPOLINE_CASE(SLOT, 4) \
+    VIR_JS_TRAMPOLINE_CASE(SLOT, 5) \
+    VIR_JS_TRAMPOLINE_CASE(SLOT, 6)
+
+static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(0)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(1)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(2)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(3)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(4)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(5)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(6)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(7)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(8)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(9)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(10)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(11)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(12)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(13)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(14)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(15)
+    return nullptr;
+}
+
+#undef VIR_JS_TRAMPOLINE_CASES_FOR_SLOT
+#undef VIR_JS_TRAMPOLINE_CASE
+
 static std::string g_call_result;
 static std::string g_call_error;
 
 static char const * known_symbol_stem(name const & n) {
+    if (char const * symbol = vir::find_host_import_symbol(n.raw())) {
+        return symbol;
+    }
     std::string dotted = n.to_string();
     for (::NativeSymbol const & entry : ::g_native_symbols) {
         if (dotted == entry.lean_name) {
@@ -2909,6 +3111,20 @@ static name name_from_dotted(char const * text, size_t len) {
 }
 
 } // namespace
+
+namespace vir {
+
+void * host_import_trampoline(char const * symbol) {
+    int32_t slot = host_import_slot_for_symbol(symbol);
+    if (slot < 0) {
+        return nullptr;
+    }
+    return host_import_trampoline_for(
+        static_cast<uint32_t>(slot),
+        host_import_arity(static_cast<uint32_t>(slot)));
+}
+
+} // namespace vir
 
 static uint64_t vir_mix_hash(uint64_t h, uint64_t k) {
     return lean_uint64_mix_hash(h, k);
@@ -3382,6 +3598,23 @@ extern "C" uint32_t vir_upstream_target_pointer_bytes(void) {
     return sizeof(void *);
 }
 
+static void cleanup_call_args(std::vector<lean::vir_arg> const & args) {
+    for (lean::vir_arg const & arg : args) {
+        if (arg.owned) lean_dec(arg.value);
+    }
+}
+
+static uint8_t decode_call_effect(lean::vir_reader & reader) {
+    uint8_t effect = 0;
+    if (reader.ok && !reader.at_end()) {
+        effect = reader.u8();
+        if (effect > 1) {
+            reader.fail("unsupported call effect tag " + std::to_string(effect));
+        }
+    }
+    return effect;
+}
+
 extern "C" char const * vir_call(
     char const * name_text,
     uint32_t name_len,
@@ -3414,32 +3647,38 @@ extern "C" char const * vir_call(
         args.push_back(decoded_args.back().value);
     }
     lean::vir_type result_type = lean::decode_type(reader);
+    uint8_t effect = decode_call_effect(reader);
     if (!reader.ok) {
         lean::g_call_error = reader.error();
-        for (lean::vir_arg const & arg : decoded_args) {
-            if (arg.owned) lean_dec(arg.value);
-        }
+        cleanup_call_args(decoded_args);
         return nullptr;
     }
     if (!has_boxed_decl && lean::needs_boxed_wasm32_call_boundary_type(result_type)) {
         lean::g_call_error = "top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary";
-        for (lean::vir_arg const & arg : decoded_args) {
-            if (arg.owned) lean_dec(arg.value);
-        }
+        cleanup_call_args(decoded_args);
         return nullptr;
     }
     if (!reader.at_end()) {
         lean::g_call_error = "trailing bytes after call payload";
-        for (lean::vir_arg const & arg : decoded_args) {
-            if (arg.owned) lean_dec(arg.value);
-        }
+        cleanup_call_args(decoded_args);
         return nullptr;
     }
 
     lean::ensure_ir_interpreter_initialized();
+    if (effect == 1) {
+        args.push_back(lean_io_mk_world());
+    }
     lean::elab_environment env(lean_box(0));
     lean::options opts(lean_box(0));
     lean::object * result = lean::ir::run_boxed(env, opts, fn, args.size(), args.data());
+    if (effect == 1) {
+        if (!lean_io_result_is_ok(result)) {
+            lean_dec(result);
+            lean::g_call_error = "IO action failed";
+            return nullptr;
+        }
+        result = lean_io_result_take_value(result);
+    }
     lean::vir_writer writer;
     lean::encode_result(writer, result_type, result, has_boxed_decl);
     if (lean::call_result_is_owned(result_type, has_boxed_decl)) {

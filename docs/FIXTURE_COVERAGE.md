@@ -22,8 +22,8 @@ inductive families, and implicit arguments.
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather
 than a separate hand-maintained list of JavaScript names. It also checks that
-every generated `vir-demo.irpkg` export appears in the `/dev.html` selector and
-that selecting each entry renders the expected control kinds from the manifest.
+the generated focused browser packages appear in `/dev.html` selectors and that
+selecting each entry renders the expected control kinds from the manifest.
 
 ## Current Passing Surface
 

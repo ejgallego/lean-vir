@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { validateInterfaceManifest } from "./interface-manifest.js";
+import { createBrowserHostBindings } from "./vir-host-bindings.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -17,7 +18,7 @@ export async function fetchBytes(path, init = { cache: "no-store" }) {
   return new Uint8Array(await response.arrayBuffer());
 }
 
-export function createVirImports(module, overrides = {}) {
+export function createVirImports(module, overrides = {}, hostState = null) {
   const imports = {};
 
   for (const spec of WebAssembly.Module.imports(module)) {
@@ -26,6 +27,9 @@ export function createVirImports(module, overrides = {}) {
       imports[spec.module][spec.name] = (...args) => {
         if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
           throw new Error(`WASI proc_exit(${args[0]})`);
+        }
+        if (spec.module === "env" && spec.name === "vir_js_call") {
+          throw new Error("Vir JavaScript host import called without an attached host state");
         }
         return 0;
       };
@@ -37,6 +41,13 @@ export function createVirImports(module, overrides = {}) {
       ...(imports[moduleName] ?? {}),
       ...moduleImports,
     };
+  }
+
+  if (hostState !== null) {
+    imports.env ??= {};
+    imports.env.vir_js_call = (slot, requestPtr, requestLen) =>
+      hostState.call(slot, requestPtr, requestLen);
+    imports.env.vir_js_call_result_size = () => hostState.resultSize();
   }
 
   return imports;
@@ -59,12 +70,16 @@ export class VirRuntimeFactory {
     wasmUrl = null,
     fetchBytes: loadBytes = fetchBytes,
     imports = null,
+    hostBindings = null,
+    defaultHostBindings = null,
   } = {}) {
     this.wasmBytes = wasmBytes;
     this.wasmModule = wasmModule;
     this.wasmUrl = wasmUrl;
     this.fetchBytes = loadBytes;
     this.imports = imports;
+    this.hostBindings = hostBindings;
+    this.defaultHostBindings = defaultHostBindings;
   }
 
   async module() {
@@ -83,13 +98,25 @@ export class VirRuntimeFactory {
 
   async instantiate() {
     const module = await this.module();
+    const runtimeRef = { runtime: null };
+    const defaultHostBindings =
+      typeof this.defaultHostBindings === "function"
+        ? this.defaultHostBindings(runtimeRef)
+        : (this.defaultHostBindings ?? createBrowserHostBindings({ runtimeRef }));
+    const hostState = new VirHostState({
+      hostBindings: this.hostBindings,
+      defaultHostBindings,
+    });
     const imports =
       typeof this.imports === "function"
-        ? this.imports(module)
-        : this.imports ?? createVirImports(module);
+        ? this.imports(module, hostState)
+        : createVirImports(module, this.imports ?? {}, hostState);
     const instance = await WebAssembly.instantiate(module, imports);
+    hostState.attach(instance.exports);
     instance.exports.__wasm_call_ctors?.();
-    return new VirRuntime(instance.exports, { module });
+    const runtime = new VirRuntime(instance.exports, { module, hostState });
+    runtimeRef.runtime = runtime;
+    return runtime;
   }
 
   async createRuntime({ irPackageBytes = null, irPackageUrl = null } = {}) {
@@ -102,10 +129,68 @@ export class VirRuntimeFactory {
   }
 }
 
+class VirHostState {
+  constructor({ hostBindings = null, defaultHostBindings = createBrowserHostBindings() } = {}) {
+    this.exports = null;
+    this.manifest = null;
+    this.hostImports = [];
+    this.userBindings = hostBindings;
+    this.lastResultSize = 0;
+    this.defaultBindings = defaultHostBindings;
+  }
+
+  attach(exports) {
+    this.exports = exports;
+  }
+
+  setManifest(manifest) {
+    this.manifest = manifest;
+    this.hostImports = manifest?.hostImports ?? [];
+  }
+
+  resultSize() {
+    return this.lastResultSize;
+  }
+
+  call(slot, requestPtr, requestLen) {
+    if (this.exports === null) {
+      throw new Error("Vir host import called before WASM exports were attached");
+    }
+    const entry = this.hostImports[slot] ?? null;
+    if (entry === null) {
+      throw new Error(`Vir host import slot ${slot} is not registered`);
+    }
+    const binding = lookupHostBinding(entry.target, this.userBindings, this.defaultBindings);
+    if (typeof binding !== "function") {
+      throw new Error(`Vir host import binding not found: ${entry.target}`);
+    }
+
+    const request = this.readWasmBytes(requestPtr, requestLen);
+    const { args, resultType } = decodeHostCallRequest(request, entry);
+    const value = binding(...args);
+    if (isPromiseLike(value)) {
+      throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
+    }
+    const result = encodeHostCallResult(resultType, value, entry);
+    const ptr = this.exports.vir_alloc_bytes(result.byteLength);
+    new Uint8Array(this.exports.memory.buffer, ptr, result.byteLength).set(result);
+    this.lastResultSize = result.byteLength;
+    return ptr;
+  }
+
+  readWasmBytes(ptr, len) {
+    if (ptr === 0 && len !== 0) {
+      throw new Error("Vir host import request pointer is null");
+    }
+    return new Uint8Array(this.exports.memory.buffer, ptr, len).slice();
+  }
+}
+
 export class VirRuntime {
-  constructor(exports, { module = null, packageInfo = null } = {}) {
+  constructor(exports, { module = null, packageInfo = null, hostState = null } = {}) {
     this.exports = exports;
     this.module = module;
+    this.hostState = hostState;
     this.packageInfo = packageInfo;
     this.interfaceManifest = null;
     this.packageMetadata = null;
@@ -117,6 +202,7 @@ export class VirRuntime {
     if (typeof this.exports.vir_package_interface_manifest_size === "function" &&
         this.exports.vir_package_interface_manifest_size() !== 0) {
       this.interfaceManifest = this.readPackageManifest();
+      this.hostState?.setManifest(this.interfaceManifest);
       this.packageMetadata = this.interfaceManifest.metadata;
       this.rebuildManifestExports();
     }
@@ -153,12 +239,14 @@ export class VirRuntime {
         throw new Error(`IR package declaration count mismatch: load returned ${count}, provider has ${providerCount}`);
       }
       this.interfaceManifest = this.readPackageManifest();
+      this.hostState?.setManifest(this.interfaceManifest);
       this.packageMetadata = this.interfaceManifest.metadata;
       this.rebuildManifestExports();
       this.packageInfo = {
         count: providerCount ?? count,
         byteLength: packageBytes.byteLength,
         interfaceExports: this.interfaceManifest.exports.length,
+        hostImports: this.interfaceManifest.hostImports?.length ?? 0,
         metadata: this.packageMetadata,
       };
       return this.packageInfo;
@@ -170,6 +258,7 @@ export class VirRuntime {
   clearPackageMetadata() {
     this.packageInfo = null;
     this.interfaceManifest = null;
+    this.hostState?.setManifest(null);
     this.packageMetadata = null;
     this.exportsByName = Object.create(null);
   }
@@ -395,6 +484,20 @@ function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
 }
 
+function lookupHostBinding(target, userBindings, defaultBindings) {
+  if (userBindings instanceof Map && userBindings.has(target)) {
+    return userBindings.get(target);
+  }
+  if (userBindings !== null && typeof userBindings === "object" && Object.hasOwn(userBindings, target)) {
+    return userBindings[target];
+  }
+  return defaultBindings[target];
+}
+
+function isPromiseLike(value) {
+  return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
+}
+
 function encodeCallPayload(entry, args) {
   const writer = new BinaryWriter();
   writer.u32(args.length);
@@ -402,6 +505,7 @@ function encodeCallPayload(entry, args) {
     encodeValue(writer, arg.type, args[index], `${entry.entry} argument ${arg.name}`);
   });
   encodeTypeDescriptor(writer, entry.result, `${entry.entry} result`);
+  writer.u8(entry.effect === "io" ? 1 : 0);
   return writer.take();
 }
 
@@ -516,6 +620,12 @@ function decodeTypeDescriptor(reader) {
 function encodeValuePayload(writer, type, value, label) {
   const tag = requireWireTag(type, label);
   switch (tag) {
+    case 22:
+      if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
+      return;
+    case 23:
+      writer.u32(normalizeResourceHandle(value, label));
+      return;
     case 0:
       writer.string(normalizeDecimal(value, label, { signed: false }));
       return;
@@ -615,10 +725,44 @@ function decodeCallResult(type, bytes) {
   return value;
 }
 
+function decodeHostCallRequest(bytes, entry) {
+  const reader = new BinaryReader(bytes);
+  const argc = reader.u32();
+  if (argc !== entry.args.length) {
+    throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argc}`);
+  }
+  const args = entry.args.map((arg, index) => {
+    const actualType = decodeTypeDescriptor(reader);
+    if (!sameWireType(arg.type, actualType)) {
+      throw new Error(`Vir host import ${entry.target} argument ${arg.name ?? index} type mismatch`);
+    }
+    return decodeValuePayload(reader, arg.type);
+  });
+  const actualResult = decodeTypeDescriptor(reader);
+  if (!sameWireType(entry.result, actualResult)) {
+    throw new Error(`Vir host import ${entry.target} result type mismatch`);
+  }
+  reader.requireEnd();
+  return { args, resultType: entry.result };
+}
+
+function encodeHostCallResult(type, value, entry) {
+  const writer = new BinaryWriter();
+  encodeTypeDescriptor(writer, type, `${entry.target} result`);
+  encodeValuePayload(writer, type, value, `${entry.target} result`);
+  return writer.take();
+}
+
 function decodeValuePayload(reader, type) {
   const expectedTag = requireWireTag(type, "result");
   let value;
   switch (expectedTag) {
+    case 22:
+      value = undefined;
+      break;
+    case 23:
+      value = { handle: reader.u32() };
+      break;
     case 0:
     case 1:
     case 7:
@@ -887,6 +1031,14 @@ function normalizeInteger(value, label, min, max) {
     throw new Error(`${label} must be an integer in ${min}..${max}`);
   }
   return value;
+}
+
+function normalizeResourceHandle(value, label) {
+  const handle = typeof value === "number" ? value : value?.handle;
+  if (!Number.isInteger(handle) || handle <= 0 || handle > 0xffffffff) {
+    throw new Error(`${label} must be a live resource handle`);
+  }
+  return handle;
 }
 
 function normalizeArray(value, label) {

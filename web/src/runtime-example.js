@@ -11,17 +11,23 @@ const output = document.querySelector("#runtime-example-output");
 try {
   const vir = await createVirRuntime({
     wasmUrl: `${import.meta.env.BASE_URL}vir-upstream.wasm`,
-    irPackageUrl: `${import.meta.env.BASE_URL}vir-demo.irpkg`,
+    irPackageUrl: `${import.meta.env.BASE_URL}fixtures-basic.irpkg`,
+  });
+  const hostVir = await createVirRuntime({
+    wasmUrl: `${import.meta.env.BASE_URL}vir-upstream.wasm`,
+    irPackageUrl: `${import.meta.env.BASE_URL}demo-host.irpkg`,
   });
 
   const results = {
     declarations: vir.packageInfo.count,
     interfaceExports: vir.packageInfo.interfaceExports,
+    hostImports: vir.packageInfo.hostImports,
     constNat: vir.exportsByName.SortDemo_demo(),
     natToNat: vir.call("fib", 12),
     natArrayToNat: vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]),
     stringToNat: vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"),
     byteArrayToNat: vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]),
+    leanToBrowserTitle: hostVir.call("HostInterop.titleHandshake", "runtime example"),
   };
 
   output.textContent = JSON.stringify(results, null, 2);

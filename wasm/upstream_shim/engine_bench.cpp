@@ -22,7 +22,7 @@ extern "C" uint32_t vir_call_result_size(void);
 extern "C" char const * vir_call_error(void);
 extern "C" uint32_t vir_call_error_size(void);
 
-#include "vir_demo_package.inc"
+#include "vir_fixtures_basic_package.inc"
 
 static uint64_t monotonic_nanos() {
     struct timespec ts;

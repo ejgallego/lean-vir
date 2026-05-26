@@ -62,6 +62,7 @@ structure Closure where
   unsupportedInitGlobals : Array Name := #[]
 
 inductive InterfaceType where
+  | unit
   | nat
   | int
   | bool
@@ -84,12 +85,22 @@ inductive InterfaceType where
   | structure (name : Name) (label : String) (trivialField? : Option Nat)
       (objectFields usizeFields scalarBytes : Nat)
       (fields : Array (String × InterfaceType × StructureFieldLayout × Bool))
+  | resource (name : Name) (label : String)
   | expr
   deriving BEq, Repr
 
 structure InterfaceArg where
   name : String
   type : InterfaceType
+
+inductive InterfaceEffect where
+  | pure
+  | io
+  deriving BEq, Repr
+
+def InterfaceEffect.label : InterfaceEffect → String
+  | .pure => "pure"
+  | .io => "io"
 
 structure InterfaceExport where
   id : String
@@ -98,6 +109,18 @@ structure InterfaceExport where
   source : String
   args : Array InterfaceArg
   result : InterfaceType
+  effect : InterfaceEffect := .pure
+
+structure HostImport where
+  slot : Nat
+  name : Name
+  source : String
+  target : String
+  symbol : String
+  arity : Nat
+  args : Array InterfaceArg
+  result : InterfaceType
+  effect : InterfaceEffect
 
 structure InterfaceDiagnostic where
   name : Name
@@ -124,6 +147,7 @@ structure PackageMetadata where
 structure InterfaceManifest where
   metadata : PackageMetadata
   exports : Array InterfaceExport := #[]
+  hostImports : Array HostImport := #[]
   diagnostics : Array InterfaceDiagnostic := #[]
 
 def defaultTargets : Array Target := #[
@@ -1376,6 +1400,29 @@ def isNativeExternCandidate (n : Name) : Bool :=
   | some head => primitiveNamespaces.contains head
   | none => false
 
+def jsExternPrefix : String := "__vir_js:"
+
+def maxHostImportSlots : Nat := 16
+
+def maxHostImportArity : Nat := 6
+
+def virJsTargetFromExternData? (data : ExternAttrData) : Option String :=
+  data.entries.findSome? fun entry =>
+    match entry with
+    | .standard _ symbol =>
+        if symbol.startsWith jsExternPrefix then
+          some (symbol.drop jsExternPrefix.length).toString
+        else
+          none
+    | _ => none
+
+def virJsTargetFromDecl? : Decl → Option String
+  | .extern _ _ _ data => virJsTargetFromExternData? data
+  | _ => none
+
+def isVirJsDecl (decl : Decl) : Bool :=
+  virJsTargetFromDecl? decl |>.isSome
+
 def sanitizeSource (input : String) : String :=
   "\n".intercalate <|
     input.splitOn "\n" |>.filter fun line =>
@@ -1416,7 +1463,11 @@ def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
         let decl <- findEnvDecl env name
         match decl with
         | .fdecl .. => some { source := s!"imported by {source}", decl }
-        | .extern .. => none
+        | .extern .. =>
+            if isVirJsDecl decl then
+              some { source := s!"imported by {source}", decl }
+            else
+              none
 
 def DeclIndex.initFnNameFor? (index : DeclIndex) (name : Name) : Option Name :=
   index.envs.findSome? fun (_, env) => getInitFnNameFor? env name
@@ -1524,6 +1575,7 @@ def DeclIndex.envForSource? (index : DeclIndex) (source : String) : Option Envir
     if candidate == source then some env else none
 
 def InterfaceType.label : InterfaceType → String
+  | .unit => "Unit"
   | .nat => "Nat"
   | .int => "Int"
   | .bool => "Bool"
@@ -1543,9 +1595,11 @@ def InterfaceType.label : InterfaceType → String
   | .simpleEnum name _ => name.toString
   | .taggedUnion _ label _ => label
   | .structure _ label .. => label
+  | .resource _ label => label
   | .expr => "Lean.Expr"
 
 def InterfaceType.wireTag : InterfaceType → Nat
+  | .unit => 22
   | .nat => 0
   | .int => 1
   | .bool => 2
@@ -1565,6 +1619,7 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .simpleEnum .. => 14
   | .taggedUnion .. => 21
   | .structure .. => 20
+  | .resource .. => 23
   | .expr => 15
 
 partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
@@ -1706,6 +1761,13 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ trivialFieldJson
       ++ "\"fields\":" ++ jsonArray fieldJson
       ++ "}"
+  | .resource name _ =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"resource\","
+      ++ "\"name\":" ++ jsonString name.toString
+      ++ "}"
   | _ =>
       "{\"type\":\"" ++ ty.label ++ "\",\"wireTag\":" ++ toString ty.wireTag ++ "}"
 
@@ -1720,6 +1782,7 @@ def constName? (e : Lean.Expr) : Option Name :=
 
 def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   match constName? e with
+  | some `Unit => some .unit
   | some `Nat => some .nat
   | some `Int => some .int
   | some `Bool => some .bool
@@ -1733,6 +1796,10 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `USize => some .usize
   | some `ByteArray => some .byteArray
   | some `Lean.Expr => some .expr
+  | some `Lean.Vir.Browser.Element => some (.resource `Lean.Vir.Browser.Element "Element")
+  | some `Lean.Vir.Browser.Event => some (.resource `Lean.Vir.Browser.Event "Event")
+  | some `Lean.Vir.Browser.EventListener => some (.resource `Lean.Vir.Browser.EventListener "EventListener")
+  | some `Lean.Vir.Browser.HTMLInputElement => some (.resource `Lean.Vir.Browser.HTMLInputElement "HTMLInputElement")
   | _ => none
 
 def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType := do
@@ -1936,8 +2003,15 @@ def binderArgName (fallback : Nat) (name : Name) : String :=
   else
     candidate
 
+def ioResultType? (e : Lean.Expr) : Option Lean.Expr :=
+  let e := stripMData e
+  let (fn, args) := e.getAppFnArgs
+  match fn, Array.toList args with
+  | `IO, [result] => some result
+  | _, _ => none
+
 partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args : Array InterfaceArg := #[]) :
-    CoreM (Except String (Array InterfaceArg × InterfaceType)) := do
+    CoreM (Except String (Array InterfaceArg × InterfaceType × InterfaceEffect)) := do
   match stripMData type with
   | .forallE name domain body binderInfo =>
       if binderInfo != .default then
@@ -1949,9 +2023,11 @@ partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args :
             let arg := { name := binderArgName argIndex name, type := argType }
             interfaceSignature? body (argIndex + 1) (args.push arg)
   | result =>
+      let effect := if ioResultType? result |>.isSome then .io else .pure
+      let result := (ioResultType? result).getD result
       match ← interfaceType result with
       | .error reason => return .error s!"unsupported result type `{result}`: {reason}"
-      | .ok resultType => return .ok (args, resultType)
+      | .ok resultType => return .ok (args, resultType, effect)
 
 def isInterfaceDeclInfo : ConstantInfo → Bool
   | .defnInfo _ => true
@@ -2025,14 +2101,87 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
           return .error { name, source, reason := "declaration is not a compiled definition" }
         else
           match ← interfaceSignature? info.type with
-          | .ok (args, result) =>
+          | .ok (args, result, effect) =>
               if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
               else
                 let jsName := jsNameFor name
-                return .ok { id := jsName, jsName, entry := name, source, args, result }
+                return .ok { id := jsName, jsName, entry := name, source, args, result, effect }
           | .error reason =>
               return .error { name, source, reason }
+
+def DeclIndex.constInfo? (index : DeclIndex) (name : Name) : Option (String × Environment × ConstantInfo) :=
+  index.envs.findSome? fun (source, env) =>
+    match env.find? name with
+    | some info => some (source, env, info)
+    | none => none
+
+def hostImportSymbol (slot arity : Nat) : String :=
+  s!"vir_js_import_{slot}_{arity}"
+
+def declParamCount : Decl → Nat
+  | .fdecl _ params _ _ _ => params.size
+  | .extern _ params _ _ => params.size
+
+def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
+    CoreM (Except InterfaceDiagnostic HostImport) := do
+  let some target := virJsTargetFromDecl? loaded.decl
+    | return .error { name := loaded.decl.name, source := loaded.source, reason := "declaration is not a Vir JavaScript import" }
+  if slot >= maxHostImportSlots then
+    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"too many JavaScript imports; v1 supports at most {maxHostImportSlots}" }
+  let arity := declParamCount loaded.decl
+  if arity > maxHostImportArity then
+    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"JavaScript import arity {arity} exceeds v1 limit {maxHostImportArity}" }
+  let env ← getEnv
+  let some info := env.find? loaded.decl.name
+    | return .error { name := loaded.decl.name, source := loaded.source, reason := "missing elaborated Lean declaration for JavaScript import" }
+  match ← interfaceSignature? info.type with
+  | .error reason =>
+      return .error { name := loaded.decl.name, source := loaded.source, reason := s!"unsupported JavaScript import signature: {reason}" }
+  | .ok (args, result, effect) =>
+    let expectedArity := args.size + if effect == .io then 1 else 0
+    if arity != expectedArity then
+      return .error {
+        name := loaded.decl.name,
+        source := loaded.source,
+        reason := s!"JavaScript import IR arity mismatch: expected {expectedArity}, got {arity}"
+      }
+    return .ok {
+      slot,
+      name := loaded.decl.name,
+      source := loaded.source,
+      target,
+      symbol := hostImportSymbol slot arity,
+      arity,
+      args,
+      result,
+      effect
+    }
+
+def runCoreForSource (source : String) (env : Environment) (x : CoreM α) : IO α :=
+  x.toIO'
+    { fileName := source, fileMap := default }
+    { env := env }
+
+def collectHostImports (index : DeclIndex) (closure : Closure) : IO (Array HostImport × Array InterfaceDiagnostic) := do
+  let mut seen : NameSet := {}
+  let mut imports : Array HostImport := #[]
+  let mut diagnostics : Array InterfaceDiagnostic := #[]
+  for loaded in closure.decls do
+    if isVirJsDecl loaded.decl && !seen.contains loaded.decl.name then
+      seen := seen.insert loaded.decl.name
+      match index.constInfo? loaded.decl.name with
+      | none =>
+          diagnostics := diagnostics.push {
+            name := loaded.decl.name,
+            source := loaded.source,
+            reason := "source environment was not loaded"
+          }
+      | some (source, env, _) =>
+          match ← runCoreForSource source env (hostImportFor imports.size loaded) with
+          | .ok hostImport => imports := imports.push hostImport
+          | .error diagnostic => diagnostics := diagnostics.push diagnostic
+  return (imports, diagnostics)
 
 def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetadata :=
   let mode :=
@@ -2050,7 +2199,7 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
 def collectPackageMetadata (generatedAt : String) (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
   {
     generator := "tools/GeneratePackage.lean"
-    packageFormatVersion := 4
+    packageFormatVersion := 5
     manifestVersion := 1
     leanVersion := Lean.versionString
     leanToolchain := Lean.toolchain
@@ -2059,13 +2208,17 @@ def collectPackageMetadata (generatedAt : String) (targets : Array Target) (inde
     targets := targets.map (targetMetadataFor index)
   }
 
-def runCoreForSource (source : String) (env : Environment) (x : CoreM α) : IO α :=
-  x.toIO'
-    { fileName := source, fileMap := default }
-    { env := env }
-
-def collectInterfaceManifest (metadata : PackageMetadata) (targets : Array Target) (index : DeclIndex) : IO InterfaceManifest := do
-  let mut manifest : InterfaceManifest := { metadata := metadata }
+def collectInterfaceManifest
+    (metadata : PackageMetadata)
+    (targets : Array Target)
+    (index : DeclIndex)
+    (hostImports : Array HostImport)
+    (hostDiagnostics : Array InterfaceDiagnostic) : IO InterfaceManifest := do
+  let mut manifest : InterfaceManifest := {
+    metadata := metadata,
+    hostImports := hostImports,
+    diagnostics := hostDiagnostics
+  }
   for target in targets do
     let source := target.source.toString
     match index.envForSource? source with
@@ -2091,6 +2244,9 @@ def InterfaceArg.toJson (arg : InterfaceArg) : String :=
   ++ "\"type\":" ++ arg.type.toJson
   ++ "}"
 
+def InterfaceEffect.toJson (effect : InterfaceEffect) : String :=
+  jsonString effect.label
+
 def InterfaceExport.toJson (entry : InterfaceExport) : String :=
   "{"
   ++ "\"id\":" ++ jsonString entry.id ++ ","
@@ -2098,7 +2254,21 @@ def InterfaceExport.toJson (entry : InterfaceExport) : String :=
   ++ "\"entry\":" ++ jsonString entry.entry.toString ++ ","
   ++ "\"source\":" ++ jsonString entry.source ++ ","
   ++ "\"args\":" ++ jsonArray (entry.args.map InterfaceArg.toJson) ++ ","
-  ++ "\"result\":" ++ entry.result.toJson
+  ++ "\"result\":" ++ entry.result.toJson ++ ","
+  ++ "\"effect\":" ++ entry.effect.toJson
+  ++ "}"
+
+def HostImport.toJson (entry : HostImport) : String :=
+  "{"
+  ++ "\"slot\":" ++ toString entry.slot ++ ","
+  ++ "\"name\":" ++ jsonString entry.name.toString ++ ","
+  ++ "\"source\":" ++ jsonString entry.source ++ ","
+  ++ "\"target\":" ++ jsonString entry.target ++ ","
+  ++ "\"symbol\":" ++ jsonString entry.symbol ++ ","
+  ++ "\"arity\":" ++ toString entry.arity ++ ","
+  ++ "\"args\":" ++ jsonArray (entry.args.map InterfaceArg.toJson) ++ ","
+  ++ "\"result\":" ++ entry.result.toJson ++ ","
+  ++ "\"effect\":" ++ entry.effect.toJson
   ++ "}"
 
 def InterfaceDiagnostic.toJson (diagnostic : InterfaceDiagnostic) : String :=
@@ -2135,6 +2305,7 @@ def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
   ++ "\"artifact\":\"lean-vir-ir-package\","
   ++ "\"metadata\":" ++ manifest.metadata.toJson ++ ","
   ++ "\"exports\":" ++ jsonArray (manifest.exports.map InterfaceExport.toJson) ++ ","
+  ++ "\"hostImports\":" ++ jsonArray (manifest.hostImports.map HostImport.toJson) ++ ","
   ++ "\"diagnostics\":" ++ jsonArray (manifest.diagnostics.map InterfaceDiagnostic.toJson)
   ++ "}"
 
@@ -2299,6 +2470,76 @@ def emitExternEntry (ext : NativeExtern) : EmitM Unit := do
     emitArray ext.params emitParam
     emitType ext.resultType
 
+partial def emitInterfaceType (type : InterfaceType) : EmitM Unit := do
+  emitU8 type.wireTag
+  match type with
+  | .array element
+  | .list element
+  | .option element =>
+      emitInterfaceType element
+  | .prod fst snd =>
+      emitInterfaceType fst
+      emitInterfaceType snd
+  | .taggedUnion _ _ constructors =>
+      emitU32 constructors.size
+      constructors.forM fun (_, _, fieldType, layout, objectFields, usizeFields, scalarBytes) => do
+        emitU32 objectFields
+        emitU32 usizeFields
+        emitU32 scalarBytes
+        match layout with
+        | .object index =>
+            emitU8 0
+            emitU32 index
+            emitU32 0
+            emitU32 0
+        | .usize index =>
+            emitU8 1
+            emitU32 index
+            emitU32 0
+            emitU32 0
+        | .scalar size offset =>
+            emitU8 2
+            emitU32 0
+            emitU32 size
+            emitU32 offset
+        emitInterfaceType fieldType
+  | .structure _ _ trivialField? objectFields usizeFields scalarBytes fields =>
+      emitU32 objectFields
+      emitU32 usizeFields
+      emitU32 scalarBytes
+      emitU32 (trivialField?.getD 0xffffffff)
+      emitU32 fields.size
+      fields.forM fun (_, fieldType, layout, _) => do
+        match layout with
+        | .object index =>
+            emitU8 0
+            emitU32 index
+            emitU32 0
+            emitU32 0
+        | .usize index =>
+            emitU8 1
+            emitU32 index
+            emitU32 0
+            emitU32 0
+        | .scalar size offset =>
+            emitU8 2
+            emitU32 0
+            emitU32 size
+            emitU32 offset
+        emitInterfaceType fieldType
+  | _ => pure ()
+
+def emitHostImport (entry : HostImport) : EmitM Unit := do
+  withEmitContext s!"while encoding JavaScript import `{entry.name}` mapped to `{entry.target}`" do
+    emitName entry.name
+    emitString entry.target
+    emitString entry.symbol
+    emitU32 entry.arity
+    emitBool (entry.effect == .io)
+    emitU32 entry.args.size
+    entry.args.forM (fun arg => emitInterfaceType arg.type)
+    emitInterfaceType entry.result
+
 def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
   withEmitContext s!"while encoding initializer global `{entry.name}`" do
     emitName entry.name
@@ -2306,11 +2547,12 @@ def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
 
 def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit := do
   emitString "lean-vir-ir-package"
-  emitU32 4
+  emitU32 5
   emitU32 (closure.decls.size + closure.externs.size)
   closure.decls.forM emitDeclEntry
   closure.externs.forM emitExternEntry
   emitArray closure.initGlobals emitInitGlobal
+  emitArray manifest.hostImports emitHostImport
   emitString manifest.toJson
 
 def emitPackage (closure : Closure) (manifest : InterfaceManifest) : Except String ByteArray := do
@@ -2344,7 +2586,13 @@ def reportFor (targets : Array Target) (closure : Closure) (manifest : Interface
   let interfaceExportLines :=
     if manifest.exports.isEmpty then #["None."] else manifest.exports.map fun entry =>
       let args := entry.args.map (fun arg => s!"{arg.name} : {arg.type.label}")
-      s!"- `{entry.entry}` as `{entry.jsName}` : ({", ".intercalate args.toList}) -> {entry.result.label}"
+      let effect := if entry.effect == .io then " IO" else ""
+      s!"- `{entry.entry}` as `{entry.jsName}` : ({", ".intercalate args.toList}) ->{effect} {entry.result.label}"
+  let hostImportLines :=
+    if manifest.hostImports.isEmpty then #["None."] else manifest.hostImports.map fun entry =>
+      let args := entry.args.map (fun arg => s!"{arg.name} : {arg.type.label}")
+      let effect := if entry.effect == .io then "IO " else ""
+      s!"- slot {entry.slot}: `{entry.name}` -> `{entry.target}` via `{entry.symbol}` : ({", ".intercalate args.toList}) -> {effect}{entry.result.label}"
   let interfaceDiagnosticLines :=
     if manifest.diagnostics.isEmpty then #["None."] else manifest.diagnostics.map fun diagnostic =>
       s!"- `{diagnostic.name}` from `{diagnostic.source}`: {diagnostic.reason}"
@@ -2359,6 +2607,7 @@ def reportFor (targets : Array Target) (closure : Closure) (manifest : Interface
   ++ s!"Loaded declarations: {closure.decls.size}\n\n"
   ++ s!"Native extern declarations: {closure.externs.size}\n\n"
   ++ s!"Initializer globals: {closure.initGlobals.size}\n\n"
+  ++ s!"JavaScript host imports: {manifest.hostImports.size}\n\n"
   ++ s!"Interface exports: {manifest.exports.size}\n\n"
   ++ "## Roots\n\n"
   ++ "\n".intercalate (roots.map (fun n => s!"- `{n}`")).toList ++ "\n\n"
@@ -2368,6 +2617,8 @@ def reportFor (targets : Array Target) (closure : Closure) (manifest : Interface
   ++ "\n".intercalate externLines.toList ++ "\n\n"
   ++ "## Initializer Globals\n\n"
   ++ "\n".intercalate initGlobalLines.toList ++ "\n\n"
+  ++ "## JavaScript Host Imports\n\n"
+  ++ "\n".intercalate hostImportLines.toList ++ "\n\n"
   ++ "## Missing IR Declarations\n\n"
   ++ "\n".intercalate missingDeclLines.toList ++ "\n\n"
   ++ "## Missing Native Extern Registrations\n\n"
@@ -2425,8 +2676,9 @@ def namesSummary (names : Array Name) : String :=
 unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath) : IO UInt32 := do
   let index <- loadDeclIndex targets
   let closure := collectClosure targets index
+  let (hostImports, hostDiagnostics) ← collectHostImports index closure
   let metadata := collectPackageMetadata (← generatedAtUtc) targets index
-  let manifest ← collectInterfaceManifest metadata targets index
+  let manifest ← collectInterfaceManifest metadata targets index hostImports hostDiagnostics
   let report := reportFor targets closure manifest
   writeTextFile reportPath report
   if !closure.missingDecls.isEmpty || !closure.missingExterns.isEmpty || !closure.unsupportedInitGlobals.isEmpty || !manifest.diagnostics.isEmpty then
@@ -2457,6 +2709,7 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.println s!"toolchain: {manifest.metadata.leanToolchain}"
       IO.println s!"generated at: {manifest.metadata.generatedAt}"
       IO.println s!"declarations: {closure.decls.size + closure.externs.size} ({closure.decls.size} Lean IR, {closure.externs.size} native externs)"
+      IO.println s!"JavaScript host imports: {manifest.hostImports.size}"
       IO.println s!"interface exports: {manifest.exports.size}"
       for target in manifest.metadata.targets do
         IO.println s!"target: {target.source} [{target.mode}] roots: {namesSummary target.resolvedRoots}"

@@ -1,0 +1,79 @@
+{
+  "version": 1,
+  "defaultPackage": "fixtures-basic",
+  "hostPackage": "demo-host",
+  "packages": [
+    {
+      "id": "fixtures-basic",
+      "file": "fixtures-basic.irpkg",
+      "report": "build/generated/fixtures-basic.report.md",
+      "targets": [
+        {
+          "source": "examples/Fib.lean",
+          "roots": ["fib"]
+        },
+        {
+          "source": "examples/MergeSort.lean",
+          "roots": ["SortDemo.demo", "SortDemo.demoFromArray"]
+        },
+        {
+          "source": "fixtures/Basic.lean",
+          "roots": [
+            "Vir.Fixtures.Basic.stringUtf8RoundtripScore",
+            "Vir.Fixtures.Basic.byteArrayInputScore"
+          ]
+        }
+      ],
+      "fixtureSources": [
+        "fixtures/Basic.lean",
+        "fixtures/ListOption.lean",
+        "fixtures/InterfaceShapes.lean"
+      ]
+    },
+    {
+      "id": "demo-host",
+      "file": "demo-host.irpkg",
+      "report": "build/generated/demo-host.report.md",
+      "targets": [
+        {
+          "source": "examples/HostInterop.lean",
+          "roots": ["HostInterop.titleHandshake"]
+        },
+        {
+          "source": "examples/Tamagotchi.lean",
+          "roots": [
+            "Tamagotchi.uiReset",
+            "Tamagotchi.uiResetFromDom",
+            "Tamagotchi.uiResetEvent",
+            "Tamagotchi.uiMountFromDom",
+            "Tamagotchi.uiRenameFromDom",
+            "Tamagotchi.uiRenameEvent",
+            "Tamagotchi.uiStep",
+            "Tamagotchi.uiStepFromDom",
+            "Tamagotchi.uiStepEvent"
+          ]
+        }
+      ],
+      "fixtureSources": []
+    },
+    {
+      "id": "fixtures-lean",
+      "file": "fixtures-lean.irpkg",
+      "report": "build/generated/fixtures-lean.report.md",
+      "targets": [],
+      "fixtureSources": [
+        "fixtures/ExprPrinter.lean",
+        "fixtures/LeanParser.lean",
+        "fixtures/LeanParserHeader.lean",
+        "fixtures/Task.lean"
+      ]
+    },
+    {
+      "id": "fixtures-boundary",
+      "file": "fixtures-boundary.irpkg",
+      "report": "build/generated/fixtures-boundary.report.md",
+      "targets": [],
+      "fixtureSources": ["fixtures/Boundary.lean"]
+    }
+  ]
+}

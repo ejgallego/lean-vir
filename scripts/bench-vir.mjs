@@ -61,7 +61,7 @@ function parseHostIrSamples(stdout, label) {
 
 async function instantiateWasm() {
   const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
-  const irPackage = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
+  const irPackage = await readFile(new URL("../web/public/fixtures-basic.irpkg", import.meta.url));
   return createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
 }
 

@@ -19,9 +19,6 @@ Author: Emilio J. Gallego Arias
             <h1>IR Interpreter Demo</h1>
             <nav class="topbar-links" aria-label="Demo pages">
               <a href="dev.html">Package Runner</a>
-              <a href="dev.html?package=local-fib.irpkg&amp;entry=fib">
-                Fib Package
-              </a>
             </nav>
           </div>
           <div class="runtime-summary" aria-label="Runtime summary">
@@ -57,20 +54,26 @@ Author: Emilio J. Gallego Arias
           </div>
         </header>
 
-        <section class="pet-demo" aria-label="Tamagotchi automaton demo">
+        <section class="pet-demo" aria-label="Lean DOM Tamagotchi demo">
           <div class="pet-state-card">
             <div class="pet-card-heading">
               <div>
                 <p class="eyebrow">Interactive demo</p>
-                <h2>Tamagotchi.step</h2>
+                <h2>Lean DOM Tamagotchi</h2>
               </div>
-              <label class="art-switch" for="pet-art-toggle">
-                <input id="pet-art-toggle" type="checkbox" checked />
-                <span class="art-switch-track" aria-hidden="true">
-                  <span class="art-switch-thumb"></span>
-                </span>
-                <span>Octopus</span>
-              </label>
+              <div class="pet-heading-controls">
+                <label class="pet-name-field" for="pet-name-input">
+                  <span>Name</span>
+                  <input id="pet-name-input" type="text" value="Octi" maxlength="18" autocomplete="off" />
+                </label>
+                <label class="art-switch" for="pet-art-toggle">
+                  <input id="pet-art-toggle" type="checkbox" checked />
+                  <span class="art-switch-track" aria-hidden="true">
+                    <span class="art-switch-thumb"></span>
+                  </span>
+                  <span>Octopus</span>
+                </label>
+              </div>
             </div>
             <div class="pet-state">
               <div
@@ -107,6 +110,20 @@ Author: Emilio J. Gallego Arias
             </div>
           </div>
           <div class="pet-action-card">
+            <section class="pet-stats-band" aria-label="Pet state summary">
+              <div>
+                <span>name</span>
+                <strong id="pet-name-display">Octi</strong>
+              </div>
+              <div>
+                <span>care</span>
+                <strong id="pet-care-display">3/5</strong>
+              </div>
+              <div>
+                <span>turns</span>
+                <strong id="pet-turn-display">0</strong>
+              </div>
+            </section>
             <div class="action-grid">
               <button type="button" data-action="feed">Feed</button>
               <button type="button" data-action="play">Play</button>
@@ -124,38 +141,50 @@ Author: Emilio J. Gallego Arias
                 <span>trace</span>
                 <strong id="pet-trace-display">happy</strong>
               </div>
+              <div>
+                <span>summary</span>
+                <strong id="pet-summary-display">Octi is happy</strong>
+              </div>
             </section>
           </div>
         </section>
 
-        <section class="pipeline-panel" aria-labelledby="pipeline-title">
-          <div class="section-heading">
+        <section class="package-panel" aria-labelledby="package-title">
+          <div class="section-heading package-heading">
             <div>
-              <p class="eyebrow">Generated interface</p>
-              <h2 id="pipeline-title">Local package runners</h2>
+              <p class="eyebrow">Focused packages</p>
+              <h2 id="package-title">Browser package set</h2>
             </div>
+            <a class="section-link" href="dev.html">Open runner</a>
           </div>
-          <div class="pipeline-grid">
+          <div class="package-list">
             <a
-              class="pipeline-item"
-              href="dev.html?package=local-fib.irpkg&amp;entry=fib"
+              class="package-item"
+              href="dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump"
             >
-              <strong>fib</strong>
-              <span>Nat -&gt; Nat</span>
-              <small>local-fib.irpkg</small>
+              <strong>fixtures-basic.irpkg</strong>
+              <span>Basic, list/option, interface shapes</span>
             </a>
             <a
-              class="pipeline-item"
-              href="dev.html?package=local-mergesort.irpkg&amp;entry=SortDemo_demoFromArray"
+              class="package-item"
+              href="dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake"
             >
-              <strong>mergesort</strong>
-              <span>Array Nat -&gt; Nat</span>
-              <small>local-mergesort.irpkg</small>
+              <strong>demo-host.irpkg</strong>
+              <span>Browser host calls and DOM Tamagotchi</span>
             </a>
-            <a class="pipeline-item" href="dev.html?package=vir-demo.irpkg&amp;entry=SortDemo_demoFromArray">
-              <strong>demo bundle</strong>
-              <span>fixture package</span>
-              <small>vir-demo.irpkg</small>
+            <a
+              class="package-item"
+              href="dev.html?package=fixtures-lean.irpkg&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore"
+            >
+              <strong>fixtures-lean.irpkg</strong>
+              <span>Lean Expr, parser, Task</span>
+            </a>
+            <a
+              class="package-item"
+              href="dev.html?package=fixtures-boundary.irpkg&amp;entry=Vir_Fixtures_Boundary_floatScaleScore"
+            >
+              <strong>fixtures-boundary.irpkg</strong>
+              <span>Numeric and runtime boundaries</span>
             </a>
           </div>
         </section>
@@ -176,7 +205,7 @@ Author: Emilio J. Gallego Arias
                 <strong id="fixture-file-count">...</strong>
               </div>
               <div>
-                <span>result type</span>
+                <span>result types</span>
                 <strong id="fixture-result-type">Nat</strong>
               </div>
             </div>
@@ -188,6 +217,7 @@ Author: Emilio J. Gallego Arias
               <button type="button" data-fixture-filter="fixtures/Basic.lean">Basic</button>
               <button type="button" data-fixture-filter="fixtures/InterfaceShapes.lean">Interfaces</button>
               <button type="button" data-fixture-filter="fixtures/ListOption.lean">List/Option</button>
+              <button type="button" data-fixture-filter="fixtures/ExprPrinter.lean">Lean</button>
               <button type="button" data-fixture-filter="fixtures/Boundary.lean">Boundary</button>
             </div>
             <button id="fixture-run-visible" class="fixture-run-visible" type="button" disabled>

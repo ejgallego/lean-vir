@@ -10,13 +10,17 @@ through the upstream interpreter and a small JavaScript runtime wrapper.
 The demo builds Lean `v4.30.0-rc2`'s upstream
 `src/library/ir_interpreter.cpp` to `wasm32-wasip1`, links the required Lean
 runtime subset, and serves generated artifacts:
-`web/public/vir-upstream.wasm` plus the demo IR package
-`web/public/vir-demo.irpkg`.
+`web/public/vir-upstream.wasm` plus focused `.irpkg` files such as
+`web/public/fixtures-basic.irpkg` and `web/public/demo-host.irpkg`.
 
 ## Browser Demo
 
-The browser page keeps `Tamagotchi.step` as the main interactive demo, driven
-one action at a time through the upstream interpreter.
+The browser page keeps Tamagotchi as the main interactive demo. Lean registers
+the pet controls with `Lean.Vir.Browser.Element.addEventListener`; the browser
+host binding installs the DOM listeners and calls exported Lean event
+entrypoints. Each reset/action reads the current pet state from DOM attributes
+and input properties, computes the next state, and renders the UI through
+`Lean.Vir.Browser` host imports.
 
 The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
 `examples/MergeSort.lean`.
@@ -24,17 +28,20 @@ The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
 The page also includes a fixture browser for the demo entries plus
 `fixtures/manifest.json`. Each entry can show its Lean source file and run
 through a fresh WASM interpreter instance backed by the same generated IR
-package. Input-capable entries, currently `fib` and `SortDemo.demoFromArray`,
-render an input control in the fixture source panel.
+package. Input-capable entries, currently `fib`, `SortDemo.demoFromArray`, and
+`HostInterop.titleHandshake`, render an input control in the fixture source
+panel. `HostInterop.titleHandshake` demonstrates Lean `IO` calling a browser
+JavaScript binding by setting and reading `document.title`.
 
 The package manifest also drives the local `/dev.html` runner. Supported
-browser-call types include primitive scalars, recursive list/array/option/product
-and `Sum`/`Except` shapes over supported element types, non-indexed
-user-defined structures including parameterized instances such as `Box Nat`,
-direct scalar fields, single-field wrappers over direct scalar fields,
-inherited parent fields flattened as JavaScript object keys, nullary inductive
-enums such as the Tamagotchi state/action types, and structural `Lean.Expr`
-values.
+browser-call types include `Unit`, primitive scalars, recursive
+list/array/option/product and `Sum`/`Except` shapes over supported element
+types, non-indexed user-defined structures including parameterized instances
+such as `Box Nat`, direct scalar fields, single-field wrappers over direct
+scalar fields, inherited parent fields flattened as JavaScript object keys,
+nullary inductive enums such as the Tamagotchi state/action types, and
+structural `Lean.Expr` values. Manifest entries can also record synchronous
+JavaScript host imports called by Lean declarations.
 Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them use the
 generated Lean `_boxed` declarations automatically; package generation fails
 loudly if a requested export needs one and it is missing.
@@ -66,8 +73,13 @@ npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
 ```
 
 The command prints the package path, report path, package format, Lean
-toolchain, declaration count, interface exports, source targets, and resolved
-roots. The same metadata is embedded in the package manifest.
+toolchain, declaration count, interface exports, JavaScript host imports, source
+targets, and resolved roots. The same metadata is embedded in the package
+manifest.
+
+Local package generation first builds the small project-owned Lean library under
+`build/lean-lib`, so test sources can import `Lean.Vir.Common`,
+`Lean.Vir.Browser`, or `Lean.Vir.Host`.
 
 Inspect a package without starting the browser:
 
@@ -82,8 +94,10 @@ the embedded interface manifest, show the loaded package metadata, and generate
 runnable controls automatically.
 
 The browser-facing runtime wrapper is exported from `web/src/vir-runtime.js` and
-documented in `docs/JS_API.md`. A minimal page that imports the wrapper directly
-is available at `/runtime-example.html` when running `npm run dev`.
+documented in `docs/JS_API.md`. Node smoke tests that need document calls use
+`web/src/vir-runtime-node.js`, which composes the same runtime with virtual
+document host bindings. A minimal page that imports the browser wrapper
+directly is available at `/runtime-example.html` when running `npm run dev`.
 
 For the config-driven path that writes a manifest-bearing package:
 
@@ -121,6 +135,8 @@ and deploys the static site artifact.
 
 - `wasm/upstream_shim/` supplies the current WASI boundary for Lean's real
   upstream interpreter.
+- `Lean/Vir/` supplies the Lean-side JavaScript host import attribute and the
+  first small common/browser import modules.
 - `tools/GeneratePackage.lean` elaborates the demo and fixture Lean sources,
   walks the typed `Lean.IR.Decl` closure, and emits
   `build/generated/vir-demo.irpkg`.
@@ -129,6 +145,10 @@ and deploys the static site artifact.
 - `docs/LOCAL_IRPKG.md` documents the focused `.lean` to `.irpkg` workflow and
   `/dev.html` package runner.
 - `docs/JS_API.md` documents the browser-facing JavaScript runtime wrapper.
+- `docs/LEAN_VIR_LIBRARY.md` documents the Lean-side `Lean.Vir.*` host import
+  library.
+- `docs/EVENT_CALLBACK_ROADMAP.md` records the v2 plan for DOM event callbacks
+  and opaque event resources.
 - `docs/INTERFACE_PIPELINE.md` documents the config-driven package plus
   embedded interface pipeline and the current WIT direction.
 - `docs/FIXTURE_COVERAGE.md` records the current fixture and boundary coverage
@@ -136,6 +156,8 @@ and deploys the static site artifact.
 - `scripts/build-upstream-probe.sh` compiles and links the upstream
   interpreter, writes `build/upstream-probe/boundary.md`, and copies the strict
   artifact to `web/public/vir-upstream.wasm`.
+- `scripts/build-lean-lib.sh` compiles the local `Lean.Vir` modules to
+  `build/lean-lib` for package generation.
 - `scripts/lean-to-irpkg.sh` generates a local `.irpkg` from a `.lean` file,
   either for explicit roots or public source definitions.
 - `scripts/prepare-irpkg.mjs` generates a configured package for `/dev.html`
@@ -184,6 +206,11 @@ agree on the explicit native extern surface.
 `npm test` runs this check before rebuilding the upstream smoke artifact and
 running the fixture suite.
 
+`@[vir_js "..."]` host imports are separate from the native extern registry.
+They are package-scoped declarations, appear in the embedded manifest, and are
+routed through the WASM `env.vir_js_call` import installed by
+`web/src/vir-runtime.js`.
+
 The build caches the upstream interpreter, Lean runtime, support, and shim
 objects under `build/upstream-probe/obj`. Updating the Lean examples regenerates
 the IR package asset, but does not recompile or relink `ir_interpreter.cpp`
@@ -193,6 +220,7 @@ unless the upstream source, compiler flags, runtime overlay, or shim changes.
 
 `npm run build:demo` writes:
 
+- `build/lean-lib/`
 - `build/upstream-probe/ir_interpreter.strict.wasm`
 - `build/upstream-probe/boundary.md`
 - `build/generated/vir-demo.irpkg`

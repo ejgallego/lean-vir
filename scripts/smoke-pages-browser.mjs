@@ -249,13 +249,128 @@ async function smokeLanding(cdp, origin) {
   await waitForReady(cdp);
   const state = await evaluate(cdp, `({
     packageName: document.querySelector("#package-name")?.textContent?.trim(),
-    links: Array.from(document.querySelectorAll(".pipeline-item")).map((link) => link.getAttribute("href")),
-    mood: document.querySelector("#pet-mood-display")?.textContent?.trim()
+    packageItems: Array.from(document.querySelectorAll(".package-item")).map((link) => ({
+      href: link.getAttribute("href"),
+      text: link.textContent.trim().replace(/\\s+/g, " "),
+    })),
+    name: document.querySelector("#pet-name-display")?.textContent?.trim(),
+    mood: document.querySelector("#pet-mood-display")?.textContent?.trim(),
+    care: document.querySelector("#pet-care-display")?.textContent?.trim(),
+    turns: document.querySelector("#pet-turn-display")?.textContent?.trim()
   })`);
-  assert.equal(state.packageName, "vir-demo.irpkg");
+  assert.equal(
+    state.packageName,
+    "fixtures-basic.irpkg, demo-host.irpkg, fixtures-lean.irpkg, fixtures-boundary.irpkg",
+  );
   assert.equal(state.mood, "happy");
-  assert.ok(state.links.includes("dev.html?package=local-fib.irpkg&entry=fib"));
-  assert.ok(state.links.includes("dev.html?package=local-mergesort.irpkg&entry=SortDemo_demoFromArray"));
+  assert.deepEqual(state.packageItems.map((item) => item.href), [
+    "dev.html?package=fixtures-basic.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump",
+    "dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake",
+    "dev.html?package=fixtures-lean.irpkg&entry=Vir_Fixtures_ExprPrinter_exprKindScore",
+    "dev.html?package=fixtures-boundary.irpkg&entry=Vir_Fixtures_Boundary_floatScaleScore",
+  ]);
+  assert.ok(state.packageItems[0].text.includes("Basic, list/option, interface shapes"));
+  assert.ok(state.packageItems[1].text.includes("Browser host calls and DOM Tamagotchi"));
+  assert.equal(state.name, "Octi");
+  assert.equal(state.care, "3/5");
+  assert.equal(state.turns, "0");
+
+  const stepped = await evaluate(cdp, `new Promise((resolve, reject) => {
+    document.querySelector("#pet-name-input").value = "Ada";
+    document.querySelector("#pet-name-input").dispatchEvent(new Event("change", { bubbles: true }));
+    document.querySelector("[data-action='ignore']").click();
+    const deadline = Date.now() + 5000;
+    const poll = () => {
+      const state = {
+        name: document.querySelector("#pet-name-display")?.textContent?.trim(),
+        mood: document.querySelector("#pet-mood-display")?.textContent?.trim(),
+        action: document.querySelector("#pet-action-display")?.textContent?.trim(),
+        trace: document.querySelector("#pet-trace-display")?.textContent?.trim(),
+        care: document.querySelector("#pet-care-display")?.textContent?.trim(),
+        turns: document.querySelector("#pet-turn-display")?.textContent?.trim(),
+        summary: document.querySelector("#pet-summary-display")?.textContent?.trim(),
+        deviceName: document.querySelector("#pet-device")?.dataset.name,
+        deviceMood: document.querySelector("#pet-device")?.dataset.mood,
+        deviceTrace: document.querySelector("#pet-device")?.dataset.trace,
+        deviceTurns: document.querySelector("#pet-device")?.dataset.turns,
+        deviceCare: document.querySelector("#pet-device")?.dataset.care,
+        status: document.querySelector("#status")?.textContent?.trim()
+      };
+      if (state.mood === "hungry") {
+        resolve(state);
+      } else if (Date.now() > deadline) {
+        reject(new Error("Lean Tamagotchi step did not update the page"));
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  })`);
+  assert.deepEqual(stepped, {
+    name: "Ada",
+    mood: "hungry",
+    action: "ignore",
+    trace: "happy -> hungry",
+    care: "2/5",
+    turns: "1",
+    summary: "Ada is hungry; last ignore; care 2/5; turn 1",
+    deviceName: "Ada",
+    deviceMood: "hungry",
+    deviceTrace: "happy,hungry",
+    deviceTurns: "1",
+    deviceCare: "2",
+    status: "Ready",
+  });
+}
+
+async function smokePackagePreset(cdp, origin) {
+  await navigate(cdp, `${origin}${basePath}dev.html`);
+  await waitForReady(cdp);
+  const state = await evaluate(cdp, `({
+    packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+    preset: document.querySelector("#dev-package-preset")?.value,
+    options: Array.from(document.querySelector("#dev-package-preset")?.options ?? []).map((option) => option.value)
+  })`);
+  assert.equal(state.packageName, "fixtures-basic.irpkg");
+  assert.equal(state.preset, "fixtures-basic.irpkg");
+  assert.deepEqual(state.options, [
+    "fixtures-basic.irpkg",
+    "demo-host.irpkg",
+    "fixtures-lean.irpkg",
+    "fixtures-boundary.irpkg",
+    "local-fib.irpkg",
+    "local-mergesort.irpkg",
+    "",
+  ]);
+
+  const switched = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const preset = document.querySelector("#dev-package-preset");
+    preset.value = "demo-host.irpkg";
+    preset.dispatchEvent(new Event("change", { bubbles: true }));
+    const deadline = Date.now() + 5000;
+    const poll = () => {
+      const state = {
+        status: document.querySelector("#status")?.textContent?.trim(),
+        packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+        packageUrl: document.querySelector("#dev-package-url")?.value,
+        entryCount: document.querySelector("#dev-entry-select")?.options.length,
+      };
+      if (state.status === "Ready" && state.packageName === "demo-host.irpkg") {
+        resolve(state);
+      } else if (Date.now() > deadline) {
+        reject(new Error("package preset did not load demo-host.irpkg"));
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  })`);
+  assert.deepEqual(switched, {
+    status: "Ready",
+    packageName: "demo-host.irpkg",
+    packageUrl: "demo-host.irpkg",
+    entryCount: 10,
+  });
 }
 
 async function smokeRunner(cdp, origin, url, expected) {
@@ -321,6 +436,10 @@ async function smokeRunner(cdp, origin, url, expected) {
     poll();
   })`);
   assert.equal(result, expected.result);
+  if (expected.documentTitle !== undefined) {
+    const title = await evaluate(cdp, "document.title");
+    assert.equal(title, expected.documentTitle);
+  }
 }
 
 async function smokeRunnerFailure(cdp, origin, url, expected) {
@@ -461,7 +580,11 @@ try {
   await cdp.send("Runtime.enable");
 
   await smokeLanding(cdp, server.origin);
-  await smokeManifestDrivenEntryList(cdp, server.origin, "vir-demo.irpkg");
+  await smokePackagePreset(cdp, server.origin);
+  await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-basic.irpkg");
+  await smokeManifestDrivenEntryList(cdp, server.origin, "demo-host.irpkg");
+  await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-lean.irpkg");
+  await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-boundary.irpkg");
   const runnerCases = [
     await runnerCaseFromManifest("local-fib.irpkg", "fib", {
       entryCount: 1,
@@ -475,24 +598,42 @@ try {
       runInput: "[4, 1, 3, 2]",
       result: "30",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Tamagotchi.step", {
-      inputs: ["happy", "feed"],
-      inputTags: ["SELECT", "SELECT"],
-      runInputs: ["happy", "ignore"],
-      result: "hungry",
+    await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.titleHandshake", {
+      input: "",
+      runInput: "pages smoke",
+      result: "Lean VIR host: pages smoke",
+      documentTitle: "Lean VIR host: pages smoke",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ExprPrinter.exprKindScore", {
+    await runnerCaseFromManifest("demo-host.irpkg", "Tamagotchi.uiStep", {
+      inputTags: ["TEXTAREA", "SELECT"],
+      runInputs: [
+        `{"name":"Mochi","mood":"happy","trace":["happy"],"artwork":"pet","turns":0,"care":3}`,
+        "ignore",
+      ],
+      result: `{
+  "name": "Mochi",
+  "mood": "hungry",
+  "trace": [
+    "happy",
+    "hungry"
+  ],
+  "artwork": "pet",
+  "turns": "1",
+  "care": "2"
+}`,
+    }),
+    await runnerCaseFromManifest("fixtures-lean.irpkg", "Vir.Fixtures.ExprPrinter.exprKindScore", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"kind":"bvar","index":4}`],
       result: "5",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", {
       input: "[]",
       inputTags: ["TEXTAREA"],
       runInputs: [`["a","bc"]`],
       result: "3",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ListOption.classifySum", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.ListOption.classifySum", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["4"],
@@ -501,37 +642,37 @@ try {
   "value": "4"
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ListOption.sumScore", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.ListOption.sumScore", {
       input: `{"kind":"inl","value":0}`,
       inputTags: ["TEXTAREA"],
       runInputs: [`{"kind":"inr","value":7}`],
       result: "70",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint32Bump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.uint32Bump", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["41"],
       result: "42",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint64Bump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.uint64Bump", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["18446744073709551615"],
       result: "0",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.floatScale", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.floatScale", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["1.5"],
       result: "6",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.float32Roundtrip", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.float32Roundtrip", {
       input: "0",
       inputTags: ["INPUT"],
       runInputs: ["1.25"],
       result: "1.25",
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.profileStatsBump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.profileStatsBump", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"enabled":true,"level":2,"score16":30,"visits":400,"quota":5,"checksum":6000,"tier":"pro","note":"ok"}`],
       result: `{
@@ -545,14 +686,14 @@ try {
   "note": "ok!"
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.boxNatBump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.boxNatBump", {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"value":41}`],
       result: `{
   "value": "42"
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
       input: `{"value":0}`,
       inputTags: ["TEXTAREA"],
       runInputs: [`{"value":41}`],
@@ -560,7 +701,7 @@ try {
   "value": 42
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
       input: `{"value":0}`,
       inputTags: ["TEXTAREA"],
       runInputs: [`{"value":41}`],
@@ -568,7 +709,7 @@ try {
   "value": 42
 }`,
     }),
-    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.extendedProfileBump", {
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.extendedProfileBump", {
       input: `{"nickname":"","active":false,"visits":0,"score":0,"tags":[]}`,
       inputTags: ["TEXTAREA"],
       runInputs: [`{"nickname":"lean","active":true,"visits":5,"score":7,"tags":["ir"]}`],
@@ -582,6 +723,9 @@ try {
     "extended"
   ]
 }`,
+    }),
+    await runnerCaseFromManifest("fixtures-boundary.irpkg", "Vir.Fixtures.Boundary.floatScaleScore", {
+      result: "6",
     }),
   ];
 
@@ -611,7 +755,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, manifest-driven entry list, local runners, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
+  console.log("pages browser smoke ok: landing, package presets, manifest-driven entry list, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

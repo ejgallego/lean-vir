@@ -23,9 +23,23 @@ const roots = Array.isArray(config.roots) ? config.roots : [];
 const includeAll = config.includeAll === true || roots.length === 0;
 
 const targetArgs = includeAll ? ["--target-all", source] : ["--target", source, ...roots];
+const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if ((libResult.status ?? 1) !== 0) {
+  console.error("error: Lean.Vir library build failed");
+  process.exit(libResult.status ?? 1);
+}
+
 const result = spawnSync("lean", ["--run", "tools/GeneratePackage.lean", packagePath, reportPath, ...targetArgs], {
   cwd: root,
   stdio: "inherit",
+  env: {
+    ...process.env,
+    LEAN_PATH: leanPathWithVirLib(process.env.LEAN_PATH),
+  },
 });
 
 if ((result.status ?? 1) !== 0) {
@@ -59,4 +73,8 @@ function reportPathFor(packagePath) {
   return packagePath.endsWith(".irpkg")
     ? `${packagePath.slice(0, -".irpkg".length)}.report.md`
     : `${packagePath}.report.md`;
+}
+
+function leanPathWithVirLib(existing) {
+  return existing ? `build/lean-lib:${existing}` : "build/lean-lib";
 }
