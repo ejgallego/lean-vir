@@ -21,8 +21,6 @@ import fixtureManifest from "../../fixtures/manifest.json";
 import browserPackages from "../../fixtures/browser-packages.json";
 
 const statusEl = document.querySelector("#status");
-const petNameInput = document.querySelector("#pet-name-input");
-const petArtToggle = document.querySelector("#pet-art-toggle");
 const petMoodDisplay = document.querySelector("#pet-mood-display");
 const wasmTarget = document.querySelector("#wasm-target");
 const linkStatus = document.querySelector("#link-status");
@@ -170,19 +168,9 @@ const fixtureInputs = new Map(
 );
 const packageBytesPromises = new Map();
 const runtimePromises = new Map();
-const petBindingDisposers = [];
 let hostRuntime = null;
 let currentFixtureFilter = "all";
 let selectedFixtureId = null;
-
-function applyPetState(state) {
-  if (typeof state?.name === "string" && document.activeElement !== petNameInput) {
-    petNameInput.value = state.name;
-  }
-  if (typeof state?.artwork === "string") {
-    petArtToggle.checked = state.artwork === "octopus";
-  }
-}
 
 function packageBytes(packageFile) {
   if (!packageBytesPromises.has(packageFile)) {
@@ -222,46 +210,9 @@ function setTrap(error) {
   console.error(error);
 }
 
-function invokePetBinding(runtime, binding) {
-  try {
-    const args = binding.argument == null ? [] : [binding.argument];
-    applyPetState(runtime.call(binding.entry, ...args));
-    setReady();
-  } catch (error) {
-    petMoodDisplay.textContent = "error";
-    setTrap(error);
-  }
-}
-
-function clearPetBindings() {
-  for (const dispose of petBindingDisposers.splice(0)) {
-    dispose();
-  }
-}
-
 function mountPet(runtime) {
   try {
-    const bindings = runtime.call("Tamagotchi.uiMountFromDom");
-    if (!Array.isArray(bindings)) {
-      throw new Error("Tamagotchi.uiMountFromDom must return an array of bindings");
-    }
-    clearPetBindings();
-    for (const binding of bindings) {
-      if (
-        typeof binding?.selector !== "string" ||
-        typeof binding?.event !== "string" ||
-        typeof binding?.entry !== "string"
-      ) {
-        throw new Error(`invalid Tamagotchi UI binding: ${JSON.stringify(binding)}`);
-      }
-      const element = document.querySelector(binding.selector);
-      if (element === null) {
-        throw new Error(`Tamagotchi UI binding selector not found: ${binding.selector}`);
-      }
-      const listener = () => invokePetBinding(runtime, binding);
-      element.addEventListener(binding.event, listener);
-      petBindingDisposers.push(() => element.removeEventListener(binding.event, listener));
-    }
+    runtime.call("Tamagotchi.uiMountFromDom");
     setReady();
   } catch (error) {
     petMoodDisplay.textContent = "error";

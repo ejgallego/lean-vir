@@ -107,6 +107,9 @@ structure UiBinding where
 def defaultName : String :=
   "Mochi"
 
+def defaultOctopusName : String :=
+  "Octi"
+
 def maxCare : Nat :=
   5
 
@@ -114,29 +117,40 @@ def initialCare : Nat :=
   3
 
 def stepEntry : String :=
-  "Tamagotchi.uiStepFromDom"
+  "Tamagotchi.uiStepEvent"
 
 def resetEntry : String :=
-  "Tamagotchi.uiResetFromDom"
+  "Tamagotchi.uiResetEvent"
 
 def renameEntry : String :=
-  "Tamagotchi.uiRenameFromDom"
-
-def normalizeName (name : String) : String :=
-  if name == "" then defaultName else name
+  "Tamagotchi.uiRenameEvent"
 
 def normalizeArtwork (artwork : String) : String :=
   if artwork == "octopus" then "octopus" else "pet"
+
+def defaultNameForArtwork (artwork : String) : String :=
+  if normalizeArtwork artwork == "octopus" then defaultOctopusName else defaultName
+
+def normalizeNameForArtwork (artwork name : String) : String :=
+  if name == "" then defaultNameForArtwork artwork else name
+
+def nameForArtworkChange (previousArtwork artwork name : String) : String :=
+  let previousDefault := defaultNameForArtwork previousArtwork
+  if name == "" || name == previousDefault then
+    defaultNameForArtwork artwork
+  else
+    name
 
 def clampCare (care : Nat) : Nat :=
   if care > maxCare then maxCare else care
 
 def initialState (name artwork : String) : PetState :=
+  let artwork := normalizeArtwork artwork
   {
-    name := normalizeName name,
+    name := normalizeNameForArtwork artwork name,
     mood := happy,
     trace := [happy],
-    artwork := normalizeArtwork artwork,
+    artwork := artwork,
     turns := 0,
     care := initialCare
   }
@@ -256,10 +270,11 @@ def setValue (selector value : String) : IO Unit := do
       | some input => Lean.Vir.Browser.HTMLInputElement.setValue input value
 
 def render (state : PetState) (actionLabel : String) : IO Unit := do
+  let artwork := normalizeArtwork state.artwork
   let state := {
     state with
-    name := normalizeName state.name,
-    artwork := normalizeArtwork state.artwork,
+    name := normalizeNameForArtwork artwork state.name,
+    artwork := artwork,
     care := clampCare state.care
   }
   let moodLabel := state.mood.label
@@ -289,14 +304,15 @@ def stateFromDom : IO PetState := do
   let careAttr ← getAttribute "#pet-device" "data-care"
   let name ← getValue "#pet-name-input"
   let checked ← getChecked "#pet-art-toggle"
+  let artwork := artworkFromChecked checked
   let current := currentAttr.bind Mood.fromString? |>.getD happy
   let trace := traceAttrValue.map traceFromAttr |>.getD [current]
   let trace := if trace.isEmpty then [current] else trace
   pure {
-    name := normalizeName name,
+    name := normalizeNameForArtwork artwork name,
     mood := current,
     trace := trace,
-    artwork := artworkFromChecked checked,
+    artwork := artwork,
     turns := natFromAttr turnsAttr (trace.length - 1),
     care := clampCare (natFromAttr careAttr initialCare)
   }
@@ -309,16 +325,19 @@ def uiReset (name artwork : String) : IO PetState := do
 def uiResetFromDom : IO PetState := do
   let name ← getValue "#pet-name-input"
   let checked ← getChecked "#pet-art-toggle"
-  uiReset name (artworkFromChecked checked)
+  let artwork := artworkFromChecked checked
+  let previousArtwork ← getAttribute "#pet-device" "data-art"
+  uiReset (nameForArtworkChange (previousArtwork.getD artwork) artwork name) artwork
 
 @[inline] def nextState (state : PetState) (action : Action) : PetState :=
+  let artwork := normalizeArtwork state.artwork
   let mood := step state.mood action
   {
     state with
-    name := normalizeName state.name,
+    name := normalizeNameForArtwork artwork state.name,
     mood := mood,
     trace := snoc state.trace mood,
-    artwork := normalizeArtwork state.artwork,
+    artwork := artwork,
     turns := state.turns + 1,
     care := careAfter state.care mood action
   }
@@ -339,8 +358,27 @@ def uiRenameFromDom : IO PetState := do
   render current "rename"
   pure current
 
+def uiStepEvent (_event : Lean.Vir.Browser.Event) (action : Action) : IO PetState :=
+  uiStepFromDom action
+
+def uiResetEvent (_event : Lean.Vir.Browser.Event) : IO PetState :=
+  uiResetFromDom
+
+def uiRenameEvent (_event : Lean.Vir.Browser.Event) : IO PetState :=
+  uiRenameFromDom
+
+def mountBinding (binding : UiBinding) : IO Unit := do
+  match ← Lean.Vir.Browser.Document.querySelector binding.selector with
+  | none => pure ()
+  | some element =>
+      let _listener ← Lean.Vir.Browser.Element.addEventListener
+        element binding.event binding.entry binding.argument
+      pure ()
+
 def uiMountFromDom : IO (Array UiBinding) := do
   let _ ← uiResetFromDom
+  for binding in uiBindings do
+    mountBinding binding
   pure uiBindings
 
 #eval trace happy demoScript

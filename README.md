@@ -15,11 +15,12 @@ runtime subset, and serves generated artifacts:
 
 ## Browser Demo
 
-The browser page keeps Tamagotchi as the main interactive demo. Lean returns the
-UI event binding plan for the pet controls, and the browser runner installs
-those bindings. Each reset/action calls Lean entrypoints that read the current
-pet state from DOM attributes and input properties, compute the next state, and
-render the UI through `Lean.Vir.Browser` host imports.
+The browser page keeps Tamagotchi as the main interactive demo. Lean registers
+the pet controls with `Lean.Vir.Browser.Element.addEventListener`; the browser
+host binding installs the DOM listeners and calls exported Lean event
+entrypoints. Each reset/action reads the current pet state from DOM attributes
+and input properties, computes the next state, and renders the UI through
+`Lean.Vir.Browser` host imports.
 
 The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
 `examples/MergeSort.lean`.
@@ -146,6 +147,8 @@ and deploys the static site artifact.
 - `docs/JS_API.md` documents the browser-facing JavaScript runtime wrapper.
 - `docs/LEAN_VIR_LIBRARY.md` documents the Lean-side `Lean.Vir.*` host import
   library.
+- `docs/EVENT_CALLBACK_ROADMAP.md` records the v2 plan for DOM event callbacks
+  and opaque event resources.
 - `docs/INTERFACE_PIPELINE.md` documents the config-driven package plus
   embedded interface pipeline and the current WIT direction.
 - `docs/FIXTURE_COVERAGE.md` records the current fixture and boundary coverage

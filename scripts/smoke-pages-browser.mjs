@@ -271,7 +271,7 @@ async function smokeLanding(cdp, origin) {
   ]);
   assert.ok(state.packageItems[0].text.includes("Basic, list/option, interface shapes"));
   assert.ok(state.packageItems[1].text.includes("Browser host calls and DOM Tamagotchi"));
-  assert.equal(state.name, "Mochi");
+  assert.equal(state.name, "Octi");
   assert.equal(state.care, "3/5");
   assert.equal(state.turns, "0");
 
@@ -369,7 +369,7 @@ async function smokePackagePreset(cdp, origin) {
     status: "Ready",
     packageName: "demo-host.irpkg",
     packageUrl: "demo-host.irpkg",
-    entryCount: 7,
+    entryCount: 10,
   });
 }
 

@@ -71,7 +71,7 @@ export class VirRuntimeFactory {
     fetchBytes: loadBytes = fetchBytes,
     imports = null,
     hostBindings = null,
-    defaultHostBindings = createBrowserHostBindings(),
+    defaultHostBindings = null,
   } = {}) {
     this.wasmBytes = wasmBytes;
     this.wasmModule = wasmModule;
@@ -98,9 +98,14 @@ export class VirRuntimeFactory {
 
   async instantiate() {
     const module = await this.module();
+    const runtimeRef = { runtime: null };
+    const defaultHostBindings =
+      typeof this.defaultHostBindings === "function"
+        ? this.defaultHostBindings(runtimeRef)
+        : (this.defaultHostBindings ?? createBrowserHostBindings({ runtimeRef }));
     const hostState = new VirHostState({
       hostBindings: this.hostBindings,
-      defaultHostBindings: this.defaultHostBindings,
+      defaultHostBindings,
     });
     const imports =
       typeof this.imports === "function"
@@ -109,7 +114,9 @@ export class VirRuntimeFactory {
     const instance = await WebAssembly.instantiate(module, imports);
     hostState.attach(instance.exports);
     instance.exports.__wasm_call_ctors?.();
-    return new VirRuntime(instance.exports, { module, hostState });
+    const runtime = new VirRuntime(instance.exports, { module, hostState });
+    runtimeRef.runtime = runtime;
+    return runtime;
   }
 
   async createRuntime({ irPackageBytes = null, irPackageUrl = null } = {}) {

@@ -180,8 +180,8 @@ if (genericByteArrayScore !== "136") {
 }
 
 const hostRuntime = await createVirRuntime({ wasmBytes: wasm, irPackageBytes: hostPackage });
-if (hostRuntime.packageInfo.hostImports !== 11) {
-  throw new Error(`expected 11 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+if (hostRuntime.packageInfo.hostImports !== 12) {
+  throw new Error(`expected 12 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
 }
 const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
 if (hostTitle !== "Lean VIR host: smoke") {
@@ -191,10 +191,10 @@ const petBindings = hostRuntime.call("Tamagotchi.uiMountFromDom");
 if (
   petBindings.length !== 8 ||
   petBindings[0]?.selector !== "[data-action='feed']" ||
-  petBindings[0]?.entry !== "Tamagotchi.uiStepFromDom" ||
+  petBindings[0]?.entry !== "Tamagotchi.uiStepEvent" ||
   petBindings[0]?.argument !== "feed" ||
   petBindings[7]?.selector !== "#pet-name-input" ||
-  petBindings[7]?.entry !== "Tamagotchi.uiRenameFromDom"
+  petBindings[7]?.entry !== "Tamagotchi.uiRenameEvent"
 ) {
   throw new Error(`Lean Tamagotchi mount bindings failed: ${JSON.stringify(petBindings)}`);
 }
@@ -212,14 +212,17 @@ if (
 const petDomReset = hostRuntime.call("Tamagotchi.uiResetFromDom");
 const petDomRename = hostRuntime.call("Tamagotchi.uiRenameFromDom");
 const petDomStep = hostRuntime.call("Tamagotchi.uiStepFromDom", "ignore");
+const petDomEventStep = hostRuntime.call("Tamagotchi.uiStepEvent", { handle: 1 }, "ignore");
 if (
   petDomReset.name !== "Mochi" ||
   petDomRename.name !== "Mochi" ||
   petDomReset.mood !== "happy" ||
   petDomStep.mood !== "hungry" ||
-  petDomStep.trace.join(" -> ") !== "happy -> hungry"
+  petDomStep.trace.join(" -> ") !== "happy -> hungry" ||
+  petDomEventStep.mood !== "angry" ||
+  petDomEventStep.trace.join(" -> ") !== "happy -> hungry -> angry"
 ) {
-  throw new Error(`Lean Tamagotchi DOM-driven step failed: ${JSON.stringify({ petDomReset, petDomRename, petDomStep })}`);
+  throw new Error(`Lean Tamagotchi DOM-driven step failed: ${JSON.stringify({ petDomReset, petDomRename, petDomStep, petDomEventStep })}`);
 }
 
 function packageForFixture(fixture) {

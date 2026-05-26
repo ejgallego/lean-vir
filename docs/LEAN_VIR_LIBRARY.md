@@ -62,6 +62,25 @@ const vir = await createVirRuntime({
 vir.call("titleHandshake", "browser handshake");
 ```
 
+Browser event listeners use the same default bindings. Lean registers the
+listener with `Element.addEventListener`; the host binding calls the exported
+Lean entrypoint named by the registration when the event fires.
+
+```lean
+import Lean.Vir.Browser
+
+def clicked (_event : Lean.Vir.Browser.Event) (action : String) : IO Unit := do
+  Lean.Vir.Browser.Console.log ("clicked " ++ action)
+
+def mountButton : IO Unit := do
+  match ← Lean.Vir.Browser.Document.querySelector "#run" with
+  | none => pure ()
+  | some button =>
+      let _listener ← Lean.Vir.Browser.Element.addEventListener
+        button "click" "clicked" (some "run")
+      pure ()
+```
+
 In Node tests or command-line tools, import the Node wrapper instead:
 
 ```js
@@ -137,6 +156,8 @@ Node-like environments:
 `Lean.Vir.Browser` provides the first browser-specific imports:
 
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
+- `Lean.Vir.Browser.Event`
+- `Lean.Vir.Browser.EventListener`
 - `Lean.Vir.Browser.Document.getTitle : IO String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.querySelector : @& String -> IO (Option Lean.Vir.Browser.Element)`
@@ -144,6 +165,8 @@ Node-like environments:
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
 - `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
 - `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Browser.Element -> @& String -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Browser.Element -> @& String -> @& String -> Option String -> IO Lean.Vir.Browser.EventListener`
+- `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Browser.EventListener -> IO Unit`
 - `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Browser.Element -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
 - `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Browser.HTMLInputElement -> IO Bool`
 - `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Browser.HTMLInputElement -> Bool -> IO Unit`
@@ -153,7 +176,9 @@ Node-like environments:
 The browser runtime bindings use standard browser APIs and require
 `globalThis.document` for document calls. In non-browser runtimes, use
 `lean-vir/vir-runtime-node` or pass explicit `hostBindings`; the Node wrapper
-keeps virtual document and element state for the built-in browser APIs.
+keeps virtual document and element state for the built-in browser APIs. Event
+listener imports are also virtualized: the Node wrapper records listeners on the
+virtual element state and can dispatch them in tests.
 
 External references:
 
@@ -163,6 +188,9 @@ External references:
 - [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
 - [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
 - [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
+- [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event)
+- [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
+- [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
 - [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
 - [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value)
 
@@ -208,6 +236,14 @@ const vir = await createVirRuntime({
 
 Bindings receive decoded JavaScript values and return a value matching the Lean
 result type. `Unit` results should return `undefined` or `null`.
+
+`Element.addEventListener` is a pragmatic v1 event API. It does not marshal Lean
+closures. The registered entrypoint name must be exported by the package, and it
+receives an opaque `Lean.Vir.Browser.Event` resource as the first argument. If
+the registration includes `some argument`, that string is passed as the second
+argument. Event resources are valid only during the callback. See
+`docs/EVENT_CALLBACK_ROADMAP.md` for the follow-up design work needed for
+closure callbacks, richer event accessors, and listener lifetime management.
 
 ## Current Surface
 

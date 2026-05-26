@@ -146,6 +146,8 @@ The first library surface is:
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
 - `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
 - `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Browser.Element -> @& String -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Browser.Element -> @& String -> @& String -> Option String -> IO Lean.Vir.Browser.EventListener`
+- `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Browser.EventListener -> IO Unit`
 - `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Browser.Element -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
 - `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Browser.HTMLInputElement -> IO Bool`
 - `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Browser.HTMLInputElement -> Bool -> IO Unit`
@@ -166,12 +168,16 @@ console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 
 `Lean.Vir.Browser.Console.log` maps to `console.log`, title calls map to
 `document.title`, `Document.querySelector` returns an opaque element resource,
-`Element` calls use DOM element properties/methods, and `HTMLInputElement`
-calls first narrow an element before reading or writing `checked` and `value`.
+`Element` calls use DOM element properties/methods, event listeners call back
+into exported Lean entrypoints with an opaque `Event` resource, and
+`HTMLInputElement` calls first narrow an element before reading or writing
+`checked` and `value`.
 The browser runtime requires `globalThis.document` for `browser.document.*`
 targets. In Node, use `lean-vir/vir-runtime-node` or pass explicit
 `hostBindings`; the Node wrapper provides virtual document and element state for
-these built-in browser targets. See MDN for the underlying browser APIs:
+these built-in browser targets. No extra `createVirRuntime` option is needed for
+the built-in `common.*` or `browser.*` imports. See MDN for the underlying
+browser APIs:
 
 - [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
 - [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
@@ -179,6 +185,9 @@ these built-in browser targets. See MDN for the underlying browser APIs:
 - [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
 - [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
 - [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
+- [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event)
+- [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
+- [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
 - [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
 - [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value)
 
@@ -216,6 +225,11 @@ factory options are treated as overrides on top of the generated import table.
 If you provide a custom `imports` function to `createVirRuntimeFactory`, call
 `createVirImports(module, overrides, hostState)` or otherwise install
 `env.vir_js_call` and `env.vir_js_call_result_size`.
+
+The v1 event listener binding is intentionally narrow: it registers an exported
+Lean entrypoint by name, passes an opaque event resource during the callback,
+and does not marshal Lean closures. The v2 work is tracked in
+`docs/EVENT_CALLBACK_ROADMAP.md`.
 
 ## Trust Boundary
 

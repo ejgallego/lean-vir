@@ -21,6 +21,27 @@ Reference: [MDN `Element`](https://developer.mozilla.org/en-US/docs/Web/API/Elem
 opaque Element : Type
 
 /--
+Opaque browser event handle.
+
+The v1 listener API passes event values to exported Lean entrypoints as private
+resources. The event resource is only valid for the duration of that listener
+callback.
+
+Reference: [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event).
+-/
+opaque Event : Type
+
+/--
+Opaque browser event listener registration handle.
+
+`Element.addEventListener` returns listener handles so Lean code can remove the
+registered listener later with `Element.removeEventListener`.
+
+Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
+-/
+opaque EventListener : Type
+
+/--
 Opaque browser `HTMLInputElement` handle.
 
 Use `HTMLInputElement.fromElement` to narrow an `Element` before reading or
@@ -129,6 +150,30 @@ Reference: [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs
 -/
 @[vir_js "browser.element.setAttribute"]
 opaque setAttribute (element : @& Element) (name value : @& String) : IO Unit
+
+/--
+Registers a browser event listener that calls an exported Lean entrypoint.
+
+This v1 API does not marshal Lean function values. Instead, the JavaScript host
+binding registers a DOM listener and, when the browser event fires, calls the
+export named by `entry`. The exported Lean entrypoint receives the opaque
+`Event` resource as its first argument. When `argument` is `some value`, the
+host passes `value` as the second argument.
+
+Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
+-/
+@[vir_js "browser.element.addEventListener"]
+opaque addEventListener
+    (element : @& Element) (event entry : @& String) (argument : Option String) :
+    IO EventListener
+
+/--
+Removes a listener previously registered by `Element.addEventListener`.
+
+Reference: [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener).
+-/
+@[vir_js "browser.element.removeEventListener"]
+opaque removeEventListener (listener : @& EventListener) : IO Unit
 
 end Element
 

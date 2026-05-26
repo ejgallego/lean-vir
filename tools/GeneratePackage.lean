@@ -1797,6 +1797,8 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `ByteArray => some .byteArray
   | some `Lean.Expr => some .expr
   | some `Lean.Vir.Browser.Element => some (.resource `Lean.Vir.Browser.Element "Element")
+  | some `Lean.Vir.Browser.Event => some (.resource `Lean.Vir.Browser.Event "Event")
+  | some `Lean.Vir.Browser.EventListener => some (.resource `Lean.Vir.Browser.EventListener "EventListener")
   | some `Lean.Vir.Browser.HTMLInputElement => some (.resource `Lean.Vir.Browser.HTMLInputElement "HTMLInputElement")
   | _ => none
 

@@ -44,10 +44,13 @@
           "roots": [
             "Tamagotchi.uiReset",
             "Tamagotchi.uiResetFromDom",
+            "Tamagotchi.uiResetEvent",
             "Tamagotchi.uiMountFromDom",
             "Tamagotchi.uiRenameFromDom",
+            "Tamagotchi.uiRenameEvent",
             "Tamagotchi.uiStep",
-            "Tamagotchi.uiStepFromDom"
+            "Tamagotchi.uiStepFromDom",
+            "Tamagotchi.uiStepEvent"
           ]
         }
       ],

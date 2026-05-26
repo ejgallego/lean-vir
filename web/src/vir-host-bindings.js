@@ -39,7 +39,7 @@ export function createBrowserDocumentHostBindings(state = createDomResourceState
   };
 }
 
-export function createBrowserElementHostBindings(state = createDomResourceState()) {
+export function createBrowserElementHostBindings(state = createDomResourceState(), { runtimeRef = null } = {}) {
   return {
     "browser.element.getTextContent": (element) => resolveResource(state, element, "Element").textContent ?? "",
     "browser.element.setTextContent": (element, text) => {
@@ -49,6 +49,20 @@ export function createBrowserElementHostBindings(state = createDomResourceState(
     "browser.element.getAttribute": (element, name) => resolveResource(state, element, "Element").getAttribute(name) ?? null,
     "browser.element.setAttribute": (element, name, value) => {
       resolveResource(state, element, "Element").setAttribute(name, value);
+      return undefined;
+    },
+    "browser.element.addEventListener": (element, eventName, entry, argument) => {
+      const target = resolveResource(state, element, "Element");
+      const handler = (event) => callRuntimeEventHandler(runtimeRef, state, event, entry, argument);
+      target.addEventListener(eventName, handler);
+      return resourceForValue(state, {
+        remove: () => target.removeEventListener(eventName, handler),
+      });
+    },
+    "browser.element.removeEventListener": (listener) => {
+      const value = resolveResource(state, listener, "EventListener");
+      value.remove();
+      releaseResource(state, listener);
       return undefined;
     },
   };
@@ -73,13 +87,13 @@ export function createBrowserHtmlInputElementHostBindings(state = createDomResou
   };
 }
 
-export function createBrowserHostBindings() {
+export function createBrowserHostBindings({ runtimeRef = null } = {}) {
   const state = createDomResourceState();
   return {
     ...createCommonHostBindings(),
     ...createConsoleHostBindings(),
     ...createBrowserDocumentHostBindings(state),
-    ...createBrowserElementHostBindings(state),
+    ...createBrowserElementHostBindings(state, { runtimeRef }),
     ...createBrowserHtmlInputElementHostBindings(state),
   };
 }
@@ -91,7 +105,10 @@ export function createVirtualDocumentState({ title = "", elements = new Map(), r
   return { title, elements, resources };
 }
 
-export function createVirtualDocumentHostBindings(state = createVirtualDocumentState()) {
+export function createVirtualDocumentHostBindings(
+  state = createVirtualDocumentState(),
+  { runtimeRef = null } = {},
+) {
   if (!(state?.elements instanceof Map)) {
     throw new Error("virtual document state must have an elements Map");
   }
@@ -114,6 +131,18 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       resolveResource(state.resources, element, "Element").attributes.set(name, value);
       return undefined;
     },
+    "browser.element.addEventListener": (element, eventName, entry, argument) => {
+      const target = resolveResource(state.resources, element, "Element");
+      const listener = virtualEventListenerState(target, eventName, entry, argument, runtimeRef, state.resources);
+      target.listeners.get(eventName).push(listener);
+      return resourceForValue(state.resources, listener);
+    },
+    "browser.element.removeEventListener": (listener) => {
+      const value = resolveResource(state.resources, listener, "EventListener");
+      value.remove();
+      releaseResource(state.resources, listener);
+      return undefined;
+    },
     "browser.htmlInputElement.fromElement": (element) =>
       resourceForValue(state.resources, resolveResource(state.resources, element, "Element")),
     "browser.htmlInputElement.getChecked": (input) =>
@@ -131,11 +160,11 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
   };
 }
 
-export function createNodeHostBindings(state = createVirtualDocumentState()) {
+export function createNodeHostBindings(state = createVirtualDocumentState(), { runtimeRef = null } = {}) {
   return {
     ...createCommonHostBindings(),
     ...createConsoleHostBindings(),
-    ...createVirtualDocumentHostBindings(state),
+    ...createVirtualDocumentHostBindings(state, { runtimeRef }),
   };
 }
 
@@ -163,6 +192,15 @@ function resourceForValue(state, value) {
   return { handle };
 }
 
+function releaseResource(state, resource) {
+  const handle = resourceHandle(resource, "Resource");
+  const value = state.values.get(handle);
+  if (value !== undefined) {
+    state.handles.delete(value);
+    state.values.delete(handle);
+  }
+}
+
 function resolveResource(state, resource, label) {
   const handle = resourceHandle(resource, label);
   const value = state.values.get(handle);
@@ -184,16 +222,68 @@ function isInputElement(value) {
   return typeof globalThis.HTMLInputElement === "function" && value instanceof globalThis.HTMLInputElement;
 }
 
+function callRuntimeEventHandler(runtimeRef, state, event, entry, argument) {
+  const runtime = runtimeRef?.runtime ?? null;
+  const eventResource = resourceForValue(state, event ?? {});
+  try {
+    if (runtime === null) {
+      throw new Error("browser.element.addEventListener requires an attached VirRuntime");
+    }
+    if (argument === null || argument === undefined) {
+      runtime.call(entry, eventResource);
+    } else {
+      runtime.call(entry, eventResource, argument);
+    }
+  } catch (error) {
+    reportEventHandlerError(error);
+  } finally {
+    if (eventResource !== null) {
+      releaseResource(state, eventResource);
+    }
+  }
+}
+
+function reportEventHandlerError(error) {
+  console.error(error);
+  const status = globalThis.document?.querySelector?.("#status") ?? null;
+  if (status !== null) {
+    status.textContent = "Trap";
+    status.dataset.ready = "false";
+  }
+}
+
 function virtualElementState(state, selector) {
   let element = state.elements.get(selector);
   if (element === undefined) {
-    element = { textContent: "", attributes: new Map(), checked: false, value: "" };
+    element = { textContent: "", attributes: new Map(), checked: false, value: "", listeners: new Map() };
     state.elements.set(selector, element);
   } else {
     element.textContent ??= "";
     element.attributes ??= new Map();
     element.checked ??= false;
     element.value ??= "";
+    element.listeners ??= new Map();
   }
   return element;
+}
+
+function virtualEventListenerState(target, eventName, entry, argument, runtimeRef, resources) {
+  if (!target.listeners.has(eventName)) {
+    target.listeners.set(eventName, []);
+  }
+  const listener = {
+    removed: false,
+    dispatch(event = {}) {
+      if (!listener.removed) {
+        callRuntimeEventHandler(runtimeRef, resources, event, entry, argument);
+      }
+    },
+    remove() {
+      if (listener.removed) return;
+      listener.removed = true;
+      const listeners = target.listeners.get(eventName) ?? [];
+      target.listeners.set(eventName, listeners.filter((candidate) => candidate !== listener));
+    },
+  };
+  return listener;
 }

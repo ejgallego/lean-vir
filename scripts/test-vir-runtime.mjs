@@ -113,7 +113,7 @@ assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
-assert.equal(hostRuntime.packageInfo.hostImports, 11);
+assert.equal(hostRuntime.packageInfo.hostImports, 12);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -255,6 +255,7 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "browser.document.getTitle",
   "browser.document.querySelector",
   "browser.document.setTitle",
+  "browser.element.addEventListener",
   "browser.element.getAttribute",
   "browser.element.setAttribute",
   "browser.element.setTextContent",
@@ -276,49 +277,49 @@ assert.deepEqual(hostRuntime.call("Tamagotchi.uiMountFromDom"), [
   {
     selector: "[data-action='feed']",
     event: "click",
-    entry: "Tamagotchi.uiStepFromDom",
+    entry: "Tamagotchi.uiStepEvent",
     argument: "feed",
   },
   {
     selector: "[data-action='play']",
     event: "click",
-    entry: "Tamagotchi.uiStepFromDom",
+    entry: "Tamagotchi.uiStepEvent",
     argument: "play",
   },
   {
     selector: "[data-action='nap']",
     event: "click",
-    entry: "Tamagotchi.uiStepFromDom",
+    entry: "Tamagotchi.uiStepEvent",
     argument: "nap",
   },
   {
     selector: "[data-action='wake']",
     event: "click",
-    entry: "Tamagotchi.uiStepFromDom",
+    entry: "Tamagotchi.uiStepEvent",
     argument: "wake",
   },
   {
     selector: "[data-action='ignore']",
     event: "click",
-    entry: "Tamagotchi.uiStepFromDom",
+    entry: "Tamagotchi.uiStepEvent",
     argument: "ignore",
   },
   {
     selector: "#pet-reset-button",
     event: "click",
-    entry: "Tamagotchi.uiResetFromDom",
+    entry: "Tamagotchi.uiResetEvent",
     argument: null,
   },
   {
     selector: "#pet-art-toggle",
     event: "change",
-    entry: "Tamagotchi.uiResetFromDom",
+    entry: "Tamagotchi.uiResetEvent",
     argument: null,
   },
   {
     selector: "#pet-name-input",
     event: "change",
-    entry: "Tamagotchi.uiRenameFromDom",
+    entry: "Tamagotchi.uiRenameEvent",
     argument: null,
   },
 ]);
@@ -362,6 +363,30 @@ assert.deepEqual(hostRuntime.call("Tamagotchi.uiStepFromDom", "ignore"), {
   artwork: "pet",
   turns: "1",
   care: "2",
+});
+assert.deepEqual(hostRuntime.call("Tamagotchi.uiStepEvent", { handle: 1 }, "ignore"), {
+  name: "Mochi",
+  mood: "angry",
+  trace: ["happy", "hungry", "angry"],
+  artwork: "pet",
+  turns: "2",
+  care: "0",
+});
+assert.deepEqual(hostRuntime.call("Tamagotchi.uiResetEvent", { handle: 1 }), {
+  name: "Mochi",
+  mood: "happy",
+  trace: ["happy"],
+  artwork: "pet",
+  turns: "0",
+  care: "3",
+});
+assert.deepEqual(hostRuntime.call("Tamagotchi.uiRenameEvent", { handle: 1 }), {
+  name: "Mochi",
+  mood: "happy",
+  trace: ["happy"],
+  artwork: "pet",
+  turns: "0",
+  care: "3",
 });
 
 const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/fixtures-basic.irpkg"], {
