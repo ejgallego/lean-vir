@@ -168,6 +168,28 @@ Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/
 @[vir_js "browser.htmlInputElement.setChecked"]
 opaque setChecked (input : @& HTMLInputElement) (checked : Bool) : IO Unit
 
+/--
+Reads the `value` property of an input element.
+
+In a browser this reads `input.value`. In Node tests, use the
+`lean-vir/vir-runtime-node` wrapper for virtual document state.
+
+Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
+-/
+@[vir_js "browser.htmlInputElement.getValue"]
+opaque getValue (input : @& HTMLInputElement) : IO String
+
+/--
+Sets the `value` property of an input element.
+
+In a browser this writes `input.value`. In Node tests, use the
+`lean-vir/vir-runtime-node` wrapper for virtual document state.
+
+Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
+-/
+@[vir_js "browser.htmlInputElement.setValue"]
+opaque setValue (input : @& HTMLInputElement) (value : @& String) : IO Unit
+
 end HTMLInputElement
 
 end Lean.Vir.Browser

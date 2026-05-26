@@ -10,15 +10,16 @@ through the upstream interpreter and a small JavaScript runtime wrapper.
 The demo builds Lean `v4.30.0-rc2`'s upstream
 `src/library/ir_interpreter.cpp` to `wasm32-wasip1`, links the required Lean
 runtime subset, and serves generated artifacts:
-`web/public/vir-upstream.wasm` plus the demo IR package
-`web/public/vir-demo.irpkg`.
+`web/public/vir-upstream.wasm` plus focused `.irpkg` files such as
+`web/public/fixtures-basic.irpkg` and `web/public/demo-host.irpkg`.
 
 ## Browser Demo
 
-The browser page keeps Tamagotchi as the main interactive demo. Button events
-still originate in JavaScript, but each reset/action calls Lean entrypoints that
-read the current pet state from DOM attributes, compute the next state, and
-render the UI through `Lean.Vir.Browser` host imports.
+The browser page keeps Tamagotchi as the main interactive demo. Button and input
+events still originate in JavaScript, but each reset/action calls Lean
+entrypoints that read the current pet state from DOM attributes and input
+properties, compute the next state, and render the UI through
+`Lean.Vir.Browser` host imports.
 
 The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
 `examples/MergeSort.lean`.

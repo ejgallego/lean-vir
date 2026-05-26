@@ -91,12 +91,40 @@ def demoScript : List Action :=
   [ignore, feed, play, nap, wake, ignore, ignore]
 
 structure PetState where
+  name : String
   mood : Mood
   trace : List Mood
   artwork : String
+  turns : Nat
+  care : Nat
 
-def initialState (artwork : String) : PetState :=
-  { mood := happy, trace := [happy], artwork := artwork }
+def defaultName : String :=
+  "Mochi"
+
+def maxCare : Nat :=
+  5
+
+def initialCare : Nat :=
+  3
+
+def normalizeName (name : String) : String :=
+  if name == "" then defaultName else name
+
+def normalizeArtwork (artwork : String) : String :=
+  if artwork == "octopus" then "octopus" else "pet"
+
+def clampCare (care : Nat) : Nat :=
+  if care > maxCare then maxCare else care
+
+def initialState (name artwork : String) : PetState :=
+  {
+    name := normalizeName name,
+    mood := happy,
+    trace := [happy],
+    artwork := normalizeArtwork artwork,
+    turns := 0,
+    care := initialCare
+  }
 
 def snoc : List α → α → List α
   | [], value => [value]
@@ -118,6 +146,29 @@ def artworkFromChecked (checked : Bool) : String :=
 
 def artLabel (artwork : String) : String :=
   if artwork == "octopus" then "Octopus" else "Virtual pet"
+
+def careAfter (current : Nat) (mood : Mood) (action : Action) : Nat :=
+  let acted :=
+    match action with
+    | feed => current + 1
+    | play => current + 1
+    | nap => current
+    | wake => current
+    | ignore => current - 1
+  let adjusted :=
+    match mood with
+    | happy => acted + 1
+    | angry => acted - 1
+    | dead => 0
+    | _ => acted
+  clampCare adjusted
+
+def statusLabel (state : PetState) (actionLabel : String) : String :=
+  s!"{state.name} is {state.mood.label}; last {actionLabel}; " ++
+    s!"care {state.care}/{maxCare}; turn {state.turns}"
+
+def natFromAttr (attr : Option String) (fallback : Nat) : Nat :=
+  attr.bind String.toNat? |>.getD fallback
 
 def withElement (selector : String) (f : Lean.Vir.Browser.Element → IO Unit) : IO Unit := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
@@ -153,15 +204,45 @@ def setChecked (selector : String) (checked : Bool) : IO Unit := do
       | none => pure ()
       | some input => Lean.Vir.Browser.HTMLInputElement.setChecked input checked
 
+def getValue (selector : String) : IO String := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure ""
+  | some element =>
+      match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
+      | none => pure ""
+      | some input => Lean.Vir.Browser.HTMLInputElement.getValue input
+
+def setValue (selector value : String) : IO Unit := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure ()
+  | some element =>
+      match ← Lean.Vir.Browser.HTMLInputElement.fromElement element with
+      | none => pure ()
+      | some input => Lean.Vir.Browser.HTMLInputElement.setValue input value
+
 def render (state : PetState) (actionLabel : String) : IO Unit := do
+  let state := {
+    state with
+    name := normalizeName state.name,
+    artwork := normalizeArtwork state.artwork,
+    care := clampCare state.care
+  }
   let moodLabel := state.mood.label
+  setValue "#pet-name-input" state.name
+  setText "#pet-name-display" state.name
   setText "#pet-mood-display" moodLabel
   setText "#pet-action-display" actionLabel
   setText "#pet-trace-display" (traceLabel state.trace)
+  setText "#pet-care-display" s!"{state.care}/{maxCare}"
+  setText "#pet-turn-display" (toString state.turns)
+  setText "#pet-summary-display" (statusLabel state actionLabel)
   setAttribute "#pet-device" "data-mood" moodLabel
   setAttribute "#pet-device" "data-art" state.artwork
   setAttribute "#pet-device" "data-trace" (traceAttr state.trace)
-  setAttribute "#pet-device" "aria-label" s!"{artLabel state.artwork} mood {moodLabel}"
+  setAttribute "#pet-device" "data-name" state.name
+  setAttribute "#pet-device" "data-turns" (toString state.turns)
+  setAttribute "#pet-device" "data-care" (toString state.care)
+  setAttribute "#pet-device" "aria-label" s!"{artLabel state.artwork} {state.name} mood {moodLabel}"
   setChecked "#pet-art-toggle" (state.artwork == "octopus")
   setText "#status" "Ready"
   setAttribute "#status" "data-ready" "true"
@@ -169,38 +250,59 @@ def render (state : PetState) (actionLabel : String) : IO Unit := do
 def stateFromDom : IO PetState := do
   let currentAttr ← getAttribute "#pet-device" "data-mood"
   let traceAttrValue ← getAttribute "#pet-device" "data-trace"
+  let turnsAttr ← getAttribute "#pet-device" "data-turns"
+  let careAttr ← getAttribute "#pet-device" "data-care"
+  let name ← getValue "#pet-name-input"
   let checked ← getChecked "#pet-art-toggle"
   let current := currentAttr.bind Mood.fromString? |>.getD happy
   let trace := traceAttrValue.map traceFromAttr |>.getD [current]
+  let trace := if trace.isEmpty then [current] else trace
   pure {
+    name := normalizeName name,
     mood := current,
-    trace := if trace.isEmpty then [current] else trace,
-    artwork := artworkFromChecked checked
+    trace := trace,
+    artwork := artworkFromChecked checked,
+    turns := natFromAttr turnsAttr (trace.length - 1),
+    care := clampCare (natFromAttr careAttr initialCare)
   }
 
-def uiReset (artwork : String) : IO PetState := do
-  let state := initialState artwork
+def uiReset (name artwork : String) : IO PetState := do
+  let state := initialState name artwork
   render state "..."
   pure state
 
 def uiResetFromDom : IO PetState := do
+  let name ← getValue "#pet-name-input"
   let checked ← getChecked "#pet-art-toggle"
-  uiReset (artworkFromChecked checked)
+  uiReset name (artworkFromChecked checked)
 
-@[inline] def nextState (current : Mood) (trace : List Mood) (artwork : String) (action : Action) : PetState :=
-  let mood := step current action
-  { mood := mood, trace := snoc trace mood, artwork := artwork }
+@[inline] def nextState (state : PetState) (action : Action) : PetState :=
+  let mood := step state.mood action
+  {
+    state with
+    name := normalizeName state.name,
+    mood := mood,
+    trace := snoc state.trace mood,
+    artwork := normalizeArtwork state.artwork,
+    turns := state.turns + 1,
+    care := careAfter state.care mood action
+  }
 
-def uiStep (current : Mood) (trace : List Mood) (artwork : String) (action : Action) : IO PetState := do
-  let next := nextState current trace artwork action
+def uiStep (state : PetState) (action : Action) : IO PetState := do
+  let next := nextState state action
   render next action.label
   pure next
 
 def uiStepFromDom (action : Action) : IO PetState := do
   let current ← stateFromDom
-  let next := nextState current.mood current.trace current.artwork action
+  let next := nextState current action
   render next action.label
   pure next
+
+def uiRenameFromDom : IO PetState := do
+  let current ← stateFromDom
+  render current "rename"
+  pure current
 
 #eval trace happy demoScript
 #eval run happy demoScript

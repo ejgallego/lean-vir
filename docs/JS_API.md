@@ -149,6 +149,8 @@ The first library surface is:
 - `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Browser.Element -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
 - `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Browser.HTMLInputElement -> IO Bool`
 - `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Browser.HTMLInputElement -> Bool -> IO Unit`
+- `Lean.Vir.Browser.HTMLInputElement.getValue : @& Lean.Vir.Browser.HTMLInputElement -> IO String`
+- `Lean.Vir.Browser.HTMLInputElement.setValue : @& Lean.Vir.Browser.HTMLInputElement -> @& String -> IO Unit`
 
 The built-in `common.*` and `browser.*` targets do not require a `hostBindings`
 option:
@@ -165,11 +167,11 @@ console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 `Lean.Vir.Browser.Console.log` maps to `console.log`, title calls map to
 `document.title`, `Document.querySelector` returns an opaque element resource,
 `Element` calls use DOM element properties/methods, and `HTMLInputElement`
-calls first narrow an element before reading or writing `checked`. The browser
-runtime requires `globalThis.document` for `browser.document.*` targets. In
-Node, use `lean-vir/vir-runtime-node` or pass explicit `hostBindings`; the Node
-wrapper provides virtual document and element state for these built-in browser
-targets. See MDN for the underlying browser APIs:
+calls first narrow an element before reading or writing `checked` and `value`.
+The browser runtime requires `globalThis.document` for `browser.document.*`
+targets. In Node, use `lean-vir/vir-runtime-node` or pass explicit
+`hostBindings`; the Node wrapper provides virtual document and element state for
+these built-in browser targets. See MDN for the underlying browser APIs:
 
 - [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
 - [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
@@ -178,6 +180,7 @@ targets. See MDN for the underlying browser APIs:
 - [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
 - [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
 - [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
+- [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value)
 
 Custom imports can be declared directly:
 

@@ -61,13 +61,19 @@ Author: Emilio J. Gallego Arias
                 <p class="eyebrow">Interactive demo</p>
                 <h2>Lean DOM Tamagotchi</h2>
               </div>
-              <label class="art-switch" for="pet-art-toggle">
-                <input id="pet-art-toggle" type="checkbox" checked />
-                <span class="art-switch-track" aria-hidden="true">
-                  <span class="art-switch-thumb"></span>
-                </span>
-                <span>Octopus</span>
-              </label>
+              <div class="pet-heading-controls">
+                <label class="pet-name-field" for="pet-name-input">
+                  <span>Name</span>
+                  <input id="pet-name-input" type="text" value="Mochi" maxlength="18" autocomplete="off" />
+                </label>
+                <label class="art-switch" for="pet-art-toggle">
+                  <input id="pet-art-toggle" type="checkbox" checked />
+                  <span class="art-switch-track" aria-hidden="true">
+                    <span class="art-switch-thumb"></span>
+                  </span>
+                  <span>Octopus</span>
+                </label>
+              </div>
             </div>
             <div class="pet-state">
               <div
@@ -104,6 +110,20 @@ Author: Emilio J. Gallego Arias
             </div>
           </div>
           <div class="pet-action-card">
+            <section class="pet-stats-band" aria-label="Pet state summary">
+              <div>
+                <span>name</span>
+                <strong id="pet-name-display">Mochi</strong>
+              </div>
+              <div>
+                <span>care</span>
+                <strong id="pet-care-display">3/5</strong>
+              </div>
+              <div>
+                <span>turns</span>
+                <strong id="pet-turn-display">0</strong>
+              </div>
+            </section>
             <div class="action-grid">
               <button type="button" data-action="feed">Feed</button>
               <button type="button" data-action="play">Play</button>
@@ -120,6 +140,10 @@ Author: Emilio J. Gallego Arias
               <div>
                 <span>trace</span>
                 <strong id="pet-trace-display">happy</strong>
+              </div>
+              <div>
+                <span>summary</span>
+                <strong id="pet-summary-display">Mochi is happy</strong>
               </div>
             </section>
           </div>

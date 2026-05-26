@@ -65,6 +65,11 @@ export function createBrowserHtmlInputElementHostBindings(state = createDomResou
       resolveResource(state, input, "HTMLInputElement").checked = checked;
       return undefined;
     },
+    "browser.htmlInputElement.getValue": (input) => resolveResource(state, input, "HTMLInputElement").value ?? "",
+    "browser.htmlInputElement.setValue": (input, value) => {
+      resolveResource(state, input, "HTMLInputElement").value = value;
+      return undefined;
+    },
   };
 }
 
@@ -115,6 +120,12 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       resolveResource(state.resources, input, "HTMLInputElement").checked === true,
     "browser.htmlInputElement.setChecked": (input, checked) => {
       resolveResource(state.resources, input, "HTMLInputElement").checked = checked;
+      return undefined;
+    },
+    "browser.htmlInputElement.getValue": (input) =>
+      resolveResource(state.resources, input, "HTMLInputElement").value ?? "",
+    "browser.htmlInputElement.setValue": (input, value) => {
+      resolveResource(state.resources, input, "HTMLInputElement").value = value;
       return undefined;
     },
   };
@@ -176,12 +187,13 @@ function isInputElement(value) {
 function virtualElementState(state, selector) {
   let element = state.elements.get(selector);
   if (element === undefined) {
-    element = { textContent: "", attributes: new Map(), checked: false };
+    element = { textContent: "", attributes: new Map(), checked: false, value: "" };
     state.elements.set(selector, element);
   } else {
     element.textContent ??= "";
     element.attributes ??= new Map();
     element.checked ??= false;
+    element.value ??= "";
   }
   return element;
 }

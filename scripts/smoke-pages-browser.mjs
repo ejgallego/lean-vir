@@ -253,7 +253,10 @@ async function smokeLanding(cdp, origin) {
       href: link.getAttribute("href"),
       text: link.textContent.trim().replace(/\\s+/g, " "),
     })),
-    mood: document.querySelector("#pet-mood-display")?.textContent?.trim()
+    name: document.querySelector("#pet-name-display")?.textContent?.trim(),
+    mood: document.querySelector("#pet-mood-display")?.textContent?.trim(),
+    care: document.querySelector("#pet-care-display")?.textContent?.trim(),
+    turns: document.querySelector("#pet-turn-display")?.textContent?.trim()
   })`);
   assert.equal(
     state.packageName,
@@ -268,17 +271,29 @@ async function smokeLanding(cdp, origin) {
   ]);
   assert.ok(state.packageItems[0].text.includes("Basic, list/option, interface shapes"));
   assert.ok(state.packageItems[1].text.includes("Browser host calls and DOM Tamagotchi"));
+  assert.equal(state.name, "Mochi");
+  assert.equal(state.care, "3/5");
+  assert.equal(state.turns, "0");
 
   const stepped = await evaluate(cdp, `new Promise((resolve, reject) => {
+    document.querySelector("#pet-name-input").value = "Ada";
+    document.querySelector("#pet-name-input").dispatchEvent(new Event("change", { bubbles: true }));
     document.querySelector("[data-action='ignore']").click();
     const deadline = Date.now() + 5000;
     const poll = () => {
       const state = {
+        name: document.querySelector("#pet-name-display")?.textContent?.trim(),
         mood: document.querySelector("#pet-mood-display")?.textContent?.trim(),
         action: document.querySelector("#pet-action-display")?.textContent?.trim(),
         trace: document.querySelector("#pet-trace-display")?.textContent?.trim(),
+        care: document.querySelector("#pet-care-display")?.textContent?.trim(),
+        turns: document.querySelector("#pet-turn-display")?.textContent?.trim(),
+        summary: document.querySelector("#pet-summary-display")?.textContent?.trim(),
+        deviceName: document.querySelector("#pet-device")?.dataset.name,
         deviceMood: document.querySelector("#pet-device")?.dataset.mood,
         deviceTrace: document.querySelector("#pet-device")?.dataset.trace,
+        deviceTurns: document.querySelector("#pet-device")?.dataset.turns,
+        deviceCare: document.querySelector("#pet-device")?.dataset.care,
         status: document.querySelector("#status")?.textContent?.trim()
       };
       if (state.mood === "hungry") {
@@ -292,11 +307,18 @@ async function smokeLanding(cdp, origin) {
     poll();
   })`);
   assert.deepEqual(stepped, {
+    name: "Ada",
     mood: "hungry",
     action: "ignore",
     trace: "happy -> hungry",
+    care: "2/5",
+    turns: "1",
+    summary: "Ada is hungry; last ignore; care 2/5; turn 1",
+    deviceName: "Ada",
     deviceMood: "hungry",
     deviceTrace: "happy,hungry",
+    deviceTurns: "1",
+    deviceCare: "2",
     status: "Ready",
   });
 }
@@ -347,7 +369,7 @@ async function smokePackagePreset(cdp, origin) {
     status: "Ready",
     packageName: "demo-host.irpkg",
     packageUrl: "demo-host.irpkg",
-    entryCount: 5,
+    entryCount: 6,
   });
 }
 
@@ -583,15 +605,21 @@ try {
       documentTitle: "Lean VIR host: pages smoke",
     }),
     await runnerCaseFromManifest("demo-host.irpkg", "Tamagotchi.uiStep", {
-      inputTags: ["SELECT", "TEXTAREA", "INPUT", "SELECT"],
-      runInputs: ["happy", `["happy"]`, "pet", "ignore"],
+      inputTags: ["TEXTAREA", "SELECT"],
+      runInputs: [
+        `{"name":"Mochi","mood":"happy","trace":["happy"],"artwork":"pet","turns":0,"care":3}`,
+        "ignore",
+      ],
       result: `{
+  "name": "Mochi",
   "mood": "hungry",
   "trace": [
     "happy",
     "hungry"
   ],
-  "artwork": "pet"
+  "artwork": "pet",
+  "turns": "1",
+  "care": "2"
 }`,
     }),
     await runnerCaseFromManifest("fixtures-lean.irpkg", "Vir.Fixtures.ExprPrinter.exprKindScore", {

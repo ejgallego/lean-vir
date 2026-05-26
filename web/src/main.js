@@ -21,6 +21,7 @@ import fixtureManifest from "../../fixtures/manifest.json";
 import browserPackages from "../../fixtures/browser-packages.json";
 
 const statusEl = document.querySelector("#status");
+const petNameInput = document.querySelector("#pet-name-input");
 const petArtToggle = document.querySelector("#pet-art-toggle");
 const petMoodDisplay = document.querySelector("#pet-mood-display");
 const petActionButtons = document.querySelectorAll("[data-action]");
@@ -177,6 +178,9 @@ let currentFixtureFilter = "all";
 let selectedFixtureId = null;
 
 function applyPetState(state) {
+  if (typeof state?.name === "string" && document.activeElement !== petNameInput) {
+    petNameInput.value = state.name;
+  }
   if (typeof state?.artwork === "string") {
     petArtToggle.checked = state.artwork === "octopus";
   }
@@ -235,6 +239,17 @@ function resetPet() {
   if (hostRuntime === null) return;
   try {
     applyPetState(hostRuntime.call("Tamagotchi.uiResetFromDom"));
+    setReady();
+  } catch (error) {
+    petMoodDisplay.textContent = "error";
+    setTrap(error);
+  }
+}
+
+function renamePet() {
+  if (hostRuntime === null) return;
+  try {
+    applyPetState(hostRuntime.call("Tamagotchi.uiRenameFromDom"));
     setReady();
   } catch (error) {
     petMoodDisplay.textContent = "error";
@@ -547,6 +562,9 @@ fixtureRunSelectedButton.addEventListener("click", () => {
 });
 petArtToggle.addEventListener("change", () => {
   resetPet();
+});
+petNameInput.addEventListener("change", () => {
+  renamePet();
 });
 
 renderFixtureSummary();

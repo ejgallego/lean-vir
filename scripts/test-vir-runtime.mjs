@@ -113,7 +113,7 @@ assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
-assert.equal(hostRuntime.packageInfo.hostImports, 9);
+assert.equal(hostRuntime.packageInfo.hostImports, 11);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -260,7 +260,9 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "browser.element.setTextContent",
   "browser.htmlInputElement.fromElement",
   "browser.htmlInputElement.getChecked",
+  "browser.htmlInputElement.getValue",
   "browser.htmlInputElement.setChecked",
+  "browser.htmlInputElement.setValue",
 ]);
 const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
 assert.throws(
@@ -270,26 +272,46 @@ assert.throws(
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
 assert.equal(hostRuntime.call("HostInterop.titleHandshake", "runtime smoke"), "Lean VIR host: runtime smoke");
-const petReset = hostRuntime.call("Tamagotchi.uiReset", "pet");
+const petReset = hostRuntime.call("Tamagotchi.uiReset", "Mochi", "pet");
 assert.deepEqual(petReset, {
+  name: "Mochi",
   mood: "happy",
   trace: ["happy"],
   artwork: "pet",
+  turns: "0",
+  care: "3",
 });
-assert.deepEqual(hostRuntime.call("Tamagotchi.uiStep", petReset.mood, petReset.trace, petReset.artwork, "ignore"), {
+assert.deepEqual(hostRuntime.call("Tamagotchi.uiStep", petReset, "ignore"), {
+  name: "Mochi",
   mood: "hungry",
   trace: ["happy", "hungry"],
   artwork: "pet",
+  turns: "1",
+  care: "2",
 });
 assert.deepEqual(hostRuntime.call("Tamagotchi.uiResetFromDom"), {
+  name: "Mochi",
   mood: "happy",
   trace: ["happy"],
   artwork: "pet",
+  turns: "0",
+  care: "3",
+});
+assert.deepEqual(hostRuntime.call("Tamagotchi.uiRenameFromDom"), {
+  name: "Mochi",
+  mood: "happy",
+  trace: ["happy"],
+  artwork: "pet",
+  turns: "0",
+  care: "3",
 });
 assert.deepEqual(hostRuntime.call("Tamagotchi.uiStepFromDom", "ignore"), {
+  name: "Mochi",
   mood: "hungry",
   trace: ["happy", "hungry"],
   artwork: "pet",
+  turns: "1",
+  care: "2",
 });
 
 const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/fixtures-basic.irpkg"], {

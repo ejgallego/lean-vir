@@ -252,6 +252,41 @@ h2 {
   gap: 14px;
 }
 
+.pet-heading-controls {
+  display: flex;
+  align-items: flex-end;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.pet-name-field {
+  display: grid;
+  gap: 5px;
+  min-width: 132px;
+  color: #33415c;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pet-name-field input {
+  width: 100%;
+  min-height: 32px;
+  border: 1px solid #bdc8bb;
+  background: #ffffff;
+  color: #17201a;
+  padding: 5px 8px;
+  font-size: 0.86rem;
+  font-weight: 700;
+  text-transform: none;
+}
+
+.pet-name-field input:focus-visible {
+  outline: 2px solid #516f88;
+  outline-offset: 2px;
+}
+
 .art-switch {
   display: inline-flex;
   align-items: center;
@@ -685,6 +720,40 @@ h2 {
   top: 32px;
 }
 
+.pet-stats-band {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 1px;
+  margin-bottom: 12px;
+  background: #d9ded2;
+  border-top: 1px solid #d9ded2;
+  border-bottom: 1px solid #d9ded2;
+}
+
+.pet-stats-band div {
+  min-width: 0;
+  min-height: 58px;
+  padding: 11px 12px;
+  background: #f8faf6;
+}
+
+.pet-stats-band span {
+  display: block;
+  color: #5f6f64;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.pet-stats-band strong {
+  display: block;
+  margin-top: 7px;
+  color: #20384a;
+  font-size: 1rem;
+  line-height: 1.1;
+  overflow-wrap: anywhere;
+}
+
 .action-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -707,7 +776,7 @@ h2 {
 
 .pet-trace-band {
   display: grid;
-  grid-template-columns: minmax(110px, 0.42fr) minmax(0, 1fr);
+  grid-template-columns: minmax(96px, 0.24fr) minmax(150px, 0.34fr) minmax(0, 0.42fr);
   gap: 1px;
   margin-top: 12px;
   background: #d9ded2;
@@ -743,6 +812,12 @@ h2 {
 
 #pet-trace-display {
   font-size: 0.92rem;
+  line-height: 1.35;
+  word-break: break-word;
+}
+
+#pet-summary-display {
+  font-size: 0.88rem;
   line-height: 1.35;
   word-break: break-word;
 }
@@ -1223,6 +1298,19 @@ h2 {
     align-items: flex-start;
     flex-direction: column;
     min-height: 100px;
+  }
+
+  .pet-card-heading {
+    flex-direction: column;
+  }
+
+  .pet-heading-controls {
+    justify-content: flex-start;
+    width: 100%;
+  }
+
+  .pet-name-field {
+    min-width: min(100%, 180px);
   }
 
   .pet-mood-readout {
