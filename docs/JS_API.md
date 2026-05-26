@@ -30,6 +30,10 @@ const hostVir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
   irPackageUrl: "demo-host.irpkg",
 });
+const prettyVir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "pretty-printer.irpkg",
+});
 const leanVir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
   irPackageUrl: "fixtures-lean.irpkg",
@@ -41,6 +45,7 @@ console.log(vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]));
 console.log(vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
 console.log(vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
 console.log(hostVir.call("HostInterop.titleHandshake", "browser handshake"));
+console.log(prettyVir.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12));
 console.log(leanVir.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }));
 ```
 

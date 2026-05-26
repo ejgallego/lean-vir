@@ -160,6 +160,14 @@ stable same-object pointer equality. The parser input fixture additionally runs
 `Task.pure`, `Task.get`, and `Task.map` are covered only in the synchronous,
 already-resolved mode needed by real `Environment` values; the demo does not
 attempt to provide a task scheduler.
+This matters for Lean's expression pretty printer: probing
+`Lean.PrettyPrinter.ppExpr` shows that it reaches `MetaM` and then
+`Environment` async-constant state, where `Environment.checked` is a
+`Task Kernel.Environment`, `addConstAsync` and `promiseChecked` use promises
+and `Task.bind`, and `Lean.addDecl` can use `BaseIO.mapTask`. The current
+`pretty-printer.irpkg` intentionally stops at `Std.Format.pretty`; supporting
+`ppExpr` requires broadening the runtime boundary to Meta/Environment task and
+promise support plus the parenthesizer/formatter interpreter externs.
 `IO.initializing` is modeled as post-initialization, and `ST.Prim.mkRef`/
 `ST.Prim.Ref.get` cover single-threaded ref allocation/read semantics. Mutation,
 blocking IO, and scheduler behavior are still outside the demo boundary.

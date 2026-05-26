@@ -260,17 +260,20 @@ async function smokeLanding(cdp, origin) {
   })`);
   assert.equal(
     state.packageName,
-    "fixtures-basic.irpkg, demo-host.irpkg, fixtures-lean.irpkg, fixtures-boundary.irpkg",
+    "fixtures-basic.irpkg, demo-host.irpkg, pretty-printer.irpkg, fixtures-lean.irpkg, fixtures-boundary.irpkg",
   );
   assert.equal(state.mood, "happy");
   assert.deepEqual(state.packageItems.map((item) => item.href), [
     "dev.html?package=fixtures-basic.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump",
     "dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake",
+    "format.html?case=list&width=12",
     "dev.html?package=fixtures-lean.irpkg&entry=Vir_Fixtures_ExprPrinter_exprKindScore",
     "dev.html?package=fixtures-boundary.irpkg&entry=Vir_Fixtures_Boundary_floatScaleScore",
   ]);
   assert.ok(state.packageItems[0].text.includes("Basic, list/option, interface shapes"));
   assert.ok(state.packageItems[1].text.includes("Browser host calls and DOM Tamagotchi"));
+  assert.ok(state.packageItems[2].text.includes("Std.Format.pretty component package"));
+  assert.ok(state.packageItems[3].text.includes("Lean Expr, parser, Task"));
   assert.equal(state.name, "Octi");
   assert.equal(state.care, "3/5");
   assert.equal(state.turns, "0");
@@ -323,6 +326,59 @@ async function smokeLanding(cdp, origin) {
   });
 }
 
+async function smokeFormatWorkbench(cdp, origin) {
+  await navigate(cdp, `${origin}${basePath}format.html?case=list&width=12`);
+  await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 15000;
+    const poll = () => {
+      const status = document.querySelector("#format-status")?.textContent?.trim();
+      if (status === "Ready") {
+        resolve(status);
+      } else if (Date.now() > deadline) {
+        reject(new Error("format page did not become Ready; last status: " + status));
+      } else {
+        setTimeout(poll, 100);
+      }
+    };
+    poll();
+  })`);
+
+  const loaded = await evaluate(cdp, `({
+    status: document.querySelector("#format-status")?.textContent?.trim(),
+    exports: document.querySelector("#format-export-count")?.textContent?.trim(),
+    width: document.querySelector("#format-width-input")?.value,
+    active: document.querySelector("[data-case][aria-pressed='true']")?.dataset.case,
+    ruler: document.querySelector("#format-ruler")?.textContent,
+    output: document.querySelector("#format-output")?.textContent,
+    source: document.querySelector("#format-source")?.textContent,
+  })`);
+  assert.equal(loaded.status, "Ready");
+  assert.equal(loaded.exports, "4");
+  assert.equal(loaded.width, "12");
+  assert.equal(loaded.active, "list");
+  assert.equal(loaded.ruler, "|------------| 12");
+  assert.equal(loaded.output, "[alpha,\n beta,\n gamma]");
+  assert.ok(loaded.source.includes("Format.group <|"));
+
+  const changed = await evaluate(cdp, `(() => {
+    const widthInput = document.querySelector("#format-width-input");
+    widthInput.value = "28";
+    widthInput.dispatchEvent(new Event("input", { bubbles: true }));
+    document.querySelector("[data-case='fill']").click();
+    return {
+      active: document.querySelector("[data-case][aria-pressed='true']")?.dataset.case,
+      width: widthInput.value,
+      output: document.querySelector("#format-output")?.textContent,
+      url: window.location.href,
+    };
+  })()`);
+  assert.equal(changed.active, "fill");
+  assert.equal(changed.width, "28");
+  assert.equal(changed.output, "lean ir runs format.pretty\ninside wasm");
+  assert.ok(changed.url.includes("case=fill"));
+  assert.ok(changed.url.includes("width=28"));
+}
+
 async function smokePackagePreset(cdp, origin) {
   await navigate(cdp, `${origin}${basePath}dev.html`);
   await waitForReady(cdp);
@@ -336,6 +392,7 @@ async function smokePackagePreset(cdp, origin) {
   assert.deepEqual(state.options, [
     "fixtures-basic.irpkg",
     "demo-host.irpkg",
+    "pretty-printer.irpkg",
     "fixtures-lean.irpkg",
     "fixtures-boundary.irpkg",
     "local-fib.irpkg",
@@ -581,8 +638,10 @@ try {
 
   await smokeLanding(cdp, server.origin);
   await smokePackagePreset(cdp, server.origin);
+  await smokeFormatWorkbench(cdp, server.origin);
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-basic.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "demo-host.irpkg");
+  await smokeManifestDrivenEntryList(cdp, server.origin, "pretty-printer.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-lean.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-boundary.irpkg");
   const runnerCases = [
@@ -626,6 +685,11 @@ try {
       inputTags: ["TEXTAREA"],
       runInputs: [`{"kind":"bvar","index":4}`],
       result: "5",
+    }),
+    await runnerCaseFromManifest("pretty-printer.irpkg", "Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", {
+      inputTags: ["SELECT", "INPUT"],
+      runInputs: ["list", "12"],
+      result: "[alpha,\n beta,\n gamma]",
     }),
     await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", {
       input: "[]",
@@ -755,7 +819,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, package presets, manifest-driven entry list, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
+  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

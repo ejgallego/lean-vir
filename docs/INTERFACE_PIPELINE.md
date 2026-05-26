@@ -35,9 +35,9 @@ prepare:pages` to generate URL-loadable sample packages:
 - `local-fib.irpkg`
 - `local-mergesort.irpkg`
 
-Vite copies those generated packages into `web/dist/` alongside `index.html`
-and `dev.html`. The landing page links directly to `/dev.html` with query
-parameters such as:
+Vite copies those generated packages into `web/dist/` alongside `index.html`,
+`dev.html`, and the `format.html` pretty-printer workbench. The landing page
+links directly to `/dev.html` with query parameters such as:
 
 ```text
 dev.html?package=local-fib.irpkg&entry=fib

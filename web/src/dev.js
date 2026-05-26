@@ -33,6 +33,7 @@ const defaultPackageUrl = packageById.get(browserPackages.defaultPackage)?.file 
 const packageLabels = new Map([
   ["fixtures-basic.irpkg", "Basic, list/option, interface shapes"],
   ["demo-host.irpkg", "Browser host calls and DOM Tamagotchi"],
+  ["pretty-printer.irpkg", "Std.Format.pretty component package"],
   ["fixtures-lean.irpkg", "Lean Expr, parser, Task"],
   ["fixtures-boundary.irpkg", "Numeric and runtime boundaries"],
   ["local-fib.irpkg", "Focused fib package"],
@@ -49,6 +50,7 @@ const packagePresets = [
 const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
 const query = new URLSearchParams(window.location.search);
 let requestedEntry = query.get("entry");
+let requestedAutoRun = query.get("run") === "1";
 
 let runtime = null;
 let interfaceEntries = [];
@@ -254,11 +256,26 @@ function renderInputFields(entry) {
       field.inputMode = "text";
     }
     if (input.type?.wireTag !== 14) {
-      field.value = inputDefault(input);
+      field.value = inputOverride(entry, input, index) ?? inputDefault(input);
     }
     label.append(caption, field);
     inputFields.append(label);
   }
+}
+
+function inputOverride(entry, input, index) {
+  const inputName = input.name ?? "";
+  const queryValue =
+    query.get(`arg${index}`) ??
+    query.get(`input${index}`) ??
+    (inputName ? query.get(inputName) : null);
+  if (queryValue !== null) {
+    return queryValue;
+  }
+  if (entry?.entry === "Vir.Fixtures.FormatPretty.formatPrettyAtWidth" && index === 0) {
+    return "18";
+  }
+  return null;
 }
 
 function renderManifestEntries(manifest) {
@@ -397,6 +414,12 @@ function formatResult(value) {
   return String(value);
 }
 
+function renderResult(value) {
+  const text = formatResult(value);
+  resultOutput.textContent = text;
+  resultOutput.dataset.multiline = String(text.includes("\n"));
+}
+
 async function loadIrPackageBytes(label, bytes) {
   runtime = await runtimeFactory.createRuntime({ irPackageBytes: bytes });
   syncPackagePreset();
@@ -408,6 +431,13 @@ async function loadIrPackageBytes(label, bytes) {
   renderPackageMetadata(runtime.packageMetadata);
   runEntryButton.disabled = interfaceEntries.length === 0;
   setStatus("Ready", true);
+  if (requestedAutoRun) {
+    requestedAutoRun = false;
+    const entry = selectedInterfaceEntry();
+    if (entry !== null) {
+      renderResult(evaluateEntry(runtime, entry));
+    }
+  }
 }
 
 async function loadPackageUrl() {
@@ -466,6 +496,7 @@ packageFile.addEventListener("change", () => {
 entrySelect.addEventListener("change", () => {
   renderInputFields(selectedInterfaceEntry());
   resultOutput.textContent = "...";
+  resultOutput.dataset.multiline = "false";
 });
 
 runEntryButton.addEventListener("click", () => {
@@ -476,7 +507,7 @@ runEntryButton.addEventListener("click", () => {
       throw new Error("no interface entry selected");
     }
     const result = evaluateEntry(runtime, entry);
-    resultOutput.textContent = formatResult(result);
+    renderResult(result);
     setStatus("Ready", true);
   } catch (error) {
     showError(error, "Trap");

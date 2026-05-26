@@ -22,7 +22,8 @@ inductive families, and implicit arguments.
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather
 than a separate hand-maintained list of JavaScript names. It also checks that
-the generated focused browser packages appear in `/dev.html` selectors and that
+the generated focused browser packages appear in `/dev.html` selectors, that
+`pretty-printer.irpkg` powers the dedicated `/format.html` workbench, and that
 selecting each entry renders the expected control kinds from the manifest.
 
 ## Current Passing Surface
@@ -80,6 +81,13 @@ The current fixture surface covers:
   `Lean.FileMap.toPosition`, `Lean.Parser.mkParserState`, and the vertical
   `Lean.Parser.parseHeader` fixture backed by packaged initialized
   parser/environment extension globals;
+- a minimal real `Lean.Expr` construction and structural renderer over
+  constants, applications, literals, binders, and universe levels, backed by
+  explicit `Lean.Expr`/`Lean.Level` data-helper externs;
+- `Std.Format.pretty` over grouped soft lines, hard text newlines, nesting, and
+  alignment;
+- the dedicated `pretty-printer.irpkg` component package and `/format.html`
+  workbench for the `Std.Format.pretty` fixture surface;
 - narrow synchronous coverage for already-resolved `Task.pure`/`Task.get`/
   `Task.map`, because real `Environment` values store a checked kernel
   environment behind `Task`;
@@ -88,3 +96,22 @@ The current fixture surface covers:
   upstream `lean_run_init`, and single-threaded `ST.Prim.mkRef`/
   `ST.Prim.Ref.get`/`ST.Prim.Ref.set`/`ST.Prim.Ref.take` support for ref access
   reached by fixtures and parser setup.
+
+## Known Pretty-Printer Boundary
+
+The current pretty-printer fixture is `Std.Format.pretty`, not
+`Lean.PrettyPrinter.ppExpr`. A local probe of `ppExpr` over a minimal
+constructed expression works in host Lean and prints `Type -> Nat.succ 41`
+modulo Lean's Unicode arrow, but package generation is much larger than the
+format fixture. The delaborator-only closure already loads more than seven
+thousand declarations and reaches native boundaries for `Task`/`Promise`,
+`Environment` async constants, `Lean.Meta.inferType`, `Lean.Meta.whnf`,
+expression substitution/equality helpers, and related IO/task state. The full
+pretty path adds the parenthesizer and formatter interpreter boundary.
+
+`Task` is pulled in through Lean's `Environment`: `Environment.checked` is a
+`Task Kernel.Environment`, `addConstAsync` and `promiseChecked` use
+`IO.Promise.result?.bind`, `AsyncConsts.findRecTask` uses `Task.bind`, and
+`Lean.addDecl` can use `BaseIO.mapTask`. Supporting `ppExpr` should therefore
+be a separate runtime-boundary effort, not an extension of the minimal
+`Std.Format.pretty` component package.

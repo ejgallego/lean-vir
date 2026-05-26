@@ -32,21 +32,26 @@ async function assertHtmlAssetLinks(htmlPath) {
 
 const indexHtml = await assertHtmlAssetLinks("index.html");
 const devHtml = await assertHtmlAssetLinks("dev.html");
+const formatHtml = await assertHtmlAssetLinks("format.html");
 
 assertLink(indexHtml, "dev.html");
+assertLink(indexHtml, "format.html?case=list&amp;width=12");
 assertLink(indexHtml, "dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump");
 assertLink(indexHtml, "dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake");
 assertLink(indexHtml, "dev.html?package=fixtures-lean.irpkg&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore");
 assertLink(indexHtml, "dev.html?package=fixtures-boundary.irpkg&amp;entry=Vir_Fixtures_Boundary_floatScaleScore");
 assert.ok(devHtml.includes("dev-package-url"), "dev.html should contain package runner controls");
 assert.ok(devHtml.includes("dev-package-preset"), "dev.html should contain package presets");
+assert.ok(formatHtml.includes("format-width-range"), "format.html should contain width controls");
+assert.ok(formatHtml.includes("format-output"), "format.html should contain rendered output controls");
 
 await assertFile("vir-upstream.wasm", 1024);
 await assertFile("fixtures-basic.irpkg", 1024);
 await assertFile("demo-host.irpkg", 1024);
+await assertFile("pretty-printer.irpkg", 1024);
 await assertFile("fixtures-lean.irpkg", 1024);
 await assertFile("fixtures-boundary.irpkg", 1024);
 await assertFile("local-fib.irpkg", 128);
 await assertFile("local-mergesort.irpkg", 128);
 
-console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, wasm, and focused manifest packages`);
+console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, format workbench, wasm, and focused manifest packages`);

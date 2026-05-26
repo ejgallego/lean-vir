@@ -338,6 +338,18 @@
       "unsafe": true
     },
     {
+      "id": "upstream-expr-minimal-printer",
+      "source": "fixtures/ExprPrinter.lean",
+      "entry": "Vir.Fixtures.ExprPrinter.minimalExprPrinterScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-format-pretty",
+      "source": "fixtures/FormatPretty.lean",
+      "entry": "Vir.Fixtures.FormatPretty.formatPrettyScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-task-pure-get",
       "source": "fixtures/Task.lean",
       "entry": "Vir.Fixtures.Task.taskPureGetScore",
