@@ -249,7 +249,10 @@ async function smokeLanding(cdp, origin) {
   await waitForReady(cdp);
   const state = await evaluate(cdp, `({
     packageName: document.querySelector("#package-name")?.textContent?.trim(),
-    links: Array.from(document.querySelectorAll(".pipeline-item")).map((link) => link.getAttribute("href")),
+    packageItems: Array.from(document.querySelectorAll(".package-item")).map((link) => ({
+      href: link.getAttribute("href"),
+      text: link.textContent.trim().replace(/\\s+/g, " "),
+    })),
     mood: document.querySelector("#pet-mood-display")?.textContent?.trim()
   })`);
   assert.equal(
@@ -257,10 +260,14 @@ async function smokeLanding(cdp, origin) {
     "fixtures-basic.irpkg, demo-host.irpkg, fixtures-lean.irpkg, fixtures-boundary.irpkg",
   );
   assert.equal(state.mood, "happy");
-  assert.ok(state.links.includes("dev.html?package=local-fib.irpkg&entry=fib"));
-  assert.ok(state.links.includes("dev.html?package=local-mergesort.irpkg&entry=SortDemo_demoFromArray"));
-  assert.ok(state.links.includes("dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake"));
-  assert.ok(state.links.includes("dev.html?package=fixtures-basic.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump"));
+  assert.deepEqual(state.packageItems.map((item) => item.href), [
+    "dev.html?package=fixtures-basic.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump",
+    "dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake",
+    "dev.html?package=fixtures-lean.irpkg&entry=Vir_Fixtures_ExprPrinter_exprKindScore",
+    "dev.html?package=fixtures-boundary.irpkg&entry=Vir_Fixtures_Boundary_floatScaleScore",
+  ]);
+  assert.ok(state.packageItems[0].text.includes("Basic, list/option, interface shapes"));
+  assert.ok(state.packageItems[1].text.includes("Browser host calls and DOM Tamagotchi"));
 
   const stepped = await evaluate(cdp, `new Promise((resolve, reject) => {
     document.querySelector("[data-action='ignore']").click();
@@ -291,6 +298,56 @@ async function smokeLanding(cdp, origin) {
     deviceMood: "hungry",
     deviceTrace: "happy,hungry",
     status: "Ready",
+  });
+}
+
+async function smokePackagePreset(cdp, origin) {
+  await navigate(cdp, `${origin}${basePath}dev.html`);
+  await waitForReady(cdp);
+  const state = await evaluate(cdp, `({
+    packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+    preset: document.querySelector("#dev-package-preset")?.value,
+    options: Array.from(document.querySelector("#dev-package-preset")?.options ?? []).map((option) => option.value)
+  })`);
+  assert.equal(state.packageName, "fixtures-basic.irpkg");
+  assert.equal(state.preset, "fixtures-basic.irpkg");
+  assert.deepEqual(state.options, [
+    "fixtures-basic.irpkg",
+    "demo-host.irpkg",
+    "fixtures-lean.irpkg",
+    "fixtures-boundary.irpkg",
+    "local-fib.irpkg",
+    "local-mergesort.irpkg",
+    "",
+  ]);
+
+  const switched = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const preset = document.querySelector("#dev-package-preset");
+    preset.value = "demo-host.irpkg";
+    preset.dispatchEvent(new Event("change", { bubbles: true }));
+    const deadline = Date.now() + 5000;
+    const poll = () => {
+      const state = {
+        status: document.querySelector("#status")?.textContent?.trim(),
+        packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+        packageUrl: document.querySelector("#dev-package-url")?.value,
+        entryCount: document.querySelector("#dev-entry-select")?.options.length,
+      };
+      if (state.status === "Ready" && state.packageName === "demo-host.irpkg") {
+        resolve(state);
+      } else if (Date.now() > deadline) {
+        reject(new Error("package preset did not load demo-host.irpkg"));
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  })`);
+  assert.deepEqual(switched, {
+    status: "Ready",
+    packageName: "demo-host.irpkg",
+    packageUrl: "demo-host.irpkg",
+    entryCount: 5,
   });
 }
 
@@ -501,6 +558,7 @@ try {
   await cdp.send("Runtime.enable");
 
   await smokeLanding(cdp, server.origin);
+  await smokePackagePreset(cdp, server.origin);
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-basic.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "demo-host.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-lean.irpkg");
@@ -669,7 +727,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, manifest-driven entry list, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
+  console.log("pages browser smoke ok: landing, package presets, manifest-driven entry list, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

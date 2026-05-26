@@ -125,39 +125,42 @@ Author: Emilio J. Gallego Arias
           </div>
         </section>
 
-        <section class="pipeline-panel" aria-labelledby="pipeline-title">
-          <div class="section-heading">
+        <section class="package-panel" aria-labelledby="package-title">
+          <div class="section-heading package-heading">
             <div>
               <p class="eyebrow">Focused packages</p>
-              <h2 id="pipeline-title">Runner shortcuts</h2>
+              <h2 id="package-title">Browser package set</h2>
             </div>
+            <a class="section-link" href="dev.html">Open runner</a>
           </div>
-          <div class="pipeline-grid">
+          <div class="package-list">
             <a
-              class="pipeline-item"
-              href="dev.html?package=local-fib.irpkg&amp;entry=fib"
+              class="package-item"
+              href="dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump"
             >
-              <strong>fib</strong>
-              <span>Nat -&gt; Nat</span>
-              <small>local-fib.irpkg</small>
+              <strong>fixtures-basic.irpkg</strong>
+              <span>Basic, list/option, interface shapes</span>
             </a>
             <a
-              class="pipeline-item"
-              href="dev.html?package=local-mergesort.irpkg&amp;entry=SortDemo_demoFromArray"
+              class="package-item"
+              href="dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake"
             >
-              <strong>mergesort</strong>
-              <span>Array Nat -&gt; Nat</span>
-              <small>local-mergesort.irpkg</small>
+              <strong>demo-host.irpkg</strong>
+              <span>Browser host calls and DOM Tamagotchi</span>
             </a>
-            <a class="pipeline-item" href="dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake">
-              <strong>host call</strong>
-              <span>Lean IO -&gt; browser JS</span>
-              <small>demo-host.irpkg</small>
+            <a
+              class="package-item"
+              href="dev.html?package=fixtures-lean.irpkg&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore"
+            >
+              <strong>fixtures-lean.irpkg</strong>
+              <span>Lean Expr, parser, Task</span>
             </a>
-            <a class="pipeline-item" href="dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump">
-              <strong>structured input</strong>
-              <span>JSON -&gt; Lean structure</span>
-              <small>fixtures-basic.irpkg</small>
+            <a
+              class="package-item"
+              href="dev.html?package=fixtures-boundary.irpkg&amp;entry=Vir_Fixtures_Boundary_floatScaleScore"
+            >
+              <strong>fixtures-boundary.irpkg</strong>
+              <span>Numeric and runtime boundaries</span>
             </a>
           </div>
         </section>

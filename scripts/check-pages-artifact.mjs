@@ -34,11 +34,12 @@ const indexHtml = await assertHtmlAssetLinks("index.html");
 const devHtml = await assertHtmlAssetLinks("dev.html");
 
 assertLink(indexHtml, "dev.html");
-assertLink(indexHtml, "dev.html?package=local-fib.irpkg&amp;entry=fib");
-assertLink(indexHtml, "dev.html?package=local-mergesort.irpkg&amp;entry=SortDemo_demoFromArray");
-assertLink(indexHtml, "dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake");
 assertLink(indexHtml, "dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump");
+assertLink(indexHtml, "dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake");
+assertLink(indexHtml, "dev.html?package=fixtures-lean.irpkg&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore");
+assertLink(indexHtml, "dev.html?package=fixtures-boundary.irpkg&amp;entry=Vir_Fixtures_Boundary_floatScaleScore");
 assert.ok(devHtml.includes("dev-package-url"), "dev.html should contain package runner controls");
+assert.ok(devHtml.includes("dev-package-preset"), "dev.html should contain package presets");
 
 await assertFile("vir-upstream.wasm", 1024);
 await assertFile("fixtures-basic.irpkg", 1024);

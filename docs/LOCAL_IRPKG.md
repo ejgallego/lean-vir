@@ -75,8 +75,10 @@ Open `/dev.html`. The page creates a fresh WASM instance, loads the selected
 from that manifest. The header also shows the package metadata, including
 source targets, toolchain, generation time, declaration count, and export count.
 
-There are two package loading paths:
+There are three package loading paths:
 
+- Choose a package preset, which covers the generated focused browser packages
+  and the prepared local fib/mergesort packages.
 - Upload a package file, which is the simplest way to test packages under
   `build/generated/`.
 - Load a package URL, which is relative to Vite's served assets. For example,

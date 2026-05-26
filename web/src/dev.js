@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import "./style.css";
 import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "./interface-manifest.js";
 import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
+import browserPackages from "../../fixtures/browser-packages.json";
 
 const statusEl = document.querySelector("#status");
 const packageName = document.querySelector("#dev-package-name");
@@ -17,6 +18,7 @@ const ptrWidth = document.querySelector("#dev-ptr-width");
 const sourceTargets = document.querySelector("#dev-source-targets");
 const toolchain = document.querySelector("#dev-toolchain");
 const generatedAt = document.querySelector("#dev-generated-at");
+const packagePreset = document.querySelector("#dev-package-preset");
 const packageUrl = document.querySelector("#dev-package-url");
 const packageFile = document.querySelector("#dev-package-file");
 const loadUrlButton = document.querySelector("#dev-load-url");
@@ -25,9 +27,28 @@ const inputFields = document.querySelector("#dev-input-fields");
 const runEntryButton = document.querySelector("#dev-run-entry");
 const resultOutput = document.querySelector("#dev-result");
 const wasmFile = "vir-upstream.wasm";
-const defaultPackageUrl = "fixtures-basic.irpkg";
+const packageSpecs = browserPackages.packages ?? [];
+const packageById = new Map(packageSpecs.map((spec) => [spec.id, spec]));
+const defaultPackageUrl = packageById.get(browserPackages.defaultPackage)?.file ?? "fixtures-basic.irpkg";
+const packageLabels = new Map([
+  ["fixtures-basic.irpkg", "Basic, list/option, interface shapes"],
+  ["demo-host.irpkg", "Browser host calls and DOM Tamagotchi"],
+  ["fixtures-lean.irpkg", "Lean Expr, parser, Task"],
+  ["fixtures-boundary.irpkg", "Numeric and runtime boundaries"],
+  ["local-fib.irpkg", "Focused fib package"],
+  ["local-mergesort.irpkg", "Focused mergesort package"],
+]);
+const packagePresets = [
+  ...packageSpecs.map((spec) => ({
+    file: spec.file,
+    label: packageLabels.get(spec.file) ?? spec.id,
+  })),
+  { file: "local-fib.irpkg", label: packageLabels.get("local-fib.irpkg") },
+  { file: "local-mergesort.irpkg", label: packageLabels.get("local-mergesort.irpkg") },
+];
 const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
 const query = new URLSearchParams(window.location.search);
+let requestedEntry = query.get("entry");
 
 let runtime = null;
 let interfaceEntries = [];
@@ -82,13 +103,33 @@ function selectedInterfaceEntry() {
 }
 
 function selectEntryFromQuery() {
-  const entryId = query.get("entry");
+  const entryId = requestedEntry;
   if (!entryId) return;
   const match = interfaceEntries.find((entry) =>
     entry.id === entryId || entry.jsName === entryId || entry.entry === entryId);
   if (match) {
     entrySelect.value = match.id;
   }
+  requestedEntry = null;
+}
+
+function renderPackagePresets() {
+  packagePreset.replaceChildren();
+  for (const preset of packagePresets) {
+    const option = document.createElement("option");
+    option.value = preset.file;
+    option.textContent = `${preset.file} / ${preset.label}`;
+    packagePreset.append(option);
+  }
+  const custom = document.createElement("option");
+  custom.value = "";
+  custom.textContent = "Custom URL";
+  packagePreset.append(custom);
+}
+
+function syncPackagePreset() {
+  const value = packageUrl.value.trim();
+  packagePreset.value = packagePresets.some((preset) => preset.file === value) ? value : "";
 }
 
 function inputDefault(input) {
@@ -358,6 +399,7 @@ function formatResult(value) {
 
 async function loadIrPackageBytes(label, bytes) {
   runtime = await runtimeFactory.createRuntime({ irPackageBytes: bytes });
+  syncPackagePreset();
   packageName.textContent = label;
   packageSize.textContent = formatBytes(runtime.packageInfo.byteLength);
   declCount.textContent = String(runtime.packageInfo.count);
@@ -402,6 +444,17 @@ loadUrlButton.addEventListener("click", () => {
   });
 });
 
+packagePreset.addEventListener("change", () => {
+  if (packagePreset.value === "") return;
+  packageUrl.value = packagePreset.value;
+  requestedEntry = null;
+  loadPackageUrl().catch((error) => {
+    showError(error, "Failed");
+  });
+});
+
+packageUrl.addEventListener("input", syncPackagePreset);
+
 packageFile.addEventListener("change", () => {
   const file = packageFile.files?.[0];
   if (!file) return;
@@ -430,7 +483,9 @@ runEntryButton.addEventListener("click", () => {
   }
 });
 
+renderPackagePresets();
 packageUrl.value = query.get("package") ?? defaultPackageUrl;
+syncPackagePreset();
 
 loadPackageUrl().catch((error) => {
   showError(error, "Failed");
