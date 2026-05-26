@@ -163,7 +163,8 @@ and deploys the static site artifact.
 - `scripts/prepare-irpkg.mjs` generates a configured package for `/dev.html`
   and the hosted Pages package links.
 - `scripts/smoke_upstream.mjs` executes the generated browser artifact in Node.
-- `web/` is the browser harness. `/dev.html` is the local package runner.
+- `web/` is the browser harness. `/dev.html` is the local package runner, and
+  `/format.html` is the focused `pretty-printer.irpkg` workbench.
 
 ## Status
 

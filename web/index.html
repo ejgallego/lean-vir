@@ -19,6 +19,7 @@ Author: Emilio J. Gallego Arias
             <h1>IR Interpreter Demo</h1>
             <nav class="topbar-links" aria-label="Demo pages">
               <a href="dev.html">Package Runner</a>
+              <a href="format.html?case=list&amp;width=12">Format.pretty</a>
             </nav>
           </div>
           <div class="runtime-summary" aria-label="Runtime summary">
@@ -174,6 +175,13 @@ Author: Emilio J. Gallego Arias
             </a>
             <a
               class="package-item"
+              href="format.html?case=list&amp;width=12"
+            >
+              <strong>pretty-printer.irpkg</strong>
+              <span>Std.Format.pretty component package</span>
+            </a>
+            <a
+              class="package-item"
               href="dev.html?package=fixtures-lean.irpkg&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore"
             >
               <strong>fixtures-lean.irpkg</strong>
@@ -218,6 +226,7 @@ Author: Emilio J. Gallego Arias
               <button type="button" data-fixture-filter="fixtures/InterfaceShapes.lean">Interfaces</button>
               <button type="button" data-fixture-filter="fixtures/ListOption.lean">List/Option</button>
               <button type="button" data-fixture-filter="fixtures/ExprPrinter.lean">Lean</button>
+              <button type="button" data-fixture-filter="fixtures/FormatPretty.lean">Format</button>
               <button type="button" data-fixture-filter="fixtures/Boundary.lean">Boundary</button>
             </div>
             <button id="fixture-run-visible" class="fixture-run-visible" type="button" disabled>

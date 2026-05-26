@@ -1,10 +1,11 @@
 # Local IR Packages
 
 The browser demo normally loads focused packages from `web/public/`, including
-`fixtures-basic.irpkg`, `demo-host.irpkg`, `fixtures-lean.irpkg`, and
-`fixtures-boundary.irpkg`. They are generated from the demo examples plus the
-fixture manifest. For focused development, use the local package utility to
-generate a smaller package from one Lean file and load it in `/dev.html`.
+`fixtures-basic.irpkg`, `demo-host.irpkg`, `pretty-printer.irpkg`,
+`fixtures-lean.irpkg`, and `fixtures-boundary.irpkg`. They are generated from
+the demo examples plus the fixture manifest. For focused development, use the
+local package utility to generate a smaller package from one Lean file and load
+it in `/dev.html`.
 
 For the config-driven path, see `docs/INTERFACE_PIPELINE.md`.
 

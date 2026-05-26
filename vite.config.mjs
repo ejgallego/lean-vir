@@ -18,6 +18,7 @@ export default defineConfig({
       input: {
         main: resolve(repoRoot, "web/index.html"),
         dev: resolve(repoRoot, "web/dev.html"),
+        format: resolve(repoRoot, "web/format.html"),
         runtimeExample: resolve(repoRoot, "web/runtime-example.html"),
       },
     },

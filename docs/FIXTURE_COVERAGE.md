@@ -22,7 +22,8 @@ inductive families, and implicit arguments.
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather
 than a separate hand-maintained list of JavaScript names. It also checks that
-the generated focused browser packages appear in `/dev.html` selectors and that
+the generated focused browser packages appear in `/dev.html` selectors, that
+`pretty-printer.irpkg` powers the dedicated `/format.html` workbench, and that
 selecting each entry renders the expected control kinds from the manifest.
 
 ## Current Passing Surface
@@ -80,6 +81,11 @@ The current fixture surface covers:
   `Lean.FileMap.toPosition`, `Lean.Parser.mkParserState`, and the vertical
   `Lean.Parser.parseHeader` fixture backed by packaged initialized
   parser/environment extension globals;
+- a minimal real `Lean.Expr` construction and structural renderer over
+  constants, applications, literals, binders, and universe levels, backed by
+  explicit `Lean.Expr`/`Lean.Level` data-helper externs;
+- `Std.Format.pretty` over grouped soft lines, hard text newlines, nesting, and
+  alignment;
 - narrow synchronous coverage for already-resolved `Task.pure`/`Task.get`/
   `Task.map`, because real `Environment` values store a checked kernel
   environment behind `Task`;

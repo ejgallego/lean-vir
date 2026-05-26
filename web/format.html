@@ -1,0 +1,79 @@
+<!doctype html>
+<!--
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+-->
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Std.Format.pretty Workbench</title>
+  </head>
+  <body>
+    <main id="format-app" class="format-app">
+      <header class="format-topbar">
+        <div>
+          <p class="eyebrow">Lean 4.30-rc2 / wasm32-wasip1</p>
+          <h1>Std.Format.pretty</h1>
+        </div>
+        <div class="format-runtime-strip" aria-label="Runtime summary">
+          <div id="format-status" class="status">Loading</div>
+          <div>
+            <span>Package</span>
+            <strong>pretty-printer.irpkg</strong>
+          </div>
+          <div>
+            <span>Target</span>
+            <strong>wasm32-wasip1</strong>
+          </div>
+          <div>
+            <span>Exports</span>
+            <strong id="format-export-count">...</strong>
+          </div>
+        </div>
+      </header>
+
+      <section class="format-workbench" aria-label="Format pretty workbench">
+        <section class="format-controls" aria-label="Controls">
+          <div class="format-control-group">
+            <span>Case</span>
+            <div class="format-segmented" role="group" aria-label="Pretty case">
+              <button type="button" data-case="group">Group</button>
+              <button type="button" data-case="list">List</button>
+              <button type="button" data-case="fill">Fill</button>
+              <button type="button" data-case="nested">Nested</button>
+              <button type="button" data-case="all">All</button>
+            </div>
+          </div>
+
+          <div class="format-width-control">
+            <label for="format-width-range">
+              <span>Width</span>
+              <strong id="format-width-readout">18</strong>
+            </label>
+            <input id="format-width-range" type="range" min="4" max="40" step="1" value="18" />
+            <input id="format-width-input" type="number" min="4" max="40" step="1" value="18" />
+          </div>
+        </section>
+
+        <section class="format-output-panel" aria-label="Rendered output">
+          <div class="format-panel-heading">
+            <p class="eyebrow">Rendered output</p>
+            <output id="format-duration">...</output>
+          </div>
+          <pre id="format-ruler" class="format-ruler">...</pre>
+          <pre id="format-output" class="format-output">...</pre>
+        </section>
+
+        <section class="format-source-panel" aria-label="Lean source">
+          <div class="format-panel-heading">
+            <p class="eyebrow">Lean source</p>
+          </div>
+          <pre id="format-source" class="format-source">...</pre>
+        </section>
+      </section>
+    </main>
+    <script type="module" src="/src/format-demo.js"></script>
+  </body>
+</html>

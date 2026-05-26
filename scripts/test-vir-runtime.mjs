@@ -95,6 +95,7 @@ async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns) {
 const wasmBytes = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const irPackageBytes = await readFile(new URL("../web/public/fixtures-basic.irpkg", import.meta.url));
 const hostPackageBytes = await readFile(new URL("../web/public/demo-host.irpkg", import.meta.url));
+const prettyPackageBytes = await readFile(new URL("../web/public/pretty-printer.irpkg", import.meta.url));
 const leanPackageBytes = await readFile(new URL("../web/public/fixtures-lean.irpkg", import.meta.url));
 const hostlessImports = createVirImports(new WebAssembly.Module(wasmBytes));
 assert.throws(
@@ -104,6 +105,7 @@ assert.throws(
 
 const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
 const hostRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
+const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
 const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
 assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
 assert.equal(createExportedNodeVirRuntime, createVirRuntime);
@@ -123,6 +125,7 @@ assert.ok(runtime.packageMetadata.targets.some((target) => target.source === "ex
 assert.ok(runtime.interfaceManifest.exports.some((entry) => entry.entry === "fib"));
 assertManifestTypeDescriptorsRoundTrip(runtime.interfaceManifest);
 assertManifestTypeDescriptorsRoundTrip(hostRuntime.interfaceManifest);
+assertManifestTypeDescriptorsRoundTrip(prettyRuntime.interfaceManifest);
 assertManifestTypeDescriptorsRoundTrip(leanRuntime.interfaceManifest);
 assert.equal(validateInterfaceManifest(structuredClone(validManifestShape)).exports[0].entry, "ok");
 assertInvalidManifest((manifest) => {
@@ -413,6 +416,11 @@ assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
+assert.equal(prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12), "[alpha,\n beta,\n gamma]");
+assert.equal(
+  prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "fill", 28),
+  "lean ir runs format.pretty\ninside wasm",
+);
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.constNatExpr"), {
   kind: "const",
   name: "Nat",

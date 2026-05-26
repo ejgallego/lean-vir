@@ -735,6 +735,21 @@ extern "C" lean_object * lean_string_push___boxed(lean_object * s, lean_object *
     return lean_string_push(s, ch);
 }
 
+extern "C" lean_object * lean_string_pushn___boxed(lean_object * s, lean_object * c, lean_object * n) {
+    uint32_t ch = lean_unbox_uint32(c);
+    size_t count = nat_to_size_or_max(n);
+    lean_dec(c);
+    lean_dec(n);
+    if (count == SIZE_MAX) {
+        lean_dec(s);
+        __builtin_trap();
+    }
+    for (size_t i = 0; i < count; i++) {
+        s = lean_string_push(s, ch);
+    }
+    return s;
+}
+
 extern "C" lean_object * lean_string_length___boxed(lean_object * a) {
     lean_object * result = lean_string_length(a);
     lean_dec(a);
@@ -760,6 +775,43 @@ extern "C" lean_object * lean_string_utf8_next___boxed(lean_object * s, lean_obj
     lean_dec(s);
     lean_dec(pos);
     return result;
+}
+
+extern "C" lean_object * lean_string_posof___boxed(lean_object * s, lean_object * c) {
+    uint32_t needle = lean_unbox_uint32(c);
+    lean_dec(c);
+
+    lean_object * pos = lean_box(0);
+    while (!lean_string_utf8_at_end(s, pos)) {
+        if (lean_string_utf8_get(s, pos) == needle) {
+            lean_dec(s);
+            return pos;
+        }
+        lean_object * next = lean_string_utf8_next(s, pos);
+        lean_dec(pos);
+        pos = next;
+    }
+
+    lean_dec(s);
+    return pos;
+}
+
+extern "C" lean_object * lean_string_offsetofpos___boxed(lean_object * s, lean_object * pos) {
+    size_t target = nat_to_size_or_max(pos);
+    lean_object * current = lean_box(0);
+    size_t offset = 0;
+
+    while (nat_to_size_or_max(current) < target && !lean_string_utf8_at_end(s, current)) {
+        lean_object * next = lean_string_utf8_next(s, current);
+        lean_dec(current);
+        current = next;
+        offset++;
+    }
+
+    lean_dec(current);
+    lean_dec(pos);
+    lean_dec(s);
+    return lean_box(offset);
 }
 
 extern "C" lean_object * lean_string_utf8_next_fast___boxed(lean_object * s, lean_object * pos, lean_object * proof) {
@@ -1459,13 +1511,17 @@ extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_ob
     X("String.ofByteArray", "lean_string_from_utf8_unchecked", lean_string_from_utf8_unchecked___boxed) \
     X("String.hash", "lean_string_hash", lean_string_hash___boxed) \
     X("String.push", "lean_string_push", lean_string_push___boxed) \
+    X("String.Internal.pushn", "lean_string_pushn", lean_string_pushn___boxed) \
     X("String.length", "lean_string_length", lean_string_length___boxed) \
+    X("String.Internal.length", "lean_string_length", lean_string_length___boxed) \
     X("String.utf8ByteSize", "lean_string_utf8_byte_size", lean_string_utf8_byte_size___boxed) \
     X("String.getUTF8Byte", "lean_string_get_byte_fast", lean_string_get_byte_fast___boxed) \
     X("String.Pos.set", "l_String_Pos_set", l_String_Pos_set___boxed) \
     X("String.Pos.Raw.set", "l_String_Pos_Raw_set", l_String_Pos_Raw_set___boxed) \
     X("String.set", "l_String_set", l_String_set___boxed) \
     X("String.Internal.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
+    X("String.Internal.posOf", "lean_string_posof", lean_string_posof___boxed) \
+    X("String.Internal.offsetOfPos", "lean_string_offsetofpos", lean_string_offsetofpos___boxed) \
     X("String.Pos.Raw.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
     X("String.Pos.next", "lean_string_utf8_next_fast", lean_string_utf8_next_fast___boxed) \
     X("String.Pos.Raw.next'", "lean_string_utf8_next_fast", lean_string_utf8_next_fast___boxed) \

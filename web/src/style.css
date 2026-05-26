@@ -1238,6 +1238,222 @@ h2 {
   overflow-wrap: anywhere;
 }
 
+.dev-eval-row output[data-multiline="true"] {
+  min-height: 220px;
+  max-height: 420px;
+  overflow: auto;
+  white-space: pre;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.9rem;
+  font-weight: 700;
+  line-height: 1.45;
+}
+
+.format-app {
+  min-height: 100vh;
+  padding: 28px;
+}
+
+.format-topbar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  max-width: 1180px;
+  margin: 0 auto;
+  padding-bottom: 20px;
+  border-bottom: 1px solid #d9ded2;
+}
+
+.format-runtime-strip {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(92px, auto));
+  gap: 1px;
+  min-width: 0;
+  border: 1px solid #d9ded2;
+  background: #d9ded2;
+}
+
+.format-runtime-strip div {
+  min-width: 0;
+  min-height: 40px;
+  padding: 7px 10px;
+  background: #ffffff;
+}
+
+.format-runtime-strip span,
+.format-runtime-strip strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.format-runtime-strip span {
+  color: #5f6f64;
+  font-size: 0.62rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.format-runtime-strip strong {
+  margin-top: 3px;
+  color: #17201a;
+  font-size: 0.76rem;
+  line-height: 1.15;
+}
+
+.format-workbench {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.62fr) minmax(360px, 1fr);
+  grid-template-areas:
+    "controls output"
+    "source output";
+  gap: 16px;
+  max-width: 1180px;
+  margin: 20px auto 0;
+}
+
+.format-controls,
+.format-output-panel,
+.format-source-panel {
+  min-width: 0;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+}
+
+.format-controls {
+  grid-area: controls;
+  display: grid;
+  gap: 18px;
+  padding: 16px;
+}
+
+.format-output-panel {
+  grid-area: output;
+}
+
+.format-source-panel {
+  grid-area: source;
+}
+
+.format-control-group > span,
+.format-width-control span {
+  display: block;
+  color: #5f6f64;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.format-segmented {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 1px;
+  margin-top: 8px;
+  background: #d9ded2;
+  border: 1px solid #d9ded2;
+}
+
+.format-segmented button {
+  min-width: 0;
+  min-height: 42px;
+  border: 0;
+  background: #ffffff;
+  color: #263d2c;
+  font-size: 0.82rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.format-segmented button[aria-pressed="true"] {
+  background: #20384a;
+  color: #ffffff;
+}
+
+.format-width-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 78px;
+  gap: 10px;
+  align-items: center;
+}
+
+.format-width-control label {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.format-width-control strong {
+  color: #20384a;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+}
+
+.format-width-control input[type="range"] {
+  width: 100%;
+  accent-color: #516f88;
+}
+
+.format-width-control input[type="number"] {
+  width: 100%;
+  min-height: 38px;
+  border: 1px solid #d9ded2;
+  padding: 7px 8px;
+}
+
+.format-panel-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 46px;
+  padding: 12px 14px;
+  border-bottom: 1px solid #d9ded2;
+}
+
+.format-panel-heading output {
+  color: #5f6f64;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.format-ruler,
+.format-output,
+.format-source {
+  margin: 0;
+  overflow: auto;
+  white-space: pre;
+  font-family: "SFMono-Regular", Consolas, "Liberation Mono", monospace;
+  line-height: 1.5;
+}
+
+.format-ruler {
+  min-height: 42px;
+  padding: 10px 14px;
+  border-bottom: 1px solid #d9ded2;
+  background: #f8faf6;
+  color: #516f88;
+  font-size: 0.82rem;
+  font-weight: 800;
+}
+
+.format-output {
+  min-height: 460px;
+  padding: 18px;
+  background: #111820;
+  color: #e8f0ef;
+  font-size: 1rem;
+}
+
+.format-source {
+  min-height: 220px;
+  padding: 16px;
+  background: #f6f7f2;
+  color: #17201a;
+  font-size: 0.86rem;
+}
+
 @media (max-width: 920px) {
   .topbar {
     flex-direction: column;
@@ -1262,6 +1478,22 @@ h2 {
 
   .fixture-source-panel {
     position: static;
+  }
+
+  .format-topbar {
+    flex-direction: column;
+  }
+
+  .format-runtime-strip {
+    width: 100%;
+  }
+
+  .format-workbench {
+    grid-template-columns: 1fr;
+    grid-template-areas:
+      "controls"
+      "output"
+      "source";
   }
 }
 
@@ -1360,6 +1592,16 @@ h2 {
   }
 
   .pet-trace-band {
+    grid-template-columns: 1fr;
+  }
+
+  .format-app {
+    padding: 20px;
+  }
+
+  .format-runtime-strip,
+  .format-segmented,
+  .format-width-control {
     grid-template-columns: 1fr;
   }
 }

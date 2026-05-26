@@ -57,6 +57,22 @@
       "fixtureSources": []
     },
     {
+      "id": "pretty-printer",
+      "file": "pretty-printer.irpkg",
+      "report": "build/generated/pretty-printer.report.md",
+      "targets": [
+        {
+          "source": "fixtures/FormatPretty.lean",
+          "roots": [
+            "Vir.Fixtures.FormatPretty.formatPrettyPreview",
+            "Vir.Fixtures.FormatPretty.formatPrettyAtWidth",
+            "Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth"
+          ]
+        }
+      ],
+      "fixtureSources": ["fixtures/FormatPretty.lean"]
+    },
+    {
       "id": "fixtures-lean",
       "file": "fixtures-lean.irpkg",
       "report": "build/generated/fixtures-lean.report.md",

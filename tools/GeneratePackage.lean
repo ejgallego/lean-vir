@@ -718,7 +718,19 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_push"
   },
   {
+    name := `String.Internal.pushn,
+    params := #[param 1 false .object, param 2 false .uint32, param 3 false .tobject],
+    resultType := .object,
+    symbol := "lean_string_pushn"
+  },
+  {
     name := `String.length,
+    params := #[param 1 true .object],
+    resultType := .tagged,
+    symbol := "lean_string_length"
+  },
+  {
+    name := `String.Internal.length,
     params := #[param 1 true .object],
     resultType := .tagged,
     symbol := "lean_string_length"
@@ -758,6 +770,18 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .tobject,
     symbol := "lean_string_utf8_next"
+  },
+  {
+    name := `String.Internal.posOf,
+    params := #[param 1 false .object, param 2 false .uint32],
+    resultType := .tobject,
+    symbol := "lean_string_posof"
+  },
+  {
+    name := `String.Internal.offsetOfPos,
+    params := #[param 1 false .object, param 2 false .tobject],
+    resultType := .tobject,
+    symbol := "lean_string_offsetofpos"
   },
   {
     name := `String.Pos.Raw.next,
