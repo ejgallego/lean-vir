@@ -4,6 +4,9 @@
 `.irpkg`, and exposes its Lean declarations through a generic JavaScript call
 API without requiring callers to manage WASM memory.
 
+For the end-to-end "my Lean function from my JavaScript code" workflow, start
+with `docs/CALL_LEAN_FROM_JS.md`.
+
 The module is also exposed through the package entry point:
 
 ```js

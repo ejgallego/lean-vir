@@ -8,7 +8,9 @@ The browser demo also loads generated focused packages from `web/public/`,
 including `fixtures-basic.irpkg`, `demo-host.irpkg`, `pretty-printer.irpkg`,
 `fixtures-lean.irpkg`, and `fixtures-boundary.irpkg`.
 
-For the config-driven path, see `docs/INTERFACE_PIPELINE.md`.
+For calling packaged Lean declarations from JavaScript, see
+`docs/CALL_LEAN_FROM_JS.md`. For the config-driven path, see
+`docs/INTERFACE_PIPELINE.md`.
 
 ## Generate A Package
 

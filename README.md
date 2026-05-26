@@ -180,6 +180,8 @@ https://ejgallego.github.io/lean-vir/
 Useful docs:
 
 - `docs/LOCAL_IRPKG.md` for the full local package workflow.
+- `docs/CALL_LEAN_FROM_JS.md` for calling exported Lean declarations from app
+  JavaScript.
 - `docs/INTERFACE_PIPELINE.md` for package configs, manifests, and interface
   details.
 - `docs/JS_API.md` for using the runtime wrapper from JavaScript.
