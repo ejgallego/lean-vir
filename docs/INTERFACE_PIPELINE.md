@@ -1,6 +1,6 @@
 # Interface Pipeline
 
-The developer path is now config-driven:
+The developer path is package-driven:
 
 ```bash
 npm run prepare:irpkg -- examples/fib.virpkg.json
@@ -10,18 +10,16 @@ That command:
 
 1. elaborates the configured Lean source with Lean 4.30-rc2;
 2. extracts the requested IR declaration closure into an `.irpkg`;
-3. writes the package report;
-4. writes a browser input spec next to the package when `inputSpec.path` is set.
+3. embeds a generated JavaScript interface manifest and package metadata in
+   the package;
+4. writes the package report next to the generated artifact.
 
-The generated package and input spec can then be loaded in `/dev.html` by URL:
+The generated `.irpkg` is the only browser artifact needed by `/dev.html`.
+After the package is loaded, the runner reads the embedded manifest and creates
+the UI entries automatically. The manifest metadata records the package format,
+Lean toolchain, generation time, source targets, and resolved roots.
 
-```text
-Package URL: local-fib.irpkg
-Spec URL:    local-fib.input.json
-```
-
-`web/public/*.irpkg` and `web/public/*.input.json` are generated local assets and
-are ignored by git.
+`web/public/*.irpkg` files are generated local assets and are ignored by git.
 
 ## Pages Landing
 
@@ -32,23 +30,21 @@ npm run build:site
 ```
 
 That script first builds the upstream WASM demo, then runs `npm run
-prepare:pages` to generate the URL-loadable sample package/spec pairs:
+prepare:pages` to generate URL-loadable sample packages:
 
 - `local-fib.irpkg`
-- `local-fib.input.json`
 - `local-mergesort.irpkg`
-- `local-mergesort.input.json`
 
-Vite then copies those generated assets into `web/dist/` alongside `index.html`
+Vite copies those generated packages into `web/dist/` alongside `index.html`
 and `dev.html`. The landing page links directly to `/dev.html` with query
 parameters such as:
 
 ```text
-dev.html?package=local-fib.irpkg&spec=local-fib.input.json&entry=fib
+dev.html?package=local-fib.irpkg&entry=fib
 ```
 
-The package runner accepts `package`, `spec`, and `entry` query parameters so a
-generated package can be opened with the right input spec and selected entry.
+The package runner accepts `package` and `entry` query parameters. `entry` may
+be a manifest `id`, `jsName`, or Lean declaration name.
 
 ## Config Shape
 
@@ -58,61 +54,116 @@ generated package can be opened with the right input spec and selected entry.
   "source": "examples/Fib.lean",
   "package": "web/public/local-fib.irpkg",
   "report": "build/generated/local-fib.report.md",
-  "roots": ["fib"],
-  "inputSpec": {
-    "path": "web/public/local-fib.input.json",
-    "entries": [
-      {
-        "id": "fib",
-        "entry": "fib",
-        "result": { "type": "Nat" },
-        "inputs": [
-          {
-            "name": "n",
-            "type": "Nat",
-            "defaultValue": "12",
-            "min": 0,
-            "max": 17
-          }
-        ]
-      }
-    ]
-  }
+  "roots": ["fib"]
 }
 ```
 
-If `roots` is omitted or empty, `prepare:irpkg` packages every IR declaration
-emitted by the source, using the generator's `--target-all` mode. Explicit roots
-are preferred for stable demos and size-sensitive experiments.
+If `roots` is omitted or empty, `prepare:irpkg` uses `--target-all`, packages
+the declarations emitted by the source, and treats public source definitions as
+interface exports. Unsupported public exports fail loudly with diagnostics in
+the report. Explicit roots are preferred for stable demos and size-sensitive
+experiments.
+
+For ad hoc local files, use the direct CLI:
+
+```bash
+npm run generate:irpkg -- <source.lean> [package.irpkg] [root ...]
+```
+
+It prints the same metadata that is embedded in the package.
+
+To inspect a generated package without starting the browser, run:
+
+```bash
+npm run inspect:irpkg -- <package.irpkg>
+```
+
+Add `--json` to emit the parsed package header and full embedded manifest.
 
 ## Supported Interface Surface
 
-The current browser interface supports:
+The embedded manifest currently supports:
 
-- `() -> Nat`;
-- `Nat -> Nat`;
-- `Array Nat -> Nat`.
+- scalar values: `Nat`, `Int`, `Bool`, `String`, `Float`, `Float32`;
+- fixed-width values: `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`;
+- byte data: `ByteArray`;
+- recursive collections: `Array α` and `List α` for supported `α`;
+- recursive option/product/tagged-union shapes: `Option α`, `α × β`,
+  `Sum α β`, and `Except ε α` for supported parameters;
+- non-indexed user-defined structures over manifest-supported fields, including
+  parameterized instances such as `Box Nat` and `Tagged (Array String)`,
+  direct `Bool`, `UInt*`, `USize`, `Float`, `Float32`, and enum fields,
+  single-field wrappers over direct scalar fields, and inherited parent fields
+  represented as flattened JavaScript object keys;
+- nullary inductive enums, represented in JavaScript by generated constructor
+  names;
+- `Lean.Expr`, represented as structural JavaScript objects.
 
-All results are returned to JavaScript as decimal strings. This avoids truncating
-large Lean `Nat` values to JavaScript numbers.
+Large exact integer values are returned to JavaScript as decimal strings to
+avoid truncating them to JavaScript numbers.
+Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them require
+the generated Lean `_boxed` declaration at the wasm32 interpreter boundary. The
+package generator auto-includes that companion for requested roots and reports a
+diagnostic instead of producing a partial package if the companion is missing.
+
+For structures, the manifest records Lean constructor layout metadata alongside
+the applied Lean type label, field names, and instantiated field types. The JS
+runtime sends that layout to the WASM shim so direct scalar fields are written
+to the same object, `USize`, and scalar slots that compiled Lean code expects.
+Parent structure fields remain explicit subobjects in the manifest so the
+runtime layout matches Lean, but the JS API accepts and returns inherited fields
+as flattened object keys.
+One-field wrappers whose only runtime field is a direct scalar, for example
+`Box UInt32`, use the same `trivialFieldIndex` path as object-field wrappers
+while keeping the JavaScript object shape.
+
+`Sum` and `Except` use manifest-backed tagged-union metadata. JavaScript sends
+objects such as `{ "kind": "inl", "value": 4 }` or `{ "ok": value }`; results
+come back as `{ kind, value }` objects using generated constructor names. The
+manifest records each constructor payload layout so direct scalar payloads are
+written into the same constructor scalar slots as compiled Lean code.
+
+The recursive type tree is embedded in the JSON manifest and sent as a compact
+internal descriptor in each `vir_call` payload. This is intentionally still an
+internal package ABI, not a committed component-model boundary.
+
+Package loading validates every exported argument/result type before exposing
+the manifest to the UI or JS caller. The validator rejects unsupported wire
+tags, malformed recursive children, invalid enum constructors, inconsistent
+structure field layouts, bad `trivialFieldIndex` values, and duplicate export
+names. Runtime tests also round-trip every generated export type through the
+compact descriptor encoder/decoder so descriptor drift fails before a call
+enters WASM.
+
+## Current Trust Boundary
+
+The manifest and package payload are trusted in this prototype. The JavaScript
+runtime validates the embedded manifest before exposing entries, then sends the
+compact type descriptor from that manifest with each `vir_call` request. The
+WASM shim currently uses that descriptor to decode arguments, construct Lean
+runtime objects, and encode results; it does not yet independently bind the
+descriptor to a package-owned export table.
+
+This is acceptable for the current generated demo packages and local developer
+packages. It is not a hardened boundary for arbitrary remote `.irpkg` files.
+The WASM sandbox protects the host browser from native memory escape, but a
+malformed or intentionally hostile package can still trap the interpreter,
+consume CPU or WASM memory, make the tab unresponsive, or confuse result
+decoding by claiming an ABI that does not match the packaged Lean declaration.
+
+The hardening path is to make the package provider own the ABI descriptors for
+each exported declaration, have `vir_call` look them up by entry name instead of
+accepting caller-provided result/layout descriptors, validate layout descriptors
+inside the WASM shim, and add size/depth/execution limits around package loading
+and calls.
 
 ## WIT Direction
 
-WIT is the right interface-description model to track, but not yet the right
+WIT is still the right interface-description model to track, but not yet the
 runtime dependency for this demo path.
 
-The current artifact is a core `wasm32-wasip1` module with hand-written JS
-marshalling over exported functions. A real WIT interface would move this toward
-the WebAssembly Component Model, where interfaces are described in WIT and use
-the Component Model's canonical ABI. That is a better long-term shape for typed
-calls, strings, lists, and future multi-language hosts.
-
-For now, the repo keeps a draft WIT contract in `interfaces/lean-vir.wit`, but
-does not build a component from it. The JSON input spec remains the source of
-truth for the browser developer UI because it works directly with the current
-core WASM artifact. The practical migration path is:
-
-1. keep extending the JSON spec with WIT-like types;
-2. keep the JS runtime wrapper as the compatibility layer over core WASM;
-3. once component tooling is worth adding, generate or validate the JSON spec
-   against the WIT world and add a component build as a second artifact.
+The current artifact is a core `wasm32-wasip1` module with a generated manifest
+and a generic byte-payload call export. We are not committing this prototype to
+a component-model boundary yet. For now, `interfaces/lean-vir.wit` mirrors the
+generic manifest/call shape as a design reference while the browser runtime
+uses the embedded JSON manifest directly.

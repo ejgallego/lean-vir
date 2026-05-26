@@ -41,12 +41,21 @@
       "id": "nested-option-sum",
       "source": "fixtures/ListOption.lean",
       "entry": "Vir.Fixtures.ListOption.nestedOptionSumScore",
+      "roots": [
+        "Vir.Fixtures.ListOption.nestedOptionSumScore",
+        "Vir.Fixtures.ListOption.classifySum",
+        "Vir.Fixtures.ListOption.sumScore"
+      ],
       "result": { "type": "Nat" }
     },
     {
       "id": "except-option-sum",
       "source": "fixtures/ListOption.lean",
       "entry": "Vir.Fixtures.ListOption.exceptOptionSumScore",
+      "roots": [
+        "Vir.Fixtures.ListOption.exceptOptionSumScore",
+        "Vir.Fixtures.ListOption.classifyExcept"
+      ],
       "result": { "type": "Nat" }
     },
     {
@@ -245,6 +254,74 @@
       "id": "upstream-bytearray-input",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayInputScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "expr-sample-score",
+      "source": "fixtures/ExprPrinter.lean",
+      "entry": "Vir.Fixtures.ExprPrinter.sampleScore",
+      "roots": [
+        "Vir.Fixtures.ExprPrinter.sampleScore",
+        "Vir.Fixtures.ExprPrinter.constNatExpr",
+        "Vir.Fixtures.ExprPrinter.twoLitExpr",
+        "Vir.Fixtures.ExprPrinter.appExpr",
+        "Vir.Fixtures.ExprPrinter.sortParamExpr",
+        "Vir.Fixtures.ExprPrinter.fvarExpr",
+        "Vir.Fixtures.ExprPrinter.mvarExpr",
+        "Vir.Fixtures.ExprPrinter.lambdaExpr",
+        "Vir.Fixtures.ExprPrinter.forallExpr",
+        "Vir.Fixtures.ExprPrinter.letExpr",
+        "Vir.Fixtures.ExprPrinter.stringLitExpr",
+        "Vir.Fixtures.ExprPrinter.mdataExpr",
+        "Vir.Fixtures.ExprPrinter.projExpr",
+        "Vir.Fixtures.ExprPrinter.exprCoverageScore",
+        "Vir.Fixtures.ExprPrinter.exprKindScore",
+        "Vir.Fixtures.ExprPrinter.bumpBVar"
+      ],
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "interface-shape-score",
+      "source": "fixtures/InterfaceShapes.lean",
+      "entry": "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",
+      "roots": [
+        "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",
+        "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength",
+        "Vir.Fixtures.InterfaceShapes.listUInt32Sum",
+        "Vir.Fixtures.InterfaceShapes.uint32Bump",
+        "Vir.Fixtures.InterfaceShapes.uint64Bump",
+        "Vir.Fixtures.InterfaceShapes.floatScale",
+        "Vir.Fixtures.InterfaceShapes.floatScore",
+        "Vir.Fixtures.InterfaceShapes.float32Roundtrip",
+        "Vir.Fixtures.InterfaceShapes.optionNatBump",
+        "Vir.Fixtures.InterfaceShapes.optionStringBang",
+        "Vir.Fixtures.InterfaceShapes.optionNatScore",
+        "Vir.Fixtures.InterfaceShapes.prodNatNatSwap",
+        "Vir.Fixtures.InterfaceShapes.prodNatNatSum",
+        "Vir.Fixtures.InterfaceShapes.optionArrayNatSum",
+        "Vir.Fixtures.InterfaceShapes.listProdNatStringScore",
+        "Vir.Fixtures.InterfaceShapes.prodStringNatSwap",
+        "Vir.Fixtures.InterfaceShapes.arrayExprKindScore",
+        "Vir.Fixtures.InterfaceShapes.optionExprBump",
+        "Vir.Fixtures.InterfaceShapes.profileBump",
+        "Vir.Fixtures.InterfaceShapes.profileScore",
+        "Vir.Fixtures.InterfaceShapes.profileSummary",
+        "Vir.Fixtures.InterfaceShapes.profileEnvelopeScore",
+        "Vir.Fixtures.InterfaceShapes.profileStatsBump",
+        "Vir.Fixtures.InterfaceShapes.profileStatsScore",
+        "Vir.Fixtures.InterfaceShapes.boxNatBump",
+        "Vir.Fixtures.InterfaceShapes.boxUInt32Bump",
+        "Vir.Fixtures.InterfaceShapes.boxUInt64Bump",
+        "Vir.Fixtures.InterfaceShapes.uint32BoxBump",
+        "Vir.Fixtures.InterfaceShapes.uint64BoxBump",
+        "Vir.Fixtures.InterfaceShapes.nestedBoxNatBump",
+        "Vir.Fixtures.InterfaceShapes.taggedArrayScore",
+        "Vir.Fixtures.InterfaceShapes.taggedProfileBump",
+        "Vir.Fixtures.InterfaceShapes.meteredBoxBump",
+        "Vir.Fixtures.InterfaceShapes.boxExprKindScore",
+        "Vir.Fixtures.InterfaceShapes.extendedProfileBump",
+        "Vir.Fixtures.InterfaceShapes.extendedProfileScore"
+      ],
       "result": { "type": "Nat" }
     },
     {

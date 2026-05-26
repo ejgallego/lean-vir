@@ -9,6 +9,8 @@ import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
 import fibSource from "../../examples/Fib.lean?raw";
 import mergeSortSource from "../../examples/MergeSort.lean?raw";
 import fixtureBasicSource from "../../fixtures/Basic.lean?raw";
+import fixtureExprPrinterSource from "../../fixtures/ExprPrinter.lean?raw";
+import fixtureInterfaceShapesSource from "../../fixtures/InterfaceShapes.lean?raw";
 import fixtureListOptionSource from "../../fixtures/ListOption.lean?raw";
 import fixtureBoundarySource from "../../fixtures/Boundary.lean?raw";
 import fixtureManifest from "../../fixtures/manifest.json";
@@ -57,6 +59,8 @@ const sourceFiles = [
   { path: "examples/Fib.lean", source: fibSource },
   { path: "examples/MergeSort.lean", source: mergeSortSource },
   { path: "fixtures/Basic.lean", source: fixtureBasicSource },
+  { path: "fixtures/ExprPrinter.lean", source: fixtureExprPrinterSource },
+  { path: "fixtures/InterfaceShapes.lean", source: fixtureInterfaceShapesSource },
   { path: "fixtures/ListOption.lean", source: fixtureListOptionSource },
   { path: "fixtures/Boundary.lean", source: fixtureBoundarySource },
 ];
@@ -108,7 +112,7 @@ let irPackageBytesPromise = null;
 let runtime = null;
 let currentFixtureFilter = "all";
 let selectedFixtureId = null;
-let petMood = 0;
+let petMood = "happy";
 let petTrace = [petMood];
 let petArtwork = petArtToggle.checked ? "octopus" : "pet";
 
@@ -143,20 +147,19 @@ function setTrap(error) {
 }
 
 function renderPet() {
-  const mood = moods[petMood] ?? "?";
+  const mood = moods.includes(petMood) ? petMood : "?";
   petMoodDisplay.textContent = mood;
   petDevice.dataset.mood = mood;
   petDevice.dataset.art = petArtwork;
   petDevice.setAttribute("aria-label", `${petArtwork === "octopus" ? "Octopus" : "Virtual pet"} mood ${mood}`);
-  petTraceDisplay.textContent = petTrace.map((mood) => moods[mood] ?? "?").join(" -> ");
+  petTraceDisplay.textContent = petTrace.map((mood) => moods.includes(mood) ? mood : "?").join(" -> ");
 }
 
 function stepPet(runtime, actionName) {
-  const action = actions.indexOf(actionName);
-  if (action < 0) return;
+  if (!actions.includes(actionName)) return;
   petActionDisplay.textContent = actionName;
   try {
-    petMood = runtime.exports.vir_upstream_tamagotchi_step(petMood, action);
+    petMood = runtime.call("Tamagotchi.step", petMood, actionName);
     petTrace.push(petMood);
     renderPet();
     setReady();
@@ -167,7 +170,7 @@ function stepPet(runtime, actionName) {
 }
 
 function resetPet() {
-  petMood = 0;
+  petMood = "happy";
   petTrace = [petMood];
   petActionDisplay.textContent = "...";
   renderPet();
@@ -361,7 +364,7 @@ function runInputFixture(runtime, fixture) {
     if (fixture.id === selectedFixtureId) {
       fixtureInput.value = String(n);
     }
-    return runtime.evalNatToNat(fixture.entry, n);
+    return runtime.call(fixture.entry, n);
   }
 
   if (fixture.runner === "sort") {
@@ -372,7 +375,7 @@ function runInputFixture(runtime, fixture) {
       fixtureInput.value = normalized;
     }
     const sorted = [...values].sort((a, b) => a - b);
-    return `checksum ${runtime.evalNatArrayToNat(fixture.entry, values)} / [${sorted.join(", ")}]`;
+    return `checksum ${runtime.call(fixture.entry, values)} / [${sorted.join(", ")}]`;
   }
 
   return null;
@@ -382,7 +385,7 @@ function evaluateFixture(runtime, fixture) {
   if (fixture.runner) {
     return runInputFixture(runtime, fixture);
   }
-  return runtime.evalConstNat(fixture.entry);
+  return runtime.call(fixture.entry);
 }
 
 async function runFixture(fixture) {

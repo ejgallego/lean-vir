@@ -19,7 +19,7 @@ Author: Emilio J. Gallego Arias
             <h1>IR Interpreter Demo</h1>
             <nav class="topbar-links" aria-label="Demo pages">
               <a href="dev.html">Package Runner</a>
-              <a href="dev.html?package=local-fib.irpkg&amp;spec=local-fib.input.json&amp;entry=fib">
+              <a href="dev.html?package=local-fib.irpkg&amp;entry=fib">
                 Fib Package
               </a>
             </nav>
@@ -138,7 +138,7 @@ Author: Emilio J. Gallego Arias
           <div class="pipeline-grid">
             <a
               class="pipeline-item"
-              href="dev.html?package=local-fib.irpkg&amp;spec=local-fib.input.json&amp;entry=fib"
+              href="dev.html?package=local-fib.irpkg&amp;entry=fib"
             >
               <strong>fib</strong>
               <span>Nat -&gt; Nat</span>
@@ -146,13 +146,13 @@ Author: Emilio J. Gallego Arias
             </a>
             <a
               class="pipeline-item"
-              href="dev.html?package=local-mergesort.irpkg&amp;spec=local-mergesort.input.json&amp;entry=sort-array"
+              href="dev.html?package=local-mergesort.irpkg&amp;entry=SortDemo_demoFromArray"
             >
               <strong>mergesort</strong>
               <span>Array Nat -&gt; Nat</span>
               <small>local-mergesort.irpkg</small>
             </a>
-            <a class="pipeline-item" href="dev.html?package=vir-demo.irpkg&amp;entry=sort-array">
+            <a class="pipeline-item" href="dev.html?package=vir-demo.irpkg&amp;entry=SortDemo_demoFromArray">
               <strong>demo bundle</strong>
               <span>fixture package</span>
               <small>vir-demo.irpkg</small>
@@ -186,6 +186,7 @@ Author: Emilio J. Gallego Arias
               <button type="button" data-fixture-filter="all" aria-pressed="true">All</button>
               <button type="button" data-fixture-filter="demos">Demos</button>
               <button type="button" data-fixture-filter="fixtures/Basic.lean">Basic</button>
+              <button type="button" data-fixture-filter="fixtures/InterfaceShapes.lean">Interfaces</button>
               <button type="button" data-fixture-filter="fixtures/ListOption.lean">List/Option</button>
               <button type="button" data-fixture-filter="fixtures/Boundary.lean">Boundary</button>
             </div>

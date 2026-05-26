@@ -3,24 +3,5 @@
   "source": "examples/Fib.lean",
   "package": "web/public/local-fib.irpkg",
   "report": "build/generated/local-fib.report.md",
-  "roots": ["fib"],
-  "inputSpec": {
-    "path": "web/public/local-fib.input.json",
-    "entries": [
-      {
-        "id": "fib",
-        "entry": "fib",
-        "result": { "type": "Nat" },
-        "inputs": [
-          {
-            "name": "n",
-            "type": "Nat",
-            "defaultValue": "12",
-            "min": 0,
-            "max": 17
-          }
-        ]
-      }
-    ]
-  }
+  "roots": ["fib"]
 }

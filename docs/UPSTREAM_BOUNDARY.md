@@ -16,8 +16,8 @@ The generated report is written to `build/upstream-probe/boundary.md`.
 Current status: the strict `wasm32-wasip1` link succeeds with the real upstream
 `ir_interpreter.cpp`, the linked Lean runtime subset, and
 `wasm/upstream_shim/`. The demo closure is supplied through a package-backed
-provider as real Lean IR declaration objects, and the exported demo functions
-execute that closure through the real upstream interpreter.
+provider as real Lean IR declaration objects, and manifest-supported browser
+calls execute that closure through the real upstream interpreter via `vir_call`.
 
 ## Policy
 
@@ -67,6 +67,8 @@ Together they supply:
 - small WASI/platform stubs for dynamic symbol lookup, C++ exception throwing,
   trace/time/options hooks, and the few environment helpers pulled in by the
   interpreter.
+- the generic `vir_call` package interface used by the JavaScript runtime for
+  manifest-supported functions.
 - name construction primitives needed by `src/util/name.cpp`.
 
 The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
@@ -98,12 +100,13 @@ return `Option decl` values using the same constructor layout:
 This is the critical distinction from the discarded bootstrap runners: the demo
 does not use a parallel C/C++ interpreter schema.
 
-## Static Closure Strategy
+## Package Closure Strategy
 
-For the demo, we will statically load the transitive declaration closure needed
-by the examples rather than loading Lean module data. This keeps `.olean`
-loading, module initialization, and full environment construction out of scope
-while still exercising the real upstream interpreter over real Lean IR objects.
+For the demo, `/dev.html` and the smoke tests load one `.irpkg` file containing
+the transitive declaration closure needed by the exported Lean functions. This
+keeps `.olean` loading, module initialization, and full environment construction
+out of scope while still exercising the real upstream interpreter over real
+Lean IR objects.
 
 The closure is extracted by `tools/GeneratePackage.lean` from real
 `Lean.IR.Decl` values. The generator starts with declarations produced for the
@@ -119,7 +122,8 @@ registrations, and the package decoder exposes its last load error for browser
 and smoke-test diagnostics.
 The current explicit native externs cover the small fixture/demo surface for
 `Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
-`Float`, and `String`. This includes the arithmetic and comparison operations
+`Float`, `String`, and the helper externs reached by `Lean.Expr`/`Lean.Level`
+data computation. This includes the arithmetic and comparison operations
 needed by the demos, List/Array/String/ByteArray fixtures, array mutation
 through `Array.emptyWithCapacity`/`Array.getInternal`/`Array.replicate`/
 `Array.set`/`Array.set!`/`Array.swap`/`Array.swapIfInBounds`/`Array.pop`,
@@ -139,8 +143,8 @@ arithmetic, `UInt8`/`UInt16` `toNat` plus arithmetic, bitwise, shift, and
 comparison operations, `UInt32.ofNat`/`toNat`/`toUInt8` plus arithmetic,
 bitwise, shift, and comparison operations, `UInt64.ofNat`/`ofNatLT`/`toNat`/
 `toUSize`/`toFloat` plus arithmetic, bitwise, shift, and comparison operations
-including a wide `UInt64.toNat` fixture returned through
-`vir_eval_const_nat_string`, package-backed `Nat` literals wider than 32 bits,
+including a wide `UInt64.toNat` fixture returned through the manifest-driven
+`vir_call` path, package-backed `Nat` literals wider than 32 bits,
 `USize` `sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
 `ByteArray.mk`/`ByteArray.get`, and
 `Float.scaleB`/`toUInt32`. Parser-adjacent hash/name/substring/pointer-address
@@ -175,6 +179,9 @@ the start index is consumed.
 distinct native stem in the shim because their boxed arities differ, but all
 three wrappers delegate to the same linked runtime helper,
 `lean_string_utf8_set`.
+The shim also owns minimal `Lean.Expr`/`Lean.Level` object construction for the
+generic JavaScript interface path, so structural `Lean.Expr` values can be sent
+from JavaScript without depending on Lean-library exported constructor wrappers.
 
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
 registry. It checks that every `nativeExterns` entry in
@@ -214,7 +221,7 @@ remove if we want parser loading to behave exactly like a full Lean runtime.
 ## Future Loading Path
 
 The current loader is intentionally demo-specific: it decodes the package format
-emitted by `tools/GeneratePackage.lean`. The next compatibility step is to make
-the package format match Lean's generated `.ir` or module data more closely, so
-the same stable `vir_load_ir_package(ptr, len)` boundary can load artifacts
-produced by Lean itself.
+emitted by `tools/GeneratePackage.lean`. A future loading step is to make the
+package format match Lean's generated `.ir` or module data more closely, so the
+same stable `vir_load_ir_package(ptr, len)` boundary can load artifacts produced
+by Lean itself.

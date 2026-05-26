@@ -27,6 +27,18 @@ through a fresh WASM interpreter instance backed by the same generated IR
 package. Input-capable entries, currently `fib` and `SortDemo.demoFromArray`,
 render an input control in the fixture source panel.
 
+The package manifest also drives the local `/dev.html` runner. Supported
+browser-call types include primitive scalars, recursive list/array/option/product
+and `Sum`/`Except` shapes over supported element types, non-indexed
+user-defined structures including parameterized instances such as `Box Nat`,
+direct scalar fields, single-field wrappers over direct scalar fields,
+inherited parent fields flattened as JavaScript object keys, nullary inductive
+enums such as the Tamagotchi state/action types, and structural `Lean.Expr`
+values.
+Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them use the
+generated Lean `_boxed` declarations automatically; package generation fails
+loudly if a requested export needs one and it is missing.
+
 ## Quick Start
 
 ```bash
@@ -47,22 +59,33 @@ For focused local package experiments, generate an IR package from one Lean file
 npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
 ```
 
-Omit the root names to package every IR declaration produced by the file:
+Omit the root names to package public source definitions from the file:
 
 ```bash
 npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
 ```
 
-Then run `npm run dev` and open `/dev.html`. The developer entry point can load a
-served package URL such as `vir-demo.irpkg` or an uploaded `.irpkg` file, then
-evaluate `() -> Nat`, `Nat -> Nat`, `Array Nat -> Nat`, `String -> Nat`, or
-`ByteArray -> Nat` entries through an editable input spec.
+The command prints the package path, report path, package format, Lean
+toolchain, declaration count, interface exports, source targets, and resolved
+roots. The same metadata is embedded in the package manifest.
+
+Inspect a package without starting the browser:
+
+```bash
+npm run inspect:irpkg -- build/generated/local.irpkg
+npm run inspect:irpkg -- --json build/generated/local.irpkg
+```
+
+Then run `npm run dev` and open `/dev.html`. The developer entry point can load
+a served package URL such as `vir-demo.irpkg` or an uploaded `.irpkg` file, read
+the embedded interface manifest, show the loaded package metadata, and generate
+runnable controls automatically.
 
 The browser-facing runtime wrapper is exported from `web/src/vir-runtime.js` and
 documented in `docs/JS_API.md`. A minimal page that imports the wrapper directly
 is available at `/runtime-example.html` when running `npm run dev`.
 
-For the config-driven path that also writes URL-loadable UI input specs:
+For the config-driven path that writes a manifest-bearing package:
 
 ```bash
 npm run prepare:irpkg -- examples/fib.virpkg.json
@@ -77,9 +100,9 @@ https://ejgallego.github.io/lean-vir/
 
 The hosted page includes the main Tamagotchi and fixture demos, plus links to
 the package runner for generated local sample packages. The Pages build prepares
-the `fib` and `mergesort` package/spec pairs before copying static assets into
+the `fib` and `mergesort` packages before copying static assets into
 the site artifact, then runs `npm run test:pages` to check the generated landing
-page, package runner, WASM, packages, and input specs.
+page, package runner, WASM, and packages.
 
 For a local browser sanity check of the built Pages artifact, run:
 
@@ -106,17 +129,17 @@ and deploys the static site artifact.
 - `docs/LOCAL_IRPKG.md` documents the focused `.lean` to `.irpkg` workflow and
   `/dev.html` package runner.
 - `docs/JS_API.md` documents the browser-facing JavaScript runtime wrapper.
-- `docs/INTERFACE_PIPELINE.md` documents the config-driven package plus input
-  spec pipeline and the current WIT direction.
+- `docs/INTERFACE_PIPELINE.md` documents the config-driven package plus
+  embedded interface pipeline and the current WIT direction.
 - `docs/FIXTURE_COVERAGE.md` records the current fixture and boundary coverage
   in detail.
 - `scripts/build-upstream-probe.sh` compiles and links the upstream
   interpreter, writes `build/upstream-probe/boundary.md`, and copies the strict
   artifact to `web/public/vir-upstream.wasm`.
 - `scripts/lean-to-irpkg.sh` generates a local `.irpkg` from a `.lean` file,
-  either for explicit roots or all declarations in that source.
-- `scripts/prepare-irpkg.mjs` generates a configured package plus optional
-  browser input spec for `/dev.html` and the hosted Pages package links.
+  either for explicit roots or public source definitions.
+- `scripts/prepare-irpkg.mjs` generates a configured package for `/dev.html`
+  and the hosted Pages package links.
 - `scripts/smoke_upstream.mjs` executes the generated browser artifact in Node.
 - `web/` is the browser harness. `/dev.html` is the local package runner.
 
@@ -130,15 +153,25 @@ The package-backed provider is isolated behind `decl_provider.h` so a future
 provider can become more faithful without changing the upstream interpreter or
 platform shim.
 
+The current `.irpkg` path is a trusted-artifact boundary. Generated demo
+packages and local developer packages are validated before use, but malformed or
+hostile package contents are not treated as a hardened public input format. The
+WASM sandbox contains execution, while a bad package can still trap the demo
+interpreter, consume the small WASM memory budget, hang the tab, or confuse ABI
+decoding if its manifest lies about declaration types or runtime layouts. See
+`docs/JS_API.md` and `docs/INTERFACE_PIPELINE.md` for the current trust boundary
+and the planned hardening path.
+
 `npm run test:fixtures` runs the upstream-backed conformance fixture surface.
 Each fixture is Lean source under `fixtures/`, elaborated by Lean 4.30-rc2 into
 real `Lean.IR.Decl` values, packaged with `tools/GeneratePackage.lean`, and
 then compared against Lean's host IR interpreter with
 `interpreter.prefer_native=false`. The current passing surface covers recursive
 functions, inductive pattern matching, common `List`/`Array`/`String`/
-`ByteArray` operations, numeric primitive boundaries, parser setup paths, and
-selected task/ref initialization paths. See `docs/FIXTURE_COVERAGE.md` for the
-detailed boundary list.
+`ByteArray` operations, numeric primitive boundaries, nested manifest-backed
+collection/option/product calls, structural `Lean.Expr` values, parser setup
+paths, and selected task/ref initialization paths. See
+`docs/FIXTURE_COVERAGE.md` for the detailed boundary list.
 
 The fixture runner writes `build/fixtures/summary.json` with per-fixture status,
 imported IR declarations, native externs, and missing-boundary diagnostics for
@@ -171,9 +204,7 @@ These generated files should not be committed.
 `npm run build:site` also runs `npm run prepare:pages` and writes:
 
 - `web/public/local-fib.irpkg`
-- `web/public/local-fib.input.json`
 - `web/public/local-mergesort.irpkg`
-- `web/public/local-mergesort.input.json`
 - `web/dist/`
 
 These files are generated and should not be committed.

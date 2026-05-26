@@ -8,6 +8,8 @@ import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { performance } from "node:perf_hooks";
 
+import { createVirRuntime } from "../web/src/vir-runtime.js";
+
 const root = new URL("..", import.meta.url);
 
 const fibInput = 17;
@@ -60,43 +62,7 @@ function parseHostIrSamples(stdout, label) {
 async function instantiateWasm() {
   const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
   const irPackage = await readFile(new URL("../web/public/vir-demo.irpkg", import.meta.url));
-  const mod = new WebAssembly.Module(wasm);
-  const imports = {};
-
-  for (const spec of WebAssembly.Module.imports(mod)) {
-    imports[spec.module] ??= {};
-    if (spec.kind === "function") {
-      imports[spec.module][spec.name] = (...args) => {
-        if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
-          throw new Error(`WASI proc_exit(${args[0]})`);
-        }
-        return 0;
-      };
-    }
-  }
-
-  const { exports } = await WebAssembly.instantiate(mod, imports);
-  exports.__wasm_call_ctors?.();
-
-  const packagePtr = exports.vir_alloc_bytes(irPackage.byteLength);
-  try {
-    new Uint8Array(exports.memory.buffer, packagePtr, irPackage.byteLength).set(irPackage);
-    const loadedDecls = exports.vir_load_ir_package(packagePtr, irPackage.byteLength);
-    if (loadedDecls === 0) {
-      throw new Error("IR package load failed");
-    }
-  } finally {
-    exports.vir_free_bytes?.(packagePtr);
-  }
-
-  return exports;
-}
-
-function writeU32Array(exports, values) {
-  const ptr = exports.vir_alloc_bytes(values.length * 4);
-  const view = new DataView(exports.memory.buffer, ptr, values.length * 4);
-  values.forEach((value, index) => view.setUint32(index * 4, value, true));
-  return ptr;
+  return createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
 }
 
 function benchWasmRepeated(label, iterations, fn) {
@@ -133,27 +99,29 @@ function printRow(name, wasm, host) {
 
 run("npm", ["run", "--silent", "build:demo"]);
 
-const exports = await instantiateWasm();
+const runtime = await instantiateWasm();
 
-const wasmFib = benchWasmRepeated("fib", fibIterations, () =>
-  exports.vir_upstream_fib_repeated(fibIterations, fibInput)
-);
+const wasmFib = benchWasmRepeated("fib", fibIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < fibIterations; i++) {
+    acc += Number(runtime.call("fib", fibInput));
+  }
+  return acc;
+});
 const hostFib = benchHostIr("fib", fibIterations, ["fib", String(fibIterations), String(fibInput)]);
 
-const sortPtr = writeU32Array(exports, sortInput);
-let wasmSort;
-try {
-  wasmSort = benchWasmRepeated("sort", sortIterations, () =>
-    exports.vir_sort_checksum_repeated(sortPtr, sortInput.length, sortIterations)
-  );
-} finally {
-  exports.vir_free_bytes?.(sortPtr);
-}
+const wasmSort = benchWasmRepeated("sort", sortIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < sortIterations; i++) {
+    acc += Number(runtime.call("SortDemo.demoFromArray", sortInput));
+  }
+  return acc;
+});
 const hostSort = benchHostIr("sort", sortIterations, ["sort", String(sortIterations), sortInput.join(",")]);
 
 console.log("# Lean VIR benchmark");
 console.log("Host baseline is `lean --run` with `interpreter.prefer_native=false`.");
-console.log("WASM timings use batched exports: one JS -> WASM measured call per sample.");
+console.log("WASM timings use the manifest-driven JavaScript runtime API.");
 console.log("Host timings exclude Lean frontend startup.");
 console.log();
 printRow(`fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib);

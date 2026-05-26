@@ -1,9 +1,8 @@
 # JavaScript Runtime API
 
-`web/src/vir-runtime.js` is a small ES module wrapper around the WASM exports.
-It loads `vir-upstream.wasm`, loads an `.irpkg`, and exposes the currently
-supported `Nat`-returning entry shapes without requiring callers to manage WASM
-memory.
+`web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a manifest-bearing
+`.irpkg`, and exposes its Lean declarations through a generic JavaScript call
+API without requiring callers to manage WASM memory.
 
 The module is also exposed through the package entry point:
 
@@ -21,15 +20,17 @@ const vir = await createVirRuntime({
   irPackageUrl: "vir-demo.irpkg",
 });
 
-console.log(vir.evalConstNat("SortDemo.demo"));
-console.log(vir.evalNatToNat("fib", 12));
-console.log(vir.evalNatArrayToNat("SortDemo.demoFromArray", [4, 1, 3, 2]));
-console.log(vir.evalStringToNat("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
-console.log(vir.evalByteArrayToNat("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
+console.log(vir.call("fib", 12));
+console.log(vir.exportsByName.SortDemo_demo());
+console.log(vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]));
+console.log(vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"));
+console.log(vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]));
+console.log(vir.call("Tamagotchi.step", "happy", "ignore"));
+console.log(vir.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }));
 ```
 
 There is also a minimal browser page at `/runtime-example.html` that imports the
-runtime directly and prints the calls above.
+runtime directly and prints sample calls.
 
 ## Reusing The Compiled Module
 
@@ -46,17 +47,81 @@ const first = await factory.createRuntime({ irPackageBytes });
 const second = await factory.createRuntime({ irPackageBytes });
 ```
 
-## Supported Calls
+## Calls And Manifest
 
-- `vir.evalConstNat(name)` for `() -> Nat`.
-- `vir.evalNatToNat(name, value)` for `Nat -> Nat`.
-- `vir.evalNatArrayToNat(name, values)` for `Array Nat -> Nat`.
-- `vir.evalStringToNat(name, value)` for `String -> Nat`.
-- `vir.evalByteArrayToNat(name, values)` for `ByteArray -> Nat`.
+- `vir.interfaceManifest` is the embedded package manifest.
+- `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
+  package format version, Lean toolchain, generation time, source targets, and
+  resolved roots.
+- `vir.call(name, ...args)` accepts a manifest `id`, `jsName`, or Lean
+  declaration name.
+- `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
+  methods.
+- `vir.packageInfo.interfaceExports` reports the number of generated exports.
 
-All results are returned as decimal strings so large `Nat` results are not
-truncated to JavaScript's safe integer range. Raw WASM exports remain available
-as `vir.exports` for demo-specific calls that do not have a generic wrapper yet.
+Supported v1 types are `Nat`, `Int`, `Bool`, `String`, `Float`, `Float32`,
+`UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`, recursive
+`Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α` shapes
+over supported types, non-indexed user-defined structures including
+parameterized instances, nullary inductive enums, and `Lean.Expr`.
+
+Large exact integer values are returned as decimal strings. ByteArray results
+are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
+numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
+use generated Lean `_boxed` declarations automatically.
+
+Nullary inductive enums are accepted as constructor names, generated JavaScript
+names, or constructor indexes. Results are returned as the constructor's
+generated JavaScript name.
+
+Options are accepted as `null`, `{ kind: "none" }`, `{ kind: "some", value }`,
+`{ some: value }`, or the bare inner value. Option results are returned as
+`null` or the inner value. Product inputs are accepted as `{ fst, snd }` or
+two-element arrays, and results are returned as `{ fst, snd }`.
+`Sum`/`Except` inputs are accepted as `{ kind, value }`, `{ tag, value }`, or
+single-constructor-key objects such as `{ inl: 4 }` and `{ ok: value }`;
+results are returned as `{ kind, value }`. Non-indexed
+structures, including parameterized instances like `Box Nat` and
+`Tagged (Array String)`, are accepted and returned as objects keyed by their
+Lean field names; inherited parent fields are accepted and returned as flattened
+object keys. Direct `Bool`, `UInt*`, `USize`, and enum fields, including
+single-field wrappers such as `Box UInt32`, use the same JS values as standalone
+arguments/results. These shapes can be nested, for example `Option (Array Nat)`,
+`List (Nat × String)`, `Except String (Option (Sum Nat Nat))`, a structure
+containing another structure, and `Array Lean.Expr`.
+
+`Lean.Expr` values use structural JavaScript objects such as
+`{ kind: "const", name: "Nat", levels: [] }`,
+`{ kind: "app", fn, arg }`, or `{ kind: "bvar", index: 0 }`. Level values use
+the same shape with `kind` values `zero`, `succ`, `max`, `imax`, `param`, and
+`mvar`. Metadata expression inputs are accepted by decoding their inner
+expression; metadata results preserve a structural `mdata` wrapper.
+
+Package loading validates the embedded interface manifest before any generated
+entry is exposed. Malformed type trees, invalid structure layouts, unsupported
+wire tags, duplicate export names, and bad enum constructor metadata are
+reported as package-load errors.
+
+## Trust Boundary
+
+The current `.irpkg` loader is intended for generated project artifacts and
+local developer experiments. It treats the package bytes and the embedded
+interface manifest as trusted inputs: the manifest describes the Lean
+declarations, runtime layouts, and JavaScript-callable ABI that the WASM shim
+uses when it builds Lean objects and decodes results.
+
+The browser's WASM sandbox still contains the loaded code, but it does not make
+malformed or hostile packages a supported public input format. A bad package may
+trap the interpreter, exhaust the small demo memory budget, hang the current
+tab, or produce invalid results if its manifest lies about declaration types or
+runtime layouts. The hosted `/dev.html` runner is therefore a convenience tool
+for trusted packages, not a hardened service for arbitrary third-party
+packages.
+
+Before treating `.irpkg` files as untrusted user content, the runtime should
+move ABI lookup into the package provider, validate layouts in the WASM shim,
+add package size and descriptor-depth limits, and run calls in a recoverable
+worker context.
 
 ## Generate A Local Package
 
@@ -66,10 +131,21 @@ Generate a package from one Lean file and one or more root declarations:
 npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
 ```
 
-Or package every declaration emitted by that file:
+Omit roots to auto-discover public source definitions:
 
 ```bash
-npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
+npm run generate:irpkg -- examples/Fib.lean build/generated/fib.irpkg
+```
+
+The command prints the package path, report path, package format, toolchain,
+declaration count, interface export count, and target roots. The same summary
+is embedded in the manifest metadata so JavaScript and `/dev.html` can show
+exactly what was loaded.
+
+Inspect the embedded manifest without loading the browser:
+
+```bash
+npm run inspect:irpkg -- build/generated/fib.irpkg
 ```
 
 Serve the generated `.irpkg` next to `vir-upstream.wasm`, or upload it through
@@ -85,7 +161,8 @@ const vir = await createVirRuntime({
 
 ## Current Limits
 
-The runtime uses the static package-backed path. It does not load `.olean`,
-`.ir`, or full Lean module data in the browser. Only the generic entry shapes
-listed above are wrapped today; additional input or result types need matching
-WASM exports in `wasm/upstream_shim/shim.cpp`.
+The runtime uses the single-file declaration package path. It does not load
+`.olean`, `.ir`, or full Lean module data in the browser. Unsupported requested
+exports fail during package generation instead of being omitted silently, and a
+failed package load clears the runtime's package metadata instead of leaving
+stale declarations callable.

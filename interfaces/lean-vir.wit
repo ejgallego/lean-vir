@@ -4,25 +4,22 @@ interface runtime {
   record package-info {
     decls: u32,
     bytes: u32,
+    interface-exports: u32,
   }
 
-  variant input {
-    none,
-    nat(string),
-    nat-array(list<string>),
-  }
-
-  record eval-request {
+  record call-request {
     entry: string,
-    input: input,
+    payload: list<u8>,
+    result-wire-tag: u8,
   }
 
-  record eval-output {
-    value: string,
+  record call-output {
+    payload: list<u8>,
   }
 
   load-package: func(bytes: list<u8>) -> result<package-info, string>;
-  eval-nat: func(request: eval-request) -> result<eval-output, string>;
+  interface-manifest: func() -> result<string, string>;
+  call: func(request: call-request) -> result<call-output, string>;
 }
 
 world runner {

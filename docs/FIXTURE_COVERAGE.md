@@ -5,11 +5,25 @@ Each fixture is Lean source under `fixtures/`, elaborated by Lean 4.30-rc2 into
 real `Lean.IR.Decl` values, packaged with `tools/GeneratePackage.lean`, and
 then compared against Lean's host IR interpreter with
 `interpreter.prefer_native=false`.
+The runner schedules fixtures in parallel using half of Node's reported
+`availableParallelism()` by default; set `VIR_FIXTURE_JOBS=1` for serial
+debugging or another positive value to pin the worker count.
 
 Known unsupported fixtures can be tracked in `fixtures/manifest.json` so
 boundary gaps remain explicit. The runner writes `build/fixtures/summary.json`
 with per-fixture status, imported IR declarations, native externs, and
 missing-boundary diagnostics for CI and boundary debugging.
+
+The runtime smoke also generates temporary packages with intentionally
+unsupported interface exports and asserts that package generation fails loudly.
+Those negative cases cover function fields, recursive structures, indexed
+inductive families, and implicit arguments.
+
+The browser smoke resolves dev-runner entries from each package's embedded
+manifest, so UI coverage follows generated entry ids and export counts rather
+than a separate hand-maintained list of JavaScript names. It also checks that
+every generated `vir-demo.irpkg` export appears in the `/dev.html` selector and
+that selecting each entry renders the expected control kinds from the manifest.
 
 ## Current Passing Surface
 
@@ -49,6 +63,16 @@ The current fixture surface covers:
   `shiftLeft`/`shiftRight`, small `Int` arithmetic, `USize` `sub`/`mul`/
   `land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`, `Float.scaleB`, and
   `Float.toUInt32`;
+- `Lean.Expr` package closure and structural JS/WASM marshaling for constants,
+  applications, literals, binders, levels, variables, projections, metadata
+  results, and bound-variable inputs/results;
+- manifest-backed recursive interface calls including `Array String`,
+  `List UInt32`, `Option Nat`, `Option String`, `Nat × Nat`,
+  `Option (Array Nat)`, `List (Nat × String)`, `Sum Nat Nat`,
+  `Except Nat (Option (Sum Nat Nat))`, non-indexed user-defined structures
+  with object, scalar, `USize`, enum, parameterized, scalar-only trivial
+  wrapper, `UInt64` trivial wrapper, and inherited parent fields, direct
+  top-level `UInt64`, `Float`, `Float32`, and `Array Lean.Expr`;
 - hash/name/substring/pointer-address primitives reached by parser data paths,
   including `mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
   `ptrAddrUnsafe`;

@@ -26,50 +26,35 @@ if (typeof exports.vir_load_ir_package !== "function") {
 if (!exports.memory) {
   throw new Error("memory export is missing");
 }
-if (typeof exports.vir_upstream_fib !== "function") {
-  throw new Error("vir_upstream_fib export is missing");
-}
-if (typeof exports.vir_upstream_fib_repeated !== "function") {
-  throw new Error("vir_upstream_fib_repeated export is missing");
-}
-if (typeof exports.vir_upstream_tamagotchi_step !== "function") {
-  throw new Error("vir_upstream_tamagotchi_step export is missing");
-}
-if (typeof exports.vir_upstream_tamagotchi_run_demo !== "function") {
-  throw new Error("vir_upstream_tamagotchi_run_demo export is missing");
-}
-if (typeof exports.vir_eval_const_nat !== "function") {
-  throw new Error("vir_eval_const_nat export is missing");
-}
-if (typeof exports.vir_eval_const_nat_string !== "function") {
-  throw new Error("vir_eval_const_nat_string export is missing");
-}
-if (typeof exports.vir_eval_nat_to_nat_string !== "function") {
-  throw new Error("vir_eval_nat_to_nat_string export is missing");
-}
-if (typeof exports.vir_eval_nat_array_to_nat_string !== "function") {
-  throw new Error("vir_eval_nat_array_to_nat_string export is missing");
-}
-if (typeof exports.vir_eval_string_to_nat_string !== "function") {
-  throw new Error("vir_eval_string_to_nat_string export is missing");
-}
-if (typeof exports.vir_eval_byte_array_to_nat_string !== "function") {
-  throw new Error("vir_eval_byte_array_to_nat_string export is missing");
-}
-if (typeof exports.vir_eval_const_nat_string_size !== "function") {
-  throw new Error("vir_eval_const_nat_string_size export is missing");
-}
-if (typeof exports.vir_sort_checksum !== "function") {
-  throw new Error("vir_sort_checksum export is missing");
-}
-if (typeof exports.vir_sort_checksum_repeated !== "function") {
-  throw new Error("vir_sort_checksum_repeated export is missing");
-}
 if (typeof exports.vir_last_package_error !== "function") {
   throw new Error("vir_last_package_error export is missing");
 }
 if (typeof exports.vir_last_package_error_size !== "function") {
   throw new Error("vir_last_package_error_size export is missing");
+}
+if (typeof exports.vir_call !== "function") {
+  throw new Error("vir_call export is missing");
+}
+if (typeof exports.vir_call_result_size !== "function") {
+  throw new Error("vir_call_result_size export is missing");
+}
+if (typeof exports.vir_call_error !== "function") {
+  throw new Error("vir_call_error export is missing");
+}
+if (typeof exports.vir_call_error_size !== "function") {
+  throw new Error("vir_call_error_size export is missing");
+}
+if (typeof exports.vir_package_interface_manifest !== "function") {
+  throw new Error("vir_package_interface_manifest export is missing");
+}
+if (typeof exports.vir_package_interface_manifest_size !== "function") {
+  throw new Error("vir_package_interface_manifest_size export is missing");
+}
+if (typeof exports.vir_package_decl_count !== "function") {
+  throw new Error("vir_package_decl_count export is missing");
+}
+if (exports.vir_package_decl_count() !== 0) {
+  throw new Error("package declaration provider should be empty before an .irpkg is loaded");
 }
 if (exports.vir_upstream_target_pointer_bytes() !== 4) {
   throw new Error("upstream wasm target layout guard failed");
@@ -112,6 +97,9 @@ try {
   if (loadedDecls === 0) {
     throw new Error("IR package load failed");
   }
+  if (exports.vir_package_decl_count() !== loadedDecls) {
+    throw new Error("loaded declaration count does not match package provider state");
+  }
 } finally {
   exports.vir_free_bytes?.(packagePtr);
 }
@@ -128,121 +116,83 @@ const fibCases = [
 ];
 
 for (const [input, expected] of fibCases) {
-  const actual = exports.vir_upstream_fib(input);
-  if (actual !== expected) {
+  const actual = runtime.call("fib", input);
+  if (actual !== String(expected)) {
     throw new Error(`upstream fib ${input}: expected ${expected}, got ${actual}`);
   }
 }
 
-const repeatedFib = exports.vir_upstream_fib_repeated(80, 17);
+let repeatedFib = 0;
+for (let i = 0; i < 80; i++) {
+  repeatedFib += Number(runtime.call("fib", 17));
+}
 if (repeatedFib !== 127760) {
   throw new Error(`upstream repeated fib: expected 127760, got ${repeatedFib}`);
 }
 
-const mood = {
-  happy: 0,
-  hungry: 1,
-  sleepy: 2,
-  angry: 3,
-  asleep: 4,
-  dead: 5,
-};
-
-const action = {
-  feed: 0,
-  play: 1,
-  nap: 2,
-  wake: 3,
-  ignore: 4,
-};
-
 const stepCases = [
-  [mood.happy, action.ignore, mood.hungry],
-  [mood.hungry, action.feed, mood.happy],
-  [mood.happy, action.play, mood.sleepy],
-  [mood.sleepy, action.nap, mood.asleep],
-  [mood.asleep, action.wake, mood.happy],
-  [mood.hungry, action.ignore, mood.angry],
-  [mood.angry, action.ignore, mood.dead],
+  ["happy", "ignore", "hungry"],
+  ["hungry", "feed", "happy"],
+  ["happy", "play", "sleepy"],
+  ["sleepy", "nap", "asleep"],
+  ["asleep", "wake", "happy"],
+  ["hungry", "ignore", "angry"],
+  ["angry", "ignore", "dead"],
 ];
 
 for (const [current, act, expected] of stepCases) {
-  const actual = exports.vir_upstream_tamagotchi_step(current, act);
+  const actual = runtime.call("Tamagotchi.step", current, act);
   if (actual !== expected) {
     throw new Error(`upstream Tamagotchi.step ${current} ${act}: expected ${expected}, got ${actual}`);
   }
 }
 
-let current = mood.happy;
+let current = "happy";
 const trace = [current];
-for (const act of [action.ignore, action.feed, action.play, action.nap, action.wake, action.ignore, action.ignore]) {
-  current = exports.vir_upstream_tamagotchi_step(current, act);
+for (const act of ["ignore", "feed", "play", "nap", "wake", "ignore", "ignore"]) {
+  current = runtime.call("Tamagotchi.step", current, act);
   trace.push(current);
 }
 
-const expectedTrace = [mood.happy, mood.hungry, mood.happy, mood.sleepy, mood.asleep, mood.happy, mood.hungry, mood.angry];
+const expectedTrace = ["happy", "hungry", "happy", "sleepy", "asleep", "happy", "hungry", "angry"];
 if (trace.join(",") !== expectedTrace.join(",")) {
   throw new Error(`upstream Tamagotchi trace: expected ${expectedTrace}, got ${trace}`);
 }
 
-const runDemo = exports.vir_upstream_tamagotchi_run_demo();
-if (runDemo !== mood.angry) {
-  throw new Error(`upstream Tamagotchi.run demoScript: expected ${mood.angry}, got ${runDemo}`);
-}
-
-const sortChecksum = runtime.evalConstNat("SortDemo.demo");
+const sortChecksum = runtime.call("SortDemo.demo");
 if (sortChecksum !== "192") {
   throw new Error(`upstream SortDemo.demo: expected 192, got ${sortChecksum}`);
 }
 
-const genericFib = runtime.evalNatToNat("fib", 12);
+const genericFib = runtime.call("fib", 12);
 if (genericFib !== "144") {
   throw new Error(`generic fib input: expected 144, got ${genericFib}`);
 }
 
-function sortChecksumFor(values) {
-  const ptr = exports.vir_alloc_bytes(values.length * 4);
-  try {
-    const view = new DataView(exports.memory.buffer, ptr, values.length * 4);
-    values.forEach((value, index) => view.setUint32(index * 4, value, true));
-    return exports.vir_sort_checksum(ptr, values.length);
-  } finally {
-    exports.vir_free_bytes?.(ptr);
-  }
-}
-
-const editableChecksum = sortChecksumFor([4, 1, 3, 2]);
-if (editableChecksum !== 30) {
+const editableChecksum = runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]);
+if (editableChecksum !== "30") {
   throw new Error(`upstream SortDemo.demoFromArray: expected 30, got ${editableChecksum}`);
 }
 
-const genericEditableChecksum = runtime.evalNatArrayToNat("SortDemo.demoFromArray", [4, 1, 3, 2]);
+const genericEditableChecksum = runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]);
 if (genericEditableChecksum !== "30") {
   throw new Error(`generic SortDemo.demoFromArray: expected 30, got ${genericEditableChecksum}`);
 }
 
-const genericStringScore = runtime.evalStringToNat("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z");
+const genericStringScore = runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z");
 if (genericStringScore !== "1381") {
   throw new Error(`generic String input: expected 1381, got ${genericStringScore}`);
 }
 
-const genericByteArrayScore = runtime.evalByteArrayToNat("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]);
+const genericByteArrayScore = runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]);
 if (genericByteArrayScore !== "136") {
   throw new Error(`generic ByteArray input: expected 136, got ${genericByteArrayScore}`);
 }
 
-function repeatedSortChecksumFor(values, iterations) {
-  const ptr = exports.vir_alloc_bytes(values.length * 4);
-  try {
-    const view = new DataView(exports.memory.buffer, ptr, values.length * 4);
-    values.forEach((value, index) => view.setUint32(index * 4, value, true));
-    return exports.vir_sort_checksum_repeated(ptr, values.length, iterations);
-  } finally {
-    exports.vir_free_bytes?.(ptr);
-  }
+let repeatedSortChecksum = 0;
+for (let i = 0; i < 5; i++) {
+  repeatedSortChecksum += Number(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]));
 }
-
-const repeatedSortChecksum = repeatedSortChecksumFor([4, 1, 3, 2], 5);
 if (repeatedSortChecksum !== 150) {
   throw new Error(`upstream repeated SortDemo.demoFromArray: expected 150, got ${repeatedSortChecksum}`);
 }
@@ -266,7 +216,7 @@ for (const fixture of fixtureManifest.fixtures ?? []) {
       fixtureExports.vir_free_bytes?.(fixturePackagePtr);
     }
 
-    value = new VirRuntime(fixtureExports).evalConstNat(fixture.entry);
+    value = new VirRuntime(fixtureExports).call(fixture.entry);
   } catch (error) {
     throw new Error(`${fixture.id}: fixture evaluation failed`, { cause: error });
   }

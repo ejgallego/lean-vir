@@ -16,11 +16,12 @@ try {
 
   const results = {
     declarations: vir.packageInfo.count,
-    constNat: vir.evalConstNat("SortDemo.demo"),
-    natToNat: vir.evalNatToNat("fib", 12),
-    natArrayToNat: vir.evalNatArrayToNat("SortDemo.demoFromArray", [4, 1, 3, 2]),
-    stringToNat: vir.evalStringToNat("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"),
-    byteArrayToNat: vir.evalByteArrayToNat("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]),
+    interfaceExports: vir.packageInfo.interfaceExports,
+    constNat: vir.exportsByName.SortDemo_demo(),
+    natToNat: vir.call("fib", 12),
+    natArrayToNat: vir.exportsByName.SortDemo_demoFromArray([4, 1, 3, 2]),
+    stringToNat: vir.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"),
+    byteArrayToNat: vir.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]),
   };
 
   output.textContent = JSON.stringify(results, null, 2);

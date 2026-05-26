@@ -14,6 +14,7 @@
     "install:engines": "bash scripts/install-wasm-engines.sh",
     "generate:package": "bash scripts/generate-ir-package.sh",
     "generate:irpkg": "bash scripts/lean-to-irpkg.sh",
+    "inspect:irpkg": "node scripts/inspect-irpkg.mjs",
     "prepare:irpkg": "node scripts/prepare-irpkg.mjs",
     "prepare:pages": "npm run prepare:irpkg -- examples/fib.virpkg.json && npm run prepare:irpkg -- examples/mergesort.virpkg.json",
     "generate:provider": "npm run generate:package",

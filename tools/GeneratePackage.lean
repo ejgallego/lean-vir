@@ -9,6 +9,7 @@ import Lean.Elab.Frontend
 import Lean.Compiler.IR.CompilerM
 import Lean.Compiler.InitAttr
 import Lean.Compiler.LCNF.Main
+import Lean.Compiler.LCNF.ToImpureType
 
 open Lean
 
@@ -16,10 +17,19 @@ namespace Vir.GeneratePackage
 
 open Lean.IR
 
+inductive StructureFieldLayout where
+  | object (index : Nat)
+  | usize (index : Nat)
+  | scalar (size offset : Nat)
+  deriving BEq, Repr
+
+abbrev StructureSeen := Array (Name × String)
+
 structure Target where
   source : System.FilePath
   roots : Array Name
   includeAll : Bool := false
+  packageOnly : Bool := false
 
 structure LoadedDecl where
   source : String
@@ -51,22 +61,90 @@ structure Closure where
   missingExterns : Array Name := #[]
   unsupportedInitGlobals : Array Name := #[]
 
+inductive InterfaceType where
+  | nat
+  | int
+  | bool
+  | string
+  | float
+  | float32
+  | uint8
+  | uint16
+  | uint32
+  | uint64
+  | usize
+  | byteArray
+  | array (element : InterfaceType)
+  | list (element : InterfaceType)
+  | option (element : InterfaceType)
+  | prod (fst snd : InterfaceType)
+  | simpleEnum (name : Name) (constructors : Array Name)
+  | taggedUnion (name : Name) (label : String)
+      (constructors : Array (Name × String × InterfaceType × StructureFieldLayout × Nat × Nat × Nat))
+  | structure (name : Name) (label : String) (trivialField? : Option Nat)
+      (objectFields usizeFields scalarBytes : Nat)
+      (fields : Array (String × InterfaceType × StructureFieldLayout × Bool))
+  | expr
+  deriving BEq, Repr
+
+structure InterfaceArg where
+  name : String
+  type : InterfaceType
+
+structure InterfaceExport where
+  id : String
+  jsName : String
+  entry : Name
+  source : String
+  args : Array InterfaceArg
+  result : InterfaceType
+
+structure InterfaceDiagnostic where
+  name : Name
+  source : String
+  reason : String
+
+structure PackageTargetMetadata where
+  source : String
+  mode : String
+  roots : Array Name
+  resolvedRoots : Array Name
+  packageOnly : Bool
+
+structure PackageMetadata where
+  generator : String
+  packageFormatVersion : Nat
+  manifestVersion : Nat
+  leanVersion : String
+  leanToolchain : String
+  leanGithash : String
+  generatedAt : String
+  targets : Array PackageTargetMetadata
+
+structure InterfaceManifest where
+  metadata : PackageMetadata
+  exports : Array InterfaceExport := #[]
+  diagnostics : Array InterfaceDiagnostic := #[]
+
 def defaultTargets : Array Target := #[
   {
     source := "examples/Fib.lean",
-    roots := #[`fib, `fib._boxed]
+    roots := #[`fib]
   },
   {
     source := "examples/Tamagotchi.lean",
     roots := #[
-      `Tamagotchi.step,
-      `Tamagotchi.step._boxed,
-      `Tamagotchi.run,
-      `Tamagotchi.run._boxed,
-      `Tamagotchi.trace,
-      `Tamagotchi.trace._boxed,
-      `Tamagotchi.demoScript
+      `Tamagotchi.step
     ]
+  },
+  {
+    source := "examples/Tamagotchi.lean",
+    roots := #[
+      `Tamagotchi.run,
+      `Tamagotchi.trace,
+      `Tamagotchi.demoScript
+    ],
+    packageOnly := true
   },
   {
     source := "examples/MergeSort.lean",
@@ -778,6 +856,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint8_to_nat"
   },
   {
+    name := `UInt8.toUInt32,
+    params := #[param 1 false .uint8],
+    resultType := .uint32,
+    symbol := "lean_uint8_to_uint32"
+  },
+  {
     name := `UInt8.add,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
@@ -988,6 +1072,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint32_to_uint8"
   },
   {
+    name := `UInt32.toUInt64,
+    params := #[param 1 false .uint32],
+    resultType := .uint64,
+    symbol := "lean_uint32_to_uint64"
+  },
+  {
     name := `UInt32.add,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
@@ -1108,6 +1198,18 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint64_to_usize"
   },
   {
+    name := `UInt64.toUInt32,
+    params := #[param 1 false .uint64],
+    resultType := .uint32,
+    symbol := "lean_uint64_to_uint32"
+  },
+  {
+    name := `UInt64.toUInt8,
+    params := #[param 1 false .uint64],
+    resultType := .uint8,
+    symbol := "lean_uint64_to_uint8"
+  },
+  {
     name := `UInt64.add,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
@@ -1214,6 +1316,38 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .float],
     resultType := .uint32,
     symbol := "lean_float_to_uint32"
+  },
+  {
+    name := `Lean.Level.mkData,
+    params := #[param 1 false .uint64, param 2 false .tobject, param 3 false .uint8, param 4 false .uint8],
+    resultType := .uint64,
+    symbol := "lean_level_mk_data"
+  },
+  {
+    name := `Lean.Expr.mkData,
+    params := #[
+      param 1 false .uint64,
+      param 2 false .tobject,
+      param 3 false .uint32,
+      param 4 false .uint8,
+      param 5 false .uint8,
+      param 6 false .uint8,
+      param 7 false .uint8
+    ],
+    resultType := .uint64,
+    symbol := "lean_expr_mk_data"
+  },
+  {
+    name := `Lean.Expr.mkAppData,
+    params := #[param 1 false .uint64, param 2 false .uint64],
+    resultType := .uint64,
+    symbol := "lean_expr_mk_app_data"
+  },
+  {
+    name := `Lean.Expr.data,
+    params := #[param 1 true .tobject],
+    resultType := .uint64,
+    symbol := "lean_expr_data"
   }
 ]
 
@@ -1226,7 +1360,7 @@ def isUnsupportedInitGlobal : Decl -> Bool
 
 def primitiveNamespaces : List String :=
   [
-    "Array", "Bool", "ByteArray", "Char", "Float", "Float32", "IO", "Int",
+    "Array", "Bool", "ByteArray", "Char", "Float", "Float32", "IO", "Int", "Lean",
     "Nat", "Ptr", "ST", "String", "UInt8", "UInt16", "UInt32", "UInt64",
     "USize"
   ]
@@ -1362,9 +1496,647 @@ def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   else
     target.roots
 
+def boxedBaseName? : Name -> Option Name
+  | .str pre "_boxed" => some pre
+  | _ => none
+
+def boxedName (name : Name) : Name :=
+  .str name "_boxed"
+
+def resolvedRootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
+  rootsForTarget index target |>.foldl (fun roots root =>
+    let roots := if roots.contains root then roots else roots.push root
+    match boxedBaseName? root with
+    | some _ => roots
+    | none =>
+        let boxed := boxedName root
+        if (index.find? boxed).isSome && !roots.contains boxed then
+          roots.push boxed
+        else
+          roots) #[]
+
 def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
   targets.foldl (fun state target =>
-    (rootsForTarget index target).foldl (fun state root => collectName index root state) state) {}
+    (resolvedRootsForTarget index target).foldl (fun state root => collectName index root state) state) {}
+
+def DeclIndex.envForSource? (index : DeclIndex) (source : String) : Option Environment :=
+  index.envs.findSome? fun (candidate, env) =>
+    if candidate == source then some env else none
+
+def InterfaceType.label : InterfaceType → String
+  | .nat => "Nat"
+  | .int => "Int"
+  | .bool => "Bool"
+  | .string => "String"
+  | .float => "Float"
+  | .float32 => "Float32"
+  | .uint8 => "UInt8"
+  | .uint16 => "UInt16"
+  | .uint32 => "UInt32"
+  | .uint64 => "UInt64"
+  | .usize => "USize"
+  | .byteArray => "ByteArray"
+  | .array element => s!"Array {element.label}"
+  | .list element => s!"List {element.label}"
+  | .option element => s!"Option {element.label}"
+  | .prod fst snd => s!"{fst.label} × {snd.label}"
+  | .simpleEnum name _ => name.toString
+  | .taggedUnion _ label _ => label
+  | .structure _ label .. => label
+  | .expr => "Lean.Expr"
+
+def InterfaceType.wireTag : InterfaceType → Nat
+  | .nat => 0
+  | .int => 1
+  | .bool => 2
+  | .string => 3
+  | .float => 10
+  | .float32 => 11
+  | .uint8 => 4
+  | .uint16 => 5
+  | .uint32 => 6
+  | .uint64 => 7
+  | .usize => 8
+  | .byteArray => 9
+  | .array .. => 16
+  | .list .. => 17
+  | .option .. => 18
+  | .prod .. => 19
+  | .simpleEnum .. => 14
+  | .taggedUnion .. => 21
+  | .structure .. => 20
+  | .expr => 15
+
+partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
+  | .float | .float32 | .uint64 => true
+  | .structure _ _ (some idx) _ _ _ fields =>
+      match fields[idx]? with
+      | some (_, fieldType, _, _) => fieldType.needsBoxedCallBoundary
+      | none => false
+  | _ => false
+
+def jsonEscape (text : String) : String :=
+  text.foldl (fun out c =>
+    match c with
+    | '"' => out ++ "\\\""
+    | '\\' => out ++ "\\\\"
+    | '\n' => out ++ "\\n"
+    | '\r' => out ++ "\\r"
+    | '\t' => out ++ "\\t"
+    | _ => out.push c) ""
+
+def jsonString (text : String) : String :=
+  "\"" ++ jsonEscape text ++ "\""
+
+def jsonArray (items : Array String) : String :=
+  "[" ++ ",".intercalate items.toList ++ "]"
+
+def jsonBool (value : Bool) : String :=
+  if value then "true" else "false"
+
+def ctorShortName (inductiveName ctorName : Name) : String :=
+  let prefixText := inductiveName.toString ++ "."
+  let text := ctorName.toString
+  if text.startsWith prefixText then
+    (text.drop prefixText.length).toString
+  else
+    text
+
+def StructureFieldLayout.toJson : StructureFieldLayout → String
+  | .object index =>
+      "{"
+      ++ "\"kind\":\"object\","
+      ++ "\"index\":" ++ toString index
+      ++ "}"
+  | .usize index =>
+      "{"
+      ++ "\"kind\":\"usize\","
+      ++ "\"index\":" ++ toString index
+      ++ "}"
+  | .scalar size offset =>
+      "{"
+      ++ "\"kind\":\"scalar\","
+      ++ "\"size\":" ++ toString size ++ ","
+      ++ "\"offset\":" ++ toString offset
+      ++ "}"
+
+partial def InterfaceType.toJson (ty : InterfaceType) : String :=
+  match ty with
+  | .array element =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"array\","
+      ++ "\"element\":" ++ element.toJson
+      ++ "}"
+  | .list element =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"list\","
+      ++ "\"element\":" ++ element.toJson
+      ++ "}"
+  | .option element =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"option\","
+      ++ "\"element\":" ++ element.toJson
+      ++ "}"
+  | .prod fst snd =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"prod\","
+      ++ "\"fst\":" ++ fst.toJson ++ ","
+      ++ "\"snd\":" ++ snd.toJson
+      ++ "}"
+  | .simpleEnum name constructors =>
+      let ctorJson := constructors.mapIdx fun idx ctor =>
+        "{"
+        ++ "\"name\":" ++ jsonString ctor.toString ++ ","
+        ++ "\"jsName\":" ++ jsonString (ctorShortName name ctor) ++ ","
+        ++ "\"tag\":" ++ toString idx
+        ++ "}"
+      "{"
+      ++ "\"type\":\"" ++ jsonEscape ty.label ++ "\","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"simpleEnum\","
+      ++ "\"constructors\":" ++ jsonArray ctorJson
+      ++ "}"
+  | .taggedUnion name _ constructors =>
+      let ctorJson := constructors.mapIdx fun idx (ctorName, jsName, fieldType, fieldLayout, objectFields, usizeFields, scalarBytes) =>
+        "{"
+        ++ "\"name\":" ++ jsonString ctorName.toString ++ ","
+        ++ "\"jsName\":" ++ jsonString jsName ++ ","
+        ++ "\"tag\":" ++ toString idx ++ ","
+        ++ "\"type\":" ++ fieldType.toJson ++ ","
+        ++ "\"layout\":" ++ fieldLayout.toJson ++ ","
+        ++ "\"objectFieldCount\":" ++ toString objectFields ++ ","
+        ++ "\"usizeFieldCount\":" ++ toString usizeFields ++ ","
+        ++ "\"scalarByteSize\":" ++ toString scalarBytes
+        ++ "}"
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"taggedUnion\","
+      ++ "\"name\":" ++ jsonString name.toString ++ ","
+      ++ "\"constructors\":" ++ jsonArray ctorJson
+      ++ "}"
+  | .structure name _ trivialField? objectFields usizeFields scalarBytes fields =>
+      let fieldJson := fields.map fun (fieldName, fieldType, fieldLayout, isSubobject) =>
+        "{"
+        ++ "\"name\":" ++ jsonString fieldName ++ ","
+        ++ "\"type\":" ++ fieldType.toJson ++ ","
+        ++ "\"layout\":" ++ fieldLayout.toJson
+        ++ (if isSubobject then ",\"subobject\":true" else "")
+        ++ "}"
+      let trivialFieldJson :=
+        match trivialField? with
+        | some idx => "\"trivialFieldIndex\":" ++ toString idx ++ ","
+        | none => ""
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"structure\","
+      ++ "\"name\":" ++ jsonString name.toString ++ ","
+      ++ "\"objectFieldCount\":" ++ toString objectFields ++ ","
+      ++ "\"usizeFieldCount\":" ++ toString usizeFields ++ ","
+      ++ "\"scalarByteSize\":" ++ toString scalarBytes ++ ","
+      ++ trivialFieldJson
+      ++ "\"fields\":" ++ jsonArray fieldJson
+      ++ "}"
+  | _ =>
+      "{\"type\":\"" ++ ty.label ++ "\",\"wireTag\":" ++ toString ty.wireTag ++ "}"
+
+partial def stripMData : Lean.Expr → Lean.Expr
+  | .mdata _ e => stripMData e
+  | e => e
+
+def constName? (e : Lean.Expr) : Option Name :=
+  match stripMData e with
+  | .const n _ => some n
+  | _ => none
+
+def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
+  match constName? e with
+  | some `Nat => some .nat
+  | some `Int => some .int
+  | some `Bool => some .bool
+  | some `String => some .string
+  | some `Float => some .float
+  | some `Float32 => some .float32
+  | some `UInt8 => some .uint8
+  | some `UInt16 => some .uint16
+  | some `UInt32 => some .uint32
+  | some `UInt64 => some .uint64
+  | some `USize => some .usize
+  | some `ByteArray => some .byteArray
+  | some `Lean.Expr => some .expr
+  | _ => none
+
+def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType := do
+  let name <- constName? e
+  let .inductInfo info <- env.find? name | none
+  if info.numParams != 0 || info.numIndices != 0 || info.isRec || info.ctors.isEmpty then
+    none
+  else
+    let ctors := info.ctors.toArray
+    let allNullary := ctors.all fun ctor =>
+      match env.find? ctor with
+      | some (.ctorInfo ctorInfo) => ctorInfo.induct == name && ctorInfo.numFields == 0
+      | _ => false
+    if allNullary then some (.simpleEnum name ctors) else none
+
+partial def exprTypeLabel (e : Lean.Expr) : String :=
+  match simpleInterfaceType? e with
+  | some ty => ty.label
+  | none =>
+      let e := stripMData e
+      let (fn, args) := e.getAppFnArgs
+      match fn, Array.toList args with
+      | `Array, [arg] => s!"Array {typeArgLabel arg}"
+      | `List, [arg] => s!"List {typeArgLabel arg}"
+      | `Option, [arg] => s!"Option {typeArgLabel arg}"
+      | `Prod, [lhs, rhs] => s!"{exprTypeLabel lhs} × {exprTypeLabel rhs}"
+      | _, [] =>
+          if fn.isAnonymous then toString e else fn.toString
+      | _, args =>
+          if fn.isAnonymous then
+            toString e
+          else
+            fn.toString ++ " " ++ " ".intercalate (args.map typeArgLabel)
+where
+  typeArgLabel (e : Lean.Expr) : String :=
+    let label := exprTypeLabel e
+    if label.contains ' ' || label.contains '×' then
+      "(" ++ label ++ ")"
+    else
+      label
+
+partial def instantiateForallPrefix? (type : Lean.Expr) (args : Array Lean.Expr) : Option Lean.Expr :=
+  let rec go (idx : Nat) (type : Lean.Expr) : Option Lean.Expr :=
+    if h : idx < args.size then
+      match stripMData type with
+      | .forallE _ _ body _ => go (idx + 1) (body.instantiate1 args[idx])
+      | _ => none
+    else
+      some type
+  go 0 type
+
+def projectionFieldType? (numParams : Nat) (params : Array Lean.Expr) (projType : Lean.Expr) : Option Lean.Expr := do
+  if params.size != numParams then
+    none
+  let instantiated ← instantiateForallPrefix? projType params
+  match stripMData instantiated with
+  | .forallE _ _ body _ => some body
+  | _ => none
+
+def structureFieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option StructureFieldLayout
+  | .object index _ => some (.object index)
+  | .usize index => some (.usize index)
+  | .scalar size offset _ => some (.scalar size offset)
+  | .erased | .void => none
+
+def structureSeenContains (seen : StructureSeen) (name : Name) (key : String) : Bool :=
+  seen.any fun (seenName, seenKey) => seenName == name && seenKey == key
+
+mutual
+
+partial def taggedUnionType (seenStructures : StructureSeen) (name : Name) (label : String)
+    (constructors : Array (Name × String × Lean.Expr)) : CoreM (Except String InterfaceType) := do
+  let mut variants := #[]
+  for (ctorName, jsName, fieldExpr) in constructors do
+    let layout ←
+      try
+        Lean.Compiler.LCNF.getCtorLayout ctorName
+      catch _ =>
+        return .error s!"could not compute runtime layout for constructor `{ctorName}`"
+    if layout.fieldInfo.size != 1 then
+      return .error s!"constructor `{ctorName}` must have exactly one runtime field"
+    let some fieldLayout := structureFieldLayout? layout.fieldInfo[0]!
+      | return .error s!"constructor `{ctorName}` has erased or void runtime layout"
+    match ← interfaceType fieldExpr seenStructures with
+    | .ok fieldType =>
+        variants := variants.push (
+          ctorName,
+          jsName,
+          fieldType,
+          fieldLayout,
+          layout.ctorInfo.size,
+          layout.ctorInfo.usize,
+          layout.ctorInfo.ssize)
+    | .error reason =>
+        return .error s!"constructor `{ctorName}` has unsupported payload type `{fieldExpr}`: {reason}"
+  return .ok (.taggedUnion name label variants)
+
+partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
+  let e := stripMData e
+  let (name, args) := e.getAppFnArgs
+  if name.isAnonymous then
+    return .error s!"unsupported type `{e}`"
+  let seenKey := toString e
+  if structureSeenContains seenStructures name seenKey then
+    return .error s!"recursive structure `{name}` is not supported"
+  else
+    let env ← getEnv
+    let some (.inductInfo indInfo) := env.find? name
+      | return .error s!"unsupported type `{e}`"
+    let some structInfo := getStructureInfo? env name
+      | return .error s!"unsupported type `{e}`"
+    if indInfo.numIndices != 0 then
+      return .error s!"indexed structure `{name}` is not supported"
+    else if args.size != indInfo.numParams then
+      return .error s!"structure `{name}` expects {indInfo.numParams} parameter(s), got {args.size}"
+    else if indInfo.isRec then
+      return .error s!"recursive structure `{name}` is not supported"
+    else if indInfo.ctors.length != 1 then
+      return .error s!"structure `{name}` must have exactly one constructor"
+    else if structInfo.fieldNames.isEmpty then
+      return .error s!"empty structure `{name}` is not supported"
+    else
+      let ctorName := indInfo.ctors.head!
+      let layout ←
+        try
+          Lean.Compiler.LCNF.getCtorLayout ctorName
+        catch _ =>
+          return .error s!"could not compute runtime layout for structure `{name}`"
+      let trivialField? :=
+        (← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx)
+      if layout.fieldInfo.size != structInfo.fieldNames.size then
+        return .error s!"runtime layout for structure `{name}` does not match its field count"
+      let nextSeen := seenStructures.push (name, seenKey)
+      let mut fields := #[]
+      for h : idx in *...structInfo.fieldNames.size do
+        let fieldName := structInfo.fieldNames[idx]
+        let isSubobject := (isSubobjectField? env name fieldName).isSome
+        let some fieldLayout := structureFieldLayout? layout.fieldInfo[idx]!
+          | return .error s!"field `{fieldName}` of structure `{name}` has erased or void runtime layout"
+        let some projName := structInfo.getProjFn? idx
+          | return .error s!"field `{fieldName}` of structure `{name}` is missing a projection function"
+        let some info := env.find? projName
+          | return .error s!"field `{fieldName}` of structure `{name}` has no projection declaration"
+        let some fieldExpr := projectionFieldType? indInfo.numParams args info.type
+          | return .error s!"field `{fieldName}` of structure `{name}` has invalid projection type `{info.type}`"
+        match ← interfaceType fieldExpr nextSeen with
+        | .ok fieldType =>
+            fields := fields.push (fieldName.toString, fieldType, fieldLayout, isSubobject)
+        | .error reason =>
+            return .error s!"field `{fieldName}` of structure `{name}` has unsupported type `{fieldExpr}`: {reason}"
+      return .ok (.structure name (exprTypeLabel e) trivialField? layout.ctorInfo.size layout.ctorInfo.usize layout.ctorInfo.ssize fields)
+
+partial def interfaceType (e : Lean.Expr) (seenStructures : StructureSeen := #[]) : CoreM (Except String InterfaceType) := do
+  match simpleInterfaceType? e with
+  | some ty => return .ok ty
+  | none =>
+      let e := stripMData e
+      let (fn, args) := e.getAppFnArgs
+      match fn, Array.toList args with
+      | `Array, [arg] =>
+          match ← interfaceType arg seenStructures with
+          | .ok ty => return .ok (.array ty)
+          | .error reason => return .error s!"unsupported Array element type: {reason}"
+      | `List, [arg] =>
+          match ← interfaceType arg seenStructures with
+          | .ok ty => return .ok (.list ty)
+          | .error reason => return .error s!"unsupported List element type: {reason}"
+      | `Option, [arg] =>
+          match ← interfaceType arg seenStructures with
+          | .ok ty => return .ok (.option ty)
+          | .error reason => return .error s!"unsupported Option element type: {reason}"
+      | `Prod, [lhs, rhs] =>
+          match ← interfaceType lhs seenStructures with
+          | .error reason => return .error s!"unsupported Prod fst type: {reason}"
+          | .ok lhsTy =>
+              match ← interfaceType rhs seenStructures with
+              | .error reason => return .error s!"unsupported Prod snd type: {reason}"
+              | .ok rhsTy => return .ok (.prod lhsTy rhsTy)
+      | `Sum, [lhs, rhs] =>
+          taggedUnionType seenStructures `Sum (exprTypeLabel e) #[
+            (`Sum.inl, "inl", lhs),
+            (`Sum.inr, "inr", rhs)
+          ]
+      | `Except, [err, ok] =>
+          taggedUnionType seenStructures `Except (exprTypeLabel e) #[
+            (`Except.error, "error", err),
+            (`Except.ok, "ok", ok)
+          ]
+      | _, _ =>
+          let env ← getEnv
+          match simpleEnumType? env e with
+          | some ty => return .ok ty
+          | none => structureType seenStructures e
+
+end
+
+def binderArgName (fallback : Nat) (name : Name) : String :=
+  let candidate := name.toString
+  if name.isAnonymous || candidate.startsWith "_" || candidate.contains '_' then
+    s!"arg{fallback}"
+  else
+    candidate
+
+partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args : Array InterfaceArg := #[]) :
+    CoreM (Except String (Array InterfaceArg × InterfaceType)) := do
+  match stripMData type with
+  | .forallE name domain body binderInfo =>
+      if binderInfo != .default then
+        return .error s!"unsupported implicit/instance argument `{name}`"
+      else
+        match ← interfaceType domain with
+        | .error reason => return .error s!"unsupported argument type `{domain}`: {reason}"
+        | .ok argType =>
+            let arg := { name := binderArgName argIndex name, type := argType }
+            interfaceSignature? body (argIndex + 1) (args.push arg)
+  | result =>
+      match ← interfaceType result with
+      | .error reason => return .error s!"unsupported result type `{result}`: {reason}"
+      | .ok resultType => return .ok (args, resultType)
+
+def isInterfaceDeclInfo : ConstantInfo → Bool
+  | .defnInfo _ => true
+  | .opaqueInfo _ => true
+  | _ => false
+
+def isGeneratedAuxName (n : Name) : Bool :=
+  match boxedBaseName? n with
+  | some _ => true
+  | none =>
+      let text := n.toString
+      (text.splitOn "._").length > 1 ||
+        text.endsWith ".elim" ||
+        text.endsWith ".ctorElim" ||
+        text.endsWith ".rec" ||
+        text.endsWith ".casesOn" ||
+        text.endsWith ".ctorIdx" ||
+        text.endsWith ".toCtorIdx" ||
+        text.endsWith ".noConfusion" ||
+        text.endsWith ".noConfusionType"
+
+def sourceDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
+  index.sourceDecls.findSome? (fun (source, names) =>
+    if source == target.source.toString then some names else none) |>.getD #[]
+
+def publicSourceDeclsFor (index : DeclIndex) (target : Target) : Array Name :=
+  match index.envForSource? target.source.toString with
+  | none => #[]
+  | some env =>
+      sourceDeclNamesFor index target |>.filter fun n =>
+        !isPrivateName n &&
+        !isGeneratedAuxName n &&
+        match env.find? n with
+        | some info => isInterfaceDeclInfo info
+        | none => false
+
+def exportCandidatesFor (index : DeclIndex) (target : Target) : Array Name :=
+  if target.packageOnly then
+    #[]
+  else if target.includeAll then
+    publicSourceDeclsFor index target
+  else
+    target.roots.foldl (fun acc root =>
+      let n := (boxedBaseName? root).getD root
+      if acc.contains n then acc else acc.push n) #[]
+
+def sanitizeJsNameChar (c : Char) : Char :=
+  if c.isAlphanum || c == '_' then c else '_'
+
+def jsNameFor (n : Name) : String :=
+  let text := n.toString
+  let sanitized := text.map sanitizeJsNameChar
+  if sanitized.isEmpty then "entry" else sanitized
+
+def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : InterfaceType) : Bool :=
+  args.any (fun arg => arg.type.needsBoxedCallBoundary) || result.needsBoxedCallBoundary
+
+def boxedBoundaryDiagnostic (name : Name) : String :=
+  s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
+
+def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
+    CoreM (Except InterfaceDiagnostic InterfaceExport) := do
+  if isPrivateName name then
+    return .error { name, source, reason := "private declarations are not exported" }
+  else
+    let env ← getEnv
+    match env.find? name with
+    | none => return .error { name, source, reason := "missing elaborated Lean declaration" }
+    | some info =>
+        if !isInterfaceDeclInfo info then
+          return .error { name, source, reason := "declaration is not a compiled definition" }
+        else
+          match ← interfaceSignature? info.type with
+          | .ok (args, result) =>
+              if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
+                return .error { name, source, reason := boxedBoundaryDiagnostic name }
+              else
+                let jsName := jsNameFor name
+                return .ok { id := jsName, jsName, entry := name, source, args, result }
+          | .error reason =>
+              return .error { name, source, reason }
+
+def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetadata :=
+  let mode :=
+    if target.packageOnly then "packageOnly"
+    else if target.includeAll then "all"
+    else "explicit"
+  {
+    source := target.source.toString
+    mode := mode
+    roots := target.roots
+    resolvedRoots := resolvedRootsForTarget index target
+    packageOnly := target.packageOnly
+  }
+
+def collectPackageMetadata (generatedAt : String) (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
+  {
+    generator := "tools/GeneratePackage.lean"
+    packageFormatVersion := 4
+    manifestVersion := 1
+    leanVersion := Lean.versionString
+    leanToolchain := Lean.toolchain
+    leanGithash := Lean.githash
+    generatedAt := generatedAt
+    targets := targets.map (targetMetadataFor index)
+  }
+
+def runCoreForSource (source : String) (env : Environment) (x : CoreM α) : IO α :=
+  x.toIO'
+    { fileName := source, fileMap := default }
+    { env := env }
+
+def collectInterfaceManifest (metadata : PackageMetadata) (targets : Array Target) (index : DeclIndex) : IO InterfaceManifest := do
+  let mut manifest : InterfaceManifest := { metadata := metadata }
+  for target in targets do
+    let source := target.source.toString
+    match index.envForSource? source with
+    | none =>
+        manifest := { manifest with diagnostics := manifest.diagnostics.push {
+          name := .anonymous,
+          source,
+          reason := "source environment was not loaded"
+        } }
+    | some env =>
+        for name in exportCandidatesFor index target do
+          match ← runCoreForSource source env (interfaceExportFor index source name) with
+          | .ok entry =>
+              if !manifest.exports.any (fun existing => existing.entry == entry.entry) then
+                manifest := { manifest with exports := manifest.exports.push entry }
+          | .error diagnostic =>
+              manifest := { manifest with diagnostics := manifest.diagnostics.push diagnostic }
+  return manifest
+
+def InterfaceArg.toJson (arg : InterfaceArg) : String :=
+  "{"
+  ++ "\"name\":" ++ jsonString arg.name ++ ","
+  ++ "\"type\":" ++ arg.type.toJson
+  ++ "}"
+
+def InterfaceExport.toJson (entry : InterfaceExport) : String :=
+  "{"
+  ++ "\"id\":" ++ jsonString entry.id ++ ","
+  ++ "\"jsName\":" ++ jsonString entry.jsName ++ ","
+  ++ "\"entry\":" ++ jsonString entry.entry.toString ++ ","
+  ++ "\"source\":" ++ jsonString entry.source ++ ","
+  ++ "\"args\":" ++ jsonArray (entry.args.map InterfaceArg.toJson) ++ ","
+  ++ "\"result\":" ++ entry.result.toJson
+  ++ "}"
+
+def InterfaceDiagnostic.toJson (diagnostic : InterfaceDiagnostic) : String :=
+  "{"
+  ++ "\"name\":" ++ jsonString diagnostic.name.toString ++ ","
+  ++ "\"source\":" ++ jsonString diagnostic.source ++ ","
+  ++ "\"reason\":" ++ jsonString diagnostic.reason
+  ++ "}"
+
+def PackageTargetMetadata.toJson (target : PackageTargetMetadata) : String :=
+  "{"
+  ++ "\"source\":" ++ jsonString target.source ++ ","
+  ++ "\"mode\":" ++ jsonString target.mode ++ ","
+  ++ "\"roots\":" ++ jsonArray (target.roots.map (fun n => jsonString n.toString)) ++ ","
+  ++ "\"resolvedRoots\":" ++ jsonArray (target.resolvedRoots.map (fun n => jsonString n.toString)) ++ ","
+  ++ "\"packageOnly\":" ++ jsonBool target.packageOnly
+  ++ "}"
+
+def PackageMetadata.toJson (metadata : PackageMetadata) : String :=
+  "{"
+  ++ "\"generator\":" ++ jsonString metadata.generator ++ ","
+  ++ "\"packageFormatVersion\":" ++ toString metadata.packageFormatVersion ++ ","
+  ++ "\"manifestVersion\":" ++ toString metadata.manifestVersion ++ ","
+  ++ "\"leanVersion\":" ++ jsonString metadata.leanVersion ++ ","
+  ++ "\"leanToolchain\":" ++ jsonString metadata.leanToolchain ++ ","
+  ++ "\"leanGithash\":" ++ jsonString metadata.leanGithash ++ ","
+  ++ "\"generatedAt\":" ++ jsonString metadata.generatedAt ++ ","
+  ++ "\"targets\":" ++ jsonArray (metadata.targets.map PackageTargetMetadata.toJson)
+  ++ "}"
+
+def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
+  "{"
+  ++ "\"version\":1,"
+  ++ "\"artifact\":\"lean-vir-ir-package\","
+  ++ "\"metadata\":" ++ manifest.metadata.toJson ++ ","
+  ++ "\"exports\":" ++ jsonArray (manifest.exports.map InterfaceExport.toJson) ++ ","
+  ++ "\"diagnostics\":" ++ jsonArray (manifest.diagnostics.map InterfaceDiagnostic.toJson)
+  ++ "}"
 
 abbrev EmitM := StateT ByteArray (Except String)
 
@@ -1500,10 +2272,6 @@ def emitParam (p : Param) : EmitM Unit :=
 def emitBody (body : FnBody) : EmitM Unit :=
   emitAlt.emitBody body
 
-def boxedBaseName? : Name -> Option Name
-  | .str pre "_boxed" => some pre
-  | _ => none
-
 def emitEntryHeader (name : Name) : EmitM Unit := do
   emitName name
   match boxedBaseName? name with
@@ -1536,19 +2304,20 @@ def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
     emitName entry.name
     emitName entry.initName
 
-def emitPackageM (closure : Closure) : EmitM Unit := do
+def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit := do
   emitString "lean-vir-ir-package"
-  emitU32 3
+  emitU32 4
   emitU32 (closure.decls.size + closure.externs.size)
   closure.decls.forM emitDeclEntry
   closure.externs.forM emitExternEntry
   emitArray closure.initGlobals emitInitGlobal
+  emitString manifest.toJson
 
-def emitPackage (closure : Closure) : Except String ByteArray := do
-  let (_, bytes) <- (emitPackageM closure).run ByteArray.empty
+def emitPackage (closure : Closure) (manifest : InterfaceManifest) : Except String ByteArray := do
+  let (_, bytes) <- (emitPackageM closure manifest).run ByteArray.empty
   return bytes
 
-def reportFor (targets : Array Target) (closure : Closure) : String :=
+def reportFor (targets : Array Target) (closure : Closure) (manifest : InterfaceManifest) : String :=
   let roots :=
     targets.foldl (fun acc target =>
       if target.includeAll then
@@ -1572,11 +2341,25 @@ def reportFor (targets : Array Target) (closure : Closure) : String :=
     if closure.missingExterns.isEmpty then #["None."] else closure.missingExterns.map fun n => s!"- `{n}`"
   let unsupportedInitGlobalLines :=
     if closure.unsupportedInitGlobals.isEmpty then #["None."] else closure.unsupportedInitGlobals.map fun n => s!"- `{n}`"
+  let interfaceExportLines :=
+    if manifest.exports.isEmpty then #["None."] else manifest.exports.map fun entry =>
+      let args := entry.args.map (fun arg => s!"{arg.name} : {arg.type.label}")
+      s!"- `{entry.entry}` as `{entry.jsName}` : ({", ".intercalate args.toList}) -> {entry.result.label}"
+  let interfaceDiagnosticLines :=
+    if manifest.diagnostics.isEmpty then #["None."] else manifest.diagnostics.map fun diagnostic =>
+      s!"- `{diagnostic.name}` from `{diagnostic.source}`: {diagnostic.reason}"
   "# Generated IR Package Report\n\n"
   ++ "Generated by `tools/GeneratePackage.lean` from typed `Lean.IR.Decl` values.\n\n"
+  ++ s!"Package format: {manifest.metadata.packageFormatVersion}\n\n"
+  ++ s!"Manifest version: {manifest.metadata.manifestVersion}\n\n"
+  ++ s!"Lean toolchain: {manifest.metadata.leanToolchain}\n\n"
+  ++ s!"Lean version: {manifest.metadata.leanVersion}\n\n"
+  ++ s!"Lean git hash: {manifest.metadata.leanGithash}\n\n"
+  ++ s!"Generated at: {manifest.metadata.generatedAt}\n\n"
   ++ s!"Loaded declarations: {closure.decls.size}\n\n"
   ++ s!"Native extern declarations: {closure.externs.size}\n\n"
   ++ s!"Initializer globals: {closure.initGlobals.size}\n\n"
+  ++ s!"Interface exports: {manifest.exports.size}\n\n"
   ++ "## Roots\n\n"
   ++ "\n".intercalate (roots.map (fun n => s!"- `{n}`")).toList ++ "\n\n"
   ++ "## Loaded IR Declarations\n\n"
@@ -1590,7 +2373,11 @@ def reportFor (targets : Array Target) (closure : Closure) : String :=
   ++ "## Missing Native Extern Registrations\n\n"
   ++ "\n".intercalate missingExternLines.toList ++ "\n\n"
   ++ "## Unsupported Init Globals\n\n"
-  ++ "\n".intercalate unsupportedInitGlobalLines.toList ++ "\n"
+  ++ "\n".intercalate unsupportedInitGlobalLines.toList ++ "\n\n"
+  ++ "## Interface Exports\n\n"
+  ++ "\n".intercalate interfaceExportLines.toList ++ "\n\n"
+  ++ "## Interface Diagnostics\n\n"
+  ++ "\n".intercalate interfaceDiagnosticLines.toList ++ "\n"
 
 def readTextFile? (path : System.FilePath) : IO (Option String) := do
   try
@@ -1616,12 +2403,33 @@ def writeBinFile (path : System.FilePath) (content : ByteArray) : IO Unit := do
   if (← readBinFile? path) != some content then
     IO.FS.writeBinFile path content
 
+def generatedAtUtc : IO String := do
+  try
+    let out <- IO.Process.output {
+      cmd := "date"
+      args := #["-u", "+%Y-%m-%dT%H:%M:%SZ"]
+    }
+    if out.exitCode == 0 then
+      return out.stdout.trimAscii.toString
+    else
+      return "unknown"
+  catch _ =>
+    return "unknown"
+
+def namesSummary (names : Array Name) : String :=
+  if names.isEmpty then
+    "(none)"
+  else
+    ", ".intercalate (names.map (fun n => n.toString)).toList
+
 unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath) : IO UInt32 := do
   let index <- loadDeclIndex targets
   let closure := collectClosure targets index
-  let report := reportFor targets closure
+  let metadata := collectPackageMetadata (← generatedAtUtc) targets index
+  let manifest ← collectInterfaceManifest metadata targets index
+  let report := reportFor targets closure manifest
   writeTextFile reportPath report
-  if !closure.missingDecls.isEmpty || !closure.missingExterns.isEmpty || !closure.unsupportedInitGlobals.isEmpty then
+  if !closure.missingDecls.isEmpty || !closure.missingExterns.isEmpty || !closure.unsupportedInitGlobals.isEmpty || !manifest.diagnostics.isEmpty then
     if !closure.missingDecls.isEmpty then
       IO.eprintln "missing IR declarations:"
       for name in closure.missingDecls do
@@ -1634,13 +2442,24 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.eprintln "unsupported initializer globals:"
       for name in closure.unsupportedInitGlobals do
         IO.eprintln s!"  - {name}"
+    if !manifest.diagnostics.isEmpty then
+      IO.eprintln "unsupported interface exports:"
+      for diagnostic in manifest.diagnostics do
+        IO.eprintln s!"  - {diagnostic.name}: {diagnostic.reason}"
     IO.eprintln s!"see {reportPath}"
     return 1
-  match emitPackage closure with
+  match emitPackage closure manifest with
   | .ok bytes =>
       writeBinFile packagePath bytes
       IO.println s!"wrote {packagePath}"
       IO.println s!"wrote {reportPath}"
+      IO.println s!"package format: {manifest.metadata.packageFormatVersion}"
+      IO.println s!"toolchain: {manifest.metadata.leanToolchain}"
+      IO.println s!"generated at: {manifest.metadata.generatedAt}"
+      IO.println s!"declarations: {closure.decls.size + closure.externs.size} ({closure.decls.size} Lean IR, {closure.externs.size} native externs)"
+      IO.println s!"interface exports: {manifest.exports.size}"
+      for target in manifest.metadata.targets do
+        IO.println s!"target: {target.source} [{target.mode}] roots: {namesSummary target.resolvedRoots}"
       return 0
   | .error err =>
       IO.eprintln err
@@ -1655,6 +2474,7 @@ def nameFromDotted (text : String) : Name :=
 partial def takeTargetRoots : List String -> List String -> List String × List String
   | [], roots => (roots.reverse, [])
   | "--target" :: rest, roots => (roots.reverse, "--target" :: rest)
+  | "--package-target" :: rest, roots => (roots.reverse, "--package-target" :: rest)
   | "--target-all" :: rest, roots => (roots.reverse, "--target-all" :: rest)
   | root :: rest, roots => takeTargetRoots rest (root :: roots)
 
@@ -1667,11 +2487,18 @@ partial def parseTargets : List String -> Except String (Array Vir.GeneratePacka
       let target : Vir.GeneratePackage.Target :=
         { source := source, roots := roots.toArray.map nameFromDotted }
       return (#[target] ++ (← parseTargets rest))
+  | "--package-target" :: source :: rest => do
+      let (roots, rest) := takeTargetRoots rest []
+      if roots.isEmpty then
+        throw s!"package target `{source}` has no roots"
+      let target : Vir.GeneratePackage.Target :=
+        { source := source, roots := roots.toArray.map nameFromDotted, packageOnly := true }
+      return (#[target] ++ (← parseTargets rest))
   | "--target-all" :: source :: rest => do
       let target : Vir.GeneratePackage.Target :=
         { source := source, roots := #[], includeAll := true }
       return (#[target] ++ (← parseTargets rest))
-  | arg :: _ => throw s!"expected `--target` or `--target-all`, got `{arg}`"
+  | arg :: _ => throw s!"expected `--target`, `--package-target`, or `--target-all`, got `{arg}`"
 
 unsafe def main (args : List String) : IO UInt32 := do
   match args with
@@ -1684,5 +2511,5 @@ unsafe def main (args : List String) : IO UInt32 := do
           IO.eprintln err
           return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--target <source.lean> <root>... | --target-all <source.lean>]..."
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--target <source.lean> <root>... | --package-target <source.lean> <root>... | --target-all <source.lean>]..."
       return 2

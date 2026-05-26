@@ -4,8 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 
 const root = new URL("..", import.meta.url).pathname;
@@ -30,20 +29,16 @@ const result = spawnSync("lean", ["--run", "tools/GeneratePackage.lean", package
 });
 
 if ((result.status ?? 1) !== 0) {
+  console.error(`error: package generation failed for ${source}`);
+  console.error(`report: ${reportPath}`);
   process.exit(result.status ?? 1);
-}
-
-if (config.inputSpec) {
-  const inputSpec = normalizeInputSpec(config.inputSpec);
-  const inputSpecPath = config.inputSpec.path ?? inputSpecPathFor(packagePath);
-  await writeJson(inputSpecPath, inputSpec);
-  console.log(`wrote ${inputSpecPath}`);
 }
 
 console.log(`package: ${packagePath}`);
 console.log(`report:  ${reportPath}`);
+console.log("interface: embedded in package");
 if (includeAll) {
-  console.log(`mode:    all declarations from ${source}`);
+  console.log(`mode:    public source definitions from ${source}`);
 } else {
   console.log(`roots:   ${roots.join(", ")}`);
 }
@@ -64,36 +59,4 @@ function reportPathFor(packagePath) {
   return packagePath.endsWith(".irpkg")
     ? `${packagePath.slice(0, -".irpkg".length)}.report.md`
     : `${packagePath}.report.md`;
-}
-
-function inputSpecPathFor(packagePath) {
-  return packagePath.endsWith(".irpkg")
-    ? `${packagePath.slice(0, -".irpkg".length)}.input.json`
-    : `${packagePath}.input.json`;
-}
-
-function normalizeInputSpec(spec) {
-  const entries = spec.entries;
-  if (!Array.isArray(entries)) {
-    throw new Error("inputSpec.entries must be an array");
-  }
-  return {
-    version: 1,
-    entries: entries.map((entry, index) => {
-      const id = entry.id ?? entry.entry;
-      const name = requiredString(entry.entry, `inputSpec.entries[${index}].entry`);
-      return {
-        id,
-        entry: name,
-        result: entry.result ?? { type: "Nat" },
-        inputs: entry.inputs ?? [],
-      };
-    }),
-  };
-}
-
-async function writeJson(path, value) {
-  await mkdir(dirname(join(root, path)), { recursive: true });
-  const content = `${JSON.stringify(value, null, 2)}\n`;
-  await writeFile(join(root, path), content);
 }

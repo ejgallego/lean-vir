@@ -7,12 +7,14 @@ and the browser loads that package without rebuilding the upstream interpreter.
 ## Workflow
 
 1. Add or edit a Lean source under `examples/`.
-2. Add the public root names to `targets` in `tools/GeneratePackage.lean`.
+2. Add exported roots to `scripts/generate-browser-package.mjs`; use
+   `packageOnly` only for internal roots that are needed by the demo but should
+   not become JS interface exports.
 3. Run `npm run check:package`.
 4. Inspect `build/generated/ir-provider-report.md`.
 5. Run `npm run check:boundary-registry` if you add or change a native extern.
 6. Run `npm test`.
-7. Update `web/` only if the demo needs new UI or a new stable WASM export.
+7. Update `web/` only if the demo needs new UI.
 
 Most example-only edits should only regenerate `web/public/vir-demo.irpkg`.
 They should not recompile or relink `ir_interpreter.cpp`.
@@ -25,23 +27,21 @@ For a narrower developer loop, generate a package from a single Lean file:
 npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg SortDemo.demo
 ```
 
-When no roots are supplied, the utility packages every IR declaration emitted for
-the source:
+When no roots are supplied, the utility packages public source definitions:
 
 ```bash
 npm run generate:irpkg -- examples/MergeSort.lean build/generated/local.irpkg
 ```
 
 Run `npm run dev` and open `/dev.html` to load a served package URL or upload the
-generated `.irpkg`, then use the input spec to evaluate a `Nat` entry. The
-developer page currently supports `() -> Nat`, `Nat -> Nat`, `Array Nat -> Nat`,
-`String -> Nat`, and `ByteArray -> Nat` entry shapes.
+generated `.irpkg`; the page reads the embedded interface manifest and generates
+entry controls automatically.
 See `docs/LOCAL_IRPKG.md` for the full local package workflow and current
 limitations.
 
 For a reproducible local setup, prefer `npm run prepare:irpkg -- <config.json>`.
-The example configs under `examples/*.virpkg.json` generate both an `.irpkg` and
-an input-spec JSON file that `/dev.html` can load by URL.
+The example configs under `examples/*.virpkg.json` generate manifest-bearing
+`.irpkg` files that `/dev.html` can load by URL.
 
 ## Reading The Report
 
@@ -54,6 +54,10 @@ The generated report has separate sections for the two common failure modes:
 - `Unsupported Init Globals`: the closure reached a nullary declaration emitted
   from Lean initialization code whose body is top-level `unreachable`; these
   need an initialized-global provider rather than another normal IR declaration.
+- `Interface Diagnostics`: a requested export could not be mapped to the
+  supported JavaScript interface surface. This is a loud failure; explicitly
+  exclude or keep such declarations package-only if they are internal support
+  roots.
 
 If the package generator reaches an unsupported IR shape, it reports the
 declaration being encoded and the unsupported package field. That usually means
@@ -66,12 +70,20 @@ the package-backed imported closure or the explicit native boundary.
 
 ## Browser Entrypoints
 
-Prefer `vir_eval_const_nat_string` for zero-argument `Nat` demos, since it also
-handles values wider than 32 bits. The JavaScript wrapper in
-`web/src/vir-runtime.js` currently covers `() -> Nat`, `Nat -> Nat`,
-`Array Nat -> Nat`, `String -> Nat`, and `ByteArray -> Nat`.
+Prefer the manifest-driven `vir.call(name, ...args)` API in
+`web/src/vir-runtime.js`. If a demo needs another browser-supplied input or
+result shape, extend the manifest type classifier and the generic call encoder
+in `wasm/upstream_shim/shim.cpp`. Keep the Lean declaration itself in
+`examples/` and include it as an exported root. Do not add per-function or
+per-shape WASM exports for manifest-supported declarations; unsupported entries
+should fail during package generation until their interface type is implemented.
 
-If a demo needs another browser-supplied input or result shape, add a narrow
-export in `wasm/upstream_shim/shim.cpp` that constructs the Lean object and then
-calls `lean::ir::run_boxed`. Keep the Lean declaration itself in `examples/` and
-include it as a root in `tools/GeneratePackage.lean`.
+The current generic interface covers primitive scalars, byte arrays, recursive
+`Array`/`List`/`Option`/`Prod`/`Sum`/`Except` shapes, non-indexed user-defined
+structures including parameterized instances, direct scalar wrappers, and
+inherited parent fields, nullary inductive enums, and structural `Lean.Expr`
+values. For enums, no per-demo code is needed: the generator records the
+constructor list in the package manifest and `/dev.html` renders a select
+control from that manifest after the package is loaded. For `Sum` and `Except`,
+the manifest records constructor payload layouts and `/dev.html` renders JSON
+inputs.

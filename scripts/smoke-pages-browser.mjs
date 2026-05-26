@@ -7,12 +7,14 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
-import { mkdtemp, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer as createNetServer } from "node:net";
+
+import { encodeInvalidMagicPackage, readIrPackageInfo, replaceIrPackageManifest } from "./irpkg-format.mjs";
 
 const distRoot = fileURLToPath(new URL("../web/dist/", import.meta.url));
 const basePath = "/lean-vir/";
@@ -222,14 +224,18 @@ async function evaluate(cdp, expression) {
 }
 
 async function waitForReady(cdp) {
+  return waitForStatus(cdp, "Ready");
+}
+
+async function waitForStatus(cdp, expected) {
   return evaluate(cdp, `new Promise((resolve, reject) => {
     const deadline = Date.now() + 15000;
     const poll = () => {
       const status = document.querySelector("#status")?.textContent?.trim();
-      if (status === "Ready") {
+      if (status === ${JSON.stringify(expected)}) {
         resolve(status);
       } else if (Date.now() > deadline) {
-        reject(new Error("page did not become Ready; last status: " + status));
+        reject(new Error("page did not become ${expected}; last status: " + status));
       } else {
         setTimeout(poll, 100);
       }
@@ -248,8 +254,8 @@ async function smokeLanding(cdp, origin) {
   })`);
   assert.equal(state.packageName, "vir-demo.irpkg");
   assert.equal(state.mood, "happy");
-  assert.ok(state.links.includes("dev.html?package=local-fib.irpkg&spec=local-fib.input.json&entry=fib"));
-  assert.ok(state.links.includes("dev.html?package=local-mergesort.irpkg&spec=local-mergesort.input.json&entry=sort-array"));
+  assert.ok(state.links.includes("dev.html?package=local-fib.irpkg&entry=fib"));
+  assert.ok(state.links.includes("dev.html?package=local-mergesort.irpkg&entry=SortDemo_demoFromArray"));
 }
 
 async function smokeRunner(cdp, origin, url, expected) {
@@ -258,22 +264,46 @@ async function smokeRunner(cdp, origin, url, expected) {
   const before = await evaluate(cdp, `({
     location: window.location.href,
     packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+    exports: document.querySelector("#dev-export-count")?.textContent?.trim(),
+    sourceTargets: document.querySelector("#dev-source-targets")?.textContent?.trim(),
+    toolchain: document.querySelector("#dev-toolchain")?.textContent?.trim(),
+    generatedAt: document.querySelector("#dev-generated-at")?.textContent?.trim(),
     entry: document.querySelector("#dev-entry-select")?.value,
     entryCount: document.querySelector("#dev-entry-select")?.options.length,
-    input: document.querySelector("[data-input-index='0']")?.value
+    input: document.querySelector("[data-input-index='0']")?.value,
+    inputs: Array.from(document.querySelectorAll("[data-input-index]")).map((field) => ({
+      value: field.value,
+      tagName: field.tagName
+    }))
   })`);
   assert.ok(before.location.endsWith(url), `unexpected runner URL: ${before.location}`);
   assert.equal(before.packageName, expected.packageName);
+  assert.ok(/^\d+$/.test(before.exports), `expected export count, got ${before.exports}`);
+  assert.notEqual(before.sourceTargets, "...");
+  assert.match(before.toolchain, /leanprover\/lean4/);
+  assert.notEqual(before.generatedAt, "...");
   assert.equal(before.entry, expected.entry);
-  assert.equal(before.entryCount, expected.entryCount);
-  assert.equal(before.input, expected.input);
+  if (expected.entryCount !== undefined) {
+    assert.equal(before.entryCount, expected.entryCount);
+  }
+  if (expected.input !== undefined) {
+    assert.equal(before.input, expected.input);
+  }
+  if (expected.inputs !== undefined) {
+    assert.deepEqual(before.inputs.map((input) => input.value).slice(0, expected.inputs.length), expected.inputs);
+  }
+  if (expected.inputTags !== undefined) {
+    assert.deepEqual(before.inputs.map((input) => input.tagName).slice(0, expected.inputTags.length), expected.inputTags);
+  }
 
-  const runInput = expected.runInput === undefined ? "null" : JSON.stringify(expected.runInput);
+  const runInputs = expected.runInputs ?? (expected.runInput === undefined ? null : [expected.runInput]);
   const result = await evaluate(cdp, `new Promise((resolve, reject) => {
     const output = document.querySelector("#dev-result");
-    const runInput = ${runInput};
-    if (runInput !== null) {
-      document.querySelector("[data-input-index='0']").value = runInput;
+    const runInputs = ${JSON.stringify(runInputs)};
+    if (runInputs !== null) {
+      for (const [index, value] of runInputs.entries()) {
+        document.querySelector("[data-input-index='" + index + "']").value = value;
+      }
     }
     output.textContent = "pending";
     document.querySelector("#dev-run-entry").click();
@@ -293,6 +323,131 @@ async function smokeRunner(cdp, origin, url, expected) {
   assert.equal(result, expected.result);
 }
 
+async function smokeRunnerFailure(cdp, origin, url, expected) {
+  await navigate(cdp, `${origin}${basePath}${url}`);
+  await waitForStatus(cdp, "Failed");
+  const state = await evaluate(cdp, `({
+    packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+    status: document.querySelector("#status")?.textContent?.trim(),
+    result: document.querySelector("#dev-result")?.textContent?.trim(),
+    entryCount: document.querySelector("#dev-entry-select")?.options.length,
+    runDisabled: document.querySelector("#dev-run-entry")?.disabled,
+    exports: document.querySelector("#dev-export-count")?.textContent?.trim()
+  })`);
+  assert.equal(state.status, "Failed");
+  assert.match(state.result, expected.result);
+  assert.equal(state.runDisabled, true);
+  if (expected.packageName !== undefined) {
+    assert.equal(state.packageName, expected.packageName);
+  }
+  if (expected.entryCount !== undefined) {
+    assert.equal(state.entryCount, expected.entryCount);
+  }
+  if (expected.exports !== undefined) {
+    assert.equal(state.exports, expected.exports);
+  }
+}
+
+function expectedInputTag(type) {
+  if (type?.wireTag === 14) return "SELECT";
+  if ([15, 16, 17, 18, 19, 20, 21].includes(type?.wireTag)) return "TEXTAREA";
+  return "INPUT";
+}
+
+async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
+  const info = await packageInfoFor(packageFile);
+  await navigate(cdp, `${origin}${basePath}dev.html?package=${encodeURIComponent(packageFile)}`);
+  await waitForReady(cdp);
+  const state = await evaluate(cdp, `(() => {
+    const select = document.querySelector("#dev-entry-select");
+    return {
+      options: Array.from(select.options).map((option) => ({
+        value: option.value,
+        text: option.textContent,
+      })),
+      packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+    };
+  })()`);
+  assert.equal(state.packageName, packageFile);
+  assert.deepEqual(
+    state.options.map((option) => option.value),
+    info.manifest.exports.map((entry) => entry.id),
+  );
+  for (const [index, entry] of info.manifest.exports.entries()) {
+    assert.ok(state.options[index].text.includes(entry.jsName), `missing ${entry.jsName} in option label`);
+  }
+
+  const expectedControls = info.manifest.exports.map((entry) => ({
+    id: entry.id,
+    inputTags: entry.args.map((arg) => expectedInputTag(arg.type)),
+    enumOptionCounts: entry.args.map((arg) =>
+      arg.type?.wireTag === 14 ? (arg.type.constructors ?? []).length : null),
+  }));
+  const renderedControls = await evaluate(cdp, `(() => {
+    const select = document.querySelector("#dev-entry-select");
+    return ${JSON.stringify(expectedControls)}.map((expected) => {
+      select.value = expected.id;
+      select.dispatchEvent(new Event("change", { bubbles: true }));
+      return {
+        id: select.value,
+        inputTags: Array.from(document.querySelectorAll("[data-input-index]")).map((field) => field.tagName),
+        enumOptionCounts: Array.from(document.querySelectorAll("[data-input-index]")).map((field) =>
+          field.tagName === "SELECT" ? field.options.length : null),
+      };
+    });
+  })()`);
+  assert.deepEqual(renderedControls, expectedControls);
+}
+
+async function prepareNegativePackages() {
+  await writeFile(resolve(distRoot, "bad-magic.irpkg"), encodeInvalidMagicPackage());
+
+  const fibBytes = await readFile(resolve(distRoot, "local-fib.irpkg"));
+  const fibInfo = readIrPackageInfo(fibBytes);
+  const manifest = {
+    ...fibInfo.manifest,
+    diagnostics: [
+      ...(Array.isArray(fibInfo.manifest.diagnostics) ? fibInfo.manifest.diagnostics : []),
+      {
+        name: "BrowserSmoke.unsupported",
+        source: "scripts/smoke-pages-browser.mjs",
+        reason: "unsupported interface export smoke fixture",
+      },
+    ],
+  };
+  await writeFile(
+    resolve(distRoot, "unsupported-interface.irpkg"),
+    replaceIrPackageManifest(fibBytes, manifest),
+  );
+}
+
+const packageInfoCache = new Map();
+
+async function packageInfoFor(packageFile) {
+  if (!packageInfoCache.has(packageFile)) {
+    packageInfoCache.set(packageFile, readIrPackageInfo(await readFile(resolve(distRoot, packageFile))));
+  }
+  return packageInfoCache.get(packageFile);
+}
+
+async function runnerCaseFromManifest(packageFile, entryName, expected) {
+  const info = await packageInfoFor(packageFile);
+  const entry = info.manifest.exports.find((candidate) =>
+    candidate.entry === entryName || candidate.id === entryName || candidate.jsName === entryName);
+  assert.ok(entry, `${packageFile} manifest does not export ${entryName}`);
+  return {
+    url: `dev.html?package=${encodeURIComponent(packageFile)}&entry=${encodeURIComponent(entry.id)}`,
+    expected: {
+      packageName: packageFile,
+      entry: entry.id,
+      entryCount: info.manifest.exports.length,
+      ...expected,
+    },
+  };
+}
+
+await prepareNegativePackages();
+
 const server = await serveDist();
 const debugPort = await freePort();
 const chromium = await launchChromium(debugPort);
@@ -306,34 +461,157 @@ try {
   await cdp.send("Runtime.enable");
 
   await smokeLanding(cdp, server.origin);
-  await smokeRunner(
+  await smokeManifestDrivenEntryList(cdp, server.origin, "vir-demo.irpkg");
+  const runnerCases = [
+    await runnerCaseFromManifest("local-fib.irpkg", "fib", {
+      entryCount: 1,
+      input: "0",
+      runInput: "12",
+      result: "144",
+    }),
+    await runnerCaseFromManifest("local-mergesort.irpkg", "SortDemo.demoFromArray", {
+      entryCount: 2,
+      input: "[]",
+      runInput: "[4, 1, 3, 2]",
+      result: "30",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Tamagotchi.step", {
+      inputs: ["happy", "feed"],
+      inputTags: ["SELECT", "SELECT"],
+      runInputs: ["happy", "ignore"],
+      result: "hungry",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ExprPrinter.exprKindScore", {
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"kind":"bvar","index":4}`],
+      result: "5",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", {
+      input: "[]",
+      inputTags: ["TEXTAREA"],
+      runInputs: [`["a","bc"]`],
+      result: "3",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ListOption.classifySum", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["4"],
+      result: `{
+  "kind": "inr",
+  "value": "4"
+}`,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.ListOption.sumScore", {
+      input: `{"kind":"inl","value":0}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"kind":"inr","value":7}`],
+      result: "70",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint32Bump", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["41"],
+      result: "42",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint64Bump", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["18446744073709551615"],
+      result: "0",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.floatScale", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["1.5"],
+      result: "6",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.float32Roundtrip", {
+      input: "0",
+      inputTags: ["INPUT"],
+      runInputs: ["1.25"],
+      result: "1.25",
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.profileStatsBump", {
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"enabled":true,"level":2,"score16":30,"visits":400,"quota":5,"checksum":6000,"tier":"pro","note":"ok"}`],
+      result: `{
+  "enabled": false,
+  "level": 3,
+  "score16": 32,
+  "visits": 403,
+  "quota": "9",
+  "checksum": "6005",
+  "tier": "elite",
+  "note": "ok!"
+}`,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.boxNatBump", {
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"value":41}`],
+      result: `{
+  "value": "42"
+}`,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
+      input: `{"value":0}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"value":41}`],
+      result: `{
+  "value": 42
+}`,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
+      input: `{"value":0}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"value":41}`],
+      result: `{
+  "value": 42
+}`,
+    }),
+    await runnerCaseFromManifest("vir-demo.irpkg", "Vir.Fixtures.InterfaceShapes.extendedProfileBump", {
+      input: `{"nickname":"","active":false,"visits":0,"score":0,"tags":[]}`,
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"nickname":"lean","active":true,"visits":5,"score":7,"tags":["ir"]}`],
+      result: `{
+  "nickname": "lean!",
+  "active": false,
+  "visits": 6,
+  "score": "8",
+  "tags": [
+    "ir",
+    "extended"
+  ]
+}`,
+    }),
+  ];
+
+  for (const { url, expected } of runnerCases) {
+    await smokeRunner(cdp, server.origin, url, expected);
+  }
+  await smokeRunnerFailure(
     cdp,
     server.origin,
-    "dev.html?package=local-fib.irpkg&spec=local-fib.input.json&entry=fib",
+    "dev.html?package=bad-magic.irpkg",
     {
-      packageName: "local-fib.irpkg",
-      entry: "fib",
-      entryCount: 1,
-      input: "12",
-      result: "144",
+      packageName: "...",
+      entryCount: 0,
+      exports: "...",
+      result: /IR package load failed: invalid IR package magic `not-lean-vir`/,
     },
   );
-  await smokeRunner(
+  await smokeRunnerFailure(
     cdp,
     server.origin,
-    "dev.html?package=local-mergesort.irpkg&spec=local-mergesort.input.json&entry=sort-array",
+    "dev.html?package=unsupported-interface.irpkg",
     {
-      packageName: "local-mergesort.irpkg",
-      entry: "sort-array",
-      entryCount: 2,
-      input: "7, 3, 9, 1, 4, 1, 5, 2",
-      runInput: "4, 1, 3, 2",
-      result: "30",
+      packageName: "unsupported-interface.irpkg",
+      entryCount: 0,
+      result: /package contains unsupported interface exports:[\s\S]*BrowserSmoke\.unsupported/,
     },
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, fib runner, and mergesort runner");
+  console.log("pages browser smoke ok: landing, manifest-driven entry list, local runners, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

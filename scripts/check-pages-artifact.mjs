@@ -34,9 +34,9 @@ const indexHtml = await assertHtmlAssetLinks("index.html");
 const devHtml = await assertHtmlAssetLinks("dev.html");
 
 assertLink(indexHtml, "dev.html");
-assertLink(indexHtml, "dev.html?package=local-fib.irpkg&amp;spec=local-fib.input.json&amp;entry=fib");
-assertLink(indexHtml, "dev.html?package=local-mergesort.irpkg&amp;spec=local-mergesort.input.json&amp;entry=sort-array");
-assertLink(indexHtml, "dev.html?package=vir-demo.irpkg&amp;entry=sort-array");
+assertLink(indexHtml, "dev.html?package=local-fib.irpkg&amp;entry=fib");
+assertLink(indexHtml, "dev.html?package=local-mergesort.irpkg&amp;entry=SortDemo_demoFromArray");
+assertLink(indexHtml, "dev.html?package=vir-demo.irpkg&amp;entry=SortDemo_demoFromArray");
 assert.ok(devHtml.includes("dev-package-url"), "dev.html should contain package runner controls");
 
 await assertFile("vir-upstream.wasm", 1024);
@@ -44,16 +44,4 @@ await assertFile("vir-demo.irpkg", 1024);
 await assertFile("local-fib.irpkg", 128);
 await assertFile("local-mergesort.irpkg", 128);
 
-const fibSpec = JSON.parse((await assertFile("local-fib.input.json", 1)).toString("utf8"));
-assert.equal(fibSpec.version, 1);
-assert.equal(fibSpec.entries?.[0]?.id, "fib");
-assert.equal(fibSpec.entries?.[0]?.inputs?.[0]?.type, "Nat");
-
-const mergeSpec = JSON.parse((await assertFile("local-mergesort.input.json", 1)).toString("utf8"));
-assert.equal(mergeSpec.version, 1);
-assert.ok(
-  mergeSpec.entries?.some((entry) => entry.id === "sort-array" && entry.inputs?.[0]?.type === "Array Nat"),
-  "mergesort spec should expose sort-array : Array Nat -> Nat",
-);
-
-console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, wasm, packages, and specs`);
+console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, wasm, and manifest-bearing packages`);
