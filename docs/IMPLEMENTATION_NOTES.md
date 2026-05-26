@@ -46,6 +46,17 @@ data fields before calling the upstream interpreter. Metadata expression inputs
 are accepted by decoding their inner expression, and metadata results are
 reported with a structural `mdata` wrapper.
 
+The first reusable pretty-printing component is deliberately
+`pretty-printer.irpkg`, which packages `Std.Format.pretty` rather than Lean's
+full expression pretty printer. A probe of `Lean.PrettyPrinter.ppExpr` showed
+that the source-level wrapper is small, but packaging it crosses from
+`Format` into `MetaM`, `CoreM`, and `Environment`: even a minimal constructed
+`Expr` reaches environment async-constant machinery, `Task`/`Promise` helpers,
+`Lean.Meta.inferType`/`whnf`, expression substitution and equality helpers, and
+the syntax parenthesizer/formatter interpreters. That makes `Std.Format.pretty`
+the right component boundary for this PR, while `ppExpr` should be treated as a
+staged follow-up to the runtime/native extern surface.
+
 The browser fixture runner exposes the `fib` and `SortDemo.demoFromArray`
 examples next to the manifest entries. Those two entries opt into the fixture
 input panel: `fib` accepts a bounded `Nat`, while the sort entry accepts
