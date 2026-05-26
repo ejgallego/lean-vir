@@ -15,11 +15,11 @@ runtime subset, and serves generated artifacts:
 
 ## Browser Demo
 
-The browser page keeps Tamagotchi as the main interactive demo. Button and input
-events still originate in JavaScript, but each reset/action calls Lean
-entrypoints that read the current pet state from DOM attributes and input
-properties, compute the next state, and render the UI through
-`Lean.Vir.Browser` host imports.
+The browser page keeps Tamagotchi as the main interactive demo. Lean returns the
+UI event binding plan for the pet controls, and the browser runner installs
+those bindings. Each reset/action calls Lean entrypoints that read the current
+pet state from DOM attributes and input properties, compute the next state, and
+render the UI through `Lean.Vir.Browser` host imports.
 
 The Lean sources are in `examples/Fib.lean`, `examples/Tamagotchi.lean`, and
 `examples/MergeSort.lean`.

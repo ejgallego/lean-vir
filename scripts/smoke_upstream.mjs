@@ -187,6 +187,17 @@ const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
 if (hostTitle !== "Lean VIR host: smoke") {
   throw new Error(`Lean to JavaScript host title: expected Lean VIR host: smoke, got ${hostTitle}`);
 }
+const petBindings = hostRuntime.call("Tamagotchi.uiMountFromDom");
+if (
+  petBindings.length !== 8 ||
+  petBindings[0]?.selector !== "[data-action='feed']" ||
+  petBindings[0]?.entry !== "Tamagotchi.uiStepFromDom" ||
+  petBindings[0]?.argument !== "feed" ||
+  petBindings[7]?.selector !== "#pet-name-input" ||
+  petBindings[7]?.entry !== "Tamagotchi.uiRenameFromDom"
+) {
+  throw new Error(`Lean Tamagotchi mount bindings failed: ${JSON.stringify(petBindings)}`);
+}
 const petReset = hostRuntime.call("Tamagotchi.uiReset", "Mochi", "pet");
 const petStep = hostRuntime.call("Tamagotchi.uiStep", petReset, "ignore");
 if (

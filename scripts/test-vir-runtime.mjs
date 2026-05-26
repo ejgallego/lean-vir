@@ -272,6 +272,56 @@ assert.throws(
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
 assert.equal(hostRuntime.call("HostInterop.titleHandshake", "runtime smoke"), "Lean VIR host: runtime smoke");
+assert.deepEqual(hostRuntime.call("Tamagotchi.uiMountFromDom"), [
+  {
+    selector: "[data-action='feed']",
+    event: "click",
+    entry: "Tamagotchi.uiStepFromDom",
+    argument: "feed",
+  },
+  {
+    selector: "[data-action='play']",
+    event: "click",
+    entry: "Tamagotchi.uiStepFromDom",
+    argument: "play",
+  },
+  {
+    selector: "[data-action='nap']",
+    event: "click",
+    entry: "Tamagotchi.uiStepFromDom",
+    argument: "nap",
+  },
+  {
+    selector: "[data-action='wake']",
+    event: "click",
+    entry: "Tamagotchi.uiStepFromDom",
+    argument: "wake",
+  },
+  {
+    selector: "[data-action='ignore']",
+    event: "click",
+    entry: "Tamagotchi.uiStepFromDom",
+    argument: "ignore",
+  },
+  {
+    selector: "#pet-reset-button",
+    event: "click",
+    entry: "Tamagotchi.uiResetFromDom",
+    argument: null,
+  },
+  {
+    selector: "#pet-art-toggle",
+    event: "change",
+    entry: "Tamagotchi.uiResetFromDom",
+    argument: null,
+  },
+  {
+    selector: "#pet-name-input",
+    event: "change",
+    entry: "Tamagotchi.uiRenameFromDom",
+    argument: null,
+  },
+]);
 const petReset = hostRuntime.call("Tamagotchi.uiReset", "Mochi", "pet");
 assert.deepEqual(petReset, {
   name: "Mochi",

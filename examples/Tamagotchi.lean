@@ -98,6 +98,12 @@ structure PetState where
   turns : Nat
   care : Nat
 
+structure UiBinding where
+  selector : String
+  event : String
+  entry : String
+  argument : Option String
+
 def defaultName : String :=
   "Mochi"
 
@@ -106,6 +112,15 @@ def maxCare : Nat :=
 
 def initialCare : Nat :=
   3
+
+def stepEntry : String :=
+  "Tamagotchi.uiStepFromDom"
+
+def resetEntry : String :=
+  "Tamagotchi.uiResetFromDom"
+
+def renameEntry : String :=
+  "Tamagotchi.uiRenameFromDom"
 
 def normalizeName (name : String) : String :=
   if name == "" then defaultName else name
@@ -169,6 +184,26 @@ def statusLabel (state : PetState) (actionLabel : String) : String :=
 
 def natFromAttr (attr : Option String) (fallback : Nat) : Nat :=
   attr.bind String.toNat? |>.getD fallback
+
+def actionBinding (action : Action) : UiBinding :=
+  {
+    selector := "[data-action='" ++ action.label ++ "']",
+    event := "click",
+    entry := stepEntry,
+    argument := some action.label
+  }
+
+def uiBindings : Array UiBinding :=
+  #[
+    actionBinding feed,
+    actionBinding play,
+    actionBinding nap,
+    actionBinding wake,
+    actionBinding ignore,
+    { selector := "#pet-reset-button", event := "click", entry := resetEntry, argument := none },
+    { selector := "#pet-art-toggle", event := "change", entry := resetEntry, argument := none },
+    { selector := "#pet-name-input", event := "change", entry := renameEntry, argument := none }
+  ]
 
 def withElement (selector : String) (f : Lean.Vir.Browser.Element → IO Unit) : IO Unit := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
@@ -303,6 +338,10 @@ def uiRenameFromDom : IO PetState := do
   let current ← stateFromDom
   render current "rename"
   pure current
+
+def uiMountFromDom : IO (Array UiBinding) := do
+  let _ ← uiResetFromDom
+  pure uiBindings
 
 #eval trace happy demoScript
 #eval run happy demoScript

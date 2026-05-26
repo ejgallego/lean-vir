@@ -369,7 +369,7 @@ async function smokePackagePreset(cdp, origin) {
     status: "Ready",
     packageName: "demo-host.irpkg",
     packageUrl: "demo-host.irpkg",
-    entryCount: 6,
+    entryCount: 7,
   });
 }
 

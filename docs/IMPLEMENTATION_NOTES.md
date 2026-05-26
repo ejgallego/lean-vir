@@ -27,11 +27,13 @@ descriptors, constructs Lean input objects, and calls the upstream interpreter
 by name.
 
 The browser keeps a Lean-rendered Tamagotchi as the top-level interactive demo
-over the same upstream interpreter artifact. The UI calls exported `IO`
-entrypoints from `demo-host.irpkg`; the Lean code reads and writes DOM state,
-including checkbox and text input properties, through `Lean.Vir.Browser` host
-imports. Its nullary inductive `Mood` and `Action` values are auto-discovered as
-simple enums and marshaled through the generic `vir_call` path.
+over the same upstream interpreter artifact. Lean returns a declarative UI
+binding array for the pet controls, then the browser runner installs those DOM
+listeners and calls the requested exported `IO` entrypoints from
+`demo-host.irpkg`. The Lean code reads and writes DOM state, including checkbox
+and text input properties, through `Lean.Vir.Browser` host imports. Its nullary
+inductive `Mood` and `Action` values are auto-discovered as simple enums and
+marshaled through the generic `vir_call` path.
 
 `Lean.Expr` is also part of the current manifest surface. JavaScript sends and
 receives structural objects for the standard expression constructors, and the

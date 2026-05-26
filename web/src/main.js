@@ -24,8 +24,6 @@ const statusEl = document.querySelector("#status");
 const petNameInput = document.querySelector("#pet-name-input");
 const petArtToggle = document.querySelector("#pet-art-toggle");
 const petMoodDisplay = document.querySelector("#pet-mood-display");
-const petActionButtons = document.querySelectorAll("[data-action]");
-const petResetButton = document.querySelector("#pet-reset-button");
 const wasmTarget = document.querySelector("#wasm-target");
 const linkStatus = document.querySelector("#link-status");
 const packageName = document.querySelector("#package-name");
@@ -65,7 +63,6 @@ for (const spec of packageSpecs) {
     packageFileByFixtureSource.set(source, spec.file);
   }
 }
-const actions = ["feed", "play", "nap", "wake", "ignore"];
 const sourceFiles = [
   { path: "examples/Fib.lean", source: fibSource },
   { path: "examples/HostInterop.lean", source: hostInteropSource },
@@ -173,6 +170,7 @@ const fixtureInputs = new Map(
 );
 const packageBytesPromises = new Map();
 const runtimePromises = new Map();
+const petBindingDisposers = [];
 let hostRuntime = null;
 let currentFixtureFilter = "all";
 let selectedFixtureId = null;
@@ -224,10 +222,10 @@ function setTrap(error) {
   console.error(error);
 }
 
-function stepPet(runtime, actionName) {
-  if (!actions.includes(actionName)) return;
+function invokePetBinding(runtime, binding) {
   try {
-    applyPetState(runtime.call("Tamagotchi.uiStepFromDom", actionName));
+    const args = binding.argument == null ? [] : [binding.argument];
+    applyPetState(runtime.call(binding.entry, ...args));
     setReady();
   } catch (error) {
     petMoodDisplay.textContent = "error";
@@ -235,21 +233,35 @@ function stepPet(runtime, actionName) {
   }
 }
 
-function resetPet() {
-  if (hostRuntime === null) return;
-  try {
-    applyPetState(hostRuntime.call("Tamagotchi.uiResetFromDom"));
-    setReady();
-  } catch (error) {
-    petMoodDisplay.textContent = "error";
-    setTrap(error);
+function clearPetBindings() {
+  for (const dispose of petBindingDisposers.splice(0)) {
+    dispose();
   }
 }
 
-function renamePet() {
-  if (hostRuntime === null) return;
+function mountPet(runtime) {
   try {
-    applyPetState(hostRuntime.call("Tamagotchi.uiRenameFromDom"));
+    const bindings = runtime.call("Tamagotchi.uiMountFromDom");
+    if (!Array.isArray(bindings)) {
+      throw new Error("Tamagotchi.uiMountFromDom must return an array of bindings");
+    }
+    clearPetBindings();
+    for (const binding of bindings) {
+      if (
+        typeof binding?.selector !== "string" ||
+        typeof binding?.event !== "string" ||
+        typeof binding?.entry !== "string"
+      ) {
+        throw new Error(`invalid Tamagotchi UI binding: ${JSON.stringify(binding)}`);
+      }
+      const element = document.querySelector(binding.selector);
+      if (element === null) {
+        throw new Error(`Tamagotchi UI binding selector not found: ${binding.selector}`);
+      }
+      const listener = () => invokePetBinding(runtime, binding);
+      element.addEventListener(binding.event, listener);
+      petBindingDisposers.push(() => element.removeEventListener(binding.event, listener));
+    }
     setReady();
   } catch (error) {
     petMoodDisplay.textContent = "error";
@@ -560,13 +572,6 @@ fixtureRunSelectedButton.addEventListener("click", () => {
     runFixture(fixture);
   }
 });
-petArtToggle.addEventListener("change", () => {
-  resetPet();
-});
-petNameInput.addEventListener("change", () => {
-  renamePet();
-});
-
 renderFixtureSummary();
 renderFixtureList();
 selectFixture(fixtures[0]);
@@ -591,11 +596,7 @@ try {
   updateFixtureRunControls();
   setReady();
 
-  for (const button of petActionButtons) {
-    button.addEventListener("click", () => stepPet(hostRuntime, button.dataset.action));
-  }
-  petResetButton.addEventListener("click", resetPet);
-  resetPet();
+  mountPet(hostRuntime);
 } catch (error) {
   hostRuntime = null;
   statusEl.textContent = "Failed";
