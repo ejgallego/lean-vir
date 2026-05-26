@@ -79,20 +79,6 @@ Author: Emilio J. Gallego Arias
           </div>
         </section>
 
-        <section class="dev-runner" aria-labelledby="dev-command-title">
-          <div class="section-heading">
-            <div>
-              <p class="eyebrow">Package your own file</p>
-              <h2 id="dev-command-title">Command Shape</h2>
-            </div>
-          </div>
-          <div class="dev-command-grid">
-            <pre><code>npm run generate:irpkg -- path/File.lean web/public/local.irpkg Namespace.entry1 Namespace.entry2</code></pre>
-            <pre><code>npm run dev -- --port 5173
-http://127.0.0.1:5173/dev.html?package=local.irpkg</code></pre>
-          </div>
-        </section>
-
         <section class="dev-runner" aria-labelledby="dev-eval-title">
           <div class="section-heading">
             <div>
@@ -110,6 +96,20 @@ http://127.0.0.1:5173/dev.html?package=local.irpkg</code></pre>
             <output id="dev-result">...</output>
           </div>
           <nav id="dev-entry-links" class="dev-entry-links" aria-label="Entry links"></nav>
+        </section>
+
+        <section class="dev-runner dev-help" aria-labelledby="dev-command-title">
+          <details>
+            <summary>
+              <span class="eyebrow">Package your own file</span>
+              <strong id="dev-command-title">Command shape</strong>
+            </summary>
+            <div class="dev-command-grid">
+              <pre><code>npm run generate:irpkg -- path/File.lean web/public/local.irpkg Namespace.entry1 Namespace.entry2</code></pre>
+              <pre><code>npm run dev -- --port 5173
+http://127.0.0.1:5173/dev.html?package=local.irpkg</code></pre>
+            </div>
+          </details>
         </section>
       </section>
     </main>
