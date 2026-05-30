@@ -10,5 +10,6 @@ web/public/*.wasm
 web/public/*.irpkg
 web/public/*.input.json
 web/public/*.report.md
+web/public/downloads/
 .npm-cache/
 npm-debug.log*

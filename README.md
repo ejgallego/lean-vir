@@ -102,6 +102,47 @@ The hosted demo is deployed from `main`:
 
 https://ejgallego.github.io/lean-vir/
 
+A downloadable static bundle is published with the hosted demo:
+
+https://ejgallego.github.io/lean-vir/downloads/lean-vir-local.tar.gz
+
+Unpack it, serve the extracted `lean-vir-local/` directory with a local HTTP
+server, and open the server URL.
+
+To build the same archive locally, run `npm run build:local-artifact`.
+
+The developer SDK artifact contains the stable JavaScript runtime files,
+`vir-upstream.wasm`, and a machine-readable `lean-vir-artifact.json` manifest:
+
+```bash
+npm run build:sdk-artifact
+```
+
+Client Lake packages can install a matching SDK archive through the package
+executable:
+
+```bash
+LEAN_VIR_COMMIT=<lean-vir-git-commit>
+lake exe lean_vir/vir_fetch_sdk \
+  --commit "$LEAN_VIR_COMMIT" \
+  --out web/public/vendor/lean-vir
+```
+
+`--commit` downloads the `lean-vir-sdk` artifact produced by GitHub Actions for
+that exact commit and rejects the install if the SDK manifest was built from a
+different commit. This keeps commit-pinned Lake dependencies and downloaded
+WASM/JS artifacts in sync before there are tagged releases. GitHub requires
+authentication for Actions artifact downloads, so set `GITHUB_TOKEN` or run
+`gh auth login` once before using the commit-artifact path.
+
+Once releases are available, clients can use the release asset path instead:
+
+```bash
+lake exe lean_vir/vir_fetch_sdk \
+  --tag v0.1.0 \
+  --out web/public/vendor/lean-vir
+```
+
 ## Where To Go Next
 
 - `docs/LOCAL_IRPKG.md` for the full local package workflow.

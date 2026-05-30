@@ -37,6 +37,16 @@ jobs:
       - run: npm run install:wasi
       - run: npm run build:site
       - run: npm run test:pages
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lean-vir-local
+          path: build/artifacts/lean-vir-local.tar.gz
+          if-no-files-found: error
+      - uses: actions/upload-artifact@v4
+        with:
+          name: lean-vir-sdk
+          path: build/artifacts/lean-vir-sdk.tar.gz
+          if-no-files-found: error
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v5
         with:

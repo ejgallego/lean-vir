@@ -5,3 +5,5 @@ Author: Emilio J. Gallego Arias
 -/
 
 import LeanVir.Host
+import LeanVir.Common
+import LeanVir.Browser

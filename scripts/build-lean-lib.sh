@@ -44,6 +44,10 @@ build_module() {
   fi
 }
 
+build_module LeanVir/Host.lean
+build_module LeanVir/Common.lean
+build_module LeanVir/Browser.lean
+build_module LeanVir.lean
 build_module Lean/Vir/Host.lean
 build_module Lean/Vir/Common.lean
 build_module Lean/Vir/Browser.lean
