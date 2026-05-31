@@ -1,7 +1,8 @@
 # Lean VIR
 
-Lean VIR runs selected Lean 4 declarations in the browser through Lean's real
-IR interpreter compiled to `wasm32-wasip1`.
+Lean VIR runs selected [Lean 4](https://github.com/leanprover/lean4)
+declarations in the browser through Lean's real IR interpreter compiled to
+`wasm32-wasip1`.
 
 The primary workflow is:
 
@@ -89,37 +90,41 @@ const result = runtime.call("Quickstart.double", 21);
 The manifest-driven call path supports pure declarations and `IO` actions over
 the currently supported scalar, array/list, option, product, sum, except,
 structure, enum, `ByteArray`, and `Lean.Expr` shapes. See
-`docs/CALL_LEAN_FROM_JS.md` for the full JavaScript guide, including `Sum` and
-`Except` result shapes.
+[docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for the full JavaScript
+guide, including `Sum` and `Except` result shapes.
 
 ## Built-In Demos
 
 Open the Vite URL from `npm run dev -- --port 5173` to see the Tamagotchi demo,
 fixture browser, and links into the package runner. The Lean sources are in
-`examples/`, with broader fixture coverage under `fixtures/`.
+[examples/](examples/), with broader fixture coverage under
+[fixtures/](fixtures/).
 
 The hosted demo is deployed from `main`:
 
-https://ejgallego.github.io/lean-vir/
+[Lean VIR hosted demo](https://ejgallego.github.io/lean-vir/)
 
 A downloadable static bundle is published with the hosted demo:
 
-https://ejgallego.github.io/lean-vir/downloads/lean-vir-local.tar.gz
+[lean-vir-local.tar.gz](https://ejgallego.github.io/lean-vir/downloads/lean-vir-local.tar.gz)
 
 Unpack it, serve the extracted `lean-vir-local/` directory with a local HTTP
 server, and open the server URL.
 
 To build the same archive locally, run `npm run build:local-artifact`.
 
-The developer SDK artifact contains the stable JavaScript runtime files,
+The latest developer SDK artifact contains the stable JavaScript runtime files,
 `vir-upstream.wasm`, and a machine-readable `lean-vir-artifact.json` manifest:
+
+[lean-vir-sdk.tar.gz](https://ejgallego.github.io/lean-vir/downloads/lean-vir-sdk.tar.gz)
 
 ```bash
 npm run build:sdk-artifact
 ```
 
 Client Lake packages can install a matching SDK archive through the package
-executable:
+executable. The first complete client is
+[ejgallego/lean-vir-examples](https://github.com/ejgallego/lean-vir-examples).
 
 ```bash
 LEAN_VIR_COMMIT=<lean-vir-git-commit>
@@ -128,31 +133,34 @@ lake exe lean_vir/vir_fetch_sdk \
   --out web/public/vendor/lean-vir
 ```
 
-`--commit` downloads the `lean-vir-sdk` artifact produced by GitHub Actions for
-that exact commit and rejects the install if the SDK manifest was built from a
-different commit. This keeps commit-pinned Lake dependencies and downloaded
-WASM/JS artifacts in sync before there are tagged releases. GitHub requires
+`--commit` downloads the `lean-vir-sdk` artifact produced by
+[GitHub Actions](https://github.com/ejgallego/lean-vir/actions) for that exact
+commit and rejects the install if the SDK manifest was built from a different
+commit. This keeps commit-pinned Lake dependencies and downloaded WASM/JS
+artifacts in sync before there are tagged releases. GitHub requires
 authentication for Actions artifact downloads, so set `GITHUB_TOKEN` or run
-`gh auth login` once before using the commit-artifact path.
+[`gh auth login`](https://cli.github.com/manual/gh_auth_login) once before using
+the commit-artifact path.
 
-Once releases are available, clients can use the release asset path instead:
-
-```bash
-lake exe lean_vir/vir_fetch_sdk \
-  --tag v0.1.0 \
-  --out web/public/vendor/lean-vir
-```
+When durable release assets exist, the same fetcher can use
+[GitHub Releases](https://github.com/ejgallego/lean-vir/releases) through
+`vir_fetch_sdk --tag <tag>`. Until then, commit-pinned clients should use
+`--commit`.
 
 ## Where To Go Next
 
-- `docs/LOCAL_IRPKG.md` for the full local package workflow.
-- `docs/CALL_LEAN_FROM_JS.md` for calling exported Lean declarations from app
+- [docs/LOCAL_IRPKG.md](docs/LOCAL_IRPKG.md) for the full local package
+  workflow.
+- [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for calling exported
+  Lean declarations from app JavaScript.
+- [docs/JS_API.md](docs/JS_API.md) for using the runtime wrapper from
   JavaScript.
-- `docs/JS_API.md` for using the runtime wrapper from JavaScript.
-- `docs/LEAN_VIR_LIBRARY.md` for Lean-side host import helpers.
-- `docs/INTERFACE_PIPELINE.md` for package configs, manifests, supported type
-  details, and interface internals.
-- `docs/IMPLEMENTATION_NOTES.md` for maintainer-facing implementation details.
+- [docs/LEAN_VIR_LIBRARY.md](docs/LEAN_VIR_LIBRARY.md) for Lean-side host
+  import helpers.
+- [docs/INTERFACE_PIPELINE.md](docs/INTERFACE_PIPELINE.md) for package configs,
+  manifests, supported type details, and interface internals.
+- [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md) for
+  maintainer-facing implementation details.
 
 ## Contributor Checks
 
@@ -167,6 +175,7 @@ Generated outputs under `build/`, `web/dist/`, and `web/public/*.wasm` /
 
 ## License
 
-This repository is licensed under Apache-2.0. See `LICENSE` and `NOTICE`.
+This repository is licensed under Apache-2.0. See [LICENSE](LICENSE) and
+[NOTICE](NOTICE).
 Generated WASM artifacts can include object code compiled from Lean 4 source,
 which is also Apache-2.0 and keeps its upstream notices.
