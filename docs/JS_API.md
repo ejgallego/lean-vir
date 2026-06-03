@@ -10,7 +10,7 @@ with `docs/CALL_LEAN_FROM_JS.md`.
 The module is also exposed through the package entry point:
 
 ```js
-import { createVirRuntime } from "lean-vir";
+import { createVirRuntime, VirCallback, VIR_HOST_DISPOSE } from "lean-vir";
 ```
 
 Node tests and command-line tools that need `Lean.Vir.Browser.Document` calls
@@ -87,9 +87,10 @@ Supported v1 types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
 recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α`
 shapes over supported types, non-indexed user-defined structures including
-parameterized instances, nullary inductive enums, and `Lean.Expr`. Exported
-Lean entrypoints and host imports may be pure or `IO α`; `IO` failures
-currently surface as call failures.
+parameterized instances, nullary inductive enums, opaque host resources, and
+`Lean.Expr`. Host imports may additionally receive Lean function values as
+callbacks. Exported Lean entrypoints and host imports may be pure or `IO α`;
+`IO` failures currently surface as call failures.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
@@ -154,13 +155,17 @@ The first library surface is:
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
 - `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
 - `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Browser.Element -> @& String -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Browser.Element -> @& String -> @& String -> Option String -> IO Lean.Vir.Browser.EventListener`
+- `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Browser.Event -> IO Unit) -> IO Lean.Vir.Browser.EventListener`
 - `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Browser.EventListener -> IO Unit`
 - `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Browser.Element -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
 - `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Browser.HTMLInputElement -> IO Bool`
 - `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Browser.HTMLInputElement -> Bool -> IO Unit`
 - `Lean.Vir.Browser.HTMLInputElement.getValue : @& Lean.Vir.Browser.HTMLInputElement -> IO String`
 - `Lean.Vir.Browser.HTMLInputElement.setValue : @& Lean.Vir.Browser.HTMLInputElement -> @& String -> IO Unit`
+- `Lean.Vir.Browser.Timer.setTimeout : UInt32 -> IO Unit -> IO Lean.Vir.Browser.Timeout`
+- `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Browser.Timeout -> IO Unit`
+- `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> IO Unit) -> IO Lean.Vir.Browser.AnimationFrame`
+- `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Browser.AnimationFrame -> IO Unit`
 
 The built-in `common.*` and `browser.*` targets do not require a `hostBindings`
 option:
@@ -176,10 +181,11 @@ console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 
 `Lean.Vir.Browser.Console.log` maps to `console.log`, title calls map to
 `document.title`, `Document.querySelector` returns an opaque element resource,
-`Element` calls use DOM element properties/methods, event listeners call back
-into exported Lean entrypoints with an opaque `Event` resource, and
-`HTMLInputElement` calls first narrow an element before reading or writing
-`checked` and `value`.
+`Element` calls use DOM element properties/methods, event listeners call
+retained Lean closures with an opaque `Event` resource, timers map to
+`setTimeout`, animation frames map to
+`requestAnimationFrame`, and `HTMLInputElement` calls first narrow an element
+before reading or writing `checked` and `value`.
 The browser runtime requires `globalThis.document` for `browser.document.*`
 targets. In Node, use `lean-vir/vir-runtime-node` or pass explicit
 `hostBindings`; the Node wrapper provides virtual document and element state for
@@ -198,6 +204,10 @@ browser APIs:
 - [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
 - [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
 - [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value)
+- [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout)
+- [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout)
+- [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)
+- [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame)
 
 Custom imports can be declared directly:
 
@@ -227,17 +237,54 @@ console.log(vir.call("bumpFromJs", 41)); // "42"
 ```
 
 Bindings receive decoded JavaScript values and return a value matching the Lean
-result type. `Unit` returns use `undefined` or `null`. Host imports are
-synchronous in v1; returning a `Promise` is an error. Object-style `imports`
-factory options are treated as overrides on top of the generated import table.
-If you provide a custom `imports` function to `createVirRuntimeFactory`, call
-`createVirImports(module, overrides, hostState)` or otherwise install
-`env.vir_js_call` and `env.vir_js_call_result_size`.
+result type. `Unit` returns use `undefined` or `null`. Function-valued Lean
+arguments are decoded as callable `VirCallback` objects. A host binding that
+stores a callback must eventually call `callback.release()` or rely on
+`VirRuntime.dispose()` to release any still-live callback roots. Host imports
+are synchronous in v1; returning a `Promise` is an error. Object-style
+`imports` factory options are treated as overrides on top of the generated
+import table. If you provide a custom `imports` function to
+`createVirRuntimeFactory`, call `createVirImports(module, overrides, hostState)`
+or otherwise install `env.vir_js_call` and `env.vir_js_call_result_size`.
 
-The v1 event listener binding is intentionally narrow: it registers an exported
-Lean entrypoint by name, passes an opaque event resource during the callback,
-and does not marshal Lean closures. The v2 work is tracked in
-`docs/EVENT_CALLBACK_ROADMAP.md`.
+## Closure And Resource Lifetime
+
+`VirCallback` is the JavaScript wrapper for a rooted Lean closure:
+
+```js
+hostBindings: {
+  "demo.withCallback": (callback) => {
+    try {
+      return callback(41);
+    } finally {
+      callback.release();
+    }
+  },
+}
+```
+
+Callbacks are idempotently releasable through `callback.release()` or
+`callback.dispose()`. Calling a released callback throws. JavaScript-provided
+function values are not accepted as Lean arguments in this phase; function
+values flow from Lean to JavaScript as callback handles.
+
+`vir.dispose()` tears down the runtime-side host state:
+
+- built-in browser bindings remove live event listeners, clear pending timers,
+  cancel pending animation frames, and release retained callbacks;
+- custom host binding maps can expose `[VIR_HOST_DISPOSE]()` or `dispose()` for
+  their own cleanup;
+- any `VirCallback` objects still tracked by the runtime are released;
+- later calls through `vir.call(...)`, `exportsByName`, or a callback fail with
+  a disposed-runtime error.
+
+Calling `vir.loadIrPackageBytes(...)` on a runtime that already has a package
+loaded performs the same package-resource cleanup before installing the new
+manifest. This keeps old listeners, timers, animation frames, and callback roots
+from surviving package reload.
+
+See `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed callback ownership
+contract and follow-up work.
 
 ## Trust Boundary
 
@@ -303,5 +350,5 @@ The runtime uses the single-file declaration package path. It does not load
 exports fail during package generation instead of being omitted silently, and a
 failed package load clears the runtime's package metadata instead of leaving
 stale declarations callable. JavaScript host imports are sync-only and limited
-to 16 imported declarations with IR arity at most 6; async host calls will need
+to 32 imported declarations with IR arity at most 6; async host calls will need
 a later Promise/JSPI-shaped boundary.

@@ -21,6 +21,7 @@ import {
 import {
   createVirRuntime,
   createVirRuntimeFactory,
+  createVirtualDocumentState,
 } from "../web/src/vir-runtime-node.js";
 import {
   INTERFACE_MANIFEST_ARTIFACT,
@@ -28,7 +29,14 @@ import {
 } from "../web/src/interface-manifest.js";
 
 function assertManifestTypeDescriptorsRoundTrip(manifest) {
-  for (const entry of manifest.exports) {
+  const entries = [
+    ...manifest.exports,
+    ...(manifest.hostImports ?? []).map((entry) => ({
+      ...entry,
+      entry: entry.name,
+    })),
+  ];
+  for (const entry of entries) {
     for (const arg of entry.args) {
       const decoded = roundTripInterfaceTypeDescriptor(arg.type, `${entry.entry} argument ${arg.name}`);
       assert.ok(
@@ -64,6 +72,10 @@ function assertInvalidManifest(mutator, pattern) {
   const manifest = structuredClone(validManifestShape);
   mutator(manifest);
   assert.throws(() => validateInterfaceManifest(manifest), pattern);
+}
+
+function wait(ms) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns) {
@@ -104,7 +116,26 @@ assert.throws(
 );
 
 const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
-const hostRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
+const callbackRecords = [];
+const virtualDocumentState = createVirtualDocumentState();
+const hostRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  virtualDocumentState,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": (value) => {
+      callbackRecords.push(Number(value));
+      return undefined;
+    },
+  },
+});
 const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
 const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
 assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
@@ -115,7 +146,7 @@ assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
-assert.equal(hostRuntime.packageInfo.hostImports, 12);
+assert.equal(hostRuntime.packageInfo.hostImports, 19);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -255,11 +286,14 @@ assertInvalidManifest((manifest) => {
   };
 }, /fields\[1\]\.name duplicates another flattened structure field/);
 assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), [
+  "browser.animation.cancelAnimationFrame",
+  "browser.animation.requestAnimationFrame",
   "browser.document.getTitle",
   "browser.document.querySelector",
   "browser.document.setTitle",
   "browser.element.addEventListener",
   "browser.element.getAttribute",
+  "browser.element.removeEventListener",
   "browser.element.setAttribute",
   "browser.element.setTextContent",
   "browser.htmlInputElement.fromElement",
@@ -267,6 +301,10 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "browser.htmlInputElement.getValue",
   "browser.htmlInputElement.setChecked",
   "browser.htmlInputElement.setValue",
+  "browser.timer.clearTimeout",
+  "browser.timer.setTimeout",
+  "test.callNatCallback",
+  "test.recordNat",
 ]);
 const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
 assert.throws(
@@ -276,56 +314,198 @@ assert.throws(
 assert.equal(runtime.call("fib", 12), "144");
 assert.equal(runtime.exportsByName.fib(12), "144");
 assert.equal(hostRuntime.call("HostInterop.titleHandshake", "runtime smoke"), "Lean VIR host: runtime smoke");
-assert.deepEqual(hostRuntime.call("Tamagotchi.uiMountFromDom"), [
-  {
-    selector: "[data-action='feed']",
-    event: "click",
-    entry: "Tamagotchi.uiStepEvent",
-    argument: "feed",
+assert.equal(hostRuntime.call("HostInterop.callbackRoundTrip", 5), "12");
+assert.equal(hostRuntime.liveCallbacks.size, 0);
+
+let retainedCallback = null;
+const retainedCallbackRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      retainedCallback = callback;
+      return callback(input);
+    },
+    "test.recordNat": () => undefined,
   },
-  {
-    selector: "[data-action='play']",
-    event: "click",
-    entry: "Tamagotchi.uiStepEvent",
-    argument: "play",
+});
+assert.equal(retainedCallbackRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
+assert.equal(retainedCallbackRuntime.liveCallbacks.size, 1);
+assert.equal(retainedCallback(4), "11");
+const staleCallbackHandle = retainedCallback.handle;
+const staleCallbackType = retainedCallback.type;
+assert.equal(retainedCallback.release(), true);
+assert.equal(retainedCallback.release(), false);
+assert.equal(retainedCallback.released, true);
+assert.equal(retainedCallbackRuntime.liveCallbacks.size, 0);
+assert.throws(() => retainedCallback(4), /released/);
+assert.throws(
+  () => retainedCallbackRuntime.callClosure(staleCallbackHandle, staleCallbackType, [4]),
+  /closure handle is not live/,
+);
+retainedCallbackRuntime.dispose();
+
+const nestedCallbackErrorRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input, input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": () => undefined,
   },
-  {
-    selector: "[data-action='nap']",
-    event: "click",
-    entry: "Tamagotchi.uiStepEvent",
-    argument: "nap",
+});
+assert.throws(
+  () => nestedCallbackErrorRuntime.call("HostInterop.callbackRoundTrip", 1),
+  /callback expects 1 arguments, got 2/,
+);
+assert.equal(nestedCallbackErrorRuntime.liveCallbacks.size, 0);
+nestedCallbackErrorRuntime.dispose();
+
+const lifecycleDocumentState = createVirtualDocumentState();
+const lifecycleRecords = [];
+const lifecycleRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  virtualDocumentState: lifecycleDocumentState,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": (value) => {
+      lifecycleRecords.push(Number(value));
+      return undefined;
+    },
   },
-  {
-    selector: "[data-action='wake']",
-    event: "click",
-    entry: "Tamagotchi.uiStepEvent",
-    argument: "wake",
+});
+assert.equal(lifecycleRuntime.call("HostInterop.mountCallbackEvent", "#callback"), "1");
+lifecycleDocumentState.elements.get("#callback").listeners.get("click")[0].dispatch({});
+assert.deepEqual(lifecycleRecords.splice(0), [101]);
+lifecycleRuntime.dispose();
+assert.equal(lifecycleRuntime.liveCallbacks.size, 0);
+lifecycleDocumentState.elements.get("#callback").listeners.get("click")?.[0]?.dispatch({});
+assert.deepEqual(lifecycleRecords.splice(0), []);
+
+const lifecycleDocumentState2 = createVirtualDocumentState();
+const lifecycleRecords2 = [];
+const lifecycleRuntime2 = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  virtualDocumentState: lifecycleDocumentState2,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": (value) => {
+      lifecycleRecords2.push(Number(value));
+      return undefined;
+    },
   },
-  {
-    selector: "[data-action='ignore']",
-    event: "click",
-    entry: "Tamagotchi.uiStepEvent",
-    argument: "ignore",
+});
+assert.equal(lifecycleRuntime2.call("HostInterop.mountAndRemoveCallbackEvent", "#callback"), "1");
+assert.equal(lifecycleRuntime2.liveCallbacks.size, 0);
+lifecycleDocumentState2.elements.get("#callback").listeners.get("click")?.[0]?.dispatch({});
+assert.deepEqual(lifecycleRecords2.splice(0), []);
+assert.equal(lifecycleRuntime2.call("HostInterop.timeoutRecord", 40), "1");
+await wait(10);
+assert.deepEqual(lifecycleRecords2.splice(0), [41]);
+assert.equal(lifecycleRuntime2.liveCallbacks.size, 0);
+assert.equal(lifecycleRuntime2.call("HostInterop.clearTimeoutRecord", 40), "1");
+await wait(30);
+assert.deepEqual(lifecycleRecords2.splice(0), []);
+assert.equal(lifecycleRuntime2.call("HostInterop.startTimeoutLoop", 2), "1");
+await wait(30);
+assert.deepEqual(lifecycleRecords2.splice(0), [2, 1, 0]);
+assert.equal(lifecycleRuntime2.call("HostInterop.animationRecord", 50), "1");
+await wait(30);
+assert.deepEqual(lifecycleRecords2.splice(0), [52]);
+assert.equal(lifecycleRuntime2.call("HostInterop.cancelAnimationRecord", 50), "1");
+await wait(30);
+assert.deepEqual(lifecycleRecords2.splice(0), []);
+assert.equal(lifecycleRuntime2.call("HostInterop.startAnimationLoop", 2), "1");
+await wait(80);
+assert.deepEqual(lifecycleRecords2.splice(0), [2, 1, 0]);
+lifecycleRuntime2.dispose();
+assert.throws(() => lifecycleRuntime2.call("HostInterop.callbackRoundTrip", 1), /disposed/);
+
+const pendingDocumentState = createVirtualDocumentState();
+const pendingRecords = [];
+const pendingRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  virtualDocumentState: pendingDocumentState,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": (value) => {
+      pendingRecords.push(Number(value));
+      return undefined;
+    },
   },
-  {
-    selector: "#pet-reset-button",
-    event: "click",
-    entry: "Tamagotchi.uiResetEvent",
-    argument: null,
+});
+assert.equal(pendingRuntime.call("HostInterop.mountCallbackEvent", "#pending"), "1");
+assert.equal(pendingRuntime.call("HostInterop.timeoutRecord", 70), "1");
+assert.equal(pendingRuntime.call("HostInterop.animationRecord", 80), "1");
+assert.equal(pendingRuntime.liveCallbacks.size, 3);
+pendingRuntime.dispose();
+assert.equal(pendingRuntime.liveCallbacks.size, 0);
+pendingDocumentState.elements.get("#pending").listeners.get("click")?.[0]?.dispatch({});
+await wait(40);
+assert.deepEqual(pendingRecords.splice(0), []);
+
+const reloadDocumentState = createVirtualDocumentState();
+const reloadRecords = [];
+const reloadRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  virtualDocumentState: reloadDocumentState,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": (value) => {
+      reloadRecords.push(Number(value));
+      return undefined;
+    },
   },
-  {
-    selector: "#pet-art-toggle",
-    event: "change",
-    entry: "Tamagotchi.uiResetEvent",
-    argument: null,
-  },
-  {
-    selector: "#pet-name-input",
-    event: "change",
-    entry: "Tamagotchi.uiRenameEvent",
-    argument: null,
-  },
-]);
+});
+assert.equal(reloadRuntime.call("HostInterop.mountCallbackEvent", "#reload"), "1");
+assert.equal(reloadRuntime.call("HostInterop.timeoutRecord", 90), "1");
+assert.equal(reloadRuntime.call("HostInterop.animationRecord", 100), "1");
+assert.equal(reloadRuntime.liveCallbacks.size, 3);
+reloadRuntime.loadIrPackageBytes(irPackageBytes);
+assert.equal(reloadRuntime.packageInfo.hostImports, 0);
+assert.equal(reloadRuntime.liveCallbacks.size, 0);
+assert.throws(() => reloadRuntime.call("HostInterop.callbackRoundTrip", 1), /interface entry not found/);
+assert.equal(reloadRuntime.call("fib", 12), "144");
+reloadDocumentState.elements.get("#reload").listeners.get("click")?.[0]?.dispatch({});
+await wait(40);
+assert.deepEqual(reloadRecords.splice(0), []);
+reloadRuntime.dispose();
+
+assert.equal(hostRuntime.call("Tamagotchi.uiMountFromDom"), "8");
+assert.equal(hostRuntime.liveCallbacks.size, 8);
 const petReset = hostRuntime.call("Tamagotchi.uiReset", "Mochi", "pet");
 assert.deepEqual(petReset, {
   name: "Mochi",
@@ -367,30 +547,17 @@ assert.deepEqual(hostRuntime.call("Tamagotchi.uiStepFromDom", "ignore"), {
   turns: "1",
   care: "2",
 });
-assert.deepEqual(hostRuntime.call("Tamagotchi.uiStepEvent", { handle: 1 }, "ignore"), {
-  name: "Mochi",
-  mood: "angry",
-  trace: ["happy", "hungry", "angry"],
-  artwork: "pet",
-  turns: "2",
-  care: "0",
-});
-assert.deepEqual(hostRuntime.call("Tamagotchi.uiResetEvent", { handle: 1 }), {
-  name: "Mochi",
-  mood: "happy",
-  trace: ["happy"],
-  artwork: "pet",
-  turns: "0",
-  care: "3",
-});
-assert.deepEqual(hostRuntime.call("Tamagotchi.uiRenameEvent", { handle: 1 }), {
-  name: "Mochi",
-  mood: "happy",
-  trace: ["happy"],
-  artwork: "pet",
-  turns: "0",
-  care: "3",
-});
+virtualDocumentState.elements.get("[data-action='ignore']").listeners.get("click")?.[0]?.dispatch({});
+assert.equal(virtualDocumentState.elements.get("#pet-device").attributes.get("data-mood"), "angry");
+assert.equal(virtualDocumentState.elements.get("#pet-device").attributes.get("data-trace"), "happy,hungry,angry");
+virtualDocumentState.elements.get("#pet-reset-button").listeners.get("click")?.[0]?.dispatch({});
+assert.equal(virtualDocumentState.elements.get("#pet-device").attributes.get("data-mood"), "happy");
+assert.equal(virtualDocumentState.elements.get("#pet-device").attributes.get("data-trace"), "happy");
+virtualDocumentState.elements.get("#pet-name-input").value = "Ada";
+virtualDocumentState.elements.get("#pet-name-input").listeners.get("change")?.[0]?.dispatch({});
+assert.equal(virtualDocumentState.elements.get("#pet-device").attributes.get("data-name"), "Ada");
+hostRuntime.dispose();
+assert.equal(hostRuntime.liveCallbacks.size, 0);
 
 const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/fixtures-basic.irpkg"], {
   encoding: "utf8",
@@ -1009,23 +1176,17 @@ try {
   });
 
   await assertUnsupportedInterfaceSource(freshDir, "UnsupportedInterfaces", [
-    "structure BadCounter where",
-    "  callback : Nat → Nat",
-    "",
     "structure RecursiveBox where",
     "  next : Option RecursiveBox",
     "",
     "inductive IndexedBox : Nat → Type where",
     "  | mk {n : Nat} (value : Nat) : IndexedBox n",
     "",
-    "def badCounterIdentity (box : BadCounter) : BadCounter := box",
     "def recursiveBoxIdentity (box : RecursiveBox) : RecursiveBox := box",
     "def indexedBoxIdentity (box : IndexedBox 3) : IndexedBox 3 := box",
     "def implicitBump {offset : Nat} (n : Nat) : Nat := n + offset",
     "",
   ], [
-    /badCounterIdentity/,
-    /field `callback`/,
     /recursiveBoxIdentity/,
     /recursive structure `RecursiveBox` is not supported/,
     /indexedBoxIdentity/,

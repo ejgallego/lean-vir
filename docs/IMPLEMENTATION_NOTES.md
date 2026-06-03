@@ -35,15 +35,22 @@ by name.
 
 The browser keeps a Lean-rendered Tamagotchi as the top-level interactive demo
 over the same upstream interpreter artifact. Lean registers the pet controls
-with `Lean.Vir.Browser.Element.addEventListener`; the browser host binding
-installs DOM listeners and calls the requested exported `IO` event entrypoints
-from `demo-host.irpkg`. The Lean code reads and writes DOM state, including
-checkbox and text input properties, through `Lean.Vir.Browser` host imports.
-Its nullary inductive `Mood` and `Action` values are auto-discovered as simple
-enums and marshaled through the generic `vir_call` path. Event resources are
-opaque v1 handles that are valid only while the listener callback is running;
-the fuller callback/resource design is tracked in
-`docs/EVENT_CALLBACK_ROADMAP.md`.
+with `Lean.Vir.Browser.Element.addEventListener`; the browser host
+binding installs DOM listeners that call retained Lean closures. The Lean code
+reads and writes DOM state, including checkbox and text input properties,
+through `Lean.Vir.Browser` host imports. Its nullary inductive `Mood` and
+`Action` values are auto-discovered as simple enums and marshaled through the
+generic `vir_call` path.
+
+The host-import path now also supports Lean function values as callback handles.
+`Element.addEventListener`, `Timer.setTimeout`, and
+`Animation.requestAnimationFrame` root Lean closures in the WASM shim, expose
+callable `VirCallback` objects to JavaScript, and release roots when listeners
+are removed, timers or frames are cancelled, one-shot callbacks fire, or the
+runtime is disposed. Loading a new package into an existing runtime performs the
+same host-resource teardown before the new manifest is installed. Event
+resources remain opaque callback-scoped handles; the ownership contract and
+follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
 
 `Lean.Expr` is also part of the current manifest surface. JavaScript sends and
 receives structural objects for the standard expression constructors, and the

@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
-import { mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, extname, resolve, sep } from "node:path";
@@ -27,6 +27,13 @@ const contentTypes = new Map([
   [".json", "application/json; charset=utf-8"],
   [".wasm", "application/wasm"],
 ]);
+
+async function distAssetPath(prefix) {
+  const files = await readdir(resolve(distRoot, "assets"));
+  const file = files.find((candidate) => candidate.startsWith(prefix) && candidate.endsWith(".js"));
+  assert.ok(file, `missing built asset matching ${prefix}*.js`);
+  return `assets/${file}`;
+}
 
 function isInside(root, path) {
   return path === root || path.startsWith(root.endsWith(sep) ? root : `${root}${sep}`);
@@ -429,7 +436,7 @@ async function smokePackagePreset(cdp, origin) {
     status: "Ready",
     packageName: "demo-host.irpkg",
     packageUrl: "demo-host.irpkg",
-    entryCount: 10,
+    entryCount: 23,
   });
 }
 
@@ -507,6 +514,249 @@ async function smokeRunner(cdp, origin, url, expected) {
     const title = await evaluate(cdp, "document.title");
     assert.equal(title, expected.documentTitle);
   }
+}
+
+async function runSelectedEntry(cdp, runInputs = null) {
+  return evaluate(cdp, `new Promise((resolve, reject) => {
+    const output = document.querySelector("#dev-result");
+    const runInputs = ${JSON.stringify(runInputs)};
+    if (runInputs !== null) {
+      for (const [index, value] of runInputs.entries()) {
+        const field = document.querySelector("[data-input-index='" + index + "']");
+        if (field.type === "checkbox") {
+          field.checked = value === true || value === "true";
+        } else {
+          field.value = value;
+        }
+      }
+    }
+    output.textContent = "pending";
+    document.querySelector("#dev-run-entry").click();
+    const deadline = Date.now() + 5000;
+    const poll = () => {
+      const text = output.textContent.trim();
+      if (text !== "pending" && text !== "...") {
+        resolve(text);
+      } else if (Date.now() > deadline) {
+        reject(new Error("runner did not produce a result"));
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  })`);
+}
+
+async function smokeBrowserCallbacks(cdp, origin) {
+  const clickCase = await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.mountCallbackText", {
+    runInputs: ["#callback-smoke-target"],
+  });
+  await navigate(cdp, `${origin}${basePath}${clickCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `(() => {
+    document.querySelector("#callback-smoke-target")?.remove();
+    const target = document.createElement("button");
+    target.id = "callback-smoke-target";
+    target.textContent = "callback:idle";
+    document.body.append(target);
+  })()`);
+  assert.equal(await runSelectedEntry(cdp, clickCase.expected.runInputs), "1");
+  const clicked = await evaluate(cdp, `new Promise((resolve, reject) => {
+    document.querySelector("#callback-smoke-target").click();
+    const deadline = Date.now() + 5000;
+    const poll = () => {
+      const state = {
+        text: document.querySelector("#callback-smoke-target")?.textContent,
+        status: document.querySelector("#status")?.textContent?.trim(),
+      };
+      if (state.text === "callback:clicked") {
+        resolve(state);
+      } else if (Date.now() > deadline) {
+        reject(new Error("callback click did not update the DOM"));
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  })`);
+  assert.deepEqual(clicked, {
+    text: "callback:clicked",
+    status: "Ready",
+  });
+
+  const timeoutCase = await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.timeoutTitle", {
+    runInputs: ["pages-timeout"],
+  });
+  await navigate(cdp, `${origin}${basePath}${timeoutCase.url}`);
+  await waitForReady(cdp);
+  assert.equal(await runSelectedEntry(cdp, timeoutCase.expected.runInputs), "1");
+  const timeoutTitle = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 5000;
+    const poll = () => {
+      if (document.title === "timeout:pages-timeout") {
+        resolve(document.title);
+      } else if (Date.now() > deadline) {
+        reject(new Error("setTimeout callback did not update document.title; got " + document.title));
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  })`);
+  assert.equal(timeoutTitle, "timeout:pages-timeout");
+
+  const frameCase = await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.animationTitle", {
+    runInputs: ["pages-frame"],
+  });
+  await navigate(cdp, `${origin}${basePath}${frameCase.url}`);
+  await waitForReady(cdp);
+  assert.equal(await runSelectedEntry(cdp, frameCase.expected.runInputs), "1");
+  const frameTitle = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 5000;
+    const poll = () => {
+      if (document.title === "frame:pages-frame") {
+        resolve(document.title);
+      } else if (Date.now() > deadline) {
+        reject(new Error("requestAnimationFrame callback did not update document.title; got " + document.title));
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  })`);
+  assert.equal(frameTitle, "frame:pages-frame");
+}
+
+async function smokeBrowserCallbackCleanup(cdp, origin) {
+  const removedCase = await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.mountAndRemoveCallbackText", {
+    runInputs: ["#callback-removed-target"],
+  });
+  await navigate(cdp, `${origin}${basePath}${removedCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `(() => {
+    document.querySelector("#callback-removed-target")?.remove();
+    const target = document.createElement("button");
+    target.id = "callback-removed-target";
+    target.textContent = "callback:removed-idle";
+    document.body.append(target);
+  })()`);
+  assert.equal(await runSelectedEntry(cdp, removedCase.expected.runInputs), "1");
+  const removed = await evaluate(cdp, `new Promise((resolve) => {
+    document.querySelector("#callback-removed-target").click();
+    setTimeout(() => resolve({
+      text: document.querySelector("#callback-removed-target")?.textContent,
+      status: document.querySelector("#status")?.textContent?.trim(),
+    }), 100);
+  })`);
+  assert.deepEqual(removed, {
+    text: "callback:removed-idle",
+    status: "Ready",
+  });
+
+  const clearTimeoutCase = await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.clearTimeoutTitle", {
+    runInputs: ["cancelled-timeout"],
+  });
+  await navigate(cdp, `${origin}${basePath}${clearTimeoutCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `document.title = "timeout:cancelled-sentinel"`);
+  assert.equal(await runSelectedEntry(cdp, clearTimeoutCase.expected.runInputs), "1");
+  const clearTimeoutTitle = await evaluate(cdp, `new Promise((resolve) => {
+    setTimeout(() => resolve(document.title), 120);
+  })`);
+  assert.equal(clearTimeoutTitle, "timeout:cancelled-sentinel");
+
+  const cancelFrameCase = await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.cancelAnimationTitle", {
+    runInputs: ["cancelled-frame"],
+  });
+  await navigate(cdp, `${origin}${basePath}${cancelFrameCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `document.title = "frame:cancelled-sentinel"`);
+  assert.equal(await runSelectedEntry(cdp, cancelFrameCase.expected.runInputs), "1");
+  const cancelFrameTitle = await evaluate(cdp, `new Promise((resolve) => {
+    setTimeout(() => resolve(document.title), 120);
+  })`);
+  assert.equal(cancelFrameTitle, "frame:cancelled-sentinel");
+
+  const reloadCase = await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.mountCallbackText", {
+    runInputs: ["#callback-reload-target"],
+  });
+  await navigate(cdp, `${origin}${basePath}${reloadCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `(() => {
+    document.querySelector("#callback-reload-target")?.remove();
+    const target = document.createElement("button");
+    target.id = "callback-reload-target";
+    target.textContent = "callback:reload-idle";
+    document.body.append(target);
+  })()`);
+  assert.equal(await runSelectedEntry(cdp, reloadCase.expected.runInputs), "1");
+  const reloaded = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const preset = document.querySelector("#dev-package-preset");
+    preset.value = "fixtures-basic.irpkg";
+    preset.dispatchEvent(new Event("change", { bubbles: true }));
+    const deadline = Date.now() + 5000;
+    const poll = () => {
+      const state = {
+        status: document.querySelector("#status")?.textContent?.trim(),
+        packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
+      };
+      if (state.status === "Ready" && state.packageName === "fixtures-basic.irpkg") {
+        document.querySelector("#callback-reload-target").click();
+        setTimeout(() => resolve({
+          ...state,
+          text: document.querySelector("#callback-reload-target")?.textContent,
+        }), 100);
+      } else if (Date.now() > deadline) {
+        reject(new Error("package preset did not reload fixtures-basic.irpkg"));
+      } else {
+        setTimeout(poll, 50);
+      }
+    };
+    poll();
+  })`);
+  assert.deepEqual(reloaded, {
+    status: "Ready",
+    packageName: "fixtures-basic.irpkg",
+    text: "callback:reload-idle",
+  });
+
+  const runtimeAsset = await distAssetPath("vir-runtime-");
+  const disposed = await evaluate(cdp, `new Promise(async (resolve, reject) => {
+    try {
+      const runtimeModule = await import(${JSON.stringify(`${origin}${basePath}${runtimeAsset}`)});
+      const createVirRuntime = runtimeModule.createVirRuntime ??
+        Object.values(runtimeModule).find((value) =>
+          typeof value === "function" && String(value).includes("irPackageUrl"));
+      if (typeof createVirRuntime !== "function") {
+        throw new Error("built runtime asset does not expose createVirRuntime");
+      }
+      const runtime = await createVirRuntime({
+        wasmUrl: ${JSON.stringify(`${origin}${basePath}vir-upstream.wasm`)},
+        irPackageUrl: ${JSON.stringify(`${origin}${basePath}demo-host.irpkg`)},
+      });
+      document.title = "dispose:sentinel";
+      document.querySelector("#callback-dispose-target")?.remove();
+      const target = document.createElement("button");
+      target.id = "callback-dispose-target";
+      target.textContent = "callback:dispose-idle";
+      document.body.append(target);
+      runtime.call("HostInterop.mountCallbackText", "#callback-dispose-target");
+      runtime.call("HostInterop.delayedTimeoutTitle", "dispose-timeout");
+      runtime.call("HostInterop.animationTitle", "dispose-frame");
+      runtime.dispose();
+      target.click();
+      setTimeout(() => resolve({
+        text: target.textContent,
+        title: document.title,
+      }), 160);
+    } catch (error) {
+      reject(error);
+    }
+  })`);
+  assert.deepEqual(disposed, {
+    text: "callback:dispose-idle",
+    title: "dispose:sentinel",
+  });
 }
 
 async function smokeRunnerFailure(cdp, origin, url, expected) {
@@ -654,6 +904,8 @@ try {
   await smokeManifestDrivenEntryList(cdp, server.origin, "pretty-printer.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-lean.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-boundary.irpkg");
+  await smokeBrowserCallbacks(cdp, server.origin);
+  await smokeBrowserCallbackCleanup(cdp, server.origin);
   const runnerCases = [
     await runnerCaseFromManifest("local-quickstart.irpkg", "Quickstart.total", {
       entryCount: 6,
@@ -836,7 +1088,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
+  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

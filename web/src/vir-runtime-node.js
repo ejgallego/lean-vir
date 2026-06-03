@@ -15,6 +15,8 @@ export {
   fetchBytes,
   roundTripInterfaceTypeDescriptor,
   sameInterfaceWireType,
+  VIR_HOST_DISPOSE,
+  VirCallback,
   VirRuntime,
 } from "./vir-runtime.js";
 export { createNodeHostBindings, createVirtualDocumentHostBindings, createVirtualDocumentState } from "./vir-host-bindings.js";

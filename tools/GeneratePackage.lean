@@ -25,6 +25,15 @@ inductive StructureFieldLayout where
 
 abbrev StructureSeen := Array (Name × String)
 
+inductive InterfaceEffect where
+  | pure
+  | io
+  deriving BEq, Repr
+
+def InterfaceEffect.label : InterfaceEffect → String
+  | .pure => "pure"
+  | .io => "io"
+
 structure Target where
   source : System.FilePath
   roots : Array Name
@@ -86,21 +95,13 @@ inductive InterfaceType where
       (objectFields usizeFields scalarBytes : Nat)
       (fields : Array (String × InterfaceType × StructureFieldLayout × Bool))
   | resource (name : Name) (label : String)
+  | function (args : Array (String × InterfaceType)) (result : InterfaceType) (effect : InterfaceEffect)
   | expr
   deriving BEq, Repr
 
 structure InterfaceArg where
   name : String
   type : InterfaceType
-
-inductive InterfaceEffect where
-  | pure
-  | io
-  deriving BEq, Repr
-
-def InterfaceEffect.label : InterfaceEffect → String
-  | .pure => "pure"
-  | .io => "io"
 
 structure InterfaceExport where
   id : String
@@ -1426,7 +1427,7 @@ def isNativeExternCandidate (n : Name) : Bool :=
 
 def jsExternPrefix : String := "__vir_js:"
 
-def maxHostImportSlots : Nat := 16
+def maxHostImportSlots : Nat := 32
 
 def maxHostImportArity : Nat := 6
 
@@ -1620,6 +1621,7 @@ def InterfaceType.label : InterfaceType → String
   | .taggedUnion _ label _ => label
   | .structure _ label .. => label
   | .resource _ label => label
+  | .function .. => "Function"
   | .expr => "Lean.Expr"
 
 def InterfaceType.wireTag : InterfaceType → Nat
@@ -1644,6 +1646,7 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .taggedUnion .. => 21
   | .structure .. => 20
   | .resource .. => 23
+  | .function .. => 24
   | .expr => 15
 
 partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
@@ -1792,6 +1795,20 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ "\"kind\":\"resource\","
       ++ "\"name\":" ++ jsonString name.toString
       ++ "}"
+  | .function args result effect =>
+      let argJson := args.map fun (argName, argType) =>
+        "{"
+        ++ "\"name\":" ++ jsonString argName ++ ","
+        ++ "\"type\":" ++ argType.toJson
+        ++ "}"
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"function\","
+      ++ "\"effect\":" ++ jsonString effect.label ++ ","
+      ++ "\"args\":" ++ jsonArray argJson ++ ","
+      ++ "\"result\":" ++ result.toJson
+      ++ "}"
   | _ =>
       "{\"type\":\"" ++ ty.label ++ "\",\"wireTag\":" ++ toString ty.wireTag ++ "}"
 
@@ -1820,10 +1837,17 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `USize => some .usize
   | some `ByteArray => some .byteArray
   | some `Lean.Expr => some .expr
-  | some `Lean.Vir.Browser.Element => some (.resource `Lean.Vir.Browser.Element "Element")
-  | some `Lean.Vir.Browser.Event => some (.resource `Lean.Vir.Browser.Event "Event")
-  | some `Lean.Vir.Browser.EventListener => some (.resource `Lean.Vir.Browser.EventListener "EventListener")
-  | some `Lean.Vir.Browser.HTMLInputElement => some (.resource `Lean.Vir.Browser.HTMLInputElement "HTMLInputElement")
+  | _ => none
+
+def resourceInterfaceType? (_env : Environment) (e : Lean.Expr) : Option InterfaceType := do
+  let name ← constName? e
+  match name with
+  | `Lean.Vir.Browser.Element => some (.resource name "Element")
+  | `Lean.Vir.Browser.Event => some (.resource name "Event")
+  | `Lean.Vir.Browser.EventListener => some (.resource name "EventListener")
+  | `Lean.Vir.Browser.HTMLInputElement => some (.resource name "HTMLInputElement")
+  | `Lean.Vir.Browser.Timeout => some (.resource name "Timeout")
+  | `Lean.Vir.Browser.AnimationFrame => some (.resource name "AnimationFrame")
   | _ => none
 
 def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType := do
@@ -1892,7 +1916,39 @@ def structureFieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option Structur
 def structureSeenContains (seen : StructureSeen) (name : Name) (key : String) : Bool :=
   seen.any fun (seenName, seenKey) => seenName == name && seenKey == key
 
+def binderArgName (fallback : Nat) (name : Name) : String :=
+  let candidate := name.toString
+  if name.isAnonymous || candidate.startsWith "_" || candidate.contains '_' then
+    s!"arg{fallback}"
+  else
+    candidate
+
+def ioResultType? (e : Lean.Expr) : Option Lean.Expr :=
+  let e := stripMData e
+  let (fn, args) := e.getAppFnArgs
+  match fn, Array.toList args with
+  | `IO, [result] => some result
+  | _, _ => none
+
 mutual
+
+partial def functionType (type : Lean.Expr) (argIndex : Nat := 1) (args : Array (String × InterfaceType) := #[]) :
+    CoreM (Except String InterfaceType) := do
+  match stripMData type with
+  | .forallE name domain body binderInfo =>
+      if binderInfo != .default then
+        return .error s!"unsupported implicit/instance callback argument `{name}`"
+      else
+        match ← interfaceType domain with
+        | .error reason => return .error s!"unsupported callback argument type `{domain}`: {reason}"
+        | .ok argType =>
+            functionType body (argIndex + 1) (args.push (binderArgName argIndex name, argType))
+  | result =>
+      let effect := if ioResultType? result |>.isSome then .io else .pure
+      let result := (ioResultType? result).getD result
+      match ← interfaceType result with
+      | .error reason => return .error s!"unsupported callback result type `{result}`: {reason}"
+      | .ok resultType => return .ok (.function args resultType effect)
 
 partial def taggedUnionType (seenStructures : StructureSeen) (name : Name) (label : String)
     (constructors : Array (Name × String × Lean.Expr)) : CoreM (Except String InterfaceType) := do
@@ -1977,62 +2033,54 @@ partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : Cor
       return .ok (.structure name (exprTypeLabel e) trivialField? layout.ctorInfo.size layout.ctorInfo.usize layout.ctorInfo.ssize fields)
 
 partial def interfaceType (e : Lean.Expr) (seenStructures : StructureSeen := #[]) : CoreM (Except String InterfaceType) := do
-  match simpleInterfaceType? e with
-  | some ty => return .ok ty
-  | none =>
-      let e := stripMData e
-      let (fn, args) := e.getAppFnArgs
-      match fn, Array.toList args with
-      | `Array, [arg] =>
-          match ← interfaceType arg seenStructures with
-          | .ok ty => return .ok (.array ty)
-          | .error reason => return .error s!"unsupported Array element type: {reason}"
-      | `List, [arg] =>
-          match ← interfaceType arg seenStructures with
-          | .ok ty => return .ok (.list ty)
-          | .error reason => return .error s!"unsupported List element type: {reason}"
-      | `Option, [arg] =>
-          match ← interfaceType arg seenStructures with
-          | .ok ty => return .ok (.option ty)
-          | .error reason => return .error s!"unsupported Option element type: {reason}"
-      | `Prod, [lhs, rhs] =>
-          match ← interfaceType lhs seenStructures with
-          | .error reason => return .error s!"unsupported Prod fst type: {reason}"
-          | .ok lhsTy =>
-              match ← interfaceType rhs seenStructures with
-              | .error reason => return .error s!"unsupported Prod snd type: {reason}"
-              | .ok rhsTy => return .ok (.prod lhsTy rhsTy)
-      | `Sum, [lhs, rhs] =>
-          taggedUnionType seenStructures `Sum (exprTypeLabel e) #[
-            (`Sum.inl, "inl", lhs),
-            (`Sum.inr, "inr", rhs)
-          ]
-      | `Except, [err, ok] =>
-          taggedUnionType seenStructures `Except (exprTypeLabel e) #[
-            (`Except.error, "error", err),
-            (`Except.ok, "ok", ok)
-          ]
-      | _, _ =>
-          let env ← getEnv
-          match simpleEnumType? env e with
-          | some ty => return .ok ty
-          | none => structureType seenStructures e
+  let e := stripMData e
+  match e with
+  | .forallE .. => functionType e
+  | _ =>
+      let env ← getEnv
+      match simpleInterfaceType? e <|> resourceInterfaceType? env e with
+      | some ty => return .ok ty
+      | none =>
+          if ioResultType? e |>.isSome then
+            functionType e
+          else
+            let (fn, args) := e.getAppFnArgs
+            match fn, Array.toList args with
+            | `Array, [arg] =>
+                match ← interfaceType arg seenStructures with
+                | .ok ty => return .ok (.array ty)
+                | .error reason => return .error s!"unsupported Array element type: {reason}"
+            | `List, [arg] =>
+                match ← interfaceType arg seenStructures with
+                | .ok ty => return .ok (.list ty)
+                | .error reason => return .error s!"unsupported List element type: {reason}"
+            | `Option, [arg] =>
+                match ← interfaceType arg seenStructures with
+                | .ok ty => return .ok (.option ty)
+                | .error reason => return .error s!"unsupported Option element type: {reason}"
+            | `Prod, [lhs, rhs] =>
+                match ← interfaceType lhs seenStructures with
+                | .error reason => return .error s!"unsupported Prod fst type: {reason}"
+                | .ok lhsTy =>
+                    match ← interfaceType rhs seenStructures with
+                    | .error reason => return .error s!"unsupported Prod snd type: {reason}"
+                    | .ok rhsTy => return .ok (.prod lhsTy rhsTy)
+            | `Sum, [lhs, rhs] =>
+                taggedUnionType seenStructures `Sum (exprTypeLabel e) #[
+                  (`Sum.inl, "inl", lhs),
+                  (`Sum.inr, "inr", rhs)
+                ]
+            | `Except, [err, ok] =>
+                taggedUnionType seenStructures `Except (exprTypeLabel e) #[
+                  (`Except.error, "error", err),
+                  (`Except.ok, "ok", ok)
+                ]
+            | _, _ =>
+                match simpleEnumType? env e with
+                | some ty => return .ok ty
+                | none => structureType seenStructures e
 
 end
-
-def binderArgName (fallback : Nat) (name : Name) : String :=
-  let candidate := name.toString
-  if name.isAnonymous || candidate.startsWith "_" || candidate.contains '_' then
-    s!"arg{fallback}"
-  else
-    candidate
-
-def ioResultType? (e : Lean.Expr) : Option Lean.Expr :=
-  let e := stripMData e
-  let (fn, args) := e.getAppFnArgs
-  match fn, Array.toList args with
-  | `IO, [result] => some result
-  | _, _ => none
 
 partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args : Array InterfaceArg := #[]) :
     CoreM (Except String (Array InterfaceArg × InterfaceType × InterfaceEffect)) := do
@@ -2551,6 +2599,11 @@ partial def emitInterfaceType (type : InterfaceType) : EmitM Unit := do
             emitU32 size
             emitU32 offset
         emitInterfaceType fieldType
+  | .function args result effect =>
+      emitBool (effect == .io)
+      emitU32 args.size
+      args.forM fun (_, argType) => emitInterfaceType argType
+      emitInterfaceType result
   | _ => pure ()
 
 def emitHostImport (entry : HostImport) : EmitM Unit := do

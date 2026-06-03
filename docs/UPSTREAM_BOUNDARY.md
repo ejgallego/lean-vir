@@ -73,6 +73,9 @@ Together they supply:
 - package-scoped JavaScript host import trampolines for declarations marked
   with `@[vir_js "..."]`, routed through `env.vir_js_call` and
   `env.vir_js_call_result_size`.
+- Lean closure roots for function-valued host-import arguments. The shim owns
+  `vir_closure_call` and `vir_closure_release`; JavaScript owns the host-side
+  lifetime policy for callback handles.
 - name construction primitives needed by `src/util/name.cpp`.
 
 The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
@@ -202,6 +205,13 @@ recognizes only those package-provided symbols, calls the single imported
 `env.vir_js_call` dispatcher, and still rejects unrelated dynamic symbol
 lookup.
 
+Function-valued host-import arguments use the same package-scoped policy. The
+generic result encoder roots the Lean closure in a small shim table and returns
+a callback handle to JavaScript. JavaScript can call that handle through
+`vir_closure_call` and must eventually release it through `vir_closure_release`.
+This keeps the Lean heap reference count explicit while avoiding any change to
+the upstream interpreter file.
+
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
 registry. It checks that every `nativeExterns` entry in
 `tools/GeneratePackage.lean` has a matching table entry, `dlsym` symbol, and
@@ -244,3 +254,35 @@ emitted by `tools/GeneratePackage.lean`. A future loading step is to make the
 package format match Lean's generated `.ir` or module data more closely, so the
 same stable `vir_load_ir_package(ptr, len)` boundary can load artifacts produced
 by Lean itself.
+
+## Future Wasm Interfaces
+
+The closure/resource bridge is intentionally conservative for `wasm32-wasip1`.
+The current module only passes integers, floats, and linear-memory byte payloads
+across the host boundary; opaque resources and Lean closures are represented by
+runtime-owned handle tables.
+
+Useful WebAssembly features to track before widening the ABI:
+
+- Reference Types are already part of the finished proposal set, and `externref`
+  is the obvious future representation for host-owned resources in browser
+  builds. It can remove the JavaScript DOM-resource table for values such as
+  `Element` or `Event`, but it does not remove the need to root and release Lean
+  heap closures explicitly.
+- The Component Model is still proposal-track and is the right semantic target
+  for typed resources once this project moves beyond an internal `.irpkg`
+  manifest. The current `@[vir_resource]` metadata is intentionally compatible
+  with that direction without committing to WIT today.
+- JS Promise Integration and Stack Switching are the relevant future mechanisms
+  for Promise-shaped or coroutine-shaped host calls. The current API avoids that
+  problem by keeping host imports synchronous and modeling browser async APIs as
+  callback registration plus cancellation handles.
+- Wasm GC and typed function references are useful platform work to watch, but
+  Lean closures are currently objects in Lean's own heap. They do not replace
+  the refcounted root/release bridge in this phase.
+
+Primary status references:
+
+- [WebAssembly finished proposals](https://github.com/WebAssembly/proposals/blob/main/finished-proposals.md)
+- [WebAssembly active proposals](https://github.com/WebAssembly/proposals)
+- [WebAssembly feature status](https://webassembly.org/features/)

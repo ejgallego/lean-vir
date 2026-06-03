@@ -86,6 +86,7 @@ function assetPathFor(text) {
 }
 
 function resetPackageState() {
+  runtime?.dispose();
   runtime = null;
   interfaceEntries = [];
   currentPackageQuery = null;

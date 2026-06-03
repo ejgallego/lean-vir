@@ -98,12 +98,6 @@ structure PetState where
   turns : Nat
   care : Nat
 
-structure UiBinding where
-  selector : String
-  event : String
-  entry : String
-  argument : Option String
-
 def defaultName : String :=
   "Mochi"
 
@@ -115,15 +109,6 @@ def maxCare : Nat :=
 
 def initialCare : Nat :=
   3
-
-def stepEntry : String :=
-  "Tamagotchi.uiStepEvent"
-
-def resetEntry : String :=
-  "Tamagotchi.uiResetEvent"
-
-def renameEntry : String :=
-  "Tamagotchi.uiRenameEvent"
 
 def normalizeArtwork (artwork : String) : String :=
   if artwork == "octopus" then "octopus" else "pet"
@@ -198,26 +183,6 @@ def statusLabel (state : PetState) (actionLabel : String) : String :=
 
 def natFromAttr (attr : Option String) (fallback : Nat) : Nat :=
   attr.bind String.toNat? |>.getD fallback
-
-def actionBinding (action : Action) : UiBinding :=
-  {
-    selector := "[data-action='" ++ action.label ++ "']",
-    event := "click",
-    entry := stepEntry,
-    argument := some action.label
-  }
-
-def uiBindings : Array UiBinding :=
-  #[
-    actionBinding feed,
-    actionBinding play,
-    actionBinding nap,
-    actionBinding wake,
-    actionBinding ignore,
-    { selector := "#pet-reset-button", event := "click", entry := resetEntry, argument := none },
-    { selector := "#pet-art-toggle", event := "change", entry := resetEntry, argument := none },
-    { selector := "#pet-name-input", event := "change", entry := renameEntry, argument := none }
-  ]
 
 def withElement (selector : String) (f : Lean.Vir.Browser.Element → IO Unit) : IO Unit := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
@@ -358,28 +323,34 @@ def uiRenameFromDom : IO PetState := do
   render current "rename"
   pure current
 
-def uiStepEvent (_event : Lean.Vir.Browser.Event) (action : Action) : IO PetState :=
-  uiStepFromDom action
-
-def uiResetEvent (_event : Lean.Vir.Browser.Event) : IO PetState :=
-  uiResetFromDom
-
-def uiRenameEvent (_event : Lean.Vir.Browser.Event) : IO PetState :=
-  uiRenameFromDom
-
-def mountBinding (binding : UiBinding) : IO Unit := do
-  match ← Lean.Vir.Browser.Document.querySelector binding.selector with
-  | none => pure ()
+def mountCallback
+    (selector event : String) (callback : Lean.Vir.Browser.Event → IO Unit) : IO Nat := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure 0
   | some element =>
-      let _listener ← Lean.Vir.Browser.Element.addEventListener
-        element binding.event binding.entry binding.argument
-      pure ()
+      let _listener ← Lean.Vir.Browser.Element.addEventListener element event callback
+      pure 1
 
-def uiMountFromDom : IO (Array UiBinding) := do
+def mountAction (action : Action) : IO Nat :=
+  mountCallback ("[data-action='" ++ action.label ++ "']") "click" fun _event =>
+    discard <| uiStepFromDom action
+
+def uiMountFromDom : IO Nat := do
   let _ ← uiResetFromDom
-  for binding in uiBindings do
-    mountBinding binding
-  pure uiBindings
+  let mut mounted := 0
+  for action in #[feed, play, nap, wake, ignore] do
+    let count ← mountAction action
+    mounted := mounted + count
+  let resetCount ← mountCallback "#pet-reset-button" "click" fun _event =>
+    discard uiResetFromDom
+  mounted := mounted + resetCount
+  let artCount ← mountCallback "#pet-art-toggle" "change" fun _event =>
+    discard uiResetFromDom
+  mounted := mounted + artCount
+  let renameCount ← mountCallback "#pet-name-input" "change" fun _event =>
+    discard uiRenameFromDom
+  mounted := mounted + renameCount
+  pure mounted
 
 #eval trace happy demoScript
 #eval run happy demoScript

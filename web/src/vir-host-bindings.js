@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
+
 export function createCommonHostBindings() {
   return {
     "common.echoString": (value) => value,
@@ -25,6 +27,7 @@ function createDomResourceState() {
     nextHandle: 1,
     values: new Map(),
     handles: new WeakMap(),
+    disposables: new Set(),
   };
 }
 
@@ -51,13 +54,19 @@ export function createBrowserElementHostBindings(state = createDomResourceState(
       resolveResource(state, element, "Element").setAttribute(name, value);
       return undefined;
     },
-    "browser.element.addEventListener": (element, eventName, entry, argument) => {
+    "browser.element.addEventListener": (element, eventName, callback) => {
       const target = resolveResource(state, element, "Element");
-      const handler = (event) => callRuntimeEventHandler(runtimeRef, state, event, entry, argument);
+      const handler = (event) => callLeanEventCallback(state, event, callback);
       target.addEventListener(eventName, handler);
-      return resourceForValue(state, {
-        remove: () => target.removeEventListener(eventName, handler),
-      });
+      const listener = {
+        remove: once(() => {
+          target.removeEventListener(eventName, handler);
+          callback.release();
+          removeDisposable(state, listener);
+        }),
+      };
+      addDisposable(state, listener);
+      return resourceForValue(state, listener);
     },
     "browser.element.removeEventListener": (listener) => {
       const value = resolveResource(state, listener, "EventListener");
@@ -87,6 +96,88 @@ export function createBrowserHtmlInputElementHostBindings(state = createDomResou
   };
 }
 
+export function createBrowserTimerHostBindings(state = createDomResourceState()) {
+  return {
+    "browser.timer.setTimeout": (delayMs, callback) => {
+      let timeout = null;
+      const value = {
+        clear: once(() => {
+          if (timeout !== null) {
+            globalThis.clearTimeout(timeout);
+            timeout = null;
+          }
+          callback.release();
+          removeDisposable(state, value);
+        }),
+      };
+      timeout = globalThis.setTimeout(() => {
+        timeout = null;
+        try {
+          callback();
+        } catch (error) {
+          reportEventHandlerError(error);
+        } finally {
+          value.clear();
+          releaseValueResource(state, value);
+        }
+      }, delayMs);
+      addDisposable(state, value);
+      return resourceForValue(state, value);
+    },
+    "browser.timer.clearTimeout": (timeout) => {
+      const value = resolveResource(state, timeout, "Timeout");
+      value.clear();
+      releaseResource(state, timeout);
+      return undefined;
+    },
+  };
+}
+
+export function createBrowserAnimationHostBindings(state = createDomResourceState()) {
+  const requestFrame =
+    typeof globalThis.requestAnimationFrame === "function"
+      ? globalThis.requestAnimationFrame.bind(globalThis)
+      : (callback) => globalThis.setTimeout(() => callback(performanceNow()), 16);
+  const cancelFrame =
+    typeof globalThis.cancelAnimationFrame === "function"
+      ? globalThis.cancelAnimationFrame.bind(globalThis)
+      : globalThis.clearTimeout.bind(globalThis);
+  return {
+    "browser.animation.requestAnimationFrame": (callback) => {
+      let frame = null;
+      const value = {
+        cancel: once(() => {
+          if (frame !== null) {
+            cancelFrame(frame);
+            frame = null;
+          }
+          callback.release();
+          removeDisposable(state, value);
+        }),
+      };
+      frame = requestFrame((timestamp) => {
+        frame = null;
+        try {
+          callback(Number(timestamp));
+        } catch (error) {
+          reportEventHandlerError(error);
+        } finally {
+          value.cancel();
+          releaseValueResource(state, value);
+        }
+      });
+      addDisposable(state, value);
+      return resourceForValue(state, value);
+    },
+    "browser.animation.cancelAnimationFrame": (frame) => {
+      const value = resolveResource(state, frame, "AnimationFrame");
+      value.cancel();
+      releaseResource(state, frame);
+      return undefined;
+    },
+  };
+}
+
 export function createBrowserHostBindings({ runtimeRef = null } = {}) {
   const state = createDomResourceState();
   return {
@@ -95,6 +186,9 @@ export function createBrowserHostBindings({ runtimeRef = null } = {}) {
     ...createBrowserDocumentHostBindings(state),
     ...createBrowserElementHostBindings(state, { runtimeRef }),
     ...createBrowserHtmlInputElementHostBindings(state),
+    ...createBrowserTimerHostBindings(state),
+    ...createBrowserAnimationHostBindings(state),
+    [VIR_HOST_DISPOSE]: () => disposeDomResourceState(state),
   };
 }
 
@@ -131,10 +225,11 @@ export function createVirtualDocumentHostBindings(
       resolveResource(state.resources, element, "Element").attributes.set(name, value);
       return undefined;
     },
-    "browser.element.addEventListener": (element, eventName, entry, argument) => {
+    "browser.element.addEventListener": (element, eventName, callback) => {
       const target = resolveResource(state.resources, element, "Element");
-      const listener = virtualEventListenerState(target, eventName, entry, argument, runtimeRef, state.resources);
+      const listener = virtualCallbackEventListenerState(target, eventName, callback, state.resources);
       target.listeners.get(eventName).push(listener);
+      addDisposable(state.resources, listener);
       return resourceForValue(state.resources, listener);
     },
     "browser.element.removeEventListener": (listener) => {
@@ -157,6 +252,71 @@ export function createVirtualDocumentHostBindings(
       resolveResource(state.resources, input, "HTMLInputElement").value = value;
       return undefined;
     },
+    "browser.timer.setTimeout": (delayMs, callback) => {
+      let timeout = null;
+      const value = {
+        clear: once(() => {
+          if (timeout !== null) {
+            globalThis.clearTimeout(timeout);
+            timeout = null;
+          }
+          callback.release();
+          removeDisposable(state.resources, value);
+        }),
+      };
+      timeout = globalThis.setTimeout(() => {
+        timeout = null;
+        try {
+          callback();
+        } catch (error) {
+          reportEventHandlerError(error);
+        } finally {
+          value.clear();
+          releaseValueResource(state.resources, value);
+        }
+      }, delayMs);
+      addDisposable(state.resources, value);
+      return resourceForValue(state.resources, value);
+    },
+    "browser.timer.clearTimeout": (timeout) => {
+      const value = resolveResource(state.resources, timeout, "Timeout");
+      value.clear();
+      releaseResource(state.resources, timeout);
+      return undefined;
+    },
+    "browser.animation.requestAnimationFrame": (callback) => {
+      let frame = null;
+      const value = {
+        cancel: once(() => {
+          if (frame !== null) {
+            globalThis.clearTimeout(frame);
+            frame = null;
+          }
+          callback.release();
+          removeDisposable(state.resources, value);
+        }),
+      };
+      frame = globalThis.setTimeout(() => {
+        frame = null;
+        try {
+          callback(performanceNow());
+        } catch (error) {
+          reportEventHandlerError(error);
+        } finally {
+          value.cancel();
+          releaseValueResource(state.resources, value);
+        }
+      }, 16);
+      addDisposable(state.resources, value);
+      return resourceForValue(state.resources, value);
+    },
+    "browser.animation.cancelAnimationFrame": (frame) => {
+      const value = resolveResource(state.resources, frame, "AnimationFrame");
+      value.cancel();
+      releaseResource(state.resources, frame);
+      return undefined;
+    },
+    [VIR_HOST_DISPOSE]: () => disposeDomResourceState(state.resources),
   };
 }
 
@@ -201,6 +361,47 @@ function releaseResource(state, resource) {
   }
 }
 
+function releaseValueResource(state, value) {
+  const handle = state.handles.get(value);
+  if (handle !== undefined) {
+    releaseResource(state, { handle });
+  }
+}
+
+function addDisposable(state, value) {
+  state.disposables ??= new Set();
+  state.disposables.add(value);
+}
+
+function removeDisposable(state, value) {
+  state.disposables?.delete(value);
+}
+
+function disposeDomResourceState(state) {
+  for (const value of Array.from(state.disposables ?? [])) {
+    if (typeof value.remove === "function") {
+      value.remove();
+    } else if (typeof value.clear === "function") {
+      value.clear();
+    } else if (typeof value.cancel === "function") {
+      value.cancel();
+    }
+  }
+  state.disposables?.clear();
+  state.values?.clear();
+  state.handles = new WeakMap();
+  state.nextHandle = 1;
+}
+
+function once(fn) {
+  let called = false;
+  return (...args) => {
+    if (called) return undefined;
+    called = true;
+    return fn(...args);
+  };
+}
+
 function resolveResource(state, resource, label) {
   const handle = resourceHandle(resource, label);
   const value = state.values.get(handle);
@@ -222,18 +423,10 @@ function isInputElement(value) {
   return typeof globalThis.HTMLInputElement === "function" && value instanceof globalThis.HTMLInputElement;
 }
 
-function callRuntimeEventHandler(runtimeRef, state, event, entry, argument) {
-  const runtime = runtimeRef?.runtime ?? null;
+function callLeanEventCallback(state, event, callback) {
   const eventResource = resourceForValue(state, event ?? {});
   try {
-    if (runtime === null) {
-      throw new Error("browser.element.addEventListener requires an attached VirRuntime");
-    }
-    if (argument === null || argument === undefined) {
-      runtime.call(entry, eventResource);
-    } else {
-      runtime.call(entry, eventResource, argument);
-    }
+    callback(eventResource);
   } catch (error) {
     reportEventHandlerError(error);
   } finally {
@@ -252,6 +445,10 @@ function reportEventHandlerError(error) {
   }
 }
 
+function performanceNow() {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+
 function virtualElementState(state, selector) {
   let element = state.elements.get(selector);
   if (element === undefined) {
@@ -267,7 +464,7 @@ function virtualElementState(state, selector) {
   return element;
 }
 
-function virtualEventListenerState(target, eventName, entry, argument, runtimeRef, resources) {
+function virtualCallbackEventListenerState(target, eventName, callback, resources) {
   if (!target.listeners.has(eventName)) {
     target.listeners.set(eventName, []);
   }
@@ -275,7 +472,7 @@ function virtualEventListenerState(target, eventName, entry, argument, runtimeRe
     removed: false,
     dispatch(event = {}) {
       if (!listener.removed) {
-        callRuntimeEventHandler(runtimeRef, resources, event, entry, argument);
+        callLeanEventCallback(resources, event, callback);
       }
     },
     remove() {
@@ -283,6 +480,8 @@ function virtualEventListenerState(target, eventName, entry, argument, runtimeRe
       listener.removed = true;
       const listeners = target.listeners.get(eventName) ?? [];
       target.listeners.set(eventName, listeners.filter((candidate) => candidate !== listener));
+      callback.release();
+      removeDisposable(resources, listener);
     },
   };
   return listener;

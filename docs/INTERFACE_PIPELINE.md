@@ -125,6 +125,12 @@ come back as `{ kind, value }` objects using generated constructor names. The
 manifest records each constructor payload layout so direct scalar payloads are
 written into the same constructor scalar slots as compiled Lean code.
 
+Function-valued interface types are used for Lean callbacks passed to
+JavaScript host imports. Their descriptors record the callback argument list,
+result type, and whether applying the callback returns `IO`. JavaScript receives
+these values as `VirCallback` objects and releases the rooted Lean closure when
+the host-owned registration is done with it.
+
 Entry points and host imports can be pure functions or `IO α` actions. For
 Lean-to-JavaScript calls, import `Lean.Vir.Host` and mark an opaque declaration
 with `@[vir_js "target.name"]`, or use the starter declarations in

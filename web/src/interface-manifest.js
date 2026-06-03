@@ -11,7 +11,7 @@ export const INTERFACE_MANIFEST_SHAPE_ERROR =
 
 const SUPPORTED_WIRE_TAGS = new Set([
   0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-  14, 15, 16, 17, 18, 19, 20, 21, 22, 23,
+  14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
 ]);
 
 function isRecord(value) {
@@ -123,6 +123,9 @@ export function validateInterfaceType(type, label = "interface type") {
       break;
     case 23:
       validateResourceType(type, label);
+      break;
+    case 24:
+      validateFunctionType(type, label);
       break;
     default:
       break;
@@ -264,6 +267,27 @@ function validateResourceType(type, label) {
   requireString(type.name, `${label}.name`);
 }
 
+function validateFunctionType(type, label) {
+  if (type.kind !== "function") {
+    throw new Error(`${label}.kind must be function`);
+  }
+  if (type.effect !== "pure" && type.effect !== "io") {
+    throw new Error(`${label}.effect must be pure or io`);
+  }
+  if (!Array.isArray(type.args)) {
+    throw new Error(`${label}.args must be an array`);
+  }
+  type.args.forEach((arg, index) => {
+    const argLabel = `${label}.args[${index}]`;
+    if (!isRecord(arg)) {
+      throw new Error(`${argLabel} must be an object`);
+    }
+    requireString(arg.name, `${argLabel}.name`);
+    validateInterfaceType(arg.type, `${argLabel}.type`);
+  });
+  validateInterfaceType(type.result, `${label}.result`);
+}
+
 function validateFlattenedStructureFields(type, label) {
   const names = new Set();
   type.fields.forEach((field, index) => {
@@ -321,6 +345,8 @@ export function formatInterfaceType(type) {
       return type.type ?? type.name ?? "TaggedUnion";
     case 23:
       return type.type ?? type.name ?? "Resource";
+    case 24:
+      return `(${(type.args ?? []).map((arg) => formatInterfaceType(arg.type)).join(", ")}) -> ${type.effect === "io" ? "IO " : ""}${formatInterfaceType(type.result)}`;
     default:
       return type?.type ?? `wireTag ${type?.wireTag ?? "?"}`;
   }
