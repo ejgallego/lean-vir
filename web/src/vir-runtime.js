@@ -9,6 +9,7 @@ import { createBrowserHostBindings } from "./vir-host-bindings.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 
 export async function fetchBytes(path, init = { cache: "no-store" }) {
   const response = await fetch(path, init);
@@ -137,10 +138,15 @@ class VirHostState {
     this.userBindings = hostBindings;
     this.lastResultSize = 0;
     this.defaultBindings = defaultHostBindings;
+    this.runtime = null;
   }
 
   attach(exports) {
     this.exports = exports;
+  }
+
+  attachRuntime(runtime) {
+    this.runtime = runtime;
   }
 
   setManifest(manifest) {
@@ -166,7 +172,7 @@ class VirHostState {
     }
 
     const request = this.readWasmBytes(requestPtr, requestLen);
-    const { args, resultType } = decodeHostCallRequest(request, entry);
+    const { args, resultType } = decodeHostCallRequest(request, entry, this.runtime);
     const value = binding(...args);
     if (isPromiseLike(value)) {
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
@@ -184,6 +190,11 @@ class VirHostState {
     }
     return new Uint8Array(this.exports.memory.buffer, ptr, len).slice();
   }
+
+  dispose() {
+    disposeHostBindings(this.userBindings);
+    disposeHostBindings(this.defaultBindings);
+  }
 }
 
 export class VirRuntime {
@@ -195,6 +206,9 @@ export class VirRuntime {
     this.interfaceManifest = null;
     this.packageMetadata = null;
     this.exportsByName = Object.create(null);
+    this.disposed = false;
+    this.liveCallbacks = new Set();
+    this.hostState?.attachRuntime(this);
 
     if (!this.exports.memory) {
       throw new Error("WASM memory export is missing");
@@ -222,12 +236,16 @@ export class VirRuntime {
   }
 
   loadIrPackageBytes(bytes) {
+    this.requireLiveRuntime();
     this.requireFunction("vir_alloc_bytes");
     this.requireFunction("vir_load_ir_package");
 
     const packageBytes = asBytes(bytes, "IR package bytes");
-    const ptr = this.allocBytes(packageBytes);
+    if (this.hasPackageState() || this.liveCallbacks.size !== 0) {
+      this.teardownPackageResources();
+    }
     this.clearPackageMetadata();
+    const ptr = this.allocBytes(packageBytes);
     try {
       const count = this.exports.vir_load_ir_package(ptr, packageBytes.byteLength);
       if (count === 0) {
@@ -263,6 +281,10 @@ export class VirRuntime {
     this.exportsByName = Object.create(null);
   }
 
+  hasPackageState() {
+    return this.packageInfo !== null || this.interfaceManifest !== null || this.packageMetadata !== null;
+  }
+
   readPackageManifest() {
     this.requireFunction("vir_package_interface_manifest");
     this.requireFunction("vir_package_interface_manifest_size");
@@ -291,6 +313,7 @@ export class VirRuntime {
   }
 
   call(name, ...args) {
+    this.requireLiveRuntime();
     this.requireFunction("vir_call");
     this.requireFunction("vir_call_result_size");
     const entry = this.findManifestEntry(name);
@@ -317,7 +340,7 @@ export class VirRuntime {
         throw new Error(this.lastCallError() || `call failed: ${entry.entry}`);
       }
       const resultLen = this.exports.vir_call_result_size();
-      return decodeCallResult(entry.result, this.readWasmBytes(resultPtr, resultLen));
+      return decodeCallResult(entry.result, this.readWasmBytes(resultPtr, resultLen), this);
     } finally {
       this.freeBytes(payloadPtr);
       this.freeBytes(namePtr);
@@ -354,6 +377,119 @@ export class VirRuntime {
     if (typeof this.exports[name] !== "function") {
       throw new Error(`${name} export is missing`);
     }
+  }
+
+  requireLiveRuntime() {
+    if (this.disposed) {
+      throw new Error("VirRuntime has been disposed");
+    }
+  }
+
+  trackCallback(callback) {
+    this.liveCallbacks.add(callback);
+  }
+
+  untrackCallback(callback) {
+    this.liveCallbacks.delete(callback);
+  }
+
+  callClosure(handle, type, args) {
+    this.requireLiveRuntime();
+    this.requireFunction("vir_closure_call");
+    this.requireFunction("vir_closure_call_result_size");
+    const payload = encodeClosureCallPayload(type, args);
+    const payloadPtr = this.allocBytes(payload);
+    try {
+      const resultPtr = this.exports.vir_closure_call(handle, payloadPtr, payload.byteLength);
+      if (resultPtr === 0) {
+        throw new Error(this.lastClosureCallError() || `closure call failed: ${handle}`);
+      }
+      const resultLen = this.exports.vir_closure_call_result_size();
+      return decodeCallResult(type.result, this.readWasmBytes(resultPtr, resultLen), this);
+    } finally {
+      this.freeBytes(payloadPtr);
+    }
+  }
+
+  releaseClosure(handle) {
+    this.exports.vir_closure_release?.(handle);
+  }
+
+  lastClosureCallError() {
+    const len = this.exports.vir_closure_call_error_size?.() ?? 0;
+    return len === 0 ? "" : this.readWasmString(this.exports.vir_closure_call_error(), len);
+  }
+
+  dispose() {
+    if (this.disposed) return;
+    this.teardownPackageResources();
+    this.disposed = true;
+    this.hostState = null;
+    this.exportsByName = Object.create(null);
+  }
+
+  teardownPackageResources() {
+    this.hostState?.dispose();
+    this.releaseLiveCallbacks();
+  }
+
+  releaseLiveCallbacks() {
+    for (const callback of Array.from(this.liveCallbacks)) {
+      callback.release();
+    }
+  }
+}
+
+export class VirCallback {
+  call(...args) {
+    if (this._released) {
+      throw new Error(`Vir callback ${this.handle} has been released`);
+    }
+    return this._runtime.callClosure(this.handle, this.type, args);
+  }
+
+  release() {
+    if (this._released) return false;
+    this._released = true;
+    this._runtime.releaseClosure(this.handle);
+    this._runtime.untrackCallback(this);
+    return true;
+  }
+
+  dispose() {
+    return this.release();
+  }
+
+  get released() {
+    return this._released;
+  }
+}
+
+Object.setPrototypeOf(VirCallback.prototype, Function.prototype);
+
+function createVirCallback(runtime, handle, type) {
+  if (!Number.isInteger(handle) || handle <= 0 || handle > 0xffffffff) {
+    throw new Error("callback handle must be a positive 32-bit integer");
+  }
+  const callback = function virCallback(...args) {
+    return callback.call(...args);
+  };
+  Object.setPrototypeOf(callback, VirCallback.prototype);
+  Object.defineProperties(callback, {
+    _runtime: { value: runtime },
+    _released: { value: false, writable: true },
+    handle: { value: handle, enumerable: true },
+    type: { value: type, enumerable: true },
+  });
+  runtime.trackCallback(callback);
+  return callback;
+}
+
+function disposeHostBindings(bindings) {
+  if (bindings === null || bindings === undefined) return;
+  const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;
+  if (typeof disposer === "function") {
+    disposer.call(bindings);
   }
 }
 
@@ -509,6 +645,21 @@ function encodeCallPayload(entry, args) {
   return writer.take();
 }
 
+function encodeClosureCallPayload(type, args) {
+  const fnArgs = requireFunctionArgs(type, "callback");
+  if (args.length !== fnArgs.length) {
+    throw new Error(`callback expects ${fnArgs.length} arguments, got ${args.length}`);
+  }
+  const writer = new BinaryWriter();
+  writer.u32(args.length);
+  fnArgs.forEach((arg, index) => {
+    encodeValue(writer, arg.type, args[index], `callback argument ${arg.name}`);
+  });
+  encodeTypeDescriptor(writer, requireFunctionResult(type, "callback"), "callback result");
+  writer.u8(type.effect === "io" ? 1 : 0);
+  return writer.take();
+}
+
 function encodeValue(writer, type, value, label) {
   encodeTypeDescriptor(writer, type, label);
   encodeValuePayload(writer, type, value, label);
@@ -565,6 +716,14 @@ function encodeTypeDescriptor(writer, type, label) {
       });
       return;
     }
+    case 24: {
+      const args = requireFunctionArgs(type, label);
+      writer.u8(type.effect === "io" ? 1 : 0);
+      writer.u32(args.length);
+      args.forEach((arg, index) => encodeTypeDescriptor(writer, arg.type, `${label}.args[${index}]`));
+      encodeTypeDescriptor(writer, requireFunctionResult(type, label), `${label}.result`);
+      return;
+    }
     default:
       return;
   }
@@ -612,6 +771,19 @@ function decodeTypeDescriptor(reader) {
         })),
       };
     }
+    case 24: {
+      const effect = reader.u8() === 0 ? "pure" : "io";
+      const len = reader.u32();
+      return {
+        wireTag: tag,
+        effect,
+        args: Array.from({ length: len }, (_, index) => ({
+          name: `arg${index + 1}`,
+          type: decodeTypeDescriptor(reader),
+        })),
+        result: decodeTypeDescriptor(reader),
+      };
+    }
     default:
       return { wireTag: tag };
   }
@@ -626,6 +798,8 @@ function encodeValuePayload(writer, type, value, label) {
     case 23:
       writer.u32(normalizeResourceHandle(value, label));
       return;
+    case 24:
+      throw new Error(`${label} cannot be a JavaScript function in v1`);
     case 0:
       writer.string(normalizeDecimal(value, label, { signed: false }));
       return;
@@ -714,18 +888,18 @@ function encodeValuePayload(writer, type, value, label) {
   }
 }
 
-function decodeCallResult(type, bytes) {
+function decodeCallResult(type, bytes, runtime = null) {
   const reader = new BinaryReader(bytes);
   const actualType = decodeTypeDescriptor(reader);
   if (!sameWireType(type, actualType)) {
     throw new Error(`result wire type mismatch: expected ${type.type ?? requireWireTag(type, "result")}, got tag ${actualType.wireTag}`);
   }
-  const value = decodeValuePayload(reader, type);
+  const value = decodeValuePayload(reader, type, runtime);
   reader.requireEnd();
   return value;
 }
 
-function decodeHostCallRequest(bytes, entry) {
+function decodeHostCallRequest(bytes, entry, runtime = null) {
   const reader = new BinaryReader(bytes);
   const argc = reader.u32();
   if (argc !== entry.args.length) {
@@ -736,7 +910,7 @@ function decodeHostCallRequest(bytes, entry) {
     if (!sameWireType(arg.type, actualType)) {
       throw new Error(`Vir host import ${entry.target} argument ${arg.name ?? index} type mismatch`);
     }
-    return decodeValuePayload(reader, arg.type);
+    return decodeValuePayload(reader, arg.type, runtime);
   });
   const actualResult = decodeTypeDescriptor(reader);
   if (!sameWireType(entry.result, actualResult)) {
@@ -753,7 +927,7 @@ function encodeHostCallResult(type, value, entry) {
   return writer.take();
 }
 
-function decodeValuePayload(reader, type) {
+function decodeValuePayload(reader, type, runtime = null) {
   const expectedTag = requireWireTag(type, "result");
   let value;
   switch (expectedTag) {
@@ -762,6 +936,12 @@ function decodeValuePayload(reader, type) {
       break;
     case 23:
       value = { handle: reader.u32() };
+      break;
+    case 24:
+      if (runtime === null) {
+        throw new Error("function value decoded without an attached VirRuntime");
+      }
+      value = createVirCallback(runtime, reader.u32(), type);
       break;
     case 0:
     case 1:
@@ -800,28 +980,28 @@ function decodeValuePayload(reader, type) {
     case 16: {
       const len = reader.u32();
       const elementType = requireTypeField(type, "element", "result");
-      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType));
+      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType, runtime));
       break;
     }
     case 17: {
       const len = reader.u32();
       const elementType = requireTypeField(type, "element", "result");
-      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType));
+      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType, runtime));
       break;
     }
     case 18:
-      value = reader.u8() === 0 ? null : decodeValuePayload(reader, requireTypeField(type, "element", "result"));
+      value = reader.u8() === 0 ? null : decodeValuePayload(reader, requireTypeField(type, "element", "result"), runtime);
       break;
     case 19:
       value = {
-        fst: decodeValuePayload(reader, requireTypeField(type, "fst", "result")),
-        snd: decodeValuePayload(reader, requireTypeField(type, "snd", "result")),
+        fst: decodeValuePayload(reader, requireTypeField(type, "fst", "result"), runtime),
+        snd: decodeValuePayload(reader, requireTypeField(type, "snd", "result"), runtime),
       };
       break;
     case 20: {
       value = {};
       for (const field of requireStructureFields(type, "result")) {
-        value[field.name] = decodeValuePayload(reader, field.type);
+        value[field.name] = decodeValuePayload(reader, field.type, runtime);
       }
       value = flattenStructureSubobjects(type, value);
       break;
@@ -831,7 +1011,7 @@ function decodeValuePayload(reader, type) {
       const ctor = taggedUnionConstructorAt(type, index, "result");
       value = {
         kind: ctor.jsName,
-        value: decodeValuePayload(reader, ctor.type),
+        value: decodeValuePayload(reader, ctor.type, runtime),
       };
       break;
     }
@@ -972,6 +1152,14 @@ function sameWireType(expected, actual) {
           sameStructureFieldLayout(ctor.layout, actualCtor?.layout) &&
           sameWireType(ctor.type, actualCtor?.type);
       });
+    }
+    case 24: {
+      const args = requireFunctionArgs(expected, "expected result");
+      if (expected.effect !== actual?.effect || !Array.isArray(actual?.args) || args.length !== actual.args.length) {
+        return false;
+      }
+      return args.every((arg, index) => sameWireType(arg.type, actual.args[index]?.type)) &&
+        sameWireType(requireFunctionResult(expected, "expected result"), actual.result);
     }
     default:
       return true;
@@ -1147,6 +1335,29 @@ function requireTaggedUnionConstructors(type, label) {
     requireStructureFieldLayout(ctor.layout, `${label}.${ctor.jsName}`);
   }
   return type.constructors;
+}
+
+function requireFunctionArgs(type, label) {
+  if (type?.effect !== "pure" && type?.effect !== "io") {
+    throw new Error(`${label} has invalid manifest function effect`);
+  }
+  if (!Array.isArray(type?.args)) {
+    throw new Error(`${label} is missing manifest function args`);
+  }
+  for (const arg of type.args) {
+    if (typeof arg?.name !== "string" || !arg.type || !Number.isInteger(arg.type.wireTag)) {
+      throw new Error(`${label} has an invalid manifest function argument`);
+    }
+  }
+  return type.args;
+}
+
+function requireFunctionResult(type, label) {
+  const result = type?.result;
+  if (!result || !Number.isInteger(result.wireTag)) {
+    throw new Error(`${label} is missing manifest function result`);
+  }
+  return result;
 }
 
 function taggedUnionConstructorAt(type, index, label) {

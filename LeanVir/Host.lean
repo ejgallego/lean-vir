@@ -26,6 +26,7 @@ declaration is packaged into a `.irpkg` and executed through the VIR JavaScript
 runtime.
 -/
 syntax (name := vir_js) "vir_js " str : attr
+syntax (name := vir_resource) "vir_resource " str : attr
 
 namespace Lean.Vir
 
@@ -38,17 +39,31 @@ structure JsImport where
   target : String
   deriving Inhabited
 
+/-- Metadata stored for an opaque Lean type represented as a VIR host resource. -/
+structure Resource where
+  /-- Short JavaScript-facing resource label, such as `"Element"`. -/
+  label : String
+  deriving Inhabited
+
 private partial def firstStringLiteral? (stx : Syntax) : Option String :=
   match stx.isStrLit? with
   | some value => some value
   | none => stx.getArgs.findSome? firstStringLiteral?
 
+private def parseNonEmptyStringAttr (attrName : String) (stx : Syntax) : AttrM String := do
+  let some value := firstStringLiteral? stx
+    | throwError s!"invalid `[{attrName}]` attribute syntax; expected `[{attrName} \"value\"]`"
+  if value.isEmpty then
+    throwError s!"invalid `[{attrName}]` attribute syntax; value must not be empty"
+  return value
+
 private def parseVirJsAttr (stx : Syntax) : AttrM JsImport := do
-  let some target := firstStringLiteral? stx
-    | throwError "invalid `[vir_js]` attribute syntax; expected `[vir_js \"target.name\"]`"
-  if target.isEmpty then
-    throwError "invalid `[vir_js]` attribute syntax; target must not be empty"
+  let target ← parseNonEmptyStringAttr "vir_js" stx
   return { target }
+
+private def parseVirResourceAttr (stx : Syntax) : AttrM Resource := do
+  let label ← parseNonEmptyStringAttr "vir_resource" stx
+  return { label }
 
 end Lean.Vir
 
@@ -67,6 +82,13 @@ initialize virJsAttr : ParametricAttribute Lean.Vir.JsImport ←
       | .error error => throwError error
   }
 
+initialize virResourceAttr : ParametricAttribute Lean.Vir.Resource ←
+  registerParametricAttribute {
+    name := `vir_resource
+    descr := "mark an opaque type as a Lean.Vir host resource"
+    getParam := fun _ stx => Lean.Vir.parseVirResourceAttr stx
+  }
+
 namespace Lean.Vir
 
 /--
@@ -75,5 +97,12 @@ was marked with `@[vir_js]` in `env`.
 -/
 def getJsImport? (env : Environment) (declName : Name) : Option JsImport :=
   _root_.virJsAttr.getParam? env declName
+
+/--
+Returns the host resource metadata for `declName`, if the declaration was
+marked with `@[vir_resource]` in `env`.
+-/
+def getResource? (env : Environment) (declName : Name) : Option Resource :=
+  _root_.virResourceAttr.getParam? env declName
 
 end Lean.Vir

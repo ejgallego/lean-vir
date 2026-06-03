@@ -37,20 +37,35 @@
       "targets": [
         {
           "source": "examples/HostInterop.lean",
-          "roots": ["HostInterop.titleHandshake"]
+          "roots": [
+            "HostInterop.titleHandshake",
+            "HostInterop.callbackRoundTrip",
+            "HostInterop.mountCallbackEvent",
+            "HostInterop.mountAndRemoveCallbackEvent",
+            "HostInterop.mountCallbackText",
+            "HostInterop.mountAndRemoveCallbackText",
+            "HostInterop.timeoutRecord",
+            "HostInterop.timeoutTitle",
+            "HostInterop.delayedTimeoutTitle",
+            "HostInterop.clearTimeoutTitle",
+            "HostInterop.clearTimeoutRecord",
+            "HostInterop.startTimeoutLoop",
+            "HostInterop.animationRecord",
+            "HostInterop.animationTitle",
+            "HostInterop.cancelAnimationTitle",
+            "HostInterop.cancelAnimationRecord",
+            "HostInterop.startAnimationLoop"
+          ]
         },
         {
           "source": "examples/Tamagotchi.lean",
           "roots": [
             "Tamagotchi.uiReset",
             "Tamagotchi.uiResetFromDom",
-            "Tamagotchi.uiResetEvent",
             "Tamagotchi.uiMountFromDom",
             "Tamagotchi.uiRenameFromDom",
-            "Tamagotchi.uiRenameEvent",
             "Tamagotchi.uiStep",
-            "Tamagotchi.uiStepFromDom",
-            "Tamagotchi.uiStepEvent"
+            "Tamagotchi.uiStepFromDom"
           ]
         }
       ],

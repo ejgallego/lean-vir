@@ -134,6 +134,8 @@ Supported v1 types:
   inherited parent fields, represented as JavaScript objects with parent fields
   flattened into ordinary keys;
 - nullary inductive enums;
+- opaque host resources;
+- Lean function values used as host callbacks;
 - `Lean.Expr`.
 
 Large exact integer results are returned as decimal strings.
@@ -143,7 +145,7 @@ one and the compiler did not produce it, package generation fails with an
 explicit wasm32 boundary diagnostic.
 
 Pure functions and `IO α` actions are supported on both exported entrypoints and
-host imports. Host imports are currently synchronous, with at most 16 imported
+host imports. Host imports are currently synchronous, with at most 32 imported
 declarations and IR arity at most 6.
 
 `/dev.html` generates enum select controls and JSON textareas for structural

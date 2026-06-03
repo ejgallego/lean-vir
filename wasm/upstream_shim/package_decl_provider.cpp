@@ -648,6 +648,15 @@ public:
             }
             break;
         }
+        case 24: {
+            boolean(); // effect
+            uint32_t arg_count = u32();
+            for (uint32_t i = 0; i < arg_count; i++) {
+                interface_type();
+            }
+            interface_type();
+            break;
+        }
         case 0:
         case 1:
         case 2:
@@ -658,6 +667,8 @@ public:
         case 7:
         case 8:
         case 9:
+        case 10:
+        case 11:
         case 14:
         case 15:
         case 22:
@@ -776,6 +787,10 @@ static bool load_package(uint8_t const * data, size_t size) {
             host_imports.push_back(r.host_import());
         }
     }
+    if (!r.ok) {
+        g_last_error = r.error();
+        return false;
+    }
     std::string interface_manifest;
     if (version >= 4) {
         interface_manifest = r.string();
@@ -783,10 +798,6 @@ static bool load_package(uint8_t const * data, size_t size) {
             g_last_error = "IR package is missing an embedded interface manifest";
             return false;
         }
-    }
-    if (!r.ok) {
-        g_last_error = r.error();
-        return false;
     }
     if (!r.at_end()) {
         g_last_error = "trailing bytes after IR package at byte " + std::to_string(r.pos());

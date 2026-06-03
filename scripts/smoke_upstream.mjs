@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 
 import { createVirImports, VirRuntime } from "../web/src/vir-runtime.js";
-import { createVirRuntime } from "../web/src/vir-runtime-node.js";
+import { createVirRuntime, createVirtualDocumentState } from "../web/src/vir-runtime-node.js";
 
 const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const fixtureManifest = JSON.parse(await readFile(new URL("../fixtures/manifest.json", import.meta.url), "utf8"));
@@ -179,24 +179,22 @@ if (genericByteArrayScore !== "136") {
   throw new Error(`generic ByteArray input: expected 136, got ${genericByteArrayScore}`);
 }
 
-const hostRuntime = await createVirRuntime({ wasmBytes: wasm, irPackageBytes: hostPackage });
-if (hostRuntime.packageInfo.hostImports !== 12) {
-  throw new Error(`expected 12 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+const hostDocumentState = createVirtualDocumentState();
+const hostRuntime = await createVirRuntime({
+  wasmBytes: wasm,
+  irPackageBytes: hostPackage,
+  virtualDocumentState: hostDocumentState,
+});
+if (hostRuntime.packageInfo.hostImports !== 19) {
+  throw new Error(`expected 19 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
 }
 const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
 if (hostTitle !== "Lean VIR host: smoke") {
   throw new Error(`Lean to JavaScript host title: expected Lean VIR host: smoke, got ${hostTitle}`);
 }
-const petBindings = hostRuntime.call("Tamagotchi.uiMountFromDom");
-if (
-  petBindings.length !== 8 ||
-  petBindings[0]?.selector !== "[data-action='feed']" ||
-  petBindings[0]?.entry !== "Tamagotchi.uiStepEvent" ||
-  petBindings[0]?.argument !== "feed" ||
-  petBindings[7]?.selector !== "#pet-name-input" ||
-  petBindings[7]?.entry !== "Tamagotchi.uiRenameEvent"
-) {
-  throw new Error(`Lean Tamagotchi mount bindings failed: ${JSON.stringify(petBindings)}`);
+const petMountCount = hostRuntime.call("Tamagotchi.uiMountFromDom");
+if (petMountCount !== "8" || hostRuntime.liveCallbacks.size !== 8) {
+  throw new Error(`Lean Tamagotchi mount callbacks failed: ${petMountCount}`);
 }
 const petReset = hostRuntime.call("Tamagotchi.uiReset", "Mochi", "pet");
 const petStep = hostRuntime.call("Tamagotchi.uiStep", petReset, "ignore");
@@ -212,17 +210,19 @@ if (
 const petDomReset = hostRuntime.call("Tamagotchi.uiResetFromDom");
 const petDomRename = hostRuntime.call("Tamagotchi.uiRenameFromDom");
 const petDomStep = hostRuntime.call("Tamagotchi.uiStepFromDom", "ignore");
-const petDomEventStep = hostRuntime.call("Tamagotchi.uiStepEvent", { handle: 1 }, "ignore");
+hostDocumentState.elements.get("[data-action='ignore']").listeners.get("click")?.[0]?.dispatch({});
+const petEventMood = hostDocumentState.elements.get("#pet-device").attributes.get("data-mood");
+const petEventTrace = hostDocumentState.elements.get("#pet-device").attributes.get("data-trace");
 if (
   petDomReset.name !== "Mochi" ||
   petDomRename.name !== "Mochi" ||
   petDomReset.mood !== "happy" ||
   petDomStep.mood !== "hungry" ||
   petDomStep.trace.join(" -> ") !== "happy -> hungry" ||
-  petDomEventStep.mood !== "angry" ||
-  petDomEventStep.trace.join(" -> ") !== "happy -> hungry -> angry"
+  petEventMood !== "angry" ||
+  petEventTrace !== "happy,hungry,angry"
 ) {
-  throw new Error(`Lean Tamagotchi DOM-driven step failed: ${JSON.stringify({ petDomReset, petDomRename, petDomStep, petDomEventStep })}`);
+  throw new Error(`Lean Tamagotchi DOM-driven step failed: ${JSON.stringify({ petDomReset, petDomRename, petDomStep, petEventMood, petEventTrace })}`);
 }
 
 function packageForFixture(fixture) {

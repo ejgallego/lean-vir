@@ -18,6 +18,7 @@ construct or persist assumptions about the handle representation.
 
 Reference: [MDN `Element`](https://developer.mozilla.org/en-US/docs/Web/API/Element).
 -/
+@[vir_resource "Element"]
 opaque Element : Type
 
 /--
@@ -29,6 +30,7 @@ callback.
 
 Reference: [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event).
 -/
+@[vir_resource "Event"]
 opaque Event : Type
 
 /--
@@ -39,6 +41,7 @@ registered listener later with `Element.removeEventListener`.
 
 Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
 -/
+@[vir_resource "EventListener"]
 opaque EventListener : Type
 
 /--
@@ -49,7 +52,26 @@ writing input-specific DOM properties.
 
 Reference: [MDN `HTMLInputElement`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement).
 -/
+@[vir_resource "HTMLInputElement"]
 opaque HTMLInputElement : Type
+
+/--
+Opaque browser timeout handle returned by `setTimeout`.
+
+The JavaScript host owns the timer registration and the retained Lean callback
+until the timer fires, is cleared, or the runtime is disposed.
+-/
+@[vir_resource "Timeout"]
+opaque Timeout : Type
+
+/--
+Opaque browser animation-frame handle returned by `requestAnimationFrame`.
+
+The JavaScript host owns the frame registration and the retained Lean callback
+until the frame fires, is cancelled, or the runtime is disposed.
+-/
+@[vir_resource "AnimationFrame"]
+opaque AnimationFrame : Type
 
 namespace Console
 
@@ -152,19 +174,17 @@ Reference: [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs
 opaque setAttribute (element : @& Element) (name value : @& String) : IO Unit
 
 /--
-Registers a browser event listener that calls an exported Lean entrypoint.
+Registers a browser event listener backed by a Lean callback closure.
 
-This v1 API does not marshal Lean function values. Instead, the JavaScript host
-binding registers a DOM listener and, when the browser event fires, calls the
-export named by `entry`. The exported Lean entrypoint receives the opaque
-`Event` resource as its first argument. When `argument` is `some value`, the
-host passes `value` as the second argument.
+The host retains the callback until `Element.removeEventListener` is called or
+the owning runtime is disposed. The callback receives an opaque event resource
+that is valid only during that event dispatch.
 
 Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
 -/
 @[vir_js "browser.element.addEventListener"]
 opaque addEventListener
-    (element : @& Element) (event entry : @& String) (argument : Option String) :
+    (element : @& Element) (event : @& String) (callback : Event → IO Unit) :
     IO EventListener
 
 /--
@@ -236,5 +256,51 @@ Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/do
 opaque setValue (input : @& HTMLInputElement) (value : @& String) : IO Unit
 
 end HTMLInputElement
+
+namespace Timer
+
+/--
+Runs `callback` once after `delayMs` milliseconds.
+
+The host releases the retained callback after it fires or when the timeout is
+cleared.
+
+Reference: [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout).
+-/
+@[vir_js "browser.timer.setTimeout"]
+opaque setTimeout (delayMs : UInt32) (callback : IO Unit) : IO Timeout
+
+/--
+Cancels a pending timeout and releases its retained callback.
+
+Reference: [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout).
+-/
+@[vir_js "browser.timer.clearTimeout"]
+opaque clearTimeout (timeout : @& Timeout) : IO Unit
+
+end Timer
+
+namespace Animation
+
+/--
+Runs `callback` at the next animation frame.
+
+The callback receives the browser frame timestamp. The host releases the
+retained callback after it fires or when the frame is cancelled.
+
+Reference: [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame).
+-/
+@[vir_js "browser.animation.requestAnimationFrame"]
+opaque requestAnimationFrame (callback : Float → IO Unit) : IO AnimationFrame
+
+/--
+Cancels a pending animation frame and releases its retained callback.
+
+Reference: [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame).
+-/
+@[vir_js "browser.animation.cancelAnimationFrame"]
+opaque cancelAnimationFrame (frame : @& AnimationFrame) : IO Unit
+
+end Animation
 
 end Lean.Vir.Browser

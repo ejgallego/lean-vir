@@ -1772,6 +1772,7 @@ enum class vir_wire_type : uint8_t {
     Structure = 20,
     TaggedUnion = 21,
     Resource = 23,
+    Function = 24,
     SimpleEnum = 14,
     Expr = 15,
 };
@@ -1800,6 +1801,7 @@ struct vir_type {
     uint32_t usize_fields = 0;
     uint32_t scalar_bytes = 0;
     uint32_t trivial_field = UINT32_MAX;
+    bool is_io = false;
 };
 
 struct vir_arg {
@@ -1978,6 +1980,7 @@ static object * decode_level(vir_reader & r);
 static object * decode_expr(vir_reader & r);
 static void encode_level(vir_writer & w, object * value);
 static void encode_expr_payload(vir_writer & w, object * value);
+extern "C" uint32_t vir_closure_root(object * value);
 
 static bool is_known_wire_type(vir_wire_type tag) {
     switch (tag) {
@@ -2002,6 +2005,7 @@ static bool is_known_wire_type(vir_wire_type tag) {
     case vir_wire_type::TaggedUnion:
     case vir_wire_type::SimpleEnum:
     case vir_wire_type::Resource:
+    case vir_wire_type::Function:
     case vir_wire_type::Expr:
         return true;
     default:
@@ -2092,6 +2096,16 @@ static vir_type decode_type(vir_reader & r) {
         }
         break;
     }
+    case vir_wire_type::Function: {
+        type.is_io = r.u8() != 0;
+        uint32_t arg_count = r.u32();
+        type.args.reserve(arg_count + 1);
+        for (uint32_t i = 0; i < arg_count; i++) {
+            type.args.push_back(decode_type(r));
+        }
+        type.args.push_back(decode_type(r));
+        break;
+    }
     default:
         break;
     }
@@ -2129,6 +2143,16 @@ static void encode_type(vir_writer & w, vir_type const & type) {
             w.u32(type.variant_scalar_bytes[i]);
             encode_field_layout(w, type.field_layouts[i]);
             encode_type(w, type.args[i]);
+        }
+        break;
+    case vir_wire_type::Function:
+        w.u8(type.is_io ? 1 : 0);
+        w.u32(type.args.empty() ? 0 : static_cast<uint32_t>(type.args.size() - 1));
+        for (size_t i = 0; i + 1 < type.args.size(); i++) {
+            encode_type(w, type.args[i]);
+        }
+        if (!type.args.empty()) {
+            encode_type(w, type.args.back());
         }
         break;
     default:
@@ -2419,6 +2443,9 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
         return lean_box_uint32(r.u32());
     case vir_wire_type::Resource:
         return lean_box_uint32(r.u32());
+    case vir_wire_type::Function:
+        r.fail("JavaScript-provided function values are not supported yet");
+        return lean_box(0);
     case vir_wire_type::UInt64: {
         uint64_t value = 0;
         if (!parse_u64(r.string(), value)) {
@@ -2852,6 +2879,9 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
     case vir_wire_type::Resource:
         w.u32(lean_unbox_uint32(value));
         break;
+    case vir_wire_type::Function:
+        w.u32(vir_closure_root(value));
+        break;
     case vir_wire_type::UInt64:
         w.string(std::to_string(lean_unbox_uint64(value)));
         break;
@@ -2953,6 +2983,9 @@ static bool call_result_is_owned(vir_type const & type, bool has_boxed_decl) {
 
 static bool same_wire_type(vir_type const & lhs, vir_type const & rhs) {
     if (lhs.tag != rhs.tag || lhs.args.size() != rhs.args.size()) {
+        return false;
+    }
+    if (lhs.tag == vir_wire_type::Function && lhs.is_io != rhs.is_io) {
         return false;
     }
     for (size_t i = 0; i < lhs.args.size(); i++) {
@@ -3090,6 +3123,22 @@ VIR_JS_TRAMPOLINES_FOR_SLOT(12)
 VIR_JS_TRAMPOLINES_FOR_SLOT(13)
 VIR_JS_TRAMPOLINES_FOR_SLOT(14)
 VIR_JS_TRAMPOLINES_FOR_SLOT(15)
+VIR_JS_TRAMPOLINES_FOR_SLOT(16)
+VIR_JS_TRAMPOLINES_FOR_SLOT(17)
+VIR_JS_TRAMPOLINES_FOR_SLOT(18)
+VIR_JS_TRAMPOLINES_FOR_SLOT(19)
+VIR_JS_TRAMPOLINES_FOR_SLOT(20)
+VIR_JS_TRAMPOLINES_FOR_SLOT(21)
+VIR_JS_TRAMPOLINES_FOR_SLOT(22)
+VIR_JS_TRAMPOLINES_FOR_SLOT(23)
+VIR_JS_TRAMPOLINES_FOR_SLOT(24)
+VIR_JS_TRAMPOLINES_FOR_SLOT(25)
+VIR_JS_TRAMPOLINES_FOR_SLOT(26)
+VIR_JS_TRAMPOLINES_FOR_SLOT(27)
+VIR_JS_TRAMPOLINES_FOR_SLOT(28)
+VIR_JS_TRAMPOLINES_FOR_SLOT(29)
+VIR_JS_TRAMPOLINES_FOR_SLOT(30)
+VIR_JS_TRAMPOLINES_FOR_SLOT(31)
 
 #undef VIR_JS_TRAMPOLINES_FOR_SLOT
 
@@ -3124,6 +3173,22 @@ static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
     VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(13)
     VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(14)
     VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(15)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(16)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(17)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(18)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(19)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(20)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(21)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(22)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(23)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(24)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(25)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(26)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(27)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(28)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(29)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(30)
+    VIR_JS_TRAMPOLINE_CASES_FOR_SLOT(31)
     return nullptr;
 }
 
@@ -3132,6 +3197,131 @@ static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
 
 static std::string g_call_result;
 static std::string g_call_error;
+static std::vector<object *> g_closure_roots;
+static std::vector<uint32_t> g_free_closure_handles;
+static std::string g_closure_call_result;
+static std::string g_closure_call_error;
+
+static object * closure_root_for_handle(uint32_t handle) {
+    if (handle == 0 || handle > g_closure_roots.size()) {
+        return nullptr;
+    }
+    return g_closure_roots[handle - 1];
+}
+
+extern "C" uint32_t vir_closure_root(object * value) {
+    if (value == nullptr) {
+        return 0;
+    }
+    lean_inc(value);
+    if (!g_free_closure_handles.empty()) {
+        uint32_t handle = g_free_closure_handles.back();
+        g_free_closure_handles.pop_back();
+        g_closure_roots[handle - 1] = value;
+        return handle;
+    }
+    g_closure_roots.push_back(value);
+    return static_cast<uint32_t>(g_closure_roots.size());
+}
+
+extern "C" uint32_t vir_closure_release(uint32_t handle) {
+    object * value = closure_root_for_handle(handle);
+    if (value == nullptr) {
+        return 0;
+    }
+    g_closure_roots[handle - 1] = nullptr;
+    g_free_closure_handles.push_back(handle);
+    lean_dec(value);
+    return 1;
+}
+
+static void cleanup_closure_call_args(std::vector<object *> const & args) {
+    for (object * arg : args) {
+        lean_dec(arg);
+    }
+}
+
+static uint8_t decode_closure_call_effect(vir_reader & reader) {
+    uint8_t effect = 0;
+    if (reader.ok && !reader.at_end()) {
+        effect = reader.u8();
+        if (effect > 1) {
+            reader.fail("unsupported closure call effect tag " + std::to_string(effect));
+        }
+    }
+    return effect;
+}
+
+extern "C" char const * vir_closure_call(uint32_t handle, uint8_t const * request, uint32_t request_len) {
+    g_closure_call_result.clear();
+    g_closure_call_error.clear();
+    if (request == nullptr && request_len != 0) {
+        g_closure_call_error = "closure call payload pointer is null";
+        return nullptr;
+    }
+    object * fn = closure_root_for_handle(handle);
+    if (fn == nullptr) {
+        g_closure_call_error = "closure handle is not live";
+        return nullptr;
+    }
+
+    vir_reader reader(request, request_len);
+    uint32_t argc = reader.u32();
+    std::vector<object *> args;
+    args.reserve(argc + 1);
+    for (uint32_t i = 0; i < argc; i++) {
+        vir_type arg_type = decode_type(reader);
+        if (!reader.ok) {
+            cleanup_closure_call_args(args);
+            g_closure_call_error = reader.error();
+            return nullptr;
+        }
+        args.push_back(decode_value(reader, arg_type));
+    }
+    vir_type result_type = decode_type(reader);
+    uint8_t effect = decode_closure_call_effect(reader);
+    if (!reader.ok) {
+        cleanup_closure_call_args(args);
+        g_closure_call_error = reader.error();
+        return nullptr;
+    }
+    if (!reader.at_end()) {
+        cleanup_closure_call_args(args);
+        g_closure_call_error = "trailing bytes after closure call payload";
+        return nullptr;
+    }
+
+    lean_inc(fn);
+    if (effect == 1) {
+        args.push_back(lean_io_mk_world());
+    }
+    object * result = apply_n(fn, static_cast<unsigned>(args.size()), args.data());
+    if (effect == 1) {
+        if (!lean_io_result_is_ok(result)) {
+            lean_dec(result);
+            g_closure_call_error = "IO callback failed";
+            return nullptr;
+        }
+        result = lean_io_result_take_value(result);
+    }
+    vir_writer writer;
+    encode_result(writer, result_type, result, true);
+    lean_dec(result);
+    g_closure_call_result = writer.take();
+    return g_closure_call_result.data();
+}
+
+extern "C" uint32_t vir_closure_call_result_size(void) {
+    return static_cast<uint32_t>(g_closure_call_result.size());
+}
+
+extern "C" char const * vir_closure_call_error(void) {
+    return g_closure_call_error.c_str();
+}
+
+extern "C" uint32_t vir_closure_call_error_size(void) {
+    return static_cast<uint32_t>(g_closure_call_error.size());
+}
 
 static char const * known_symbol_stem(name const & n) {
     if (char const * symbol = vir::find_host_import_symbol(n.raw())) {
