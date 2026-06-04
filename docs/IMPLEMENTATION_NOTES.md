@@ -52,6 +52,13 @@ same host-resource teardown before the new manifest is installed. Event
 resources remain opaque callback-scoped handles; the ownership contract and
 follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
 
+The next browser-facing direction is React rendering for ProofWidgets-style
+Lean UIs. The first proposed slice is a standalone React root plus a narrow
+blessed recursive `Html` codec that reuses the existing resource and callback
+lifetime model before attempting full Lean infoview RPC compatibility. The
+design notes and open questions are tracked in
+`docs/REACT_PROOFWIDGETS_ROADMAP.md`.
+
 `Lean.Expr` is also part of the current manifest surface. JavaScript sends and
 receives structural objects for the standard expression constructors, and the
 WASM shim constructs real Lean `Expr` and `Level` runtime objects with computed
