@@ -76,6 +76,17 @@
             "Tamagotchi.uiStep",
             "Tamagotchi.uiStepFromDom"
           ]
+        },
+        {
+          "source": "examples/ReactCounter.lean",
+          "roots": [
+            "ReactCounter.mount",
+            "ReactCounter.mountDefault",
+            "ReactCounter.renderStatic",
+            "ReactCounter.mountAndUnmount",
+            "ReactCounter.renderAfterUnmount",
+            "ReactCounter.renderTooDeep"
+          ]
         }
       ],
       "fixtureSources": []

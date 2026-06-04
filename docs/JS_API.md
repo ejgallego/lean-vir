@@ -90,8 +90,9 @@ shapes over supported types, non-indexed user-defined structures including
 parameterized instances, nullary inductive enums, non-indexed custom inductives
 with nullary or runtime-payload constructors, opaque host resources, and
 `Lean.Expr`. Host imports may additionally receive Lean function values as
-callbacks. Exported Lean entrypoints and host imports may be pure or `IO α`;
-`IO` failures currently surface as call failures.
+callbacks, including inside the recursive `Lean.Vir.React.Html` custom
+inductive tree. Exported Lean entrypoints and host imports may be pure or
+`IO α`; `IO` failures currently surface as call failures.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
@@ -195,9 +196,12 @@ The first library surface is:
 - `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Browser.Timeout -> IO Unit`
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> IO Unit) -> IO Lean.Vir.Browser.AnimationFrame`
 - `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Browser.AnimationFrame -> IO Unit`
+- `Lean.Vir.React.Root.create : @& Lean.Vir.Browser.Element -> IO Lean.Vir.React.Root`
+- `Lean.Vir.React.Root.render : @& Lean.Vir.React.Root -> @& Lean.Vir.React.Html -> IO Unit`
+- `Lean.Vir.React.Root.unmount : @& Lean.Vir.React.Root -> IO Unit`
 
-The built-in `common.*` and `browser.*` targets do not require a `hostBindings`
-option:
+The built-in `common.*`, `browser.*`, and `react.root.*` targets do not require
+a `hostBindings` option:
 
 ```js
 const vir = await createVirRuntime({
@@ -213,14 +217,15 @@ console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 `Element` calls use DOM element properties/methods, event listeners call
 retained Lean closures with an opaque `Event` resource, timers map to
 `setTimeout`, animation frames map to
-`requestAnimationFrame`, and `HTMLInputElement` calls first narrow an element
-before reading or writing `checked` and `value`.
+`requestAnimationFrame`, `HTMLInputElement` calls first narrow an element
+before reading or writing `checked` and `value`, and React roots map to
+`ReactDOMClient.createRoot` plus `root.render`/`root.unmount`.
 The browser runtime requires `globalThis.document` for `browser.document.*`
 targets. In Node, use `lean-vir/vir-runtime-node` or pass explicit
 `hostBindings`; the Node wrapper provides virtual document and element state for
-these built-in browser targets. No extra `createVirRuntime` option is needed for
-the built-in `common.*` or `browser.*` imports. See MDN for the underlying
-browser APIs:
+these built-in browser and React targets. No extra `createVirRuntime` option is
+needed for the built-in `common.*`, `browser.*`, or `react.root.*` imports. See
+MDN and the React reference for the underlying APIs:
 
 - [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
 - [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
@@ -237,6 +242,8 @@ browser APIs:
 - [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout)
 - [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)
 - [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame)
+- [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot)
+- [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount)
 
 Custom imports can be declared directly:
 
@@ -251,7 +258,7 @@ def bumpFromJs (n : Nat) : Nat :=
 ```
 
 Bind custom targets when constructing the runtime. User bindings override the
-default `common.*` and `browser.*` bindings:
+default `common.*`, `browser.*`, and `react.root.*` bindings:
 
 ```js
 const vir = await createVirRuntime({
@@ -300,7 +307,8 @@ values flow from Lean to JavaScript as callback handles.
 `vir.dispose()` tears down the runtime-side host state:
 
 - built-in browser bindings remove live event listeners, clear pending timers,
-  cancel pending animation frames, and release retained callbacks;
+  cancel pending animation frames, unmount live React roots, and release
+  retained callbacks;
 - custom host binding maps can expose `[VIR_HOST_DISPOSE]()` or `dispose()` for
   their own cleanup;
 - any `VirCallback` objects still tracked by the runtime are released;
@@ -309,8 +317,8 @@ values flow from Lean to JavaScript as callback handles.
 
 Calling `vir.loadIrPackageBytes(...)` on a runtime that already has a package
 loaded performs the same package-resource cleanup before installing the new
-manifest. This keeps old listeners, timers, animation frames, and callback roots
-from surviving package reload.
+manifest. This keeps old listeners, timers, animation frames, React roots, and
+callback roots from surviving package reload.
 
 See `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed callback ownership
 contract and follow-up work.
