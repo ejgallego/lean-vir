@@ -268,6 +268,9 @@ async function runFixture(fixture) {
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const fixtureFilter = process.env.VIR_FIXTURE_FILTER?.trim() ?? "";
+const skipBuild =
+  process.env.VIR_FIXTURE_SKIP_BUILD === "1" ||
+  process.argv.includes("--no-build");
 function fixtureMatchesFilter(fixture, filter) {
   if (filter === "") return true;
   const needle = filter.toLowerCase();
@@ -284,7 +287,16 @@ if (fixtures.length === 0) {
   throw new Error(`no fixtures matched VIR_FIXTURE_FILTER=${JSON.stringify(fixtureFilter)}`);
 }
 await mkdir(buildDir, { recursive: true });
-requireOk(await run("npm", ["run", "--silent", "build:demo"]), "npm run build:demo");
+if (skipBuild) {
+  try {
+    await readFile(wasmPath);
+  } catch {
+    throw new Error("VIR fixture no-build mode requires web/public/vir-upstream.wasm; run npm run build:demo first");
+  }
+  console.log("fixture build: skipped (--no-build)");
+} else {
+  requireOk(await run("npm", ["run", "--silent", "build:demo"]), "npm run build:demo");
+}
 
 function fixtureJobCount(total) {
   const configured = Number.parseInt(process.env.VIR_FIXTURE_JOBS ?? "", 10);

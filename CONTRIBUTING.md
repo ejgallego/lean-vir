@@ -83,9 +83,11 @@ Common checks:
 
 ```bash
 npm run build:demo
+npm run doctor
 npm run test:upstream
 npm run test:runtime
 VIR_FIXTURE_FILTER=fib12 npm run test:fixtures
+VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 npm run test:site
 CHROMIUM=/path/to/chromium npm run test:pages:browser
 npm test

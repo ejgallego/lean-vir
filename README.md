@@ -166,6 +166,7 @@ When durable release assets exist, the same fetcher can use
 
 ```bash
 npm run setup
+npm run doctor
 npm run test:site
 npm run test:pages:browser
 npm test

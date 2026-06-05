@@ -28,6 +28,30 @@ const contentTypes = new Map([
   [".wasm", "application/wasm"],
 ]);
 
+async function assertDistReady() {
+  const required = [
+    "index.html",
+    "dev.html",
+    "format.html",
+    "runtime-example.html",
+    "vir-upstream.wasm",
+    "fixtures-basic.irpkg",
+  ];
+  const missing = [];
+  for (const path of required) {
+    try {
+      await access(resolve(distRoot, path), fsConstants.R_OK);
+    } catch {
+      missing.push(path);
+    }
+  }
+  if (missing.length !== 0) {
+    throw new Error(
+      `web/dist is missing browser smoke artifacts (${missing.join(", ")}); run npm run build:site first`,
+    );
+  }
+}
+
 async function distAssetPath(prefix) {
   const files = await readdir(resolve(distRoot, "assets"));
   const file = files.find((candidate) => candidate.startsWith(prefix) && candidate.endsWith(".js"));
@@ -935,6 +959,7 @@ async function runnerCaseFromManifest(packageFile, entryName, expected) {
   };
 }
 
+await assertDistReady();
 await prepareNegativePackages();
 
 const server = await serveDist();
@@ -1147,6 +1172,7 @@ try {
   if (details) {
     console.error(details);
   }
+  console.error("browser smoke failed; if web/dist was not built from the current checkout, run npm run build:site first");
   throw error;
 } finally {
   await chromium.close();

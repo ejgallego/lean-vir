@@ -28,6 +28,7 @@ asks for that machinery.
 
 - `npm install`
 - `npm run setup`
+- `npm run doctor`
 - `npm run fetch:lean`
 - `npm run install:wasi`
 - `npm run build:demo`
@@ -36,6 +37,7 @@ asks for that machinery.
 - `npm test`
 - `npm run test:upstream`
 - `VIR_FIXTURE_FILTER=fib12 npm run test:fixtures`
+- `VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build`
 - `CHROMIUM=/path/to/chromium npm run test:pages:browser`
 - `npm run dev -- --port 5173`
 

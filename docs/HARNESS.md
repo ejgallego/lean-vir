@@ -24,6 +24,7 @@ Then prepare the local Lean source checkout, WASI SDK, and demo WASM:
 
 ```bash
 npm run setup
+npm run doctor
 ```
 
 `npm run setup` expands to:
@@ -33,6 +34,10 @@ npm run fetch:lean
 npm run install:wasi
 npm run build:demo
 ```
+
+`npm run doctor` checks the local command and artifact state after setup. It
+fails for missing required pieces and warns when Chromium is not available for
+browser smoke tests.
 
 The Lean toolchain is pinned by `lean-toolchain`. The upstream source fetcher
 pins the matching Lean source checkout under `third_party/lean4-src/`.
@@ -89,6 +94,7 @@ Tests:
 npm run test:upstream
 npm run test:runtime
 npm run test:fixtures
+npm run test:fixtures:no-build
 npm run test:site
 npm run test:pages:browser
 npm test
@@ -109,6 +115,9 @@ tests, and fixture suite. It is the default pre-merge signal for code changes.
   `npm run test:fixtures`
 - A single fixture or fixture family:
   `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures`
+- A single fixture after `npm run build:demo` has already refreshed the WASM
+  and browser packages:
+  `VIR_FIXTURE_FILTER=<substring> npm run test:fixtures:no-build`
 - Site bundle, SDK archive, or local archive shape:
   `npm run test:site`
 - Browser interaction, DOM, React, timers, animation callbacks, or page runner
@@ -124,7 +133,11 @@ case-insensitive substring. For example:
 ```bash
 VIR_FIXTURE_FILTER=string npm run test:fixtures
 VIR_FIXTURE_FILTER=fib12 npm run test:fixtures
+VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 ```
+
+`test:fixtures:no-build` is a local iteration shortcut. It requires
+`web/public/vir-upstream.wasm` from a previous `npm run build:demo`.
 
 ## Browser Smoke
 
