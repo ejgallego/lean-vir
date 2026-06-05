@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
-import { access } from "node:fs/promises";
+import { access, readFile } from "node:fs/promises";
 import { delimiter, resolve } from "node:path";
 
 const checks = [];
@@ -29,6 +29,18 @@ function commandVersion(command, args = ["--version"]) {
   return { ok: true, detail: (result.stdout || result.stderr).trim().split(/\r?\n/)[0] };
 }
 
+function commandOutput(command, args) {
+  const result = spawnSync(command, args, {
+    encoding: "utf8",
+    stdio: ["ignore", "pipe", "pipe"],
+  });
+  if (result.status !== 0) {
+    const detail = (result.stderr || result.stdout || "").trim();
+    return { ok: false, detail: detail || `${command} exited with status ${result.status}` };
+  }
+  return { ok: true, detail: result.stdout.trim() };
+}
+
 async function exists(path, mode = fsConstants.R_OK) {
   try {
     await access(path, mode);
@@ -48,6 +60,37 @@ async function checkPath(name, path, help, mode = fsConstants.R_OK) {
     record("ok", name, path);
   } else {
     record("fail", name, `${path} missing; ${help}`);
+  }
+}
+
+async function expectedLeanSourceCommit() {
+  const source = await readFile("scripts/fetch-lean-source.sh", "utf8");
+  const match = source.match(/\bgit\s+-C\s+third_party\/lean4-src\s+checkout\s+([0-9a-f]{40})\b/);
+  if (!match) {
+    return null;
+  }
+  return match[1];
+}
+
+async function checkLeanSourceCommit() {
+  const expected = await expectedLeanSourceCommit();
+  if (!expected) {
+    record("warn", "Lean source commit", "could not find pinned checkout commit in scripts/fetch-lean-source.sh");
+    return;
+  }
+  const actual = commandOutput("git", ["-C", "third_party/lean4-src", "rev-parse", "HEAD"]);
+  if (!actual.ok) {
+    record("fail", "Lean source commit", actual.detail);
+    return;
+  }
+  if (actual.detail === expected) {
+    record("ok", "Lean source commit", actual.detail);
+  } else {
+    record(
+      "fail",
+      "Lean source commit",
+      `${actual.detail}; expected ${expected}; run npm run fetch:lean`,
+    );
   }
 }
 
@@ -98,6 +141,9 @@ await checkPath(
   "third_party/lean4-src/src/library/ir_interpreter.cpp",
   "run npm run fetch:lean",
 );
+if (await exists("third_party/lean4-src/.git")) {
+  await checkLeanSourceCommit();
+}
 
 const wasiPath = process.env.WASI_SDK_PATH ?? ".tools/wasi-sdk";
 await checkPath(

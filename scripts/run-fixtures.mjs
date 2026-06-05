@@ -17,6 +17,35 @@ const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
 const summaryPath = new URL("summary.json", buildDir);
 const sourceCache = new Map();
 let cachedWasmBytes = null;
+const args = process.argv.slice(2);
+
+function usage() {
+  console.log(`Usage: node scripts/run-fixtures.mjs [--no-build]
+
+Run Lean fixture host-oracle checks against the WASI upstream interpreter.
+
+Options:
+  --no-build       Reuse web/public/vir-upstream.wasm and generated browser packages.
+  -h, --help       Show this help.
+
+Environment:
+  VIR_FIXTURE_FILTER      Case-insensitive substring matched against fixture id,
+                          source path, entry name, and roots.
+  VIR_FIXTURE_JOBS        Positive integer worker limit.
+  VIR_FIXTURE_SKIP_BUILD  Set to 1 for the same behavior as --no-build.
+`);
+}
+
+if (args.includes("-h") || args.includes("--help")) {
+  usage();
+  process.exit(0);
+}
+
+for (const arg of args) {
+  if (arg !== "--no-build") {
+    throw new Error(`unknown argument: ${arg}; run node scripts/run-fixtures.mjs --help`);
+  }
+}
 
 function run(cmd, args, options = {}) {
   return new Promise((resolve) => {
@@ -270,7 +299,7 @@ const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 const fixtureFilter = process.env.VIR_FIXTURE_FILTER?.trim() ?? "";
 const skipBuild =
   process.env.VIR_FIXTURE_SKIP_BUILD === "1" ||
-  process.argv.includes("--no-build");
+  args.includes("--no-build");
 function fixtureMatchesFilter(fixture, filter) {
   if (filter === "") return true;
   const needle = filter.toLowerCase();

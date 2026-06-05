@@ -1,7 +1,8 @@
 # Harness
 
 This document is for maintaining Lean VIR. The user-facing quickstart stays in
-the top-level `README.md`.
+the top-level `README.md`. A narrower map of script entry points lives in
+`scripts/README.md`.
 
 The repository-local harness has three jobs:
 
@@ -86,6 +87,7 @@ npm run generate:irpkg -- examples/Fib.lean web/public/local-fib.irpkg
 npm run prepare:irpkg -- examples/quickstart.virpkg.json
 npm run inspect:irpkg -- web/public/local-quickstart.irpkg
 npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
+node scripts/run-fixtures.mjs --help
 ```
 
 Tests:
