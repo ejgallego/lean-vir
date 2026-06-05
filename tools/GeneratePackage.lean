@@ -23,7 +23,7 @@ inductive StructureFieldLayout where
   | scalar (size offset : Nat)
   deriving BEq, Repr
 
-abbrev StructureSeen := Array (Name × String)
+abbrev RecursiveSeen := Array (Name × String)
 
 inductive InterfaceEffect where
   | pure
@@ -91,6 +91,9 @@ inductive InterfaceType where
   | simpleEnum (name : Name) (constructors : Array Name)
   | taggedUnion (name : Name) (label : String)
       (constructors : Array (Name × String × InterfaceType × StructureFieldLayout × Nat × Nat × Nat))
+  | recursiveSelf (name : Name) (label : String)
+  | customInductive (name : Name) (label : String)
+      (constructors : Array (Name × String × Nat × Nat × Nat × Array (String × InterfaceType × StructureFieldLayout)))
   | structure (name : Name) (label : String) (trivialField? : Option Nat)
       (objectFields usizeFields scalarBytes : Nat)
       (fields : Array (String × InterfaceType × StructureFieldLayout × Bool))
@@ -1619,6 +1622,8 @@ def InterfaceType.label : InterfaceType → String
   | .prod fst snd => s!"{fst.label} × {snd.label}"
   | .simpleEnum name _ => name.toString
   | .taggedUnion _ label _ => label
+  | .recursiveSelf _ label => label
+  | .customInductive _ label _ => label
   | .structure _ label .. => label
   | .resource _ label => label
   | .function .. => "Function"
@@ -1644,6 +1649,8 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .prod .. => 19
   | .simpleEnum .. => 14
   | .taggedUnion .. => 21
+  | .customInductive .. => 25
+  | .recursiveSelf .. => 26
   | .structure .. => 20
   | .resource .. => 23
   | .function .. => 24
@@ -1762,6 +1769,37 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       ++ "\"type\":" ++ jsonString ty.label ++ ","
       ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
       ++ "\"kind\":\"taggedUnion\","
+      ++ "\"name\":" ++ jsonString name.toString ++ ","
+      ++ "\"constructors\":" ++ jsonArray ctorJson
+      ++ "}"
+  | .recursiveSelf name _ =>
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"recursiveSelf\","
+      ++ "\"name\":" ++ jsonString name.toString
+      ++ "}"
+  | .customInductive name _ constructors =>
+      let ctorJson := constructors.mapIdx fun idx (ctorName, jsName, objectFields, usizeFields, scalarBytes, fields) =>
+        let fieldJson := fields.map fun (fieldName, fieldType, fieldLayout) =>
+          "{"
+          ++ "\"name\":" ++ jsonString fieldName ++ ","
+          ++ "\"type\":" ++ fieldType.toJson ++ ","
+          ++ "\"layout\":" ++ fieldLayout.toJson
+          ++ "}"
+        "{"
+        ++ "\"name\":" ++ jsonString ctorName.toString ++ ","
+        ++ "\"jsName\":" ++ jsonString jsName ++ ","
+        ++ "\"tag\":" ++ toString idx ++ ","
+        ++ "\"objectFieldCount\":" ++ toString objectFields ++ ","
+        ++ "\"usizeFieldCount\":" ++ toString usizeFields ++ ","
+        ++ "\"scalarByteSize\":" ++ toString scalarBytes ++ ","
+        ++ "\"fields\":" ++ jsonArray fieldJson
+        ++ "}"
+      "{"
+      ++ "\"type\":" ++ jsonString ty.label ++ ","
+      ++ "\"wireTag\":" ++ toString ty.wireTag ++ ","
+      ++ "\"kind\":\"customInductive\","
       ++ "\"name\":" ++ jsonString name.toString ++ ","
       ++ "\"constructors\":" ++ jsonArray ctorJson
       ++ "}"
@@ -1913,8 +1951,16 @@ def structureFieldLayout? : Lean.Compiler.LCNF.CtorFieldInfo → Option Structur
   | .scalar size offset _ => some (.scalar size offset)
   | .erased | .void => none
 
-def structureSeenContains (seen : StructureSeen) (name : Name) (key : String) : Bool :=
+def recursiveSeenContains (seen : RecursiveSeen) (name : Name) (key : String) : Bool :=
   seen.any fun (seenName, seenKey) => seenName == name && seenKey == key
+
+def recursiveSeenContainsName (seen : RecursiveSeen) (name : Name) : Bool :=
+  seen.any fun (seenName, _) => seenName == name
+
+def recursiveSeenLastMatches (seen : RecursiveSeen) (name : Name) (key : String) : Bool :=
+  match seen[seen.size - 1]? with
+  | some (seenName, seenKey) => seenName == name && seenKey == key
+  | none => false
 
 def binderArgName (fallback : Nat) (name : Name) : String :=
   let candidate := name.toString
@@ -1950,7 +1996,7 @@ partial def functionType (type : Lean.Expr) (argIndex : Nat := 1) (args : Array 
       | .error reason => return .error s!"unsupported callback result type `{result}`: {reason}"
       | .ok resultType => return .ok (.function args resultType effect)
 
-partial def taggedUnionType (seenStructures : StructureSeen) (name : Name) (label : String)
+partial def taggedUnionType (seenTypes : RecursiveSeen) (name : Name) (label : String)
     (constructors : Array (Name × String × Lean.Expr)) : CoreM (Except String InterfaceType) := do
   let mut variants := #[]
   for (ctorName, jsName, fieldExpr) in constructors do
@@ -1963,7 +2009,7 @@ partial def taggedUnionType (seenStructures : StructureSeen) (name : Name) (labe
       return .error s!"constructor `{ctorName}` must have exactly one runtime field"
     let some fieldLayout := structureFieldLayout? layout.fieldInfo[0]!
       | return .error s!"constructor `{ctorName}` has erased or void runtime layout"
-    match ← interfaceType fieldExpr seenStructures with
+    match ← interfaceType fieldExpr seenTypes with
     | .ok fieldType =>
         variants := variants.push (
           ctorName,
@@ -1977,30 +2023,107 @@ partial def taggedUnionType (seenStructures : StructureSeen) (name : Name) (labe
         return .error s!"constructor `{ctorName}` has unsupported payload type `{fieldExpr}`: {reason}"
   return .ok (.taggedUnion name label variants)
 
-partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
+partial def constructorFieldTypes? (type : Lean.Expr) (startIndex : Nat := 1) : Option (Array (String × Lean.Expr)) :=
+  let rec go (idx : Nat) (type : Lean.Expr) (fields : Array (String × Lean.Expr)) : Option (Array (String × Lean.Expr)) :=
+    match stripMData type with
+    | .forallE name domain body binderInfo =>
+        if binderInfo != .default then
+          none
+        else
+          go (idx + 1) body (fields.push (binderArgName idx name, domain))
+    | _ => some fields
+  go startIndex type #[]
+
+partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
   let e := stripMData e
   let (name, args) := e.getAppFnArgs
   if name.isAnonymous then
     return .error s!"unsupported type `{e}`"
   let seenKey := toString e
-  if structureSeenContains seenStructures name seenKey then
-    return .error s!"recursive structure `{name}` is not supported"
+  let env ← getEnv
+  let some (.inductInfo indInfo) := env.find? name
+    | return .error s!"unsupported type `{e}`"
+  if recursiveSeenContains seenTypes name seenKey then
+    if recursiveSeenLastMatches seenTypes name seenKey then
+      return .ok (.recursiveSelf name (exprTypeLabel e))
+    else
+      return .error s!"mutually recursive inductive `{name}` is not supported"
+  else if indInfo.isRec && recursiveSeenContainsName seenTypes name then
+    return .error s!"non-uniform recursive inductive `{name}` is not supported"
   else
-    let env ← getEnv
-    let some (.inductInfo indInfo) := env.find? name
-      | return .error s!"unsupported type `{e}`"
-    let some structInfo := getStructureInfo? env name
-      | return .error s!"unsupported type `{e}`"
+    if indInfo.numIndices != 0 then
+      return .error s!"indexed inductive `{name}` is not supported"
+    else if args.size != indInfo.numParams then
+      return .error s!"inductive `{name}` expects {indInfo.numParams} parameter(s), got {args.size}"
+    else if indInfo.ctors.isEmpty then
+      return .error s!"inductive `{name}` has no constructors"
+    else
+      let nextSeen := seenTypes.push (name, seenKey)
+      let mut constructors := #[]
+      for ctorName in indInfo.ctors do
+        let some (.ctorInfo ctorInfo) := env.find? ctorName
+          | return .error s!"constructor `{ctorName}` has no declaration"
+        if ctorInfo.induct != name then
+          return .error s!"constructor `{ctorName}` does not belong to `{name}`"
+        let some instantiated := instantiateForallPrefix? ctorInfo.type args
+          | return .error s!"constructor `{ctorName}` has invalid type `{ctorInfo.type}`"
+        let some fieldExprs := constructorFieldTypes? instantiated
+          | return .error s!"constructor `{ctorName}` has unsupported implicit/instance fields"
+        let layout ←
+          try
+            Lean.Compiler.LCNF.getCtorLayout ctorName
+          catch _ =>
+            return .error s!"could not compute runtime layout for constructor `{ctorName}`"
+        if layout.fieldInfo.size != fieldExprs.size then
+          return .error s!"runtime layout for constructor `{ctorName}` does not match its field count"
+        let mut fields := #[]
+        for h : idx in *...fieldExprs.size do
+          let (fieldName, fieldExpr) := fieldExprs[idx]
+          let some fieldLayout := structureFieldLayout? layout.fieldInfo[idx]!
+            | return .error s!"field `{fieldName}` of constructor `{ctorName}` has erased or void runtime layout"
+          match ← interfaceType fieldExpr nextSeen with
+          | .ok fieldType =>
+              fields := fields.push (fieldName, fieldType, fieldLayout)
+          | .error reason =>
+              return .error s!"field `{fieldName}` of constructor `{ctorName}` has unsupported type `{fieldExpr}`: {reason}"
+        constructors := constructors.push (
+          ctorName,
+          ctorShortName name ctorName,
+          layout.ctorInfo.size,
+          layout.ctorInfo.usize,
+          layout.ctorInfo.ssize,
+          fields)
+      return .ok (.customInductive name (exprTypeLabel e) constructors)
+
+partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
+  let e := stripMData e
+  let (name, args) := e.getAppFnArgs
+  if name.isAnonymous then
+    return .error s!"unsupported type `{e}`"
+  let seenKey := toString e
+  let env ← getEnv
+  let some (.inductInfo indInfo) := env.find? name
+    | return .error s!"unsupported type `{e}`"
+  let some structInfo := getStructureInfo? env name
+    | return .error s!"unsupported type `{e}`"
+  if recursiveSeenContains seenTypes name seenKey then
+    if recursiveSeenLastMatches seenTypes name seenKey then
+      return .ok (.recursiveSelf name (exprTypeLabel e))
+    else
+      return .error s!"mutually recursive structure `{name}` is not supported"
+  else if indInfo.isRec && recursiveSeenContainsName seenTypes name then
+    return .error s!"non-uniform recursive structure `{name}` is not supported"
+  else
     if indInfo.numIndices != 0 then
       return .error s!"indexed structure `{name}` is not supported"
     else if args.size != indInfo.numParams then
       return .error s!"structure `{name}` expects {indInfo.numParams} parameter(s), got {args.size}"
-    else if indInfo.isRec then
-      return .error s!"recursive structure `{name}` is not supported"
     else if indInfo.ctors.length != 1 then
       return .error s!"structure `{name}` must have exactly one constructor"
     else if structInfo.fieldNames.isEmpty then
       return .error s!"empty structure `{name}` is not supported"
+    else if indInfo.isRec && structInfo.fieldNames.any (fun fieldName => (isSubobjectField? env name fieldName).isSome) then
+      return .error s!"recursive inherited structure `{name}` is not supported"
     else
       let ctorName := indInfo.ctors.head!
       let layout ←
@@ -2012,7 +2135,7 @@ partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : Cor
         (← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx)
       if layout.fieldInfo.size != structInfo.fieldNames.size then
         return .error s!"runtime layout for structure `{name}` does not match its field count"
-      let nextSeen := seenStructures.push (name, seenKey)
+      let nextSeen := seenTypes.push (name, seenKey)
       let mut fields := #[]
       for h : idx in *...structInfo.fieldNames.size do
         let fieldName := structInfo.fieldNames[idx]
@@ -2032,7 +2155,7 @@ partial def structureType (seenStructures : StructureSeen) (e : Lean.Expr) : Cor
             return .error s!"field `{fieldName}` of structure `{name}` has unsupported type `{fieldExpr}`: {reason}"
       return .ok (.structure name (exprTypeLabel e) trivialField? layout.ctorInfo.size layout.ctorInfo.usize layout.ctorInfo.ssize fields)
 
-partial def interfaceType (e : Lean.Expr) (seenStructures : StructureSeen := #[]) : CoreM (Except String InterfaceType) := do
+partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : CoreM (Except String InterfaceType) := do
   let e := stripMData e
   match e with
   | .forallE .. => functionType e
@@ -2047,38 +2170,42 @@ partial def interfaceType (e : Lean.Expr) (seenStructures : StructureSeen := #[]
             let (fn, args) := e.getAppFnArgs
             match fn, Array.toList args with
             | `Array, [arg] =>
-                match ← interfaceType arg seenStructures with
+                match ← interfaceType arg seenTypes with
                 | .ok ty => return .ok (.array ty)
                 | .error reason => return .error s!"unsupported Array element type: {reason}"
             | `List, [arg] =>
-                match ← interfaceType arg seenStructures with
+                match ← interfaceType arg seenTypes with
                 | .ok ty => return .ok (.list ty)
                 | .error reason => return .error s!"unsupported List element type: {reason}"
             | `Option, [arg] =>
-                match ← interfaceType arg seenStructures with
+                match ← interfaceType arg seenTypes with
                 | .ok ty => return .ok (.option ty)
                 | .error reason => return .error s!"unsupported Option element type: {reason}"
             | `Prod, [lhs, rhs] =>
-                match ← interfaceType lhs seenStructures with
+                match ← interfaceType lhs seenTypes with
                 | .error reason => return .error s!"unsupported Prod fst type: {reason}"
                 | .ok lhsTy =>
-                    match ← interfaceType rhs seenStructures with
+                    match ← interfaceType rhs seenTypes with
                     | .error reason => return .error s!"unsupported Prod snd type: {reason}"
                     | .ok rhsTy => return .ok (.prod lhsTy rhsTy)
             | `Sum, [lhs, rhs] =>
-                taggedUnionType seenStructures `Sum (exprTypeLabel e) #[
+                taggedUnionType seenTypes `Sum (exprTypeLabel e) #[
                   (`Sum.inl, "inl", lhs),
                   (`Sum.inr, "inr", rhs)
                 ]
             | `Except, [err, ok] =>
-                taggedUnionType seenStructures `Except (exprTypeLabel e) #[
+                taggedUnionType seenTypes `Except (exprTypeLabel e) #[
                   (`Except.error, "error", err),
                   (`Except.ok, "ok", ok)
                 ]
             | _, _ =>
                 match simpleEnumType? env e with
                 | some ty => return .ok ty
-                | none => structureType seenStructures e
+                | none =>
+                    if (getStructureInfo? env fn).isSome then
+                      structureType seenTypes e
+                    else
+                      inductiveType seenTypes e
 
 end
 
@@ -2575,6 +2702,33 @@ partial def emitInterfaceType (type : InterfaceType) : EmitM Unit := do
             emitU32 size
             emitU32 offset
         emitInterfaceType fieldType
+  | .recursiveSelf .. =>
+      pure ()
+  | .customInductive _ _ constructors =>
+      emitU32 constructors.size
+      constructors.forM fun (_, _, objectFields, usizeFields, scalarBytes, fields) => do
+        emitU32 objectFields
+        emitU32 usizeFields
+        emitU32 scalarBytes
+        emitU32 fields.size
+        fields.forM fun (_, fieldType, layout) => do
+          match layout with
+          | .object index =>
+              emitU8 0
+              emitU32 index
+              emitU32 0
+              emitU32 0
+          | .usize index =>
+              emitU8 1
+              emitU32 index
+              emitU32 0
+              emitU32 0
+          | .scalar size offset =>
+              emitU8 2
+              emitU32 0
+              emitU32 size
+              emitU32 offset
+          emitInterfaceType fieldType
   | .structure _ _ trivialField? objectFields usizeFields scalarBytes fields =>
       emitU32 objectFields
       emitU32 usizeFields

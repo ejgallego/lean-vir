@@ -16,8 +16,8 @@ missing-boundary diagnostics for CI and boundary debugging.
 
 The runtime smoke also generates temporary packages with intentionally
 unsupported interface exports and asserts that package generation fails loudly.
-Those negative cases cover function fields, recursive structures, indexed
-inductive families, and implicit arguments.
+Those negative cases cover recursive inherited structures, indexed inductive
+families, mutual recursion, erased proof fields, and implicit arguments.
 
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather
@@ -67,6 +67,9 @@ The current fixture surface covers:
 - `Lean.Expr` package closure and structural JS/WASM marshaling for constants,
   applications, literals, binders, levels, variables, projections, metadata
   results, and bound-variable inputs/results;
+- direct recursive custom structures, such as linked chains, and direct
+  recursive custom inductives such as trees and lambda terms;
+- mixed nullary/payload custom inductives, such as JSON-like trees;
 - manifest-backed recursive interface calls including `Array String`,
   `List UInt32`, `Option Nat`, `Option String`, `Nat × Nat`,
   `Option (Array Nat)`, `List (Nat × String)`, `Sum Nat Nat`,

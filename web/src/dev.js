@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import "./style.css";
 import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "./interface-manifest.js";
 import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
+import { JSON_INPUT_WIRE_TAGS, WIRE } from "./wire-tags.js";
 import browserPackages from "../../fixtures/browser-packages.json";
 
 const statusEl = document.querySelector("#status");
@@ -151,54 +152,58 @@ function parseBoolText(text) {
   return false;
 }
 
-function defaultValueForType(type) {
+function defaultValueForType(type, selfType = null, depth = 0) {
   switch (type?.wireTag) {
-    case 0:
-    case 1:
-    case 4:
-    case 5:
-    case 6:
-    case 7:
-    case 8:
-    case 10:
-    case 11:
+    case WIRE.RECURSIVE_SELF:
+      return selfType && depth < 2 ? defaultValueForType(selfType, selfType, depth + 1) : null;
+    case WIRE.NAT:
+    case WIRE.INT:
+    case WIRE.UINT8:
+    case WIRE.UINT16:
+    case WIRE.UINT32:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
       return 0;
-    case 2:
+    case WIRE.BOOL:
       return false;
-    case 3:
+    case WIRE.STRING:
       return "";
-    case 9:
+    case WIRE.BYTE_ARRAY:
       return [];
-    case 15:
+    case WIRE.EXPR:
       return { kind: "const", name: "Nat", levels: [] };
-    case 16:
-    case 17:
+    case WIRE.ARRAY:
+    case WIRE.LIST:
       return [];
-    case 18:
+    case WIRE.OPTION:
       return null;
-    case 19:
+    case WIRE.PROD:
       return {
-        fst: defaultValueForType(type?.fst),
-        snd: defaultValueForType(type?.snd),
+        fst: defaultValueForType(type?.fst, selfType, depth),
+        snd: defaultValueForType(type?.snd, selfType, depth),
       };
-    case 20:
-      return defaultStructureValue(type);
-    case 21:
+    case WIRE.STRUCTURE:
+      return defaultStructureValue(type, depth);
+    case WIRE.TAGGED_UNION:
       return defaultTaggedUnionValue(type);
-    case 14:
+    case WIRE.CUSTOM_INDUCTIVE:
+      return defaultCustomInductiveValue(type, depth);
+    case WIRE.SIMPLE_ENUM:
       return type?.constructors?.[0]?.jsName ?? "";
     default:
       return "";
   }
 }
 
-function defaultStructureValue(type) {
+function defaultStructureValue(type, depth = 0) {
   const value = {};
   for (const field of type?.fields ?? []) {
     if (field.subobject === true) {
-      Object.assign(value, defaultValueForType(field.type));
+      Object.assign(value, defaultValueForType(field.type, type, depth + 1));
     } else {
-      value[field.name] = defaultValueForType(field.type);
+      value[field.name] = defaultValueForType(field.type, type, depth + 1);
     }
   }
   return value;
@@ -213,8 +218,28 @@ function defaultTaggedUnionValue(type) {
   };
 }
 
+function defaultCustomInductiveValue(type, depth = 0) {
+  const ctor = type?.constructors?.[0];
+  if (!ctor) return { kind: "", value: null };
+  const kind = ctor.jsName ?? ctor.name;
+  if ((ctor.fields ?? []).length === 0) {
+    return { kind };
+  }
+  if ((ctor.fields ?? []).length === 1) {
+    return {
+      kind,
+      value: defaultValueForType(ctor.fields[0].type, type, depth + 1),
+    };
+  }
+  const fields = {};
+  for (const field of ctor.fields ?? []) {
+    fields[field.name] = defaultValueForType(field.type, type, depth + 1);
+  }
+  return { kind, fields };
+}
+
 function isJsonInputTag(tag) {
-  return tag === 15 || tag === 16 || tag === 17 || tag === 18 || tag === 19 || tag === 20 || tag === 21;
+  return JSON_INPUT_WIRE_TAGS.has(tag);
 }
 
 function inputFieldId(input, index) {
@@ -238,12 +263,12 @@ function renderInputFields(entry) {
     const caption = document.createElement("span");
     caption.textContent = `${input.name ?? `input${index + 1}`} : ${formatInterfaceType(input.type)}`;
     const field =
-      input.type?.wireTag === 14 ? document.createElement("select") :
+      input.type?.wireTag === WIRE.SIMPLE_ENUM ? document.createElement("select") :
       isJsonInputTag(input.type?.wireTag) ? document.createElement("textarea") :
       document.createElement("input");
     field.id = inputFieldId(input, index);
     field.dataset.inputIndex = String(index);
-    if (input.type?.wireTag === 14) {
+    if (input.type?.wireTag === WIRE.SIMPLE_ENUM) {
       for (const ctor of input.type?.constructors ?? []) {
         const option = document.createElement("option");
         option.value = ctor.jsName ?? ctor.name;
@@ -251,16 +276,19 @@ function renderInputFields(entry) {
         field.append(option);
       }
       field.value = inputDefault(input);
-    } else if (input.type?.wireTag === 0 || input.type?.wireTag === 4 || input.type?.wireTag === 5 || input.type?.wireTag === 6) {
+    } else if (input.type?.wireTag === WIRE.NAT ||
+        input.type?.wireTag === WIRE.UINT8 ||
+        input.type?.wireTag === WIRE.UINT16 ||
+        input.type?.wireTag === WIRE.UINT32) {
       field.type = "number";
       field.inputMode = "numeric";
       field.min = "0";
-    } else if (input.type?.wireTag === 10 || input.type?.wireTag === 11) {
+    } else if (input.type?.wireTag === WIRE.FLOAT || input.type?.wireTag === WIRE.FLOAT32) {
       field.type = "text";
       field.inputMode = "decimal";
     } else if (isJsonInputTag(input.type?.wireTag)) {
       field.spellcheck = false;
-    } else if (input.type?.wireTag === 2) {
+    } else if (input.type?.wireTag === WIRE.BOOL) {
       label.classList.add("dev-checkbox-field");
       field.type = "checkbox";
       field.checked = parseBoolText(inputOverride(entry, input, index) ?? inputDefault(input));
@@ -268,7 +296,7 @@ function renderInputFields(entry) {
       field.type = "text";
       field.inputMode = "text";
     }
-    if (input.type?.wireTag !== 14 && input.type?.wireTag !== 2) {
+    if (input.type?.wireTag !== WIRE.SIMPLE_ENUM && input.type?.wireTag !== WIRE.BOOL) {
       field.value = inputOverride(entry, input, index) ?? inputDefault(input);
     }
     label.append(caption, field);
@@ -401,39 +429,40 @@ function parseFloatInput(text) {
 function parseInputValue(input, field) {
   const text = field?.value ?? inputDefault(input);
   switch (input.type?.wireTag) {
-    case 0:
-    case 7:
-    case 8:
+    case WIRE.NAT:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
       return parseNatInput(text);
-    case 1:
+    case WIRE.INT:
       return parseIntInput(text);
-    case 2:
+    case WIRE.BOOL:
       if (field?.type === "checkbox") return Boolean(field.checked);
       if (String(text).trim() === "true") return true;
       if (String(text).trim() === "false") return false;
       throw new Error(`invalid Bool literal: ${text}`);
-    case 3:
+    case WIRE.STRING:
       return text;
-    case 4:
-    case 5:
-    case 6: {
+    case WIRE.UINT8:
+    case WIRE.UINT16:
+    case WIRE.UINT32: {
       const value = Number(parseNatInput(text));
       return value;
     }
-    case 9:
+    case WIRE.BYTE_ARRAY:
       return parseByteArrayInput(text);
-    case 10:
-    case 11:
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
       return parseFloatInput(text);
-    case 14:
+    case WIRE.SIMPLE_ENUM:
       return text.trim();
-    case 15:
-    case 16:
-    case 17:
-    case 18:
-    case 19:
-    case 20:
-    case 21:
+    case WIRE.EXPR:
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+    case WIRE.PROD:
+    case WIRE.STRUCTURE:
+    case WIRE.TAGGED_UNION:
+    case WIRE.CUSTOM_INDUCTIVE:
       return JSON.parse(text);
     default:
       throw new Error(`unsupported input type: ${input.type?.type ?? "?"}`);
@@ -494,7 +523,7 @@ function evaluateEntry(runtime, entry) {
   const values = inputs.map((input, index) => {
     const field = inputFields.querySelector(`[data-input-index='${index}']`);
     const value = parseInputValue(input, field);
-    if (field && input.type?.wireTag === 9) {
+    if (field && input.type?.wireTag === WIRE.BYTE_ARRAY) {
       field.value = value.join(", ");
     }
     return value;

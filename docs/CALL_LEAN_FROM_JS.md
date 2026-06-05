@@ -142,10 +142,87 @@ vir.call("MyApp.validateName", "Lean");
 // { kind: "ok", value: "Hello, Lean" }
 ```
 
-Payload-carrying sum types currently use Lean's built-in `Sum` and `Except`
-interface support. Custom nullary inductives are supported as enums. General
-custom inductives with payloads are not part of the stable user-facing interface
-yet.
+Payload-carrying sum types can use Lean's built-in `Sum` and `Except`
+interface support. Custom nullary inductives are supported as enums, and
+non-indexed custom inductives can cross the boundary using `{ kind }` for
+nullary constructors, `{ kind, value }` for single-field constructors, or
+`{ kind, fields }` for multi-field constructors.
+
+For example, a recursive tree can use one-field leaves and multi-field branch
+nodes:
+
+```lean
+inductive Tree (α : Type) where
+  | leaf (value : α)
+  | branch (left : Tree α) (right : Tree α)
+
+def treeRootScore (tree : Tree Nat) : Nat := ...
+```
+
+```js
+vir.call("MyApp.treeRootScore", {
+  kind: "branch",
+  fields: {
+    left: { kind: "leaf", value: 4 },
+    right: { kind: "leaf", value: 5 },
+  },
+});
+```
+
+A lambda-calculus AST follows the same convention:
+
+```lean
+inductive Term where
+  | var (name : String)
+  | app (fn : Term) (arg : Term)
+  | lam (binder : String) (body : Term)
+```
+
+```js
+vir.call("MyApp.termSize", {
+  kind: "app",
+  fields: {
+    fn: { kind: "lam", fields: { binder: "x", body: { kind: "var", value: "x" } } },
+    arg: { kind: "var", value: "y" },
+  },
+});
+```
+
+Mixed nullary and payload constructors follow the same rule:
+
+```lean
+inductive Json where
+  | null
+  | bool (value : Bool)
+  | array (items : List Json)
+```
+
+```js
+vir.call("MyApp.jsonScore", { kind: "null" });
+vir.call("MyApp.jsonScore", { kind: "bool", value: true });
+vir.call("MyApp.jsonScore", {
+  kind: "array",
+  value: [{ kind: "null" }, { kind: "bool", value: false }],
+});
+```
+
+Direct recursive structures are also supported when every field has a
+manifest-supported runtime type:
+
+```lean
+structure Chain where
+  label : String
+  next : Option Chain
+
+def chainRootScore (chain : Chain) : Nat := ...
+```
+
+```js
+vir.call("MyApp.chainRootScore", {
+  label: "root",
+  next: { label: "leaf", next: null },
+});
+```
 
 ## 4. Serve The Artifacts In Your App
 
@@ -185,6 +262,8 @@ Common Lean values map to JavaScript values like this:
 - `Sum` and `Except` use `{ kind, value }` tagged objects.
 - Structures use JavaScript objects keyed by Lean field name.
 - Nullary inductive enums use generated constructor names.
+- Custom inductive constructors use `{ kind }`, `{ kind, value }`, or
+  `{ kind, fields }` depending on field count.
 - `ByteArray` inputs accept byte arrays or byte-like JavaScript arrays; results
   are `Uint8Array`.
 

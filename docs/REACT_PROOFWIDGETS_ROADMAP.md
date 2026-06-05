@@ -44,12 +44,13 @@ The merged closure bridge gives us the hard part for interactive React views:
 - Opaque host resources already cover DOM elements and can be extended to React
   roots or rendered node handles.
 
-The main mismatch is structural: the current interface generator rejects
-general recursive Lean structures and recursive inductive data. A natural
-ProofWidgets-like `Html` tree is recursive, but there is no semantic reason
-that this particular tree cannot cross the boundary. The v0 plan should add a
-narrow, blessed codec for one known `Html` shape instead of teaching the whole
-manifest system arbitrary recursive types.
+The main remaining mismatch is structural: direct recursive structures and
+simple non-indexed recursive inductives with nullary or runtime-payload
+constructors can now cross the boundary, but mutual recursion, non-uniform
+recursion, and inherited recursive structures remain outside the general
+manifest surface. A natural ProofWidgets-like `Html` tree is recursive and may
+fit that surface, but the v0 React plan should still keep callback ownership
+and renderer-specific cleanup inside a narrow audited ABI.
 
 ## Recommended V0
 

@@ -14,6 +14,7 @@ import fixtureExprPrinterSource from "../../fixtures/ExprPrinter.lean?raw";
 import fixtureFormatPrettySource from "../../fixtures/FormatPretty.lean?raw";
 import fixtureInterfaceShapesSource from "../../fixtures/InterfaceShapes.lean?raw";
 import fixtureListOptionSource from "../../fixtures/ListOption.lean?raw";
+import fixtureRecursiveTypesSource from "../../fixtures/RecursiveTypes.lean?raw";
 import fixtureBoundarySource from "../../fixtures/Boundary.lean?raw";
 import fixtureLeanParserSource from "../../fixtures/LeanParser.lean?raw";
 import fixtureLeanParserHeaderSource from "../../fixtures/LeanParserHeader.lean?raw";
@@ -71,6 +72,7 @@ const sourceFiles = [
   { path: "fixtures/FormatPretty.lean", source: fixtureFormatPrettySource },
   { path: "fixtures/InterfaceShapes.lean", source: fixtureInterfaceShapesSource },
   { path: "fixtures/ListOption.lean", source: fixtureListOptionSource },
+  { path: "fixtures/RecursiveTypes.lean", source: fixtureRecursiveTypesSource },
   { path: "fixtures/Boundary.lean", source: fixtureBoundarySource },
   { path: "fixtures/LeanParser.lean", source: fixtureLeanParserSource },
   { path: "fixtures/LeanParserHeader.lean", source: fixtureLeanParserHeaderSource },

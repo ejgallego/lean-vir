@@ -89,8 +89,10 @@ should fail during package generation until their interface type is implemented.
 The current generic interface covers `Unit`, primitive scalars, byte arrays,
 recursive `Array`/`List`/`Option`/`Prod`/`Sum`/`Except` shapes, non-indexed
 user-defined structures including parameterized instances, direct scalar
-wrappers, inherited parent fields, nullary inductive enums, and structural
-`Lean.Expr` values. For enums, no per-demo code is needed: the generator records
+wrappers, inherited parent fields, nullary inductive enums, non-indexed custom
+inductives with nullary or runtime-payload constructors, and structural
+`Lean.Expr` values. For
+enums, no per-demo code is needed: the generator records
 the constructor list in the package manifest and `/dev.html` renders a select
 control from that manifest after the package is loaded. For `Sum` and `Except`,
 the manifest records constructor payload layouts and `/dev.html` renders JSON

@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { validateInterfaceManifest } from "./interface-manifest.js";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
+import { WIRE } from "./wire-tags.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
@@ -682,20 +683,18 @@ function encodeTypeDescriptor(writer, type, label) {
   const tag = requireWireTag(type, label);
   writer.u8(tag);
   switch (tag) {
-    case 16:
-    case 17:
-    case 18:
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
       encodeTypeDescriptor(writer, requireTypeField(type, "element", label), `${label}.element`);
       return;
-    case 19:
+    case WIRE.PROD:
       encodeTypeDescriptor(writer, requireTypeField(type, "fst", label), `${label}.fst`);
       encodeTypeDescriptor(writer, requireTypeField(type, "snd", label), `${label}.snd`);
       return;
-    case 20: {
+    case WIRE.STRUCTURE: {
       const fields = requireStructureFields(type, label);
-      writer.u32(requireStructureCount(type, "objectFieldCount", label));
-      writer.u32(requireStructureCount(type, "usizeFieldCount", label));
-      writer.u32(requireStructureCount(type, "scalarByteSize", label));
+      encodeRuntimeCounts(writer, type, label);
       writer.u32(requireStructureTrivialFieldIndex(type, label));
       writer.u32(fields.length);
       fields.forEach((field) => {
@@ -704,19 +703,32 @@ function encodeTypeDescriptor(writer, type, label) {
       });
       return;
     }
-    case 21: {
+    case WIRE.TAGGED_UNION: {
       const constructors = requireTaggedUnionConstructors(type, label);
       writer.u32(constructors.length);
       constructors.forEach((ctor) => {
-        writer.u32(requireStructureCount(ctor, "objectFieldCount", `${label}.${ctor.jsName}`));
-        writer.u32(requireStructureCount(ctor, "usizeFieldCount", `${label}.${ctor.jsName}`));
-        writer.u32(requireStructureCount(ctor, "scalarByteSize", `${label}.${ctor.jsName}`));
+        encodeRuntimeCounts(writer, ctor, `${label}.${ctor.jsName}`);
         encodeStructureFieldLayout(writer, ctor.layout, `${label}.${ctor.jsName}`);
         encodeTypeDescriptor(writer, ctor.type, `${label}.${ctor.jsName}`);
       });
       return;
     }
-    case 24: {
+    case WIRE.CUSTOM_INDUCTIVE: {
+      const constructors = requireCustomInductiveConstructors(type, label);
+      writer.u32(constructors.length);
+      constructors.forEach((ctor) => {
+        encodeRuntimeCounts(writer, ctor, `${label}.${ctor.jsName}`);
+        writer.u32(ctor.fields.length);
+        ctor.fields.forEach((field) => {
+          encodeStructureFieldLayout(writer, field.layout, `${label}.${ctor.jsName}.${field.name}`);
+          encodeTypeDescriptor(writer, field.type, `${label}.${ctor.jsName}.${field.name}`);
+        });
+      });
+      return;
+    }
+    case WIRE.RECURSIVE_SELF:
+      return;
+    case WIRE.FUNCTION: {
       const args = requireFunctionArgs(type, label);
       writer.u8(type.effect === "io" ? 1 : 0);
       writer.u32(args.length);
@@ -732,25 +744,21 @@ function encodeTypeDescriptor(writer, type, label) {
 function decodeTypeDescriptor(reader) {
   const tag = reader.u8();
   switch (tag) {
-    case 16:
+    case WIRE.ARRAY:
       return { wireTag: tag, element: decodeTypeDescriptor(reader) };
-    case 17:
+    case WIRE.LIST:
       return { wireTag: tag, element: decodeTypeDescriptor(reader) };
-    case 18:
+    case WIRE.OPTION:
       return { wireTag: tag, element: decodeTypeDescriptor(reader) };
-    case 19:
+    case WIRE.PROD:
       return { wireTag: tag, fst: decodeTypeDescriptor(reader), snd: decodeTypeDescriptor(reader) };
-    case 20: {
-      const objectFieldCount = reader.u32();
-      const usizeFieldCount = reader.u32();
-      const scalarByteSize = reader.u32();
+    case WIRE.STRUCTURE: {
+      const counts = decodeRuntimeCounts(reader);
       const trivialFieldIndex = decodeStructureTrivialFieldIndex(reader.u32());
       const len = reader.u32();
       return {
         wireTag: tag,
-        objectFieldCount,
-        usizeFieldCount,
-        scalarByteSize,
+        ...counts,
         ...(trivialFieldIndex === null ? {} : { trivialFieldIndex }),
         fields: Array.from({ length: len }, () => ({
           layout: decodeStructureFieldLayout(reader),
@@ -758,20 +766,37 @@ function decodeTypeDescriptor(reader) {
         })),
       };
     }
-    case 21: {
+    case WIRE.TAGGED_UNION: {
       const len = reader.u32();
       return {
         wireTag: tag,
         constructors: Array.from({ length: len }, () => ({
-          objectFieldCount: reader.u32(),
-          usizeFieldCount: reader.u32(),
-          scalarByteSize: reader.u32(),
+          ...decodeRuntimeCounts(reader),
           layout: decodeStructureFieldLayout(reader),
           type: decodeTypeDescriptor(reader),
         })),
       };
     }
-    case 24: {
+    case WIRE.CUSTOM_INDUCTIVE: {
+      const len = reader.u32();
+      return {
+        wireTag: tag,
+        constructors: Array.from({ length: len }, () => {
+          const counts = decodeRuntimeCounts(reader);
+          const fieldLen = reader.u32();
+          return {
+            ...counts,
+            fields: Array.from({ length: fieldLen }, () => ({
+              layout: decodeStructureFieldLayout(reader),
+              type: decodeTypeDescriptor(reader),
+            })),
+          };
+        }),
+      };
+    }
+    case WIRE.RECURSIVE_SELF:
+      return { wireTag: tag };
+    case WIRE.FUNCTION: {
       const effect = reader.u8() === 0 ? "pure" : "io";
       const len = reader.u32();
       return {
@@ -789,98 +814,112 @@ function decodeTypeDescriptor(reader) {
   }
 }
 
-function encodeValuePayload(writer, type, value, label) {
+function encodeValuePayload(writer, type, value, label, selfType = null) {
   const tag = requireWireTag(type, label);
   switch (tag) {
-    case 22:
+    case WIRE.RECURSIVE_SELF:
+      if (selfType === null) {
+        throw new Error(`${label} has a recursive self reference without an enclosing type`);
+      }
+      encodeValuePayload(writer, selfType, value, label, selfType);
+      return;
+    case WIRE.UNIT:
       if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
       return;
-    case 23:
+    case WIRE.RESOURCE:
       writer.u32(normalizeResourceHandle(value, label));
       return;
-    case 24:
+    case WIRE.FUNCTION:
       throw new Error(`${label} cannot be a JavaScript function in v1`);
-    case 0:
+    case WIRE.NAT:
       writer.string(normalizeDecimal(value, label, { signed: false }));
       return;
-    case 1:
+    case WIRE.INT:
       writer.string(normalizeDecimal(value, label, { signed: true }));
       return;
-    case 2:
+    case WIRE.BOOL:
       if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
       writer.u8(value ? 1 : 0);
       return;
-    case 3:
+    case WIRE.STRING:
       if (typeof value !== "string") throw new Error(`${label} must be a string`);
       writer.string(value);
       return;
-    case 4:
+    case WIRE.UINT8:
       writer.u8(normalizeInteger(value, label, 0, 0xff));
       return;
-    case 5:
+    case WIRE.UINT16:
       writer.u32(normalizeInteger(value, label, 0, 0xffff));
       return;
-    case 6:
+    case WIRE.UINT32:
       writer.u32(normalizeUint32(value, label));
       return;
-    case 7:
-    case 8:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
       writer.string(normalizeDecimal(value, label, { signed: false }));
       return;
-    case 9:
+    case WIRE.BYTE_ARRAY:
       writer.bytesValue(asByteArrayBytes(value));
       return;
-    case 10:
+    case WIRE.FLOAT:
       writer.f64(normalizeFloat(value, label));
       return;
-    case 11:
+    case WIRE.FLOAT32:
       writer.f32(normalizeFloat(value, label));
       return;
-    case 14:
+    case WIRE.SIMPLE_ENUM:
       writer.u32(normalizeEnum(value, type, label));
       return;
-    case 15:
+    case WIRE.EXPR:
       encodeExpr(writer, value, label);
       return;
-    case 16: {
+    case WIRE.ARRAY: {
       const values = normalizeArray(value, label);
       writer.u32(values.length);
       const elementType = requireTypeField(type, "element", label);
-      values.forEach((item, itemIndex) => encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`));
+      values.forEach((item, itemIndex) => encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`, selfType));
       return;
     }
-    case 17: {
+    case WIRE.LIST: {
       const values = normalizeArray(value, label);
       writer.u32(values.length);
       const elementType = requireTypeField(type, "element", label);
-      values.forEach((item, itemIndex) => encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`));
+      values.forEach((item, itemIndex) => encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`, selfType));
       return;
     }
-    case 18: {
+    case WIRE.OPTION: {
       const option = normalizeOption(value, label);
       writer.u8(option.some ? 1 : 0);
       if (option.some) {
-        encodeValuePayload(writer, requireTypeField(type, "element", label), option.value, `${label}.value`);
+        encodeValuePayload(writer, requireTypeField(type, "element", label), option.value, `${label}.value`, selfType);
       }
       return;
     }
-    case 19: {
+    case WIRE.PROD: {
       const pair = normalizePair(value, label);
-      encodeValuePayload(writer, requireTypeField(type, "fst", label), pair.fst, `${label}.fst`);
-      encodeValuePayload(writer, requireTypeField(type, "snd", label), pair.snd, `${label}.snd`);
+      encodeValuePayload(writer, requireTypeField(type, "fst", label), pair.fst, `${label}.fst`, selfType);
+      encodeValuePayload(writer, requireTypeField(type, "snd", label), pair.snd, `${label}.snd`, selfType);
       return;
     }
-    case 20: {
+    case WIRE.STRUCTURE: {
       const fields = requireStructureFields(type, label);
       const record = normalizeStructure(value, fields, label);
       fields.forEach((field) =>
-        encodeValuePayload(writer, field.type, record[field.name], `${label}.${field.name}`));
+        encodeValuePayload(writer, field.type, record[field.name], `${label}.${field.name}`, type));
       return;
     }
-    case 21: {
+    case WIRE.TAGGED_UNION: {
       const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
       writer.u32(index);
-      encodeValuePayload(writer, ctor.type, payload, `${label}.${ctor.jsName}`);
+      encodeValuePayload(writer, ctor.type, payload, `${label}.${ctor.jsName}`, selfType);
+      return;
+    }
+    case WIRE.CUSTOM_INDUCTIVE: {
+      const { index, ctor, fields } = normalizeCustomInductive(value, type, label);
+      writer.u32(index);
+      ctor.fields.forEach((field) => {
+        encodeValuePayload(writer, field.type, fields[field.name], `${label}.${ctor.jsName}.${field.name}`, type);
+      });
       return;
     }
     default:
@@ -927,91 +966,110 @@ function encodeHostCallResult(type, value, entry) {
   return writer.take();
 }
 
-function decodeValuePayload(reader, type, runtime = null) {
+function decodeValuePayload(reader, type, runtime = null, selfType = null) {
   const expectedTag = requireWireTag(type, "result");
   let value;
   switch (expectedTag) {
-    case 22:
+    case WIRE.RECURSIVE_SELF:
+      if (selfType === null) {
+        throw new Error("recursive self result decoded without an enclosing type");
+      }
+      value = decodeValuePayload(reader, selfType, runtime, selfType);
+      break;
+    case WIRE.UNIT:
       value = undefined;
       break;
-    case 23:
+    case WIRE.RESOURCE:
       value = { handle: reader.u32() };
       break;
-    case 24:
+    case WIRE.FUNCTION:
       if (runtime === null) {
         throw new Error("function value decoded without an attached VirRuntime");
       }
       value = createVirCallback(runtime, reader.u32(), type);
       break;
-    case 0:
-    case 1:
-    case 7:
-    case 8:
+    case WIRE.NAT:
+    case WIRE.INT:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
       value = reader.string();
       break;
-    case 2:
+    case WIRE.BOOL:
       value = reader.u8() !== 0;
       break;
-    case 3:
+    case WIRE.STRING:
       value = reader.string();
       break;
-    case 4:
+    case WIRE.UINT8:
       value = reader.u8();
       break;
-    case 5:
-    case 6:
+    case WIRE.UINT16:
+    case WIRE.UINT32:
       value = reader.u32();
       break;
-    case 9:
+    case WIRE.BYTE_ARRAY:
       value = reader.bytesValue();
       break;
-    case 10:
+    case WIRE.FLOAT:
       value = reader.f64();
       break;
-    case 11:
+    case WIRE.FLOAT32:
       value = reader.f32();
       break;
-    case 14:
+    case WIRE.SIMPLE_ENUM:
       value = enumValue(type, reader.u32());
       break;
-    case 15:
+    case WIRE.EXPR:
       value = decodeExpr(reader);
       break;
-    case 16: {
+    case WIRE.ARRAY: {
       const len = reader.u32();
       const elementType = requireTypeField(type, "element", "result");
-      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType, runtime));
+      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType, runtime, selfType));
       break;
     }
-    case 17: {
+    case WIRE.LIST: {
       const len = reader.u32();
       const elementType = requireTypeField(type, "element", "result");
-      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType, runtime));
+      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType, runtime, selfType));
       break;
     }
-    case 18:
-      value = reader.u8() === 0 ? null : decodeValuePayload(reader, requireTypeField(type, "element", "result"), runtime);
+    case WIRE.OPTION:
+      value = reader.u8() === 0 ? null : decodeValuePayload(reader, requireTypeField(type, "element", "result"), runtime, selfType);
       break;
-    case 19:
+    case WIRE.PROD:
       value = {
-        fst: decodeValuePayload(reader, requireTypeField(type, "fst", "result"), runtime),
-        snd: decodeValuePayload(reader, requireTypeField(type, "snd", "result"), runtime),
+        fst: decodeValuePayload(reader, requireTypeField(type, "fst", "result"), runtime, selfType),
+        snd: decodeValuePayload(reader, requireTypeField(type, "snd", "result"), runtime, selfType),
       };
       break;
-    case 20: {
+    case WIRE.STRUCTURE: {
       value = {};
       for (const field of requireStructureFields(type, "result")) {
-        value[field.name] = decodeValuePayload(reader, field.type, runtime);
+        value[field.name] = decodeValuePayload(reader, field.type, runtime, type);
       }
       value = flattenStructureSubobjects(type, value);
       break;
     }
-    case 21: {
+    case WIRE.TAGGED_UNION: {
       const index = reader.u32();
       const ctor = taggedUnionConstructorAt(type, index, "result");
       value = {
         kind: ctor.jsName,
-        value: decodeValuePayload(reader, ctor.type, runtime),
+        value: decodeValuePayload(reader, ctor.type, runtime, selfType),
+      };
+      break;
+    }
+    case WIRE.CUSTOM_INDUCTIVE: {
+      const index = reader.u32();
+      const ctor = customInductiveConstructorAt(type, index, "result");
+      const fields = {};
+      for (const field of ctor.fields) {
+        fields[field.name] = decodeValuePayload(reader, field.type, runtime, type);
+      }
+      value = ctor.fields.length === 0 ? { kind: ctor.jsName } : {
+        kind: ctor.jsName,
+        ...(ctor.fields.length === 1 ? { value: fields[ctor.fields[0].name] } : { fields }),
       };
       break;
     }
@@ -1042,6 +1100,26 @@ function requireStructureCount(type, field, label) {
     throw new Error(`${label} has invalid manifest structure ${field}`);
   }
   return value;
+}
+
+function encodeRuntimeCounts(writer, type, label) {
+  writer.u32(requireStructureCount(type, "objectFieldCount", label));
+  writer.u32(requireStructureCount(type, "usizeFieldCount", label));
+  writer.u32(requireStructureCount(type, "scalarByteSize", label));
+}
+
+function decodeRuntimeCounts(reader) {
+  return {
+    objectFieldCount: reader.u32(),
+    usizeFieldCount: reader.u32(),
+    scalarByteSize: reader.u32(),
+  };
+}
+
+function sameRuntimeCounts(expected, actual, label) {
+  return requireStructureCount(expected, "objectFieldCount", label) === actual?.objectFieldCount &&
+    requireStructureCount(expected, "usizeFieldCount", label) === actual?.usizeFieldCount &&
+    requireStructureCount(expected, "scalarByteSize", label) === actual?.scalarByteSize;
 }
 
 function requireStructureTrivialFieldIndex(type, label) {
@@ -1120,19 +1198,17 @@ function requireStructureFields(type, label) {
 function sameWireType(expected, actual) {
   if (requireWireTag(expected, "expected result") !== actual?.wireTag) return false;
   switch (expected.wireTag) {
-    case 16:
-    case 17:
-    case 18:
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
       return sameWireType(requireTypeField(expected, "element", "expected result"), actual.element);
-    case 19:
+    case WIRE.PROD:
       return sameWireType(requireTypeField(expected, "fst", "expected result"), actual.fst) &&
         sameWireType(requireTypeField(expected, "snd", "expected result"), actual.snd);
-    case 20: {
+    case WIRE.STRUCTURE: {
       const fields = requireStructureFields(expected, "expected result");
       if (!Array.isArray(actual?.fields) || fields.length !== actual.fields.length) return false;
-      if (requireStructureCount(expected, "objectFieldCount", "expected result") !== actual?.objectFieldCount ||
-          requireStructureCount(expected, "usizeFieldCount", "expected result") !== actual?.usizeFieldCount ||
-          requireStructureCount(expected, "scalarByteSize", "expected result") !== actual?.scalarByteSize ||
+      if (!sameRuntimeCounts(expected, actual, "expected result") ||
           requireStructureTrivialFieldIndex(expected, "expected result") !==
             normalizeStructureTrivialFieldIndex(actual?.trivialFieldIndex, actual.fields.length, "actual result")) {
         return false;
@@ -1141,19 +1217,34 @@ function sameWireType(expected, actual) {
         sameStructureFieldLayout(field.layout, actual.fields[index]?.layout) &&
         sameWireType(field.type, actual.fields[index]?.type));
     }
-    case 21: {
+    case WIRE.TAGGED_UNION: {
       const constructors = requireTaggedUnionConstructors(expected, "expected result");
       if (!Array.isArray(actual?.constructors) || constructors.length !== actual.constructors.length) return false;
       return constructors.every((ctor, index) => {
         const actualCtor = actual.constructors[index];
-        return requireStructureCount(ctor, "objectFieldCount", "expected result") === actualCtor?.objectFieldCount &&
-          requireStructureCount(ctor, "usizeFieldCount", "expected result") === actualCtor?.usizeFieldCount &&
-          requireStructureCount(ctor, "scalarByteSize", "expected result") === actualCtor?.scalarByteSize &&
+        return sameRuntimeCounts(ctor, actualCtor, "expected result") &&
           sameStructureFieldLayout(ctor.layout, actualCtor?.layout) &&
           sameWireType(ctor.type, actualCtor?.type);
       });
     }
-    case 24: {
+    case WIRE.CUSTOM_INDUCTIVE: {
+      const constructors = requireCustomInductiveConstructors(expected, "expected result");
+      if (!Array.isArray(actual?.constructors) || constructors.length !== actual.constructors.length) return false;
+      return constructors.every((ctor, index) => {
+        const actualCtor = actual.constructors[index];
+        if (!sameRuntimeCounts(ctor, actualCtor, "expected result") ||
+            !Array.isArray(actualCtor?.fields) ||
+            ctor.fields.length !== actualCtor.fields.length) {
+          return false;
+        }
+        return ctor.fields.every((field, fieldIndex) =>
+          sameStructureFieldLayout(field.layout, actualCtor.fields[fieldIndex]?.layout) &&
+          sameWireType(field.type, actualCtor.fields[fieldIndex]?.type));
+      });
+    }
+    case WIRE.RECURSIVE_SELF:
+      return true;
+    case WIRE.FUNCTION: {
       const args = requireFunctionArgs(expected, "expected result");
       if (expected.effect !== actual?.effect || !Array.isArray(actual?.args) || args.length !== actual.args.length) {
         return false;
@@ -1337,6 +1428,33 @@ function requireTaggedUnionConstructors(type, label) {
   return type.constructors;
 }
 
+function requireCustomInductiveConstructors(type, label) {
+  if (!Array.isArray(type?.constructors) || type.constructors.length === 0) {
+    throw new Error(`${label} is missing manifest custom inductive constructors`);
+  }
+  for (const ctor of type.constructors) {
+    if (typeof ctor?.name !== "string" ||
+        typeof ctor?.jsName !== "string" ||
+        !Array.isArray(ctor.fields)) {
+      throw new Error(`${label} has an invalid manifest custom inductive constructor`);
+    }
+    requireStructureCount(ctor, "objectFieldCount", `${label}.${ctor.jsName}`);
+    requireStructureCount(ctor, "usizeFieldCount", `${label}.${ctor.jsName}`);
+    requireStructureCount(ctor, "scalarByteSize", `${label}.${ctor.jsName}`);
+    if (ctor.fields.length === 0 &&
+        (ctor.objectFieldCount !== 0 || ctor.usizeFieldCount !== 0 || ctor.scalarByteSize !== 0)) {
+      throw new Error(`${label}.${ctor.jsName} has no fields but non-zero runtime field counts`);
+    }
+    for (const field of ctor.fields) {
+      if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
+        throw new Error(`${label}.${ctor.jsName} has an invalid manifest custom inductive field`);
+      }
+      requireStructureFieldLayout(field.layout, `${label}.${ctor.jsName}.${field.name}`);
+    }
+  }
+  return type.constructors;
+}
+
 function requireFunctionArgs(type, label) {
   if (type?.effect !== "pure" && type?.effect !== "io") {
     throw new Error(`${label} has invalid manifest function effect`);
@@ -1368,8 +1486,22 @@ function taggedUnionConstructorAt(type, index, label) {
   return constructors[index];
 }
 
+function customInductiveConstructorAt(type, index, label) {
+  const constructors = requireCustomInductiveConstructors(type, label);
+  if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
+    throw new Error(`${label} custom inductive constructor index is out of range`);
+  }
+  return constructors[index];
+}
+
 function findTaggedUnionConstructor(type, text) {
   const constructors = requireTaggedUnionConstructors(type, "tagged union");
+  const index = constructors.findIndex((ctor) => ctor.name === text || ctor.jsName === text);
+  return index < 0 ? null : { index, ctor: constructors[index] };
+}
+
+function findCustomInductiveConstructor(type, text) {
+  const constructors = requireCustomInductiveConstructors(type, "custom inductive");
   const index = constructors.findIndex((ctor) => ctor.name === text || ctor.jsName === text);
   return index < 0 ? null : { index, ctor: constructors[index] };
 }
@@ -1406,6 +1538,72 @@ function normalizeTaggedUnion(value, type, label) {
     if (hasOwn(value, ctor.name)) return { index, ctor, payload: value[ctor.name] };
   }
   throw new Error(`${label} must specify a tagged-union constructor`);
+}
+
+function normalizeCustomInductive(value, type, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be a custom inductive object`);
+  }
+  if (typeof value.kind !== "string") {
+    throw new Error(`${label} must specify custom inductive kind`);
+  }
+
+  const match = findCustomInductiveConstructor(type, value.kind);
+  if (match === null) {
+    throw new Error(`${label} has unknown custom inductive constructor ${value.kind}`);
+  }
+  const ctorLabel = `${label}.${match.ctor.jsName}`;
+  if (match.ctor.fields.length === 0) {
+    requireOnlyKeys(value, new Set(["kind"]), label);
+    return { ...match, fields: {} };
+  }
+  if (match.ctor.fields.length === 1) {
+    requireOnlyKeys(value, new Set(["kind", "value"]), label);
+    if (!hasOwn(value, "value")) {
+      throw new Error(`${ctorLabel} is missing value`);
+    }
+    return {
+      ...match,
+      fields: { [match.ctor.fields[0].name]: value.value },
+    };
+  }
+  requireOnlyKeys(value, new Set(["kind", "fields"]), label);
+  if (!hasOwn(value, "fields")) {
+    throw new Error(`${ctorLabel} is missing fields`);
+  }
+  return {
+    ...match,
+    fields: normalizeCustomInductiveFields(value.fields, match.ctor, ctorLabel),
+  };
+}
+
+function requireOnlyKeys(value, allowed, label) {
+  for (const key of Object.keys(value)) {
+    if (!allowed.has(key)) {
+      throw new Error(`${label}.${key} is not supported for this custom inductive constructor shape`);
+    }
+  }
+}
+
+function normalizeCustomInductiveFields(payload, ctor, label) {
+  if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
+    throw new Error(`${label} fields must be an object`);
+  }
+  const expectedNames = new Set(ctor.fields.map((field) => field.name));
+  for (const key of Object.keys(payload)) {
+    if (!expectedNames.has(key)) {
+      throw new Error(`${label}.${key} is not a constructor field`);
+    }
+  }
+  const fields = {};
+  for (const field of ctor.fields) {
+    if (!hasOwn(payload, field.name)) {
+      throw new Error(`${label}.${field.name} is missing`);
+    } else {
+      fields[field.name] = payload[field.name];
+    }
+  }
+  return fields;
 }
 
 function normalizeEnum(value, type, label) {

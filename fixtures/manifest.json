@@ -362,6 +362,30 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "recursive-tree-score",
+      "source": "fixtures/RecursiveTypes.lean",
+      "entry": "Vir.Fixtures.RecursiveTypes.treeScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "recursive-lambda-score",
+      "source": "fixtures/RecursiveTypes.lean",
+      "entry": "Vir.Fixtures.RecursiveTypes.lambdaScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "recursive-structure-score",
+      "source": "fixtures/RecursiveTypes.lean",
+      "entry": "Vir.Fixtures.RecursiveTypes.chainScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "mixed-inductive-score",
+      "source": "fixtures/RecursiveTypes.lean",
+      "entry": "Vir.Fixtures.RecursiveTypes.jsonScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-uint32-literal-to-nat",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.uint32LiteralToNatScore",
