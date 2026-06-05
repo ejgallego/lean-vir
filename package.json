@@ -10,6 +10,8 @@
     "./vir-runtime-node": "./web/src/vir-runtime-node.js"
   },
   "scripts": {
+    "setup": "npm run fetch:lean && npm run install:wasi && npm run build:demo",
+    "doctor": "node scripts/doctor.mjs",
     "fetch:lean": "bash scripts/fetch-lean-source.sh",
     "build:lean-lib": "bash scripts/build-lean-lib.sh",
     "install:wasi": "bash scripts/install-wasi-sdk.sh",
@@ -35,6 +37,8 @@
     "bench:engines": "node scripts/bench-engines.mjs",
     "test": "npm run check:boundary-registry && npm run test:upstream && npm run test:runtime && npm run test:fixtures",
     "test:fixtures": "node scripts/run-fixtures.mjs",
+    "test:fixtures:no-build": "node scripts/run-fixtures.mjs --no-build",
+    "test:site": "npm run build:site && npm run test:pages",
     "test:pages": "node scripts/check-pages-artifact.mjs",
     "test:pages:browser": "node scripts/smoke-pages-browser.mjs",
     "test:runtime": "node scripts/test-vir-runtime.mjs",

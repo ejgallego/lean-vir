@@ -2,6 +2,7 @@
 .beam/
 .lake/
 .tools/
+.worktrees/
 build/
 third_party/lean4-src/
 node_modules/

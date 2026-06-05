@@ -17,6 +17,35 @@ const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
 const summaryPath = new URL("summary.json", buildDir);
 const sourceCache = new Map();
 let cachedWasmBytes = null;
+const args = process.argv.slice(2);
+
+function usage() {
+  console.log(`Usage: node scripts/run-fixtures.mjs [--no-build]
+
+Run Lean fixture host-oracle checks against the WASI upstream interpreter.
+
+Options:
+  --no-build       Reuse web/public/vir-upstream.wasm and generated browser packages.
+  -h, --help       Show this help.
+
+Environment:
+  VIR_FIXTURE_FILTER      Case-insensitive substring matched against fixture id,
+                          source path, entry name, and roots.
+  VIR_FIXTURE_JOBS        Positive integer worker limit.
+  VIR_FIXTURE_SKIP_BUILD  Set to 1 for the same behavior as --no-build.
+`);
+}
+
+if (args.includes("-h") || args.includes("--help")) {
+  usage();
+  process.exit(0);
+}
+
+for (const arg of args) {
+  if (arg !== "--no-build") {
+    throw new Error(`unknown argument: ${arg}; run node scripts/run-fixtures.mjs --help`);
+  }
+}
 
 function run(cmd, args, options = {}) {
   return new Promise((resolve) => {
@@ -267,8 +296,36 @@ async function runFixture(fixture) {
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+const fixtureFilter = process.env.VIR_FIXTURE_FILTER?.trim() ?? "";
+const skipBuild =
+  process.env.VIR_FIXTURE_SKIP_BUILD === "1" ||
+  args.includes("--no-build");
+function fixtureMatchesFilter(fixture, filter) {
+  if (filter === "") return true;
+  const needle = filter.toLowerCase();
+  const haystack = [
+    fixture.id,
+    fixture.source,
+    fixture.entry,
+    ...(fixture.roots ?? []),
+  ].join("\n").toLowerCase();
+  return haystack.includes(needle);
+}
+const fixtures = (manifest.fixtures ?? []).filter((fixture) => fixtureMatchesFilter(fixture, fixtureFilter));
+if (fixtures.length === 0) {
+  throw new Error(`no fixtures matched VIR_FIXTURE_FILTER=${JSON.stringify(fixtureFilter)}`);
+}
 await mkdir(buildDir, { recursive: true });
-requireOk(await run("npm", ["run", "--silent", "build:demo"]), "npm run build:demo");
+if (skipBuild) {
+  try {
+    await readFile(wasmPath);
+  } catch {
+    throw new Error("VIR fixture no-build mode requires web/public/vir-upstream.wasm; run npm run build:demo first");
+  }
+  console.log("fixture build: skipped (--no-build)");
+} else {
+  requireOk(await run("npm", ["run", "--silent", "build:demo"]), "npm run build:demo");
+}
 
 function fixtureJobCount(total) {
   const configured = Number.parseInt(process.env.VIR_FIXTURE_JOBS ?? "", 10);
@@ -292,9 +349,12 @@ async function mapWithLimit(items, limit, fn) {
   return results;
 }
 
-const jobs = fixtureJobCount(manifest.fixtures.length);
+const jobs = fixtureJobCount(fixtures.length);
+if (fixtureFilter !== "") {
+  console.log(`fixture filter: ${fixtureFilter} (${fixtures.length}/${manifest.fixtures?.length ?? 0})`);
+}
 console.log(`fixture jobs: ${jobs}`);
-const results = await mapWithLimit(manifest.fixtures, jobs, runFixture);
+const results = await mapWithLimit(fixtures, jobs, runFixture);
 
 let passed = 0;
 let unsupported = 0;

@@ -6,11 +6,11 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { createReadStream } from "node:fs";
-import { mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
+import { constants as fsConstants, createReadStream } from "node:fs";
+import { access, mkdtemp, readFile, readdir, rm, stat, writeFile } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { basename, extname, resolve, sep } from "node:path";
+import { basename, delimiter, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer as createNetServer } from "node:net";
 
@@ -28,6 +28,30 @@ const contentTypes = new Map([
   [".json", "application/json; charset=utf-8"],
   [".wasm", "application/wasm"],
 ]);
+
+async function assertDistReady() {
+  const required = [
+    "index.html",
+    "dev.html",
+    "format.html",
+    "runtime-example.html",
+    "vir-upstream.wasm",
+    "fixtures-basic.irpkg",
+  ];
+  const missing = [];
+  for (const path of required) {
+    try {
+      await access(resolve(distRoot, path), fsConstants.R_OK);
+    } catch {
+      missing.push(path);
+    }
+  }
+  if (missing.length !== 0) {
+    throw new Error(
+      `web/dist is missing browser smoke artifacts (${missing.join(", ")}); run npm run build:site first`,
+    );
+  }
+}
 
 async function distAssetPath(prefix) {
   const files = await readdir(resolve(distRoot, "assets"));
@@ -94,8 +118,60 @@ async function serveDist() {
   };
 }
 
-function chromiumPath() {
-  return process.env.CHROMIUM ?? "/snap/bin/chromium";
+async function isExecutable(path) {
+  try {
+    await access(path, fsConstants.X_OK);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function findExecutableInPath(name) {
+  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
+    if (dir === "") continue;
+    const candidate = resolve(dir, name);
+    if (await isExecutable(candidate)) return candidate;
+  }
+  return null;
+}
+
+async function resolveChromiumPath() {
+  const configured = process.env.CHROMIUM;
+  if (configured) {
+    if (configured.includes("/") || configured.includes("\\")) {
+      if (!(await isExecutable(configured))) {
+        throw new Error(`CHROMIUM is set to ${configured}, but that file is not executable`);
+      }
+      return configured;
+    }
+    const pathMatch = await findExecutableInPath(configured);
+    if (pathMatch) return pathMatch;
+    throw new Error(`CHROMIUM is set to ${configured}, but it was not found on PATH`);
+  }
+
+  const directCandidates = [
+    "/snap/bin/chromium",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Chromium.app/Contents/MacOS/Chromium",
+  ];
+  for (const candidate of directCandidates) {
+    if (await isExecutable(candidate)) return candidate;
+  }
+
+  const names = ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"];
+  for (const name of names) {
+    const pathMatch = await findExecutableInPath(name);
+    if (pathMatch) return pathMatch;
+  }
+
+  throw new Error(
+    `Chromium executable not found. Set CHROMIUM=/path/to/chromium before running npm run test:pages:browser`,
+  );
 }
 
 async function fetchJsonWithRetry(url, child) {
@@ -178,8 +254,9 @@ async function openCdp(wsUrl) {
 }
 
 async function launchChromium(debugPort) {
+  const executable = await resolveChromiumPath();
   const profileDir = await mkdtemp(`${tmpdir()}/lean-vir-chromium-`);
-  const child = spawn(chromiumPath(), [
+  const child = spawn(executable, [
     "--headless=new",
     "--disable-dev-shm-usage",
     "--disable-gpu",
@@ -883,6 +960,7 @@ async function runnerCaseFromManifest(packageFile, entryName, expected) {
   };
 }
 
+await assertDistReady();
 await prepareNegativePackages();
 
 const server = await serveDist();
@@ -1110,6 +1188,7 @@ try {
   if (details) {
     console.error(details);
   }
+  console.error("browser smoke failed; if web/dist was not built from the current checkout, run npm run build:site first");
   throw error;
 } finally {
   await chromium.close();
