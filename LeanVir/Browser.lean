@@ -73,6 +73,50 @@ until the frame fires, is cancelled, or the runtime is disposed.
 @[vir_resource "AnimationFrame"]
 opaque AnimationFrame : Type
 
+namespace Event
+
+/--
+Returns the event target as a DOM element when the target is an element.
+
+The returned element resource may be used after the callback, but the event
+resource itself remains callback-scoped.
+
+Reference: [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target).
+-/
+@[vir_js "browser.event.target"]
+opaque target (event : @& Event) : IO (Option Element)
+
+/--
+Returns the current event target as a DOM element when the current target is an
+element.
+
+The returned element resource may be used after the callback, but the event
+resource itself remains callback-scoped.
+
+Reference: [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget).
+-/
+@[vir_js "browser.event.currentTarget"]
+opaque currentTarget (event : @& Event) : IO (Option Element)
+
+/--
+Prevents the default action for this event when the underlying browser event is
+cancelable.
+
+Reference: [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault).
+-/
+@[vir_js "browser.event.preventDefault"]
+opaque preventDefault (event : @& Event) : IO Unit
+
+/--
+Stops propagation of this event to further listeners.
+
+Reference: [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation).
+-/
+@[vir_js "browser.event.stopPropagation"]
+opaque stopPropagation (event : @& Event) : IO Unit
+
+end Event
+
 namespace Console
 
 /--
@@ -116,7 +160,10 @@ opaque setTitle (title : @& String) : IO Unit
 Returns the first element matching a CSS selector.
 
 In a browser this calls `document.querySelector(selector)`. In Node tests, use
-the `lean-vir/vir-runtime-node` wrapper for virtual document state.
+the `lean-vir/vir-runtime-node` wrapper for virtual document state. The virtual
+binding follows DOM lookup behavior: a missing selector returns `none`. Tests
+that need an element fixture should pre-seed it from JavaScript with
+`ensureVirtualElementState`.
 
 Reference: [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector).
 -/
@@ -256,6 +303,46 @@ Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/do
 opaque setValue (input : @& HTMLInputElement) (value : @& String) : IO Unit
 
 end HTMLInputElement
+
+namespace Event
+
+/--
+Returns the current input element for an input-like event.
+
+This checks `currentTarget` first, then falls back to `target`, and narrows the
+element with `HTMLInputElement.fromElement`.
+-/
+def inputElement? (event : @& Event) : IO (Option HTMLInputElement) := do
+  match ← currentTarget event with
+  | some element => HTMLInputElement.fromElement element
+  | none =>
+      match ← target event with
+      | none => pure none
+      | some element => HTMLInputElement.fromElement element
+
+/--
+Returns the current input value for an input-like event.
+
+This is the usual helper for controlled input handlers. It checks
+`currentTarget` before `target`.
+-/
+def inputValue? (event : @& Event) : IO (Option String) := do
+  match ← inputElement? event with
+  | none => pure none
+  | some input => some <$> HTMLInputElement.getValue input
+
+/--
+Returns the current checked state for an input-like event.
+
+This is the usual helper for controlled checkbox/radio handlers. It checks
+`currentTarget` before `target`.
+-/
+def inputChecked? (event : @& Event) : IO (Option Bool) := do
+  match ← inputElement? event with
+  | none => pure none
+  | some input => some <$> HTMLInputElement.getChecked input
+
+end Event
 
 namespace Timer
 

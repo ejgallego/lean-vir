@@ -82,12 +82,24 @@ def mountButtonCallback : IO Unit := do
 In Node tests or command-line tools, import the Node wrapper instead:
 
 ```js
-import { createVirRuntime } from "lean-vir/vir-runtime-node";
+import {
+  createVirRuntime,
+  ensureVirtualElementState,
+  findVirtualReactElementById,
+  virtualReactElementById,
+} from "lean-vir/vir-runtime-node";
 ```
 
 That wrapper uses the same runtime and installs virtual browser bindings for
 `Lean.Vir.Browser.Document`, `Lean.Vir.Browser.Element`,
-`Lean.Vir.Browser.HTMLInputElement`, timers, animation frames, and React roots.
+`Lean.Vir.Browser.Event`, `Lean.Vir.Browser.HTMLInputElement`, timers,
+animation frames, and React roots. It also exports
+`createVirtualElementState`, `createVirtualEventState`,
+`ensureVirtualElementState`, `findVirtualReactElementById`, and
+`virtualReactElementById` for direct virtual callback tests. Virtual
+`Document.querySelector` matches the DOM by returning `none` for missing
+selectors; call `ensureVirtualElementState(state, selector)` in JS tests when
+the fixture should exist.
 
 Pass `hostBindings` only for custom targets or to override one of the default
 bindings. If a package imports both built-in and custom targets, the custom map
@@ -164,6 +176,13 @@ Node-like environments:
 - `Lean.Vir.Browser.Document.getTitle : IO String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.querySelector : @& String -> IO (Option Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Event.target : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Browser.Event -> IO Unit`
+- `Lean.Vir.Browser.Event.stopPropagation : @& Lean.Vir.Browser.Event -> IO Unit`
+- `Lean.Vir.Browser.Event.inputElement? : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
+- `Lean.Vir.Browser.Event.inputValue? : @& Lean.Vir.Browser.Event -> IO (Option String)`
+- `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Browser.Event -> IO (Option Bool)`
 - `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Browser.Element -> IO String`
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
 - `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
@@ -189,6 +208,8 @@ recursive `Html` tree:
 - `Lean.Vir.React.PropValue`
 - `Lean.Vir.React.EventHandler`
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Browser.Element -> IO Lean.Vir.React.Root`
+- `Lean.Vir.React.Root.createFromSelector : String -> IO (Option Lean.Vir.React.Root)`
+- `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.React.Root -> IO Unit) -> IO Bool`
 - `Lean.Vir.React.Root.render : @& Lean.Vir.React.Root -> @& Lean.Vir.React.Html -> IO Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.React.Root -> IO Unit`
 
@@ -196,6 +217,46 @@ recursive `Html` tree:
 interface descriptors. Rendering retains any Lean event callbacks embedded in
 the tree until the root is rerendered, unmounted, the package is reloaded, or
 the runtime is disposed.
+
+The intended v0 authoring surface is a small DOM-like helper set over that
+recursive `Html` ABI:
+
+- `Lean.Vir.React.Property.id`, `inputName`, `className`, `title`, `role`,
+  `ariaLabel`, `data`, `dataTestId`, `tabIndex`, `type`, `htmlFor`,
+  `inputValue`, `placeholder`, `checked`, and `disabled`
+- `Lean.Vir.React.EventHandler.onClick`, `onClickWith`, `onInput`,
+  `onInputUnit`, `onChange`, `onChangeUnit`, `onSubmit`, and `onSubmitWith`
+- `Lean.Vir.React.Html.div`, `divWith`, `span`, `spanWith`, `input`, `label`,
+  `labelWith`, `form`, `formWith`, `button`, and `buttonWith`
+
+`Property.inputValue` maps to React's `value` prop. It is named `inputValue`
+because `Property.value` is already the Lean structure-field projection.
+`Property.inputName` maps to React's `name` prop for the same reason:
+`Property.name` is the structure-field projection. `Property.htmlFor` maps to
+React's label `htmlFor` prop, `Property.ariaLabel` maps to `aria-label`,
+`Property.data name value` prefixes the prop name with `data-`,
+`Property.dataTestId` maps to `data-testid`, and `Property.tabIndex` maps to
+React's numeric `tabIndex` prop. The `data` helper expects a non-empty suffix,
+matching the documented `data-*` shape.
+`EventHandler.onInput` and `onChange` receive the callback `Event`; use
+`Event.inputValue?` when reading controlled text state and
+`Event.inputChecked?` when reading controlled checkbox/radio state. Both check
+`Event.currentTarget` first, then fall back to `Event.target`. Use the `*Unit`
+variants for handlers that do not need the event.
+
+`Property.string`/`bool`/`int`/`float`, `EventHandler.on`/`onUnit`, and
+`Html.elementWith`/`keyedElementWith` are intentional escape hatches for the
+small v0 surface. Prefer the named helpers above unless a demo needs a specific
+DOM prop, handler, or tag that is not blessed yet.
+
+The React browser fixtures are split by intent: `examples/ReactCounter.lean`
+contains the counter, static render, lifecycle, and stress cases, while
+`examples/ReactInput.lean` contains controlled text, change, submit,
+attribute-conformance, and checkbox callbacks.
+
+The standalone React HTML renderer status is tracked in `docs/REACT_HTML.md`.
+Future ProofWidgets compatibility work is tracked separately in
+`docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
 The browser runtime bindings use standard browser APIs and require
 `globalThis.document` for document calls. In non-browser runtimes, use
@@ -213,6 +274,10 @@ External references:
 - [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
 - [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
 - [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event)
+- [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target)
+- [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget)
+- [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault)
+- [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation)
 - [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
 - [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
 - [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)

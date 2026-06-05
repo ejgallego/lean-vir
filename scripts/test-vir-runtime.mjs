@@ -23,11 +23,19 @@ import {
   createVirRuntimeFactory,
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
+  createVirtualElementState,
+  createVirtualEventState,
+  ensureVirtualElementState,
+  virtualReactElementById,
 } from "../web/src/vir-runtime-node.js";
 import {
   INTERFACE_MANIFEST_ARTIFACT,
   validateInterfaceManifest,
 } from "../web/src/interface-manifest.js";
+import {
+  ensureTamagotchiVirtualDom,
+  ensureVirtualElements,
+} from "./virtual-fixtures.mjs";
 
 function assertManifestTypeDescriptorsRoundTrip(manifest) {
   const entries = [
@@ -161,7 +169,7 @@ assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
-assert.equal(hostRuntime.packageInfo.hostImports, 22);
+assert.equal(hostRuntime.packageInfo.hostImports, 26);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -466,6 +474,10 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "browser.element.removeEventListener",
   "browser.element.setAttribute",
   "browser.element.setTextContent",
+  "browser.event.currentTarget",
+  "browser.event.preventDefault",
+  "browser.event.stopPropagation",
+  "browser.event.target",
   "browser.htmlInputElement.fromElement",
   "browser.htmlInputElement.getChecked",
   "browser.htmlInputElement.getValue",
@@ -484,6 +496,31 @@ assert.equal(
     ?.args[1]?.type?.kind,
   "customInductive",
 );
+const virtualQueryState = createVirtualDocumentState();
+const virtualQueryHost = createVirtualDocumentHostBindings(virtualQueryState);
+assert.equal(virtualQueryHost["browser.document.querySelector"]("#missing"), null);
+ensureVirtualElementState(virtualQueryState, "#present");
+const virtualPresentElement = virtualQueryHost["browser.document.querySelector"]("#present");
+assert.notEqual(virtualPresentElement, null);
+assert.equal(virtualQueryHost["browser.element.getTextContent"](virtualPresentElement), "");
+let virtualMissingEventTarget = "not-dispatched";
+let virtualMissingEventCurrentTarget = "not-dispatched";
+const virtualMissingEventCallback = Object.assign((event) => {
+  virtualMissingEventTarget = virtualQueryHost["browser.event.target"](event);
+  virtualMissingEventCurrentTarget = virtualQueryHost["browser.event.currentTarget"](event);
+}, { release: () => undefined });
+const virtualMissingEventListener = virtualQueryHost["browser.element.addEventListener"](
+  virtualPresentElement,
+  "click",
+  virtualMissingEventCallback,
+);
+virtualQueryState.elements.get("#present").listeners.get("click")[0].dispatch(createVirtualEventState({
+  target: "#missing",
+  currentTarget: "#missing",
+}));
+assert.equal(virtualMissingEventTarget, null);
+assert.equal(virtualMissingEventCurrentTarget, null);
+virtualQueryHost["browser.element.removeEventListener"](virtualMissingEventListener);
 const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
 assert.throws(
   () => browserRuntime.call("HostInterop.titleHandshake", "node"),
@@ -564,6 +601,7 @@ const lifecycleRuntime = await createVirRuntime({
     },
   },
 });
+ensureVirtualElementState(lifecycleDocumentState, "#callback");
 assert.equal(lifecycleRuntime.call("HostInterop.mountCallbackEvent", "#callback"), "1");
 lifecycleDocumentState.elements.get("#callback").listeners.get("click")[0].dispatch({});
 assert.deepEqual(lifecycleRecords.splice(0), [101]);
@@ -592,6 +630,7 @@ const lifecycleRuntime2 = await createVirRuntime({
     },
   },
 });
+ensureVirtualElementState(lifecycleDocumentState2, "#callback");
 assert.equal(lifecycleRuntime2.call("HostInterop.mountAndRemoveCallbackEvent", "#callback"), "1");
 assert.equal(lifecycleRuntime2.liveCallbacks.size, 0);
 lifecycleDocumentState2.elements.get("#callback").listeners.get("click")?.[0]?.dispatch({});
@@ -634,20 +673,118 @@ const reactRuntime = await createVirRuntime({
     "test.recordNat": () => undefined,
   },
 });
-assert.equal(reactRuntime.call("ReactCounter.renderStatic", "#react-static"), "1");
+ensureVirtualElements(reactDocumentState, [
+  "#react-static",
+  "#react-counter",
+  "#react-input",
+  "#react-change",
+  "#react-checkbox",
+  "#react-attributes",
+  "#react-unmount",
+  "#react-stale-root",
+  "#react-too-deep",
+  "#react-dispose",
+]);
+assert.equal(reactRuntime.call("ReactCounter.renderStatic", "#react-static"), true);
 assert.equal(reactDocumentState.elements.get("#react-static").textContent, "react:static");
 assert.equal(reactRuntime.liveCallbacks.size, 0);
-assert.equal(reactRuntime.call("ReactCounter.mount", "#react-counter"), "1");
+const missingSelectorDocumentState = createVirtualDocumentState();
+const missingSelectorRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  virtualDocumentState: missingSelectorDocumentState,
+});
+assert.equal(missingSelectorRuntime.call("ReactCounter.mount", "#missing-react-root"), false);
+assert.equal(missingSelectorRuntime.liveCallbacks.size, 0);
+missingSelectorRuntime.dispose();
+assert.equal(reactRuntime.call("ReactCounter.mount", "#react-counter"), true);
 const reactElement = reactDocumentState.elements.get("#react-counter");
 assert.equal(reactElement.textContent, "react:0");
 assert.equal(reactRuntime.liveCallbacks.size, 1);
-reactElement.reactRoot.current.handlers.onClick({});
+virtualReactElementById(reactElement.reactRoot, "react-counter-button").handlers.onClick({});
 assert.equal(reactElement.textContent, "react:1");
 assert.equal(reactRuntime.liveCallbacks.size, 1);
 reactElement.reactRoot.unmount();
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactElement.reactRoot, undefined);
-assert.equal(reactRuntime.call("ReactCounter.mountAndUnmount", "#react-unmount"), "1");
+assert.equal(reactRuntime.call("ReactInput.mountInput", "#react-input"), true);
+const reactInputElement = reactDocumentState.elements.get("#react-input");
+assert.equal(reactInputElement.textContent, "name:");
+assert.equal(reactRuntime.liveCallbacks.size, 1);
+const reactNameInput = createVirtualElementState({ value: "Ada" });
+reactDocumentState.elements.set("#react-name-input", reactNameInput);
+virtualReactElementById(reactInputElement.reactRoot, "react-name-input").handlers.onInput(createVirtualEventState({
+  currentTarget: reactNameInput,
+  target: createVirtualElementState({ value: "unused-target" }),
+}));
+assert.equal(reactInputElement.textContent, "name:Ada");
+assert.equal(reactRuntime.liveCallbacks.size, 1);
+virtualReactElementById(reactInputElement.reactRoot, "react-name-input").handlers.onInput(createVirtualEventState({
+  target: createVirtualElementState({ value: "Target" }),
+}));
+assert.equal(reactInputElement.textContent, "name:Target");
+assert.equal(reactRuntime.liveCallbacks.size, 1);
+reactInputElement.reactRoot.unmount();
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+assert.equal(reactInputElement.reactRoot, undefined);
+assert.equal(reactRuntime.call("ReactInput.mountChangeInput", "#react-change"), true);
+const reactChangeElement = reactDocumentState.elements.get("#react-change");
+assert.equal(reactChangeElement.textContent, "change:");
+assert.equal(reactRuntime.liveCallbacks.size, 2);
+const reactSubmitEvent = createVirtualEventState();
+virtualReactElementById(reactChangeElement.reactRoot, "react-change-widget").handlers.onSubmit(reactSubmitEvent);
+assert.equal(reactSubmitEvent.defaultPrevented, true);
+assert.equal(reactSubmitEvent.propagationStopped, true);
+assert.equal(reactRuntime.liveCallbacks.size, 2);
+const reactChangeInput = createVirtualElementState({ value: "Grace" });
+const reactChangeEvent = createVirtualEventState({
+  currentTarget: reactChangeInput,
+});
+virtualReactElementById(reactChangeElement.reactRoot, "react-change-input").handlers.onChange(reactChangeEvent);
+assert.equal(reactChangeElement.textContent, "change:Grace");
+assert.equal(reactChangeEvent.defaultPrevented, true);
+assert.equal(reactChangeEvent.propagationStopped, true);
+assert.equal(reactRuntime.liveCallbacks.size, 2);
+reactChangeElement.reactRoot.unmount();
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+assert.equal(reactRuntime.call("ReactInput.mountCheckbox", "#react-checkbox"), true);
+const reactCheckboxElement = reactDocumentState.elements.get("#react-checkbox");
+assert.equal(reactCheckboxElement.textContent, "checked:false");
+assert.equal(reactRuntime.liveCallbacks.size, 1);
+const reactCheckboxInput = createVirtualElementState({ checked: true });
+virtualReactElementById(reactCheckboxElement.reactRoot, "react-checkbox-input").handlers.onChange(createVirtualEventState({
+  currentTarget: reactCheckboxInput,
+}));
+assert.equal(reactCheckboxElement.textContent, "checked:true");
+assert.equal(reactRuntime.liveCallbacks.size, 1);
+virtualReactElementById(reactCheckboxElement.reactRoot, "react-checkbox-input").handlers.onChange(createVirtualEventState({
+  target: createVirtualElementState({ checked: false }),
+}));
+assert.equal(reactCheckboxElement.textContent, "checked:false");
+assert.equal(reactRuntime.liveCallbacks.size, 1);
+reactCheckboxElement.reactRoot.unmount();
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+assert.equal(reactRuntime.call("ReactInput.mountAttributes", "#react-attributes"), true);
+const reactAttributesElement = reactDocumentState.elements.get("#react-attributes");
+assert.equal(reactAttributesElement.textContent, "attrs:attrs");
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+const reactAttributesWidget = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-widget");
+assert.equal(reactAttributesWidget.props.role, "group");
+assert.equal(reactAttributesWidget.props["aria-label"], "React attribute fixture");
+assert.equal(reactAttributesWidget.props["data-case"], "attributes");
+assert.equal(reactAttributesWidget.props["data-testid"], "react-attributes");
+assert.equal(reactAttributesWidget.props.tabIndex, 3);
+const reactAttributesLabel = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-label");
+assert.equal(reactAttributesLabel.props.htmlFor, "react-attributes-input");
+const reactAttributesInput = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-input");
+assert.equal(reactAttributesInput.props.name, "attributes");
+assert.equal(reactAttributesInput.props.type, "checkbox");
+assert.equal(reactAttributesInput.props.checked, true);
+assert.equal(reactAttributesInput.props.disabled, true);
+const reactAttributesOutput = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-output");
+assert.equal(reactAttributesOutput.props.title, "attribute output");
+reactAttributesElement.reactRoot.unmount();
+assert.equal(reactRuntime.call("ReactCounter.mountAndUnmount", "#react-unmount"), true);
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactDocumentState.elements.get("#react-unmount").reactRoot, undefined);
 assert.throws(
@@ -662,10 +799,19 @@ assert.throws(
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 
 const malformedReactDocumentState = createVirtualDocumentState();
+ensureVirtualElementState(malformedReactDocumentState, "#react-malformed");
 const malformedReactHost = createVirtualDocumentHostBindings(malformedReactDocumentState);
 const malformedReactContainer = malformedReactHost["browser.document.querySelector"]("#react-malformed");
 const malformedReactRoot = malformedReactHost["react.root.create"](malformedReactContainer);
 const renderMalformedReactHtml = (html) => malformedReactHost["react.root.render"](malformedReactRoot, html);
+renderMalformedReactHtml(reactHtmlElement({
+  props: [
+    { name: "tabIndex", value: { kind: "int", value: "4" } },
+    { name: "data-ratio", value: { kind: "float", value: 1.5 } },
+  ],
+}));
+assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.tabIndex, 4);
+assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props["data-ratio"], 1.5);
 assert.throws(
   () => renderMalformedReactHtml({ kind: "text", value: 1 }),
   /React Html text value must be a string/,
@@ -690,6 +836,12 @@ assert.throws(
 );
 assert.throws(
   () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "data-", value: { kind: "string", value: "bad" } }],
+  })),
+  /React Html data-\* property name must include a suffix/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
     props: [{ name: "title", value: { kind: "string", value: false } }],
   })),
   /React PropValue\.string value must be a string/,
@@ -702,9 +854,27 @@ assert.throws(
 );
 assert.throws(
   () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "tabIndex", value: { kind: "int", value: "7.5" } }],
+  })),
+  /React PropValue\.int value must be a safe integer/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "tabIndex", value: { kind: "int", value: "9007199254740992" } }],
+  })),
+  /React PropValue\.int value must be a safe integer/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "value", value: { kind: "float", value: "1.5" } }],
+  })),
+  /React PropValue\.float value must be a finite number/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
     props: [{ name: "data-x", value: { kind: "number", value: 1 } }],
   })),
-  /React PropValue must be string or bool/,
+  /React PropValue must be string, bool, int, or float/,
 );
 assert.throws(
   () => renderMalformedReactHtml(reactHtmlElement({
@@ -719,7 +889,7 @@ assert.throws(
   /React Html event handler callback must be a releasable function/,
 );
 
-assert.equal(reactRuntime.call("ReactCounter.mount", "#react-dispose"), "1");
+assert.equal(reactRuntime.call("ReactCounter.mount", "#react-dispose"), true);
 assert.equal(reactRuntime.liveCallbacks.size, 1);
 reactRuntime.dispose();
 assert.equal(reactRuntime.liveCallbacks.size, 0);
@@ -745,6 +915,7 @@ const pendingRuntime = await createVirRuntime({
     },
   },
 });
+ensureVirtualElementState(pendingDocumentState, "#pending");
 assert.equal(pendingRuntime.call("HostInterop.mountCallbackEvent", "#pending"), "1");
 assert.equal(pendingRuntime.call("HostInterop.timeoutRecord", 70), "1");
 assert.equal(pendingRuntime.call("HostInterop.animationRecord", 80), "1");
@@ -775,6 +946,7 @@ const reloadRuntime = await createVirRuntime({
     },
   },
 });
+ensureVirtualElementState(reloadDocumentState, "#reload");
 assert.equal(reloadRuntime.call("HostInterop.mountCallbackEvent", "#reload"), "1");
 assert.equal(reloadRuntime.call("HostInterop.timeoutRecord", 90), "1");
 assert.equal(reloadRuntime.call("HostInterop.animationRecord", 100), "1");
@@ -805,13 +977,15 @@ const reactReloadRuntime = await createVirRuntime({
     "test.recordNat": () => undefined,
   },
 });
-assert.equal(reactReloadRuntime.call("ReactCounter.mount", "#react-reload"), "1");
+ensureVirtualElementState(reactReloadDocumentState, "#react-reload");
+assert.equal(reactReloadRuntime.call("ReactCounter.mount", "#react-reload"), true);
 assert.equal(reactReloadRuntime.liveCallbacks.size, 1);
 reactReloadRuntime.loadIrPackageBytes(irPackageBytes);
 assert.equal(reactReloadRuntime.liveCallbacks.size, 0);
 assert.equal(reactReloadDocumentState.elements.get("#react-reload").reactRoot, undefined);
 reactReloadRuntime.dispose();
 
+ensureTamagotchiVirtualDom(virtualDocumentState);
 assert.equal(hostRuntime.call("Tamagotchi.uiMountFromDom"), "8");
 assert.equal(hostRuntime.liveCallbacks.size, 8);
 const petReset = hostRuntime.call("Tamagotchi.uiReset", "Mochi", "pet");
@@ -1750,7 +1924,10 @@ try {
     { encoding: "utf8" },
   );
   assert.equal(hostGenerated.status, 0, hostGenerated.stderr || hostGenerated.stdout);
-  const hostRuntime = await factory.createRuntime({ irPackageBytes: await readFile(hostPackage) });
+  const freshHostDocumentState = createVirtualDocumentState();
+  ensureVirtualElementState(freshHostDocumentState, "#fresh");
+  const hostFactory = createVirRuntimeFactory({ wasmBytes, virtualDocumentState: freshHostDocumentState });
+  const hostRuntime = await hostFactory.createRuntime({ irPackageBytes: await readFile(hostPackage) });
   assert.equal(hostRuntime.interfaceManifest.hostImports.length, 8);
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
   assert.equal(hostRuntime.call("freshTitleRoundtrip", "Lean.Vir"), "Lean.Vir");

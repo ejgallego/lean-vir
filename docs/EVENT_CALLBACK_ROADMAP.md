@@ -37,6 +37,13 @@ registering a Lean callback and returning an opaque cancellation handle.
 - The `Event` resource is callback-scoped and is released after dispatch.
 - `Element.removeEventListener` removes the listener and releases its retained
   callback.
+- `Event.target` and `Event.currentTarget` return `some Element` when the
+  underlying event target is a DOM element, and `none` otherwise.
+- `Event.preventDefault` and `Event.stopPropagation` forward to the underlying
+  browser event and are also modeled in the virtual test host.
+- `Event.inputElement?`, `Event.inputValue?`, and `Event.inputChecked?` are
+  Lean helpers for controlled input handlers; they check `currentTarget` before
+  falling back to `target`.
 
 ## Timer And Frame APIs
 
@@ -68,6 +75,11 @@ callback from the current callback.
 - one-shot `requestAnimationFrame`, cancelled frame, and a recursive frame loop;
 - package reload cleanup for pending listeners, timers, frames, and callback
   roots;
+- callback-scoped event target/currentTarget access through React input, change,
+  and checkbox callbacks;
+- `preventDefault`/`stopPropagation` dispatch through virtual events and real
+  browser `onChange`/`onSubmit` smoke coverage;
+- virtual event helper coverage through `createVirtualEventState`;
 - browser-page smoke coverage for real DOM click dispatch, `setTimeout`,
   `requestAnimationFrame`, cancellation/removal, package reload cleanup, and
   direct runtime disposal;
@@ -75,9 +87,7 @@ callback from the current callback.
 
 ## Remaining Work
 
-1. Add event accessors while keeping `Event` opaque:
-   `preventDefault`, `stopPropagation`, `target`, `currentTarget`, and focused
-   helpers for common input events.
+1. Add more focused helpers for common events while keeping `Event` opaque.
 2. Keep the v1 closure-root table simple. If release overhead becomes visible,
    optimize handle allocation/release in a second phase, after leak tests make
    the ownership contract hard to regress.
@@ -107,5 +117,7 @@ References:
 - [WebAssembly active proposals](https://github.com/WebAssembly/proposals)
 - [WebAssembly feature status](https://webassembly.org/features/)
 - [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
+- [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault)
+- [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation)
 - [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout)
 - [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)

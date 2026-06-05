@@ -514,7 +514,7 @@ async function smokePackagePreset(cdp, origin) {
     status: "Ready",
     packageName: "demo-host.irpkg",
     packageUrl: "demo-host.irpkg",
-    entryCount: 29,
+    entryCount: 33,
   });
 }
 
@@ -673,7 +673,7 @@ async function smokeBrowserCallbacks(cdp, origin) {
     target.id = "react-smoke-root";
     document.body.append(target);
   })()`);
-  assert.equal(await runSelectedEntry(cdp, reactCase.expected.runInputs), "1");
+  assert.equal(await runSelectedEntry(cdp, reactCase.expected.runInputs), "true");
   const reactClicked = await evaluate(cdp, `new Promise((resolve, reject) => {
     const deadline = Date.now() + 5000;
     const pollMounted = () => {
@@ -709,6 +709,251 @@ async function smokeBrowserCallbacks(cdp, origin) {
   })`);
   assert.match(reactClicked.text, /^react:[12]$/);
   assert.equal(reactClicked.status, "Ready");
+
+  const reactInputCase = await runnerCaseFromManifest("demo-host.irpkg", "ReactInput.mountInput", {
+    runInputs: ["#react-input-smoke-root"],
+  });
+  await navigate(cdp, `${origin}${basePath}${reactInputCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `(() => {
+    document.querySelector("#react-input-smoke-root")?.remove();
+    const target = document.createElement("div");
+    target.id = "react-input-smoke-root";
+    document.body.append(target);
+  })()`);
+  assert.equal(await runSelectedEntry(cdp, reactInputCase.expected.runInputs), "true");
+  const reactInputChanged = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 5000;
+    const pollMounted = () => {
+      const input = document.querySelector("#react-name-input");
+      const output = document.querySelector("#react-name-output");
+      if (input instanceof HTMLInputElement && output?.textContent === "") {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        if (typeof setter === "function") {
+          setter.call(input, "Ada");
+        } else {
+          input.value = "Ada";
+        }
+        input.dispatchEvent(new Event("input", { bubbles: true }));
+        pollChanged();
+      } else if (Date.now() > deadline) {
+        reject(new Error("React input did not mount; got " + output?.textContent));
+      } else {
+        setTimeout(pollMounted, 50);
+      }
+    };
+    const pollChanged = () => {
+      const text = document.querySelector("#react-name-output")?.textContent;
+      const status = document.querySelector("#status")?.textContent?.trim();
+      if (status === "Trap") {
+        reject(new Error("React input callback trapped: " + document.querySelector("#dev-result")?.textContent));
+      } else if (text === "Ada") {
+        resolve({ text, status });
+      } else if (Date.now() > deadline) {
+        reject(new Error("React input callback did not rerender; got " + text));
+      } else {
+        setTimeout(pollChanged, 50);
+      }
+    };
+    pollMounted();
+  })`);
+  assert.deepEqual(reactInputChanged, {
+    text: "Ada",
+    status: "Ready",
+  });
+
+  const reactChangeCase = await runnerCaseFromManifest("demo-host.irpkg", "ReactInput.mountChangeInput", {
+    runInputs: ["#react-change-smoke-root"],
+  });
+  await navigate(cdp, `${origin}${basePath}${reactChangeCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `(() => {
+    document.querySelector("#react-change-smoke-root")?.remove();
+    const target = document.createElement("div");
+    target.id = "react-change-smoke-root";
+    document.body.append(target);
+  })()`);
+  assert.equal(await runSelectedEntry(cdp, reactChangeCase.expected.runInputs), "true");
+  const reactSubmitHandled = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 5000;
+    const pollMounted = () => {
+      const root = document.querySelector("#react-change-smoke-root");
+      const form = document.querySelector("#react-change-widget");
+      const status = document.querySelector("#status")?.textContent?.trim();
+      if (form instanceof HTMLFormElement && root !== null) {
+        let escapedRoot = false;
+        const controller = new AbortController();
+        document.body.addEventListener("submit", () => {
+          escapedRoot = true;
+        }, { once: true, signal: controller.signal });
+        const event = new Event("submit", { bubbles: true, cancelable: true });
+        const allowed = form.dispatchEvent(event);
+        controller.abort();
+        resolve({
+          allowed,
+          escapedRoot,
+          defaultPrevented: event.defaultPrevented,
+          status,
+        });
+      } else if (Date.now() > deadline) {
+        reject(new Error("React submit form did not mount"));
+      } else {
+        setTimeout(pollMounted, 50);
+      }
+    };
+    pollMounted();
+  })`);
+  assert.deepEqual(reactSubmitHandled, {
+    allowed: false,
+    escapedRoot: false,
+    defaultPrevented: true,
+    status: "Ready",
+  });
+  const reactChangeChanged = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 5000;
+    const pollMounted = () => {
+      const input = document.querySelector("#react-change-input");
+      const output = document.querySelector("#react-change-output");
+      if (input instanceof HTMLInputElement && output?.textContent === "") {
+        const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+        if (typeof setter === "function") {
+          setter.call(input, "Grace");
+        } else {
+          input.value = "Grace";
+        }
+        input.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+        pollChanged();
+      } else if (Date.now() > deadline) {
+        reject(new Error("React change input did not mount; got " + output?.textContent));
+      } else {
+        setTimeout(pollMounted, 50);
+      }
+    };
+    const pollChanged = () => {
+      const text = document.querySelector("#react-change-output")?.textContent;
+      const status = document.querySelector("#status")?.textContent?.trim();
+      if (status === "Trap") {
+        reject(new Error("React change input callback trapped: " + document.querySelector("#dev-result")?.textContent));
+      } else if (text === "Grace") {
+        resolve({ text, status });
+      } else if (Date.now() > deadline) {
+        reject(new Error("React change input callback did not rerender; got " + text));
+      } else {
+        setTimeout(pollChanged, 50);
+      }
+    };
+    pollMounted();
+  })`);
+  assert.deepEqual(reactChangeChanged, {
+    text: "Grace",
+    status: "Ready",
+  });
+
+  const reactCheckboxCase = await runnerCaseFromManifest("demo-host.irpkg", "ReactInput.mountCheckbox", {
+    runInputs: ["#react-checkbox-smoke-root"],
+  });
+  await navigate(cdp, `${origin}${basePath}${reactCheckboxCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `(() => {
+    document.querySelector("#react-checkbox-smoke-root")?.remove();
+    const target = document.createElement("div");
+    target.id = "react-checkbox-smoke-root";
+    document.body.append(target);
+  })()`);
+  assert.equal(await runSelectedEntry(cdp, reactCheckboxCase.expected.runInputs), "true");
+  const reactCheckboxChanged = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 5000;
+    const pollMounted = () => {
+      const input = document.querySelector("#react-checkbox-input");
+      const output = document.querySelector("#react-checkbox-output");
+      if (input instanceof HTMLInputElement && output?.textContent === "checked:false") {
+        input.click();
+        pollChanged();
+      } else if (Date.now() > deadline) {
+        reject(new Error("React checkbox did not mount; got " + output?.textContent));
+      } else {
+        setTimeout(pollMounted, 50);
+      }
+    };
+    const pollChanged = () => {
+      const text = document.querySelector("#react-checkbox-output")?.textContent;
+      const status = document.querySelector("#status")?.textContent?.trim();
+      if (status === "Trap") {
+        reject(new Error("React checkbox callback trapped: " + document.querySelector("#dev-result")?.textContent));
+      } else if (text === "checked:true") {
+        resolve({ text, status });
+      } else if (Date.now() > deadline) {
+        reject(new Error("React checkbox callback did not rerender; got " + text));
+      } else {
+        setTimeout(pollChanged, 50);
+      }
+    };
+    pollMounted();
+  })`);
+  assert.deepEqual(reactCheckboxChanged, {
+    text: "checked:true",
+    status: "Ready",
+  });
+
+  const reactAttributesCase = await runnerCaseFromManifest("demo-host.irpkg", "ReactInput.mountAttributes", {
+    runInputs: ["#react-attributes-smoke-root"],
+  });
+  await navigate(cdp, `${origin}${basePath}${reactAttributesCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `(() => {
+    document.querySelector("#react-attributes-smoke-root")?.remove();
+    const target = document.createElement("div");
+    target.id = "react-attributes-smoke-root";
+    document.body.append(target);
+  })()`);
+  assert.equal(await runSelectedEntry(cdp, reactAttributesCase.expected.runInputs), "true");
+  const reactAttributesDom = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 5000;
+    const pollMounted = () => {
+      const widget = document.querySelector("#react-attributes-widget");
+      const label = document.querySelector("#react-attributes-label");
+      const input = document.querySelector("#react-attributes-input");
+      const output = document.querySelector("#react-attributes-output");
+      const status = document.querySelector("#status")?.textContent?.trim();
+      if (widget instanceof HTMLElement && label instanceof HTMLLabelElement && input instanceof HTMLInputElement && output instanceof HTMLElement) {
+        resolve({
+          text: document.querySelector("#react-attributes-smoke-root")?.textContent,
+          role: widget.getAttribute("role"),
+          ariaLabel: widget.getAttribute("aria-label"),
+          dataCase: widget.getAttribute("data-case"),
+          dataTestId: widget.getAttribute("data-testid"),
+          tabIndex: widget.tabIndex,
+          labelFor: label.htmlFor,
+          inputName: input.name,
+          inputType: input.type,
+          checked: input.checked,
+          disabled: input.disabled,
+          title: output.title,
+          status,
+        });
+      } else if (Date.now() > deadline) {
+        reject(new Error("React attributes did not mount"));
+      } else {
+        setTimeout(pollMounted, 50);
+      }
+    };
+    pollMounted();
+  })`);
+  assert.deepEqual(reactAttributesDom, {
+    text: "attrs:attrs",
+    role: "group",
+    ariaLabel: "React attribute fixture",
+    dataCase: "attributes",
+    dataTestId: "react-attributes",
+    tabIndex: 3,
+    labelFor: "react-attributes-input",
+    inputName: "attributes",
+    inputType: "checkbox",
+    checked: true,
+    disabled: true,
+    title: "attribute output",
+    status: "Ready",
+  });
 
   const timeoutCase = await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.timeoutTitle", {
     runInputs: ["pages-timeout"],
@@ -1230,7 +1475,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
+  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

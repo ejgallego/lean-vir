@@ -8,73 +8,46 @@ import Lean.Vir.React
 
 namespace ReactCounter
 
+open Lean.Vir.React
+
 def label (value : Nat) : String :=
   "react:" ++ toString value
 
-partial def renderInto (root : Lean.Vir.React.Root) (value : Nat) : IO Unit := do
-  Lean.Vir.React.Root.render root <|
-    .element "button" none
-      #[
-        Lean.Vir.React.Property.string "id" "react-counter-button",
-        Lean.Vir.React.Property.string "type" "button"
-      ]
-      #[Lean.Vir.React.EventHandler.mkClick (renderInto root (value + 1))]
+partial def renderInto (root : Root) (value : Nat) : IO Unit := do
+  Root.render root <|
+    Html.buttonWith
+      #[Property.id "react-counter-button"]
+      #[EventHandler.onClick (renderInto root (value + 1))]
       #[.text (label value)]
 
-def mount (selector : String) : IO Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
-  | none => pure 0
-  | some container =>
-      let root ← Lean.Vir.React.Root.create container
-      renderInto root 0
-      pure 1
+def mount (selector : String) : IO Bool :=
+  Root.mountFromSelector selector fun root => renderInto root 0
 
-def mountDefault : IO Nat :=
+def mountDefault : IO Bool :=
   mount "#react-counter-root"
 
-def staticTree : Lean.Vir.React.Html :=
-  .element "span" none
-    #[Lean.Vir.React.Property.string "id" "react-static-label"]
-    #[]
-    #[.text "react:static"]
+def staticTree : Html :=
+  Html.spanWith #[Property.id "react-static-label"] #[] #[.text "react:static"]
 
-def renderStatic (selector : String) : IO Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
-  | none => pure 0
-  | some container =>
-      let root ← Lean.Vir.React.Root.create container
-      Lean.Vir.React.Root.render root staticTree
-      pure 1
+def renderStatic (selector : String) : IO Bool :=
+  Root.mountFromSelector selector fun root => Root.render root staticTree
 
-def mountAndUnmount (selector : String) : IO Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
-  | none => pure 0
-  | some container =>
-      let root ← Lean.Vir.React.Root.create container
-      renderInto root 0
-      Lean.Vir.React.Root.unmount root
-      pure 1
+def mountAndUnmount (selector : String) : IO Bool :=
+  Root.mountFromSelector selector fun root => do
+    renderInto root 0
+    Root.unmount root
 
-def renderAfterUnmount (selector : String) : IO Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
-  | none => pure 0
-  | some container =>
-      let root ← Lean.Vir.React.Root.create container
-      Lean.Vir.React.Root.unmount root
-      renderInto root 0
-      pure 1
+def renderAfterUnmount (selector : String) : IO Bool :=
+  Root.mountFromSelector selector fun root => do
+    Root.unmount root
+    renderInto root 0
 
-def nestedDivs (depth : Nat) : Lean.Vir.React.Html :=
+def nestedDivs (depth : Nat) : Html :=
   match depth with
   | 0 => .text "deep"
-  | n + 1 => .element "div" none #[] #[] #[nestedDivs n]
+  | n + 1 => Html.div #[nestedDivs n]
 
-def renderTooDeep (selector : String) : IO Nat := do
-  match ← Lean.Vir.Browser.Document.querySelector selector with
-  | none => pure 0
-  | some container =>
-      let root ← Lean.Vir.React.Root.create container
-      Lean.Vir.React.Root.render root (nestedDivs 129)
-      pure 1
+def renderTooDeep (selector : String) : IO Bool :=
+  Root.mountFromSelector selector fun root => Root.render root (nestedDivs 129)
 
 end ReactCounter

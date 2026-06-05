@@ -52,13 +52,23 @@ same host-resource teardown before the new manifest is installed. Event
 resources remain opaque callback-scoped handles; the ownership contract and
 follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
 
-The browser-facing direction now includes the first React rendering slice for
-ProofWidgets-style Lean UIs. Lean code can create a standalone React root from a
-browser element, render a narrow recursive `Html` tree represented by the
-generic custom-inductive interface support, and retain Lean callbacks inside
-React event handlers. Root rerender, unmount, package reload, and runtime
-disposal reuse the existing resource and callback lifetime model. Full Lean
-infoview RPC compatibility remains follow-up work tracked in
+The browser-facing direction now includes a standalone React rendering slice.
+Lean code can create a React root from a browser element, render a narrow
+recursive `Html` tree represented by the generic custom-inductive interface
+support, and retain Lean callbacks inside React event handlers. The Lean
+library exposes a small DOM-like helper set for common props, events, labels,
+forms, inputs, buttons, and text containers, with examples covering button
+clicks in `ReactCounter`, controlled input rerendering, and DOM attribute
+conformance in `ReactInput`.
+Controlled text handlers use `Event.inputValue?` and checkbox handlers use
+`Event.inputChecked?`; both check `Event.currentTarget` before `target`.
+`onChange` and `onSubmit` callbacks can also forward `Event.preventDefault` and
+`Event.stopPropagation` through the same opaque event resource. The virtual
+Node document mirrors DOM `querySelector` for missing selectors; tests that
+need fixtures explicitly pre-seed them. Root rerender, unmount, package reload,
+and runtime disposal reuse the existing resource and callback lifetime model.
+Current standalone React HTML status is tracked in `docs/REACT_HTML.md`; full
+Lean infoview RPC compatibility remains follow-up work tracked in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
 `Lean.Expr` is also part of the current manifest surface. JavaScript sends and

@@ -87,6 +87,15 @@
             "ReactCounter.renderAfterUnmount",
             "ReactCounter.renderTooDeep"
           ]
+        },
+        {
+          "source": "examples/ReactInput.lean",
+          "roots": [
+            "ReactInput.mountInput",
+            "ReactInput.mountChangeInput",
+            "ReactInput.mountCheckbox",
+            "ReactInput.mountAttributes"
+          ]
         }
       ],
       "fixtureSources": []
