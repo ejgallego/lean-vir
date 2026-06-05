@@ -1962,6 +1962,23 @@ def recursiveSeenLastMatches (seen : RecursiveSeen) (name : Name) (key : String)
   | some (seenName, seenKey) => seenName == name && seenKey == key
   | none => false
 
+inductive RecursiveVisit where
+  | selfReference
+  | descend (nextSeen : RecursiveSeen)
+  | error (reason : String)
+
+def recursiveVisit (seen : RecursiveSeen) (kind : String) (name : Name) (key : String) (isRec : Bool) :
+    RecursiveVisit :=
+  if recursiveSeenContains seen name key then
+    if recursiveSeenLastMatches seen name key then
+      .selfReference
+    else
+      .error s!"mutually recursive {kind} `{name}` is not supported"
+  else if isRec && recursiveSeenContainsName seen name then
+    .error s!"non-uniform recursive {kind} `{name}` is not supported"
+  else
+    .descend (seen.push (name, key))
+
 def binderArgName (fallback : Nat) (name : Name) : String :=
   let candidate := name.toString
   if name.isAnonymous || candidate.startsWith "_" || candidate.contains '_' then
@@ -2043,14 +2060,12 @@ partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (E
   let env ← getEnv
   let some (.inductInfo indInfo) := env.find? name
     | return .error s!"unsupported type `{e}`"
-  if recursiveSeenContains seenTypes name seenKey then
-    if recursiveSeenLastMatches seenTypes name seenKey then
+  match recursiveVisit seenTypes "inductive" name seenKey indInfo.isRec with
+  | .selfReference =>
       return .ok (.recursiveSelf name (exprTypeLabel e))
-    else
-      return .error s!"mutually recursive inductive `{name}` is not supported"
-  else if indInfo.isRec && recursiveSeenContainsName seenTypes name then
-    return .error s!"non-uniform recursive inductive `{name}` is not supported"
-  else
+  | .error reason =>
+      return .error reason
+  | .descend nextSeen =>
     if indInfo.numIndices != 0 then
       return .error s!"indexed inductive `{name}` is not supported"
     else if args.size != indInfo.numParams then
@@ -2058,7 +2073,6 @@ partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (E
     else if indInfo.ctors.isEmpty then
       return .error s!"inductive `{name}` has no constructors"
     else
-      let nextSeen := seenTypes.push (name, seenKey)
       let mut constructors := #[]
       for ctorName in indInfo.ctors do
         let some (.ctorInfo ctorInfo) := env.find? ctorName
@@ -2106,14 +2120,12 @@ partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (E
     | return .error s!"unsupported type `{e}`"
   let some structInfo := getStructureInfo? env name
     | return .error s!"unsupported type `{e}`"
-  if recursiveSeenContains seenTypes name seenKey then
-    if recursiveSeenLastMatches seenTypes name seenKey then
+  match recursiveVisit seenTypes "structure" name seenKey indInfo.isRec with
+  | .selfReference =>
       return .ok (.recursiveSelf name (exprTypeLabel e))
-    else
-      return .error s!"mutually recursive structure `{name}` is not supported"
-  else if indInfo.isRec && recursiveSeenContainsName seenTypes name then
-    return .error s!"non-uniform recursive structure `{name}` is not supported"
-  else
+  | .error reason =>
+      return .error reason
+  | .descend nextSeen =>
     if indInfo.numIndices != 0 then
       return .error s!"indexed structure `{name}` is not supported"
     else if args.size != indInfo.numParams then
@@ -2135,7 +2147,6 @@ partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (E
         (← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx)
       if layout.fieldInfo.size != structInfo.fieldNames.size then
         return .error s!"runtime layout for structure `{name}` does not match its field count"
-      let nextSeen := seenTypes.push (name, seenKey)
       let mut fields := #[]
       for h : idx in *...structInfo.fieldNames.size do
         let fieldName := structInfo.fieldNames[idx]
