@@ -146,7 +146,9 @@ Payload-carrying sum types can use Lean's built-in `Sum` and `Except`
 interface support. Custom nullary inductives are supported as enums, and
 non-indexed custom inductives can cross the boundary using `{ kind }` for
 nullary constructors, `{ kind, value }` for single-field constructors, or
-`{ kind, fields }` for multi-field constructors.
+`{ kind, fields }` for multi-field constructors. Those custom-inductive shapes
+are canonical: `Sum`/`Except` conveniences such as `{ tag, value }` and
+single-constructor-key objects do not apply to user-defined custom inductives.
 
 For example, a recursive tree can use one-field leaves and multi-field branch
 nodes:
@@ -168,6 +170,9 @@ vir.call("MyApp.treeRootScore", {
   },
 });
 ```
+
+Results use the same constructor shape. Large exact numeric payloads, such as
+`Nat`, still come back as decimal strings inside the returned object.
 
 A lambda-calculus AST follows the same convention:
 
@@ -223,6 +228,10 @@ vir.call("MyApp.chainRootScore", {
   next: { label: "leaf", next: null },
 });
 ```
+
+`Option Chain` uses the normal option shape: `null` for `none`, or the nested
+`Chain` object for `some`. Recursive structures are direct records; they do not
+wrap the recursive field in a custom-inductive `{ kind, ... }` object.
 
 ## 4. Serve The Artifacts In Your App
 

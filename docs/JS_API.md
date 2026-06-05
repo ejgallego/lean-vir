@@ -111,12 +111,37 @@ single-constructor-key objects such as `{ inl: 4 }` and `{ ok: value }`;
 results are returned as `{ kind, value }`. Non-indexed custom inductives use
 canonical constructor objects only: nullary constructors accept and return
 `{ kind }`, single-field constructors accept and return `{ kind, value }`,
-and multi-field constructors accept and return `{ kind, fields }`. Non-indexed structures,
-including parameterized instances like `Box Nat` and
+and multi-field constructors accept and return `{ kind, fields }`.
+For example, a recursive `Tree Nat` value with constructors
+`leaf (value : Nat)` and `branch (left right : Tree Nat)` is:
+
+```js
+{
+  kind: "branch",
+  fields: {
+    left: { kind: "leaf", value: 4 },
+    right: { kind: "leaf", value: 5 },
+  },
+}
+```
+
+For a custom inductive with a nullary constructor and a recursive single-field
+constructor, use `{ kind: "null" }` and `{ kind: "array", value: [...] }`.
+The `{ tag, value }` and single-constructor-key input aliases are only for
+`Sum`/`Except`, not for custom inductives.
+
+Non-indexed structures, including parameterized instances like `Box Nat` and
 `Tagged (Array String)`, are accepted and returned as objects keyed by their
 Lean field names; inherited parent fields are accepted and returned as flattened
-object keys. Direct `Bool`, `UInt*`, `USize`, and enum fields, including
-single-field wrappers such as `Box UInt32`, use the same JS values as standalone
+object keys. A direct recursive structure such as
+`{ label : String, next : Option Chain }` uses a normal nested record:
+
+```js
+{ label: "root", next: { label: "leaf", next: null } }
+```
+
+Direct `Bool`, `UInt*`, `USize`, and enum fields, including single-field
+wrappers such as `Box UInt32`, use the same JS values as standalone
 arguments/results. These shapes can be nested, for example `Option (Array Nat)`,
 `List (Nat × String)`, `Except String (Option (Sum Nat Nat))`, a structure
 containing another structure, and `Array Lean.Expr`.
