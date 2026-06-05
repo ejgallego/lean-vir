@@ -620,6 +620,12 @@ assert.match(inspected.stdout, /package: build\/generated\/fixtures-basic\.irpkg
 assert.match(inspected.stdout, new RegExp(`exports: ${runtime.interfaceManifest.exports.length}`));
 assert.match(inspected.stdout, /host imports: 0/);
 assert.match(inspected.stdout, /fib\(arg1: Nat\) -> Nat \[fib\]/);
+assert.match(inspected.stdout, /arg tree descriptor: customInductive Vir\.Fixtures\.RecursiveTypes\.Tree/);
+assert.match(inspected.stdout, /branch\(left: recursiveSelf Vir\.Fixtures\.RecursiveTypes\.Tree, right: recursiveSelf Vir\.Fixtures\.RecursiveTypes\.Tree\)/);
+assert.match(inspected.stdout, /arg chain descriptor: structure Vir\.Fixtures\.RecursiveTypes\.Chain/);
+assert.match(inspected.stdout, /next: Option<recursiveSelf Vir\.Fixtures\.RecursiveTypes\.Chain>/);
+assert.match(inspected.stdout, /arg json descriptor: customInductive Vir\.Fixtures\.RecursiveTypes\.MiniJson/);
+assert.match(inspected.stdout, /array\(items: List<recursiveSelf Vir\.Fixtures\.RecursiveTypes\.MiniJson>\)/);
 
 const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "build/generated/fixtures-basic.irpkg"], {
   encoding: "utf8",
@@ -1374,10 +1380,16 @@ try {
       },
     },
   });
-  assert.throws(() => freshRuntime.call("freshJsonWeight", "null"), /must be a custom inductive object/);
+  assert.throws(() => freshRuntime.call("freshTermSize", {
+    kind: "app",
+    fn: { kind: "var", value: "x" },
+    arg: { kind: "var", value: "y" },
+  }), /expected \{ kind: "app", fields: \{ fn, arg \} \}/);
+  assert.throws(() => freshRuntime.call("freshJsonWeight", "null"), /must be a custom inductive object; expected \{ kind: "null" \}/);
   assert.equal(freshRuntime.call("freshJsonWeight", { kind: "null" }), "1");
-  assert.throws(() => freshRuntime.call("freshJsonWeight", { tag: 0 }), /must specify custom inductive kind/);
-  assert.throws(() => freshRuntime.call("freshJsonWeight", { kind: "null", value: null }), /not supported for this custom inductive constructor shape/);
+  assert.throws(() => freshRuntime.call("freshJsonWeight", { tag: 0 }), /must specify custom inductive kind; expected \{ kind: "null" \}/);
+  assert.throws(() => freshRuntime.call("freshJsonWeight", { kind: "null", value: null }), /not supported for this custom inductive constructor shape; expected \{ kind: "null" \}/);
+  assert.throws(() => freshRuntime.call("freshJsonWeight", { kind: "bool" }), /freshJsonWeight argument .*\.bool is missing value; expected \{ kind: "bool", value \}/);
   assert.equal(freshRuntime.call("freshJsonWeight", { kind: "bool", value: true }), "2");
   assert.equal(freshRuntime.call("freshJsonWeight", {
     kind: "array",

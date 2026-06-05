@@ -1506,6 +1506,24 @@ function findCustomInductiveConstructor(type, text) {
   return index < 0 ? null : { index, ctor: constructors[index] };
 }
 
+function customInductiveShape(ctor) {
+  const kind = JSON.stringify(ctor.jsName ?? ctor.name ?? "?");
+  const fields = ctor.fields ?? [];
+  if (fields.length === 0) {
+    return `{ kind: ${kind} }`;
+  }
+  if (fields.length === 1) {
+    return `{ kind: ${kind}, value }`;
+  }
+  return `{ kind: ${kind}, fields: { ${fields.map((field) => field.name).join(", ")} } }`;
+}
+
+function customInductiveShapes(type) {
+  return requireCustomInductiveConstructors(type, "custom inductive")
+    .map((ctor) => customInductiveShape(ctor))
+    .join(" | ");
+}
+
 function normalizeTaggedUnion(value, type, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be a tagged-union object`);
@@ -1541,64 +1559,66 @@ function normalizeTaggedUnion(value, type, label) {
 }
 
 function normalizeCustomInductive(value, type, label) {
+  const expectedShapes = customInductiveShapes(type);
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`${label} must be a custom inductive object`);
+    throw new Error(`${label} must be a custom inductive object; expected ${expectedShapes}`);
   }
   if (typeof value.kind !== "string") {
-    throw new Error(`${label} must specify custom inductive kind`);
+    throw new Error(`${label} must specify custom inductive kind; expected ${expectedShapes}`);
   }
 
   const match = findCustomInductiveConstructor(type, value.kind);
   if (match === null) {
-    throw new Error(`${label} has unknown custom inductive constructor ${value.kind}`);
+    throw new Error(`${label} has unknown custom inductive constructor ${value.kind}; expected ${expectedShapes}`);
   }
   const ctorLabel = `${label}.${match.ctor.jsName}`;
+  const expectedShape = customInductiveShape(match.ctor);
   if (match.ctor.fields.length === 0) {
-    requireOnlyKeys(value, new Set(["kind"]), label);
+    requireOnlyKeys(value, new Set(["kind"]), label, expectedShape);
     return { ...match, fields: {} };
   }
   if (match.ctor.fields.length === 1) {
-    requireOnlyKeys(value, new Set(["kind", "value"]), label);
+    requireOnlyKeys(value, new Set(["kind", "value"]), label, expectedShape);
     if (!hasOwn(value, "value")) {
-      throw new Error(`${ctorLabel} is missing value`);
+      throw new Error(`${ctorLabel} is missing value; expected ${expectedShape}`);
     }
     return {
       ...match,
       fields: { [match.ctor.fields[0].name]: value.value },
     };
   }
-  requireOnlyKeys(value, new Set(["kind", "fields"]), label);
+  requireOnlyKeys(value, new Set(["kind", "fields"]), label, expectedShape);
   if (!hasOwn(value, "fields")) {
-    throw new Error(`${ctorLabel} is missing fields`);
+    throw new Error(`${ctorLabel} is missing fields; expected ${expectedShape}`);
   }
   return {
     ...match,
-    fields: normalizeCustomInductiveFields(value.fields, match.ctor, ctorLabel),
+    fields: normalizeCustomInductiveFields(value.fields, match.ctor, ctorLabel, expectedShape),
   };
 }
 
-function requireOnlyKeys(value, allowed, label) {
+function requireOnlyKeys(value, allowed, label, expectedShape) {
   for (const key of Object.keys(value)) {
     if (!allowed.has(key)) {
-      throw new Error(`${label}.${key} is not supported for this custom inductive constructor shape`);
+      throw new Error(`${label}.${key} is not supported for this custom inductive constructor shape; expected ${expectedShape}`);
     }
   }
 }
 
-function normalizeCustomInductiveFields(payload, ctor, label) {
+function normalizeCustomInductiveFields(payload, ctor, label, expectedShape) {
   if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
-    throw new Error(`${label} fields must be an object`);
+    throw new Error(`${label} fields must be an object; expected ${expectedShape}`);
   }
   const expectedNames = new Set(ctor.fields.map((field) => field.name));
   for (const key of Object.keys(payload)) {
     if (!expectedNames.has(key)) {
-      throw new Error(`${label}.${key} is not a constructor field`);
+      throw new Error(`${label}.${key} is not a constructor field; expected ${expectedShape}`);
     }
   }
   const fields = {};
   for (const field of ctor.fields) {
     if (!hasOwn(payload, field.name)) {
-      throw new Error(`${label}.${field.name} is missing`);
+      throw new Error(`${label}.${field.name} is missing; expected ${expectedShape}`);
     } else {
       fields[field.name] = payload[field.name];
     }
