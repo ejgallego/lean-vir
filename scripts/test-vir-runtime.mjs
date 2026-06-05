@@ -240,6 +240,108 @@ assertInvalidManifest((manifest) => {
 }, /constructors\[0\]\.fields\[0\]\.type\.element\.name must match Tree/);
 assertInvalidManifest((manifest) => {
   manifest.exports[0].result = {
+    type: "Tree Nat",
+    wireTag: 26,
+    kind: "recursiveSelf",
+    name: "Tree",
+  };
+}, /result cannot be recursiveSelf outside a recursive descriptor/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Option Tree",
+    wireTag: 18,
+    element: {
+      type: "Tree Nat",
+      wireTag: 26,
+      kind: "recursiveSelf",
+      name: "Tree",
+    },
+  };
+}, /result\.element cannot be recursiveSelf outside a recursive descriptor/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Chain",
+    wireTag: 20,
+    kind: "structure",
+    name: "Chain",
+    objectFieldCount: 1,
+    usizeFieldCount: 0,
+    scalarByteSize: 0,
+    fields: [
+      {
+        name: "next",
+        type: {
+          type: "Option Chain",
+          wireTag: 18,
+          element: {
+            type: "Other",
+            wireTag: 26,
+            kind: "recursiveSelf",
+            name: "Other",
+          },
+        },
+        layout: { kind: "object", index: 0 },
+      },
+    ],
+  };
+}, /fields\[0\]\.type\.element\.name must match Chain/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Tree Nat",
+    wireTag: 25,
+    kind: "customInductive",
+    name: "Tree",
+    constructors: [
+      {
+        name: "Tree.branch",
+        jsName: "branch",
+        tag: 0,
+        objectFieldCount: 2,
+        usizeFieldCount: 0,
+        scalarByteSize: 0,
+        fields: [
+          {
+            name: "child",
+            type: { type: "Nat", wireTag: 0 },
+            layout: { kind: "object", index: 0 },
+          },
+          {
+            name: "child",
+            type: { type: "Nat", wireTag: 0 },
+            layout: { kind: "object", index: 1 },
+          },
+        ],
+      },
+    ],
+  };
+}, /constructors\[0\]\.fields\[1\]\.name duplicates another field/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Tree Nat",
+    wireTag: 25,
+    kind: "customInductive",
+    name: "Tree",
+    constructors: [
+      {
+        name: "Tree.leaf",
+        jsName: "leaf",
+        tag: 0,
+        objectFieldCount: 1,
+        usizeFieldCount: 0,
+        scalarByteSize: 0,
+        fields: [
+          {
+            name: "value",
+            type: { type: "Nat", wireTag: 0 },
+            layout: { kind: "object", index: 1 },
+          },
+        ],
+      },
+    ],
+  };
+}, /constructors\[0\]\.fields\[0\]\.layout\.index is outside objectFieldCount/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
     type: "Box Nat",
     wireTag: 20,
     kind: "structure",

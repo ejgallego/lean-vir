@@ -78,15 +78,15 @@ function validateManifestExports(exports) {
         throw new Error(`${argLabel} must be an object`);
       }
       requireString(arg.name, `${argLabel}.name`);
-      validateInterfaceType(arg.type, `${argLabel}.type`);
+      validateInterfaceRootType(arg.type, `${argLabel}.type`);
     });
-    validateInterfaceType(entry.result, `${label}.result`);
+    validateInterfaceRootType(entry.result, `${label}.result`);
   });
 }
 
-function requireUnique(seen, value, label) {
+function requireUnique(seen, value, label, owner = "interface export") {
   if (seen.has(value)) {
-    throw new Error(`${label} duplicates another interface export`);
+    throw new Error(`${label} duplicates another ${owner}`);
   }
   seen.add(value);
 }
@@ -136,6 +136,11 @@ export function validateInterfaceType(type, label = "interface type") {
   return type;
 }
 
+function validateInterfaceRootType(type, label) {
+  validateInterfaceType(type, label);
+  validateNoDanglingRecursiveSelf(type, label);
+}
+
 function validateSimpleEnumType(type, label) {
   if (type.kind !== "simpleEnum") {
     throw new Error(`${label}.kind must be simpleEnum`);
@@ -146,17 +151,7 @@ function validateSimpleEnumType(type, label) {
   const names = new Set();
   const jsNames = new Set();
   type.constructors.forEach((ctor, index) => {
-    const ctorLabel = `${label}.constructors[${index}]`;
-    if (!isRecord(ctor)) {
-      throw new Error(`${ctorLabel} must be an object`);
-    }
-    requireString(ctor.name, `${ctorLabel}.name`);
-    requireString(ctor.jsName, `${ctorLabel}.jsName`);
-    if (ctor.tag !== index) {
-      throw new Error(`${ctorLabel}.tag must be ${index}`);
-    }
-    requireUnique(names, ctor.name, `${ctorLabel}.name`);
-    requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`);
+    validateConstructorHeader(ctor, index, label, names, jsNames);
   });
 }
 
@@ -165,9 +160,7 @@ function validateStructureType(type, label) {
     throw new Error(`${label}.kind must be structure`);
   }
   requireString(type.name, `${label}.name`);
-  requireNonNegativeInteger(type.objectFieldCount, `${label}.objectFieldCount`);
-  requireNonNegativeInteger(type.usizeFieldCount, `${label}.usizeFieldCount`);
-  requireNonNegativeInteger(type.scalarByteSize, `${label}.scalarByteSize`);
+  validateRuntimeCounts(type, label);
   if (!Array.isArray(type.fields) || type.fields.length === 0) {
     throw new Error(`${label}.fields must be a non-empty array`);
   }
@@ -181,17 +174,10 @@ function validateStructureType(type, label) {
   const names = new Set();
   type.fields.forEach((field, index) => {
     const fieldLabel = `${label}.fields[${index}]`;
-    if (!isRecord(field)) {
-      throw new Error(`${fieldLabel} must be an object`);
-    }
-    requireString(field.name, `${fieldLabel}.name`);
-    requireUnique(names, field.name, `${fieldLabel}.name`);
+    validateInterfaceField(field, fieldLabel, names, type, type.name);
     if (field.subobject !== undefined && typeof field.subobject !== "boolean") {
       throw new Error(`${fieldLabel}.subobject must be a boolean`);
     }
-    validateStructureFieldLayout(field.layout, type, `${fieldLabel}.layout`);
-    validateInterfaceType(field.type, `${fieldLabel}.type`);
-    validateRecursiveSelfOwner(field.type, type.name, `${fieldLabel}.type`);
     if (field.subobject === true) {
       if (field.type?.wireTag !== WIRE.STRUCTURE) {
         throw new Error(`${fieldLabel}.subobject field type must be a structure`);
@@ -245,20 +231,8 @@ function validateTaggedUnionType(type, label) {
   const names = new Set();
   const jsNames = new Set();
   type.constructors.forEach((ctor, index) => {
-    const ctorLabel = `${label}.constructors[${index}]`;
-    if (!isRecord(ctor)) {
-      throw new Error(`${ctorLabel} must be an object`);
-    }
-    requireString(ctor.name, `${ctorLabel}.name`);
-    requireString(ctor.jsName, `${ctorLabel}.jsName`);
-    if (ctor.tag !== index) {
-      throw new Error(`${ctorLabel}.tag must be ${index}`);
-    }
-    requireUnique(names, ctor.name, `${ctorLabel}.name`);
-    requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`);
-    requireNonNegativeInteger(ctor.objectFieldCount, `${ctorLabel}.objectFieldCount`);
-    requireNonNegativeInteger(ctor.usizeFieldCount, `${ctorLabel}.usizeFieldCount`);
-    requireNonNegativeInteger(ctor.scalarByteSize, `${ctorLabel}.scalarByteSize`);
+    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
+    validateRuntimeCounts(ctor, ctorLabel);
     validateStructureFieldLayout(ctor.layout, ctor, `${ctorLabel}.layout`);
     validateInterfaceType(ctor.type, `${ctorLabel}.type`);
   });
@@ -275,20 +249,8 @@ function validateCustomInductiveType(type, label) {
   const names = new Set();
   const jsNames = new Set();
   type.constructors.forEach((ctor, index) => {
-    const ctorLabel = `${label}.constructors[${index}]`;
-    if (!isRecord(ctor)) {
-      throw new Error(`${ctorLabel} must be an object`);
-    }
-    requireString(ctor.name, `${ctorLabel}.name`);
-    requireString(ctor.jsName, `${ctorLabel}.jsName`);
-    if (ctor.tag !== index) {
-      throw new Error(`${ctorLabel}.tag must be ${index}`);
-    }
-    requireUnique(names, ctor.name, `${ctorLabel}.name`);
-    requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`);
-    requireNonNegativeInteger(ctor.objectFieldCount, `${ctorLabel}.objectFieldCount`);
-    requireNonNegativeInteger(ctor.usizeFieldCount, `${ctorLabel}.usizeFieldCount`);
-    requireNonNegativeInteger(ctor.scalarByteSize, `${ctorLabel}.scalarByteSize`);
+    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
+    validateRuntimeCounts(ctor, ctorLabel);
     if (!Array.isArray(ctor.fields)) {
       throw new Error(`${ctorLabel}.fields must be an array`);
     }
@@ -299,16 +261,41 @@ function validateCustomInductiveType(type, label) {
     const fieldNames = new Set();
     ctor.fields.forEach((field, fieldIndex) => {
       const fieldLabel = `${ctorLabel}.fields[${fieldIndex}]`;
-      if (!isRecord(field)) {
-        throw new Error(`${fieldLabel} must be an object`);
-      }
-      requireString(field.name, `${fieldLabel}.name`);
-      requireUnique(fieldNames, field.name, `${fieldLabel}.name`);
-      validateStructureFieldLayout(field.layout, ctor, `${fieldLabel}.layout`);
-      validateInterfaceType(field.type, `${fieldLabel}.type`);
-      validateRecursiveSelfOwner(field.type, type.name, `${fieldLabel}.type`);
+      validateInterfaceField(field, fieldLabel, fieldNames, ctor, type.name);
     });
   });
+}
+
+function validateConstructorHeader(ctor, index, label, names, jsNames) {
+  const ctorLabel = `${label}.constructors[${index}]`;
+  if (!isRecord(ctor)) {
+    throw new Error(`${ctorLabel} must be an object`);
+  }
+  requireString(ctor.name, `${ctorLabel}.name`);
+  requireString(ctor.jsName, `${ctorLabel}.jsName`);
+  if (ctor.tag !== index) {
+    throw new Error(`${ctorLabel}.tag must be ${index}`);
+  }
+  requireUnique(names, ctor.name, `${ctorLabel}.name`, "constructor");
+  requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`, "constructor");
+  return ctorLabel;
+}
+
+function validateRuntimeCounts(type, label) {
+  requireNonNegativeInteger(type.objectFieldCount, `${label}.objectFieldCount`);
+  requireNonNegativeInteger(type.usizeFieldCount, `${label}.usizeFieldCount`);
+  requireNonNegativeInteger(type.scalarByteSize, `${label}.scalarByteSize`);
+}
+
+function validateInterfaceField(field, fieldLabel, names, layoutOwner, recursiveOwnerName) {
+  if (!isRecord(field)) {
+    throw new Error(`${fieldLabel} must be an object`);
+  }
+  requireString(field.name, `${fieldLabel}.name`);
+  requireUnique(names, field.name, `${fieldLabel}.name`, "field");
+  validateStructureFieldLayout(field.layout, layoutOwner, `${fieldLabel}.layout`);
+  validateInterfaceType(field.type, `${fieldLabel}.type`);
+  validateRecursiveSelfOwner(field.type, recursiveOwnerName, `${fieldLabel}.type`);
 }
 
 function validateRecursiveSelfType(type, label) {
@@ -352,6 +339,35 @@ function validateRecursiveSelfOwner(type, ownerName, label) {
         validateRecursiveSelfOwner(arg.type, ownerName, `${label}.${arg.name}`);
       }
       validateRecursiveSelfOwner(type.result, ownerName, `${label}.result`);
+      break;
+    default:
+      break;
+  }
+}
+
+function validateNoDanglingRecursiveSelf(type, label) {
+  switch (type?.wireTag) {
+    case WIRE.RECURSIVE_SELF:
+      throw new Error(`${label} cannot be recursiveSelf outside a recursive descriptor`);
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      validateNoDanglingRecursiveSelf(type.element, `${label}.element`);
+      break;
+    case WIRE.PROD:
+      validateNoDanglingRecursiveSelf(type.fst, `${label}.fst`);
+      validateNoDanglingRecursiveSelf(type.snd, `${label}.snd`);
+      break;
+    case WIRE.TAGGED_UNION:
+      for (const ctor of type.constructors ?? []) {
+        validateNoDanglingRecursiveSelf(ctor.type, `${label}.${ctor.jsName}`);
+      }
+      break;
+    case WIRE.FUNCTION:
+      for (const arg of type.args ?? []) {
+        validateNoDanglingRecursiveSelf(arg.type, `${label}.${arg.name}`);
+      }
+      validateNoDanglingRecursiveSelf(type.result, `${label}.result`);
       break;
     default:
       break;
