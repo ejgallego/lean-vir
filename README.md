@@ -165,13 +165,17 @@ When durable release assets exist, the same fetcher can use
 ## Contributor Checks
 
 ```bash
-npm run build:site
+npm run setup
+npm run test:site
 npm run test:pages:browser
 npm test
 ```
 
 Generated outputs under `build/`, `web/dist/`, and `web/public/*.wasm` /
 `web/public/*.irpkg` are ignored by git.
+
+Contributor workflow and harness details live in
+[CONTRIBUTING.md](CONTRIBUTING.md) and [docs/HARNESS.md](docs/HARNESS.md).
 
 ## License
 

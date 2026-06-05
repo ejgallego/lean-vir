@@ -267,6 +267,22 @@ async function runFixture(fixture) {
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
+const fixtureFilter = process.env.VIR_FIXTURE_FILTER?.trim() ?? "";
+function fixtureMatchesFilter(fixture, filter) {
+  if (filter === "") return true;
+  const needle = filter.toLowerCase();
+  const haystack = [
+    fixture.id,
+    fixture.source,
+    fixture.entry,
+    ...(fixture.roots ?? []),
+  ].join("\n").toLowerCase();
+  return haystack.includes(needle);
+}
+const fixtures = (manifest.fixtures ?? []).filter((fixture) => fixtureMatchesFilter(fixture, fixtureFilter));
+if (fixtures.length === 0) {
+  throw new Error(`no fixtures matched VIR_FIXTURE_FILTER=${JSON.stringify(fixtureFilter)}`);
+}
 await mkdir(buildDir, { recursive: true });
 requireOk(await run("npm", ["run", "--silent", "build:demo"]), "npm run build:demo");
 
@@ -292,9 +308,12 @@ async function mapWithLimit(items, limit, fn) {
   return results;
 }
 
-const jobs = fixtureJobCount(manifest.fixtures.length);
+const jobs = fixtureJobCount(fixtures.length);
+if (fixtureFilter !== "") {
+  console.log(`fixture filter: ${fixtureFilter} (${fixtures.length}/${manifest.fixtures?.length ?? 0})`);
+}
 console.log(`fixture jobs: ${jobs}`);
-const results = await mapWithLimit(manifest.fixtures, jobs, runFixture);
+const results = await mapWithLimit(fixtures, jobs, runFixture);
 
 let passed = 0;
 let unsupported = 0;
