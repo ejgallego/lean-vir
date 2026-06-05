@@ -697,10 +697,7 @@ function encodeTypeDescriptor(writer, type, label) {
       encodeRuntimeCounts(writer, type, label);
       writer.u32(requireStructureTrivialFieldIndex(type, label));
       writer.u32(fields.length);
-      fields.forEach((field) => {
-        encodeStructureFieldLayout(writer, field.layout, `${label}.${field.name}`);
-        encodeTypeDescriptor(writer, field.type, `${label}.${field.name}`);
-      });
+      fields.forEach((field) => encodeFieldDescriptor(writer, field, `${label}.${field.name}`));
       return;
     }
     case WIRE.TAGGED_UNION: {
@@ -716,14 +713,8 @@ function encodeTypeDescriptor(writer, type, label) {
     case WIRE.CUSTOM_INDUCTIVE: {
       const constructors = requireCustomInductiveConstructors(type, label);
       writer.u32(constructors.length);
-      constructors.forEach((ctor) => {
-        encodeRuntimeCounts(writer, ctor, `${label}.${ctor.jsName}`);
-        writer.u32(ctor.fields.length);
-        ctor.fields.forEach((field) => {
-          encodeStructureFieldLayout(writer, field.layout, `${label}.${ctor.jsName}.${field.name}`);
-          encodeTypeDescriptor(writer, field.type, `${label}.${ctor.jsName}.${field.name}`);
-        });
-      });
+      constructors.forEach((ctor) =>
+        encodeCustomInductiveConstructorDescriptor(writer, ctor, `${label}.${ctor.jsName}`));
       return;
     }
     case WIRE.RECURSIVE_SELF:
@@ -741,13 +732,22 @@ function encodeTypeDescriptor(writer, type, label) {
   }
 }
 
+function encodeFieldDescriptor(writer, field, label) {
+  encodeStructureFieldLayout(writer, field.layout, label);
+  encodeTypeDescriptor(writer, field.type, label);
+}
+
+function encodeCustomInductiveConstructorDescriptor(writer, ctor, label) {
+  encodeRuntimeCounts(writer, ctor, label);
+  writer.u32(ctor.fields.length);
+  ctor.fields.forEach((field) => encodeFieldDescriptor(writer, field, `${label}.${field.name}`));
+}
+
 function decodeTypeDescriptor(reader) {
   const tag = reader.u8();
   switch (tag) {
     case WIRE.ARRAY:
-      return { wireTag: tag, element: decodeTypeDescriptor(reader) };
     case WIRE.LIST:
-      return { wireTag: tag, element: decodeTypeDescriptor(reader) };
     case WIRE.OPTION:
       return { wireTag: tag, element: decodeTypeDescriptor(reader) };
     case WIRE.PROD:
@@ -760,10 +760,7 @@ function decodeTypeDescriptor(reader) {
         wireTag: tag,
         ...counts,
         ...(trivialFieldIndex === null ? {} : { trivialFieldIndex }),
-        fields: Array.from({ length: len }, () => ({
-          layout: decodeStructureFieldLayout(reader),
-          type: decodeTypeDescriptor(reader),
-        })),
+        fields: decodeFieldDescriptors(reader, len),
       };
     }
     case WIRE.TAGGED_UNION: {
@@ -786,10 +783,7 @@ function decodeTypeDescriptor(reader) {
           const fieldLen = reader.u32();
           return {
             ...counts,
-            fields: Array.from({ length: fieldLen }, () => ({
-              layout: decodeStructureFieldLayout(reader),
-              type: decodeTypeDescriptor(reader),
-            })),
+            fields: decodeFieldDescriptors(reader, fieldLen),
           };
         }),
       };
@@ -812,6 +806,13 @@ function decodeTypeDescriptor(reader) {
     default:
       return { wireTag: tag };
   }
+}
+
+function decodeFieldDescriptors(reader, len) {
+  return Array.from({ length: len }, () => ({
+    layout: decodeStructureFieldLayout(reader),
+    type: decodeTypeDescriptor(reader),
+  }));
 }
 
 function encodeValuePayload(writer, type, value, label, selfType = null) {
@@ -873,20 +874,10 @@ function encodeValuePayload(writer, type, value, label, selfType = null) {
     case WIRE.EXPR:
       encodeExpr(writer, value, label);
       return;
-    case WIRE.ARRAY: {
-      const values = normalizeArray(value, label);
-      writer.u32(values.length);
-      const elementType = requireTypeField(type, "element", label);
-      values.forEach((item, itemIndex) => encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`, selfType));
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+      encodeSequencePayload(writer, type, value, label, selfType);
       return;
-    }
-    case WIRE.LIST: {
-      const values = normalizeArray(value, label);
-      writer.u32(values.length);
-      const elementType = requireTypeField(type, "element", label);
-      values.forEach((item, itemIndex) => encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`, selfType));
-      return;
-    }
     case WIRE.OPTION: {
       const option = normalizeOption(value, label);
       writer.u8(option.some ? 1 : 0);
@@ -904,8 +895,7 @@ function encodeValuePayload(writer, type, value, label, selfType = null) {
     case WIRE.STRUCTURE: {
       const fields = requireStructureFields(type, label);
       const record = normalizeStructure(value, fields, label);
-      fields.forEach((field) =>
-        encodeValuePayload(writer, field.type, record[field.name], `${label}.${field.name}`, type));
+      encodeNamedFieldPayloads(writer, fields, record, label, type);
       return;
     }
     case WIRE.TAGGED_UNION: {
@@ -917,14 +907,25 @@ function encodeValuePayload(writer, type, value, label, selfType = null) {
     case WIRE.CUSTOM_INDUCTIVE: {
       const { index, ctor, fields } = normalizeCustomInductive(value, type, label);
       writer.u32(index);
-      ctor.fields.forEach((field) => {
-        encodeValuePayload(writer, field.type, fields[field.name], `${label}.${ctor.jsName}.${field.name}`, type);
-      });
+      encodeNamedFieldPayloads(writer, ctor.fields, fields, `${label}.${ctor.jsName}`, type);
       return;
     }
     default:
       throw new Error(`${label} has unsupported wire tag ${tag}`);
   }
+}
+
+function encodeSequencePayload(writer, type, value, label, selfType) {
+  const values = normalizeArray(value, label);
+  writer.u32(values.length);
+  const elementType = requireTypeField(type, "element", label);
+  values.forEach((item, itemIndex) =>
+    encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`, selfType));
+}
+
+function encodeNamedFieldPayloads(writer, fields, values, label, selfType) {
+  fields.forEach((field) =>
+    encodeValuePayload(writer, field.type, values[field.name], `${label}.${field.name}`, selfType));
 }
 
 function decodeCallResult(type, bytes, runtime = null) {
@@ -1022,18 +1023,10 @@ function decodeValuePayload(reader, type, runtime = null, selfType = null) {
     case WIRE.EXPR:
       value = decodeExpr(reader);
       break;
-    case WIRE.ARRAY: {
-      const len = reader.u32();
-      const elementType = requireTypeField(type, "element", "result");
-      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType, runtime, selfType));
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+      value = decodeSequencePayload(reader, type, runtime, selfType);
       break;
-    }
-    case WIRE.LIST: {
-      const len = reader.u32();
-      const elementType = requireTypeField(type, "element", "result");
-      value = Array.from({ length: len }, () => decodeValuePayload(reader, elementType, runtime, selfType));
-      break;
-    }
     case WIRE.OPTION:
       value = reader.u8() === 0 ? null : decodeValuePayload(reader, requireTypeField(type, "element", "result"), runtime, selfType);
       break;
@@ -1044,10 +1037,7 @@ function decodeValuePayload(reader, type, runtime = null, selfType = null) {
       };
       break;
     case WIRE.STRUCTURE: {
-      value = {};
-      for (const field of requireStructureFields(type, "result")) {
-        value[field.name] = decodeValuePayload(reader, field.type, runtime, type);
-      }
+      value = decodeNamedFieldPayloads(reader, requireStructureFields(type, "result"), runtime, type);
       value = flattenStructureSubobjects(type, value);
       break;
     }
@@ -1063,10 +1053,7 @@ function decodeValuePayload(reader, type, runtime = null, selfType = null) {
     case WIRE.CUSTOM_INDUCTIVE: {
       const index = reader.u32();
       const ctor = customInductiveConstructorAt(type, index, "result");
-      const fields = {};
-      for (const field of ctor.fields) {
-        fields[field.name] = decodeValuePayload(reader, field.type, runtime, type);
-      }
+      const fields = decodeNamedFieldPayloads(reader, ctor.fields, runtime, type);
       value = ctor.fields.length === 0 ? { kind: ctor.jsName } : {
         kind: ctor.jsName,
         ...(ctor.fields.length === 1 ? { value: fields[ctor.fields[0].name] } : { fields }),
@@ -1077,6 +1064,20 @@ function decodeValuePayload(reader, type, runtime = null, selfType = null) {
       throw new Error(`unsupported result wire tag ${expectedTag}`);
   }
   return value;
+}
+
+function decodeSequencePayload(reader, type, runtime, selfType) {
+  const len = reader.u32();
+  const elementType = requireTypeField(type, "element", "result");
+  return Array.from({ length: len }, () => decodeValuePayload(reader, elementType, runtime, selfType));
+}
+
+function decodeNamedFieldPayloads(reader, fields, runtime, selfType) {
+  const values = {};
+  for (const field of fields) {
+    values[field.name] = decodeValuePayload(reader, field.type, runtime, selfType);
+  }
+  return values;
 }
 
 function requireWireTag(type, label) {
@@ -1103,9 +1104,10 @@ function requireStructureCount(type, field, label) {
 }
 
 function encodeRuntimeCounts(writer, type, label) {
-  writer.u32(requireStructureCount(type, "objectFieldCount", label));
-  writer.u32(requireStructureCount(type, "usizeFieldCount", label));
-  writer.u32(requireStructureCount(type, "scalarByteSize", label));
+  requireRuntimeCounts(type, label);
+  writer.u32(type.objectFieldCount);
+  writer.u32(type.usizeFieldCount);
+  writer.u32(type.scalarByteSize);
 }
 
 function decodeRuntimeCounts(reader) {
@@ -1414,16 +1416,12 @@ function requireTaggedUnionConstructors(type, label) {
     throw new Error(`${label} is missing manifest tagged-union constructors`);
   }
   for (const ctor of type.constructors) {
-    if (typeof ctor?.name !== "string" ||
-        typeof ctor?.jsName !== "string" ||
-        !ctor.type ||
+    const ctorLabel = requireConstructorHeader(ctor, label, "tagged-union");
+    if (!ctor.type ||
         !Number.isInteger(ctor.type.wireTag)) {
       throw new Error(`${label} has an invalid manifest tagged-union constructor`);
     }
-    requireStructureCount(ctor, "objectFieldCount", `${label}.${ctor.jsName}`);
-    requireStructureCount(ctor, "usizeFieldCount", `${label}.${ctor.jsName}`);
-    requireStructureCount(ctor, "scalarByteSize", `${label}.${ctor.jsName}`);
-    requireStructureFieldLayout(ctor.layout, `${label}.${ctor.jsName}`);
+    requireStructureFieldLayout(ctor.layout, ctorLabel);
   }
   return type.constructors;
 }
@@ -1433,26 +1431,37 @@ function requireCustomInductiveConstructors(type, label) {
     throw new Error(`${label} is missing manifest custom inductive constructors`);
   }
   for (const ctor of type.constructors) {
-    if (typeof ctor?.name !== "string" ||
-        typeof ctor?.jsName !== "string" ||
-        !Array.isArray(ctor.fields)) {
+    const ctorLabel = requireConstructorHeader(ctor, label, "custom inductive");
+    if (!Array.isArray(ctor.fields)) {
       throw new Error(`${label} has an invalid manifest custom inductive constructor`);
     }
-    requireStructureCount(ctor, "objectFieldCount", `${label}.${ctor.jsName}`);
-    requireStructureCount(ctor, "usizeFieldCount", `${label}.${ctor.jsName}`);
-    requireStructureCount(ctor, "scalarByteSize", `${label}.${ctor.jsName}`);
     if (ctor.fields.length === 0 &&
         (ctor.objectFieldCount !== 0 || ctor.usizeFieldCount !== 0 || ctor.scalarByteSize !== 0)) {
-      throw new Error(`${label}.${ctor.jsName} has no fields but non-zero runtime field counts`);
+      throw new Error(`${ctorLabel} has no fields but non-zero runtime field counts`);
     }
     for (const field of ctor.fields) {
       if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
-        throw new Error(`${label}.${ctor.jsName} has an invalid manifest custom inductive field`);
+        throw new Error(`${ctorLabel} has an invalid manifest custom inductive field`);
       }
-      requireStructureFieldLayout(field.layout, `${label}.${ctor.jsName}.${field.name}`);
+      requireStructureFieldLayout(field.layout, `${ctorLabel}.${field.name}`);
     }
   }
   return type.constructors;
+}
+
+function requireConstructorHeader(ctor, label, kindLabel) {
+  if (typeof ctor?.name !== "string" || typeof ctor?.jsName !== "string") {
+    throw new Error(`${label} has an invalid manifest ${kindLabel} constructor`);
+  }
+  const ctorLabel = `${label}.${ctor.jsName}`;
+  requireRuntimeCounts(ctor, ctorLabel);
+  return ctorLabel;
+}
+
+function requireRuntimeCounts(type, label) {
+  requireStructureCount(type, "objectFieldCount", label);
+  requireStructureCount(type, "usizeFieldCount", label);
+  requireStructureCount(type, "scalarByteSize", label);
 }
 
 function requireFunctionArgs(type, label) {
@@ -1479,29 +1488,31 @@ function requireFunctionResult(type, label) {
 }
 
 function taggedUnionConstructorAt(type, index, label) {
-  const constructors = requireTaggedUnionConstructors(type, label);
-  if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
-    throw new Error(`${label} tagged-union constructor index is out of range`);
-  }
-  return constructors[index];
+  return constructorAt(type, index, label, requireTaggedUnionConstructors, "tagged-union");
 }
 
 function customInductiveConstructorAt(type, index, label) {
-  const constructors = requireCustomInductiveConstructors(type, label);
+  return constructorAt(type, index, label, requireCustomInductiveConstructors, "custom inductive");
+}
+
+function findTaggedUnionConstructor(type, text) {
+  return findConstructor(type, text, requireTaggedUnionConstructors, "tagged union");
+}
+
+function findCustomInductiveConstructor(type, text) {
+  return findConstructor(type, text, requireCustomInductiveConstructors, "custom inductive");
+}
+
+function constructorAt(type, index, label, requireConstructors, kindLabel) {
+  const constructors = requireConstructors(type, label);
   if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
-    throw new Error(`${label} custom inductive constructor index is out of range`);
+    throw new Error(`${label} ${kindLabel} constructor index is out of range`);
   }
   return constructors[index];
 }
 
-function findTaggedUnionConstructor(type, text) {
-  const constructors = requireTaggedUnionConstructors(type, "tagged union");
-  const index = constructors.findIndex((ctor) => ctor.name === text || ctor.jsName === text);
-  return index < 0 ? null : { index, ctor: constructors[index] };
-}
-
-function findCustomInductiveConstructor(type, text) {
-  const constructors = requireCustomInductiveConstructors(type, "custom inductive");
+function findConstructor(type, text, requireConstructors, kindLabel) {
+  const constructors = requireConstructors(type, kindLabel);
   const index = constructors.findIndex((ctor) => ctor.name === text || ctor.jsName === text);
   return index < 0 ? null : { index, ctor: constructors[index] };
 }
