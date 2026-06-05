@@ -358,7 +358,7 @@ async function smokeLanding(cdp, origin) {
   ]);
   assert.ok(state.packageItems[0].text.includes("Four small exports from one Lean file"));
   assert.ok(state.packageItems[1].text.includes("Basic, list/option, interface shapes"));
-  assert.ok(state.packageItems[2].text.includes("Browser host calls and DOM Tamagotchi"));
+  assert.ok(state.packageItems[2].text.includes("Browser host calls, React, and DOM Tamagotchi"));
   assert.ok(state.packageItems[3].text.includes("Std.Format.pretty component package"));
   assert.ok(state.packageItems[4].text.includes("Lean Expr, parser, Task"));
   assert.equal(state.name, "Octi");
@@ -514,7 +514,7 @@ async function smokePackagePreset(cdp, origin) {
     status: "Ready",
     packageName: "demo-host.irpkg",
     packageUrl: "demo-host.irpkg",
-    entryCount: 23,
+    entryCount: 29,
   });
 }
 
@@ -661,6 +661,54 @@ async function smokeBrowserCallbacks(cdp, origin) {
     text: "callback:clicked",
     status: "Ready",
   });
+
+  const reactCase = await runnerCaseFromManifest("demo-host.irpkg", "ReactCounter.mount", {
+    runInputs: ["#react-smoke-root"],
+  });
+  await navigate(cdp, `${origin}${basePath}${reactCase.url}`);
+  await waitForReady(cdp);
+  await evaluate(cdp, `(() => {
+    document.querySelector("#react-smoke-root")?.remove();
+    const target = document.createElement("div");
+    target.id = "react-smoke-root";
+    document.body.append(target);
+  })()`);
+  assert.equal(await runSelectedEntry(cdp, reactCase.expected.runInputs), "1");
+  const reactClicked = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 5000;
+    const pollMounted = () => {
+      const button = document.querySelector("#react-counter-button");
+      if (button?.textContent === "react:0") {
+        button.click();
+        button.click();
+        pollClicked();
+      } else if (Date.now() > deadline) {
+        reject(new Error("React counter did not mount; got " + button?.textContent));
+      } else {
+        setTimeout(pollMounted, 50);
+      }
+    };
+    const pollClicked = () => {
+      const button = document.querySelector("#react-counter-button");
+      const text = button?.textContent;
+      const status = document.querySelector("#status")?.textContent?.trim();
+      if (status === "Trap") {
+        reject(new Error("React counter rapid rerender trapped: " + document.querySelector("#dev-result")?.textContent));
+      } else if (/^react:[12]$/.test(text ?? "")) {
+        resolve({
+          text,
+          status,
+        });
+      } else if (Date.now() > deadline) {
+        reject(new Error("React counter click did not rerender; got " + button?.textContent));
+      } else {
+        setTimeout(pollClicked, 50);
+      }
+    };
+    pollMounted();
+  })`);
+  assert.match(reactClicked.text, /^react:[12]$/);
+  assert.equal(reactClicked.status, "Ready");
 
   const timeoutCase = await runnerCaseFromManifest("demo-host.irpkg", "HostInterop.timeoutTitle", {
     runInputs: ["pages-timeout"],
@@ -1182,7 +1230,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
+  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

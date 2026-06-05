@@ -15,9 +15,9 @@ modules below.
 
 ## User Workflow
 
-For the built-in browser and common host imports, the Lean code is the only
+For the built-in browser, React, and common host imports, the Lean code is the only
 piece users need to write. The JavaScript runtime already provides default
-bindings for `common.*` and `browser.*` targets.
+bindings for `common.*`, `browser.*`, and `react.root.*` targets.
 
 1. Import the Lean module that provides the host import.
 
@@ -87,7 +87,7 @@ import { createVirRuntime } from "lean-vir/vir-runtime-node";
 
 That wrapper uses the same runtime and installs virtual browser bindings for
 `Lean.Vir.Browser.Document`, `Lean.Vir.Browser.Element`,
-`Lean.Vir.Browser.HTMLInputElement`, timers, and animation frames.
+`Lean.Vir.Browser.HTMLInputElement`, timers, animation frames, and React roots.
 
 Pass `hostBindings` only for custom targets or to override one of the default
 bindings. If a package imports both built-in and custom targets, the custom map
@@ -180,11 +180,29 @@ Node-like environments:
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> IO Unit) -> IO Lean.Vir.Browser.AnimationFrame`
 - `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Browser.AnimationFrame -> IO Unit`
 
+`Lean.Vir.React` provides the first React-specific imports and a narrow
+recursive `Html` tree:
+
+- `Lean.Vir.React.Root`
+- `Lean.Vir.React.Html`
+- `Lean.Vir.React.Property`
+- `Lean.Vir.React.PropValue`
+- `Lean.Vir.React.EventHandler`
+- `Lean.Vir.React.Root.create : @& Lean.Vir.Browser.Element -> IO Lean.Vir.React.Root`
+- `Lean.Vir.React.Root.render : @& Lean.Vir.React.Root -> @& Lean.Vir.React.Html -> IO Unit`
+- `Lean.Vir.React.Root.unmount : @& Lean.Vir.React.Root -> IO Unit`
+
+`Html` uses the generic non-indexed custom-inductive and `recursiveSelf`
+interface descriptors. Rendering retains any Lean event callbacks embedded in
+the tree until the root is rerendered, unmounted, the package is reloaded, or
+the runtime is disposed.
+
 The browser runtime bindings use standard browser APIs and require
 `globalThis.document` for document calls. In non-browser runtimes, use
 `lean-vir/vir-runtime-node` or pass explicit `hostBindings`; the Node wrapper
 keeps virtual document and element state for the built-in browser APIs. Event
-listener, timeout, and animation-frame imports are also virtualized for tests.
+listener, timeout, animation-frame, and React root imports are also virtualized
+for tests.
 
 External references:
 
@@ -203,6 +221,8 @@ External references:
 - [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout)
 - [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)
 - [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame)
+- [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot)
+- [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount)
 
 ## Example
 
@@ -254,10 +274,11 @@ when the host binding calls `callback.release()` or when the runtime is disposed
 JavaScript-provided function values are not accepted as Lean arguments in this
 phase.
 
-`Element.addEventListener`, `Timer.setTimeout`, and
-`Animation.requestAnimationFrame` use the callback ABI. Event resources are valid
-only during the callback. Listener, timeout, and frame handles own their retained
-callbacks until removal, cancellation, firing, or runtime disposal. See
+`Element.addEventListener`, `Timer.setTimeout`,
+`Animation.requestAnimationFrame`, and `React.Root.render` use the callback ABI.
+Event resources are valid only during the callback. Listener, timeout, frame,
+and React root handles own their retained callbacks until removal,
+cancellation, firing, rerender, unmount, package reload, or runtime disposal. See
 `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed ownership contract and
 follow-up work.
 
@@ -275,9 +296,10 @@ entrypoints:
 - non-indexed user-defined structures and custom inductives with nullary or
   runtime-payload constructors
 - nullary inductive enums
-- opaque `Lean.Vir.Browser` resource handles
+- opaque `Lean.Vir.Browser` and `Lean.Vir.React` resource handles
 - Lean function values used as host callbacks
 - `Lean.Expr`
+- `Lean.Vir.React.Html` through the generic recursive custom-inductive surface
 
 Imports may be pure functions or `IO α` actions. The v1 host boundary is
 synchronous; returning a JavaScript `Promise` is an error. The current package

@@ -4,7 +4,4 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import LeanVir.Host
-import LeanVir.Common
-import LeanVir.Browser
 import LeanVir.React

@@ -103,7 +103,9 @@ The embedded manifest currently supports:
 - non-indexed custom inductives with zero or more runtime payload fields per
   constructor, including direct recursive references through supported
   container shapes;
-- `Lean.Expr`, represented as structural JavaScript objects.
+- `Lean.Expr`, represented as structural JavaScript objects;
+- `Lean.Vir.React.Html`, represented through the same recursive custom
+  inductive surface and rendered by the React host bindings.
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
@@ -134,6 +136,11 @@ JavaScript host imports. Their descriptors record the callback argument list,
 result type, and whether applying the callback returns `IO`. JavaScript receives
 these values as `VirCallback` objects and releases the rooted Lean closure when
 the host-owned registration is done with it.
+
+`Lean.Vir.React.Html` now uses the same improved custom-inductive and
+`recursiveSelf` descriptor support as other non-indexed recursive inductives.
+The React-specific boundary is the host renderer and callback ownership policy,
+not a separate private `reactHtml` wire type.
 
 Entry points and host imports can be pure functions or `IO α` actions. For
 Lean-to-JavaScript calls, import `Lean.Vir.Host` and mark an opaque declaration

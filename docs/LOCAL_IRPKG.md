@@ -138,7 +138,8 @@ Supported v1 types:
   including direct recursive references through supported container shapes;
 - opaque host resources;
 - Lean function values used as host callbacks;
-- `Lean.Expr`.
+- `Lean.Expr`;
+- `Lean.Vir.React.Html` through the generic recursive custom-inductive surface.
 
 Large exact integer results are returned as decimal strings.
 Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them use the

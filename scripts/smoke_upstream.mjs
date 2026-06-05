@@ -185,12 +185,25 @@ const hostRuntime = await createVirRuntime({
   irPackageBytes: hostPackage,
   virtualDocumentState: hostDocumentState,
 });
-if (hostRuntime.packageInfo.hostImports !== 19) {
-  throw new Error(`expected 19 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+if (hostRuntime.packageInfo.hostImports !== 22) {
+  throw new Error(`expected 22 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
 }
 const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
 if (hostTitle !== "Lean VIR host: smoke") {
   throw new Error(`Lean to JavaScript host title: expected Lean VIR host: smoke, got ${hostTitle}`);
+}
+const reactMountCount = hostRuntime.call("ReactCounter.mount", "#react-smoke");
+const reactElement = hostDocumentState.elements.get("#react-smoke");
+if (reactMountCount !== "1" || reactElement.textContent !== "react:0" || hostRuntime.liveCallbacks.size !== 1) {
+  throw new Error(`Lean React mount failed: ${JSON.stringify({ reactMountCount, text: reactElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+reactElement.reactRoot.current.handlers.onClick({});
+if (reactElement.textContent !== "react:1" || hostRuntime.liveCallbacks.size !== 1) {
+  throw new Error(`Lean React click failed: ${JSON.stringify({ text: reactElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+reactElement.reactRoot.unmount();
+if (hostRuntime.liveCallbacks.size !== 0 || reactElement.reactRoot !== undefined) {
+  throw new Error(`Lean React unmount cleanup failed: ${JSON.stringify({ callbacks: hostRuntime.liveCallbacks.size, root: reactElement.reactRoot })}`);
 }
 const petMountCount = hostRuntime.call("Tamagotchi.uiMountFromDom");
 if (petMountCount !== "8" || hostRuntime.liveCallbacks.size !== 8) {

@@ -52,11 +52,13 @@ same host-resource teardown before the new manifest is installed. Event
 resources remain opaque callback-scoped handles; the ownership contract and
 follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
 
-The next browser-facing direction is React rendering for ProofWidgets-style
-Lean UIs. The first proposed slice is a standalone React root plus a narrow
-blessed recursive `Html` codec that reuses the existing resource and callback
-lifetime model before attempting full Lean infoview RPC compatibility. The
-design notes and open questions are tracked in
+The browser-facing direction now includes the first React rendering slice for
+ProofWidgets-style Lean UIs. Lean code can create a standalone React root from a
+browser element, render a narrow recursive `Html` tree represented by the
+generic custom-inductive interface support, and retain Lean callbacks inside
+React event handlers. Root rerender, unmount, package reload, and runtime
+disposal reuse the existing resource and callback lifetime model. Full Lean
+infoview RPC compatibility remains follow-up work tracked in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
 `Lean.Expr` is also part of the current manifest surface. JavaScript sends and

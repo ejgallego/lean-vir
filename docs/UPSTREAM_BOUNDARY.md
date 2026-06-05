@@ -267,8 +267,8 @@ Useful WebAssembly features to track before widening the ABI:
 - Reference Types are already part of the finished proposal set, and `externref`
   is the obvious future representation for host-owned resources in browser
   builds. It can remove the JavaScript DOM-resource table for values such as
-  `Element` or `Event`, but it does not remove the need to root and release Lean
-  heap closures explicitly.
+  `Element`, callback-scoped `Event`, or `ReactRoot`, but it does not remove the
+  need to root and release Lean heap closures explicitly.
 - The Component Model is still proposal-track and is the right semantic target
   for typed resources once this project moves beyond an internal `.irpkg`
   manifest. The current `@[vir_resource]` metadata is intentionally compatible

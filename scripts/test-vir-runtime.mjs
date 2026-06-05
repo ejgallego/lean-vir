@@ -21,6 +21,7 @@ import {
 import {
   createVirRuntime,
   createVirRuntimeFactory,
+  createVirtualDocumentHostBindings,
   createVirtualDocumentState,
 } from "../web/src/vir-runtime-node.js";
 import {
@@ -76,6 +77,20 @@ function assertInvalidManifest(mutator, pattern) {
 
 function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function reactHtmlElement(fields = {}) {
+  return {
+    kind: "element",
+    fields: {
+      tag: "div",
+      "key?": null,
+      props: [],
+      handlers: [],
+      children: [],
+      ...fields,
+    },
+  };
 }
 
 async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns, roots = null) {
@@ -146,7 +161,7 @@ assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
-assert.equal(hostRuntime.packageInfo.hostImports, 19);
+assert.equal(hostRuntime.packageInfo.hostImports, 22);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -458,9 +473,17 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "browser.htmlInputElement.setValue",
   "browser.timer.clearTimeout",
   "browser.timer.setTimeout",
+  "react.root.create",
+  "react.root.render",
+  "react.root.unmount",
   "test.callNatCallback",
   "test.recordNat",
 ]);
+assert.equal(
+  hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
+    ?.args[1]?.type?.kind,
+  "customInductive",
+);
 const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
 assert.throws(
   () => browserRuntime.call("HostInterop.titleHandshake", "node"),
@@ -595,6 +618,113 @@ assert.deepEqual(lifecycleRecords2.splice(0), [2, 1, 0]);
 lifecycleRuntime2.dispose();
 assert.throws(() => lifecycleRuntime2.call("HostInterop.callbackRoundTrip", 1), /disposed/);
 
+const reactDocumentState = createVirtualDocumentState();
+const reactRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  virtualDocumentState: reactDocumentState,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": () => undefined,
+  },
+});
+assert.equal(reactRuntime.call("ReactCounter.renderStatic", "#react-static"), "1");
+assert.equal(reactDocumentState.elements.get("#react-static").textContent, "react:static");
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+assert.equal(reactRuntime.call("ReactCounter.mount", "#react-counter"), "1");
+const reactElement = reactDocumentState.elements.get("#react-counter");
+assert.equal(reactElement.textContent, "react:0");
+assert.equal(reactRuntime.liveCallbacks.size, 1);
+reactElement.reactRoot.current.handlers.onClick({});
+assert.equal(reactElement.textContent, "react:1");
+assert.equal(reactRuntime.liveCallbacks.size, 1);
+reactElement.reactRoot.unmount();
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+assert.equal(reactElement.reactRoot, undefined);
+assert.equal(reactRuntime.call("ReactCounter.mountAndUnmount", "#react-unmount"), "1");
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+assert.equal(reactDocumentState.elements.get("#react-unmount").reactRoot, undefined);
+assert.throws(
+  () => reactRuntime.call("ReactCounter.renderAfterUnmount", "#react-stale-root"),
+  /ReactRoot resource handle \d+ is not live/,
+);
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+assert.throws(
+  () => reactRuntime.call("ReactCounter.renderTooDeep", "#react-too-deep"),
+  /React Html exceeds maximum depth 128/,
+);
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+
+const malformedReactDocumentState = createVirtualDocumentState();
+const malformedReactHost = createVirtualDocumentHostBindings(malformedReactDocumentState);
+const malformedReactContainer = malformedReactHost["browser.document.querySelector"]("#react-malformed");
+const malformedReactRoot = malformedReactHost["react.root.create"](malformedReactContainer);
+const renderMalformedReactHtml = (html) => malformedReactHost["react.root.render"](malformedReactRoot, html);
+assert.throws(
+  () => renderMalformedReactHtml({ kind: "text", value: 1 }),
+  /React Html text value must be a string/,
+);
+assert.throws(
+  () => renderMalformedReactHtml({ kind: "element", fields: null }),
+  /React Html element fields must be an object/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({ tag: "" })),
+  /React Html element tag must be a non-empty string/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({ "key?": 7 })),
+  /React Html element key must be a string or null/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: 1, value: { kind: "string", value: "bad" } }],
+  })),
+  /React Html property name must be a non-empty string/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "title", value: { kind: "string", value: false } }],
+  })),
+  /React PropValue\.string value must be a string/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "hidden", value: { kind: "bool", value: "false" } }],
+  })),
+  /React PropValue\.bool value must be a boolean/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "data-x", value: { kind: "number", value: 1 } }],
+  })),
+  /React PropValue must be string or bool/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    handlers: [{ name: 1, callback: Object.assign(() => undefined, { release: () => undefined }) }],
+  })),
+  /React Html event handler name must be a non-empty string/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    handlers: [{ name: "onClick" }],
+  })),
+  /React Html event handler callback must be a releasable function/,
+);
+
+assert.equal(reactRuntime.call("ReactCounter.mount", "#react-dispose"), "1");
+assert.equal(reactRuntime.liveCallbacks.size, 1);
+reactRuntime.dispose();
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+assert.throws(() => reactRuntime.call("ReactCounter.mount", "#react-disposed"), /disposed/);
+
 const pendingDocumentState = createVirtualDocumentState();
 const pendingRecords = [];
 const pendingRuntime = await createVirRuntime({
@@ -658,6 +788,29 @@ reloadDocumentState.elements.get("#reload").listeners.get("click")?.[0]?.dispatc
 await wait(40);
 assert.deepEqual(reloadRecords.splice(0), []);
 reloadRuntime.dispose();
+
+const reactReloadDocumentState = createVirtualDocumentState();
+const reactReloadRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  virtualDocumentState: reactReloadDocumentState,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": () => undefined,
+  },
+});
+assert.equal(reactReloadRuntime.call("ReactCounter.mount", "#react-reload"), "1");
+assert.equal(reactReloadRuntime.liveCallbacks.size, 1);
+reactReloadRuntime.loadIrPackageBytes(irPackageBytes);
+assert.equal(reactReloadRuntime.liveCallbacks.size, 0);
+assert.equal(reactReloadDocumentState.elements.get("#react-reload").reactRoot, undefined);
+reactReloadRuntime.dispose();
 
 assert.equal(hostRuntime.call("Tamagotchi.uiMountFromDom"), "8");
 assert.equal(hostRuntime.liveCallbacks.size, 8);

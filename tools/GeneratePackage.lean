@@ -1886,6 +1886,7 @@ def resourceInterfaceType? (_env : Environment) (e : Lean.Expr) : Option Interfa
   | `Lean.Vir.Browser.HTMLInputElement => some (.resource name "HTMLInputElement")
   | `Lean.Vir.Browser.Timeout => some (.resource name "Timeout")
   | `Lean.Vir.Browser.AnimationFrame => some (.resource name "AnimationFrame")
+  | `Lean.Vir.React.Root => some (.resource name "ReactRoot")
   | _ => none
 
 def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType := do

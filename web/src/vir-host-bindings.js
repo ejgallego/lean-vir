@@ -4,7 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import * as React from "react";
+import * as ReactDOMClient from "react-dom/client";
+
 const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
+const REACT_HTML_MAX_DEPTH = 128;
+const REACT_HTML_MAX_NODES = 10000;
+const disposedReactHtmlRoots = new WeakSet();
 
 export function createCommonHostBindings() {
   return {
@@ -178,6 +184,32 @@ export function createBrowserAnimationHostBindings(state = createDomResourceStat
   };
 }
 
+export function createBrowserReactHostBindings(state = createDomResourceState()) {
+  return {
+    "react.root.create": (container) => {
+      const target = resolveResource(state, container, "Element");
+      const root = ReactDOMClient.createRoot(target);
+      return resourceForValue(state, createReactRootResource(state, root));
+    },
+    "react.root.render": (root, html) => {
+      try {
+        const value = resolveResource(state, root, "ReactRoot");
+        value.render(html);
+      } catch (error) {
+        disposeReactHtml(html);
+        throw error;
+      }
+      return undefined;
+    },
+    "react.root.unmount": (root) => {
+      const value = resolveResource(state, root, "ReactRoot");
+      value.unmount();
+      releaseResource(state, root);
+      return undefined;
+    },
+  };
+}
+
 export function createBrowserHostBindings({ runtimeRef = null } = {}) {
   const state = createDomResourceState();
   return {
@@ -188,6 +220,7 @@ export function createBrowserHostBindings({ runtimeRef = null } = {}) {
     ...createBrowserHtmlInputElementHostBindings(state),
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
+    ...createBrowserReactHostBindings(state),
     [VIR_HOST_DISPOSE]: () => disposeDomResourceState(state),
   };
 }
@@ -316,6 +349,26 @@ export function createVirtualDocumentHostBindings(
       releaseResource(state.resources, frame);
       return undefined;
     },
+    "react.root.create": (container) => {
+      const target = resolveResource(state.resources, container, "Element");
+      return resourceForValue(state.resources, createVirtualReactRootResource(state.resources, target));
+    },
+    "react.root.render": (root, html) => {
+      try {
+        const value = resolveResource(state.resources, root, "ReactRoot");
+        value.render(html);
+      } catch (error) {
+        disposeReactHtml(html);
+        throw error;
+      }
+      return undefined;
+    },
+    "react.root.unmount": (root) => {
+      const value = resolveResource(state.resources, root, "ReactRoot");
+      value.unmount();
+      releaseResource(state.resources, root);
+      return undefined;
+    },
     [VIR_HOST_DISPOSE]: () => disposeDomResourceState(state.resources),
   };
 }
@@ -385,6 +438,8 @@ function disposeDomResourceState(state) {
       value.clear();
     } else if (typeof value.cancel === "function") {
       value.cancel();
+    } else if (typeof value.unmount === "function") {
+      value.unmount();
     }
   }
   state.disposables?.clear();
@@ -447,6 +502,266 @@ function reportEventHandlerError(error) {
 
 function performanceNow() {
   return globalThis.performance?.now?.() ?? Date.now();
+}
+
+function createReactRootResource(state, root) {
+  let currentHtml = null;
+  const value = {
+    render(html) {
+      let nextElement;
+      try {
+        nextElement = reactElementFromHtml(state, html);
+        root.render(nextElement);
+      } catch (error) {
+        disposeReactHtml(html);
+        throw error;
+      }
+      queueReactHtmlDispose(currentHtml);
+      currentHtml = html;
+    },
+    unmount: once(() => {
+      try {
+        root.unmount();
+      } finally {
+        disposeReactHtml(currentHtml);
+        currentHtml = null;
+        removeDisposable(state, value);
+      }
+    }),
+  };
+  addDisposable(state, value);
+  return value;
+}
+
+function createVirtualReactRootResource(resources, target) {
+  let currentHtml = null;
+  const value = {
+    current: null,
+    render(html) {
+      let nextTree;
+      try {
+        nextTree = virtualReactNodeFromHtml(resources, html);
+      } catch (error) {
+        disposeReactHtml(html);
+        throw error;
+      }
+      disposeReactHtml(currentHtml);
+      currentHtml = html;
+      value.current = nextTree;
+      target.reactRoot = value;
+      target.textContent = virtualReactTextContent(nextTree);
+    },
+    unmount: once(() => {
+      disposeReactHtml(currentHtml);
+      currentHtml = null;
+      value.current = null;
+      if (target.reactRoot === value) {
+        delete target.reactRoot;
+      }
+      removeDisposable(resources, value);
+    }),
+  };
+  addDisposable(resources, value);
+  return value;
+}
+
+function reactElementFromHtml(state, html) {
+  return reactElementFromHtmlNode(state, html, createReactHtmlTraversalContext(), 0);
+}
+
+function reactElementFromHtmlNode(state, html, context, depth) {
+  countReactHtmlNode(context, depth);
+  if (html?.kind === "text") {
+    return reactHtmlTextValue(html);
+  }
+  if (html?.kind !== "element") {
+    throw new Error("React Html node must be text or element");
+  }
+  const fields = reactHtmlElementFields(html);
+  const props = reactPropsFromHtml(state, fields);
+  const children = reactHtmlArray(fields.children, "children")
+    .map((child) => reactElementFromHtmlNode(state, child, context, depth + 1));
+  return React.createElement(fields.tag, props, ...children);
+}
+
+function reactPropsFromHtml(state, fields) {
+  const props = {};
+  const key = reactHtmlKey(fields);
+  if (key !== null && key !== undefined) {
+    props.key = key;
+  }
+  for (const prop of reactHtmlArray(fields.props, "props")) {
+    props[reactHtmlNamedField(prop, "property")] = reactPropValue(prop?.value);
+  }
+  for (const handler of reactHtmlArray(fields.handlers, "handlers")) {
+    const name = reactHtmlNamedField(handler, "event handler");
+    const callback = reactHtmlEventCallback(handler);
+    props[name] = (event) => callLeanEventCallback(state, event, callback);
+  }
+  return props;
+}
+
+function virtualReactNodeFromHtml(resources, html) {
+  return virtualReactNodeFromHtmlNode(resources, html, createReactHtmlTraversalContext(), 0);
+}
+
+function virtualReactNodeFromHtmlNode(resources, html, context, depth) {
+  countReactHtmlNode(context, depth);
+  if (html?.kind === "text") {
+    return { kind: "text", value: reactHtmlTextValue(html) };
+  }
+  if (html?.kind !== "element") {
+    throw new Error("React Html node must be text or element");
+  }
+  const fields = reactHtmlElementFields(html);
+  return {
+    kind: "element",
+    tag: fields.tag,
+    key: reactHtmlKey(fields),
+    props: Object.fromEntries(
+      reactHtmlArray(fields.props, "props")
+        .map((prop) => [reactHtmlNamedField(prop, "property"), reactPropValue(prop?.value)]),
+    ),
+    handlers: Object.fromEntries(
+      reactHtmlArray(fields.handlers, "handlers")
+        .map((handler) => {
+          const name = reactHtmlNamedField(handler, "event handler");
+          const callback = reactHtmlEventCallback(handler);
+          return [name, (event = {}) => callLeanEventCallback(resources, event, callback)];
+        }),
+    ),
+    children: reactHtmlArray(fields.children, "children")
+      .map((child) => virtualReactNodeFromHtmlNode(resources, child, context, depth + 1)),
+  };
+}
+
+function virtualReactTextContent(node) {
+  if (node === null || node === undefined) return "";
+  if (node.kind === "text") return node.value;
+  if (node.kind === "element") return node.children.map(virtualReactTextContent).join("");
+  return "";
+}
+
+function disposeReactHtml(html) {
+  if (html === null || html === undefined) return;
+  if (typeof html.dispose === "function") {
+    html.dispose();
+    return;
+  }
+  if (typeof html !== "object" || disposedReactHtmlRoots.has(html)) return;
+  disposedReactHtmlRoots.add(html);
+  releaseReactHtmlCallbacks(html);
+}
+
+function queueReactHtmlDispose(html) {
+  if (html === null || html === undefined) return;
+  const queue =
+    typeof globalThis.queueMicrotask === "function"
+      ? globalThis.queueMicrotask.bind(globalThis)
+      : (callback) => Promise.resolve().then(callback);
+  queue(() => disposeReactHtml(html));
+}
+
+function createReactHtmlTraversalContext() {
+  return { nodeCount: 0 };
+}
+
+function countReactHtmlNode(context, depth) {
+  if (depth > REACT_HTML_MAX_DEPTH) {
+    throw new Error(`React Html exceeds maximum depth ${REACT_HTML_MAX_DEPTH}`);
+  }
+  context.nodeCount++;
+  if (context.nodeCount > REACT_HTML_MAX_NODES) {
+    throw new Error(`React Html exceeds maximum node count ${REACT_HTML_MAX_NODES}`);
+  }
+}
+
+function reactHtmlElementFields(html) {
+  const fields = html?.fields;
+  if (fields === null || typeof fields !== "object" || Array.isArray(fields)) {
+    throw new Error("React Html element fields must be an object");
+  }
+  reactHtmlName(fields.tag, "element tag");
+  return fields;
+}
+
+function reactHtmlTextValue(html) {
+  if (typeof html.value !== "string") {
+    throw new Error("React Html text value must be a string");
+  }
+  return html.value;
+}
+
+function reactHtmlKey(fields) {
+  const key = Object.prototype.hasOwnProperty.call(fields, "key?") ? fields["key?"] : fields.key;
+  if (key !== null && key !== undefined && typeof key !== "string") {
+    throw new Error("React Html element key must be a string or null");
+  }
+  return key;
+}
+
+function reactHtmlArray(value, label) {
+  if (!Array.isArray(value)) {
+    throw new Error(`React Html ${label} must be an array`);
+  }
+  return value;
+}
+
+function reactHtmlNamedField(value, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`React Html ${label} must be an object`);
+  }
+  return reactHtmlName(value.name, `${label} name`);
+}
+
+function reactHtmlName(value, label) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`React Html ${label} must be a non-empty string`);
+  }
+  return value;
+}
+
+function reactHtmlEventCallback(handler) {
+  const callback = handler?.callback;
+  if (typeof callback !== "function" || typeof callback.release !== "function") {
+    throw new Error("React Html event handler callback must be a releasable function");
+  }
+  return callback;
+}
+
+function reactPropValue(value) {
+  switch (value?.kind) {
+    case "string":
+      if (typeof value.value !== "string") {
+        throw new Error("React PropValue.string value must be a string");
+      }
+      return value.value;
+    case "bool":
+      if (typeof value.value !== "boolean") {
+        throw new Error("React PropValue.bool value must be a boolean");
+      }
+      return value.value;
+    default:
+      throw new Error("React PropValue must be string or bool");
+  }
+}
+
+function releaseReactHtmlCallbacks(html) {
+  if (html === null || typeof html !== "object" || html.kind !== "element") return;
+  const fields = html.fields;
+  if (fields === null || typeof fields !== "object" || Array.isArray(fields)) return;
+  if (Array.isArray(fields.handlers)) {
+    for (const handler of fields.handlers) {
+      if (typeof handler?.callback?.release === "function") {
+        handler.callback.release();
+      }
+    }
+  }
+  if (Array.isArray(fields.children)) {
+    for (const child of fields.children) {
+      releaseReactHtmlCallbacks(child);
+    }
+  }
 }
 
 function virtualElementState(state, selector) {

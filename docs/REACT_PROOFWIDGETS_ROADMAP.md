@@ -1,6 +1,6 @@
 # React And ProofWidgets Roadmap
 
-This note records the next browser-facing direction after the closure host
+This note records the browser-facing React direction after the closure host
 callback bridge. The practical goal is basic React support good enough to write
 ProofWidgets-style views from Lean, then grow toward richer ProofWidgets
 compatibility.
@@ -52,9 +52,17 @@ manifest surface. A natural ProofWidgets-like `Html` tree is recursive and may
 fit that surface, but the v0 React plan should still keep callback ownership
 and renderer-specific cleanup inside a narrow audited ABI.
 
-## Recommended V0
+This roadmap assumes the current `main` branch repository setup: Lean
+`v4.30.0-rc2`, the local WASI SDK from `npm run install:wasi`, and the small
+repository harness documented in `AGENTS.md`, `CONTRIBUTING.md`, and
+`docs/HARNESS.md`. For this line of work, use `npm run setup` for a fresh
+checkout and `npm run doctor` before deeper validation when the local toolchain
+state is uncertain.
 
-Add React as a runtime renderer behind a blessed recursive `Html` ABI:
+## Current V0
+
+The current v0 exposes React as a runtime renderer behind a narrow recursive
+`Html` ABI:
 
 ```lean
 namespace Lean.Vir.React
@@ -66,7 +74,7 @@ inductive PropValue where
   | string : String → PropValue
   | bool : Bool → PropValue
 
-structure Prop where
+structure Property where
   name : String
   value : PropValue
 
@@ -79,17 +87,19 @@ inductive Html where
   | element
       (tag : String)
       (key? : Option String)
-      (props : Array Prop)
+      (props : Array Property)
       (handlers : Array EventHandler)
       (children : Array Html)
 
 def button (label : String) (onClick : IO Unit) : Html :=
   .element "button" none #[]
-    #[{ name := "onClick", callback := fun _ => onClick }]
+    #[EventHandler.mkClick onClick]
     #[.text label]
 
+namespace Root
+
 @[vir_js "react.root.create"]
-opaque createRoot (container : @& Lean.Vir.Browser.Element) : IO Root
+opaque create (container : @& Lean.Vir.Browser.Element) : IO Root
 
 @[vir_js "react.root.render"]
 opaque render (root : @& Root) (html : @& Html) : IO Unit
@@ -97,16 +107,17 @@ opaque render (root : @& Root) (html : @& Html) : IO Unit
 @[vir_js "react.root.unmount"]
 opaque unmount (root : @& Root) : IO Unit
 
+end Root
+
 end Lean.Vir.React
 ```
 
-This is deliberately not "support recursive types" in general. The package
-generator should recognize `Lean.Vir.React.Html`, `Prop`, `PropValue`, and
-`EventHandler` by name and emit a dedicated manifest type such as
-`kind: "reactHtml"` with a stable wire tag. The WASM shim and JavaScript
-runtime then use a custom recursive codec for this one type. That lets Lean
-authors write normal tree-shaped UI code while keeping recursion, callbacks,
-and release ownership inside a small audited surface.
+After the recursive interface work, this no longer needs a private `reactHtml`
+wire tag. The package generator represents `Lean.Vir.React.Html` using the
+generic non-indexed custom-inductive and `recursiveSelf` descriptors, including
+the known `Property`, `PropValue`, and `EventHandler` payload shapes. The small
+audited surface is now the React renderer and callback ownership policy rather
+than a separate recursive codec.
 
 The JavaScript renderer may still flatten the tree internally for bookkeeping,
 diffing, or callback cleanup. That lowering should remain an implementation
@@ -121,8 +132,9 @@ The browser host binding should own a React root resource:
   calls and invokes `root.render(...)`.
 - `react.root.unmount` calls `root.unmount()` and releases callbacks retained
   by the current render.
-- Rendering a new tree into the same root releases callbacks retained by the
-  previous tree after React has been given the replacement tree.
+- Rendering a new tree into the same browser root queues callbacks retained by
+  the previous tree for microtask release after React has been given the
+  replacement tree. The virtual test host releases immediately.
 - Runtime dispose and package reload unmount all live React roots through the
   same disposable-resource path used for DOM listeners, timeouts, and frames.
 
@@ -149,7 +161,8 @@ A realistic path has three layers:
    callbacks into a browser DOM container. This enables small interactive
    widgets from Lean without a Lean server.
 2. **ProofWidgets-style HTML subset.** Provide a Lean DSL close to
-   `ProofWidgets.Data.Html` / JSX-like usage and compile it to blessed `Html`.
+   `ProofWidgets.Data.Html` / JSX-like usage and compile it to this narrow
+   `Html`.
    This should cover text, attributes, children, basic events, and reusable
    Lean components.
 3. **Infoview/RPC compatibility.** Add document positions, snapshot-aware RPC,
@@ -157,22 +170,23 @@ A realistic path has three layers:
    tactic UIs and proof-script editing, and it should be designed after the
    standalone renderer is working.
 
-## Initial Implementation Slice
+## Implemented V0 Slice
 
-1. Add `react` and `react-dom` dependencies to the Vite app.
-2. Add `LeanVir/React.lean` with `Root`, `Html`, `Prop`, `PropValue`,
+1. Added `react` and `react-dom` dependencies to the Vite app.
+2. Added `LeanVir/React.lean` with `Root`, `Html`, `Property`, `PropValue`,
    `EventHandler`, and root create/render/unmount host imports.
-3. Add a dedicated `reactHtml` manifest/wire type recognized by declaration
-   name, not generic recursive type expansion.
-4. Add WASM and JavaScript recursive codecs for the blessed `Html` shape,
-   including recursion-depth and node-count limits.
-5. Add browser and virtual Node host bindings under `react.root.*`.
-6. Add `examples/ReactCounter.lean` that renders a button and updates through
+3. Reused the generic custom-inductive and `recursiveSelf` manifest support for
+   the recursive `Html` shape.
+4. Added JavaScript React tree validation with recursion-depth and node-count
+   limits before rendering.
+5. Added browser and virtual Node host bindings under `react.root.*`.
+6. Added `examples/ReactCounter.lean` that renders a button and updates through
    a retained Lean callback.
-7. Add runtime tests for nested callbacks inside `Html`, root rerender cleanup,
+7. Added runtime tests for nested callbacks inside `Html`, root rerender cleanup,
    unmount cleanup, package reload cleanup, runtime dispose, malformed trees,
    and recursion limits.
-8. Add browser smoke coverage proving a real React click calls back into Lean.
+8. Added browser smoke coverage proving a real React click calls back into Lean,
+   including a rapid rerender cleanup stress case.
 
 ## Open Questions
 
@@ -180,11 +194,10 @@ A realistic path has three layers:
   style-object, class-list, and JSON-like values immediately.
 - Whether React roots should be created only from `Browser.Element` resources
   or also from CSS selectors for convenience.
-- Whether callback release on rerender should happen immediately after
-  `root.render` or after a microtask to give React a chance to detach old event
-  handlers. This needs a small browser stress test.
-- Whether the blessed recursive codec should preserve sharing or intentionally
-  treat `Html` as a pure tree. The first phase should almost certainly use pure
-  trees and reject only by depth/node-count limits.
+- Whether the microtask cleanup policy for browser React rerenders is enough for
+  broader concurrent React edge cases.
+- Whether recursive custom-inductive values should eventually preserve sharing
+  or intentionally treat `Html` as a pure tree. The first phase should almost
+  certainly use pure trees and reject only by depth/node-count limits.
 - How much of ProofWidgets' RPC layer can be approximated without a Lean
   server snapshot model.
