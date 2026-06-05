@@ -96,9 +96,13 @@ The embedded manifest currently supports:
   parameterized instances such as `Box Nat` and `Tagged (Array String)`,
   direct `Bool`, `UInt*`, `USize`, `Float`, `Float32`, and enum fields,
   single-field wrappers over direct scalar fields, and inherited parent fields
-  represented as flattened JavaScript object keys;
+  represented as flattened JavaScript object keys. Direct recursive structures
+  are supported, but recursive inherited structures are not;
 - nullary inductive enums, represented in JavaScript by generated constructor
   names;
+- non-indexed custom inductives with zero or more runtime payload fields per
+  constructor, including direct recursive references through supported
+  container shapes;
 - `Lean.Expr`, represented as structural JavaScript objects.
 
 Large exact integer values are returned to JavaScript as decimal strings to

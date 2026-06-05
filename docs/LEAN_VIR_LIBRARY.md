@@ -270,7 +270,10 @@ entrypoints:
 - `Nat`, `Int`, `Bool`, `String`
 - `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`
 - `ByteArray`
-- `Array α`, `List α`, `Option α`, and `α × β` over supported types
+- `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α` over
+  supported types
+- non-indexed user-defined structures and custom inductives with nullary or
+  runtime-payload constructors
 - nullary inductive enums
 - opaque `Lean.Vir.Browser` resource handles
 - Lean function values used as host callbacks

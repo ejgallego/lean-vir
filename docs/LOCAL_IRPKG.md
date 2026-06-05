@@ -134,6 +134,8 @@ Supported v1 types:
   inherited parent fields, represented as JavaScript objects with parent fields
   flattened into ordinary keys;
 - nullary inductive enums;
+- non-indexed custom inductives with nullary or runtime-payload constructors,
+  including direct recursive references through supported container shapes;
 - opaque host resources;
 - Lean function values used as host callbacks;
 - `Lean.Expr`.

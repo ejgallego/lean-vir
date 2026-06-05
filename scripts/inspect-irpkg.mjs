@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { formatInterfaceType, manifestDiagnostics } from "../web/src/interface-manifest.js";
+import { WIRE } from "../web/src/wire-tags.js";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 
 function usage() {
@@ -71,6 +72,7 @@ function printText(info) {
       .join(", ");
     const effect = entry.effect === "io" ? " IO" : "";
     console.log(`  - ${entry.jsName ?? entry.entry}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.entry}]`);
+    printDescriptorDetails(entry.args ?? [], entry.result);
   }
   const hostImports = Array.isArray(info.manifest.hostImports) ? info.manifest.hostImports : [];
   console.log(`host imports: ${hostImports.length}`);
@@ -80,9 +82,91 @@ function printText(info) {
       .join(", ");
     const effect = entry.effect === "io" ? " IO" : "";
     console.log(`  - #${entry.slot} ${entry.name}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.target}]`);
+    printDescriptorDetails(entry.args ?? [], entry.result);
   }
   console.log(`diagnostics: ${diagnostics.length}`);
   for (const diagnostic of diagnostics) {
     console.log(`  - ${diagnostic.name ?? "unknown"}: ${diagnostic.reason ?? "unsupported interface"}`);
+  }
+}
+
+function printDescriptorDetails(args, result) {
+  for (const arg of args) {
+    const summary = descriptorSummary(arg.type);
+    if (summary !== null) {
+      console.log(`    arg ${arg.name ?? "arg"} descriptor: ${summary}`);
+    }
+  }
+  const resultSummary = descriptorSummary(result);
+  if (resultSummary !== null) {
+    console.log(`    result descriptor: ${resultSummary}`);
+  }
+}
+
+function descriptorSummary(type) {
+  switch (type?.wireTag) {
+    case WIRE.CUSTOM_INDUCTIVE:
+      return `customInductive ${type.name ?? type.type ?? "?"} { ${customInductiveConstructors(type).join(", ")} }`;
+    case WIRE.STRUCTURE:
+      if (!containsRecursiveSelf(type)) return null;
+      return `structure ${type.name ?? type.type ?? "?"} { ${(type.fields ?? []).map((field) =>
+        `${field.name}: ${descriptorLabel(field.type)}`).join(", ")} }`;
+    default:
+      return containsRecursiveSelf(type) ? descriptorLabel(type) : null;
+  }
+}
+
+function customInductiveConstructors(type) {
+  return (type.constructors ?? []).map((ctor) => {
+    const fields = ctor.fields ?? [];
+    if (fields.length === 0) return `${ctor.jsName ?? ctor.name}()`;
+    return `${ctor.jsName ?? ctor.name}(${fields.map((field) =>
+      `${field.name}: ${descriptorLabel(field.type)}`).join(", ")})`;
+  });
+}
+
+function descriptorLabel(type) {
+  switch (type?.wireTag) {
+    case WIRE.RECURSIVE_SELF:
+      return `recursiveSelf ${type.name ?? type.type ?? "?"}`;
+    case WIRE.ARRAY:
+      return `Array<${descriptorLabel(type.element)}>`;
+    case WIRE.LIST:
+      return `List<${descriptorLabel(type.element)}>`;
+    case WIRE.OPTION:
+      return `Option<${descriptorLabel(type.element)}>`;
+    case WIRE.PROD:
+      return `Prod<${descriptorLabel(type.fst)}, ${descriptorLabel(type.snd)}>`;
+    case WIRE.CUSTOM_INDUCTIVE:
+      return `customInductive ${type.name ?? type.type ?? "?"}`;
+    case WIRE.STRUCTURE:
+      return `structure ${type.name ?? type.type ?? "?"}`;
+    default:
+      return formatInterfaceType(type);
+  }
+}
+
+function containsRecursiveSelf(type) {
+  switch (type?.wireTag) {
+    case WIRE.RECURSIVE_SELF:
+      return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      return containsRecursiveSelf(type.element);
+    case WIRE.PROD:
+      return containsRecursiveSelf(type.fst) || containsRecursiveSelf(type.snd);
+    case WIRE.STRUCTURE:
+      return (type.fields ?? []).some((field) => containsRecursiveSelf(field.type));
+    case WIRE.TAGGED_UNION:
+      return (type.constructors ?? []).some((ctor) => containsRecursiveSelf(ctor.type));
+    case WIRE.CUSTOM_INDUCTIVE:
+      return (type.constructors ?? []).some((ctor) =>
+        (ctor.fields ?? []).some((field) => containsRecursiveSelf(field.type)));
+    case WIRE.FUNCTION:
+      return (type.args ?? []).some((arg) => containsRecursiveSelf(arg.type)) ||
+        containsRecursiveSelf(type.result);
+    default:
+      return false;
   }
 }

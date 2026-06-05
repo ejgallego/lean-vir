@@ -1773,6 +1773,8 @@ enum class vir_wire_type : uint8_t {
     TaggedUnion = 21,
     Resource = 23,
     Function = 24,
+    CustomInductive = 25,
+    RecursiveSelf = 26,
     SimpleEnum = 14,
     Expr = 15,
 };
@@ -1790,13 +1792,21 @@ struct vir_field_layout {
     uint32_t offset;
 };
 
+struct vir_type;
+
+struct vir_variant {
+    std::vector<vir_type> fields;
+    std::vector<vir_field_layout> field_layouts;
+    uint32_t object_fields = 0;
+    uint32_t usize_fields = 0;
+    uint32_t scalar_bytes = 0;
+};
+
 struct vir_type {
     vir_wire_type tag;
     std::vector<vir_type> args;
     std::vector<vir_field_layout> field_layouts;
-    std::vector<uint32_t> variant_object_fields;
-    std::vector<uint32_t> variant_usize_fields;
-    std::vector<uint32_t> variant_scalar_bytes;
+    std::vector<vir_variant> variants;
     uint32_t object_fields = 0;
     uint32_t usize_fields = 0;
     uint32_t scalar_bytes = 0;
@@ -2003,6 +2013,8 @@ static bool is_known_wire_type(vir_wire_type tag) {
     case vir_wire_type::Prod:
     case vir_wire_type::Structure:
     case vir_wire_type::TaggedUnion:
+    case vir_wire_type::CustomInductive:
+    case vir_wire_type::RecursiveSelf:
     case vir_wire_type::SimpleEnum:
     case vir_wire_type::Resource:
     case vir_wire_type::Function:
@@ -2044,6 +2056,52 @@ static void encode_field_layout(vir_writer & w, vir_field_layout const & layout)
     w.u32(layout.offset);
 }
 
+static vir_type decode_type(vir_reader & r);
+static void encode_type(vir_writer & w, vir_type const & type);
+
+static vir_variant decode_variant_runtime_counts(vir_reader & r) {
+    vir_variant variant;
+    variant.object_fields = r.u32();
+    variant.usize_fields = r.u32();
+    variant.scalar_bytes = r.u32();
+    return variant;
+}
+
+static void encode_variant_runtime_counts(vir_writer & w, vir_variant const & variant) {
+    w.u32(variant.object_fields);
+    w.u32(variant.usize_fields);
+    w.u32(variant.scalar_bytes);
+}
+
+static bool same_variant_runtime_counts(vir_variant const & lhs, vir_variant const & rhs) {
+    return lhs.object_fields == rhs.object_fields &&
+        lhs.usize_fields == rhs.usize_fields &&
+        lhs.scalar_bytes == rhs.scalar_bytes;
+}
+
+static void decode_field_descriptors(
+    vir_reader & r,
+    uint32_t field_count,
+    std::vector<vir_type> & fields,
+    std::vector<vir_field_layout> & layouts) {
+    fields.reserve(field_count);
+    layouts.reserve(field_count);
+    for (uint32_t i = 0; i < field_count; i++) {
+        layouts.push_back(decode_field_layout(r));
+        fields.push_back(decode_type(r));
+    }
+}
+
+static void encode_field_descriptors(
+    vir_writer & w,
+    std::vector<vir_type> const & fields,
+    std::vector<vir_field_layout> const & layouts) {
+    for (size_t i = 0; i < fields.size(); i++) {
+        encode_field_layout(w, layouts[i]);
+        encode_type(w, fields[i]);
+    }
+}
+
 static vir_type decode_type(vir_reader & r) {
     vir_type type { static_cast<vir_wire_type>(r.u8()), {} };
     if (!is_known_wire_type(type.tag)) {
@@ -2066,12 +2124,7 @@ static vir_type decode_type(vir_reader & r) {
         type.scalar_bytes = r.u32();
         type.trivial_field = r.u32();
         uint32_t field_count = r.u32();
-        type.args.reserve(field_count);
-        type.field_layouts.reserve(field_count);
-        for (uint32_t i = 0; i < field_count; i++) {
-            type.field_layouts.push_back(decode_field_layout(r));
-            type.args.push_back(decode_type(r));
-        }
+        decode_field_descriptors(r, field_count, type.args, type.field_layouts);
         if (type.trivial_field != UINT32_MAX && type.trivial_field >= field_count) {
             r.fail("structure trivial field index is out of range");
         }
@@ -2079,20 +2132,28 @@ static vir_type decode_type(vir_reader & r) {
     }
     case vir_wire_type::TaggedUnion: {
         uint32_t variant_count = r.u32();
-        type.args.reserve(variant_count);
-        type.field_layouts.reserve(variant_count);
-        type.variant_object_fields.reserve(variant_count);
-        type.variant_usize_fields.reserve(variant_count);
-        type.variant_scalar_bytes.reserve(variant_count);
+        type.variants.reserve(variant_count);
         for (uint32_t i = 0; i < variant_count; i++) {
-            type.variant_object_fields.push_back(r.u32());
-            type.variant_usize_fields.push_back(r.u32());
-            type.variant_scalar_bytes.push_back(r.u32());
-            type.field_layouts.push_back(decode_field_layout(r));
-            type.args.push_back(decode_type(r));
+            vir_variant variant = decode_variant_runtime_counts(r);
+            decode_field_descriptors(r, 1, variant.fields, variant.field_layouts);
+            type.variants.push_back(std::move(variant));
         }
         if (variant_count == 0) {
             r.fail("tagged union has no constructors");
+        }
+        break;
+    }
+    case vir_wire_type::CustomInductive: {
+        uint32_t variant_count = r.u32();
+        type.variants.reserve(variant_count);
+        for (uint32_t i = 0; i < variant_count; i++) {
+            vir_variant variant = decode_variant_runtime_counts(r);
+            uint32_t field_count = r.u32();
+            decode_field_descriptors(r, field_count, variant.fields, variant.field_layouts);
+            type.variants.push_back(std::move(variant));
+        }
+        if (variant_count == 0) {
+            r.fail("custom inductive has no constructors");
         }
         break;
     }
@@ -2130,19 +2191,21 @@ static void encode_type(vir_writer & w, vir_type const & type) {
         w.u32(type.scalar_bytes);
         w.u32(type.trivial_field);
         w.u32(static_cast<uint32_t>(type.args.size()));
-        for (size_t i = 0; i < type.args.size(); i++) {
-            encode_field_layout(w, type.field_layouts[i]);
-            encode_type(w, type.args[i]);
-        }
+        encode_field_descriptors(w, type.args, type.field_layouts);
         break;
     case vir_wire_type::TaggedUnion:
-        w.u32(static_cast<uint32_t>(type.args.size()));
-        for (size_t i = 0; i < type.args.size(); i++) {
-            w.u32(type.variant_object_fields[i]);
-            w.u32(type.variant_usize_fields[i]);
-            w.u32(type.variant_scalar_bytes[i]);
-            encode_field_layout(w, type.field_layouts[i]);
-            encode_type(w, type.args[i]);
+        w.u32(static_cast<uint32_t>(type.variants.size()));
+        for (vir_variant const & variant : type.variants) {
+            encode_variant_runtime_counts(w, variant);
+            encode_field_descriptors(w, variant.fields, variant.field_layouts);
+        }
+        break;
+    case vir_wire_type::CustomInductive:
+        w.u32(static_cast<uint32_t>(type.variants.size()));
+        for (vir_variant const & variant : type.variants) {
+            encode_variant_runtime_counts(w, variant);
+            w.u32(static_cast<uint32_t>(variant.fields.size()));
+            encode_field_descriptors(w, variant.fields, variant.field_layouts);
         }
         break;
     case vir_wire_type::Function:
@@ -2360,13 +2423,18 @@ static uint32_t structure_scalar_base(vir_type const & type) {
     return scalar_field_base(type.object_fields, type.usize_fields);
 }
 
+static uint32_t variant_scalar_base(vir_variant const & variant) {
+    return scalar_field_base(variant.object_fields, variant.usize_fields);
+}
+
 static void set_scalar_field(
     vir_reader & r,
     object * obj,
     uint32_t scalar_base,
     vir_type const & field_type,
     vir_field_layout const & layout,
-    object * field_value) {
+    object * field_value,
+    char const * owner) {
     uint32_t offset = scalar_base + layout.offset;
     switch (field_type.tag) {
     case vir_wire_type::Bool:
@@ -2384,7 +2452,7 @@ static void set_scalar_field(
             lean_ctor_set_uint32(obj, offset, static_cast<uint32_t>(lean_unbox(field_value)));
             break;
         }
-        r.fail("unsupported structure enum scalar size " + std::to_string(layout.size));
+        r.fail("unsupported " + std::string(owner) + " enum scalar size " + std::to_string(layout.size));
         break;
     case vir_wire_type::UInt16:
         lean_ctor_set_uint16(obj, offset, static_cast<uint16_t>(lean_unbox(field_value)));
@@ -2402,23 +2470,46 @@ static void set_scalar_field(
         lean_ctor_set_float32(obj, offset, lean_unbox_float32(field_value));
         break;
     default:
-        r.fail("structure scalar field has non-scalar wire type");
+        r.fail(std::string(owner) + " scalar field has non-scalar wire type");
         break;
     }
 }
 
-static void set_structure_scalar_field(
+static void set_ctor_field(
     vir_reader & r,
     object * obj,
-    vir_type const & structure_type,
+    uint32_t scalar_base,
     vir_type const & field_type,
     vir_field_layout const & layout,
-    object * field_value) {
-    set_scalar_field(r, obj, structure_scalar_base(structure_type), field_type, layout, field_value);
+    object * field_value,
+    char const * owner) {
+    switch (layout.kind) {
+    case vir_field_layout_kind::Object:
+        lean_ctor_set(obj, layout.index, field_value);
+        break;
+    case vir_field_layout_kind::USize:
+        if (field_type.tag != vir_wire_type::USize) {
+            r.fail(std::string(owner) + " usize field has non-USize wire type");
+        } else {
+            lean_ctor_set_usize(obj, layout.index, lean_unbox_usize(field_value));
+        }
+        lean_dec(field_value);
+        break;
+    case vir_field_layout_kind::Scalar:
+        set_scalar_field(r, obj, scalar_base, field_type, layout, field_value, owner);
+        lean_dec(field_value);
+        break;
+    }
 }
 
-static object * decode_value(vir_reader & r, vir_type const & type) {
+static object * decode_value(vir_reader & r, vir_type const & type, vir_type const * self_type = nullptr) {
     switch (type.tag) {
+    case vir_wire_type::RecursiveSelf:
+        if (self_type == nullptr) {
+            r.fail("recursive self reference has no enclosing type");
+            return lean_box(0);
+        }
+        return decode_value(r, *self_type, self_type);
     case vir_wire_type::Unit:
         return lean_box(0);
     case vir_wire_type::Nat: {
@@ -2474,7 +2565,7 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
         uint32_t len = r.u32();
         object * array = lean_alloc_array(len, len);
         for (uint32_t i = 0; i < len; i++) {
-            lean_array_set_core(array, i, decode_value(r, type.args[0]));
+            lean_array_set_core(array, i, decode_value(r, type.args[0], self_type));
         }
         return array;
     }
@@ -2483,7 +2574,7 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
         std::vector<object *> values;
         values.reserve(len);
         for (uint32_t i = 0; i < len; i++) {
-            values.push_back(decode_value(r, type.args[0]));
+            values.push_back(decode_value(r, type.args[0], self_type));
         }
         std::reverse(values.begin(), values.end());
         object * out = mk_list_from_reversed(values);
@@ -2492,16 +2583,16 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
     }
     case vir_wire_type::Option: {
         if (r.u8() == 0) return lean_box(0);
-        return mk_ctor_owned(1, { decode_value(r, type.args[0]) });
+        return mk_ctor_owned(1, { decode_value(r, type.args[0], self_type) });
     }
     case vir_wire_type::Prod: {
-        object * fst = decode_value(r, type.args[0]);
-        object * snd = decode_value(r, type.args[1]);
+        object * fst = decode_value(r, type.args[0], self_type);
+        object * snd = decode_value(r, type.args[1], self_type);
         return mk_ctor_owned(0, { fst, snd });
     }
     case vir_wire_type::Structure: {
         if (type.trivial_field != UINT32_MAX) {
-            return decode_value(r, type.args[type.trivial_field]);
+            return decode_value(r, type.args[type.trivial_field], &type);
         }
         object * obj = lean_alloc_ctor(
             0,
@@ -2510,62 +2601,47 @@ static object * decode_value(vir_reader & r, vir_type const & type) {
         for (size_t i = 0; i < type.args.size(); i++) {
             vir_type const & field_type = type.args[i];
             vir_field_layout const & layout = type.field_layouts[i];
-            object * field_value = decode_value(r, field_type);
-            switch (layout.kind) {
-            case vir_field_layout_kind::Object:
-                lean_ctor_set(obj, layout.index, field_value);
-                break;
-            case vir_field_layout_kind::USize:
-                if (field_type.tag != vir_wire_type::USize) {
-                    r.fail("structure usize field has non-USize wire type");
-                } else {
-                    lean_ctor_set_usize(obj, layout.index, lean_unbox_usize(field_value));
-                }
-                lean_dec(field_value);
-                break;
-            case vir_field_layout_kind::Scalar:
-                set_structure_scalar_field(r, obj, type, field_type, layout, field_value);
-                lean_dec(field_value);
-                break;
-            }
+            object * field_value = decode_value(r, field_type, &type);
+            set_ctor_field(r, obj, structure_scalar_base(type), field_type, layout, field_value, "structure");
         }
         return obj;
     }
     case vir_wire_type::TaggedUnion: {
         uint32_t tag = r.u32();
-        if (tag >= type.args.size()) {
+        if (tag >= type.variants.size()) {
             r.fail("tagged union constructor index is out of range");
             return lean_box(0);
         }
-        vir_type const & field_type = type.args[tag];
-        vir_field_layout const & layout = type.field_layouts[tag];
-        object * field_value = decode_value(r, field_type);
+        vir_variant const & variant = type.variants[tag];
+        vir_type const & field_type = variant.fields[0];
+        vir_field_layout const & layout = variant.field_layouts[0];
+        object * field_value = decode_value(r, field_type, self_type);
         object * obj = lean_alloc_ctor(
             tag,
-            type.variant_object_fields[tag],
-            type.variant_usize_fields[tag] * sizeof(size_t) + type.variant_scalar_bytes[tag]);
-        switch (layout.kind) {
-        case vir_field_layout_kind::Object:
-            lean_ctor_set(obj, layout.index, field_value);
-            break;
-        case vir_field_layout_kind::USize:
-            if (field_type.tag != vir_wire_type::USize) {
-                r.fail("tagged union usize field has non-USize wire type");
-            } else {
-                lean_ctor_set_usize(obj, layout.index, lean_unbox_usize(field_value));
-            }
-            lean_dec(field_value);
-            break;
-        case vir_field_layout_kind::Scalar:
-            set_scalar_field(
-                r,
-                obj,
-                scalar_field_base(type.variant_object_fields[tag], type.variant_usize_fields[tag]),
-                field_type,
-                layout,
-                field_value);
-            lean_dec(field_value);
-            break;
+            variant.object_fields,
+            variant.usize_fields * sizeof(size_t) + variant.scalar_bytes);
+        set_ctor_field(r, obj, variant_scalar_base(variant), field_type, layout, field_value, "tagged union");
+        return obj;
+    }
+    case vir_wire_type::CustomInductive: {
+        uint32_t tag = r.u32();
+        if (tag >= type.variants.size()) {
+            r.fail("custom inductive constructor index is out of range");
+            return lean_box(0);
+        }
+        vir_variant const & variant = type.variants[tag];
+        if (variant.fields.empty()) {
+            return lean_box(tag);
+        }
+        object * obj = lean_alloc_ctor(
+            tag,
+            variant.object_fields,
+            variant.usize_fields * sizeof(size_t) + variant.scalar_bytes);
+        for (size_t i = 0; i < variant.fields.size(); i++) {
+            vir_type const & field_type = variant.fields[i];
+            vir_field_layout const & layout = variant.field_layouts[i];
+            object * field_value = decode_value(r, field_type, &type);
+            set_ctor_field(r, obj, variant_scalar_base(variant), field_type, layout, field_value, "custom inductive");
         }
         return obj;
     }
@@ -2794,16 +2870,8 @@ static object * scalar_field_as_object(
     }
 }
 
-static object * structure_scalar_field_as_object(
-    vir_type const & structure_type,
-    vir_type const & field_type,
-    vir_field_layout const & layout,
-    object * value) {
-    return scalar_field_as_object(structure_scalar_base(structure_type), field_type, layout, value);
-}
-
-static object * structure_field_as_object(
-    vir_type const & structure_type,
+static object * ctor_field_as_object(
+    uint32_t scalar_base,
     vir_type const & field_type,
     vir_field_layout const & layout,
     object * value,
@@ -2817,40 +2885,19 @@ static object * structure_field_as_object(
         return lean_box_usize(lean_ctor_get_usize(value, layout.index));
     case vir_field_layout_kind::Scalar:
         borrowed = false;
-        return structure_scalar_field_as_object(structure_type, field_type, layout, value);
+        return scalar_field_as_object(scalar_base, field_type, layout, value);
     }
     borrowed = false;
     return lean_box(0);
 }
 
-static object * tagged_union_field_as_object(
-    vir_type const & type,
-    uint32_t tag,
-    vir_type const & field_type,
-    vir_field_layout const & layout,
-    object * value,
-    bool & borrowed) {
-    switch (layout.kind) {
-    case vir_field_layout_kind::Object:
-        borrowed = true;
-        return lean_ctor_get(value, layout.index);
-    case vir_field_layout_kind::USize:
-        borrowed = false;
-        return lean_box_usize(lean_ctor_get_usize(value, layout.index));
-    case vir_field_layout_kind::Scalar:
-        borrowed = false;
-        return scalar_field_as_object(
-            scalar_field_base(type.variant_object_fields[tag], type.variant_usize_fields[tag]),
-            field_type,
-            layout,
-            value);
-    }
-    borrowed = false;
-    return lean_box(0);
-}
-
-static void encode_value_payload(vir_writer & w, vir_type const & type, object * value) {
+static void encode_value_payload(vir_writer & w, vir_type const & type, object * value, vir_type const * self_type = nullptr) {
     switch (type.tag) {
+    case vir_wire_type::RecursiveSelf:
+        if (self_type != nullptr) {
+            encode_value_payload(w, *self_type, value, self_type);
+        }
+        break;
     case vir_wire_type::Unit:
         (void)w;
         (void)value;
@@ -2901,7 +2948,7 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
         uint32_t len = static_cast<uint32_t>(lean_array_size(value));
         w.u32(len);
         for (uint32_t i = 0; i < len; i++) {
-            encode_value_payload(w, type.args[0], lean_array_get_core(value, i));
+            encode_value_payload(w, type.args[0], lean_array_get_core(value, i), self_type);
         }
         break;
     }
@@ -2914,7 +2961,7 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
         }
         w.u32(static_cast<uint32_t>(values.size()));
         for (object * elem : values) {
-            encode_value_payload(w, type.args[0], elem);
+            encode_value_payload(w, type.args[0], elem, self_type);
         }
         break;
     }
@@ -2923,36 +2970,71 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
             w.u8(0);
         } else {
             w.u8(1);
-            encode_value_payload(w, type.args[0], lean_ctor_get(value, 0));
+            encode_value_payload(w, type.args[0], lean_ctor_get(value, 0), self_type);
         }
         break;
     case vir_wire_type::Prod:
-        encode_value_payload(w, type.args[0], lean_ctor_get(value, 0));
-        encode_value_payload(w, type.args[1], lean_ctor_get(value, 1));
+        encode_value_payload(w, type.args[0], lean_ctor_get(value, 0), self_type);
+        encode_value_payload(w, type.args[1], lean_ctor_get(value, 1), self_type);
         break;
     case vir_wire_type::Structure:
         if (type.trivial_field != UINT32_MAX) {
-            encode_value_payload(w, type.args[type.trivial_field], value);
+            encode_value_payload(w, type.args[type.trivial_field], value, &type);
             break;
         }
         for (size_t i = 0; i < type.args.size(); i++) {
             bool borrowed = false;
-            object * field = structure_field_as_object(type, type.args[i], type.field_layouts[i], value, borrowed);
-            encode_value_payload(w, type.args[i], field);
+            object * field = ctor_field_as_object(
+                structure_scalar_base(type),
+                type.args[i],
+                type.field_layouts[i],
+                value,
+                borrowed);
+            encode_value_payload(w, type.args[i], field, &type);
             if (!borrowed) lean_dec(field);
         }
         break;
     case vir_wire_type::TaggedUnion: {
         uint32_t tag = lean_obj_tag(value);
-        if (tag >= type.args.size()) {
+        if (tag >= type.variants.size()) {
             w.u32(tag);
             break;
         }
+        vir_variant const & variant = type.variants[tag];
         w.u32(tag);
         bool borrowed = false;
-        object * field = tagged_union_field_as_object(type, tag, type.args[tag], type.field_layouts[tag], value, borrowed);
-        encode_value_payload(w, type.args[tag], field);
+        object * field = ctor_field_as_object(
+            variant_scalar_base(variant),
+            variant.fields[0],
+            variant.field_layouts[0],
+            value,
+            borrowed);
+        encode_value_payload(w, variant.fields[0], field, self_type);
         if (!borrowed) lean_dec(field);
+        break;
+    }
+    case vir_wire_type::CustomInductive: {
+        uint32_t tag = static_cast<uint32_t>(lean_is_scalar(value) ? lean_unbox(value) : lean_obj_tag(value));
+        if (tag >= type.variants.size()) {
+            w.u32(tag);
+            break;
+        }
+        vir_variant const & variant = type.variants[tag];
+        w.u32(tag);
+        if (variant.fields.empty()) {
+            break;
+        }
+        for (size_t i = 0; i < variant.fields.size(); i++) {
+            bool borrowed = false;
+            object * field = ctor_field_as_object(
+                variant_scalar_base(variant),
+                variant.fields[i],
+                variant.field_layouts[i],
+                value,
+                borrowed);
+            encode_value_payload(w, variant.fields[i], field, &type);
+            if (!borrowed) lean_dec(field);
+        }
         break;
     }
     case vir_wire_type::SimpleEnum:
@@ -2985,8 +3067,31 @@ static bool same_wire_type(vir_type const & lhs, vir_type const & rhs) {
     if (lhs.tag != rhs.tag || lhs.args.size() != rhs.args.size()) {
         return false;
     }
+    if (lhs.tag == vir_wire_type::RecursiveSelf) {
+        return true;
+    }
     if (lhs.tag == vir_wire_type::Function && lhs.is_io != rhs.is_io) {
         return false;
+    }
+    if (lhs.tag == vir_wire_type::TaggedUnion || lhs.tag == vir_wire_type::CustomInductive) {
+        if (lhs.variants.size() != rhs.variants.size()) {
+            return false;
+        }
+        for (size_t i = 0; i < lhs.variants.size(); i++) {
+            vir_variant const & lhs_variant = lhs.variants[i];
+            vir_variant const & rhs_variant = rhs.variants[i];
+            if (
+                !same_variant_runtime_counts(lhs_variant, rhs_variant) ||
+                lhs_variant.fields.size() != rhs_variant.fields.size()) {
+                return false;
+            }
+            for (size_t j = 0; j < lhs_variant.fields.size(); j++) {
+                if (!same_wire_type(lhs_variant.fields[j], rhs_variant.fields[j])) {
+                    return false;
+                }
+            }
+        }
+        return true;
     }
     for (size_t i = 0; i < lhs.args.size(); i++) {
         if (!same_wire_type(lhs.args[i], rhs.args[i])) {

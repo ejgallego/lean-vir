@@ -15,6 +15,7 @@ import { fileURLToPath } from "node:url";
 import { createServer as createNetServer } from "node:net";
 
 import { encodeInvalidMagicPackage, readIrPackageInfo, replaceIrPackageManifest } from "./irpkg-format.mjs";
+import { JSON_INPUT_WIRE_TAGS, WIRE } from "../web/src/wire-tags.js";
 
 const distRoot = fileURLToPath(new URL("../web/dist/", import.meta.url));
 const basePath = "/lean-vir/";
@@ -785,8 +786,8 @@ async function smokeRunnerFailure(cdp, origin, url, expected) {
 }
 
 function expectedInputTag(type) {
-  if (type?.wireTag === 14) return "SELECT";
-  if ([15, 16, 17, 18, 19, 20, 21].includes(type?.wireTag)) return "TEXTAREA";
+  if (type?.wireTag === WIRE.SIMPLE_ENUM) return "SELECT";
+  if (JSON_INPUT_WIRE_TAGS.has(type?.wireTag)) return "TEXTAREA";
   return "INPUT";
 }
 
@@ -817,7 +818,7 @@ async function smokeManifestDrivenEntryList(cdp, origin, packageFile) {
     id: entry.id,
     inputTags: entry.args.map((arg) => expectedInputTag(arg.type)),
     enumOptionCounts: entry.args.map((arg) =>
-      arg.type?.wireTag === 14 ? (arg.type.constructors ?? []).length : null),
+      arg.type?.wireTag === WIRE.SIMPLE_ENUM ? (arg.type.constructors ?? []).length : null),
   }));
   const renderedControls = await evaluate(cdp, `(() => {
     const select = document.querySelector("#dev-entry-select");
@@ -1057,6 +1058,21 @@ try {
   ]
 }`,
     }),
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.RecursiveTypes.treeRootScore", {
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"kind":"branch","fields":{"left":{"kind":"leaf","value":4},"right":{"kind":"branch","fields":{"left":{"kind":"leaf","value":5},"right":{"kind":"leaf","value":6}}}}}`],
+      result: "515",
+    }),
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.RecursiveTypes.chainRootScore", {
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"label":"browser","next":{"label":"leaf","next":null}}`],
+      result: "211",
+    }),
+    await runnerCaseFromManifest("fixtures-basic.irpkg", "Vir.Fixtures.RecursiveTypes.jsonRootScore", {
+      inputTags: ["TEXTAREA"],
+      runInputs: [`{"kind":"object","value":[{"fst":"flag","snd":{"kind":"bool","value":true}},{"fst":"empty","snd":{"kind":"null"}}]}`],
+      result: "22",
+    }),
     await runnerCaseFromManifest("fixtures-boundary.irpkg", "Vir.Fixtures.Boundary.floatScaleScore", {
       result: "6",
     }),
@@ -1088,7 +1104,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, and failure paths");
+  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

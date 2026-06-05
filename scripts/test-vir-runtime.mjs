@@ -78,11 +78,12 @@ function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns) {
+async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns, roots = null) {
   const source = join(dir, `${stem}.lean`);
   const packagePath = join(dir, `${stem}.irpkg`);
   const reportPath = join(dir, `${stem}.report.md`);
   await writeFile(source, lines.join("\n"));
+  const targetArgs = roots === null ? ["--target-all", source] : ["--target", source, ...roots];
   const generated = spawnSync(
     "lean",
     [
@@ -90,8 +91,7 @@ async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns) {
       "tools/GeneratePackage.lean",
       packagePath,
       reportPath,
-      "--target-all",
-      source,
+      ...targetArgs,
     ],
     { encoding: "utf8" },
   );
@@ -185,6 +185,161 @@ assertInvalidManifest((manifest) => {
     constructors: [],
   };
 }, /constructors must be a non-empty array/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Tree Nat",
+    wireTag: 25,
+    kind: "customInductive",
+    name: "Tree",
+    constructors: [
+      {
+        name: "Tree.leaf",
+        jsName: "leaf",
+        tag: 0,
+        objectFieldCount: 1,
+        usizeFieldCount: 0,
+        scalarByteSize: 0,
+        fields: [],
+      },
+    ],
+  };
+}, /constructors\[0\] with no fields must have zero runtime field counts/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Tree Nat",
+    wireTag: 25,
+    kind: "customInductive",
+    name: "Tree",
+    constructors: [
+      {
+        name: "Tree.branch",
+        jsName: "branch",
+        tag: 0,
+        objectFieldCount: 1,
+        usizeFieldCount: 0,
+        scalarByteSize: 0,
+        fields: [
+          {
+            name: "children",
+            type: {
+              type: "List Tree",
+              wireTag: 17,
+              element: {
+                type: "Other",
+                wireTag: 26,
+                kind: "recursiveSelf",
+                name: "Other",
+              },
+            },
+            layout: { kind: "object", index: 0 },
+          },
+        ],
+      },
+    ],
+  };
+}, /constructors\[0\]\.fields\[0\]\.type\.element\.name must match Tree/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Tree Nat",
+    wireTag: 26,
+    kind: "recursiveSelf",
+    name: "Tree",
+  };
+}, /result cannot be recursiveSelf outside a recursive descriptor/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Option Tree",
+    wireTag: 18,
+    element: {
+      type: "Tree Nat",
+      wireTag: 26,
+      kind: "recursiveSelf",
+      name: "Tree",
+    },
+  };
+}, /result\.element cannot be recursiveSelf outside a recursive descriptor/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Chain",
+    wireTag: 20,
+    kind: "structure",
+    name: "Chain",
+    objectFieldCount: 1,
+    usizeFieldCount: 0,
+    scalarByteSize: 0,
+    fields: [
+      {
+        name: "next",
+        type: {
+          type: "Option Chain",
+          wireTag: 18,
+          element: {
+            type: "Other",
+            wireTag: 26,
+            kind: "recursiveSelf",
+            name: "Other",
+          },
+        },
+        layout: { kind: "object", index: 0 },
+      },
+    ],
+  };
+}, /fields\[0\]\.type\.element\.name must match Chain/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Tree Nat",
+    wireTag: 25,
+    kind: "customInductive",
+    name: "Tree",
+    constructors: [
+      {
+        name: "Tree.branch",
+        jsName: "branch",
+        tag: 0,
+        objectFieldCount: 2,
+        usizeFieldCount: 0,
+        scalarByteSize: 0,
+        fields: [
+          {
+            name: "child",
+            type: { type: "Nat", wireTag: 0 },
+            layout: { kind: "object", index: 0 },
+          },
+          {
+            name: "child",
+            type: { type: "Nat", wireTag: 0 },
+            layout: { kind: "object", index: 1 },
+          },
+        ],
+      },
+    ],
+  };
+}, /constructors\[0\]\.fields\[1\]\.name duplicates another field/);
+assertInvalidManifest((manifest) => {
+  manifest.exports[0].result = {
+    type: "Tree Nat",
+    wireTag: 25,
+    kind: "customInductive",
+    name: "Tree",
+    constructors: [
+      {
+        name: "Tree.leaf",
+        jsName: "leaf",
+        tag: 0,
+        objectFieldCount: 1,
+        usizeFieldCount: 0,
+        scalarByteSize: 0,
+        fields: [
+          {
+            name: "value",
+            type: { type: "Nat", wireTag: 0 },
+            layout: { kind: "object", index: 1 },
+          },
+        ],
+      },
+    ],
+  };
+}, /constructors\[0\]\.fields\[0\]\.layout\.index is outside objectFieldCount/);
 assertInvalidManifest((manifest) => {
   manifest.exports[0].result = {
     type: "Box Nat",
@@ -567,6 +722,12 @@ assert.match(inspected.stdout, /package: build\/generated\/fixtures-basic\.irpkg
 assert.match(inspected.stdout, new RegExp(`exports: ${runtime.interfaceManifest.exports.length}`));
 assert.match(inspected.stdout, /host imports: 0/);
 assert.match(inspected.stdout, /fib\(arg1: Nat\) -> Nat \[fib\]/);
+assert.match(inspected.stdout, /arg tree descriptor: customInductive Vir\.Fixtures\.RecursiveTypes\.Tree/);
+assert.match(inspected.stdout, /branch\(left: recursiveSelf Vir\.Fixtures\.RecursiveTypes\.Tree, right: recursiveSelf Vir\.Fixtures\.RecursiveTypes\.Tree\)/);
+assert.match(inspected.stdout, /arg chain descriptor: structure Vir\.Fixtures\.RecursiveTypes\.Chain/);
+assert.match(inspected.stdout, /next: Option<recursiveSelf Vir\.Fixtures\.RecursiveTypes\.Chain>/);
+assert.match(inspected.stdout, /arg json descriptor: customInductive Vir\.Fixtures\.RecursiveTypes\.MiniJson/);
+assert.match(inspected.stdout, /array\(items: List<recursiveSelf Vir\.Fixtures\.RecursiveTypes\.MiniJson>\)/);
 
 const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "build/generated/fixtures-basic.irpkg"], {
   encoding: "utf8",
@@ -1000,6 +1161,26 @@ try {
     "structure FreshUInt64Box where",
     "  value : UInt64",
     "",
+    "structure FreshChain where",
+    "  label : String",
+    "  next : Option FreshChain",
+    "",
+    "inductive FreshTree (α : Type) where",
+    "  | leaf (value : α)",
+    "  | node (children : List (FreshTree α))",
+    "",
+    "inductive FreshTerm where",
+    "  | var (name : String)",
+    "  | app (fn : FreshTerm) (arg : FreshTerm)",
+    "  | lam (binder : String) (body : FreshTerm)",
+    "",
+    "inductive FreshJson where",
+    "  | null",
+    "  | bool (value : Bool)",
+    "  | nat (value : Nat)",
+    "  | array (items : List FreshJson)",
+    "  | object (entries : List (String × FreshJson))",
+    "",
     "def freshBump (n : Nat) : Nat := n + 7",
     "def freshSum (xs : Array Nat) : Nat := xs.foldl (fun acc n => acc + n) 0",
     "def freshPairSum (p : Nat × Nat) : Nat := p.fst + p.snd",
@@ -1036,6 +1217,46 @@ try {
     "def freshUInt64BoxBump (box : FreshUInt64Box) : FreshUInt64Box :=",
     "  { value := box.value + 1 }",
     "",
+    "def freshChainDepth : FreshChain → Nat",
+    "  | { next := none, .. } => 1",
+    "  | { next := some next, .. } => 1 + freshChainDepth next",
+    "",
+    "def freshChainLabelScore : FreshChain → Nat",
+    "  | { label, next := none } => label.length",
+    "  | { label, next := some next } => label.length + freshChainLabelScore next",
+    "",
+    "def freshChainIdentity (chain : FreshChain) : FreshChain := chain",
+    "",
+    "def freshChainPush (label : String) (chain : FreshChain) : FreshChain :=",
+    "  { label := label, next := some chain }",
+    "",
+    "def freshChainScore (chain : FreshChain) : Nat :=",
+    "  freshChainDepth chain * 100 + freshChainLabelScore chain",
+    "",
+    "def freshTreeIdentity (tree : FreshTree Nat) : FreshTree Nat := tree",
+    "",
+    "def freshTreeRootScore : FreshTree Nat → Nat",
+    "  | .leaf value => value",
+    "  | .node children => children.length + 10",
+    "",
+    "def freshTermSize : FreshTerm → Nat",
+    "  | .var _ => 1",
+    "  | .app fn arg => 1 + freshTermSize fn + freshTermSize arg",
+    "  | .lam _ body => 1 + freshTermSize body",
+    "",
+    "def freshTermWrap (term : FreshTerm) : FreshTerm :=",
+    "  .lam \"x\" (.app term (.var \"x\"))",
+    "",
+    "def freshJsonWeight : FreshJson → Nat",
+    "  | .null => 1",
+    "  | .bool value => if value then 2 else 3",
+    "  | .nat value => value",
+    "  | .array items => 10 + items.length",
+    "  | .object entries => 20 + entries.length",
+    "",
+    "def freshJsonWrap (value : FreshJson) : FreshJson :=",
+    "  .array [value, .null]",
+    "",
   ].join("\n"));
 
   const generated = spawnSync(
@@ -1064,14 +1285,25 @@ try {
   assert.deepEqual(freshEntries, [
     "freshBoxBump",
     "freshBump",
+    "freshChainDepth",
+    "freshChainIdentity",
+    "freshChainLabelScore",
+    "freshChainPush",
+    "freshChainScore",
     "freshClassifyExcept",
     "freshClassifySum",
     "freshFloat32Roundtrip",
     "freshFloatScale",
+    "freshJsonWeight",
+    "freshJsonWrap",
     "freshPairSum",
     "freshScalarBoxBump",
     "freshSum",
     "freshSumScore",
+    "freshTermSize",
+    "freshTermWrap",
+    "freshTreeIdentity",
+    "freshTreeRootScore",
     "freshUInt64BoxBump",
     "freshUInt64Bump",
     "freshWrapBoxBump",
@@ -1174,26 +1406,166 @@ try {
       mode: "hot",
     },
   });
+  const freshChain = {
+    label: "root",
+    next: {
+      label: "leaf",
+      next: null,
+    },
+  };
+  assert.deepEqual(freshRuntime.call("freshChainIdentity", freshChain), freshChain);
+  assert.equal(freshRuntime.call("freshChainScore", freshChain), "208");
+  assert.deepEqual(freshRuntime.call("freshChainPush", "new", freshChain), {
+    label: "new",
+    next: freshChain,
+  });
+  const freshChainEntry = freshManifest.exports.find((entry) => entry.entry === "freshChainIdentity");
+  assert.equal(freshChainEntry.args[0].type.wireTag, 20);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.wireTag, 18);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.element.wireTag, 26);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.element.kind, "recursiveSelf");
+  const freshTree = {
+    kind: "node",
+    value: [
+      { kind: "leaf", value: 3 },
+      {
+        kind: "node",
+        value: [
+          { kind: "leaf", value: 5 },
+          { kind: "leaf", value: 8 },
+        ],
+      },
+    ],
+  };
+  assert.deepEqual(freshRuntime.call("freshTreeIdentity", freshTree), {
+    kind: "node",
+    value: [
+      { kind: "leaf", value: "3" },
+      {
+        kind: "node",
+        value: [
+          { kind: "leaf", value: "5" },
+          { kind: "leaf", value: "8" },
+        ],
+      },
+    ],
+  });
+  assert.equal(freshRuntime.call("freshTreeRootScore", freshTree), "12");
+  const freshTreeEntry = freshManifest.exports.find((entry) => entry.entry === "freshTreeIdentity");
+  assert.equal(freshTreeEntry.args[0].type.wireTag, 25);
+  assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.wireTag, 26);
+  assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.kind, "recursiveSelf");
+  const term = {
+    kind: "app",
+    fields: {
+      fn: { kind: "lam", fields: { binder: "x", body: { kind: "var", value: "x" } } },
+      arg: { kind: "var", value: "y" },
+    },
+  };
+  assert.equal(freshRuntime.call("freshTermSize", term), "4");
+  assert.deepEqual(freshRuntime.call("freshTermWrap", term), {
+    kind: "lam",
+    fields: {
+      binder: "x",
+      body: {
+        kind: "app",
+        fields: {
+          fn: {
+            kind: "app",
+            fields: {
+              fn: { kind: "lam", fields: { binder: "x", body: { kind: "var", value: "x" } } },
+              arg: { kind: "var", value: "y" },
+            },
+          },
+          arg: { kind: "var", value: "x" },
+        },
+      },
+    },
+  });
+  assert.throws(() => freshRuntime.call("freshTermSize", {
+    kind: "app",
+    fn: { kind: "var", value: "x" },
+    arg: { kind: "var", value: "y" },
+  }), /expected \{ kind: "app", fields: \{ fn, arg \} \}/);
+  assert.throws(() => freshRuntime.call("freshJsonWeight", "null"), /must be a custom inductive object; expected \{ kind: "null" \}/);
+  assert.equal(freshRuntime.call("freshJsonWeight", { kind: "null" }), "1");
+  assert.throws(() => freshRuntime.call("freshJsonWeight", { tag: 0 }), /must specify custom inductive kind; expected \{ kind: "null" \}/);
+  assert.throws(() => freshRuntime.call("freshJsonWeight", { kind: "null", value: null }), /not supported for this custom inductive constructor shape; expected \{ kind: "null" \}/);
+  assert.throws(() => freshRuntime.call("freshJsonWeight", { kind: "bool" }), /freshJsonWeight argument .*\.bool is missing value; expected \{ kind: "bool", value \}/);
+  assert.equal(freshRuntime.call("freshJsonWeight", { kind: "bool", value: true }), "2");
+  assert.equal(freshRuntime.call("freshJsonWeight", {
+    kind: "array",
+    value: [
+      { kind: "null" },
+      { kind: "nat", value: 4 },
+    ],
+  }), "12");
+  assert.equal(freshRuntime.call("freshJsonWeight", {
+    kind: "object",
+    value: [
+      { fst: "ok", snd: { kind: "bool", value: false } },
+      { fst: "empty", snd: { kind: "null" } },
+    ],
+  }), "22");
+  assert.deepEqual(freshRuntime.call("freshJsonWrap", { kind: "nat", value: 4 }), {
+    kind: "array",
+    value: [
+      { kind: "nat", value: "4" },
+      { kind: "null" },
+    ],
+  });
+  const freshJsonEntry = freshManifest.exports.find((entry) => entry.entry === "freshJsonWeight");
+  assert.equal(freshJsonEntry.args[0].type.wireTag, 25);
+  assert.equal(freshJsonEntry.args[0].type.constructors[0].fields.length, 0);
+  assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.wireTag, 26);
+  assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.kind, "recursiveSelf");
+  assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.wireTag, 26);
+  assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.kind, "recursiveSelf");
 
   await assertUnsupportedInterfaceSource(freshDir, "UnsupportedInterfaces", [
-    "structure RecursiveBox where",
-    "  next : Option RecursiveBox",
+    "inductive IndexedPair : Nat → Type where",
+    "  | mk (left : Nat) (right : Nat) : IndexedPair 0",
     "",
-    "inductive IndexedBox : Nat → Type where",
-    "  | mk {n : Nat} (value : Nat) : IndexedBox n",
-    "",
-    "def recursiveBoxIdentity (box : RecursiveBox) : RecursiveBox := box",
-    "def indexedBoxIdentity (box : IndexedBox 3) : IndexedBox 3 := box",
+    "def indexedPairIdentity (box : IndexedPair 0) : IndexedPair 0 := box",
     "def implicitBump {offset : Nat} (n : Nat) : Nat := n + offset",
     "",
   ], [
-    /recursiveBoxIdentity/,
-    /recursive structure `RecursiveBox` is not supported/,
-    /indexedBoxIdentity/,
-    /unsupported type `IndexedBox/,
+    /indexedPairIdentity/,
+    /indexed inductive `IndexedPair` is not supported/,
     /implicitBump/,
     /unsupported implicit\/instance argument `offset`/,
-  ]);
+  ], ["indexedPairIdentity", "implicitBump"]);
+
+  await assertUnsupportedInterfaceSource(freshDir, "UnsupportedRecursiveInductives", [
+    "structure RecursiveBase where",
+    "  label : String",
+    "",
+    "structure RecursiveChild extends RecursiveBase where",
+    "  next : Option RecursiveChild",
+    "",
+    "mutual",
+    "inductive MutualLeft where",
+    "  | leaf (value : Nat)",
+    "  | step (right : MutualRight)",
+    "inductive MutualRight where",
+    "  | step (left : MutualLeft)",
+    "end",
+    "",
+    "inductive ProofPayload where",
+    "  | mk (value : Nat) (proof : value = value)",
+    "",
+    "def recursiveChildIdentity (box : RecursiveChild) : RecursiveChild := box",
+    "def mutualLeftIdentity (value : MutualLeft) : MutualLeft := value",
+    "def proofPayloadIdentity (value : ProofPayload) : ProofPayload := value",
+    "",
+  ], [
+    /recursiveChildIdentity/,
+    /recursive inherited structure `RecursiveChild` is not supported/,
+    /mutualLeftIdentity/,
+    /mutually recursive inductive `MutualLeft` is not supported/,
+    /proofPayloadIdentity/,
+    /field `proof` of constructor `ProofPayload\.mk` has erased or void runtime layout/,
+  ], ["recursiveChildIdentity", "mutualLeftIdentity", "proofPayloadIdentity"]);
 
   const hostSource = join(freshDir, "FreshHost.lean");
   const hostPackage = join(freshDir, "host.irpkg");

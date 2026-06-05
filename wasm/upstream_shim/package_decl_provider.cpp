@@ -648,6 +648,23 @@ public:
             }
             break;
         }
+        case 25: {
+            uint32_t variant_count = u32();
+            for (uint32_t i = 0; i < variant_count; i++) {
+                u32(); // object field count
+                u32(); // usize field count
+                u32(); // scalar byte size
+                uint32_t field_count = u32();
+                for (uint32_t j = 0; j < field_count; j++) {
+                    u8();  // field layout tag
+                    u32(); // object/usize index
+                    u32(); // scalar size
+                    u32(); // scalar offset
+                    interface_type();
+                }
+            }
+            break;
+        }
         case 24: {
             boolean(); // effect
             uint32_t arg_count = u32();
@@ -673,6 +690,7 @@ public:
         case 15:
         case 22:
         case 23:
+        case 26:
             break;
         default:
             fail("unsupported interface type tag " + std::to_string(tag));

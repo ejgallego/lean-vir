@@ -4,15 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { SUPPORTED_WIRE_TAGS, WIRE } from "./wire-tags.js";
+
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
   "embedded interface manifest must be { version: 1, metadata: {...}, exports: [...] }";
-
-const SUPPORTED_WIRE_TAGS = new Set([
-  0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11,
-  14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24,
-]);
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -81,15 +78,15 @@ function validateManifestExports(exports) {
         throw new Error(`${argLabel} must be an object`);
       }
       requireString(arg.name, `${argLabel}.name`);
-      validateInterfaceType(arg.type, `${argLabel}.type`);
+      validateInterfaceRootType(arg.type, `${argLabel}.type`);
     });
-    validateInterfaceType(entry.result, `${label}.result`);
+    validateInterfaceRootType(entry.result, `${label}.result`);
   });
 }
 
-function requireUnique(seen, value, label) {
+function requireUnique(seen, value, label, owner = "interface export") {
   if (seen.has(value)) {
-    throw new Error(`${label} duplicates another interface export`);
+    throw new Error(`${label} duplicates another ${owner}`);
   }
   seen.add(value);
 }
@@ -103,34 +100,45 @@ export function validateInterfaceType(type, label = "interface type") {
     throw new Error(`${label}.wireTag is not supported`);
   }
   switch (type.wireTag) {
-    case 14:
+    case WIRE.SIMPLE_ENUM:
       validateSimpleEnumType(type, label);
       break;
-    case 16:
-    case 17:
-    case 18:
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
       validateInterfaceType(type.element, `${label}.element`);
       break;
-    case 19:
+    case WIRE.PROD:
       validateInterfaceType(type.fst, `${label}.fst`);
       validateInterfaceType(type.snd, `${label}.snd`);
       break;
-    case 20:
+    case WIRE.STRUCTURE:
       validateStructureType(type, label);
       break;
-    case 21:
+    case WIRE.TAGGED_UNION:
       validateTaggedUnionType(type, label);
       break;
-    case 23:
+    case WIRE.CUSTOM_INDUCTIVE:
+      validateCustomInductiveType(type, label);
+      break;
+    case WIRE.RECURSIVE_SELF:
+      validateRecursiveSelfType(type, label);
+      break;
+    case WIRE.RESOURCE:
       validateResourceType(type, label);
       break;
-    case 24:
+    case WIRE.FUNCTION:
       validateFunctionType(type, label);
       break;
     default:
       break;
   }
   return type;
+}
+
+function validateInterfaceRootType(type, label) {
+  validateInterfaceType(type, label);
+  validateNoDanglingRecursiveSelf(type, label);
 }
 
 function validateSimpleEnumType(type, label) {
@@ -143,17 +151,7 @@ function validateSimpleEnumType(type, label) {
   const names = new Set();
   const jsNames = new Set();
   type.constructors.forEach((ctor, index) => {
-    const ctorLabel = `${label}.constructors[${index}]`;
-    if (!isRecord(ctor)) {
-      throw new Error(`${ctorLabel} must be an object`);
-    }
-    requireString(ctor.name, `${ctorLabel}.name`);
-    requireString(ctor.jsName, `${ctorLabel}.jsName`);
-    if (ctor.tag !== index) {
-      throw new Error(`${ctorLabel}.tag must be ${index}`);
-    }
-    requireUnique(names, ctor.name, `${ctorLabel}.name`);
-    requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`);
+    validateConstructorHeader(ctor, index, label, names, jsNames);
   });
 }
 
@@ -162,9 +160,7 @@ function validateStructureType(type, label) {
     throw new Error(`${label}.kind must be structure`);
   }
   requireString(type.name, `${label}.name`);
-  requireNonNegativeInteger(type.objectFieldCount, `${label}.objectFieldCount`);
-  requireNonNegativeInteger(type.usizeFieldCount, `${label}.usizeFieldCount`);
-  requireNonNegativeInteger(type.scalarByteSize, `${label}.scalarByteSize`);
+  validateRuntimeCounts(type, label);
   if (!Array.isArray(type.fields) || type.fields.length === 0) {
     throw new Error(`${label}.fields must be a non-empty array`);
   }
@@ -178,18 +174,12 @@ function validateStructureType(type, label) {
   const names = new Set();
   type.fields.forEach((field, index) => {
     const fieldLabel = `${label}.fields[${index}]`;
-    if (!isRecord(field)) {
-      throw new Error(`${fieldLabel} must be an object`);
-    }
-    requireString(field.name, `${fieldLabel}.name`);
-    requireUnique(names, field.name, `${fieldLabel}.name`);
+    validateInterfaceField(field, fieldLabel, names, type, type.name);
     if (field.subobject !== undefined && typeof field.subobject !== "boolean") {
       throw new Error(`${fieldLabel}.subobject must be a boolean`);
     }
-    validateStructureFieldLayout(field.layout, type, `${fieldLabel}.layout`);
-    validateInterfaceType(field.type, `${fieldLabel}.type`);
     if (field.subobject === true) {
-      if (field.type?.wireTag !== 20) {
+      if (field.type?.wireTag !== WIRE.STRUCTURE) {
         throw new Error(`${fieldLabel}.subobject field type must be a structure`);
       }
       if (field.layout?.kind !== "object") {
@@ -241,23 +231,147 @@ function validateTaggedUnionType(type, label) {
   const names = new Set();
   const jsNames = new Set();
   type.constructors.forEach((ctor, index) => {
-    const ctorLabel = `${label}.constructors[${index}]`;
-    if (!isRecord(ctor)) {
-      throw new Error(`${ctorLabel} must be an object`);
-    }
-    requireString(ctor.name, `${ctorLabel}.name`);
-    requireString(ctor.jsName, `${ctorLabel}.jsName`);
-    if (ctor.tag !== index) {
-      throw new Error(`${ctorLabel}.tag must be ${index}`);
-    }
-    requireUnique(names, ctor.name, `${ctorLabel}.name`);
-    requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`);
-    requireNonNegativeInteger(ctor.objectFieldCount, `${ctorLabel}.objectFieldCount`);
-    requireNonNegativeInteger(ctor.usizeFieldCount, `${ctorLabel}.usizeFieldCount`);
-    requireNonNegativeInteger(ctor.scalarByteSize, `${ctorLabel}.scalarByteSize`);
+    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
+    validateRuntimeCounts(ctor, ctorLabel);
     validateStructureFieldLayout(ctor.layout, ctor, `${ctorLabel}.layout`);
     validateInterfaceType(ctor.type, `${ctorLabel}.type`);
   });
+}
+
+function validateCustomInductiveType(type, label) {
+  if (type.kind !== "customInductive") {
+    throw new Error(`${label}.kind must be customInductive`);
+  }
+  requireString(type.name, `${label}.name`);
+  if (!Array.isArray(type.constructors) || type.constructors.length === 0) {
+    throw new Error(`${label}.constructors must be a non-empty array`);
+  }
+  const names = new Set();
+  const jsNames = new Set();
+  type.constructors.forEach((ctor, index) => {
+    const ctorLabel = validateConstructorHeader(ctor, index, label, names, jsNames);
+    validateRuntimeCounts(ctor, ctorLabel);
+    if (!Array.isArray(ctor.fields)) {
+      throw new Error(`${ctorLabel}.fields must be an array`);
+    }
+    if (ctor.fields.length === 0 &&
+        (ctor.objectFieldCount !== 0 || ctor.usizeFieldCount !== 0 || ctor.scalarByteSize !== 0)) {
+      throw new Error(`${ctorLabel} with no fields must have zero runtime field counts`);
+    }
+    const fieldNames = new Set();
+    ctor.fields.forEach((field, fieldIndex) => {
+      const fieldLabel = `${ctorLabel}.fields[${fieldIndex}]`;
+      validateInterfaceField(field, fieldLabel, fieldNames, ctor, type.name);
+    });
+  });
+}
+
+function validateConstructorHeader(ctor, index, label, names, jsNames) {
+  const ctorLabel = `${label}.constructors[${index}]`;
+  if (!isRecord(ctor)) {
+    throw new Error(`${ctorLabel} must be an object`);
+  }
+  requireString(ctor.name, `${ctorLabel}.name`);
+  requireString(ctor.jsName, `${ctorLabel}.jsName`);
+  if (ctor.tag !== index) {
+    throw new Error(`${ctorLabel}.tag must be ${index}`);
+  }
+  requireUnique(names, ctor.name, `${ctorLabel}.name`, "constructor");
+  requireUnique(jsNames, ctor.jsName, `${ctorLabel}.jsName`, "constructor");
+  return ctorLabel;
+}
+
+function validateRuntimeCounts(type, label) {
+  requireNonNegativeInteger(type.objectFieldCount, `${label}.objectFieldCount`);
+  requireNonNegativeInteger(type.usizeFieldCount, `${label}.usizeFieldCount`);
+  requireNonNegativeInteger(type.scalarByteSize, `${label}.scalarByteSize`);
+}
+
+function validateInterfaceField(field, fieldLabel, names, layoutOwner, recursiveOwnerName) {
+  if (!isRecord(field)) {
+    throw new Error(`${fieldLabel} must be an object`);
+  }
+  requireString(field.name, `${fieldLabel}.name`);
+  requireUnique(names, field.name, `${fieldLabel}.name`, "field");
+  validateStructureFieldLayout(field.layout, layoutOwner, `${fieldLabel}.layout`);
+  validateInterfaceType(field.type, `${fieldLabel}.type`);
+  validateRecursiveSelfOwner(field.type, recursiveOwnerName, `${fieldLabel}.type`);
+}
+
+function validateRecursiveSelfType(type, label) {
+  if (type.kind !== "recursiveSelf") {
+    throw new Error(`${label}.kind must be recursiveSelf`);
+  }
+  requireString(type.name, `${label}.name`);
+}
+
+function validateRecursiveSelfOwner(type, ownerName, label) {
+  switch (type?.wireTag) {
+    case WIRE.RECURSIVE_SELF:
+      if (type.name !== ownerName) {
+        throw new Error(`${label}.name must match ${ownerName}`);
+      }
+      break;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      validateRecursiveSelfOwner(type.element, ownerName, `${label}.element`);
+      break;
+    case WIRE.PROD:
+      validateRecursiveSelfOwner(type.fst, ownerName, `${label}.fst`);
+      validateRecursiveSelfOwner(type.snd, ownerName, `${label}.snd`);
+      break;
+    case WIRE.STRUCTURE:
+      // A complete nested structure descriptor owns any recursiveSelf markers
+      // below it; validateStructureType has already checked that owner locally.
+      break;
+    case WIRE.TAGGED_UNION:
+      for (const ctor of type.constructors ?? []) {
+        validateRecursiveSelfOwner(ctor.type, ownerName, `${label}.${ctor.jsName}`);
+      }
+      break;
+    case WIRE.CUSTOM_INDUCTIVE:
+      // A complete nested custom inductive descriptor owns any recursiveSelf
+      // markers below it; validateCustomInductiveType has checked them locally.
+      break;
+    case WIRE.FUNCTION:
+      for (const arg of type.args ?? []) {
+        validateRecursiveSelfOwner(arg.type, ownerName, `${label}.${arg.name}`);
+      }
+      validateRecursiveSelfOwner(type.result, ownerName, `${label}.result`);
+      break;
+    default:
+      break;
+  }
+}
+
+function validateNoDanglingRecursiveSelf(type, label) {
+  switch (type?.wireTag) {
+    case WIRE.RECURSIVE_SELF:
+      throw new Error(`${label} cannot be recursiveSelf outside a recursive descriptor`);
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      validateNoDanglingRecursiveSelf(type.element, `${label}.element`);
+      break;
+    case WIRE.PROD:
+      validateNoDanglingRecursiveSelf(type.fst, `${label}.fst`);
+      validateNoDanglingRecursiveSelf(type.snd, `${label}.snd`);
+      break;
+    case WIRE.TAGGED_UNION:
+      for (const ctor of type.constructors ?? []) {
+        validateNoDanglingRecursiveSelf(ctor.type, `${label}.${ctor.jsName}`);
+      }
+      break;
+    case WIRE.FUNCTION:
+      for (const arg of type.args ?? []) {
+        validateNoDanglingRecursiveSelf(arg.type, `${label}.${arg.name}`);
+      }
+      validateNoDanglingRecursiveSelf(type.result, `${label}.result`);
+      break;
+    default:
+      break;
+  }
 }
 
 function validateResourceType(type, label) {
@@ -327,25 +441,28 @@ export function manifestDiagnostics(manifest) {
 
 export function formatInterfaceType(type) {
   switch (type?.wireTag) {
-    case 22:
+    case WIRE.UNIT:
       return "Unit";
-    case 14:
+    case WIRE.SIMPLE_ENUM:
       return type.type ?? "Enum";
-    case 16:
+    case WIRE.ARRAY:
       return `Array<${formatInterfaceType(type.element)}>`;
-    case 17:
+    case WIRE.LIST:
       return `List<${formatInterfaceType(type.element)}>`;
-    case 18:
+    case WIRE.OPTION:
       return `Option<${formatInterfaceType(type.element)}>`;
-    case 19:
+    case WIRE.PROD:
       return `Prod<${formatInterfaceType(type.fst)}, ${formatInterfaceType(type.snd)}>`;
-    case 20:
+    case WIRE.STRUCTURE:
       return type.type ?? type.name ?? "Structure";
-    case 21:
+    case WIRE.TAGGED_UNION:
       return type.type ?? type.name ?? "TaggedUnion";
-    case 23:
+    case WIRE.CUSTOM_INDUCTIVE:
+    case WIRE.RECURSIVE_SELF:
+      return type.type ?? type.name ?? "Recursive";
+    case WIRE.RESOURCE:
       return type.type ?? type.name ?? "Resource";
-    case 24:
+    case WIRE.FUNCTION:
       return `(${(type.args ?? []).map((arg) => formatInterfaceType(arg.type)).join(", ")}) -> ${type.effect === "io" ? "IO " : ""}${formatInterfaceType(type.result)}`;
     default:
       return type?.type ?? `wireTag ${type?.wireTag ?? "?"}`;

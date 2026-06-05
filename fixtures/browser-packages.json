@@ -22,12 +22,21 @@
             "Vir.Fixtures.Basic.stringUtf8RoundtripScore",
             "Vir.Fixtures.Basic.byteArrayInputScore"
           ]
+        },
+        {
+          "source": "fixtures/RecursiveTypes.lean",
+          "roots": [
+            "Vir.Fixtures.RecursiveTypes.treeRootScore",
+            "Vir.Fixtures.RecursiveTypes.chainRootScore",
+            "Vir.Fixtures.RecursiveTypes.jsonRootScore"
+          ]
         }
       ],
       "fixtureSources": [
         "fixtures/Basic.lean",
         "fixtures/ListOption.lean",
-        "fixtures/InterfaceShapes.lean"
+        "fixtures/InterfaceShapes.lean",
+        "fixtures/RecursiveTypes.lean"
       ]
     },
     {
