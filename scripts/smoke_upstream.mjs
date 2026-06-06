@@ -17,6 +17,7 @@ import {
 import {
   ensureTamagotchiVirtualDom,
   ensureVirtualElements,
+  virtualReactTextContent,
 } from "./virtual-fixtures.mjs";
 
 const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
@@ -208,6 +209,7 @@ ensureVirtualElements(hostDocumentState, [
   "#react-change-smoke",
   "#react-checkbox-smoke",
   "#react-attributes-smoke",
+  "#react-pet-smoke",
 ]);
 const reactMountCount = hostRuntime.call("ReactCounter.mount", "#react-smoke");
 const reactElement = hostDocumentState.elements.get("#react-smoke");
@@ -311,7 +313,10 @@ if (
   reactAttributesWidget.props["aria-label"] !== "React attribute fixture" ||
   reactAttributesWidget.props["data-case"] !== "attributes" ||
   reactAttributesWidget.props["data-testid"] !== "react-attributes" ||
-  reactAttributesWidget.props.tabIndex !== 3
+  reactAttributesWidget.props.tabIndex !== 3 ||
+  reactAttributesWidget.props.className !== "react-attributes is-mounted" ||
+  reactAttributesWidget.props.style?.color !== "rgb(1, 2, 3)" ||
+  reactAttributesWidget.props.style?.marginTop !== "4px"
 ) {
   throw new Error(`Lean React attribute widget props failed: ${JSON.stringify(reactAttributesWidget.props)}`);
 }
@@ -329,6 +334,37 @@ if (
   throw new Error(`Lean React attribute child props failed: ${JSON.stringify({ label: reactAttributesLabel.props, input: reactAttributesInput.props, output: reactAttributesOutput.props })}`);
 }
 reactAttributesElement.reactRoot.unmount();
+const reactPetMountCount = hostRuntime.call("ReactTamagotchi.mount", "#react-pet-smoke");
+const reactPetElement = hostDocumentState.elements.get("#react-pet-smoke");
+if (reactPetMountCount !== true || hostRuntime.liveCallbacks.size !== 9) {
+  throw new Error(`Lean React Tamagotchi mount failed: ${JSON.stringify({ reactPetMountCount, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+virtualReactElementById(reactPetElement.reactRoot, "react-pet-action-ignore").handlers.onClick({});
+const reactPetSummary = virtualReactTextContent(virtualReactElementById(reactPetElement.reactRoot, "react-pet-summary"));
+const reactPetTrace = virtualReactElementById(reactPetElement.reactRoot, "react-pet-trace");
+const reactPetTraceText = virtualReactTextContent(reactPetTrace);
+if (
+  reactPetSummary !== "Octi is hungry; last ignore; care 2/5; turn 1" ||
+  reactPetTraceText !== "happyhungry" ||
+  reactPetTrace.props.role !== "list" ||
+  reactPetTrace.props["aria-label"] !== "Mood trace: happy -> hungry" ||
+  reactPetTrace.children[0].props.role !== "listitem" ||
+  reactPetTrace.children[1].props.role !== "listitem" ||
+  hostRuntime.liveCallbacks.size !== 9
+) {
+  throw new Error(`Lean React Tamagotchi action failed: ${JSON.stringify({ reactPetSummary, reactPetTraceText, traceProps: reactPetTrace.props, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+virtualReactElementById(reactPetElement.reactRoot, "react-pet-name-input").handlers.onChange(createVirtualEventState({
+  currentTarget: createVirtualElementState({ value: "Ada" }),
+}));
+const reactPetRenamed = virtualReactTextContent(virtualReactElementById(reactPetElement.reactRoot, "react-pet-summary"));
+if (reactPetRenamed !== "Ada is hungry; last rename; care 2/5; turn 1" || hostRuntime.liveCallbacks.size !== 9) {
+  throw new Error(`Lean React Tamagotchi rename failed: ${JSON.stringify({ reactPetRenamed, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+reactPetElement.reactRoot.unmount();
+if (hostRuntime.liveCallbacks.size !== 0 || reactPetElement.reactRoot !== undefined) {
+  throw new Error(`Lean React Tamagotchi unmount cleanup failed: ${JSON.stringify({ callbacks: hostRuntime.liveCallbacks.size, root: reactPetElement.reactRoot })}`);
+}
 ensureTamagotchiVirtualDom(hostDocumentState);
 const petMountCount = hostRuntime.call("Tamagotchi.uiMountFromDom");
 if (petMountCount !== "8" || hostRuntime.liveCallbacks.size !== 8) {
@@ -405,5 +441,5 @@ for (const fixture of fixtureManifest.fixtures ?? []) {
 }
 
 console.log(
-  `upstream smoke ok: fib 17 = 1597, Lean DOM Tamagotchi works, editable SortDemo works, ${fixtureManifest.fixtures.length} fixtures run`,
+  `upstream smoke ok: fib 17 = 1597, Lean DOM and React Tamagotchi work, editable SortDemo works, ${fixtureManifest.fixtures.length} fixtures run`,
 );

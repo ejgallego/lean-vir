@@ -18,12 +18,19 @@ disposal.
 @[vir_resource "ReactRoot"]
 opaque Root : Type
 
+/-- A single React `style` object entry. Use camelCase property names. -/
+structure StyleProperty where
+  name : String
+  value : String
+
 /-- Conservative v0 set of React property values. -/
 inductive PropValue where
   | string (value : String)
   | bool (value : Bool)
   | int (value : Int)
   | float (value : Float)
+  | style (entries : Array StyleProperty)
+  | classList (classes : Array String)
 
 /-- A React property. Event handlers live in `EventHandler`, not `Property`. -/
 structure Property where
@@ -78,6 +85,10 @@ def inputName (value : String) : Property :=
 def className (value : String) : Property :=
   string "className" value
 
+/-- DOMTokenList-like class helper. The host validates and deduplicates tokens. -/
+def classList (classes : Array String) : Property :=
+  { name := "className", value := .classList classes }
+
 def title (value : String) : Property :=
   string "title" value
 
@@ -86,6 +97,9 @@ def role (value : String) : Property :=
 
 def ariaLabel (value : String) : Property :=
   string "aria-label" value
+
+def ariaHidden (value : Bool) : Property :=
+  bool "aria-hidden" value
 
 /--
 DOM `data-*` prop helper. Pass the suffix without `data-`; the JavaScript
@@ -100,6 +114,10 @@ def dataTestId (value : String) : Property :=
 def tabIndex (value : Int) : Property :=
   int "tabIndex" value
 
+/-- React style-object helper. Use camelCase style names and string values. -/
+def style (entries : Array StyleProperty) : Property :=
+  { name := "style", value := .style entries }
+
 def type (value : String) : Property :=
   string "type" value
 
@@ -111,6 +129,12 @@ def inputValue (value : String) : Property :=
 
 def placeholder (value : String) : Property :=
   string "placeholder" value
+
+def autoComplete (value : String) : Property :=
+  string "autoComplete" value
+
+def maxLength (value : Int) : Property :=
+  int "maxLength" value
 
 def checked (value : Bool) : Property :=
   bool "checked" value
@@ -177,14 +201,27 @@ def keyedElementWith
 def div (children : Array Html) : Html :=
   elementWith "div" #[] #[] children
 
+def keyedDiv (key : String) (children : Array Html) : Html :=
+  keyedElementWith "div" key #[] #[] children
+
 def divWith
     (props : Array Property := #[])
     (handlers : Array EventHandler := #[])
     (children : Array Html := #[]) : Html :=
   elementWith "div" props handlers children
 
+def keyedDivWith
+    (key : String)
+    (props : Array Property := #[])
+    (handlers : Array EventHandler := #[])
+    (children : Array Html := #[]) : Html :=
+  keyedElementWith "div" key props handlers children
+
 def span (children : Array Html) : Html :=
   elementWith "span" #[] #[] children
+
+def keyedSpan (key : String) (children : Array Html) : Html :=
+  keyedElementWith "span" key #[] #[] children
 
 def spanWith
     (props : Array Property := #[])
@@ -192,11 +229,27 @@ def spanWith
     (children : Array Html := #[]) : Html :=
   elementWith "span" props handlers children
 
+def keyedSpanWith
+    (key : String)
+    (props : Array Property := #[])
+    (handlers : Array EventHandler := #[])
+    (children : Array Html := #[]) : Html :=
+  keyedElementWith "span" key props handlers children
+
 def input (props : Array Property := #[]) (handlers : Array EventHandler := #[]) : Html :=
   elementWith "input" props handlers #[]
 
+def keyedInput
+    (key : String)
+    (props : Array Property := #[])
+    (handlers : Array EventHandler := #[]) : Html :=
+  keyedElementWith "input" key props handlers #[]
+
 def label (children : Array Html) : Html :=
   elementWith "label" #[] #[] children
+
+def keyedLabel (key : String) (children : Array Html) : Html :=
+  keyedElementWith "label" key #[] #[] children
 
 def labelWith
     (props : Array Property := #[])
@@ -204,8 +257,18 @@ def labelWith
     (children : Array Html := #[]) : Html :=
   elementWith "label" props handlers children
 
+def keyedLabelWith
+    (key : String)
+    (props : Array Property := #[])
+    (handlers : Array EventHandler := #[])
+    (children : Array Html := #[]) : Html :=
+  keyedElementWith "label" key props handlers children
+
 def form (children : Array Html) : Html :=
   elementWith "form" #[] #[] children
+
+def keyedForm (key : String) (children : Array Html) : Html :=
+  keyedElementWith "form" key #[] #[] children
 
 def formWith
     (props : Array Property := #[])
@@ -213,14 +276,31 @@ def formWith
     (children : Array Html := #[]) : Html :=
   elementWith "form" props handlers children
 
+def keyedFormWith
+    (key : String)
+    (props : Array Property := #[])
+    (handlers : Array EventHandler := #[])
+    (children : Array Html := #[]) : Html :=
+  keyedElementWith "form" key props handlers children
+
 def button (children : Array Html) : Html :=
   elementWith "button" #[Property.type "button"] #[] children
+
+def keyedButton (key : String) (children : Array Html) : Html :=
+  keyedElementWith "button" key #[Property.type "button"] #[] children
 
 def buttonWith
     (props : Array Property := #[])
     (handlers : Array EventHandler := #[])
     (children : Array Html := #[]) : Html :=
   elementWith "button" (#[Property.type "button"] ++ props) handlers children
+
+def keyedButtonWith
+    (key : String)
+    (props : Array Property := #[])
+    (handlers : Array EventHandler := #[])
+    (children : Array Html := #[]) : Html :=
+  keyedElementWith "button" key (#[Property.type "button"] ++ props) handlers children
 
 end Html
 

@@ -74,7 +74,9 @@
             "Tamagotchi.uiMountFromDom",
             "Tamagotchi.uiRenameFromDom",
             "Tamagotchi.uiStep",
-            "Tamagotchi.uiStepFromDom"
+            "Tamagotchi.uiStepFromDom",
+            "ReactTamagotchi.mount",
+            "ReactTamagotchi.mountDefault"
           ]
         },
         {

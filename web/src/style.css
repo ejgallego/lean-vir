@@ -1311,6 +1311,288 @@ h2 {
   line-height: 1.45;
 }
 
+.react-review-toolbar {
+  margin-top: 28px;
+}
+
+.react-review-toolbar button {
+  min-height: 40px;
+  border: 0;
+  background: #263d2c;
+  color: #ffffff;
+  padding: 0 18px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.react-review-toolbar button:disabled {
+  background: #bdc8bb;
+  color: #415146;
+  cursor: default;
+}
+
+.react-demo-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.react-demo-panel {
+  min-width: 0;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+}
+
+.react-demo-panel-wide {
+  grid-column: 1 / -1;
+}
+
+.react-demo-panel header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  border-bottom: 1px solid #d9ded2;
+}
+
+.react-demo-panel .eyebrow {
+  margin-bottom: 0;
+  overflow-wrap: anywhere;
+}
+
+.react-mount {
+  min-height: 116px;
+  padding: 16px;
+  background: #f8faf6;
+}
+
+.react-mount label,
+.react-mount span {
+  margin-right: 8px;
+}
+
+.react-mount input {
+  min-height: 34px;
+  border: 1px solid #bdc8bb;
+  background: #ffffff;
+  color: #17201a;
+  padding: 5px 8px;
+}
+
+.react-mount input[type="checkbox"] {
+  width: 22px;
+  height: 22px;
+  min-height: 22px;
+  margin: 0 8px 0 0;
+  accent-color: #263d2c;
+  vertical-align: middle;
+}
+
+.react-mount button {
+  min-height: 38px;
+  border: 1px solid #bdc8bb;
+  background: #ffffff;
+  color: #263d2c;
+  padding: 0 14px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.react-mount button:hover,
+.react-mount input:focus-visible {
+  border-color: #516f88;
+}
+
+.react-attributes.is-mounted {
+  border-left: 4px solid #516f88;
+  background: #ffffff;
+  padding: 12px;
+}
+
+.react-pet-mount {
+  min-height: 430px;
+}
+
+.react-pet-widget {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+
+.react-pet-widget span,
+.react-pet-widget label {
+  margin-right: 0;
+}
+
+.react-pet-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  min-width: 0;
+}
+
+#react-pet-name-form {
+  display: flex;
+  align-items: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+#react-pet-name-form label,
+.react-pet-toggle {
+  color: #33415c;
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+#react-pet-name-form input {
+  width: min(180px, 100%);
+  font-weight: 700;
+}
+
+.react-pet-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  cursor: pointer;
+}
+
+.react-pet-body {
+  display: grid;
+  grid-template-columns: minmax(220px, 0.9fr) minmax(0, 1.1fr);
+  gap: 12px;
+  align-items: stretch;
+  min-width: 0;
+}
+
+.react-pet-body .pet-state {
+  min-height: 186px;
+  margin-top: 0;
+}
+
+.react-pet-body .pet-mood-readout span {
+  display: block;
+}
+
+#react-pet-mood {
+  margin-top: 8px;
+  color: #20384a;
+  font-size: 2.25rem;
+  font-weight: 800;
+  line-height: 0.95;
+  overflow-wrap: anywhere;
+  text-transform: none;
+}
+
+.react-pet-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1px;
+  min-width: 0;
+  border: 1px solid #d9ded2;
+  background: #d9ded2;
+}
+
+.react-pet-stat {
+  min-width: 0;
+  min-height: 72px;
+  padding: 12px;
+  background: #ffffff;
+}
+
+.react-pet-stat span {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.react-pet-stat span:first-child {
+  color: #5f6f64;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.react-pet-stat span:last-child {
+  margin-top: 8px;
+  color: #17201a;
+  font-size: 1rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.react-pet-actions,
+.react-pet-trace,
+.react-pet-summary,
+#react-pet-reset {
+  grid-column: 1 / -1;
+}
+
+.react-pet-actions button:disabled {
+  color: #6f786e;
+  background: #eef1ea;
+  cursor: default;
+}
+
+.react-pet-trace {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px;
+  min-height: 44px;
+  padding: 10px;
+  border: 1px solid #d9ded2;
+  background: #ffffff;
+}
+
+.react-pet-trace-token {
+  display: inline-flex;
+  align-items: center;
+  min-height: 24px;
+  padding: 0 8px;
+  background: #f8faf6;
+  color: #20384a;
+  font-size: 0.76rem;
+  font-weight: 800;
+}
+
+.react-pet-summary {
+  min-height: 42px;
+  padding: 11px 12px;
+  background: #ffffff;
+  color: #33415c;
+  font-size: 0.88rem;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+#react-pet-reset {
+  width: max-content;
+}
+
+.react-demo-panel output {
+  display: block;
+  min-height: 38px;
+  padding: 9px 14px;
+  border-top: 1px solid #d9ded2;
+  color: #5f6f64;
+  font-size: 0.8rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.react-demo-panel output[data-failed="true"] {
+  color: #7c2820;
+}
+
 .format-app {
   min-height: 100vh;
   padding: 28px;
@@ -1535,6 +1817,14 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .react-demo-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .react-pet-body {
+    grid-template-columns: 1fr;
+  }
+
   .fixture-runner-layout {
     grid-template-columns: 1fr;
   }
@@ -1649,8 +1939,20 @@ h2 {
   }
 
   .dev-runner-grid,
-  .dev-eval-row {
+  .dev-eval-row,
+  .react-demo-grid {
     grid-template-columns: 1fr;
+  }
+
+  .react-pet-heading,
+  #react-pet-name-form {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  #react-pet-name-form input,
+  #react-pet-reset {
+    width: 100%;
   }
 
   .action-grid {

@@ -222,22 +222,34 @@ The intended v0 authoring surface is a small DOM-like helper set over that
 recursive `Html` ABI:
 
 - `Lean.Vir.React.Property.id`, `inputName`, `className`, `title`, `role`,
-  `ariaLabel`, `data`, `dataTestId`, `tabIndex`, `type`, `htmlFor`,
-  `inputValue`, `placeholder`, `checked`, and `disabled`
+  `classList`, `ariaLabel`, `ariaHidden`, `data`, `dataTestId`, `tabIndex`,
+  `style`, `type`, `htmlFor`, `inputValue`, `placeholder`, `autoComplete`,
+  `maxLength`, `checked`, and `disabled`
 - `Lean.Vir.React.EventHandler.onClick`, `onClickWith`, `onInput`,
   `onInputUnit`, `onChange`, `onChangeUnit`, `onSubmit`, and `onSubmitWith`
-- `Lean.Vir.React.Html.div`, `divWith`, `span`, `spanWith`, `input`, `label`,
-  `labelWith`, `form`, `formWith`, `button`, and `buttonWith`
+- `Lean.Vir.React.Html.div`/`keyedDiv`, `divWith`/`keyedDivWith`,
+  `span`/`keyedSpan`, `spanWith`/`keyedSpanWith`, `input`/`keyedInput`,
+  `label`/`keyedLabel`, `labelWith`/`keyedLabelWith`,
+  `form`/`keyedForm`, `formWith`/`keyedFormWith`,
+  `button`/`keyedButton`, and `buttonWith`/`keyedButtonWith`
 
 `Property.inputValue` maps to React's `value` prop. It is named `inputValue`
 because `Property.value` is already the Lean structure-field projection.
 `Property.inputName` maps to React's `name` prop for the same reason:
 `Property.name` is the structure-field projection. `Property.htmlFor` maps to
 React's label `htmlFor` prop, `Property.ariaLabel` maps to `aria-label`,
-`Property.data name value` prefixes the prop name with `data-`,
-`Property.dataTestId` maps to `data-testid`, and `Property.tabIndex` maps to
-React's numeric `tabIndex` prop. The `data` helper expects a non-empty suffix,
-matching the documented `data-*` shape.
+`Property.ariaHidden` maps to `aria-hidden`, `Property.data name value`
+prefixes the prop name with `data-`, `Property.dataTestId` maps to
+`data-testid`, and `Property.tabIndex` maps to React's numeric `tabIndex` prop.
+`Property.autoComplete` and `Property.maxLength` use React's DOM prop names.
+The `data` helper expects a non-empty suffix, matching the documented
+`data-*` shape. `Property.classList` validates
+DOMTokenList-like non-empty class tokens, deduplicates them while preserving
+order, and lowers to `className`.
+`Property.style` builds React's object-valued `style` prop from camelCase
+`StyleProperty.mk` entries with string values. The keyed element helpers set
+React's `key` for list-like children while preserving the same props, handlers,
+and children conventions as their unkeyed counterparts.
 `EventHandler.onInput` and `onChange` receive the callback `Event`; use
 `Event.inputValue?` when reading controlled text state and
 `Event.inputChecked?` when reading controlled checkbox/radio state. Both check
@@ -247,12 +259,17 @@ variants for handlers that do not need the event.
 `Property.string`/`bool`/`int`/`float`, `EventHandler.on`/`onUnit`, and
 `Html.elementWith`/`keyedElementWith` are intentional escape hatches for the
 small v0 surface. Prefer the named helpers above unless a demo needs a specific
-DOM prop, handler, or tag that is not blessed yet.
+scalar DOM prop, handler, or tag that is not blessed yet. `PropValue.style` and
+`PropValue.classList` are intentionally constrained to the `style` and
+`className` props by the host renderer.
 
 The React browser fixtures are split by intent: `examples/ReactCounter.lean`
 contains the counter, static render, lifecycle, and stress cases, while
 `examples/ReactInput.lean` contains controlled text, change, submit,
-attribute-conformance, and checkbox callbacks.
+attribute-conformance, and checkbox callbacks. `examples/Tamagotchi.lean`
+keeps both demos: `Tamagotchi` is the non-React DOM-hosted version, and
+`ReactTamagotchi` reuses the same model with a keyed React tree, controlled
+text input, checkbox state, form submit handling, and action callbacks.
 
 The standalone React HTML renderer status is tracked in `docs/REACT_HTML.md`.
 Future ProofWidgets compatibility work is tracked separately in

@@ -33,9 +33,9 @@ go through a generic byte-payload WASM export that carries recursive type
 descriptors, constructs Lean input objects, and calls the upstream interpreter
 by name.
 
-The browser keeps a Lean-rendered Tamagotchi as the top-level interactive demo
-over the same upstream interpreter artifact. Lean registers the pet controls
-with `Lean.Vir.Browser.Element.addEventListener`; the browser host
+The browser keeps a Lean-rendered DOM Tamagotchi as the top-level interactive
+demo over the same upstream interpreter artifact. Lean registers the pet
+controls with `Lean.Vir.Browser.Element.addEventListener`; the browser host
 binding installs DOM listeners that call retained Lean closures. The Lean code
 reads and writes DOM state, including checkbox and text input properties,
 through `Lean.Vir.Browser` host imports. Its nullary inductive `Mood` and
@@ -56,10 +56,12 @@ The browser-facing direction now includes a standalone React rendering slice.
 Lean code can create a React root from a browser element, render a narrow
 recursive `Html` tree represented by the generic custom-inductive interface
 support, and retain Lean callbacks inside React event handlers. The Lean
-library exposes a small DOM-like helper set for common props, events, labels,
-forms, inputs, buttons, and text containers, with examples covering button
-clicks in `ReactCounter`, controlled input rerendering, and DOM attribute
-conformance in `ReactInput`.
+library exposes a small DOM-like helper set for common props, events, keyed
+labels, forms, inputs, buttons, style objects, class lists, and text containers,
+with examples covering button clicks in `ReactCounter`, controlled input
+rerendering, DOM attribute conformance in `ReactInput`, and a React
+Tamagotchi that shares the DOM demo's model while keeping view state in Lean
+closures instead of reading it back from DOM attributes.
 Controlled text handlers use `Event.inputValue?` and checkbox handlers use
 `Event.inputChecked?`; both check `Event.currentTarget` before `target`.
 `onChange` and `onSubmit` callbacks can also forward `Event.preventDefault` and

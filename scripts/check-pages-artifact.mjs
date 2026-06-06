@@ -58,6 +58,7 @@ async function assertLocalBundle(path) {
     "lean-vir-local/index.html",
     "lean-vir-local/dev.html",
     "lean-vir-local/format.html",
+    "lean-vir-local/react.html",
     "lean-vir-local/runtime-example.html",
     "lean-vir-local/vir-upstream.wasm",
     "lean-vir-local/local-quickstart.irpkg",
@@ -115,8 +116,10 @@ async function assertSdkBundle(path) {
 const indexHtml = await assertHtmlAssetLinks("index.html");
 const devHtml = await assertHtmlAssetLinks("dev.html");
 const formatHtml = await assertHtmlAssetLinks("format.html");
+const reactHtml = await assertHtmlAssetLinks("react.html");
 
 assertLink(indexHtml, "dev.html");
+assertLink(indexHtml, "react.html");
 assertLink(indexHtml, "downloads/lean-vir-local.tar.gz");
 assertLink(indexHtml, "downloads/lean-vir-sdk.tar.gz");
 assertLink(indexHtml, "format.html?case=list&amp;width=12");
@@ -130,6 +133,9 @@ assert.ok(devHtml.includes("dev-package-preset"), "dev.html should contain packa
 assert.ok(devHtml.includes("npm run generate:irpkg -- path/File.lean"), "dev.html should show the package command shape");
 assert.ok(formatHtml.includes("format-width-range"), "format.html should contain width controls");
 assert.ok(formatHtml.includes("format-output"), "format.html should contain rendered output controls");
+assert.ok(reactHtml.includes("react-counter-root"), "react.html should contain the React counter mount");
+assert.ok(reactHtml.includes("react-attributes-root"), "react.html should contain the React attributes mount");
+assert.ok(reactHtml.includes("react-pet-root"), "react.html should contain the React Tamagotchi mount");
 
 await assertFile("vir-upstream.wasm", 1024);
 await assertFile("fixtures-basic.irpkg", 1024);
@@ -143,4 +149,4 @@ await assertFile("local-mergesort.irpkg", 128);
 await assertLocalBundle("downloads/lean-vir-local.tar.gz");
 await assertSdkBundle("downloads/lean-vir-sdk.tar.gz");
 
-console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, format workbench, wasm, focused manifest packages, local bundle, and SDK bundle`);
+console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, React review, format workbench, wasm, focused manifest packages, local bundle, and SDK bundle`);

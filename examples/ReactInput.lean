@@ -85,18 +85,25 @@ def renderAttributesInto (root : Root) : IO Unit := do
         Property.ariaLabel "React attribute fixture",
         Property.data "case" "attributes",
         Property.dataTestId "react-attributes",
-        Property.tabIndex 3
+        Property.tabIndex 3,
+        Property.classList #["react-attributes", "is-mounted"],
+        Property.style #[
+          StyleProperty.mk "color" "rgb(1, 2, 3)",
+          StyleProperty.mk "marginTop" "4px"
+        ]
       ]
       #[]
       #[
-        Html.labelWith
+        Html.keyedLabelWith
+          "attributes-label"
           #[
             Property.id "react-attributes-label",
             Property.htmlFor "react-attributes-input"
           ]
           #[]
           #[.text "attrs:"],
-        Html.input
+        Html.keyedInput
+          "attributes-input"
           #[
             Property.id "react-attributes-input",
             Property.inputName "attributes",
@@ -105,7 +112,8 @@ def renderAttributesInto (root : Root) : IO Unit := do
             Property.disabled true
           ]
           #[],
-        Html.spanWith
+        Html.keyedSpanWith
+          "attributes-output"
           #[
             Property.id "react-attributes-output",
             Property.title "attribute output"

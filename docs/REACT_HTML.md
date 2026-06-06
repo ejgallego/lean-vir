@@ -20,6 +20,12 @@ inductive PropValue where
   | bool : Bool → PropValue
   | int : Int → PropValue
   | float : Float → PropValue
+  | style : Array StyleProperty → PropValue
+  | classList : Array String → PropValue
+
+structure StyleProperty where
+  name : String
+  value : String
 
 structure Property where
   name : String
@@ -68,26 +74,40 @@ private recursive wire codec.
 The intended authoring surface is a small DOM-like helper set over that ABI:
 
 - props: `Property.id`, `inputName`, `className`, `title`, `role`,
-  `ariaLabel`, `data`, `dataTestId`, `tabIndex`, `type`, `htmlFor`,
-  `inputValue`, `placeholder`, `checked`, and `disabled`
+  `classList`, `ariaLabel`, `ariaHidden`, `data`, `dataTestId`, `tabIndex`,
+  `style`, `type`, `htmlFor`, `inputValue`, `placeholder`, `autoComplete`,
+  `maxLength`, `checked`, and `disabled`
 - handlers: `EventHandler.onClick`, `onClickWith`, `onInput`, `onInputUnit`,
   `onChange`, `onChangeUnit`, `onSubmit`, and `onSubmitWith`
-- elements: `Html.div`, `divWith`, `span`, `spanWith`, `input`, `label`,
-  `labelWith`, `form`, `formWith`, `button`, and `buttonWith`
+- elements: `Html.div`/`keyedDiv`, `divWith`/`keyedDivWith`,
+  `span`/`keyedSpan`, `spanWith`/`keyedSpanWith`, `input`/`keyedInput`,
+  `label`/`keyedLabel`, `labelWith`/`keyedLabelWith`,
+  `form`/`keyedForm`, `formWith`/`keyedFormWith`,
+  `button`/`keyedButton`, and `buttonWith`/`keyedButtonWith`
 
 `Property.inputValue` maps to React's `value` prop. It is named `inputValue`
 because `Property.value` is already the Lean structure-field projection.
 `Property.inputName` maps to React's `name` prop for the same reason:
 `Property.name` is the structure-field projection. `Property.htmlFor` maps to
 React's label `htmlFor` prop, `Property.ariaLabel` maps to `aria-label`,
-`Property.data name value` prefixes the prop name with `data-`,
-`Property.dataTestId` maps to `data-testid`, and `Property.tabIndex` maps to
-React's numeric `tabIndex` prop. The `data` helper expects a non-empty suffix,
-matching the documented `data-*` shape.
+`Property.ariaHidden` maps to `aria-hidden`, `Property.data name value`
+prefixes the prop name with `data-`, `Property.dataTestId` maps to
+`data-testid`, and `Property.tabIndex` maps to React's numeric `tabIndex` prop.
+`Property.autoComplete` and `Property.maxLength` use React's DOM prop names.
+The `data` helper expects a non-empty suffix, matching the documented
+`data-*` shape. `Property.classList` validates
+DOMTokenList-like non-empty class tokens, deduplicates them while preserving
+order, and lowers to `className`.
+`Property.style` builds React's object-valued `style` prop from camelCase
+`StyleProperty.mk` entries with string values. The keyed element helpers set
+React's `key` for list-like children while preserving the same props, handlers,
+and children conventions as their unkeyed counterparts.
 
 `Property.string`/`bool`/`int`/`float`, `EventHandler.on`/`onUnit`, and
 `Html.elementWith`/`keyedElementWith` remain intentional escape hatches for
-unblessed prop names, event names, and tags.
+unblessed scalar prop names, event names, and tags. `PropValue.style` and
+`PropValue.classList` are intentionally constrained to the `style` and
+`className` props by the host renderer.
 
 ## Runtime Contract
 
@@ -128,16 +148,19 @@ helpers check `currentTarget` first, then fall back to `target`.
    a retained Lean callback.
 7. Added `examples/ReactInput.lean` with controlled text, change, submit,
    checkbox, attribute-conformance, label, and form examples.
-8. Added runtime tests for nested callbacks inside `Html`, root rerender
+8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger stateful
+   example that shares the non-React Tamagotchi model, renders a keyed React
+   tree, and handles controlled input, checkbox, submit, and action callbacks.
+9. Added runtime tests for nested callbacks inside `Html`, root rerender
    cleanup, unmount cleanup, package reload cleanup, runtime dispose,
    malformed trees, recursion limits, missing selectors, and input-event
    target fallback. Virtual `Document.querySelector` follows DOM semantics, so
    tests pre-seed expected fixtures with `ensureVirtualElementState`. Virtual
    React callback tests find nodes by DOM-like `id` props instead of child
    indexes.
-9. Added browser smoke coverage proving real React click, input, change, and
-   submit/checkbox handlers call back into Lean, including rapid rerender
-   cleanup.
+10. Added browser smoke coverage proving real React click, input, change,
+    submit/checkbox, and React Tamagotchi handlers call back into Lean,
+    including rapid rerender cleanup.
 
 ## Future Notes
 
@@ -149,8 +172,8 @@ the table later without changing this Lean-facing API much.
 
 Open engineering questions:
 
-- Whether `PropValue` should add style-object, class-list, and JSON-like
-  values beyond the current scalar string/bool/int/float surface.
+- Whether `PropValue` should add JSON-like values beyond the current scalar,
+  style-object, and class-list surface.
 - Whether the microtask cleanup policy for browser React rerenders is enough for
   broader concurrent React edge cases.
 - Whether recursive custom-inductive values should eventually preserve sharing
