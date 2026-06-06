@@ -17,7 +17,14 @@ Node tests and command-line tools that need `Lean.Vir.Browser.Document` calls
 can import the Node wrapper:
 
 ```js
-import { createVirRuntime } from "lean-vir/vir-runtime-node";
+import {
+  createVirRuntime,
+  createVirtualElementState,
+  createVirtualEventState,
+  ensureVirtualElementState,
+  findVirtualReactElementById,
+  virtualReactElementById,
+} from "lean-vir/vir-runtime-node";
 ```
 
 ## Browser Usage
@@ -181,6 +188,13 @@ The first library surface is:
 - `Lean.Vir.Browser.Document.getTitle : IO String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
 - `Lean.Vir.Browser.Document.querySelector : @& String -> IO (Option Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Event.target : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.Element)`
+- `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Browser.Event -> IO Unit`
+- `Lean.Vir.Browser.Event.stopPropagation : @& Lean.Vir.Browser.Event -> IO Unit`
+- `Lean.Vir.Browser.Event.inputElement? : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
+- `Lean.Vir.Browser.Event.inputValue? : @& Lean.Vir.Browser.Event -> IO (Option String)`
+- `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Browser.Event -> IO (Option Bool)`
 - `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Browser.Element -> IO String`
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
 - `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
@@ -197,6 +211,8 @@ The first library surface is:
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> IO Unit) -> IO Lean.Vir.Browser.AnimationFrame`
 - `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Browser.AnimationFrame -> IO Unit`
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Browser.Element -> IO Lean.Vir.React.Root`
+- `Lean.Vir.React.Root.createFromSelector : String -> IO (Option Lean.Vir.React.Root)`
+- `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.React.Root -> IO Unit) -> IO Bool`
 - `Lean.Vir.React.Root.render : @& Lean.Vir.React.Root -> @& Lean.Vir.React.Html -> IO Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.React.Root -> IO Unit`
 
@@ -215,17 +231,28 @@ console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 `Lean.Vir.Browser.Console.log` maps to `console.log`, title calls map to
 `document.title`, `Document.querySelector` returns an opaque element resource,
 `Element` calls use DOM element properties/methods, event listeners call
-retained Lean closures with an opaque `Event` resource, timers map to
-`setTimeout`, animation frames map to
-`requestAnimationFrame`, `HTMLInputElement` calls first narrow an element
-before reading or writing `checked` and `value`, and React roots map to
+retained Lean closures with an opaque `Event` resource, `Event.target` and
+`Event.currentTarget` return element resources when the event target is an
+element, event `preventDefault` and `stopPropagation` forward to the browser
+event, `Event.inputValue?`/`inputChecked?` check `currentTarget` before `target`
+and narrow to `HTMLInputElement`, timers map to `setTimeout`, animation frames map to
+`requestAnimationFrame`, `HTMLInputElement` calls first narrow an element before
+reading or writing `checked` and `value`, and React roots map to
 `ReactDOMClient.createRoot` plus `root.render`/`root.unmount`.
 The browser runtime requires `globalThis.document` for `browser.document.*`
 targets. In Node, use `lean-vir/vir-runtime-node` or pass explicit
 `hostBindings`; the Node wrapper provides virtual document and element state for
-these built-in browser and React targets. No extra `createVirRuntime` option is
-needed for the built-in `common.*`, `browser.*`, or `react.root.*` imports. See
-MDN and the React reference for the underlying APIs:
+these built-in browser and React targets. Virtual `Document.querySelector`
+follows DOM semantics and returns `none`/`null` for missing selectors; use
+`ensureVirtualElementState` to pre-seed selectors in Node tests.
+`createVirtualElementState` and `createVirtualEventState` construct test
+resources for direct virtual callback dispatch, and
+`findVirtualReactElementById`/`virtualReactElementById` locate rendered virtual
+React nodes by DOM-like `id` props. No extra `createVirRuntime` option is needed
+for the built-in
+`common.*`, `browser.*`, or `react.root.*` imports. The current Lean-side React
+HTML authoring surface is documented in `docs/REACT_HTML.md`. See MDN and the
+React reference for the underlying APIs:
 
 - [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
 - [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
@@ -234,6 +261,10 @@ MDN and the React reference for the underlying APIs:
 - [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
 - [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
 - [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event)
+- [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target)
+- [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget)
+- [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault)
+- [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation)
 - [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
 - [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
 - [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)

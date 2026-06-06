@@ -7,7 +7,17 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 
 import { createVirImports, VirRuntime } from "../web/src/vir-runtime.js";
-import { createVirRuntime, createVirtualDocumentState } from "../web/src/vir-runtime-node.js";
+import {
+  createVirRuntime,
+  createVirtualDocumentState,
+  createVirtualElementState,
+  createVirtualEventState,
+  virtualReactElementById,
+} from "../web/src/vir-runtime-node.js";
+import {
+  ensureTamagotchiVirtualDom,
+  ensureVirtualElements,
+} from "./virtual-fixtures.mjs";
 
 const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const fixtureManifest = JSON.parse(await readFile(new URL("../fixtures/manifest.json", import.meta.url), "utf8"));
@@ -185,19 +195,26 @@ const hostRuntime = await createVirRuntime({
   irPackageBytes: hostPackage,
   virtualDocumentState: hostDocumentState,
 });
-if (hostRuntime.packageInfo.hostImports !== 22) {
-  throw new Error(`expected 22 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+if (hostRuntime.packageInfo.hostImports !== 26) {
+  throw new Error(`expected 26 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
 }
 const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
 if (hostTitle !== "Lean VIR host: smoke") {
   throw new Error(`Lean to JavaScript host title: expected Lean VIR host: smoke, got ${hostTitle}`);
 }
+ensureVirtualElements(hostDocumentState, [
+  "#react-smoke",
+  "#react-input-smoke",
+  "#react-change-smoke",
+  "#react-checkbox-smoke",
+  "#react-attributes-smoke",
+]);
 const reactMountCount = hostRuntime.call("ReactCounter.mount", "#react-smoke");
 const reactElement = hostDocumentState.elements.get("#react-smoke");
-if (reactMountCount !== "1" || reactElement.textContent !== "react:0" || hostRuntime.liveCallbacks.size !== 1) {
+if (reactMountCount !== true || reactElement.textContent !== "react:0" || hostRuntime.liveCallbacks.size !== 1) {
   throw new Error(`Lean React mount failed: ${JSON.stringify({ reactMountCount, text: reactElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
 }
-reactElement.reactRoot.current.handlers.onClick({});
+virtualReactElementById(reactElement.reactRoot, "react-counter-button").handlers.onClick({});
 if (reactElement.textContent !== "react:1" || hostRuntime.liveCallbacks.size !== 1) {
   throw new Error(`Lean React click failed: ${JSON.stringify({ text: reactElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
 }
@@ -205,6 +222,114 @@ reactElement.reactRoot.unmount();
 if (hostRuntime.liveCallbacks.size !== 0 || reactElement.reactRoot !== undefined) {
   throw new Error(`Lean React unmount cleanup failed: ${JSON.stringify({ callbacks: hostRuntime.liveCallbacks.size, root: reactElement.reactRoot })}`);
 }
+const missingSelectorDocumentState = createVirtualDocumentState();
+const missingSelectorRuntime = await createVirRuntime({
+  wasmBytes: wasm,
+  irPackageBytes: hostPackage,
+  virtualDocumentState: missingSelectorDocumentState,
+});
+const missingReactMountCount = missingSelectorRuntime.call("ReactCounter.mount", "#missing-react-root");
+if (missingReactMountCount !== false || missingSelectorRuntime.liveCallbacks.size !== 0) {
+  throw new Error(`Lean React missing selector failed: ${JSON.stringify({ missingReactMountCount, callbacks: missingSelectorRuntime.liveCallbacks.size })}`);
+}
+missingSelectorRuntime.dispose();
+const reactInputMountCount = hostRuntime.call("ReactInput.mountInput", "#react-input-smoke");
+const reactInputElement = hostDocumentState.elements.get("#react-input-smoke");
+if (reactInputMountCount !== true || reactInputElement.textContent !== "name:" || hostRuntime.liveCallbacks.size !== 1) {
+  throw new Error(`Lean React input mount failed: ${JSON.stringify({ reactInputMountCount, text: reactInputElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+const reactNameInput = createVirtualElementState({ value: "Ada" });
+hostDocumentState.elements.set("#react-name-input", reactNameInput);
+virtualReactElementById(reactInputElement.reactRoot, "react-name-input").handlers.onInput(createVirtualEventState({
+  currentTarget: reactNameInput,
+  target: createVirtualElementState({ value: "unused-target" }),
+}));
+if (reactInputElement.textContent !== "name:Ada" || hostRuntime.liveCallbacks.size !== 1) {
+  throw new Error(`Lean React input change failed: ${JSON.stringify({ text: reactInputElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+virtualReactElementById(reactInputElement.reactRoot, "react-name-input").handlers.onInput(createVirtualEventState({
+  target: createVirtualElementState({ value: "Target" }),
+}));
+if (reactInputElement.textContent !== "name:Target" || hostRuntime.liveCallbacks.size !== 1) {
+  throw new Error(`Lean React input target fallback failed: ${JSON.stringify({ text: reactInputElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+reactInputElement.reactRoot.unmount();
+if (hostRuntime.liveCallbacks.size !== 0 || reactInputElement.reactRoot !== undefined) {
+  throw new Error(`Lean React input unmount cleanup failed: ${JSON.stringify({ callbacks: hostRuntime.liveCallbacks.size, root: reactInputElement.reactRoot })}`);
+}
+const reactChangeMountCount = hostRuntime.call("ReactInput.mountChangeInput", "#react-change-smoke");
+const reactChangeElement = hostDocumentState.elements.get("#react-change-smoke");
+if (reactChangeMountCount !== true || reactChangeElement.textContent !== "change:" || hostRuntime.liveCallbacks.size !== 2) {
+  throw new Error(`Lean React change input mount failed: ${JSON.stringify({ reactChangeMountCount, text: reactChangeElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+const reactSubmitEvent = createVirtualEventState();
+virtualReactElementById(reactChangeElement.reactRoot, "react-change-widget").handlers.onSubmit(reactSubmitEvent);
+if (!reactSubmitEvent.defaultPrevented || !reactSubmitEvent.propagationStopped || hostRuntime.liveCallbacks.size !== 2) {
+  throw new Error(`Lean React submit failed: ${JSON.stringify({ defaultPrevented: reactSubmitEvent.defaultPrevented, propagationStopped: reactSubmitEvent.propagationStopped, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+const reactChangeInput = createVirtualElementState({ value: "Grace" });
+const reactChangeEvent = createVirtualEventState({
+  currentTarget: reactChangeInput,
+});
+virtualReactElementById(reactChangeElement.reactRoot, "react-change-input").handlers.onChange(reactChangeEvent);
+if (reactChangeElement.textContent !== "change:Grace" || !reactChangeEvent.defaultPrevented || !reactChangeEvent.propagationStopped || hostRuntime.liveCallbacks.size !== 2) {
+  throw new Error(`Lean React change input failed: ${JSON.stringify({ text: reactChangeElement.textContent, defaultPrevented: reactChangeEvent.defaultPrevented, propagationStopped: reactChangeEvent.propagationStopped, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+reactChangeElement.reactRoot.unmount();
+if (hostRuntime.liveCallbacks.size !== 0 || reactChangeElement.reactRoot !== undefined) {
+  throw new Error(`Lean React change input unmount cleanup failed: ${JSON.stringify({ callbacks: hostRuntime.liveCallbacks.size, root: reactChangeElement.reactRoot })}`);
+}
+const reactCheckboxMountCount = hostRuntime.call("ReactInput.mountCheckbox", "#react-checkbox-smoke");
+const reactCheckboxElement = hostDocumentState.elements.get("#react-checkbox-smoke");
+if (reactCheckboxMountCount !== true || reactCheckboxElement.textContent !== "checked:false" || hostRuntime.liveCallbacks.size !== 1) {
+  throw new Error(`Lean React checkbox mount failed: ${JSON.stringify({ reactCheckboxMountCount, text: reactCheckboxElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+virtualReactElementById(reactCheckboxElement.reactRoot, "react-checkbox-input").handlers.onChange(createVirtualEventState({
+  currentTarget: createVirtualElementState({ checked: true }),
+}));
+if (reactCheckboxElement.textContent !== "checked:true" || hostRuntime.liveCallbacks.size !== 1) {
+  throw new Error(`Lean React checkbox failed: ${JSON.stringify({ text: reactCheckboxElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+virtualReactElementById(reactCheckboxElement.reactRoot, "react-checkbox-input").handlers.onChange(createVirtualEventState({
+  target: createVirtualElementState({ checked: false }),
+}));
+if (reactCheckboxElement.textContent !== "checked:false" || hostRuntime.liveCallbacks.size !== 1) {
+  throw new Error(`Lean React checkbox target fallback failed: ${JSON.stringify({ text: reactCheckboxElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+reactCheckboxElement.reactRoot.unmount();
+if (hostRuntime.liveCallbacks.size !== 0 || reactCheckboxElement.reactRoot !== undefined) {
+  throw new Error(`Lean React checkbox unmount cleanup failed: ${JSON.stringify({ callbacks: hostRuntime.liveCallbacks.size, root: reactCheckboxElement.reactRoot })}`);
+}
+const reactAttributesMountCount = hostRuntime.call("ReactInput.mountAttributes", "#react-attributes-smoke");
+const reactAttributesElement = hostDocumentState.elements.get("#react-attributes-smoke");
+if (reactAttributesMountCount !== true || reactAttributesElement.textContent !== "attrs:attrs" || hostRuntime.liveCallbacks.size !== 0) {
+  throw new Error(`Lean React attributes mount failed: ${JSON.stringify({ reactAttributesMountCount, text: reactAttributesElement.textContent, callbacks: hostRuntime.liveCallbacks.size })}`);
+}
+const reactAttributesWidget = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-widget");
+if (
+  reactAttributesWidget.props.role !== "group" ||
+  reactAttributesWidget.props["aria-label"] !== "React attribute fixture" ||
+  reactAttributesWidget.props["data-case"] !== "attributes" ||
+  reactAttributesWidget.props["data-testid"] !== "react-attributes" ||
+  reactAttributesWidget.props.tabIndex !== 3
+) {
+  throw new Error(`Lean React attribute widget props failed: ${JSON.stringify(reactAttributesWidget.props)}`);
+}
+const reactAttributesLabel = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-label");
+const reactAttributesInput = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-input");
+const reactAttributesOutput = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-output");
+if (
+  reactAttributesLabel.props.htmlFor !== "react-attributes-input" ||
+  reactAttributesInput.props.name !== "attributes" ||
+  reactAttributesInput.props.type !== "checkbox" ||
+  reactAttributesInput.props.checked !== true ||
+  reactAttributesInput.props.disabled !== true ||
+  reactAttributesOutput.props.title !== "attribute output"
+) {
+  throw new Error(`Lean React attribute child props failed: ${JSON.stringify({ label: reactAttributesLabel.props, input: reactAttributesInput.props, output: reactAttributesOutput.props })}`);
+}
+reactAttributesElement.reactRoot.unmount();
+ensureTamagotchiVirtualDom(hostDocumentState);
 const petMountCount = hostRuntime.call("Tamagotchi.uiMountFromDom");
 if (petMountCount !== "8" || hostRuntime.liveCallbacks.size !== 8) {
   throw new Error(`Lean Tamagotchi mount callbacks failed: ${petMountCount}`);

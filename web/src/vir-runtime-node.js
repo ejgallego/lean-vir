@@ -19,7 +19,17 @@ export {
   VirCallback,
   VirRuntime,
 } from "./vir-runtime.js";
-export { createNodeHostBindings, createVirtualDocumentHostBindings, createVirtualDocumentState } from "./vir-host-bindings.js";
+export {
+  createNodeHostBindings,
+  createVirtualDocumentHostBindings,
+  createVirtualDocumentState,
+  createVirtualElementState,
+  ensureVirtualElementState,
+  findVirtualReactElementById,
+  createVirtualEventState,
+  createVirtualEventHostBindings,
+  virtualReactElementById,
+} from "./vir-host-bindings.js";
 
 export function createVirRuntimeFactory(options = {}) {
   const { hostBindings = null, virtualDocumentState = createVirtualDocumentState(), ...browserOptions } = options;
