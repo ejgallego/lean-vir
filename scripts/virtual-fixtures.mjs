@@ -29,3 +29,10 @@ export function ensureVirtualElements(state, selectors) {
 export function ensureTamagotchiVirtualDom(state) {
   ensureVirtualElements(state, TAMAGOTCHI_VIRTUAL_DOM_SELECTORS);
 }
+
+export function virtualReactTextContent(node) {
+  if (node === null || node === undefined) return "";
+  if (node.kind === "text") return node.value;
+  if (node.kind === "element") return node.children.map(virtualReactTextContent).join("");
+  return "";
+}

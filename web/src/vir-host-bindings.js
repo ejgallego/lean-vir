@@ -817,7 +817,10 @@ function reactHtmlArray(value, label) {
 
 function reactHtmlPropertyEntries(fields) {
   return reactHtmlArray(fields.props, "props")
-    .map((prop) => [reactHtmlPropertyName(prop), reactPropValue(prop?.value)]);
+    .map((prop) => {
+      const name = reactHtmlPropertyName(prop);
+      return [name, reactPropValue(prop?.value, name)];
+    });
 }
 
 function reactHtmlEventHandlerEntries(fields) {
@@ -855,7 +858,7 @@ function reactHtmlEventCallback(handler) {
   return callback;
 }
 
-function reactPropValue(value) {
+function reactPropValue(value, propName) {
   switch (value?.kind) {
     case "string":
       if (typeof value.value !== "string") {
@@ -871,8 +874,18 @@ function reactPropValue(value) {
       return reactIntPropValue(value.value);
     case "float":
       return reactFloatPropValue(value.value);
+    case "style":
+      if (propName !== "style") {
+        throw new Error("React PropValue.style is only supported for the style prop");
+      }
+      return reactStylePropValue(value.value);
+    case "classList":
+      if (propName !== "className") {
+        throw new Error("React PropValue.classList is only supported for the className prop");
+      }
+      return reactClassListPropValue(value.value);
     default:
-      throw new Error("React PropValue must be string, bool, int, or float");
+      throw new Error("React PropValue must be string, bool, int, float, style, or classList");
   }
 }
 
@@ -894,6 +907,70 @@ function reactIntPropValue(value) {
 function reactFloatPropValue(value) {
   if (typeof value !== "number" || !Number.isFinite(value)) {
     throw new Error("React PropValue.float value must be a finite number");
+  }
+  return value;
+}
+
+function reactStylePropValue(entries) {
+  const style = {};
+  for (const [index, entry] of reactStyleEntries(entries).entries()) {
+    const styleEntry = reactStyleEntry(entry, `React PropValue.style[${index}]`);
+    const name = reactStyleName(styleEntry.name, `React PropValue.style[${index}].name`);
+    style[name] = reactStyleEntryValue(styleEntry.value, `React PropValue.style[${index}].value`);
+  }
+  return style;
+}
+
+function reactStyleEntries(value) {
+  if (!Array.isArray(value)) {
+    throw new Error("React PropValue.style value must be an array");
+  }
+  return value;
+}
+
+function reactStyleEntry(value, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`${label} must be an object`);
+  }
+  return value;
+}
+
+function reactStyleName(value, label) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`${label} must be a non-empty string`);
+  }
+  if (value === "__proto__" || value === "prototype" || value === "constructor") {
+    throw new Error(`${label} is not supported`);
+  }
+  return value;
+}
+
+function reactStyleEntryValue(value, label) {
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string`);
+  }
+  return value;
+}
+
+function reactClassListPropValue(classes) {
+  if (!Array.isArray(classes)) {
+    throw new Error("React PropValue.classList value must be an array");
+  }
+  const tokens = [];
+  const seen = new Set();
+  for (const [index, value] of classes.entries()) {
+    const token = reactClassToken(value, index);
+    if (!seen.has(token)) {
+      seen.add(token);
+      tokens.push(token);
+    }
+  }
+  return tokens.join(" ");
+}
+
+function reactClassToken(value, index) {
+  if (typeof value !== "string" || value.length === 0 || /\s/.test(value)) {
+    throw new Error(`React PropValue.classList[${index}] must be a non-empty token without whitespace`);
   }
   return value;
 }

@@ -95,9 +95,9 @@ guide, including `Sum` and `Except` result shapes.
 
 ## Built-In Demos
 
-Open the Vite URL from `npm run dev -- --port 5173` to see the Tamagotchi demo,
-fixture browser, and links into the package runner. The Lean sources are in
-[examples/](examples/), with broader fixture coverage under
+Open the Vite URL from `npm run dev -- --port 5173` to see the DOM Tamagotchi,
+the React review page, fixture browser, and links into the package runner. The
+Lean sources are in [examples/](examples/), with broader fixture coverage under
 [fixtures/](fixtures/).
 
 The hosted demo is deployed from `main`:

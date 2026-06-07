@@ -81,6 +81,7 @@ Useful entry points:
 
   index.html              Main demo and fixture browser
   dev.html                Package runner
+  react.html              Lean-authored React examples
   format.html             Format.pretty workbench
   runtime-example.html    Minimal JavaScript runtime example
 EOF

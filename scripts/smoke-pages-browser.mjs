@@ -308,15 +308,15 @@ async function evaluate(cdp, expression) {
   return result.result.value;
 }
 
-async function waitForReady(cdp) {
-  return waitForStatus(cdp, "Ready");
+async function waitForReady(cdp, selector = "#status") {
+  return waitForStatus(cdp, "Ready", selector);
 }
 
-async function waitForStatus(cdp, expected) {
+async function waitForStatus(cdp, expected, selector = "#status") {
   return evaluate(cdp, `new Promise((resolve, reject) => {
     const deadline = Date.now() + 15000;
     const poll = () => {
-      const status = document.querySelector("#status")?.textContent?.trim();
+      const status = document.querySelector(${JSON.stringify(selector)})?.textContent?.trim();
       if (status === ${JSON.stringify(expected)}) {
         resolve(status);
       } else if (Date.now() > deadline) {
@@ -352,15 +352,17 @@ async function smokeLanding(cdp, origin) {
     "dev.html?package=local-quickstart.irpkg&entry=Quickstart.total",
     "dev.html?package=fixtures-basic.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump",
     "dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake",
+    "react.html",
     "format.html?case=list&width=12",
     "dev.html?package=fixtures-lean.irpkg&entry=Vir_Fixtures_ExprPrinter_exprKindScore",
     "dev.html?package=fixtures-boundary.irpkg&entry=Vir_Fixtures_Boundary_floatScaleScore",
   ]);
   assert.ok(state.packageItems[0].text.includes("Four small exports from one Lean file"));
   assert.ok(state.packageItems[1].text.includes("Basic, list/option, interface shapes"));
-  assert.ok(state.packageItems[2].text.includes("Browser host calls, React, and DOM Tamagotchi"));
-  assert.ok(state.packageItems[3].text.includes("Std.Format.pretty component package"));
-  assert.ok(state.packageItems[4].text.includes("Lean Expr, parser, Task"));
+  assert.ok(state.packageItems[2].text.includes("Browser host calls, React, and Tamagotchi demos"));
+  assert.ok(state.packageItems[3].text.includes("Lean-authored React examples"));
+  assert.ok(state.packageItems[4].text.includes("Std.Format.pretty component package"));
+  assert.ok(state.packageItems[5].text.includes("Lean Expr, parser, Task"));
   assert.equal(state.name, "Octi");
   assert.equal(state.care, "3/5");
   assert.equal(state.turns, "0");
@@ -514,7 +516,7 @@ async function smokePackagePreset(cdp, origin) {
     status: "Ready",
     packageName: "demo-host.irpkg",
     packageUrl: "demo-host.irpkg",
-    entryCount: 33,
+    entryCount: 35,
   });
 }
 
@@ -923,6 +925,9 @@ async function smokeBrowserCallbacks(cdp, origin) {
           dataCase: widget.getAttribute("data-case"),
           dataTestId: widget.getAttribute("data-testid"),
           tabIndex: widget.tabIndex,
+          className: widget.className,
+          color: widget.style.color,
+          marginTop: widget.style.marginTop,
           labelFor: label.htmlFor,
           inputName: input.name,
           inputType: input.type,
@@ -946,6 +951,9 @@ async function smokeBrowserCallbacks(cdp, origin) {
     dataCase: "attributes",
     dataTestId: "react-attributes",
     tabIndex: 3,
+    className: "react-attributes is-mounted",
+    color: "rgb(1, 2, 3)",
+    marginTop: "4px",
     labelFor: "react-attributes-input",
     inputName: "attributes",
     inputType: "checkbox",
@@ -996,6 +1004,158 @@ async function smokeBrowserCallbacks(cdp, origin) {
     poll();
   })`);
   assert.equal(frameTitle, "frame:pages-frame");
+}
+
+async function smokeReactReview(cdp, origin) {
+  await navigate(cdp, `${origin}${basePath}react.html`);
+  await waitForReady(cdp, "#react-review-status");
+  const reviewState = await evaluate(cdp, `new Promise((resolve, reject) => {
+    const deadline = Date.now() + 5000;
+    const setInputValue = (input, value) => {
+      const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value")?.set;
+      if (typeof setter === "function") {
+        setter.call(input, value);
+      } else {
+        input.value = value;
+      }
+    };
+    const pollMounted = () => {
+      const counter = document.querySelector("#react-counter-button");
+      const nameInput = document.querySelector("#react-name-input");
+      const changeInput = document.querySelector("#react-change-input");
+      const checkbox = document.querySelector("#react-checkbox-input");
+      const attributes = document.querySelector("#react-attributes-widget");
+      const petNameInput = document.querySelector("#react-pet-name-input");
+      if (
+        counter instanceof HTMLButtonElement &&
+        nameInput instanceof HTMLInputElement &&
+        changeInput instanceof HTMLInputElement &&
+        checkbox instanceof HTMLInputElement &&
+        attributes instanceof HTMLElement &&
+        petNameInput instanceof HTMLInputElement
+      ) {
+        counter.click();
+        setInputValue(nameInput, "Ada");
+        setInputValue(changeInput, "Grace");
+        setInputValue(petNameInput, "Ada");
+        nameInput.dispatchEvent(new Event("input", { bubbles: true }));
+        changeInput.dispatchEvent(new Event("input", { bubbles: true, cancelable: true }));
+        petNameInput.dispatchEvent(new Event("input", { bubbles: true }));
+        checkbox.click();
+        pollChanged();
+      } else if (Date.now() > deadline) {
+        reject(new Error("React review examples did not mount"));
+      } else {
+        setTimeout(pollMounted, 50);
+      }
+    };
+    const pollChanged = () => {
+      const state = {
+        status: document.querySelector("#react-review-status")?.textContent?.trim(),
+        counter: document.querySelector("#react-counter-button")?.textContent,
+        input: document.querySelector("#react-name-output")?.textContent,
+        change: document.querySelector("#react-change-output")?.textContent,
+        checkbox: document.querySelector("#react-checkbox-output")?.textContent,
+        className: document.querySelector("#react-attributes-widget")?.className,
+        color: document.querySelector("#react-attributes-widget")?.style.color,
+        marginTop: document.querySelector("#react-attributes-widget")?.style.marginTop,
+        petSummary: document.querySelector("#react-pet-summary")?.textContent,
+      };
+      if (
+        state.counter === "react:1" &&
+        state.input === "Ada" &&
+        state.change === "Grace" &&
+        state.checkbox === "checked:true" &&
+        state.petSummary === "Ada is happy; last rename; care 3/5; turn 0"
+      ) {
+        document.querySelector("#react-pet-action-ignore")?.click();
+        pollPetAction();
+      } else if (Date.now() > deadline) {
+        reject(new Error("React review examples did not update: " + JSON.stringify(state)));
+      } else {
+        setTimeout(pollChanged, 50);
+      }
+    };
+    const pollPetAction = () => {
+      const state = {
+        status: document.querySelector("#react-review-status")?.textContent?.trim(),
+        counter: document.querySelector("#react-counter-button")?.textContent,
+        input: document.querySelector("#react-name-output")?.textContent,
+        change: document.querySelector("#react-change-output")?.textContent,
+        checkbox: document.querySelector("#react-checkbox-output")?.textContent,
+        className: document.querySelector("#react-attributes-widget")?.className,
+        color: document.querySelector("#react-attributes-widget")?.style.color,
+        marginTop: document.querySelector("#react-attributes-widget")?.style.marginTop,
+        petSummary: document.querySelector("#react-pet-summary")?.textContent,
+        petMood: document.querySelector("#react-pet-mood")?.textContent,
+        petTrace: document.querySelector("#react-pet-trace")?.textContent,
+        petTraceRole: document.querySelector("#react-pet-trace")?.getAttribute("role"),
+        petTraceAriaLabel: document.querySelector("#react-pet-trace")?.getAttribute("aria-label"),
+      };
+      if (
+        state.petSummary === "Ada is hungry; last ignore; care 2/5; turn 1" &&
+        state.petMood === "hungry" &&
+        state.petTrace === "happyhungry" &&
+        state.petTraceRole === "list" &&
+        state.petTraceAriaLabel === "Mood trace: happy -> hungry"
+      ) {
+        document.querySelector("#react-pet-art-toggle")?.click();
+        pollPetToggle();
+      } else if (Date.now() > deadline) {
+        reject(new Error("React Tamagotchi action did not update: " + JSON.stringify(state)));
+      } else {
+        setTimeout(pollPetAction, 50);
+      }
+    };
+    const pollPetToggle = () => {
+      const state = {
+        status: document.querySelector("#react-review-status")?.textContent?.trim(),
+        counter: document.querySelector("#react-counter-button")?.textContent,
+        input: document.querySelector("#react-name-output")?.textContent,
+        change: document.querySelector("#react-change-output")?.textContent,
+        checkbox: document.querySelector("#react-checkbox-output")?.textContent,
+        className: document.querySelector("#react-attributes-widget")?.className,
+        color: document.querySelector("#react-attributes-widget")?.style.color,
+        marginTop: document.querySelector("#react-attributes-widget")?.style.marginTop,
+        petSummary: document.querySelector("#react-pet-summary")?.textContent,
+        petMood: document.querySelector("#react-pet-mood")?.textContent,
+        petTrace: document.querySelector("#react-pet-trace")?.textContent,
+        petTraceRole: document.querySelector("#react-pet-trace")?.getAttribute("role"),
+        petTraceAriaLabel: document.querySelector("#react-pet-trace")?.getAttribute("aria-label"),
+        petArt: document.querySelector("#react-pet-device")?.dataset.art,
+        petToggleChecked: document.querySelector("#react-pet-art-toggle")?.checked,
+      };
+      if (
+        state.petSummary === "Ada is hungry; last artwork; care 2/5; turn 1" &&
+        state.petArt === "pet" &&
+        state.petToggleChecked === false
+      ) {
+        resolve(state);
+      } else if (Date.now() > deadline) {
+        reject(new Error("React Tamagotchi toggle did not update: " + JSON.stringify(state)));
+      } else {
+        setTimeout(pollPetToggle, 50);
+      }
+    };
+    pollMounted();
+  })`);
+  assert.deepEqual(reviewState, {
+    status: "Ready",
+    counter: "react:1",
+    input: "Ada",
+    change: "Grace",
+    checkbox: "checked:true",
+    className: "react-attributes is-mounted",
+    color: "rgb(1, 2, 3)",
+    marginTop: "4px",
+    petSummary: "Ada is hungry; last artwork; care 2/5; turn 1",
+    petMood: "hungry",
+    petTrace: "happyhungry",
+    petTraceRole: "list",
+    petTraceAriaLabel: "Mood trace: happy -> hungry",
+    petArt: "pet",
+    petToggleChecked: false,
+  });
 }
 
 async function smokeBrowserCallbackCleanup(cdp, origin) {
@@ -1271,6 +1431,7 @@ try {
   await smokeLanding(cdp, server.origin);
   await smokePackagePreset(cdp, server.origin);
   await smokeFormatWorkbench(cdp, server.origin);
+  await smokeReactReview(cdp, server.origin);
   await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-basic.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "demo-host.irpkg");
   await smokeManifestDrivenEntryList(cdp, server.origin, "pretty-printer.irpkg");
@@ -1475,7 +1636,7 @@ try {
   );
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
+  console.log("pages browser smoke ok: landing, React review, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

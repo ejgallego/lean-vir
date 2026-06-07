@@ -35,6 +35,7 @@ import {
 import {
   ensureTamagotchiVirtualDom,
   ensureVirtualElements,
+  virtualReactTextContent,
 } from "./virtual-fixtures.mjs";
 
 function assertManifestTypeDescriptorsRoundTrip(manifest) {
@@ -59,6 +60,25 @@ function assertManifestTypeDescriptorsRoundTrip(manifest) {
       `${entry.entry} result descriptor should round-trip`,
     );
   }
+}
+
+function findTypeDescriptor(type, predicate, seen = new Set()) {
+  if (type === null || typeof type !== "object") return null;
+  if (seen.has(type)) return null;
+  seen.add(type);
+  if (predicate(type)) return type;
+  for (const value of Object.values(type)) {
+    if (Array.isArray(value)) {
+      for (const item of value) {
+        const found = findTypeDescriptor(item, predicate, seen);
+        if (found !== null) return found;
+      }
+    } else if (value !== null && typeof value === "object") {
+      const found = findTypeDescriptor(value, predicate, seen);
+      if (found !== null) return found;
+    }
+  }
+  return null;
 }
 
 const validManifestShape = {
@@ -496,6 +516,16 @@ assert.equal(
     ?.args[1]?.type?.kind,
   "customInductive",
 );
+const reactHtmlType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
+  ?.args[1]?.type;
+const reactPropValueType = findTypeDescriptor(
+  reactHtmlType,
+  (type) => type.kind === "customInductive" && typeof type.name === "string" && type.name.endsWith(".PropValue"),
+);
+assert.deepEqual(
+  reactPropValueType?.constructors.map((ctor) => ctor.jsName),
+  ["string", "bool", "int", "float", "style", "classList"],
+);
 const virtualQueryState = createVirtualDocumentState();
 const virtualQueryHost = createVirtualDocumentHostBindings(virtualQueryState);
 assert.equal(virtualQueryHost["browser.document.querySelector"]("#missing"), null);
@@ -680,6 +710,7 @@ ensureVirtualElements(reactDocumentState, [
   "#react-change",
   "#react-checkbox",
   "#react-attributes",
+  "#react-pet",
   "#react-unmount",
   "#react-stale-root",
   "#react-too-deep",
@@ -774,16 +805,83 @@ assert.equal(reactAttributesWidget.props["aria-label"], "React attribute fixture
 assert.equal(reactAttributesWidget.props["data-case"], "attributes");
 assert.equal(reactAttributesWidget.props["data-testid"], "react-attributes");
 assert.equal(reactAttributesWidget.props.tabIndex, 3);
+assert.equal(reactAttributesWidget.props.className, "react-attributes is-mounted");
+assert.equal(reactAttributesWidget.props.style.color, "rgb(1, 2, 3)");
+assert.equal(reactAttributesWidget.props.style.marginTop, "4px");
 const reactAttributesLabel = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-label");
+assert.equal(reactAttributesLabel.key, "attributes-label");
 assert.equal(reactAttributesLabel.props.htmlFor, "react-attributes-input");
 const reactAttributesInput = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-input");
+assert.equal(reactAttributesInput.key, "attributes-input");
 assert.equal(reactAttributesInput.props.name, "attributes");
 assert.equal(reactAttributesInput.props.type, "checkbox");
 assert.equal(reactAttributesInput.props.checked, true);
 assert.equal(reactAttributesInput.props.disabled, true);
 const reactAttributesOutput = virtualReactElementById(reactAttributesElement.reactRoot, "react-attributes-output");
+assert.equal(reactAttributesOutput.key, "attributes-output");
 assert.equal(reactAttributesOutput.props.title, "attribute output");
 reactAttributesElement.reactRoot.unmount();
+assert.equal(reactRuntime.liveCallbacks.size, 0);
+assert.equal(reactRuntime.call("ReactTamagotchi.mount", "#react-pet"), true);
+const reactPetElement = reactDocumentState.elements.get("#react-pet");
+assert.equal(reactRuntime.liveCallbacks.size, 9);
+const reactPetWidget = virtualReactElementById(reactPetElement.reactRoot, "react-pet-widget");
+assert.equal(reactPetWidget.props["data-mood"], "happy");
+const reactPetDevice = virtualReactElementById(reactPetElement.reactRoot, "react-pet-device");
+assert.equal(reactPetDevice.props.role, "img");
+assert.equal(reactPetDevice.props["data-art"], "octopus");
+assert.equal(reactPetDevice.props["data-mood"], "happy");
+assert.match(reactPetDevice.props["aria-label"], /Octopus Octi mood happy/);
+const reactPetNameInput = virtualReactElementById(reactPetElement.reactRoot, "react-pet-name-input");
+assert.equal(reactPetNameInput.props.maxLength, 18);
+assert.equal(reactPetNameInput.props.autoComplete, "off");
+assert.equal(
+  virtualReactTextContent(virtualReactElementById(reactPetElement.reactRoot, "react-pet-summary")),
+  "Octi is happy; last ...; care 3/5; turn 0",
+);
+virtualReactElementById(reactPetElement.reactRoot, "react-pet-action-ignore").handlers.onClick({});
+assert.equal(reactRuntime.liveCallbacks.size, 9);
+assert.equal(virtualReactElementById(reactPetElement.reactRoot, "react-pet-widget").props["data-mood"], "hungry");
+assert.equal(
+  virtualReactTextContent(virtualReactElementById(reactPetElement.reactRoot, "react-pet-summary")),
+  "Octi is hungry; last ignore; care 2/5; turn 1",
+);
+assert.equal(
+  virtualReactTextContent(virtualReactElementById(reactPetElement.reactRoot, "react-pet-trace")),
+  "happyhungry",
+);
+const reactPetTrace = virtualReactElementById(reactPetElement.reactRoot, "react-pet-trace");
+assert.equal(reactPetTrace.props.role, "list");
+assert.equal(reactPetTrace.props["aria-label"], "Mood trace: happy -> hungry");
+assert.equal(reactPetTrace.children[0].props.role, "listitem");
+assert.equal(reactPetTrace.children[1].props.role, "listitem");
+virtualReactElementById(reactPetElement.reactRoot, "react-pet-name-input").handlers.onChange(createVirtualEventState({
+  currentTarget: createVirtualElementState({ value: "Ada" }),
+}));
+assert.equal(reactRuntime.liveCallbacks.size, 9);
+assert.equal(
+  virtualReactTextContent(virtualReactElementById(reactPetElement.reactRoot, "react-pet-summary")),
+  "Ada is hungry; last rename; care 2/5; turn 1",
+);
+const reactPetSubmitEvent = createVirtualEventState();
+virtualReactElementById(reactPetElement.reactRoot, "react-pet-name-form").handlers.onSubmit(reactPetSubmitEvent);
+assert.equal(reactPetSubmitEvent.defaultPrevented, true);
+assert.equal(reactPetSubmitEvent.propagationStopped, true);
+assert.equal(reactRuntime.liveCallbacks.size, 9);
+virtualReactElementById(reactPetElement.reactRoot, "react-pet-art-toggle").handlers.onChange(createVirtualEventState({
+  currentTarget: createVirtualElementState({ checked: false }),
+}));
+assert.equal(reactRuntime.liveCallbacks.size, 9);
+assert.equal(virtualReactElementById(reactPetElement.reactRoot, "react-pet-device").props["data-art"], "pet");
+assert.equal(virtualReactElementById(reactPetElement.reactRoot, "react-pet-art-toggle").props.checked, false);
+virtualReactElementById(reactPetElement.reactRoot, "react-pet-reset").handlers.onClick({});
+assert.equal(reactRuntime.liveCallbacks.size, 9);
+assert.equal(
+  virtualReactTextContent(virtualReactElementById(reactPetElement.reactRoot, "react-pet-summary")),
+  "Ada is happy; last ...; care 3/5; turn 0",
+);
+reactPetElement.reactRoot.unmount();
+assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactRuntime.call("ReactCounter.mountAndUnmount", "#react-unmount"), true);
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactDocumentState.elements.get("#react-unmount").reactRoot, undefined);
@@ -808,10 +906,14 @@ renderMalformedReactHtml(reactHtmlElement({
   props: [
     { name: "tabIndex", value: { kind: "int", value: "4" } },
     { name: "data-ratio", value: { kind: "float", value: 1.5 } },
+    { name: "className", value: { kind: "classList", value: ["alpha", "beta", "alpha"] } },
+    { name: "style", value: { kind: "style", value: [{ name: "marginTop", value: "1px" }] } },
   ],
 }));
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.tabIndex, 4);
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props["data-ratio"], 1.5);
+assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.className, "alpha beta");
+assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.style.marginTop, "1px");
 assert.throws(
   () => renderMalformedReactHtml({ kind: "text", value: 1 }),
   /React Html text value must be a string/,
@@ -872,9 +974,69 @@ assert.throws(
 );
 assert.throws(
   () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "title", value: { kind: "style", value: [] } }],
+  })),
+  /React PropValue\.style is only supported for the style prop/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "style", value: { kind: "style", value: "margin-top: 1px" } }],
+  })),
+  /React PropValue\.style value must be an array/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "style", value: { kind: "style", value: ["marginTop"] } }],
+  })),
+  /React PropValue\.style\[0\] must be an object/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "style", value: { kind: "style", value: [{ name: "", value: "1px" }] } }],
+  })),
+  /React PropValue\.style\[0\]\.name must be a non-empty string/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "style", value: { kind: "style", value: [{ name: "__proto__", value: "1px" }] } }],
+  })),
+  /React PropValue\.style\[0\]\.name is not supported/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "style", value: { kind: "style", value: [{ name: "marginTop", value: 1 }] } }],
+  })),
+  /React PropValue\.style\[0\]\.value must be a string/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "title", value: { kind: "classList", value: [] } }],
+  })),
+  /React PropValue\.classList is only supported for the className prop/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "className", value: { kind: "classList", value: "alpha beta" } }],
+  })),
+  /React PropValue\.classList value must be an array/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "className", value: { kind: "classList", value: ["ok", ""] } }],
+  })),
+  /React PropValue\.classList\[1\] must be a non-empty token without whitespace/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
+    props: [{ name: "className", value: { kind: "classList", value: ["ok", "bad token"] } }],
+  })),
+  /React PropValue\.classList\[1\] must be a non-empty token without whitespace/,
+);
+assert.throws(
+  () => renderMalformedReactHtml(reactHtmlElement({
     props: [{ name: "data-x", value: { kind: "number", value: 1 } }],
   })),
-  /React PropValue must be string, bool, int, or float/,
+  /React PropValue must be string, bool, int, float, style, or classList/,
 );
 assert.throws(
   () => renderMalformedReactHtml(reactHtmlElement({

@@ -33,7 +33,7 @@ const packageById = new Map(packageSpecs.map((spec) => [spec.id, spec]));
 const defaultPackageUrl = packageById.get(browserPackages.defaultPackage)?.file ?? "fixtures-basic.irpkg";
 const packageLabels = new Map([
   ["fixtures-basic.irpkg", "Basic, list/option, interface shapes"],
-  ["demo-host.irpkg", "Browser host calls, React, and DOM Tamagotchi"],
+  ["demo-host.irpkg", "Browser host calls, React, and Tamagotchi demos"],
   ["pretty-printer.irpkg", "Std.Format.pretty component package"],
   ["fixtures-lean.irpkg", "Lean Expr, parser, Task"],
   ["fixtures-boundary.irpkg", "Numeric and runtime boundaries"],
