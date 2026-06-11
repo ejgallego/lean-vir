@@ -103,8 +103,8 @@ the manifest records constructor payload layouts and `/dev.html` renders JSON
 inputs.
 
 Lean code can call JavaScript by importing `Vir.Common`, `Vir.Browser`, or
-`Vir.Host` and adding an opaque declaration marked
-with `@[vir_js "target.name"]`. Bind new targets in `hostBindings` when creating
+`Vir.Host` and adding an opaque declaration marked with `@[vir_js "target.name"]`.
+Bind new targets in `hostBindings` when creating
 the browser runtime. The v1 host boundary is synchronous; async browser APIs
 need an explicit callback/polling design until the runtime grows an async
 boundary.

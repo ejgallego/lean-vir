@@ -306,7 +306,45 @@ overrides on top of the generated import table. If you provide a custom
 `createVirImports(module, overrides, hostState)` or otherwise install
 `env.vir_js_call_objects` plus the `env.vir_resource_*` root-table imports.
 
-## Closure Lifetime
+Custom imports can be declared directly:
+
+```lean
+import Vir.Host
+
+@[vir_js "demo.bumpNat"]
+opaque jsBumpNat (n : Nat) : Nat
+
+def bumpFromJs (n : Nat) : Nat :=
+  jsBumpNat n
+```
+
+Bind custom targets when constructing the runtime. User bindings override the
+default `common.*`, `browser.*`, and `react.root.*` bindings:
+
+```js
+const vir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageUrl: "custom.irpkg",
+  hostBindings: {
+    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
+  },
+});
+
+console.log(vir.call("bumpFromJs", 41)); // "42"
+```
+
+Bindings receive decoded JavaScript values and return a value matching the Lean
+result type. `Unit` returns use `undefined` or `null`. Function-valued Lean
+arguments are decoded as callable `VirCallback` objects. A host binding that
+stores a callback must eventually call `callback.release()` or rely on
+`VirRuntime.dispose()` to release any still-live callback roots. Host imports
+are synchronous in v1; returning a `Promise` is an error. Object-style
+`imports` factory options are treated as overrides on top of the generated
+import table. If you provide a custom `imports` function to
+`createVirRuntimeFactory`, call `createVirImports(module, overrides, hostState)`
+or otherwise install `env.vir_js_call` and `env.vir_js_call_result_size`.
+
+## Closure And Resource Lifetime
 
 `VirCallback` is the JavaScript wrapper for a rooted Lean closure:
 
