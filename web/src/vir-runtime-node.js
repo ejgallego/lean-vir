@@ -35,7 +35,7 @@ export function createVirRuntimeFactory(options = {}) {
   const { hostBindings = null, virtualDocumentState = createVirtualDocumentState(), ...browserOptions } = options;
   return createBrowserVirRuntimeFactory({
     ...browserOptions,
-    defaultHostBindings: (runtimeRef) => createNodeHostBindings(virtualDocumentState, { runtimeRef }),
+    defaultHostBindings: () => createNodeHostBindings(virtualDocumentState),
     hostBindings,
   });
 }

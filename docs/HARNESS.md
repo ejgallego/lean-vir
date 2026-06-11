@@ -155,6 +155,21 @@ CHROMIUM=/path/to/chromium npm run test:pages:browser
 
 Run `npm run build:site` first when you want to refresh `web/dist/`.
 
+## Implementation Map
+
+Keep focused checks and shared helpers in the split modules instead of copying
+logic into entry-point scripts or pages:
+
+- Runtime smoke tests: `scripts/runtime-tests/*.mjs`
+- Browser smoke cases and page suites: `scripts/browser-smoke-*.mjs`
+- Process and benchmark helpers: `scripts/process-utils.mjs` and
+  `scripts/bench-utils.mjs`
+- Browser page helpers: `web/src/pages/page-utils.js` and
+  `web/src/pages/input-parsers.js`
+- Host resource and virtual binding internals:
+  `web/src/host/vir-host-resources.js` and
+  `web/src/host/vir-virtual-host-bindings.js`
+
 ## Worktree Workflow
 
 For multi-step implementation work, prefer a linked worktree:

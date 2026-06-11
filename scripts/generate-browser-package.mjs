@@ -7,9 +7,10 @@ Author: Emilio J. Gallego Arias
 import { mkdir, readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 
+import { packageSpecs } from "./browser-package-config.mjs";
+
 const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
-const packageConfigPath = new URL("../fixtures/browser-packages.json", import.meta.url);
 
 function rootsFor(fixture) {
   return fixture.roots?.length ? fixture.roots : [fixture.entry];
@@ -67,8 +68,6 @@ if ((libResult.status ?? 1) !== 0) {
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
-const packageConfig = JSON.parse(await readFile(packageConfigPath, "utf8"));
-const packageSpecs = packageConfig.packages ?? [];
 
 await mkdir(new URL("../build/generated/", import.meta.url), { recursive: true });
 

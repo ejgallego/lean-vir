@@ -5,10 +5,19 @@ Author: Emilio J. Gallego Arias
 */
 
 import "./style.css";
-import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "./interface-manifest.js";
-import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
-import { JSON_INPUT_WIRE_TAGS, WIRE } from "./wire-tags.js";
-import browserPackages from "../../fixtures/browser-packages.json";
+import {
+  inputDefault,
+  interfaceInputTag,
+  isJsonInputTag,
+  parseBoolText,
+} from "./pages/interface-inputs.js";
+import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "./runtime/interface-manifest.js";
+import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
+import { defaultPackageFile, packagePresets } from "./pages/browser-packages.js";
+import { parseByteArrayInput, parseFloatText, parseIntText, parseNatText } from "./pages/input-parsers.js";
+import { assetPathFor, errorMessage, formatBytes, setReadyState } from "./pages/page-utils.js";
+import { fetchBytes } from "./vir-runtime.js";
+import { WIRE } from "./runtime/wire-tags.js";
 
 const statusEl = document.querySelector("#status");
 const packageName = document.querySelector("#dev-package-name");
@@ -28,29 +37,7 @@ const inputFields = document.querySelector("#dev-input-fields");
 const runEntryButton = document.querySelector("#dev-run-entry");
 const resultOutput = document.querySelector("#dev-result");
 const wasmFile = "vir-upstream.wasm";
-const packageSpecs = browserPackages.packages ?? [];
-const packageById = new Map(packageSpecs.map((spec) => [spec.id, spec]));
-const defaultPackageUrl = packageById.get(browserPackages.defaultPackage)?.file ?? "fixtures-basic.irpkg";
-const packageLabels = new Map([
-  ["fixtures-basic.irpkg", "Basic, list/option, interface shapes"],
-  ["demo-host.irpkg", "Browser host calls, React, and Tamagotchi demos"],
-  ["pretty-printer.irpkg", "Std.Format.pretty component package"],
-  ["fixtures-lean.irpkg", "Lean Expr, parser, Task"],
-  ["fixtures-boundary.irpkg", "Numeric and runtime boundaries"],
-  ["local-quickstart.irpkg", "Four small exports from one Lean file"],
-  ["local-fib.irpkg", "Focused fib package"],
-  ["local-mergesort.irpkg", "Focused mergesort package"],
-]);
-const packagePresets = [
-  ...packageSpecs.map((spec) => ({
-    file: spec.file,
-    label: packageLabels.get(spec.file) ?? spec.id,
-  })),
-  { file: "local-quickstart.irpkg", label: packageLabels.get("local-quickstart.irpkg") },
-  { file: "local-fib.irpkg", label: packageLabels.get("local-fib.irpkg") },
-  { file: "local-mergesort.irpkg", label: packageLabels.get("local-mergesort.irpkg") },
-];
-const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
+const runtimeFactory = createBrowserReactRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
 const query = new URLSearchParams(window.location.search);
 let requestedEntry = query.get("entry");
 let requestedAutoRun = query.get("run") === "1";
@@ -59,31 +46,10 @@ let runtime = null;
 let interfaceEntries = [];
 let currentPackageQuery = null;
 
-function formatBytes(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  return `${(bytes / 1024).toFixed(1)} KiB`;
-}
-
-function setStatus(text, ready) {
-  statusEl.textContent = text;
-  statusEl.dataset.ready = String(ready);
-}
-
-function errorMessage(error) {
-  return error instanceof Error ? error.message : String(error);
-}
-
 function showError(error, status = "Failed") {
   resultOutput.textContent = errorMessage(error);
-  setStatus(status, false);
+  setReadyState(statusEl, status, false);
   console.error(error);
-}
-
-function assetPathFor(text) {
-  if (/^(https?:)?\/\//.test(text) || text.startsWith("/")) {
-    return text;
-  }
-  return `${import.meta.env.BASE_URL}${text}`;
 }
 
 function resetPackageState() {
@@ -140,108 +106,6 @@ function syncPackagePreset() {
   packagePreset.value = packagePresets.some((preset) => preset.file === value) ? value : "";
 }
 
-function inputDefault(input) {
-  const value = defaultValueForType(input.type);
-  return typeof value === "string" ? value : JSON.stringify(value);
-}
-
-function parseBoolText(text) {
-  if (text === true || text === false) return text;
-  if (String(text).trim() === "true") return true;
-  if (String(text).trim() === "false") return false;
-  return false;
-}
-
-function defaultValueForType(type, selfType = null, depth = 0) {
-  switch (type?.wireTag) {
-    case WIRE.RECURSIVE_SELF:
-      return selfType && depth < 2 ? defaultValueForType(selfType, selfType, depth + 1) : null;
-    case WIRE.NAT:
-    case WIRE.INT:
-    case WIRE.UINT8:
-    case WIRE.UINT16:
-    case WIRE.UINT32:
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-      return 0;
-    case WIRE.BOOL:
-      return false;
-    case WIRE.STRING:
-      return "";
-    case WIRE.BYTE_ARRAY:
-      return [];
-    case WIRE.EXPR:
-      return { kind: "const", name: "Nat", levels: [] };
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-      return [];
-    case WIRE.OPTION:
-      return null;
-    case WIRE.PROD:
-      return {
-        fst: defaultValueForType(type?.fst, selfType, depth),
-        snd: defaultValueForType(type?.snd, selfType, depth),
-      };
-    case WIRE.STRUCTURE:
-      return defaultStructureValue(type, depth);
-    case WIRE.TAGGED_UNION:
-      return defaultTaggedUnionValue(type);
-    case WIRE.CUSTOM_INDUCTIVE:
-      return defaultCustomInductiveValue(type, depth);
-    case WIRE.SIMPLE_ENUM:
-      return type?.constructors?.[0]?.jsName ?? "";
-    default:
-      return "";
-  }
-}
-
-function defaultStructureValue(type, depth = 0) {
-  const value = {};
-  for (const field of type?.fields ?? []) {
-    if (field.subobject === true) {
-      Object.assign(value, defaultValueForType(field.type, type, depth + 1));
-    } else {
-      value[field.name] = defaultValueForType(field.type, type, depth + 1);
-    }
-  }
-  return value;
-}
-
-function defaultTaggedUnionValue(type) {
-  const ctor = type?.constructors?.[0];
-  if (!ctor) return { kind: "", value: null };
-  return {
-    kind: ctor.jsName ?? ctor.name,
-    value: defaultValueForType(ctor.type),
-  };
-}
-
-function defaultCustomInductiveValue(type, depth = 0) {
-  const ctor = type?.constructors?.[0];
-  if (!ctor) return { kind: "", value: null };
-  const kind = ctor.jsName ?? ctor.name;
-  if ((ctor.fields ?? []).length === 0) {
-    return { kind };
-  }
-  if ((ctor.fields ?? []).length === 1) {
-    return {
-      kind,
-      value: defaultValueForType(ctor.fields[0].type, type, depth + 1),
-    };
-  }
-  const fields = {};
-  for (const field of ctor.fields ?? []) {
-    fields[field.name] = defaultValueForType(field.type, type, depth + 1);
-  }
-  return { kind, fields };
-}
-
-function isJsonInputTag(tag) {
-  return JSON_INPUT_WIRE_TAGS.has(tag);
-}
-
 function inputFieldId(input, index) {
   return `dev-entry-input-${index}-${input.name ?? "input"}`;
 }
@@ -262,10 +126,7 @@ function renderInputFields(entry) {
     label.className = "dev-field";
     const caption = document.createElement("span");
     caption.textContent = `${input.name ?? `input${index + 1}`} : ${formatInterfaceType(input.type)}`;
-    const field =
-      input.type?.wireTag === WIRE.SIMPLE_ENUM ? document.createElement("select") :
-      isJsonInputTag(input.type?.wireTag) ? document.createElement("textarea") :
-      document.createElement("input");
+    const field = document.createElement(interfaceInputTag(input.type).toLowerCase());
     field.id = inputFieldId(input, index);
     field.dataset.inputIndex = String(index);
     if (input.type?.wireTag === WIRE.SIMPLE_ENUM) {
@@ -381,60 +242,15 @@ function renderPackageMetadata(metadata) {
   generatedAt.textContent = metadata?.generatedAt ?? "unknown";
 }
 
-function parseNatInput(text) {
-  const trimmed = text.trim();
-  if (!/^\d+$/.test(trimmed)) {
-    throw new Error(`invalid Nat literal: ${text}`);
-  }
-  return trimmed;
-}
-
-function parseIntInput(text) {
-  const trimmed = text.trim();
-  if (!/^-?\d+$/.test(trimmed)) {
-    throw new Error(`invalid Int literal: ${text}`);
-  }
-  return trimmed;
-}
-
-function parseByteArrayInput(text) {
-  const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
-  return parts.map((part) => {
-    if (!/^\d+$/.test(part)) {
-      throw new Error(`invalid byte literal: ${part}`);
-    }
-    const value = Number(part);
-    if (!Number.isInteger(value) || value < 0 || value > 255) {
-      throw new Error("ByteArray values must be in 0..255");
-    }
-    return value;
-  });
-}
-
-function parseFloatInput(text) {
-  const trimmed = text.trim();
-  if (trimmed.length === 0) {
-    throw new Error("invalid Float literal: empty input");
-  }
-  if (/^[+-]?nan$/i.test(trimmed)) {
-    return Number.NaN;
-  }
-  const value = Number(trimmed);
-  if (Number.isNaN(value)) {
-    throw new Error(`invalid Float literal: ${text}`);
-  }
-  return value;
-}
-
 function parseInputValue(input, field) {
   const text = field?.value ?? inputDefault(input);
   switch (input.type?.wireTag) {
     case WIRE.NAT:
     case WIRE.UINT64:
     case WIRE.USIZE:
-      return parseNatInput(text);
+      return parseNatText(text);
     case WIRE.INT:
-      return parseIntInput(text);
+      return parseIntText(text);
     case WIRE.BOOL:
       if (field?.type === "checkbox") return Boolean(field.checked);
       if (String(text).trim() === "true") return true;
@@ -445,14 +261,14 @@ function parseInputValue(input, field) {
     case WIRE.UINT8:
     case WIRE.UINT16:
     case WIRE.UINT32: {
-      const value = Number(parseNatInput(text));
+      const value = Number(parseNatText(text));
       return value;
     }
     case WIRE.BYTE_ARRAY:
       return parseByteArrayInput(text);
     case WIRE.FLOAT:
     case WIRE.FLOAT32:
-      return parseFloatInput(text);
+      return parseFloatText(text);
     case WIRE.SIMPLE_ENUM:
       return text.trim();
     case WIRE.EXPR:
@@ -492,7 +308,7 @@ async function loadIrPackageBytes(label, bytes, packageQuery = null) {
   renderManifestEntries(runtime.interfaceManifest);
   renderPackageMetadata(runtime.packageMetadata);
   runEntryButton.disabled = interfaceEntries.length === 0;
-  setStatus("Ready", true);
+  setReadyState(statusEl, "Ready", true);
   updateLocationForSelectedEntry();
   if (requestedAutoRun) {
     requestedAutoRun = false;
@@ -505,15 +321,15 @@ async function loadIrPackageBytes(label, bytes, packageQuery = null) {
 
 async function loadPackageUrl() {
   resetPackageState();
-  setStatus("Loading", false);
-  const label = packageUrl.value.trim() || defaultPackageUrl;
-  const bytes = await fetchBytes(assetPathFor(label));
+  setReadyState(statusEl, "Loading", false);
+  const label = packageUrl.value.trim() || defaultPackageFile;
+  const bytes = await fetchBytes(assetPathFor(label, import.meta.env.BASE_URL));
   await loadIrPackageBytes(label, bytes, label);
 }
 
 async function loadPackageFile(file) {
   resetPackageState();
-  setStatus("Loading", false);
+  setReadyState(statusEl, "Loading", false);
   const bytes = new Uint8Array(await file.arrayBuffer());
   await loadIrPackageBytes(file.name, bytes);
 }
@@ -572,14 +388,14 @@ runEntryButton.addEventListener("click", () => {
     }
     const result = evaluateEntry(runtime, entry);
     renderResult(result);
-    setStatus("Ready", true);
+    setReadyState(statusEl, "Ready", true);
   } catch (error) {
     showError(error, "Trap");
   }
 });
 
 renderPackagePresets();
-packageUrl.value = query.get("package") ?? defaultPackageUrl;
+packageUrl.value = query.get("package") ?? defaultPackageFile;
 syncPackagePreset();
 
 loadPackageUrl().catch((error) => {

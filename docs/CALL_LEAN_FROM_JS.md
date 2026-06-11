@@ -313,6 +313,12 @@ console.log(vir.call("MyApp.bumpViaJavaScript", 41)); // "42"
 
 Host imports are synchronous in the current prototype.
 
+Most app code can pass only its custom `hostBindings`; the built-in browser
+bindings stay installed as defaults. Packages that call
+`Lean.Vir.React.Root.*` in a browser also need the separate React host entry.
+See `docs/JS_API.md` for the canonical `defaultHostBindings` composition and
+low-level binding factory reference.
+
 ## Troubleshooting
 
 - Package generation failed: open the generated `.report.md`; it lists missing

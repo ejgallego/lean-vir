@@ -4,8 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { formatInterfaceType, manifestDiagnostics } from "../web/src/interface-manifest.js";
-import { WIRE } from "../web/src/wire-tags.js";
+import { formatInterfaceType, manifestDiagnostics } from "../web/src/runtime/interface-manifest.js";
+import { WIRE } from "../web/src/runtime/wire-tags.js";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 
 function usage() {

@@ -1,0 +1,41 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+*/
+
+export const SDK_PAYLOADS = [
+  ["wasm/vir-upstream.wasm", "web/public/vir-upstream.wasm"],
+  ["js/vir-runtime.js", "web/src/vir-runtime.js"],
+  ["js/vir-runtime-node.js", "web/src/vir-runtime-node.js"],
+  ["js/vir-host-bindings.js", "web/src/vir-host-bindings.js"],
+  ["js/vir-react-host-bindings.js", "web/src/vir-react-host-bindings.js"],
+  ["js/runtime/vir-codec.js", "web/src/runtime/vir-codec.js"],
+  ["js/runtime/vir-lean-codec.js", "web/src/runtime/vir-lean-codec.js"],
+  ["js/runtime/vir-value-codec.js", "web/src/runtime/vir-value-codec.js"],
+  ["js/runtime/vir-value-normalizers.js", "web/src/runtime/vir-value-normalizers.js"],
+  ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],
+  ["js/runtime/wire-tags.js", "web/src/runtime/wire-tags.js"],
+  ["js/host/vir-host-resources.js", "web/src/host/vir-host-resources.js"],
+  ["js/host/vir-virtual-host-bindings.js", "web/src/host/vir-virtual-host-bindings.js"],
+  ["js/react/vir-react-html.js", "web/src/react/vir-react-html.js"],
+];
+
+export const SDK_METADATA_ENTRIES = [
+  "README.txt",
+  "LICENSE",
+  "NOTICE",
+  "lean-vir-artifact.json",
+];
+
+export const SDK_JS_MODULES = SDK_PAYLOADS
+  .map(([dest]) => dest)
+  .filter((dest) => dest.startsWith("js/"))
+  .map((dest) => dest.slice("js/".length));
+
+export function sdkArchiveEntries(root = "lean-vir-sdk") {
+  return [
+    ...SDK_METADATA_ENTRIES.map((entry) => `${root}/${entry}`),
+    ...SDK_PAYLOADS.map(([dest]) => `${root}/${dest}`),
+  ];
+}

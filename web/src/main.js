@@ -5,22 +5,24 @@ Author: Emilio J. Gallego Arias
 */
 
 import "./style.css";
+import {
+  defaultPackageFile,
+  hostPackageFile,
+  packageSpecs,
+} from "./pages/browser-packages.js";
+import {
+  createFixtureInputDefaults,
+  fixtures,
+  matchesFixtureFilter,
+  maxFibInput,
+  maxSortItems,
+  maxSortValue,
+  sourceLabel,
+} from "./pages/fixture-catalog.js";
+import { sourceSnippetForFixture } from "./pages/fixture-sources.js";
+import { parseByteArrayInput, parseClampedNatInput, parseDelimitedNumberText } from "./pages/input-parsers.js";
+import { formatBytes, setReadyState } from "./pages/page-utils.js";
 import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
-import fibSource from "../../examples/Fib.lean?raw";
-import hostInteropSource from "../../examples/HostInterop.lean?raw";
-import mergeSortSource from "../../examples/MergeSort.lean?raw";
-import fixtureBasicSource from "../../fixtures/Basic.lean?raw";
-import fixtureExprPrinterSource from "../../fixtures/ExprPrinter.lean?raw";
-import fixtureFormatPrettySource from "../../fixtures/FormatPretty.lean?raw";
-import fixtureInterfaceShapesSource from "../../fixtures/InterfaceShapes.lean?raw";
-import fixtureListOptionSource from "../../fixtures/ListOption.lean?raw";
-import fixtureRecursiveTypesSource from "../../fixtures/RecursiveTypes.lean?raw";
-import fixtureBoundarySource from "../../fixtures/Boundary.lean?raw";
-import fixtureLeanParserSource from "../../fixtures/LeanParser.lean?raw";
-import fixtureLeanParserHeaderSource from "../../fixtures/LeanParserHeader.lean?raw";
-import fixtureTaskSource from "../../fixtures/Task.lean?raw";
-import fixtureManifest from "../../fixtures/manifest.json";
-import browserPackages from "../../fixtures/browser-packages.json";
 
 const statusEl = document.querySelector("#status");
 const petMoodDisplay = document.querySelector("#pet-mood-display");
@@ -48,128 +50,11 @@ const fixtureInputHint = document.querySelector("#fixture-input-hint");
 const fixtureSourcePath = document.querySelector("#fixture-source-path");
 const fixtureSourceEntry = document.querySelector("#fixture-source-entry");
 const fixtureSourceCode = document.querySelector("#fixture-source-code");
-const maxFibInput = 17;
-const maxSortItems = 16;
-const maxSortValue = 9999;
 const wasmFile = "vir-upstream.wasm";
 const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
-const packageSpecs = browserPackages.packages ?? [];
-const packageById = new Map(packageSpecs.map((spec) => [spec.id, spec]));
-const defaultPackageFile = packageById.get(browserPackages.defaultPackage)?.file ?? "fixtures-basic.irpkg";
-const hostPackageFile = packageById.get(browserPackages.hostPackage)?.file ?? "demo-host.irpkg";
-const packageFileByFixtureSource = new Map();
-for (const spec of packageSpecs) {
-  for (const source of spec.fixtureSources ?? []) {
-    packageFileByFixtureSource.set(source, spec.file);
-  }
-}
-const sourceFiles = [
-  { path: "examples/Fib.lean", source: fibSource },
-  { path: "examples/HostInterop.lean", source: hostInteropSource },
-  { path: "examples/MergeSort.lean", source: mergeSortSource },
-  { path: "fixtures/Basic.lean", source: fixtureBasicSource },
-  { path: "fixtures/ExprPrinter.lean", source: fixtureExprPrinterSource },
-  { path: "fixtures/FormatPretty.lean", source: fixtureFormatPrettySource },
-  { path: "fixtures/InterfaceShapes.lean", source: fixtureInterfaceShapesSource },
-  { path: "fixtures/ListOption.lean", source: fixtureListOptionSource },
-  { path: "fixtures/RecursiveTypes.lean", source: fixtureRecursiveTypesSource },
-  { path: "fixtures/Boundary.lean", source: fixtureBoundarySource },
-  { path: "fixtures/LeanParser.lean", source: fixtureLeanParserSource },
-  { path: "fixtures/LeanParserHeader.lean", source: fixtureLeanParserHeaderSource },
-  { path: "fixtures/Task.lean", source: fixtureTaskSource },
-];
-const sourceByPath = new Map(sourceFiles.map((source) => [source.path, source.source]));
-const demoFixtures = [
-  {
-    id: "fib",
-    source: "examples/Fib.lean",
-    entry: "fib",
-    packageFile: defaultPackageFile,
-    group: "demo",
-    runner: "fib",
-    result: { type: "Nat" },
-    input: {
-      kind: "nat",
-      label: "Input",
-      defaultValue: "8",
-      max: maxFibInput,
-      hint: `Nat, 0..${maxFibInput}`,
-    },
-  },
-  {
-    id: "sort-array",
-    source: "examples/MergeSort.lean",
-    entry: "SortDemo.demoFromArray",
-    packageFile: defaultPackageFile,
-    group: "demo",
-    runner: "sort",
-    result: { type: "Nat" },
-    input: {
-      kind: "natArray",
-      label: "Array",
-      defaultValue: "7, 3, 9, 1, 4, 1, 5, 2",
-      hint: `Nat array, up to ${maxSortItems} items`,
-    },
-  },
-  {
-    id: "host-title",
-    source: "examples/HostInterop.lean",
-    entry: "HostInterop.titleHandshake",
-    packageFile: hostPackageFile,
-    group: "demo",
-    runner: "hostTitle",
-    result: { type: "String" },
-    input: {
-      kind: "string",
-      label: "Title",
-      defaultValue: "browser handshake",
-      hint: "String passed from Lean to the browser document title",
-    },
-  },
-  {
-    id: "string-roundtrip",
-    source: "fixtures/Basic.lean",
-    entry: "Vir.Fixtures.Basic.stringUtf8RoundtripScore",
-    packageFile: defaultPackageFile,
-    group: "demo",
-    runner: "singleString",
-    result: { type: "Nat" },
-    input: {
-      kind: "string",
-      label: "String",
-      defaultValue: "Aé∀Z",
-      hint: "String -> Nat score through Lean UTF-8 operations",
-    },
-  },
-  {
-    id: "bytearray-score",
-    source: "fixtures/Basic.lean",
-    entry: "Vir.Fixtures.Basic.byteArrayInputScore",
-    packageFile: defaultPackageFile,
-    group: "demo",
-    runner: "byteArray",
-    result: { type: "Nat" },
-    input: {
-      kind: "byteArray",
-      label: "Bytes",
-      defaultValue: "65, 66, 67",
-      hint: "ByteArray values, each in 0..255",
-    },
-  },
-];
-const manifestFixtures = (fixtureManifest.fixtures ?? []).map((fixture) => ({
-  ...fixture,
-  packageFile: packageFileByFixtureSource.get(fixture.source) ?? defaultPackageFile,
-  group: "manifest",
-}));
-const fixtures = [...demoFixtures, ...manifestFixtures];
 const fixtureResults = new Map();
 const fixtureResultFailures = new Map();
-const fixtureInputs = new Map(
-  demoFixtures
-    .filter((fixture) => fixture.input)
-    .map((fixture) => [fixture.id, fixture.input.defaultValue ?? ""]),
-);
+const fixtureInputs = createFixtureInputDefaults();
 const packageBytesPromises = new Map();
 const runtimePromises = new Map();
 let hostRuntime = null;
@@ -193,24 +78,12 @@ function runtimeForPackage(packageFile) {
   return runtimePromises.get(packageFile);
 }
 
-function formatBytes(bytes) {
-  if (bytes < 1024) return `${bytes} B`;
-  return `${(bytes / 1024).toFixed(1)} KiB`;
-}
-
-function clampInput(value, max) {
-  if (!Number.isFinite(value)) return 0;
-  return Math.max(0, Math.min(max, Math.trunc(value)));
-}
-
 function setReady() {
-  statusEl.textContent = "Ready";
-  statusEl.dataset.ready = "true";
+  setReadyState(statusEl, "Ready", true);
 }
 
 function setTrap(error) {
-  statusEl.textContent = "Trap";
-  statusEl.dataset.ready = "false";
+  setReadyState(statusEl, "Trap", false);
   console.error(error);
 }
 
@@ -225,7 +98,7 @@ function mountPet(runtime) {
 }
 
 function parseSortInput(text) {
-  const parts = text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean);
+  const parts = parseDelimitedNumberText(text);
   if (parts.length > maxSortItems) {
     throw new Error(`sort input is capped at ${maxSortItems} items`);
   }
@@ -239,58 +112,6 @@ function parseSortInput(text) {
     }
     return value;
   });
-}
-
-function parseByteArrayInput(text) {
-  return text.replace(/[\[\]]/g, " ").split(/[,\s]+/).filter(Boolean).map((part) => {
-    if (!/^\d+$/.test(part)) {
-      throw new Error(`invalid byte literal: ${part}`);
-    }
-    const value = Number(part);
-    if (!Number.isInteger(value) || value < 0 || value > 255) {
-      throw new Error(`ByteArray values must be in 0..255`);
-    }
-    return value;
-  });
-}
-
-function sourceLabel(path) {
-  return path.replace(/^fixtures\//, "").replace(/^examples\//, "").replace(".lean", "");
-}
-
-function shortEntryName(entry) {
-  return entry.split(".").at(-1) ?? entry;
-}
-
-function sourceSnippetForFixture(fixture) {
-  const source = sourceByPath.get(fixture.source);
-  if (!source) return "";
-  if (fixture.group === "demo") return source.trimEnd();
-  const lines = source.trimEnd().split(/\r?\n/);
-  const name = shortEntryName(fixture.entry);
-  const start = lines.findIndex((line) =>
-    line.startsWith(`def ${name}`) ||
-    line.startsWith(`partial def ${name}`) ||
-    line.startsWith(`unsafe def ${name}`)
-  );
-  if (start === -1) {
-    return source.trimEnd();
-  }
-
-  let end = lines.length;
-  for (let index = start + 1; index < lines.length; index++) {
-    if (/^(def|partial def|unsafe def|inductive|structure|namespace|end|#eval)\b/.test(lines[index])) {
-      end = index;
-      break;
-    }
-  }
-  return lines.slice(start, end).join("\n").trimEnd();
-}
-
-function matchesFixtureFilter(fixture, filter) {
-  if (filter === "all") return true;
-  if (filter === "demos") return fixture.group === "demo";
-  return fixture.source === filter;
 }
 
 function fixtureInputValue(fixture) {
@@ -413,20 +234,9 @@ function setFixtureResult(fixture, value, failed = false) {
   }
 }
 
-function parseNatInput(text, max) {
-  if (!/^\d+$/.test(text.trim())) {
-    throw new Error(`invalid Nat literal: ${text}`);
-  }
-  const value = Number(text);
-  if (!Number.isSafeInteger(value)) {
-    throw new Error(`invalid Nat literal: ${text}`);
-  }
-  return clampInput(value, max);
-}
-
 function runInputFixture(runtime, fixture) {
   if (fixture.runner === "fib") {
-    const n = parseNatInput(fixtureInputValue(fixture), fixture.input.max ?? maxFibInput);
+    const n = parseClampedNatInput(fixtureInputValue(fixture), fixture.input.max ?? maxFibInput);
     fixtureInputs.set(fixture.id, String(n));
     if (fixture.id === selectedFixtureId) {
       fixtureInput.value = String(n);
@@ -554,8 +364,7 @@ try {
   mountPet(hostRuntime);
 } catch (error) {
   hostRuntime = null;
-  statusEl.textContent = "Failed";
-  statusEl.dataset.ready = "false";
+  setReadyState(statusEl, "Failed", false);
   fixtureRunStatus.textContent = "Unavailable";
   updateFixtureRunControls();
   petMoodDisplay.textContent = "error";

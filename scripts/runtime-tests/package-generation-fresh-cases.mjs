@@ -1,0 +1,293 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+*/
+
+import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import {
+  assert,
+  assertManifestTypeDescriptorsRoundTrip,
+  generateIrPackage,
+  join,
+  manifestEntry,
+  readFile,
+  spawnSync,
+  writeFile,
+} from "./shared.mjs";
+
+export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
+  const factory = createVirRuntimeFactory({ wasmBytes });
+  const freshSource = join(freshDir, "FreshUser.lean");
+  const freshPackage = join(freshDir, "fresh.irpkg");
+  const freshFixture = new URL("../../fixtures/runtime-tests/FreshUser.lean", import.meta.url);
+  await writeFile(freshSource, await readFile(freshFixture, "utf8"));
+
+  const generated = generateIrPackage(freshSource, freshPackage);
+  assert.match(generated.stdout, /mode:\s+auto-discover public definitions/);
+  assert.match(generated.stdout, /local package ready/);
+
+  const freshRuntime = await factory.createRuntime({ irPackageBytes: await readFile(freshPackage) });
+  const freshManifest = freshRuntime.interfaceManifest;
+  assert.equal(freshManifest.metadata.packageFormatVersion, 5);
+  assert.equal(freshManifest.metadata.manifestVersion, 1);
+  assert.match(freshManifest.metadata.leanToolchain, /leanprover\/lean4/);
+  assert.ok(freshManifest.metadata.generatedAt.length > 0);
+  assert.equal(freshManifest.metadata.targets.length, 1);
+  assert.equal(freshManifest.metadata.targets[0].source, freshSource);
+  assert.equal(freshManifest.metadata.targets[0].mode, "all");
+  assert.deepEqual(freshManifest.metadata.targets[0].roots, []);
+  assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"));
+  assertManifestTypeDescriptorsRoundTrip(freshManifest);
+
+  const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
+  assert.deepEqual(freshEntries, [
+    "freshBoxBump",
+    "freshBump",
+    "freshChainDepth",
+    "freshChainIdentity",
+    "freshChainLabelScore",
+    "freshChainPush",
+    "freshChainScore",
+    "freshClassifyExcept",
+    "freshClassifySum",
+    "freshFloat32Roundtrip",
+    "freshFloatScale",
+    "freshJsonWeight",
+    "freshJsonWrap",
+    "freshPairSum",
+    "freshScalarBoxBump",
+    "freshSum",
+    "freshSumScore",
+    "freshTermSize",
+    "freshTermWrap",
+    "freshTreeIdentity",
+    "freshTreeRootScore",
+    "freshUInt64BoxBump",
+    "freshUInt64Bump",
+    "freshWrapBoxBump",
+    "freshWrapUInt32Bump",
+  ]);
+  assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshUInt64Bump._boxed"));
+  assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshFloatScale._boxed"));
+
+  const freshInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", freshPackage], {
+    encoding: "utf8",
+  });
+  assert.equal(freshInspect.status, 0, freshInspect.stderr || freshInspect.stdout);
+  const freshInfo = JSON.parse(freshInspect.stdout);
+  assert.equal(freshInfo.manifest.metadata.targets[0].source, freshSource);
+  assert.deepEqual(freshInfo.manifest.exports.map((entry) => entry.entry).sort(), freshEntries);
+
+  assert.equal(freshRuntime.call("freshBump", 35), "42");
+  assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
+  assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");
+  assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), "15");
+  assert.equal(freshRuntime.call("freshUInt64Bump", "18446744073709551615"), "0");
+  assert.equal(freshRuntime.call("freshFloatScale", 2.5), 5);
+  assert.equal(freshRuntime.call("freshFloat32Roundtrip", 1.25), 1.25);
+  assert.deepEqual(freshRuntime.call("freshClassifySum", 2), {
+    kind: "inl",
+    value: "12",
+  });
+  assert.deepEqual(freshRuntime.call("freshClassifySum", 5), {
+    kind: "inr",
+    value: "5",
+  });
+  assert.equal(freshRuntime.call("freshSumScore", { kind: "inr", value: "lean" }), "24");
+  assert.deepEqual(freshRuntime.call("freshClassifyExcept", 0), {
+    kind: "error",
+    value: "zero",
+  });
+  assert.deepEqual(freshRuntime.call("freshClassifyExcept", 6), {
+    kind: "ok",
+    value: "7",
+  });
+  assert.deepEqual(freshRuntime.call("freshBoxBump", {
+    label: "abc",
+    value: 4,
+    enabled: false,
+    hits: 7,
+    quota: 8,
+    mode: "cold",
+  }), {
+    label: "abc",
+    value: "7",
+    enabled: true,
+    hits: 8,
+    quota: "10",
+    mode: "hot",
+  });
+
+  const freshWrapUInt32Entry = manifestEntry(freshManifest, "freshWrapUInt32Bump");
+  assert.equal(freshWrapUInt32Entry.args[0].type.type, "FreshWrap UInt32");
+  assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].type.wireTag, 6);
+  assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].layout.kind, "object");
+  assert.deepEqual(freshRuntime.call("freshWrapUInt32Bump", {
+    label: "u",
+    payload: 9,
+  }), {
+    label: "u!",
+    payload: 10,
+  });
+
+  const freshScalarBoxEntry = manifestEntry(freshManifest, "freshScalarBoxBump");
+  assert.equal(freshScalarBoxEntry.args[0].type.trivialFieldIndex, 0);
+  assert.equal(freshScalarBoxEntry.args[0].type.fields[0].layout.kind, "scalar");
+  assert.deepEqual(freshRuntime.call("freshScalarBoxBump", {
+    value: 9,
+  }), {
+    value: 10,
+  });
+
+  const freshUInt64BoxEntry = manifestEntry(freshManifest, "freshUInt64BoxBump");
+  assert.equal(freshUInt64BoxEntry.args[0].type.trivialFieldIndex, 0);
+  assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].type.wireTag, 7);
+  assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
+  assert.deepEqual(freshRuntime.call("freshUInt64BoxBump", {
+    value: "18446744073709551615",
+  }), {
+    value: "0",
+  });
+
+  assert.deepEqual(freshRuntime.call("freshWrapBoxBump", {
+    label: "box",
+    payload: {
+      label: "abc",
+      value: 4,
+      enabled: false,
+      hits: 7,
+      quota: 8,
+      mode: "cold",
+    },
+  }), {
+    label: "box!",
+    payload: {
+      label: "abc",
+      value: "7",
+      enabled: true,
+      hits: 8,
+      quota: "10",
+      mode: "hot",
+    },
+  });
+
+  const freshChain = {
+    label: "root",
+    next: {
+      label: "leaf",
+      next: null,
+    },
+  };
+  assert.deepEqual(freshRuntime.call("freshChainIdentity", freshChain), freshChain);
+  assert.equal(freshRuntime.call("freshChainScore", freshChain), "208");
+  assert.deepEqual(freshRuntime.call("freshChainPush", "new", freshChain), {
+    label: "new",
+    next: freshChain,
+  });
+  const freshChainEntry = manifestEntry(freshManifest, "freshChainIdentity");
+  assert.equal(freshChainEntry.args[0].type.wireTag, 20);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.wireTag, 18);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.element.wireTag, 26);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.element.kind, "recursiveSelf");
+
+  const freshTree = {
+    kind: "node",
+    value: [
+      { kind: "leaf", value: 3 },
+      {
+        kind: "node",
+        value: [
+          { kind: "leaf", value: 5 },
+          { kind: "leaf", value: 8 },
+        ],
+      },
+    ],
+  };
+  assert.deepEqual(freshRuntime.call("freshTreeIdentity", freshTree), {
+    kind: "node",
+    value: [
+      { kind: "leaf", value: "3" },
+      {
+        kind: "node",
+        value: [
+          { kind: "leaf", value: "5" },
+          { kind: "leaf", value: "8" },
+        ],
+      },
+    ],
+  });
+  assert.equal(freshRuntime.call("freshTreeRootScore", freshTree), "12");
+  const freshTreeEntry = manifestEntry(freshManifest, "freshTreeIdentity");
+  assert.equal(freshTreeEntry.args[0].type.wireTag, 25);
+  assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.wireTag, 26);
+  assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.kind, "recursiveSelf");
+
+  const term = {
+    kind: "app",
+    fields: {
+      fn: { kind: "lam", fields: { binder: "x", body: { kind: "var", value: "x" } } },
+      arg: { kind: "var", value: "y" },
+    },
+  };
+  assert.equal(freshRuntime.call("freshTermSize", term), "4");
+  assert.deepEqual(freshRuntime.call("freshTermWrap", term), {
+    kind: "lam",
+    fields: {
+      binder: "x",
+      body: {
+        kind: "app",
+        fields: {
+          fn: {
+            kind: "app",
+            fields: {
+              fn: { kind: "lam", fields: { binder: "x", body: { kind: "var", value: "x" } } },
+              arg: { kind: "var", value: "y" },
+            },
+          },
+          arg: { kind: "var", value: "x" },
+        },
+      },
+    },
+  });
+  assert.throws(() => freshRuntime.call("freshTermSize", {
+    kind: "app",
+    fn: { kind: "var", value: "x" },
+    arg: { kind: "var", value: "y" },
+  }), /expected \{ kind: "app", fields: \{ fn, arg \} \}/);
+
+  assert.throws(() => freshRuntime.call("freshJsonWeight", "null"), /must be a custom inductive object; expected \{ kind: "null" \}/);
+  assert.equal(freshRuntime.call("freshJsonWeight", { kind: "null" }), "1");
+  assert.throws(() => freshRuntime.call("freshJsonWeight", { tag: 0 }), /must specify custom inductive kind; expected \{ kind: "null" \}/);
+  assert.throws(() => freshRuntime.call("freshJsonWeight", { kind: "null", value: null }), /not supported for this custom inductive constructor shape; expected \{ kind: "null" \}/);
+  assert.throws(() => freshRuntime.call("freshJsonWeight", { kind: "bool" }), /freshJsonWeight argument .*\.bool is missing value; expected \{ kind: "bool", value \}/);
+  assert.equal(freshRuntime.call("freshJsonWeight", { kind: "bool", value: true }), "2");
+  assert.equal(freshRuntime.call("freshJsonWeight", {
+    kind: "array",
+    value: [
+      { kind: "null" },
+      { kind: "nat", value: 4 },
+    ],
+  }), "12");
+  assert.equal(freshRuntime.call("freshJsonWeight", {
+    kind: "object",
+    value: [
+      { fst: "ok", snd: { kind: "bool", value: false } },
+      { fst: "empty", snd: { kind: "null" } },
+    ],
+  }), "22");
+  assert.deepEqual(freshRuntime.call("freshJsonWrap", { kind: "nat", value: 4 }), {
+    kind: "array",
+    value: [
+      { kind: "nat", value: "4" },
+      { kind: "null" },
+    ],
+  });
+  const freshJsonEntry = manifestEntry(freshManifest, "freshJsonWeight");
+  assert.equal(freshJsonEntry.args[0].type.wireTag, 25);
+  assert.equal(freshJsonEntry.args[0].type.constructors[0].fields.length, 0);
+  assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.wireTag, 26);
+  assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.kind, "recursiveSelf");
+  assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.wireTag, 26);
+  assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.kind, "recursiveSelf");
+}

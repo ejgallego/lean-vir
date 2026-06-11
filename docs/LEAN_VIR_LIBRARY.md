@@ -15,9 +15,13 @@ modules below.
 
 ## User Workflow
 
-For the built-in browser, React, and common host imports, the Lean code is the only
+For the built-in browser and common host imports, the Lean code is the only
 piece users need to write. The JavaScript runtime already provides default
-bindings for `common.*`, `browser.*`, and `react.root.*` targets.
+bindings for `common.*` and `browser.*` targets. Browser packages that call
+`Lean.Vir.React.Root.*` should also install the bindings from
+`lean-vir/react-host-bindings`; the Node wrapper provides virtual `react.root.*`
+bindings for tests. The JavaScript-side binding composition reference lives in
+`docs/JS_API.md`.
 
 1. Import the Lean module that provides the host import.
 
@@ -219,49 +223,13 @@ the tree until the root is rerendered, unmounted, the package is reloaded, or
 the runtime is disposed.
 
 The intended v0 authoring surface is a small DOM-like helper set over that
-recursive `Html` ABI:
-
-- `Lean.Vir.React.Property.id`, `inputName`, `className`, `title`, `role`,
-  `classList`, `ariaLabel`, `ariaHidden`, `data`, `dataTestId`, `tabIndex`,
-  `style`, `type`, `htmlFor`, `inputValue`, `placeholder`, `autoComplete`,
-  `maxLength`, `checked`, and `disabled`
-- `Lean.Vir.React.EventHandler.onClick`, `onClickWith`, `onInput`,
-  `onInputUnit`, `onChange`, `onChangeUnit`, `onSubmit`, and `onSubmitWith`
-- `Lean.Vir.React.Html.div`/`keyedDiv`, `divWith`/`keyedDivWith`,
-  `span`/`keyedSpan`, `spanWith`/`keyedSpanWith`, `input`/`keyedInput`,
-  `label`/`keyedLabel`, `labelWith`/`keyedLabelWith`,
-  `form`/`keyedForm`, `formWith`/`keyedFormWith`,
-  `button`/`keyedButton`, and `buttonWith`/`keyedButtonWith`
-
-`Property.inputValue` maps to React's `value` prop. It is named `inputValue`
-because `Property.value` is already the Lean structure-field projection.
-`Property.inputName` maps to React's `name` prop for the same reason:
-`Property.name` is the structure-field projection. `Property.htmlFor` maps to
-React's label `htmlFor` prop, `Property.ariaLabel` maps to `aria-label`,
-`Property.ariaHidden` maps to `aria-hidden`, `Property.data name value`
-prefixes the prop name with `data-`, `Property.dataTestId` maps to
-`data-testid`, and `Property.tabIndex` maps to React's numeric `tabIndex` prop.
-`Property.autoComplete` and `Property.maxLength` use React's DOM prop names.
-The `data` helper expects a non-empty suffix, matching the documented
-`data-*` shape. `Property.classList` validates
-DOMTokenList-like non-empty class tokens, deduplicates them while preserving
-order, and lowers to `className`.
-`Property.style` builds React's object-valued `style` prop from camelCase
-`StyleProperty.mk` entries with string values. The keyed element helpers set
-React's `key` for list-like children while preserving the same props, handlers,
-and children conventions as their unkeyed counterparts.
-`EventHandler.onInput` and `onChange` receive the callback `Event`; use
-`Event.inputValue?` when reading controlled text state and
-`Event.inputChecked?` when reading controlled checkbox/radio state. Both check
-`Event.currentTarget` first, then fall back to `Event.target`. Use the `*Unit`
-variants for handlers that do not need the event.
-
-`Property.string`/`bool`/`int`/`float`, `EventHandler.on`/`onUnit`, and
-`Html.elementWith`/`keyedElementWith` are intentional escape hatches for the
-small v0 surface. Prefer the named helpers above unless a demo needs a specific
-scalar DOM prop, handler, or tag that is not blessed yet. `PropValue.style` and
-`PropValue.classList` are intentionally constrained to the `style` and
-`className` props by the host renderer.
+recursive `Html` ABI: named property helpers, named event-handler helpers,
+and keyed or unkeyed constructors for the currently blessed elements. The
+generic scalar prop, event, and element helpers remain intentional escape
+hatches for demos that need a DOM case not yet covered by the named surface.
+`docs/REACT_HTML.md` is the canonical reference for helper names, prop
+mappings, validation rules, callback ownership, and the JavaScript renderer
+contract.
 
 The React browser fixtures are split by intent: `examples/ReactCounter.lean`
 contains the counter, static render, lifecycle, and stress cases, while
@@ -275,36 +243,9 @@ The standalone React HTML renderer status is tracked in `docs/REACT_HTML.md`.
 Future ProofWidgets compatibility work is tracked separately in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
-The browser runtime bindings use standard browser APIs and require
-`globalThis.document` for document calls. In non-browser runtimes, use
-`lean-vir/vir-runtime-node` or pass explicit `hostBindings`; the Node wrapper
-keeps virtual document and element state for the built-in browser APIs. Event
-listener, timeout, animation-frame, and React root imports are also virtualized
-for tests.
-
-External references:
-
-- [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
-- [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
-- [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector)
-- [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
-- [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
-- [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
-- [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event)
-- [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target)
-- [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget)
-- [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault)
-- [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation)
-- [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
-- [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
-- [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
-- [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value)
-- [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout)
-- [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout)
-- [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)
-- [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame)
-- [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot)
-- [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount)
+The JavaScript runtime binding map, Node virtual-host behavior, cleanup hooks,
+and external browser/React API references are documented in
+`docs/HOST_BINDINGS.md`.
 
 ## Example
 

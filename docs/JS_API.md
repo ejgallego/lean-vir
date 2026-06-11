@@ -27,6 +27,83 @@ import {
 } from "lean-vir/vir-runtime-node";
 ```
 
+Custom hosts can import the built-in binding factories directly:
+
+```js
+import {
+  createBrowserDocumentHostBindings,
+  createBrowserElementHostBindings,
+  createHostResourceState,
+} from "lean-vir/host-bindings";
+```
+
+Browser apps that render `Lean.Vir.React.Html` import the React binding factory
+from the separate React entry point:
+
+```js
+import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
+```
+
+When composing low-level browser binding groups, pass the same
+`createHostResourceState()` result to each group so resource handles returned by
+one group are live in the others.
+
+## Runtime Module Map
+
+The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
+
+| Module | Role |
+| --- | --- |
+| `vir-runtime.js` | Public runtime, WASM/package loading, exported Lean calls, callback lifecycle. |
+| `vir-runtime-node.js` | Node wrapper that installs virtual browser and React host bindings for tests/tools. |
+| `runtime/vir-codec.js` | Binary reader/writer and interface type descriptor codec. |
+| `runtime/vir-value-codec.js` | JavaScript value encode/decode for Lean call arguments, results, and host imports. |
+| `runtime/vir-value-normalizers.js` | Input normalization helpers used by the value codec. |
+| `runtime/vir-lean-codec.js` | Structural `Lean.Expr` and level encode/decode helpers. |
+| `vir-host-bindings.js` | Public common/browser host binding factories and stable re-exports. |
+| `host/vir-host-resources.js` | Opaque resource tables, cleanup, timers, callbacks, and shared binding helpers. |
+| `host/vir-virtual-host-bindings.js` | Virtual document/event/React host bindings for Node tests/tools. |
+| `react/vir-react-html.js` | React HTML tree validation, conversion, callback release, and virtual text helpers. |
+| `vir-react-host-bindings.js` | Browser `react.root.*` bindings; imports `react` and `react-dom/client`. |
+| `runtime/interface-manifest.js` | Manifest validation, diagnostics, and type formatting helpers. |
+| `runtime/wire-tags.js` | Shared wire tag constants and JSON-input tag set. |
+
+Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
+`lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. The narrower codec
+modules are packaged so the runtime's internal imports resolve consistently in
+the SDK artifact.
+
+## Host Bindings
+
+The browser runtime installs the built-in `common.*` and `browser.*` host
+bindings by default. The complete target map, factory list, virtual Node
+helpers, custom binding rules, and cleanup behavior are documented in
+`docs/HOST_BINDINGS.md`.
+
+`defaultHostBindings` may be either a binding map or a function returning a
+binding map. To enable browser React roots while keeping non-React imports free
+of React dependencies, compose the React binding group explicitly:
+
+```js
+import { createVirRuntimeFactory } from "lean-vir";
+import {
+  createBrowserHostBindings,
+  createHostResourceState,
+} from "lean-vir/host-bindings";
+import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
+
+const factory = createVirRuntimeFactory({
+  wasmUrl: "vir-upstream.wasm",
+  defaultHostBindings: () => {
+    const resources = createHostResourceState();
+    return createBrowserHostBindings({
+      resources,
+      reactHostBindings: createBrowserReactHostBindings(resources),
+    });
+  },
+});
+```
+
 ## Browser Usage
 
 ```js
@@ -180,44 +257,13 @@ def titleRoundtrip (title : String) : IO String := do
   Lean.Vir.Browser.Document.getTitle
 ```
 
-The first library surface is:
+The full Lean-side declaration list is maintained in
+`docs/LEAN_VIR_LIBRARY.md`. The JavaScript target map, custom binding examples,
+virtual Node helpers, and resource lifetime rules are maintained in
+`docs/HOST_BINDINGS.md`.
 
-- `Lean.Vir.Common.echoString : @& String -> String`
-- `Lean.Vir.Common.addNat : Nat -> Nat -> Nat`
-- `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
-- `Lean.Vir.Browser.Document.getTitle : IO String`
-- `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
-- `Lean.Vir.Browser.Document.querySelector : @& String -> IO (Option Lean.Vir.Browser.Element)`
-- `Lean.Vir.Browser.Event.target : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.Element)`
-- `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.Element)`
-- `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Browser.Event -> IO Unit`
-- `Lean.Vir.Browser.Event.stopPropagation : @& Lean.Vir.Browser.Event -> IO Unit`
-- `Lean.Vir.Browser.Event.inputElement? : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
-- `Lean.Vir.Browser.Event.inputValue? : @& Lean.Vir.Browser.Event -> IO (Option String)`
-- `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Browser.Event -> IO (Option Bool)`
-- `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Browser.Element -> IO String`
-- `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
-- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Browser.Element -> @& String -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Browser.Event -> IO Unit) -> IO Lean.Vir.Browser.EventListener`
-- `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Browser.EventListener -> IO Unit`
-- `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Browser.Element -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
-- `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Browser.HTMLInputElement -> IO Bool`
-- `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Browser.HTMLInputElement -> Bool -> IO Unit`
-- `Lean.Vir.Browser.HTMLInputElement.getValue : @& Lean.Vir.Browser.HTMLInputElement -> IO String`
-- `Lean.Vir.Browser.HTMLInputElement.setValue : @& Lean.Vir.Browser.HTMLInputElement -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Timer.setTimeout : UInt32 -> IO Unit -> IO Lean.Vir.Browser.Timeout`
-- `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Browser.Timeout -> IO Unit`
-- `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> IO Unit) -> IO Lean.Vir.Browser.AnimationFrame`
-- `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Browser.AnimationFrame -> IO Unit`
-- `Lean.Vir.React.Root.create : @& Lean.Vir.Browser.Element -> IO Lean.Vir.React.Root`
-- `Lean.Vir.React.Root.createFromSelector : String -> IO (Option Lean.Vir.React.Root)`
-- `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.React.Root -> IO Unit) -> IO Bool`
-- `Lean.Vir.React.Root.render : @& Lean.Vir.React.Root -> @& Lean.Vir.React.Html -> IO Unit`
-- `Lean.Vir.React.Root.unmount : @& Lean.Vir.React.Root -> IO Unit`
-
-The built-in `common.*`, `browser.*`, and `react.root.*` targets do not require
-a `hostBindings` option:
+The built-in `common.*` and `browser.*` targets do not require a
+`hostBindings` option:
 
 ```js
 const vir = await createVirRuntime({
@@ -228,93 +274,23 @@ const vir = await createVirRuntime({
 console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 ```
 
-`Lean.Vir.Browser.Console.log` maps to `console.log`, title calls map to
-`document.title`, `Document.querySelector` returns an opaque element resource,
-`Element` calls use DOM element properties/methods, event listeners call
-retained Lean closures with an opaque `Event` resource, `Event.target` and
-`Event.currentTarget` return element resources when the event target is an
-element, event `preventDefault` and `stopPropagation` forward to the browser
-event, `Event.inputValue?`/`inputChecked?` check `currentTarget` before `target`
-and narrow to `HTMLInputElement`, timers map to `setTimeout`, animation frames map to
-`requestAnimationFrame`, `HTMLInputElement` calls first narrow an element before
-reading or writing `checked` and `value`, and React roots map to
-`ReactDOMClient.createRoot` plus `root.render`/`root.unmount`.
-The browser runtime requires `globalThis.document` for `browser.document.*`
-targets. In Node, use `lean-vir/vir-runtime-node` or pass explicit
-`hostBindings`; the Node wrapper provides virtual document and element state for
-these built-in browser and React targets. Virtual `Document.querySelector`
-follows DOM semantics and returns `none`/`null` for missing selectors; use
-`ensureVirtualElementState` to pre-seed selectors in Node tests.
-`createVirtualElementState` and `createVirtualEventState` construct test
-resources for direct virtual callback dispatch, and
-`findVirtualReactElementById`/`virtualReactElementById` locate rendered virtual
-React nodes by DOM-like `id` props. No extra `createVirRuntime` option is needed
-for the built-in
-`common.*`, `browser.*`, or `react.root.*` imports. The current Lean-side React
-HTML authoring surface is documented in `docs/REACT_HTML.md`. See MDN and the
-React reference for the underlying APIs:
+Browser `react.root.*` targets are provided by `lean-vir/react-host-bindings`.
+Use the `defaultHostBindings` composition shown above when a browser package
+calls `Lean.Vir.React.Root.*`. The browser runtime requires
+`globalThis.document` for `browser.document.*` targets. In Node, use
+`lean-vir/vir-runtime-node` or pass explicit `hostBindings`; the Node wrapper
+provides virtual document, event, and React state for tests/tools.
 
-- [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static)
-- [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
-- [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector)
-- [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
-- [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
-- [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
-- [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event)
-- [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target)
-- [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget)
-- [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault)
-- [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation)
-- [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
-- [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
-- [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
-- [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value)
-- [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout)
-- [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout)
-- [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)
-- [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame)
-- [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot)
-- [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount)
+Custom target bindings are passed through `hostBindings`; user bindings
+override defaults. Bindings receive decoded JavaScript values and return a value
+matching the Lean result type. Host imports are synchronous in v1; returning a
+`Promise` is an error. Object-style `imports` factory options are treated as
+overrides on top of the generated import table. If you provide a custom
+`imports` function to `createVirRuntimeFactory`, call
+`createVirImports(module, overrides, hostState)` or otherwise install
+`env.vir_js_call` and `env.vir_js_call_result_size`.
 
-Custom imports can be declared directly:
-
-```lean
-import Lean.Vir.Host
-
-@[vir_js "demo.bumpNat"]
-opaque jsBumpNat (n : Nat) : Nat
-
-def bumpFromJs (n : Nat) : Nat :=
-  jsBumpNat n
-```
-
-Bind custom targets when constructing the runtime. User bindings override the
-default `common.*`, `browser.*`, and `react.root.*` bindings:
-
-```js
-const vir = await createVirRuntime({
-  wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "custom.irpkg",
-  hostBindings: {
-    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
-  },
-});
-
-console.log(vir.call("bumpFromJs", 41)); // "42"
-```
-
-Bindings receive decoded JavaScript values and return a value matching the Lean
-result type. `Unit` returns use `undefined` or `null`. Function-valued Lean
-arguments are decoded as callable `VirCallback` objects. A host binding that
-stores a callback must eventually call `callback.release()` or rely on
-`VirRuntime.dispose()` to release any still-live callback roots. Host imports
-are synchronous in v1; returning a `Promise` is an error. Object-style
-`imports` factory options are treated as overrides on top of the generated
-import table. If you provide a custom `imports` function to
-`createVirRuntimeFactory`, call `createVirImports(module, overrides, hostState)`
-or otherwise install `env.vir_js_call` and `env.vir_js_call_result_size`.
-
-## Closure And Resource Lifetime
+## Closure Lifetime
 
 `VirCallback` is the JavaScript wrapper for a rooted Lean closure:
 
@@ -335,21 +311,11 @@ Callbacks are idempotently releasable through `callback.release()` or
 function values are not accepted as Lean arguments in this phase; function
 values flow from Lean to JavaScript as callback handles.
 
-`vir.dispose()` tears down the runtime-side host state:
-
-- built-in browser bindings remove live event listeners, clear pending timers,
-  cancel pending animation frames, unmount live React roots, and release
-  retained callbacks;
-- custom host binding maps can expose `[VIR_HOST_DISPOSE]()` or `dispose()` for
-  their own cleanup;
-- any `VirCallback` objects still tracked by the runtime are released;
-- later calls through `vir.call(...)`, `exportsByName`, or a callback fail with
-  a disposed-runtime error.
-
-Calling `vir.loadIrPackageBytes(...)` on a runtime that already has a package
-loaded performs the same package-resource cleanup before installing the new
-manifest. This keeps old listeners, timers, animation frames, React roots, and
-callback roots from surviving package reload.
+`vir.dispose()` releases any `VirCallback` objects still tracked by the runtime
+and calls host-binding cleanup hooks. Calling `vir.loadIrPackageBytes(...)` on a
+runtime that already has a package loaded performs the same package-resource
+cleanup before installing the new manifest. See `docs/HOST_BINDINGS.md` for the
+built-in resource cleanup behavior.
 
 See `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed callback ownership
 contract and follow-up work.

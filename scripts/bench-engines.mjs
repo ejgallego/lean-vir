@@ -10,6 +10,9 @@ import { delimiter, join } from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
 
+import { formatMs, parseBenchmarkSamples, requireBenchmarkSample } from "./bench-utils.mjs";
+import { runSync } from "./process-utils.mjs";
+
 const root = new URL("..", import.meta.url);
 const benchWasm = "build/upstream-probe/vir-engine-bench.wasm";
 const sortInput = "7,3,9,1,4,1,5,2,8,6,0,10,12,11,13,14";
@@ -19,18 +22,6 @@ const engineHome = fileURLToPath(new URL("../.tools/engine-home", import.meta.ur
 mkdirSync(join(engineHome, "cache"), { recursive: true });
 mkdirSync(join(engineHome, "config"), { recursive: true });
 mkdirSync(join(engineHome, "wasmer"), { recursive: true });
-
-function run(cmd, args, options = {}) {
-  const result = spawnSync(cmd, args, {
-    cwd: root,
-    encoding: "utf8",
-    stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
-  });
-  if (result.status !== 0) {
-    throw new Error(`${cmd} ${args.join(" ")} failed with status ${result.status}\n${result.stderr ?? ""}`);
-  }
-  return result.stdout ?? "";
-}
 
 function commandExists(cmd) {
   const result = spawnSync(cmd, ["--version"], {
@@ -54,45 +45,8 @@ function findCommand(names) {
   return null;
 }
 
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
-}
-
-function formatMs(ms) {
-  return ms < 1 ? `${(ms * 1000).toFixed(1)} us` : `${ms.toFixed(2)} ms`;
-}
-
-function parseSamples(stdout, prefix) {
-  const byLabel = new Map();
-  for (const line of stdout.split("\n")) {
-    const match = new RegExp(`^${prefix} (\\S+) (\\d+) (\\d+) (\\d+)$`).exec(line.trim());
-    if (!match) continue;
-    const label = match[1];
-    const sample = byLabel.get(label) ?? {
-      label,
-      iterations: Number(match[2]),
-      checksum: Number(match[3]),
-      samples: [],
-    };
-    sample.iterations = Number(match[2]);
-    sample.checksum = Number(match[3]);
-    sample.samples.push(Number(match[4]) / 1_000_000);
-    byLabel.set(label, sample);
-  }
-  for (const sample of byLabel.values()) {
-    sample.medianMs = median(sample.samples);
-  }
-  return byLabel;
-}
-
 function parseHostIr(label, stdout) {
-  const samples = parseSamples(stdout, "host-ir");
-  const sample = samples.get(label);
-  if (!sample) {
-    throw new Error(`no host IR benchmark samples found for ${label}`);
-  }
-  return sample;
+  return requireBenchmarkSample(stdout, "host-ir", label, "host IR");
 }
 
 function engineVersion(cmd, args = ["--version"]) {
@@ -150,7 +104,7 @@ function runEngine(engine) {
     version: engine.version(),
     status: "ok",
     elapsedMs,
-    samples: parseSamples(result.stdout, "engine-bench"),
+    samples: parseBenchmarkSamples(result.stdout, "engine-bench"),
   };
 }
 
@@ -170,7 +124,7 @@ function printBenchmark(label, title, host, engines) {
   }
 }
 
-run("bash", ["scripts/build-engine-bench.sh"]);
+runSync("bash", ["scripts/build-engine-bench.sh"], { cwd: root, trimStdout: false });
 
 const engines = [
   {
@@ -215,11 +169,22 @@ if (wasmedge) {
 const results = engines.map(runEngine);
 const okEngines = results.filter((result) => result.status === "ok");
 if (okEngines.length === 0) {
-  throw new Error("no WASM engines completed the benchmark");
+  const details = results
+    .map((result) => `${result.name}: ${result.detail?.split("\n")[0] ?? result.status}`)
+    .join("; ");
+  throw new Error(`no WASM engines completed the benchmark${details ? ` (${details})` : ""}`);
 }
 
-const hostFibStdout = run("lean", ["--run", "tools/HostInterpreterBench.lean", "fib", "80", "17"], { capture: true });
-const hostSortStdout = run("lean", ["--run", "tools/HostInterpreterBench.lean", "sort", "2000", sortInput], { capture: true });
+const hostFibStdout = runSync("lean", ["--run", "tools/HostInterpreterBench.lean", "fib", "80", "17"], {
+  cwd: root,
+  capture: true,
+  trimStdout: false,
+});
+const hostSortStdout = runSync("lean", ["--run", "tools/HostInterpreterBench.lean", "sort", "2000", sortInput], {
+  cwd: root,
+  capture: true,
+  trimStdout: false,
+});
 const hostFib = parseHostIr("fib", hostFibStdout);
 const hostSort = parseHostIr("sort", hostSortStdout);
 

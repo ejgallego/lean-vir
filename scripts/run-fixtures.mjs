@@ -5,10 +5,10 @@ Author: Emilio J. Gallego Arias
 */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { spawn } from "node:child_process";
 import { availableParallelism } from "node:os";
 
 import { createVirRuntime } from "../web/src/vir-runtime.js";
+import { runAsync } from "./process-utils.mjs";
 
 const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
@@ -45,43 +45,6 @@ for (const arg of args) {
   if (arg !== "--no-build") {
     throw new Error(`unknown argument: ${arg}; run node scripts/run-fixtures.mjs --help`);
   }
-}
-
-function run(cmd, args, options = {}) {
-  return new Promise((resolve) => {
-    const child = spawn(cmd, args, {
-      cwd: root,
-      stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
-    });
-    let stdout = "";
-    let stderr = "";
-    if (options.capture) {
-      child.stdout.setEncoding("utf8");
-      child.stderr.setEncoding("utf8");
-      child.stdout.on("data", (chunk) => {
-        stdout += chunk;
-      });
-      child.stderr.on("data", (chunk) => {
-        stderr += chunk;
-      });
-    }
-    child.on("error", (error) => {
-      resolve({
-        ok: false,
-        status: null,
-        stdout,
-        stderr: stderr || String(error),
-      });
-    });
-    child.on("close", (status) => {
-      resolve({
-        ok: status === 0,
-        status,
-        stdout,
-        stderr,
-      });
-    });
-  });
 }
 
 function requireOk(result, command) {
@@ -189,7 +152,7 @@ async function hostOracle(fixture) {
   ].join("\n");
   const hostPath = new URL(`${sanitizeId(fixture.id)}.host.lean`, buildDir);
   await writeFile(hostPath, hostSource);
-  const result = await run("lean", ["--run", hostPath.pathname], { capture: true });
+  const result = await runAsync("lean", ["--run", hostPath.pathname], { cwd: root, capture: true });
   requireOk(result, `host oracle ${fixture.id}`);
   const lines = result.stdout.trim().split("\n").filter(Boolean);
   const value = lines.at(-1);
@@ -230,7 +193,7 @@ async function generatePackage(fixture) {
     fixture.source,
     ...rootsFor(fixture),
   ];
-  const result = await run("lean", args, { capture: true });
+  const result = await runAsync("lean", args, { cwd: root, capture: true });
   const report = await readFile(reportPath, "utf8").catch(() => "");
   const diagnostics = packageDiagnostics(report);
   if (!result.ok) {
@@ -324,7 +287,7 @@ if (skipBuild) {
   }
   console.log("fixture build: skipped (--no-build)");
 } else {
-  requireOk(await run("npm", ["run", "--silent", "build:demo"]), "npm run build:demo");
+  requireOk(await runAsync("npm", ["run", "--silent", "build:demo"], { cwd: root }), "npm run build:demo");
 }
 
 function fixtureJobCount(total) {

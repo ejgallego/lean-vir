@@ -5,11 +5,13 @@ Author: Emilio J. Gallego Arias
 */
 
 import "./style.css";
-import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
+import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
+import { errorMessage, setReadyState } from "./pages/page-utils.js";
+import { fetchBytes } from "./vir-runtime.js";
 
 const wasmFile = "vir-upstream.wasm";
 const packageFile = "demo-host.irpkg";
-const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
+const runtimeFactory = createBrowserReactRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
 
 const statusEl = document.querySelector("#react-review-status");
 const packageEl = document.querySelector("#react-review-package");
@@ -53,11 +55,6 @@ const examples = [
 
 let runtime = null;
 
-function setStatus(text, ready) {
-  statusEl.textContent = text;
-  statusEl.dataset.ready = String(ready);
-}
-
 function setExampleResult(example, text, failed = false) {
   example.result.textContent = text;
   example.result.dataset.failed = String(failed);
@@ -84,7 +81,7 @@ function disposeRuntime() {
 
 async function mountExamples() {
   reloadButton.disabled = true;
-  setStatus("Loading package", false);
+  setReadyState(statusEl, "Loading package", false);
   disposeRuntime();
   clearMounts();
   try {
@@ -95,11 +92,11 @@ async function mountExamples() {
       const mounted = runtime.call(example.entry, example.selector);
       setExampleResult(example, mounted === true ? "mounted" : "missing", mounted !== true);
     }
-    setStatus("Ready", true);
+    setReadyState(statusEl, "Ready", true);
   } catch (error) {
-    setStatus("Failed", false);
+    setReadyState(statusEl, "Failed", false);
     for (const example of examples) {
-      setExampleResult(example, error instanceof Error ? error.message : String(error), true);
+      setExampleResult(example, errorMessage(error), true);
     }
     console.error(error);
   } finally {
