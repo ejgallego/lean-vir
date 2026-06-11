@@ -143,9 +143,8 @@ Supported v1 types:
 
 Large exact integer results are returned as decimal strings.
 Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them use the
-generated Lean `_boxed` declarations automatically. If a requested export needs
-one and the compiler did not produce it, package generation fails with an
-explicit wasm32 boundary diagnostic.
+typed IR bridge, so successful calls do not require the boxed fallback even when
+`_boxed` companions are packaged.
 
 Pure functions and `IO α` actions are supported on both exported entrypoints and
 host imports. Host imports are currently synchronous, with at most 32 imported
@@ -168,3 +167,8 @@ current package format. The WASM side decodes that package into real Lean IR
 objects and serves them through `lean_ir_find_env_decl`. Loading a new package
 replaces the previous provider state; a failed load clears it so stale
 declarations cannot be called accidentally.
+
+The JS-call boundary reads the exported declaration's `Lean.IR` signature and
+passes each supported argument/result in the native IR lane (`object`, integer,
+`USize`, `Float`, or `Float32`). It falls back to the boxed path only when the
+typed bridge cannot handle the declaration and a boxed declaration is packaged.
