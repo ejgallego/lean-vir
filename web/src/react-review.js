@@ -47,6 +47,11 @@ const examples = [
     result: document.querySelector("#react-attributes-result"),
   },
   {
+    entry: "ReactProofWidget.mount",
+    selector: "#react-proof-root",
+    result: document.querySelector("#react-proof-result"),
+  },
+  {
     entry: "ReactTamagotchi.mount",
     selector: "#react-pet-root",
     result: document.querySelector("#react-pet-result"),

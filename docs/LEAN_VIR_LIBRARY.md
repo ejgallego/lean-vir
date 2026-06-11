@@ -305,6 +305,9 @@ submit, attribute-conformance, and checkbox callbacks. `examples/Tamagotchi.lean
 keeps both demos: `Tamagotchi` is the non-React DOM-hosted version, and
 `ReactTamagotchi` reuses the same model with a keyed React tree, controlled
 text input, checkbox state, form submit handling, and action callbacks.
+`examples/ReactProofWidget.lean` is a minimal proof-widget-shaped React
+example that compiles into `demo-host.irpkg`, displays on `react.html`, and
+keeps any extra tag/ARIA conveniences local to the example file.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in

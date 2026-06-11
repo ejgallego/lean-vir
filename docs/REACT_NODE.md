@@ -300,16 +300,20 @@ helpers check `currentTarget` first, then fall back to `target`.
 8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger stateful
    example that shares the non-React Tamagotchi model, renders a keyed React
    tree, and handles controlled input, checkbox, submit, and action callbacks.
-9. Added runtime tests for nested callbacks inside `ReactNode`, hook-backed
+9. Added `examples/ReactProofWidget.lean` as a minimal proof-widget-shaped
+   example that compiles into `demo-host.irpkg`, displays on `react.html`, and
+   keeps any extra tag/ARIA conveniences local to the example file.
+10. Added runtime tests for nested callbacks inside `ReactNode`, hook-backed
    component rerenders, root rerender cleanup, unmount cleanup, package reload
-   cleanup, runtime dispose, malformed Node construction, depth limits, missing selectors, and input-event
+   cleanup, runtime dispose, malformed Node construction, depth limits, missing
+   selectors, and input-event
    target fallback. Virtual `Document.querySelector` follows DOM semantics, so
    tests pre-seed expected fixtures with `ensureVirtualElementState`. Virtual
    React callback tests find nodes by DOM-like `id` props instead of child
    indexes.
-10. Added browser smoke coverage proving real React click, input, change,
+11. Added browser smoke coverage proving real React click, input, change,
     submit/checkbox, and React Tamagotchi handlers call back into Lean,
-    including rapid rerender cleanup.
+    including rapid rerender cleanup, plus proof-state goal selection.
 
 ## Future Notes
 

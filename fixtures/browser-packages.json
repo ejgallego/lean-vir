@@ -106,6 +106,13 @@
             "ReactInput.mountCheckbox",
             "ReactInput.mountAttributes"
           ]
+        },
+        {
+          "source": "examples/ReactProofWidget.lean",
+          "roots": [
+            "ReactProofWidget.mount",
+            "ReactProofWidget.mountDefault"
+          ]
         }
       ],
       "fixtureSources": []

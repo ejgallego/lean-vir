@@ -83,7 +83,9 @@ A realistic path has three layers:
    `ProofWidgets.Data.Html` / JSX-like usage and compile it to this narrow
    `ReactNode` surface.
    This should cover text, attributes, children, basic events, and reusable
-   Lean components.
+   Lean components. Before adding that API layer,
+   `examples/ReactProofWidget.lean` provides a minimal proof-widget-shaped
+   example that compiles and displays through the existing React renderer.
 3. **Infoview/RPC compatibility.** Add document positions, snapshot-aware RPC,
    server-side references, and edit commands. This is the layer needed for
    tactic UIs and proof-script editing, and it should be designed after the
