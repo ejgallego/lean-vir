@@ -38,6 +38,8 @@ import {
   virtualReactTextContent,
 } from "./virtual-fixtures.mjs";
 
+const testEncoder = new TextEncoder();
+
 function assertManifestTypeDescriptorsRoundTrip(manifest) {
   const entries = [
     ...manifest.exports,
@@ -145,6 +147,67 @@ async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns, root
     assert.match(generated.stderr, pattern);
     assert.match(report, pattern);
   }
+}
+
+function assertCallMode(runtime, name, args, expected, mode) {
+  assert.deepEqual(runtime.call(name, ...args), expected);
+  assert.equal(runtime.lastCallMode(), mode, `${name} should use ${mode} call mode`);
+}
+
+function pushU32(bytes, value) {
+  assert.ok(Number.isInteger(value) && value >= 0 && value <= 0xffffffff);
+  bytes.push(value & 0xff, (value >>> 8) & 0xff, (value >>> 16) & 0xff, (value >>> 24) & 0xff);
+}
+
+function pushString(bytes, value) {
+  const encoded = testEncoder.encode(value);
+  pushU32(bytes, encoded.byteLength);
+  bytes.push(...encoded);
+}
+
+function pushName(bytes, parts) {
+  if (parts.length === 0) {
+    bytes.push(0);
+    return;
+  }
+  bytes.push(1);
+  pushName(bytes, parts.slice(0, -1));
+  pushString(bytes, parts[parts.length - 1]);
+}
+
+function manualUnsupportedExternPackage() {
+  // Minimal package: one manifest export backed by an extern declaration the shim cannot resolve.
+  const bytes = [];
+  pushString(bytes, "lean-vir-ir-package");
+  pushU32(bytes, 4);
+  pushU32(bytes, 1);
+
+  pushName(bytes, ["Vir", "Tests", "UnsupportedExtern"]);
+  bytes.push(0);
+  bytes.push(1);
+  pushU32(bytes, 1);
+  pushU32(bytes, 1);
+  bytes.push(0);
+  bytes.push(3);
+  bytes.push(8);
+
+  pushU32(bytes, 0);
+  pushString(bytes, JSON.stringify({
+    artifact: INTERFACE_MANIFEST_ARTIFACT,
+    version: 1,
+    metadata: {},
+    exports: [
+      {
+        id: "Vir.Tests.UnsupportedExtern",
+        jsName: "unsupportedExtern",
+        entry: "Vir.Tests.UnsupportedExtern",
+        source: "manual",
+        args: [{ name: "x", type: { type: "UInt32", wireTag: 6 } }],
+        result: { type: "Nat", wireTag: 0 },
+      },
+    ],
+  }));
+  return Uint8Array.from(bytes);
 }
 
 const wasmBytes = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
@@ -1331,10 +1394,10 @@ assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 5), {
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint32Bump", 41), 42);
-assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint64Bump", "18446744073709551615"), "0");
-assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScale", 1.5), 6);
+assertCallMode(runtime, "Vir.Fixtures.InterfaceShapes.uint64Bump", ["18446744073709551615"], "0", "typed");
+assertCallMode(runtime, "Vir.Fixtures.InterfaceShapes.floatScale", [1.5], 6, "typed");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScore", 3.25), "4");
-assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.float32Roundtrip", 1.25), 1.25);
+assertCallMode(runtime, "Vir.Fixtures.InterfaceShapes.float32Roundtrip", [1.25], 1.25, "typed");
 const floatScaleEntry = runtime.interfaceManifest.exports.find(
   (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.floatScale",
 );
@@ -1463,11 +1526,11 @@ assert.equal(boxUInt32Entry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box
 assert.equal(boxUInt32Entry.args[0].type.trivialFieldIndex, 0);
 assert.equal(boxUInt32Entry.args[0].type.fields[0].type.wireTag, 6);
 assert.equal(boxUInt32Entry.args[0].type.fields[0].layout.kind, "object");
-assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
+assertCallMode(runtime, "Vir.Fixtures.InterfaceShapes.boxUInt32Bump", [{
   value: 41,
-}), {
+}], {
   value: 42,
-});
+}, "typed");
 const boxUInt64Entry = runtime.interfaceManifest.exports.find(
   (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.boxUInt64Bump",
 );
@@ -1475,11 +1538,11 @@ assert.equal(boxUInt64Entry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box
 assert.equal(boxUInt64Entry.args[0].type.trivialFieldIndex, 0);
 assert.equal(boxUInt64Entry.args[0].type.fields[0].type.wireTag, 7);
 assert.equal(boxUInt64Entry.args[0].type.fields[0].layout.kind, "object");
-assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt64Bump", {
+assertCallMode(runtime, "Vir.Fixtures.InterfaceShapes.boxUInt64Bump", [{
   value: "18446744073709551615",
-}), {
+}], {
   value: "0",
-});
+}, "typed");
 const uint32BoxEntry = runtime.interfaceManifest.exports.find(
   (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.uint32BoxBump",
 );
@@ -1487,11 +1550,11 @@ assert.equal(uint32BoxEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.UIn
 assert.equal(uint32BoxEntry.args[0].type.trivialFieldIndex, 0);
 assert.equal(uint32BoxEntry.args[0].type.fields[0].type.wireTag, 6);
 assert.equal(uint32BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
-assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
+assertCallMode(runtime, "Vir.Fixtures.InterfaceShapes.uint32BoxBump", [{
   value: 41,
-}), {
+}], {
   value: 42,
-});
+}, "typed");
 const uint64BoxEntry = runtime.interfaceManifest.exports.find(
   (entry) => entry.entry === "Vir.Fixtures.InterfaceShapes.uint64BoxBump",
 );
@@ -1499,11 +1562,11 @@ assert.equal(uint64BoxEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.UIn
 assert.equal(uint64BoxEntry.args[0].type.trivialFieldIndex, 0);
 assert.equal(uint64BoxEntry.args[0].type.fields[0].type.wireTag, 7);
 assert.equal(uint64BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
-assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint64BoxBump", {
+assertCallMode(runtime, "Vir.Fixtures.InterfaceShapes.uint64BoxBump", [{
   value: "18446744073709551615",
-}), {
+}], {
   value: "0",
-});
+}, "typed");
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.nestedBoxNatBump", {
   value: { value: 4 },
 }), {
@@ -1623,6 +1686,14 @@ assert.throws(
   /fib argument arg1 must be non-negative/,
 );
 
+const unsupportedRuntime = await factory.createRuntime({ irPackageBytes: manualUnsupportedExternPackage() });
+assert.throws(
+  () => unsupportedRuntime.call("Vir.Tests.UnsupportedExtern", 7),
+  /typed IR call bridge could not represent `Vir\.Tests\.UnsupportedExtern` and no boxed fallback is packaged/,
+);
+assert.equal(unsupportedRuntime.lastCallMode(), "unsupported");
+assert.match(unsupportedRuntime.lastCallError(), /UnsupportedExtern/);
+
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-fresh-"));
 try {
   const freshSource = join(freshDir, "FreshUser.lean");
@@ -1678,6 +1749,10 @@ try {
     "def freshFloat32Roundtrip (n : Float32) : Float32 := n",
     "def freshClassifySum (n : Nat) : Sum Nat String :=",
     "  if n < 3 then .inl (n + 10) else .inr (toString n)",
+    "",
+    "def freshModeFlip : FreshMode → FreshMode",
+    "  | .cold => .hot",
+    "  | .hot => .cold",
     "",
     "def freshSumScore : Sum Nat String → Nat",
     "  | .inl n => n",
@@ -1785,6 +1860,7 @@ try {
     "freshFloatScale",
     "freshJsonWeight",
     "freshJsonWrap",
+    "freshModeFlip",
     "freshPairSum",
     "freshScalarBoxBump",
     "freshSum",
@@ -1811,9 +1887,10 @@ try {
   assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
   assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");
   assert.equal(freshRuntime.call("freshPairSum", { fst: 7, snd: 8 }), "15");
-  assert.equal(freshRuntime.call("freshUInt64Bump", "18446744073709551615"), "0");
-  assert.equal(freshRuntime.call("freshFloatScale", 2.5), 5);
-  assert.equal(freshRuntime.call("freshFloat32Roundtrip", 1.25), 1.25);
+  assertCallMode(freshRuntime, "freshUInt64Bump", ["18446744073709551615"], "0", "typed");
+  assertCallMode(freshRuntime, "freshFloatScale", [2.5], 5, "typed");
+  assertCallMode(freshRuntime, "freshFloat32Roundtrip", [1.25], 1.25, "typed");
+  assertCallMode(freshRuntime, "freshModeFlip", ["cold"], "hot", "typed");
   assert.deepEqual(freshRuntime.call("freshClassifySum", 2), {
     kind: "inl",
     value: "12",
@@ -2010,6 +2087,19 @@ try {
   assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.kind, "recursiveSelf");
   assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.wireTag, 26);
   assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.kind, "recursiveSelf");
+
+  const nativeSource = join(freshDir, "FreshNative.lean");
+  const nativePackage = join(freshDir, "native.irpkg");
+  await writeFile(nativeSource, "def nativeAnchor : Nat := 0\n");
+  const nativeGenerated = spawnSync(
+    "bash",
+    ["scripts/lean-to-irpkg.sh", nativeSource, nativePackage, "UInt32.toNat"],
+    { encoding: "utf8" },
+  );
+  assert.equal(nativeGenerated.status, 0, nativeGenerated.stderr || nativeGenerated.stdout);
+  assert.match(nativeGenerated.stdout, /mode:\s+explicit roots: UInt32\.toNat/);
+  const nativeRuntime = await factory.createRuntime({ irPackageBytes: await readFile(nativePackage) });
+  assertCallMode(nativeRuntime, "UInt32.toNat", [37], "37", "boxed-fallback");
 
   await assertUnsupportedInterfaceSource(freshDir, "UnsupportedInterfaces", [
     "inductive IndexedPair : Nat → Type where",

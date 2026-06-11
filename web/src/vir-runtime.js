@@ -353,6 +353,11 @@ export class VirRuntime {
     return len === 0 ? "" : this.readWasmString(this.exports.vir_call_error(), len);
   }
 
+  lastCallMode() {
+    const len = this.exports.vir_last_call_mode_size?.() ?? 0;
+    return len === 0 ? "" : this.readWasmString(this.exports.vir_last_call_mode(), len);
+  }
+
   allocBytes(bytes) {
     this.requireFunction("vir_alloc_bytes");
 

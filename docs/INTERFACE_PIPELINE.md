@@ -109,10 +109,30 @@ The embedded manifest currently supports:
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
-Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them require
-the generated Lean `_boxed` declaration at the wasm32 interpreter boundary. The
-package generator auto-includes that companion for requested roots and reports a
-diagnostic instead of producing a partial package if the companion is missing.
+The WASM shim prefers the typed IR bridge for JavaScript calls. It decodes each
+manifest argument into the corresponding Lean IR lane (`object`, integer,
+`USize`, `Float`, or `Float32`) and calls the actual package declaration instead
+of requiring the generated `_boxed` wrapper. `_boxed` declarations may still be
+packaged as fallback entries when the compiler emits them. If the typed bridge
+cannot represent a declaration and no boxed fallback is available, the call
+fails loudly instead of silently omitting or partially compiling the export.
+Declared native extern roots have no interpreted body, so they intentionally
+fall through to `run_boxed` when the shim knows their native symbol. The JS
+runtime reports the most recent successful or failed call path through
+`lastCallMode()`: `typed`, `boxed-fallback`, or `unsupported`.
+
+Design note: the pinned upstream `ir_interpreter.cpp` stays unmodified, but the
+build creates a generated overlay that makes selected `interpreter` internals
+public inside the build tree. The typed bridge currently reaches into the
+interpreter's IR value stack (`m_arg_stack`), symbol lookup/cache result
+(`symbol_cache_entry` and `lookup_symbol`), frame operations
+(`push_frame`/`pop_frame`), and body evaluator (`eval_body`). This mirrors the
+interpreter's internal non-boxed application path, but it is intentionally
+treated as prototype plumbing rather than a stable ABI. Upstream Lean exposes
+boxed external entry points such as `run_boxed`, `lean_eval_const`,
+`lean_eval_main`, and `lean_run_init`; the non-boxed `interpreter::call` path is
+used internally while evaluating IR `FAp` instructions, where arguments are
+already references to values in the active interpreter frame.
 
 For structures, the manifest records Lean constructor layout metadata alongside
 the applied Lean type label, field names, and instantiated field types. The JS

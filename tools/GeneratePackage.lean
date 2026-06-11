@@ -1568,16 +1568,16 @@ partial def collectName (index : DeclIndex) (name : Name) (state : Closure) : Cl
               let state := { state with decls := state.decls.push loaded }
               refsOfDecl loaded.decl |>.foldl (fun state dep => collectName index dep state) state
 
+def boxedBaseName? : Name -> Option Name
+  | .str pre "_boxed" => some pre
+  | _ => none
+
 def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   if target.includeAll then
     index.sourceDecls.findSome? (fun (source, names) =>
       if source == target.source.toString then some names else none) |>.getD #[]
   else
     target.roots
-
-def boxedBaseName? : Name -> Option Name
-  | .str pre "_boxed" => some pre
-  | _ => none
 
 def boxedName (name : Name) : Name :=
   .str name "_boxed"
@@ -1655,14 +1655,6 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .resource .. => 23
   | .function .. => 24
   | .expr => 15
-
-partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
-  | .float | .float32 | .uint64 => true
-  | .structure _ _ (some idx) _ _ _ fields =>
-      match fields[idx]? with
-      | some (_, fieldType, _, _) => fieldType.needsBoxedCallBoundary
-      | none => false
-  | _ => false
 
 def jsonEscape (text : String) : String :=
   text.foldl (fun out c =>
@@ -2293,13 +2285,7 @@ def jsNameFor (n : Name) : String :=
   let sanitized := text.map sanitizeJsNameChar
   if sanitized.isEmpty then "entry" else sanitized
 
-def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : InterfaceType) : Bool :=
-  args.any (fun arg => arg.type.needsBoxedCallBoundary) || result.needsBoxedCallBoundary
-
-def boxedBoundaryDiagnostic (name : Name) : String :=
-  s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
-
-def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
+def interfaceExportFor (_index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except InterfaceDiagnostic InterfaceExport) := do
   if isPrivateName name then
     return .error { name, source, reason := "private declarations are not exported" }
@@ -2313,11 +2299,8 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
         else
           match ← interfaceSignature? info.type with
           | .ok (args, result, effect) =>
-              if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
-                return .error { name, source, reason := boxedBoundaryDiagnostic name }
-              else
-                let jsName := jsNameFor name
-                return .ok { id := jsName, jsName, entry := name, source, args, result, effect }
+              let jsName := jsNameFor name
+              return .ok { id := jsName, jsName, entry := name, source, args, result, effect }
           | .error reason =>
               return .error { name, source, reason }
 

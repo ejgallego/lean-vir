@@ -93,6 +93,14 @@ structure, enum, `ByteArray`, and `Lean.Expr` shapes. See
 [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for the full JavaScript
 guide, including `Sum` and `Except` result shapes.
 
+Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them are
+called through the typed IR bridge, so those calls do not require generated
+`_boxed` companions. `_boxed` declarations may still be packaged as fallback
+entries for declarations the typed bridge cannot handle. Declared native extern
+roots still use the boxed fallback path when they are present in the shim's
+native symbol table, and the JS runtime exposes `lastCallMode()` for diagnostics
+(`typed`, `boxed-fallback`, or `unsupported`).
+
 ## Built-In Demos
 
 Open the Vite URL from `npm run dev -- --port 5173` to see the DOM Tamagotchi,

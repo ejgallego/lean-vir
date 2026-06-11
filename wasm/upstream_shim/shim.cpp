@@ -24,11 +24,13 @@ Author: Emilio J. Gallego Arias
 #include "library/init_attribute.h"
 #include "library/ir_interpreter.h"
 #include "library/time_task.h"
+#include "runtime/exception.h"
 #include "runtime/io.h"
 #include "runtime/object.h"
 #include "util/name.h"
 #include "util/option_declarations.h"
 #include "util/options.h"
+#include "typed_ir_call.h"
 
 extern "C" {
 lean_object * l_ByteArray_empty = nullptr;
@@ -1819,6 +1821,11 @@ struct vir_arg {
     bool owned = true;
 };
 
+struct vir_typed_arg {
+    ir::typed_call_value value;
+    bool owns_object = false;
+};
+
 class vir_reader {
     uint8_t const * m_data;
     uint32_t m_size;
@@ -1958,6 +1965,8 @@ public:
         return std::move(m_bytes);
     }
 };
+
+static void encode_value_payload(vir_writer & w, vir_type const & type, object * value, vir_type const * self_type = nullptr);
 
 static bool parse_u64(std::string const & text, uint64_t & out) {
     if (text.empty()) return false;
@@ -2655,102 +2664,178 @@ static object * decode_value(vir_reader & r, vir_type const & type, vir_type con
     }
 }
 
-static bool is_unboxed_call_boundary_type(vir_type const & type) {
+static bool typed_call_boundary_tag_for_type(vir_type const & type, ir::typed_call_tag & tag) {
     switch (type.tag) {
+    case vir_wire_type::SimpleEnum:
+        tag = ir::typed_call_tag::UInt8;
+        return true;
     case vir_wire_type::UInt8:
+        tag = ir::typed_call_tag::UInt8;
+        return true;
     case vir_wire_type::UInt16:
+        tag = ir::typed_call_tag::UInt16;
+        return true;
     case vir_wire_type::UInt32:
+        tag = ir::typed_call_tag::UInt32;
+        return true;
+    case vir_wire_type::UInt64:
+        tag = ir::typed_call_tag::UInt64;
+        return true;
     case vir_wire_type::USize:
+        tag = ir::typed_call_tag::USize;
+        return true;
+    case vir_wire_type::Float:
+        tag = ir::typed_call_tag::Float;
+        return true;
+    case vir_wire_type::Float32:
+        tag = ir::typed_call_tag::Float32;
+        return true;
+    case vir_wire_type::Structure:
+        if (type.trivial_field != UINT32_MAX && type.trivial_field < type.args.size()) {
+            return typed_call_boundary_tag_for_type(type.args[type.trivial_field], tag);
+        }
+        tag = ir::typed_call_tag::Object;
         return true;
     default:
-        return false;
-    }
-}
-
-static bool is_unboxed_call_boundary_type(vir_type const & type, vir_type const ** field_type) {
-    if (is_unboxed_call_boundary_type(type)) {
-        *field_type = &type;
+        tag = ir::typed_call_tag::Object;
         return true;
     }
-    if (type.tag == vir_wire_type::Structure && type.trivial_field != UINT32_MAX) {
-        vir_type const & trivial_type = type.args[type.trivial_field];
-        if (is_unboxed_call_boundary_type(trivial_type)) {
-            *field_type = &trivial_type;
-            return true;
-        }
-    }
-    return false;
 }
 
-static bool needs_boxed_wasm32_call_boundary_type(vir_type const & type) {
-    if (
-        type.tag == vir_wire_type::Float ||
-        type.tag == vir_wire_type::Float32 ||
-        type.tag == vir_wire_type::UInt64) {
-        return true;
-    }
-    if (type.tag == vir_wire_type::Structure && type.trivial_field != UINT32_MAX) {
-        return needs_boxed_wasm32_call_boundary_type(type.args[type.trivial_field]);
-    }
-    return false;
-}
-
-static object * decode_unboxed_call_argument(vir_reader & r, vir_type const & type) {
-    uintptr_t value = 0;
+static vir_typed_arg decode_typed_call_argument(vir_reader & r, vir_type const & type) {
+    ir::typed_call_value value;
     switch (type.tag) {
+    case vir_wire_type::SimpleEnum: {
+        uint32_t parsed = r.u32();
+        if (parsed > std::numeric_limits<uint8_t>::max()) {
+            r.fail("simple enum argument index is out of range");
+            return { value, false };
+        }
+        value.tag = ir::typed_call_tag::UInt8;
+        value.uint64_value = parsed;
+        return { value, false };
+    }
     case vir_wire_type::UInt8:
-        value = r.u8();
-        break;
-    case vir_wire_type::UInt16:
+        value.tag = ir::typed_call_tag::UInt8;
+        value.uint64_value = r.u8();
+        return { value, false };
+    case vir_wire_type::UInt16: {
+        uint32_t parsed = r.u32();
+        if (parsed > std::numeric_limits<uint16_t>::max()) {
+            r.fail("invalid UInt16 argument");
+            return { value, false };
+        }
+        value.tag = ir::typed_call_tag::UInt16;
+        value.uint64_value = parsed;
+        return { value, false };
+    }
     case vir_wire_type::UInt32:
-        value = r.u32();
-        break;
+        value.tag = ir::typed_call_tag::UInt32;
+        value.uint64_value = r.u32();
+        return { value, false };
+    case vir_wire_type::UInt64: {
+        uint64_t parsed = 0;
+        if (!parse_u64(r.string(), parsed)) {
+            r.fail("invalid UInt64 decimal argument");
+            return { value, false };
+        }
+        value.tag = ir::typed_call_tag::UInt64;
+        value.uint64_value = parsed;
+        return { value, false };
+    }
     case vir_wire_type::USize: {
         uint64_t parsed = 0;
-        if (!parse_u64(r.string(), parsed) || parsed > std::numeric_limits<uintptr_t>::max()) {
-            r.fail("invalid USize trivial structure argument");
-            return nullptr;
+        if (!parse_u64(r.string(), parsed) || parsed > std::numeric_limits<size_t>::max()) {
+            r.fail("invalid USize decimal argument");
+            return { value, false };
         }
-        value = static_cast<uintptr_t>(parsed);
-        break;
+        value.tag = ir::typed_call_tag::USize;
+        value.usize_value = static_cast<size_t>(parsed);
+        return { value, false };
     }
+    case vir_wire_type::Float:
+        value.tag = ir::typed_call_tag::Float;
+        value.float_value = r.f64();
+        return { value, false };
+    case vir_wire_type::Float32:
+        value.tag = ir::typed_call_tag::Float32;
+        value.float32_value = r.f32();
+        return { value, false };
+    case vir_wire_type::Structure:
+        if (type.trivial_field != UINT32_MAX && type.trivial_field < type.args.size()) {
+            return decode_typed_call_argument(r, type.args[type.trivial_field]);
+        }
+        [[fallthrough]];
     default:
-        lean_unreachable();
+        value.tag = ir::typed_call_tag::Object;
+        value.object_value = decode_value(r, type);
+        return { value, true };
     }
-    return reinterpret_cast<object *>(value);
 }
 
-static void encode_unboxed_call_result(vir_writer & w, vir_type const & type, object * value) {
-    uintptr_t raw = reinterpret_cast<uintptr_t>(value);
+static void encode_typed_scalar_result(vir_writer & w, vir_type const & type, ir::typed_call_value const & value) {
     switch (type.tag) {
+    case vir_wire_type::SimpleEnum:
+        w.u32(static_cast<uint8_t>(value.uint64_value));
+        return;
     case vir_wire_type::UInt8:
-        w.u8(static_cast<uint8_t>(raw));
-        break;
+        w.u8(static_cast<uint8_t>(value.uint64_value));
+        return;
     case vir_wire_type::UInt16:
-        w.u32(static_cast<uint16_t>(raw));
-        break;
+        w.u32(static_cast<uint16_t>(value.uint64_value));
+        return;
     case vir_wire_type::UInt32:
-        w.u32(static_cast<uint32_t>(raw));
-        break;
+        w.u32(static_cast<uint32_t>(value.uint64_value));
+        return;
+    case vir_wire_type::UInt64:
+        w.string(std::to_string(value.uint64_value));
+        return;
     case vir_wire_type::USize:
-        w.string(std::to_string(raw));
+        w.string(std::to_string(value.usize_value));
+        return;
+    case vir_wire_type::Float:
+        w.f64(value.float_value);
+        return;
+    case vir_wire_type::Float32:
+        w.f32(value.float32_value);
+        return;
+    case vir_wire_type::Structure:
+        if (type.trivial_field != UINT32_MAX && type.trivial_field < type.args.size()) {
+            encode_typed_scalar_result(w, type.args[type.trivial_field], value);
+            return;
+        }
         break;
     default:
-        lean_unreachable();
+        break;
+    }
+    lean_unreachable();
+}
+
+static void cleanup_typed_args(std::vector<vir_typed_arg> const & args) {
+    for (vir_typed_arg const & arg : args) {
+        if (arg.owns_object) {
+            lean_dec(arg.value.object_value);
+        }
     }
 }
 
-static vir_arg decode_argument(vir_reader & r, bool has_boxed_decl) {
+static void encode_typed_result(vir_writer & w, vir_type const & type, ir::typed_call_value const & value) {
+    encode_type(w, type);
+    ir::typed_call_tag expected;
+    lean_always_assert(typed_call_boundary_tag_for_type(type, expected));
+    if (value.tag != expected) {
+        throw exception("typed IR call result did not match the interface manifest");
+    }
+    if (value.tag == ir::typed_call_tag::Object) {
+        encode_value_payload(w, type, value.object_value);
+    } else {
+        encode_typed_scalar_result(w, type, value);
+    }
+}
+
+static vir_arg decode_argument(vir_reader & r) {
     vir_type type = decode_type(r);
     if (!r.ok) return { lean_box(0), true };
-    if (!has_boxed_decl && needs_boxed_wasm32_call_boundary_type(type)) {
-        r.fail("top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary");
-        return { lean_box(0), true };
-    }
-    vir_type const * unboxed_type = nullptr;
-    if (!has_boxed_decl && is_unboxed_call_boundary_type(type, &unboxed_type)) {
-        return { decode_unboxed_call_argument(r, *unboxed_type), false };
-    }
     return { decode_value(r, type), true };
 }
 
@@ -2891,7 +2976,7 @@ static object * ctor_field_as_object(
     return lean_box(0);
 }
 
-static void encode_value_payload(vir_writer & w, vir_type const & type, object * value, vir_type const * self_type = nullptr) {
+static void encode_value_payload(vir_writer & w, vir_type const & type, object * value, vir_type const * self_type) {
     switch (type.tag) {
     case vir_wire_type::RecursiveSelf:
         if (self_type != nullptr) {
@@ -3048,19 +3133,9 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
     }
 }
 
-static void encode_result(vir_writer & w, vir_type const & type, object * value, bool has_boxed_decl) {
+static void encode_result(vir_writer & w, vir_type const & type, object * value) {
     encode_type(w, type);
-    vir_type const * unboxed_type = nullptr;
-    if (!has_boxed_decl && is_unboxed_call_boundary_type(type, &unboxed_type)) {
-        encode_unboxed_call_result(w, *unboxed_type, value);
-    } else {
-        encode_value_payload(w, type, value);
-    }
-}
-
-static bool call_result_is_owned(vir_type const & type, bool has_boxed_decl) {
-    vir_type const * unboxed_type = nullptr;
-    return has_boxed_decl || !is_unboxed_call_boundary_type(type, &unboxed_type);
+    encode_value_payload(w, type, value);
 }
 
 static bool same_wire_type(vir_type const & lhs, vir_type const & rhs) {
@@ -3302,6 +3377,7 @@ static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
 
 static std::string g_call_result;
 static std::string g_call_error;
+static std::string g_call_mode;
 static std::vector<object *> g_closure_roots;
 static std::vector<uint32_t> g_free_closure_handles;
 static std::string g_closure_call_result;
@@ -3410,7 +3486,7 @@ extern "C" char const * vir_closure_call(uint32_t handle, uint8_t const * reques
         result = lean_io_result_take_value(result);
     }
     vir_writer writer;
-    encode_result(writer, result_type, result, true);
+    encode_result(writer, result_type, result);
     lean_dec(result);
     g_closure_call_result = writer.take();
     return g_closure_call_result.data();
@@ -3966,27 +4042,14 @@ static uint8_t decode_call_effect(lean::vir_reader & reader) {
     return effect;
 }
 
-extern "C" char const * vir_call(
-    char const * name_text,
-    uint32_t name_len,
+extern "C" uint32_t vir_typed_call_bridge_available(void) {
+    return 1;
+}
+
+static char const * vir_call_boxed(
+    lean::name const & fn,
     uint8_t const * request,
-    uint32_t request_len,
-    uint8_t result_tag) {
-    (void) result_tag;
-    lean::g_call_result.clear();
-    lean::g_call_error.clear();
-    if (request == nullptr && request_len != 0) {
-        lean::g_call_error = "call payload pointer is null";
-        return nullptr;
-    }
-    if (!lean::vir::package_loaded()) {
-        lean::g_call_error = "no IR package has been loaded";
-        return nullptr;
-    }
-
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
-    bool has_boxed_decl = lean::vir::find_package_boxed_decl(fn.to_obj_arg()) != nullptr;
-
+    uint32_t request_len) {
     lean::vir_reader reader(request, request_len);
     uint32_t argc = reader.u32();
     std::vector<lean::vir_arg> decoded_args;
@@ -3994,18 +4057,13 @@ extern "C" char const * vir_call(
     decoded_args.reserve(argc);
     args.reserve(argc);
     for (uint32_t i = 0; i < argc; i++) {
-        decoded_args.push_back(lean::decode_argument(reader, has_boxed_decl));
+        decoded_args.push_back(lean::decode_argument(reader));
         args.push_back(decoded_args.back().value);
     }
     lean::vir_type result_type = lean::decode_type(reader);
     uint8_t effect = decode_call_effect(reader);
     if (!reader.ok) {
         lean::g_call_error = reader.error();
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-    if (!has_boxed_decl && lean::needs_boxed_wasm32_call_boundary_type(result_type)) {
-        lean::g_call_error = "top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary";
         cleanup_call_args(decoded_args);
         return nullptr;
     }
@@ -4031,12 +4089,114 @@ extern "C" char const * vir_call(
         result = lean_io_result_take_value(result);
     }
     lean::vir_writer writer;
-    lean::encode_result(writer, result_type, result, has_boxed_decl);
-    if (lean::call_result_is_owned(result_type, has_boxed_decl)) {
-        lean_dec(result);
+    lean::encode_result(writer, result_type, result);
+    lean_dec(result);
+    lean::g_call_result = writer.take();
+    lean::g_call_mode = "boxed-fallback";
+    return lean::g_call_result.data();
+}
+
+static char const * vir_call_typed(
+    lean::name const & fn,
+    uint8_t const * request,
+    uint32_t request_len,
+    bool & unsupported) {
+    unsupported = false;
+    lean::vir_reader reader(request, request_len);
+    uint32_t argc = reader.u32();
+    std::vector<lean::vir_typed_arg> decoded_args;
+    std::vector<lean::ir::typed_call_value> args;
+    decoded_args.reserve(argc);
+    args.reserve(argc);
+    for (uint32_t i = 0; i < argc; i++) {
+        lean::vir_type type = lean::decode_type(reader);
+        if (!reader.ok) {
+            lean::g_call_error = reader.error();
+            lean::cleanup_typed_args(decoded_args);
+            return nullptr;
+        }
+        decoded_args.push_back(lean::decode_typed_call_argument(reader, type));
+        args.push_back(decoded_args.back().value);
+    }
+    lean::vir_type result_type = lean::decode_type(reader);
+    uint8_t effect = decode_call_effect(reader);
+    if (!reader.ok) {
+        lean::g_call_error = reader.error();
+        lean::cleanup_typed_args(decoded_args);
+        return nullptr;
+    }
+    if (!reader.at_end()) {
+        lean::g_call_error = "trailing bytes after call payload";
+        lean::cleanup_typed_args(decoded_args);
+        return nullptr;
+    }
+    if (effect == 1) {
+        unsupported = true;
+        lean::cleanup_typed_args(decoded_args);
+        return nullptr;
+    }
+
+    lean::ensure_ir_interpreter_initialized();
+    lean::elab_environment env(lean_box(0));
+    lean::options opts(lean_box(0));
+    lean::ir::typed_call_value result;
+    if (!lean::ir::run_typed(env, opts, fn, args.size(), args.data(), &result)) {
+        unsupported = true;
+        lean::cleanup_typed_args(decoded_args);
+        return nullptr;
+    }
+
+    lean::vir_writer writer;
+    lean::encode_typed_result(writer, result_type, result);
+    if (result.tag == lean::ir::typed_call_tag::Object) {
+        lean_dec(result.object_value);
     }
     lean::g_call_result = writer.take();
+    lean::g_call_mode = "typed";
     return lean::g_call_result.data();
+}
+
+extern "C" char const * vir_call(
+    char const * name_text,
+    uint32_t name_len,
+    uint8_t const * request,
+    uint32_t request_len,
+    uint8_t result_tag) {
+    (void) result_tag;
+    lean::g_call_result.clear();
+    lean::g_call_error.clear();
+    lean::g_call_mode.clear();
+    if (request == nullptr && request_len != 0) {
+        lean::g_call_error = "call payload pointer is null";
+        return nullptr;
+    }
+    if (!lean::vir::package_loaded()) {
+        lean::g_call_error = "no IR package has been loaded";
+        return nullptr;
+    }
+
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    bool has_boxed_decl = lean::vir::find_package_boxed_decl(fn.to_obj_arg()) != nullptr;
+    bool has_native_boxed_symbol = lean::known_symbol_stem(fn) != nullptr;
+
+    try {
+        bool typed_unsupported = false;
+        if (char const * result = vir_call_typed(fn, request, request_len, typed_unsupported)) {
+            return result;
+        }
+        if (!typed_unsupported) {
+            return nullptr;
+        }
+        if (!has_boxed_decl && !has_native_boxed_symbol) {
+            lean::g_call_mode = "unsupported";
+            lean::g_call_error = std::string("typed IR call bridge could not represent `") + fn.to_string() + "` and no boxed fallback is packaged";
+            return nullptr;
+        }
+        return vir_call_boxed(fn, request, request_len);
+    } catch (lean::throwable const & ex) {
+        lean::g_call_error = ex.what();
+        return nullptr;
+    }
 }
 
 extern "C" uint32_t vir_call_result_size(void) {
@@ -4049,4 +4209,12 @@ extern "C" char const * vir_call_error(void) {
 
 extern "C" uint32_t vir_call_error_size(void) {
     return static_cast<uint32_t>(lean::g_call_error.size());
+}
+
+extern "C" char const * vir_last_call_mode(void) {
+    return lean::g_call_mode.c_str();
+}
+
+extern "C" uint32_t vir_last_call_mode_size(void) {
+    return static_cast<uint32_t>(lean::g_call_mode.size());
 }
