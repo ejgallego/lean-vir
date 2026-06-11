@@ -313,6 +313,20 @@ The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
+The `Vir.Infoview` module provides the first infoview-facing shell:
+
+- `Lean.Vir.Infoview.WidgetProps`
+- `Lean.Vir.Infoview.widget`
+- `Lean.Vir.Infoview.localProofWidget`
+
+`WidgetProps` points the infoview widget at a VIR runtime module URL, the
+`vir-upstream.wasm` URL, an `.irpkg` URL, and an entry name. The entry must have
+signature `String -> IO Bool`; the shell creates a nested mount element, passes
+its selector to the entry, and disposes the VIR runtime when the infoview widget
+unmounts. `examples/InfoviewVirWidget.lean` is the local smoke example for this
+path. `node scripts/smoke-infoview-widget.mjs` checks that the shell module
+loads and that `ReactProofWidget.mount` has the required widget signature.
+
 The JavaScript runtime binding map, Node virtual-host behavior, cleanup hooks,
 and external browser/React API references are documented in
 `docs/HOST_BINDINGS.md`.
