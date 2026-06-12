@@ -15,9 +15,9 @@ The runtime still targets a portable core `wasm32-wasip1` artifact:
 - JavaScript calls Lean through the generic `vir_call` byte-payload export.
 - Lean calls JavaScript through package-scoped `@[vir_js]` host imports routed
   to `env.vir_js_call`.
-- Opaque browser and React resources cross the Lean/shim boundary as `UInt32`
-  tokens. In the JavaScript host, those tokens index a required `externref`
-  table.
+- Opaque browser and React resources cross the JS/Wasm boundary through
+  `externref` side-channel imports. Lean stores them as GC-finalized external
+  resource objects that root JavaScript resource cells in the host runtime.
 - Lean closures passed to JavaScript are explicit rooted callback handles that
   must be released by the host binding or runtime teardown.
 
@@ -38,19 +38,20 @@ The experimental `externref` path should be strict:
 
 - feature-detect support at runtime and fail fast on unsupported engines;
 - do not design a long-term numeric-resource fallback for the prototype;
-- keep the current `UInt32` token in the package/shim ABI until the C++/Wasm
-  boundary is widened;
 - preserve the Lean-facing `@[vir_resource]` API;
 - keep explicit Lean closure root/release semantics.
 
-The first implementation step is an `externref` table-backed JavaScript
-resource store. This removes the plain JavaScript `Map` of live host resources
-and avoids a reverse object-to-handle compatibility map while leaving the
-existing Lean object representation and wire payload format unchanged. The
-JavaScript API treats resources as opaque runtime objects and does not accept
-raw numeric resource tokens or expose a supported numeric `.handle` field. A
-later ABI-widening step can replace the `UInt32` token itself with direct
-`externref` import/export values.
+The prototype uses a direct `externref` side channel for resource values while
+keeping the generic byte-payload dispatcher for ordinary scalar and structured
+values. `WIRE.RESOURCE` carries no serialized numeric payload. JavaScript
+queues branded resource cells before entering Wasm, and the shim queues cells
+back before JavaScript decodes resource results or host-import arguments. Lean
+resource values are external objects whose finalizers release the host root
+table entry.
+
+The JavaScript API treats resources as opaque runtime objects and does not
+accept raw numeric resource tokens or expose a supported numeric `.handle`
+field.
 
 `externref` does not replace callback rooting. Lean callbacks are still Lean
 heap objects owned by the interpreter runtime. JavaScript may retain a callback
@@ -85,9 +86,9 @@ React authoring ergonomics can improve independently of Wasm extensions:
 - continue testing rapid rerender, unmount, package reload, and runtime dispose
   cleanup for retained callbacks.
 
-The first implementation step is the strict `externref` resource table. JSPI
-should wait for an async Lean app use case that cannot be expressed cleanly
-with callback registration.
+The strict `externref` resource path is implemented. JSPI should wait for an
+async Lean app use case that cannot be expressed cleanly with callback
+registration.
 
 ## Local Probes
 

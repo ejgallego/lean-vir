@@ -9,9 +9,9 @@ removed; event listeners now use retained Lean closures directly.
 
 - Opaque browser resources are represented in Lean by abstract types such as
   `Element`, `Event`, `EventListener`, `Timeout`, and `AnimationFrame`.
-- The current Lean/shim ABI still passes numeric resource tokens through the
-  `wasm32-wasip1` boundary. The JavaScript host stores those tokens in a
-  required `externref` table.
+- Opaque resources cross the JS/Wasm boundary through `externref` side-channel
+  imports. Lean stores them as GC-finalized external resource objects that root
+  JavaScript resource cells in the host runtime.
 - Lean function values in host-import arguments are encoded as rooted callback
   handles. JavaScript receives them as callable `VirCallback` objects.
 - `VirCallback.release()` is idempotent and calls the WASM
@@ -98,9 +98,9 @@ callback from the current callback.
 
 ## Wasm Extension Direction
 
-- `externref` is now required by the experimental JavaScript resource store for
-  opaque host resources. Direct `externref` values across the C++/Wasm ABI
-  remain future work; `externref` does not by itself solve Lean closure
+- `externref` is now required by the experimental JavaScript resource path for
+  opaque host resources. Resource values cross the C++/Wasm ABI through an
+  `externref` side channel; `externref` does not by itself solve Lean closure
   rooting, release ownership, or WASI portability.
 - The Component Model and WIT `resource` semantics are the right long-term
   interface shape for typed host resources. The current manifest is intentionally

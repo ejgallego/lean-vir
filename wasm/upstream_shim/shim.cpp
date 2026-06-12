@@ -57,6 +57,11 @@ uint64_t lean_expr_mk_data(
 uint64_t lean_expr_mk_app_data(uint64_t f_data, uint64_t a_data);
 char const * vir_js_call(uint32_t slot, uint8_t const * request, uint32_t request_len);
 uint32_t vir_js_call_result_size(void);
+__externref_t vir_resource_take(void);
+void vir_resource_push(__externref_t value);
+uint32_t vir_resource_root(__externref_t value);
+__externref_t vir_resource_get(uint32_t handle);
+void vir_resource_release(uint32_t handle);
 }
 
 static uint8_t g_vir_io_initializing = 0;
@@ -1819,6 +1824,29 @@ struct vir_arg {
     bool owned = true;
 };
 
+struct vir_resource_data {
+    uint32_t handle = 0;
+};
+
+static lean_external_class * g_vir_resource_external_class = nullptr;
+
+static void vir_resource_finalize(void * data) {
+    vir_resource_data * resource = static_cast<vir_resource_data *>(data);
+    if (resource != nullptr) {
+        if (resource->handle != 0) {
+            vir_resource_release(resource->handle);
+        }
+        delete resource;
+    }
+}
+
+static lean_external_class * vir_resource_external_class() {
+    if (g_vir_resource_external_class == nullptr) {
+        g_vir_resource_external_class = lean_register_external_class(vir_resource_finalize, nullptr);
+    }
+    return g_vir_resource_external_class;
+}
+
 class vir_reader {
     uint8_t const * m_data;
     uint32_t m_size;
@@ -1912,13 +1940,29 @@ public:
 
 class vir_writer {
     std::string m_bytes;
+    std::string m_error;
 
 public:
+    bool ok = true;
+
+    std::string const & error() const {
+        return m_error;
+    }
+
+    void fail(std::string const & message) {
+        if (ok) {
+            ok = false;
+            m_error = message;
+        }
+    }
+
     void u8(uint8_t value) {
+        if (!ok) return;
         m_bytes.push_back(static_cast<char>(value));
     }
 
     void u32(uint32_t value) {
+        if (!ok) return;
         m_bytes.push_back(static_cast<char>(value & 0xff));
         m_bytes.push_back(static_cast<char>((value >> 8) & 0xff));
         m_bytes.push_back(static_cast<char>((value >> 16) & 0xff));
@@ -1943,11 +1987,13 @@ public:
     }
 
     void string(std::string const & value) {
+        if (!ok) return;
         u32(static_cast<uint32_t>(value.size()));
         m_bytes.append(value);
     }
 
     void bytes(uint8_t const * ptr, uint32_t len) {
+        if (!ok) return;
         u32(len);
         if (len != 0) {
             m_bytes.append(reinterpret_cast<char const *>(ptr), len);
@@ -1958,6 +2004,28 @@ public:
         return std::move(m_bytes);
     }
 };
+
+static object * mk_resource_object(__externref_t value, vir_reader & r) {
+    uint32_t handle = vir_resource_root(value);
+    if (handle == 0) {
+        r.fail("missing externref resource value");
+        return lean_box(0);
+    }
+    return lean_alloc_external(vir_resource_external_class(), new vir_resource_data{handle});
+}
+
+static uint32_t resource_handle_for_object(object * value, vir_writer & w) {
+    if (!lean_is_external(value) || lean_get_external_class(value) != vir_resource_external_class()) {
+        w.fail("Lean resource value is not a VIR externref resource");
+        return 0;
+    }
+    vir_resource_data * resource = static_cast<vir_resource_data *>(lean_get_external_data(value));
+    if (resource == nullptr || resource->handle == 0) {
+        w.fail("Lean resource value has been released");
+        return 0;
+    }
+    return resource->handle;
+}
 
 static bool parse_u64(std::string const & text, uint64_t & out) {
     if (text.empty()) return false;
@@ -2533,7 +2601,7 @@ static object * decode_value(vir_reader & r, vir_type const & type, vir_type con
     case vir_wire_type::UInt32:
         return lean_box_uint32(r.u32());
     case vir_wire_type::Resource:
-        return lean_box_uint32(r.u32());
+        return mk_resource_object(vir_resource_take(), r);
     case vir_wire_type::Function:
         r.fail("JavaScript-provided function values are not supported yet");
         return lean_box(0);
@@ -2923,9 +2991,13 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
     case vir_wire_type::UInt32:
         w.u32(lean_unbox_uint32(value));
         break;
-    case vir_wire_type::Resource:
-        w.u32(lean_unbox_uint32(value));
+    case vir_wire_type::Resource: {
+        uint32_t handle = resource_handle_for_object(value, w);
+        if (w.ok) {
+            vir_resource_push(vir_resource_get(handle));
+        }
         break;
+    }
     case vir_wire_type::Function:
         w.u32(vir_closure_root(value));
         break;
@@ -3164,6 +3236,12 @@ static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
         encode_value_payload(request, signature.args[i], args[i]);
     }
     encode_type(request, signature.result);
+    if (!request.ok) {
+        for (uint32_t i = 0; i < argc; i++) {
+            lean_dec(args[i]);
+        }
+        return vir::host_import_is_io(slot) ? lean_io_result_mk_ok(lean_box(0)) : lean_box(0);
+    }
     std::string request_bytes = request.take();
     char const * result_bytes = vir_js_call(
         slot,
@@ -3411,6 +3489,11 @@ extern "C" char const * vir_closure_call(uint32_t handle, uint8_t const * reques
     }
     vir_writer writer;
     encode_result(writer, result_type, result, true);
+    if (!writer.ok) {
+        lean_dec(result);
+        g_closure_call_error = writer.error();
+        return nullptr;
+    }
     lean_dec(result);
     g_closure_call_result = writer.take();
     return g_closure_call_result.data();
@@ -4032,6 +4115,13 @@ extern "C" char const * vir_call(
     }
     lean::vir_writer writer;
     lean::encode_result(writer, result_type, result, has_boxed_decl);
+    if (!writer.ok) {
+        if (lean::call_result_is_owned(result_type, has_boxed_decl)) {
+            lean_dec(result);
+        }
+        lean::g_call_error = writer.error();
+        return nullptr;
+    }
     if (lean::call_result_is_owned(result_type, has_boxed_decl)) {
         lean_dec(result);
     }
