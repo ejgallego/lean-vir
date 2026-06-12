@@ -45,9 +45,10 @@ The experimental `externref` path should be strict:
 
 The first implementation step is an `externref` table-backed JavaScript
 resource store. This removes the plain JavaScript `Map` of live host resources
-while leaving the existing Lean object representation and wire payload format
-unchanged. A later ABI-widening step can replace the `UInt32` token itself
-with direct `externref` import/export values.
+and avoids a reverse object-to-handle compatibility map while leaving the
+existing Lean object representation and wire payload format unchanged. A later
+ABI-widening step can replace the `UInt32` token itself with direct `externref`
+import/export values.
 
 `externref` does not replace callback rooting. Lean callbacks are still Lean
 heap objects owned by the interpreter runtime. JavaScript may retain a callback
