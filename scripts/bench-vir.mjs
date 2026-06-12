@@ -24,10 +24,10 @@ const fibInput = 17;
 const fibIterations = 80;
 const sortInput = [7, 3, 9, 1, 4, 1, 5, 2, 8, 6, 0, 10, 12, 11, 13, 14];
 const sortIterations = 2000;
-const hostScalarIterations = 2000;
-const callbackIterations = 2000;
-const domResourceIterations = 500;
-const reactRootIterations = 300;
+const hostScalarIterations = 5000;
+const callbackIterations = 5000;
+const domResourceIterations = 1000;
+const reactRootIterations = 500;
 const benchArtifactPaths = [
   "web/public/vir-upstream.wasm",
   "web/public/fixtures-basic.irpkg",
@@ -242,35 +242,19 @@ const wasmSort = benchWasmRepeated("sort", sortIterations, () => {
 const hostSort = benchHostIr("sort", sortIterations, ["sort", String(sortIterations), sortInput.join(",")]);
 
 const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < hostScalarIterations; i++) {
-    acc += hostRuntime.call("HostInterop.titleHandshake", `bench-${i}`).length;
-  }
-  return acc;
+  return Number(hostRuntime.call("HostInterop.titleHandshakeLoop", hostScalarIterations));
 });
 
 const wasmCallback = benchWasmRepeated("callback-roundtrip", callbackIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < callbackIterations; i++) {
-    acc += Number(hostRuntime.call("HostInterop.callbackRoundTrip", i & 0xff));
-  }
-  return acc;
+  return Number(hostRuntime.call("HostInterop.callbackRoundTripLoop", callbackIterations));
 });
 
 const wasmDomResource = benchWasmRepeated("dom-listener-resource", domResourceIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < domResourceIterations; i++) {
-    acc += Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackText", "#bench-dom"));
-  }
-  return acc;
+  return Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEventLoop", "#bench-dom", domResourceIterations));
 });
 
 const wasmReactRoot = benchWasmRepeated("react-root-lifecycle", reactRootIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < reactRootIterations; i++) {
-    acc += hostRuntime.call("ReactCounter.mountAndUnmount", "#bench-react") ? 1 : 0;
-  }
-  return acc;
+  return Number(hostRuntime.call("ReactCounter.mountAndUnmountLoop", "#bench-react", reactRootIterations));
 });
 
 console.log("# Lean VIR benchmark");

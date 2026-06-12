@@ -50,9 +50,12 @@
           "source": "examples/HostInterop.lean",
           "roots": [
             "HostInterop.titleHandshake",
+            "HostInterop.titleHandshakeLoop",
             "HostInterop.callbackRoundTrip",
+            "HostInterop.callbackRoundTripLoop",
             "HostInterop.mountCallbackEvent",
             "HostInterop.mountAndRemoveCallbackEvent",
+            "HostInterop.mountAndRemoveCallbackEventLoop",
             "HostInterop.mountCallbackText",
             "HostInterop.mountAndRemoveCallbackText",
             "HostInterop.timeoutRecord",
@@ -88,6 +91,7 @@
             "ReactCounter.mountDefault",
             "ReactCounter.renderStatic",
             "ReactCounter.mountAndUnmount",
+            "ReactCounter.mountAndUnmountLoop",
             "ReactCounter.renderAfterUnmount",
             "ReactCounter.renderTooDeep"
           ]

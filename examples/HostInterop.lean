@@ -19,8 +19,25 @@ def titleHandshake (label : String) : IO String := do
   Lean.Vir.Browser.Document.setTitle title
   Lean.Vir.Browser.Document.getTitle
 
+partial def titleHandshakeLoopAux (remaining acc : Nat) : IO Nat := do
+  match remaining with
+  | 0 => pure acc
+  | n + 1 => do
+      let title ← titleHandshake "bench"
+      titleHandshakeLoopAux n (acc + title.length)
+
+def titleHandshakeLoop (count : Nat) : IO Nat :=
+  titleHandshakeLoopAux count 0
+
 def callbackRoundTrip (n : Nat) : Nat :=
   callNatCallback n fun value => value + 7
+
+partial def callbackRoundTripLoopAux : Nat → Nat → Nat
+  | 0, acc => acc
+  | n + 1, acc => callbackRoundTripLoopAux n (acc + callbackRoundTrip (n % 256))
+
+def callbackRoundTripLoop (count : Nat) : Nat :=
+  callbackRoundTripLoopAux count 0
 
 def mountCallbackEvent (selector : String) : IO Nat := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
@@ -38,6 +55,16 @@ def mountAndRemoveCallbackEvent (selector : String) : IO Nat := do
       Lean.Vir.Browser.Element.removeEventListener listener
       pure 1
   | none => pure 0
+
+partial def mountAndRemoveCallbackEventLoopAux (selector : String) (remaining acc : Nat) : IO Nat := do
+  match remaining with
+  | 0 => pure acc
+  | n + 1 => do
+      let mounted ← mountAndRemoveCallbackEvent selector
+      mountAndRemoveCallbackEventLoopAux selector n (acc + mounted)
+
+def mountAndRemoveCallbackEventLoop (selector : String) (count : Nat) : IO Nat :=
+  mountAndRemoveCallbackEventLoopAux selector count 0
 
 def mountCallbackText (selector : String) : IO Nat := do
   match ← Lean.Vir.Browser.Document.querySelector selector with

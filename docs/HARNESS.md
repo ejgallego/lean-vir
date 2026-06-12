@@ -186,6 +186,9 @@ The comparison checks benchmark names, iteration counts, and checksums before
 printing per-call deltas. The default benchmark includes pure-runtime controls
 (`fib` and `sort`) plus host/resource rows for scalar host imports, callback
 root round trips, DOM listener resource churn, and React root lifecycle work.
+The host/resource rows run loops inside Lean so they measure repeated host
+interop operations without mostly measuring repeated top-level `vir.call(...)`
+entry overhead.
 
 ## Implementation Map
 

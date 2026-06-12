@@ -37,6 +37,16 @@ def mountAndUnmount (selector : String) : IO Bool :=
     renderInto root 0
     Root.unmount root
 
+partial def mountAndUnmountLoopAux (selector : String) (remaining acc : Nat) : IO Nat := do
+  match remaining with
+  | 0 => pure acc
+  | n + 1 => do
+      let mounted ← mountAndUnmount selector
+      mountAndUnmountLoopAux selector n (if mounted then acc + 1 else acc)
+
+def mountAndUnmountLoop (selector : String) (count : Nat) : IO Nat :=
+  mountAndUnmountLoopAux selector count 0
+
 def renderAfterUnmount (selector : String) : IO Bool :=
   Root.mountFromSelector selector fun root => do
     Root.unmount root
