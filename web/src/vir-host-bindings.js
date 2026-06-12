@@ -29,10 +29,12 @@ import {
 } from "./host/vir-virtual-host-bindings.js";
 
 export {
-  createHostResourceState,
-  createReactRootResourceHostBindings,
   hasExternrefTableSupport,
   requireExternrefTableSupport,
+} from "./host-resource.js";
+export {
+  createHostResourceState,
+  createReactRootResourceHostBindings,
 } from "./host/vir-host-resources.js";
 export {
   createVirtualDocumentHostBindings,

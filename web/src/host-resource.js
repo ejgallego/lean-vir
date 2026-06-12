@@ -4,7 +4,33 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
 const hostResourceState = new WeakMap();
+let externrefTableSupport = null;
+
+export function hasExternrefTableSupport() {
+  if (externrefTableSupport !== null) {
+    return externrefTableSupport;
+  }
+  try {
+    const table = new WebAssembly.Table({
+      element: "externref",
+      initial: EXTERNREF_TABLE_INITIAL_LENGTH,
+    });
+    const marker = { kind: "lean-vir.externref-table-probe" };
+    table.set(0, marker);
+    externrefTableSupport = table.get(0) === marker;
+  } catch {
+    externrefTableSupport = false;
+  }
+  return externrefTableSupport;
+}
+
+export function requireExternrefTableSupport() {
+  if (!hasExternrefTableSupport()) {
+    throw new Error("Lean VIR React/browser host resources require WebAssembly externref support");
+  }
+}
 
 class HostResource {
   constructor(value, label) {
@@ -47,7 +73,8 @@ export function releaseHostResource(resource) {
 }
 
 export class ExternrefResourceRoots {
-  constructor({ initial = 1 } = {}) {
+  constructor({ initial = EXTERNREF_TABLE_INITIAL_LENGTH } = {}) {
+    requireExternrefTableSupport();
     this.table = new WebAssembly.Table({ element: "externref", initial });
     this.freeRootIds = [];
   }

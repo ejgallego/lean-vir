@@ -75,6 +75,14 @@ The JavaScript API treats resources as opaque runtime objects and does not
 accept raw numeric resource tokens or expose a supported numeric `.handle`
 field.
 
+`externref` replaces opaque resource transport, not the entire call ABI. Plain
+scalars and structured Lean values still use the manifest-described byte
+payload because they must be reconstructed as Lean heap objects inside the
+interpreter. Replacing `vir_js_call(slot, payload)` for those values would
+require generated per-package Wasm imports with typed lowering rules, or a
+component-model/WIT-style resource and value ABI. The current prototype keeps
+that larger ABI change separate from the React resource path.
+
 `externref` does not replace callback rooting. Lean callbacks are still Lean
 heap objects owned by the interpreter runtime. JavaScript may retain a callback
 across React renders, event listeners, timers, or animation frames, so the

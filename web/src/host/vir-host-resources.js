@@ -11,34 +11,8 @@ import {
   hostResourceValue,
   isHostResource,
   releaseHostResource,
+  requireExternrefTableSupport,
 } from "../host-resource.js";
-
-const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
-let externrefTableSupport = null;
-
-export function hasExternrefTableSupport() {
-  if (externrefTableSupport !== null) {
-    return externrefTableSupport;
-  }
-  try {
-    const table = new WebAssembly.Table({
-      element: "externref",
-      initial: EXTERNREF_TABLE_INITIAL_LENGTH,
-    });
-    const marker = { kind: "lean-vir.externref-table-probe" };
-    table.set(0, marker);
-    externrefTableSupport = table.get(0) === marker;
-  } catch {
-    externrefTableSupport = false;
-  }
-  return externrefTableSupport;
-}
-
-export function requireExternrefTableSupport() {
-  if (!hasExternrefTableSupport()) {
-    throw new Error("Lean VIR React/browser host resources require WebAssembly externref support");
-  }
-}
 
 export function createHostResourceState() {
   requireExternrefTableSupport();
