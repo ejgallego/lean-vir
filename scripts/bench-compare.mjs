@@ -87,6 +87,15 @@ function compareSample(benchmarkName, sampleName, beforeSample, afterSample) {
   );
 }
 
+function compareOptionalSample(benchmarkName, sampleName, beforeSample, afterSample) {
+  if (!beforeSample && !afterSample) return;
+  if (!beforeSample || !afterSample) {
+    console.log(`  ${sampleName}: missing on one side`);
+    return;
+  }
+  compareSample(benchmarkName, sampleName, beforeSample, afterSample);
+}
+
 console.log("# Lean VIR benchmark comparison");
 console.log(`before: ${reportLabel(before)} (${before.path})`);
 console.log(`after:  ${reportLabel(after)} (${after.path})`);
@@ -101,7 +110,7 @@ for (const name of names) {
   const pair = requireBenchmarkPair(name);
   console.log(pair.after.title ?? pair.before.title ?? name);
   compareSample(name, "wasm", pair.before.wasm, pair.after.wasm);
-  compareSample(name, "host", pair.before.host, pair.after.host);
+  compareOptionalSample(name, "host", pair.before.host, pair.after.host);
   const beforeRatio = pair.before.ratioWasmToHost;
   const afterRatio = pair.after.ratioWasmToHost;
   if (typeof beforeRatio === "number" && typeof afterRatio === "number") {

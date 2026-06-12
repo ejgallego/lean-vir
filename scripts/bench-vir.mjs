@@ -10,7 +10,12 @@ import { performance } from "node:perf_hooks";
 
 import { ensureCachedBenchArtifacts } from "./bench-artifact-cache.mjs";
 import { formatMs, median, requireBenchmarkSample } from "./bench-utils.mjs";
-import { createVirRuntime } from "../web/src/vir-runtime.js";
+import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
+import {
+  createVirRuntime as createNodeVirRuntime,
+  createVirtualDocumentState,
+  ensureVirtualElementState,
+} from "../web/src/vir-runtime-node.js";
 import { runSync } from "./process-utils.mjs";
 
 const root = new URL("..", import.meta.url);
@@ -19,9 +24,14 @@ const fibInput = 17;
 const fibIterations = 80;
 const sortInput = [7, 3, 9, 1, 4, 1, 5, 2, 8, 6, 0, 10, 12, 11, 13, 14];
 const sortIterations = 2000;
+const hostScalarIterations = 2000;
+const callbackIterations = 2000;
+const domResourceIterations = 500;
+const reactRootIterations = 300;
 const benchArtifactPaths = [
   "web/public/vir-upstream.wasm",
   "web/public/fixtures-basic.irpkg",
+  "web/public/demo-host.irpkg",
 ];
 const args = parseArgs(process.argv.slice(2));
 
@@ -82,10 +92,34 @@ function printUsage() {
   ].join("\n"));
 }
 
-async function instantiateWasm() {
+async function instantiateRuntimes() {
   const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
   const irPackage = await readFile(new URL("../web/public/fixtures-basic.irpkg", import.meta.url));
-  return createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
+  const hostPackage = await readFile(new URL("../web/public/demo-host.irpkg", import.meta.url));
+  const virtualDocumentState = createVirtualDocumentState();
+  ensureVirtualElementState(virtualDocumentState, "#bench-dom");
+  ensureVirtualElementState(virtualDocumentState, "#bench-react");
+  const runtime = await createBrowserVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
+  const hostRuntime = await createNodeVirRuntime({
+    wasmBytes: wasm,
+    irPackageBytes: hostPackage,
+    virtualDocumentState,
+    hostBindings: createBenchmarkHostBindings(),
+  });
+  return { runtime, hostRuntime };
+}
+
+function createBenchmarkHostBindings() {
+  return {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": () => undefined,
+  };
 }
 
 function benchWasmRepeated(label, iterations, fn) {
@@ -123,13 +157,22 @@ function printRow(name, wasm, host) {
   console.log(`  checksums:   wasm=${wasm.checksum} host=${host.checksum}`);
 }
 
-function benchmarkReportRow(name, title, wasm, host) {
+function printWasmRow(name, sample) {
+  const perCall = sample.medianMs / sample.iterations;
+  console.log(`${name}`);
+  console.log(`  wasm IR:   ${formatMs(sample.medianMs)} total, ${formatMs(perCall)} / call`);
+  console.log(`  checksum:  ${sample.checksum}`);
+}
+
+function benchmarkReportRow(name, title, wasm, host = null) {
   return {
     name,
     title,
     wasm: benchmarkSampleReport(wasm),
-    host: benchmarkSampleReport(host),
-    ratioWasmToHost: (wasm.medianMs / wasm.iterations) / (host.medianMs / host.iterations),
+    ...(host === null ? {} : {
+      host: benchmarkSampleReport(host),
+      ratioWasmToHost: (wasm.medianMs / wasm.iterations) / (host.medianMs / host.iterations),
+    }),
   };
 }
 
@@ -178,7 +221,7 @@ const artifactCache = await ensureCachedBenchArtifacts({
   options: args,
   build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
 });
-const runtime = await instantiateWasm();
+const { runtime, hostRuntime } = await instantiateRuntimes();
 
 const wasmFib = benchWasmRepeated("fib", fibIterations, () => {
   let acc = 0;
@@ -198,18 +241,85 @@ const wasmSort = benchWasmRepeated("sort", sortIterations, () => {
 });
 const hostSort = benchHostIr("sort", sortIterations, ["sort", String(sortIterations), sortInput.join(",")]);
 
+const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < hostScalarIterations; i++) {
+    acc += hostRuntime.call("HostInterop.titleHandshake", `bench-${i}`).length;
+  }
+  return acc;
+});
+
+const wasmCallback = benchWasmRepeated("callback-roundtrip", callbackIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < callbackIterations; i++) {
+    acc += Number(hostRuntime.call("HostInterop.callbackRoundTrip", i & 0xff));
+  }
+  return acc;
+});
+
+const wasmDomResource = benchWasmRepeated("dom-listener-resource", domResourceIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < domResourceIterations; i++) {
+    acc += Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackText", "#bench-dom"));
+  }
+  return acc;
+});
+
+const wasmReactRoot = benchWasmRepeated("react-root-lifecycle", reactRootIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < reactRootIterations; i++) {
+    acc += hostRuntime.call("ReactCounter.mountAndUnmount", "#bench-react") ? 1 : 0;
+  }
+  return acc;
+});
+
 console.log("# Lean VIR benchmark");
 console.log("Host baseline is `lean --run` with `interpreter.prefer_native=false`.");
 console.log("WASM timings use the manifest-driven JavaScript runtime API.");
 console.log("Host timings exclude Lean frontend startup.");
 console.log();
+console.log("Pure runtime controls");
+console.log();
 printRow(`fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib);
 console.log();
 printRow(`sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort);
+console.log();
+console.log("Host/resource paths");
+console.log();
+printWasmRow(`host scalar title handshake x ${hostScalarIterations}`, wasmHostScalar);
+console.log();
+printWasmRow(`callback root round trip x ${callbackIterations}`, wasmCallback);
+console.log();
+printWasmRow(`DOM listener resource create/remove x ${domResourceIterations}`, wasmDomResource);
+console.log();
+printWasmRow(`React root mount/render/unmount x ${reactRootIterations}`, wasmReactRoot);
 
 if (args.jsonPath !== null) {
   await writeJsonReport(args.jsonPath, [
     benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib),
     benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
+    benchmarkReportRow(
+      "host-title",
+      `host scalar title handshake x ${hostScalarIterations}`,
+      wasmHostScalar,
+    ),
+    benchmarkReportRow(
+      "callback-roundtrip",
+      `callback root round trip x ${callbackIterations}`,
+      wasmCallback,
+    ),
+    benchmarkReportRow(
+      "dom-listener-resource",
+      `DOM listener resource create/remove x ${domResourceIterations}`,
+      wasmDomResource,
+    ),
+    benchmarkReportRow(
+      "react-root-lifecycle",
+      `React root mount/render/unmount x ${reactRootIterations}`,
+      wasmReactRoot,
+    ),
   ]);
 }
+
+runtime.dispose();
+hostRuntime.dispose();

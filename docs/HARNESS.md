@@ -183,7 +183,9 @@ npm run bench:compare -- build/perf/before.json build/perf/after.json
 ```
 
 The comparison checks benchmark names, iteration counts, and checksums before
-printing per-call deltas for the Wasm runtime and host Lean IR baseline.
+printing per-call deltas. The default benchmark includes pure-runtime controls
+(`fib` and `sort`) plus host/resource rows for scalar host imports, callback
+root round trips, DOM listener resource churn, and React root lifecycle work.
 
 ## Implementation Map
 
