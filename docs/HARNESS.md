@@ -190,6 +190,19 @@ The host/resource rows run loops inside Lean so they measure repeated host
 interop operations without mostly measuring repeated top-level `vir.call(...)`
 entry overhead.
 
+For routine before/after comparisons between two already checked-out trees, use
+the paired runner:
+
+```bash
+npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
+```
+
+It alternates `npm run bench -- --json` in each checkout, stores the per-run
+reports under `build/perf/paired/`, and prints median per-call deltas for common
+benchmark rows. The compared checkouts must both support the current benchmark
+JSON interface; for older refs, first create a temporary compatible checkout or
+compare manually saved reports with `bench:compare`.
+
 ## Implementation Map
 
 Keep focused checks and shared helpers in the split modules instead of copying

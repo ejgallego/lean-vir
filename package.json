@@ -37,6 +37,7 @@
     "package:sdk-artifact": "node scripts/package-sdk-artifact.mjs",
     "bench": "node scripts/bench-vir.mjs",
     "bench:compare": "node scripts/bench-compare.mjs",
+    "bench:paired": "node scripts/bench-paired.mjs",
     "bench:engines": "node scripts/bench-engines.mjs",
     "test": "npm run check:boundary-registry && npm run test:wasm-extensions && npm run test:upstream && npm run test:runtime && npm run test:fixtures",
     "test:fixtures": "node scripts/run-fixtures.mjs",

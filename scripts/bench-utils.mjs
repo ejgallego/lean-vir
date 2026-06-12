@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { readFile } from "node:fs/promises";
+
 export function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)];
@@ -42,4 +44,31 @@ export function requireBenchmarkSample(stdout, prefix, label, description = pref
     throw new Error(`no ${description} benchmark samples found for ${label}`);
   }
   return sample;
+}
+
+export async function readBenchmarkReport(path, label = "benchmark") {
+  const report = JSON.parse(await readFile(path, "utf8"));
+  if (report?.schema !== "lean-vir.bench.v1") {
+    throw new Error(`${label} report ${path} is not a lean-vir.bench.v1 report`);
+  }
+  if (!Array.isArray(report.benchmarks)) {
+    throw new Error(`${label} report ${path} is missing benchmarks`);
+  }
+  return {
+    path,
+    report,
+    benchmarks: new Map(report.benchmarks.map((benchmark) => [benchmark.name, benchmark])),
+  };
+}
+
+export function benchmarkReportLabel(side) {
+  const git = side.report.git ?? {};
+  const ref = git.ref && git.ref !== "HEAD" ? git.ref : "detached";
+  const commit = typeof git.commit === "string" ? git.commit.slice(0, 12) : "unknown";
+  const dirty = git.dirty ? " dirty" : "";
+  return `${ref}@${commit}${dirty}`;
+}
+
+export function benchmarkSamplePerCallMs(sample) {
+  return sample.perCallMs ?? sample.medianMs / sample.iterations;
 }

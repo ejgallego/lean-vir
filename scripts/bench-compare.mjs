@@ -4,13 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { readFile } from "node:fs/promises";
-
-import { formatMs } from "./bench-utils.mjs";
+import {
+  benchmarkReportLabel,
+  benchmarkSamplePerCallMs,
+  formatMs,
+  readBenchmarkReport,
+} from "./bench-utils.mjs";
 
 const args = parseArgs(process.argv.slice(2));
-const before = await readReport(args.beforePath, "before");
-const after = await readReport(args.afterPath, "after");
+const before = await readBenchmarkReport(args.beforePath, "before");
+const after = await readBenchmarkReport(args.afterPath, "after");
 
 function parseArgs(argv) {
   if (argv.includes("--help") || argv.includes("-h")) {
@@ -29,29 +32,6 @@ function parseArgs(argv) {
 
 function printUsage() {
   console.log("usage: npm run bench:compare -- build/perf/before.json build/perf/after.json");
-}
-
-async function readReport(path, label) {
-  const report = JSON.parse(await readFile(path, "utf8"));
-  if (report?.schema !== "lean-vir.bench.v1") {
-    throw new Error(`${label} report ${path} is not a lean-vir.bench.v1 report`);
-  }
-  if (!Array.isArray(report.benchmarks)) {
-    throw new Error(`${label} report ${path} is missing benchmarks`);
-  }
-  return {
-    path,
-    report,
-    benchmarks: new Map(report.benchmarks.map((benchmark) => [benchmark.name, benchmark])),
-  };
-}
-
-function reportLabel(side) {
-  const git = side.report.git ?? {};
-  const ref = git.ref && git.ref !== "HEAD" ? git.ref : "detached";
-  const commit = typeof git.commit === "string" ? git.commit.slice(0, 12) : "unknown";
-  const dirty = git.dirty ? " dirty" : "";
-  return `${ref}@${commit}${dirty}`;
 }
 
 function requireBenchmarkPair(name) {
@@ -74,15 +54,17 @@ function compareSample(benchmarkName, sampleName, beforeSample, afterSample) {
   if (beforeSample.checksum !== afterSample.checksum) {
     throw new Error(
       `${benchmarkName} ${sampleName}: checksum mismatch ` +
-        `${beforeSample.checksum} vs ${afterSample.checksum}`,
+      `${beforeSample.checksum} vs ${afterSample.checksum}`,
     );
   }
-  const deltaPct = ((afterSample.perCallMs - beforeSample.perCallMs) / beforeSample.perCallMs) * 100;
+  const beforePerCallMs = benchmarkSamplePerCallMs(beforeSample);
+  const afterPerCallMs = benchmarkSamplePerCallMs(afterSample);
+  const deltaPct = ((afterPerCallMs - beforePerCallMs) / beforePerCallMs) * 100;
   const sign = deltaPct >= 0 ? "+" : "";
-  const speed = beforeSample.perCallMs / afterSample.perCallMs;
+  const speed = beforePerCallMs / afterPerCallMs;
   console.log(
-    `  ${sampleName}: ${formatMs(beforeSample.perCallMs)} -> ` +
-      `${formatMs(afterSample.perCallMs)} / call (${sign}${deltaPct.toFixed(1)}%, ` +
+    `  ${sampleName}: ${formatMs(beforePerCallMs)} -> ` +
+      `${formatMs(afterPerCallMs)} / call (${sign}${deltaPct.toFixed(1)}%, ` +
       `${speed.toFixed(2)}x speed)`,
   );
 }
@@ -97,8 +79,8 @@ function compareOptionalSample(benchmarkName, sampleName, beforeSample, afterSam
 }
 
 console.log("# Lean VIR benchmark comparison");
-console.log(`before: ${reportLabel(before)} (${before.path})`);
-console.log(`after:  ${reportLabel(after)} (${after.path})`);
+console.log(`before: ${benchmarkReportLabel(before)} (${before.path})`);
+console.log(`after:  ${benchmarkReportLabel(after)} (${after.path})`);
 console.log();
 
 const names = [...before.benchmarks.keys()].filter((name) => after.benchmarks.has(name));

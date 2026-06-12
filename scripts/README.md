@@ -89,3 +89,13 @@ Then compare them with:
 ```bash
 npm run bench:compare -- build/perf/before.json build/perf/after.json
 ```
+
+For repeated before/after runs across two checked-out trees, use:
+
+```bash
+npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
+```
+
+This alternates the two checkouts, writes per-run JSON reports under
+`build/perf/paired/`, and summarizes median deltas for common rows. Both
+checkouts must support `npm run bench -- --json PATH`.
