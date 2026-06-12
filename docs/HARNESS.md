@@ -95,6 +95,7 @@ Tests:
 ```bash
 npm run test:upstream
 npm run test:runtime
+npm run test:wasm-extensions
 npm run test:fixtures
 npm run test:fixtures:no-build
 npm run test:site
@@ -102,8 +103,9 @@ npm run test:pages:browser
 npm test
 ```
 
-`npm test` runs the boundary registry check, upstream smoke, JavaScript runtime
-tests, and fixture suite. It is the default pre-merge signal for code changes.
+`npm test` runs the boundary registry check, Wasm extension probes, upstream
+smoke, JavaScript runtime tests, and fixture suite. It is the default pre-merge
+signal for code changes.
 
 ## Smallest Useful Check
 
@@ -113,6 +115,8 @@ tests, and fixture suite. It is the default pre-merge signal for code changes.
   `npm run test:upstream`
 - JavaScript runtime, host bindings, manifest decoding, or callback lifecycle:
   `npm run test:runtime`
+- Local JS engine Wasm interop feature availability, such as `externref` or JSPI:
+  `npm run test:wasm-extensions`
 - Lean fixture behavior or package generation coverage:
   `npm run test:fixtures`
 - A single fixture or fixture family:

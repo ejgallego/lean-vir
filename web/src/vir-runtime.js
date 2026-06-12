@@ -17,6 +17,11 @@ import {
   encodeHostCallResult,
 } from "./runtime/vir-value-codec.js";
 
+export {
+  hasExternrefTableSupport,
+  requireExternrefTableSupport,
+} from "./vir-host-bindings.js";
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");

@@ -159,6 +159,8 @@ When durable release assets exist, the same fetcher can use
   targets, virtual hosts, and resource cleanup.
 - [docs/LEAN_VIR_LIBRARY.md](docs/LEAN_VIR_LIBRARY.md) for Lean-side host
   import helpers.
+- [docs/REACT_WASM_BINDINGS.md](docs/REACT_WASM_BINDINGS.md) for the
+  React-first plan for `externref`, JSPI, and related Wasm interop features.
 - [docs/INTERFACE_PIPELINE.md](docs/INTERFACE_PIPELINE.md) for package configs,
   manifests, supported type details, and interface internals.
 - [docs/IMPLEMENTATION_NOTES.md](docs/IMPLEMENTATION_NOTES.md) for

@@ -259,16 +259,24 @@ by Lean itself.
 
 The closure/resource bridge is intentionally conservative for `wasm32-wasip1`.
 The current module only passes integers, floats, and linear-memory byte payloads
-across the host boundary; opaque resources and Lean closures are represented by
-runtime-owned handle tables.
+across the host boundary. Opaque resources still cross the Lean/shim boundary as
+integer tokens, but the JavaScript host stores those tokens in a required
+`externref` table for the experimental React resource path. Lean closures remain
+represented by runtime-owned rooted callback handles.
+
+See `docs/REACT_WASM_BINDINGS.md` for the React-first binding plan and local
+feature probes. This repository uses `externref` terminology for host
+references; `nativeref` is not a standard WebAssembly feature name. The
+experimental React resource path requires `externref` instead of carrying a
+plain JavaScript map fallback.
 
 Useful WebAssembly features to track before widening the ABI:
 
 - Reference Types are already part of the finished proposal set, and `externref`
-  is the obvious future representation for host-owned resources in browser
-  builds. It can remove the JavaScript DOM-resource table for values such as
-  `Element`, callback-scoped `Event`, or `ReactRoot`, but it does not remove the
-  need to root and release Lean heap closures explicitly.
+  is now required for the JavaScript host-resource store. Direct `externref`
+  values for `Element`, callback-scoped `Event`, or `ReactRoot` across the
+  C++/Wasm ABI remain future work, and `externref` does not remove the need to
+  root and release Lean heap closures explicitly.
 - The Component Model is still proposal-track and is the right semantic target
   for typed resources once this project moves beyond an internal `.irpkg`
   manifest. The current `@[vir_resource]` metadata is intentionally compatible

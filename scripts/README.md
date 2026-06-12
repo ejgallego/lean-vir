@@ -18,6 +18,10 @@ map lives in `docs/HARNESS.md`.
   Build the demo and run the upstream interpreter smoke test.
 - `npm run test:runtime`
   Run JavaScript runtime, host binding, callback lifecycle, and manifest tests.
+- `npm run test:wasm-extensions`
+  Probe optional JS/Wasm interop features such as `externref` and JSPI.
+  Missing `externref` support fails because the experimental React resource
+  prototype requires it; unsupported JSPI is reported as skipped.
 - `npm run test:fixtures`
   Run the fixture host-oracle suite. Use `VIR_FIXTURE_FILTER=<substring>` to
   narrow it.
