@@ -10,8 +10,8 @@ import {
   asBytes,
 } from "./runtime/vir-codec.js";
 import {
-  createResourceObjectFromCell,
-  isResourceCell,
+  hostResourceExternref,
+  isHostResource,
 } from "./resource-handles.js";
 import {
   decodeCallResult,
@@ -210,10 +210,10 @@ class VirHostState {
 
   takeOutgoingResource(label) {
     const value = this.outgoingResources.shift() ?? null;
-    if (!isResourceCell(value)) {
-      throw new Error(`${label} did not receive a live externref resource`);
+    if (!isHostResource(value)) {
+      throw new Error(`${label} did not receive an externref resource`);
     }
-    return createResourceObjectFromCell(value);
+    return value;
   }
 
   clearOutgoingResources() {
@@ -250,14 +250,15 @@ class VirHostState {
   }
 
   rootResource(value) {
-    if (!isResourceCell(value) || value.value === null || value.value === undefined) {
+    const resource = hostResourceExternref(value);
+    if (resource === null) {
       return 0;
     }
     const rootId = this.freeResourceRootIds.pop() ?? this.resourceRoots.grow(1);
     if (rootId <= 0 || rootId > 0xffffffff) {
       throw new Error("Lean VIR externref resource root table exceeded the 32-bit root id range");
     }
-    this.resourceRoots.set(rootId, value);
+    this.resourceRoots.set(rootId, resource);
     return rootId;
   }
 

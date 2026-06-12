@@ -17,7 +17,8 @@ The runtime still targets a portable core `wasm32-wasip1` artifact:
   to `env.vir_js_call`.
 - Opaque browser and React resources cross the JS/Wasm boundary through
   `externref` side-channel imports. Lean stores them as GC-finalized external
-  resource objects that root JavaScript resource cells in the host runtime.
+  resource objects that root JavaScript host-resource objects in the host
+  runtime.
 - Lean closures passed to JavaScript cross through an internal closure-root
   side channel and appear as callable `VirCallback` objects that must be
   released by the host binding or runtime teardown.
@@ -45,11 +46,12 @@ The experimental `externref` path should be strict:
 The prototype uses direct side channels for opaque values while keeping the
 generic byte-payload dispatcher for ordinary scalar and structured values.
 `WIRE.RESOURCE` and `WIRE.FUNCTION` carry no serialized numeric payload.
-JavaScript queues branded resource cells before entering Wasm, and the shim
-queues cells back before JavaScript decodes resource results or host-import
-arguments. Lean closures are rooted in the shim and queued back as internal
-closure root ids before JavaScript decodes `VirCallback` values. Lean resource
-values are external objects whose finalizers release the host root table entry.
+JavaScript queues opaque host-resource objects before entering Wasm, and the
+shim queues those same objects back before JavaScript decodes resource results
+or host-import arguments. Lean closures are rooted in the shim and queued back
+as internal closure root ids before JavaScript decodes `VirCallback` values.
+Lean resource values are external objects whose finalizers release the host
+root table entry.
 
 The JavaScript API treats resources as opaque runtime objects and does not
 accept raw numeric resource tokens or expose a supported numeric `.handle`

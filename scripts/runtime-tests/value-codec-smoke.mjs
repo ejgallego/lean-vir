@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntime, createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
-import { createResourceObject, releaseResourceObject } from "../../web/src/resource-handles.js";
+import { createHostResource, releaseHostResource } from "../../web/src/resource-handles.js";
 import { BinaryWriter, encodeTypeDescriptor } from "../../web/src/runtime/vir-codec.js";
 import {
   decodeCallResult,
@@ -28,19 +28,19 @@ const resourceEntry = {
   effect: "pure",
 };
 const resourceValue = { name: "resource" };
-const resourceArg = createResourceObject(resourceValue);
+const resourceArg = createHostResource(resourceValue);
 const incomingResources = [];
 const resourceArgPayload = encodeCallPayload(resourceEntry, [resourceArg], {
   pushIncomingResource: (value) => incomingResources.push(value),
 });
 assert.deepEqual([...resourceArgPayload], [1, 0, 0, 0, WIRE.RESOURCE, WIRE.UNIT, 0]);
 assert.equal(incomingResources.length, 1);
-assert.equal(incomingResources[0].value, resourceValue);
+assert.equal(incomingResources[0], resourceArg);
 assert.throws(
   () => encodeCallPayload(resourceEntry, [{ handle: 1 }], { pushIncomingResource: () => undefined }),
   /resourceArg argument arg1 must be a live resource object/,
 );
-releaseResourceObject(resourceArg);
+releaseHostResource(resourceArg);
 assert.throws(
   () => encodeCallPayload(resourceEntry, [resourceArg], { pushIncomingResource: () => undefined }),
   /resourceArg argument arg1 must be a live resource object/,

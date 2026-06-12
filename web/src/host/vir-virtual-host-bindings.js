@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirtualReactRootResource as createVirtualReactRootResourceFromHtml } from "../react/vir-react-html.js";
-import { isResourceObject } from "../resource-handles.js";
+import { isHostResource } from "../resource-handles.js";
 import {
   callLeanEventCallback,
   createAnimationFrameResource,
@@ -205,7 +205,7 @@ function virtualEventElementResource(state, event, field) {
   if (typeof value === "string") {
     return resourceForValue(state.resources, queryVirtualElementState(state, value));
   }
-  if (isResourceObject(value)) {
+  if (isHostResource(value)) {
     resolveResource(state.resources, value, "Element");
     return value;
   }

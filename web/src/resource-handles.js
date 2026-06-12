@@ -4,55 +4,44 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-const RESOURCE_CELL = Symbol("lean-vir.resourceCell");
-const RESOURCE_CELL_BRAND = Symbol("lean-vir.resourceCellBrand");
+const hostResourceState = new WeakMap();
 
-export function createResourceObject(value) {
+class HostResource {
+  constructor(value, label) {
+    hostResourceState.set(this, { value, label });
+    Object.freeze(this);
+  }
+}
+
+export function createHostResource(value, label = null) {
   if (value === null || value === undefined) {
-    throw new Error("resource object value must not be null");
+    throw new Error("host resource value must not be null");
   }
-  return createResourceObjectFromCell(createResourceCell(value));
-}
-
-export function createResourceObjectFromCell(cell) {
-  if (!isResourceCell(cell)) {
-    throw new Error("resource cell must be a Lean VIR resource cell");
+  if (typeof value !== "object" && typeof value !== "function") {
+    throw new Error("host resource value must be an object");
   }
-  const resource = {};
-  Object.defineProperty(resource, RESOURCE_CELL, { value: cell });
-  return Object.freeze(resource);
+  return new HostResource(value, label);
 }
 
-export function resourceObjectCell(resource) {
-  return resource?.[RESOURCE_CELL];
+export function isHostResource(resource) {
+  return hostResourceState.has(resource);
 }
 
-export function resourceObjectValue(resource) {
-  return resourceObjectCell(resource)?.value;
+export function hostResourceValue(resource) {
+  return hostResourceState.get(resource)?.value;
 }
 
-export function resourceObjectExternref(resource) {
-  const cell = resourceObjectCell(resource);
-  return isResourceCell(cell) && cell.value !== null && cell.value !== undefined ? cell : null;
+export function hostResourceLabel(resource) {
+  return hostResourceState.get(resource)?.label ?? null;
 }
 
-export function releaseResourceObject(resource) {
-  const cell = resourceObjectCell(resource);
-  if (isResourceCell(cell)) {
-    cell.value = null;
+export function hostResourceExternref(resource) {
+  return isHostResource(resource) && hostResourceValue(resource) !== null ? resource : null;
+}
+
+export function releaseHostResource(resource) {
+  const state = hostResourceState.get(resource);
+  if (state !== undefined) {
+    state.value = null;
   }
-}
-
-export function isResourceObject(resource) {
-  return isResourceCell(resourceObjectCell(resource));
-}
-
-export function isResourceCell(cell) {
-  return cell !== null && typeof cell === "object" && cell[RESOURCE_CELL_BRAND] === true;
-}
-
-function createResourceCell(value) {
-  const cell = { value };
-  Object.defineProperty(cell, RESOURCE_CELL_BRAND, { value: true });
-  return cell;
 }

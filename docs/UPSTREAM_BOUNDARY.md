@@ -264,7 +264,8 @@ The closure/resource bridge is intentionally conservative for `wasm32-wasip1`.
 Ordinary scalar and structured values still use the generic linear-memory byte
 payload dispatcher. Opaque resources cross the JS/Wasm boundary through
 `externref` side-channel imports, and Lean stores them as GC-finalized external
-resource objects that root JavaScript resource cells in the host runtime.
+resource objects that root JavaScript host-resource objects in the host
+runtime.
 `WIRE.FUNCTION` likewise avoids a serialized numeric token; Lean closures remain
 represented by runtime-owned closure roots surfaced to JavaScript as opaque
 `VirCallback` objects.

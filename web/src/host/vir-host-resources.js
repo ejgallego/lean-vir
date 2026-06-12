@@ -6,11 +6,11 @@ Author: Emilio J. Gallego Arias
 
 import { disposeReactHtml } from "../react/vir-react-html.js";
 import {
-  createResourceObject,
-  isResourceObject,
-  releaseResourceObject,
-  resourceObjectCell,
-  resourceObjectValue,
+  createHostResource,
+  hostResourceLabel,
+  hostResourceValue,
+  isHostResource,
+  releaseHostResource,
 } from "../resource-handles.js";
 
 const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
@@ -44,7 +44,7 @@ export function createHostResourceState() {
   requireExternrefTableSupport();
   return {
     resources: new WeakMap(),
-    resourceCells: new WeakSet(),
+    liveResources: new WeakSet(),
     disposables: new Set(),
   };
 }
@@ -125,24 +125,23 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
 export function resourceForValue(state, value) {
   if (value === null || value === undefined) return null;
   let resource = state.resources.get(value);
-  if (!isResourceObject(resource) || resourceObjectValue(resource) === null) {
-    resource = createResourceObject(value);
+  if (!isHostResource(resource) || hostResourceValue(resource) === null) {
+    resource = createHostResource(value);
     state.resources.set(value, resource);
   }
-  state.resourceCells.add(resourceObjectCell(resource));
+  state.liveResources.add(resource);
   return resource;
 }
 
 export function releaseResource(state, resource) {
-  const cell = resourceObjectCell(resource);
-  const value = resourceObjectValue(resource);
+  const value = hostResourceValue(resource);
   if (value !== null && value !== undefined) {
     state.resources.delete(value);
   }
-  if (cell !== undefined) {
-    state.resourceCells.delete(cell);
+  if (isHostResource(resource)) {
+    state.liveResources.delete(resource);
   }
-  releaseResourceObject(resource);
+  releaseHostResource(resource);
 }
 
 export function releaseValueResource(state, value) {
@@ -175,7 +174,7 @@ export function disposeDomResourceState(state) {
   }
   state.disposables?.clear();
   state.resources = new WeakMap();
-  state.resourceCells = new WeakSet();
+  state.liveResources = new WeakSet();
 }
 
 export function createTimeoutResource(resources, delayMs, callback) {
@@ -233,10 +232,9 @@ export function once(fn) {
 }
 
 export function resolveResource(state, resource, label) {
-  const cell = resourceObjectCell(resource);
-  const value = resourceObjectValue(resource);
-  if (value === null || value === undefined || !state.resourceCells.has(cell)) {
-    throw new Error(`${label} resource is not live`);
+  const value = hostResourceValue(resource);
+  if (value === null || value === undefined || !state.liveResources.has(resource)) {
+    throw new Error(`${hostResourceLabel(resource) ?? label} resource is not live`);
   }
   return value;
 }
