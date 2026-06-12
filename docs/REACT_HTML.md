@@ -111,7 +111,8 @@ unblessed scalar prop names, event names, and tags. `PropValue.style` and
 
 ## Runtime Contract
 
-The browser host binding owns a React root resource:
+The browser React host binding is exposed from
+`lean-vir/react-host-bindings`. It owns a React root resource:
 
 - `react.root.create` calls `ReactDOM.createRoot(container)`.
 - `react.root.render` converts the decoded `Html` tree into `React.createElement`
@@ -123,6 +124,11 @@ The browser host binding owns a React root resource:
   replacement tree. The virtual test host releases immediately.
 - Runtime dispose and package reload unmount all live React roots through the
   same disposable-resource path used for DOM listeners, timeouts, and frames.
+
+Browser apps compose these bindings with `createBrowserHostBindings` and a
+shared `createHostResourceState()`. The generic `lean-vir/host-bindings` entry
+does not import React; the Node wrapper still provides a virtual `react.root.*`
+host for tests.
 
 Event handlers use DOM-like names such as `onClick`, `onChange`, `onInput`, and
 `onSubmit`, and receive the same opaque `Lean.Vir.Browser.Event` resource that

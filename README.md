@@ -155,6 +155,8 @@ When durable release assets exist, the same fetcher can use
   Lean declarations from app JavaScript.
 - [docs/JS_API.md](docs/JS_API.md) for using the runtime wrapper from
   JavaScript.
+- [docs/HOST_BINDINGS.md](docs/HOST_BINDINGS.md) for JavaScript host binding
+  targets, virtual hosts, and resource cleanup.
 - [docs/LEAN_VIR_LIBRARY.md](docs/LEAN_VIR_LIBRARY.md) for Lean-side host
   import helpers.
 - [docs/INTERFACE_PIPELINE.md](docs/INTERFACE_PIPELINE.md) for package configs,

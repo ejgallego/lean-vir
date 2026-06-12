@@ -5,10 +5,11 @@ Author: Emilio J. Gallego Arias
 */
 
 import { readFile } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
 import { performance } from "node:perf_hooks";
 
+import { formatMs, median, requireBenchmarkSample } from "./bench-utils.mjs";
 import { createVirRuntime } from "../web/src/vir-runtime.js";
+import { runSync } from "./process-utils.mjs";
 
 const root = new URL("..", import.meta.url);
 
@@ -16,48 +17,6 @@ const fibInput = 17;
 const fibIterations = 80;
 const sortInput = [7, 3, 9, 1, 4, 1, 5, 2, 8, 6, 0, 10, 12, 11, 13, 14];
 const sortIterations = 2000;
-
-function run(cmd, args, options = {}) {
-  const result = spawnSync(cmd, args, {
-    cwd: root,
-    encoding: "utf8",
-    stdio: options.capture ? ["ignore", "pipe", "pipe"] : "inherit",
-  });
-  if (result.status !== 0) {
-    throw new Error(`${cmd} ${args.join(" ")} failed with status ${result.status}\n${result.stderr ?? ""}`);
-  }
-  return result.stdout?.trim() ?? "";
-}
-
-function median(values) {
-  const sorted = [...values].sort((a, b) => a - b);
-  return sorted[Math.floor(sorted.length / 2)];
-}
-
-function formatMs(ms) {
-  return ms < 1 ? `${(ms * 1000).toFixed(1)} us` : `${ms.toFixed(2)} ms`;
-}
-
-function parseHostIrSamples(stdout, label) {
-  const samples = [];
-  let checksum = 0;
-  let iterations = 0;
-
-  for (const line of stdout.split("\n")) {
-    const match = /^host-ir (\S+) (\d+) (\d+) (\d+)$/.exec(line.trim());
-    if (!match) continue;
-    if (match[1] !== label) continue;
-    iterations = Number(match[2]);
-    checksum = Number(match[3]);
-    samples.push(Number(match[4]) / 1_000_000);
-  }
-
-  if (samples.length === 0) {
-    throw new Error(`no host IR benchmark samples found for ${label}`);
-  }
-
-  return { label, iterations, checksum, medianMs: median(samples) };
-}
 
 async function instantiateWasm() {
   const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
@@ -78,8 +37,11 @@ function benchWasmRepeated(label, iterations, fn) {
 }
 
 function benchHostIr(label, iterations, args) {
-  const stdout = run("lean", ["--run", "tools/HostInterpreterBench.lean", ...args], { capture: true });
-  const sample = parseHostIrSamples(stdout, label);
+  const stdout = runSync("lean", ["--run", "tools/HostInterpreterBench.lean", ...args], {
+    cwd: root,
+    capture: true,
+  });
+  const sample = requireBenchmarkSample(stdout, "host-ir", label, "host IR");
   if (sample.iterations !== iterations) {
     throw new Error(`host IR ${label}: expected ${iterations} iterations, got ${sample.iterations}`);
   }
@@ -97,7 +59,7 @@ function printRow(name, wasm, host) {
   console.log(`  checksums:   wasm=${wasm.checksum} host=${host.checksum}`);
 }
 
-run("npm", ["run", "--silent", "build:demo"]);
+runSync("npm", ["run", "--silent", "build:demo"], { cwd: root });
 
 const runtime = await instantiateWasm();
 

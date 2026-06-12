@@ -22,7 +22,23 @@ extern "C" uint32_t vir_call_result_size(void);
 extern "C" char const * vir_call_error(void);
 extern "C" uint32_t vir_call_error_size(void);
 
+extern "C" char const * vir_js_call(uint32_t slot, uint8_t const * request, uint32_t request_len) {
+    (void) request;
+    (void) request_len;
+    fprintf(stderr, "unexpected JavaScript host import call in engine benchmark: slot %u\n", slot);
+    return nullptr;
+}
+
+extern "C" uint32_t vir_js_call_result_size(void) {
+    return 0;
+}
+
 #include "vir_fixtures_basic_package.inc"
+
+static bool g_benchmark_failed = false;
+
+constexpr uint8_t WIRE_NAT = 0;
+constexpr uint8_t WIRE_ARRAY = 16;
 
 static uint64_t monotonic_nanos() {
     struct timespec ts;
@@ -36,6 +52,13 @@ static void print_sample(char const * label, uint32_t iterations, uint32_t check
         iterations,
         checksum,
         static_cast<unsigned long long>(elapsed_ns));
+}
+
+static void expect_checksum(char const * label, uint32_t checksum, uint32_t expected) {
+    if (checksum != expected) {
+        fprintf(stderr, "%s checksum mismatch: expected %u, got %u\n", label, expected, checksum);
+        g_benchmark_failed = true;
+    }
 }
 
 static void write_u32(uint8_t *& cursor, uint32_t value) {
@@ -60,8 +83,22 @@ static void write_decimal(uint8_t *& cursor, uint32_t value) {
     cursor += len;
 }
 
+static void write_nat_type(uint8_t *& cursor) {
+    *cursor++ = WIRE_NAT;
+}
+
+static void write_array_nat_type(uint8_t *& cursor) {
+    *cursor++ = WIRE_ARRAY;
+    write_nat_type(cursor);
+}
+
+static void write_call_tail_nat(uint8_t *& cursor) {
+    write_nat_type(cursor);
+    *cursor++ = 0;
+}
+
 static uint32_t parse_nat_result(char const * data, uint32_t len) {
-    if (data == nullptr || len < 5 || static_cast<uint8_t>(data[0]) != 0) {
+    if (data == nullptr || len < 5 || static_cast<uint8_t>(data[0]) != WIRE_NAT) {
         fprintf(stderr, "invalid Nat result payload\n");
         return 0;
     }
@@ -92,29 +129,32 @@ static uint32_t call_nat(char const * name, uint8_t const * payload, uint32_t pa
             fprintf(stderr, ": %.*s", static_cast<int>(error_len), vir_call_error());
         }
         fprintf(stderr, "\n");
+        g_benchmark_failed = true;
         return 0;
     }
     return parse_nat_result(result, vir_call_result_size());
 }
 
 static uint32_t call_fib(uint32_t input) {
-    uint8_t payload[4 + 1 + 4 + 16];
+    uint8_t payload[4 + 1 + 4 + 16 + 1 + 1];
     uint8_t * cursor = payload;
     write_u32(cursor, 1);
-    *cursor++ = 0;
+    write_nat_type(cursor);
     write_decimal(cursor, input);
+    write_call_tail_nat(cursor);
     return call_nat("fib", payload, static_cast<uint32_t>(cursor - payload));
 }
 
 static uint32_t call_sort(uint32_t const * input, uint32_t len) {
-    uint8_t payload[4 + 1 + 4 + 64 * (4 + 16)];
+    uint8_t payload[4 + 2 + 4 + 64 * (4 + 16) + 1 + 1];
     uint8_t * cursor = payload;
     write_u32(cursor, 1);
-    *cursor++ = 10;
+    write_array_nat_type(cursor);
     write_u32(cursor, len);
     for (uint32_t i = 0; i < len; i++) {
         write_decimal(cursor, input[i]);
     }
+    write_call_tail_nat(cursor);
     return call_nat("SortDemo.demoFromArray", payload, static_cast<uint32_t>(cursor - payload));
 }
 
@@ -128,6 +168,7 @@ static void bench_fib() {
             checksum += call_fib(input);
         }
         uint64_t stop = monotonic_nanos();
+        expect_checksum("fib", checksum, 127760);
         print_sample("fib", iterations, checksum, stop - start);
     }
 }
@@ -142,6 +183,7 @@ static void bench_sort() {
             checksum += call_sort(input, 16);
         }
         uint64_t stop = monotonic_nanos();
+        expect_checksum("sort", checksum, 2454000);
         print_sample("sort", iterations, checksum, stop - start);
     }
 }
@@ -162,5 +204,5 @@ int main() {
 
     bench_fib();
     bench_sort();
-    return 0;
+    return g_benchmark_failed ? 1 : 0;
 }

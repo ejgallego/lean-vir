@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import "./style.css";
+import { errorMessage, setReadyState } from "./pages/page-utils.js";
 import { createVirRuntimeFactory } from "./vir-runtime.js";
 
 const cases = [
@@ -66,11 +67,6 @@ const runtimeFactory = createVirRuntimeFactory({
 let runtime = null;
 let activeCase = normalizeCase(query.get("case") ?? "list");
 
-function setStatus(text, ready) {
-  statusEl.textContent = text;
-  statusEl.dataset.ready = String(ready);
-}
-
 function normalizeCase(value) {
   return caseById.has(value) ? value : "list";
 }
@@ -106,10 +102,10 @@ function updateUrl(width) {
 }
 
 function renderError(error) {
-  const message = error instanceof Error ? error.message : String(error);
+  const message = errorMessage(error);
   outputEl.textContent = message;
   durationEl.textContent = "Trap";
-  setStatus("Failed", false);
+  setReadyState(statusEl, "Failed", false);
   console.error(error);
 }
 
@@ -123,7 +119,7 @@ function render() {
     const elapsed = performance.now() - start;
     outputEl.textContent = value;
     durationEl.textContent = `${elapsed.toFixed(2)} ms`;
-    setStatus("Ready", true);
+    setReadyState(statusEl, "Ready", true);
     updateUrl(width);
   } catch (error) {
     renderError(error);
@@ -131,7 +127,7 @@ function render() {
 }
 
 async function boot() {
-  setStatus("Loading", false);
+  setReadyState(statusEl, "Loading", false);
   const width = setWidth(query.get("width") ?? "18");
   setActiveCase(activeCase);
   runtime = await runtimeFactory.createRuntime({

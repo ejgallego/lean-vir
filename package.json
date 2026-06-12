@@ -6,6 +6,8 @@
   "type": "module",
   "exports": {
     ".": "./web/src/vir-runtime.js",
+    "./host-bindings": "./web/src/vir-host-bindings.js",
+    "./react-host-bindings": "./web/src/vir-react-host-bindings.js",
     "./vir-runtime": "./web/src/vir-runtime.js",
     "./vir-runtime-node": "./web/src/vir-runtime-node.js"
   },

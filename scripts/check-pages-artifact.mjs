@@ -11,6 +11,8 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import { sdkArchiveEntries } from "./sdk-payloads.mjs";
+
 const distDir = new URL("../web/dist/", import.meta.url);
 const execFileAsync = promisify(execFile);
 
@@ -91,18 +93,7 @@ async function assertSdkBundle(path) {
   const archivePath = fileURLToPath(archive);
   const { stdout } = await execFileAsync("tar", ["-tzf", archivePath]);
   const entries = new Set(stdout.trim().split(/\r?\n/).filter(Boolean));
-  const requiredEntries = [
-    "lean-vir-sdk/README.txt",
-    "lean-vir-sdk/LICENSE",
-    "lean-vir-sdk/NOTICE",
-    "lean-vir-sdk/lean-vir-artifact.json",
-    "lean-vir-sdk/wasm/vir-upstream.wasm",
-    "lean-vir-sdk/js/vir-runtime.js",
-    "lean-vir-sdk/js/vir-runtime-node.js",
-    "lean-vir-sdk/js/vir-host-bindings.js",
-    "lean-vir-sdk/js/interface-manifest.js",
-  ];
-  for (const entry of requiredEntries) {
+  for (const entry of sdkArchiveEntries()) {
     assert.ok(entries.has(entry), `SDK bundle missing ${entry}`);
   }
   const { stdout: manifestText } = await execFileAsync("tar", ["-xOzf", archivePath, "lean-vir-sdk/lean-vir-artifact.json"]);

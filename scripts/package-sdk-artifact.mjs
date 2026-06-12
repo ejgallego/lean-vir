@@ -8,7 +8,9 @@ Author: Emilio J. Gallego Arias
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
 import { basename, dirname, join } from "node:path";
-import { spawnSync } from "node:child_process";
+
+import { runSync } from "./process-utils.mjs";
+import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
 const artifactName = process.env.VIR_SDK_ARTIFACT_NAME ?? "lean-vir-sdk";
@@ -17,25 +19,6 @@ const sdkDir = join(artifactRoot, artifactName);
 const archive = join(artifactRoot, `${artifactName}.tar.gz`);
 const publicDownloads = join(repoRoot, "web", "public", "downloads");
 const publicArchive = join(publicDownloads, `${artifactName}.tar.gz`);
-const payloads = [
-  ["wasm/vir-upstream.wasm", "web/public/vir-upstream.wasm"],
-  ["js/vir-runtime.js", "web/src/vir-runtime.js"],
-  ["js/vir-runtime-node.js", "web/src/vir-runtime-node.js"],
-  ["js/vir-host-bindings.js", "web/src/vir-host-bindings.js"],
-  ["js/interface-manifest.js", "web/src/interface-manifest.js"],
-];
-
-function run(cmd, args, options = {}) {
-  const result = spawnSync(cmd, args, {
-    cwd: repoRoot,
-    encoding: "utf8",
-    ...options,
-  });
-  if (result.status !== 0) {
-    throw new Error(`${cmd} ${args.join(" ")} failed: ${result.stderr || result.stdout}`);
-  }
-  return result.stdout.trim();
-}
 
 async function sha256(path) {
   const bytes = await readFile(path);
@@ -52,7 +35,7 @@ await rm(archive, { force: true });
 await mkdir(sdkDir, { recursive: true });
 
 const files = [];
-for (const [destRel, sourceRel] of payloads) {
+for (const [destRel, sourceRel] of SDK_PAYLOADS) {
   const source = join(repoRoot, sourceRel);
   const dest = join(sdkDir, destRel);
   await copyFileWithDirs(source, dest);
@@ -68,9 +51,9 @@ await copyFileWithDirs(join(repoRoot, "NOTICE"), join(sdkDir, "NOTICE"));
 
 const packageJson = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
 const leanToolchain = (await readFile(join(repoRoot, "lean-toolchain"), "utf8")).trim();
-const gitCommit = run("git", ["rev-parse", "HEAD"]);
-const gitStatus = run("git", ["status", "--short"]);
-const leanVersion = run("lean", ["--version"]);
+const gitCommit = runSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, capture: true });
+const gitStatus = runSync("git", ["status", "--short"], { cwd: repoRoot, capture: true });
+const leanVersion = runSync("lean", ["--version"], { cwd: repoRoot, capture: true });
 const artifact = {
   name: artifactName,
   version: packageJson.version,
@@ -93,24 +76,54 @@ await writeFile(
 This SDK contains the JavaScript runtime modules and wasm32-wasip1 interpreter
 for the matching lean_vir package revision.
 
+The JavaScript files are ES modules. The generic runtime and host-binding
+modules do not import React; js/vir-react-host-bindings.js imports react and
+react-dom/client and should only be used by browser React integrations.
+
 Use the matching Lean package generator to create .irpkg files, then serve:
 
   wasm/vir-upstream.wasm
-  js/*.js
+  js/vir-runtime.js
   your generated .irpkg
+
+Minimal browser usage:
+
+  import { createVirRuntime } from "./js/vir-runtime.js";
+
+  const vir = await createVirRuntime({
+    wasmUrl: "./wasm/vir-upstream.wasm",
+    irPackageUrl: "./my-app.irpkg",
+  });
+
+Browser React root usage:
+
+  import { createVirRuntimeFactory } from "./js/vir-runtime.js";
+  import {
+    createBrowserHostBindings,
+    createHostResourceState,
+  } from "./js/vir-host-bindings.js";
+  import { createBrowserReactHostBindings } from "./js/vir-react-host-bindings.js";
+
+  const factory = createVirRuntimeFactory({
+    wasmUrl: "./wasm/vir-upstream.wasm",
+    defaultHostBindings: () => {
+      const resources = createHostResourceState();
+      return createBrowserHostBindings({
+        resources,
+        reactHostBindings: createBrowserReactHostBindings(resources),
+      });
+    },
+  });
 
 Check lean-vir-artifact.json before mixing this SDK with generated packages
 from another lean_vir revision.
 `,
 );
 
-const tar = spawnSync("tar", ["-czf", archive, "-C", artifactRoot, artifactName], {
+runSync("tar", ["-czf", archive, "-C", artifactRoot, artifactName], {
   cwd: repoRoot,
   stdio: "inherit",
 });
-if (tar.status !== 0) {
-  throw new Error(`tar failed with status ${tar.status}`);
-}
 
 await mkdir(publicDownloads, { recursive: true });
 await copyFileWithDirs(archive, publicArchive);

@@ -6,6 +6,7 @@
     {
       "id": "fixtures-basic",
       "file": "fixtures-basic.irpkg",
+      "label": "Basic, list/option, interface shapes",
       "report": "build/generated/fixtures-basic.report.md",
       "targets": [
         {
@@ -42,6 +43,7 @@
     {
       "id": "demo-host",
       "file": "demo-host.irpkg",
+      "label": "Browser host calls, React, and Tamagotchi demos",
       "report": "build/generated/demo-host.report.md",
       "targets": [
         {
@@ -105,6 +107,7 @@
     {
       "id": "pretty-printer",
       "file": "pretty-printer.irpkg",
+      "label": "Std.Format.pretty component package",
       "report": "build/generated/pretty-printer.report.md",
       "targets": [
         {
@@ -121,6 +124,7 @@
     {
       "id": "fixtures-lean",
       "file": "fixtures-lean.irpkg",
+      "label": "Lean Expr, parser, Task",
       "report": "build/generated/fixtures-lean.report.md",
       "targets": [],
       "fixtureSources": [
@@ -133,9 +137,24 @@
     {
       "id": "fixtures-boundary",
       "file": "fixtures-boundary.irpkg",
+      "label": "Numeric and runtime boundaries",
       "report": "build/generated/fixtures-boundary.report.md",
       "targets": [],
       "fixtureSources": ["fixtures/Boundary.lean"]
+    }
+  ],
+  "localPackages": [
+    {
+      "file": "local-quickstart.irpkg",
+      "label": "Four small exports from one Lean file"
+    },
+    {
+      "file": "local-fib.irpkg",
+      "label": "Focused fib package"
+    },
+    {
+      "file": "local-mergesort.irpkg",
+      "label": "Focused mergesort package"
     }
   ]
 }
