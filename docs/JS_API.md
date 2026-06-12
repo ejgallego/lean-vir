@@ -309,7 +309,9 @@ hostBindings: {
 Callbacks are idempotently releasable through `callback.release()` or
 `callback.dispose()`. Calling a released callback throws. JavaScript-provided
 function values are not accepted as Lean arguments in this phase; function
-values flow from Lean to JavaScript as callback handles.
+values flow from Lean to JavaScript as callable `VirCallback` objects backed by
+internal closure root ids. `VirCallback` objects intentionally do not expose a
+numeric root id.
 
 `vir.dispose()` releases any `VirCallback` objects still tracked by the runtime
 and calls host-binding cleanup hooks. Calling `vir.loadIrPackageBytes(...)` on a

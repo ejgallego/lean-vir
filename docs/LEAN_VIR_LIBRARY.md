@@ -292,8 +292,9 @@ result type. `Unit` results should return `undefined` or `null`.
 
 Lean function values in host-import arguments are supported as callbacks from
 JavaScript into Lean. The JavaScript runtime roots the closure in the WASM shim,
-passes a handle to the host binding, and releases it with `vir_closure_release`
-when the host binding calls `callback.release()` or when the runtime is disposed.
+passes a callable `VirCallback` object to the host binding, and releases the
+internal root with `vir_closure_release` when the host binding calls
+`callback.release()` or when the runtime is disposed.
 JavaScript-provided function values are not accepted as Lean arguments in this
 phase.
 

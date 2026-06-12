@@ -42,7 +42,7 @@ through `Lean.Vir.Browser` host imports. Its nullary inductive `Mood` and
 `Action` values are auto-discovered as simple enums and marshaled through the
 generic `vir_call` path.
 
-The host-import path now also supports Lean function values as callback handles.
+The host-import path now also supports Lean function values as callback objects.
 `Element.addEventListener`, `Timer.setTimeout`, and
 `Animation.requestAnimationFrame` root Lean closures in the WASM shim, expose
 callable `VirCallback` objects to JavaScript, and release roots when listeners

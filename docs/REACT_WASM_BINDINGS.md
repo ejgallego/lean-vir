@@ -18,8 +18,9 @@ The runtime still targets a portable core `wasm32-wasip1` artifact:
 - Opaque browser and React resources cross the JS/Wasm boundary through
   `externref` side-channel imports. Lean stores them as GC-finalized external
   resource objects that root JavaScript resource cells in the host runtime.
-- Lean closures passed to JavaScript are explicit rooted callback handles that
-  must be released by the host binding or runtime teardown.
+- Lean closures passed to JavaScript are callable `VirCallback` objects backed
+  by internal closure root ids that must be released by the host binding or
+  runtime teardown.
 
 That baseline describes the current implementation. The experimental React
 resource prototype can intentionally require newer browser/Wasm support instead

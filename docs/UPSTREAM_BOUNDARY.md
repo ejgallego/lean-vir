@@ -75,7 +75,7 @@ Together they supply:
   `env.vir_js_call_result_size`.
 - Lean closure roots for function-valued host-import arguments. The shim owns
   `vir_closure_call` and `vir_closure_release`; JavaScript owns the host-side
-  lifetime policy for callback handles.
+  lifetime policy for `VirCallback` objects.
 - name construction primitives needed by `src/util/name.cpp`.
 
 The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
@@ -207,10 +207,10 @@ lookup.
 
 Function-valued host-import arguments use the same package-scoped policy. The
 generic result encoder roots the Lean closure in a small shim table and returns
-a callback handle to JavaScript. JavaScript can call that handle through
-`vir_closure_call` and must eventually release it through `vir_closure_release`.
-This keeps the Lean heap reference count explicit while avoiding any change to
-the upstream interpreter file.
+a callable `VirCallback` object to JavaScript. The wrapper calls the internal
+closure root id through `vir_closure_call` and must eventually release it
+through `vir_closure_release`. This keeps the Lean heap reference count explicit
+while avoiding any change to the upstream interpreter file.
 
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
 registry. It checks that every `nativeExterns` entry in
@@ -262,7 +262,8 @@ Ordinary scalar and structured values still use the generic linear-memory byte
 payload dispatcher. Opaque resources cross the JS/Wasm boundary through
 `externref` side-channel imports, and Lean stores them as GC-finalized external
 resource objects that root JavaScript resource cells in the host runtime. Lean
-closures remain represented by runtime-owned rooted callback handles.
+closures remain represented by runtime-owned closure roots surfaced to
+JavaScript as opaque `VirCallback` objects.
 
 See `docs/REACT_WASM_BINDINGS.md` for the React-first binding plan and local
 feature probes. This repository uses `externref` terminology for host

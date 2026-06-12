@@ -12,8 +12,9 @@ removed; event listeners now use retained Lean closures directly.
 - Opaque resources cross the JS/Wasm boundary through `externref` side-channel
   imports. Lean stores them as GC-finalized external resource objects that root
   JavaScript resource cells in the host runtime.
-- Lean function values in host-import arguments are encoded as rooted callback
-  handles. JavaScript receives them as callable `VirCallback` objects.
+- Lean function values in host-import arguments are encoded as internal closure
+  root ids. JavaScript receives them as callable `VirCallback` objects, not raw
+  numeric roots.
 - `VirCallback.release()` is idempotent and calls the WASM
   `vir_closure_release` export to decrement the rooted Lean closure.
 - Browser listener, timeout, and animation-frame bindings retain callbacks until
@@ -68,7 +69,7 @@ callback from the current callback.
 `scripts/test-vir-runtime.mjs` covers the current callback surface:
 
 - pure callback round-trip through a custom `test.callNatCallback` host import;
-- double release, call-after-release, and stale closure handle failure;
+- double release, call-after-release, and stale closure root failure;
 - nested callback argument errors while Lean is inside a host import;
 - callback-backed event listener dispatch, listener removal, and runtime
   teardown cleanup;
@@ -90,7 +91,7 @@ callback from the current callback.
 
 1. Add more focused helpers for common events while keeping `Event` opaque.
 2. Keep the v1 closure-root table simple. If release overhead becomes visible,
-   optimize handle allocation/release in a second phase, after leak tests make
+   optimize root-id allocation/release in a second phase, after leak tests make
    the ownership contract hard to regress.
 3. Keep async host imports out of v1. Promise-returning host bindings need a
    later JSPI or task-queue design that can report rejection without leaving the

@@ -3381,15 +3381,15 @@ static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
 static std::string g_call_result;
 static std::string g_call_error;
 static std::vector<object *> g_closure_roots;
-static std::vector<uint32_t> g_free_closure_handles;
+static std::vector<uint32_t> g_free_closure_root_ids;
 static std::string g_closure_call_result;
 static std::string g_closure_call_error;
 
-static object * closure_root_for_handle(uint32_t handle) {
-    if (handle == 0 || handle > g_closure_roots.size()) {
+static object * closure_root_for_id(uint32_t root_id) {
+    if (root_id == 0 || root_id > g_closure_roots.size()) {
         return nullptr;
     }
-    return g_closure_roots[handle - 1];
+    return g_closure_roots[root_id - 1];
 }
 
 extern "C" uint32_t vir_closure_root(object * value) {
@@ -3397,23 +3397,23 @@ extern "C" uint32_t vir_closure_root(object * value) {
         return 0;
     }
     lean_inc(value);
-    if (!g_free_closure_handles.empty()) {
-        uint32_t handle = g_free_closure_handles.back();
-        g_free_closure_handles.pop_back();
-        g_closure_roots[handle - 1] = value;
-        return handle;
+    if (!g_free_closure_root_ids.empty()) {
+        uint32_t root_id = g_free_closure_root_ids.back();
+        g_free_closure_root_ids.pop_back();
+        g_closure_roots[root_id - 1] = value;
+        return root_id;
     }
     g_closure_roots.push_back(value);
     return static_cast<uint32_t>(g_closure_roots.size());
 }
 
-extern "C" uint32_t vir_closure_release(uint32_t handle) {
-    object * value = closure_root_for_handle(handle);
+extern "C" uint32_t vir_closure_release(uint32_t root_id) {
+    object * value = closure_root_for_id(root_id);
     if (value == nullptr) {
         return 0;
     }
-    g_closure_roots[handle - 1] = nullptr;
-    g_free_closure_handles.push_back(handle);
+    g_closure_roots[root_id - 1] = nullptr;
+    g_free_closure_root_ids.push_back(root_id);
     lean_dec(value);
     return 1;
 }
@@ -3435,16 +3435,16 @@ static uint8_t decode_closure_call_effect(vir_reader & reader) {
     return effect;
 }
 
-extern "C" char const * vir_closure_call(uint32_t handle, uint8_t const * request, uint32_t request_len) {
+extern "C" char const * vir_closure_call(uint32_t root_id, uint8_t const * request, uint32_t request_len) {
     g_closure_call_result.clear();
     g_closure_call_error.clear();
     if (request == nullptr && request_len != 0) {
         g_closure_call_error = "closure call payload pointer is null";
         return nullptr;
     }
-    object * fn = closure_root_for_handle(handle);
+    object * fn = closure_root_for_id(root_id);
     if (fn == nullptr) {
-        g_closure_call_error = "closure handle is not live";
+        g_closure_call_error = "closure root id is not live";
         return nullptr;
     }
 
