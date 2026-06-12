@@ -48,8 +48,9 @@ resource store. This removes the plain JavaScript `Map` of live host resources
 and avoids a reverse object-to-handle compatibility map while leaving the
 existing Lean object representation and wire payload format unchanged. The
 JavaScript API treats resources as opaque runtime objects and does not accept
-raw numeric resource tokens. A later ABI-widening step can replace the `UInt32`
-token itself with direct `externref` import/export values.
+raw numeric resource tokens or expose a supported numeric `.handle` field. A
+later ABI-widening step can replace the `UInt32` token itself with direct
+`externref` import/export values.
 
 `externref` does not replace callback rooting. Lean callbacks are still Lean
 heap objects owned by the interpreter runtime. JavaScript may retain a callback
