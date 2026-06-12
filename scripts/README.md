@@ -72,3 +72,20 @@ The split helpers below are the intended extension points for focused changes:
   parsing and formatting live in `scripts/bench-utils.mjs`.
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
+
+For performance comparisons, capture reports from each version with:
+
+```bash
+npm run bench -- --json build/perf/current.json
+```
+
+`npm run bench` keeps built benchmark inputs in
+`.perf-artifacts/vir-bench-cache` by default. Use `--no-artifact-cache`,
+`--artifact-cache DIR`, or `--refresh-artifact-cache` when you need explicit
+cache control.
+
+Then compare them with:
+
+```bash
+npm run bench:compare -- build/perf/before.json build/perf/after.json
+```

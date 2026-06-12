@@ -159,6 +159,32 @@ CHROMIUM=/path/to/chromium npm run test:pages:browser
 
 Run `npm run build:site` first when you want to refresh `web/dist/`.
 
+## Performance Comparisons
+
+`npm run bench` runs the manifest-driven JavaScript runtime benchmark against
+the host Lean IR baseline. It restores/stores built benchmark inputs under
+`.perf-artifacts/vir-bench-cache` by default, keyed by commit plus a build-key
+hash. The cache stores artifacts such as `web/public/vir-upstream.wasm` and
+`web/public/fixtures-basic.irpkg`, not timing samples, so benchmark timings are
+still regenerated for each run. Use `--no-artifact-cache` to disable the cache,
+`--artifact-cache DIR` to put it elsewhere, and `--refresh-artifact-cache` to
+replace the current cache entry.
+
+Pass `--json` to save a machine-readable report:
+
+```bash
+npm run bench -- --json build/perf/current.json
+```
+
+Compare two saved reports with:
+
+```bash
+npm run bench:compare -- build/perf/before.json build/perf/after.json
+```
+
+The comparison checks benchmark names, iteration counts, and checksums before
+printing per-call deltas for the Wasm runtime and host Lean IR baseline.
+
 ## Implementation Map
 
 Keep focused checks and shared helpers in the split modules instead of copying

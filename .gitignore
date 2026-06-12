@@ -1,6 +1,7 @@
 .vir.git/
 .beam/
 .lake/
+.perf-artifacts/
 .tools/
 .worktrees/
 build/
