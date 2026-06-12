@@ -49,7 +49,7 @@ callable `VirCallback` objects to JavaScript, and release roots when listeners
 are removed, timers or frames are cancelled, one-shot callbacks fire, or the
 runtime is disposed. Loading a new package into an existing runtime performs the
 same host-resource teardown before the new manifest is installed. Event
-resources remain opaque callback-scoped handles; the ownership contract and
+resources remain opaque callback-scoped values; the ownership contract and
 follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
 
 The browser-facing direction now includes a standalone React rendering slice.

@@ -60,8 +60,8 @@ uint32_t vir_js_call_result_size(void);
 __externref_t vir_resource_take(void);
 void vir_resource_push(__externref_t value);
 uint32_t vir_resource_root(__externref_t value);
-__externref_t vir_resource_get(uint32_t handle);
-void vir_resource_release(uint32_t handle);
+__externref_t vir_resource_get(uint32_t root_id);
+void vir_resource_release(uint32_t root_id);
 }
 
 static uint8_t g_vir_io_initializing = 0;
@@ -1825,7 +1825,7 @@ struct vir_arg {
 };
 
 struct vir_resource_data {
-    uint32_t handle = 0;
+    uint32_t root_id = 0;
 };
 
 static lean_external_class * g_vir_resource_external_class = nullptr;
@@ -1833,8 +1833,8 @@ static lean_external_class * g_vir_resource_external_class = nullptr;
 static void vir_resource_finalize(void * data) {
     vir_resource_data * resource = static_cast<vir_resource_data *>(data);
     if (resource != nullptr) {
-        if (resource->handle != 0) {
-            vir_resource_release(resource->handle);
+        if (resource->root_id != 0) {
+            vir_resource_release(resource->root_id);
         }
         delete resource;
     }
@@ -2006,25 +2006,25 @@ public:
 };
 
 static object * mk_resource_object(__externref_t value, vir_reader & r) {
-    uint32_t handle = vir_resource_root(value);
-    if (handle == 0) {
+    uint32_t root_id = vir_resource_root(value);
+    if (root_id == 0) {
         r.fail("missing externref resource value");
         return lean_box(0);
     }
-    return lean_alloc_external(vir_resource_external_class(), new vir_resource_data{handle});
+    return lean_alloc_external(vir_resource_external_class(), new vir_resource_data{root_id});
 }
 
-static uint32_t resource_handle_for_object(object * value, vir_writer & w) {
+static uint32_t resource_root_id_for_object(object * value, vir_writer & w) {
     if (!lean_is_external(value) || lean_get_external_class(value) != vir_resource_external_class()) {
         w.fail("Lean resource value is not a VIR externref resource");
         return 0;
     }
     vir_resource_data * resource = static_cast<vir_resource_data *>(lean_get_external_data(value));
-    if (resource == nullptr || resource->handle == 0) {
+    if (resource == nullptr || resource->root_id == 0) {
         w.fail("Lean resource value has been released");
         return 0;
     }
-    return resource->handle;
+    return resource->root_id;
 }
 
 static bool parse_u64(std::string const & text, uint64_t & out) {
@@ -2992,9 +2992,9 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
         w.u32(lean_unbox_uint32(value));
         break;
     case vir_wire_type::Resource: {
-        uint32_t handle = resource_handle_for_object(value, w);
+        uint32_t root_id = resource_root_id_for_object(value, w);
         if (w.ok) {
-            vir_resource_push(vir_resource_get(handle));
+            vir_resource_push(vir_resource_get(root_id));
         }
         break;
     }

@@ -67,9 +67,9 @@ tree into a browser React root, retain Lean callbacks in event handlers, and
 release them on rerender, unmount, package reload, or runtime disposal.
 
 That renderer deliberately avoids full infoview compatibility. It validates the
-host-resource and callback-lifetime model first. The JavaScript resource store
-now requires `externref`, while direct `externref` values across the C++/Wasm
-ABI and ProofWidgets RPC compatibility remain later layers.
+host-resource and callback-lifetime model first. Resource values now cross the
+C++/Wasm ABI through an `externref` side channel, while ProofWidgets RPC
+compatibility remains a later layer.
 
 ## ProofWidgets Compatibility Layers
 

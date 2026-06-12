@@ -300,7 +300,7 @@ phase.
 `Element.addEventListener`, `Timer.setTimeout`,
 `Animation.requestAnimationFrame`, and `React.Root.render` use the callback ABI.
 Event resources are valid only during the callback. Listener, timeout, frame,
-and React root handles own their retained callbacks until removal,
+and React root resources own their retained callbacks until removal,
 cancellation, firing, rerender, unmount, package reload, or runtime disposal. See
 `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed ownership contract and
 follow-up work.
@@ -319,7 +319,7 @@ entrypoints:
 - non-indexed user-defined structures and custom inductives with nullary or
   runtime-payload constructors
 - nullary inductive enums
-- opaque `Lean.Vir.Browser` and `Lean.Vir.React` resource handles
+- opaque `Lean.Vir.Browser` and `Lean.Vir.React` resource values
 - Lean function values used as host callbacks
 - `Lean.Expr`
 - `Lean.Vir.React.Html` through the generic recursive custom-inductive surface
