@@ -32,7 +32,7 @@ import {
   normalizeInteger,
   normalizeOption,
   normalizePair,
-  normalizeResourceObject,
+  normalizeHostResource,
   normalizeStructure,
   normalizeTaggedUnion,
 } from "./vir-value-normalizers.js";
@@ -124,7 +124,7 @@ function encodeValuePayload(writer, type, value, label, options = {}, selfType =
       if (typeof options.pushIncomingResource !== "function") {
         throw new Error(`${label} cannot be encoded without an attached resource queue`);
       }
-      options.pushIncomingResource(normalizeResourceObject(value, label));
+      options.pushIncomingResource(normalizeHostResource(value, label));
       return;
     case WIRE.FUNCTION:
       throw new Error(`${label} cannot be a JavaScript function in v1`);

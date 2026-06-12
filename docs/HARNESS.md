@@ -215,7 +215,7 @@ logic into entry-point scripts or pages:
 - Browser page helpers: `web/src/pages/page-utils.js` and
   `web/src/pages/input-parsers.js`
 - Host resource and virtual binding internals:
-  `web/src/host/vir-host-resources.js` and
+  `web/src/host-resource.js`, `web/src/host/vir-host-resources.js`, and
   `web/src/host/vir-virtual-host-bindings.js`
 
 ## Worktree Workflow

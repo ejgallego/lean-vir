@@ -45,3 +45,48 @@ export function releaseHostResource(resource) {
     state.value = null;
   }
 }
+
+export class ExternrefResourceRoots {
+  constructor({ initial = 1 } = {}) {
+    this.table = new WebAssembly.Table({ element: "externref", initial });
+    this.freeRootIds = [];
+  }
+
+  root(value) {
+    const resource = hostResourceExternref(value);
+    if (resource === null) {
+      return 0;
+    }
+    const rootId = this.freeRootIds.pop() ?? this.table.grow(1);
+    if (rootId <= 0 || rootId > 0xffffffff) {
+      throw new Error("Lean VIR externref resource root table exceeded the 32-bit root id range");
+    }
+    this.table.set(rootId, resource);
+    return rootId;
+  }
+
+  get(rootId) {
+    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
+      return null;
+    }
+    return this.table.get(rootId);
+  }
+
+  release(rootId) {
+    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
+      return undefined;
+    }
+    if (this.table.get(rootId) !== null) {
+      this.table.set(rootId, null);
+      this.freeRootIds.push(rootId);
+    }
+    return undefined;
+  }
+
+  clear() {
+    for (let rootId = 1; rootId < this.table.length; rootId += 1) {
+      this.table.set(rootId, null);
+    }
+    this.freeRootIds.length = 0;
+  }
+}

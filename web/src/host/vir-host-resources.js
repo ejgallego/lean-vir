@@ -11,7 +11,7 @@ import {
   hostResourceValue,
   isHostResource,
   releaseHostResource,
-} from "../resource-handles.js";
+} from "../host-resource.js";
 
 const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
 let externrefTableSupport = null;

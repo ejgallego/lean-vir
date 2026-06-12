@@ -5,7 +5,11 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntime, createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
-import { createHostResource, releaseHostResource } from "../../web/src/resource-handles.js";
+import {
+  createHostResource,
+  ExternrefResourceRoots,
+  releaseHostResource,
+} from "../../web/src/host-resource.js";
 import { BinaryWriter, encodeTypeDescriptor } from "../../web/src/runtime/vir-codec.js";
 import {
   decodeCallResult,
@@ -29,6 +33,11 @@ const resourceEntry = {
 };
 const resourceValue = { name: "resource" };
 const resourceArg = createHostResource(resourceValue);
+assert.deepEqual(Object.keys(resourceArg), []);
+assert.equal(Object.hasOwn(resourceArg, "handle"), false);
+assert.equal("handle" in resourceArg, false);
+assert.equal(Object.hasOwn(resourceArg, "value"), false);
+assert.equal("value" in resourceArg, false);
 const incomingResources = [];
 const resourceArgPayload = encodeCallPayload(resourceEntry, [resourceArg], {
   pushIncomingResource: (value) => incomingResources.push(value),
@@ -38,13 +47,28 @@ assert.equal(incomingResources.length, 1);
 assert.equal(incomingResources[0], resourceArg);
 assert.throws(
   () => encodeCallPayload(resourceEntry, [{ handle: 1 }], { pushIncomingResource: () => undefined }),
-  /resourceArg argument arg1 must be a live resource object/,
+  /resourceArg argument arg1 must be a live host resource/,
 );
 releaseHostResource(resourceArg);
 assert.throws(
   () => encodeCallPayload(resourceEntry, [resourceArg], { pushIncomingResource: () => undefined }),
-  /resourceArg argument arg1 must be a live resource object/,
+  /resourceArg argument arg1 must be a live host resource/,
 );
+const roots = new ExternrefResourceRoots();
+const firstRootResource = createHostResource({ name: "first" });
+const firstRootId = roots.root(firstRootResource);
+assert.equal(firstRootId, 1);
+assert.equal(roots.get(firstRootId), firstRootResource);
+roots.release(firstRootId);
+assert.equal(roots.get(firstRootId), null);
+const secondRootResource = createHostResource({ name: "second" });
+const secondRootId = roots.root(secondRootResource);
+assert.equal(secondRootId, firstRootId);
+assert.equal(roots.get(secondRootId), secondRootResource);
+roots.clear();
+assert.equal(roots.get(secondRootId), null);
+releaseHostResource(secondRootResource);
+assert.equal(roots.root(secondRootResource), 0);
 const resourceResultWriter = new BinaryWriter();
 encodeTypeDescriptor(resourceResultWriter, resourceType, "resource result");
 let outgoingResourceTakes = 0;

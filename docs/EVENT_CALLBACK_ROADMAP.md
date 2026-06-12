@@ -10,8 +10,8 @@ removed; event listeners now use retained Lean closures directly.
 - Opaque browser resources are represented in Lean by abstract types such as
   `Element`, `Event`, `EventListener`, `Timeout`, and `AnimationFrame`.
 - Opaque resources cross the JS/Wasm boundary through `externref` side-channel
-  imports. Lean stores them as GC-finalized external resource objects that root
-  JavaScript host-resource objects in the host runtime.
+  imports. Lean stores them as GC-finalized external objects that root
+  JavaScript `HostResource` objects in the host runtime.
 - Lean function values in host-import arguments are queued as internal closure
   root ids, not serialized into `WIRE.FUNCTION` payloads. JavaScript receives
   callable `VirCallback` objects, not raw numeric roots.

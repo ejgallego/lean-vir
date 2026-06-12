@@ -10,7 +10,7 @@ export const SDK_PAYLOADS = [
   ["js/vir-runtime-node.js", "web/src/vir-runtime-node.js"],
   ["js/vir-host-bindings.js", "web/src/vir-host-bindings.js"],
   ["js/vir-react-host-bindings.js", "web/src/vir-react-host-bindings.js"],
-  ["js/resource-handles.js", "web/src/resource-handles.js"],
+  ["js/host-resource.js", "web/src/host-resource.js"],
   ["js/runtime/vir-codec.js", "web/src/runtime/vir-codec.js"],
   ["js/runtime/vir-lean-codec.js", "web/src/runtime/vir-lean-codec.js"],
   ["js/runtime/vir-value-codec.js", "web/src/runtime/vir-value-codec.js"],

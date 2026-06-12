@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirtualReactRootResource as createVirtualReactRootResourceFromHtml } from "../react/vir-react-html.js";
-import { isHostResource } from "../resource-handles.js";
+import { isHostResource } from "../host-resource.js";
 import {
   callLeanEventCallback,
   createAnimationFrameResource,

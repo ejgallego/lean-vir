@@ -10,9 +10,9 @@ import {
   asBytes,
 } from "./runtime/vir-codec.js";
 import {
-  hostResourceExternref,
+  ExternrefResourceRoots,
   isHostResource,
-} from "./resource-handles.js";
+} from "./host-resource.js";
 import {
   decodeCallResult,
   decodeHostCallRequest,
@@ -171,8 +171,7 @@ class VirHostState {
     this.incomingResources = [];
     this.outgoingResources = [];
     this.outgoingClosureRootIds = [];
-    this.resourceRoots = new WebAssembly.Table({ element: "externref", initial: 1 });
-    this.freeResourceRootIds = [];
+    this.resourceRoots = new ExternrefResourceRoots();
   }
 
   attach(exports) {
@@ -250,41 +249,19 @@ class VirHostState {
   }
 
   rootResource(value) {
-    const resource = hostResourceExternref(value);
-    if (resource === null) {
-      return 0;
-    }
-    const rootId = this.freeResourceRootIds.pop() ?? this.resourceRoots.grow(1);
-    if (rootId <= 0 || rootId > 0xffffffff) {
-      throw new Error("Lean VIR externref resource root table exceeded the 32-bit root id range");
-    }
-    this.resourceRoots.set(rootId, resource);
-    return rootId;
+    return this.resourceRoots.root(value);
   }
 
   getRootedResource(rootId) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.resourceRoots.length) {
-      return null;
-    }
     return this.resourceRoots.get(rootId);
   }
 
   releaseRootedResource(rootId) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.resourceRoots.length) {
-      return undefined;
-    }
-    if (this.resourceRoots.get(rootId) !== null) {
-      this.resourceRoots.set(rootId, null);
-      this.freeResourceRootIds.push(rootId);
-    }
-    return undefined;
+    return this.resourceRoots.release(rootId);
   }
 
   clearResourceRoots() {
-    for (let rootId = 1; rootId < this.resourceRoots.length; rootId += 1) {
-      this.resourceRoots.set(rootId, null);
-    }
-    this.freeResourceRootIds.length = 0;
+    this.resourceRoots.clear();
   }
 
   call(slot, requestPtr, requestLen) {
