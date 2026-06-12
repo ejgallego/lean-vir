@@ -35,7 +35,7 @@ const { wasmBytes, hostPackageBytes, irPackageBytes } = await readRuntimeArtifac
 
 const browserBindingsWithReact = createBrowserHostBindings({
   reactHostBindings: {
-    "react.root.create": () => ({ handle: 1 }),
+    "react.root.create": () => undefined,
   },
 });
 assert.equal(typeof browserBindingsWithReact["browser.document.getTitle"], "function");
@@ -101,7 +101,7 @@ assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactDocumentState.elements.get("#react-unmount").reactRoot, undefined);
 assert.throws(
   () => reactRuntime.call("ReactCounter.renderAfterUnmount", "#react-stale-root"),
-  /ReactRoot resource handle \d+ is not live/,
+  /ReactRoot resource is not live/,
 );
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.throws(

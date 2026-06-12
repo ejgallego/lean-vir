@@ -42,16 +42,23 @@ const retainedCallbackRuntime = await createVirRuntime({
 assert.equal(retainedCallbackRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
 assert.equal(retainedCallbackRuntime.liveCallbacks.size, 1);
 assert.equal(retainedCallback(4), "11");
-const staleCallbackHandle = retainedCallback.handle;
-const staleCallbackType = retainedCallback.type;
+assert.deepEqual(Object.keys(retainedCallback), []);
+assert.equal(Object.hasOwn(retainedCallback, "handle"), false);
+assert.equal("handle" in retainedCallback, false);
+assert.equal(Object.hasOwn(retainedCallback, "type"), false);
+const staleCallbackRootId = 1;
+const staleCallbackType = retainedCallbackRuntime.interfaceManifest.hostImports
+  .find((entry) => entry.target === "test.callNatCallback")
+  ?.args[1]?.type;
+assert.ok(staleCallbackType);
 assert.equal(retainedCallback.release(), true);
 assert.equal(retainedCallback.release(), false);
 assert.equal(retainedCallback.released, true);
 assert.equal(retainedCallbackRuntime.liveCallbacks.size, 0);
 assert.throws(() => retainedCallback(4), /released/);
 assert.throws(
-  () => retainedCallbackRuntime.callClosure(staleCallbackHandle, staleCallbackType, [4]),
-  /closure handle is not live/,
+  () => retainedCallbackRuntime.callClosure(staleCallbackRootId, staleCallbackType, [4]),
+  /closure root id is not live/,
 );
 retainedCallbackRuntime.dispose();
 

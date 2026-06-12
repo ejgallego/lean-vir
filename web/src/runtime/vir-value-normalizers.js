@@ -14,6 +14,7 @@ import {
   requireTaggedUnionConstructors,
   taggedUnionConstructorAt,
 } from "./vir-codec.js";
+import { resourceObjectExternref } from "../resource-handles.js";
 
 export function normalizeDecimal(value, label, { signed }) {
   if (typeof value === "bigint") {
@@ -61,12 +62,12 @@ export function normalizeInteger(value, label, min, max) {
   return value;
 }
 
-export function normalizeResourceHandle(value, label) {
-  const handle = typeof value === "number" ? value : value?.handle;
-  if (!Number.isInteger(handle) || handle <= 0 || handle > 0xffffffff) {
-    throw new Error(`${label} must be a live resource handle`);
+export function normalizeResourceObject(value, label) {
+  const ref = resourceObjectExternref(value);
+  if (ref === null) {
+    throw new Error(`${label} must be a live resource object`);
   }
-  return handle;
+  return ref;
 }
 
 export function normalizeArray(value, label) {

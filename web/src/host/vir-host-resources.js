@@ -5,12 +5,46 @@ Author: Emilio J. Gallego Arias
 */
 
 import { disposeReactHtml } from "../react/vir-react-html.js";
+import {
+  createResourceObject,
+  isResourceObject,
+  releaseResourceObject,
+  resourceObjectCell,
+  resourceObjectValue,
+} from "../resource-handles.js";
+
+const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
+let externrefTableSupport = null;
+
+export function hasExternrefTableSupport() {
+  if (externrefTableSupport !== null) {
+    return externrefTableSupport;
+  }
+  try {
+    const table = new WebAssembly.Table({
+      element: "externref",
+      initial: EXTERNREF_TABLE_INITIAL_LENGTH,
+    });
+    const marker = { kind: "lean-vir.externref-table-probe" };
+    table.set(0, marker);
+    externrefTableSupport = table.get(0) === marker;
+  } catch {
+    externrefTableSupport = false;
+  }
+  return externrefTableSupport;
+}
+
+export function requireExternrefTableSupport() {
+  if (!hasExternrefTableSupport()) {
+    throw new Error("Lean VIR React/browser host resources require WebAssembly externref support");
+  }
+}
 
 export function createHostResourceState() {
+  requireExternrefTableSupport();
   return {
-    nextHandle: 1,
-    values: new Map(),
-    handles: new WeakMap(),
+    resources: new WeakMap(),
+    resourceCells: new WeakSet(),
     disposables: new Set(),
   };
 }
@@ -90,28 +124,31 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
 
 export function resourceForValue(state, value) {
   if (value === null || value === undefined) return null;
-  let handle = state.handles.get(value);
-  if (handle === undefined) {
-    handle = state.nextHandle++;
-    state.handles.set(value, handle);
-    state.values.set(handle, value);
+  let resource = state.resources.get(value);
+  if (!isResourceObject(resource) || resourceObjectValue(resource) === null) {
+    resource = createResourceObject(value);
+    state.resources.set(value, resource);
   }
-  return { handle };
+  state.resourceCells.add(resourceObjectCell(resource));
+  return resource;
 }
 
 export function releaseResource(state, resource) {
-  const handle = resourceHandle(resource, "Resource");
-  const value = state.values.get(handle);
-  if (value !== undefined) {
-    state.handles.delete(value);
-    state.values.delete(handle);
+  const cell = resourceObjectCell(resource);
+  const value = resourceObjectValue(resource);
+  if (value !== null && value !== undefined) {
+    state.resources.delete(value);
   }
+  if (cell !== undefined) {
+    state.resourceCells.delete(cell);
+  }
+  releaseResourceObject(resource);
 }
 
 export function releaseValueResource(state, value) {
-  const handle = state.handles.get(value);
-  if (handle !== undefined) {
-    releaseResource(state, { handle });
+  const resource = state.resources.get(value);
+  if (resource !== undefined) {
+    releaseResource(state, resource);
   }
 }
 
@@ -137,9 +174,8 @@ export function disposeDomResourceState(state) {
     }
   }
   state.disposables?.clear();
-  state.values?.clear();
-  state.handles = new WeakMap();
-  state.nextHandle = 1;
+  state.resources = new WeakMap();
+  state.resourceCells = new WeakSet();
 }
 
 export function createTimeoutResource(resources, delayMs, callback) {
@@ -197,10 +233,10 @@ export function once(fn) {
 }
 
 export function resolveResource(state, resource, label) {
-  const handle = resourceHandle(resource, label);
-  const value = state.values.get(handle);
-  if (value === undefined) {
-    throw new Error(`${label} resource handle ${handle} is not live`);
+  const cell = resourceObjectCell(resource);
+  const value = resourceObjectValue(resource);
+  if (value === null || value === undefined || !state.resourceCells.has(cell)) {
+    throw new Error(`${label} resource is not live`);
   }
   return value;
 }
@@ -254,12 +290,4 @@ export function createReactHostHooks() {
     callLeanEventCallback,
     once,
   };
-}
-
-function resourceHandle(resource, label) {
-  const handle = resource?.handle;
-  if (!Number.isInteger(handle) || handle <= 0 || handle > 0xffffffff) {
-    throw new Error(`${label} resource must be a live DOM resource handle`);
-  }
-  return handle;
 }

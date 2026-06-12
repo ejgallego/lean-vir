@@ -31,6 +31,8 @@ import {
 export {
   createHostResourceState,
   createReactRootResourceHostBindings,
+  hasExternrefTableSupport,
+  requireExternrefTableSupport,
 } from "./host/vir-host-resources.js";
 export {
   createVirtualDocumentHostBindings,

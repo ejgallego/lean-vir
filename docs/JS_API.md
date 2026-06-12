@@ -45,8 +45,8 @@ import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
 ```
 
 When composing low-level browser binding groups, pass the same
-`createHostResourceState()` result to each group so resource handles returned by
-one group are live in the others.
+`createHostResourceState()` result to each group so opaque resources returned
+by one group are live in the others.
 
 ## Runtime Module Map
 
