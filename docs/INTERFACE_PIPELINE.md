@@ -134,8 +134,10 @@ written into the same constructor scalar slots as compiled Lean code.
 Function-valued interface types are used for Lean callbacks passed to
 JavaScript host imports. Their descriptors record the callback argument list,
 result type, and whether applying the callback returns `IO`. JavaScript receives
-these values as `VirCallback` objects and releases the rooted Lean closure when
-the host-owned registration is done with it.
+these values as `VirCallback` objects. The `WIRE.FUNCTION` value payload carries
+no serialized numeric token; the runtime receives the internal closure root id
+through a side channel and releases the rooted Lean closure when the host-owned
+registration is done with it.
 
 `Lean.Vir.React.Html` now uses the same improved custom-inductive and
 `recursiveSelf` descriptor support as other non-indexed recursive inductives.

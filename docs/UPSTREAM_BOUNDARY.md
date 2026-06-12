@@ -74,8 +74,9 @@ Together they supply:
   with `@[vir_js "..."]`, routed through `env.vir_js_call` and
   `env.vir_js_call_result_size`.
 - Lean closure roots for function-valued host-import arguments. The shim owns
-  `vir_closure_call` and `vir_closure_release`; JavaScript owns the host-side
-  lifetime policy for `VirCallback` objects.
+  `vir_closure_call` and `vir_closure_release`, and queues new roots to
+  JavaScript with `env.vir_closure_push`; JavaScript owns the host-side lifetime
+  policy for `VirCallback` objects.
 - name construction primitives needed by `src/util/name.cpp`.
 
 The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
@@ -206,11 +207,13 @@ recognizes only those package-provided symbols, calls the single imported
 lookup.
 
 Function-valued host-import arguments use the same package-scoped policy. The
-generic result encoder roots the Lean closure in a small shim table and returns
-a callable `VirCallback` object to JavaScript. The wrapper calls the internal
-closure root id through `vir_closure_call` and must eventually release it
-through `vir_closure_release`. This keeps the Lean heap reference count explicit
-while avoiding any change to the upstream interpreter file.
+generic result encoder roots the Lean closure in a small shim table, queues the
+internal root id through `env.vir_closure_push`, and emits no serialized
+`WIRE.FUNCTION` payload bytes. JavaScript wraps the queued root as a callable
+`VirCallback` object. The wrapper calls the internal closure root id through
+`vir_closure_call` and must eventually release it through `vir_closure_release`.
+This keeps the Lean heap reference count explicit while avoiding any change to
+the upstream interpreter file.
 
 `scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
 registry. It checks that every `nativeExterns` entry in
@@ -261,9 +264,10 @@ The closure/resource bridge is intentionally conservative for `wasm32-wasip1`.
 Ordinary scalar and structured values still use the generic linear-memory byte
 payload dispatcher. Opaque resources cross the JS/Wasm boundary through
 `externref` side-channel imports, and Lean stores them as GC-finalized external
-resource objects that root JavaScript resource cells in the host runtime. Lean
-closures remain represented by runtime-owned closure roots surfaced to
-JavaScript as opaque `VirCallback` objects.
+resource objects that root JavaScript resource cells in the host runtime.
+`WIRE.FUNCTION` likewise avoids a serialized numeric token; Lean closures remain
+represented by runtime-owned closure roots surfaced to JavaScript as opaque
+`VirCallback` objects.
 
 See `docs/REACT_WASM_BINDINGS.md` for the React-first binding plan and local
 feature probes. This repository uses `externref` terminology for host

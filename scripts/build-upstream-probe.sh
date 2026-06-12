@@ -62,6 +62,7 @@ mkdir -p web/public
 cat > "$allowed_undefined" <<'EOF'
 vir_js_call
 vir_js_call_result_size
+vir_closure_push
 vir_resource_get
 vir_resource_push
 vir_resource_release

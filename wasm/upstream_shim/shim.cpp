@@ -62,6 +62,7 @@ void vir_resource_push(__externref_t value);
 uint32_t vir_resource_root(__externref_t value);
 __externref_t vir_resource_get(uint32_t root_id);
 void vir_resource_release(uint32_t root_id);
+void vir_closure_push(uint32_t root_id);
 }
 
 static uint8_t g_vir_io_initializing = 0;
@@ -2998,9 +2999,15 @@ static void encode_value_payload(vir_writer & w, vir_type const & type, object *
         }
         break;
     }
-    case vir_wire_type::Function:
-        w.u32(vir_closure_root(value));
+    case vir_wire_type::Function: {
+        uint32_t root_id = vir_closure_root(value);
+        if (root_id == 0) {
+            w.fail("missing Lean closure value");
+        } else {
+            vir_closure_push(root_id);
+        }
         break;
+    }
     case vir_wire_type::UInt64:
         w.string(std::to_string(lean_unbox_uint64(value)));
         break;

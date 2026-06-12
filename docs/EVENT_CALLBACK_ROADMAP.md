@@ -12,9 +12,9 @@ removed; event listeners now use retained Lean closures directly.
 - Opaque resources cross the JS/Wasm boundary through `externref` side-channel
   imports. Lean stores them as GC-finalized external resource objects that root
   JavaScript resource cells in the host runtime.
-- Lean function values in host-import arguments are encoded as internal closure
-  root ids. JavaScript receives them as callable `VirCallback` objects, not raw
-  numeric roots.
+- Lean function values in host-import arguments are queued as internal closure
+  root ids, not serialized into `WIRE.FUNCTION` payloads. JavaScript receives
+  callable `VirCallback` objects, not raw numeric roots.
 - `VirCallback.release()` is idempotent and calls the WASM
   `vir_closure_release` export to decrement the rooted Lean closure.
 - Browser listener, timeout, and animation-frame bindings retain callbacks until

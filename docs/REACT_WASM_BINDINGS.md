@@ -18,9 +18,9 @@ The runtime still targets a portable core `wasm32-wasip1` artifact:
 - Opaque browser and React resources cross the JS/Wasm boundary through
   `externref` side-channel imports. Lean stores them as GC-finalized external
   resource objects that root JavaScript resource cells in the host runtime.
-- Lean closures passed to JavaScript are callable `VirCallback` objects backed
-  by internal closure root ids that must be released by the host binding or
-  runtime teardown.
+- Lean closures passed to JavaScript cross through an internal closure-root
+  side channel and appear as callable `VirCallback` objects that must be
+  released by the host binding or runtime teardown.
 
 That baseline describes the current implementation. The experimental React
 resource prototype can intentionally require newer browser/Wasm support instead
@@ -42,13 +42,14 @@ The experimental `externref` path should be strict:
 - preserve the Lean-facing `@[vir_resource]` API;
 - keep explicit Lean closure root/release semantics.
 
-The prototype uses a direct `externref` side channel for resource values while
-keeping the generic byte-payload dispatcher for ordinary scalar and structured
-values. `WIRE.RESOURCE` carries no serialized numeric payload. JavaScript
-queues branded resource cells before entering Wasm, and the shim queues cells
-back before JavaScript decodes resource results or host-import arguments. Lean
-resource values are external objects whose finalizers release the host root
-table entry.
+The prototype uses direct side channels for opaque values while keeping the
+generic byte-payload dispatcher for ordinary scalar and structured values.
+`WIRE.RESOURCE` and `WIRE.FUNCTION` carry no serialized numeric payload.
+JavaScript queues branded resource cells before entering Wasm, and the shim
+queues cells back before JavaScript decodes resource results or host-import
+arguments. Lean closures are rooted in the shim and queued back as internal
+closure root ids before JavaScript decodes `VirCallback` values. Lean resource
+values are external objects whose finalizers release the host root table entry.
 
 The JavaScript API treats resources as opaque runtime objects and does not
 accept raw numeric resource tokens or expose a supported numeric `.handle`
