@@ -162,10 +162,9 @@ VIR_FIXTURE_FILTER=fib12 npm run test:fixtures
 VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 ```
 
-`VIR_RUNTIME_TEST_FILTER` similarly narrows `npm run test:runtime`.
-`VIR_RUNTIME_TEST_GROUP` selects comma-separated groups such as `pure` or
-`lean`, and `VIR_RUNTIME_JOBS` controls the number of runtime smoke
-subprocesses. The available runtime smoke ids and groups are printed by:
+`VIR_RUNTIME_TEST_FILTER` similarly narrows `npm run test:runtime`, and
+`VIR_RUNTIME_JOBS` controls the number of runtime smoke subprocesses. The
+available runtime smoke ids and groups are printed by:
 
 ```bash
 node scripts/test-vir-runtime.mjs --list

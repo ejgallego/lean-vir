@@ -12,17 +12,14 @@ import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
 const root = new URL("..", import.meta.url).pathname;
 
 const tests = [
-  { id: "manifest", file: "scripts/runtime-tests/manifest-smoke.mjs", groups: ["pure"] },
-  { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", groups: ["pure"] },
-  { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", groups: ["pure"] },
-  { id: "value-codec", file: "scripts/runtime-tests/value-codec-smoke.mjs", groups: ["pure"] },
-  {
-    id: "package-generation",
-    file: "scripts/runtime-tests/package-generation-smoke.mjs",
-    groups: ["lean", "package-generation"],
-  },
-  { id: "sdk-import", file: "scripts/runtime-tests/sdk-import-smoke.mjs", groups: ["lean", "sdk"] },
+  { id: "manifest", file: "scripts/runtime-tests/manifest-smoke.mjs", group: "pure" },
+  { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", group: "pure" },
+  { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },
+  { id: "value-codec", file: "scripts/runtime-tests/value-codec-smoke.mjs", group: "pure" },
+  { id: "package-generation", file: "scripts/runtime-tests/package-generation-smoke.mjs", group: "lean" },
+  { id: "sdk-import", file: "scripts/runtime-tests/sdk-import-smoke.mjs", group: "lean" },
 ];
+const runtimeGroupNames = [...new Set(tests.map((test) => test.group))].sort();
 
 const cli = parseRuntimeArgs(process.argv.slice(2));
 
@@ -37,12 +34,11 @@ Arguments:
 
 Options:
   --list          Print runtime test ids.
-  --group GROUP   Run tests tagged with GROUP; repeatable. Groups: ${runtimeTestGroups().join(", ")}.
+  --group GROUP   Run tests tagged with GROUP. Groups: ${runtimeGroupNames.join(", ")}.
   -h, --help      Show this help.
 
 Environment:
   VIR_RUNTIME_TEST_FILTER  Comma-separated filters, combined with positional filters.
-  VIR_RUNTIME_TEST_GROUP   Comma-separated groups, combined with --group.
   VIR_RUNTIME_JOBS         Positive integer worker limit.
   VIR_RUNTIME_VERBOSE      Set to 1 to print passing subtest output.
 `);
@@ -55,7 +51,7 @@ if (cli.help) {
 
 function parseRuntimeArgs(argv) {
   const positionalFilters = [];
-  const groups = [];
+  let group = null;
   let help = false;
   let list = false;
 
@@ -70,20 +66,11 @@ function parseRuntimeArgs(argv) {
       continue;
     }
     if (arg === "--group") {
-      const group = argv[index + 1];
+      group = argv[index + 1];
       if (!group || group.startsWith("--")) {
         throw new Error("--group requires a group name");
       }
-      groups.push(...splitGroupList(group));
       index += 1;
-      continue;
-    }
-    if (arg.startsWith("--group=")) {
-      const group = arg.slice("--group=".length);
-      if (!group) {
-        throw new Error("--group requires a group name");
-      }
-      groups.push(...splitGroupList(group));
       continue;
     }
     if (arg.startsWith("--")) {
@@ -92,22 +79,7 @@ function parseRuntimeArgs(argv) {
     positionalFilters.push(arg);
   }
 
-  return { positionalFilters, groups, help, list };
-}
-
-function splitGroupList(value) {
-  return value
-    .split(",")
-    .map((group) => group.trim().toLowerCase())
-    .filter(Boolean);
-}
-
-function unique(items) {
-  return [...new Set(items)];
-}
-
-function runtimeTestGroups() {
-  return unique(tests.flatMap((test) => test.groups)).sort();
+  return { positionalFilters, group, help, list };
 }
 
 function runtimeFilters(positionalFilters) {
@@ -118,20 +90,15 @@ function runtimeFilters(positionalFilters) {
   return [...positionalFilters, ...envFilters].map((filter) => filter.toLowerCase());
 }
 
-function runtimeGroups(cliGroups) {
-  const groups = unique([
-    ...cliGroups,
-    ...splitGroupList(process.env.VIR_RUNTIME_TEST_GROUP ?? ""),
-  ]);
-  const knownGroups = new Set(runtimeTestGroups());
-  for (const group of groups) {
-    if (!knownGroups.has(group)) {
-      throw new Error(
-        `unknown runtime test group ${JSON.stringify(group)}; available groups: ${runtimeTestGroups().join(", ")}`,
-      );
-    }
+function runtimeGroup(cliGroup) {
+  if (cliGroup === null) return null;
+  const group = cliGroup.toLowerCase();
+  if (!runtimeGroupNames.includes(group)) {
+    throw new Error(
+      `unknown runtime test group ${JSON.stringify(group)}; available groups: ${runtimeGroupNames.join(", ")}`,
+    );
   }
-  return groups;
+  return group;
 }
 
 function testMatchesFilter(test, filters) {
@@ -140,9 +107,8 @@ function testMatchesFilter(test, filters) {
   return filters.some((filter) => haystack.includes(filter));
 }
 
-function testMatchesGroup(test, groups) {
-  if (groups.length === 0) return true;
-  return groups.some((group) => test.groups.includes(group));
+function testMatchesGroup(test, group) {
+  return group === null || test.group === group;
 }
 
 function runtimeJobCount(total) {
@@ -178,18 +144,18 @@ function printCapturedOutput(result) {
 }
 
 const filters = runtimeFilters(cli.positionalFilters);
-const groups = runtimeGroups(cli.groups);
-const selected = tests.filter((test) => testMatchesGroup(test, groups) && testMatchesFilter(test, filters));
+const group = runtimeGroup(cli.group);
+const selected = tests.filter((test) => testMatchesGroup(test, group) && testMatchesFilter(test, filters));
 if (cli.list) {
   for (const test of selected) {
-    console.log(`${test.id}\t${test.groups.join(",")}\t${test.file}`);
+    console.log(`${test.id}\t${test.group}\t${test.file}`);
   }
   process.exit(0);
 }
 if (selected.length === 0) {
   const clauses = [];
-  if (groups.length !== 0) {
-    clauses.push(`groups ${groups.map((group) => JSON.stringify(group)).join(", ")}`);
+  if (group !== null) {
+    clauses.push(`group ${JSON.stringify(group)}`);
   }
   if (filters.length !== 0) {
     clauses.push(`filters ${filters.map((filter) => JSON.stringify(filter)).join(", ")}`);
@@ -198,8 +164,8 @@ if (selected.length === 0) {
 }
 
 const jobs = runtimeJobCount(selected.length);
-if (groups.length !== 0) {
-  console.log(`runtime group: ${groups.join(", ")} (${selected.length}/${tests.length})`);
+if (group !== null) {
+  console.log(`runtime group: ${group} (${selected.length}/${tests.length})`);
 }
 if (filters.length !== 0) {
   console.log(`runtime filter: ${filters.join(", ")} (${selected.length}/${tests.length})`);

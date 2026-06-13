@@ -8,7 +8,6 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
   const wasmPublicFile = "vir-upstream.wasm";
   const packageSpecs = browserPackageConfig.packages ?? [];
   const localPackagePresets = browserPackageConfig.localPackages ?? [];
-  const packageById = new Map(packageSpecs.map((spec) => [spec.id, spec]));
   const packageFileById = new Map(packageSpecs.map((spec) => [spec.id, spec.file]));
   const packageFiles = packageSpecs.map((spec) => spec.file);
   const localPackageFiles = localPackagePresets.map((preset) => preset.file);
@@ -19,7 +18,6 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
     })),
     ...localPackagePresets,
   ];
-  const packageLabels = new Map(packagePresets.map((preset) => [preset.file, preset.label ?? preset.file]));
   const packageFileByFixtureSource = new Map();
 
   for (const spec of packageSpecs) {
@@ -46,10 +44,6 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
     return packageFileByFixtureSource.get(source) ?? defaultPackageFile;
   }
 
-  function packageFileForId(id) {
-    return packageFileById.get(id) ?? null;
-  }
-
   function publicArtifactPath(file) {
     return `web/public/${file}`;
   }
@@ -58,15 +52,11 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
     browserPackageConfig,
     wasmPublicFile,
     packageSpecs,
-    localPackagePresets,
-    packageById,
-    packageFileById,
     packageFiles,
     localPackageFiles,
     benchmarkArtifactPaths: benchmarkPublicFiles.map(publicArtifactPath),
     generatedPublicFiles,
     packagePresets,
-    packageLabels,
     packageFileByFixtureSource,
     defaultPackageFile,
     hostPackageFile,
@@ -74,7 +64,6 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
     leanPackageFile,
     boundaryPackageFile,
     packageFileForFixtureSource,
-    packageFileForId,
     publicArtifactPath,
   };
 }

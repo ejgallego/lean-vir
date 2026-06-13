@@ -10,22 +10,10 @@ import { deriveBrowserPackageConfig } from "./browser-package-config.js";
 
 export const {
   wasmPublicFile,
-  packageSpecs,
-  localPackagePresets,
-  packageById,
-  packageFileById,
   packageFiles,
-  localPackageFiles,
-  benchmarkArtifactPaths,
-  generatedPublicFiles,
   defaultPackageFile,
   hostPackageFile,
   prettyPackageFile,
-  leanPackageFile,
-  boundaryPackageFile,
   packagePresets,
-  packageLabels,
   packageFileByFixtureSource,
-  packageFileForId,
-  publicArtifactPath,
 } = deriveBrowserPackageConfig(browserPackages);

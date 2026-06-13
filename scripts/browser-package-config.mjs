@@ -14,15 +14,11 @@ export const browserPackageConfig = JSON.parse(await readFile(configUrl, "utf8")
 export const {
   wasmPublicFile,
   packageSpecs,
-  localPackagePresets,
-  packageById,
-  packageFileById,
   packageFiles,
   localPackageFiles,
   benchmarkArtifactPaths,
   generatedPublicFiles,
   packagePresets,
-  packageLabels,
   packageFileByFixtureSource,
   defaultPackageFile,
   hostPackageFile,
@@ -30,6 +26,5 @@ export const {
   leanPackageFile,
   boundaryPackageFile,
   packageFileForFixtureSource,
-  packageFileForId,
   publicArtifactPath,
 } = deriveBrowserPackageConfig(browserPackageConfig);
