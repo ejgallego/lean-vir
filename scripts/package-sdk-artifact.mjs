@@ -6,34 +6,34 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createHash } from "node:crypto";
-import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { basename, join } from "node:path";
+import { readFile, writeFile } from "node:fs/promises";
+import { join } from "node:path";
 
-import { copyFileWithDirs } from "./file-utils.mjs";
+import {
+  artifactBundlePaths,
+  cleanArtifactBundle,
+  copyFileWithDirs,
+  copyArtifactMetadata,
+  writeAndPublishArtifactArchive,
+} from "./file-utils.mjs";
 import { runSync } from "./process-utils.mjs";
 import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
 const artifactName = process.env.VIR_SDK_ARTIFACT_NAME ?? "lean-vir-sdk";
-const artifactRoot = join(repoRoot, "build", "artifacts");
-const sdkDir = join(artifactRoot, artifactName);
-const archive = join(artifactRoot, `${artifactName}.tar.gz`);
-const publicDownloads = join(repoRoot, "web", "public", "downloads");
-const publicArchive = join(publicDownloads, `${artifactName}.tar.gz`);
+const artifactPaths = artifactBundlePaths(repoRoot, artifactName);
 
 async function sha256(path) {
   const bytes = await readFile(path);
   return createHash("sha256").update(bytes).digest("hex");
 }
 
-await rm(sdkDir, { recursive: true, force: true });
-await rm(archive, { force: true });
-await mkdir(sdkDir, { recursive: true });
+await cleanArtifactBundle(artifactPaths);
 
 const files = [];
 for (const [destRel, sourceRel] of SDK_PAYLOADS) {
   const source = join(repoRoot, sourceRel);
-  const dest = join(sdkDir, destRel);
+  const dest = join(artifactPaths.bundleDir, destRel);
   await copyFileWithDirs(source, dest);
   files.push({
     path: destRel,
@@ -42,15 +42,14 @@ for (const [destRel, sourceRel] of SDK_PAYLOADS) {
   });
 }
 
-await copyFileWithDirs(join(repoRoot, "LICENSE"), join(sdkDir, "LICENSE"));
-await copyFileWithDirs(join(repoRoot, "NOTICE"), join(sdkDir, "NOTICE"));
+await copyArtifactMetadata(repoRoot, artifactPaths.bundleDir);
 
 const packageJson = JSON.parse(await readFile(join(repoRoot, "package.json"), "utf8"));
 const leanToolchain = (await readFile(join(repoRoot, "lean-toolchain"), "utf8")).trim();
 const gitCommit = runSync("git", ["rev-parse", "HEAD"], { cwd: repoRoot, capture: true });
 const gitStatus = runSync("git", ["status", "--short"], { cwd: repoRoot, capture: true });
 const leanVersion = runSync("lean", ["--version"], { cwd: repoRoot, capture: true });
-const artifact = {
+const artifactManifest = {
   name: artifactName,
   version: packageJson.version,
   gitCommit,
@@ -63,9 +62,9 @@ const artifact = {
   generatedAt: new Date().toISOString(),
   files,
 };
-await writeFile(join(sdkDir, "lean-vir-artifact.json"), `${JSON.stringify(artifact, null, 2)}\n`);
+await writeFile(join(artifactPaths.bundleDir, "lean-vir-artifact.json"), `${JSON.stringify(artifactManifest, null, 2)}\n`);
 await writeFile(
-  join(sdkDir, "README.txt"),
+  join(artifactPaths.bundleDir, "README.txt"),
   `Lean VIR SDK
 ============
 
@@ -116,13 +115,4 @@ from another lean_vir revision.
 `,
 );
 
-runSync("tar", ["-czf", archive, "-C", artifactRoot, artifactName], {
-  cwd: repoRoot,
-  stdio: "inherit",
-});
-
-await mkdir(publicDownloads, { recursive: true });
-await copyFileWithDirs(archive, publicArchive);
-
-console.log(`wrote ${join("build", "artifacts", basename(archive))}`);
-console.log(`wrote ${join("web", "public", "downloads", basename(publicArchive))}`);
+await writeAndPublishArtifactArchive(repoRoot, artifactPaths);
