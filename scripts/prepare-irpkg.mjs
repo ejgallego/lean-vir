@@ -7,10 +7,20 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { delimiter } from "node:path";
+import { performance } from "node:perf_hooks";
 
 const root = new URL("..", import.meta.url).pathname;
 const irpkgGenerator = ".lake/build/bin/vir_irpkg";
 const configPath = process.argv[2];
+const scriptStart = performance.now();
+
+function elapsedSeconds(start) {
+  return (performance.now() - start) / 1000;
+}
+
+function formatSeconds(seconds) {
+  return seconds.toFixed(2);
+}
 
 if (!configPath) {
   console.error("usage: npm run prepare:irpkg -- <config.json>");
@@ -25,20 +35,24 @@ const roots = Array.isArray(config.roots) ? config.roots : [];
 const includeAll = config.includeAll === true || roots.length === 0;
 
 const targetArgs = includeAll ? ["--target-all", source] : ["--target", source, ...roots];
+const libStart = performance.now();
 const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
   cwd: root,
   stdio: "inherit",
 });
+const libSeconds = elapsedSeconds(libStart);
 
 if ((libResult.status ?? 1) !== 0) {
   console.error("error: Lean.Vir library build failed");
   process.exit(libResult.status ?? 1);
 }
 
+const generatorStart = performance.now();
 const generatorResult = spawnSync("lake", ["build", "vir_irpkg"], {
   cwd: root,
   stdio: "inherit",
 });
+const generatorSeconds = elapsedSeconds(generatorStart);
 
 if ((generatorResult.status ?? 1) !== 0) {
   console.error("error: vir_irpkg generator build failed");
@@ -56,6 +70,7 @@ if ((leanPrefix.status ?? 1) !== 0) {
   process.exit(leanPrefix.status ?? 1);
 }
 
+const packageStart = performance.now();
 const result = spawnSync(irpkgGenerator, [packagePath, reportPath, ...targetArgs], {
   cwd: root,
   stdio: "inherit",
@@ -64,6 +79,7 @@ const result = spawnSync(irpkgGenerator, [packagePath, reportPath, ...targetArgs
     LEAN_PATH: leanPathWithGenerator(leanPrefix.stdout.trim(), process.env.LEAN_PATH),
   },
 });
+const packageSeconds = elapsedSeconds(packageStart);
 
 if ((result.status ?? 1) !== 0) {
   console.error(`error: package generation failed for ${source}`);
@@ -79,6 +95,11 @@ if (includeAll) {
 } else {
   console.log(`roots:   ${roots.join(", ")}`);
 }
+console.log(
+  `irpkg timing: lean-lib=${formatSeconds(libSeconds)}s `
+  + `generator=${formatSeconds(generatorSeconds)}s package=${formatSeconds(packageSeconds)}s `
+  + `total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
+);
 
 function requiredString(value, field) {
   if (typeof value !== "string" || value.length === 0) {

@@ -167,6 +167,17 @@ runner use the `vir_irpkg` Lake executable instead of repeatedly starting
 executable once, then reuses it for per-fixture packages while keeping the
 host-oracle checks unchanged.
 
+The build and test entry points print compact timing summaries that are useful
+when comparing CI runs:
+
+- `npm run build:demo` prints browser package, compile, link, and total probe
+  timing.
+- `npm run prepare:irpkg` prints Lean library, generator, package, and total
+  timing.
+- `npm run test:runtime` prints per-group timings plus the slowest groups.
+- `npm run test:fixtures` prints build, generator, fixture-run, and slowest
+  fixture timings; the JSON summary also records per-fixture phase timings.
+
 ## CI Shape
 
 The CI workflow keeps one job responsible for fetching the pinned Lean source,

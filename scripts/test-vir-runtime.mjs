@@ -136,6 +136,7 @@ if (filters.length !== 0) {
 }
 console.log(`runtime jobs: ${jobs}`);
 
+const runStart = performance.now();
 const results = await mapWithLimit(selected, jobs, runRuntimeTest);
 let failed = 0;
 for (const result of results) {
@@ -155,4 +156,9 @@ if (failed !== 0) {
   process.exit(1);
 }
 
+const slowest = [...results]
+  .sort((left, right) => Number(right.seconds) - Number(left.seconds))
+  .slice(0, 3)
+  .map((result) => `${result.test.id}=${result.seconds}s`);
+console.log(`runtime timing: total=${elapsedSeconds(runStart)}s slowest=${slowest.join(", ")}`);
 console.log(`vir runtime smoke ok: ${selected.length} tests`);

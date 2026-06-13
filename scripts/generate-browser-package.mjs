@@ -7,12 +7,22 @@ Author: Emilio J. Gallego Arias
 import { mkdir, readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 import { delimiter } from "node:path";
+import { performance } from "node:perf_hooks";
 
 import { packageSpecs } from "./browser-package-config.mjs";
 
 const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
 const irpkgGeneratorPath = new URL("../.lake/build/bin/vir_irpkg", import.meta.url);
+const scriptStart = performance.now();
+
+function elapsedSeconds(start) {
+  return (performance.now() - start) / 1000;
+}
+
+function formatSeconds(seconds) {
+  return seconds.toFixed(2);
+}
 
 function rootsFor(fixture) {
   return fixture.roots?.length ? fixture.roots : [fixture.entry];
@@ -60,19 +70,23 @@ function targetsForSpec(spec, fixtures) {
   return { targets, packageTargets };
 }
 
+const libStart = performance.now();
 const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
   cwd: root,
   stdio: "inherit",
 });
+const libSeconds = elapsedSeconds(libStart);
 
 if ((libResult.status ?? 1) !== 0) {
   process.exit(libResult.status ?? 1);
 }
 
+const generatorStart = performance.now();
 const generatorResult = spawnSync("lake", ["build", "vir_irpkg"], {
   cwd: root,
   stdio: "inherit",
 });
+const generatorSeconds = elapsedSeconds(generatorStart);
 
 if ((generatorResult.status ?? 1) !== 0) {
   process.exit(generatorResult.status ?? 1);
@@ -102,10 +116,12 @@ const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
 await mkdir(new URL("../build/generated/", import.meta.url), { recursive: true });
 
+const packageTimings = [];
 for (const spec of packageSpecs) {
   const { targets, packageTargets } = targetsForSpec(spec, manifest.fixtures ?? []);
   const packagePath = packagePathFor(spec);
   const reportPath = spec.report ?? packagePath.replace(/\.irpkg$/, ".report.md");
+  const packageStart = performance.now();
   const result = spawnSync(
     irpkgGeneratorPath.pathname,
     [packagePath, reportPath, ...targetArgsFor(targets, packageTargets)],
@@ -119,4 +135,19 @@ for (const spec of packageSpecs) {
   if ((result.status ?? 1) !== 0) {
     process.exit(result.status ?? 1);
   }
+  packageTimings.push({
+    id: spec.id ?? spec.file,
+    seconds: elapsedSeconds(packageStart),
+  });
 }
+
+const packagesSeconds = packageTimings.reduce((sum, timing) => sum + timing.seconds, 0);
+const packageSummary = packageTimings
+  .map((timing) => `${timing.id}=${formatSeconds(timing.seconds)}s`)
+  .join(", ");
+console.log(
+  `browser package timing: lean-lib=${formatSeconds(libSeconds)}s `
+  + `generator=${formatSeconds(generatorSeconds)}s packages=${formatSeconds(packagesSeconds)}s `
+  + `total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
+);
+console.log(`browser package files: ${packageSummary}`);

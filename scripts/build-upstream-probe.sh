@@ -7,6 +7,7 @@
 set -euo pipefail
 
 cd "$(dirname "$0")/.."
+script_start=$SECONDS
 
 src="${LEAN4_SRC:-third_party/lean4-src}"
 out="build/upstream-probe"
@@ -70,6 +71,7 @@ vir_resource_root
 vir_resource_take
 EOF
 
+package_start=$SECONDS
 npm run --silent generate:package
 for package in "${browser_packages[@]}"; do
   generated_package="build/generated/$package"
@@ -78,6 +80,7 @@ for package in "${browser_packages[@]}"; do
     cp "$generated_package" "$demo_package"
   fi
 done
+package_seconds=$((SECONDS - package_start))
 
 src_commit="unknown"
 if git -C "$src" rev-parse HEAD >/dev/null 2>&1; then
@@ -193,10 +196,13 @@ compile_one() {
   if [ "$needs_compile" = "1" ]; then
     mkdir -p "$(dirname "$object")"
     echo "compile $source"
+    compiled_count=$((compiled_count + 1))
     "$cxx" "${common_flags[@]}" -c "$source" -o "$object"
   fi
 }
 
+compiled_count=0
+compile_start=$SECONDS
 upstream_obj="$obj_dir/ir_interpreter.o"
 stable_objects=("$upstream_obj")
 compile_one "$upstream" "$upstream_obj"
@@ -210,6 +216,7 @@ for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]
   fi
   stable_objects+=("$object")
 done
+compile_seconds=$((SECONDS - compile_start))
 printf '%s\n' "${stable_objects[@]}" > "$out/objects.txt"
 
 link_objects=(
@@ -278,7 +285,9 @@ else
 fi
 
 strict_status=0
+link_seconds=0
 if [ "$needs_link" = "1" ]; then
+  link_start=$SECONDS
   echo "link $wasm"
   "$cxx" "--target=$target" "${link_objects[@]}" \
     "${link_flags[@]}" \
@@ -293,6 +302,7 @@ if [ "$needs_link" = "1" ]; then
     -Wl,--error-limit=0 \
     "${exports[@]}" \
     -o "$strict_wasm" > "$strict_log" 2>&1 || strict_status=$?
+  link_seconds=$((SECONDS - link_start))
 else
   strict_status=0
 fi
@@ -339,6 +349,8 @@ wasi_import_count="$(wc -l < "$wasi_imports" | tr -d ' ')"
 runtime_source_count="${#runtime_sources[@]}"
 support_source_count="${#support_sources[@]}"
 shim_source_count="${#shim_sources[@]}"
+report_total_seconds=$((SECONDS - script_start))
+report_start=$SECONDS
 
 {
   echo "# Upstream IR Interpreter WASI Boundary"
@@ -369,6 +381,14 @@ shim_source_count="${#shim_sources[@]}"
   for package in "${browser_packages[@]}"; do
     echo "  - \`web/public/$package\`"
   done
+  echo
+  echo "## Timing"
+  echo
+  echo "- Browser package generation: ${package_seconds}s"
+  echo "- Object compile phase: ${compile_seconds}s"
+  echo "- Objects compiled in this run: $compiled_count"
+  echo "- Link phase: ${link_seconds}s"
+  echo "- Total before report write: ${report_total_seconds}s"
   echo
   echo "## Outputs"
   echo
@@ -470,12 +490,14 @@ shim_source_count="${#shim_sources[@]}"
   echo "typed \`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`. The browser"
   echo "demos run through the real upstream interpreter."
 } > "$report"
+report_seconds=$((SECONDS - report_start))
 
 echo "wrote $report"
 if [ "$copied_demo_wasm" = "1" ]; then
   echo "wrote $demo_wasm"
 fi
 echo "strict unresolved symbols: $unresolved_count"
+echo "upstream probe timing: packages=${package_seconds}s compile=${compile_seconds}s link=${link_seconds}s report=${report_seconds}s total=$((SECONDS - script_start))s compiled_objects=$compiled_count link_reused=$([ "$needs_link" = "0" ] && echo "yes" || echo "no")"
 if [ "$strict_status" != "0" ]; then
   exit "$strict_status"
 fi

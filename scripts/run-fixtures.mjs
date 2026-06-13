@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 import { delimiter } from "node:path";
+import { performance } from "node:perf_hooks";
 
 import { createVirRuntime } from "../web/src/vir-runtime.js";
 import { runAsync } from "./process-utils.mjs";
@@ -21,6 +22,7 @@ const sourceCache = new Map();
 let cachedWasmBytes = null;
 let irpkgGeneratorEnv = null;
 const args = process.argv.slice(2);
+const scriptStart = performance.now();
 
 function usage() {
   console.log(`Usage: node scripts/run-fixtures.mjs [--no-build]
@@ -55,6 +57,14 @@ function requireOk(result, command) {
     throw new Error(`${command} failed with status ${result.status}\n${result.stderr}`);
   }
   return result;
+}
+
+function elapsedSeconds(start) {
+  return (performance.now() - start) / 1000;
+}
+
+function formatSeconds(seconds) {
+  return seconds.toFixed(2);
 }
 
 async function commandOutput(cmd, args, command) {
@@ -248,9 +258,14 @@ async function generatePackage(fixture) {
 }
 
 async function runFixture(fixture) {
+  const start = performance.now();
   const expectedStatus = fixture.expect?.status ?? "pass";
+  const hostStart = performance.now();
   const host = await hostOracle(fixture);
+  const hostSeconds = elapsedSeconds(hostStart);
+  const packageStart = performance.now();
   const generated = await generatePackage(fixture);
+  const packageSeconds = elapsedSeconds(packageStart);
 
   if (!generated.ok) {
     if (expectedStatus === "unsupported") {
@@ -260,6 +275,7 @@ async function runFixture(fixture) {
         host,
         diagnostics: generated.diagnostics,
         detail: `${generated.failure.kind}: ${generated.failure.detail}`,
+        timing: { total: elapsedSeconds(start), host: hostSeconds, package: packageSeconds, wasm: 0 },
       };
     }
     return {
@@ -268,11 +284,20 @@ async function runFixture(fixture) {
       host,
       diagnostics: generated.diagnostics,
       detail: `${generated.failure.kind}: ${generated.failure.detail}`,
+      timing: { total: elapsedSeconds(start), host: hostSeconds, package: packageSeconds, wasm: 0 },
     };
   }
 
+  const wasmStart = performance.now();
   const runtime = await instantiateWasm(generated.packagePath);
   const wasm = runtime.call(fixture.entry);
+  const wasmSeconds = elapsedSeconds(wasmStart);
+  const timing = {
+    total: elapsedSeconds(start),
+    host: hostSeconds,
+    package: packageSeconds,
+    wasm: wasmSeconds,
+  };
   if (expectedStatus === "unsupported") {
     return {
       status: "failed",
@@ -281,6 +306,7 @@ async function runFixture(fixture) {
       wasm,
       diagnostics: generated.diagnostics,
       detail: "expected unsupported fixture passed",
+      timing,
     };
   }
   if (wasm !== host) {
@@ -291,9 +317,10 @@ async function runFixture(fixture) {
       wasm,
       diagnostics: generated.diagnostics,
       detail: `host=${host} wasm=${wasm}`,
+      timing,
     };
   }
-  return { status: "passed", fixture, host, wasm, diagnostics: generated.diagnostics };
+  return { status: "passed", fixture, host, wasm, diagnostics: generated.diagnostics, timing };
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -317,6 +344,7 @@ if (fixtures.length === 0) {
   throw new Error(`no fixtures matched VIR_FIXTURE_FILTER=${JSON.stringify(fixtureFilter)}`);
 }
 await mkdir(buildDir, { recursive: true });
+let buildSeconds = 0;
 if (skipBuild) {
   try {
     await readFile(wasmPath);
@@ -325,9 +353,13 @@ if (skipBuild) {
   }
   console.log("fixture build: skipped (--no-build)");
 } else {
+  const buildStart = performance.now();
   requireOk(await runAsync("npm", ["run", "--silent", "build:demo"], { cwd: root }), "npm run build:demo");
+  buildSeconds = elapsedSeconds(buildStart);
 }
+const generatorStart = performance.now();
 await prepareIrpkgGenerator();
+const generatorSeconds = elapsedSeconds(generatorStart);
 
 function fixtureJobCount(total) {
   const configured = Number.parseInt(process.env.VIR_FIXTURE_JOBS ?? "", 10);
@@ -356,7 +388,9 @@ if (fixtureFilter !== "") {
   console.log(`fixture filter: ${fixtureFilter} (${fixtures.length}/${manifest.fixtures?.length ?? 0})`);
 }
 console.log(`fixture jobs: ${jobs}`);
+const fixtureRunStart = performance.now();
 const results = await mapWithLimit(fixtures, jobs, runFixture);
+const fixtureRunSeconds = elapsedSeconds(fixtureRunStart);
 
 let passed = 0;
 let unsupported = 0;
@@ -390,6 +424,12 @@ const summary = {
     host: result.host,
     wasm: result.wasm,
     detail: result.detail,
+    timing: result.timing && {
+      totalSeconds: Number(result.timing.total.toFixed(3)),
+      hostSeconds: Number(result.timing.host.toFixed(3)),
+      packageSeconds: Number(result.timing.package.toFixed(3)),
+      wasmSeconds: Number(result.timing.wasm.toFixed(3)),
+    },
     diagnostics: result.diagnostics && {
       loadedDeclCount: result.diagnostics.loadedDecls.length,
       importedDecls: result.diagnostics.importedDecls,
@@ -404,6 +444,20 @@ await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
 
 console.log();
 console.log(`fixture summary: ${passed} passed, ${unsupported} expected unsupported, ${failed} failed`);
+const buildTiming = skipBuild ? "skipped" : `${formatSeconds(buildSeconds)}s`;
+const slowestFixtures = [...results]
+  .sort((left, right) => (right.timing?.total ?? 0) - (left.timing?.total ?? 0))
+  .slice(0, 5)
+  .map((result) => {
+    const timing = result.timing;
+    return `${result.fixture.id}=${formatSeconds(timing.total)}s`
+      + `(host=${formatSeconds(timing.host)}s,pkg=${formatSeconds(timing.package)}s,wasm=${formatSeconds(timing.wasm)}s)`;
+  });
+console.log(
+  `fixture timing: build=${buildTiming} generator=${formatSeconds(generatorSeconds)}s `
+  + `run=${formatSeconds(fixtureRunSeconds)}s total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
+);
+console.log(`fixture slowest: ${slowestFixtures.join(", ")}`);
 const importedSummaries = results
   .filter((result) => result.diagnostics?.importedDecls?.length)
   .map((result) => `${result.fixture.id}:${result.diagnostics.importedDecls.length}`);
