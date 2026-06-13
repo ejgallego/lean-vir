@@ -52,7 +52,18 @@ the interpreter's name formatting and diagnostics.
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
 
-- `shim.cpp` owns WASI/platform stubs and the exported Lean C hooks.
+- `shim.cpp` owns the package call surface, host import trampolines, closure
+  roots, and `lean_ir_find_env_decl` hooks.
+- `interface_codec.cpp` owns the JavaScript interface wire codec shared by
+  `vir_call`, JavaScript host imports, and Lean callback calls.
+- `native_symbols.cpp` owns the explicit native extern wrappers, generated
+  native registry include, restricted `dlsym` lookup, native symbol stem
+  lookup, and C++ exception stubs.
+- `platform_stubs.cpp` owns WASI/platform and environment fidelity stubs.
+- `lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
+  constructor replacements for exported Lean-library constructors.
+- `package_decl_provider.cpp` owns package decoding, declaration lookup, host
+  import metadata, and initializer execution.
 - `tools/GeneratePackage.lean` owns extraction of the demo declaration closures
   from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
   packages.
@@ -65,9 +76,8 @@ Together they supply:
   package closures, including `fib`, `SortDemo.demoFromArray`, the
   `Lean.Vir.Browser`-backed Tamagotchi UI entrypoints, and the fixture
   dependencies.
-- small WASI/platform stubs for dynamic symbol lookup, C++ exception throwing,
-  trace/time/options hooks, and the few environment helpers pulled in by the
-  interpreter.
+- small WASI/platform stubs for C++ exception throwing, trace/time/options
+  hooks, and the few environment helpers pulled in by the interpreter.
 - the generic `vir_call` package interface used by the JavaScript runtime for
   manifest-supported functions.
 - package-scoped JavaScript host import trampolines for declarations marked
@@ -175,10 +185,10 @@ promise support plus the parenthesizer/formatter interpreter externs.
 `IO.initializing` is modeled as post-initialization, and `ST.Prim.mkRef`/
 `ST.Prim.Ref.get` cover single-threaded ref allocation/read semantics. Mutation,
 blocking IO, and scheduler behavior are still outside the demo boundary.
-They are backed by a table-driven shim registry; a full native symbol loader is
-still out of scope. The public String search/drop fixture currently imports a
-small upstream IR closure and adds native registrations for the runtime helper
-boundary that closure reaches (`Nat.ble`, `String.Pos.next`,
+They are backed by a generated native registry include; a full native symbol
+loader is still out of scope. The public String search/drop fixture currently
+imports a small upstream IR closure and adds native registrations for the
+runtime helper boundary that closure reaches (`Nat.ble`, `String.Pos.next`,
 `String.decodeChar`, `String.extract`, and `String.Slice.Pattern.Internal.memcmpStr`).
 `String.splitOn` additionally exercises the legacy `String.Pos.Raw.next`/
 `String.Pos.Raw.extract`/`String.Pos.Raw.atEnd` aliases over the same runtime
@@ -195,9 +205,10 @@ the start index is consumed.
 distinct native stem in the shim because their boxed arities differ, but all
 three wrappers delegate to the same linked runtime helper,
 `lean_string_utf8_set`.
-The shim also owns minimal `Lean.Expr`/`Lean.Level` object construction for the
-generic JavaScript interface path, so structural `Lean.Expr` values can be sent
-from JavaScript without depending on Lean-library exported constructor wrappers.
+`lean_object_constructors.cpp` also owns minimal `Lean.Expr`/`Lean.Level` object
+construction for the generic JavaScript interface path, so structural
+`Lean.Expr` values can be sent from JavaScript without depending on
+Lean-library exported constructor wrappers.
 
 JavaScript host imports deliberately do not widen the native extern policy.
 `tools/GeneratePackage.lean` encodes `@[vir_js "..."]` extern declarations into
@@ -215,11 +226,15 @@ internal root id through `env.vir_closure_push`, and emits no serialized
 This keeps the Lean heap reference count explicit while avoiding any change to
 the upstream interpreter file.
 
-`scripts/check-boundary-registry.mjs` is a guard against drift in this explicit
-registry. It checks that every `nativeExterns` entry in
-`tools/GeneratePackage.lean` has a matching table entry, `dlsym` symbol, and
-boxed wrapper or native constant entry in `wasm/upstream_shim/shim.cpp`.
-`npm test` runs this before the smoke and fixture suites.
+`tools/GeneratePackage.lean` is the source of truth for native extern
+registrations. Run `node scripts/check-boundary-registry.mjs --write` after
+changing its `nativeExterns` table; this regenerates
+`wasm/upstream_shim/native_symbols_registry.inc`. The regular
+`npm run check:boundary-registry` guard then verifies that the generated
+registry is current and that every native extern has a matching `dlsym` symbol
+plus either a handwritten boxed wrapper or a native constant entry in
+`wasm/upstream_shim/native_symbols.cpp`. `npm test` runs this before the smoke
+and fixture suites.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
@@ -249,6 +264,18 @@ environment bridges: `evalConstCore` delegates to upstream `lean_eval_const`,
 `isReservedName` delegates back into packaged IR for `Lean.isReservedName`, and
 `evalCheckMeta` is accepted for the demo. That is the next fidelity boundary to
 remove if we want parser loading to behave exactly like a full Lean runtime.
+
+`platform_stubs.cpp` keeps the remaining platform boundary explicit:
+
+- runtime budget and tracing hooks (`check_system`, heartbeat reset, time tasks,
+  and trace scopes) are inert in this single-threaded demo build;
+- initializer metadata queries are package-backed, using the same init-global
+  table that `vir_load_ir_package` executes through upstream `lean_run_init`;
+- unsupported kernel-environment inspection for `lean_eval_main` now traps
+  instead of fabricating constant metadata;
+- option registration, sorry dependency lookup, and stderr/error printing remain
+  demo no-ops because the package generator and JavaScript runtime provide the
+  active diagnostics for this path.
 
 ## Future Loading Path
 

@@ -894,6 +894,15 @@ object * find_package_boxed_decl(object * n) {
     return nullptr;
 }
 
+object * find_package_init_name(object * n) {
+    for (init_global_entry const & entry : g_init_entries) {
+        if (lean_name_eq(n, entry.name)) {
+            return entry.init_name;
+        }
+    }
+    return nullptr;
+}
+
 char const * find_host_import_symbol(object * n) {
     for (host_import_entry const & entry : g_host_imports) {
         if (lean_name_eq(n, entry.name)) {

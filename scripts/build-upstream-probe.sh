@@ -123,8 +123,18 @@ support_sources=(
 )
 
 shim_sources=(
+  "wasm/upstream_shim/lean_object_constructors.cpp"
+  "wasm/upstream_shim/interface_codec.cpp"
+  "wasm/upstream_shim/native_symbols.cpp"
+  "wasm/upstream_shim/platform_stubs.cpp"
   "wasm/upstream_shim/shim.cpp"
   "wasm/upstream_shim/package_decl_provider.cpp"
+)
+
+shim_deps=(
+  "wasm/upstream_shim/decl_provider.h"
+  "wasm/upstream_shim/interface_codec.h"
+  "wasm/upstream_shim/native_symbols_registry.inc"
 )
 
 common_flags=(
@@ -168,7 +178,19 @@ object_for_source() {
 compile_one() {
   local source="$1"
   local object="$2"
+  shift 2
+  local needs_compile=0
   if [ ! -f "$object" ] || [ "$source" -nt "$object" ] || [ "$config_h" -nt "$object" ] || [ "$compile_stamp" -nt "$object" ]; then
+    needs_compile=1
+  else
+    for dep in "$@"; do
+      if [ "$dep" -nt "$object" ]; then
+        needs_compile=1
+        break
+      fi
+    done
+  fi
+  if [ "$needs_compile" = "1" ]; then
     mkdir -p "$(dirname "$object")"
     echo "compile $source"
     "$cxx" "${common_flags[@]}" -c "$source" -o "$object"
@@ -181,7 +203,11 @@ compile_one "$upstream" "$upstream_obj"
 
 for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]}"; do
   object="$(object_for_source "$source")"
-  compile_one "$source" "$object"
+  if [[ "$source" == wasm/upstream_shim/* ]]; then
+    compile_one "$source" "$object" "${shim_deps[@]}"
+  else
+    compile_one "$source" "$object"
+  fi
   stable_objects+=("$object")
 done
 printf '%s\n' "${stable_objects[@]}" > "$out/objects.txt"
@@ -433,13 +459,16 @@ shim_source_count="${#shim_sources[@]}"
   echo
   echo "## Current Shim Scope"
   echo
-  echo "\`wasm/upstream_shim/shim.cpp\` supplies the minimal host/environment"
-  echo "boundary for the strict WASI link. \`wasm/upstream_shim/package_decl_provider.cpp\`"
+  echo "\`wasm/upstream_shim/shim.cpp\` supplies the package call surface,"
+  echo "closure bridge, and declaration lookup hooks. \`interface_codec.cpp\`"
+  echo "supplies the JavaScript interface wire codec."
+  echo "\`wasm/upstream_shim/native_symbols.cpp\` supplies the explicit native"
+  echo "extern wrappers plus generated registry include and restricted \`dlsym\` lookup;"
+  echo "\`platform_stubs.cpp\`"
+  echo "contains the remaining host/platform stubs. \`package_decl_provider.cpp\`"
   echo "loads \`$generated_package\`, a single-file declaration package emitted from"
-  echo "typed \`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`. The current"
-  echo "Nat and Array demo externs are represented as native extern declarations"
-  echo "backed by the small WASI symbol registry in the shim. The browser demos run"
-  echo "through the real upstream interpreter."
+  echo "typed \`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`. The browser"
+  echo "demos run through the real upstream interpreter."
 } > "$report"
 
 echo "wrote $report"

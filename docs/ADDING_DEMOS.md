@@ -13,9 +13,11 @@ rebuilding the upstream interpreter.
    that are needed by the demo but should not become JS interface exports.
 3. Run `npm run check:package`.
 4. Inspect the relevant `build/generated/*.report.md`.
-5. Run `npm run check:boundary-registry` if you add or change a native extern.
-   This is not needed for `@[vir_js "..."]` host imports; those appear in the
-   report's JavaScript host import section instead of the native registry.
+5. If you add or change a native extern in `tools/GeneratePackage.lean`, run
+   `node scripts/check-boundary-registry.mjs --write`, then
+   `npm run check:boundary-registry`. This is not needed for `@[vir_js "..."]`
+   host imports; those appear in the report's JavaScript host import section
+   instead of the native registry.
 6. Run `npm test`.
 7. Update `web/` only if the demo needs new UI.
 
@@ -81,7 +83,8 @@ the package-backed imported closure or the explicit native boundary.
 Prefer the manifest-driven `vir.call(name, ...args)` API in
 `web/src/vir-runtime.js`. If a demo needs another browser-supplied input or
 result shape, extend the manifest type classifier and the generic call encoder
-in `wasm/upstream_shim/shim.cpp`. Keep the Lean declaration itself in
+in `tools/GeneratePackage.lean`, `web/src/runtime/`, and the interface codec in
+`wasm/upstream_shim/interface_codec.cpp`. Keep the Lean declaration itself in
 `examples/` and include it as an exported root. Do not add per-function or
 per-shape WASM exports for manifest-supported declarations; unsupported entries
 should fail during package generation until their interface type is implemented.

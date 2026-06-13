@@ -29,7 +29,8 @@ The same package encoder also supports focused developer packages through
 public source definitions for a single Lean file. The `/dev.html` Vite entry
 point loads a served or uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls
-go through a generic byte-payload WASM export that carries recursive type
+go through a generic byte-payload WASM export; the local
+`wasm/upstream_shim/interface_codec.cpp` codec carries recursive type
 descriptors, constructs Lean input objects, and calls the upstream interpreter
 by name.
 
@@ -75,10 +76,11 @@ Lean infoview RPC compatibility remains follow-up work tracked in
 
 `Lean.Expr` is also part of the current manifest surface. JavaScript sends and
 receives structural objects for the standard expression constructors, and the
-WASM shim constructs real Lean `Expr` and `Level` runtime objects with computed
-data fields before calling the upstream interpreter. Metadata expression inputs
-are accepted by decoding their inner expression, and metadata results are
-reported with a structural `mdata` wrapper.
+temporary constructor boundary in `wasm/upstream_shim/lean_object_constructors.cpp`
+constructs real Lean `Expr` and `Level` runtime objects with computed data
+fields before calling the upstream interpreter. Metadata expression inputs are
+accepted by decoding their inner expression, and metadata results are reported
+with a structural `mdata` wrapper.
 
 The first reusable pretty-printing component is deliberately
 `pretty-printer.irpkg`, which packages `Std.Format.pretty` rather than Lean's

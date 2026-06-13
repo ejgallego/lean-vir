@@ -15,6 +15,7 @@ namespace lean::vir {
 
 object * find_package_decl(object * name);
 object * find_package_boxed_decl(object * name);
+object * find_package_init_name(object * name);
 char const * find_host_import_symbol(object * name);
 int32_t host_import_slot_for_symbol(char const * symbol);
 uint32_t host_import_arity(uint32_t slot);
