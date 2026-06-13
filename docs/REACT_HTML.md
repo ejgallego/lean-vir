@@ -170,11 +170,12 @@ helpers check `currentTarget` first, then fall back to `target`.
 
 ## Future Notes
 
-`externref` remains the right future representation for host-owned resources,
-but it is not required for this v0. The resource table is enough for
-`ReactRoot` and callback-scoped events, and it keeps the current path
-compatible with the `wasm32-wasip1` shim. An `externref` lowering can replace
-the table later without changing this Lean-facing API much.
+`externref` is now required by the experimental JavaScript resource path.
+Resource values cross the JS/Wasm boundary through `externref` side-channel
+imports, while Lean stores GC-finalized external resource objects. This keeps
+the Lean-facing API compatible with future component-model-style resources.
+The React-first direction and feature probes are tracked in
+`docs/REACT_WASM_BINDINGS.md`.
 
 Open engineering questions:
 

@@ -8,6 +8,8 @@ import { createVirRuntimeFactory as createBrowserVirRuntimeFactory } from "./vir
 import {
   createNodeHostBindings,
   createVirtualDocumentState,
+  hasExternrefTableSupport,
+  requireExternrefTableSupport,
 } from "./vir-host-bindings.js";
 
 export {
@@ -28,6 +30,8 @@ export {
   findVirtualReactElementById,
   createVirtualEventState,
   createVirtualEventHostBindings,
+  hasExternrefTableSupport,
+  requireExternrefTableSupport,
   virtualReactElementById,
 } from "./vir-host-bindings.js";
 

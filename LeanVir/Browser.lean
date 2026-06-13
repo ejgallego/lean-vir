@@ -13,8 +13,8 @@ Opaque browser DOM element handle.
 
 Lean code receives element values from `Document.querySelector` and passes them
 to `Element` or more-specific element APIs. The current `wasm32-wasip1`
-runtime represents this as a private resource handle; Lean programs should not
-construct or persist assumptions about the handle representation.
+runtime represents this as an opaque host resource; Lean programs should not
+construct or persist assumptions about the resource representation.
 
 Reference: [MDN `Element`](https://developer.mozilla.org/en-US/docs/Web/API/Element).
 -/

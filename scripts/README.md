@@ -18,6 +18,10 @@ map lives in `docs/HARNESS.md`.
   Build the demo and run the upstream interpreter smoke test.
 - `npm run test:runtime`
   Run JavaScript runtime, host binding, callback lifecycle, and manifest tests.
+- `npm run test:wasm-extensions`
+  Probe optional JS/Wasm interop features such as `externref` and JSPI.
+  Missing `externref` support fails because the experimental React resource
+  prototype requires it; unsupported JSPI is reported as skipped.
 - `npm run test:fixtures`
   Run the fixture host-oracle suite. Use `VIR_FIXTURE_FILTER=<substring>` to
   narrow it.
@@ -68,3 +72,30 @@ The split helpers below are the intended extension points for focused changes:
   parsing and formatting live in `scripts/bench-utils.mjs`.
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
+
+For performance comparisons, capture reports from each version with:
+
+```bash
+npm run bench -- --json build/perf/current.json
+```
+
+`npm run bench` keeps built benchmark inputs in
+`.perf-artifacts/vir-bench-cache` by default. Use `--no-artifact-cache`,
+`--artifact-cache DIR`, or `--refresh-artifact-cache` when you need explicit
+cache control.
+
+Then compare them with:
+
+```bash
+npm run bench:compare -- build/perf/before.json build/perf/after.json
+```
+
+For repeated before/after runs across two checked-out trees, use:
+
+```bash
+npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
+```
+
+This alternates the two checkouts, writes per-run JSON reports under
+`build/perf/paired/`, and summarizes median deltas for common rows. Both
+checkouts must support `npm run bench -- --json PATH`.

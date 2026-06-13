@@ -292,15 +292,16 @@ result type. `Unit` results should return `undefined` or `null`.
 
 Lean function values in host-import arguments are supported as callbacks from
 JavaScript into Lean. The JavaScript runtime roots the closure in the WASM shim,
-passes a handle to the host binding, and releases it with `vir_closure_release`
-when the host binding calls `callback.release()` or when the runtime is disposed.
+passes a callable `VirCallback` object to the host binding, and releases the
+internal root with `vir_closure_release` when the host binding calls
+`callback.release()` or when the runtime is disposed.
 JavaScript-provided function values are not accepted as Lean arguments in this
 phase.
 
 `Element.addEventListener`, `Timer.setTimeout`,
 `Animation.requestAnimationFrame`, and `React.Root.render` use the callback ABI.
 Event resources are valid only during the callback. Listener, timeout, frame,
-and React root handles own their retained callbacks until removal,
+and React root resources own their retained callbacks until removal,
 cancellation, firing, rerender, unmount, package reload, or runtime disposal. See
 `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed ownership contract and
 follow-up work.
@@ -319,7 +320,7 @@ entrypoints:
 - non-indexed user-defined structures and custom inductives with nullary or
   runtime-payload constructors
 - nullary inductive enums
-- opaque `Lean.Vir.Browser` and `Lean.Vir.React` resource handles
+- opaque `Lean.Vir.Browser` and `Lean.Vir.React` resource values
 - Lean function values used as host callbacks
 - `Lean.Expr`
 - `Lean.Vir.React.Html` through the generic recursive custom-inductive surface

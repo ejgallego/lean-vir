@@ -4,23 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createBrowserReactRootResource as createBrowserReactRootResourceFromHtml } from "./react/vir-react-html.js";
 import {
   callLeanEventCallback,
-  createAnimationFrameResource,
+  createAnimationResourceHostBindings,
   createElementResourceHostBindings,
   createHostResourceState,
   createHtmlInputElementResourceHostBindings,
-  createReactHostHooks,
-  createTimeoutResource,
-  disposeDomResourceState,
+  createTimerResourceHostBindings,
   once,
   performanceNow,
   preventDefaultOnEvent,
-  releaseResource,
-  removeDisposable,
-  resolveResource,
-  resourceForValue,
   stopPropagationOnEvent,
 } from "./host/vir-host-resources.js";
 import {
@@ -29,8 +22,11 @@ import {
 } from "./host/vir-virtual-host-bindings.js";
 
 export {
+  hasExternrefTableSupport,
+  requireExternrefTableSupport,
+} from "./host-resource.js";
+export {
   createHostResourceState,
-  createReactRootResourceHostBindings,
 } from "./host/vir-host-resources.js";
 export {
   createVirtualDocumentHostBindings,
@@ -68,22 +64,22 @@ export function createBrowserDocumentHostBindings(state = createHostResourceStat
       browserDocument().title = title;
       return undefined;
     },
-    "browser.document.querySelector": (selector) => resourceForValue(state, queryDocumentElement(selector)),
+    "browser.document.querySelector": (selector) => state.resourceForValue(queryDocumentElement(selector)),
   };
 }
 
 export function createBrowserEventHostBindings(state = createHostResourceState()) {
   return {
     "browser.event.target": (event) =>
-      resourceForElementTarget(state, resolveResource(state, event, "Event").target),
+      resourceForElementTarget(state, state.resolveResource(event, "Event").target),
     "browser.event.currentTarget": (event) =>
-      resourceForElementTarget(state, resolveResource(state, event, "Event").currentTarget),
+      resourceForElementTarget(state, state.resolveResource(event, "Event").currentTarget),
     "browser.event.preventDefault": (event) => {
-      preventDefaultOnEvent(resolveResource(state, event, "Event"));
+      preventDefaultOnEvent(state.resolveResource(event, "Event"));
       return undefined;
     },
     "browser.event.stopPropagation": (event) => {
-      stopPropagationOnEvent(resolveResource(state, event, "Event"));
+      stopPropagationOnEvent(state.resolveResource(event, "Event"));
       return undefined;
     },
   };
@@ -104,21 +100,12 @@ export function createBrowserElementHostBindings(state = createHostResourceState
 
 export function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
   return createHtmlInputElementResourceHostBindings(state, {
-    fromElement: (element) => isInputElement(element) ? resourceForValue(state, element) : null,
+    fromElement: (element) => isInputElement(element) ? state.resourceForValue(element) : null,
   });
 }
 
 export function createBrowserTimerHostBindings(state = createHostResourceState()) {
-  return {
-    "browser.timer.setTimeout": (delayMs, callback) =>
-      resourceForValue(state, createTimeoutResource(state, delayMs, callback)),
-    "browser.timer.clearTimeout": (timeout) => {
-      const value = resolveResource(state, timeout, "Timeout");
-      value.clear();
-      releaseResource(state, timeout);
-      return undefined;
-    },
-  };
+  return createTimerResourceHostBindings(state);
 }
 
 export function createBrowserAnimationHostBindings(state = createHostResourceState()) {
@@ -130,24 +117,7 @@ export function createBrowserAnimationHostBindings(state = createHostResourceSta
     typeof globalThis.cancelAnimationFrame === "function"
       ? globalThis.cancelAnimationFrame.bind(globalThis)
       : globalThis.clearTimeout.bind(globalThis);
-  return {
-    "browser.animation.requestAnimationFrame": (callback) =>
-      resourceForValue(state, createAnimationFrameResource(state, callback, requestFrame, cancelFrame)),
-    "browser.animation.cancelAnimationFrame": (frame) => {
-      const value = resolveResource(state, frame, "AnimationFrame");
-      value.cancel();
-      releaseResource(state, frame);
-      return undefined;
-    },
-  };
-}
-
-export function createBrowserReactHostBindings() {
-  throw new Error(
-    "Browser React host bindings moved to lean-vir/react-host-bindings; " +
-      "import createBrowserReactHostBindings from that entry point and pass it through " +
-      "createBrowserHostBindings({ reactHostBindings })",
-  );
+  return createAnimationResourceHostBindings(state, { requestFrame, cancelFrame });
 }
 
 export function createBrowserHostBindings({
@@ -170,7 +140,7 @@ export function createBrowserHostBindings({
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
     ...reactBindings,
-    [VIR_HOST_DISPOSE]: () => disposeDomResourceState(state),
+    [VIR_HOST_DISPOSE]: () => state.dispose(),
   };
 }
 
@@ -180,10 +150,6 @@ export function createNodeHostBindings(state = createVirtualDocumentState()) {
     ...createConsoleHostBindings(),
     ...createVirtualDocumentHostBindings(state),
   };
-}
-
-export function createBrowserReactRootResource(state, root, createElement) {
-  return createBrowserReactRootResourceFromHtml(state, root, createElement, createReactHostHooks());
 }
 
 function normalizeOptionalHostBindingMap(value, label) {
@@ -214,7 +180,7 @@ function createBrowserEventListenerResource(resources, target, eventName, callba
     remove: once(() => {
       target.removeEventListener(eventName, handler);
       callback.release();
-      removeDisposable(resources, listener);
+      resources.removeDisposable(listener);
     }),
   };
   return listener;
@@ -229,5 +195,5 @@ function isElement(value) {
 }
 
 function resourceForElementTarget(state, value) {
-  return isElement(value) ? resourceForValue(state, value) : null;
+  return isElement(value) ? state.resourceForValue(value) : null;
 }

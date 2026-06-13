@@ -45,8 +45,8 @@ import { createBrowserReactHostBindings } from "lean-vir/react-host-bindings";
 ```
 
 When composing low-level browser binding groups, pass the same
-`createHostResourceState()` result to each group so resource handles returned by
-one group are live in the others.
+`createHostResourceState()` result to each group so opaque resources returned
+by one group are live in the others.
 
 ## Runtime Module Map
 
@@ -61,7 +61,8 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/vir-value-normalizers.js` | Input normalization helpers used by the value codec. |
 | `runtime/vir-lean-codec.js` | Structural `Lean.Expr` and level encode/decode helpers. |
 | `vir-host-bindings.js` | Public common/browser host binding factories and stable re-exports. |
-| `host/vir-host-resources.js` | Opaque resource tables, cleanup, timers, callbacks, and shared binding helpers. |
+| `host-resource.js` | Opaque host-resource objects and externref root tables. |
+| `host/vir-host-resources.js` | Host-resource store, liveness, teardown, timers, callbacks, and shared binding helpers. |
 | `host/vir-virtual-host-bindings.js` | Virtual document/event/React host bindings for Node tests/tools. |
 | `react/vir-react-html.js` | React HTML tree validation, conversion, callback release, and virtual text helpers. |
 | `vir-react-host-bindings.js` | Browser `react.root.*` bindings; imports `react` and `react-dom/client`. |
@@ -71,7 +72,9 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
 `lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. The narrower codec
 modules are packaged so the runtime's internal imports resolve consistently in
-the SDK artifact.
+the SDK artifact. React browser bindings are intentionally exported only from
+`lean-vir/react-host-bindings`, keeping `lean-vir/host-bindings` free of React
+and `react-dom/client` dependencies.
 
 ## Host Bindings
 
@@ -309,7 +312,9 @@ hostBindings: {
 Callbacks are idempotently releasable through `callback.release()` or
 `callback.dispose()`. Calling a released callback throws. JavaScript-provided
 function values are not accepted as Lean arguments in this phase; function
-values flow from Lean to JavaScript as callback handles.
+values flow from Lean to JavaScript as callable `VirCallback` objects backed by
+internal closure root ids. `VirCallback` objects intentionally do not expose a
+numeric root id.
 
 `vir.dispose()` releases any `VirCallback` objects still tracked by the runtime
 and calls host-binding cleanup hooks. Calling `vir.loadIrPackageBytes(...)` on a

@@ -32,24 +32,24 @@ import {
   normalizeInteger,
   normalizeOption,
   normalizePair,
-  normalizeResourceHandle,
+  normalizeHostResource,
   normalizeStructure,
   normalizeTaggedUnion,
 } from "./vir-value-normalizers.js";
 import { WIRE } from "./wire-tags.js";
 
-export function encodeCallPayload(entry, args) {
+export function encodeCallPayload(entry, args, options = {}) {
   const writer = new BinaryWriter();
   writer.u32(args.length);
   entry.args.forEach((arg, index) => {
-    encodeValue(writer, arg.type, args[index], `${entry.entry} argument ${arg.name}`);
+    encodeValue(writer, arg.type, args[index], `${entry.entry} argument ${arg.name}`, options);
   });
   encodeTypeDescriptor(writer, entry.result, `${entry.entry} result`);
   writer.u8(entry.effect === "io" ? 1 : 0);
   return writer.take();
 }
 
-export function encodeClosureCallPayload(type, args) {
+export function encodeClosureCallPayload(type, args, options = {}) {
   const fnArgs = requireFunctionArgs(type, "callback");
   if (args.length !== fnArgs.length) {
     throw new Error(`callback expects ${fnArgs.length} arguments, got ${args.length}`);
@@ -57,7 +57,7 @@ export function encodeClosureCallPayload(type, args) {
   const writer = new BinaryWriter();
   writer.u32(args.length);
   fnArgs.forEach((arg, index) => {
-    encodeValue(writer, arg.type, args[index], `callback argument ${arg.name}`);
+    encodeValue(writer, arg.type, args[index], `callback argument ${arg.name}`, options);
   });
   encodeTypeDescriptor(writer, requireFunctionResult(type, "callback"), "callback result");
   writer.u8(type.effect === "io" ? 1 : 0);
@@ -96,32 +96,35 @@ export function decodeHostCallRequest(bytes, entry, options = {}) {
   return { args, resultType: entry.result };
 }
 
-export function encodeHostCallResult(type, value, entry) {
+export function encodeHostCallResult(type, value, entry, options = {}) {
   const writer = new BinaryWriter();
   encodeTypeDescriptor(writer, type, `${entry.target} result`);
-  encodeValuePayload(writer, type, value, `${entry.target} result`);
+  encodeValuePayload(writer, type, value, `${entry.target} result`, options);
   return writer.take();
 }
 
-function encodeValue(writer, type, value, label) {
+function encodeValue(writer, type, value, label, options) {
   encodeTypeDescriptor(writer, type, label);
-  encodeValuePayload(writer, type, value, label);
+  encodeValuePayload(writer, type, value, label, options);
 }
 
-function encodeValuePayload(writer, type, value, label, selfType = null) {
+function encodeValuePayload(writer, type, value, label, options = {}, selfType = null) {
   const tag = requireWireTag(type, label);
   switch (tag) {
     case WIRE.RECURSIVE_SELF:
       if (selfType === null) {
         throw new Error(`${label} has a recursive self reference without an enclosing type`);
       }
-      encodeValuePayload(writer, selfType, value, label, selfType);
+      encodeValuePayload(writer, selfType, value, label, options, selfType);
       return;
     case WIRE.UNIT:
       if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
       return;
     case WIRE.RESOURCE:
-      writer.u32(normalizeResourceHandle(value, label));
+      if (typeof options.pushIncomingResource !== "function") {
+        throw new Error(`${label} cannot be encoded without an attached resource queue`);
+      }
+      options.pushIncomingResource(normalizeHostResource(value, label));
       return;
     case WIRE.FUNCTION:
       throw new Error(`${label} cannot be a JavaScript function in v1`);
@@ -169,38 +172,38 @@ function encodeValuePayload(writer, type, value, label, selfType = null) {
       return;
     case WIRE.ARRAY:
     case WIRE.LIST:
-      encodeSequencePayload(writer, type, value, label, selfType);
+      encodeSequencePayload(writer, type, value, label, options, selfType);
       return;
     case WIRE.OPTION: {
       const option = normalizeOption(value, label);
       writer.u8(option.some ? 1 : 0);
       if (option.some) {
-        encodeValuePayload(writer, requireTypeField(type, "element", label), option.value, `${label}.value`, selfType);
+        encodeValuePayload(writer, requireTypeField(type, "element", label), option.value, `${label}.value`, options, selfType);
       }
       return;
     }
     case WIRE.PROD: {
       const pair = normalizePair(value, label);
-      encodeValuePayload(writer, requireTypeField(type, "fst", label), pair.fst, `${label}.fst`, selfType);
-      encodeValuePayload(writer, requireTypeField(type, "snd", label), pair.snd, `${label}.snd`, selfType);
+      encodeValuePayload(writer, requireTypeField(type, "fst", label), pair.fst, `${label}.fst`, options, selfType);
+      encodeValuePayload(writer, requireTypeField(type, "snd", label), pair.snd, `${label}.snd`, options, selfType);
       return;
     }
     case WIRE.STRUCTURE: {
       const fields = requireStructureFields(type, label);
       const record = normalizeStructure(value, fields, label);
-      encodeNamedFieldPayloads(writer, fields, record, label, type);
+      encodeNamedFieldPayloads(writer, fields, record, label, type, options);
       return;
     }
     case WIRE.TAGGED_UNION: {
       const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
       writer.u32(index);
-      encodeValuePayload(writer, ctor.type, payload, `${label}.${ctor.jsName}`, selfType);
+      encodeValuePayload(writer, ctor.type, payload, `${label}.${ctor.jsName}`, options, selfType);
       return;
     }
     case WIRE.CUSTOM_INDUCTIVE: {
       const { index, ctor, fields } = normalizeCustomInductive(value, type, label);
       writer.u32(index);
-      encodeNamedFieldPayloads(writer, ctor.fields, fields, `${label}.${ctor.jsName}`, type);
+      encodeNamedFieldPayloads(writer, ctor.fields, fields, `${label}.${ctor.jsName}`, type, options);
       return;
     }
     default:
@@ -208,17 +211,17 @@ function encodeValuePayload(writer, type, value, label, selfType = null) {
   }
 }
 
-function encodeSequencePayload(writer, type, value, label, selfType) {
+function encodeSequencePayload(writer, type, value, label, options, selfType) {
   const values = normalizeArray(value, label);
   writer.u32(values.length);
   const elementType = requireTypeField(type, "element", label);
   values.forEach((item, itemIndex) =>
-    encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`, selfType));
+    encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`, options, selfType));
 }
 
-function encodeNamedFieldPayloads(writer, fields, values, label, selfType) {
+function encodeNamedFieldPayloads(writer, fields, values, label, selfType, options) {
   fields.forEach((field) =>
-    encodeValuePayload(writer, field.type, values[field.name], `${label}.${field.name}`, selfType));
+    encodeValuePayload(writer, field.type, values[field.name], `${label}.${field.name}`, options, selfType));
 }
 
 function decodeValuePayload(reader, type, options = {}, selfType = null) {
@@ -235,13 +238,19 @@ function decodeValuePayload(reader, type, options = {}, selfType = null) {
       value = undefined;
       break;
     case WIRE.RESOURCE:
-      value = { handle: reader.u32() };
+      if (typeof options.takeOutgoingResource !== "function") {
+        throw new Error("resource value decoded without an attached resource queue");
+      }
+      value = options.takeOutgoingResource("resource result");
       break;
     case WIRE.FUNCTION:
       if (typeof options.createCallback !== "function") {
         throw new Error("function value decoded without an attached VirRuntime");
       }
-      value = options.createCallback(reader.u32(), type);
+      if (typeof options.takeOutgoingClosureRootId !== "function") {
+        throw new Error("function value decoded without an attached closure root queue");
+      }
+      value = options.createCallback(options.takeOutgoingClosureRootId("function result"), type);
       break;
     case WIRE.NAT:
     case WIRE.INT:

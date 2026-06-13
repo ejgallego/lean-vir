@@ -5,40 +5,122 @@ Author: Emilio J. Gallego Arias
 */
 
 import { disposeReactHtml } from "../react/vir-react-html.js";
+import {
+  createHostResource,
+  hostResourceLabel,
+  hostResourceValue,
+  isHostResource,
+  releaseHostResource,
+  requireExternrefTableSupport,
+} from "../host-resource.js";
+
+export class HostResourceState {
+  constructor() {
+    requireExternrefTableSupport();
+    this.resources = new WeakMap();
+    this.liveResources = new Set();
+    this.disposables = new Set();
+  }
+
+  resourceForValue(value) {
+    if (value === null || value === undefined) return null;
+    let resource = this.resources.get(value);
+    if (!isHostResource(resource) || hostResourceValue(resource) === null) {
+      resource = createHostResource(value);
+      this.resources.set(value, resource);
+    }
+    this.liveResources.add(resource);
+    return resource;
+  }
+
+  releaseResource(resource) {
+    const value = hostResourceValue(resource);
+    if (value !== null && value !== undefined) {
+      this.resources.delete(value);
+    }
+    if (isHostResource(resource)) {
+      this.liveResources.delete(resource);
+    }
+    releaseHostResource(resource);
+    return undefined;
+  }
+
+  releaseValueResource(value) {
+    const resource = this.resources.get(value);
+    if (resource !== undefined) {
+      this.releaseResource(resource);
+    }
+    return undefined;
+  }
+
+  addDisposable(value) {
+    this.disposables.add(value);
+    return undefined;
+  }
+
+  removeDisposable(value) {
+    this.disposables.delete(value);
+    return undefined;
+  }
+
+  resolveResource(resource, label) {
+    const value = hostResourceValue(resource);
+    if (value === null || value === undefined || !this.liveResources.has(resource)) {
+      throw new Error(`${hostResourceLabel(resource) ?? label} resource is not live`);
+    }
+    return value;
+  }
+
+  dispose() {
+    for (const value of Array.from(this.disposables)) {
+      if (typeof value.remove === "function") {
+        value.remove();
+      } else if (typeof value.clear === "function") {
+        value.clear();
+      } else if (typeof value.cancel === "function") {
+        value.cancel();
+      } else if (typeof value.unmount === "function") {
+        value.unmount();
+      }
+    }
+    this.disposables.clear();
+    for (const resource of Array.from(this.liveResources)) {
+      this.releaseResource(resource);
+    }
+    this.resources = new WeakMap();
+    this.liveResources.clear();
+    return undefined;
+  }
+}
 
 export function createHostResourceState() {
-  return {
-    nextHandle: 1,
-    values: new Map(),
-    handles: new WeakMap(),
-    disposables: new Set(),
-  };
+  return new HostResourceState();
 }
 
 export function createElementResourceHostBindings(resources, operations) {
   return {
     "browser.element.getTextContent": (element) =>
-      operations.getTextContent(resolveResource(resources, element, "Element")),
+      operations.getTextContent(resources.resolveResource(element, "Element")),
     "browser.element.setTextContent": (element, text) => {
-      operations.setTextContent(resolveResource(resources, element, "Element"), text);
+      operations.setTextContent(resources.resolveResource(element, "Element"), text);
       return undefined;
     },
     "browser.element.getAttribute": (element, name) =>
-      operations.getAttribute(resolveResource(resources, element, "Element"), name),
+      operations.getAttribute(resources.resolveResource(element, "Element"), name),
     "browser.element.setAttribute": (element, name, value) => {
-      operations.setAttribute(resolveResource(resources, element, "Element"), name, value);
+      operations.setAttribute(resources.resolveResource(element, "Element"), name, value);
       return undefined;
     },
     "browser.element.addEventListener": (element, eventName, callback) => {
-      const target = resolveResource(resources, element, "Element");
+      const target = resources.resolveResource(element, "Element");
       const listener = operations.createEventListener(target, eventName, callback);
-      addDisposable(resources, listener);
-      return resourceForValue(resources, listener);
+      resources.addDisposable(listener);
+      return resources.resourceForValue(listener);
     },
     "browser.element.removeEventListener": (listener) => {
-      const value = resolveResource(resources, listener, "EventListener");
+      const value = resources.resolveResource(listener, "EventListener");
       value.remove();
-      releaseResource(resources, listener);
+      resources.releaseResource(listener);
       return undefined;
     },
   };
@@ -47,17 +129,17 @@ export function createElementResourceHostBindings(resources, operations) {
 export function createHtmlInputElementResourceHostBindings(resources, { fromElement }) {
   return {
     "browser.htmlInputElement.fromElement": (element) =>
-      fromElement(resolveResource(resources, element, "Element")),
+      fromElement(resources.resolveResource(element, "Element")),
     "browser.htmlInputElement.getChecked": (input) =>
-      resolveResource(resources, input, "HTMLInputElement").checked === true,
+      resources.resolveResource(input, "HTMLInputElement").checked === true,
     "browser.htmlInputElement.setChecked": (input, checked) => {
-      resolveResource(resources, input, "HTMLInputElement").checked = checked;
+      resources.resolveResource(input, "HTMLInputElement").checked = checked;
       return undefined;
     },
     "browser.htmlInputElement.getValue": (input) =>
-      resolveResource(resources, input, "HTMLInputElement").value ?? "",
+      resources.resolveResource(input, "HTMLInputElement").value ?? "",
     "browser.htmlInputElement.setValue": (input, value) => {
-      resolveResource(resources, input, "HTMLInputElement").value = value;
+      resources.resolveResource(input, "HTMLInputElement").value = value;
       return undefined;
     },
   };
@@ -66,12 +148,12 @@ export function createHtmlInputElementResourceHostBindings(resources, { fromElem
 export function createReactRootResourceHostBindings(resources, createRootResource) {
   return {
     "react.root.create": (container) => {
-      const target = resolveResource(resources, container, "Element");
-      return resourceForValue(resources, createRootResource(target));
+      const target = resources.resolveResource(container, "Element");
+      return resources.resourceForValue(createRootResource(target));
     },
     "react.root.render": (root, html) => {
       try {
-        const value = resolveResource(resources, root, "ReactRoot");
+        const value = resources.resolveResource(root, "ReactRoot");
         value.render(html);
       } catch (error) {
         disposeReactHtml(html);
@@ -80,66 +162,38 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       return undefined;
     },
     "react.root.unmount": (root) => {
-      const value = resolveResource(resources, root, "ReactRoot");
+      const value = resources.resolveResource(root, "ReactRoot");
       value.unmount();
-      releaseResource(resources, root);
+      resources.releaseResource(root);
       return undefined;
     },
   };
 }
 
-export function resourceForValue(state, value) {
-  if (value === null || value === undefined) return null;
-  let handle = state.handles.get(value);
-  if (handle === undefined) {
-    handle = state.nextHandle++;
-    state.handles.set(value, handle);
-    state.values.set(handle, value);
-  }
-  return { handle };
-}
-
-export function releaseResource(state, resource) {
-  const handle = resourceHandle(resource, "Resource");
-  const value = state.values.get(handle);
-  if (value !== undefined) {
-    state.handles.delete(value);
-    state.values.delete(handle);
-  }
-}
-
-export function releaseValueResource(state, value) {
-  const handle = state.handles.get(value);
-  if (handle !== undefined) {
-    releaseResource(state, { handle });
-  }
-}
-
-export function addDisposable(state, value) {
-  state.disposables ??= new Set();
-  state.disposables.add(value);
-}
-
-export function removeDisposable(state, value) {
-  state.disposables?.delete(value);
-}
-
-export function disposeDomResourceState(state) {
-  for (const value of Array.from(state.disposables ?? [])) {
-    if (typeof value.remove === "function") {
-      value.remove();
-    } else if (typeof value.clear === "function") {
+export function createTimerResourceHostBindings(resources) {
+  return {
+    "browser.timer.setTimeout": (delayMs, callback) =>
+      resources.resourceForValue(createTimeoutResource(resources, delayMs, callback)),
+    "browser.timer.clearTimeout": (timeout) => {
+      const value = resources.resolveResource(timeout, "Timeout");
       value.clear();
-    } else if (typeof value.cancel === "function") {
+      resources.releaseResource(timeout);
+      return undefined;
+    },
+  };
+}
+
+export function createAnimationResourceHostBindings(resources, { requestFrame, cancelFrame }) {
+  return {
+    "browser.animation.requestAnimationFrame": (callback) =>
+      resources.resourceForValue(createAnimationFrameResource(resources, callback, requestFrame, cancelFrame)),
+    "browser.animation.cancelAnimationFrame": (frame) => {
+      const value = resources.resolveResource(frame, "AnimationFrame");
       value.cancel();
-    } else if (typeof value.unmount === "function") {
-      value.unmount();
-    }
-  }
-  state.disposables?.clear();
-  state.values?.clear();
-  state.handles = new WeakMap();
-  state.nextHandle = 1;
+      resources.releaseResource(frame);
+      return undefined;
+    },
+  };
 }
 
 export function createTimeoutResource(resources, delayMs, callback) {
@@ -169,7 +223,7 @@ export function createScheduledCallbackResource(resources, callback, { disposeMe
         token = null;
       }
       callback.release();
-      removeDisposable(resources, value);
+      resources.removeDisposable(value);
     }),
   };
   token = schedule((...args) => {
@@ -180,10 +234,10 @@ export function createScheduledCallbackResource(resources, callback, { disposeMe
       reportEventHandlerError(error);
     } finally {
       value[disposeMethod]();
-      releaseValueResource(resources, value);
+      resources.releaseValueResource(value);
     }
   });
-  addDisposable(resources, value);
+  resources.addDisposable(value);
   return value;
 }
 
@@ -194,15 +248,6 @@ export function once(fn) {
     called = true;
     return fn(...args);
   };
-}
-
-export function resolveResource(state, resource, label) {
-  const handle = resourceHandle(resource, label);
-  const value = state.values.get(handle);
-  if (value === undefined) {
-    throw new Error(`${label} resource handle ${handle} is not live`);
-  }
-  return value;
 }
 
 export function preventDefaultOnEvent(event) {
@@ -222,14 +267,14 @@ export function stopPropagationOnEvent(event) {
 }
 
 export function callLeanEventCallback(state, event, callback) {
-  const eventResource = resourceForValue(state, event ?? {});
+  const eventResource = state.resourceForValue(event ?? {});
   try {
     callback(eventResource);
   } catch (error) {
     reportEventHandlerError(error);
   } finally {
     if (eventResource !== null) {
-      releaseResource(state, eventResource);
+      state.releaseResource(eventResource);
     }
   }
 }
@@ -249,17 +294,9 @@ export function performanceNow() {
 
 export function createReactHostHooks() {
   return {
-    addDisposable,
-    removeDisposable,
+    addDisposable: (state, value) => state.addDisposable(value),
+    removeDisposable: (state, value) => state.removeDisposable(value),
     callLeanEventCallback,
     once,
   };
-}
-
-function resourceHandle(resource, label) {
-  const handle = resource?.handle;
-  if (!Number.isInteger(handle) || handle <= 0 || handle > 0xffffffff) {
-    throw new Error(`${label} resource must be a live DOM resource handle`);
-  }
-  return handle;
 }

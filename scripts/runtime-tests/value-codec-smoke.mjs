@@ -5,12 +5,115 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntime, createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import {
+  createHostResource,
+  ExternrefResourceRoots,
+  releaseHostResource,
+} from "../../web/src/host-resource.js";
+import {
+  createHostResourceState,
+} from "../../web/src/host/vir-host-resources.js";
+import { BinaryWriter, encodeTypeDescriptor } from "../../web/src/runtime/vir-codec.js";
+import {
+  decodeCallResult,
+  encodeCallPayload,
+} from "../../web/src/runtime/vir-value-codec.js";
+import { WIRE } from "../../web/src/runtime/wire-tags.js";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
 
 const { wasmBytes, irPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();
 const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
 const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
 const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
+const natType = { type: "Nat", wireTag: WIRE.NAT };
+const unitType = { type: "Unit", wireTag: WIRE.UNIT };
+const resourceType = { type: "Resource", wireTag: WIRE.RESOURCE };
+const resourceEntry = {
+  entry: "resourceArg",
+  args: [{ name: "arg1", type: resourceType }],
+  result: unitType,
+  effect: "pure",
+};
+const resourceValue = { name: "resource" };
+const resourceArg = createHostResource(resourceValue);
+assert.deepEqual(Object.keys(resourceArg), []);
+assert.equal(Object.hasOwn(resourceArg, "handle"), false);
+assert.equal("handle" in resourceArg, false);
+assert.equal(Object.hasOwn(resourceArg, "value"), false);
+assert.equal("value" in resourceArg, false);
+const incomingResources = [];
+const resourceArgPayload = encodeCallPayload(resourceEntry, [resourceArg], {
+  pushIncomingResource: (value) => incomingResources.push(value),
+});
+assert.deepEqual([...resourceArgPayload], [1, 0, 0, 0, WIRE.RESOURCE, WIRE.UNIT, 0]);
+assert.equal(incomingResources.length, 1);
+assert.equal(incomingResources[0], resourceArg);
+assert.throws(
+  () => encodeCallPayload(resourceEntry, [{ handle: 1 }], { pushIncomingResource: () => undefined }),
+  /resourceArg argument arg1 must be a live host resource/,
+);
+releaseHostResource(resourceArg);
+assert.throws(
+  () => encodeCallPayload(resourceEntry, [resourceArg], { pushIncomingResource: () => undefined }),
+  /resourceArg argument arg1 must be a live host resource/,
+);
+const resourceStore = createHostResourceState();
+const staleStoreResource = resourceStore.resourceForValue({ name: "stale" });
+resourceStore.dispose();
+assert.throws(
+  () => encodeCallPayload(resourceEntry, [staleStoreResource], { pushIncomingResource: () => undefined }),
+  /resourceArg argument arg1 must be a live host resource/,
+);
+const roots = new ExternrefResourceRoots();
+const firstRootResource = createHostResource({ name: "first" });
+const firstRootId = roots.root(firstRootResource);
+assert.equal(firstRootId, 1);
+assert.equal(roots.get(firstRootId), firstRootResource);
+roots.release(firstRootId);
+assert.equal(roots.get(firstRootId), null);
+const secondRootResource = createHostResource({ name: "second" });
+const secondRootId = roots.root(secondRootResource);
+assert.equal(secondRootId, firstRootId);
+assert.equal(roots.get(secondRootId), secondRootResource);
+roots.clear();
+assert.equal(roots.get(secondRootId), null);
+releaseHostResource(secondRootResource);
+assert.equal(roots.root(secondRootResource), 0);
+const resourceResultWriter = new BinaryWriter();
+encodeTypeDescriptor(resourceResultWriter, resourceType, "resource result");
+let outgoingResourceTakes = 0;
+assert.equal(
+  decodeCallResult(resourceType, resourceResultWriter.take(), {
+    takeOutgoingResource: (label) => {
+      assert.equal(label, "resource result");
+      outgoingResourceTakes += 1;
+      return "opaque-resource";
+    },
+  }),
+  "opaque-resource",
+);
+assert.equal(outgoingResourceTakes, 1);
+const callbackType = {
+  type: "Function",
+  wireTag: WIRE.FUNCTION,
+  effect: "io",
+  args: [{ name: "input", type: natType }],
+  result: natType,
+};
+const callbackResultWriter = new BinaryWriter();
+encodeTypeDescriptor(callbackResultWriter, callbackType, "callback result");
+let closureRootTakes = 0;
+const callbackResult = decodeCallResult(callbackType, callbackResultWriter.take(), {
+  takeOutgoingClosureRootId: (label) => {
+    assert.equal(label, "function result");
+    closureRootTakes += 1;
+    return 7;
+  },
+  createCallback: (rootId, type) => ({ rootId, type }),
+});
+assert.equal(callbackResult.rootId, 7);
+assert.equal(callbackResult.type, callbackType);
+assert.equal(closureRootTakes, 1);
 const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/fixtures-basic.irpkg"], {
   encoding: "utf8",
 });

@@ -10,6 +10,10 @@ import {
   asBytes,
 } from "./runtime/vir-codec.js";
 import {
+  ExternrefResourceRoots,
+  isHostResource,
+} from "./host-resource.js";
+import {
   decodeCallResult,
   decodeHostCallRequest,
   encodeCallPayload,
@@ -17,9 +21,15 @@ import {
   encodeHostCallResult,
 } from "./runtime/vir-value-codec.js";
 
+export {
+  hasExternrefTableSupport,
+  requireExternrefTableSupport,
+} from "./vir-host-bindings.js";
+
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
+const virCallbackStates = new WeakMap();
 
 export {
   roundTripInterfaceTypeDescriptor,
@@ -64,6 +74,12 @@ export function createVirImports(module, overrides = {}, hostState = null) {
     imports.env.vir_js_call = (slot, requestPtr, requestLen) =>
       hostState.call(slot, requestPtr, requestLen);
     imports.env.vir_js_call_result_size = () => hostState.resultSize();
+    imports.env.vir_resource_take = () => hostState.takeIncomingResource();
+    imports.env.vir_resource_push = (value) => hostState.pushOutgoingResource(value);
+    imports.env.vir_resource_root = (value) => hostState.rootResource(value);
+    imports.env.vir_resource_get = (rootId) => hostState.getRootedResource(rootId);
+    imports.env.vir_resource_release = (rootId) => hostState.releaseRootedResource(rootId);
+    imports.env.vir_closure_push = (rootId) => hostState.pushOutgoingClosureRootId(rootId);
   }
 
   return imports;
@@ -152,6 +168,10 @@ class VirHostState {
     this.lastResultSize = 0;
     this.defaultBindings = defaultHostBindings;
     this.runtime = null;
+    this.incomingResources = [];
+    this.outgoingResources = [];
+    this.outgoingClosureRootIds = [];
+    this.resourceRoots = new ExternrefResourceRoots();
   }
 
   attach(exports) {
@@ -171,6 +191,79 @@ class VirHostState {
     return this.lastResultSize;
   }
 
+  pushIncomingResource(value) {
+    this.incomingResources.push(value);
+  }
+
+  takeIncomingResource() {
+    return this.incomingResources.shift() ?? null;
+  }
+
+  clearIncomingResources() {
+    this.incomingResources.length = 0;
+  }
+
+  pushOutgoingResource(value) {
+    this.outgoingResources.push(value);
+  }
+
+  takeOutgoingResource(label) {
+    const value = this.outgoingResources.shift() ?? null;
+    if (!isHostResource(value)) {
+      throw new Error(`${label} did not receive an externref resource`);
+    }
+    return value;
+  }
+
+  clearOutgoingResources() {
+    this.outgoingResources.length = 0;
+  }
+
+  pushOutgoingClosureRootId(rootId) {
+    if (!Number.isInteger(rootId) || rootId <= 0 || rootId > 0xffffffff) {
+      throw new Error("Lean VIR closure root id must be a positive 32-bit integer");
+    }
+    this.outgoingClosureRootIds.push(rootId);
+    return undefined;
+  }
+
+  takeOutgoingClosureRootId(label) {
+    const rootId = this.outgoingClosureRootIds.shift() ?? 0;
+    if (!Number.isInteger(rootId) || rootId <= 0 || rootId > 0xffffffff) {
+      throw new Error(`${label} did not receive a live closure root id`);
+    }
+    return rootId;
+  }
+
+  clearOutgoingClosureRootIds() {
+    const rootIds = this.outgoingClosureRootIds.splice(0);
+    for (const rootId of rootIds) {
+      this.exports?.vir_closure_release?.(rootId);
+    }
+  }
+
+  clearTransientQueues() {
+    this.clearIncomingResources();
+    this.clearOutgoingResources();
+    this.clearOutgoingClosureRootIds();
+  }
+
+  rootResource(value) {
+    return this.resourceRoots.root(value);
+  }
+
+  getRootedResource(rootId) {
+    return this.resourceRoots.get(rootId);
+  }
+
+  releaseRootedResource(rootId) {
+    return this.resourceRoots.release(rootId);
+  }
+
+  clearResourceRoots() {
+    this.resourceRoots.clear();
+  }
+
   call(slot, requestPtr, requestLen) {
     if (this.exports === null) {
       throw new Error("Vir host import called before WASM exports were attached");
@@ -185,12 +278,20 @@ class VirHostState {
     }
 
     const request = this.readWasmBytes(requestPtr, requestLen);
-    const { args, resultType } = decodeHostCallRequest(request, entry, this.runtime?.codecOptions ?? {});
+    let args;
+    let resultType;
+    try {
+      ({ args, resultType } = decodeHostCallRequest(request, entry, this.runtime?.codecOptions ?? {}));
+      this.clearOutgoingClosureRootIds();
+    } catch (error) {
+      this.clearOutgoingClosureRootIds();
+      throw error;
+    }
     const value = binding(...args);
     if (isPromiseLike(value)) {
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
-    const result = encodeHostCallResult(resultType, value, entry);
+    const result = encodeHostCallResult(resultType, value, entry, this.runtime?.codecOptions ?? {});
     const ptr = this.exports.vir_alloc_bytes(result.byteLength);
     new Uint8Array(this.exports.memory.buffer, ptr, result.byteLength).set(result);
     this.lastResultSize = result.byteLength;
@@ -205,6 +306,8 @@ class VirHostState {
   }
 
   dispose() {
+    this.clearTransientQueues();
+    this.clearResourceRoots();
     disposeHostBindings(this.userBindings);
     disposeHostBindings(this.defaultBindings);
   }
@@ -354,7 +457,14 @@ export class VirRuntime {
     }
 
     const { nameBytes } = this.callCacheFor(entry);
-    const payload = encodeCallPayload(entry, args);
+    this.hostState?.clearTransientQueues();
+    let payload;
+    try {
+      payload = encodeCallPayload(entry, args, this.codecOptions);
+    } catch (error) {
+      this.hostState?.clearTransientQueues();
+      throw error;
+    }
     const namePtr = this.allocBytes(nameBytes);
     const payloadPtr = this.allocBytes(payload);
     try {
@@ -373,6 +483,7 @@ export class VirRuntime {
     } finally {
       this.freeBytes(payloadPtr);
       this.freeBytes(namePtr);
+      this.hostState?.clearTransientQueues();
     }
   }
 
@@ -431,26 +542,34 @@ export class VirRuntime {
     this.liveCallbacks.delete(callback);
   }
 
-  callClosure(handle, type, args) {
+  callClosure(rootId, type, args) {
     this.requireLiveRuntime();
     this.requireFunction("vir_closure_call");
     this.requireFunction("vir_closure_call_result_size");
-    const payload = encodeClosureCallPayload(type, args);
+    this.hostState?.clearTransientQueues();
+    let payload;
+    try {
+      payload = encodeClosureCallPayload(type, args, this.codecOptions);
+    } catch (error) {
+      this.hostState?.clearTransientQueues();
+      throw error;
+    }
     const payloadPtr = this.allocBytes(payload);
     try {
-      const resultPtr = this.exports.vir_closure_call(handle, payloadPtr, payload.byteLength);
+      const resultPtr = this.exports.vir_closure_call(rootId, payloadPtr, payload.byteLength);
       if (resultPtr === 0) {
-        throw new Error(this.lastClosureCallError() || `closure call failed: ${handle}`);
+        throw new Error(this.lastClosureCallError() || "closure call failed");
       }
       const resultLen = this.exports.vir_closure_call_result_size();
       return decodeCallResult(type.result, this.readWasmBytes(resultPtr, resultLen), this.codecOptions);
     } finally {
       this.freeBytes(payloadPtr);
+      this.hostState?.clearTransientQueues();
     }
   }
 
-  releaseClosure(handle) {
-    this.exports.vir_closure_release?.(handle);
+  releaseClosure(rootId) {
+    this.exports.vir_closure_release?.(rootId);
   }
 
   lastClosureCallError() {
@@ -480,17 +599,19 @@ export class VirRuntime {
 
 export class VirCallback {
   call(...args) {
-    if (this._released) {
-      throw new Error(`Vir callback ${this.handle} has been released`);
+    const state = requireVirCallbackState(this);
+    if (state.released) {
+      throw new Error("Vir callback has been released");
     }
-    return this._runtime.callClosure(this.handle, this.type, args);
+    return state.runtime.callClosure(state.rootId, state.type, args);
   }
 
   release() {
-    if (this._released) return false;
-    this._released = true;
-    this._runtime.releaseClosure(this.handle);
-    this._runtime.untrackCallback(this);
+    const state = requireVirCallbackState(this);
+    if (state.released) return false;
+    state.released = true;
+    state.runtime.releaseClosure(state.rootId);
+    state.runtime.untrackCallback(this);
     return true;
   }
 
@@ -499,34 +620,52 @@ export class VirCallback {
   }
 
   get released() {
-    return this._released;
+    return requireVirCallbackState(this).released;
   }
 }
 
 Object.setPrototypeOf(VirCallback.prototype, Function.prototype);
 
-function createVirCallback(runtime, handle, type) {
-  if (!Number.isInteger(handle) || handle <= 0 || handle > 0xffffffff) {
-    throw new Error("callback handle must be a positive 32-bit integer");
+function createVirCallback(runtime, rootId, type) {
+  if (!Number.isInteger(rootId) || rootId <= 0 || rootId > 0xffffffff) {
+    throw new Error("callback root id must be a positive 32-bit integer");
   }
   const callback = function virCallback(...args) {
     return callback.call(...args);
   };
   Object.setPrototypeOf(callback, VirCallback.prototype);
-  Object.defineProperties(callback, {
-    _runtime: { value: runtime },
-    _released: { value: false, writable: true },
-    handle: { value: handle, enumerable: true },
-    type: { value: type, enumerable: true },
+  virCallbackStates.set(callback, {
+    runtime,
+    rootId,
+    type,
+    released: false,
   });
   runtime.trackCallback(callback);
   return callback;
 }
 
+function requireVirCallbackState(callback) {
+  const state = virCallbackStates.get(callback);
+  if (state === undefined) {
+    throw new Error("Vir callback state is missing");
+  }
+  return state;
+}
+
 function valueCodecOptions(runtime) {
   return runtime === null ? {} : {
-    createCallback: (handle, type) => createVirCallback(runtime, handle, type),
+    createCallback: (rootId, type) => createVirCallback(runtime, rootId, type),
+    pushIncomingResource: (value) => requireVirHostState(runtime).pushIncomingResource(value),
+    takeOutgoingResource: (label) => requireVirHostState(runtime).takeOutgoingResource(label),
+    takeOutgoingClosureRootId: (label) => requireVirHostState(runtime).takeOutgoingClosureRootId(label),
   };
+}
+
+function requireVirHostState(runtime) {
+  if (runtime.hostState === null) {
+    throw new Error("VirRuntime is missing an attached host state");
+  }
+  return runtime.hostState;
 }
 
 function registerManifestEntryKey(map, key, entry) {

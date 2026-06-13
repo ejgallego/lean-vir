@@ -62,6 +62,12 @@ mkdir -p web/public
 cat > "$allowed_undefined" <<'EOF'
 vir_js_call
 vir_js_call_result_size
+vir_closure_push
+vir_resource_get
+vir_resource_push
+vir_resource_release
+vir_resource_root
+vir_resource_take
 EOF
 
 npm run --silent generate:package

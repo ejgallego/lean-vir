@@ -84,7 +84,7 @@ assert.equal(typeof createExportedHostResourceState, "function");
     assert.equal(elementBindings["browser.element.getTextContent"](sharedElement), "shared element");
     assert.throws(
       () => createExportedBrowserElementHostBindings()["browser.element.getTextContent"](sharedElement),
-      /Element resource handle \d+ is not live/,
+      /Element resource is not live/,
     );
   } finally {
     if (previousDocument) {

@@ -5,22 +5,18 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirtualReactRootResource as createVirtualReactRootResourceFromHtml } from "../react/vir-react-html.js";
+import { isHostResource } from "../host-resource.js";
 import {
   callLeanEventCallback,
-  createAnimationFrameResource,
+  createAnimationResourceHostBindings,
   createElementResourceHostBindings,
   createHostResourceState,
   createHtmlInputElementResourceHostBindings,
   createReactHostHooks,
   createReactRootResourceHostBindings,
-  createTimeoutResource,
-  disposeDomResourceState,
+  createTimerResourceHostBindings,
   performanceNow,
   preventDefaultOnEvent,
-  releaseResource,
-  removeDisposable,
-  resolveResource,
-  resourceForValue,
   stopPropagationOnEvent,
 } from "./vir-host-resources.js";
 
@@ -85,11 +81,11 @@ export function createVirtualEventHostBindings(state = createVirtualDocumentStat
     "browser.event.target": (event) => virtualEventElementResource(state, event, "target"),
     "browser.event.currentTarget": (event) => virtualEventElementResource(state, event, "currentTarget"),
     "browser.event.preventDefault": (event) => {
-      preventDefaultOnEvent(resolveResource(state.resources, event, "Event"));
+      preventDefaultOnEvent(state.resources.resolveResource(event, "Event"));
       return undefined;
     },
     "browser.event.stopPropagation": (event) => {
-      stopPropagationOnEvent(resolveResource(state.resources, event, "Event"));
+      stopPropagationOnEvent(state.resources.resolveResource(event, "Event"));
       return undefined;
     },
   };
@@ -106,7 +102,7 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       state.title = title;
       return undefined;
     },
-    "browser.document.querySelector": (selector) => resourceForValue(state.resources, queryVirtualElementState(state, selector)),
+    "browser.document.querySelector": (selector) => state.resources.resourceForValue(queryVirtualElementState(state, selector)),
     ...createVirtualEventHostBindings(state),
     ...createElementResourceHostBindings(state.resources, {
       getTextContent: (target) => target.textContent,
@@ -119,35 +115,16 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
         createVirtualEventListenerResource(state.resources, target, eventName, callback),
     }),
     ...createHtmlInputElementResourceHostBindings(state.resources, {
-      fromElement: (element) => resourceForValue(state.resources, element),
+      fromElement: (element) => state.resources.resourceForValue(element),
     }),
-    "browser.timer.setTimeout": (delayMs, callback) =>
-      resourceForValue(state.resources, createTimeoutResource(state.resources, delayMs, callback)),
-    "browser.timer.clearTimeout": (timeout) => {
-      const value = resolveResource(state.resources, timeout, "Timeout");
-      value.clear();
-      releaseResource(state.resources, timeout);
-      return undefined;
-    },
-    "browser.animation.requestAnimationFrame": (callback) =>
-      resourceForValue(
-        state.resources,
-        createAnimationFrameResource(
-          state.resources,
-          callback,
-          (run) => globalThis.setTimeout(() => run(performanceNow()), 16),
-          globalThis.clearTimeout.bind(globalThis),
-        ),
-      ),
-    "browser.animation.cancelAnimationFrame": (frame) => {
-      const value = resolveResource(state.resources, frame, "AnimationFrame");
-      value.cancel();
-      releaseResource(state.resources, frame);
-      return undefined;
-    },
+    ...createTimerResourceHostBindings(state.resources),
+    ...createAnimationResourceHostBindings(state.resources, {
+      requestFrame: (run) => globalThis.setTimeout(() => run(performanceNow()), 16),
+      cancelFrame: globalThis.clearTimeout.bind(globalThis),
+    }),
     ...createReactRootResourceHostBindings(state.resources, (target) =>
       createVirtualReactRootResource(state.resources, target)),
-    [VIR_HOST_DISPOSE]: () => disposeDomResourceState(state.resources),
+    [VIR_HOST_DISPOSE]: () => state.resources.dispose(),
   };
 }
 
@@ -199,17 +176,17 @@ function findVirtualReactElementNodeById(node, id) {
 }
 
 function virtualEventElementResource(state, event, field) {
-  const value = resolveResource(state.resources, event, "Event")?.[field];
+  const value = state.resources.resolveResource(event, "Event")?.[field];
   if (value === null || value === undefined) return null;
   if (typeof value === "string") {
-    return resourceForValue(state.resources, queryVirtualElementState(state, value));
+    return state.resources.resourceForValue(queryVirtualElementState(state, value));
   }
-  if (Number.isInteger(value?.handle)) {
-    resolveResource(state.resources, value, "Element");
+  if (isHostResource(value)) {
+    state.resources.resolveResource(value, "Element");
     return value;
   }
   if (typeof value === "object") {
-    return resourceForValue(state.resources, value);
+    return state.resources.resourceForValue(value);
   }
   return null;
 }
@@ -234,7 +211,7 @@ function virtualCallbackEventListenerState(target, eventName, callback, resource
       const listeners = target.listeners.get(eventName) ?? [];
       target.listeners.set(eventName, listeners.filter((candidate) => candidate !== listener));
       callback.release();
-      removeDisposable(resources, listener);
+      resources.removeDisposable(listener);
     },
   };
   return listener;

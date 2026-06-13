@@ -12,7 +12,6 @@ import {
 } from "../../web/src/vir-runtime-node.js";
 import {
   createBrowserHostBindings,
-  createBrowserReactHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import {
   assert,
@@ -35,7 +34,7 @@ const { wasmBytes, hostPackageBytes, irPackageBytes } = await readRuntimeArtifac
 
 const browserBindingsWithReact = createBrowserHostBindings({
   reactHostBindings: {
-    "react.root.create": () => ({ handle: 1 }),
+    "react.root.create": () => undefined,
   },
 });
 assert.equal(typeof browserBindingsWithReact["browser.document.getTitle"], "function");
@@ -43,10 +42,6 @@ assert.equal(typeof browserBindingsWithReact["react.root.create"], "function");
 assert.throws(
   () => createBrowserHostBindings({ reactHostBindings: "react.root.create" }),
   /reactHostBindings must be a host binding object/,
-);
-assert.throws(
-  () => createBrowserReactHostBindings(),
-  /Browser React host bindings moved to lean-vir\/react-host-bindings/,
 );
 
 const reactDocumentState = createVirtualDocumentState();
@@ -101,7 +96,7 @@ assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactDocumentState.elements.get("#react-unmount").reactRoot, undefined);
 assert.throws(
   () => reactRuntime.call("ReactCounter.renderAfterUnmount", "#react-stale-root"),
-  /ReactRoot resource handle \d+ is not live/,
+  /ReactRoot resource is not live/,
 );
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.throws(

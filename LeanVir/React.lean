@@ -9,7 +9,7 @@ import LeanVir.Browser
 namespace Lean.Vir.React
 
 /--
-Opaque React root handle created from a browser container element.
+Opaque React root resource created from a browser container element.
 
 The JavaScript host owns the underlying React root and any callbacks retained by
 the currently rendered tree until `Root.unmount`, package reload, or runtime

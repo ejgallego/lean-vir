@@ -95,6 +95,7 @@ Tests:
 ```bash
 npm run test:upstream
 npm run test:runtime
+npm run test:wasm-extensions
 npm run test:fixtures
 npm run test:fixtures:no-build
 npm run test:site
@@ -102,8 +103,9 @@ npm run test:pages:browser
 npm test
 ```
 
-`npm test` runs the boundary registry check, upstream smoke, JavaScript runtime
-tests, and fixture suite. It is the default pre-merge signal for code changes.
+`npm test` runs the boundary registry check, Wasm extension probes, upstream
+smoke, JavaScript runtime tests, and fixture suite. It is the default pre-merge
+signal for code changes.
 
 ## Smallest Useful Check
 
@@ -113,6 +115,8 @@ tests, and fixture suite. It is the default pre-merge signal for code changes.
   `npm run test:upstream`
 - JavaScript runtime, host bindings, manifest decoding, or callback lifecycle:
   `npm run test:runtime`
+- Local JS engine Wasm interop feature availability, such as `externref` or JSPI:
+  `npm run test:wasm-extensions`
 - Lean fixture behavior or package generation coverage:
   `npm run test:fixtures`
 - A single fixture or fixture family:
@@ -155,6 +159,50 @@ CHROMIUM=/path/to/chromium npm run test:pages:browser
 
 Run `npm run build:site` first when you want to refresh `web/dist/`.
 
+## Performance Comparisons
+
+`npm run bench` runs the manifest-driven JavaScript runtime benchmark against
+the host Lean IR baseline. It restores/stores built benchmark inputs under
+`.perf-artifacts/vir-bench-cache` by default, keyed by commit plus a build-key
+hash. The cache stores artifacts such as `web/public/vir-upstream.wasm` and
+`web/public/fixtures-basic.irpkg`, not timing samples, so benchmark timings are
+still regenerated for each run. Use `--no-artifact-cache` to disable the cache,
+`--artifact-cache DIR` to put it elsewhere, and `--refresh-artifact-cache` to
+replace the current cache entry.
+
+Pass `--json` to save a machine-readable report:
+
+```bash
+npm run bench -- --json build/perf/current.json
+```
+
+Compare two saved reports with:
+
+```bash
+npm run bench:compare -- build/perf/before.json build/perf/after.json
+```
+
+The comparison checks benchmark names, iteration counts, and checksums before
+printing per-call deltas. The default benchmark includes pure-runtime controls
+(`fib` and `sort`) plus host/resource rows for scalar host imports, callback
+root round trips, DOM listener resource churn, and React root lifecycle work.
+The host/resource rows run loops inside Lean so they measure repeated host
+interop operations without mostly measuring repeated top-level `vir.call(...)`
+entry overhead.
+
+For routine before/after comparisons between two already checked-out trees, use
+the paired runner:
+
+```bash
+npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
+```
+
+It alternates `npm run bench -- --json` in each checkout, stores the per-run
+reports under `build/perf/paired/`, and prints median per-call deltas for common
+benchmark rows. The compared checkouts must both support the current benchmark
+JSON interface; for older refs, first create a temporary compatible checkout or
+compare manually saved reports with `bench:compare`.
+
 ## Implementation Map
 
 Keep focused checks and shared helpers in the split modules instead of copying
@@ -167,7 +215,7 @@ logic into entry-point scripts or pages:
 - Browser page helpers: `web/src/pages/page-utils.js` and
   `web/src/pages/input-parsers.js`
 - Host resource and virtual binding internals:
-  `web/src/host/vir-host-resources.js` and
+  `web/src/host-resource.js`, `web/src/host/vir-host-resources.js`, and
   `web/src/host/vir-virtual-host-bindings.js`
 
 ## Worktree Workflow
