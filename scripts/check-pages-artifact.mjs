@@ -19,6 +19,7 @@ import {
   leanPackageFile,
   localPackageFiles,
 } from "./browser-package-config.mjs";
+import { isGeneratedPublicFile } from "./file-utils.mjs";
 import { sdkArchiveEntries } from "./sdk-payloads.mjs";
 
 const distDir = new URL("../web/dist/", import.meta.url);
@@ -70,7 +71,7 @@ async function assertLocalBundle(path) {
     const match = /^lean-vir-local\/([^/]+)$/.exec(entry);
     if (!match) continue;
     const basename = match[1];
-    if (/\.(wasm|irpkg|input\.json|report\.md)$/.test(basename)) {
+    if (isGeneratedPublicFile(basename)) {
       assert.ok(generatedPublicFileSet.has(basename), `local bundle contains unexpected generated payload ${entry}`);
     }
   }
