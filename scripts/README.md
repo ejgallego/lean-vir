@@ -23,9 +23,16 @@ map lives in `docs/HARNESS.md`.
 - `npm run test:upstream:no-build`
   Reuse existing demo WASM and browser packages for the upstream smoke test.
 - `npm run test:runtime`
-  Run JavaScript runtime, host binding, callback lifecycle, and manifest tests.
-  Use `npm run test:runtime -- <substring>` or
+  Run all JavaScript runtime, host binding, callback lifecycle, manifest,
+  package-generation, and SDK import smoke tests. Use
+  `npm run test:runtime -- <substring>` or
   `VIR_RUNTIME_TEST_FILTER=<substring>` to narrow it.
+- `npm run test:runtime:pure`
+  Run the runtime smoke group that only needs Node plus existing demo artifacts.
+- `npm run test:runtime:lean`
+  Run the package-generation and SDK import runtime smoke group that also needs
+  Lean. Use `npm run test:runtime -- --group <group>` or
+  `VIR_RUNTIME_TEST_GROUP=<group>` for explicit group selection.
 - `npm run test:wasm-extensions`
   Probe optional JS/Wasm interop features such as `externref` and JSPI.
   Missing `externref` support fails because the experimental React resource

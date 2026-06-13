@@ -31,7 +31,12 @@ fi
 echo
 echo "IR package generation succeeded."
 echo "Packages:"
-for package in build/generated/fixtures-basic.irpkg build/generated/demo-host.irpkg build/generated/pretty-printer.irpkg build/generated/fixtures-lean.irpkg build/generated/fixtures-boundary.irpkg; do
+mapfile -t package_files < <(
+  node --input-type=module -e \
+    'import { packageFiles } from "./scripts/browser-package-config.mjs"; for (const file of packageFiles) console.log(file);'
+)
+for package_file in "${package_files[@]}"; do
+  package="build/generated/$package_file"
   echo "  $package"
 done
 echo "Primary report: $report"

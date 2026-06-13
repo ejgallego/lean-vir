@@ -57,6 +57,23 @@ jobs:
     needs: build-demo
     steps:
       - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Download demo artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: vir-demo-artifacts
+          path: web/public
+      - run: npm run test:runtime:pure
+
+  runtime-lean:
+    runs-on: ubuntu-latest
+    needs: build-demo
+    steps:
+      - uses: actions/checkout@v5
       - name: Install Lean
         run: |
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
@@ -72,7 +89,7 @@ jobs:
         with:
           name: vir-demo-artifacts
           path: web/public
-      - run: npm run test:runtime
+      - run: npm run test:runtime:lean
 
   fixtures:
     runs-on: ubuntu-latest

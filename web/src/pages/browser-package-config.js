@@ -9,6 +9,12 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
   const localPackagePresets = browserPackageConfig.localPackages ?? [];
   const packageById = new Map(packageSpecs.map((spec) => [spec.id, spec]));
   const packageFiles = packageSpecs.map((spec) => spec.file);
+  const localPackageFiles = localPackagePresets.map((preset) => preset.file);
+  const generatedPublicFiles = [
+    "vir-upstream.wasm",
+    ...packageFiles,
+    ...localPackageFiles,
+  ];
   const packagePresets = [
     ...packageSpecs.map((spec) => ({
       file: spec.file,
@@ -40,6 +46,8 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
     localPackagePresets,
     packageById,
     packageFiles,
+    localPackageFiles,
+    generatedPublicFiles,
     packagePresets,
     packageLabels,
     packageFileByFixtureSource,

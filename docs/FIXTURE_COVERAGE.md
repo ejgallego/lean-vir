@@ -15,8 +15,9 @@ boundary gaps remain explicit. The runner writes `build/fixtures/summary.json`
 with per-fixture status, imported IR declarations, native externs, and
 missing-boundary diagnostics for CI and boundary debugging.
 
-The runtime smoke also generates temporary packages with intentionally
-unsupported interface exports and asserts that package generation fails loudly.
+The Lean-dependent runtime smoke also generates temporary packages with
+intentionally unsupported interface exports and asserts that package generation
+fails loudly.
 Those negative cases cover recursive inherited structures, indexed inductive
 families, mutual recursion, erased proof fields, and implicit arguments.
 

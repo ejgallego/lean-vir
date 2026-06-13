@@ -25,6 +25,7 @@ import {
 } from "./browser-smoke-dev-runner.mjs";
 import { smokeFormatWorkbench, smokeLanding, smokePackagePreset } from "./browser-smoke-page-suites.mjs";
 import { smokeReactReview } from "./browser-smoke-react-review.mjs";
+import { packageFiles } from "./browser-package-config.mjs";
 
 await assertDistReady();
 await prepareNegativePackages();
@@ -45,11 +46,9 @@ try {
   await smokePackagePreset(cdp, server.origin);
   await smokeFormatWorkbench(cdp, server.origin);
   await smokeReactReview(cdp, server.origin);
-  await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-basic.irpkg");
-  await smokeManifestDrivenEntryList(cdp, server.origin, "demo-host.irpkg");
-  await smokeManifestDrivenEntryList(cdp, server.origin, "pretty-printer.irpkg");
-  await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-lean.irpkg");
-  await smokeManifestDrivenEntryList(cdp, server.origin, "fixtures-boundary.irpkg");
+  for (const packageFile of packageFiles) {
+    await smokeManifestDrivenEntryList(cdp, server.origin, packageFile);
+  }
   await smokeBrowserCallbacks(cdp, server.origin);
   await smokeBrowserCallbackCleanup(cdp, server.origin);
 

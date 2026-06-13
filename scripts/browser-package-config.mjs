@@ -16,6 +16,8 @@ export const {
   localPackagePresets,
   packageById,
   packageFiles,
+  localPackageFiles,
+  generatedPublicFiles,
   packagePresets,
   packageLabels,
   packageFileByFixtureSource,

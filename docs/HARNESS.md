@@ -4,6 +4,11 @@ This document is for maintaining Lean VIR. The user-facing quickstart stays in
 the top-level `README.md`. A narrower map of script entry points lives in
 `scripts/README.md`.
 
+This document owns setup, generated-artifact policy, validation command
+selection, and CI shape. Package config and manifest semantics live in
+`docs/INTERFACE_PIPELINE.md`; architecture status lives in
+`docs/IMPLEMENTATION_NOTES.md`.
+
 The repository-local harness has three jobs:
 
 - fetch and pin the upstream Lean source used for the WASI build
@@ -96,6 +101,8 @@ Tests:
 npm run test:upstream
 npm run test:upstream:no-build
 npm run test:runtime
+npm run test:runtime:pure
+npm run test:runtime:lean
 npm run test:wasm-extensions
 npm run test:fixtures
 npm run test:fixtures:no-build
@@ -119,12 +126,17 @@ signal for code changes.
 - Upstream smoke after `npm run build:demo` has already refreshed the WASM and
   browser packages:
   `npm run test:upstream:no-build`
-- JavaScript runtime, host bindings, manifest decoding, or callback lifecycle:
-  `npm run test:runtime`
+- JavaScript runtime, host bindings, manifest decoding, or callback lifecycle
+  without Lean-dependent package generation:
+  `npm run test:runtime:pure`
+- Runtime package generation or SDK artifact import checks:
+  `npm run test:runtime:lean`
 - Local JS engine Wasm interop feature availability, such as `externref` or JSPI:
   `npm run test:wasm-extensions`
-- A single runtime smoke group:
+- A single runtime smoke id/path substring:
   `npm run test:runtime -- <substring>`
+- An explicit runtime smoke group:
+  `npm run test:runtime -- --group pure`
 - Lean fixture behavior or package generation coverage:
   `npm run test:fixtures`
 - A single fixture or fixture family:
@@ -150,9 +162,10 @@ VIR_FIXTURE_FILTER=fib12 npm run test:fixtures
 VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 ```
 
-`VIR_RUNTIME_TEST_FILTER` similarly narrows `npm run test:runtime`, and
-`VIR_RUNTIME_JOBS` controls the number of runtime smoke subprocesses. The
-available runtime smoke ids are printed by:
+`VIR_RUNTIME_TEST_FILTER` similarly narrows `npm run test:runtime`.
+`VIR_RUNTIME_TEST_GROUP` selects comma-separated groups such as `pure` or
+`lean`, and `VIR_RUNTIME_JOBS` controls the number of runtime smoke
+subprocesses. The available runtime smoke ids and groups are printed by:
 
 ```bash
 node scripts/test-vir-runtime.mjs --list
@@ -174,7 +187,8 @@ when comparing CI runs:
   timing.
 - `npm run prepare:irpkg` prints Lean library, generator, package, and total
   timing.
-- `npm run test:runtime` prints per-group timings plus the slowest groups.
+- `npm run test:runtime` prints selected groups/filters plus per-test timings
+  and the slowest tests.
 - `npm run test:fixtures` prints build, generator, fixture-run, and slowest
   fixture timings; the JSON summary also records per-fixture phase timings.
 
@@ -183,8 +197,11 @@ when comparing CI runs:
 The CI workflow keeps one job responsible for fetching the pinned Lean source,
 installing the WASI SDK, building `web/public/vir-upstream.wasm`, generating
 browser `.irpkg` files, and running upstream smoke. That job uploads the demo
-artifacts. Runtime and fixture jobs download those artifacts and run in
-parallel without re-fetching Lean source or reinstalling the WASI SDK.
+artifacts. The pure runtime job downloads those artifacts and runs without
+installing Lean. The Lean-dependent runtime job installs Lean only for package
+generation and SDK metadata smoke tests. The fixture job also downloads the
+demo artifacts and runs in parallel without re-fetching Lean source or
+reinstalling the WASI SDK.
 
 ## Browser Smoke
 

@@ -17,6 +17,7 @@ import {
   setInputValueAndDispatch,
   waitForBrowserState,
 } from "./browser-smoke-page-actions.mjs";
+import { packageFiles, packagePresets } from "./browser-package-config.mjs";
 
 export async function smokeLanding(cdp, origin) {
   await navigate(cdp, `${origin}${basePath}`);
@@ -34,7 +35,7 @@ export async function smokeLanding(cdp, origin) {
   })`);
   assert.equal(
     state.packageName,
-    "fixtures-basic.irpkg, demo-host.irpkg, pretty-printer.irpkg, fixtures-lean.irpkg, fixtures-boundary.irpkg",
+    packageFiles.join(", "),
   );
   assert.equal(state.mood, "happy");
   assert.deepEqual(state.packageItems.map((item) => item.href), [
@@ -139,17 +140,7 @@ export async function smokePackagePreset(cdp, origin) {
   })`);
   assert.equal(state.packageName, "fixtures-basic.irpkg");
   assert.equal(state.preset, "fixtures-basic.irpkg");
-  assert.deepEqual(state.options, [
-    "fixtures-basic.irpkg",
-    "demo-host.irpkg",
-    "pretty-printer.irpkg",
-    "fixtures-lean.irpkg",
-    "fixtures-boundary.irpkg",
-    "local-quickstart.irpkg",
-    "local-fib.irpkg",
-    "local-mergesort.irpkg",
-    "",
-  ]);
+  assert.deepEqual(state.options, [...packagePresets.map((preset) => preset.file), ""]);
 
   await evaluate(cdp, `(() => {
     const preset = document.querySelector("#dev-package-preset");
