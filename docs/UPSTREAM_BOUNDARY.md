@@ -70,7 +70,8 @@ not a fork of Lean. It is split by responsibility:
   import metadata, and initializer execution.
 - `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
   from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
-  packages; `docs/GENERATE_PACKAGE.md` maps the full split generator.
+  packages; `docs/GENERATE_PACKAGE.md` maps the full split generator, and
+  `tools/GeneratePackage.lean` is the CLI wrapper.
 - `decl_provider.h` is the replacement point for a future module-backed
   provider.
 

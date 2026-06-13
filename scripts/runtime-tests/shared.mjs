@@ -232,10 +232,11 @@ async function assertUnsupportedInterfaceFile(source, packagePath, reportPath, p
     { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
   );
   assert.notEqual(generated.status, 0, `${source} unexpectedly generated successfully`);
-  assert.match(generated.stderr, /package diagnostics/);
+  const diagnosticsText = `${generated.stderr}${generated.stdout}`;
+  assert.match(diagnosticsText, /package diagnostics|unsupported interface exports/);
   const report = await readFile(reportPath, "utf8");
   for (const pattern of patterns) {
-    assert.match(generated.stderr, pattern);
+    assert.match(diagnosticsText, pattern);
     assert.match(report, pattern);
   }
 }

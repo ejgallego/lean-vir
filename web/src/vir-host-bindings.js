@@ -14,6 +14,7 @@ import {
   once,
   performanceNow,
   preventDefaultOnEvent,
+  reportEventHandlerError,
   stopPropagationOnEvent,
 } from "./host/vir-host-resources.js";
 import {
@@ -82,6 +83,7 @@ export function createBrowserEventHostBindings(state = createHostResourceState()
       stopPropagationOnEvent(state.resolveResource(event, "Event"));
       return undefined;
     },
+    "browser.event.formValue": (event) => formControlEventValue(state.resolveResource(event, "Event")),
   };
 }
 
@@ -120,14 +122,22 @@ export function createBrowserAnimationHostBindings(state = createHostResourceSta
   return createAnimationResourceHostBindings(state, { requestFrame, cancelFrame });
 }
 
+export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
+  return {
+    "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
+    "infoview.command.revealPosition": (position) => revealInfoviewPosition(commandDispatcher, position),
+  };
+}
+
 export function createBrowserHostBindings({
   resources = createHostResourceState(),
+  infoviewCommandDispatcher = null,
   reactHostBindings = null,
 } = {}) {
   const state = resources;
   const reactBindingsSource =
     typeof reactHostBindings === "function"
-      ? reactHostBindings(state)
+      ? reactHostBindings(state, { querySelector: queryDocumentElement })
       : reactHostBindings;
   const reactBindings = normalizeOptionalHostBindingMap(reactBindingsSource, "reactHostBindings");
   return {
@@ -139,6 +149,7 @@ export function createBrowserHostBindings({
     ...createBrowserHtmlInputElementHostBindings(state),
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
+    ...createInfoviewHostBindings({ commandDispatcher: infoviewCommandDispatcher }),
     ...reactBindings,
     [VIR_HOST_DISPOSE]: () => state.dispose(),
   };
@@ -173,6 +184,118 @@ function queryDocumentElement(selector) {
   return browserDocument().querySelector(selector);
 }
 
+function writeTextToHostClipboard(text) {
+  const copiedSynchronously = copyTextWithExecCommand(text);
+  if (copiedSynchronously) {
+    return true;
+  }
+  const clipboard = globalThis.navigator?.clipboard;
+  if (clipboard !== null && typeof clipboard === "object" && typeof clipboard.writeText === "function") {
+    try {
+      clipboard.writeText(text).catch((error) => {
+        reportEventHandlerError(error);
+      });
+      return true;
+    } catch (error) {
+      reportEventHandlerError(error);
+      return false;
+    }
+  }
+  return false;
+}
+
+function revealInfoviewPosition(commandDispatcher, position) {
+  const normalized = normalizeInfoviewDocumentPosition(position);
+  if (normalized === null) {
+    return false;
+  }
+  return dispatchInfoviewCommand(commandDispatcher, "revealPosition", normalized);
+}
+
+export function normalizeInfoviewDocumentPosition(position) {
+  if (position === null || typeof position !== "object") {
+    return null;
+  }
+  const uri = typeof position.uri === "string" ? position.uri : "";
+  if (uri.length === 0) {
+    return null;
+  }
+  const line = nonNegativeInteger(position.line);
+  const character = nonNegativeInteger(position.character);
+  if (line === null || character === null) {
+    return null;
+  }
+  return { uri, line, character };
+}
+
+function nonNegativeInteger(value) {
+  if (typeof value === "bigint") {
+    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+  }
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : null;
+  }
+  return null;
+}
+
+function dispatchInfoviewCommand(commandDispatcher, name, payload) {
+  const dispatcher = commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
+  let handler = null;
+  if (typeof dispatcher === "function") {
+    handler = (value) => dispatcher(name, value);
+  } else if (dispatcher !== null && typeof dispatcher === "object" && typeof dispatcher[name] === "function") {
+    handler = (value) => dispatcher[name](value);
+  }
+  if (handler === null) {
+    return false;
+  }
+  try {
+    const result = handler(payload);
+    if (result !== null && typeof result === "object" && typeof result.then === "function") {
+      result.catch((error) => {
+        reportEventHandlerError(error);
+      });
+      return true;
+    }
+    return result !== false;
+  } catch (error) {
+    reportEventHandlerError(error);
+    return false;
+  }
+}
+
+function copyTextWithExecCommand(text) {
+  const document = globalThis.document;
+  if (document === null || typeof document !== "object" || typeof document.execCommand !== "function") {
+    return false;
+  }
+  const body = document.body;
+  if (body === null || typeof body !== "object") {
+    return false;
+  }
+  const textarea = document.createElement("textarea");
+  textarea.value = text;
+  textarea.setAttribute("readonly", "");
+  textarea.style.position = "fixed";
+  textarea.style.top = "-1000px";
+  textarea.style.left = "-1000px";
+  textarea.style.opacity = "0";
+  body.appendChild(textarea);
+  textarea.select();
+  textarea.setSelectionRange(0, textarea.value.length);
+  try {
+    return document.execCommand("copy") === true;
+  } catch {
+    return false;
+  } finally {
+    textarea.remove();
+  }
+}
+
 function createBrowserEventListenerResource(resources, target, eventName, callback) {
   const handler = (event) => callLeanEventCallback(resources, event, callback);
   target.addEventListener(eventName, handler);
@@ -190,10 +313,31 @@ function isInputElement(value) {
   return typeof globalThis.HTMLInputElement === "function" && value instanceof globalThis.HTMLInputElement;
 }
 
+function isTextAreaElement(value) {
+  return typeof globalThis.HTMLTextAreaElement === "function" && value instanceof globalThis.HTMLTextAreaElement;
+}
+
+function isSelectElement(value) {
+  return typeof globalThis.HTMLSelectElement === "function" && value instanceof globalThis.HTMLSelectElement;
+}
+
 function isElement(value) {
   return typeof globalThis.Element === "function" && value instanceof globalThis.Element;
 }
 
 function resourceForElementTarget(state, value) {
   return isElement(value) ? state.resourceForValue(value) : null;
+}
+
+function formControlEventValue(event) {
+  const currentValue = formControlValue(event?.currentTarget);
+  if (currentValue !== null) return currentValue;
+  return formControlValue(event?.target);
+}
+
+function formControlValue(value) {
+  if (!isInputElement(value) && !isTextAreaElement(value) && !isSelectElement(value)) {
+    return null;
+  }
+  return String(value.value ?? "");
 }

@@ -64,6 +64,14 @@ material by default:
 - `third_party/lean4-src/`: fetched Lean source checkout
 - `.tools/`: local WASI SDK and optional engine installs
 
+The checked-in infoview widget bundle
+`web/src/generated/vir-infoview-widget.js` is the exception: `Vir.Infoview`
+embeds it with `include_str`, so it must be present for Lean builds. Regenerate
+it with `npm run build:infoview` after editing the infoview widget shell or the
+JavaScript runtime modules it imports. `npm run build:demo` also runs that
+bundle step and rebuilds `Vir`, so the VS Code infoview demo does not get a
+stale shell embedded in `Vir.Infoview`.
+
 The most useful generated diagnostics are:
 
 - `build/upstream-probe/boundary.md`
@@ -89,8 +97,12 @@ Toolchain and build:
 ```bash
 npm run fetch:lean
 npm run install:wasi
+npm run build:infoview
+npm run check:infoview-bundle
 npm run build:demo
+npm run build:demo-package
 npm run build:site
+npm run check:api-coverage
 ```
 
 Package generation and inspection:
@@ -109,6 +121,7 @@ Tests:
 ```bash
 npm run test:upstream
 npm run test:upstream:no-build
+npm run test:infoview
 npm run test:runtime
 npm run test:runtime:pure
 npm run test:runtime:lean
@@ -120,16 +133,18 @@ npm run test:pages:browser
 npm test
 ```
 
-`npm test` runs the boundary registry check and Wasm extension probes, builds
-the demo artifacts once, then reuses those artifacts for upstream smoke,
-JavaScript runtime tests, and the fixture suite. It is the default pre-merge
-signal for code changes.
+`npm test` runs the boundary registry check, API coverage docs check, and Wasm
+extension probes, builds the demo artifacts once, then reuses those artifacts
+for upstream smoke, infoview widget smoke, JavaScript runtime tests, and the
+fixture suite. It is the default pre-merge signal for code changes.
 
 ## Smallest Useful Check
 
 - Shim/native extern registry changes:
   `node scripts/check-boundary-registry.mjs --write`, then
   `npm run check:boundary-registry`
+- API coverage documentation changes:
+  `npm run check:api-coverage`
 - Upstream interpreter or WASI boundary changes:
   `npm run test:upstream`
 - Upstream smoke after `npm run build:demo` has already refreshed the WASM and
@@ -146,6 +161,14 @@ signal for code changes.
   `npm run test:runtime -- <substring>`
 - An explicit runtime smoke group:
   `npm run test:runtime -- --group pure`
+- Lean infoview bundle freshness, shell loading, local asset RPC, or widget-entry
+  signature checks:
+  `npm run test:infoview`
+- React proof-widget demo iteration after `npm run build:demo`:
+  open `examples/ReactProofWidget.lean` in VS Code; the widget package is built
+  from the active Lean server snapshot. If the file was already open before the
+  build, restart the Lean server or reopen the file so the editor sees the
+  rebuilt `Vir.Infoview` widget module.
 - Lean fixture behavior or package generation coverage:
   `npm run test:fixtures`
 - A single fixture or fixture family:

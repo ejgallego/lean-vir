@@ -103,15 +103,23 @@
           "roots": [
             "ReactInput.mountInput",
             "ReactInput.mountChangeInput",
+            "ReactInput.mountSelectTextarea",
             "ReactInput.mountCheckbox",
             "ReactInput.mountAttributes"
+          ]
+        },
+        {
+          "source": "examples/ReactProofWidgetHello.lean",
+          "roots": [
+            "ReactProofWidgetHello.mount",
+            "ReactProofWidgetHello.unmount"
           ]
         },
         {
           "source": "examples/ReactProofWidget.lean",
           "roots": [
             "ReactProofWidget.mount",
-            "ReactProofWidget.mountDefault"
+            "ReactProofWidget.unmount"
           ]
         }
       ],

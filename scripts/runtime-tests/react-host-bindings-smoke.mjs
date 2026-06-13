@@ -33,6 +33,9 @@ import {
   smokeVirtualReactCheckbox,
   smokeVirtualReactCounter,
   smokeVirtualReactInput,
+  smokeVirtualReactProofWidget,
+  smokeVirtualReactProofWidgetHello,
+  smokeVirtualReactSelectTextarea,
   smokeVirtualReactTamagotchi,
 } from "../virtual-react-smoke-scenarios.mjs";
 
@@ -157,8 +160,11 @@ ensureVirtualElements(reactDocumentState, [
   "#react-counter",
   "#react-input",
   "#react-change",
+  "#react-select-textarea",
   "#react-checkbox",
   "#react-attributes",
+  "#react-proof-hello",
+  "#react-proof",
   "#react-pet",
   "#react-unmount",
   "#react-stale-root",
@@ -180,8 +186,11 @@ missingSelectorRuntime.dispose();
 smokeVirtualReactCounter(reactRuntime, reactDocumentState, "#react-counter");
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
 smokeVirtualReactChangeInput(reactRuntime, reactDocumentState, "#react-change");
+smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select-textarea");
 smokeVirtualReactCheckbox(reactRuntime, reactDocumentState, "#react-checkbox");
 smokeVirtualReactAttributes(reactRuntime, reactDocumentState, "#react-attributes", { assertKeys: true });
+smokeVirtualReactProofWidgetHello(reactRuntime, reactDocumentState, "#react-proof-hello");
+smokeVirtualReactProofWidget(reactRuntime, reactDocumentState, "#react-proof");
 smokeVirtualReactTamagotchi(reactRuntime, reactDocumentState, "#react-pet", { extended: true });
 assert.equal(reactRuntime.call("ReactCounter.mountAndUnmount", "#react-unmount"), true);
 assert.equal(reactRuntime.liveCallbacks.size, 0);

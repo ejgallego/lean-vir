@@ -44,9 +44,9 @@ registering a Lean callback and returning an opaque cancellation handle.
   underlying event target is a DOM element, and `none` otherwise.
 - `Event.preventDefault` and `Event.stopPropagation` forward to the underlying
   browser event and are also modeled in the virtual test host.
-- `Event.inputElement?`, `Event.inputValue?`, and `Event.inputChecked?` are
-  Lean helpers for controlled input handlers; they check `currentTarget` before
-  falling back to `target`.
+- `Event.inputElement?`, `Event.inputValue?`, `Event.formValue?`, and
+  `Event.inputChecked?` are Lean helpers for controlled input handlers; they
+  check `currentTarget` before falling back to `target`.
 
 ## Timer And Frame APIs
 
@@ -78,8 +78,8 @@ callback from the current callback.
 - one-shot `requestAnimationFrame`, cancelled frame, and a recursive frame loop;
 - package reload cleanup for pending listeners, timers, frames, and callback
   roots;
-- callback-scoped event target/currentTarget access through React input, change,
-  and checkbox callbacks;
+- callback-scoped event target/currentTarget access through React input,
+  textarea/select, change, and checkbox callbacks;
 - `preventDefault`/`stopPropagation` dispatch through virtual events and real
   browser `onChange`/`onSubmit` smoke coverage;
 - virtual event helper coverage through `createVirtualEventState`;
