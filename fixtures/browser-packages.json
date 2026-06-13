@@ -90,6 +90,8 @@
             "ReactCounter.mount",
             "ReactCounter.mountDefault",
             "ReactCounter.renderStatic",
+            "ReactCounter.renderWideTextLoop",
+            "ReactCounter.renderCallbackTreeLoop",
             "ReactCounter.mountAndUnmount",
             "ReactCounter.mountAndUnmountLoop",
             "ReactCounter.renderAfterUnmount",

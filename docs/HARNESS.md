@@ -223,13 +223,16 @@ Compare two saved reports with:
 npm run bench:compare -- build/perf/before.json build/perf/after.json
 ```
 
-The comparison checks benchmark names, iteration counts, and checksums before
-printing per-call deltas. The default benchmark includes pure-runtime controls
-(`fib` and `sort`) plus host/resource rows for scalar host imports, callback
-root round trips, DOM listener resource churn, and React root lifecycle work.
-The host/resource rows run loops inside Lean so they measure repeated host
-interop operations without mostly measuring repeated top-level `vir.call(...)`
-entry overhead.
+The comparison checks benchmark names, sample names, iteration counts, and
+checksums before printing per-call deltas. The default benchmark includes
+pure-runtime controls (`fib` and `sort`), JavaScript codec-only rows plus
+end-to-end top-level value conversion rows for WIT-like scalar records, nested
+records/lists/options, and recursive custom inductives, plus host/resource rows
+for scalar host imports, callback root round trips, DOM listener resource churn,
+React root lifecycle work, and focused React `Html` render conversion.
+The host/resource and React `Html` rows run loops inside Lean so they measure
+repeated host interop or render-conversion operations without mostly measuring
+repeated top-level `vir.call(...)` entry overhead.
 
 For routine before/after comparisons between two already checked-out trees, use
 the paired runner:

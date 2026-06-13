@@ -120,6 +120,41 @@ The strict `externref` resource path is implemented. JSPI should wait for an
 async Lean app use case that cannot be expressed cleanly with callback
 registration.
 
+## WIT Alignment
+
+The current runtime should stay morally aligned with WIT even while the browser
+artifact remains a core `wasm32-wasip1` module. WIT already has enums and
+variants, so the main mismatch for `Lean.Vir.React.Html` is not enum support.
+The mismatch is that WIT value types are not recursive, while the Lean authoring
+type is recursive and embeds callback closures inside event-handler records.
+
+The intended alignment is:
+
+- keep recursive `Html` as the Lean authoring DSL;
+- treat browser values such as `Element`, callback-scoped `Event`, and
+  `ReactRoot` as resource-like handles;
+- keep records, variants/enums, lists, options, strings, numeric scalars, and
+  resources close to WIT's value/resource categories;
+- if a future component boundary is introduced, lower recursive `Html` to a
+  non-recursive flat tree such as `{ root, nodes }`, with children represented
+  by node indexes and callbacks represented by resources or runtime-owned
+  callback ids.
+
+The benchmark suite includes rows that should be sensitive to future WIT
+binding choices:
+
+- JavaScript codec-only encoding for scalar records/enums,
+  nested records/lists/options, and recursive custom inductives;
+- end-to-end scalar record plus enum conversion;
+- end-to-end nested record/list/option conversion;
+- end-to-end recursive custom-inductive conversion as a proxy for shapes that
+  WIT cannot represent directly;
+- React text-tree render conversion;
+- React callback-heavy render conversion.
+
+These rows are meant to catch conversion-cost regressions separately from the
+pure `fib`/`sort` controls and the broader React root lifecycle benchmark.
+
 The public JavaScript entrypoints keep React separate from the generic runtime
 surface:
 

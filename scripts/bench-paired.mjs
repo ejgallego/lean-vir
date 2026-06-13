@@ -9,6 +9,7 @@ import { join, resolve } from "node:path";
 
 import {
   benchmarkReportLabel,
+  benchmarkSampleNames,
   benchmarkSamplePerCallMs,
   formatMs,
   median,
@@ -198,20 +199,25 @@ function printSummary(beforeSide, beforeReports, afterSide, afterReports, args) 
     const beforeBenchmark = beforeReports[0].benchmarks.get(name);
     const afterBenchmark = afterReports[0].benchmarks.get(name);
     console.log(afterBenchmark.title ?? beforeBenchmark.title ?? name);
-    compareSampleSummaries(
-      name,
-      "wasm",
-      summarizeSample(name, "wasm", beforeReports),
-      summarizeSample(name, "wasm", afterReports),
-    );
-    compareOptionalSampleSummaries(
-      name,
-      "host",
-      summarizeOptionalSample(name, "host", beforeReports),
-      summarizeOptionalSample(name, "host", afterReports),
-    );
+    const sampleNames = benchmarkSampleNamesForReports([...beforeReports, ...afterReports], name);
+    for (const sampleName of sampleNames) {
+      compareOptionalSampleSummaries(
+        name,
+        sampleName,
+        summarizeOptionalSample(name, sampleName, beforeReports),
+        summarizeOptionalSample(name, sampleName, afterReports),
+      );
+    }
     console.log();
   }
+}
+
+function benchmarkSampleNamesForReports(reports, benchmarkName) {
+  return [
+    ...new Set(reports.flatMap((report) =>
+      benchmarkSampleNames(report.benchmarks.get(benchmarkName) ?? {}),
+    )),
+  ];
 }
 
 function summarizeSample(benchmarkName, sampleName, reports) {
