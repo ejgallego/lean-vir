@@ -90,7 +90,10 @@ npm run bench -- --json build/perf/current.json
 `npm run bench` keeps built benchmark inputs in
 `.perf-artifacts/vir-bench-cache` by default. Use `--no-artifact-cache`,
 `--artifact-cache DIR`, or `--refresh-artifact-cache` when you need explicit
-cache control.
+cache control. The default benchmark report includes a top-level
+`branchAndSub` dispatch row with both named and resolved package-call samples,
+so call-dispatch changes show up in the same JSON reports as the broader
+runtime rows.
 
 Then compare them with:
 

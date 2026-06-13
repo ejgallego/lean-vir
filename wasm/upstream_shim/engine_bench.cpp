@@ -12,9 +12,9 @@ Author: Emilio J. Gallego Arias
 extern "C" uint32_t vir_load_ir_package(uint8_t const * data, uint32_t size);
 extern "C" uint32_t vir_last_package_error_size(void);
 extern "C" char const * vir_last_package_error(void);
-extern "C" char const * vir_call(
-    char const * name_text,
-    uint32_t name_len,
+extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len);
+extern "C" char const * vir_call_resolved(
+    uint32_t call_slot,
     uint8_t const * request,
     uint32_t request_len,
     uint8_t result_tag);
@@ -33,9 +33,37 @@ extern "C" uint32_t vir_js_call_result_size(void) {
     return 0;
 }
 
+extern "C" __externref_t vir_resource_take(void) {
+    return __builtin_wasm_ref_null_extern();
+}
+
+extern "C" void vir_resource_push(__externref_t value) {
+    (void) value;
+}
+
+extern "C" uint32_t vir_resource_root(__externref_t value) {
+    (void) value;
+    return 0;
+}
+
+extern "C" __externref_t vir_resource_get(uint32_t root_id) {
+    (void) root_id;
+    return __builtin_wasm_ref_null_extern();
+}
+
+extern "C" void vir_resource_release(uint32_t root_id) {
+    (void) root_id;
+}
+
+extern "C" void vir_closure_push(uint32_t root_id) {
+    (void) root_id;
+}
+
 #include "vir_fixtures_basic_package.inc"
 
 static bool g_benchmark_failed = false;
+static uint32_t g_fib_slot = 0;
+static uint32_t g_sort_slot = 0;
 
 constexpr uint8_t WIRE_NAT = 0;
 constexpr uint8_t WIRE_ARRAY = 16;
@@ -120,11 +148,25 @@ static uint32_t parse_nat_result(char const * data, uint32_t len) {
     return value;
 }
 
-static uint32_t call_nat(char const * name, uint8_t const * payload, uint32_t payload_len) {
-    char const * result = vir_call(name, static_cast<uint32_t>(strlen(name)), payload, payload_len, 0);
+static uint32_t resolve_call_slot(char const * name) {
+    uint32_t slot = vir_resolve_call(name, static_cast<uint32_t>(strlen(name)));
+    if (slot == 0) {
+        uint32_t error_len = vir_call_error_size();
+        fprintf(stderr, "vir_resolve_call(%s) failed", name);
+        if (error_len != 0) {
+            fprintf(stderr, ": %.*s", static_cast<int>(error_len), vir_call_error());
+        }
+        fprintf(stderr, "\n");
+        g_benchmark_failed = true;
+    }
+    return slot;
+}
+
+static uint32_t call_nat_resolved(uint32_t slot, char const * name, uint8_t const * payload, uint32_t payload_len) {
+    char const * result = vir_call_resolved(slot, payload, payload_len, 0);
     if (result == nullptr) {
         uint32_t error_len = vir_call_error_size();
-        fprintf(stderr, "vir_call(%s) failed", name);
+        fprintf(stderr, "vir_call_resolved(%s) failed", name);
         if (error_len != 0) {
             fprintf(stderr, ": %.*s", static_cast<int>(error_len), vir_call_error());
         }
@@ -142,7 +184,7 @@ static uint32_t call_fib(uint32_t input) {
     write_nat_type(cursor);
     write_decimal(cursor, input);
     write_call_tail_nat(cursor);
-    return call_nat("fib", payload, static_cast<uint32_t>(cursor - payload));
+    return call_nat_resolved(g_fib_slot, "fib", payload, static_cast<uint32_t>(cursor - payload));
 }
 
 static uint32_t call_sort(uint32_t const * input, uint32_t len) {
@@ -155,7 +197,7 @@ static uint32_t call_sort(uint32_t const * input, uint32_t len) {
         write_decimal(cursor, input[i]);
     }
     write_call_tail_nat(cursor);
-    return call_nat("SortDemo.demoFromArray", payload, static_cast<uint32_t>(cursor - payload));
+    return call_nat_resolved(g_sort_slot, "SortDemo.demoFromArray", payload, static_cast<uint32_t>(cursor - payload));
 }
 
 static void bench_fib() {
@@ -199,6 +241,11 @@ int main() {
             fprintf(stderr, ": %.*s", static_cast<int>(len), vir_last_package_error());
         }
         fprintf(stderr, "\n");
+        return 1;
+    }
+    g_fib_slot = resolve_call_slot("fib");
+    g_sort_slot = resolve_call_slot("SortDemo.demoFromArray");
+    if (g_fib_slot == 0 || g_sort_slot == 0) {
         return 1;
     }
 
