@@ -35,7 +35,8 @@ const isolatedDir = await mkdtemp(join(tmpdir(), "lean-vir-sdk-import-"));
 try {
   const jsDir = await extractSdk(isolatedDir);
   const modules = {};
-  for (const moduleName of SDK_JS_MODULES.filter((name) => name !== "vir-react-host-bindings.js")) {
+  const reactDependentModules = new Set(["vir-react-host-bindings.js", "vir-react-dom-client.js"]);
+  for (const moduleName of SDK_JS_MODULES.filter((name) => !reactDependentModules.has(name))) {
     modules[moduleName] = await import(pathToFileURL(join(jsDir, moduleName)));
   }
   const runtime = modules["vir-runtime.js"];
@@ -78,7 +79,9 @@ try {
   assert.equal(typeof bindings["react.node.createElement"], "function");
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.render"], "function");
+  assert.equal(typeof bindings["react.root.renderIntoSelector"], "function");
   assert.equal(typeof bindings["react.root.unmount"], "function");
+  assert.equal(typeof bindings["react.root.unmountSelector"], "function");
 } finally {
   await rm(tempDir, { recursive: true, force: true });
 }

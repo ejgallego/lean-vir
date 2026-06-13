@@ -65,6 +65,8 @@ build_module Vir/Common.lean
 build_module Vir/Browser.lean
 build_module Vir/React.lean
 build_module Vir/GeneratePackage.lean
+build_module Vir/Infoview/Surface.lean
+build_module Vir/Infoview.lean
 build_module Vir.lean
 
 for stale in "${stale_layouts[@]}"; do

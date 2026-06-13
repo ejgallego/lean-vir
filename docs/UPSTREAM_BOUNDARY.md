@@ -70,7 +70,7 @@ not a fork of Lean. It is split by responsibility:
   import metadata, and initializer execution.
 - `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
   from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
-  packages.
+  packages; `tools/GeneratePackage.lean` is the CLI wrapper.
 - `decl_provider.h` is the replacement point for a future module-backed
   provider.
 
@@ -302,8 +302,8 @@ boundary values into real `Lean.Expr` objects without depending on Lean-library
 exported constructor wrappers.
 
 JavaScript host imports deliberately do not widen the native extern policy.
-`Vir/GeneratePackage/Interface.lean` encodes `@[vir_js "..."]` extern declarations into
-the package manifest and assigns each one a finite trampoline symbol. The shim
+`Vir/GeneratePackage/Interface.lean` encodes `@[vir_js "..."]` extern declarations
+into the package manifest and assigns each one a finite trampoline symbol. The shim
 recognizes only those package-provided symbols, calls the single imported
 `env.vir_js_call_objects` dispatcher, and still rejects unrelated dynamic symbol
 lookup.

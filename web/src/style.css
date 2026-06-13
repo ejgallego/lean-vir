@@ -1374,12 +1374,24 @@ h2 {
   margin-right: 8px;
 }
 
-.react-mount input {
+.react-mount input,
+.react-mount textarea,
+.react-mount select {
   min-height: 34px;
   border: 1px solid #bdc8bb;
   background: #ffffff;
   color: #17201a;
   padding: 5px 8px;
+}
+
+.react-mount textarea,
+.react-mount select {
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.react-mount textarea {
+  resize: vertical;
 }
 
 .react-mount input[type="checkbox"] {
@@ -1402,7 +1414,9 @@ h2 {
 }
 
 .react-mount button:hover,
-.react-mount input:focus-visible {
+.react-mount input:focus-visible,
+.react-mount textarea:focus-visible,
+.react-mount select:focus-visible {
   border-color: #516f88;
 }
 
@@ -1410,10 +1424,6 @@ h2 {
   border-left: 4px solid #516f88;
   background: #ffffff;
   padding: 12px;
-}
-
-.react-proof-mount {
-  min-height: 360px;
 }
 
 .react-proof-widget {
@@ -1443,6 +1453,34 @@ h2 {
   line-height: 1.2;
 }
 
+.react-proof-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.react-proof-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  color: #5f6f64;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.react-proof-module,
+.react-proof-range {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.react-proof-range::before {
+  color: #8a9b90;
+  content: "/";
+  margin-right: 6px;
+}
+
 .react-proof-summary {
   max-width: 360px;
   margin: 0;
@@ -1463,6 +1501,14 @@ h2 {
 
 .react-proof-sidebar,
 .react-proof-detail {
+  min-width: 0;
+}
+
+.react-proof-sidebar,
+.react-proof-main {
+  display: grid;
+  align-content: start;
+  gap: 14px;
   min-width: 0;
 }
 
@@ -1525,6 +1571,7 @@ h2 {
   margin: 0;
   color: #33415c;
   font-size: 0.88rem;
+  overflow-wrap: anywhere;
 }
 
 .react-proof-target {
@@ -1564,6 +1611,10 @@ h2 {
 
 .react-pet-mount {
   min-height: 430px;
+}
+
+.react-proof-review-mount {
+  min-height: 560px;
 }
 
 .react-pet-widget {

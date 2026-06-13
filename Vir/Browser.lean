@@ -369,6 +369,16 @@ def inputValue? (event : @& Lean.Vir.Js Event) : DomM (Option String) := do
   | some input => some <$> HTMLInputElement.getValue input
 
 /--
+Returns the current value for a form-control event.
+
+This checks `currentTarget` first, then falls back to `target`. In a browser it
+returns `some value` for `HTMLInputElement`, `HTMLTextAreaElement`, and
+`HTMLSelectElement` targets, and `none` for other elements.
+-/
+@[vir_js "browser.event.formValue"]
+opaque formValue? (event : @& Event) : IO (Option String)
+
+/--
 Returns the current checked state for an input-like event.
 
 This is the usual helper for controlled checkbox/radio handlers. It checks

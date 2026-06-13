@@ -14,7 +14,10 @@
   "scripts": {
     "setup": "npm run fetch:lean && npm run install:wasi && npm run build:demo",
     "doctor": "node scripts/doctor.mjs",
+    "check:api-coverage": "node scripts/check-api-coverage.mjs",
     "fetch:lean": "bash scripts/fetch-lean-source.sh",
+    "build:infoview": "node scripts/build-infoview-widget.mjs",
+    "build:demo-package": "node scripts/generate-browser-package.mjs --package demo-host --copy-public",
     "build:lean-lib": "bash scripts/build-lean-lib.sh",
     "install:wasi": "bash scripts/install-wasi-sdk.sh",
     "install:engines": "bash scripts/install-wasm-engines.sh",
@@ -26,10 +29,11 @@
     "prepare:pages": "npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json examples/mergesort.virpkg.json",
     "generate:provider": "npm run generate:package",
     "check:package": "bash scripts/check-demo-package.sh",
+    "check:infoview-bundle": "node scripts/build-infoview-widget.mjs --check",
     "check:boundary-registry": "node scripts/check-boundary-registry.mjs",
     "probe:upstream": "bash scripts/build-upstream-probe.sh",
     "build": "npm run build:demo",
-    "build:demo": "npm run probe:upstream",
+    "build:demo": "bash scripts/build-demo.sh",
     "build:local-artifact": "npm run build:demo && npm run prepare:pages && npm run package:local-artifact",
     "build:sdk-artifact": "npm run build:demo && npm run package:sdk-artifact",
     "build:site": "npm run build:demo && npm run prepare:pages && npm run package:sdk-artifact && npm run package:local-artifact && vite build --base /lean-vir/",
@@ -39,12 +43,13 @@
     "bench:compare": "node scripts/bench-compare.mjs",
     "bench:paired": "node scripts/bench-paired.mjs",
     "bench:engines": "node scripts/bench-engines.mjs",
-    "test": "npm run check:boundary-registry && npm run test:wasm-extensions && npm run build:demo && npm run test:upstream:no-build && npm run test:runtime && npm run test:fixtures:no-build",
+    "test": "npm run check:boundary-registry && npm run check:api-coverage && npm run test:wasm-extensions && npm run build:demo && npm run test:upstream:no-build && npm run test:infoview && npm run test:runtime && npm run test:fixtures:no-build",
     "test:fixtures": "node scripts/run-fixtures.mjs",
     "test:fixtures:no-build": "node scripts/run-fixtures.mjs --no-build",
     "test:site": "npm run build:site && npm run test:pages",
     "test:pages": "node scripts/check-pages-artifact.mjs",
     "test:pages:browser": "node scripts/smoke-pages-browser.mjs",
+    "test:infoview": "npm run check:infoview-bundle && lake env lean scripts/smoke-infoview-lean.lean && node scripts/smoke-infoview-widget.mjs",
     "test:runtime": "node scripts/test-vir-runtime.mjs",
     "test:runtime:lean": "node scripts/test-vir-runtime.mjs --group lean",
     "test:runtime:pure": "node scripts/test-vir-runtime.mjs --group pure",
@@ -54,6 +59,7 @@
     "dev": "vite --host 127.0.0.1"
   },
   "devDependencies": {
+    "esbuild": "^0.27.7",
     "vite": "^8.0.13"
   },
   "dependencies": {

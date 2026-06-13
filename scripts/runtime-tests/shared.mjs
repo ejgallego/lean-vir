@@ -161,10 +161,11 @@ export async function assertUnsupportedInterfaceSource(dir, stem, lines, pattern
     { encoding: "utf8" },
   );
   assert.notEqual(generated.status, 0, `${stem} unexpectedly generated successfully`);
-  assert.match(generated.stderr, /unsupported interface exports/);
+  const diagnosticsText = `${generated.stderr}${generated.stdout}`;
+  assert.match(diagnosticsText, /unsupported interface exports/);
   const report = await readFile(reportPath, "utf8");
   for (const pattern of patterns) {
-    assert.match(generated.stderr, pattern);
+    assert.match(diagnosticsText, pattern);
     assert.match(report, pattern);
   }
 }
