@@ -7,8 +7,9 @@ Author: Emilio J. Gallego Arias
 
 import { createHash } from "node:crypto";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { basename, dirname, join } from "node:path";
+import { basename, join } from "node:path";
 
+import { copyFileWithDirs } from "./file-utils.mjs";
 import { runSync } from "./process-utils.mjs";
 import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
 
@@ -23,11 +24,6 @@ const publicArchive = join(publicDownloads, `${artifactName}.tar.gz`);
 async function sha256(path) {
   const bytes = await readFile(path);
   return createHash("sha256").update(bytes).digest("hex");
-}
-
-async function copyFileWithDirs(source, dest) {
-  await mkdir(dirname(dest), { recursive: true });
-  await writeFile(dest, await readFile(source));
 }
 
 await rm(sdkDir, { recursive: true, force: true });

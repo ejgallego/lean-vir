@@ -6,10 +6,11 @@ Author: Emilio J. Gallego Arias
 
 import { createHash } from "node:crypto";
 import { readFileSync } from "node:fs";
-import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { mkdir, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { copyFileWithDirs } from "./file-utils.mjs";
 import { runSync } from "./process-utils.mjs";
 
 const artifactCacheVersion = 1;
@@ -204,11 +205,6 @@ async function storeBenchArtifacts(rootPath, artifactPaths, entry, payload, refr
   } finally {
     await rm(tmp, { recursive: true, force: true });
   }
-}
-
-async function copyFileWithDirs(source, dest) {
-  await mkdir(dirname(dest), { recursive: true });
-  await writeFile(dest, await readFile(source));
 }
 
 async function renamePath(source, dest) {

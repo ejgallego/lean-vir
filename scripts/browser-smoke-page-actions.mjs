@@ -12,6 +12,7 @@ import {
   navigate,
   waitForReady,
 } from "./browser-smoke-harness.mjs";
+import { hostPackageFile } from "./browser-package-config.mjs";
 import { createDomTargetScript, inputValueHelperScript } from "./browser-smoke-dom-scripts.mjs";
 import { runnerCaseFromManifest, runSelectedEntry } from "./browser-smoke-dev-runner.mjs";
 
@@ -28,7 +29,7 @@ export async function runDemoHostEntry(cdp, origin, entryName, {
   target = null,
   beforeRunScript = null,
 }) {
-  const runnerCase = await runnerCaseFromManifest("demo-host.irpkg", entryName, { runInputs });
+  const runnerCase = await runnerCaseFromManifest(hostPackageFile, entryName, { runInputs });
   await navigate(cdp, `${origin}${basePath}${runnerCase.url}`);
   await waitForReady(cdp);
   if (target !== null) {

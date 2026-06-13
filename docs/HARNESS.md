@@ -4,6 +4,11 @@ This document is for maintaining Lean VIR. The user-facing quickstart stays in
 the top-level `README.md`. A narrower map of script entry points lives in
 `scripts/README.md`.
 
+This document owns setup, generated-artifact policy, validation command
+selection, and CI shape. Package config and manifest semantics live in
+`docs/INTERFACE_PIPELINE.md`; architecture status lives in
+`docs/IMPLEMENTATION_NOTES.md`.
+
 The repository-local harness has three jobs:
 
 - fetch and pin the upstream Lean source used for the WASI build
@@ -96,6 +101,8 @@ Tests:
 npm run test:upstream
 npm run test:upstream:no-build
 npm run test:runtime
+npm run test:runtime:pure
+npm run test:runtime:lean
 npm run test:wasm-extensions
 npm run test:fixtures
 npm run test:fixtures:no-build
@@ -119,12 +126,17 @@ signal for code changes.
 - Upstream smoke after `npm run build:demo` has already refreshed the WASM and
   browser packages:
   `npm run test:upstream:no-build`
-- JavaScript runtime, host bindings, manifest decoding, or callback lifecycle:
-  `npm run test:runtime`
+- JavaScript runtime, host bindings, manifest decoding, or callback lifecycle
+  without Lean-dependent package generation:
+  `npm run test:runtime:pure`
+- Runtime package generation or SDK artifact import checks:
+  `npm run test:runtime:lean`
 - Local JS engine Wasm interop feature availability, such as `externref` or JSPI:
   `npm run test:wasm-extensions`
-- A single runtime smoke group:
+- A single runtime smoke id/path substring:
   `npm run test:runtime -- <substring>`
+- An explicit runtime smoke group:
+  `npm run test:runtime -- --group pure`
 - Lean fixture behavior or package generation coverage:
   `npm run test:fixtures`
 - A single fixture or fixture family:
@@ -152,7 +164,7 @@ VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 
 `VIR_RUNTIME_TEST_FILTER` similarly narrows `npm run test:runtime`, and
 `VIR_RUNTIME_JOBS` controls the number of runtime smoke subprocesses. The
-available runtime smoke ids are printed by:
+available runtime smoke ids and groups are printed by:
 
 ```bash
 node scripts/test-vir-runtime.mjs --list
@@ -174,7 +186,8 @@ when comparing CI runs:
   timing.
 - `npm run prepare:irpkg` prints Lean library, generator, package, and total
   timing.
-- `npm run test:runtime` prints per-group timings plus the slowest groups.
+- `npm run test:runtime` prints selected groups/filters plus per-test timings
+  and the slowest tests.
 - `npm run test:fixtures` prints build, generator, fixture-run, and slowest
   fixture timings; the JSON summary also records per-fixture phase timings.
 
@@ -183,8 +196,11 @@ when comparing CI runs:
 The CI workflow keeps one job responsible for fetching the pinned Lean source,
 installing the WASI SDK, building `web/public/vir-upstream.wasm`, generating
 browser `.irpkg` files, and running upstream smoke. That job uploads the demo
-artifacts. Runtime and fixture jobs download those artifacts and run in
-parallel without re-fetching Lean source or reinstalling the WASI SDK.
+artifacts. The pure runtime job downloads those artifacts and runs without
+installing Lean. The Lean-dependent runtime job installs Lean only for package
+generation and SDK metadata smoke tests. The fixture job also downloads the
+demo artifacts and runs in parallel without re-fetching Lean source or
+reinstalling the WASI SDK.
 
 ## Browser Smoke
 
@@ -202,59 +218,8 @@ Run `npm run build:site` first when you want to refresh `web/dist/`.
 
 ## Performance Comparisons
 
-`npm run bench` runs the manifest-driven JavaScript runtime benchmark against
-the host Lean IR baseline. It restores/stores built benchmark inputs under
-`.perf-artifacts/vir-bench-cache` by default, keyed by commit plus a build-key
-hash. The cache stores artifacts such as `web/public/vir-upstream.wasm` and
-`web/public/fixtures-basic.irpkg`, not timing samples, so benchmark timings are
-still regenerated for each run. Use `--no-artifact-cache` to disable the cache,
-`--artifact-cache DIR` to put it elsewhere, and `--refresh-artifact-cache` to
-replace the current cache entry.
-
-Pass `--json` to save a machine-readable report:
-
-```bash
-npm run bench -- --json build/perf/current.json
-```
-
-Compare two saved reports with:
-
-```bash
-npm run bench:compare -- build/perf/before.json build/perf/after.json
-```
-
-The comparison checks benchmark names, sample names, iteration counts, and
-checksums before printing per-call deltas. The default benchmark includes
-the `branchAndSub` top-level dispatch row with both named and resolved package
-call samples, pure-runtime controls (`fib` and `sort`), JavaScript codec-only
-rows plus end-to-end top-level value conversion rows for WIT-like scalar
-records, nested records/lists/options, and recursive custom inductives, plus
-host/resource rows for scalar host imports, callback root round trips, DOM
-listener resource churn, React root lifecycle work, and focused React `Html`
-render conversion.
-The host/resource and React `Html` rows run loops inside Lean so they measure
-repeated host interop or render-conversion operations without mostly measuring
-repeated top-level `vir.call(...)` entry overhead.
-
-The `branchAndSub` row calls a tiny exported fixture through both `vir_call` and
-`vir_call_resolved`, so it is the focused check for call-slot dispatch changes.
-The broader `fib`, `sort`, host/resource, and React rows spend more time in Lean
-execution or host work and should show smaller movement from dispatch-only work.
-`npm run bench:engines` remains a WASI command-module comparison across
-available engines for the broader `fib` and `sort` rows.
-
-For routine before/after comparisons between two already checked-out trees, use
-the paired runner:
-
-```bash
-npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
-```
-
-It alternates `npm run bench -- --json` in each checkout, stores the per-run
-reports under `build/perf/paired/`, and prints median per-call deltas for common
-benchmark rows. The compared checkouts must both support the current benchmark
-JSON interface; for older refs, first create a temporary compatible checkout or
-compare manually saved reports with `bench:compare`.
+Benchmark commands, artifact-cache behavior, and before/after comparison
+workflow live in `docs/PERFORMANCE.md`.
 
 ## Implementation Map
 

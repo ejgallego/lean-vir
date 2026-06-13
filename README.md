@@ -149,6 +149,8 @@ When durable release assets exist, the same fetcher can use
 
 ## Where To Go Next
 
+- [docs/README.md](docs/README.md) for a map of maintainer and integration
+  documentation.
 - [docs/LOCAL_IRPKG.md](docs/LOCAL_IRPKG.md) for the full local package
   workflow.
 - [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for calling exported

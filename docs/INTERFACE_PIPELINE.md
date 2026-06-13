@@ -1,5 +1,9 @@
 # Interface Pipeline
 
+This document owns package config shape, generated manifest semantics, and the
+current interface surface. Command selection and CI shape live in
+`docs/HARNESS.md`; architecture status lives in `docs/IMPLEMENTATION_NOTES.md`.
+
 The developer path is package-driven:
 
 ```bash

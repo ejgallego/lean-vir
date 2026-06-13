@@ -13,7 +13,7 @@ import {
 } from "./pages/interface-inputs.js";
 import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "./runtime/interface-manifest.js";
 import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
-import { defaultPackageFile, packagePresets } from "./pages/browser-packages.js";
+import { defaultPackageFile, packagePresets, wasmPublicFile } from "./pages/browser-packages.js";
 import { parseByteArrayInput, parseFloatText, parseIntText, parseNatText } from "./pages/input-parsers.js";
 import { assetPathFor, errorMessage, formatBytes, setReadyState } from "./pages/page-utils.js";
 import { fetchBytes } from "./vir-runtime.js";
@@ -36,8 +36,7 @@ const entrySelect = document.querySelector("#dev-entry-select");
 const inputFields = document.querySelector("#dev-input-fields");
 const runEntryButton = document.querySelector("#dev-run-entry");
 const resultOutput = document.querySelector("#dev-result");
-const wasmFile = "vir-upstream.wasm";
-const runtimeFactory = createBrowserReactRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
+const runtimeFactory = createBrowserReactRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}` });
 const query = new URLSearchParams(window.location.search);
 let requestedEntry = query.get("entry");
 let requestedAutoRun = query.get("run") === "1";

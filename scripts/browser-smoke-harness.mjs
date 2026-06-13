@@ -14,6 +14,8 @@ import { basename, delimiter, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer as createNetServer } from "node:net";
 
+import { generatedPublicFiles } from "./browser-package-config.mjs";
+
 export const distRoot = fileURLToPath(new URL("../web/dist/", import.meta.url));
 export const basePath = "/lean-vir/";
 
@@ -32,8 +34,7 @@ export async function assertDistReady() {
     "dev.html",
     "format.html",
     "runtime-example.html",
-    "vir-upstream.wasm",
-    "fixtures-basic.irpkg",
+    ...generatedPublicFiles,
   ];
   const missing = [];
   for (const path of required) {

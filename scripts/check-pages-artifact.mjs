@@ -11,10 +11,20 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
+import {
+  boundaryPackageFile,
+  defaultPackageFile,
+  generatedPublicFiles,
+  hostPackageFile,
+  leanPackageFile,
+  localPackageFiles,
+} from "./browser-package-config.mjs";
 import { sdkArchiveEntries } from "./sdk-payloads.mjs";
 
 const distDir = new URL("../web/dist/", import.meta.url);
 const execFileAsync = promisify(execFile);
+const generatedPublicFileSet = new Set(generatedPublicFiles);
+const localPackageFileSet = new Set(localPackageFiles);
 
 async function assertFile(path, minSize = 1) {
   const file = new URL(path, distDir);
@@ -42,17 +52,6 @@ async function assertLocalBundle(path) {
   const archivePath = fileURLToPath(archive);
   const { stdout } = await execFileAsync("tar", ["-tzf", archivePath]);
   const entries = new Set(stdout.trim().split(/\r?\n/).filter(Boolean));
-  const expectedPayloads = new Set([
-    "vir-upstream.wasm",
-    "fixtures-basic.irpkg",
-    "demo-host.irpkg",
-    "pretty-printer.irpkg",
-    "fixtures-lean.irpkg",
-    "fixtures-boundary.irpkg",
-    "local-quickstart.irpkg",
-    "local-fib.irpkg",
-    "local-mergesort.irpkg",
-  ]);
   const requiredEntries = [
     "lean-vir-local/README.txt",
     "lean-vir-local/LICENSE",
@@ -62,10 +61,7 @@ async function assertLocalBundle(path) {
     "lean-vir-local/format.html",
     "lean-vir-local/react.html",
     "lean-vir-local/runtime-example.html",
-    "lean-vir-local/vir-upstream.wasm",
-    "lean-vir-local/local-quickstart.irpkg",
-    "lean-vir-local/fixtures-basic.irpkg",
-    "lean-vir-local/demo-host.irpkg",
+    ...generatedPublicFiles.map((file) => `lean-vir-local/${file}`),
   ];
   for (const entry of requiredEntries) {
     assert.ok(entries.has(entry), `local bundle missing ${entry}`);
@@ -75,7 +71,7 @@ async function assertLocalBundle(path) {
     if (!match) continue;
     const basename = match[1];
     if (/\.(wasm|irpkg|input\.json|report\.md)$/.test(basename)) {
-      assert.ok(expectedPayloads.has(basename), `local bundle contains unexpected generated payload ${entry}`);
+      assert.ok(generatedPublicFileSet.has(basename), `local bundle contains unexpected generated payload ${entry}`);
     }
   }
   assert.ok(
@@ -115,10 +111,10 @@ assertLink(indexHtml, "downloads/lean-vir-local.tar.gz");
 assertLink(indexHtml, "downloads/lean-vir-sdk.tar.gz");
 assertLink(indexHtml, "format.html?case=list&amp;width=12");
 assertLink(indexHtml, "dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total");
-assertLink(indexHtml, "dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump");
-assertLink(indexHtml, "dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake");
-assertLink(indexHtml, "dev.html?package=fixtures-lean.irpkg&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore");
-assertLink(indexHtml, "dev.html?package=fixtures-boundary.irpkg&amp;entry=Vir_Fixtures_Boundary_floatScaleScore");
+assertLink(indexHtml, `dev.html?package=${defaultPackageFile}&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`);
+assertLink(indexHtml, `dev.html?package=${hostPackageFile}&amp;entry=HostInterop_titleHandshake`);
+assertLink(indexHtml, `dev.html?package=${leanPackageFile}&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore`);
+assertLink(indexHtml, `dev.html?package=${boundaryPackageFile}&amp;entry=Vir_Fixtures_Boundary_floatScaleScore`);
 assert.ok(devHtml.includes("dev-package-url"), "dev.html should contain package runner controls");
 assert.ok(devHtml.includes("dev-package-preset"), "dev.html should contain package presets");
 assert.ok(devHtml.includes("npm run generate:irpkg -- path/File.lean"), "dev.html should show the package command shape");
@@ -128,16 +124,14 @@ assert.ok(reactHtml.includes("react-counter-root"), "react.html should contain t
 assert.ok(reactHtml.includes("react-attributes-root"), "react.html should contain the React attributes mount");
 assert.ok(reactHtml.includes("react-pet-root"), "react.html should contain the React Tamagotchi mount");
 
-await assertFile("vir-upstream.wasm", 1024);
-await assertFile("fixtures-basic.irpkg", 1024);
-await assertFile("demo-host.irpkg", 1024);
-await assertFile("pretty-printer.irpkg", 1024);
-await assertFile("fixtures-lean.irpkg", 1024);
-await assertFile("fixtures-boundary.irpkg", 1024);
-await assertFile("local-quickstart.irpkg", 128);
-await assertFile("local-fib.irpkg", 128);
-await assertFile("local-mergesort.irpkg", 128);
+for (const file of generatedPublicFiles) {
+  await assertFile(file, minGeneratedPublicFileSize(file));
+}
 await assertLocalBundle("downloads/lean-vir-local.tar.gz");
 await assertSdkBundle("downloads/lean-vir-sdk.tar.gz");
 
 console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, React review, format workbench, wasm, focused manifest packages, local bundle, and SDK bundle`);
+
+function minGeneratedPublicFileSize(file) {
+  return localPackageFileSet.has(file) ? 128 : 1024;
+}
