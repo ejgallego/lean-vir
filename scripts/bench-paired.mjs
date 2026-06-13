@@ -179,10 +179,13 @@ async function readReports(side) {
 }
 
 function printSummary(beforeSide, beforeReports, afterSide, afterReports, args) {
-  const allReports = [...beforeReports, ...afterReports];
-  const benchmarkNames = [...allReports[0].benchmarks.keys()].filter((name) =>
-    allReports.every((report) => report.benchmarks.has(name)),
-  );
+  const beforeNames = benchmarkNamesForSide(beforeSide.label, beforeReports);
+  const afterNames = benchmarkNamesForSide(afterSide.label, afterReports);
+  const beforeNameSet = new Set(beforeNames);
+  const afterNameSet = new Set(afterNames);
+  const benchmarkNames = beforeNames.filter((name) => afterNameSet.has(name));
+  const beforeOnlyNames = beforeNames.filter((name) => !afterNameSet.has(name));
+  const afterOnlyNames = afterNames.filter((name) => !beforeNameSet.has(name));
   if (benchmarkNames.length === 0) {
     throw new Error("paired benchmark reports have no benchmark names in common");
   }
@@ -210,6 +213,8 @@ function printSummary(beforeSide, beforeReports, afterSide, afterReports, args) 
     }
     console.log();
   }
+  printSideOnlyBenchmarkSummaries(beforeSide.label, beforeReports, beforeOnlyNames);
+  printSideOnlyBenchmarkSummaries(afterSide.label, afterReports, afterOnlyNames);
 }
 
 function benchmarkSampleNamesForReports(reports, benchmarkName) {
@@ -218,6 +223,33 @@ function benchmarkSampleNamesForReports(reports, benchmarkName) {
       benchmarkSampleNames(report.benchmarks.get(benchmarkName) ?? {}),
     )),
   ];
+}
+
+function benchmarkNamesForSide(sideLabel, reports) {
+  const names = [...new Set(reports.flatMap((report) => [...report.benchmarks.keys()]))];
+  for (const name of names) {
+    const missingIndex = reports.findIndex((report) => !report.benchmarks.has(name));
+    if (missingIndex !== -1) {
+      throw new Error(`${sideLabel} benchmark ${name} is missing from run ${missingIndex + 1}`);
+    }
+  }
+  return names;
+}
+
+function printSideOnlyBenchmarkSummaries(sideLabel, reports, benchmarkNames) {
+  if (benchmarkNames.length === 0) return;
+  console.log(`${sideLabel}-only benchmark rows`);
+  console.log(`Rows present only in ${sideLabel} reports; no before/after delta is available.`);
+  console.log();
+  for (const name of benchmarkNames) {
+    const benchmark = reports[0].benchmarks.get(name);
+    console.log(benchmark.title ?? name);
+    const sampleNames = benchmarkSampleNamesForReports(reports, name);
+    for (const sampleName of sampleNames) {
+      printSampleSummary(name, sampleName, summarizeSample(name, sampleName, reports));
+    }
+    console.log();
+  }
 }
 
 function summarizeSample(benchmarkName, sampleName, reports) {
@@ -289,5 +321,15 @@ function compareSampleSummaries(benchmarkName, sampleName, before, after) {
     `  ${sampleName}: ${formatMs(before.perCallMs)} -> ` +
       `${formatMs(after.perCallMs)} / call (${sign}${deltaPct.toFixed(1)}%, ` +
       `${speed.toFixed(2)}x speed)`,
+  );
+}
+
+function printSampleSummary(benchmarkName, sampleName, summary) {
+  if (summary.iterations === 0) {
+    throw new Error(`${benchmarkName} ${sampleName}: iteration count must be positive`);
+  }
+  console.log(
+    `  ${sampleName}: ${formatMs(summary.perCallMs)} / call ` +
+      `(${summary.iterations} iterations, checksum ${summary.checksum})`,
   );
 }

@@ -54,6 +54,9 @@ npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
 
 It alternates `npm run bench -- --json` in each checkout, stores the per-run
 reports under `build/perf/paired/`, and prints median per-call deltas for common
-benchmark rows. The compared checkouts must both support the current benchmark
-JSON interface; for older refs, first create a temporary compatible checkout or
-compare manually saved reports with `bench:compare`.
+benchmark rows. Rows present in only one checkout are listed separately with
+their per-call medians, which makes newly added benchmark rows visible without
+pretending they have a before/after delta. The compared checkouts must both
+support the current benchmark JSON interface; for older refs, first create a
+temporary compatible checkout or compare manually saved reports with
+`bench:compare`.
