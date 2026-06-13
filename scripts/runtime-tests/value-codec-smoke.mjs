@@ -12,8 +12,6 @@ import {
 } from "../../web/src/host-resource.js";
 import {
   createHostResourceState,
-  disposeDomResourceState,
-  resourceForValue,
 } from "../../web/src/host/vir-host-resources.js";
 import { BinaryWriter, encodeTypeDescriptor } from "../../web/src/runtime/vir-codec.js";
 import {
@@ -60,8 +58,8 @@ assert.throws(
   /resourceArg argument arg1 must be a live host resource/,
 );
 const resourceStore = createHostResourceState();
-const staleStoreResource = resourceForValue(resourceStore, { name: "stale" });
-disposeDomResourceState(resourceStore);
+const staleStoreResource = resourceStore.resourceForValue({ name: "stale" });
+resourceStore.dispose();
 assert.throws(
   () => encodeCallPayload(resourceEntry, [staleStoreResource], { pushIncomingResource: () => undefined }),
   /resourceArg argument arg1 must be a live host resource/,

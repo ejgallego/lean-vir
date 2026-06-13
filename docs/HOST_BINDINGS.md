@@ -104,6 +104,11 @@ are synchronous in v1; returning a `Promise` is an error.
 
 ## Resource Lifetime
 
+`createHostResourceState()` returns the shared host-resource store used when
+composing browser, React, timer, animation, and virtual binding groups. The
+store owns opaque `HostResource` wrappers, liveness checks, and disposable host
+objects; its `dispose()` method performs the built-in teardown.
+
 `vir.dispose()` tears down runtime-side host state:
 
 - built-in browser bindings remove live event listeners, clear pending timers,
