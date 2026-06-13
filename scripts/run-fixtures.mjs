@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
+import { delimiter } from "node:path";
 
 import { createVirRuntime } from "../web/src/vir-runtime.js";
 import { runAsync } from "./process-utils.mjs";
@@ -14,9 +15,11 @@ const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
 const buildDir = new URL("../build/fixtures/", import.meta.url);
 const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
+const irpkgGeneratorPath = new URL("../.lake/build/bin/vir_irpkg", import.meta.url);
 const summaryPath = new URL("summary.json", buildDir);
 const sourceCache = new Map();
 let cachedWasmBytes = null;
+let irpkgGeneratorEnv = null;
 const args = process.argv.slice(2);
 
 function usage() {
@@ -52,6 +55,36 @@ function requireOk(result, command) {
     throw new Error(`${command} failed with status ${result.status}\n${result.stderr}`);
   }
   return result;
+}
+
+async function commandOutput(cmd, args, command) {
+  const result = requireOk(await runAsync(cmd, args, { cwd: root, capture: true }), command);
+  return result.stdout.trim();
+}
+
+function leanPathWithGenerator(leanPrefix) {
+  return [
+    "build/lean-lib",
+    ".lake/build/lib/lean",
+    `${leanPrefix}/lib/lean`,
+    process.env.LEAN_PATH,
+  ].filter(Boolean).join(delimiter);
+}
+
+async function prepareIrpkgGenerator() {
+  requireOk(
+    await runAsync("bash", ["scripts/build-lean-lib.sh"], { cwd: root }),
+    "bash scripts/build-lean-lib.sh",
+  );
+  requireOk(
+    await runAsync("lake", ["build", "vir_irpkg"], { cwd: root }),
+    "lake build vir_irpkg",
+  );
+  const leanPrefix = await commandOutput("lean", ["--print-prefix"], "lean --print-prefix");
+  irpkgGeneratorEnv = {
+    ...process.env,
+    LEAN_PATH: leanPathWithGenerator(leanPrefix),
+  };
 }
 
 function sanitizeId(id) {
@@ -181,19 +214,24 @@ async function instantiateWasm(packagePath) {
 }
 
 async function generatePackage(fixture) {
+  if (irpkgGeneratorEnv === null) {
+    throw new Error("IR package generator was not prepared");
+  }
   const id = sanitizeId(fixture.id);
   const packagePath = new URL(`${id}.irpkg`, buildDir);
   const reportPath = new URL(`${id}.report.md`, buildDir);
   const args = [
-    "--run",
-    "tools/GeneratePackage.lean",
     packagePath.pathname,
     reportPath.pathname,
     "--target",
     fixture.source,
     ...rootsFor(fixture),
   ];
-  const result = await runAsync("lean", args, { cwd: root, capture: true });
+  const result = await runAsync(irpkgGeneratorPath.pathname, args, {
+    cwd: root,
+    capture: true,
+    env: irpkgGeneratorEnv,
+  });
   const report = await readFile(reportPath, "utf8").catch(() => "");
   const diagnostics = packageDiagnostics(report);
   if (!result.ok) {
@@ -289,6 +327,7 @@ if (skipBuild) {
 } else {
   requireOk(await runAsync("npm", ["run", "--silent", "build:demo"], { cwd: root }), "npm run build:demo");
 }
+await prepareIrpkgGenerator();
 
 function fixtureJobCount(total) {
   const configured = Number.parseInt(process.env.VIR_FIXTURE_JOBS ?? "", 10);

@@ -13,11 +13,19 @@ map lives in `docs/HARNESS.md`.
   Check the local toolchain, pinned Lean source checkout, generated WASM/package
   artifacts, WASI SDK, and optional Chromium browser.
 - `npm run build:demo`
-  Build the upstream IR interpreter WASM and generated browser packages.
+  Build the upstream IR interpreter WASM and generated browser packages. The
+  browser package step uses the compiled `vir_irpkg` generator executable.
+- `npm run generate:irpkg`
+  Build the local Lean library and `vir_irpkg` generator executable, then
+  generate one manifest-bearing `.irpkg`.
 - `npm run test:upstream`
   Build the demo and run the upstream interpreter smoke test.
+- `npm run test:upstream:no-build`
+  Reuse existing demo WASM and browser packages for the upstream smoke test.
 - `npm run test:runtime`
   Run JavaScript runtime, host binding, callback lifecycle, and manifest tests.
+  Use `npm run test:runtime -- <substring>` or
+  `VIR_RUNTIME_TEST_FILTER=<substring>` to narrow it.
 - `npm run test:wasm-extensions`
   Probe optional JS/Wasm interop features such as `externref` and JSPI.
   Missing `externref` support fails because the experimental React resource

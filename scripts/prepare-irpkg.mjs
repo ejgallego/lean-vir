@@ -6,8 +6,10 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { delimiter } from "node:path";
 
 const root = new URL("..", import.meta.url).pathname;
+const irpkgGenerator = ".lake/build/bin/vir_irpkg";
 const configPath = process.argv[2];
 
 if (!configPath) {
@@ -33,12 +35,33 @@ if ((libResult.status ?? 1) !== 0) {
   process.exit(libResult.status ?? 1);
 }
 
-const result = spawnSync("lean", ["--run", "tools/GeneratePackage.lean", packagePath, reportPath, ...targetArgs], {
+const generatorResult = spawnSync("lake", ["build", "vir_irpkg"], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if ((generatorResult.status ?? 1) !== 0) {
+  console.error("error: vir_irpkg generator build failed");
+  process.exit(generatorResult.status ?? 1);
+}
+
+const leanPrefix = spawnSync("lean", ["--print-prefix"], {
+  cwd: root,
+  encoding: "utf8",
+  stdio: ["ignore", "pipe", "inherit"],
+});
+
+if ((leanPrefix.status ?? 1) !== 0) {
+  console.error("error: could not find Lean prefix");
+  process.exit(leanPrefix.status ?? 1);
+}
+
+const result = spawnSync(irpkgGenerator, [packagePath, reportPath, ...targetArgs], {
   cwd: root,
   stdio: "inherit",
   env: {
     ...process.env,
-    LEAN_PATH: leanPathWithVirLib(process.env.LEAN_PATH),
+    LEAN_PATH: leanPathWithGenerator(leanPrefix.stdout.trim(), process.env.LEAN_PATH),
   },
 });
 
@@ -75,6 +98,11 @@ function reportPathFor(packagePath) {
     : `${packagePath}.report.md`;
 }
 
-function leanPathWithVirLib(existing) {
-  return existing ? `build/lean-lib:${existing}` : "build/lean-lib";
+function leanPathWithGenerator(leanPrefix, existing) {
+  return [
+    "build/lean-lib",
+    ".lake/build/lib/lean",
+    `${leanPrefix}/lib/lean`,
+    existing,
+  ].filter(Boolean).join(delimiter);
 }

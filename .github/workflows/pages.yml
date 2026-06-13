@@ -33,6 +33,18 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - name: Cache Lean source
+        uses: actions/cache@v4
+        with:
+          path: third_party/lean4-src
+          key: ${{ runner.os }}-lean4-src-${{ hashFiles('lean-toolchain', 'scripts/fetch-lean-source.sh') }}
+      - name: Cache WASI SDK
+        uses: actions/cache@v4
+        with:
+          path: |
+            .tools/cache
+            .tools/wasi-sdk-33.0-x86_64-linux
+          key: ${{ runner.os }}-${{ runner.arch }}-wasi-sdk-${{ hashFiles('scripts/install-wasi-sdk.sh') }}
       - run: npm run fetch:lean
       - run: npm run install:wasi
       - run: npm run build:site

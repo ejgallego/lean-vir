@@ -6,11 +6,13 @@ Author: Emilio J. Gallego Arias
 
 import { mkdir, readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
+import { delimiter } from "node:path";
 
 import { packageSpecs } from "./browser-package-config.mjs";
 
 const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
+const irpkgGeneratorPath = new URL("../.lake/build/bin/vir_irpkg", import.meta.url);
 
 function rootsFor(fixture) {
   return fixture.roots?.length ? fixture.roots : [fixture.entry];
@@ -67,6 +69,35 @@ if ((libResult.status ?? 1) !== 0) {
   process.exit(libResult.status ?? 1);
 }
 
+const generatorResult = spawnSync("lake", ["build", "vir_irpkg"], {
+  cwd: root,
+  stdio: "inherit",
+});
+
+if ((generatorResult.status ?? 1) !== 0) {
+  process.exit(generatorResult.status ?? 1);
+}
+
+const leanPrefixResult = spawnSync("lean", ["--print-prefix"], {
+  cwd: root,
+  encoding: "utf8",
+  stdio: ["ignore", "pipe", "inherit"],
+});
+
+if ((leanPrefixResult.status ?? 1) !== 0) {
+  process.exit(leanPrefixResult.status ?? 1);
+}
+
+const generatorEnv = {
+  ...process.env,
+  LEAN_PATH: [
+    "build/lean-lib",
+    ".lake/build/lib/lean",
+    `${leanPrefixResult.stdout.trim()}/lib/lean`,
+    process.env.LEAN_PATH,
+  ].filter(Boolean).join(delimiter),
+};
+
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
 
 await mkdir(new URL("../build/generated/", import.meta.url), { recursive: true });
@@ -76,15 +107,12 @@ for (const spec of packageSpecs) {
   const packagePath = packagePathFor(spec);
   const reportPath = spec.report ?? packagePath.replace(/\.irpkg$/, ".report.md");
   const result = spawnSync(
-    "lean",
-    ["--run", "tools/GeneratePackage.lean", packagePath, reportPath, ...targetArgsFor(targets, packageTargets)],
+    irpkgGeneratorPath.pathname,
+    [packagePath, reportPath, ...targetArgsFor(targets, packageTargets)],
     {
       cwd: root,
       stdio: "inherit",
-      env: {
-        ...process.env,
-        LEAN_PATH: process.env.LEAN_PATH ? `build/lean-lib:${process.env.LEAN_PATH}` : "build/lean-lib",
-      },
+      env: generatorEnv,
     },
   );
 
