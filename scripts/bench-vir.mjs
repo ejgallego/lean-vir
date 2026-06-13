@@ -16,7 +16,15 @@ import {
   publicArtifactPath,
   wasmPublicFile,
 } from "./browser-package-config.mjs";
-import { formatMs, median, requireBenchmarkSample } from "./bench-utils.mjs";
+import {
+  benchmarkCacheOptionDefaults,
+  formatMs,
+  median,
+  parseBenchmarkCacheOption,
+  requireBenchmarkSample,
+  requireOptionValue,
+  validateBenchmarkCacheOptions,
+} from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
 import { decodeCallResult, encodeCallPayload } from "../web/src/runtime/vir-value-codec.js";
 import {
@@ -97,10 +105,8 @@ const args = parseArgs(process.argv.slice(2));
 
 function parseArgs(argv) {
   const parsed = {
-    artifactCacheEnabled: true,
-    artifactCachePath: null,
+    ...benchmarkCacheOptionDefaults(),
     jsonPath: null,
-    refreshArtifactCache: false,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
@@ -108,36 +114,23 @@ function parseArgs(argv) {
       parsed.jsonPath = requireOptionValue(argv, ++index, "--json");
     } else if (arg.startsWith("--json=")) {
       parsed.jsonPath = arg.slice("--json=".length);
-    } else if (arg === "--artifact-cache") {
-      parsed.artifactCachePath = requireOptionValue(argv, ++index, "--artifact-cache");
-    } else if (arg.startsWith("--artifact-cache=")) {
-      parsed.artifactCachePath = arg.slice("--artifact-cache=".length);
-    } else if (arg === "--no-artifact-cache") {
-      parsed.artifactCacheEnabled = false;
-    } else if (arg === "--refresh-artifact-cache") {
-      parsed.refreshArtifactCache = true;
     } else if (arg === "--help" || arg === "-h") {
       printUsage();
       process.exit(0);
     } else {
+      const nextIndex = parseBenchmarkCacheOption(parsed, argv, index);
+      if (nextIndex !== null) {
+        index = nextIndex;
+        continue;
+      }
       throw new Error(`unknown benchmark argument: ${arg}`);
     }
   }
   if (parsed.jsonPath === "") {
     throw new Error("--json requires a path");
   }
-  if (parsed.artifactCachePath === "") {
-    throw new Error("--artifact-cache requires a path");
-  }
+  validateBenchmarkCacheOptions(parsed);
   return parsed;
-}
-
-function requireOptionValue(argv, index, option) {
-  const value = argv[index];
-  if (value === undefined || value === "") {
-    throw new Error(`${option} requires a path`);
-  }
-  return value;
 }
 
 function printUsage() {

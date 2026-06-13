@@ -6,9 +6,9 @@ Author: Emilio J. Gallego Arias
 
 import {
   benchmarkReportLabel,
-  benchmarkSampleNames,
-  benchmarkSamplePerCallMs,
-  formatMs,
+  benchmarkSampleNamesForReports,
+  printOptionalBenchmarkSampleComparison,
+  printSideOnlyBenchmarkSummaries,
   readBenchmarkReport,
 } from "./bench-utils.mjs";
 
@@ -42,49 +42,16 @@ function requireBenchmarkPair(name) {
   return { before: beforeBenchmark, after: afterBenchmark };
 }
 
-function compareSample(benchmarkName, sampleName, beforeSample, afterSample) {
-  if (!beforeSample || !afterSample) {
-    throw new Error(`${benchmarkName}: missing ${sampleName} sample`);
-  }
-  if (beforeSample.iterations !== afterSample.iterations) {
-    throw new Error(
-      `${benchmarkName} ${sampleName}: iteration mismatch ` +
-        `${beforeSample.iterations} vs ${afterSample.iterations}`,
-    );
-  }
-  if (beforeSample.checksum !== afterSample.checksum) {
-    throw new Error(
-      `${benchmarkName} ${sampleName}: checksum mismatch ` +
-      `${beforeSample.checksum} vs ${afterSample.checksum}`,
-    );
-  }
-  const beforePerCallMs = benchmarkSamplePerCallMs(beforeSample);
-  const afterPerCallMs = benchmarkSamplePerCallMs(afterSample);
-  const deltaPct = ((afterPerCallMs - beforePerCallMs) / beforePerCallMs) * 100;
-  const sign = deltaPct >= 0 ? "+" : "";
-  const speed = beforePerCallMs / afterPerCallMs;
-  console.log(
-    `  ${sampleName}: ${formatMs(beforePerCallMs)} -> ` +
-      `${formatMs(afterPerCallMs)} / call (${sign}${deltaPct.toFixed(1)}%, ` +
-      `${speed.toFixed(2)}x speed)`,
-  );
-}
-
-function compareOptionalSample(benchmarkName, sampleName, beforeSample, afterSample) {
-  if (!beforeSample && !afterSample) return;
-  if (!beforeSample || !afterSample) {
-    console.log(`  ${sampleName}: missing on one side`);
-    return;
-  }
-  compareSample(benchmarkName, sampleName, beforeSample, afterSample);
-}
-
 console.log("# Lean VIR benchmark comparison");
 console.log(`before: ${benchmarkReportLabel(before)} (${before.path})`);
 console.log(`after:  ${benchmarkReportLabel(after)} (${after.path})`);
 console.log();
 
-const names = [...before.benchmarks.keys()].filter((name) => after.benchmarks.has(name));
+const beforeNames = [...before.benchmarks.keys()];
+const afterNames = [...after.benchmarks.keys()];
+const afterNameSet = new Set(afterNames);
+const beforeNameSet = new Set(beforeNames);
+const names = beforeNames.filter((name) => afterNameSet.has(name));
 if (names.length === 0) {
   throw new Error("benchmark reports have no benchmark names in common");
 }
@@ -92,14 +59,14 @@ if (names.length === 0) {
 for (const name of names) {
   const pair = requireBenchmarkPair(name);
   console.log(pair.after.title ?? pair.before.title ?? name);
-  const sampleNames = [
-    ...new Set([
-      ...benchmarkSampleNames(pair.before),
-      ...benchmarkSampleNames(pair.after),
-    ]),
-  ];
+  const sampleNames = benchmarkSampleNamesForReports([before, after], name);
   for (const sampleName of sampleNames) {
-    compareOptionalSample(name, sampleName, pair.before[sampleName], pair.after[sampleName]);
+    printOptionalBenchmarkSampleComparison(
+      name,
+      sampleName,
+      pair.before[sampleName] ?? null,
+      pair.after[sampleName] ?? null,
+    );
   }
   const beforeRatio = pair.before.ratioWasmToHost;
   const afterRatio = pair.after.ratioWasmToHost;
@@ -110,3 +77,6 @@ for (const name of names) {
   }
   console.log();
 }
+
+printSideOnlyBenchmarkSummaries("before", [before], beforeNames.filter((name) => !afterNameSet.has(name)));
+printSideOnlyBenchmarkSummaries("after", [after], afterNames.filter((name) => !beforeNameSet.has(name)));

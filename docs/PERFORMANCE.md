@@ -24,13 +24,14 @@ Compare two saved reports with:
 npm run bench:compare -- build/perf/before.json build/perf/after.json
 ```
 
-The comparison checks benchmark names, sample names, iteration counts, and
-checksums before printing per-call deltas. The default benchmark includes the
-`branchAndSub` top-level dispatch row with both named and resolved package call
-samples, pure-runtime controls (`fib` and `sort`), JavaScript codec-only rows
-plus end-to-end top-level value conversion rows for WIT-like scalar records,
-nested records/lists/options, and recursive custom inductives, plus
-host/resource rows for scalar host imports, callback root round trips, DOM
+The comparison checks common benchmark rows for sample names, iteration counts,
+and checksums before printing per-call deltas. Rows present in only one report
+are listed separately with their per-call medians. The default benchmark
+includes the `branchAndSub` top-level dispatch row with both named and resolved
+package call samples, pure-runtime controls (`fib` and `sort`), JavaScript
+codec-only rows plus end-to-end top-level value conversion rows for WIT-like
+scalar records, nested records/lists/options, and recursive custom inductives,
+plus host/resource rows for scalar host imports, callback root round trips, DOM
 listener resource churn, React root lifecycle work, and focused React `Html`
 render conversion.
 
@@ -54,9 +55,7 @@ npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
 
 It alternates `npm run bench -- --json` in each checkout, stores the per-run
 reports under `build/perf/paired/`, and prints median per-call deltas for common
-benchmark rows. Rows present in only one checkout are listed separately with
-their per-call medians, which makes newly added benchmark rows visible without
-pretending they have a before/after delta. The compared checkouts must both
-support the current benchmark JSON interface; for older refs, first create a
-temporary compatible checkout or compare manually saved reports with
-`bench:compare`.
+benchmark rows. Side-only rows are reported with the same summary format as
+`bench:compare`. The compared checkouts must both support the current benchmark
+JSON interface; for older refs, first create a temporary compatible checkout or
+compare manually saved reports with `bench:compare`.
