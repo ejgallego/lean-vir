@@ -9,8 +9,6 @@ Author: Emilio J. Gallego Arias
 #include <cstdlib>
 #include <string>
 
-#include "kernel/environment.h"
-#include "kernel/expr.h"
 #include "kernel/trace.h"
 #include "library/elab_environment.h"
 #include "library/init_attribute.h"
@@ -28,11 +26,6 @@ static object * mk_option_some_borrowed(object * value) {
     lean_inc(value);
     lean_ctor_set(result, 0, value);
     return result;
-}
-
-[[noreturn]] static void unsupported_platform_stub(char const *) {
-    __builtin_trap();
-    __builtin_unreachable();
 }
 
 static optional<name> find_package_init_name_ref(name const & n) {
@@ -76,17 +69,6 @@ scope_trace_env::~scope_trace_env() {}
 environment elab_environment::to_kernel_env() const {
     lean_inc(raw());
     return environment(raw());
-}
-
-// `lean_eval_main` asks the kernel environment for `main`'s type to compute a
-// process exit code. The package-backed browser path does not provide kernel
-// constant metadata, so fail loudly if that path is reached.
-constant_info environment::get(name const &) const {
-    unsupported_platform_stub("environment::get");
-}
-
-bool is_arrow(expr const &) {
-    unsupported_platform_stub("is_arrow");
 }
 
 name const & get_uint32_name() {
