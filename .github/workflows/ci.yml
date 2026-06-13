@@ -50,7 +50,6 @@ jobs:
           path: |
             web/public/vir-upstream.wasm
             web/public/*.irpkg
-            build/generated/*.irpkg
           if-no-files-found: error
 
   runtime:
@@ -72,7 +71,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vir-demo-artifacts
-          path: .
+          path: web/public
       - run: npm run test:runtime
 
   fixtures:
@@ -92,5 +91,5 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vir-demo-artifacts
-          path: .
+          path: web/public
       - run: npm run test:fixtures:no-build

@@ -114,11 +114,11 @@ const callbackResult = decodeCallResult(callbackType, callbackResultWriter.take(
 assert.equal(callbackResult.rootId, 7);
 assert.equal(callbackResult.type, callbackType);
 assert.equal(closureRootTakes, 1);
-const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "build/generated/fixtures-basic.irpkg"], {
+const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", "web/public/fixtures-basic.irpkg"], {
   encoding: "utf8",
 });
 assert.equal(inspected.status, 0, inspected.stderr || inspected.stdout);
-assert.match(inspected.stdout, /package: build\/generated\/fixtures-basic\.irpkg/);
+assert.match(inspected.stdout, /package: web\/public\/fixtures-basic\.irpkg/);
 assert.match(inspected.stdout, new RegExp(`exports: ${runtime.interfaceManifest.exports.length}`));
 assert.match(inspected.stdout, /host imports: 0/);
 assert.match(inspected.stdout, /fib\(arg1: Nat\) -> Nat \[fib\]/);
@@ -129,7 +129,7 @@ assert.match(inspected.stdout, /next: Option<recursiveSelf Vir\.Fixtures\.Recurs
 assert.match(inspected.stdout, /arg json descriptor: customInductive Vir\.Fixtures\.RecursiveTypes\.MiniJson/);
 assert.match(inspected.stdout, /array\(items: List<recursiveSelf Vir\.Fixtures\.RecursiveTypes\.MiniJson>\)/);
 
-const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "build/generated/fixtures-basic.irpkg"], {
+const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", "web/public/fixtures-basic.irpkg"], {
   encoding: "utf8",
 });
 assert.equal(inspectedJson.status, 0, inspectedJson.stderr || inspectedJson.stdout);
