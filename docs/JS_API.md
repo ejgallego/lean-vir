@@ -62,7 +62,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/vir-lean-codec.js` | Structural `Lean.Expr` and level encode/decode helpers. |
 | `vir-host-bindings.js` | Public common/browser host binding factories and stable re-exports. |
 | `host-resource.js` | Opaque host-resource objects and externref root tables. |
-| `host/vir-host-resources.js` | Host-resource liveness, cleanup, timers, callbacks, and shared binding helpers. |
+| `host/vir-host-resources.js` | Host-resource store, liveness, teardown, timers, callbacks, and shared binding helpers. |
 | `host/vir-virtual-host-bindings.js` | Virtual document/event/React host bindings for Node tests/tools. |
 | `react/vir-react-html.js` | React HTML tree validation, conversion, callback release, and virtual text helpers. |
 | `vir-react-host-bindings.js` | Browser `react.root.*` bindings; imports `react` and `react-dom/client`. |
