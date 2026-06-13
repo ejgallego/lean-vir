@@ -271,8 +271,6 @@ remove if we want parser loading to behave exactly like a full Lean runtime.
   and trace scopes) are inert in this single-threaded demo build;
 - initializer metadata queries are package-backed, using the same init-global
   table that `vir_load_ir_package` executes through upstream `lean_run_init`;
-- unsupported kernel-environment inspection for `lean_eval_main` now traps
-  instead of fabricating constant metadata;
 - option registration, sorry dependency lookup, and stderr/error printing remain
   demo no-ops because the package generator and JavaScript runtime provide the
   active diagnostics for this path.

@@ -226,7 +226,6 @@ link_flags=(
 
 exports=(
   -Wl,--export=lean_eval_const
-  -Wl,--export=lean_eval_main
   -Wl,--export=lean_run_init
   -Wl,--export=lean_run_mod_init_core
   -Wl,--export=vir_upstream_target_pointer_bytes
