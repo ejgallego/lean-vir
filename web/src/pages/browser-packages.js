@@ -6,25 +6,15 @@ Author: Emilio J. Gallego Arias
 
 import browserPackages from "../../../fixtures/browser-packages.json";
 
-export const packageSpecs = browserPackages.packages ?? [];
-export const localPackagePresets = browserPackages.localPackages ?? [];
-export const packageById = new Map(packageSpecs.map((spec) => [spec.id, spec]));
-export const defaultPackageFile = packageById.get(browserPackages.defaultPackage)?.file ?? "fixtures-basic.irpkg";
-export const hostPackageFile = packageById.get(browserPackages.hostPackage)?.file ?? "demo-host.irpkg";
+import { deriveBrowserPackageConfig } from "./browser-package-config.js";
 
-export const packagePresets = [
-  ...packageSpecs.map((spec) => ({
-    file: spec.file,
-    label: spec.label ?? spec.id,
-  })),
-  ...localPackagePresets,
-];
-
-export const packageLabels = new Map(packagePresets.map((preset) => [preset.file, preset.label ?? preset.file]));
-
-export const packageFileByFixtureSource = new Map();
-for (const spec of packageSpecs) {
-  for (const source of spec.fixtureSources ?? []) {
-    packageFileByFixtureSource.set(source, spec.file);
-  }
-}
+export const {
+  packageSpecs,
+  localPackagePresets,
+  packageById,
+  defaultPackageFile,
+  hostPackageFile,
+  packagePresets,
+  packageLabels,
+  packageFileByFixtureSource,
+} = deriveBrowserPackageConfig(browserPackages);
