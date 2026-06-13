@@ -6,15 +6,16 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
-import { constants as fsConstants, createReadStream } from "node:fs";
-import { access, mkdtemp, readdir, rm, stat } from "node:fs/promises";
+import { createReadStream } from "node:fs";
+import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { basename, delimiter, extname, resolve, sep } from "node:path";
+import { basename, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 import { createServer as createNetServer } from "node:net";
 
 import { generatedPublicFiles } from "./browser-package-config.mjs";
+import { pathExists, requireChromiumExecutable } from "./file-utils.mjs";
 
 export const distRoot = fileURLToPath(new URL("../web/dist/", import.meta.url));
 export const basePath = "/lean-vir/";
@@ -38,9 +39,7 @@ export async function assertDistReady() {
   ];
   const missing = [];
   for (const path of required) {
-    try {
-      await access(resolve(distRoot, path), fsConstants.R_OK);
-    } catch {
+    if (!(await pathExists(resolve(distRoot, path)))) {
       missing.push(path);
     }
   }
@@ -192,7 +191,7 @@ export async function openCdp(wsUrl) {
 }
 
 export async function launchChromium(debugPort) {
-  const executable = await resolveChromiumPath();
+  const executable = await requireChromiumExecutable();
   const profileDir = await mkdtemp(`${tmpdir()}/lean-vir-chromium-`);
   const child = spawn(executable, [
     "--headless=new",
@@ -269,60 +268,4 @@ export async function waitForStatus(cdp, expected, selector = "#status") {
 
 function isInside(root, path) {
   return path === root || path.startsWith(root.endsWith(sep) ? root : `${root}${sep}`);
-}
-
-async function isExecutable(path) {
-  try {
-    await access(path, fsConstants.X_OK);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
-async function findExecutableInPath(name) {
-  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
-    if (dir === "") continue;
-    const candidate = resolve(dir, name);
-    if (await isExecutable(candidate)) return candidate;
-  }
-  return null;
-}
-
-async function resolveChromiumPath() {
-  const configured = process.env.CHROMIUM;
-  if (configured) {
-    if (configured.includes("/") || configured.includes("\\")) {
-      if (!(await isExecutable(configured))) {
-        throw new Error(`CHROMIUM is set to ${configured}, but that file is not executable`);
-      }
-      return configured;
-    }
-    const pathMatch = await findExecutableInPath(configured);
-    if (pathMatch) return pathMatch;
-    throw new Error(`CHROMIUM is set to ${configured}, but it was not found on PATH`);
-  }
-
-  const directCandidates = [
-    "/snap/bin/chromium",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/google-chrome",
-    "/usr/bin/google-chrome-stable",
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-  ];
-  for (const candidate of directCandidates) {
-    if (await isExecutable(candidate)) return candidate;
-  }
-
-  const names = ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"];
-  for (const name of names) {
-    const pathMatch = await findExecutableInPath(name);
-    if (pathMatch) return pathMatch;
-  }
-
-  throw new Error(
-    `Chromium executable not found. Set CHROMIUM=/path/to/chromium before running npm run test:pages:browser`,
-  );
 }

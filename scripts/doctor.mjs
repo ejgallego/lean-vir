@@ -6,10 +6,11 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 import { constants as fsConstants } from "node:fs";
-import { access, readFile } from "node:fs/promises";
-import { delimiter, resolve } from "node:path";
+import { readFile } from "node:fs/promises";
+import { resolve } from "node:path";
 
 import { defaultPackageFile, publicArtifactPath, wasmPublicFile } from "./browser-package-config.mjs";
+import { findChromiumExecutable, pathExists } from "./file-utils.mjs";
 
 const checks = [];
 
@@ -43,22 +44,13 @@ function commandOutput(command, args) {
   return { ok: true, detail: result.stdout.trim() };
 }
 
-async function exists(path, mode = fsConstants.R_OK) {
-  try {
-    await access(path, mode);
-    return true;
-  } catch {
-    return false;
-  }
-}
-
 async function checkCommand(name, command, args) {
   const result = commandVersion(command, args);
   record(result.ok ? "ok" : "fail", name, result.detail);
 }
 
 async function checkPath(name, path, help, mode = fsConstants.R_OK) {
-  if (await exists(path, mode)) {
+  if (await pathExists(path, mode)) {
     record("ok", name, path);
   } else {
     record("fail", name, `${path} missing; ${help}`);
@@ -96,42 +88,6 @@ async function checkLeanSourceCommit() {
   }
 }
 
-async function findExecutableInPath(name) {
-  for (const dir of (process.env.PATH ?? "").split(delimiter)) {
-    if (dir === "") continue;
-    const candidate = resolve(dir, name);
-    if (await exists(candidate, fsConstants.X_OK)) return candidate;
-  }
-  return null;
-}
-
-async function chromiumPath() {
-  const configured = process.env.CHROMIUM;
-  if (configured) {
-    if (configured.includes("/") || configured.includes("\\")) {
-      return (await exists(configured, fsConstants.X_OK)) ? configured : null;
-    }
-    return findExecutableInPath(configured);
-  }
-  const directCandidates = [
-    "/snap/bin/chromium",
-    "/usr/bin/chromium",
-    "/usr/bin/chromium-browser",
-    "/usr/bin/google-chrome",
-    "/usr/bin/google-chrome-stable",
-    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
-    "/Applications/Chromium.app/Contents/MacOS/Chromium",
-  ];
-  for (const candidate of directCandidates) {
-    if (await exists(candidate, fsConstants.X_OK)) return candidate;
-  }
-  for (const name of ["chromium", "chromium-browser", "google-chrome", "google-chrome-stable"]) {
-    const found = await findExecutableInPath(name);
-    if (found) return found;
-  }
-  return null;
-}
-
 console.log(`Lean VIR doctor`);
 console.log(`node: ${process.version}`);
 
@@ -143,7 +99,7 @@ await checkPath(
   "third_party/lean4-src/src/library/ir_interpreter.cpp",
   "run npm run fetch:lean",
 );
-if (await exists("third_party/lean4-src/.git")) {
+if (await pathExists("third_party/lean4-src/.git")) {
   await checkLeanSourceCommit();
 }
 
@@ -158,7 +114,7 @@ await checkPath(
 await checkPath("upstream WASM", publicArtifactPath(wasmPublicFile), "run npm run build:demo");
 await checkPath("browser package", publicArtifactPath(defaultPackageFile), "run npm run build:demo");
 
-const chromium = await chromiumPath();
+const chromium = await findChromiumExecutable();
 if (chromium) {
   record("ok", "Chromium", chromium);
 } else {

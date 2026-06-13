@@ -5,14 +5,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { constants as fsConstants } from "node:fs";
-import { access, cp, rm, writeFile } from "node:fs/promises";
+import { cp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import {
   artifactBundlePaths,
   cleanArtifactBundle,
   copyArtifactMetadata,
+  preferredExecutablePath,
   removeUnexpectedGeneratedFiles,
   writeAndPublishArtifactArchive,
 } from "./file-utils.mjs";
@@ -23,7 +23,7 @@ const repoRoot = new URL("..", import.meta.url).pathname;
 const artifactName = process.env.VIR_LOCAL_ARTIFACT_NAME ?? "lean-vir-local";
 const artifactPaths = artifactBundlePaths(repoRoot, artifactName);
 const localSite = join(repoRoot, "build", "local-site");
-const viteBin = await executablePath(process.env.VITE ?? join(repoRoot, "node_modules", ".bin", "vite"), "vite");
+const viteBin = await preferredExecutablePath(process.env.VITE ?? join(repoRoot, "node_modules", ".bin", "vite"), "vite");
 const generatedPublicFileSet = new Set(generatedPublicFiles);
 
 await rm(localSite, { recursive: true, force: true });
@@ -42,15 +42,6 @@ await copyArtifactMetadata(repoRoot, artifactPaths.bundleDir);
 await writeFile(join(artifactPaths.bundleDir, "README.txt"), localBundleReadme());
 
 await writeAndPublishArtifactArchive(repoRoot, artifactPaths);
-
-async function executablePath(preferred, fallback) {
-  try {
-    await access(preferred, fsConstants.X_OK);
-    return preferred;
-  } catch {
-    return fallback;
-  }
-}
 
 function localBundleReadme() {
   return `Lean VIR local bundle
