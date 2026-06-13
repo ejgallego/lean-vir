@@ -115,5 +115,6 @@ npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
 ```
 
 This alternates the two checkouts, writes per-run JSON reports under
-`build/perf/paired/`, and summarizes median deltas for common rows. Both
-checkouts must support `npm run bench -- --json PATH`.
+`build/perf/paired/`, summarizes median deltas for common rows, and lists rows
+present in only one checkout with their per-call medians. Both checkouts must
+support `npm run bench -- --json PATH`.
