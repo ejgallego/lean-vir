@@ -110,6 +110,7 @@ signal for code changes.
 ## Smallest Useful Check
 
 - Shim/native extern registry changes:
+  `node scripts/check-boundary-registry.mjs --write`, then
   `npm run check:boundary-registry`
 - Upstream interpreter or WASI boundary changes:
   `npm run test:upstream`
