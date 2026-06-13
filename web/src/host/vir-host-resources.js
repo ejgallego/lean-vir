@@ -14,13 +14,45 @@ import {
   requireExternrefTableSupport,
 } from "../host-resource.js";
 
+export class HostResourceState {
+  constructor() {
+    requireExternrefTableSupport();
+    this.resources = new WeakMap();
+    this.liveResources = new Set();
+    this.disposables = new Set();
+  }
+
+  resourceForValue(value) {
+    return resourceForValue(this, value);
+  }
+
+  releaseResource(resource) {
+    return releaseResource(this, resource);
+  }
+
+  releaseValueResource(value) {
+    return releaseValueResource(this, value);
+  }
+
+  addDisposable(value) {
+    return addDisposable(this, value);
+  }
+
+  removeDisposable(value) {
+    return removeDisposable(this, value);
+  }
+
+  resolveResource(resource, label) {
+    return resolveResource(this, resource, label);
+  }
+
+  dispose() {
+    return disposeDomResourceState(this);
+  }
+}
+
 export function createHostResourceState() {
-  requireExternrefTableSupport();
-  return {
-    resources: new WeakMap(),
-    liveResources: new WeakSet(),
-    disposables: new Set(),
-  };
+  return new HostResourceState();
 }
 
 export function createElementResourceHostBindings(resources, operations) {
@@ -173,8 +205,15 @@ export function disposeDomResourceState(state) {
     }
   }
   state.disposables?.clear();
+  for (const resource of Array.from(state.liveResources ?? [])) {
+    releaseResource(state, resource);
+  }
   state.resources = new WeakMap();
-  state.liveResources = new WeakSet();
+  if (typeof state.liveResources?.clear === "function") {
+    state.liveResources.clear();
+  } else {
+    state.liveResources = new Set();
+  }
 }
 
 export function createTimeoutResource(resources, delayMs, callback) {

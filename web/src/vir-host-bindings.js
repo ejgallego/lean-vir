@@ -4,14 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createBrowserReactRootResource as createBrowserReactRootResourceFromHtml } from "./react/vir-react-html.js";
 import {
   callLeanEventCallback,
   createAnimationResourceHostBindings,
   createElementResourceHostBindings,
   createHostResourceState,
   createHtmlInputElementResourceHostBindings,
-  createReactHostHooks,
   createTimerResourceHostBindings,
   disposeDomResourceState,
   once,
@@ -33,7 +31,6 @@ export {
 } from "./host-resource.js";
 export {
   createHostResourceState,
-  createReactRootResourceHostBindings,
 } from "./host/vir-host-resources.js";
 export {
   createVirtualDocumentHostBindings,
@@ -157,10 +154,6 @@ export function createNodeHostBindings(state = createVirtualDocumentState()) {
     ...createConsoleHostBindings(),
     ...createVirtualDocumentHostBindings(state),
   };
-}
-
-export function createBrowserReactRootResource(state, root, createElement) {
-  return createBrowserReactRootResourceFromHtml(state, root, createElement, createReactHostHooks());
 }
 
 function normalizeOptionalHostBindingMap(value, label) {

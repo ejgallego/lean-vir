@@ -109,6 +109,8 @@ are synchronous in v1; returning a `Promise` is an error.
 - built-in browser bindings remove live event listeners, clear pending timers,
   cancel pending animation frames, unmount live React roots, and release
   retained callbacks;
+- opaque host resources retained by the built-in resource store are invalidated,
+  so stale resource objects cannot be passed into later Lean calls;
 - custom host binding maps can expose `[VIR_HOST_DISPOSE]()` or `dispose()` for
   their own cleanup;
 - any `VirCallback` objects still tracked by the runtime are released;
