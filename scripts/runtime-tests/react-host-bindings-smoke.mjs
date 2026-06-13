@@ -12,7 +12,6 @@ import {
 } from "../../web/src/vir-runtime-node.js";
 import {
   createBrowserHostBindings,
-  createBrowserReactHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import {
   assert,
@@ -43,10 +42,6 @@ assert.equal(typeof browserBindingsWithReact["react.root.create"], "function");
 assert.throws(
   () => createBrowserHostBindings({ reactHostBindings: "react.root.create" }),
   /reactHostBindings must be a host binding object/,
-);
-assert.throws(
-  () => createBrowserReactHostBindings(),
-  /Browser React host bindings moved to lean-vir\/react-host-bindings/,
 );
 
 const reactDocumentState = createVirtualDocumentState();

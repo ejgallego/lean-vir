@@ -120,6 +120,17 @@ The strict `externref` resource path is implemented. JSPI should wait for an
 async Lean app use case that cannot be expressed cleanly with callback
 registration.
 
+The public JavaScript entrypoints keep React separate from the generic runtime
+surface:
+
+- `lean-vir` exports the generic runtime API.
+- `lean-vir/host-bindings` exports common and browser host-binding factories,
+  but does not export React bindings or import React packages.
+- `lean-vir/react-host-bindings` exports browser `react.root.*` bindings and is
+  the only browser entrypoint that imports `react` and `react-dom/client`.
+- `lean-vir/vir-runtime-node` composes virtual browser and React bindings for
+  Node tests and tools.
+
 ## Local Probes
 
 Run:

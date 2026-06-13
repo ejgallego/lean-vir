@@ -8,17 +8,16 @@ import { createVirtualReactRootResource as createVirtualReactRootResourceFromHtm
 import { isHostResource } from "../host-resource.js";
 import {
   callLeanEventCallback,
-  createAnimationFrameResource,
+  createAnimationResourceHostBindings,
   createElementResourceHostBindings,
   createHostResourceState,
   createHtmlInputElementResourceHostBindings,
   createReactHostHooks,
   createReactRootResourceHostBindings,
-  createTimeoutResource,
+  createTimerResourceHostBindings,
   disposeDomResourceState,
   performanceNow,
   preventDefaultOnEvent,
-  releaseResource,
   removeDisposable,
   resolveResource,
   resourceForValue,
@@ -122,30 +121,11 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
     ...createHtmlInputElementResourceHostBindings(state.resources, {
       fromElement: (element) => resourceForValue(state.resources, element),
     }),
-    "browser.timer.setTimeout": (delayMs, callback) =>
-      resourceForValue(state.resources, createTimeoutResource(state.resources, delayMs, callback)),
-    "browser.timer.clearTimeout": (timeout) => {
-      const value = resolveResource(state.resources, timeout, "Timeout");
-      value.clear();
-      releaseResource(state.resources, timeout);
-      return undefined;
-    },
-    "browser.animation.requestAnimationFrame": (callback) =>
-      resourceForValue(
-        state.resources,
-        createAnimationFrameResource(
-          state.resources,
-          callback,
-          (run) => globalThis.setTimeout(() => run(performanceNow()), 16),
-          globalThis.clearTimeout.bind(globalThis),
-        ),
-      ),
-    "browser.animation.cancelAnimationFrame": (frame) => {
-      const value = resolveResource(state.resources, frame, "AnimationFrame");
-      value.cancel();
-      releaseResource(state.resources, frame);
-      return undefined;
-    },
+    ...createTimerResourceHostBindings(state.resources),
+    ...createAnimationResourceHostBindings(state.resources, {
+      requestFrame: (run) => globalThis.setTimeout(() => run(performanceNow()), 16),
+      cancelFrame: globalThis.clearTimeout.bind(globalThis),
+    }),
     ...createReactRootResourceHostBindings(state.resources, (target) =>
       createVirtualReactRootResource(state.resources, target)),
     [VIR_HOST_DISPOSE]: () => disposeDomResourceState(state.resources),

@@ -7,17 +7,16 @@ Author: Emilio J. Gallego Arias
 import { createBrowserReactRootResource as createBrowserReactRootResourceFromHtml } from "./react/vir-react-html.js";
 import {
   callLeanEventCallback,
-  createAnimationFrameResource,
+  createAnimationResourceHostBindings,
   createElementResourceHostBindings,
   createHostResourceState,
   createHtmlInputElementResourceHostBindings,
   createReactHostHooks,
-  createTimeoutResource,
+  createTimerResourceHostBindings,
   disposeDomResourceState,
   once,
   performanceNow,
   preventDefaultOnEvent,
-  releaseResource,
   removeDisposable,
   resolveResource,
   resourceForValue,
@@ -113,16 +112,7 @@ export function createBrowserHtmlInputElementHostBindings(state = createHostReso
 }
 
 export function createBrowserTimerHostBindings(state = createHostResourceState()) {
-  return {
-    "browser.timer.setTimeout": (delayMs, callback) =>
-      resourceForValue(state, createTimeoutResource(state, delayMs, callback)),
-    "browser.timer.clearTimeout": (timeout) => {
-      const value = resolveResource(state, timeout, "Timeout");
-      value.clear();
-      releaseResource(state, timeout);
-      return undefined;
-    },
-  };
+  return createTimerResourceHostBindings(state);
 }
 
 export function createBrowserAnimationHostBindings(state = createHostResourceState()) {
@@ -134,24 +124,7 @@ export function createBrowserAnimationHostBindings(state = createHostResourceSta
     typeof globalThis.cancelAnimationFrame === "function"
       ? globalThis.cancelAnimationFrame.bind(globalThis)
       : globalThis.clearTimeout.bind(globalThis);
-  return {
-    "browser.animation.requestAnimationFrame": (callback) =>
-      resourceForValue(state, createAnimationFrameResource(state, callback, requestFrame, cancelFrame)),
-    "browser.animation.cancelAnimationFrame": (frame) => {
-      const value = resolveResource(state, frame, "AnimationFrame");
-      value.cancel();
-      releaseResource(state, frame);
-      return undefined;
-    },
-  };
-}
-
-export function createBrowserReactHostBindings() {
-  throw new Error(
-    "Browser React host bindings moved to lean-vir/react-host-bindings; " +
-      "import createBrowserReactHostBindings from that entry point and pass it through " +
-      "createBrowserHostBindings({ reactHostBindings })",
-  );
+  return createAnimationResourceHostBindings(state, { requestFrame, cancelFrame });
 }
 
 export function createBrowserHostBindings({

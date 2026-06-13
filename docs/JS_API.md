@@ -72,7 +72,9 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
 `lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. The narrower codec
 modules are packaged so the runtime's internal imports resolve consistently in
-the SDK artifact.
+the SDK artifact. React browser bindings are intentionally exported only from
+`lean-vir/react-host-bindings`, keeping `lean-vir/host-bindings` free of React
+and `react-dom/client` dependencies.
 
 ## Host Bindings
 

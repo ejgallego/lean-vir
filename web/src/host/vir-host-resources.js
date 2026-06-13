@@ -96,6 +96,32 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
   };
 }
 
+export function createTimerResourceHostBindings(resources) {
+  return {
+    "browser.timer.setTimeout": (delayMs, callback) =>
+      resourceForValue(resources, createTimeoutResource(resources, delayMs, callback)),
+    "browser.timer.clearTimeout": (timeout) => {
+      const value = resolveResource(resources, timeout, "Timeout");
+      value.clear();
+      releaseResource(resources, timeout);
+      return undefined;
+    },
+  };
+}
+
+export function createAnimationResourceHostBindings(resources, { requestFrame, cancelFrame }) {
+  return {
+    "browser.animation.requestAnimationFrame": (callback) =>
+      resourceForValue(resources, createAnimationFrameResource(resources, callback, requestFrame, cancelFrame)),
+    "browser.animation.cancelAnimationFrame": (frame) => {
+      const value = resolveResource(resources, frame, "AnimationFrame");
+      value.cancel();
+      releaseResource(resources, frame);
+      return undefined;
+    },
+  };
+}
+
 export function resourceForValue(state, value) {
   if (value === null || value === undefined) return null;
   let resource = state.resources.get(value);
