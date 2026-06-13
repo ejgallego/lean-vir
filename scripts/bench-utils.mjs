@@ -72,3 +72,17 @@ export function benchmarkReportLabel(side) {
 export function benchmarkSamplePerCallMs(sample) {
   return sample.perCallMs ?? sample.medianMs / sample.iterations;
 }
+
+export function benchmarkSampleNames(benchmark) {
+  return Object.entries(benchmark)
+    .filter(([, value]) => isBenchmarkSample(value))
+    .map(([name]) => name);
+}
+
+function isBenchmarkSample(value) {
+  return value !== null &&
+    typeof value === "object" &&
+    Number.isInteger(value.iterations) &&
+    Number.isFinite(value.checksum) &&
+    Number.isFinite(value.medianMs);
+}

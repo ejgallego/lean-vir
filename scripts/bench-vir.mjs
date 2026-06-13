@@ -11,6 +11,7 @@ import { performance } from "node:perf_hooks";
 import { ensureCachedBenchArtifacts } from "./bench-artifact-cache.mjs";
 import { formatMs, median, requireBenchmarkSample } from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
+import { encodeCallPayload } from "../web/src/runtime/vir-value-codec.js";
 import {
   createVirRuntime as createNodeVirRuntime,
   createVirtualDocumentState,
@@ -28,6 +29,61 @@ const hostScalarIterations = 5000;
 const callbackIterations = 5000;
 const domResourceIterations = 1000;
 const reactRootIterations = 500;
+const scalarRecordIterations = 5000;
+const nestedRecordIterations = 3000;
+const recursiveValueIterations = 2000;
+const codecScalarRecordIterations = 20000;
+const codecNestedRecordIterations = 20000;
+const codecRecursiveValueIterations = 20000;
+const reactTextRenderIterations = 300;
+const reactTextRenderWidth = 40;
+const reactCallbackRenderIterations = 200;
+const reactCallbackRenderWidth = 20;
+const profileStatsInput = {
+  enabled: true,
+  level: 2,
+  score16: 30,
+  visits: 400,
+  quota: 5,
+  checksum: 6000,
+  tier: "pro",
+  note: "ok",
+};
+const profileEnvelopeInput = {
+  profile: {
+    nickname: "lean",
+    points: 7,
+    tags: ["ir", "wasm", "react", "wit"],
+  },
+  summary: {
+    label: "lean:4",
+    total: 24,
+    bonus: 17,
+  },
+};
+const recursiveJsonInput = {
+  kind: "object",
+  value: [
+    {
+      fst: "items",
+      snd: {
+        kind: "array",
+        value: [
+          { kind: "null" },
+          { kind: "bool", value: true },
+          { kind: "nat", value: 4 },
+          {
+            kind: "object",
+            value: [
+              { fst: "nested", snd: { kind: "array", value: [{ kind: "nat", value: 9 }] } },
+            ],
+          },
+        ],
+      },
+    },
+    { fst: "ok", snd: { kind: "bool", value: false } },
+  ],
+};
 const benchArtifactPaths = [
   "web/public/vir-upstream.wasm",
   "web/public/fixtures-basic.irpkg",
@@ -134,6 +190,18 @@ function benchWasmRepeated(label, iterations, fn) {
   return { label, iterations, checksum, medianMs: median(samples) };
 }
 
+function benchJsRepeated(label, iterations, fn) {
+  const samples = [];
+  let checksum = 0;
+  for (let sample = 0; sample < 7; sample++) {
+    const start = performance.now();
+    const acc = fn();
+    samples.push(performance.now() - start);
+    checksum = acc;
+  }
+  return { label, iterations, checksum, medianMs: median(samples) };
+}
+
 function benchHostIr(label, iterations, args) {
   const stdout = runSync("lean", ["--run", "tools/HostInterpreterBench.lean", ...args], {
     cwd: root,
@@ -164,6 +232,13 @@ function printWasmRow(name, sample) {
   console.log(`  checksum:  ${sample.checksum}`);
 }
 
+function printJsRow(name, sample) {
+  const perCall = sample.medianMs / sample.iterations;
+  console.log(`${name}`);
+  console.log(`  js codec:  ${formatMs(sample.medianMs)} total, ${formatMs(perCall)} / call`);
+  console.log(`  checksum:  ${sample.checksum}`);
+}
+
 function benchmarkReportRow(name, title, wasm, host = null) {
   return {
     name,
@@ -173,6 +248,14 @@ function benchmarkReportRow(name, title, wasm, host = null) {
       host: benchmarkSampleReport(host),
       ratioWasmToHost: (wasm.medianMs / wasm.iterations) / (host.medianMs / host.iterations),
     }),
+  };
+}
+
+function benchmarkJsReportRow(name, title, js) {
+  return {
+    name,
+    title,
+    js: benchmarkSampleReport(js),
   };
 }
 
@@ -223,6 +306,28 @@ const artifactCache = await ensureCachedBenchArtifacts({
 });
 const { runtime, hostRuntime } = await instantiateRuntimes();
 
+function manifestEntry(name) {
+  const entry = runtime.findManifestEntry(name);
+  if (entry === null) {
+    throw new Error(`benchmark interface entry not found: ${name}`);
+  }
+  return entry;
+}
+
+function benchEncodeCallPayload(label, iterations, entry, args) {
+  return benchJsRepeated(label, iterations, () => {
+    let acc = 0;
+    for (let i = 0; i < iterations; i++) {
+      acc += encodeCallPayload(entry, args, runtime.codecOptions).byteLength;
+    }
+    return acc;
+  });
+}
+
+const scalarRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileStatsScore");
+const nestedRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore");
+const recursiveValueEntry = manifestEntry("Vir.Fixtures.RecursiveTypes.jsonRootScore");
+
 const wasmFib = benchWasmRepeated("fib", fibIterations, () => {
   let acc = 0;
   for (let i = 0; i < fibIterations; i++) {
@@ -241,6 +346,51 @@ const wasmSort = benchWasmRepeated("sort", sortIterations, () => {
 });
 const hostSort = benchHostIr("sort", sortIterations, ["sort", String(sortIterations), sortInput.join(",")]);
 
+const jsCodecScalarRecord = benchEncodeCallPayload(
+  "codec-scalar-record",
+  codecScalarRecordIterations,
+  scalarRecordEntry,
+  [profileStatsInput],
+);
+
+const jsCodecNestedRecord = benchEncodeCallPayload(
+  "codec-nested-record",
+  codecNestedRecordIterations,
+  nestedRecordEntry,
+  [profileEnvelopeInput],
+);
+
+const jsCodecRecursiveValue = benchEncodeCallPayload(
+  "codec-recursive-value",
+  codecRecursiveValueIterations,
+  recursiveValueEntry,
+  [recursiveJsonInput],
+);
+
+const wasmScalarRecord = benchWasmRepeated("scalar-record", scalarRecordIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < scalarRecordIterations; i++) {
+    acc += Number(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsScore", profileStatsInput));
+  }
+  return acc;
+});
+
+const wasmNestedRecord = benchWasmRepeated("nested-record", nestedRecordIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < nestedRecordIterations; i++) {
+    acc += Number(runtime.call("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore", profileEnvelopeInput));
+  }
+  return acc;
+});
+
+const wasmRecursiveValue = benchWasmRepeated("recursive-value", recursiveValueIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < recursiveValueIterations; i++) {
+    acc += Number(runtime.call("Vir.Fixtures.RecursiveTypes.jsonRootScore", recursiveJsonInput));
+  }
+  return acc;
+});
+
 const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
   return Number(hostRuntime.call("HostInterop.titleHandshakeLoop", hostScalarIterations));
 });
@@ -257,6 +407,24 @@ const wasmReactRoot = benchWasmRepeated("react-root-lifecycle", reactRootIterati
   return Number(hostRuntime.call("ReactCounter.mountAndUnmountLoop", "#bench-react", reactRootIterations));
 });
 
+const wasmReactTextRender = benchWasmRepeated("react-html-text-render", reactTextRenderIterations, () => {
+  return Number(hostRuntime.call(
+    "ReactCounter.renderWideTextLoop",
+    "#bench-react",
+    reactTextRenderWidth,
+    reactTextRenderIterations,
+  ));
+});
+
+const wasmReactCallbackRender = benchWasmRepeated("react-html-callback-render", reactCallbackRenderIterations, () => {
+  return Number(hostRuntime.call(
+    "ReactCounter.renderCallbackTreeLoop",
+    "#bench-react",
+    reactCallbackRenderWidth,
+    reactCallbackRenderIterations,
+  ));
+});
+
 console.log("# Lean VIR benchmark");
 console.log("Host baseline is `lean --run` with `interpreter.prefer_native=false`.");
 console.log("WASM timings use the manifest-driven JavaScript runtime API.");
@@ -268,6 +436,20 @@ printRow(`fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib);
 console.log();
 printRow(`sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort);
 console.log();
+console.log("Top-level value conversion paths");
+console.log();
+printJsRow(`JS codec scalar record/enums encode x ${codecScalarRecordIterations}`, jsCodecScalarRecord);
+console.log();
+printJsRow(`JS codec nested record/list/option encode x ${codecNestedRecordIterations}`, jsCodecNestedRecord);
+console.log();
+printJsRow(`JS codec recursive custom-inductive encode x ${codecRecursiveValueIterations}`, jsCodecRecursiveValue);
+console.log();
+printWasmRow(`scalar record/enums x ${scalarRecordIterations}`, wasmScalarRecord);
+console.log();
+printWasmRow(`nested record/list/option x ${nestedRecordIterations}`, wasmNestedRecord);
+console.log();
+printWasmRow(`recursive custom-inductive value x ${recursiveValueIterations}`, wasmRecursiveValue);
+console.log();
 console.log("Host/resource paths");
 console.log();
 printWasmRow(`host scalar title handshake x ${hostScalarIterations}`, wasmHostScalar);
@@ -277,11 +459,53 @@ console.log();
 printWasmRow(`DOM listener resource create/remove x ${domResourceIterations}`, wasmDomResource);
 console.log();
 printWasmRow(`React root mount/render/unmount x ${reactRootIterations}`, wasmReactRoot);
+console.log();
+console.log("React Html conversion paths");
+console.log();
+printWasmRow(
+  `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
+  wasmReactTextRender,
+);
+console.log();
+printWasmRow(
+  `React callback tree render ${reactCallbackRenderWidth} handlers x ${reactCallbackRenderIterations}`,
+  wasmReactCallbackRender,
+);
 
 if (args.jsonPath !== null) {
   await writeJsonReport(args.jsonPath, [
     benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib),
     benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
+    benchmarkJsReportRow(
+      "codec-scalar-record",
+      `JS codec scalar record/enums encode x ${codecScalarRecordIterations}`,
+      jsCodecScalarRecord,
+    ),
+    benchmarkJsReportRow(
+      "codec-nested-record",
+      `JS codec nested record/list/option encode x ${codecNestedRecordIterations}`,
+      jsCodecNestedRecord,
+    ),
+    benchmarkJsReportRow(
+      "codec-recursive-value",
+      `JS codec recursive custom-inductive encode x ${codecRecursiveValueIterations}`,
+      jsCodecRecursiveValue,
+    ),
+    benchmarkReportRow(
+      "scalar-record",
+      `scalar record/enums x ${scalarRecordIterations}`,
+      wasmScalarRecord,
+    ),
+    benchmarkReportRow(
+      "nested-record",
+      `nested record/list/option x ${nestedRecordIterations}`,
+      wasmNestedRecord,
+    ),
+    benchmarkReportRow(
+      "recursive-value",
+      `recursive custom-inductive value x ${recursiveValueIterations}`,
+      wasmRecursiveValue,
+    ),
     benchmarkReportRow(
       "host-title",
       `host scalar title handshake x ${hostScalarIterations}`,
@@ -301,6 +525,16 @@ if (args.jsonPath !== null) {
       "react-root-lifecycle",
       `React root mount/render/unmount x ${reactRootIterations}`,
       wasmReactRoot,
+    ),
+    benchmarkReportRow(
+      "react-html-text-render",
+      `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
+      wasmReactTextRender,
+    ),
+    benchmarkReportRow(
+      "react-html-callback-render",
+      `React callback tree render ${reactCallbackRenderWidth} handlers x ${reactCallbackRenderIterations}`,
+      wasmReactCallbackRender,
     ),
   ]);
 }

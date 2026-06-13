@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import {
   benchmarkReportLabel,
+  benchmarkSampleNames,
   benchmarkSamplePerCallMs,
   formatMs,
   readBenchmarkReport,
@@ -91,8 +92,15 @@ if (names.length === 0) {
 for (const name of names) {
   const pair = requireBenchmarkPair(name);
   console.log(pair.after.title ?? pair.before.title ?? name);
-  compareSample(name, "wasm", pair.before.wasm, pair.after.wasm);
-  compareOptionalSample(name, "host", pair.before.host, pair.after.host);
+  const sampleNames = [
+    ...new Set([
+      ...benchmarkSampleNames(pair.before),
+      ...benchmarkSampleNames(pair.after),
+    ]),
+  ];
+  for (const sampleName of sampleNames) {
+    compareOptionalSample(name, sampleName, pair.before[sampleName], pair.after[sampleName]);
+  }
   const beforeRatio = pair.before.ratioWasmToHost;
   const afterRatio = pair.after.ratioWasmToHost;
   if (typeof beforeRatio === "number" && typeof afterRatio === "number") {
