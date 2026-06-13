@@ -88,33 +88,8 @@ The split helpers below are the intended extension points for focused changes:
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
 
-For performance comparisons, capture reports from each version with:
-
-```bash
-npm run bench -- --json build/perf/current.json
-```
-
-`npm run bench` keeps built benchmark inputs in
-`.perf-artifacts/vir-bench-cache` by default. Use `--no-artifact-cache`,
-`--artifact-cache DIR`, or `--refresh-artifact-cache` when you need explicit
-cache control. The default benchmark report includes a top-level
-`branchAndSub` dispatch row with both named and resolved package-call samples,
-so call-dispatch changes show up in the same JSON reports as the broader
-runtime rows.
-
-Then compare them with:
-
-```bash
-npm run bench:compare -- build/perf/before.json build/perf/after.json
-```
-
-For repeated before/after runs across two checked-out trees, use:
-
-```bash
-npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
-```
-
-This alternates the two checkouts, writes per-run JSON reports under
-`build/perf/paired/`, summarizes median deltas for common rows, and lists rows
-present in only one checkout with their per-call medians. Both checkouts must
-support `npm run bench -- --json PATH`.
+Performance comparison commands are documented in `docs/PERFORMANCE.md`.
+Use `npm run bench -- --json PATH` for report capture,
+`npm run bench:compare -- BEFORE.json AFTER.json` for saved reports, and
+`npm run bench:paired -- --repeat 5 BEFORE_CHECKOUT AFTER_CHECKOUT` for
+alternating repeated runs across two checked-out trees.
