@@ -65,9 +65,13 @@ echo "report:  $report"
 echo "mode:    $mode"
 
 scripts/build-lean-lib.sh
+lake build vir_irpkg
+
+lean_prefix="$(lean --print-prefix)"
+generator_lean_path="build/lean-lib:.lake/build/lib/lean:$lean_prefix/lib/lean"
 
 set +e
-LEAN_PATH="build/lean-lib${LEAN_PATH:+:$LEAN_PATH}" lean --run tools/GeneratePackage.lean "$package" "$report" "${target_args[@]}"
+LEAN_PATH="$generator_lean_path${LEAN_PATH:+:$LEAN_PATH}" .lake/build/bin/vir_irpkg "$package" "$report" "${target_args[@]}"
 status=$?
 set -e
 if [ "$status" -ne 0 ]; then

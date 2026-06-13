@@ -63,3 +63,21 @@ export function runAsync(cmd, args, { cwd, capture = false, ...options } = {}) {
     });
   });
 }
+
+export async function mapWithLimit(items, limit, fn) {
+  if (items.length === 0) return [];
+  const workerCount = Math.max(1, Math.min(limit, items.length));
+  const results = new Array(items.length);
+  let next = 0;
+
+  async function worker() {
+    while (next < items.length) {
+      const index = next;
+      next += 1;
+      results[index] = await fn(items[index], index);
+    }
+  }
+
+  await Promise.all(Array.from({ length: workerCount }, () => worker()));
+  return results;
+}

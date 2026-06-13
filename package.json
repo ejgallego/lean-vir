@@ -39,7 +39,7 @@
     "bench:compare": "node scripts/bench-compare.mjs",
     "bench:paired": "node scripts/bench-paired.mjs",
     "bench:engines": "node scripts/bench-engines.mjs",
-    "test": "npm run check:boundary-registry && npm run test:wasm-extensions && npm run test:upstream && npm run test:runtime && npm run test:fixtures",
+    "test": "npm run check:boundary-registry && npm run test:wasm-extensions && npm run build:demo && npm run test:upstream:no-build && npm run test:runtime && npm run test:fixtures:no-build",
     "test:fixtures": "node scripts/run-fixtures.mjs",
     "test:fixtures:no-build": "node scripts/run-fixtures.mjs --no-build",
     "test:site": "npm run build:site && npm run test:pages",
@@ -47,7 +47,8 @@
     "test:pages:browser": "node scripts/smoke-pages-browser.mjs",
     "test:runtime": "node scripts/test-vir-runtime.mjs",
     "test:wasm-extensions": "node scripts/probe-wasm-extensions.mjs",
-    "test:upstream": "npm run build:demo && node scripts/smoke_upstream.mjs",
+    "test:upstream": "npm run build:demo && npm run test:upstream:no-build",
+    "test:upstream:no-build": "node scripts/smoke_upstream.mjs",
     "dev": "vite --host 127.0.0.1"
   },
   "devDependencies": {

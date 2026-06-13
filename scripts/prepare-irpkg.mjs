@@ -7,8 +7,12 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 import { spawnSync } from "node:child_process";
 
+import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "./irpkg-generator.mjs";
+import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
+
 const root = new URL("..", import.meta.url).pathname;
 const configPath = process.argv[2];
+const scriptStart = timerStart();
 
 if (!configPath) {
   console.error("usage: npm run prepare:irpkg -- <config.json>");
@@ -23,24 +27,19 @@ const roots = Array.isArray(config.roots) ? config.roots : [];
 const includeAll = config.includeAll === true || roots.length === 0;
 
 const targetArgs = includeAll ? ["--target-all", source] : ["--target", source, ...roots];
-const libResult = spawnSync("bash", ["scripts/build-lean-lib.sh"], {
-  cwd: root,
-  stdio: "inherit",
-});
-
-if ((libResult.status ?? 1) !== 0) {
-  console.error("error: Lean.Vir library build failed");
-  process.exit(libResult.status ?? 1);
+const generator = prepareVirIrpkgSync(root);
+if (!generator.ok) {
+  console.error(`error: ${irpkgGeneratorFailureMessage(generator)}`);
+  process.exit(generator.status);
 }
 
-const result = spawnSync("lean", ["--run", "tools/GeneratePackage.lean", packagePath, reportPath, ...targetArgs], {
+const packageStart = timerStart();
+const result = spawnSync(generator.path, [packagePath, reportPath, ...targetArgs], {
   cwd: root,
   stdio: "inherit",
-  env: {
-    ...process.env,
-    LEAN_PATH: leanPathWithVirLib(process.env.LEAN_PATH),
-  },
+  env: generator.env,
 });
+const packageSeconds = elapsedSeconds(packageStart);
 
 if ((result.status ?? 1) !== 0) {
   console.error(`error: package generation failed for ${source}`);
@@ -56,6 +55,11 @@ if (includeAll) {
 } else {
   console.log(`roots:   ${roots.join(", ")}`);
 }
+console.log(
+  `irpkg timing: lean-lib=${formatSeconds(generator.libSeconds)}s `
+  + `generator=${formatSeconds(generator.generatorSeconds)}s package=${formatSeconds(packageSeconds)}s `
+  + `total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
+);
 
 function requiredString(value, field) {
   if (typeof value !== "string" || value.length === 0) {
@@ -73,8 +77,4 @@ function reportPathFor(packagePath) {
   return packagePath.endsWith(".irpkg")
     ? `${packagePath.slice(0, -".irpkg".length)}.report.md`
     : `${packagePath}.report.md`;
-}
-
-function leanPathWithVirLib(existing) {
-  return existing ? `build/lean-lib:${existing}` : "build/lean-lib";
 }

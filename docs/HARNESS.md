@@ -94,6 +94,7 @@ Tests:
 
 ```bash
 npm run test:upstream
+npm run test:upstream:no-build
 npm run test:runtime
 npm run test:wasm-extensions
 npm run test:fixtures
@@ -103,8 +104,9 @@ npm run test:pages:browser
 npm test
 ```
 
-`npm test` runs the boundary registry check, Wasm extension probes, upstream
-smoke, JavaScript runtime tests, and fixture suite. It is the default pre-merge
+`npm test` runs the boundary registry check and Wasm extension probes, builds
+the demo artifacts once, then reuses those artifacts for upstream smoke,
+JavaScript runtime tests, and the fixture suite. It is the default pre-merge
 signal for code changes.
 
 ## Smallest Useful Check
@@ -114,10 +116,15 @@ signal for code changes.
   `npm run check:boundary-registry`
 - Upstream interpreter or WASI boundary changes:
   `npm run test:upstream`
+- Upstream smoke after `npm run build:demo` has already refreshed the WASM and
+  browser packages:
+  `npm run test:upstream:no-build`
 - JavaScript runtime, host bindings, manifest decoding, or callback lifecycle:
   `npm run test:runtime`
 - Local JS engine Wasm interop feature availability, such as `externref` or JSPI:
   `npm run test:wasm-extensions`
+- A single runtime smoke group:
+  `npm run test:runtime -- <substring>`
 - Lean fixture behavior or package generation coverage:
   `npm run test:fixtures`
 - A single fixture or fixture family:
@@ -143,8 +150,41 @@ VIR_FIXTURE_FILTER=fib12 npm run test:fixtures
 VIR_FIXTURE_FILTER=fib12 npm run test:fixtures:no-build
 ```
 
+`VIR_RUNTIME_TEST_FILTER` similarly narrows `npm run test:runtime`, and
+`VIR_RUNTIME_JOBS` controls the number of runtime smoke subprocesses. The
+available runtime smoke ids are printed by:
+
+```bash
+node scripts/test-vir-runtime.mjs --list
+```
+
 `test:fixtures:no-build` is a local iteration shortcut. It requires
 `web/public/vir-upstream.wasm` from a previous `npm run build:demo`.
+
+The local package-generation helper, browser package generator, and fixture
+runner use the `vir_irpkg` Lake executable instead of repeatedly starting
+`lean --run tools/GeneratePackage.lean`. The fixture runner builds that
+executable once, then reuses it for per-fixture packages while keeping the
+host-oracle checks unchanged.
+
+The build and test entry points print compact timing summaries that are useful
+when comparing CI runs:
+
+- `npm run build:demo` prints browser package, compile, link, and total probe
+  timing.
+- `npm run prepare:irpkg` prints Lean library, generator, package, and total
+  timing.
+- `npm run test:runtime` prints per-group timings plus the slowest groups.
+- `npm run test:fixtures` prints build, generator, fixture-run, and slowest
+  fixture timings; the JSON summary also records per-fixture phase timings.
+
+## CI Shape
+
+The CI workflow keeps one job responsible for fetching the pinned Lean source,
+installing the WASI SDK, building `web/public/vir-upstream.wasm`, generating
+browser `.irpkg` files, and running upstream smoke. That job uploads the demo
+artifacts. Runtime and fixture jobs download those artifacts and run in
+parallel without re-fetching Lean source or reinstalling the WASI SDK.
 
 ## Browser Smoke
 

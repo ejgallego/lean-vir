@@ -8,7 +8,9 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
 
 import { createVirRuntime } from "../web/src/vir-runtime.js";
-import { runAsync } from "./process-utils.mjs";
+import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "./irpkg-generator.mjs";
+import { mapWithLimit, runAsync } from "./process-utils.mjs";
+import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
 
 const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
@@ -17,7 +19,9 @@ const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
 const summaryPath = new URL("summary.json", buildDir);
 const sourceCache = new Map();
 let cachedWasmBytes = null;
+let irpkgGenerator = null;
 const args = process.argv.slice(2);
+const scriptStart = timerStart();
 
 function usage() {
   console.log(`Usage: node scripts/run-fixtures.mjs [--no-build]
@@ -181,19 +185,24 @@ async function instantiateWasm(packagePath) {
 }
 
 async function generatePackage(fixture) {
+  if (irpkgGenerator === null) {
+    throw new Error("IR package generator was not prepared");
+  }
   const id = sanitizeId(fixture.id);
   const packagePath = new URL(`${id}.irpkg`, buildDir);
   const reportPath = new URL(`${id}.report.md`, buildDir);
   const args = [
-    "--run",
-    "tools/GeneratePackage.lean",
     packagePath.pathname,
     reportPath.pathname,
     "--target",
     fixture.source,
     ...rootsFor(fixture),
   ];
-  const result = await runAsync("lean", args, { cwd: root, capture: true });
+  const result = await runAsync(irpkgGenerator.path, args, {
+    cwd: root,
+    capture: true,
+    env: irpkgGenerator.env,
+  });
   const report = await readFile(reportPath, "utf8").catch(() => "");
   const diagnostics = packageDiagnostics(report);
   if (!result.ok) {
@@ -210,9 +219,14 @@ async function generatePackage(fixture) {
 }
 
 async function runFixture(fixture) {
+  const start = timerStart();
   const expectedStatus = fixture.expect?.status ?? "pass";
+  const hostStart = timerStart();
   const host = await hostOracle(fixture);
+  const hostSeconds = elapsedSeconds(hostStart);
+  const packageStart = timerStart();
   const generated = await generatePackage(fixture);
+  const packageSeconds = elapsedSeconds(packageStart);
 
   if (!generated.ok) {
     if (expectedStatus === "unsupported") {
@@ -222,6 +236,7 @@ async function runFixture(fixture) {
         host,
         diagnostics: generated.diagnostics,
         detail: `${generated.failure.kind}: ${generated.failure.detail}`,
+        timing: { total: elapsedSeconds(start), host: hostSeconds, package: packageSeconds, wasm: 0 },
       };
     }
     return {
@@ -230,11 +245,20 @@ async function runFixture(fixture) {
       host,
       diagnostics: generated.diagnostics,
       detail: `${generated.failure.kind}: ${generated.failure.detail}`,
+      timing: { total: elapsedSeconds(start), host: hostSeconds, package: packageSeconds, wasm: 0 },
     };
   }
 
+  const wasmStart = timerStart();
   const runtime = await instantiateWasm(generated.packagePath);
   const wasm = runtime.call(fixture.entry);
+  const wasmSeconds = elapsedSeconds(wasmStart);
+  const timing = {
+    total: elapsedSeconds(start),
+    host: hostSeconds,
+    package: packageSeconds,
+    wasm: wasmSeconds,
+  };
   if (expectedStatus === "unsupported") {
     return {
       status: "failed",
@@ -243,6 +267,7 @@ async function runFixture(fixture) {
       wasm,
       diagnostics: generated.diagnostics,
       detail: "expected unsupported fixture passed",
+      timing,
     };
   }
   if (wasm !== host) {
@@ -253,9 +278,10 @@ async function runFixture(fixture) {
       wasm,
       diagnostics: generated.diagnostics,
       detail: `host=${host} wasm=${wasm}`,
+      timing,
     };
   }
-  return { status: "passed", fixture, host, wasm, diagnostics: generated.diagnostics };
+  return { status: "passed", fixture, host, wasm, diagnostics: generated.diagnostics, timing };
 }
 
 const manifest = JSON.parse(await readFile(manifestPath, "utf8"));
@@ -279,6 +305,7 @@ if (fixtures.length === 0) {
   throw new Error(`no fixtures matched VIR_FIXTURE_FILTER=${JSON.stringify(fixtureFilter)}`);
 }
 await mkdir(buildDir, { recursive: true });
+let buildSeconds = 0;
 if (skipBuild) {
   try {
     await readFile(wasmPath);
@@ -287,7 +314,16 @@ if (skipBuild) {
   }
   console.log("fixture build: skipped (--no-build)");
 } else {
+  const buildStart = timerStart();
   requireOk(await runAsync("npm", ["run", "--silent", "build:demo"], { cwd: root }), "npm run build:demo");
+  buildSeconds = elapsedSeconds(buildStart);
+}
+const generatorStart = timerStart();
+irpkgGenerator = prepareVirIrpkgSync(root);
+const generatorSeconds = elapsedSeconds(generatorStart);
+if (!irpkgGenerator.ok) {
+  console.error(`error: ${irpkgGeneratorFailureMessage(irpkgGenerator)}`);
+  process.exit(irpkgGenerator.status);
 }
 
 function fixtureJobCount(total) {
@@ -298,26 +334,14 @@ function fixtureJobCount(total) {
   return Math.min(Math.max(1, Math.floor(availableParallelism() / 2)), total);
 }
 
-async function mapWithLimit(items, limit, fn) {
-  const results = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const index = next;
-      next += 1;
-      results[index] = await fn(items[index], index);
-    }
-  }
-  await Promise.all(Array.from({ length: limit }, () => worker()));
-  return results;
-}
-
 const jobs = fixtureJobCount(fixtures.length);
 if (fixtureFilter !== "") {
   console.log(`fixture filter: ${fixtureFilter} (${fixtures.length}/${manifest.fixtures?.length ?? 0})`);
 }
 console.log(`fixture jobs: ${jobs}`);
+const fixtureRunStart = timerStart();
 const results = await mapWithLimit(fixtures, jobs, runFixture);
+const fixtureRunSeconds = elapsedSeconds(fixtureRunStart);
 
 let passed = 0;
 let unsupported = 0;
@@ -351,6 +375,12 @@ const summary = {
     host: result.host,
     wasm: result.wasm,
     detail: result.detail,
+    timing: result.timing && {
+      totalSeconds: Number(result.timing.total.toFixed(3)),
+      hostSeconds: Number(result.timing.host.toFixed(3)),
+      packageSeconds: Number(result.timing.package.toFixed(3)),
+      wasmSeconds: Number(result.timing.wasm.toFixed(3)),
+    },
     diagnostics: result.diagnostics && {
       loadedDeclCount: result.diagnostics.loadedDecls.length,
       importedDecls: result.diagnostics.importedDecls,
@@ -365,6 +395,20 @@ await writeFile(summaryPath, `${JSON.stringify(summary, null, 2)}\n`);
 
 console.log();
 console.log(`fixture summary: ${passed} passed, ${unsupported} expected unsupported, ${failed} failed`);
+const buildTiming = skipBuild ? "skipped" : `${formatSeconds(buildSeconds)}s`;
+const slowestFixtures = [...results]
+  .sort((left, right) => (right.timing?.total ?? 0) - (left.timing?.total ?? 0))
+  .slice(0, 5)
+  .map((result) => {
+    const timing = result.timing;
+    return `${result.fixture.id}=${formatSeconds(timing.total)}s`
+      + `(host=${formatSeconds(timing.host)}s,pkg=${formatSeconds(timing.package)}s,wasm=${formatSeconds(timing.wasm)}s)`;
+  });
+console.log(
+  `fixture timing: build=${buildTiming} generator=${formatSeconds(generatorSeconds)}s `
+  + `run=${formatSeconds(fixtureRunSeconds)}s total=${formatSeconds(elapsedSeconds(scriptStart))}s`,
+);
+console.log(`fixture slowest: ${slowestFixtures.join(", ")}`);
 const importedSummaries = results
   .filter((result) => result.diagnostics?.importedDecls?.length)
   .map((result) => `${result.fixture.id}:${result.diagnostics.importedDecls.length}`);

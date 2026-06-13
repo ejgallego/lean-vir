@@ -154,16 +154,11 @@ export async function assertUnsupportedInterfaceSource(dir, stem, lines, pattern
   const packagePath = join(dir, `${stem}.irpkg`);
   const reportPath = join(dir, `${stem}.report.md`);
   await writeFile(source, lines.join("\n"));
-  const targetArgs = roots === null ? ["--target-all", source] : ["--target", source, ...roots];
   const generated = spawnSync(
-    "lean",
-    [
-      "--run",
-      "tools/GeneratePackage.lean",
-      packagePath,
-      reportPath,
-      ...targetArgs,
-    ],
+    "bash",
+    roots === null
+      ? ["scripts/lean-to-irpkg.sh", source, packagePath]
+      : ["scripts/lean-to-irpkg.sh", source, packagePath, ...roots],
     { encoding: "utf8" },
   );
   assert.notEqual(generated.status, 0, `${stem} unexpectedly generated successfully`);
