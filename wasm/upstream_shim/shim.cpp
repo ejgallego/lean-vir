@@ -452,27 +452,13 @@ static uint8_t decode_call_effect(lean::vir_reader & reader) {
     return effect;
 }
 
-extern "C" char const * vir_call(
-    char const * name_text,
-    uint32_t name_len,
+static char const * vir_call_core(
+    lean::name const & fn,
+    bool has_boxed_decl,
     uint8_t const * request,
     uint32_t request_len,
     uint8_t result_tag) {
     (void) result_tag;
-    lean::g_call_result.clear();
-    lean::g_call_error.clear();
-    if (request == nullptr && request_len != 0) {
-        lean::g_call_error = "call payload pointer is null";
-        return nullptr;
-    }
-    if (!lean::vir::package_loaded()) {
-        lean::g_call_error = "no IR package has been loaded";
-        return nullptr;
-    }
-
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
-    bool has_boxed_decl = lean::vir::find_package_boxed_decl(fn.to_obj_arg()) != nullptr;
-
     lean::vir_reader reader(request, request_len);
     uint32_t argc = reader.u32();
     std::vector<lean::vir_arg> decoded_args;
@@ -530,6 +516,77 @@ extern "C" char const * vir_call(
     }
     lean::g_call_result = writer.take();
     return lean::g_call_result.data();
+}
+
+extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len) {
+    lean::g_call_error.clear();
+    if (name_text == nullptr) {
+        lean::g_call_error = "call name pointer is null";
+        return 0;
+    }
+    if (!lean::vir::package_loaded()) {
+        lean::g_call_error = "no IR package has been loaded";
+        return 0;
+    }
+
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    uint32_t slot = lean::vir::package_call_slot_for_name(fn.to_obj_arg());
+    if (slot == 0) {
+        lean::g_call_error = "call entry not found";
+    }
+    return slot;
+}
+
+extern "C" char const * vir_call(
+    char const * name_text,
+    uint32_t name_len,
+    uint8_t const * request,
+    uint32_t request_len,
+    uint8_t result_tag) {
+    lean::g_call_result.clear();
+    lean::g_call_error.clear();
+    if (name_text == nullptr) {
+        lean::g_call_error = "call name pointer is null";
+        return nullptr;
+    }
+    if (request == nullptr && request_len != 0) {
+        lean::g_call_error = "call payload pointer is null";
+        return nullptr;
+    }
+    if (!lean::vir::package_loaded()) {
+        lean::g_call_error = "no IR package has been loaded";
+        return nullptr;
+    }
+
+    lean::name fn = lean::name_from_dotted(name_text, name_len);
+    bool has_boxed_decl = lean::vir::find_package_boxed_decl(fn.to_obj_arg()) != nullptr;
+    return vir_call_core(fn, has_boxed_decl, request, request_len, result_tag);
+}
+
+extern "C" char const * vir_call_resolved(
+    uint32_t call_slot,
+    uint8_t const * request,
+    uint32_t request_len,
+    uint8_t result_tag) {
+    lean::g_call_result.clear();
+    lean::g_call_error.clear();
+    if (request == nullptr && request_len != 0) {
+        lean::g_call_error = "call payload pointer is null";
+        return nullptr;
+    }
+    if (!lean::vir::package_loaded()) {
+        lean::g_call_error = "no IR package has been loaded";
+        return nullptr;
+    }
+
+    lean::object * fn_obj = lean::vir::package_call_slot_name(call_slot);
+    if (fn_obj == nullptr) {
+        lean::g_call_error = "call slot is not registered";
+        return nullptr;
+    }
+    lean::name fn(fn_obj, true);
+    bool has_boxed_decl = lean::vir::package_call_slot_has_boxed_decl(call_slot);
+    return vir_call_core(fn, has_boxed_decl, request, request_len, result_tag);
 }
 
 extern "C" uint32_t vir_call_result_size(void) {

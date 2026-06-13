@@ -874,6 +874,27 @@ static bool run_package_initializers() {
     return true;
 }
 
+static uint32_t package_call_slot_matching(object * n, bool boxed_name) {
+    for (size_t i = 0; i < g_entries.size(); i++) {
+        object * candidate = boxed_name ? g_entries[i].boxed_base : g_entries[i].name;
+        if (candidate && lean_name_eq(n, candidate)) {
+            return static_cast<uint32_t>(i + 1);
+        }
+    }
+    return 0;
+}
+
+static decl_entry const * package_entry_for_call_slot(uint32_t slot) {
+    if (slot == 0 || slot > g_entries.size()) {
+        return nullptr;
+    }
+    return &g_entries[slot - 1];
+}
+
+static object * package_entry_call_name(decl_entry const & entry) {
+    return entry.boxed_base ? entry.boxed_base : entry.name;
+}
+
 } // namespace
 
 object * find_package_decl(object * n) {
@@ -901,6 +922,24 @@ object * find_package_init_name(object * n) {
         }
     }
     return nullptr;
+}
+
+uint32_t package_call_slot_for_name(object * n) {
+    uint32_t boxed_slot = package_call_slot_matching(n, true);
+    return boxed_slot != 0 ? boxed_slot : package_call_slot_matching(n, false);
+}
+
+object * package_call_slot_name(uint32_t slot) {
+    decl_entry const * entry = package_entry_for_call_slot(slot);
+    if (entry == nullptr) {
+        return nullptr;
+    }
+    return package_entry_call_name(*entry);
+}
+
+bool package_call_slot_has_boxed_decl(uint32_t slot) {
+    decl_entry const * entry = package_entry_for_call_slot(slot);
+    return entry != nullptr && entry->boxed_base != nullptr;
 }
 
 char const * find_host_import_symbol(object * n) {

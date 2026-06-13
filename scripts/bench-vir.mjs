@@ -11,7 +11,7 @@ import { performance } from "node:perf_hooks";
 import { ensureCachedBenchArtifacts } from "./bench-artifact-cache.mjs";
 import { formatMs, median, requireBenchmarkSample } from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
-import { encodeCallPayload } from "../web/src/runtime/vir-value-codec.js";
+import { decodeCallResult, encodeCallPayload } from "../web/src/runtime/vir-value-codec.js";
 import {
   createVirRuntime as createNodeVirRuntime,
   createVirtualDocumentState,
@@ -23,6 +23,7 @@ const root = new URL("..", import.meta.url);
 
 const fibInput = 17;
 const fibIterations = 80;
+const dispatchIterations = 20000;
 const sortInput = [7, 3, 9, 1, 4, 1, 5, 2, 8, 6, 0, 10, 12, 11, 13, 14];
 const sortIterations = 2000;
 const hostScalarIterations = 5000;
@@ -84,6 +85,7 @@ const recursiveJsonInput = {
     { fst: "ok", snd: { kind: "bool", value: false } },
   ],
 };
+const textEncoder = new TextEncoder();
 const benchArtifactPaths = [
   "web/public/vir-upstream.wasm",
   "web/public/fixtures-basic.irpkg",
@@ -232,11 +234,35 @@ function printWasmRow(name, sample) {
   console.log(`  checksum:  ${sample.checksum}`);
 }
 
+function printDispatchRow(name, named, resolved) {
+  const namedPerCall = named.medianMs / named.iterations;
+  const resolvedPerCall = resolved.medianMs / resolved.iterations;
+  const deltaPct = ((resolvedPerCall - namedPerCall) / namedPerCall) * 100;
+  const sign = deltaPct >= 0 ? "+" : "";
+  const speed = namedPerCall / resolvedPerCall;
+  console.log(`${name}`);
+  console.log(`  named ABI:    ${formatMs(named.medianMs)} total, ${formatMs(namedPerCall)} / call`);
+  console.log(
+    `  resolved ABI: ${formatMs(resolved.medianMs)} total, ${formatMs(resolvedPerCall)} / call ` +
+      `(${sign}${deltaPct.toFixed(1)}%, ${speed.toFixed(2)}x speed)`,
+  );
+  console.log(`  checksums:    named=${named.checksum} resolved=${resolved.checksum}`);
+}
+
 function printJsRow(name, sample) {
   const perCall = sample.medianMs / sample.iterations;
   console.log(`${name}`);
   console.log(`  js codec:  ${formatMs(sample.medianMs)} total, ${formatMs(perCall)} / call`);
   console.log(`  checksum:  ${sample.checksum}`);
+}
+
+function benchmarkDispatchReportRow(name, title, named, resolved) {
+  return {
+    name,
+    title,
+    named: benchmarkSampleReport(named),
+    resolved: benchmarkSampleReport(resolved),
+  };
 }
 
 function benchmarkReportRow(name, title, wasm, host = null) {
@@ -324,9 +350,73 @@ function benchEncodeCallPayload(label, iterations, entry, args) {
   });
 }
 
+function resolveRawCallSlot(entry, nameBytes) {
+  const namePtr = runtime.allocBytes(nameBytes);
+  try {
+    const callSlot = runtime.exports.vir_resolve_call(namePtr, nameBytes.byteLength) >>> 0;
+    if (callSlot === 0) {
+      throw new Error(runtime.lastCallError() || `call entry not found: ${entry.entry}`);
+    }
+    return callSlot;
+  } finally {
+    runtime.freeBytes(namePtr);
+  }
+}
+
+function callRawNamed(entry, namePtr, nameLen, payloadPtr, payloadLen) {
+  const resultPtr = runtime.exports.vir_call(namePtr, nameLen, payloadPtr, payloadLen, entry.result.wireTag);
+  if (resultPtr === 0) {
+    throw new Error(runtime.lastCallError() || `named call failed: ${entry.entry}`);
+  }
+  const resultLen = runtime.exports.vir_call_result_size();
+  return decodeCallResult(entry.result, runtime.readWasmBytes(resultPtr, resultLen), runtime.codecOptions);
+}
+
+function callRawResolved(entry, callSlot, payloadPtr, payloadLen) {
+  const resultPtr = runtime.exports.vir_call_resolved(callSlot, payloadPtr, payloadLen, entry.result.wireTag);
+  if (resultPtr === 0) {
+    throw new Error(runtime.lastCallError() || `resolved call failed: ${entry.entry}`);
+  }
+  const resultLen = runtime.exports.vir_call_result_size();
+  return decodeCallResult(entry.result, runtime.readWasmBytes(resultPtr, resultLen), runtime.codecOptions);
+}
+
+function benchTopLevelDispatch(entry) {
+  const nameBytes = textEncoder.encode(entry.entry);
+  const payload = encodeCallPayload(entry, [], runtime.codecOptions);
+  const callSlot = resolveRawCallSlot(entry, nameBytes);
+  const namePtr = runtime.allocBytes(nameBytes);
+  const namedPayloadPtr = runtime.allocBytes(payload);
+  const resolvedPayloadPtr = runtime.allocBytes(payload);
+  try {
+    const named = benchWasmRepeated("named", dispatchIterations, () => {
+      let acc = 0;
+      for (let i = 0; i < dispatchIterations; i++) {
+        acc += Number(callRawNamed(entry, namePtr, nameBytes.byteLength, namedPayloadPtr, payload.byteLength));
+      }
+      return acc;
+    });
+    const resolved = benchWasmRepeated("resolved", dispatchIterations, () => {
+      let acc = 0;
+      for (let i = 0; i < dispatchIterations; i++) {
+        acc += Number(callRawResolved(entry, callSlot, resolvedPayloadPtr, payload.byteLength));
+      }
+      return acc;
+    });
+    return { named, resolved };
+  } finally {
+    runtime.freeBytes(resolvedPayloadPtr);
+    runtime.freeBytes(namedPayloadPtr);
+    runtime.freeBytes(namePtr);
+  }
+}
+
+const dispatchEntry = manifestEntry("Vir.Fixtures.Basic.branchAndSub");
 const scalarRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileStatsScore");
 const nestedRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore");
 const recursiveValueEntry = manifestEntry("Vir.Fixtures.RecursiveTypes.jsonRootScore");
+
+const dispatch = benchTopLevelDispatch(dispatchEntry);
 
 const wasmFib = benchWasmRepeated("fib", fibIterations, () => {
   let acc = 0;
@@ -432,6 +522,8 @@ console.log("Host timings exclude Lean frontend startup.");
 console.log();
 console.log("Pure runtime controls");
 console.log();
+printDispatchRow(`top-level dispatch branchAndSub x ${dispatchIterations}`, dispatch.named, dispatch.resolved);
+console.log();
 printRow(`fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib);
 console.log();
 printRow(`sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort);
@@ -474,6 +566,12 @@ printWasmRow(
 
 if (args.jsonPath !== null) {
   await writeJsonReport(args.jsonPath, [
+    benchmarkDispatchReportRow(
+      "top-level-dispatch",
+      `top-level dispatch branchAndSub x ${dispatchIterations}`,
+      dispatch.named,
+      dispatch.resolved,
+    ),
     benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib),
     benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
     benchmarkJsReportRow(

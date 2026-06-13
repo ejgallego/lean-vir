@@ -17,7 +17,8 @@ Current status: the strict `wasm32-wasip1` link succeeds with the real upstream
 `ir_interpreter.cpp`, the linked Lean runtime subset, and
 `wasm/upstream_shim/`. The demo closure is supplied through a package-backed
 provider as real Lean IR declaration objects, and manifest-supported browser
-calls execute that closure through the real upstream interpreter via `vir_call`.
+calls execute that closure through the real upstream interpreter via package
+call slots.
 
 ## Policy
 
@@ -78,8 +79,9 @@ Together they supply:
   dependencies.
 - small WASI/platform stubs for C++ exception throwing, trace/time/options
   hooks, and the few environment helpers pulled in by the interpreter.
-- the generic `vir_call` package interface used by the JavaScript runtime for
-  manifest-supported functions.
+- the generic package call interface used by the JavaScript runtime for
+  manifest-supported functions. The runtime resolves each export once with
+  `vir_resolve_call` and then calls `vir_call_resolved` with the cached slot.
 - package-scoped JavaScript host import trampolines for declarations marked
   with `@[vir_js "..."]`, routed through `env.vir_js_call` and
   `env.vir_js_call_result_size`.
@@ -138,6 +140,19 @@ upstream interpreter's expected object layout at runtime. The generator report
 separates missing Lean IR declarations from missing native extern
 registrations, and the package decoder exposes its last load error for browser
 and smoke-test diagnostics.
+
+## Package Call ABI
+
+The browser runtime does not send a dotted Lean entry name on every call. After
+loading an `.irpkg`, it resolves a manifest export once with
+`vir_resolve_call(name, len)`. The returned slot is package-local, 1-based, and
+uses `0` as the failure sentinel. Repeated calls then use
+`vir_call_resolved(slot, payload, payloadLen, resultTag)`.
+
+The shim still keeps `vir_call(name, len, payload, payloadLen, resultTag)` as a
+named entry point for diagnostics and benchmark comparisons, but the JavaScript
+runtime requires the resolved-call exports.
+
 The current explicit native externs cover the small fixture/demo surface for
 `Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
 `Float`, `String`, and the helper externs reached by `Lean.Expr`/`Lean.Level`
@@ -162,7 +177,7 @@ comparison operations, `UInt32.ofNat`/`toNat`/`toUInt8` plus arithmetic,
 bitwise, shift, and comparison operations, `UInt64.ofNat`/`ofNatLT`/`toNat`/
 `toUSize`/`toFloat` plus arithmetic, bitwise, shift, and comparison operations
 including a wide `UInt64.toNat` fixture returned through the manifest-driven
-`vir_call` path, package-backed `Nat` literals wider than 32 bits,
+package-call path, package-backed `Nat` literals wider than 32 bits,
 `USize` `sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
 `ByteArray.mk`/`ByteArray.get`, and
 `Float.scaleB`/`toUInt32`. Parser-adjacent hash/name/substring/pointer-address

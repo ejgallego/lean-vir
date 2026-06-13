@@ -450,13 +450,14 @@ export class VirRuntime {
 
   callEntry(entry, args) {
     this.requireLiveRuntime();
-    this.requireFunction("vir_call");
+    this.requireFunction("vir_resolve_call");
+    this.requireFunction("vir_call_resolved");
     this.requireFunction("vir_call_result_size");
     if (args.length !== entry.args.length) {
       throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
     }
 
-    const { nameBytes } = this.callCacheFor(entry);
+    const cache = this.callCacheFor(entry);
     this.hostState?.clearTransientQueues();
     let payload;
     try {
@@ -465,12 +466,11 @@ export class VirRuntime {
       this.hostState?.clearTransientQueues();
       throw error;
     }
-    const namePtr = this.allocBytes(nameBytes);
     const payloadPtr = this.allocBytes(payload);
     try {
-      const resultPtr = this.exports.vir_call(
-        namePtr,
-        nameBytes.byteLength,
+      const callSlot = this.resolveCallSlot(entry, cache);
+      const resultPtr = this.exports.vir_call_resolved(
+        callSlot,
         payloadPtr,
         payload.byteLength,
         entry.result.wireTag,
@@ -482,7 +482,6 @@ export class VirRuntime {
       return decodeCallResult(entry.result, this.readWasmBytes(resultPtr, resultLen), this.codecOptions);
     } finally {
       this.freeBytes(payloadPtr);
-      this.freeBytes(namePtr);
       this.hostState?.clearTransientQueues();
     }
   }
@@ -494,6 +493,23 @@ export class VirRuntime {
       this.entryCallCache.set(entry, cache);
     }
     return cache;
+  }
+
+  resolveCallSlot(entry, cache) {
+    if (cache.callSlot !== undefined) {
+      return cache.callSlot;
+    }
+    const namePtr = this.allocBytes(cache.nameBytes);
+    try {
+      const callSlot = this.exports.vir_resolve_call(namePtr, cache.nameBytes.byteLength) >>> 0;
+      if (callSlot === 0) {
+        throw new Error(this.lastCallError() || `call entry not found: ${entry.entry}`);
+      }
+      cache.callSlot = callSlot;
+      return callSlot;
+    } finally {
+      this.freeBytes(namePtr);
+    }
   }
 
   lastCallError() {
