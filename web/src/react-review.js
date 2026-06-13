@@ -6,12 +6,12 @@ Author: Emilio J. Gallego Arias
 
 import "./style.css";
 import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
+import { hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
 import { errorMessage, setReadyState } from "./pages/page-utils.js";
 import { fetchBytes } from "./vir-runtime.js";
 
-const wasmFile = "vir-upstream.wasm";
-const packageFile = "demo-host.irpkg";
-const runtimeFactory = createBrowserReactRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
+const packageFile = hostPackageFile;
+const runtimeFactory = createBrowserReactRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}` });
 
 const statusEl = document.querySelector("#react-review-status");
 const packageEl = document.querySelector("#react-review-package");

@@ -8,7 +8,8 @@ import "./style.css";
 import {
   defaultPackageFile,
   hostPackageFile,
-  packageSpecs,
+  packageFiles,
+  wasmPublicFile,
 } from "./pages/browser-packages.js";
 import {
   createFixtureInputDefaults,
@@ -50,8 +51,7 @@ const fixtureInputHint = document.querySelector("#fixture-input-hint");
 const fixtureSourcePath = document.querySelector("#fixture-source-path");
 const fixtureSourceEntry = document.querySelector("#fixture-source-entry");
 const fixtureSourceCode = document.querySelector("#fixture-source-code");
-const wasmFile = "vir-upstream.wasm";
-const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmFile}` });
+const runtimeFactory = createVirRuntimeFactory({ wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}` });
 const fixtureResults = new Map();
 const fixtureResultFailures = new Map();
 const fixtureInputs = createFixtureInputDefaults();
@@ -342,7 +342,6 @@ renderFixtureList();
 selectFixture(fixtures[0]);
 
 try {
-  const packageFiles = packageSpecs.map((spec) => spec.file);
   const runtimes = await Promise.all(packageFiles.map((file) => runtimeForPackage(file)));
   hostRuntime = await runtimeForPackage(hostPackageFile);
   const primaryRuntime = await runtimeForPackage(defaultPackageFile);

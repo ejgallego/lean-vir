@@ -9,6 +9,13 @@ import { dirname } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import { ensureCachedBenchArtifacts } from "./bench-artifact-cache.mjs";
+import {
+  benchmarkArtifactPaths,
+  defaultPackageFile,
+  hostPackageFile,
+  publicArtifactPath,
+  wasmPublicFile,
+} from "./browser-package-config.mjs";
 import { formatMs, median, requireBenchmarkSample } from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
 import { decodeCallResult, encodeCallPayload } from "../web/src/runtime/vir-value-codec.js";
@@ -86,11 +93,6 @@ const recursiveJsonInput = {
   ],
 };
 const textEncoder = new TextEncoder();
-const benchArtifactPaths = [
-  "web/public/vir-upstream.wasm",
-  "web/public/fixtures-basic.irpkg",
-  "web/public/demo-host.irpkg",
-];
 const args = parseArgs(process.argv.slice(2));
 
 function parseArgs(argv) {
@@ -151,9 +153,9 @@ function printUsage() {
 }
 
 async function instantiateRuntimes() {
-  const wasm = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
-  const irPackage = await readFile(new URL("../web/public/fixtures-basic.irpkg", import.meta.url));
-  const hostPackage = await readFile(new URL("../web/public/demo-host.irpkg", import.meta.url));
+  const wasm = await readPublicArtifact(wasmPublicFile);
+  const irPackage = await readPublicArtifact(defaultPackageFile);
+  const hostPackage = await readPublicArtifact(hostPackageFile);
   const virtualDocumentState = createVirtualDocumentState();
   ensureVirtualElementState(virtualDocumentState, "#bench-dom");
   ensureVirtualElementState(virtualDocumentState, "#bench-react");
@@ -165,6 +167,10 @@ async function instantiateRuntimes() {
     hostBindings: createBenchmarkHostBindings(),
   });
   return { runtime, hostRuntime };
+}
+
+function readPublicArtifact(file) {
+  return readFile(new URL(`../${publicArtifactPath(file)}`, import.meta.url));
 }
 
 function createBenchmarkHostBindings() {

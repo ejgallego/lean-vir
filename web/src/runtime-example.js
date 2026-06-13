@@ -4,18 +4,19 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
 import { createVirRuntime } from "./vir-runtime.js";
 
 const output = document.querySelector("#runtime-example-output");
 
 try {
   const vir = await createVirRuntime({
-    wasmUrl: `${import.meta.env.BASE_URL}vir-upstream.wasm`,
-    irPackageUrl: `${import.meta.env.BASE_URL}fixtures-basic.irpkg`,
+    wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
+    irPackageUrl: `${import.meta.env.BASE_URL}${defaultPackageFile}`,
   });
   const hostVir = await createVirRuntime({
-    wasmUrl: `${import.meta.env.BASE_URL}vir-upstream.wasm`,
-    irPackageUrl: `${import.meta.env.BASE_URL}demo-host.irpkg`,
+    wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
+    irPackageUrl: `${import.meta.env.BASE_URL}${hostPackageFile}`,
   });
 
   const results = {

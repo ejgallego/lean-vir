@@ -12,7 +12,10 @@ src="${LEAN4_SRC:-third_party/lean4-src}"
 out="build/upstream-probe"
 obj_dir="$out/obj"
 objects_file="$out/objects.txt"
-demo_package="web/public/fixtures-basic.irpkg"
+demo_package="$(
+  node --input-type=module -e \
+    'import { defaultPackageFile, publicArtifactPath } from "./scripts/browser-package-config.mjs"; console.log(publicArtifactPath(defaultPackageFile));'
+)"
 package_header="$out/vir_fixtures_basic_package.inc"
 bench_source="wasm/upstream_shim/engine_bench.cpp"
 bench_object="$obj_dir/wasm_upstream_shim_engine_bench.o"

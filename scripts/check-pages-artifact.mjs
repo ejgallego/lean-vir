@@ -11,7 +11,14 @@ import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
-import { generatedPublicFiles, localPackageFiles } from "./browser-package-config.mjs";
+import {
+  boundaryPackageFile,
+  defaultPackageFile,
+  generatedPublicFiles,
+  hostPackageFile,
+  leanPackageFile,
+  localPackageFiles,
+} from "./browser-package-config.mjs";
 import { sdkArchiveEntries } from "./sdk-payloads.mjs";
 
 const distDir = new URL("../web/dist/", import.meta.url);
@@ -104,10 +111,10 @@ assertLink(indexHtml, "downloads/lean-vir-local.tar.gz");
 assertLink(indexHtml, "downloads/lean-vir-sdk.tar.gz");
 assertLink(indexHtml, "format.html?case=list&amp;width=12");
 assertLink(indexHtml, "dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total");
-assertLink(indexHtml, "dev.html?package=fixtures-basic.irpkg&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump");
-assertLink(indexHtml, "dev.html?package=demo-host.irpkg&amp;entry=HostInterop_titleHandshake");
-assertLink(indexHtml, "dev.html?package=fixtures-lean.irpkg&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore");
-assertLink(indexHtml, "dev.html?package=fixtures-boundary.irpkg&amp;entry=Vir_Fixtures_Boundary_floatScaleScore");
+assertLink(indexHtml, `dev.html?package=${defaultPackageFile}&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`);
+assertLink(indexHtml, `dev.html?package=${hostPackageFile}&amp;entry=HostInterop_titleHandshake`);
+assertLink(indexHtml, `dev.html?package=${leanPackageFile}&amp;entry=Vir_Fixtures_ExprPrinter_exprKindScore`);
+assertLink(indexHtml, `dev.html?package=${boundaryPackageFile}&amp;entry=Vir_Fixtures_Boundary_floatScaleScore`);
 assert.ok(devHtml.includes("dev-package-url"), "dev.html should contain package runner controls");
 assert.ok(devHtml.includes("dev-package-preset"), "dev.html should contain package presets");
 assert.ok(devHtml.includes("npm run generate:irpkg -- path/File.lean"), "dev.html should show the package command shape");

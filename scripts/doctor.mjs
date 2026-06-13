@@ -9,6 +9,8 @@ import { constants as fsConstants } from "node:fs";
 import { access, readFile } from "node:fs/promises";
 import { delimiter, resolve } from "node:path";
 
+import { defaultPackageFile, publicArtifactPath, wasmPublicFile } from "./browser-package-config.mjs";
+
 const checks = [];
 
 function record(kind, name, detail) {
@@ -153,8 +155,8 @@ await checkPath(
   fsConstants.X_OK,
 );
 
-await checkPath("upstream WASM", "web/public/vir-upstream.wasm", "run npm run build:demo");
-await checkPath("browser package", "web/public/fixtures-basic.irpkg", "run npm run build:demo");
+await checkPath("upstream WASM", publicArtifactPath(wasmPublicFile), "run npm run build:demo");
+await checkPath("browser package", publicArtifactPath(defaultPackageFile), "run npm run build:demo");
 
 const chromium = await chromiumPath();
 if (chromium) {

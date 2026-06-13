@@ -28,6 +28,8 @@ top-level `README.md` remains the user-facing quickstart.
   implementation status.
 - [FIXTURE_COVERAGE.md](FIXTURE_COVERAGE.md): fixture coverage and known
   unsupported surface.
+- [PERFORMANCE.md](PERFORMANCE.md): benchmark commands, artifact-cache
+  behavior, and before/after comparisons.
 
 ## Roadmaps
 

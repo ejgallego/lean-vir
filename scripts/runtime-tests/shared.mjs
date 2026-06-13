@@ -10,6 +10,14 @@ import { spawnSync } from "node:child_process";
 import { join } from "node:path";
 
 import {
+  defaultPackageFile,
+  hostPackageFile,
+  leanPackageFile,
+  prettyPackageFile,
+  publicArtifactPath,
+  wasmPublicFile,
+} from "../browser-package-config.mjs";
+import {
   roundTripInterfaceTypeDescriptor,
   sameInterfaceWireType,
 } from "../../web/src/vir-runtime.js";
@@ -22,12 +30,16 @@ export { assert, readFile, writeFile, spawnSync, join, validateInterfaceManifest
 
 export async function readRuntimeArtifacts() {
   return {
-    wasmBytes: await readFile(new URL("../../web/public/vir-upstream.wasm", import.meta.url)),
-    irPackageBytes: await readFile(new URL("../../web/public/fixtures-basic.irpkg", import.meta.url)),
-    hostPackageBytes: await readFile(new URL("../../web/public/demo-host.irpkg", import.meta.url)),
-    prettyPackageBytes: await readFile(new URL("../../web/public/pretty-printer.irpkg", import.meta.url)),
-    leanPackageBytes: await readFile(new URL("../../web/public/fixtures-lean.irpkg", import.meta.url)),
+    wasmBytes: await readPublicArtifact(wasmPublicFile),
+    irPackageBytes: await readPublicArtifact(defaultPackageFile),
+    hostPackageBytes: await readPublicArtifact(hostPackageFile),
+    prettyPackageBytes: await readPublicArtifact(prettyPackageFile),
+    leanPackageBytes: await readPublicArtifact(leanPackageFile),
   };
+}
+
+function readPublicArtifact(file) {
+  return readFile(new URL(`../../${publicArtifactPath(file)}`, import.meta.url));
 }
 
 export function createCallbackHostBindings(records = []) {

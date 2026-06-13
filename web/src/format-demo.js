@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import "./style.css";
+import { prettyPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
 import { errorMessage, setReadyState } from "./pages/page-utils.js";
 import { createVirRuntimeFactory } from "./vir-runtime.js";
 
@@ -61,7 +62,7 @@ const outputEl = document.querySelector("#format-output");
 const sourceEl = document.querySelector("#format-source");
 const caseButtons = Array.from(document.querySelectorAll("[data-case]"));
 const runtimeFactory = createVirRuntimeFactory({
-  wasmUrl: `${import.meta.env.BASE_URL}vir-upstream.wasm`,
+  wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
 });
 
 let runtime = null;
@@ -131,7 +132,7 @@ async function boot() {
   const width = setWidth(query.get("width") ?? "18");
   setActiveCase(activeCase);
   runtime = await runtimeFactory.createRuntime({
-    irPackageUrl: `${import.meta.env.BASE_URL}pretty-printer.irpkg`,
+    irPackageUrl: `${import.meta.env.BASE_URL}${prettyPackageFile}`,
   });
   exportCountEl.textContent = String(runtime.packageInfo.interfaceExports);
   setWidth(width);

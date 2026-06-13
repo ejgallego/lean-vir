@@ -17,7 +17,14 @@ import {
   setInputValueAndDispatch,
   waitForBrowserState,
 } from "./browser-smoke-page-actions.mjs";
-import { packageFiles, packagePresets } from "./browser-package-config.mjs";
+import {
+  boundaryPackageFile,
+  defaultPackageFile,
+  hostPackageFile,
+  leanPackageFile,
+  packageFiles,
+  packagePresets,
+} from "./browser-package-config.mjs";
 
 export async function smokeLanding(cdp, origin) {
   await navigate(cdp, `${origin}${basePath}`);
@@ -40,12 +47,12 @@ export async function smokeLanding(cdp, origin) {
   assert.equal(state.mood, "happy");
   assert.deepEqual(state.packageItems.map((item) => item.href), [
     "dev.html?package=local-quickstart.irpkg&entry=Quickstart.total",
-    "dev.html?package=fixtures-basic.irpkg&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump",
-    "dev.html?package=demo-host.irpkg&entry=HostInterop_titleHandshake",
+    `dev.html?package=${defaultPackageFile}&entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`,
+    `dev.html?package=${hostPackageFile}&entry=HostInterop_titleHandshake`,
     "react.html",
     "format.html?case=list&width=12",
-    "dev.html?package=fixtures-lean.irpkg&entry=Vir_Fixtures_ExprPrinter_exprKindScore",
-    "dev.html?package=fixtures-boundary.irpkg&entry=Vir_Fixtures_Boundary_floatScaleScore",
+    `dev.html?package=${leanPackageFile}&entry=Vir_Fixtures_ExprPrinter_exprKindScore`,
+    `dev.html?package=${boundaryPackageFile}&entry=Vir_Fixtures_Boundary_floatScaleScore`,
   ]);
   assert.ok(state.packageItems[0].text.includes("Four small exports from one Lean file"));
   assert.ok(state.packageItems[1].text.includes("Basic, list/option, interface shapes"));
@@ -138,8 +145,8 @@ export async function smokePackagePreset(cdp, origin) {
     preset: document.querySelector("#dev-package-preset")?.value,
     options: Array.from(document.querySelector("#dev-package-preset")?.options ?? []).map((option) => option.value)
   })`);
-  assert.equal(state.packageName, "fixtures-basic.irpkg");
-  assert.equal(state.preset, "fixtures-basic.irpkg");
+  assert.equal(state.packageName, defaultPackageFile);
+  assert.equal(state.preset, defaultPackageFile);
   assert.deepEqual(state.options, [...packagePresets.map((preset) => preset.file), ""]);
 
   await evaluate(cdp, `(() => {
@@ -147,19 +154,19 @@ export async function smokePackagePreset(cdp, origin) {
     if (!(preset instanceof HTMLSelectElement)) {
       throw new Error("package preset selector is missing");
     }
-    preset.value = "demo-host.irpkg";
+    preset.value = ${JSON.stringify(hostPackageFile)};
     preset.dispatchEvent(new Event("change", { bubbles: true }));
   })()`);
   const switched = await waitForBrowserState(cdp, packagePresetStateScript(`
     state.status === "Ready" &&
-    state.packageName === "demo-host.irpkg"
+    state.packageName === ${JSON.stringify(hostPackageFile)}
   `), {
-    timeoutMessage: "package preset did not load demo-host.irpkg",
+    timeoutMessage: `package preset did not load ${hostPackageFile}`,
   });
   assert.deepEqual(switched, {
     status: "Ready",
-    packageName: "demo-host.irpkg",
-    packageUrl: "demo-host.irpkg",
+    packageName: hostPackageFile,
+    packageUrl: hostPackageFile,
     entryCount: 35,
   });
 }

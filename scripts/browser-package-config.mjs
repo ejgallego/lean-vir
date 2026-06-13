@@ -12,16 +12,24 @@ const configUrl = new URL("../fixtures/browser-packages.json", import.meta.url);
 
 export const browserPackageConfig = JSON.parse(await readFile(configUrl, "utf8"));
 export const {
+  wasmPublicFile,
   packageSpecs,
   localPackagePresets,
   packageById,
+  packageFileById,
   packageFiles,
   localPackageFiles,
+  benchmarkArtifactPaths,
   generatedPublicFiles,
   packagePresets,
   packageLabels,
   packageFileByFixtureSource,
   defaultPackageFile,
   hostPackageFile,
+  prettyPackageFile,
+  leanPackageFile,
+  boundaryPackageFile,
   packageFileForFixtureSource,
+  packageFileForId,
+  publicArtifactPath,
 } = deriveBrowserPackageConfig(browserPackageConfig);

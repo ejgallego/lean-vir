@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 
 import { basePath, distAssetPath, evaluate } from "./browser-smoke-harness.mjs";
+import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./browser-package-config.mjs";
 import {
   clickSelector,
   runDemoHostEntry,
@@ -332,7 +333,7 @@ export async function smokeBrowserCallbackCleanup(cdp, origin) {
     if (!(preset instanceof HTMLSelectElement)) {
       throw new Error("package preset selector is missing");
     }
-    preset.value = "fixtures-basic.irpkg";
+    preset.value = ${JSON.stringify(defaultPackageFile)};
     preset.dispatchEvent(new Event("change", { bubbles: true }));
   })()`);
   const reloadedState = await waitForBrowserState(cdp, `(() => {
@@ -341,11 +342,11 @@ export async function smokeBrowserCallbackCleanup(cdp, origin) {
       packageName: document.querySelector("#dev-package-name")?.textContent?.trim(),
     };
     return {
-      ready: state.status === "Ready" && state.packageName === "fixtures-basic.irpkg",
+      ready: state.status === "Ready" && state.packageName === ${JSON.stringify(defaultPackageFile)},
       value: state,
       ...state,
     };
-  })()`, { timeoutMessage: "package preset did not reload fixtures-basic.irpkg" });
+  })()`, { timeoutMessage: `package preset did not reload ${defaultPackageFile}` });
   await clickSelector(cdp, "#callback-reload-target");
   await waitInBrowser(cdp, 100);
   const reloaded = {
@@ -354,7 +355,7 @@ export async function smokeBrowserCallbackCleanup(cdp, origin) {
   };
   assert.deepEqual(reloaded, {
     status: "Ready",
-    packageName: "fixtures-basic.irpkg",
+    packageName: defaultPackageFile,
     text: "callback:reload-idle",
   });
 
@@ -369,8 +370,8 @@ export async function smokeBrowserCallbackCleanup(cdp, origin) {
         throw new Error("built runtime asset does not expose createVirRuntime");
       }
       const runtime = await createVirRuntime({
-        wasmUrl: ${JSON.stringify(`${origin}${basePath}vir-upstream.wasm`)},
-        irPackageUrl: ${JSON.stringify(`${origin}${basePath}demo-host.irpkg`)},
+        wasmUrl: ${JSON.stringify(`${origin}${basePath}${wasmPublicFile}`)},
+        irPackageUrl: ${JSON.stringify(`${origin}${basePath}${hostPackageFile}`)},
       });
       document.title = "dispose:sentinel";
       document.querySelector("#callback-dispose-target")?.remove();
