@@ -6,23 +6,22 @@ Author: Emilio J. Gallego Arias
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { availableParallelism } from "node:os";
-import { delimiter } from "node:path";
-import { performance } from "node:perf_hooks";
 
 import { createVirRuntime } from "../web/src/vir-runtime.js";
-import { runAsync } from "./process-utils.mjs";
+import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "./irpkg-generator.mjs";
+import { mapWithLimit, runAsync } from "./process-utils.mjs";
+import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
 
 const root = new URL("..", import.meta.url);
 const manifestPath = new URL("../fixtures/manifest.json", import.meta.url);
 const buildDir = new URL("../build/fixtures/", import.meta.url);
 const wasmPath = new URL("../web/public/vir-upstream.wasm", import.meta.url);
-const irpkgGeneratorPath = new URL("../.lake/build/bin/vir_irpkg", import.meta.url);
 const summaryPath = new URL("summary.json", buildDir);
 const sourceCache = new Map();
 let cachedWasmBytes = null;
-let irpkgGeneratorEnv = null;
+let irpkgGenerator = null;
 const args = process.argv.slice(2);
-const scriptStart = performance.now();
+const scriptStart = timerStart();
 
 function usage() {
   console.log(`Usage: node scripts/run-fixtures.mjs [--no-build]
@@ -57,44 +56,6 @@ function requireOk(result, command) {
     throw new Error(`${command} failed with status ${result.status}\n${result.stderr}`);
   }
   return result;
-}
-
-function elapsedSeconds(start) {
-  return (performance.now() - start) / 1000;
-}
-
-function formatSeconds(seconds) {
-  return seconds.toFixed(2);
-}
-
-async function commandOutput(cmd, args, command) {
-  const result = requireOk(await runAsync(cmd, args, { cwd: root, capture: true }), command);
-  return result.stdout.trim();
-}
-
-function leanPathWithGenerator(leanPrefix) {
-  return [
-    "build/lean-lib",
-    ".lake/build/lib/lean",
-    `${leanPrefix}/lib/lean`,
-    process.env.LEAN_PATH,
-  ].filter(Boolean).join(delimiter);
-}
-
-async function prepareIrpkgGenerator() {
-  requireOk(
-    await runAsync("bash", ["scripts/build-lean-lib.sh"], { cwd: root }),
-    "bash scripts/build-lean-lib.sh",
-  );
-  requireOk(
-    await runAsync("lake", ["build", "vir_irpkg"], { cwd: root }),
-    "lake build vir_irpkg",
-  );
-  const leanPrefix = await commandOutput("lean", ["--print-prefix"], "lean --print-prefix");
-  irpkgGeneratorEnv = {
-    ...process.env,
-    LEAN_PATH: leanPathWithGenerator(leanPrefix),
-  };
 }
 
 function sanitizeId(id) {
@@ -224,7 +185,7 @@ async function instantiateWasm(packagePath) {
 }
 
 async function generatePackage(fixture) {
-  if (irpkgGeneratorEnv === null) {
+  if (irpkgGenerator === null) {
     throw new Error("IR package generator was not prepared");
   }
   const id = sanitizeId(fixture.id);
@@ -237,10 +198,10 @@ async function generatePackage(fixture) {
     fixture.source,
     ...rootsFor(fixture),
   ];
-  const result = await runAsync(irpkgGeneratorPath.pathname, args, {
+  const result = await runAsync(irpkgGenerator.path, args, {
     cwd: root,
     capture: true,
-    env: irpkgGeneratorEnv,
+    env: irpkgGenerator.env,
   });
   const report = await readFile(reportPath, "utf8").catch(() => "");
   const diagnostics = packageDiagnostics(report);
@@ -258,12 +219,12 @@ async function generatePackage(fixture) {
 }
 
 async function runFixture(fixture) {
-  const start = performance.now();
+  const start = timerStart();
   const expectedStatus = fixture.expect?.status ?? "pass";
-  const hostStart = performance.now();
+  const hostStart = timerStart();
   const host = await hostOracle(fixture);
   const hostSeconds = elapsedSeconds(hostStart);
-  const packageStart = performance.now();
+  const packageStart = timerStart();
   const generated = await generatePackage(fixture);
   const packageSeconds = elapsedSeconds(packageStart);
 
@@ -288,7 +249,7 @@ async function runFixture(fixture) {
     };
   }
 
-  const wasmStart = performance.now();
+  const wasmStart = timerStart();
   const runtime = await instantiateWasm(generated.packagePath);
   const wasm = runtime.call(fixture.entry);
   const wasmSeconds = elapsedSeconds(wasmStart);
@@ -353,13 +314,17 @@ if (skipBuild) {
   }
   console.log("fixture build: skipped (--no-build)");
 } else {
-  const buildStart = performance.now();
+  const buildStart = timerStart();
   requireOk(await runAsync("npm", ["run", "--silent", "build:demo"], { cwd: root }), "npm run build:demo");
   buildSeconds = elapsedSeconds(buildStart);
 }
-const generatorStart = performance.now();
-await prepareIrpkgGenerator();
+const generatorStart = timerStart();
+irpkgGenerator = prepareVirIrpkgSync(root);
 const generatorSeconds = elapsedSeconds(generatorStart);
+if (!irpkgGenerator.ok) {
+  console.error(`error: ${irpkgGeneratorFailureMessage(irpkgGenerator)}`);
+  process.exit(irpkgGenerator.status);
+}
 
 function fixtureJobCount(total) {
   const configured = Number.parseInt(process.env.VIR_FIXTURE_JOBS ?? "", 10);
@@ -369,26 +334,12 @@ function fixtureJobCount(total) {
   return Math.min(Math.max(1, Math.floor(availableParallelism() / 2)), total);
 }
 
-async function mapWithLimit(items, limit, fn) {
-  const results = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const index = next;
-      next += 1;
-      results[index] = await fn(items[index], index);
-    }
-  }
-  await Promise.all(Array.from({ length: limit }, () => worker()));
-  return results;
-}
-
 const jobs = fixtureJobCount(fixtures.length);
 if (fixtureFilter !== "") {
   console.log(`fixture filter: ${fixtureFilter} (${fixtures.length}/${manifest.fixtures?.length ?? 0})`);
 }
 console.log(`fixture jobs: ${jobs}`);
-const fixtureRunStart = performance.now();
+const fixtureRunStart = timerStart();
 const results = await mapWithLimit(fixtures, jobs, runFixture);
 const fixtureRunSeconds = elapsedSeconds(fixtureRunStart);
 

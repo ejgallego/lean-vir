@@ -5,9 +5,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import { availableParallelism } from "node:os";
-import { performance } from "node:perf_hooks";
 
-import { runAsync } from "./process-utils.mjs";
+import { mapWithLimit, runAsync } from "./process-utils.mjs";
+import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
 
 const root = new URL("..", import.meta.url).pathname;
 
@@ -82,26 +82,8 @@ function runtimeJobCount(total) {
   return Math.min(Math.max(1, availableParallelism()), total);
 }
 
-async function mapWithLimit(items, limit, fn) {
-  const results = new Array(items.length);
-  let next = 0;
-  async function worker() {
-    while (next < items.length) {
-      const index = next;
-      next += 1;
-      results[index] = await fn(items[index], index);
-    }
-  }
-  await Promise.all(Array.from({ length: limit }, () => worker()));
-  return results;
-}
-
-function elapsedSeconds(start) {
-  return ((performance.now() - start) / 1000).toFixed(2);
-}
-
 async function runRuntimeTest(test) {
-  const start = performance.now();
+  const start = timerStart();
   const result = await runAsync(process.execPath, [test.file], {
     capture: true,
     cwd: root,
@@ -136,18 +118,20 @@ if (filters.length !== 0) {
 }
 console.log(`runtime jobs: ${jobs}`);
 
-const runStart = performance.now();
+const runStart = timerStart();
 const results = await mapWithLimit(selected, jobs, runRuntimeTest);
 let failed = 0;
 for (const result of results) {
   if (result.ok) {
-    console.log(`PASS ${result.test.id}: ${result.seconds}s`);
+    console.log(`PASS ${result.test.id}: ${formatSeconds(result.seconds)}s`);
     if (process.env.VIR_RUNTIME_VERBOSE === "1") {
       printCapturedOutput(result);
     }
   } else {
     failed++;
-    console.log(`FAIL ${result.test.id}: status ${result.status ?? "unknown"} after ${result.seconds}s`);
+    console.log(
+      `FAIL ${result.test.id}: status ${result.status ?? "unknown"} after ${formatSeconds(result.seconds)}s`,
+    );
     printCapturedOutput(result);
   }
 }
@@ -157,8 +141,8 @@ if (failed !== 0) {
 }
 
 const slowest = [...results]
-  .sort((left, right) => Number(right.seconds) - Number(left.seconds))
+  .sort((left, right) => right.seconds - left.seconds)
   .slice(0, 3)
-  .map((result) => `${result.test.id}=${result.seconds}s`);
-console.log(`runtime timing: total=${elapsedSeconds(runStart)}s slowest=${slowest.join(", ")}`);
+  .map((result) => `${result.test.id}=${formatSeconds(result.seconds)}s`);
+console.log(`runtime timing: total=${formatSeconds(elapsedSeconds(runStart))}s slowest=${slowest.join(", ")}`);
 console.log(`vir runtime smoke ok: ${selected.length} tests`);
