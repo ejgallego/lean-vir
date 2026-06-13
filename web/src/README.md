@@ -32,8 +32,8 @@ unrelated responsibilities.
   and type formatting helpers.
 - `runtime/wire-tags.js`: shared wire tag constants.
 - `host-resource.js`: opaque host-resource objects and externref root tables.
-- `host/vir-host-resources.js`: host-resource liveness, timers, callbacks, DOM
-  cleanup, and shared host-binding helpers.
+- `host/vir-host-resources.js`: host-resource store, liveness, teardown,
+  timers, callbacks, and shared host-binding helpers.
 - `host/vir-virtual-host-bindings.js`: virtual document, event, element, and
   React host bindings for Node tests/tools.
 - `react/vir-react-html.js`: `Lean.Vir.React.Html` validation, conversion,
