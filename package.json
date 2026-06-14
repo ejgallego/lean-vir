@@ -23,7 +23,7 @@
     "inspect:irpkg": "node scripts/inspect-irpkg.mjs",
     "prepare:irpkg": "node scripts/prepare-irpkg.mjs",
     "quickstart": "npm run prepare:irpkg -- examples/quickstart.virpkg.json && node scripts/quickstart-url.mjs",
-    "prepare:pages": "npm run prepare:irpkg -- examples/quickstart.virpkg.json && npm run prepare:irpkg -- examples/fib.virpkg.json && npm run prepare:irpkg -- examples/mergesort.virpkg.json",
+    "prepare:pages": "npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json examples/mergesort.virpkg.json",
     "generate:provider": "npm run generate:package",
     "check:package": "bash scripts/check-demo-package.sh",
     "check:boundary-registry": "node scripts/check-boundary-registry.mjs",

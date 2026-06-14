@@ -90,6 +90,7 @@ Package generation and inspection:
 ```bash
 npm run generate:irpkg -- examples/Fib.lean web/public/local-fib.irpkg
 npm run prepare:irpkg -- examples/quickstart.virpkg.json
+npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
 npm run inspect:irpkg -- web/public/local-quickstart.irpkg
 npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
 node scripts/run-fixtures.mjs --help
@@ -185,7 +186,7 @@ when comparing CI runs:
 - `npm run build:demo` prints browser package, compile, link, and total probe
   timing.
 - `npm run prepare:irpkg` prints Lean library, generator, package, and total
-  timing.
+  timing; when passed multiple configs, it prepares the generator once.
 - `npm run test:runtime` prints selected groups/filters plus per-test timings
   and the slowest tests.
 - `npm run test:fixtures` prints build, generator, fixture-run, and slowest

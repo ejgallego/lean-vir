@@ -24,6 +24,11 @@ the UI entries automatically. The manifest metadata records the package format,
 Lean toolchain, generation time, source targets, and resolved roots.
 
 `web/public/*.irpkg` files are generated local assets and are ignored by git.
+Pass multiple config files to reuse the same prepared `vir_irpkg` generator:
+
+```bash
+npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
+```
 
 ## Pages Landing
 
@@ -34,7 +39,8 @@ npm run build:site
 ```
 
 That script first builds the upstream WASM demo, then runs `npm run
-prepare:pages` to generate URL-loadable sample packages:
+prepare:pages` to generate URL-loadable sample packages in one generator
+session:
 
 - `local-fib.irpkg`
 - `local-quickstart.irpkg`
