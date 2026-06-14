@@ -19,8 +19,11 @@ export function runSync(cmd, args, {
     stdio: capture ? ["ignore", "pipe", "pipe"] : "inherit",
     ...options,
   });
-  if (result.status !== 0) {
-    throw new Error(`${cmd} ${args.join(" ")} failed with status ${result.status}\n${result.stderr ?? ""}`);
+  if ((result.status ?? 1) !== 0) {
+    const status = result.status ?? 1;
+    const error = new Error(`${cmd} ${args.join(" ")} failed with status ${status}\n${result.stderr ?? ""}`);
+    error.status = status;
+    throw error;
   }
   const stdout = result.stdout ?? "";
   return trimStdout ? stdout.trim() : stdout;

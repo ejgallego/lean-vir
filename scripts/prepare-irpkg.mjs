@@ -5,9 +5,9 @@ Author: Emilio J. Gallego Arias
 */
 
 import { readFile } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
 
 import { irpkgGeneratorFailureMessage, prepareVirIrpkgSync } from "./irpkg-generator.mjs";
+import { runSync } from "./process-utils.mjs";
 import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
 
 const root = new URL("..", import.meta.url).pathname;
@@ -34,18 +34,17 @@ if (!generator.ok) {
 }
 
 const packageStart = timerStart();
-const result = spawnSync(generator.path, [packagePath, reportPath, ...targetArgs], {
-  cwd: root,
-  stdio: "inherit",
-  env: generator.env,
-});
-const packageSeconds = elapsedSeconds(packageStart);
-
-if ((result.status ?? 1) !== 0) {
+try {
+  runSync(generator.path, [packagePath, reportPath, ...targetArgs], {
+    cwd: root,
+    env: generator.env,
+  });
+} catch (error) {
   console.error(`error: package generation failed for ${source}`);
   console.error(`report: ${reportPath}`);
-  process.exit(result.status ?? 1);
+  process.exit(error.status ?? 1);
 }
+const packageSeconds = elapsedSeconds(packageStart);
 
 console.log(`package: ${packagePath}`);
 console.log(`report:  ${reportPath}`);

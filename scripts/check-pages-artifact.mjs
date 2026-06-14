@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { access, readFile, stat } from "node:fs/promises";
+import { readFile, stat } from "node:fs/promises";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -29,7 +29,6 @@ const localPackageFileSet = new Set(localPackageFiles);
 
 async function assertFile(path, minSize = 1) {
   const file = new URL(path, distDir);
-  await access(file);
   const info = await stat(file);
   assert.ok(info.size >= minSize, `${path} should be at least ${minSize} bytes`);
   return readFile(file);

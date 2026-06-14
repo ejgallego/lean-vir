@@ -83,8 +83,11 @@ The split helpers below are the intended extension points for focused changes:
   `scripts/test-vir-runtime.mjs`.
 - Browser smoke behavior is split across `scripts/browser-smoke-*.mjs`;
   `scripts/smoke-pages-browser.mjs` should stay an orchestrator.
-- Child process wrappers live in `scripts/process-utils.mjs`; benchmark sample
-  parsing and formatting live in `scripts/bench-utils.mjs`.
+- Child process wrappers live in `scripts/process-utils.mjs`; filesystem,
+  artifact, and executable lookup helpers live in `scripts/file-utils.mjs`.
+- IR package generator setup lives in `scripts/irpkg-generator.mjs`; reuse it
+  instead of shelling out through `lean --run tools/GeneratePackage.lean`.
+- Benchmark sample parsing and formatting live in `scripts/bench-utils.mjs`.
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
 

@@ -230,6 +230,8 @@ logic into entry-point scripts or pages:
 - Browser smoke cases and page suites: `scripts/browser-smoke-*.mjs`
 - Process and benchmark helpers: `scripts/process-utils.mjs` and
   `scripts/bench-utils.mjs`
+- Artifact, filesystem, and executable lookup helpers: `scripts/file-utils.mjs`
+- IR package generator setup: `scripts/irpkg-generator.mjs`
 - Browser page helpers: `web/src/pages/page-utils.js` and
   `web/src/pages/input-parsers.js`
 - Host resource and virtual binding internals:

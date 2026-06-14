@@ -5,10 +5,10 @@ Author: Emilio J. Gallego Arias
 */
 
 import { mkdir, readFile } from "node:fs/promises";
-import { spawnSync } from "node:child_process";
 
 import { packageSpecs } from "./browser-package-config.mjs";
 import { prepareVirIrpkgSync } from "./irpkg-generator.mjs";
+import { runSync } from "./process-utils.mjs";
 import { elapsedSeconds, formatSeconds, timerStart } from "./timing-utils.mjs";
 
 const root = new URL("..", import.meta.url);
@@ -76,18 +76,13 @@ for (const spec of packageSpecs) {
   const packagePath = packagePathFor(spec);
   const reportPath = spec.report ?? packagePath.replace(/\.irpkg$/, ".report.md");
   const packageStart = timerStart();
-  const result = spawnSync(
-    generator.path,
-    [packagePath, reportPath, ...targetArgsFor(targets, packageTargets)],
-    {
+  try {
+    runSync(generator.path, [packagePath, reportPath, ...targetArgsFor(targets, packageTargets)], {
       cwd: root,
-      stdio: "inherit",
       env: generator.env,
-    },
-  );
-
-  if ((result.status ?? 1) !== 0) {
-    process.exit(result.status ?? 1);
+    });
+  } catch (error) {
+    process.exit(error.status ?? 1);
   }
   packageTimings.push({
     id: spec.id ?? spec.file,
