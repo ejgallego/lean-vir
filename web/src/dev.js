@@ -11,6 +11,7 @@ import {
   isJsonInputTag,
   parseBoolText,
 } from "./pages/interface-inputs.js";
+import { formatInterfaceEffectPrefix } from "./runtime/interface-effects.js";
 import { formatInterfaceType, manifestDiagnostics, validateInterfaceManifest } from "./runtime/interface-manifest.js";
 import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
 import { defaultPackageFile, packagePresets, wasmPublicFile } from "./pages/browser-packages.js";
@@ -192,7 +193,7 @@ function renderManifestEntries(manifest) {
   for (const entry of interfaceEntries) {
     const option = document.createElement("option");
     option.value = entry.id;
-    const effect = entry.effect === "io" ? "IO " : "";
+    const effect = formatInterfaceEffectPrefix(entry.effect);
     const signature = `${entry.args.map((arg) => formatInterfaceType(arg.type)).join(", ") || "()"} -> ${effect}${formatInterfaceType(entry.result)}`;
     option.textContent = `${entry.jsName} / ${signature}`;
     entrySelect.append(option);

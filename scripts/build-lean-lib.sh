@@ -10,6 +10,13 @@ cd "$(dirname "$0")/.."
 
 out="build/lean-lib"
 lean_lib="$(lean --print-prefix)/lib/lean"
+toolchain_id="$(lean --version)"
+toolchain_stamp="$out/.lean-toolchain-version"
+rebuild_all=0
+
+if [ ! -f "$toolchain_stamp" ] || [ "$(cat "$toolchain_stamp")" != "$toolchain_id" ]; then
+  rebuild_all=1
+fi
 
 # Drop stale project-owned module outputs from superseded import layouts.
 stale_namespace_root="Lean"
@@ -31,16 +38,12 @@ for entry in "$lean_lib"/*; do
   if [ "$base" = "Lean" ]; then
     continue
   fi
-  if [ ! -e "$out/$base" ]; then
-    ln -s "$entry" "$out/$base"
-  fi
+  ln -sfn "$entry" "$out/$base"
 done
 
 for entry in "$lean_lib/Lean"/*; do
   base="$(basename "$entry")"
-  if [ ! -e "$out/Lean/$base" ]; then
-    ln -s "$entry" "$out/Lean/$base"
-  fi
+  ln -sfn "$entry" "$out/Lean/$base"
 done
 
 build_module() {
@@ -49,13 +52,15 @@ build_module() {
   local olean="$out/$module.olean"
   local ilean="$out/$module.ilean"
   mkdir -p "$(dirname "$olean")"
-  if [ ! -f "$olean" ] || [ "$source" -nt "$olean" ]; then
+  if [ "$rebuild_all" = 1 ] || [ ! -f "$olean" ] || [ "$source" -nt "$olean" ]; then
     echo "compile $source"
     LEAN_PATH="$out${LEAN_PATH:+:$LEAN_PATH}" lean -o "$olean" -i "$ilean" "$source"
+    rebuild_all=1
   fi
 }
 
 build_module Vir/Host.lean
+build_module Vir/Js.lean
 build_module Vir/Common.lean
 build_module Vir/Browser.lean
 build_module Vir/React.lean
@@ -68,3 +73,5 @@ for stale in "${stale_layouts[@]}"; do
     exit 1
   fi
 done
+
+printf '%s\n' "$toolchain_id" > "$toolchain_stamp"

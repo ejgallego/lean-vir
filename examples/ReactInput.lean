@@ -8,12 +8,13 @@ import Vir.React
 
 namespace ReactInput
 
+open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
 def checkedLabel (checked : Bool) : String :=
   "checked:" ++ toString checked
 
-partial def renderInputInto (root : Root) (value : String) : IO Unit := do
+partial def renderInputInto (root : Lean.Vir.Js Root) (value : String) : DomM Unit := do
   Root.render root <|
     Html.divWith #[Property.id "react-input-widget"] #[] #[
       Html.labelWith #[Property.htmlFor "react-name-input"] #[] #[.text "name:"],
@@ -31,7 +32,7 @@ partial def renderInputInto (root : Root) (value : String) : IO Unit := do
       Html.spanWith #[Property.id "react-name-output"] #[] #[.text value]
     ]
 
-partial def renderChangeInputInto (root : Root) (value : String) : IO Unit := do
+partial def renderChangeInputInto (root : Lean.Vir.Js Root) (value : String) : DomM Unit := do
   Root.render root <|
     Html.formWith
       #[Property.id "react-change-widget"]
@@ -57,7 +58,7 @@ partial def renderChangeInputInto (root : Root) (value : String) : IO Unit := do
         Html.spanWith #[Property.id "react-change-output"] #[] #[.text value]
       ]
 
-partial def renderCheckboxInto (root : Root) (checked : Bool) : IO Unit := do
+partial def renderCheckboxInto (root : Lean.Vir.Js Root) (checked : Bool) : DomM Unit := do
   Root.render root <|
     Html.divWith #[Property.id "react-checkbox-widget"] #[] #[
       Html.input
@@ -76,7 +77,7 @@ partial def renderCheckboxInto (root : Root) (checked : Bool) : IO Unit := do
         #[.text (checkedLabel checked)]
     ]
 
-def renderAttributesInto (root : Root) : IO Unit := do
+def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
   Root.render root <|
     Html.divWith
       #[
@@ -122,16 +123,16 @@ def renderAttributesInto (root : Root) : IO Unit := do
           #[.text "attrs"]
       ]
 
-def mountInput (selector : String) : IO Bool :=
+def mountInput (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => renderInputInto root ""
 
-def mountChangeInput (selector : String) : IO Bool :=
+def mountChangeInput (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => renderChangeInputInto root ""
 
-def mountCheckbox (selector : String) : IO Bool :=
+def mountCheckbox (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => renderCheckboxInto root false
 
-def mountAttributes (selector : String) : IO Bool :=
+def mountAttributes (selector : String) : DomM Bool :=
   Root.mountFromSelector selector renderAttributesInto
 
 end ReactInput

@@ -176,10 +176,18 @@ recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Exce
 shapes over supported types, non-indexed user-defined structures including
 parameterized instances, nullary inductive enums, non-indexed custom inductives
 with nullary or runtime-payload constructors, opaque host resources, and
-`Lean.Expr`. Host imports may additionally receive Lean function values as
+`Lean.Expr`. `Lean.Vir.Js α` is an opaque `Js` resource for JavaScript-owned
+objects; the `α` parameter is not decoded while the value remains in the JS
+object lane. Host imports may additionally receive Lean function values as
 callbacks, including inside the recursive `Lean.Vir.React.Html` custom
-inductive tree. Exported Lean entrypoints and host imports may be pure or
-`IO α`; `IO` failures currently surface as call failures.
+inductive tree. Exported Lean entrypoints and host imports may be pure or use a
+recognized synchronous effect. Raw custom host imports can use `IO α`; DOM and
+React-root imports use `Lean.Vir.Browser.DomM α`; React render-construction
+imports use `Lean.Vir.React.ReactM α`. Effect failures currently surface as
+call failures.
+The JSON manifest records those as `effect: "pure"`, `"io"`, `"dom"`, or
+`"react"` for tooling and documentation. The wasm call payload still lowers
+them to pure versus effectful execution.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
@@ -255,7 +263,7 @@ Lean-side API reference. Import one of the provided modules:
 ```lean
 import Vir.Browser
 
-def titleRoundtrip (title : String) : IO String := do
+def titleRoundtrip (title : String) : Lean.Vir.Browser.DomM String := do
   Lean.Vir.Browser.Document.setTitle title
   Lean.Vir.Browser.Document.getTitle
 ```

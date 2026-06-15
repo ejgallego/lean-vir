@@ -29,7 +29,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const freshRuntime = await factory.createRuntime({ irPackageBytes: await readFile(freshPackage) });
   const freshManifest = freshRuntime.interfaceManifest;
-  assert.equal(freshManifest.metadata.packageFormatVersion, 5);
+  assert.equal(freshManifest.metadata.packageFormatVersion, 6);
   assert.equal(freshManifest.metadata.manifestVersion, 1);
   assert.match(freshManifest.metadata.leanToolchain, /leanprover\/lean4/);
   assert.ok(freshManifest.metadata.generatedAt.length > 0);

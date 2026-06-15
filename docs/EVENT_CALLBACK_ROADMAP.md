@@ -7,8 +7,9 @@ removed; event listeners now use retained Lean closures directly.
 
 ## Current Contract
 
-- Opaque browser resources are represented in Lean by abstract types such as
-  `Element`, `Event`, `EventListener`, `Timeout`, and `AnimationFrame`.
+- Opaque browser resources are represented in Lean as `Lean.Vir.Js` handles
+  over abstract marker classes such as `Element`, `Event`, `EventListener`,
+  `Timeout`, and `AnimationFrame`.
 - Opaque resources cross the JS/Wasm boundary through `externref` side-channel
   imports. Lean stores them as GC-finalized external objects that root
   JavaScript `HostResource` objects in the host runtime.
@@ -33,13 +34,13 @@ registering a Lean callback and returning an opaque cancellation handle.
 
 `Element.addEventListener`:
 
-- Lean passes an `Event -> IO Unit` closure directly.
+- Lean passes a `Lean.Vir.Js Event -> DomM Unit` closure directly.
 - The host creates a DOM listener and calls the retained Lean closure when the
   event fires.
 - The `Event` resource is callback-scoped and is released after dispatch.
 - `Element.removeEventListener` removes the listener and releases its retained
   callback.
-- `Event.target` and `Event.currentTarget` return `some Element` when the
+- `Event.target` and `Event.currentTarget` return `some (Js Element)` when the
   underlying event target is a DOM element, and `none` otherwise.
 - `Event.preventDefault` and `Event.stopPropagation` forward to the underlying
   browser event and are also modeled in the virtual test host.

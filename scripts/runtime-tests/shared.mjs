@@ -119,6 +119,7 @@ const validManifestShape = {
       source: "Ok.lean",
       args: [{ name: "arg1", type: { type: "Nat", wireTag: 0 } }],
       result: { type: "Nat", wireTag: 0 },
+      effect: "pure",
     },
   ],
 };

@@ -67,7 +67,7 @@ The generated report has separate sections for the two common failure modes:
 - `JavaScript Host Imports`: package-scoped Lean-to-JavaScript imports collected
   from `@[vir_js "..."]` declarations. Each row shows the Lean name, JavaScript
   target, trampoline symbol, argument types, result type, and whether the import
-  is `IO`.
+  is effectful.
 
 If the package generator reaches an unsupported IR shape, it reports the
 declaration being encoded and the unsupported package field. That usually means

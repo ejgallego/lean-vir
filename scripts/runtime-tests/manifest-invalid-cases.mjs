@@ -6,6 +6,13 @@ Author: Emilio J. Gallego Arias
 
 export const invalidManifestCases = [
   {
+    name: "unsupported export effect",
+    mutate: (manifest) => {
+      manifest.exports[0].effect = "sideEffect";
+    },
+    pattern: /exports\[0\]\.effect must be one of pure, io, dom, or react/,
+  },
+  {
     name: "unsupported wire tag",
     mutate: (manifest) => {
       manifest.exports[0].result = { type: "UnsupportedTag13", wireTag: 13 };

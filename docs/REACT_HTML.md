@@ -12,7 +12,8 @@ The current v0 exposes React as a runtime renderer behind a narrow recursive
 ```lean
 namespace Lean.Vir.React
 
-@[vir_resource "ReactRoot"]
+@[irreducible] def ReactM (α : Type) : Type := Lean.Vir.Browser.DomM α
+
 opaque Root : Type
 
 inductive PropValue where
@@ -33,7 +34,7 @@ structure Property where
 
 structure EventHandler where
   name : String
-  callback : Lean.Vir.Browser.Event → IO Unit
+  callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit
 
 inductive Html where
   | text (value : String)
@@ -47,17 +48,23 @@ inductive Html where
 namespace Root
 
 @[vir_js "react.root.create"]
-opaque create (container : @& Lean.Vir.Browser.Element) : IO Root
+opaque create (container : @& Lean.Vir.Js Lean.Vir.Browser.Element) :
+  Lean.Vir.Browser.DomM (Lean.Vir.Js Root)
 
-def createFromSelector (selector : String) : IO (Option Root) := ...
+def createFromSelector (selector : String) :
+  Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Root)) := ...
 
-def mountFromSelector (selector : String) (action : Root → IO Unit) : IO Bool := ...
+def mountFromSelector
+    (selector : String)
+    (action : Lean.Vir.Js Root → Lean.Vir.Browser.DomM Unit) :
+    Lean.Vir.Browser.DomM Bool := ...
 
 @[vir_js "react.root.render"]
-opaque render (root : @& Root) (html : @& Html) : IO Unit
+opaque render (root : @& Lean.Vir.Js Root) (html : @& Html) :
+  Lean.Vir.Browser.DomM Unit
 
 @[vir_js "react.root.unmount"]
-opaque unmount (root : @& Root) : IO Unit
+opaque unmount (root : @& Lean.Vir.Js Root) : Lean.Vir.Browser.DomM Unit
 
 end Root
 end Lean.Vir.React
@@ -68,6 +75,11 @@ end Lean.Vir.React
 known `Property`, `PropValue`, and `EventHandler` payload shapes directly; the
 React-specific boundary is the renderer and callback ownership policy, not a
 private recursive wire codec.
+
+`Lean.Vir.Browser.DomM` is the browser/DOM effect used by React root lifetime
+operations and event callbacks. `ReactM` is the narrower render-construction
+effect reserved for React component APIs; it follows the proofwidgets-style
+split between host IO, DOM mutation, and React render construction.
 
 ## Blessed Helpers
 
@@ -131,9 +143,10 @@ does not import React; the Node wrapper still provides a virtual `react.root.*`
 host for tests.
 
 Event handlers use DOM-like names such as `onClick`, `onChange`, `onInput`, and
-`onSubmit`, and receive the same opaque `Lean.Vir.Browser.Event` resource that
-`Element.addEventListener` uses. React synthetic events should not be stored by
-Lean; they are callback-scoped resources.
+`onSubmit`, and receive the same opaque
+`Lean.Vir.Js Lean.Vir.Browser.Event` resource that `Element.addEventListener`
+uses. React synthetic events should not be stored by Lean; they are
+callback-scoped resources.
 
 Input callbacks can read `Event.currentTarget` or `Event.target`, narrow the
 returned element with `HTMLInputElement.fromElement`, or use

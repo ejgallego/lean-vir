@@ -36,6 +36,7 @@ import {
   normalizeStructure,
   normalizeTaggedUnion,
 } from "./vir-value-normalizers.js";
+import { interfaceEffectRuntimeTag } from "./interface-effects.js";
 import { WIRE } from "./wire-tags.js";
 
 export function encodeCallPayload(entry, args, options = {}) {
@@ -45,7 +46,7 @@ export function encodeCallPayload(entry, args, options = {}) {
     encodeValue(writer, arg.type, args[index], `${entry.entry} argument ${arg.name}`, options);
   });
   encodeTypeDescriptor(writer, entry.result, `${entry.entry} result`);
-  writer.u8(entry.effect === "io" ? 1 : 0);
+  writer.u8(interfaceEffectRuntimeTag(entry.effect));
   return writer.take();
 }
 
@@ -60,7 +61,7 @@ export function encodeClosureCallPayload(type, args, options = {}) {
     encodeValue(writer, arg.type, args[index], `callback argument ${arg.name}`, options);
   });
   encodeTypeDescriptor(writer, requireFunctionResult(type, "callback"), "callback result");
-  writer.u8(type.effect === "io" ? 1 : 0);
+  writer.u8(interfaceEffectRuntimeTag(type.effect));
   return writer.take();
 }
 

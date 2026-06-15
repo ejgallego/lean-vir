@@ -102,7 +102,7 @@ assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface
 assert.equal(runtime.packageInfo.hostImports, 0);
 assert.equal(hostRuntime.packageInfo.hostImports, 26);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
-assert.equal(runtime.packageMetadata.packageFormatVersion, 5);
+assert.equal(runtime.packageMetadata.packageFormatVersion, 6);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
 assert.match(runtime.packageMetadata.leanToolchain, /leanprover\/lean4/);
 assert.ok(runtime.packageMetadata.generatedAt.length > 0);

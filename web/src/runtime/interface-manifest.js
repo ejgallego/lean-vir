@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { formatInterfaceEffectPrefix, requireInterfaceEffect } from "./interface-effects.js";
 import { SUPPORTED_WIRE_TAGS, WIRE } from "./wire-tags.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
@@ -50,6 +51,7 @@ export function validateInterfaceManifest(manifest) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
   validateManifestExports(manifest.exports);
+  validateManifestHostImports(manifest.hostImports ?? []);
   return manifest;
 }
 
@@ -66,6 +68,7 @@ function validateManifestExports(exports) {
     requireOptionalString(entry.id, `${label}.id`);
     requireOptionalString(entry.jsName, `${label}.jsName`);
     requireOptionalString(entry.source, `${label}.source`);
+    requireInterfaceEffect(entry.effect, `${label}.effect`);
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== undefined) requireUnique(ids, entry.id, `${label}.id`);
     if (entry.jsName !== undefined) requireUnique(jsNames, entry.jsName, `${label}.jsName`);
@@ -81,6 +84,16 @@ function validateManifestExports(exports) {
       validateInterfaceRootType(arg.type, `${argLabel}.type`);
     });
     validateInterfaceRootType(entry.result, `${label}.result`);
+  });
+}
+
+function validateManifestHostImports(hostImports) {
+  hostImports.forEach((entry, index) => {
+    const label = `embedded interface manifest hostImports[${index}]`;
+    if (!isRecord(entry)) {
+      throw new Error(`${label} must be an object`);
+    }
+    requireInterfaceEffect(entry.effect, `${label}.effect`);
   });
 }
 
@@ -385,9 +398,7 @@ function validateFunctionType(type, label) {
   if (type.kind !== "function") {
     throw new Error(`${label}.kind must be function`);
   }
-  if (type.effect !== "pure" && type.effect !== "io") {
-    throw new Error(`${label}.effect must be pure or io`);
-  }
+  requireInterfaceEffect(type.effect, `${label}.effect`);
   if (!Array.isArray(type.args)) {
     throw new Error(`${label}.args must be an array`);
   }
@@ -463,7 +474,7 @@ export function formatInterfaceType(type) {
     case WIRE.RESOURCE:
       return type.type ?? type.name ?? "Resource";
     case WIRE.FUNCTION:
-      return `(${(type.args ?? []).map((arg) => formatInterfaceType(arg.type)).join(", ")}) -> ${type.effect === "io" ? "IO " : ""}${formatInterfaceType(type.result)}`;
+      return `(${(type.args ?? []).map((arg) => formatInterfaceType(arg.type)).join(", ")}) -> ${formatInterfaceEffectPrefix(type.effect)}${formatInterfaceType(type.result)}`;
     default:
       return type?.type ?? `wireTag ${type?.wireTag ?? "?"}`;
   }

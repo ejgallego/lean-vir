@@ -9,13 +9,62 @@ import Vir.Browser
 namespace Lean.Vir.React
 
 /--
-Opaque React root resource created from a browser container element.
+Effect used by Lean-authored React render construction.
+
+`ReactM` is intentionally narrower than `IO`: React render construction can
+allocate React-side resources exposed by this module, but arbitrary host `IO`
+must stay outside the render surface unless the API exposes a render-safe
+operation for it.
+-/
+@[irreducible] def ReactM (α : Type) : Type :=
+  Lean.Vir.Browser.DomM α
+
+namespace ReactM
+
+/-- Runs a render-construction action in the browser/DOM effect. -/
+def run (action : ReactM α) : Lean.Vir.Browser.DomM α :=
+  by
+    unfold ReactM at action
+    exact action
+
+protected def pure (value : α) : ReactM α :=
+  by
+    unfold ReactM
+    exact pure value
+
+protected def bind (action : ReactM α) (next : α → ReactM β) : ReactM β :=
+  by
+    unfold ReactM
+    exact do
+      let value ← action.run
+      (next value).run
+
+protected def map (f : α → β) (action : ReactM α) : ReactM β :=
+  by
+    unfold ReactM
+    exact f <$> action.run
+
+instance : Monad ReactM where
+  pure := ReactM.pure
+  bind := ReactM.bind
+
+instance : Nonempty (ReactM α) :=
+  by
+    unfold ReactM
+    infer_instance
+
+end ReactM
+
+instance : MonadLift ReactM Lean.Vir.Browser.DomM where
+  monadLift := ReactM.run
+
+/--
+React root object class created from a browser container element.
 
 The JavaScript host owns the underlying React root and any callbacks retained by
 the currently rendered tree until `Root.unmount`, package reload, or runtime
 disposal.
 -/
-@[vir_resource "ReactRoot"]
 opaque Root : Type
 
 /-- A single React `style` object entry. Use camelCase property names. -/
@@ -40,7 +89,7 @@ structure Property where
 /-- A DOM-like React event handler backed by a retained Lean closure. -/
 structure EventHandler where
   name : String
-  callback : Lean.Vir.Browser.Event → IO Unit
+  callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit
 
 /--
 Narrow recursive React HTML tree.
@@ -147,35 +196,35 @@ end Property
 namespace EventHandler
 
 /-- Raw event handler escape hatch. Prefer named `onClick`/`onInput`/`onChange` helpers. -/
-def on (name : String) (callback : Lean.Vir.Browser.Event → IO Unit) : EventHandler :=
+def on (name : String) (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : EventHandler :=
   { name, callback }
 
 /-- Raw event handler escape hatch for handlers that ignore the event. -/
-def onUnit (name : String) (callback : IO Unit) : EventHandler :=
+def onUnit (name : String) (callback : Lean.Vir.Browser.DomM Unit) : EventHandler :=
   on name fun _event => callback
 
-def onClick (callback : IO Unit) : EventHandler :=
+def onClick (callback : Lean.Vir.Browser.DomM Unit) : EventHandler :=
   onUnit "onClick" callback
 
-def onClickWith (callback : Lean.Vir.Browser.Event → IO Unit) : EventHandler :=
+def onClickWith (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : EventHandler :=
   on "onClick" callback
 
-def onInput (callback : Lean.Vir.Browser.Event → IO Unit) : EventHandler :=
+def onInput (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : EventHandler :=
   on "onInput" callback
 
-def onInputUnit (callback : IO Unit) : EventHandler :=
+def onInputUnit (callback : Lean.Vir.Browser.DomM Unit) : EventHandler :=
   onUnit "onInput" callback
 
-def onChange (callback : Lean.Vir.Browser.Event → IO Unit) : EventHandler :=
+def onChange (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : EventHandler :=
   on "onChange" callback
 
-def onChangeUnit (callback : IO Unit) : EventHandler :=
+def onChangeUnit (callback : Lean.Vir.Browser.DomM Unit) : EventHandler :=
   onUnit "onChange" callback
 
-def onSubmit (callback : IO Unit) : EventHandler :=
+def onSubmit (callback : Lean.Vir.Browser.DomM Unit) : EventHandler :=
   onUnit "onSubmit" callback
 
-def onSubmitWith (callback : Lean.Vir.Browser.Event → IO Unit) : EventHandler :=
+def onSubmitWith (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : EventHandler :=
   on "onSubmit" callback
 
 end EventHandler
@@ -312,12 +361,12 @@ Creates a React root for an existing browser element.
 Reference: [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot).
 -/
 @[vir_js "react.root.create"]
-opaque create (container : @& Lean.Vir.Browser.Element) : IO Root
+opaque create (container : @& Lean.Vir.Js Lean.Vir.Browser.Element) : Lean.Vir.Browser.DomM (Lean.Vir.Js Root)
 
 /--
 Creates a React root for the first element matching a CSS selector.
 -/
-def createFromSelector (selector : String) : IO (Option Root) := do
+def createFromSelector (selector : String) : Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Root)) := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure none
   | some container => some <$> create container
@@ -328,7 +377,10 @@ Creates a React root for a selector and runs an action when the selector exists.
 Returns `true` when a root was created and `false` when the selector did not match.
 This is a small convenience for exported browser demos.
 -/
-def mountFromSelector (selector : String) (action : Root → IO Unit) : IO Bool := do
+def mountFromSelector
+    (selector : String)
+    (action : Lean.Vir.Js Root → Lean.Vir.Browser.DomM Unit) :
+    Lean.Vir.Browser.DomM Bool := do
   match ← createFromSelector selector with
   | none => pure false
   | some root =>
@@ -342,7 +394,7 @@ The host retains callbacks embedded in the rendered tree until the root is
 rerendered, unmounted, or the owning runtime is disposed.
 -/
 @[vir_js "react.root.render"]
-opaque render (root : @& Root) (html : @& Html) : IO Unit
+opaque render (root : @& Lean.Vir.Js Root) (html : @& Html) : Lean.Vir.Browser.DomM Unit
 
 /--
 Unmounts a React root and releases callbacks retained by its current render.
@@ -350,7 +402,7 @@ Unmounts a React root and releases callbacks retained by its current render.
 Reference: [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount).
 -/
 @[vir_js "react.root.unmount"]
-opaque unmount (root : @& Root) : IO Unit
+opaque unmount (root : @& Lean.Vir.Js Root) : Lean.Vir.Browser.DomM Unit
 
 end Root
 

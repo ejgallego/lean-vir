@@ -104,7 +104,14 @@ static object * decode_host_result(vir_type const & expected, char const * bytes
 
 static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
     host_signature signature = decode_host_signature(slot);
+    uint32_t erased_prefix_args = vir::host_import_erased_prefix_args(slot);
     if (!signature.ok) {
+        for (uint32_t i = 0; i < argc; i++) {
+            lean_dec(args[i]);
+        }
+        return vir::host_import_is_io(slot) ? lean_io_result_mk_ok(lean_box(0)) : lean_box(0);
+    }
+    if (argc < erased_prefix_args || signature.args.size() > argc - erased_prefix_args) {
         for (uint32_t i = 0; i < argc; i++) {
             lean_dec(args[i]);
         }
@@ -114,7 +121,7 @@ static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
     request.u32(static_cast<uint32_t>(signature.args.size()));
     for (size_t i = 0; i < signature.args.size(); i++) {
         encode_type(request, signature.args[i]);
-        encode_value_payload(request, signature.args[i], args[i]);
+        encode_value_payload(request, signature.args[i], args[erased_prefix_args + i]);
     }
     encode_type(request, signature.result);
     if (!request.ok) {
