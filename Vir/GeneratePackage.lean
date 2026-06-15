@@ -28,11 +28,25 @@ abbrev RecursiveSeen := Array (Name × String)
 inductive InterfaceEffect where
   | pure
   | io
+  | dom
+  | react
   deriving BEq, Repr
 
 def InterfaceEffect.label : InterfaceEffect → String
   | .pure => "pure"
   | .io => "io"
+  | .dom => "dom"
+  | .react => "react"
+
+def InterfaceEffect.isEffectful : InterfaceEffect → Bool
+  | .pure => false
+  | _ => true
+
+def InterfaceEffect.display : InterfaceEffect → String
+  | .pure => ""
+  | .io => "IO"
+  | .dom => "DomM"
+  | .react => "ReactM"
 
 structure Target where
   source : System.FilePath
@@ -122,6 +136,7 @@ structure HostImport where
   target : String
   symbol : String
   arity : Nat
+  erasedPrefixArgs : Nat := 0
   args : Array InterfaceArg
   result : InterfaceType
   effect : InterfaceEffect
@@ -1859,6 +1874,11 @@ def constName? (e : Lean.Expr) : Option Name :=
   | .const n _ => some n
   | _ => none
 
+def headConstName? (e : Lean.Expr) : Option Name :=
+  match (stripMData e).getAppFn with
+  | .const n _ => some n
+  | _ => none
+
 def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   match constName? e with
   | some `Unit => some .unit
@@ -1877,16 +1897,25 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `Lean.Expr => some .expr
   | _ => none
 
-def resourceInterfaceType? (_env : Environment) (e : Lean.Expr) : Option InterfaceType := do
+def jsResourceMarker? (e : Lean.Expr) : Option (Name × String) := do
   let name ← constName? e
   match name with
-  | `Lean.Vir.Browser.Element => some (.resource name "Element")
-  | `Lean.Vir.Browser.Event => some (.resource name "Event")
-  | `Lean.Vir.Browser.EventListener => some (.resource name "EventListener")
-  | `Lean.Vir.Browser.HTMLInputElement => some (.resource name "HTMLInputElement")
-  | `Lean.Vir.Browser.Timeout => some (.resource name "Timeout")
-  | `Lean.Vir.Browser.AnimationFrame => some (.resource name "AnimationFrame")
-  | `Lean.Vir.React.Root => some (.resource name "ReactRoot")
+  | `Lean.Vir.Browser.Element => some (name, "Element")
+  | `Lean.Vir.Browser.Event => some (name, "Event")
+  | `Lean.Vir.Browser.EventListener => some (name, "EventListener")
+  | `Lean.Vir.Browser.HTMLInputElement => some (name, "HTMLInputElement")
+  | `Lean.Vir.Browser.Timeout => some (name, "Timeout")
+  | `Lean.Vir.Browser.AnimationFrame => some (name, "AnimationFrame")
+  | `Lean.Vir.React.Root => some (name, "ReactRoot")
+  | _ => none
+
+def resourceInterfaceType? (_env : Environment) (e : Lean.Expr) : Option InterfaceType :=
+  let (fn, args) := (stripMData e).getAppFnArgs
+  match fn with
+  | `Lean.Vir.Js =>
+      match args[0]? >>= jsResourceMarker? with
+      | some (name, label) => some (.resource name label)
+      | none => some (.resource `Lean.Vir.Js "Js")
   | _ => none
 
 def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType := do
@@ -1987,12 +2016,19 @@ def binderArgName (fallback : Nat) (name : Name) : String :=
   else
     candidate
 
-def ioResultType? (e : Lean.Expr) : Option Lean.Expr :=
+def effectResult? (e : Lean.Expr) : Option (InterfaceEffect × Lean.Expr) :=
   let e := stripMData e
   let (fn, args) := e.getAppFnArgs
   match fn, Array.toList args with
-  | `IO, [result] => some result
+  | `IO, [result] => some (.io, result)
+  | `Lean.Vir.Browser.DomM, [result] => some (.dom, result)
+  | `Lean.Vir.React.ReactM, [result] => some (.react, result)
   | _, _ => none
+
+def isRuntimeErasedTypeBinder (domain : Lean.Expr) : Bool :=
+  match stripMData domain with
+  | .sort _ => true
+  | _ => false
 
 mutual
 
@@ -2000,7 +2036,9 @@ partial def functionType (type : Lean.Expr) (argIndex : Nat := 1) (args : Array 
     CoreM (Except String InterfaceType) := do
   match stripMData type with
   | .forallE name domain body binderInfo =>
-      if binderInfo != .default then
+      if isRuntimeErasedTypeBinder domain then
+        return .error s!"unsupported polymorphic callback type parameter `{name}`"
+      else if binderInfo != .default then
         return .error s!"unsupported implicit/instance callback argument `{name}`"
       else
         match ← interfaceType domain with
@@ -2008,8 +2046,7 @@ partial def functionType (type : Lean.Expr) (argIndex : Nat := 1) (args : Array 
         | .ok argType =>
             functionType body (argIndex + 1) (args.push (binderArgName argIndex name, argType))
   | result =>
-      let effect := if ioResultType? result |>.isSome then .io else .pure
-      let result := (ioResultType? result).getD result
+      let (effect, result) := (effectResult? result).getD (.pure, result)
       match ← interfaceType result with
       | .error reason => return .error s!"unsupported callback result type `{result}`: {reason}"
       | .ok resultType => return .ok (.function args resultType effect)
@@ -2176,7 +2213,7 @@ partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : C
       match simpleInterfaceType? e <|> resourceInterfaceType? env e with
       | some ty => return .ok ty
       | none =>
-          if ioResultType? e |>.isSome then
+          if effectResult? e |>.isSome then
             functionType e
           else
             let (fn, args) := e.getAppFnArgs
@@ -2214,31 +2251,41 @@ partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : C
                 match simpleEnumType? env e with
                 | some ty => return .ok ty
                 | none =>
-                    if (getStructureInfo? env fn).isSome then
+                    if let some (markerName, _) := jsResourceMarker? e then
+                      return .error s!"JavaScript object marker `{markerName}` must appear under `Lean.Vir.Js`; use `Lean.Vir.Js {markerName}` at the boundary"
+                    else if (getStructureInfo? env fn).isSome then
                       structureType seenTypes e
                     else
                       inductiveType seenTypes e
 
 end
 
-partial def interfaceSignature? (type : Lean.Expr) (argIndex : Nat := 1) (args : Array InterfaceArg := #[]) :
-    CoreM (Except String (Array InterfaceArg × InterfaceType × InterfaceEffect)) := do
+partial def interfaceSignature?
+    (type : Lean.Expr)
+    (argIndex : Nat := 1)
+    (args : Array InterfaceArg := #[])
+    (erasedArgCount : Nat := 0) :
+    CoreM (Except String (Array InterfaceArg × InterfaceType × InterfaceEffect × Nat)) := do
   match stripMData type with
   | .forallE name domain body binderInfo =>
-      if binderInfo != .default then
+      if isRuntimeErasedTypeBinder domain then
+        if args.isEmpty then
+          interfaceSignature? body argIndex args (erasedArgCount + 1)
+        else
+          return .error s!"unsupported runtime-erased type parameter `{name}` after runtime arguments"
+      else if binderInfo != .default then
         return .error s!"unsupported implicit/instance argument `{name}`"
       else
         match ← interfaceType domain with
         | .error reason => return .error s!"unsupported argument type `{domain}`: {reason}"
         | .ok argType =>
             let arg := { name := binderArgName argIndex name, type := argType }
-            interfaceSignature? body (argIndex + 1) (args.push arg)
+            interfaceSignature? body (argIndex + 1) (args.push arg) erasedArgCount
   | result =>
-      let effect := if ioResultType? result |>.isSome then .io else .pure
-      let result := (ioResultType? result).getD result
+      let (effect, result) := (effectResult? result).getD (.pure, result)
       match ← interfaceType result with
       | .error reason => return .error s!"unsupported result type `{result}`: {reason}"
-      | .ok resultType => return .ok (args, resultType, effect)
+      | .ok resultType => return .ok (args, resultType, effect, erasedArgCount)
 
 def isInterfaceDeclInfo : ConstantInfo → Bool
   | .defnInfo _ => true
@@ -2312,8 +2359,14 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
           return .error { name, source, reason := "declaration is not a compiled definition" }
         else
           match ← interfaceSignature? info.type with
-          | .ok (args, result, effect) =>
-              if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
+          | .ok (args, result, effect, erasedArgCount) =>
+              if erasedArgCount != 0 then
+                return .error {
+                  name,
+                  source,
+                  reason := "polymorphic exported entrypoints with erased type parameters are not supported; export a concrete wrapper"
+                }
+              else if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
               else
                 let jsName := jsNameFor name
@@ -2349,8 +2402,8 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
   match ← interfaceSignature? info.type with
   | .error reason =>
       return .error { name := loaded.decl.name, source := loaded.source, reason := s!"unsupported JavaScript import signature: {reason}" }
-  | .ok (args, result, effect) =>
-    let expectedArity := args.size + if effect == .io then 1 else 0
+  | .ok (args, result, effect, erasedArgCount) =>
+    let expectedArity := erasedArgCount + args.size + if effect.isEffectful then 1 else 0
     if arity != expectedArity then
       return .error {
         name := loaded.decl.name,
@@ -2364,6 +2417,7 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
       target,
       symbol := hostImportSymbol slot arity,
       arity,
+      erasedPrefixArgs := erasedArgCount,
       args,
       result,
       effect
@@ -2410,7 +2464,7 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
 def collectPackageMetadata (generatedAt : String) (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
   {
     generator := "tools/GeneratePackage.lean"
-    packageFormatVersion := 5
+    packageFormatVersion := 6
     manifestVersion := 1
     leanVersion := Lean.versionString
     leanToolchain := Lean.toolchain
@@ -2477,6 +2531,7 @@ def HostImport.toJson (entry : HostImport) : String :=
   ++ "\"target\":" ++ jsonString entry.target ++ ","
   ++ "\"symbol\":" ++ jsonString entry.symbol ++ ","
   ++ "\"arity\":" ++ toString entry.arity ++ ","
+  ++ "\"erasedPrefixArgs\":" ++ toString entry.erasedPrefixArgs ++ ","
   ++ "\"args\":" ++ jsonArray (entry.args.map InterfaceArg.toJson) ++ ","
   ++ "\"result\":" ++ entry.result.toJson ++ ","
   ++ "\"effect\":" ++ entry.effect.toJson
@@ -2766,7 +2821,7 @@ partial def emitInterfaceType (type : InterfaceType) : EmitM Unit := do
             emitU32 offset
         emitInterfaceType fieldType
   | .function args result effect =>
-      emitBool (effect == .io)
+      emitBool effect.isEffectful
       emitU32 args.size
       args.forM fun (_, argType) => emitInterfaceType argType
       emitInterfaceType result
@@ -2778,7 +2833,8 @@ def emitHostImport (entry : HostImport) : EmitM Unit := do
     emitString entry.target
     emitString entry.symbol
     emitU32 entry.arity
-    emitBool (entry.effect == .io)
+    emitU32 entry.erasedPrefixArgs
+    emitBool entry.effect.isEffectful
     emitU32 entry.args.size
     entry.args.forM (fun arg => emitInterfaceType arg.type)
     emitInterfaceType entry.result
@@ -2790,7 +2846,7 @@ def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
 
 def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit := do
   emitString "lean-vir-ir-package"
-  emitU32 5
+  emitU32 6
   emitU32 (closure.decls.size + closure.externs.size)
   closure.decls.forM emitDeclEntry
   closure.externs.forM emitExternEntry
@@ -2829,13 +2885,16 @@ def reportFor (targets : Array Target) (closure : Closure) (manifest : Interface
   let interfaceExportLines :=
     if manifest.exports.isEmpty then #["None."] else manifest.exports.map fun entry =>
       let args := entry.args.map (fun arg => s!"{arg.name} : {arg.type.label}")
-      let effect := if entry.effect == .io then " IO" else ""
+      let effect := if entry.effect.isEffectful then s!" {entry.effect.display}" else ""
       s!"- `{entry.entry}` as `{entry.jsName}` : ({", ".intercalate args.toList}) ->{effect} {entry.result.label}"
   let hostImportLines :=
     if manifest.hostImports.isEmpty then #["None."] else manifest.hostImports.map fun entry =>
       let args := entry.args.map (fun arg => s!"{arg.name} : {arg.type.label}")
-      let effect := if entry.effect == .io then "IO " else ""
-      s!"- slot {entry.slot}: `{entry.name}` -> `{entry.target}` via `{entry.symbol}` : ({", ".intercalate args.toList}) -> {effect}{entry.result.label}"
+      let effect := if entry.effect.isEffectful then s!"{entry.effect.display} " else ""
+      let erased :=
+        if entry.erasedPrefixArgs == 0 then ""
+        else s!" erasedPrefixArgs={entry.erasedPrefixArgs}"
+      s!"- slot {entry.slot}: `{entry.name}` -> `{entry.target}` via `{entry.symbol}` arity={entry.arity}{erased} : ({", ".intercalate args.toList}) -> {effect}{entry.result.label}"
   let interfaceDiagnosticLines :=
     if manifest.diagnostics.isEmpty then #["None."] else manifest.diagnostics.map fun diagnostic =>
       s!"- `{diagnostic.name}` from `{diagnostic.source}`: {diagnostic.reason}"

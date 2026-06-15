@@ -4,6 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import {
+  interfaceEffectRuntimeTag,
+  requireInterfaceEffect,
+  sameRuntimeInterfaceEffect,
+} from "./interface-effects.js";
 import { WIRE } from "./wire-tags.js";
 
 const textEncoder = new TextEncoder();
@@ -187,7 +192,7 @@ export function encodeTypeDescriptor(writer, type, label) {
       return;
     case WIRE.FUNCTION: {
       const args = requireFunctionArgs(type, label);
-      writer.u8(type.effect === "io" ? 1 : 0);
+      writer.u8(interfaceEffectRuntimeTag(type.effect));
       writer.u32(args.length);
       args.forEach((arg, index) => encodeTypeDescriptor(writer, arg.type, `${label}.args[${index}]`));
       encodeTypeDescriptor(writer, requireFunctionResult(type, label), `${label}.result`);
@@ -449,7 +454,9 @@ export function sameWireType(expected, actual) {
       return true;
     case WIRE.FUNCTION: {
       const args = requireFunctionArgs(expected, "expected result");
-      if (expected.effect !== actual?.effect || !Array.isArray(actual?.args) || args.length !== actual.args.length) {
+      if (!sameRuntimeInterfaceEffect(expected.effect, actual?.effect) ||
+          !Array.isArray(actual?.args) ||
+          args.length !== actual.args.length) {
         return false;
       }
       return args.every((arg, index) => sameWireType(arg.type, actual.args[index]?.type)) &&
@@ -523,9 +530,7 @@ function requireRuntimeCounts(type, label) {
 }
 
 export function requireFunctionArgs(type, label) {
-  if (type?.effect !== "pure" && type?.effect !== "io") {
-    throw new Error(`${label} has invalid manifest function effect`);
-  }
+  requireInterfaceEffect(type?.effect, `${label} effect`);
   if (!Array.isArray(type?.args)) {
     throw new Error(`${label} is missing manifest function args`);
   }

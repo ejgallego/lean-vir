@@ -8,25 +8,27 @@ import Vir.Browser
 
 namespace HostInterop
 
+open Lean.Vir.Browser (DomM)
+
 @[vir_js "test.callNatCallback"]
 opaque callNatCallback (input : Nat) (callback : Nat → Nat) : Nat
 
 @[vir_js "test.recordNat"]
-opaque recordNat (value : Nat) : IO Unit
+opaque recordNat (value : Nat) : DomM Unit
 
-def titleHandshake (label : String) : IO String := do
+def titleHandshake (label : String) : DomM String := do
   let title := "Lean VIR host: " ++ label
   Lean.Vir.Browser.Document.setTitle title
   Lean.Vir.Browser.Document.getTitle
 
-partial def titleHandshakeLoopAux (remaining acc : Nat) : IO Nat := do
+partial def titleHandshakeLoopAux (remaining acc : Nat) : DomM Nat := do
   match remaining with
   | 0 => pure acc
   | n + 1 => do
       let title ← titleHandshake "bench"
       titleHandshakeLoopAux n (acc + title.length)
 
-def titleHandshakeLoop (count : Nat) : IO Nat :=
+def titleHandshakeLoop (count : Nat) : DomM Nat :=
   titleHandshakeLoopAux count 0
 
 def callbackRoundTrip (n : Nat) : Nat :=
@@ -39,7 +41,7 @@ partial def callbackRoundTripLoopAux : Nat → Nat → Nat
 def callbackRoundTripLoop (count : Nat) : Nat :=
   callbackRoundTripLoopAux count 0
 
-def mountCallbackEvent (selector : String) : IO Nat := do
+def mountCallbackEvent (selector : String) : DomM Nat := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
@@ -47,7 +49,7 @@ def mountCallbackEvent (selector : String) : IO Nat := do
       pure 1
   | none => pure 0
 
-def mountAndRemoveCallbackEvent (selector : String) : IO Nat := do
+def mountAndRemoveCallbackEvent (selector : String) : DomM Nat := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | some element =>
       let listener ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
@@ -56,17 +58,17 @@ def mountAndRemoveCallbackEvent (selector : String) : IO Nat := do
       pure 1
   | none => pure 0
 
-partial def mountAndRemoveCallbackEventLoopAux (selector : String) (remaining acc : Nat) : IO Nat := do
+partial def mountAndRemoveCallbackEventLoopAux (selector : String) (remaining acc : Nat) : DomM Nat := do
   match remaining with
   | 0 => pure acc
   | n + 1 => do
       let mounted ← mountAndRemoveCallbackEvent selector
       mountAndRemoveCallbackEventLoopAux selector n (acc + mounted)
 
-def mountAndRemoveCallbackEventLoop (selector : String) (count : Nat) : IO Nat :=
+def mountAndRemoveCallbackEventLoop (selector : String) (count : Nat) : DomM Nat :=
   mountAndRemoveCallbackEventLoopAux selector count 0
 
-def mountCallbackText (selector : String) : IO Nat := do
+def mountCallbackText (selector : String) : DomM Nat := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | some element =>
       let _ ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
@@ -74,7 +76,7 @@ def mountCallbackText (selector : String) : IO Nat := do
       pure 1
   | none => pure 0
 
-def mountAndRemoveCallbackText (selector : String) : IO Nat := do
+def mountAndRemoveCallbackText (selector : String) : DomM Nat := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | some element =>
       let listener ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
@@ -83,74 +85,74 @@ def mountAndRemoveCallbackText (selector : String) : IO Nat := do
       pure 1
   | none => pure 0
 
-def timeoutRecord (value : Nat) : IO Nat := do
+def timeoutRecord (value : Nat) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Timer.setTimeout 0 do
     recordNat (value + 1)
   pure 1
 
-def timeoutTitle (label : String) : IO Nat := do
+def timeoutTitle (label : String) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Timer.setTimeout 0 do
     Lean.Vir.Browser.Document.setTitle ("timeout:" ++ label)
   pure 1
 
-def delayedTimeoutTitle (label : String) : IO Nat := do
+def delayedTimeoutTitle (label : String) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Timer.setTimeout 80 do
     Lean.Vir.Browser.Document.setTitle ("timeout:" ++ label)
   pure 1
 
-def clearTimeoutTitle (label : String) : IO Nat := do
+def clearTimeoutTitle (label : String) : DomM Nat := do
   let timeout ← Lean.Vir.Browser.Timer.setTimeout 20 do
     Lean.Vir.Browser.Document.setTitle ("timeout:" ++ label)
   Lean.Vir.Browser.Timer.clearTimeout timeout
   pure 1
 
-def clearTimeoutRecord (value : Nat) : IO Nat := do
+def clearTimeoutRecord (value : Nat) : DomM Nat := do
   let timeout ← Lean.Vir.Browser.Timer.setTimeout 20 do
     recordNat (value + 10)
   Lean.Vir.Browser.Timer.clearTimeout timeout
   pure 1
 
-def timeoutLoop : Nat → IO Unit
+def timeoutLoop : Nat → DomM Unit
   | 0 => recordNat 0
   | n + 1 => do
       recordNat (n + 1)
       let _ ← Lean.Vir.Browser.Timer.setTimeout 0 (timeoutLoop n)
       pure ()
 
-def startTimeoutLoop (count : Nat) : IO Nat := do
+def startTimeoutLoop (count : Nat) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Timer.setTimeout 0 (timeoutLoop count)
   pure 1
 
-def animationRecord (value : Nat) : IO Nat := do
+def animationRecord (value : Nat) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
     recordNat (value + 2)
   pure 1
 
-def animationTitle (label : String) : IO Nat := do
+def animationTitle (label : String) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
     Lean.Vir.Browser.Document.setTitle ("frame:" ++ label)
   pure 1
 
-def cancelAnimationTitle (label : String) : IO Nat := do
+def cancelAnimationTitle (label : String) : DomM Nat := do
   let frame ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
     Lean.Vir.Browser.Document.setTitle ("frame:" ++ label)
   Lean.Vir.Browser.Animation.cancelAnimationFrame frame
   pure 1
 
-def cancelAnimationRecord (value : Nat) : IO Nat := do
+def cancelAnimationRecord (value : Nat) : DomM Nat := do
   let frame ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
     recordNat (value + 20)
   Lean.Vir.Browser.Animation.cancelAnimationFrame frame
   pure 1
 
-def animationLoop : Nat → Float → IO Unit
+def animationLoop : Nat → Float → DomM Unit
   | 0, _ => recordNat 0
   | n + 1, _ => do
       recordNat (n + 1)
       let _ ← Lean.Vir.Browser.Animation.requestAnimationFrame (animationLoop n)
       pure ()
 
-def startAnimationLoop (count : Nat) : IO Nat := do
+def startAnimationLoop (count : Nat) : DomM Nat := do
   let _ ← Lean.Vir.Browser.Animation.requestAnimationFrame (animationLoop count)
   pure 1
 

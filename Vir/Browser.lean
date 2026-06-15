@@ -5,24 +5,64 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.Common
+import Vir.Js
 
 namespace Lean.Vir.Browser
 
+/-- Browser/DOM effect used by Lean-authored browser code. -/
+@[irreducible] def DomM (α : Type) : Type :=
+  IO α
+
+namespace DomM
+
+/-- Runs a browser/DOM action at an exported `IO` boundary. -/
+def run (action : DomM α) : IO α :=
+  by
+    unfold DomM at action
+    exact action
+
+protected def pure (value : α) : DomM α :=
+  by
+    unfold DomM
+    exact pure value
+
+protected def bind (action : DomM α) (next : α → DomM β) : DomM β :=
+  by
+    unfold DomM
+    exact do
+      let value ← action.run
+      (next value).run
+
+protected def map (f : α → β) (action : DomM α) : DomM β :=
+  by
+    unfold DomM
+    exact f <$> action.run
+
+instance : Monad DomM where
+  pure := DomM.pure
+  bind := DomM.bind
+
+instance : Nonempty (DomM α) :=
+  by
+    unfold DomM
+    exact ⟨throw (IO.userError "unreachable DomM placeholder")⟩
+
+end DomM
+
 /--
-Opaque browser DOM element handle.
+Browser DOM element object class.
 
 Lean code receives element values from `Document.querySelector` and passes them
-to `Element` or more-specific element APIs. The current `wasm32-wasip1`
-runtime represents this as an opaque host resource; Lean programs should not
+to `Element` or more-specific element APIs. The current `wasm32-wasip1` runtime
+represents this as a typed JavaScript object resource; Lean programs should not
 construct or persist assumptions about the resource representation.
 
 Reference: [MDN `Element`](https://developer.mozilla.org/en-US/docs/Web/API/Element).
 -/
-@[vir_resource "Element"]
 opaque Element : Type
 
 /--
-Opaque browser event handle.
+Browser event object class.
 
 The v1 listener API passes event values to exported Lean entrypoints as private
 resources. The event resource is only valid for the duration of that listener
@@ -30,47 +70,42 @@ callback.
 
 Reference: [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event).
 -/
-@[vir_resource "Event"]
 opaque Event : Type
 
 /--
-Opaque browser event listener registration handle.
+Browser event listener registration object class.
 
 `Element.addEventListener` returns listener handles so Lean code can remove the
 registered listener later with `Element.removeEventListener`.
 
 Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
 -/
-@[vir_resource "EventListener"]
 opaque EventListener : Type
 
 /--
-Opaque browser `HTMLInputElement` handle.
+Browser `HTMLInputElement` object class.
 
 Use `HTMLInputElement.fromElement` to narrow an `Element` before reading or
 writing input-specific DOM properties.
 
 Reference: [MDN `HTMLInputElement`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement).
 -/
-@[vir_resource "HTMLInputElement"]
 opaque HTMLInputElement : Type
 
 /--
-Opaque browser timeout handle returned by `setTimeout`.
+Browser timeout object class returned by `setTimeout`.
 
 The JavaScript host owns the timer registration and the retained Lean callback
 until the timer fires, is cleared, or the runtime is disposed.
 -/
-@[vir_resource "Timeout"]
 opaque Timeout : Type
 
 /--
-Opaque browser animation-frame handle returned by `requestAnimationFrame`.
+Browser animation-frame object class returned by `requestAnimationFrame`.
 
 The JavaScript host owns the frame registration and the retained Lean callback
 until the frame fires, is cancelled, or the runtime is disposed.
 -/
-@[vir_resource "AnimationFrame"]
 opaque AnimationFrame : Type
 
 namespace Event
@@ -84,7 +119,7 @@ resource itself remains callback-scoped.
 Reference: [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target).
 -/
 @[vir_js "browser.event.target"]
-opaque target (event : @& Event) : IO (Option Element)
+opaque target (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element))
 
 /--
 Returns the current event target as a DOM element when the current target is an
@@ -96,7 +131,7 @@ resource itself remains callback-scoped.
 Reference: [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget).
 -/
 @[vir_js "browser.event.currentTarget"]
-opaque currentTarget (event : @& Event) : IO (Option Element)
+opaque currentTarget (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element))
 
 /--
 Prevents the default action for this event when the underlying browser event is
@@ -105,7 +140,7 @@ cancelable.
 Reference: [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault).
 -/
 @[vir_js "browser.event.preventDefault"]
-opaque preventDefault (event : @& Event) : IO Unit
+opaque preventDefault (event : @& Lean.Vir.Js Event) : DomM Unit
 
 /--
 Stops propagation of this event to further listeners.
@@ -113,7 +148,7 @@ Stops propagation of this event to further listeners.
 Reference: [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation).
 -/
 @[vir_js "browser.event.stopPropagation"]
-opaque stopPropagation (event : @& Event) : IO Unit
+opaque stopPropagation (event : @& Lean.Vir.Js Event) : DomM Unit
 
 end Event
 
@@ -143,7 +178,7 @@ In a browser this returns `document.title`. In Node tests, use the
 Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title).
 -/
 @[vir_js "browser.document.getTitle"]
-opaque getTitle : IO String
+opaque getTitle : DomM String
 
 /--
 Sets the current document title through the JavaScript host.
@@ -154,7 +189,7 @@ In a browser this writes `document.title`. In Node tests, use the
 Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title).
 -/
 @[vir_js "browser.document.setTitle"]
-opaque setTitle (title : @& String) : IO Unit
+opaque setTitle (title : @& String) : DomM Unit
 
 /--
 Returns the first element matching a CSS selector.
@@ -168,7 +203,7 @@ that need an element fixture should pre-seed it from JavaScript with
 Reference: [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector).
 -/
 @[vir_js "browser.document.querySelector"]
-opaque querySelector (selector : @& String) : IO (Option Element)
+opaque querySelector (selector : @& String) : DomM (Option (Lean.Vir.Js Element))
 
 end Document
 
@@ -184,7 +219,7 @@ wrapper for virtual document state.
 Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
 -/
 @[vir_js "browser.element.getTextContent"]
-opaque getTextContent (element : @& Element) : IO String
+opaque getTextContent (element : @& Lean.Vir.Js Element) : DomM String
 
 /--
 Sets an element's text content through the JavaScript host.
@@ -195,7 +230,7 @@ In a browser this writes `element.textContent`. In Node tests, use the
 Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
 -/
 @[vir_js "browser.element.setTextContent"]
-opaque setTextContent (element : @& Element) (text : @& String) : IO Unit
+opaque setTextContent (element : @& Lean.Vir.Js Element) (text : @& String) : DomM Unit
 
 /--
 Reads an element attribute through the JavaScript host.
@@ -207,7 +242,7 @@ wrapper for virtual document state.
 Reference: [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute).
 -/
 @[vir_js "browser.element.getAttribute"]
-opaque getAttribute (element : @& Element) (name : @& String) : IO (Option String)
+opaque getAttribute (element : @& Lean.Vir.Js Element) (name : @& String) : DomM (Option String)
 
 /--
 Sets an element attribute through the JavaScript host.
@@ -218,7 +253,7 @@ the `lean-vir/vir-runtime-node` wrapper for virtual document state.
 Reference: [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute).
 -/
 @[vir_js "browser.element.setAttribute"]
-opaque setAttribute (element : @& Element) (name value : @& String) : IO Unit
+opaque setAttribute (element : @& Lean.Vir.Js Element) (name value : @& String) : DomM Unit
 
 /--
 Registers a browser event listener backed by a Lean callback closure.
@@ -231,8 +266,10 @@ Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en
 -/
 @[vir_js "browser.element.addEventListener"]
 opaque addEventListener
-    (element : @& Element) (event : @& String) (callback : Event → IO Unit) :
-    IO EventListener
+    (element : @& Lean.Vir.Js Element)
+    (event : @& String)
+    (callback : Lean.Vir.Js Event → DomM Unit) :
+    DomM (Lean.Vir.Js EventListener)
 
 /--
 Removes a listener previously registered by `Element.addEventListener`.
@@ -240,7 +277,7 @@ Removes a listener previously registered by `Element.addEventListener`.
 Reference: [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener).
 -/
 @[vir_js "browser.element.removeEventListener"]
-opaque removeEventListener (listener : @& EventListener) : IO Unit
+opaque removeEventListener (listener : @& Lean.Vir.Js EventListener) : DomM Unit
 
 end Element
 
@@ -256,7 +293,7 @@ for virtual document state.
 Reference: [MDN `HTMLInputElement`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement).
 -/
 @[vir_js "browser.htmlInputElement.fromElement"]
-opaque fromElement (element : @& Element) : IO (Option HTMLInputElement)
+opaque fromElement (element : @& Lean.Vir.Js Element) : DomM (Option (Lean.Vir.Js HTMLInputElement))
 
 /--
 Reads the `checked` property of a checkbox or radio input.
@@ -267,7 +304,7 @@ In a browser this reads `input.checked`. In Node tests, use the
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
 @[vir_js "browser.htmlInputElement.getChecked"]
-opaque getChecked (input : @& HTMLInputElement) : IO Bool
+opaque getChecked (input : @& Lean.Vir.Js HTMLInputElement) : DomM Bool
 
 /--
 Sets the `checked` property of a checkbox or radio input.
@@ -278,7 +315,7 @@ In a browser this writes `input.checked`. In Node tests, use the
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
 @[vir_js "browser.htmlInputElement.setChecked"]
-opaque setChecked (input : @& HTMLInputElement) (checked : Bool) : IO Unit
+opaque setChecked (input : @& Lean.Vir.Js HTMLInputElement) (checked : Bool) : DomM Unit
 
 /--
 Reads the `value` property of an input element.
@@ -289,7 +326,7 @@ In a browser this reads `input.value`. In Node tests, use the
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/
 @[vir_js "browser.htmlInputElement.getValue"]
-opaque getValue (input : @& HTMLInputElement) : IO String
+opaque getValue (input : @& Lean.Vir.Js HTMLInputElement) : DomM String
 
 /--
 Sets the `value` property of an input element.
@@ -300,7 +337,7 @@ In a browser this writes `input.value`. In Node tests, use the
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/
 @[vir_js "browser.htmlInputElement.setValue"]
-opaque setValue (input : @& HTMLInputElement) (value : @& String) : IO Unit
+opaque setValue (input : @& Lean.Vir.Js HTMLInputElement) (value : @& String) : DomM Unit
 
 end HTMLInputElement
 
@@ -312,7 +349,7 @@ Returns the current input element for an input-like event.
 This checks `currentTarget` first, then falls back to `target`, and narrows the
 element with `HTMLInputElement.fromElement`.
 -/
-def inputElement? (event : @& Event) : IO (Option HTMLInputElement) := do
+def inputElement? (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js HTMLInputElement)) := do
   match ← currentTarget event with
   | some element => HTMLInputElement.fromElement element
   | none =>
@@ -326,7 +363,7 @@ Returns the current input value for an input-like event.
 This is the usual helper for controlled input handlers. It checks
 `currentTarget` before `target`.
 -/
-def inputValue? (event : @& Event) : IO (Option String) := do
+def inputValue? (event : @& Lean.Vir.Js Event) : DomM (Option String) := do
   match ← inputElement? event with
   | none => pure none
   | some input => some <$> HTMLInputElement.getValue input
@@ -337,7 +374,7 @@ Returns the current checked state for an input-like event.
 This is the usual helper for controlled checkbox/radio handlers. It checks
 `currentTarget` before `target`.
 -/
-def inputChecked? (event : @& Event) : IO (Option Bool) := do
+def inputChecked? (event : @& Lean.Vir.Js Event) : DomM (Option Bool) := do
   match ← inputElement? event with
   | none => pure none
   | some input => some <$> HTMLInputElement.getChecked input
@@ -355,7 +392,7 @@ cleared.
 Reference: [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout).
 -/
 @[vir_js "browser.timer.setTimeout"]
-opaque setTimeout (delayMs : UInt32) (callback : IO Unit) : IO Timeout
+opaque setTimeout (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Timeout)
 
 /--
 Cancels a pending timeout and releases its retained callback.
@@ -363,7 +400,7 @@ Cancels a pending timeout and releases its retained callback.
 Reference: [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout).
 -/
 @[vir_js "browser.timer.clearTimeout"]
-opaque clearTimeout (timeout : @& Timeout) : IO Unit
+opaque clearTimeout (timeout : @& Lean.Vir.Js Timeout) : DomM Unit
 
 end Timer
 
@@ -378,7 +415,7 @@ retained callback after it fires or when the frame is cancelled.
 Reference: [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame).
 -/
 @[vir_js "browser.animation.requestAnimationFrame"]
-opaque requestAnimationFrame (callback : Float → IO Unit) : IO AnimationFrame
+opaque requestAnimationFrame (callback : Float → DomM Unit) : DomM (Lean.Vir.Js AnimationFrame)
 
 /--
 Cancels a pending animation frame and releases its retained callback.
@@ -386,7 +423,7 @@ Cancels a pending animation frame and releases its retained callback.
 Reference: [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame).
 -/
 @[vir_js "browser.animation.cancelAnimationFrame"]
-opaque cancelAnimationFrame (frame : @& AnimationFrame) : IO Unit
+opaque cancelAnimationFrame (frame : @& Lean.Vir.Js AnimationFrame) : DomM Unit
 
 end Animation
 

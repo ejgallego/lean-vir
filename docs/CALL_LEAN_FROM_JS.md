@@ -12,9 +12,11 @@ The flow is:
 
 ## 1. Write The Lean Function
 
-Start with an ordinary Lean file. Exported declarations can be pure functions or
-`IO` actions, as long as their argument and result types are part of the current
-browser interface surface.
+Start with an ordinary Lean file. Exported declarations can be pure functions
+or recognized synchronous effects, as long as their argument and result types
+are part of the current browser interface surface. Use raw `IO` for ordinary
+host IO boundaries, `Lean.Vir.Browser.DomM` for DOM code, and
+`Lean.Vir.React.ReactM` for React render-construction code.
 
 ```lean
 namespace MyApp

@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { formatInterfaceEffectSuffix } from "../web/src/runtime/interface-effects.js";
 import { formatInterfaceType, manifestDiagnostics } from "../web/src/runtime/interface-manifest.js";
 import { WIRE } from "../web/src/runtime/wire-tags.js";
 import { readIrPackageFile } from "./irpkg-format.mjs";
@@ -70,7 +71,7 @@ function printText(info) {
     const args = (entry.args ?? [])
       .map((arg) => `${arg.name ?? "arg"}: ${formatInterfaceType(arg.type)}`)
       .join(", ");
-    const effect = entry.effect === "io" ? " IO" : "";
+    const effect = formatInterfaceEffectSuffix(entry.effect);
     console.log(`  - ${entry.jsName ?? entry.entry}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.entry}]`);
     printDescriptorDetails(entry.args ?? [], entry.result);
   }
@@ -80,8 +81,9 @@ function printText(info) {
     const args = (entry.args ?? [])
       .map((arg) => `${arg.name ?? "arg"}: ${formatInterfaceType(arg.type)}`)
       .join(", ");
-    const effect = entry.effect === "io" ? " IO" : "";
-    console.log(`  - #${entry.slot} ${entry.name}(${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.target}]`);
+    const effect = formatInterfaceEffectSuffix(entry.effect);
+    const erased = entry.erasedPrefixArgs ? ` erasedPrefixArgs=${entry.erasedPrefixArgs}` : "";
+    console.log(`  - #${entry.slot} ${entry.name} arity=${entry.arity ?? "?"}${erased} (${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.target}]`);
     printDescriptorDetails(entry.args ?? [], entry.result);
   }
   console.log(`diagnostics: ${diagnostics.length}`);

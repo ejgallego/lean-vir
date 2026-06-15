@@ -39,7 +39,7 @@ The experimental `externref` path should be strict:
 
 - feature-detect support at runtime and fail fast on unsupported engines;
 - do not design a long-term numeric-resource fallback for the prototype;
-- preserve the Lean-facing `@[vir_resource]` API;
+- keep the Lean-facing resource API centered on `Lean.Vir.Js α` object values;
 - keep explicit Lean closure root/release semantics.
 
 The prototype uses direct side channels for opaque values while keeping the
@@ -111,8 +111,8 @@ React authoring ergonomics can improve independently of Wasm extensions:
   props and events;
 - document app patterns for controlled inputs, form submission, state updates,
   and component-like helper functions over `Html`;
-- keep `Html`, `Property`, `PropValue`, `EventHandler`, and `Root` as the
-  stable Lean-facing shape while the lower boundary evolves;
+- keep `Html`, `Property`, `PropValue`, `EventHandler`, and `Root` object
+  markers as the stable Lean-facing shape while the lower boundary evolves;
 - continue testing rapid rerender, unmount, package reload, and runtime dispose
   cleanup for retained callbacks.
 

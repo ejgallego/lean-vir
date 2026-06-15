@@ -33,7 +33,7 @@ bindings for tests. The JavaScript-side binding composition reference lives in
 2. Write an exported Lean declaration that calls the host import.
 
    ```lean
-   def titleHandshake (label : String) : IO String := do
+   def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
      let title := "Lean VIR host: " ++ label
      Lean.Vir.Browser.Document.setTitle title
      Lean.Vir.Browser.Document.getTitle
@@ -74,13 +74,13 @@ until the listener is removed or the runtime is disposed.
 ```lean
 import Vir.Browser
 
-def mountButtonCallback : IO Unit := do
+def mountButtonCallback : Lean.Vir.Browser.DomM Unit := do
   match ← Lean.Vir.Browser.Document.querySelector "#run" with
   | none => pure ()
   | some button =>
       let _listener ← Lean.Vir.Browser.Element.addEventListener
         button "click" fun _event => do
-          Lean.Vir.Browser.Console.log "clicked run"
+          Lean.Vir.Browser.Element.setTextContent button "clicked run"
       pure ()
 ```
 
@@ -153,8 +153,7 @@ LEAN_PATH="build/lean-lib${LEAN_PATH:+:$LEAN_PATH}" lean MyDemo.lean
 
 ## Modules
 
-`Vir.Host` provides the low-level `@[vir_js "..."]` host-import attribute
-and the `@[vir_resource "..."]` marker for opaque Lean resource types.
+`Vir.Host` provides the low-level `@[vir_js "..."]` host-import attribute.
 
 ```lean
 import Vir.Host
@@ -163,60 +162,78 @@ import Vir.Host
 opaque jsBumpNat (n : Nat) : Nat
 ```
 
+`Vir.Js` provides `Lean.Vir.Js α`, an opaque resource handle for
+JavaScript-owned objects. The `α` parameter is a Lean-side phantom marker: while
+the value remains inside `Js`, the VIR codec transports it as one host resource
+and does not decode the underlying `α`. This is the intended lane for
+polymorphic JavaScript object APIs that move objects around without inspecting
+their Lean representation.
+
+Top-level erased type parameters are allowed before runtime arguments in
+host-import signatures. The package records how many leading erased parameters
+the low-level trampoline must skip, while JavaScript receives only the
+manifest-described runtime arguments. Polymorphic callback values are still not
+supported; callbacks must have a concrete runtime signature. Exported Lean
+entrypoints with erased type parameters are also unsupported for now; export a
+concrete wrapper instead.
+
 `Vir.Common` provides small host imports that are useful in browser and
 Node-like environments:
 
 - `Lean.Vir.Common.echoString : @& String -> String`
 - `Lean.Vir.Common.addNat : Nat -> Nat -> Nat`
 
-`Vir.Browser` provides the first browser-specific imports:
+`Vir.Browser` provides the first browser-specific imports. DOM object names
+such as `Lean.Vir.Browser.Element` and `Lean.Vir.Browser.Event` are object-class
+markers; values at the boundary are `Lean.Vir.Js ...` handles. DOM-mutating or
+DOM-reading APIs use `Lean.Vir.Browser.DomM`; it is the Lean-facing browser
+effect and is recognized by the package generator as a synchronous host effect.
+Use `DomM.run` only at an explicit exported `IO` boundary.
 
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
-- `Lean.Vir.Browser.Element`
-- `Lean.Vir.Browser.Event`
-- `Lean.Vir.Browser.EventListener`
-- `Lean.Vir.Browser.HTMLInputElement`
-- `Lean.Vir.Browser.Timeout`
-- `Lean.Vir.Browser.AnimationFrame`
-- `Lean.Vir.Browser.Document.getTitle : IO String`
-- `Lean.Vir.Browser.Document.setTitle : @& String -> IO Unit`
-- `Lean.Vir.Browser.Document.querySelector : @& String -> IO (Option Lean.Vir.Browser.Element)`
-- `Lean.Vir.Browser.Event.target : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.Element)`
-- `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.Element)`
-- `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Browser.Event -> IO Unit`
-- `Lean.Vir.Browser.Event.stopPropagation : @& Lean.Vir.Browser.Event -> IO Unit`
-- `Lean.Vir.Browser.Event.inputElement? : @& Lean.Vir.Browser.Event -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
-- `Lean.Vir.Browser.Event.inputValue? : @& Lean.Vir.Browser.Event -> IO (Option String)`
-- `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Browser.Event -> IO (Option Bool)`
-- `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Browser.Element -> IO String`
-- `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Browser.Element -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Browser.Element -> @& String -> IO (Option String)`
-- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Browser.Element -> @& String -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Browser.Event -> IO Unit) -> IO Lean.Vir.Browser.EventListener`
-- `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Browser.EventListener -> IO Unit`
-- `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Browser.Element -> IO (Option Lean.Vir.Browser.HTMLInputElement)`
-- `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Browser.HTMLInputElement -> IO Bool`
-- `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Browser.HTMLInputElement -> Bool -> IO Unit`
-- `Lean.Vir.Browser.HTMLInputElement.getValue : @& Lean.Vir.Browser.HTMLInputElement -> IO String`
-- `Lean.Vir.Browser.HTMLInputElement.setValue : @& Lean.Vir.Browser.HTMLInputElement -> @& String -> IO Unit`
-- `Lean.Vir.Browser.Timer.setTimeout : UInt32 -> IO Unit -> IO Lean.Vir.Browser.Timeout`
-- `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Browser.Timeout -> IO Unit`
-- `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> IO Unit) -> IO Lean.Vir.Browser.AnimationFrame`
-- `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Browser.AnimationFrame -> IO Unit`
+- object markers: `Element`, `Event`, `EventListener`, `HTMLInputElement`,
+  `Timeout`, and `AnimationFrame`
+- `Lean.Vir.Browser.Document.getTitle : Lean.Vir.Browser.DomM String`
+- `Lean.Vir.Browser.Document.setTitle : @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Document.querySelector : @& String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
+- `Lean.Vir.Browser.Event.target : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
+- `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
+- `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Event.stopPropagation : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Event.inputElement? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`
+- `Lean.Vir.Browser.Event.inputValue? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option String)`
+- `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option Bool)`
+- `Lean.Vir.Browser.Element.getTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM String`
+- `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM (Option String)`
+- `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.EventListener)`
+- `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Js Lean.Vir.Browser.EventListener -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`
+- `Lean.Vir.Browser.HTMLInputElement.getChecked : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Lean.Vir.Browser.DomM Bool`
+- `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Bool -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.HTMLInputElement.getValue : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Lean.Vir.Browser.DomM String`
+- `Lean.Vir.Browser.HTMLInputElement.setValue : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Timer.setTimeout : UInt32 -> Lean.Vir.Browser.DomM Unit -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Timeout)`
+- `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Js Lean.Vir.Browser.Timeout -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame)`
+- `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Js Lean.Vir.Browser.AnimationFrame -> Lean.Vir.Browser.DomM Unit`
 
-`Vir.React` provides the first React-specific imports and a narrow
-recursive `Html` tree:
+`Vir.React` provides the first React-specific imports and a narrow recursive
+`Html` tree. React root lifetime operations and event callbacks use
+`Lean.Vir.Browser.DomM`; `Lean.Vir.React.ReactM` is the narrower
+render-construction effect for future React component APIs.
 
-- `Lean.Vir.React.Root`
+- object marker: `Lean.Vir.React.Root`
 - `Lean.Vir.React.Html`
 - `Lean.Vir.React.Property`
 - `Lean.Vir.React.PropValue`
 - `Lean.Vir.React.EventHandler`
-- `Lean.Vir.React.Root.create : @& Lean.Vir.Browser.Element -> IO Lean.Vir.React.Root`
-- `Lean.Vir.React.Root.createFromSelector : String -> IO (Option Lean.Vir.React.Root)`
-- `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.React.Root -> IO Unit) -> IO Bool`
-- `Lean.Vir.React.Root.render : @& Lean.Vir.React.Root -> @& Lean.Vir.React.Html -> IO Unit`
-- `Lean.Vir.React.Root.unmount : @& Lean.Vir.React.Root -> IO Unit`
+- `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
+- `Lean.Vir.React.Root.createFromSelector : String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.React.Root))`
+- `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
+- `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> @& Lean.Vir.React.Html -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 
 `Html` uses the generic non-indexed custom-inductive and `recursiveSelf`
 interface descriptors. Rendering retains any Lean event callbacks embedded in
@@ -255,7 +272,7 @@ import Vir.Browser
 
 namespace HostInterop
 
-def titleHandshake (label : String) : IO String := do
+def titleHandshake (label : String) : Lean.Vir.Browser.DomM String := do
   let title := "Lean VIR host: " ++ label
   Lean.Vir.Browser.Document.setTitle title
   Lean.Vir.Browser.Document.getTitle
@@ -321,14 +338,20 @@ entrypoints:
 - non-indexed user-defined structures and custom inductives with nullary or
   runtime-payload constructors
 - nullary inductive enums
-- opaque `Lean.Vir.Browser` and `Lean.Vir.React` resource values
+- opaque `Lean.Vir.Js α` resources for JavaScript-owned objects, including
+  browser and React object markers
 - Lean function values used as host callbacks
 - `Lean.Expr`
 - `Lean.Vir.React.Html` through the generic recursive custom-inductive surface
 
-Imports may be pure functions or `IO α` actions. The v1 host boundary is
-synchronous; returning a JavaScript `Promise` is an error. The current package
-format supports up to 32 host imports with IR arity at most 6.
+Imports may be pure functions or synchronous effect actions. Raw custom host
+imports can use `IO α`; DOM and React-root APIs use `Lean.Vir.Browser.DomM α`,
+and render construction APIs use `ReactM α`. The v1 host boundary is synchronous;
+returning a JavaScript `Promise` is an error. The current package format
+supports up to 32 host imports with IR arity at most 6. Host-import metadata
+records both the low-level IR arity and the number of leading erased type
+parameters skipped before JavaScript-visible arguments.
+The JSON manifest records effect labels as `pure`, `io`, `dom`, or `react`.
 
 ## Runtime Behavior
 

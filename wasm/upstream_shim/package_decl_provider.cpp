@@ -51,6 +51,7 @@ struct host_import_entry {
     std::string target;
     std::string symbol;
     uint32_t arity;
+    uint32_t erased_prefix_args;
     bool is_io;
     std::string signature;
 };
@@ -703,6 +704,7 @@ public:
         std::string target = string();
         std::string symbol = string();
         uint32_t arity = u32();
+        uint32_t erased_prefix_args = m_version >= 6 ? u32() : 0;
         bool is_io = boolean();
         size_t signature_start = pos();
         uint32_t argc = u32();
@@ -711,7 +713,7 @@ public:
         }
         interface_type();
         size_t signature_end = pos();
-        return { n, target, symbol, arity, is_io, bytes_from(signature_start, signature_end) };
+        return { n, target, symbol, arity, erased_prefix_args, is_io, bytes_from(signature_start, signature_end) };
     }
 
 private:
@@ -772,7 +774,7 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "invalid IR package magic `" + magic + "`";
         return false;
     }
-    if (version != 1 && version != 2 && version != 3 && version != 4 && version != 5) {
+    if (version != 1 && version != 2 && version != 3 && version != 4 && version != 5 && version != 6) {
         g_last_error = "unsupported IR package version " + std::to_string(version);
         return false;
     }
@@ -969,6 +971,13 @@ uint32_t host_import_arity(uint32_t slot) {
         return 0;
     }
     return g_host_imports[slot].arity;
+}
+
+uint32_t host_import_erased_prefix_args(uint32_t slot) {
+    if (slot >= g_host_imports.size()) {
+        return 0;
+    }
+    return g_host_imports[slot].erased_prefix_args;
 }
 
 char const * host_import_signature(uint32_t slot) {

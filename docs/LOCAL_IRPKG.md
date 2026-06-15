@@ -137,6 +137,8 @@ Supported v1 types:
 - non-indexed custom inductives with nullary or runtime-payload constructors,
   including direct recursive references through supported container shapes;
 - opaque host resources;
+- `Lean.Vir.Js α`, an opaque `Js` resource for JavaScript-owned objects whose
+  `α` parameter is a Lean-side phantom shape;
 - Lean function values used as host callbacks;
 - `Lean.Expr`;
 - `Lean.Vir.React.Html` through the generic recursive custom-inductive surface.
@@ -147,9 +149,15 @@ generated Lean `_boxed` declarations automatically. If a requested export needs
 one and the compiler did not produce it, package generation fails with an
 explicit wasm32 boundary diagnostic.
 
-Pure functions and `IO α` actions are supported on both exported entrypoints and
-host imports. Host imports are currently synchronous, with at most 32 imported
-declarations and IR arity at most 6.
+Pure functions and recognized synchronous effects are supported on both
+exported entrypoints and host imports. Raw custom host imports can use `IO α`;
+browser APIs use `Lean.Vir.Browser.DomM α`; React render-construction APIs use
+`Lean.Vir.React.ReactM α`. Host imports are currently synchronous, with at most
+32 imported declarations and IR arity at most 6. Leading erased type parameters
+on host imports are recorded in package format 6 and skipped before
+JavaScript-visible arguments.
+The embedded JSON manifest preserves the effect labels as `pure`, `io`, `dom`,
+or `react`; the binary call path currently consumes only pure versus effectful.
 
 `/dev.html` generates enum select controls and JSON textareas for structural
 `Lean.Expr`, user-defined structures, and manifest-supported compound values
@@ -163,7 +171,7 @@ single-field structures.
 
 This is still the single-file declaration package path. It does not load
 `.olean`, `.ir`, or full Lean module data. The package generator elaborates the
-source with Lean 4.30-rc2, extracts typed `Lean.IR.Decl` values, and writes the
+source with Lean 4.30.0, extracts typed `Lean.IR.Decl` values, and writes the
 current package format. The WASM side decodes that package into real Lean IR
 objects and serves them through `lean_ir_find_env_decl`. Loading a new package
 replaces the previous provider state; a failed load clears it so stale

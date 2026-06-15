@@ -94,7 +94,7 @@ async function assertSdkBundle(path) {
   }
   const { stdout: manifestText } = await execFileAsync("tar", ["-xOzf", archivePath, "lean-vir-sdk/lean-vir-artifact.json"]);
   const manifest = JSON.parse(manifestText);
-  assert.equal(manifest.packageFormatVersion, 5);
+  assert.equal(manifest.packageFormatVersion, 6);
   assert.equal(manifest.manifestVersion, 1);
   assert.equal(manifest.runtimeAbiVersion, 1);
   assert.ok(Array.isArray(manifest.files));

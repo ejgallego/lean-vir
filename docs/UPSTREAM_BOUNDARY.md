@@ -23,7 +23,7 @@ call slots.
 ## Policy
 
 - Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified.
-- Compile the exact upstream file against the pinned Lean `v4.30.0-rc2`
+- Compile the exact upstream file against the pinned Lean `v4.30.0`
   headers.
 - Link real Lean runtime source files into the WASI probe before adding local
   stubs.
@@ -324,8 +324,8 @@ Useful WebAssembly features to track before widening the ABI:
   root and release Lean heap closures explicitly.
 - The Component Model is still proposal-track and is the right semantic target
   for typed resources once this project moves beyond an internal `.irpkg`
-  manifest. The current `@[vir_resource]` metadata is intentionally compatible
-  with that direction without committing to WIT today.
+  manifest. The current `Lean.Vir.Js α` marker model is intentionally
+  compatible with that direction without committing to WIT today.
 - JS Promise Integration and Stack Switching are the relevant future mechanisms
   for Promise-shaped or coroutine-shaped host calls. The current API avoids that
   problem by keeping host imports synchronous and modeling browser async APIs as

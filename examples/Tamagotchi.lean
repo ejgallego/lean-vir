@@ -9,6 +9,8 @@ import Vir.React
 
 namespace Tamagotchi
 
+open Lean.Vir.Browser (DomM)
+
 inductive Mood where
   | happy
   | hungry
@@ -185,25 +187,26 @@ def statusLabel (state : PetState) (actionLabel : String) : String :=
 def natFromAttr (attr : Option String) (fallback : Nat) : Nat :=
   attr.bind String.toNat? |>.getD fallback
 
-def withElement (selector : String) (f : Lean.Vir.Browser.Element → IO Unit) : IO Unit := do
+def withElement
+    (selector : String) (f : Lean.Vir.Js Lean.Vir.Browser.Element → DomM Unit) : DomM Unit := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure ()
   | some element => f element
 
-def setText (selector text : String) : IO Unit :=
+def setText (selector text : String) : DomM Unit :=
   withElement selector fun element =>
     Lean.Vir.Browser.Element.setTextContent element text
 
-def getAttribute (selector name : String) : IO (Option String) := do
+def getAttribute (selector name : String) : DomM (Option String) := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure none
   | some element => Lean.Vir.Browser.Element.getAttribute element name
 
-def setAttribute (selector name value : String) : IO Unit :=
+def setAttribute (selector name value : String) : DomM Unit :=
   withElement selector fun element =>
     Lean.Vir.Browser.Element.setAttribute element name value
 
-def getChecked (selector : String) : IO Bool := do
+def getChecked (selector : String) : DomM Bool := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure false
   | some element =>
@@ -211,7 +214,7 @@ def getChecked (selector : String) : IO Bool := do
       | none => pure false
       | some input => Lean.Vir.Browser.HTMLInputElement.getChecked input
 
-def setChecked (selector : String) (checked : Bool) : IO Unit := do
+def setChecked (selector : String) (checked : Bool) : DomM Unit := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure ()
   | some element =>
@@ -219,7 +222,7 @@ def setChecked (selector : String) (checked : Bool) : IO Unit := do
       | none => pure ()
       | some input => Lean.Vir.Browser.HTMLInputElement.setChecked input checked
 
-def getValue (selector : String) : IO String := do
+def getValue (selector : String) : DomM String := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure ""
   | some element =>
@@ -227,7 +230,7 @@ def getValue (selector : String) : IO String := do
       | none => pure ""
       | some input => Lean.Vir.Browser.HTMLInputElement.getValue input
 
-def setValue (selector value : String) : IO Unit := do
+def setValue (selector value : String) : DomM Unit := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure ()
   | some element =>
@@ -235,7 +238,7 @@ def setValue (selector value : String) : IO Unit := do
       | none => pure ()
       | some input => Lean.Vir.Browser.HTMLInputElement.setValue input value
 
-def render (state : PetState) (actionLabel : String) : IO Unit := do
+def render (state : PetState) (actionLabel : String) : DomM Unit := do
   let artwork := normalizeArtwork state.artwork
   let state := {
     state with
@@ -263,7 +266,7 @@ def render (state : PetState) (actionLabel : String) : IO Unit := do
   setText "#status" "Ready"
   setAttribute "#status" "data-ready" "true"
 
-def stateFromDom : IO PetState := do
+def stateFromDom : DomM PetState := do
   let currentAttr ← getAttribute "#pet-device" "data-mood"
   let traceAttrValue ← getAttribute "#pet-device" "data-trace"
   let turnsAttr ← getAttribute "#pet-device" "data-turns"
@@ -283,12 +286,12 @@ def stateFromDom : IO PetState := do
     care := clampCare (natFromAttr careAttr initialCare)
   }
 
-def uiReset (name artwork : String) : IO PetState := do
+def uiReset (name artwork : String) : DomM PetState := do
   let state := initialState name artwork
   render state "..."
   pure state
 
-def uiResetFromDom : IO PetState := do
+def uiResetFromDom : DomM PetState := do
   let name ← getValue "#pet-name-input"
   let checked ← getChecked "#pet-art-toggle"
   let artwork := artworkFromChecked checked
@@ -308,35 +311,36 @@ def uiResetFromDom : IO PetState := do
     care := careAfter state.care mood action
   }
 
-def uiStep (state : PetState) (action : Action) : IO PetState := do
+def uiStep (state : PetState) (action : Action) : DomM PetState := do
   let next := nextState state action
   render next action.label
   pure next
 
-def uiStepFromDom (action : Action) : IO PetState := do
+def uiStepFromDom (action : Action) : DomM PetState := do
   let current ← stateFromDom
   let next := nextState current action
   render next action.label
   pure next
 
-def uiRenameFromDom : IO PetState := do
+def uiRenameFromDom : DomM PetState := do
   let current ← stateFromDom
   render current "rename"
   pure current
 
 def mountCallback
-    (selector event : String) (callback : Lean.Vir.Browser.Event → IO Unit) : IO Nat := do
+    (selector event : String)
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → DomM Unit) : DomM Nat := do
   match ← Lean.Vir.Browser.Document.querySelector selector with
   | none => pure 0
   | some element =>
       let _listener ← Lean.Vir.Browser.Element.addEventListener element event callback
       pure 1
 
-def mountAction (action : Action) : IO Nat :=
+def mountAction (action : Action) : DomM Nat :=
   mountCallback ("[data-action='" ++ action.label ++ "']") "click" fun _event =>
     discard <| uiStepFromDom action
 
-def uiMountFromDom : IO Nat := do
+def uiMountFromDom : DomM Nat := do
   let _ ← uiResetFromDom
   let mut mounted := 0
   for action in #[feed, play, nap, wake, ignore] do
@@ -360,6 +364,7 @@ end Tamagotchi
 
 namespace ReactTamagotchi
 
+open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
 def actions : Array Tamagotchi.Action :=
@@ -449,7 +454,8 @@ def normalizeViewState (state : Tamagotchi.PetState) : Tamagotchi.PetState :=
   let artwork := Tamagotchi.normalizeArtwork state.artwork
   { state with artwork := artwork, care := Tamagotchi.clampCare state.care }
 
-partial def renderInto (root : Root) (state : Tamagotchi.PetState) (actionLabel : String) : IO Unit := do
+partial def renderInto
+    (root : Lean.Vir.Js Root) (state : Tamagotchi.PetState) (actionLabel : String) : DomM Unit := do
   let state := normalizeViewState state
   let shownName := displayName state
   let actionButton := fun action =>
@@ -571,11 +577,11 @@ partial def renderInto (root : Root) (state : Tamagotchi.PetState) (actionLabel 
           ]
       ]
 
-def mount (selector : String) : IO Bool :=
+def mount (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root =>
     renderInto root (Tamagotchi.initialState Tamagotchi.defaultOctopusName "octopus") "..."
 
-def mountDefault : IO Bool :=
+def mountDefault : DomM Bool :=
   mount "#react-pet-root"
 
 end ReactTamagotchi

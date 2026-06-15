@@ -136,7 +136,7 @@ const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", 
 });
 assert.equal(inspectedJson.status, 0, inspectedJson.stderr || inspectedJson.stdout);
 const inspectedInfo = JSON.parse(inspectedJson.stdout);
-assert.equal(inspectedInfo.package.version, 5);
+assert.equal(inspectedInfo.package.version, 6);
 assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
 assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
 assert.equal(inspectedInfo.manifest.hostImports.length, 0);

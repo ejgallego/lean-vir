@@ -56,7 +56,7 @@ const artifactManifest = {
   gitDirty: gitStatus.length !== 0,
   leanToolchain,
   leanVersion,
-  packageFormatVersion: 5,
+  packageFormatVersion: 6,
   manifestVersion: 1,
   runtimeAbiVersion: 1,
   generatedAt: new Date().toISOString(),
