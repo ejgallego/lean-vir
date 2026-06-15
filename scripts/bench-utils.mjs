@@ -82,6 +82,7 @@ export function median(values) {
 }
 
 export function formatMs(ms) {
+  if (ms < 0.001) return `${(ms * 1000000).toFixed(1)} ns`;
   return ms < 1 ? `${(ms * 1000).toFixed(1)} us` : `${ms.toFixed(2)} ms`;
 }
 

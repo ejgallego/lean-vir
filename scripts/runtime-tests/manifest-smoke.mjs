@@ -78,6 +78,9 @@ assert.equal(typeof createExportedHostResourceState, "function");
   });
   try {
     const resources = createExportedHostResourceState();
+    const primitiveResource = resources.resourceForValue(false);
+    assert.equal(resources.resolveResource(primitiveResource, "Js"), false);
+    assert.equal(resources.resourceForValue(false), primitiveResource);
     const documentBindings = createExportedBrowserDocumentHostBindings(resources);
     const elementBindings = createExportedBrowserElementHostBindings(resources);
     const sharedElement = documentBindings["browser.document.querySelector"]("#shared");
@@ -100,7 +103,7 @@ assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
-assert.equal(hostRuntime.packageInfo.hostImports, 35);
+assert.equal(hostRuntime.packageInfo.hostImports, 37);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 7);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -145,21 +148,29 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "browser.htmlInputElement.setValue",
   "browser.timer.clearTimeout",
   "browser.timer.setTimeout",
+  "js.bool",
+  "js.bool.value",
+  "js.nat",
+  "js.nat.value",
+  "js.string",
+  "js.string.value",
   "react.html.element",
   "react.html.text",
   "react.root.create",
   "react.root.render",
   "react.root.renderComponent",
   "react.root.unmount",
-  "react.state.modify",
   "react.state.set",
-  "react.state.set",
-  "react.useState",
-  "react.useState",
   "react.useState",
   "test.callNatCallback",
   "test.recordNat",
 ]);
+const reactUseStateImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useState");
+assert.equal(reactUseStateImports.length, 1);
+assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
+assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
+assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
+assert.equal(reactUseStateImports[0]?.result?.fields?.find((field) => field.name === "value")?.type?.type, "Js");
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
     ?.args[1]?.type?.kind,
@@ -168,7 +179,12 @@ assert.equal(
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
     ?.args[1]?.type?.name,
-  "Lean.Vir.React.Html",
+  "Lean.Vir.Js",
+);
+assert.equal(
+  hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
+    ?.args[1]?.type?.type,
+  "Js",
 );
 const reactHtmlType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.html.element")
   ?.args[2]?.type;

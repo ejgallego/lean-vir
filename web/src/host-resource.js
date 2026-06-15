@@ -43,9 +43,6 @@ export function createHostResource(value, label = null) {
   if (value === null || value === undefined) {
     throw new Error("host resource value must not be null");
   }
-  if (typeof value !== "object" && typeof value !== "function") {
-    throw new Error("host resource value must be an object");
-  }
   return new HostResource(value, label);
 }
 

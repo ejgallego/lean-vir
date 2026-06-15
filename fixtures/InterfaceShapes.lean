@@ -4,8 +4,26 @@ namespace Vir.Fixtures.InterfaceShapes
 
 open Lean
 
-def stringRoundtrip (value : String) : String :=
+def baseUnitRoundtrip (_ : Unit) : Unit :=
+  ()
+
+def baseBoolFlip (value : Bool) : Bool :=
+  !value
+
+def baseNatBump (value : Nat) : Nat :=
+  value + 1
+
+def baseIntNegate (value : Int) : Int :=
+  -value
+
+def baseStringRoundtrip (value : String) : String :=
   value
+
+def baseUInt8Bump (value : UInt8) : UInt8 :=
+  value + 1
+
+def baseUInt16Bump (value : UInt16) : UInt16 :=
+  value + 1
 
 def arrayStringTotalLength (xs : Array String) : Nat :=
   xs.foldl (fun acc text => acc + text.length) 0
@@ -19,6 +37,9 @@ def uint32Bump (value : UInt32) : UInt32 :=
 def uint64Bump (value : UInt64) : UInt64 :=
   value + 1
 
+def baseUSizeBump (value : USize) : USize :=
+  value + 1
+
 def floatScale (value : Float) : Float :=
   Float.scaleB value (2 : Int)
 
@@ -27,6 +48,12 @@ def floatScore (value : Float) : Nat :=
 
 def float32Roundtrip (value : Float32) : Float32 :=
   value
+
+def baseByteArrayRoundtrip (bytes : ByteArray) : ByteArray :=
+  bytes
+
+def baseArrayNatSum (xs : Array Nat) : Nat :=
+  xs.foldl (fun acc value => acc + value) 0
 
 def optionNatBump : Option Nat → Option Nat
   | none => some 0

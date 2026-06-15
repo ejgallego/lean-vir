@@ -8,6 +8,7 @@ import * as React from "react";
 import * as ReactDOMClient from "react-dom/client";
 import {
   createBrowserReactHookRuntime,
+  createReactJsValueHostBindings,
   createReactStateHostBindings,
 } from "./react/vir-react-hooks.js";
 import {
@@ -34,6 +35,7 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
         createHtmlElementResource: (tag, key, props, handlers, children) =>
           createBrowserReactHtmlElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
       }),
+    ...createReactJsValueHostBindings(state),
     ...createReactStateHostBindings(state, hookRuntime),
   };
 }

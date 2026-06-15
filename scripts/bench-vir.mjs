@@ -53,7 +53,10 @@ const reactRootIterations = 300;
 const scalarRecordIterations = 5000;
 const nestedRecordIterations = 3000;
 const recursiveValueIterations = 2000;
-const stringRoundtripIterations = 5000;
+const baseScalarIterations = 10000;
+const baseBlobIterations = 3000;
+const baseArrayIterations = 3000;
+const baseCodecIterations = 20000;
 const codecScalarRecordIterations = 20000;
 const codecNestedRecordIterations = 20000;
 const codecRecursiveValueIterations = 20000;
@@ -106,7 +109,10 @@ const recursiveJsonInput = {
     { fst: "ok", snd: { kind: "bool", value: false } },
   ],
 };
-const stringRoundtripInput = "lean-ir-wasm-Aé∀Z";
+const baseStringInput = "Lean IR boundary Aé∀Z ".repeat(8);
+const baseByteArrayInput = Uint8Array.from(Array.from({ length: 128 }, (_, index) => (index * 17) & 0xff));
+const baseArrayNatInput = Array.from({ length: 64 }, (_, index) => index + 1);
+const baseArrayStringInput = Array.from({ length: 32 }, (_, index) => `s${index}`);
 const textEncoder = new TextEncoder();
 const args = parseArgs(process.argv.slice(2));
 
@@ -262,6 +268,19 @@ function printJsRow(name, sample) {
   console.log(`  checksum:  ${sample.checksum}`);
 }
 
+function printConversionRow(name, codec, wasm, native = null) {
+  const codecPerCall = codec.medianMs / codec.iterations;
+  const wasmPerCall = wasm.medianMs / wasm.iterations;
+  console.log(`${name}`);
+  console.log(`  js encode:  ${formatMs(codec.medianMs)} total, ${formatMs(codecPerCall)} / call`);
+  console.log(`  wasm call:  ${formatMs(wasm.medianMs)} total, ${formatMs(wasmPerCall)} / call`);
+  if (native !== null) {
+    const nativePerCall = native.medianMs / native.iterations;
+    console.log(`  native api: ${formatMs(native.medianMs)} total, ${formatMs(nativePerCall)} / call`);
+  }
+  console.log(`  checksums: codec=${codec.checksum} wasm=${wasm.checksum}`);
+}
+
 function benchmarkDispatchReportRow(name, title, named, resolved) {
   return {
     name,
@@ -288,6 +307,16 @@ function benchmarkJsReportRow(name, title, js) {
     name,
     title,
     js: benchmarkSampleReport(js),
+  };
+}
+
+function benchmarkConversionReportRow(name, title, codec, wasm, native = null) {
+  return {
+    name,
+    title,
+    codec: benchmarkSampleReport(codec),
+    wasm: benchmarkSampleReport(wasm),
+    ...(native === null ? {} : { native: benchmarkSampleReport(native) }),
   };
 }
 
@@ -356,6 +385,70 @@ function benchEncodeCallPayload(label, iterations, entry, args) {
   });
 }
 
+function benchBoundaryConversionCase(testCase) {
+  const entry = manifestEntry(testCase.entry);
+  const codec = benchEncodeCallPayload(`codec-${testCase.name}`, testCase.codecIterations ?? baseCodecIterations, entry, testCase.args);
+  const wasm = benchWasmRepeated(testCase.name, testCase.iterations, () => {
+    let acc = 0;
+    for (let i = 0; i < testCase.iterations; i++) {
+      acc += testCase.checksum(runtime.call(testCase.entry, ...testCase.args));
+    }
+    return acc;
+  });
+  const native = typeof testCase.native === "function" ? testCase.native(testCase) : null;
+  return { ...testCase, codec, wasm, native };
+}
+
+function benchNativeScalar(label, iterations, fn, checksum = checksumNumber) {
+  return benchWasmRepeated(label, iterations, () => {
+    let acc = 0;
+    for (let i = 0; i < iterations; i++) {
+      acc += checksum(fn());
+    }
+    return acc;
+  });
+}
+
+function benchNativeTextResult(label, iterations, input, call, checksum) {
+  const inputBytes = textEncoder.encode(input);
+  const inputPtr = runtime.allocBytes(inputBytes);
+  try {
+    return benchWasmRepeated(label, iterations, () => {
+      let acc = 0;
+      for (let i = 0; i < iterations; i++) {
+        const resultPtr = call(inputPtr, inputBytes.byteLength);
+        const resultLen = runtime.exports.vir_native_conversion_result_size();
+        acc += checksum(runtime.readWasmString(resultPtr, resultLen));
+      }
+      return acc;
+    });
+  } finally {
+    runtime.freeBytes(inputPtr);
+  }
+}
+
+function checksumNumber(value) {
+  return Number(value);
+}
+
+function checksumBool(value) {
+  return value === true ? 1 : 0;
+}
+
+function checksumString(value) {
+  if (typeof value !== "string") {
+    throw new Error(`expected benchmark string result, got ${typeof value}`);
+  }
+  return value.length;
+}
+
+function checksumByteArray(value) {
+  if (!(value instanceof Uint8Array)) {
+    throw new Error("expected benchmark ByteArray result to decode as Uint8Array");
+  }
+  return value.length + (value[0] ?? 0) + (value[value.length - 1] ?? 0);
+}
+
 function resolveRawCallSlot(entry, nameBytes) {
   const namePtr = runtime.allocBytes(nameBytes);
   try {
@@ -422,8 +515,160 @@ const dispatchEntry = manifestEntry("Vir.Fixtures.Basic.branchAndSub");
 const scalarRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileStatsScore");
 const nestedRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore");
 const recursiveValueEntry = manifestEntry("Vir.Fixtures.RecursiveTypes.jsonRootScore");
+const baseConversionCases = [
+  {
+    name: "base-unit",
+    title: `Unit -> Unit x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUnitRoundtrip",
+    args: [undefined],
+    iterations: baseScalarIterations,
+    checksum: (value) => value === undefined ? 1 : 0,
+  },
+  {
+    name: "base-bool",
+    title: `Bool -> Bool x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseBoolFlip",
+    args: [true],
+    iterations: baseScalarIterations,
+    checksum: checksumBool,
+    native: (testCase) => benchNativeScalar(
+      `native-${testCase.name}`,
+      testCase.iterations,
+      () => runtime.exports.vir_native_bool_flip(1),
+    ),
+  },
+  {
+    name: "base-nat",
+    title: `Nat -> Nat x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseNatBump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+    native: (testCase) => benchNativeTextResult(
+      `native-${testCase.name}`,
+      testCase.iterations,
+      "41",
+      (ptr, len) => runtime.exports.vir_native_nat_bump(ptr, len),
+      checksumNumber,
+    ),
+  },
+  {
+    name: "base-int",
+    title: `Int -> Int x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseIntNegate",
+    args: [-41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-string",
+    title: `String -> String (${baseStringInput.length} code units) x ${baseBlobIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip",
+    args: [baseStringInput],
+    iterations: baseBlobIterations,
+    checksum: checksumString,
+    native: (testCase) => benchNativeTextResult(
+      `native-${testCase.name}`,
+      testCase.iterations,
+      baseStringInput,
+      (ptr, len) => runtime.exports.vir_native_string_roundtrip(ptr, len),
+      checksumString,
+    ),
+  },
+  {
+    name: "base-uint8",
+    title: `UInt8 -> UInt8 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUInt8Bump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-uint16",
+    title: `UInt16 -> UInt16 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUInt16Bump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-uint32",
+    title: `UInt32 -> UInt32 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.uint32Bump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+    native: (testCase) => benchNativeScalar(
+      `native-${testCase.name}`,
+      testCase.iterations,
+      () => runtime.exports.vir_native_uint32_bump(41),
+    ),
+  },
+  {
+    name: "base-uint64",
+    title: `UInt64 -> UInt64 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.uint64Bump",
+    args: ["41"],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-usize",
+    title: `USize -> USize x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUSizeBump",
+    args: ["41"],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-float",
+    title: `Float -> Float x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.floatScale",
+    args: [1.5],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+    native: (testCase) => benchNativeScalar(
+      `native-${testCase.name}`,
+      testCase.iterations,
+      () => runtime.exports.vir_native_float_scale(1.5),
+    ),
+  },
+  {
+    name: "base-float32",
+    title: `Float32 -> Float32 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.float32Roundtrip",
+    args: [1.25],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-byte-array",
+    title: `ByteArray -> ByteArray (${baseByteArrayInput.length} bytes) x ${baseBlobIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip",
+    args: [baseByteArrayInput],
+    iterations: baseBlobIterations,
+    checksum: checksumByteArray,
+  },
+  {
+    name: "base-array-nat",
+    title: `Array Nat -> Nat (${baseArrayNatInput.length} items) x ${baseArrayIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseArrayNatSum",
+    args: [baseArrayNatInput],
+    iterations: baseArrayIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-array-string",
+    title: `Array String -> Nat (${baseArrayStringInput.length} items) x ${baseArrayIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength",
+    args: [baseArrayStringInput],
+    iterations: baseArrayIterations,
+    checksum: checksumNumber,
+  },
+];
 
 const dispatch = benchTopLevelDispatch(dispatchEntry);
+const baseConversionBenchmarks = baseConversionCases.map(benchBoundaryConversionCase);
 
 const wasmFib = benchWasmRepeated("fib", fibIterations, () => {
   let acc = 0;
@@ -488,16 +733,12 @@ const wasmRecursiveValue = benchWasmRepeated("recursive-value", recursiveValueIt
   return acc;
 });
 
-const wasmStringRoundtrip = benchWasmRepeated("string-roundtrip", stringRoundtripIterations, () => {
+const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
   let acc = 0;
-  for (let i = 0; i < stringRoundtripIterations; i++) {
-    acc += runtime.call("Vir.Fixtures.InterfaceShapes.stringRoundtrip", stringRoundtripInput).length;
+  for (let i = 0; i < hostScalarIterations; i++) {
+    acc += hostRuntime.call("HostInterop.titleHandshake", "bench").length;
   }
   return acc;
-});
-
-const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
-  return Number(hostRuntime.call("HostInterop.titleHandshakeLoop", hostScalarIterations));
 });
 
 const wasmCallback = benchWasmRepeated("callback-roundtrip", callbackIterations, () => {
@@ -505,29 +746,35 @@ const wasmCallback = benchWasmRepeated("callback-roundtrip", callbackIterations,
 });
 
 const wasmDomResource = benchWasmRepeated("dom-listener-resource", domResourceIterations, () => {
-  return Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEventLoop", "#bench-dom", domResourceIterations));
+  let acc = 0;
+  for (let i = 0; i < domResourceIterations; i++) {
+    acc += Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEvent", "#bench-dom"));
+  }
+  return acc;
 });
 
 const wasmReactRoot = benchWasmRepeated("react-root-lifecycle", reactRootIterations, () => {
-  return Number(hostRuntime.call("ReactCounter.mountAndUnmountLoop", "#bench-react", reactRootIterations));
+  let acc = 0;
+  for (let i = 0; i < reactRootIterations; i++) {
+    acc += hostRuntime.call("ReactCounter.mountAndUnmount", "#bench-react") ? 1 : 0;
+  }
+  return acc;
 });
 
 const wasmReactTextRender = benchWasmRepeated("react-html-text-render", reactTextRenderIterations, () => {
-  return Number(hostRuntime.call(
-    "ReactCounter.renderWideTextLoop",
-    "#bench-react",
-    reactTextRenderWidth,
-    reactTextRenderIterations,
-  ));
+  let acc = 0;
+  for (let i = 0; i < reactTextRenderIterations; i++) {
+    acc += Number(hostRuntime.call("ReactCounter.renderWideTextLoop", "#bench-react", reactTextRenderWidth, 1));
+  }
+  return acc;
 });
 
 const wasmReactCallbackRender = benchWasmRepeated("react-html-callback-render", reactCallbackRenderIterations, () => {
-  return Number(hostRuntime.call(
-    "ReactCounter.renderCallbackTreeLoop",
-    "#bench-react",
-    reactCallbackRenderWidth,
-    reactCallbackRenderIterations,
-  ));
+  let acc = 0;
+  for (let i = 0; i < reactCallbackRenderIterations; i++) {
+    acc += Number(hostRuntime.call("ReactCounter.renderCallbackTreeLoop", "#bench-react", reactCallbackRenderWidth, 1));
+  }
+  return acc;
 });
 
 console.log("# Lean VIR benchmark");
@@ -545,6 +792,12 @@ printRow(`sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort
 console.log();
 console.log("Top-level value conversion paths");
 console.log();
+console.log("Base value conversion paths");
+console.log();
+for (const testCase of baseConversionBenchmarks) {
+  printConversionRow(testCase.title, testCase.codec, testCase.wasm, testCase.native);
+  console.log();
+}
 printJsRow(`JS codec scalar record/enums encode x ${codecScalarRecordIterations}`, jsCodecScalarRecord);
 console.log();
 printJsRow(`JS codec nested record/list/option encode x ${codecNestedRecordIterations}`, jsCodecNestedRecord);
@@ -556,8 +809,6 @@ console.log();
 printWasmRow(`nested record/list/option x ${nestedRecordIterations}`, wasmNestedRecord);
 console.log();
 printWasmRow(`recursive custom-inductive value x ${recursiveValueIterations}`, wasmRecursiveValue);
-console.log();
-printWasmRow(`string roundtrip x ${stringRoundtripIterations}`, wasmStringRoundtrip);
 console.log();
 console.log("Host/resource paths");
 console.log();
@@ -591,6 +842,8 @@ if (args.jsonPath !== null) {
     ),
     benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib),
     benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
+    ...baseConversionBenchmarks.map((testCase) =>
+      benchmarkConversionReportRow(testCase.name, testCase.title, testCase.codec, testCase.wasm, testCase.native)),
     benchmarkJsReportRow(
       "codec-scalar-record",
       `JS codec scalar record/enums encode x ${codecScalarRecordIterations}`,
@@ -620,11 +873,6 @@ if (args.jsonPath !== null) {
       "recursive-value",
       `recursive custom-inductive value x ${recursiveValueIterations}`,
       wasmRecursiveValue,
-    ),
-    benchmarkReportRow(
-      "string-roundtrip",
-      `string roundtrip x ${stringRoundtripIterations}`,
-      wasmStringRoundtrip,
     ),
     benchmarkReportRow(
       "host-title",

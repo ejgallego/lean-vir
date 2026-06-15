@@ -114,6 +114,28 @@ structure State (α : Type) where
   value : α
   setter : Lean.Vir.Js (StateSetter α)
 
+namespace JsValue
+
+@[vir_js "js.string"]
+opaque ofString (value : @& String) : ReactM (Lean.Vir.Js String)
+
+@[vir_js "js.string.value"]
+opaque toString (value : @& Lean.Vir.Js String) : ReactM String
+
+@[vir_js "js.nat"]
+opaque ofNat (value : Nat) : ReactM (Lean.Vir.Js Nat)
+
+@[vir_js "js.nat.value"]
+opaque toNat (value : @& Lean.Vir.Js Nat) : ReactM Nat
+
+@[vir_js "js.bool"]
+opaque ofBool (value : Bool) : ReactM (Lean.Vir.Js Bool)
+
+@[vir_js "js.bool.value"]
+opaque toBool (value : @& Lean.Vir.Js Bool) : ReactM Bool
+
+end JsValue
+
 /--
 React node object class created by the JavaScript host through React's public
 APIs.
@@ -395,105 +417,35 @@ def onSubmitWith (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Bro
 
 end EventHandler
 
-class StateValue (α : Type) where
-  useState : α → ReactM (State α)
-  set : Lean.Vir.Js (StateSetter α) → α → ReactM Unit
-  modify : Lean.Vir.Js (StateSetter α) → (α → α) → ReactM Unit
-
 namespace StateSetter
 
 @[vir_js "react.state.set"]
-opaque setString (setter : @& Lean.Vir.Js (StateSetter String)) (value : @& String) : ReactM Unit
-
-@[vir_js "react.state.modify"]
-opaque modifyString
-    (setter : @& Lean.Vir.Js (StateSetter String))
-    (update : String → String) :
-    ReactM Unit
-
-@[vir_js "react.state.set"]
-opaque setNat (setter : @& Lean.Vir.Js (StateSetter Nat)) (value : Nat) : ReactM Unit
-
-@[vir_js "react.state.modify"]
-opaque modifyNat
-    (setter : @& Lean.Vir.Js (StateSetter Nat))
-    (update : Nat → Nat) :
-    ReactM Unit
-
-@[vir_js "react.state.set"]
-opaque setBool (setter : @& Lean.Vir.Js (StateSetter Bool)) (value : Bool) : ReactM Unit
-
-@[vir_js "react.state.modify"]
-opaque modifyBool
-    (setter : @& Lean.Vir.Js (StateSetter Bool))
-    (update : Bool → Bool) :
-    ReactM Unit
-
-@[vir_js "react.state.set"]
-opaque setJs {α : Type}
+opaque set {α : Type}
     (setter : @& Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
     (value : @& Lean.Vir.Js α) :
     ReactM Unit
 
 @[vir_js "react.state.modify"]
-opaque modifyJs {α : Type}
+opaque modify {α : Type}
     (setter : @& Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
     (update : Lean.Vir.Js α → Lean.Vir.Js α) :
     ReactM Unit
-
-def set [StateValue α] (setter : Lean.Vir.Js (StateSetter α)) (value : α) : ReactM Unit :=
-  StateValue.set setter value
-
-def modify [StateValue α] (setter : Lean.Vir.Js (StateSetter α)) (update : α → α) : ReactM Unit :=
-  StateValue.modify setter update
 
 end StateSetter
 
 namespace Hooks
 
 @[vir_js "react.useState"]
-opaque useStateString (initial : @& String) : ReactM (State String)
-
-@[vir_js "react.useState"]
-opaque useStateNat (initial : Nat) : ReactM (State Nat)
-
-@[vir_js "react.useState"]
-opaque useStateBool (initial : Bool) : ReactM (State Bool)
-
-@[vir_js "react.useState"]
-opaque useStateJs {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
-
-def useState [StateValue α] (initial : α) : ReactM (State α) :=
-  StateValue.useState initial
+opaque useState {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
 
 end Hooks
 
-instance : StateValue String where
-  useState := Hooks.useStateString
-  set := StateSetter.setString
-  modify := StateSetter.modifyString
-
-instance : StateValue Nat where
-  useState := Hooks.useStateNat
-  set := StateSetter.setNat
-  modify := StateSetter.modifyNat
-
-instance : StateValue Bool where
-  useState := Hooks.useStateBool
-  set := StateSetter.setBool
-  modify := StateSetter.modifyBool
-
-instance : StateValue (Lean.Vir.Js α) where
-  useState := Hooks.useStateJs
-  set := StateSetter.setJs
-  modify := StateSetter.modifyJs
-
 namespace State
 
-def set [StateValue α] (state : State α) (value : α) : ReactM Unit :=
+def set (state : State (Lean.Vir.Js α)) (value : Lean.Vir.Js α) : ReactM Unit :=
   StateSetter.set state.setter value
 
-def modify [StateValue α] (state : State α) (update : α → α) : ReactM Unit :=
+def modify (state : State (Lean.Vir.Js α)) (update : Lean.Vir.Js α → Lean.Vir.Js α) : ReactM Unit :=
   StateSetter.modify state.setter update
 
 end State

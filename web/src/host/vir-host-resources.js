@@ -18,12 +18,22 @@ export class HostResourceState {
   constructor() {
     requireExternrefTableSupport();
     this.resources = new WeakMap();
+    this.primitiveResources = new Map();
     this.liveResources = new Set();
     this.disposables = new Set();
   }
 
   resourceForValue(value) {
     if (value === null || value === undefined) return null;
+    if (!isWeakMapKey(value)) {
+      let resource = this.primitiveResources.get(value);
+      if (!isHostResource(resource) || hostResourceValue(resource) === null) {
+        resource = createHostResource(value);
+        this.primitiveResources.set(value, resource);
+      }
+      this.liveResources.add(resource);
+      return resource;
+    }
     let resource = this.resources.get(value);
     if (!isHostResource(resource) || hostResourceValue(resource) === null) {
       resource = createHostResource(value);
@@ -35,8 +45,10 @@ export class HostResourceState {
 
   releaseResource(resource) {
     const value = hostResourceValue(resource);
-    if (value !== null && value !== undefined) {
+    if (isWeakMapKey(value)) {
       this.resources.delete(value);
+    } else if (value !== null && value !== undefined) {
+      this.primitiveResources.delete(value);
     }
     if (isHostResource(resource)) {
       this.liveResources.delete(resource);
@@ -46,6 +58,13 @@ export class HostResourceState {
   }
 
   releaseValueResource(value) {
+    if (!isWeakMapKey(value)) {
+      const resource = this.primitiveResources.get(value);
+      if (resource !== undefined) {
+        this.releaseResource(resource);
+      }
+      return undefined;
+    }
     const resource = this.resources.get(value);
     if (resource !== undefined) {
       this.releaseResource(resource);
@@ -90,9 +109,14 @@ export class HostResourceState {
       this.releaseResource(resource);
     }
     this.resources = new WeakMap();
+    this.primitiveResources.clear();
     this.liveResources.clear();
     return undefined;
   }
+}
+
+function isWeakMapKey(value) {
+  return (typeof value === "object" && value !== null) || typeof value === "function";
 }
 
 export function createHostResourceState() {
