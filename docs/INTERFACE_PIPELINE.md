@@ -171,17 +171,14 @@ tooling: `pure`, `io`, `dom`, or `react`. The compact wasm call descriptor still
 lowers that to the runtime distinction the shim needs today: pure versus
 effectful.
 
-`Lean.Vir.Js α` is represented as a `Js` resource. Its type parameter is a
-Lean-side phantom while the value remains in the JavaScript object lane. This
-lets a polymorphic host import such as a JavaScript array helper share one
-resource ABI. Decoding `α` itself still requires a concrete supported interface
-type or future explicit ABI descriptor.
-
-Built-in browser and React object markers must appear under the same `Js`
-boundary type and keep DOM-like manifest labels. For example, `Lean.Vir.Js
-Lean.Vir.Browser.Element` is a resource named `Lean.Vir.Browser.Element` and
-labeled `Element`; arbitrary markers remain generic `Js` resources. Naked marker
-types such as `Lean.Vir.Browser.Element` are rejected at package generation.
+`Lean.Vir.Js α` is always represented as the generic `Js` resource. Its type
+parameter is a Lean-side phantom while the value remains in the JavaScript
+externref lane. This lets browser, React, scalar-wrapper, and future
+polymorphic JavaScript helpers share one resource ABI. The marker-specific
+protocol and lifetime policy live in the Lean API and JavaScript host bindings,
+not in the manifest resource descriptor. Naked marker types such as
+`Lean.Vir.Browser.Element` remain unsupported boundary types because they do not
+cross as `Lean.Vir.Js α`.
 
 The recursive type tree is embedded in the JSON manifest and, for package
 format 7 and newer, also in a compact package-owned export signature table.

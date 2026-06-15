@@ -46,16 +46,32 @@ structure State (α : Type) where
 abbrev Component (props : Type := Unit) : Type :=
   props → ReactM (Lean.Vir.Js Html)
 
-class StateValue (α : Type) where
-  useState : α → ReactM (State α)
-  set : Lean.Vir.Js (StateSetter α) → α → ReactM Unit
-  modify : Lean.Vir.Js (StateSetter α) → (α → α) → ReactM Unit
+namespace JsValue
+
+def ofString (value : String) : ReactM (Lean.Vir.Js String)
+def toString (value : Lean.Vir.Js String) : ReactM String
+def ofNat (value : Nat) : ReactM (Lean.Vir.Js Nat)
+def toNat (value : Lean.Vir.Js Nat) : ReactM Nat
+def ofBool (value : Bool) : ReactM (Lean.Vir.Js Bool)
+def toBool (value : Lean.Vir.Js Bool) : ReactM Bool
+
+end JsValue
 
 namespace Hooks
 
-def useState [StateValue α] (initial : α) : ReactM (State α)
+def useState (initial : Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
 
 end Hooks
+
+namespace State
+
+def set (state : State (Lean.Vir.Js α)) (value : Lean.Vir.Js α) : ReactM Unit
+def modify
+    (state : State (Lean.Vir.Js α))
+    (update : Lean.Vir.Js α → Lean.Vir.Js α) :
+    ReactM Unit
+
+end State
 
 namespace Html
 
@@ -124,10 +140,11 @@ of being simulated by the Lean runtime. Components are props-taking functions:
 `Component props := props → ReactM (Lean.Vir.Js Html)`, and no-props
 components use `Component Unit` plus `()` at the render call.
 
-The public state surface is generic: `Hooks.useState`, `State.set`, and
-`State.modify` operate through `StateValue α`. Today the blessed instances are
-`String`, `Nat`, `Bool`, and opaque `Lean.Vir.Js α` values. `State.modify`
-passes a functional updater to React's setter.
+The public state surface is resource-typed: `Hooks.useState`, `State.set`, and
+`State.modify` operate on `Lean.Vir.Js α` values. There are deliberately no
+`String`, `Nat`, or `Bool` `useState` overloads; scalar values must be converted
+explicitly with `JsValue` helpers before crossing the React hook boundary.
+`State.modify` passes a functional updater to React's setter.
 
 ## Blessed Helpers
 
@@ -179,8 +196,10 @@ The browser React host binding is exposed from
 - `react.root.renderComponent` wraps a Lean thunk produced from
   `Component props` plus concrete props in a JavaScript React function
   component and invokes `root.render(...)` with that component.
-- `react.useState` calls `React.useState` while rendering a component and
-  returns the current value plus a typed state-setter resource.
+- `react.useState` calls `React.useState` while rendering a component. Its ABI
+  is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
+- `js.string`, `js.nat`, and `js.bool` convert Lean scalar values into explicit
+  `Lean.Vir.Js α` values for examples that need primitive React state.
 - `react.state.set` and `react.state.modify` call the retained React setter;
   `modify` retains the Lean updater callback until React invokes it or the
   runtime is disposed.

@@ -10,6 +10,7 @@ import {
   createVirtualReactRootResource as createVirtualReactRootResourceFromHtml,
 } from "../react/vir-react-html.js";
 import {
+  createReactJsValueHostBindings,
   createReactStateHostBindings,
   createVirtualReactHookRuntime,
 } from "../react/vir-react-hooks.js";
@@ -141,6 +142,7 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
         createHtmlElementResource: (tag, key, props, handlers, children) =>
           createVirtualReactHtmlElementResource(state.resources, reactHooks, tag, key, props, handlers, children),
       }),
+    ...createReactJsValueHostBindings(state.resources),
     ...createReactStateHostBindings(state.resources, reactHookRuntime),
     [VIR_HOST_DISPOSE]: () => state.resources.dispose(),
   };

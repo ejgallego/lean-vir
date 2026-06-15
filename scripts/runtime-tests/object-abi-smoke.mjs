@@ -31,7 +31,6 @@ function makeObjectString(runtime, input) {
     runtime.freeBytes(ptr);
   }
 }
-
 function withObjectString(runtime, input, body) {
   let obj = makeObjectString(runtime, input);
   try {

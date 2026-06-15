@@ -16,11 +16,15 @@ def label (value : Nat) : String :=
 
 def counter : Component Unit :=
   fun _ => do
-    let count ← Hooks.useState 0
-    let text ← Html.text (label count.value)
+    let initial ← JsValue.ofNat 0
+    let count ← Hooks.useState initial
+    let countValue ← JsValue.toNat count.value
+    let text ← Html.text (label countValue)
     Html.buttonWith
       #[Property.id "react-counter-button"]
-      #[EventHandler.onClick ((State.modify count (fun value => value + 1)).run)]
+      #[EventHandler.onClick do
+        let next ← (JsValue.ofNat (countValue + 1)).run
+        (State.set count next).run]
       #[text]
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do

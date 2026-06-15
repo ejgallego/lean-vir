@@ -16,7 +16,9 @@ def checkedLabel (checked : Bool) : String :=
 
 def inputComponent : Component Unit :=
   fun _ => do
-    let name ← Hooks.useState ""
+    let initial ← JsValue.ofString ""
+    let name ← Hooks.useState initial
+    let nameValue ← JsValue.toString name.value
     let labelText ← Html.text "name:"
     let label ← Html.labelWith #[Property.htmlFor "react-name-input"] #[] #[labelText]
     let input ←
@@ -24,20 +26,24 @@ def inputComponent : Component Unit :=
         #[
           Property.id "react-name-input",
           Property.type "text",
-          Property.inputValue name.value,
+          Property.inputValue nameValue,
           Property.placeholder "name"
         ]
         #[EventHandler.onInput fun event => do
           match ← Lean.Vir.Browser.Event.inputValue? event with
           | none => pure ()
-          | some next => (State.set name next).run]
-    let outputText ← Html.text name.value
+          | some next => do
+              let nextValue ← (JsValue.ofString next).run
+              (State.set name nextValue).run]
+    let outputText ← Html.text nameValue
     let output ← Html.spanWith #[Property.id "react-name-output"] #[] #[outputText]
     Html.divWith #[Property.id "react-input-widget"] #[] #[label, input, output]
 
 def changeInputComponent : Component Unit :=
   fun _ => do
-    let value ← Hooks.useState ""
+    let initial ← JsValue.ofString ""
+    let value ← Hooks.useState initial
+    let currentValue ← JsValue.toString value.value
     let labelText ← Html.text "change:"
     let label ← Html.labelWith #[Property.htmlFor "react-change-input"] #[] #[labelText]
     let input ←
@@ -46,7 +52,7 @@ def changeInputComponent : Component Unit :=
           Property.id "react-change-input",
           Property.inputName "change",
           Property.type "text",
-          Property.inputValue value.value,
+          Property.inputValue currentValue,
           Property.placeholder "change"
         ]
         #[EventHandler.onChange fun event => do
@@ -54,8 +60,10 @@ def changeInputComponent : Component Unit :=
           Lean.Vir.Browser.Event.stopPropagation event
           match ← Lean.Vir.Browser.Event.inputValue? event with
           | none => pure ()
-          | some next => (State.set value next).run]
-    let outputText ← Html.text value.value
+          | some next => do
+              let nextValue ← (JsValue.ofString next).run
+              (State.set value nextValue).run]
+    let outputText ← Html.text currentValue
     let output ← Html.spanWith #[Property.id "react-change-output"] #[] #[outputText]
     Html.formWith
       #[Property.id "react-change-widget"]
@@ -66,19 +74,23 @@ def changeInputComponent : Component Unit :=
 
 def checkboxComponent : Component Unit :=
   fun _ => do
-    let checked ← Hooks.useState false
+    let initial ← JsValue.ofBool false
+    let checked ← Hooks.useState initial
+    let checkedValue ← JsValue.toBool checked.value
     let input ←
       Html.input
         #[
           Property.id "react-checkbox-input",
           Property.type "checkbox",
-          Property.checked checked.value
+          Property.checked checkedValue
         ]
         #[EventHandler.onChange fun event => do
           match ← Lean.Vir.Browser.Event.inputChecked? event with
           | none => pure ()
-          | some next => (State.set checked next).run]
-    let outputText ← Html.text (checkedLabel checked.value)
+          | some next => do
+              let nextValue ← (JsValue.ofBool next).run
+              (State.set checked nextValue).run]
+    let outputText ← Html.text (checkedLabel checkedValue)
     let output ←
       Html.labelWith
         #[Property.id "react-checkbox-output", Property.htmlFor "react-checkbox-input"]

@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { isHostResource } from "../host-resource.js";
+
 export function createBrowserReactHookRuntime(resources, React) {
   const setters = new WeakMap();
   let currentComponent = null;
@@ -83,9 +85,20 @@ export function createVirtualReactHookRuntime(resources) {
 
 export function createReactStateHostBindings(resources, hookRuntime) {
   return {
-    "react.useState": (initial) => hookRuntime.useState(initial),
+    "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
     "react.state.set": (setter, value) => setStateValue(resources, setter, value),
     "react.state.modify": (setter, update) => modifyStateValue(resources, setter, update),
+  };
+}
+
+export function createReactJsValueHostBindings(resources) {
+  return {
+    "js.string": (value) => resources.resourceForValue(jsStringValue(value)),
+    "js.string.value": (value) => jsStringPayload(resources.resolveResource(value, "Js")),
+    "js.nat": (value) => resources.resourceForValue(jsNatValue(value)),
+    "js.nat.value": (value) => jsNatPayload(resources.resolveResource(value, "Js")),
+    "js.bool": (value) => resources.resourceForValue(jsBoolValue(value)),
+    "js.bool.value": (value) => jsBoolPayload(resources.resolveResource(value, "Js")),
   };
 }
 
@@ -116,13 +129,13 @@ function createVirtualStateHook(initial, scheduleRender) {
 
 function stateResult(resources, value, setter) {
   return {
-    value,
+    value: resources.resourceForValue(value),
     setter: resources.resourceForValue(setter),
   };
 }
 
 function setStateValue(resources, setter, value) {
-  resources.resolveResource(setter, "ReactStateSetter").set(value);
+  resources.resolveResource(setter, "ReactStateSetter").set(reactStatePayload(resources, value));
   return undefined;
 }
 
@@ -140,8 +153,9 @@ function modifyStateValue(resources, setter, update) {
   resources.addDisposable(retainedUpdate);
   try {
     stateSetter.set((previous) => {
+      const previousResource = resources.resourceForValue(previous);
       try {
-        return update(previous);
+        return reactStatePayload(resources, update(previousResource));
       } finally {
         retainedUpdate.remove();
       }
@@ -151,4 +165,54 @@ function modifyStateValue(resources, setter, update) {
     throw error;
   }
   return undefined;
+}
+
+function reactStatePayload(resources, value) {
+  return isHostResource(value) ? resources.resolveResource(value, "Js") : value;
+}
+
+function jsStringValue(value) {
+  if (typeof value !== "string") {
+    throw new Error("js.string expects a string");
+  }
+  return value;
+}
+
+function jsStringPayload(value) {
+  if (typeof value !== "string") {
+    throw new Error("js.string.value expects a JS string");
+  }
+  return value;
+}
+
+function jsNatValue(value) {
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
+    throw new Error("js.nat expects a natural number");
+  }
+  const text = String(value);
+  if (!/^(0|[1-9][0-9]*)$/.test(text)) {
+    throw new Error("js.nat expects a natural number");
+  }
+  return BigInt(text);
+}
+
+function jsNatPayload(value) {
+  if (typeof value !== "bigint" || value < 0n) {
+    throw new Error("js.nat.value expects a JS natural number");
+  }
+  return value;
+}
+
+function jsBoolValue(value) {
+  if (typeof value !== "boolean") {
+    throw new Error("js.bool expects a boolean");
+  }
+  return value;
+}
+
+function jsBoolPayload(value) {
+  if (typeof value !== "boolean") {
+    throw new Error("js.bool.value expects a JS boolean");
+  }
+  return value;
 }

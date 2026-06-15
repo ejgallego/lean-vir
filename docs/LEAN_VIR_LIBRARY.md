@@ -232,8 +232,13 @@ render-construction effect for React component APIs.
 - `Lean.Vir.React.PropValue`
 - `Lean.Vir.React.EventHandler`
 - `Lean.Vir.React.State α`
-- `Lean.Vir.React.StateValue α`
 - `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html)`
+- `Lean.Vir.React.JsValue.ofString : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js String)`
+- `Lean.Vir.React.JsValue.toString : @& Lean.Vir.Js String -> Lean.Vir.React.ReactM String`
+- `Lean.Vir.React.JsValue.ofNat : Nat -> Lean.Vir.React.ReactM (Lean.Vir.Js Nat)`
+- `Lean.Vir.React.JsValue.toNat : @& Lean.Vir.Js Nat -> Lean.Vir.React.ReactM Nat`
+- `Lean.Vir.React.JsValue.ofBool : Bool -> Lean.Vir.React.ReactM (Lean.Vir.Js Bool)`
+- `Lean.Vir.React.JsValue.toBool : @& Lean.Vir.Js Bool -> Lean.Vir.React.ReactM Bool`
 - `Lean.Vir.React.Html.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html)`
 - `Lean.Vir.React.Html.element : @& String -> Option String -> Array Lean.Vir.React.Property -> Array Lean.Vir.React.EventHandler -> Array (Lean.Vir.Js Lean.Vir.React.Html) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html)`
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
@@ -242,9 +247,9 @@ render-construction effect for React component APIs.
 - `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> @& Lean.Vir.Js Lean.Vir.React.Html -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.React.Hooks.useState : [Lean.Vir.React.StateValue α] -> α -> Lean.Vir.React.ReactM (Lean.Vir.React.State α)`
-- `Lean.Vir.React.State.set : [Lean.Vir.React.StateValue α] -> Lean.Vir.React.State α -> α -> Lean.Vir.React.ReactM Unit`
-- `Lean.Vir.React.State.modify : [Lean.Vir.React.StateValue α] -> Lean.Vir.React.State α -> (α -> α) -> Lean.Vir.React.ReactM Unit`
+- `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
+- `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.React.ReactM Unit`
+- `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.Js α) -> Lean.Vir.React.ReactM Unit`
 
 `Html` is an opaque JavaScript-owned object marker. Lean constructs values with
 `Html.text` and `Html.element`, which call `react.html.text` and
@@ -254,10 +259,11 @@ embedded in the resource graph until the root is rerendered, unmounted, the
 package is reloaded, or the runtime is disposed.
 
 `Root.renderComponent` wraps a Lean `Component props` plus concrete props in a
-real JavaScript React function component. The public hook surface is generic
-over `StateValue α`; today the blessed instances are `String`, `Nat`, `Bool`,
-and opaque `Lean.Vir.Js α` values. State setters are typed JavaScript resources
-and must cross public signatures as `Lean.Vir.Js
+real JavaScript React function component. The public hook surface is
+resource-typed: `useState`, `State.set`, and `State.modify` accept
+`Lean.Vir.Js α`, not raw Lean scalar values. Use the explicit `JsValue`
+helpers when a component needs scalar state. State setters are typed JavaScript
+resources and must cross public signatures as `Lean.Vir.Js
 (Lean.Vir.React.StateSetter α)`.
 
 The intended v0 authoring surface is a DOM-like helper set over that `Js Html`

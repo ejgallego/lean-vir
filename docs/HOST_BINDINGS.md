@@ -44,8 +44,10 @@ test-visible virtual React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
 `Root.renderComponent root component props` API in a real React function
 component. The hook bindings `react.useState`, `react.state.set`, and
-`react.state.modify` share the same browser and virtual host resource store as
-React roots.
+`react.state.modify` operate on `Lean.Vir.Js α` resources and share the same
+browser and virtual host resource store as React roots. Small `js.string`,
+`js.nat`, and `js.bool` helpers provide explicit scalar conversion for examples
+that need primitive React state without giving `react.useState` a scalar ABI.
 
 ## Virtual Node Bindings
 
