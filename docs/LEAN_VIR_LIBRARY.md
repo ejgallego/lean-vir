@@ -19,9 +19,9 @@ modules below.
 For the built-in browser and common host imports, the Lean code is the only
 piece users need to write. The JavaScript runtime already provides default
 bindings for `common.*` and `browser.*` targets. Browser packages that call
-`Lean.Vir.React.Root.*` should also install the bindings from
-`lean-vir/react-host-bindings`; the Node wrapper provides virtual `react.root.*`
-bindings for tests. The JavaScript-side binding composition reference lives in
+`Lean.Vir.React.Root.*` or `Lean.Vir.React.Hooks.*` should also install the
+bindings from `lean-vir/react-host-bindings`; the Node wrapper provides virtual
+React bindings for tests. The JavaScript-side binding composition reference lives in
 `docs/JS_API.md`.
 
 1. Import the Lean module that provides the host import.
@@ -219,30 +219,50 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame)`
 - `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Js Lean.Vir.Browser.AnimationFrame -> Lean.Vir.Browser.DomM Unit`
 
-`Vir.React` provides the first React-specific imports and a narrow recursive
-`Html` tree. React root lifetime operations and event callbacks use
+`Vir.React` provides the first React-specific imports and a native `ReactHtml`
+resource surface. React root lifetime operations and event callbacks use
 `Lean.Vir.Browser.DomM`; `Lean.Vir.React.ReactM` is the narrower
-render-construction effect for future React component APIs.
+render-construction effect for React component APIs.
 
 - object marker: `Lean.Vir.React.Root`
+- object marker: `Lean.Vir.React.StateSetter α`
+- object marker: `Lean.Vir.React.Props`
 - `Lean.Vir.React.Html`
 - `Lean.Vir.React.Property`
 - `Lean.Vir.React.PropValue`
 - `Lean.Vir.React.EventHandler`
+- `Lean.Vir.React.State α`
+- `Lean.Vir.React.StateValue α`
+- `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html)`
+- `Lean.Vir.React.Html.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html)`
+- `Lean.Vir.React.Html.element : @& String -> Option String -> Array Lean.Vir.React.Property -> Array Lean.Vir.React.EventHandler -> Array (Lean.Vir.Js Lean.Vir.React.Html) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html)`
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
 - `Lean.Vir.React.Root.createFromSelector : String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.React.Root))`
 - `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
-- `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> @& Lean.Vir.React.Html -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> @& Lean.Vir.Js Lean.Vir.React.Html -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.React.Hooks.useState : [Lean.Vir.React.StateValue α] -> α -> Lean.Vir.React.ReactM (Lean.Vir.React.State α)`
+- `Lean.Vir.React.State.set : [Lean.Vir.React.StateValue α] -> Lean.Vir.React.State α -> α -> Lean.Vir.React.ReactM Unit`
+- `Lean.Vir.React.State.modify : [Lean.Vir.React.StateValue α] -> Lean.Vir.React.State α -> (α -> α) -> Lean.Vir.React.ReactM Unit`
 
-`Html` uses the generic non-indexed custom-inductive and `recursiveSelf`
-interface descriptors. Rendering retains any Lean event callbacks embedded in
-the tree until the root is rerendered, unmounted, the package is reloaded, or
-the runtime is disposed.
+`Html` is an opaque JavaScript-owned object marker. Lean constructs values with
+`Html.text` and `Html.element`, which call `react.html.text` and
+`react.html.element`; browser hosts construct native React nodes with
+`React.createElement` at that point. Rendering retains any Lean event callbacks
+embedded in the resource graph until the root is rerendered, unmounted, the
+package is reloaded, or the runtime is disposed.
 
-The intended v0 authoring surface is a small DOM-like helper set over that
-recursive `Html` ABI: named property helpers, named event-handler helpers,
-and keyed or unkeyed constructors for the currently blessed elements. The
+`Root.renderComponent` wraps a Lean `Component props` plus concrete props in a
+real JavaScript React function component. The public hook surface is generic
+over `StateValue α`; today the blessed instances are `String`, `Nat`, `Bool`,
+and opaque `Lean.Vir.Js α` values. State setters are typed JavaScript resources
+and must cross public signatures as `Lean.Vir.Js
+(Lean.Vir.React.StateSetter α)`.
+
+The intended v0 authoring surface is a DOM-like helper set over that `Js Html`
+resource ABI: named property helpers, named event-handler helpers, and keyed
+or unkeyed constructors for the currently blessed elements. The
 generic scalar prop, event, and element helpers remain intentional escape
 hatches for demos that need a DOM case not yet covered by the named surface.
 `docs/REACT_HTML.md` is the canonical reference for helper names, prop
@@ -250,9 +270,9 @@ mappings, validation rules, callback ownership, and the JavaScript renderer
 contract.
 
 The React browser fixtures are split by intent: `examples/ReactCounter.lean`
-contains the counter, static render, lifecycle, and stress cases, while
-`examples/ReactInput.lean` contains controlled text, change, submit,
-attribute-conformance, and checkbox callbacks. `examples/Tamagotchi.lean`
+contains the hook-backed counter, static render, lifecycle, and stress cases, while
+`examples/ReactInput.lean` contains hook-backed controlled text, change,
+submit, attribute-conformance, and checkbox callbacks. `examples/Tamagotchi.lean`
 keeps both demos: `Tamagotchi` is the non-React DOM-hosted version, and
 `ReactTamagotchi` reuses the same model with a keyed React tree, controlled
 text input, checkbox state, form submit handling, and action callbacks.
@@ -342,13 +362,14 @@ entrypoints:
   browser and React object markers
 - Lean function values used as host callbacks
 - `Lean.Expr`
-- `Lean.Vir.React.Html` through the generic recursive custom-inductive surface
+- `Lean.Vir.React.Html` as an opaque JavaScript-owned resource under
+  `Lean.Vir.Js`
 
 Imports may be pure functions or synchronous effect actions. Raw custom host
 imports can use `IO α`; DOM and React-root APIs use `Lean.Vir.Browser.DomM α`,
 and render construction APIs use `ReactM α`. The v1 host boundary is synchronous;
 returning a JavaScript `Promise` is an error. The current package format
-supports up to 32 host imports with IR arity at most 6. Host-import metadata
+supports up to 64 host imports with IR arity at most 6. Host-import metadata
 records both the low-level IR arity and the number of leading erased type
 parameters skipped before JavaScript-visible arguments.
 The JSON manifest records effect labels as `pure`, `io`, `dom`, or `react`.

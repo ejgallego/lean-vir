@@ -115,8 +115,8 @@ The embedded manifest currently supports:
   container shapes;
 - direct `Lean.Expr`, represented at the JavaScript boundary as structural
   expression objects;
-- `Lean.Vir.React.Html`, represented through the same recursive custom
-  inductive surface and rendered by the React host bindings.
+- `Lean.Vir.React.Html`, represented as an opaque `Lean.Vir.Js` resource whose
+  native React node is constructed by the React host bindings.
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
@@ -151,10 +151,11 @@ the runtime receives the internal closure root id through a side channel and
 releases the rooted Lean closure when the host-owned registration is done with
 it.
 
-`Lean.Vir.React.Html` now uses the same improved custom-inductive and
-`recursiveSelf` descriptor support as other non-indexed recursive inductives.
-The React-specific boundary is the host renderer and callback ownership policy,
-not a separate private `reactHtml` wire type.
+`Lean.Vir.React.Html` is a JavaScript-owned resource marker. The recursive
+structure of the rendered tree lives in the host resource graph created by
+`react.html.text` and `react.html.element`; the manifest still describes the
+ordinary `Property`, `PropValue`, and `EventHandler` payloads that those host
+imports receive.
 
 Entry points and host imports can be pure functions or synchronous effect
 actions. Raw custom host imports can use `IO α`; browser APIs use

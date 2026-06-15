@@ -15,7 +15,6 @@ import {
 } from "../../web/src/vir-host-bindings.js";
 import {
   assert,
-  reactHtmlElement,
   readRuntimeArtifacts,
 } from "./shared.mjs";
 import {
@@ -111,169 +110,182 @@ const malformedReactHost = createVirtualDocumentHostBindings(malformedReactDocum
 const malformedReactContainer = malformedReactHost["browser.document.querySelector"]("#react-malformed");
 const malformedReactRoot = malformedReactHost["react.root.create"](malformedReactContainer);
 const renderMalformedReactHtml = (html) => malformedReactHost["react.root.render"](malformedReactRoot, html);
-renderMalformedReactHtml(reactHtmlElement({
+const reactHtmlText = (value) => malformedReactHost["react.html.text"](value);
+const reactHtmlElement = ({
+  tag = "div",
+  key = null,
+  props = [],
+  handlers = [],
+  children = [],
+} = {}) => malformedReactHost["react.html.element"](tag, key, props, handlers, children);
+const renderReactHtmlElement = (fields) => renderMalformedReactHtml(reactHtmlElement(fields));
+renderReactHtmlElement({
   props: [
     { name: "tabIndex", value: { kind: "int", value: "4" } },
     { name: "data-ratio", value: { kind: "float", value: 1.5 } },
     { name: "className", value: { kind: "classList", value: ["alpha", "beta", "alpha"] } },
     { name: "style", value: { kind: "style", value: [{ name: "marginTop", value: "1px" }] } },
   ],
-}));
+});
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.tabIndex, 4);
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props["data-ratio"], 1.5);
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.className, "alpha beta");
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.style.marginTop, "1px");
 assert.throws(
-  () => renderMalformedReactHtml({ kind: "text", value: 1 }),
+  () => reactHtmlText(1),
   /React Html text value must be a string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml({ kind: "element", fields: null }),
-  /React Html element fields must be an object/,
+  () => malformedReactHost["react.html.element"]("div", null, [], [], "children"),
+  /React Html children must be an array/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({ tag: "" })),
+  () => renderReactHtmlElement({ children: [{}] }),
+  /React Html child\[0\] resource is not live/,
+);
+assert.throws(
+  () => renderReactHtmlElement({ tag: "" }),
   /React Html element tag must be a non-empty string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({ "key?": 7 })),
+  () => renderReactHtmlElement({ key: 7 }),
   /React Html element key must be a string or null/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: 1, value: { kind: "string", value: "bad" } }],
-  })),
+  }),
   /React Html property name must be a non-empty string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "data-", value: { kind: "string", value: "bad" } }],
-  })),
+  }),
   /React Html data-\* property name must include a suffix/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "__proto__", value: { kind: "string", value: "bad" } }],
-  })),
+  }),
   /React Html property name is not supported/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "title", value: { kind: "string", value: false } }],
-  })),
+  }),
   /React PropValue\.string value must be a string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "hidden", value: { kind: "bool", value: "false" } }],
-  })),
+  }),
   /React PropValue\.bool value must be a boolean/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "tabIndex", value: { kind: "int", value: "7.5" } }],
-  })),
+  }),
   /React PropValue\.int value must be a safe integer/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "tabIndex", value: { kind: "int", value: "9007199254740992" } }],
-  })),
+  }),
   /React PropValue\.int value must be a safe integer/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "value", value: { kind: "float", value: "1.5" } }],
-  })),
+  }),
   /React PropValue\.float value must be a finite number/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "title", value: { kind: "style", value: [] } }],
-  })),
+  }),
   /React PropValue\.style is only supported for the style prop/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "style", value: { kind: "style", value: "margin-top: 1px" } }],
-  })),
+  }),
   /React PropValue\.style value must be an array/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "style", value: { kind: "style", value: ["marginTop"] } }],
-  })),
+  }),
   /React PropValue\.style\[0\] must be an object/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "style", value: { kind: "style", value: [{ name: "", value: "1px" }] } }],
-  })),
+  }),
   /React PropValue\.style\[0\]\.name must be a non-empty string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "style", value: { kind: "style", value: [{ name: "__proto__", value: "1px" }] } }],
-  })),
+  }),
   /React PropValue\.style\[0\]\.name is not supported/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "style", value: { kind: "style", value: [{ name: "marginTop", value: 1 }] } }],
-  })),
+  }),
   /React PropValue\.style\[0\]\.value must be a string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "title", value: { kind: "classList", value: [] } }],
-  })),
+  }),
   /React PropValue\.classList is only supported for the className prop/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "className", value: { kind: "classList", value: "alpha beta" } }],
-  })),
+  }),
   /React PropValue\.classList value must be an array/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "className", value: { kind: "classList", value: ["ok", ""] } }],
-  })),
+  }),
   /React PropValue\.classList\[1\] must be a non-empty token without whitespace/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "className", value: { kind: "classList", value: ["ok", "bad token"] } }],
-  })),
+  }),
   /React PropValue\.classList\[1\] must be a non-empty token without whitespace/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     props: [{ name: "data-x", value: { kind: "number", value: 1 } }],
-  })),
+  }),
   /React PropValue must be string, bool, int, float, style, or classList/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     handlers: [{ name: 1, callback: Object.assign(() => undefined, { release: () => undefined }) }],
-  })),
+  }),
   /React Html event handler name must be a non-empty string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     handlers: [{ name: "__proto__", callback: Object.assign(() => undefined, { release: () => undefined }) }],
-  })),
+  }),
   /React Html event handler name is not supported/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactHtmlElement({
     handlers: [{ name: "onClick" }],
-  })),
+  }),
   /React Html event handler callback must be a releasable function/,
 );
 
 assert.equal(reactRuntime.call("ReactCounter.mount", "#react-dispose"), true);
-assert.equal(reactRuntime.liveCallbacks.size, 1);
+assert.equal(reactRuntime.liveCallbacks.size, 2);
 reactRuntime.dispose();
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.throws(() => reactRuntime.call("ReactCounter.mount", "#react-disposed"), /disposed/);
@@ -296,7 +308,7 @@ const reactReloadRuntime = await createVirRuntime({
 });
 ensureVirtualElementState(reactReloadDocumentState, "#react-reload");
 assert.equal(reactReloadRuntime.call("ReactCounter.mount", "#react-reload"), true);
-assert.equal(reactReloadRuntime.liveCallbacks.size, 1);
+assert.equal(reactReloadRuntime.liveCallbacks.size, 2);
 reactReloadRuntime.loadIrPackageBytes(irPackageBytes);
 assert.equal(reactReloadRuntime.liveCallbacks.size, 0);
 assert.equal(reactReloadDocumentState.elements.get("#react-reload").reactRoot, undefined);

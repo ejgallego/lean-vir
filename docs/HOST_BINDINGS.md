@@ -38,6 +38,14 @@ non-browser environments.
 Browser `react.root.*` targets are provided by
 `lean-vir/react-host-bindings`. With that entry installed, React roots map to
 `ReactDOMClient.createRoot`, `root.render`, and `root.unmount`.
+`react.html.text` and `react.html.element` construct `ReactHtml` resources;
+the browser binding uses `React.createElement`, while the virtual binding builds
+test-visible virtual React nodes.
+`react.root.renderComponent` wraps the thunk produced by Lean's
+`Root.renderComponent root component props` API in a real React function
+component. The hook bindings `react.useState`, `react.state.set`, and
+`react.state.modify` share the same browser and virtual host resource store as
+React roots.
 
 ## Virtual Node Bindings
 
@@ -148,4 +156,5 @@ manifest.
 - [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)
 - [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame)
 - [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot)
+- [React `useState`](https://react.dev/reference/react/useState)
 - [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount)

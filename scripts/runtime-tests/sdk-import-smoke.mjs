@@ -74,6 +74,8 @@ try {
   const resources = hostBindings.createHostResourceState();
   const bindings = reactHostBindings.createBrowserReactHostBindings(resources);
   assert.equal(typeof reactHostBindings.createBrowserReactHostBindings, "function");
+  assert.equal(typeof bindings["react.html.text"], "function");
+  assert.equal(typeof bindings["react.html.element"], "function");
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.render"], "function");
   assert.equal(typeof bindings["react.root.unmount"], "function");

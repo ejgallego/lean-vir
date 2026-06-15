@@ -18,6 +18,8 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "def polymorphicJsIdentity {α : Type} (value : Lean.Vir.Js α) : Lean.Vir.Js α := value",
     "def nakedElementIdentity (element : Lean.Vir.Browser.Element) : Lean.Vir.Browser.Element := element",
     "def nakedReactRootIdentity (root : Lean.Vir.React.Root) : Lean.Vir.React.Root := root",
+    "def nakedStateSetterIdentity (setter : Lean.Vir.React.StateSetter Nat) : Lean.Vir.React.StateSetter Nat := setter",
+    "def nakedPropsIdentity (props : Lean.Vir.React.Props) : Lean.Vir.React.Props := props",
     "",
   ], [
     /indexedPairIdentity/,
@@ -30,12 +32,18 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /JavaScript object marker `Lean\.Vir\.Browser\.Element` must appear under `Lean\.Vir\.Js`/,
     /nakedReactRootIdentity/,
     /JavaScript object marker `Lean\.Vir\.React\.Root` must appear under `Lean\.Vir\.Js`/,
+    /nakedStateSetterIdentity/,
+    /JavaScript object marker `Lean\.Vir\.React\.StateSetter` must appear under `Lean\.Vir\.Js`/,
+    /nakedPropsIdentity/,
+    /JavaScript object marker `Lean\.Vir\.React\.Props` must appear under `Lean\.Vir\.Js`/,
   ], [
     "indexedPairIdentity",
     "implicitBump",
     "polymorphicJsIdentity",
     "nakedElementIdentity",
     "nakedReactRootIdentity",
+    "nakedStateSetterIdentity",
+    "nakedPropsIdentity",
   ]);
 
   await assertUnsupportedInterfaceSource(freshDir, "UnsupportedRecursiveInductives", [

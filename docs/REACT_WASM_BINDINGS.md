@@ -125,20 +125,23 @@ registration.
 The current runtime should stay morally aligned with WIT even while the browser
 artifact remains a core `wasm32-wasip1` module. WIT already has enums and
 variants, so the main mismatch for `Lean.Vir.React.Html` is not enum support.
-The mismatch is that WIT value types are not recursive, while the Lean authoring
-type is recursive and embeds callback closures inside event-handler records.
+The current `Html` marker is now resource-like: Lean constructs a
+JavaScript-owned `ReactHtml` through `react.html.text` and
+`react.html.element`, and event-handler records passed to construction can
+embed callback closures.
 
 The intended alignment is:
 
-- keep recursive `Html` as the Lean authoring DSL;
+- keep `Lean.Vir.Js Lean.Vir.React.Html` as the shallow native-node resource
+  authored through Lean combinators;
 - treat browser values such as `Element`, callback-scoped `Event`, and
   `ReactRoot` as resource-like handles;
 - keep records, variants/enums, lists, options, strings, numeric scalars, and
   resources close to WIT's value/resource categories;
-- if a future component boundary is introduced, lower recursive `Html` to a
-  non-recursive flat tree such as `{ root, nodes }`, with children represented
-  by node indexes and callbacks represented by resources or runtime-owned
-  callback ids.
+- keep the initial
+  `Component props := props -> ReactM (Lean.Vir.Js Html)` boundary shallow and
+  React-like while treating future node-sharing or batching encodings as an
+  optimization question, not a user-facing API requirement.
 
 The benchmark suite includes rows that should be sensitive to future WIT
 binding choices:
@@ -161,8 +164,9 @@ surface:
 - `lean-vir` exports the generic runtime API.
 - `lean-vir/host-bindings` exports common and browser host-binding factories,
   but does not export React bindings or import React packages.
-- `lean-vir/react-host-bindings` exports browser `react.root.*` bindings and is
-  the only browser entrypoint that imports `react` and `react-dom/client`.
+- `lean-vir/react-host-bindings` exports browser React root/component/hook
+  bindings and is the only browser entrypoint that imports `react` and
+  `react-dom/client`.
 - `lean-vir/vir-runtime-node` composes virtual browser and React bindings for
   Node tests and tools.
 

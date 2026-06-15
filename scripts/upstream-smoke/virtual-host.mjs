@@ -28,8 +28,8 @@ export async function smokeVirtualHostRuntime(context) {
     irPackageBytes: context.hostPackageBytes,
     virtualDocumentState: hostDocumentState,
   });
-  if (hostRuntime.packageInfo.hostImports !== 26) {
-    throw new Error(`expected 26 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+  if (hostRuntime.packageInfo.hostImports !== 35) {
+    throw new Error(`expected 35 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
   }
   const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
   if (hostTitle !== "Lean VIR host: smoke") {

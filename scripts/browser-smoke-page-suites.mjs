@@ -167,7 +167,7 @@ export async function smokePackagePreset(cdp, origin) {
     status: "Ready",
     packageName: hostPackageFile,
     packageUrl: hostPackageFile,
-    entryCount: 35,
+    entryCount: 41,
   });
 }
 
