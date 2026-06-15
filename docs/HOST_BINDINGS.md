@@ -71,7 +71,7 @@ rendered virtual React nodes by DOM-like `id` props.
 Custom imports can be declared directly:
 
 ```lean
-import Lean.Vir.Host
+import Vir.Host
 
 @[vir_js "demo.bumpNat"]
 opaque jsBumpNat (n : Nat) : Nat

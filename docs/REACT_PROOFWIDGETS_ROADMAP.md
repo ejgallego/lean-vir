@@ -1,6 +1,6 @@
 # ProofWidgets Compatibility Roadmap
 
-This note records the path from LeanVir's standalone React renderer toward
+This note records the path from Vir's standalone React renderer toward
 richer ProofWidgets compatibility. The implemented renderer and its current
 API are tracked separately in `docs/REACT_HTML.md`; this file focuses on the
 future infoview/RPC and ProofWidgets-style layers.
@@ -25,12 +25,12 @@ TypeScript/React assets and splices the bundled JavaScript into Lean modules:
 
 - <https://github.com/leanprover-community/ProofWidgets4>
 
-For LeanVir, full infoview compatibility remains a follow-up target. We do not
+For Vir, full infoview compatibility remains a follow-up target. We do not
 yet have the Lean server snapshot/RPC layer, document positions, or proof-script
 edit channel that real ProofWidgets can rely on. The first useful target is the
 standalone React renderer documented in `docs/REACT_HTML.md`.
 
-## Current LeanVir Fit
+## Current Vir Fit
 
 The merged closure bridge gives us the hard part for interactive React views:
 

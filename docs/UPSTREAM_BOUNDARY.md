@@ -65,7 +65,7 @@ not a fork of Lean. It is split by responsibility:
   constructor replacements for exported Lean-library constructors.
 - `package_decl_provider.cpp` owns package decoding, declaration lookup, host
   import metadata, and initializer execution.
-- `tools/GeneratePackage.lean` owns extraction of the demo declaration closures
+- `Vir/GeneratePackage.lean` owns extraction of the demo declaration closures
   from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
   packages.
 - `decl_provider.h` is the replacement point for a future module-backed
@@ -128,7 +128,7 @@ surface. This keeps `.olean` loading, module initialization, and full
 environment construction out of scope while still exercising the real upstream
 interpreter over real Lean IR objects.
 
-The closure is extracted by `tools/GeneratePackage.lean` from real
+The closure is extracted by `Vir/GeneratePackage.lean` from real
 `Lean.IR.Decl` values. The generator starts with declarations produced for the
 example sources, walks `FAp`/`PAP` references, and can now fall back to
 `Lean.IR.findEnvDecl` for imported IR declarations already available through
@@ -226,7 +226,7 @@ construction for the generic JavaScript interface path, so structural
 Lean-library exported constructor wrappers.
 
 JavaScript host imports deliberately do not widen the native extern policy.
-`tools/GeneratePackage.lean` encodes `@[vir_js "..."]` extern declarations into
+`Vir/GeneratePackage.lean` encodes `@[vir_js "..."]` extern declarations into
 the package manifest and assigns each one a finite trampoline symbol. The shim
 recognizes only those package-provided symbols, calls the single imported
 `env.vir_js_call` dispatcher, and still rejects unrelated dynamic symbol
@@ -241,7 +241,7 @@ internal root id through `env.vir_closure_push`, and emits no serialized
 This keeps the Lean heap reference count explicit while avoiding any change to
 the upstream interpreter file.
 
-`tools/GeneratePackage.lean` is the source of truth for native extern
+`Vir/GeneratePackage.lean` is the source of truth for native extern
 registrations. Run `node scripts/check-boundary-registry.mjs --write` after
 changing its `nativeExterns` table; this regenerates
 `wasm/upstream_shim/native_symbols_registry.inc`. The regular
@@ -293,7 +293,7 @@ remove if we want parser loading to behave exactly like a full Lean runtime.
 ## Future Loading Path
 
 The current loader is intentionally demo-specific: it decodes the package format
-emitted by `tools/GeneratePackage.lean`. A future loading step is to make the
+emitted by `Vir/GeneratePackage.lean`. A future loading step is to make the
 package format match Lean's generated `.ir` or module data more closely, so the
 same stable `vir_load_ir_package(ptr, len)` boundary can load artifacts produced
 by Lean itself.

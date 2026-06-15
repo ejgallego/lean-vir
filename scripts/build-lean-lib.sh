@@ -10,7 +10,21 @@ cd "$(dirname "$0")/.."
 
 out="build/lean-lib"
 lean_lib="$(lean --print-prefix)/lib/lean"
-mkdir -p "$out/Lean/Vir"
+
+# Drop stale project-owned module outputs from superseded import layouts.
+stale_namespace_root="Lean"
+stale_module_root="Vir"
+stale_flat_root="${stale_namespace_root}${stale_module_root}"
+stale_layouts=(
+  "$out/$stale_flat_root"
+  "$out/$stale_flat_root.olean"
+  "$out/$stale_flat_root.ilean"
+  "$out/$stale_namespace_root/$stale_module_root"
+)
+rm -rf \
+  "${stale_layouts[@]}"
+
+mkdir -p "$out/Lean"
 
 for entry in "$lean_lib"/*; do
   base="$(basename "$entry")"
@@ -24,9 +38,6 @@ done
 
 for entry in "$lean_lib/Lean"/*; do
   base="$(basename "$entry")"
-  if [ "$base" = "Vir" ]; then
-    continue
-  fi
   if [ ! -e "$out/Lean/$base" ]; then
     ln -s "$entry" "$out/Lean/$base"
   fi
@@ -44,12 +55,16 @@ build_module() {
   fi
 }
 
-build_module LeanVir/Host.lean
-build_module LeanVir/Common.lean
-build_module LeanVir/Browser.lean
-build_module LeanVir/React.lean
-build_module LeanVir.lean
-build_module Lean/Vir/Host.lean
-build_module Lean/Vir/Common.lean
-build_module Lean/Vir/Browser.lean
-build_module Lean/Vir/React.lean
+build_module Vir/Host.lean
+build_module Vir/Common.lean
+build_module Vir/Browser.lean
+build_module Vir/React.lean
+build_module Vir/GeneratePackage.lean
+build_module Vir.lean
+
+for stale in "${stale_layouts[@]}"; do
+  if [ -e "$stale" ]; then
+    echo "stale Lean library output remains: $stale" >&2
+    exit 1
+  fi
+done

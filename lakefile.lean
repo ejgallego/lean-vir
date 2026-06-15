@@ -5,8 +5,8 @@ package lean_vir where
   releaseRepo := "https://github.com/ejgallego/lean-vir"
 
 @[default_target]
-lean_lib LeanVir where
-  globs := #[.andSubmodules `LeanVir]
+lean_lib Vir where
+  globs := #[.andSubmodules `Vir]
 
 lean_exe vir_irpkg where
   root := `tools.GeneratePackage

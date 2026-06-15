@@ -13,7 +13,7 @@ rebuilding the upstream interpreter.
    that are needed by the demo but should not become JS interface exports.
 3. Run `npm run check:package`.
 4. Inspect the relevant `build/generated/*.report.md`.
-5. If you add or change a native extern in `tools/GeneratePackage.lean`, run
+5. If you add or change a native extern in `Vir/GeneratePackage.lean`, run
    `node scripts/check-boundary-registry.mjs --write`, then
    `npm run check:boundary-registry`. This is not needed for `@[vir_js "..."]`
    host imports; those appear in the report's JavaScript host import section
@@ -83,7 +83,7 @@ the package-backed imported closure or the explicit native boundary.
 Prefer the manifest-driven `vir.call(name, ...args)` API in
 `web/src/vir-runtime.js`. If a demo needs another browser-supplied input or
 result shape, extend the manifest type classifier and the generic call encoder
-in `tools/GeneratePackage.lean`, `web/src/runtime/`, and the interface codec in
+in `Vir/GeneratePackage.lean`, `web/src/runtime/`, and the interface codec in
 `wasm/upstream_shim/interface_codec.cpp`. Keep the Lean declaration itself in
 `examples/` and include it as an exported root. Do not add per-function or
 per-shape WASM exports for manifest-supported declarations; unsupported entries
@@ -101,8 +101,8 @@ control from that manifest after the package is loaded. For `Sum` and `Except`,
 the manifest records constructor payload layouts and `/dev.html` renders JSON
 inputs.
 
-Lean code can call JavaScript by importing `Lean.Vir.Common`,
-`Lean.Vir.Browser`, or `Lean.Vir.Host` and adding an opaque declaration marked
+Lean code can call JavaScript by importing `Vir.Common`, `Vir.Browser`, or
+`Vir.Host` and adding an opaque declaration marked
 with `@[vir_js "target.name"]`. Bind new targets in `hostBindings` when creating
 the browser runtime. The v1 host boundary is synchronous; async browser APIs
 need an explicit callback/polling design until the runtime grows an async

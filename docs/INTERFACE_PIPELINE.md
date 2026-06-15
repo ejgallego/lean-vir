@@ -155,9 +155,9 @@ The React-specific boundary is the host renderer and callback ownership policy,
 not a separate private `reactHtml` wire type.
 
 Entry points and host imports can be pure functions or `IO α` actions. For
-Lean-to-JavaScript calls, import `Lean.Vir.Host` and mark an opaque declaration
+Lean-to-JavaScript calls, import `Vir.Host` and mark an opaque declaration
 with `@[vir_js "target.name"]`, or use the starter declarations in
-`Lean.Vir.Common` and `Lean.Vir.Browser`. The manifest records each host import
+`Vir.Common` and `Vir.Browser`. The manifest records each host import
 under `hostImports` with its slot, Lean name, JavaScript target, generated WASM
 symbol, arguments, result type, and effect.
 
