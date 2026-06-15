@@ -62,9 +62,10 @@ state is uncertain.
 ## Current Standalone Renderer
 
 The current standalone renderer is implemented and documented in
-`docs/REACT_HTML.md`. In short, Lean can render a recursive DOM-like `Html`
-tree into a browser React root, retain Lean callbacks in event handlers, and
-release them on rerender, unmount, package reload, or runtime disposal.
+`docs/REACT_HTML.md`. In short, Lean can construct `ReactHtml` resources
+through DOM-like combinators, render them into a browser React root, retain
+Lean callbacks in event handlers, and release them on rerender, unmount,
+package reload, or runtime disposal.
 
 That renderer deliberately avoids full infoview compatibility. It validates the
 host-resource and callback-lifetime model first. Resource values now cross the

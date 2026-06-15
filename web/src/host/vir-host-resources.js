@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { disposeReactHtml } from "../react/vir-react-html.js";
+import { disposeReactHtml, disposeUnownedReactHtml } from "../react/vir-react-html.js";
 import {
   createHostResource,
   hostResourceLabel,
@@ -73,7 +73,9 @@ export class HostResourceState {
 
   dispose() {
     for (const value of Array.from(this.disposables)) {
-      if (typeof value.remove === "function") {
+      if (typeof value.dispose === "function") {
+        value.dispose();
+      } else if (typeof value.remove === "function") {
         value.remove();
       } else if (typeof value.clear === "function") {
         value.clear();
@@ -145,20 +147,35 @@ export function createHtmlInputElementResourceHostBindings(resources, { fromElem
   };
 }
 
-export function createReactRootResourceHostBindings(resources, createRootResource) {
+export function createReactRootResourceHostBindings(resources, createRootResource, {
+  createHtmlTextResource = null,
+  createHtmlElementResource = null,
+} = {}) {
   return {
+    "react.html.text": (value) =>
+      resources.resourceForValue(requireReactHtmlTextResourceFactory(createHtmlTextResource)(value)),
+    "react.html.element": (tag, key, props, handlers, children) =>
+      resources.resourceForValue(
+        requireReactHtmlElementResourceFactory(createHtmlElementResource)(tag, key, props, handlers, children)
+      ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
       return resources.resourceForValue(createRootResource(target));
     },
     "react.root.render": (root, html) => {
+      let value;
       try {
-        const value = resources.resolveResource(root, "ReactRoot");
-        value.render(html);
+        value = resources.resolveResource(root, "ReactRoot");
       } catch (error) {
-        disposeReactHtml(html);
+        disposeUnownedReactHtml(resources, html);
         throw error;
       }
+      value.render(html);
+      return undefined;
+    },
+    "react.root.renderComponent": (root, component) => {
+      const value = resources.resolveResource(root, "ReactRoot");
+      value.renderComponent(component);
       return undefined;
     },
     "react.root.unmount": (root) => {
@@ -168,6 +185,20 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       return undefined;
     },
   };
+}
+
+function requireReactHtmlTextResourceFactory(factory) {
+  if (typeof factory !== "function") {
+    throw new Error("react.html.text host binding requires a React Html text resource factory");
+  }
+  return factory;
+}
+
+function requireReactHtmlElementResourceFactory(factory) {
+  if (typeof factory !== "function") {
+    throw new Error("react.html.element host binding requires a React Html element resource factory");
+  }
+  return factory;
 }
 
 export function createTimerResourceHostBindings(resources) {
@@ -293,10 +324,44 @@ export function performanceNow() {
 }
 
 export function createReactHostHooks() {
+  let eventDepth = 0;
+  const deferredReactHtmlDisposals = [];
+  const flushReactHtmlDisposals = () => {
+    if (eventDepth !== 0) return undefined;
+    const pending = deferredReactHtmlDisposals.splice(0);
+    for (const dispose of pending) {
+      dispose();
+    }
+    return undefined;
+  };
   return {
     addDisposable: (state, value) => state.addDisposable(value),
     removeDisposable: (state, value) => state.removeDisposable(value),
     callLeanEventCallback,
+    beginReactHtmlEventCallback: () => {
+      eventDepth++;
+      return undefined;
+    },
+    endReactHtmlEventCallback: () => {
+      eventDepth = Math.max(0, eventDepth - 1);
+      return undefined;
+    },
+    deferReactHtmlDispose: (dispose) => {
+      if (typeof dispose !== "function") {
+        throw new Error("React Html deferred disposal must be a function");
+      }
+      if (eventDepth === 0) {
+        const queue =
+          typeof globalThis.queueMicrotask === "function"
+            ? globalThis.queueMicrotask.bind(globalThis)
+            : (callback) => Promise.resolve().then(callback);
+        queue(dispose);
+        return undefined;
+      }
+      deferredReactHtmlDisposals.push(dispose);
+      return undefined;
+    },
+    flushReactHtmlDisposals,
     once,
   };
 }

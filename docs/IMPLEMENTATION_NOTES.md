@@ -60,13 +60,14 @@ resources remain opaque callback-scoped values; the ownership contract and
 follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
 
 The browser-facing direction now includes a standalone React rendering slice.
-Lean code can create a React root from a browser element, render a narrow
-recursive `Html` tree represented by the generic custom-inductive interface
-support, and retain Lean callbacks inside React event handlers. The Lean
-library exposes a small DOM-like helper set for common props, events, keyed
-labels, forms, inputs, buttons, style objects, class lists, and text containers,
-with examples covering button clicks in `ReactCounter`, controlled input
-rerendering, DOM attribute conformance in `ReactInput`, and a React
+Lean code can create a React root from a browser element, construct native
+React nodes through `Html.text`/`Html.element`, render the resulting
+`Lean.Vir.Js Lean.Vir.React.Html` resource, and retain Lean callbacks inside
+React event handlers. The Lean library exposes a DOM-like helper set for common
+props, events, keyed labels, forms, inputs, buttons, style objects, class
+lists, and text containers, with examples covering button clicks in
+`ReactCounter`, controlled input rerendering, DOM attribute conformance in
+`ReactInput`, and a React
 Tamagotchi that shares the DOM demo's model while keeping view state in Lean
 closures instead of reading it back from DOM attributes.
 Controlled text handlers use `Event.inputValue?` and checkbox handlers use

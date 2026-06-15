@@ -569,7 +569,7 @@ printWasmRow(`DOM listener resource create/remove x ${domResourceIterations}`, w
 console.log();
 printWasmRow(`React root mount/render/unmount x ${reactRootIterations}`, wasmReactRoot);
 console.log();
-console.log("React Html conversion paths");
+console.log("React Html resource paths");
 console.log();
 printWasmRow(
   `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,

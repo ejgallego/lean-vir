@@ -100,7 +100,7 @@ assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
-assert.equal(hostRuntime.packageInfo.hostImports, 26);
+assert.equal(hostRuntime.packageInfo.hostImports, 35);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 7);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -145,19 +145,33 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "browser.htmlInputElement.setValue",
   "browser.timer.clearTimeout",
   "browser.timer.setTimeout",
+  "react.html.element",
+  "react.html.text",
   "react.root.create",
   "react.root.render",
+  "react.root.renderComponent",
   "react.root.unmount",
+  "react.state.modify",
+  "react.state.set",
+  "react.state.set",
+  "react.useState",
+  "react.useState",
+  "react.useState",
   "test.callNatCallback",
   "test.recordNat",
 ]);
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
     ?.args[1]?.type?.kind,
-  "customInductive",
+  "resource",
 );
-const reactHtmlType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
-  ?.args[1]?.type;
+assert.equal(
+  hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
+    ?.args[1]?.type?.name,
+  "Lean.Vir.React.Html",
+);
+const reactHtmlType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.html.element")
+  ?.args[2]?.type;
 const reactPropValueType = findTypeDescriptor(
   reactHtmlType,
   (type) => type.kind === "customInductive" && typeof type.name === "string" && type.name.endsWith(".PropValue"),

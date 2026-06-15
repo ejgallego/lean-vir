@@ -138,20 +138,6 @@ export function wait(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-export function reactHtmlElement(fields = {}) {
-  return {
-    kind: "element",
-    fields: {
-      tag: "div",
-      "key?": null,
-      props: [],
-      handlers: [],
-      children: [],
-      ...fields,
-    },
-  };
-}
-
 export function generateIrPackage(source, packagePath) {
   const generated = spawnSync(
     "bash",

@@ -1451,7 +1451,7 @@ def isNativeExternCandidate (n : Name) : Bool :=
 
 def jsExternPrefix : String := "__vir_js:"
 
-def maxHostImportSlots : Nat := 32
+def maxHostImportSlots : Nat := 64
 
 def maxHostImportArity : Nat := 6
 
@@ -1904,7 +1904,7 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | _ => none
 
 def jsResourceMarker? (e : Lean.Expr) : Option (Name × String) := do
-  let name ← constName? e
+  let name ← headConstName? e
   match name with
   | `Lean.Vir.Browser.Element => some (name, "Element")
   | `Lean.Vir.Browser.Event => some (name, "Event")
@@ -1913,6 +1913,9 @@ def jsResourceMarker? (e : Lean.Expr) : Option (Name × String) := do
   | `Lean.Vir.Browser.Timeout => some (name, "Timeout")
   | `Lean.Vir.Browser.AnimationFrame => some (name, "AnimationFrame")
   | `Lean.Vir.React.Root => some (name, "ReactRoot")
+  | `Lean.Vir.React.Html => some (name, "ReactHtml")
+  | `Lean.Vir.React.StateSetter => some (name, "ReactStateSetter")
+  | `Lean.Vir.React.Props => some (name, "ReactProps")
   | _ => none
 
 def resourceInterfaceType? (_env : Environment) (e : Lean.Expr) : Option InterfaceType :=

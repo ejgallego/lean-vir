@@ -6,7 +6,15 @@ Author: Emilio J. Gallego Arias
 
 import * as React from "react";
 import * as ReactDOMClient from "react-dom/client";
-import { createBrowserReactRootResource as createBrowserReactRootResourceFromHtml } from "./react/vir-react-html.js";
+import {
+  createBrowserReactHookRuntime,
+  createReactStateHostBindings,
+} from "./react/vir-react-hooks.js";
+import {
+  createBrowserReactHtmlElementResource,
+  createBrowserReactHtmlTextResource,
+  createBrowserReactRootResource as createBrowserReactRootResourceFromHtml,
+} from "./react/vir-react-html.js";
 import {
   createHostResourceState,
   createReactHostHooks,
@@ -14,10 +22,22 @@ import {
 } from "./host/vir-host-resources.js";
 
 export function createBrowserReactHostBindings(state = createHostResourceState()) {
-  return createReactRootResourceHostBindings(state, (target) =>
-    createBrowserReactRootResource(state, ReactDOMClient.createRoot(target), React.createElement));
+  const hookRuntime = createBrowserReactHookRuntime(state, React);
+  const hooks = {
+    ...createReactHostHooks(),
+    hookRuntime,
+  };
+  return {
+    ...createReactRootResourceHostBindings(state, (target) =>
+      createBrowserReactRootResource(state, ReactDOMClient.createRoot(target), React, hooks), {
+        createHtmlTextResource: (value) => createBrowserReactHtmlTextResource(state, value),
+        createHtmlElementResource: (tag, key, props, handlers, children) =>
+          createBrowserReactHtmlElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
+      }),
+    ...createReactStateHostBindings(state, hookRuntime),
+  };
 }
 
-function createBrowserReactRootResource(state, root, createElement) {
-  return createBrowserReactRootResourceFromHtml(state, root, createElement, createReactHostHooks());
+function createBrowserReactRootResource(state, root, React, hooks) {
+  return createBrowserReactRootResourceFromHtml(state, root, React, hooks);
 }
