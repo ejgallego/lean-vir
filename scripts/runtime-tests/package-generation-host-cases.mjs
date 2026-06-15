@@ -21,7 +21,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const hostSource = join(freshDir, "FreshHost.lean");
   const hostPackage = join(freshDir, "host.irpkg");
   await writeFile(hostSource, [
-    "import Lean.Vir.Browser",
+    "import Vir.Browser",
     "",
     "def freshEchoBang (s : String) : String :=",
     "  Lean.Vir.Common.echoString (s ++ \"!\")",
@@ -58,7 +58,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const customHostSource = join(freshDir, "FreshCustomHost.lean");
   const customHostPackage = join(freshDir, "custom-host.irpkg");
   await writeFile(customHostSource, [
-    "import Lean.Vir.Host",
+    "import Vir.Host",
     "",
     "structure HostCounter where",
     "  label : String",

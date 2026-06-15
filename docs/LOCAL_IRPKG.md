@@ -56,7 +56,7 @@ host imports, source targets, and resolved roots. The same data is embedded in
 `manifest.metadata`.
 
 Local package generation also builds `build/lean-lib`, which provides the
-project-owned `Lean.Vir.*` modules for host import declarations.
+project-owned `Vir.*` modules for host import declarations.
 
 If a requested export cannot be packaged or mapped to the supported JavaScript
 interface surface, generation exits nonzero and points at the report.

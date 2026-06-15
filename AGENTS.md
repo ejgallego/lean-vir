@@ -11,7 +11,7 @@ asks for that machinery.
 
 - Repository root: `/home/egallego/lean/vir`
 - Primary work areas:
-  - `Lean/`, `LeanVir/`, and `tools/` for Lean-side library and package tools
+  - `Vir/` and `tools/` for Lean-side library and package tools
   - `wasm/upstream_shim/` for the local WASI boundary and demo host shims
   - `web/src/` for the JavaScript runtime and browser runner
   - `examples/` and `fixtures/` for demos and regression fixtures

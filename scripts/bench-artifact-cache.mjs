@@ -16,7 +16,7 @@ import { runSync } from "./process-utils.mjs";
 const artifactCacheVersion = 1;
 const buildInputDiffPaths = [
   "Lean",
-  "LeanVir",
+  "Vir",
   "examples",
   "fixtures",
   "interfaces",

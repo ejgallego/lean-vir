@@ -253,7 +253,7 @@ marked with `@[vir_js "..."]`. See `docs/LEAN_VIR_LIBRARY.md` for the
 Lean-side API reference. Import one of the provided modules:
 
 ```lean
-import Lean.Vir.Browser
+import Vir.Browser
 
 def titleRoundtrip (title : String) : IO String := do
   Lean.Vir.Browser.Document.setTitle title

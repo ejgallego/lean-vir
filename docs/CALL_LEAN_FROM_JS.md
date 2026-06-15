@@ -288,7 +288,7 @@ when creating the runtime.
 Lean:
 
 ```lean
-import Lean.Vir.Host
+import Vir.Host
 
 @[vir_js "demo.bumpNat"]
 opaque jsBumpNat (n : Nat) : Nat

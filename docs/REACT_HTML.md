@@ -1,6 +1,6 @@
 # React HTML Renderer
 
-This note tracks the standalone React renderer that LeanVir exposes today. It
+This note tracks the standalone React renderer that Vir exposes today. It
 is intentionally separate from the future ProofWidgets compatibility work in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
@@ -143,7 +143,7 @@ helpers check `currentTarget` first, then fall back to `target`.
 ## Implemented Slice
 
 1. Added `react` and `react-dom` dependencies to the Vite app.
-2. Added `LeanVir/React.lean` with `Root`, `Html`, `Property`, `PropValue`,
+2. Added `Vir/React.lean` with `Root`, `Html`, `Property`, `PropValue`,
    `EventHandler`, and root create/render/unmount host imports.
 3. Reused the generic custom-inductive and `recursiveSelf` manifest support for
    the recursive `Html` shape.

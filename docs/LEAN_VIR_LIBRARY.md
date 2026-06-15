@@ -1,7 +1,8 @@
-# Lean.Vir Library
+# Vir Library
 
-`Lean.Vir.*` is the Lean-side library for declarations that call back into the
-JavaScript host while running through VIR's WASM interpreter.
+`Vir.*` is the Lean-side module family for declarations that call back into the
+JavaScript host while running through VIR's WASM interpreter. Those modules
+expose APIs in the `Lean.Vir.*` namespace.
 
 The library is built locally by:
 
@@ -26,7 +27,7 @@ bindings for tests. The JavaScript-side binding composition reference lives in
 1. Import the Lean module that provides the host import.
 
    ```lean
-   import Lean.Vir.Browser
+   import Vir.Browser
    ```
 
 2. Write an exported Lean declaration that calls the host import.
@@ -44,7 +45,7 @@ bindings for tests. The JavaScript-side binding composition reference lives in
    npm run generate:irpkg -- MyDemo.lean web/public/my-demo.irpkg titleHandshake
    ```
 
-   The command builds `Lean.Vir.*`, adds `build/lean-lib` to `LEAN_PATH`, writes
+   The command builds `Vir.*`, adds `build/lean-lib` to `LEAN_PATH`, writes
    the `.irpkg`, and writes a report next to it. The report should list the
    JavaScript host imports collected from the package.
 
@@ -71,7 +72,7 @@ directly with `Element.addEventListener`; the host retains that closure
 until the listener is removed or the runtime is disposed.
 
 ```lean
-import Lean.Vir.Browser
+import Vir.Browser
 
 def mountButtonCallback : IO Unit := do
   match ← Lean.Vir.Browser.Document.querySelector "#run" with
@@ -114,7 +115,7 @@ For custom JavaScript functions, declare the host import in Lean and bind the
 same target string in JavaScript.
 
 ```lean
-import Lean.Vir.Host
+import Vir.Host
 
 @[vir_js "demo.bumpNat"]
 opaque jsBumpNat (n : Nat) : Nat
@@ -152,23 +153,23 @@ LEAN_PATH="build/lean-lib${LEAN_PATH:+:$LEAN_PATH}" lean MyDemo.lean
 
 ## Modules
 
-`Lean.Vir.Host` provides the low-level `@[vir_js "..."]` host-import attribute
+`Vir.Host` provides the low-level `@[vir_js "..."]` host-import attribute
 and the `@[vir_resource "..."]` marker for opaque Lean resource types.
 
 ```lean
-import Lean.Vir.Host
+import Vir.Host
 
 @[vir_js "demo.bumpNat"]
 opaque jsBumpNat (n : Nat) : Nat
 ```
 
-`Lean.Vir.Common` provides small host imports that are useful in browser and
+`Vir.Common` provides small host imports that are useful in browser and
 Node-like environments:
 
 - `Lean.Vir.Common.echoString : @& String -> String`
 - `Lean.Vir.Common.addNat : Nat -> Nat -> Nat`
 
-`Lean.Vir.Browser` provides the first browser-specific imports:
+`Vir.Browser` provides the first browser-specific imports:
 
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
 - `Lean.Vir.Browser.Element`
@@ -203,7 +204,7 @@ Node-like environments:
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> IO Unit) -> IO Lean.Vir.Browser.AnimationFrame`
 - `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Browser.AnimationFrame -> IO Unit`
 
-`Lean.Vir.React` provides the first React-specific imports and a narrow
+`Vir.React` provides the first React-specific imports and a narrow
 recursive `Html` tree:
 
 - `Lean.Vir.React.Root`
@@ -250,7 +251,7 @@ and external browser/React API references are documented in
 ## Example
 
 ```lean
-import Lean.Vir.Browser
+import Vir.Browser
 
 namespace HostInterop
 
