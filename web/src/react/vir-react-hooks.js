@@ -92,14 +92,12 @@ export function createReactStateHostBindings(resources, hookRuntime) {
 }
 
 export function createReactJsValueHostBindings(resources) {
-  return {
-    "js.string": (value) => resources.resourceForValue(jsStringValue(value)),
-    "js.string.value": (value) => jsStringPayload(resources.resolveResource(value, "Js")),
-    "js.nat": (value) => resources.resourceForValue(jsNatValue(value)),
-    "js.nat.value": (value) => jsNatPayload(resources.resolveResource(value, "Js")),
-    "js.bool": (value) => resources.resourceForValue(jsBoolValue(value)),
-    "js.bool.value": (value) => jsBoolPayload(resources.resolveResource(value, "Js")),
-  };
+  const bindings = {};
+  for (const [target, codec] of Object.entries(jsValueCodecs)) {
+    bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
+    bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
+  }
+  return bindings;
 }
 
 function stateSetterFor(setters, setState) {
@@ -170,6 +168,21 @@ function modifyStateValue(resources, setter, update) {
 function reactStatePayload(resources, value) {
   return isHostResource(value) ? resources.resolveResource(value, "Js") : value;
 }
+
+const jsValueCodecs = {
+  "js.string": {
+    toJs: jsStringValue,
+    fromJs: jsStringPayload,
+  },
+  "js.nat": {
+    toJs: jsNatValue,
+    fromJs: jsNatPayload,
+  },
+  "js.bool": {
+    toJs: jsBoolValue,
+    fromJs: jsBoolPayload,
+  },
+};
 
 function jsStringValue(value) {
   if (typeof value !== "string") {

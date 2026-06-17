@@ -4,6 +4,23 @@ This note tracks the standalone React renderer that Vir exposes today. It
 is intentionally separate from the future ProofWidgets compatibility work in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
+For implementors, [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) has the React
+component call-flow diagram and the shared host-resource/closure ownership
+diagrams. The short model is:
+
+- `Component props := props -> ReactM (Lean.Vir.Js Html)` is a Lean-authored
+  React function component.
+- `Root.render root tree` takes a `ReactM (Lean.Vir.Js Html)` tree and lowers
+  it at the DOM/root boundary.
+- `Root.renderComponent` wraps that Lean function in a real JavaScript React
+  function component, so hooks run under React's dispatcher.
+- `ReactM` is for render-safe React construction; root and DOM lifetime
+  operations remain in `DomM`.
+- `Html`, `Root`, state setters, events, and primitive JavaScript state values
+  are JavaScript-owned resources that cross as `Lean.Vir.Js α`.
+- Event and updater closures are Lean-owned closures that cross to JavaScript
+  as releasable `VirCallback` objects.
+
 ## Current V0
 
 The current v0 exposes React as a runtime renderer behind a narrow native-node
@@ -104,8 +121,8 @@ def mountFromSelector
     Lean.Vir.Browser.DomM Bool := ...
 
 @[vir_js "react.root.render"]
-opaque render (root : @& Lean.Vir.Js Root) (html : @& Lean.Vir.Js Html) :
-  Lean.Vir.Browser.DomM Unit
+opaque render (root : @& Lean.Vir.Js Root) (html : ReactM (Lean.Vir.Js Html)) :
+  Lean.Vir.Browser.DomM Unit := ...
 
 def renderComponent
     (root : @& Lean.Vir.Js Root)
@@ -131,8 +148,13 @@ ownership policy, not a private recursive wire codec.
 
 `Lean.Vir.Browser.DomM` is the browser/DOM effect used by React root lifetime
 operations and event callbacks. `ReactM` is the narrower render-construction
-effect reserved for React component APIs; it follows the proofwidgets-style
-split between host IO, DOM mutation, and React render construction.
+effect reserved for React component APIs and static tree construction;
+`Root.render` is itself the host boundary and receives a `ReactM` tree action.
+The JavaScript host invokes that render action to obtain the concrete `Js Html`
+resource, renders it into the root, and releases the render callback. The
+current runtime uses the same synchronous host-call representation for both
+effects, so `ReactM` is an irreducible Lean-side effect marker rather than a
+distinct runtime wrapper.
 
 `Root.renderComponent` wraps the Lean function in a real JavaScript React
 function component. Hooks therefore run under React's normal dispatcher instead
@@ -191,8 +213,9 @@ The browser React host binding is exposed from
 - `react.html.element` validates props/handlers/children, calls
   `React.createElement(tag, props, ...children)`, and returns a `ReactHtml`
   resource.
-- `react.root.render` renders the retained native React node held by a
-  `ReactHtml` resource.
+- `react.root.render` invokes the received Lean `ReactM` render action, renders
+  the retained native React node held by the resulting `ReactHtml` resource,
+  and releases the render callback.
 - `react.root.renderComponent` wraps a Lean thunk produced from
   `Component props` plus concrete props in a JavaScript React function
   component and invokes `root.render(...)` with that component.

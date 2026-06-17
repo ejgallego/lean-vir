@@ -28,12 +28,12 @@ def counter : Component Unit :=
       #[text]
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
-  let text ← Html.text (label value)
-  let html ← Html.buttonWith
-    #[Property.id "react-counter-button"]
-    #[EventHandler.onClick (renderInto root (value + 1))]
-    #[text]
-  Root.render root html
+  Root.render root do
+    let text ← Html.text (label value)
+    Html.buttonWith
+      #[Property.id "react-counter-button"]
+      #[EventHandler.onClick (renderInto root (value + 1))]
+      #[text]
 
 def mount (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root counter ()
@@ -47,8 +47,7 @@ def staticTree : ReactM (Lean.Vir.Js Html) := do
 
 def renderStatic (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => do
-    let tree ← staticTree
-    Root.render root tree
+    Root.render root staticTree
 
 def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Html) := do
   let text ← Html.text ("item:" ++ toString index)
@@ -84,8 +83,7 @@ partial def renderWideTextLoopAux (root : Lean.Vir.Js Root) (width remaining acc
   match remaining with
   | 0 => pure acc
   | n + 1 => do
-      let tree ← benchTextTree width
-      Root.render root tree
+      Root.render root (benchTextTree width)
       renderWideTextLoopAux root width n (acc + 1)
 
 def renderWideTextLoop (selector : String) (width count : Nat) : DomM Nat := do
@@ -104,8 +102,7 @@ def benchCallbackButton (root : Lean.Vir.Js Root) (index : Nat) : ReactM (Lean.V
       Property.data "index" (toString index)
     ]
     #[EventHandler.onClick do
-      let tree ← benchTextTree 1
-      Root.render root tree]
+      Root.render root (benchTextTree 1)]
     #[text]
 
 partial def benchCallbackChildrenAux
@@ -133,8 +130,7 @@ partial def renderCallbackTreeLoopAux (root : Lean.Vir.Js Root) (width remaining
   match remaining with
   | 0 => pure acc
   | n + 1 => do
-      let tree ← benchCallbackTree root width
-      Root.render root tree
+      Root.render root (benchCallbackTree root width)
       renderCallbackTreeLoopAux root width n (acc + 1)
 
 def renderCallbackTreeLoop (selector : String) (width count : Nat) : DomM Nat := do
@@ -174,7 +170,6 @@ def nestedDivs (depth : Nat) : ReactM (Lean.Vir.Js Html) := do
 
 def renderTooDeep (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => do
-    let html ← nestedDivs 129
-    Root.render root html
+    Root.render root (nestedDivs 129)
 
 end ReactCounter

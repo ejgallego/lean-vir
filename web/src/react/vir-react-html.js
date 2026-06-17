@@ -11,124 +11,83 @@ const REACT_HTML_MAX_NODES = 10000;
 
 export function createBrowserReactRootResource(state, root, React, hooks) {
   const createElement = requireReactCreateElement(React, "createBrowserReactRootResource");
-  const { addDisposable, removeDisposable, once } = requireReactHostHooks(hooks);
-  let currentHtml = null;
-  let currentComponent = null;
-  const value = {
-    render(html) {
-      const sameHtml = currentHtml === html;
-      let nextHtml = null;
-      let retained = false;
-      try {
-        nextHtml = resolveReactHtmlResource(state, html);
-        validateRenderableReactHtml(nextHtml);
-        if (!sameHtml) {
-          retainReactHtmlValue(nextHtml);
-          retained = true;
-        }
-        root.render(nextHtml.node);
-      } catch (error) {
-        if (retained) {
-          releaseReactHtmlValue(state, nextHtml);
-        } else if (!sameHtml && nextHtml?.refCount === 0) {
-          disposeReactHtml(state, html);
-        }
-        throw error;
-      }
-      if (!sameHtml) {
-        queueReactHtmlRelease(state, currentHtml, hooks);
-      }
-      currentHtml = html;
-      disposeReactComponent(currentComponent);
-      currentComponent = null;
+  return createReactRootResource(state, hooks, {
+    commitHtml(_value, nextHtml) {
+      root.render(nextHtml.node);
     },
-    renderComponent(renderCallback) {
-      const component = createReactComponentResource(
-        state,
+    createComponent(resources, rootHooks, renderCallback, renderHtml, disposePreviousHtml) {
+      return createReactComponentResource(
+        resources,
         renderCallback,
-        hooks.hookRuntime,
-        (html) => resolveRenderedReactHtmlNode(state, html),
+        rootHooks.hookRuntime,
+        renderHtml,
         null,
-        (html) => queueReactHtmlRelease(state, html, hooks));
-      try {
-        root.render(createElement(component.Component));
-      } catch (error) {
-        component.dispose();
-        throw error;
-      }
-      queueReactHtmlRelease(state, currentHtml, hooks);
-      currentHtml = null;
-      disposeReactComponent(currentComponent);
-      currentComponent = component;
+        disposePreviousHtml);
     },
-    unmount: once(() => {
-      try {
-        root.unmount();
-      } finally {
-        releaseReactHtmlResource(state, currentHtml);
-        currentHtml = null;
-        disposeReactComponent(currentComponent);
-        currentComponent = null;
-        removeDisposable(state, value);
-      }
-    }),
-  };
-  addDisposable(state, value);
-  return value;
+    commitComponent(_value, component) {
+      root.render(createElement(component.Component));
+    },
+    unmount() {
+      root.unmount();
+    },
+  });
 }
 
 export function createVirtualReactRootResource(resources, target, hooks) {
+  return createReactRootResource(resources, hooks, {
+    initialState: { current: null },
+    commitHtml(value, nextHtml) {
+      updateVirtualReactRoot(target, value, nextHtml.node);
+    },
+    createComponent(rootResources, rootHooks, renderCallback, renderHtml, disposePreviousHtml, value) {
+      let component = null;
+      const renderCurrent = () => {
+        updateVirtualReactRoot(target, value, component.render());
+      };
+      component = createReactComponentResource(
+        rootResources,
+        renderCallback,
+        rootHooks.hookRuntime,
+        renderHtml,
+        renderCurrent,
+        disposePreviousHtml);
+      return component;
+    },
+    commitComponent(value, component) {
+      updateVirtualReactRoot(target, value, component.render());
+    },
+    unmount(value) {
+      value.current = null;
+      if (target.reactRoot === value) {
+        delete target.reactRoot;
+      }
+    },
+  });
+}
+
+function createReactRootResource(resources, hooks, adapter) {
   const { addDisposable, removeDisposable, once } = requireReactHostHooks(hooks);
   let currentHtml = null;
   let currentComponent = null;
   const value = {
-    current: null,
+    ...(adapter.initialState ?? {}),
     render(html) {
-      const sameHtml = currentHtml === html;
-      let nextHtml = null;
-      let retained = false;
-      try {
-        nextHtml = resolveReactHtmlResource(resources, html);
-        validateRenderableReactHtml(nextHtml);
-        if (!sameHtml) {
-          retainReactHtmlValue(nextHtml);
-          retained = true;
-        }
-      } catch (error) {
-        if (retained) {
-          releaseReactHtmlValue(resources, nextHtml);
-        } else if (!sameHtml && nextHtml?.refCount === 0) {
-          disposeReactHtml(resources, html);
-        }
-        throw error;
-      }
-      if (!sameHtml) {
-        queueReactHtmlRelease(resources, currentHtml, hooks);
-      }
-      currentHtml = html;
+      currentHtml = commitReactHtmlRender(resources, hooks, html, currentHtml, (nextHtml) => {
+        adapter.commitHtml(value, nextHtml);
+      });
       disposeReactComponent(currentComponent);
       currentComponent = null;
-      value.current = nextHtml.node;
-      target.reactRoot = value;
-      target.textContent = virtualReactTextContent(value.current);
     },
     renderComponent(renderCallback) {
-      let component = null;
-      const renderCurrent = () => {
-        const nextTree = component.render();
-        value.current = nextTree;
-        target.reactRoot = value;
-        target.textContent = virtualReactTextContent(nextTree);
-      };
-      component = createReactComponentResource(
+      const component = adapter.createComponent(
         resources,
+        hooks,
         renderCallback,
-        hooks.hookRuntime,
         (html) => resolveRenderedReactHtmlNode(resources, html),
-        renderCurrent,
-        (html) => queueReactHtmlRelease(resources, html, hooks));
+        (html) => queueReactHtmlRelease(resources, html, hooks),
+        value);
       try {
-        renderCurrent();
+        adapter.commitComponent(value, component);
       } catch (error) {
         component.dispose();
         throw error;
@@ -139,19 +98,51 @@ export function createVirtualReactRootResource(resources, target, hooks) {
       currentComponent = component;
     },
     unmount: once(() => {
-      releaseReactHtmlResource(resources, currentHtml);
-      currentHtml = null;
-      disposeReactComponent(currentComponent);
-      currentComponent = null;
-      value.current = null;
-      if (target.reactRoot === value) {
-        delete target.reactRoot;
+      try {
+        adapter.unmount?.(value);
+      } finally {
+        releaseReactHtmlResource(resources, currentHtml);
+        currentHtml = null;
+        disposeReactComponent(currentComponent);
+        currentComponent = null;
+        removeDisposable(resources, value);
       }
-      removeDisposable(resources, value);
     }),
   };
   addDisposable(resources, value);
   return value;
+}
+
+function commitReactHtmlRender(resources, hooks, html, currentHtml, commit) {
+  const sameHtml = currentHtml === html;
+  let nextHtml = null;
+  let retained = false;
+  try {
+    nextHtml = resolveReactHtmlResource(resources, html);
+    validateRenderableReactHtml(nextHtml);
+    if (!sameHtml) {
+      retainReactHtmlValue(nextHtml);
+      retained = true;
+    }
+    commit(nextHtml);
+  } catch (error) {
+    if (retained) {
+      releaseReactHtmlValue(resources, nextHtml);
+    } else if (!sameHtml && nextHtml?.refCount === 0) {
+      disposeReactHtml(resources, html);
+    }
+    throw error;
+  }
+  if (!sameHtml) {
+    queueReactHtmlRelease(resources, currentHtml, hooks);
+  }
+  return html;
+}
+
+function updateVirtualReactRoot(target, value, nextTree) {
+  value.current = nextTree;
+  target.reactRoot = value;
+  target.textContent = virtualReactTextContent(nextTree);
 }
 
 export function createBrowserReactHtmlTextResource(resources, value) {

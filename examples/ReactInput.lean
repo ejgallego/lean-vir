@@ -99,38 +99,38 @@ def checkboxComponent : Component Unit :=
     Html.divWith #[Property.id "react-checkbox-widget"] #[] #[input, output]
 
 def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
-  let labelText ← Html.text "attrs:"
-  let label ←
-    Html.keyedLabelWith
-      "attributes-label"
-      #[
-        Property.id "react-attributes-label",
-        Property.htmlFor "react-attributes-input"
-      ]
-      #[]
-      #[labelText]
-  let input ←
-    Html.keyedInput
-      "attributes-input"
-      #[
-        Property.id "react-attributes-input",
-        Property.inputName "attributes",
-        Property.type "checkbox",
-        Property.checked true,
-        Property.disabled true
-      ]
-      #[]
-  let outputText ← Html.text "attrs"
-  let output ←
-    Html.keyedSpanWith
-      "attributes-output"
-      #[
-        Property.id "react-attributes-output",
-        Property.title "attribute output"
-      ]
-      #[]
-      #[outputText]
-  let html ←
+  Root.render root do
+    let labelText ← Html.text "attrs:"
+    let label ←
+      Html.keyedLabelWith
+        "attributes-label"
+        #[
+          Property.id "react-attributes-label",
+          Property.htmlFor "react-attributes-input"
+        ]
+        #[]
+        #[labelText]
+    let input ←
+      Html.keyedInput
+        "attributes-input"
+        #[
+          Property.id "react-attributes-input",
+          Property.inputName "attributes",
+          Property.type "checkbox",
+          Property.checked true,
+          Property.disabled true
+        ]
+        #[]
+    let outputText ← Html.text "attrs"
+    let output ←
+      Html.keyedSpanWith
+        "attributes-output"
+        #[
+          Property.id "react-attributes-output",
+          Property.title "attribute output"
+        ]
+        #[]
+        #[outputText]
     Html.divWith
       #[
         Property.id "react-attributes-widget",
@@ -147,7 +147,6 @@ def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
       ]
       #[]
       #[label, input, output]
-  Root.render root html
 
 def mountInput (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root inputComponent ()

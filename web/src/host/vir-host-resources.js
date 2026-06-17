@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { disposeReactHtml, disposeUnownedReactHtml } from "../react/vir-react-html.js";
 import {
   createHostResource,
   hostResourceLabel,
@@ -186,16 +185,16 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       const target = resources.resolveResource(container, "Element");
       return resources.resourceForValue(createRootResource(target));
     },
-    "react.root.render": (root, html) => {
-      let value;
+    "react.root.render": (root, renderTree) => {
+      const render = requireReactRenderCallback(renderTree);
       try {
-        value = resources.resolveResource(root, "ReactRoot");
-      } catch (error) {
-        disposeUnownedReactHtml(resources, html);
-        throw error;
+        const value = resources.resolveResource(root, "ReactRoot");
+        const html = render();
+        value.render(html);
+        return undefined;
+      } finally {
+        render.release();
       }
-      value.render(html);
-      return undefined;
     },
     "react.root.renderComponent": (root, component) => {
       const value = resources.resolveResource(root, "ReactRoot");
@@ -209,6 +208,13 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       return undefined;
     },
   };
+}
+
+function requireReactRenderCallback(renderTree) {
+  if (typeof renderTree !== "function" || typeof renderTree.release !== "function") {
+    throw new Error("react.root.render requires a releasable render callback");
+  }
+  return renderTree;
 }
 
 function requireReactHtmlTextResourceFactory(factory) {

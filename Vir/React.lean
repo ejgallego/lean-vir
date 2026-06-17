@@ -15,13 +15,18 @@ Effect used by Lean-authored React render construction.
 allocate React-side resources exposed by this module, but arbitrary host `IO`
 must stay outside the render surface unless the API exposes a render-safe
 operation for it.
+
+The current runtime lowers `ReactM` through the same synchronous host-call ABI
+as `DomM`, so this is an irreducible effect marker rather than a separate
+runtime representation. Use `ReactM.run` only at explicit root/event boundaries
+that already live in `DomM`.
 -/
 @[irreducible] def ReactM (α : Type) : Type :=
   Lean.Vir.Browser.DomM α
 
 namespace ReactM
 
-/-- Runs a render-construction action in the browser/DOM effect. -/
+/-- Explicitly lowers a render-construction action at a browser/DOM boundary. -/
 def run (action : ReactM α) : Lean.Vir.Browser.DomM α :=
   by
     unfold ReactM at action
@@ -54,9 +59,6 @@ instance : Nonempty (ReactM α) :=
     infer_instance
 
 end ReactM
-
-instance : MonadLift ReactM Lean.Vir.Browser.DomM where
-  monadLift := ReactM.run
 
 /--
 React root object class created from a browser container element.
@@ -685,7 +687,7 @@ def mountFromSelector
       pure true
 
 /--
-Renders a JavaScript-owned `Html` resource into a React root.
+Constructs a React tree and renders it into a React root.
 
 The host retains callbacks embedded in the rendered resource graph until the
 root is rerendered, unmounted, or the owning runtime is disposed.
@@ -693,7 +695,7 @@ root is rerendered, unmounted, or the owning runtime is disposed.
 @[vir_js "react.root.render"]
 opaque render
     (root : @& Lean.Vir.Js Root)
-    (html : @& Lean.Vir.Js Html) :
+    (html : ReactM (Lean.Vir.Js Html)) :
     Lean.Vir.Browser.DomM Unit
 
 /--

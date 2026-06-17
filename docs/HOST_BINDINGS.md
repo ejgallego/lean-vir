@@ -48,6 +48,10 @@ component. The hook bindings `react.useState`, `react.state.set`, and
 browser and virtual host resource store as React roots. Small `js.string`,
 `js.nat`, and `js.bool` helpers provide explicit scalar conversion for examples
 that need primitive React state without giving `react.useState` a scalar ABI.
+`Root.render` accepts a `ReactM (Lean.Vir.Js Html)` tree. The
+`react.root.render` host binding receives that render action as a releasable
+callback, invokes it to obtain the concrete `Js Html` resource, renders the
+resource, and releases the render callback.
 
 ## Virtual Node Bindings
 
@@ -118,6 +122,8 @@ are synchronous in v1; returning a `Promise` is an error.
 composing browser, React, timer, animation, and virtual binding groups. The
 store owns opaque `HostResource` wrappers, liveness checks, and disposable host
 objects; its `dispose()` method performs the built-in teardown.
+See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for diagrams of the
+`Lean.Vir.Js α` resource path and the separate `VirCallback` closure-root path.
 
 `vir.dispose()` tears down runtime-side host state:
 
