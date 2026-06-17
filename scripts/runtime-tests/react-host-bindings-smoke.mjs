@@ -109,7 +109,39 @@ ensureVirtualElementState(malformedReactDocumentState, "#react-malformed");
 const malformedReactHost = createVirtualDocumentHostBindings(malformedReactDocumentState);
 const malformedReactContainer = malformedReactHost["browser.document.querySelector"]("#react-malformed");
 const malformedReactRoot = malformedReactHost["react.root.create"](malformedReactContainer);
-const renderMalformedReactHtml = (html) => malformedReactHost["react.root.render"](malformedReactRoot, html);
+const renderMalformedReactHtml = (html) => {
+  let released = false;
+  const render = Object.assign(() => html, {
+    release: () => {
+      released = true;
+      return true;
+    },
+  });
+  try {
+    return malformedReactHost["react.root.render"](malformedReactRoot, render);
+  } finally {
+    assert.equal(released, true);
+  }
+};
+{
+  let called = false;
+  let released = false;
+  const render = Object.assign(() => {
+    called = true;
+    throw new Error("render callback should not be invoked for a stale root");
+  }, {
+    release: () => {
+      released = true;
+      return true;
+    },
+  });
+  assert.throws(
+    () => malformedReactHost["react.root.render"]({}, render),
+    /ReactRoot resource is not live/,
+  );
+  assert.equal(called, false);
+  assert.equal(released, true);
+}
 const reactHtmlText = (value) => malformedReactHost["react.html.text"](value);
 const reactHtmlElement = ({
   tag = "div",

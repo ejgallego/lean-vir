@@ -174,16 +174,21 @@ assert.equal(reactUseStateImports[0]?.result?.fields?.find((field) => field.name
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
     ?.args[1]?.type?.kind,
-  "resource",
+  "function",
 );
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
-    ?.args[1]?.type?.name,
-  "Lean.Vir.Js",
+    ?.args[1]?.type?.effect,
+  "react",
 );
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
-    ?.args[1]?.type?.type,
+    ?.args[1]?.type?.args?.length,
+  0,
+);
+assert.equal(
+  hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
+    ?.args[1]?.type?.result?.type,
   "Js",
 );
 const reactHtmlType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.html.element")

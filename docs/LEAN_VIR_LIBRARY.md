@@ -244,7 +244,7 @@ render-construction effect for React component APIs.
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
 - `Lean.Vir.React.Root.createFromSelector : String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.React.Root))`
 - `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
-- `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> @& Lean.Vir.Js Lean.Vir.React.Html -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html) -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
@@ -258,8 +258,12 @@ render-construction effect for React component APIs.
 embedded in the resource graph until the root is rerendered, unmounted, the
 package is reloaded, or the runtime is disposed.
 
-`Root.renderComponent` wraps a Lean `Component props` plus concrete props in a
-real JavaScript React function component. The public hook surface is
+`Root.render` is the host boundary for rendering a `ReactM` tree into an
+existing root. The JavaScript host invokes the received render action to obtain
+the concrete `Js Html` resource and releases that render callback after the
+render attempt. `Root.renderComponent` wraps a Lean `Component props` plus
+concrete props in a real JavaScript React function component. The public hook
+surface is
 resource-typed: `useState`, `State.set`, and `State.modify` accept
 `Lean.Vir.Js α`, not raw Lean scalar values. Use the explicit `JsValue`
 helpers when a component needs scalar state. State setters are typed JavaScript
@@ -343,7 +347,7 @@ JavaScript-provided function values are not accepted as Lean arguments in this
 phase.
 
 `Element.addEventListener`, `Timer.setTimeout`,
-`Animation.requestAnimationFrame`, and `React.Root.render` use the callback ABI.
+`Animation.requestAnimationFrame`, and raw React HTML rendering use the callback ABI.
 Event resources are valid only during the callback. Listener, timeout, frame,
 and React root resources own their retained callbacks until removal,
 cancellation, firing, rerender, unmount, package reload, or runtime disposal. See
