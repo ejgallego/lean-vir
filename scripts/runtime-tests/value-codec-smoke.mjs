@@ -17,8 +17,10 @@ import {
 import { BinaryWriter, encodeTypeDescriptor } from "../../web/src/runtime/vir-codec.js";
 import {
   decodeCallResult,
+  decodeHostCallRequest,
   decodeResolvedCallResult,
   encodeCallPayload,
+  encodeHostCallResult,
   encodeResolvedCallPayload,
 } from "../../web/src/runtime/vir-value-codec.js";
 import { WIRE } from "../../web/src/runtime/wire-tags.js";
@@ -30,6 +32,7 @@ const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
 const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
 const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
 const natType = { type: "Nat", wireTag: WIRE.NAT };
+const boolType = { type: "Bool", wireTag: WIRE.BOOL };
 const unitType = { type: "Unit", wireTag: WIRE.UNIT };
 const resourceType = { type: "Resource", wireTag: WIRE.RESOURCE };
 const resourceEntry = {
@@ -115,6 +118,26 @@ assert.equal(
   "opaque-resource-compact",
 );
 assert.equal(outgoingResourceTakes, 2);
+const boolHostEntry = {
+  target: "test.boolHost",
+  args: [{ name: "flag", type: boolType }],
+  result: boolType,
+};
+const compactHostRequest = new BinaryWriter();
+compactHostRequest.u32(1);
+compactHostRequest.u8(1);
+assert.deepEqual(
+  decodeHostCallRequest(compactHostRequest.take(), boolHostEntry, {}, { compactPayload: true }),
+  { args: [true], resultType: boolType },
+);
+assert.equal(
+  decodeResolvedCallResult(boolType, encodeHostCallResult(boolType, false, boolHostEntry, {}, { compactPayload: true })),
+  false,
+);
+assert.equal(
+  decodeCallResult(boolType, encodeHostCallResult(boolType, true, boolHostEntry)),
+  true,
+);
 const callbackType = {
   type: "Function",
   wireTag: WIRE.FUNCTION,

@@ -177,15 +177,17 @@ static host_signature const * cached_package_call_signature(uint32_t slot) {
     return &cached.signature;
 }
 
-static object * decode_host_result(vir_type const & expected, char const * bytes, uint32_t size) {
+static object * decode_host_result(vir_type const & expected, char const * bytes, uint32_t size, bool compact_payload) {
     vir_reader reader(reinterpret_cast<uint8_t const *>(bytes), size);
-    vir_type actual = decode_type(reader);
-    if (!reader.ok) {
-        return lean_box(0);
-    }
-    if (!same_wire_type(expected, actual)) {
-        reader.fail("JavaScript import result type mismatch");
-        return lean_box(0);
+    if (!compact_payload) {
+        vir_type actual = decode_type(reader);
+        if (!reader.ok) {
+            return lean_box(0);
+        }
+        if (!same_wire_type(expected, actual)) {
+            reader.fail("JavaScript import result type mismatch");
+            return lean_box(0);
+        }
     }
     object * value = decode_value(reader, expected);
     if (!reader.ok || !reader.at_end()) {
@@ -198,6 +200,7 @@ static object * decode_host_result(vir_type const & expected, char const * bytes
 static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
     host_signature const * signature = cached_host_signature(slot);
     uint32_t erased_prefix_args = vir::host_import_erased_prefix_args(slot);
+    bool compact_payload = vir::package_format_version() >= 7;
     if (!signature->ok) {
         for (uint32_t i = 0; i < argc; i++) {
             lean_dec(args[i]);
@@ -213,10 +216,14 @@ static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
     vir_writer request;
     request.u32(static_cast<uint32_t>(signature->args.size()));
     for (size_t i = 0; i < signature->args.size(); i++) {
-        encode_type(request, signature->args[i]);
+        if (!compact_payload) {
+            encode_type(request, signature->args[i]);
+        }
         encode_value_payload(request, signature->args[i], args[erased_prefix_args + i]);
     }
-    encode_type(request, signature->result);
+    if (!compact_payload) {
+        encode_type(request, signature->result);
+    }
     if (!request.ok) {
         for (uint32_t i = 0; i < argc; i++) {
             lean_dec(args[i]);
@@ -229,7 +236,7 @@ static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
         reinterpret_cast<uint8_t const *>(request_bytes.data()),
         static_cast<uint32_t>(request_bytes.size()));
     uint32_t result_size = vir_js_call_result_size();
-    object * value = decode_host_result(signature->result, result_bytes, result_size);
+    object * value = decode_host_result(signature->result, result_bytes, result_size, compact_payload);
     if (result_bytes != nullptr) {
         vir_free_bytes(const_cast<char *>(result_bytes));
     }

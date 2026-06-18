@@ -280,10 +280,12 @@ class VirHostState {
     }
 
     const request = this.readWasmBytes(requestPtr, requestLen);
+    const compactPayload = this.runtime?.usesPackageCallSignatures() === true;
+    const codecOptions = this.runtime?.codecOptions ?? {};
     let args;
     let resultType;
     try {
-      ({ args, resultType } = decodeHostCallRequest(request, entry, this.runtime?.codecOptions ?? {}));
+      ({ args, resultType } = decodeHostCallRequest(request, entry, codecOptions, { compactPayload }));
       this.clearOutgoingClosureRootIds();
     } catch (error) {
       this.clearOutgoingClosureRootIds();
@@ -293,7 +295,7 @@ class VirHostState {
     if (isPromiseLike(value)) {
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
-    const result = encodeHostCallResult(resultType, value, entry, this.runtime?.codecOptions ?? {});
+    const result = encodeHostCallResult(resultType, value, entry, codecOptions, { compactPayload });
     const ptr = this.exports.vir_alloc_bytes(result.byteLength);
     new Uint8Array(this.exports.memory.buffer, ptr, result.byteLength).set(result);
     this.lastResultSize = result.byteLength;

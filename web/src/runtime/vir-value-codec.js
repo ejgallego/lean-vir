@@ -92,30 +92,36 @@ export function decodeResolvedCallResult(type, bytes, options = {}) {
   return value;
 }
 
-export function decodeHostCallRequest(bytes, entry, options = {}) {
+export function decodeHostCallRequest(bytes, entry, options = {}, { compactPayload = false } = {}) {
   const reader = new BinaryReader(bytes);
   const argc = reader.u32();
   if (argc !== entry.args.length) {
     throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argc}`);
   }
   const args = entry.args.map((arg, index) => {
-    const actualType = decodeTypeDescriptor(reader);
-    if (!sameWireType(arg.type, actualType)) {
-      throw new Error(`Vir host import ${entry.target} argument ${arg.name ?? index} type mismatch`);
+    if (!compactPayload) {
+      const actualType = decodeTypeDescriptor(reader);
+      if (!sameWireType(arg.type, actualType)) {
+        throw new Error(`Vir host import ${entry.target} argument ${arg.name ?? index} type mismatch`);
+      }
     }
     return decodeValuePayload(reader, arg.type, options);
   });
-  const actualResult = decodeTypeDescriptor(reader);
-  if (!sameWireType(entry.result, actualResult)) {
-    throw new Error(`Vir host import ${entry.target} result type mismatch`);
+  if (!compactPayload) {
+    const actualResult = decodeTypeDescriptor(reader);
+    if (!sameWireType(entry.result, actualResult)) {
+      throw new Error(`Vir host import ${entry.target} result type mismatch`);
+    }
   }
   reader.requireEnd();
   return { args, resultType: entry.result };
 }
 
-export function encodeHostCallResult(type, value, entry, options = {}) {
+export function encodeHostCallResult(type, value, entry, options = {}, { compactPayload = false } = {}) {
   const writer = new BinaryWriter();
-  encodeTypeDescriptor(writer, type, `${entry.target} result`);
+  if (!compactPayload) {
+    encodeTypeDescriptor(writer, type, `${entry.target} result`);
+  }
   encodeValuePayload(writer, type, value, `${entry.target} result`, options);
   return writer.take();
 }

@@ -114,11 +114,12 @@ The manifest includes package metadata plus one entry per export with its Lean
 declaration name, JavaScript name, argument types, result type, and recursive
 type tree. It also includes `hostImports` for Lean declarations marked with
 `@[vir_js "..."]`. JavaScript validates inputs against that manifest and sends a
-compact byte payload through the generic `vir_call` WASM export. WASM
+compact byte payload through the resolved `vir_call_resolved` WASM export. WASM
 constructs Lean runtime objects, calls the upstream IR interpreter, and encodes
 the result bytes for JavaScript. When interpreted Lean code reaches a host
 import, the shim calls the runtime's `env.vir_js_call` import and decodes the
-synchronous result back into Lean.
+synchronous result back into Lean. Package format 7 uses package-owned
+signatures for compact value-only payloads on both boundaries.
 
 Supported v1 types:
 

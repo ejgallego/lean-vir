@@ -188,6 +188,9 @@ the argument/result descriptors from the loaded package. The descriptor-bearing
 `vir_call` path remains available for diagnostics, compatibility with older
 packages, and benchmark comparison. This is intentionally still an internal
 package ABI, not a committed component-model boundary.
+Lean-to-JavaScript host imports use the same package-owned signature idea in
+format 7: the shim and `VirHostState` exchange value-only request and result
+payloads for package-declared host imports.
 
 Package loading validates every exported argument/result type before exposing
 the manifest to the UI or JS caller. The validator rejects unsupported wire
@@ -203,7 +206,8 @@ The manifest and package payload are trusted in this prototype. The JavaScript
 runtime validates the embedded manifest before exposing entries. For format 7
 packages, the WASM shim uses the package-owned compact export signature table
 to decode arguments, construct Lean runtime objects, and encode compact result
-payloads for `vir_call_resolved`.
+payloads for `vir_call_resolved`. It also uses package-owned host-import
+signatures to frame compact `env.vir_js_call` requests and responses.
 
 This is acceptable for the current generated demo packages and local developer
 packages. It is not a hardened boundary for arbitrary remote `.irpkg` files.

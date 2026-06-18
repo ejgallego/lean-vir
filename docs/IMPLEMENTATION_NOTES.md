@@ -35,10 +35,10 @@ The same package encoder also supports focused developer packages through
 public source definitions for a single Lean file. The `/dev.html` Vite entry
 point loads a served or uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls
-go through a generic byte-payload WASM export; the local
+go through the resolved package-call WASM export; the local
 `wasm/upstream_shim/interface_codec.cpp` codec carries recursive type
 descriptors, constructs Lean input objects, and calls the upstream interpreter
-by name.
+through a package-local slot.
 
 The browser keeps a Lean-rendered DOM Tamagotchi as the top-level interactive
 demo over the same upstream interpreter artifact. Lean registers the pet
@@ -47,7 +47,7 @@ binding installs DOM listeners that call retained Lean closures. The Lean code
 reads and writes DOM state, including checkbox and text input properties,
 through `Lean.Vir.Browser` host imports. Its nullary inductive `Mood` and
 `Action` values are auto-discovered as simple enums and marshaled through the
-generic `vir_call` path.
+generic value codec on the package-call path.
 
 The host-import path now also supports Lean function values as callback objects.
 `Element.addEventListener`, `Timer.setTimeout`, and

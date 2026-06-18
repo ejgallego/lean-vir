@@ -153,8 +153,12 @@ In package format 7 and newer, the package contains a compact export signature
 table. `vir_call_resolved` uses that table to decode value-only argument
 payloads and to encode value-only result payloads. Older packages without the
 table keep using the descriptor-bearing payload accepted by `vir_call`.
-The shim caches decoded export and host-import signatures by package generation
-and slot, so compact signature bytes are decoded once per loaded package rather
+Package format 7 also uses package-owned host-import signatures for
+Lean-to-JavaScript calls: the shim sends value-only argument payloads through
+`env.vir_js_call`, and JavaScript returns a value-only result payload. Format 5
+and 6 host imports keep the descriptor-bearing host-import envelope. The shim
+caches decoded export and host-import signatures by package generation and
+slot, so compact signature bytes are decoded once per loaded package rather
 than on every call.
 
 The shim still keeps `vir_call(name, len, payload, payloadLen, resultTag)` as a
