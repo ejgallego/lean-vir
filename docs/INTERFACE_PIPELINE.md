@@ -192,10 +192,10 @@ boundary.
 Lean-to-JavaScript host imports use the same package-owned signature idea in
 format 7: the shim and `VirHostState` exchange value-only request and result
 payloads for package-declared host imports.
-For exact pure `Unit`, `Bool`, small unsigned scalar, and `String` round trips,
-the runtime may use a direct resolved-call helper instead of constructing a
-compact byte payload. That is a transparent optimization of the same
-package-owned signature path, not a separate user-facing API.
+For exact pure `Unit`, `Bool`, small unsigned scalar, floating scalar, and
+`String` round trips, the runtime may use a direct resolved-call helper instead
+of constructing a compact byte payload. That is a transparent optimization of
+the same package-owned signature path, not a separate user-facing API.
 Function-valued imports are rooted with their package-owned function signature.
 Calls back into Lean therefore send only value payloads; the shim decodes
 arguments and encodes the result from the rooted signature metadata.

@@ -119,6 +119,19 @@ function callDirectString(runtime, name, input) {
   }
 }
 
+function callDirectFloat(runtime, name, input) {
+  const result = runtime.exports.vir_call_resolved_f64_f64(
+    resolveEntrySlot(runtime, name),
+    input,
+  );
+  const error = runtime.lastCallError();
+  if (error !== "") {
+    throw new Error(error);
+  }
+  assert.equal(result, 1);
+  return runtime.exports.vir_call_direct_f64_result();
+}
+
 const natType = { type: "Nat", wireTag: WIRE.NAT };
 const boolType = { type: "Bool", wireTag: WIRE.BOOL };
 const unitType = { type: "Unit", wireTag: WIRE.UNIT };
@@ -298,6 +311,11 @@ try {
 assert.equal(
   callDirectString(runtime, "Vir.Fixtures.InterfaceShapes.stringRoundtrip", "Aé∀Z"),
   "Aé∀Z",
+);
+assert.equal(callDirectFloat(runtime, "Vir.Fixtures.InterfaceShapes.floatScale", 1.5), 6);
+assert.equal(
+  Math.fround(callDirectFloat(runtime, "Vir.Fixtures.InterfaceShapes.float32Roundtrip", 1.25)),
+  1.25,
 );
 withObjectString(runtime, "Aé∀Z", (obj) => {
   const len = runtime.exports.vir_obj_string_size(obj);
