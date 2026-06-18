@@ -22,6 +22,9 @@ import {
   encodeHostCallResult,
   encodeResolvedCallPayload,
 } from "./runtime/vir-value-codec.js";
+import {
+  normalizeFloat,
+} from "./runtime/vir-value-normalizers.js";
 
 export {
   hasExternrefTableSupport,
@@ -567,6 +570,21 @@ export class VirRuntime {
       }
     }
 
+    if (isDirectFloatTag(argTag) && resultTag === argTag) {
+      if (
+        typeof this.exports.vir_call_resolved_f64_f64 !== "function" ||
+        typeof this.exports.vir_call_direct_f64_result !== "function") {
+        return DIRECT_CALL_UNAVAILABLE;
+      }
+      const value = normalizeFloat(args[0], `${entry.entry} argument ${entry.args[0].name}`);
+      const callSlot = this.resolveCallSlot(entry, cache);
+      if (this.exports.vir_call_resolved_f64_f64(callSlot, value) === 0) {
+        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
+      }
+      const result = this.exports.vir_call_direct_f64_result();
+      return argTag === WIRE.FLOAT32 ? Math.fround(result) : result;
+    }
+
     return DIRECT_CALL_UNAVAILABLE;
   }
 
@@ -788,6 +806,10 @@ function isIdentifier(text) {
 
 function isDirectUnsignedTag(tag) {
   return tag === WIRE.UINT8 || tag === WIRE.UINT16 || tag === WIRE.UINT32;
+}
+
+function isDirectFloatTag(tag) {
+  return tag === WIRE.FLOAT || tag === WIRE.FLOAT32;
 }
 
 function normalizeDirectUnsigned(value, tag, label) {

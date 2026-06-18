@@ -296,6 +296,7 @@ static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
 static std::string g_call_result;
 static std::string g_call_error;
 static uint32_t g_direct_u32_result = 0;
+static double g_direct_f64_result = 0.0;
 struct closure_root {
     object * value = nullptr;
     host_signature signature;
@@ -373,7 +374,7 @@ extern "C" char const * vir_closure_call(uint32_t root_id, uint8_t const * reque
         return nullptr;
     }
     object * fn = root->value;
-    host_signature const & signature = root->signature;
+    host_signature signature = root->signature;
 
     vir_reader reader(request, request_len);
     uint32_t argc = reader.u32();
@@ -734,6 +735,7 @@ extern "C" lean::object * vir_call_resolved_objects(
     lean::g_call_result.clear();
     lean::g_call_error.clear();
     lean::g_direct_u32_result = 0;
+    lean::g_direct_f64_result = 0.0;
     if (argv == nullptr && argc != 0) {
         lean::g_call_error = "object call argv pointer is null";
         return nullptr;
@@ -852,6 +854,12 @@ static bool direct_small_uint_type(lean::vir_wire_type tag) {
         tag == lean::vir_wire_type::UInt32;
 }
 
+static bool direct_float_type(lean::vir_wire_type tag) {
+    return
+        tag == lean::vir_wire_type::Float ||
+        tag == lean::vir_wire_type::Float32;
+}
+
 static lean::object * direct_small_uint_arg(lean::vir_wire_type tag, uint32_t value, bool has_boxed_decl) {
     uintptr_t raw = value;
     if (tag == lean::vir_wire_type::UInt8) raw = static_cast<uint8_t>(value);
@@ -865,6 +873,13 @@ static lean::object * direct_small_uint_arg(lean::vir_wire_type tag, uint32_t va
     return lean_box(static_cast<unsigned>(raw));
 }
 
+static lean::object * direct_float_arg(lean::vir_wire_type tag, double value) {
+    if (tag == lean::vir_wire_type::Float32) {
+        return lean_box_float32(static_cast<float>(value));
+    }
+    return lean_box_float(value);
+}
+
 static uint32_t direct_small_uint_result(lean::vir_wire_type tag, lean::object * value, bool has_boxed_decl) {
     uintptr_t raw = has_boxed_decl
         ? (tag == lean::vir_wire_type::UInt32 ? lean_unbox_uint32(value) : lean_unbox(value))
@@ -872,6 +887,13 @@ static uint32_t direct_small_uint_result(lean::vir_wire_type tag, lean::object *
     if (tag == lean::vir_wire_type::UInt8) return static_cast<uint8_t>(raw);
     if (tag == lean::vir_wire_type::UInt16) return static_cast<uint16_t>(raw);
     return static_cast<uint32_t>(raw);
+}
+
+static double direct_float_result(lean::vir_wire_type tag, lean::object * value) {
+    if (tag == lean::vir_wire_type::Float32) {
+        return static_cast<double>(lean_unbox_float32(value));
+    }
+    return lean_unbox_float(value);
 }
 
 static lean::object * run_direct_resolved_call(
@@ -979,8 +1001,41 @@ extern "C" char const * vir_call_resolved_string_string(
     return lean::g_call_result.data();
 }
 
+extern "C" uint32_t vir_call_resolved_f64_f64(uint32_t call_slot, double value) {
+    lean::object * fn_obj = nullptr;
+    bool has_boxed_decl = false;
+    lean::host_signature const * signature = nullptr;
+    char const * label = "direct floating scalar call";
+    if (!direct_call_header(call_slot, label, &fn_obj, &has_boxed_decl, &signature)) {
+        return 0;
+    }
+    if (
+        signature->args.size() != 1 ||
+        !direct_float_type(signature->args[0].tag) ||
+        signature->result.tag != signature->args[0].tag) {
+        lean::g_call_error = std::string(label) + " signature mismatch";
+        return 0;
+    }
+    if (!has_boxed_decl) {
+        lean::g_call_error = std::string(label) + " requires a boxed declaration";
+        return 0;
+    }
+    lean::object * arg = direct_float_arg(signature->args[0].tag, value);
+    lean::object * args[] = { arg };
+    lean::object * result = run_direct_resolved_call(fn_obj, 1, args);
+    lean::g_direct_f64_result = direct_float_result(signature->result.tag, result);
+    if (lean::call_result_is_owned(signature->result, has_boxed_decl)) {
+        lean_dec(result);
+    }
+    return 1;
+}
+
 extern "C" uint32_t vir_call_direct_u32_result(void) {
     return lean::g_direct_u32_result;
+}
+
+extern "C" double vir_call_direct_f64_result(void) {
+    return lean::g_direct_f64_result;
 }
 
 extern "C" uint32_t vir_call_result_size(void) {
