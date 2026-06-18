@@ -8,7 +8,9 @@ import { validateInterfaceManifest } from "./runtime/interface-manifest.js";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
 import {
   asBytes,
+  normalizeUint32,
 } from "./runtime/vir-codec.js";
+import { WIRE } from "./runtime/wire-tags.js";
 import {
   ExternrefResourceRoots,
   isHostResource,
@@ -32,6 +34,7 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 const virCallbackStates = new WeakMap();
+const DIRECT_CALL_UNAVAILABLE = Symbol("direct-call-unavailable");
 
 export {
   roundTripInterfaceTypeDescriptor,
@@ -280,7 +283,7 @@ class VirHostState {
     }
 
     const request = this.readWasmBytes(requestPtr, requestLen);
-    const compactPayload = this.runtime?.usesPackageCallSignatures() === true;
+    const compactPayload = this.runtime?.usesCompactPackageFraming() === true;
     const codecOptions = this.runtime?.codecOptions ?? {};
     let args;
     let resultType;
@@ -463,7 +466,11 @@ export class VirRuntime {
 
     const cache = this.callCacheFor(entry);
     this.hostState?.clearTransientQueues();
-    const compactPayload = this.usesPackageCallSignatures();
+    const directResult = this.tryDirectResolvedCall(entry, args, cache);
+    if (directResult !== DIRECT_CALL_UNAVAILABLE) {
+      return directResult;
+    }
+    const compactPayload = this.usesCompactPackageFraming();
     let payload;
     try {
       payload = compactPayload
@@ -496,6 +503,60 @@ export class VirRuntime {
     }
   }
 
+  tryDirectResolvedCall(entry, args, cache) {
+    if (!this.usesCompactPackageFraming() || entry.effect !== "pure" || entry.args.length !== 1) {
+      return DIRECT_CALL_UNAVAILABLE;
+    }
+    const argType = entry.args[0].type;
+    const resultType = entry.result;
+    const argTag = argType?.wireTag;
+    const resultTag = resultType?.wireTag;
+
+    if (argTag === WIRE.UNIT && resultTag === WIRE.UNIT) {
+      if (typeof this.exports.vir_call_resolved_unit_unit !== "function") {
+        return DIRECT_CALL_UNAVAILABLE;
+      }
+      if (args[0] !== undefined && args[0] !== null) {
+        throw new Error(`${entry.entry} argument ${entry.args[0].name} must be undefined or null`);
+      }
+      const callSlot = this.resolveCallSlot(entry, cache);
+      if (this.exports.vir_call_resolved_unit_unit(callSlot) === 0) {
+        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
+      }
+      return undefined;
+    }
+
+    if (argTag === WIRE.BOOL && resultTag === WIRE.BOOL) {
+      if (typeof this.exports.vir_call_resolved_bool_bool !== "function") {
+        return DIRECT_CALL_UNAVAILABLE;
+      }
+      if (typeof args[0] !== "boolean") {
+        throw new Error(`${entry.entry} argument ${entry.args[0].name} must be a boolean`);
+      }
+      const callSlot = this.resolveCallSlot(entry, cache);
+      if (this.exports.vir_call_resolved_bool_bool(callSlot, args[0] ? 1 : 0) === 0) {
+        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
+      }
+      return this.exports.vir_call_direct_u32_result() !== 0;
+    }
+
+    if (isDirectUnsignedTag(argTag) && resultTag === argTag) {
+      if (
+        typeof this.exports.vir_call_resolved_u32_u32 !== "function" ||
+        typeof this.exports.vir_call_direct_u32_result !== "function") {
+        return DIRECT_CALL_UNAVAILABLE;
+      }
+      const value = normalizeDirectUnsigned(args[0], argTag, `${entry.entry} argument ${entry.args[0].name}`);
+      const callSlot = this.resolveCallSlot(entry, cache);
+      if (this.exports.vir_call_resolved_u32_u32(callSlot, value) === 0) {
+        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
+      }
+      return this.exports.vir_call_direct_u32_result();
+    }
+
+    return DIRECT_CALL_UNAVAILABLE;
+  }
+
   callCacheFor(entry) {
     let cache = this.entryCallCache.get(entry);
     if (cache === undefined) {
@@ -522,7 +583,7 @@ export class VirRuntime {
     }
   }
 
-  usesPackageCallSignatures() {
+  usesCompactPackageFraming() {
     return Number.isInteger(this.packageMetadata?.packageFormatVersion) &&
       this.packageMetadata.packageFormatVersion >= 7;
   }
@@ -715,6 +776,26 @@ function disposeHostBindings(bindings) {
 
 function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
+}
+
+function isDirectUnsignedTag(tag) {
+  return tag === WIRE.UINT8 || tag === WIRE.UINT16 || tag === WIRE.UINT32;
+}
+
+function normalizeDirectUnsigned(value, tag, label) {
+  if (tag === WIRE.UINT8) {
+    if (!Number.isInteger(value) || value < 0 || value > 0xff) {
+      throw new Error(`${label} must be an integer in 0..255`);
+    }
+    return value;
+  }
+  if (tag === WIRE.UINT16) {
+    if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
+      throw new Error(`${label} must be an integer in 0..65535`);
+    }
+    return value;
+  }
+  return normalizeUint32(value, label);
 }
 
 function lookupHostBinding(target, userBindings, defaultBindings) {

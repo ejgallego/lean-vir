@@ -191,6 +191,10 @@ package ABI, not a committed component-model boundary.
 Lean-to-JavaScript host imports use the same package-owned signature idea in
 format 7: the shim and `VirHostState` exchange value-only request and result
 payloads for package-declared host imports.
+For exact pure `Unit`, `Bool`, and small unsigned scalar round trips, the
+runtime may use a direct resolved-call helper instead of constructing a compact
+byte payload. That is a transparent optimization of the same package-owned
+signature path, not a separate user-facing API.
 
 Package loading validates every exported argument/result type before exposing
 the manifest to the UI or JS caller. The validator rejects unsupported wire

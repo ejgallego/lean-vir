@@ -161,6 +161,20 @@ caches decoded export and host-import signatures by package generation and
 slot, so compact signature bytes are decoded once per loaded package rather
 than on every call.
 
+For a small set of exact pure scalar signatures, the JavaScript runtime can skip
+the byte payload entirely after slot resolution and call direct resolved-call
+helpers:
+
+- `vir_call_resolved_unit_unit`
+- `vir_call_resolved_bool_bool`
+- `vir_call_resolved_u32_u32`
+- `vir_call_direct_u32_result`
+
+This currently covers `Unit -> Unit`, `Bool -> Bool`, and same-width
+`UInt8`/`UInt16`/`UInt32` calls. All other signatures, including structured
+values, resources, callbacks, and effectful calls, stay on the compact
+package-owned value-payload path.
+
 The shim still keeps `vir_call(name, len, payload, payloadLen, resultTag)` as a
 named entry point for diagnostics and benchmark comparisons, but the JavaScript
 runtime requires the resolved-call exports.
