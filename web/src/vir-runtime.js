@@ -523,7 +523,7 @@ export class VirRuntime {
     const label = `${entry.entry} argument ${entry.args[0].name}`;
     const finish = () => {
       if (this.exports.vir_call_resolved_primitive(callSlot, argLane, resultLane) === 0) {
-        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
+        throw new Error(this.lastCallError() || `primitive call failed: ${entry.entry}`);
       }
       return this.readPrimitiveResult(resultLane, resultTag);
     };
@@ -564,7 +564,7 @@ export class VirRuntime {
       const ptr = this.allocBytes(bytes);
       try {
         if (this.exports.vir_call_primitive_set_string(ptr, bytes.byteLength) === 0) {
-          throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
+          throw new Error(this.lastCallError() || `primitive string argument failed: ${entry.entry}`);
         }
         return finish();
       } finally {

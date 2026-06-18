@@ -30,7 +30,7 @@ top-level `README.md` remains the user-facing quickstart.
   unsupported surface.
 - [PERFORMANCE.md](PERFORMANCE.md): benchmark commands, artifact-cache
   behavior, and before/after comparisons.
-- [OBJECT_ABI.md](OBJECT_ABI.md): direct Lean object construction,
+- [OBJECT_ABI.md](OBJECT_ABI.md): Lean object ABI construction,
   inspection, ownership, and codec-retirement roadmap.
 
 ## Roadmaps

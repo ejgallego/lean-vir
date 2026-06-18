@@ -1,4 +1,4 @@
-# Direct Lean Object ABI
+# Lean Object ABI
 
 This note records the direction for replacing the C++ byte value codec with
 JavaScript-driven construction and inspection of Lean runtime objects.
@@ -102,9 +102,9 @@ sequenceDiagram
 ```
 
 The compact byte payload path remains the complete path while this lands. It
-handles structured values, resources, callbacks, and host imports. The direct
-scalar helpers are still useful for the hottest exact scalar signatures because
-they avoid object allocation entirely.
+handles structured values, resources, callbacks, and host imports. Primitive
+lane helpers are still useful for the hottest exact scalar signatures because
+they avoid both byte payloads and object allocation.
 
 ## Phases
 
