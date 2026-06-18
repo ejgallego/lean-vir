@@ -10,22 +10,6 @@ Author: Emilio J. Gallego Arias
 
 #include "runtime/object.h"
 
-extern "C" lean::object * vir_obj_bool(uint32_t value) {
-    return lean_box(value == 0 ? 0 : 1);
-}
-
-extern "C" uint32_t vir_obj_get_bool(lean::object * value) {
-    return lean_unbox(value) == 0 ? 0 : 1;
-}
-
-extern "C" lean::object * vir_obj_uint32(uint32_t value) {
-    return lean_box_uint32(value);
-}
-
-extern "C" uint32_t vir_obj_get_uint32(lean::object * value) {
-    return lean_unbox_uint32(value);
-}
-
 extern "C" lean::object * vir_obj_string(char const * text, uint32_t len) {
     return lean_mk_string_from_bytes(text, len);
 }

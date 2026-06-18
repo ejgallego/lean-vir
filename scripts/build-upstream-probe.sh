@@ -266,10 +266,6 @@ exports=(
   -Wl,--export=vir_package_interface_manifest
   -Wl,--export=vir_package_interface_manifest_size
   -Wl,--export=vir_package_decl_count
-  -Wl,--export=vir_obj_bool
-  -Wl,--export=vir_obj_get_bool
-  -Wl,--export=vir_obj_uint32
-  -Wl,--export=vir_obj_get_uint32
   -Wl,--export=vir_obj_string
   -Wl,--export=vir_obj_string_data
   -Wl,--export=vir_obj_string_size
@@ -507,8 +503,8 @@ report_start=$SECONDS
   echo "closure bridge, and declaration lookup hooks. \`signature_cache.cpp\`"
   echo "owns decoded package and host-import interface signatures."
   echo "\`interface_codec.cpp\` supplies the JavaScript interface wire codec."
-  echo "\`object_abi.cpp\` supplies direct object conversion probes and owned"
-  echo "Lean object helpers used by runtime boundary tests."
+  echo "\`object_abi.cpp\` supplies owned Lean object helpers used by runtime"
+  echo "boundary tests and object-call experiments."
   echo "\`wasm/upstream_shim/native_symbols.cpp\` supplies the explicit native"
   echo "extern wrappers plus generated registry include and restricted \`dlsym\` lookup;"
   echo "\`platform_stubs.cpp\`"

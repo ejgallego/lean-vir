@@ -45,8 +45,6 @@ flowchart LR
 
 The initial exported primitive surface is deliberately small:
 
-- `vir_obj_bool` / `vir_obj_get_bool`
-- `vir_obj_uint32` / `vir_obj_get_uint32`
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
 - `vir_obj_inc` / `vir_obj_dec`
@@ -110,8 +108,8 @@ they avoid object allocation entirely.
 
 ## Phases
 
-1. Base object primitives: Bool, UInt32, String, and ByteArray construction and
-   inspection, plus ownership tests.
+1. Base object primitives: String and ByteArray construction and inspection,
+   plus ownership tests.
 2. Object call helpers: resolved calls that accept already-lowered owned object
    arguments and return an owned object result.
 3. Bulk builders: arrays, strings, and byte arrays with fewer intermediate

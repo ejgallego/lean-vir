@@ -37,15 +37,21 @@ const PRIMITIVE_LANE = Object.freeze({
   STRING: 3,
 });
 
-function withObjectString(runtime, input, body) {
+function makeObjectString(runtime, input) {
   const bytes = new TextEncoder().encode(input);
   const ptr = runtime.allocBytes(bytes);
-  let obj = 0;
   try {
-    obj = runtime.exports.vir_obj_string(ptr, bytes.byteLength);
-    return body(obj);
+    return runtime.exports.vir_obj_string(ptr, bytes.byteLength);
   } finally {
     runtime.freeBytes(ptr);
+  }
+}
+
+function withObjectString(runtime, input, body) {
+  let obj = makeObjectString(runtime, input);
+  try {
+    return body(obj);
+  } finally {
     if (obj !== 0) {
       runtime.exports.vir_obj_dec(obj);
     }
@@ -309,21 +315,15 @@ assert.equal(inspectedInfo.manifest.hostImports.length, 0);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");
-const boolObject = runtime.exports.vir_obj_bool(1);
-assert.equal(runtime.exports.vir_obj_get_bool(boolObject), 1);
-runtime.exports.vir_obj_inc(boolObject);
-runtime.exports.vir_obj_dec(boolObject);
-runtime.exports.vir_obj_dec(boolObject);
-const uint32Object = runtime.exports.vir_obj_uint32(0x7f00aa55);
-assert.equal(runtime.exports.vir_obj_get_uint32(uint32Object), 0x7f00aa55);
-runtime.exports.vir_obj_dec(uint32Object);
-const uint32CallResult = callResolvedObjects(runtime, "Vir.Fixtures.InterfaceShapes.uint32Bump", [
-  runtime.exports.vir_obj_uint32(41),
+const stringCallResult = callResolvedObjects(runtime, "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", [
+  makeObjectString(runtime, "object-call"),
 ]);
 try {
-  assert.equal(runtime.exports.vir_obj_get_uint32(uint32CallResult), 42);
+  const len = runtime.exports.vir_obj_string_size(stringCallResult);
+  const data = runtime.exports.vir_obj_string_data(stringCallResult);
+  assert.equal(runtime.readWasmString(data, len), "object-call");
 } finally {
-  runtime.exports.vir_obj_dec(uint32CallResult);
+  runtime.exports.vir_obj_dec(stringCallResult);
 }
 assert.equal(
   callDirectString(runtime, "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "Aé∀Z"),
@@ -336,6 +336,8 @@ assert.equal(
   1.25,
 );
 withObjectString(runtime, "Aé∀Z", (obj) => {
+  runtime.exports.vir_obj_inc(obj);
+  runtime.exports.vir_obj_dec(obj);
   const len = runtime.exports.vir_obj_string_size(obj);
   const data = runtime.exports.vir_obj_string_data(obj);
   assert.equal(runtime.readWasmString(data, len), "Aé∀Z");
