@@ -433,65 +433,13 @@ static uint8_t decode_call_effect(lean::vir_reader & reader) {
     return effect;
 }
 
-static char const * vir_call_core(
+static char const * run_decoded_call(
     lean::name const & fn,
     bool has_boxed_decl,
-    uint8_t const * request,
-    uint32_t request_len,
-    uint8_t result_tag,
-    lean::host_signature const * package_signature = nullptr) {
-    (void) result_tag;
-    bool compact_payload = package_signature != nullptr;
-    lean::vir_reader reader(request, request_len);
-    uint32_t argc = reader.u32();
-    std::vector<lean::vir_arg> decoded_args;
-    std::vector<lean::object *> args;
-    decoded_args.reserve(argc);
-    args.reserve(argc);
-    lean::vir_type result_type { lean::vir_wire_type::Unit, {} };
-    uint8_t effect = 0;
-    if (compact_payload) {
-        if (!package_signature->ok) {
-            lean::g_call_error = package_signature->error;
-            return nullptr;
-        }
-        if (argc != package_signature->args.size()) {
-            lean::g_call_error =
-                "call argument count mismatch: package signature expects " +
-                std::to_string(package_signature->args.size()) +
-                ", got " + std::to_string(argc);
-            return nullptr;
-        }
-        for (uint32_t i = 0; i < argc; i++) {
-            decoded_args.push_back(lean::decode_argument_payload(reader, package_signature->args[i], has_boxed_decl));
-            args.push_back(decoded_args.back().value);
-        }
-        result_type = package_signature->result;
-        effect = package_signature->is_io ? 1 : 0;
-    } else {
-        for (uint32_t i = 0; i < argc; i++) {
-            decoded_args.push_back(lean::decode_argument(reader, has_boxed_decl));
-            args.push_back(decoded_args.back().value);
-        }
-        result_type = lean::decode_type(reader);
-        effect = decode_call_effect(reader);
-    }
-    if (!reader.ok) {
-        lean::g_call_error = reader.error();
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-    if (!has_boxed_decl && lean::needs_boxed_wasm32_call_boundary_type(result_type)) {
-        lean::g_call_error = "top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary";
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-    if (!reader.at_end()) {
-        lean::g_call_error = "trailing bytes after call payload";
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-
+    lean::vir_type const & result_type,
+    uint8_t effect,
+    std::vector<lean::object *> & args,
+    bool value_only_result) {
     lean::ensure_ir_interpreter_initialized();
     if (effect == 1) {
         args.push_back(lean_io_mk_world());
@@ -508,7 +456,7 @@ static char const * vir_call_core(
         result = lean_io_result_take_value(result);
     }
     lean::vir_writer writer;
-    if (compact_payload) {
+    if (value_only_result) {
         lean::encode_result_payload(writer, result_type, result, has_boxed_decl);
     } else {
         lean::encode_result(writer, result_type, result, has_boxed_decl);
@@ -525,6 +473,92 @@ static char const * vir_call_core(
     }
     lean::g_call_result = writer.take();
     return lean::g_call_result.data();
+}
+
+static char const * vir_call_descriptor_core(
+    lean::name const & fn,
+    bool has_boxed_decl,
+    uint8_t const * request,
+    uint32_t request_len) {
+    lean::vir_reader reader(request, request_len);
+    uint32_t argc = reader.u32();
+    std::vector<lean::vir_arg> decoded_args;
+    std::vector<lean::object *> args;
+    decoded_args.reserve(argc);
+    args.reserve(argc);
+    for (uint32_t i = 0; i < argc; i++) {
+        decoded_args.push_back(lean::decode_argument(reader, has_boxed_decl));
+        args.push_back(decoded_args.back().value);
+    }
+    lean::vir_type result_type = lean::decode_type(reader);
+    uint8_t effect = decode_call_effect(reader);
+    if (!reader.ok) {
+        lean::g_call_error = reader.error();
+        cleanup_call_args(decoded_args);
+        return nullptr;
+    }
+    if (!has_boxed_decl && lean::needs_boxed_wasm32_call_boundary_type(result_type)) {
+        lean::g_call_error = "top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary";
+        cleanup_call_args(decoded_args);
+        return nullptr;
+    }
+    if (!reader.at_end()) {
+        lean::g_call_error = "trailing bytes after call payload";
+        cleanup_call_args(decoded_args);
+        return nullptr;
+    }
+    return run_decoded_call(fn, has_boxed_decl, result_type, effect, args, false);
+}
+
+static char const * vir_call_resolved_core(
+    lean::name const & fn,
+    bool has_boxed_decl,
+    uint8_t const * request,
+    uint32_t request_len,
+    lean::host_signature const & signature) {
+    if (!signature.ok) {
+        lean::g_call_error = signature.error;
+        return nullptr;
+    }
+    lean::vir_reader reader(request, request_len);
+    uint32_t argc = reader.u32();
+    if (argc != signature.args.size()) {
+        lean::g_call_error =
+            "call argument count mismatch: package signature expects " +
+            std::to_string(signature.args.size()) +
+            ", got " + std::to_string(argc);
+        return nullptr;
+    }
+    std::vector<lean::vir_arg> decoded_args;
+    std::vector<lean::object *> args;
+    decoded_args.reserve(argc);
+    args.reserve(argc);
+    for (uint32_t i = 0; i < argc; i++) {
+        decoded_args.push_back(lean::decode_argument_payload(reader, signature.args[i], has_boxed_decl));
+        args.push_back(decoded_args.back().value);
+    }
+    if (!reader.ok) {
+        lean::g_call_error = reader.error();
+        cleanup_call_args(decoded_args);
+        return nullptr;
+    }
+    if (!has_boxed_decl && lean::needs_boxed_wasm32_call_boundary_type(signature.result)) {
+        lean::g_call_error = "top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary";
+        cleanup_call_args(decoded_args);
+        return nullptr;
+    }
+    if (!reader.at_end()) {
+        lean::g_call_error = "trailing bytes after call payload";
+        cleanup_call_args(decoded_args);
+        return nullptr;
+    }
+    return run_decoded_call(
+        fn,
+        has_boxed_decl,
+        signature.result,
+        signature.is_io ? 1 : 0,
+        args,
+        true);
 }
 
 extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len) {
@@ -569,7 +603,8 @@ extern "C" char const * vir_call(
 
     lean::name fn = lean::name_from_dotted(name_text, name_len);
     bool has_boxed_decl = lean::vir::find_package_boxed_decl(fn.to_obj_arg()) != nullptr;
-    return vir_call_core(fn, has_boxed_decl, request, request_len, result_tag);
+    (void) result_tag;
+    return vir_call_descriptor_core(fn, has_boxed_decl, request, request_len);
 }
 
 extern "C" char const * vir_call_resolved(
@@ -600,7 +635,8 @@ extern "C" char const * vir_call_resolved(
         lean::g_call_error = "resolved call requires a package-owned call signature";
         return nullptr;
     }
-    return vir_call_core(fn, has_boxed_decl, request, request_len, result_tag, signature);
+    (void) result_tag;
+    return vir_call_resolved_core(fn, has_boxed_decl, request, request_len, *signature);
 }
 
 static void cleanup_object_call_args(uint32_t argc, lean::object ** args) {
