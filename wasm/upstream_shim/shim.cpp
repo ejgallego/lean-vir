@@ -62,6 +62,18 @@ struct host_signature {
     bool is_io = false;
 };
 
+struct cached_signature {
+    uint32_t package_generation = 0;
+    uint32_t slot = UINT32_MAX;
+    char const * data = nullptr;
+    uint32_t size = 0;
+    bool is_io = false;
+    host_signature signature;
+};
+
+static std::vector<cached_signature> g_host_signature_cache;
+static std::vector<cached_signature> g_package_call_signature_cache;
+
 static host_signature decode_signature_bytes(
     char const * data,
     uint32_t size,
@@ -97,13 +109,72 @@ static host_signature decode_host_signature(uint32_t slot) {
         "trailing bytes after JavaScript import signature");
 }
 
-static host_signature decode_package_call_signature(uint32_t slot) {
+static host_signature decode_package_call_signature(
+    char const * data,
+    uint32_t size,
+    bool is_io) {
     return decode_signature_bytes(
-        vir::package_call_signature(slot),
-        vir::package_call_signature_size(slot),
-        vir::package_call_is_io(slot),
+        data,
+        size,
+        is_io,
         "missing package call signature",
         "trailing bytes after package call signature");
+}
+
+static host_signature const * cached_host_signature(uint32_t slot) {
+    char const * data = vir::host_import_signature(slot);
+    uint32_t size = vir::host_import_signature_size(slot);
+    bool is_io = vir::host_import_is_io(slot);
+    uint32_t generation = vir::package_generation();
+    if (slot >= g_host_signature_cache.size()) {
+        g_host_signature_cache.resize(slot + 1);
+    }
+    cached_signature & cached = g_host_signature_cache[slot];
+    if (
+        cached.package_generation == generation &&
+        cached.slot == slot &&
+        cached.data == data &&
+        cached.size == size &&
+        cached.is_io == is_io) {
+        return &cached.signature;
+    }
+    cached.package_generation = generation;
+    cached.slot = slot;
+    cached.data = data;
+    cached.size = size;
+    cached.is_io = is_io;
+    cached.signature = decode_host_signature(slot);
+    return &cached.signature;
+}
+
+static host_signature const * cached_package_call_signature(uint32_t slot) {
+    char const * data = vir::package_call_signature(slot);
+    if (data == nullptr) {
+        return nullptr;
+    }
+    uint32_t size = vir::package_call_signature_size(slot);
+    bool is_io = vir::package_call_is_io(slot);
+    uint32_t generation = vir::package_generation();
+    size_t index = slot - 1;
+    if (index >= g_package_call_signature_cache.size()) {
+        g_package_call_signature_cache.resize(index + 1);
+    }
+    cached_signature & cached = g_package_call_signature_cache[index];
+    if (
+        cached.package_generation == generation &&
+        cached.slot == slot &&
+        cached.data == data &&
+        cached.size == size &&
+        cached.is_io == is_io) {
+        return &cached.signature;
+    }
+    cached.package_generation = generation;
+    cached.slot = slot;
+    cached.data = data;
+    cached.size = size;
+    cached.is_io = is_io;
+    cached.signature = decode_package_call_signature(data, size, is_io);
+    return &cached.signature;
 }
 
 static object * decode_host_result(vir_type const & expected, char const * bytes, uint32_t size) {
@@ -125,27 +196,27 @@ static object * decode_host_result(vir_type const & expected, char const * bytes
 }
 
 static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
-    host_signature signature = decode_host_signature(slot);
+    host_signature const * signature = cached_host_signature(slot);
     uint32_t erased_prefix_args = vir::host_import_erased_prefix_args(slot);
-    if (!signature.ok) {
+    if (!signature->ok) {
         for (uint32_t i = 0; i < argc; i++) {
             lean_dec(args[i]);
         }
         return vir::host_import_is_io(slot) ? lean_io_result_mk_ok(lean_box(0)) : lean_box(0);
     }
-    if (argc < erased_prefix_args || signature.args.size() > argc - erased_prefix_args) {
+    if (argc < erased_prefix_args || signature->args.size() > argc - erased_prefix_args) {
         for (uint32_t i = 0; i < argc; i++) {
             lean_dec(args[i]);
         }
         return vir::host_import_is_io(slot) ? lean_io_result_mk_ok(lean_box(0)) : lean_box(0);
     }
     vir_writer request;
-    request.u32(static_cast<uint32_t>(signature.args.size()));
-    for (size_t i = 0; i < signature.args.size(); i++) {
-        encode_type(request, signature.args[i]);
-        encode_value_payload(request, signature.args[i], args[erased_prefix_args + i]);
+    request.u32(static_cast<uint32_t>(signature->args.size()));
+    for (size_t i = 0; i < signature->args.size(); i++) {
+        encode_type(request, signature->args[i]);
+        encode_value_payload(request, signature->args[i], args[erased_prefix_args + i]);
     }
-    encode_type(request, signature.result);
+    encode_type(request, signature->result);
     if (!request.ok) {
         for (uint32_t i = 0; i < argc; i++) {
             lean_dec(args[i]);
@@ -158,14 +229,14 @@ static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
         reinterpret_cast<uint8_t const *>(request_bytes.data()),
         static_cast<uint32_t>(request_bytes.size()));
     uint32_t result_size = vir_js_call_result_size();
-    object * value = decode_host_result(signature.result, result_bytes, result_size);
+    object * value = decode_host_result(signature->result, result_bytes, result_size);
     if (result_bytes != nullptr) {
         vir_free_bytes(const_cast<char *>(result_bytes));
     }
     for (uint32_t i = 0; i < argc; i++) {
         lean_dec(args[i]);
     }
-    if (vir::host_import_is_io(slot)) {
+    if (signature->is_io) {
         return lean_io_result_mk_ok(value);
     }
     return value;
@@ -643,11 +714,11 @@ extern "C" char const * vir_call_resolved(
     }
     lean::name fn(fn_obj, true);
     bool has_boxed_decl = lean::vir::package_call_slot_has_boxed_decl(call_slot);
-    if (lean::vir::package_call_signature(call_slot) == nullptr) {
+    lean::host_signature const * signature = lean::cached_package_call_signature(call_slot);
+    if (signature == nullptr) {
         return vir_call_core(fn, has_boxed_decl, request, request_len, result_tag);
     }
-    lean::host_signature signature = lean::decode_package_call_signature(call_slot);
-    return vir_call_core(fn, has_boxed_decl, request, request_len, result_tag, &signature);
+    return vir_call_core(fn, has_boxed_decl, request, request_len, result_tag, signature);
 }
 
 extern "C" uint32_t vir_call_result_size(void) {

@@ -69,6 +69,7 @@ static std::vector<export_signature_entry> g_export_signatures;
 static std::string g_interface_manifest;
 static std::string g_last_error;
 static bool g_package_loaded = false;
+static uint32_t g_package_generation = 1;
 
 static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
     object * obj = lean_alloc_ctor(tag, fields.size(), scalar_size);
@@ -776,6 +777,10 @@ static void clear_loaded_package() {
     g_export_signatures.clear();
     g_interface_manifest.clear();
     g_package_loaded = false;
+    g_package_generation++;
+    if (g_package_generation == 0) {
+        g_package_generation = 1;
+    }
 }
 
 static bool load_package(uint8_t const * data, size_t size) {
@@ -1069,6 +1074,10 @@ uint32_t package_decl_count() {
 
 bool package_loaded() {
     return g_package_loaded;
+}
+
+uint32_t package_generation() {
+    return g_package_generation;
 }
 
 char const * last_package_error() {

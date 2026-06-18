@@ -153,6 +153,9 @@ In package format 7 and newer, the package contains a compact export signature
 table. `vir_call_resolved` uses that table to decode value-only argument
 payloads and to encode value-only result payloads. Older packages without the
 table keep using the descriptor-bearing payload accepted by `vir_call`.
+The shim caches decoded export and host-import signatures by package generation
+and slot, so compact signature bytes are decoded once per loaded package rather
+than on every call.
 
 The shim still keeps `vir_call(name, len, payload, payloadLen, resultTag)` as a
 named entry point for diagnostics and benchmark comparisons, but the JavaScript

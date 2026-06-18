@@ -32,6 +32,7 @@ uint32_t host_import_signature_size(uint32_t slot);
 bool host_import_is_io(uint32_t slot);
 uint32_t package_decl_count();
 bool package_loaded();
+uint32_t package_generation();
 
 }
 
