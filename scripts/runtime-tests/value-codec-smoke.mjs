@@ -37,17 +37,6 @@ const PRIMITIVE_LANE = Object.freeze({
   STRING: 3,
 });
 
-function callNativeText(runtime, fn, input) {
-  const bytes = new TextEncoder().encode(input);
-  const ptr = runtime.allocBytes(bytes);
-  try {
-    const resultPtr = fn(ptr, bytes.byteLength);
-    const resultLen = runtime.exports.vir_native_conversion_result_size();
-    return runtime.readWasmString(resultPtr, resultLen);
-  } finally {
-    runtime.freeBytes(ptr);
-  }
-}
 function withObjectString(runtime, input, body) {
   const bytes = new TextEncoder().encode(input);
   const ptr = runtime.allocBytes(bytes);
@@ -320,11 +309,6 @@ assert.equal(inspectedInfo.manifest.hostImports.length, 0);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");
-assert.equal(runtime.exports.vir_native_bool_flip(1), 0);
-assert.equal(callNativeText(runtime, runtime.exports.vir_native_nat_bump, "41"), "42");
-assert.equal(callNativeText(runtime, runtime.exports.vir_native_string_roundtrip, "ok"), "ok");
-assert.equal(runtime.exports.vir_native_uint32_bump(41), 42);
-assert.equal(runtime.exports.vir_native_float_scale(1.5), 6);
 const boolObject = runtime.exports.vir_obj_bool(1);
 assert.equal(runtime.exports.vir_obj_get_bool(boolObject), 1);
 runtime.exports.vir_obj_inc(boolObject);

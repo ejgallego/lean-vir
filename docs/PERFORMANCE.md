@@ -39,10 +39,10 @@ lifecycle work, and focused React `Node` render conversion.
 
 The `base-*` JSON rows are intended as the first regression surface for direct
 base-type conversion work. Each row has a `codec` sample for JavaScript request
-encoding and a `wasm` sample for the full top-level call. Rows with an
-implemented direct shim helper also have a `native` sample that calls the
-native conversion API directly, bypassing value payload decoding and `vir_call`
-dispatch. The scalar host/resource and React rows repeat one exported operation
+encoding and a `wasm` sample for the full top-level call. Rows supported by the
+primitive-lane resolved-call API also have a `direct` sample that bypasses value
+payload encoding/decoding while still resolving and validating the package
+entry. The scalar host/resource and React rows repeat one exported operation
 from JavaScript where possible, so they stress boundary conversion without
 primarily measuring a deep recursive Lean `DomM` loop.
 
@@ -52,13 +52,13 @@ for exact pure `Unit -> Unit`, `Bool -> Bool`, same-width
 signatures. Those rows still report under the normal `wasm` sample because the
 public API remains `vir.call(...)`; internally they bypass payload allocation,
 binary value encoding, and result byte decoding after the package slot is
-resolved. The `native` rows are still lower-bound probes that bypass package
-dispatch entirely.
+resolved. The `direct` rows expose the same primitive-lane path explicitly for
+benchmarking.
 
 The machine-readable report schema is `lean-vir.bench.v1`. Benchmark rows are
 objects under the top-level `benchmarks` array. Every timed sample uses the same
 shape, regardless of whether it is named `codec`, `wasm`, `native`, `host`,
-`named`, `resolved`, or `js`:
+`direct`, `host`, `named`, `resolved`, or `js`:
 
 ```json
 {
@@ -87,8 +87,8 @@ The `base-*` conversion rows use this stable row shape:
     "medianMs": 185.0,
     "checksum": 0
   },
-  "native": {
-    "label": "native-base-bool",
+  "direct": {
+    "label": "direct-base-bool",
     "iterations": 50000,
     "medianMs": 1.07,
     "checksum": 0
@@ -96,11 +96,10 @@ The `base-*` conversion rows use this stable row shape:
 }
 ```
 
-`native` is optional. Its absence means the row does not yet have a direct
-shim helper; it must not be interpreted as zero time or a failed benchmark.
-Today the native probe covers only the base scalar helpers exported by the
-WASI shim (`Bool`, `Nat`, `String`, `UInt32`, and `Float`). Those helpers are
-prototype conversion probes for benchmarking, not the public package-call API.
+`direct` is optional. Its absence means the row does not yet have a
+primitive-lane call path; it must not be interpreted as zero time or a failed
+benchmark. Today the direct sample covers only exact pure `Unit`, `Bool`,
+`UInt8`, `UInt16`, `UInt32`, `Float`, `Float32`, and `String` round trips.
 
 The `branchAndSub` row calls a tiny exported fixture through both descriptor-
 bearing `vir_call` and compact `vir_call_resolved`, so it is the focused check

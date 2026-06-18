@@ -194,23 +194,6 @@ The shim still keeps `vir_call(name, len, payload, payloadLen, resultTag)` as a
 named entry point for diagnostics and benchmark comparisons, but the JavaScript
 runtime requires the resolved-call exports.
 
-The shim also exports a very small direct conversion probe surface for
-benchmarks:
-
-- `vir_native_bool_flip`
-- `vir_native_nat_bump`
-- `vir_native_string_roundtrip`
-- `vir_native_uint32_bump`
-- `vir_native_float_scale`
-- `vir_native_conversion_result_size`
-
-These exports measure the cost of direct base-type conversion APIs discussed in
-[PERFORMANCE.md](PERFORMANCE.md). They bypass value payload decoding and
-`vir_call`/`vir_call_resolved` dispatch, so they are useful as a lower-bound
-comparison for future conversion work. They are not package exports, not
-general native lookup support, and not a replacement for the manifest-driven
-runtime API.
-
 The shim also exposes the first experimental direct Lean object ABI helpers:
 
 - `vir_obj_bool` / `vir_obj_get_bool`
