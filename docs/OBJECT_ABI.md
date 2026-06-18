@@ -43,7 +43,7 @@ flowchart LR
   ResultObj --> Release["vir_obj_dec"]
 ```
 
-The initial exported primitive surface is deliberately small:
+The initial exported object helper surface is deliberately small:
 
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
@@ -56,7 +56,7 @@ after `vir_obj_dec` releases the object or after the runtime is torn down.
 
 ## Ownership
 
-The primitive constructors return an owned Lean object pointer. JavaScript owns
+Object constructors return an owned Lean object pointer. JavaScript owns
 that reference and must release it with `vir_obj_dec` unless a call helper
 explicitly documents that it consumes ownership. `vir_obj_inc` can be used to
 retain an object across a helper call that consumes one reference.

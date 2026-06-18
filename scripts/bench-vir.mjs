@@ -32,7 +32,10 @@ import {
   encodeCallPayload,
   encodeResolvedCallPayload,
 } from "../web/src/runtime/vir-value-codec.js";
-import { WIRE } from "../web/src/runtime/wire-tags.js";
+import {
+  PRIMITIVE_LANE,
+  readPrimitiveResult,
+} from "../web/src/runtime/primitive-lanes.js";
 import {
   createVirRuntime as createNodeVirRuntime,
   createVirtualDocumentState,
@@ -115,12 +118,6 @@ const baseByteArrayInput = Uint8Array.from(Array.from({ length: 128 }, (_, index
 const baseArrayNatInput = Array.from({ length: 64 }, (_, index) => index + 1);
 const baseArrayStringInput = Array.from({ length: 32 }, (_, index) => `s${index}`);
 const textEncoder = new TextEncoder();
-const PRIMITIVE_LANE = Object.freeze({
-  UNIT: 0,
-  U32: 1,
-  F64: 2,
-  STRING: 3,
-});
 const args = parseArgs(process.argv.slice(2));
 
 function parseArgs(argv) {
@@ -417,9 +414,9 @@ function benchDirectPrimitiveCall(testCase, entry, lane) {
       for (let i = 0; i < testCase.iterations; i++) {
         setPrimitiveArg(lane, testCase.args[0], stringPtr, stringBytes?.byteLength ?? 0);
         if (runtime.exports.vir_call_resolved_primitive(callSlot, lane, lane) === 0) {
-          throw new Error(runtime.lastCallError() || `direct primitive call failed: ${entry.entry}`);
+          throw new Error(runtime.lastCallError() || `primitive call failed: ${entry.entry}`);
         }
-        acc += testCase.checksum(readPrimitiveResult(lane, entry.result.wireTag));
+        acc += testCase.checksum(readPrimitiveResult(runtime, lane, entry.result.wireTag));
       }
       return acc;
     });
@@ -444,30 +441,9 @@ function setPrimitiveArg(lane, value, stringPtr, stringLen) {
   }
   if (lane === PRIMITIVE_LANE.STRING) {
     if (runtime.exports.vir_call_primitive_set_string(stringPtr, stringLen) === 0) {
-      throw new Error(runtime.lastCallError() || "direct primitive string argument failed");
+      throw new Error(runtime.lastCallError() || "primitive string argument failed");
     }
     return;
-  }
-  throw new Error(`unsupported primitive lane ${lane}`);
-}
-
-function readPrimitiveResult(lane, resultTag) {
-  if (lane === PRIMITIVE_LANE.UNIT) {
-    return undefined;
-  }
-  if (lane === PRIMITIVE_LANE.U32) {
-    const value = runtime.exports.vir_call_primitive_u32_result();
-    return resultTag === WIRE.BOOL ? value !== 0 : value;
-  }
-  if (lane === PRIMITIVE_LANE.F64) {
-    const value = runtime.exports.vir_call_primitive_f64_result();
-    return resultTag === WIRE.FLOAT32 ? Math.fround(value) : value;
-  }
-  if (lane === PRIMITIVE_LANE.STRING) {
-    return runtime.readWasmString(
-      runtime.exports.vir_call_primitive_string_result(),
-      runtime.exports.vir_call_result_size(),
-    );
   }
   throw new Error(`unsupported primitive lane ${lane}`);
 }

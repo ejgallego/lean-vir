@@ -231,8 +231,8 @@ static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
 
 static std::string g_call_result;
 static std::string g_call_error;
-static uint32_t g_direct_u32_result = 0;
-static double g_direct_f64_result = 0.0;
+static uint32_t g_primitive_u32_result = 0;
+static double g_primitive_f64_result = 0.0;
 static uint32_t g_primitive_u32_arg = 0;
 static double g_primitive_f64_arg = 0.0;
 static char const * g_primitive_string_arg = nullptr;
@@ -675,8 +675,8 @@ extern "C" lean::object * vir_call_resolved_objects(
     uint32_t argc) {
     lean::g_call_result.clear();
     lean::g_call_error.clear();
-    lean::g_direct_u32_result = 0;
-    lean::g_direct_f64_result = 0.0;
+    lean::g_primitive_u32_result = 0;
+    lean::g_primitive_f64_result = 0.0;
     if (argv == nullptr && argc != 0) {
         lean::g_call_error = "object call argv pointer is null";
         return nullptr;
@@ -738,7 +738,7 @@ extern "C" lean::object * vir_call_resolved_objects(
     return result;
 }
 
-static bool direct_call_header(
+static bool primitive_call_header(
     uint32_t call_slot,
     char const * label,
     lean::object ** fn_obj,
@@ -746,8 +746,8 @@ static bool direct_call_header(
     lean::host_signature const ** signature) {
     lean::g_call_result.clear();
     lean::g_call_error.clear();
-    lean::g_direct_u32_result = 0;
-    lean::g_direct_f64_result = 0.0;
+    lean::g_primitive_u32_result = 0;
+    lean::g_primitive_f64_result = 0.0;
     if (!lean::vir::package_loaded()) {
         lean::g_call_error = "no IR package has been loaded";
         return false;
@@ -829,7 +829,7 @@ static void clear_primitive_string_arg(void) {
     lean::g_primitive_string_arg_set = false;
 }
 
-static lean::object * direct_small_uint_arg(lean::vir_wire_type tag, uint32_t value, bool has_boxed_decl) {
+static lean::object * primitive_u32_arg(lean::vir_wire_type tag, uint32_t value, bool has_boxed_decl) {
     uintptr_t raw = value;
     if (tag == lean::vir_wire_type::UInt8) raw = static_cast<uint8_t>(value);
     if (tag == lean::vir_wire_type::UInt16) raw = static_cast<uint16_t>(value);
@@ -842,14 +842,14 @@ static lean::object * direct_small_uint_arg(lean::vir_wire_type tag, uint32_t va
     return lean_box(static_cast<unsigned>(raw));
 }
 
-static lean::object * direct_float_arg(lean::vir_wire_type tag, double value) {
+static lean::object * primitive_f64_arg(lean::vir_wire_type tag, double value) {
     if (tag == lean::vir_wire_type::Float32) {
         return lean_box_float32(static_cast<float>(value));
     }
     return lean_box_float(value);
 }
 
-static uint32_t direct_small_uint_result(lean::vir_wire_type tag, lean::object * value, bool has_boxed_decl) {
+static uint32_t primitive_u32_result_from_object(lean::vir_wire_type tag, lean::object * value, bool has_boxed_decl) {
     uintptr_t raw = has_boxed_decl
         ? (tag == lean::vir_wire_type::UInt32 ? lean_unbox_uint32(value) : lean_unbox(value))
         : reinterpret_cast<uintptr_t>(value);
@@ -858,18 +858,11 @@ static uint32_t direct_small_uint_result(lean::vir_wire_type tag, lean::object *
     return static_cast<uint32_t>(raw);
 }
 
-static double direct_float_result(lean::vir_wire_type tag, lean::object * value) {
+static double primitive_f64_result_from_object(lean::vir_wire_type tag, lean::object * value) {
     if (tag == lean::vir_wire_type::Float32) {
         return static_cast<double>(lean_unbox_float32(value));
     }
     return lean_unbox_float(value);
-}
-
-static lean::object * run_direct_resolved_call(
-    lean::object * fn_obj,
-    size_t argc,
-    lean::object ** args) {
-    return run_package_function(fn_obj, argc, args);
 }
 
 static lean::object * primitive_arg_for_type(lean::vir_wire_type tag, bool has_boxed_decl) {
@@ -881,14 +874,14 @@ static lean::object * primitive_arg_for_type(lean::vir_wire_type tag, bool has_b
     case lean::vir_wire_type::UInt8:
     case lean::vir_wire_type::UInt16:
     case lean::vir_wire_type::UInt32:
-        return direct_small_uint_arg(tag, lean::g_primitive_u32_arg, has_boxed_decl);
+        return primitive_u32_arg(tag, lean::g_primitive_u32_arg, has_boxed_decl);
     case lean::vir_wire_type::String:
         return lean_mk_string_from_bytes(
             lean::g_primitive_string_arg == nullptr ? "" : lean::g_primitive_string_arg,
             lean::g_primitive_string_arg_len);
     case lean::vir_wire_type::Float:
     case lean::vir_wire_type::Float32:
-        return direct_float_arg(tag, lean::g_primitive_f64_arg);
+        return primitive_f64_arg(tag, lean::g_primitive_f64_arg);
     default:
         return lean_box(0);
     }
@@ -899,12 +892,12 @@ static void store_primitive_result(lean::vir_wire_type tag, lean::object * resul
     case lean::vir_wire_type::Unit:
         return;
     case lean::vir_wire_type::Bool:
-        lean::g_direct_u32_result = lean_unbox(result) == 0 ? 0 : 1;
+        lean::g_primitive_u32_result = lean_unbox(result) == 0 ? 0 : 1;
         return;
     case lean::vir_wire_type::UInt8:
     case lean::vir_wire_type::UInt16:
     case lean::vir_wire_type::UInt32:
-        lean::g_direct_u32_result = direct_small_uint_result(tag, result, has_boxed_decl);
+        lean::g_primitive_u32_result = primitive_u32_result_from_object(tag, result, has_boxed_decl);
         return;
     case lean::vir_wire_type::String: {
         size_t size = lean_string_size(result);
@@ -914,7 +907,7 @@ static void store_primitive_result(lean::vir_wire_type tag, lean::object * resul
     }
     case lean::vir_wire_type::Float:
     case lean::vir_wire_type::Float32:
-        lean::g_direct_f64_result = direct_float_result(tag, result);
+        lean::g_primitive_f64_result = primitive_f64_result_from_object(tag, result);
         return;
     default:
         return;
@@ -946,8 +939,8 @@ extern "C" uint32_t vir_call_resolved_primitive(uint32_t call_slot, uint32_t arg
     lean::object * fn_obj = nullptr;
     bool has_boxed_decl = false;
     lean::host_signature const * signature = nullptr;
-    char const * label = "direct primitive call";
-    if (!direct_call_header(call_slot, label, &fn_obj, &has_boxed_decl, &signature)) {
+    char const * label = "primitive call";
+    if (!primitive_call_header(call_slot, label, &fn_obj, &has_boxed_decl, &signature)) {
         clear_primitive_string_arg();
         return 0;
     }
@@ -986,7 +979,7 @@ extern "C" uint32_t vir_call_resolved_primitive(uint32_t call_slot, uint32_t arg
     lean::object * arg = primitive_arg_for_type(signature->args[0].tag, has_boxed_decl);
     clear_primitive_string_arg();
     lean::object * args[] = { arg };
-    lean::object * result = run_direct_resolved_call(fn_obj, 1, args);
+    lean::object * result = run_package_function(fn_obj, 1, args);
     store_primitive_result(signature->result.tag, result, has_boxed_decl);
     if (lean::call_result_is_owned(signature->result, has_boxed_decl)) {
         lean_dec(result);
@@ -995,11 +988,11 @@ extern "C" uint32_t vir_call_resolved_primitive(uint32_t call_slot, uint32_t arg
 }
 
 extern "C" uint32_t vir_call_primitive_u32_result(void) {
-    return lean::g_direct_u32_result;
+    return lean::g_primitive_u32_result;
 }
 
 extern "C" double vir_call_primitive_f64_result(void) {
-    return lean::g_direct_f64_result;
+    return lean::g_primitive_f64_result;
 }
 
 extern "C" char const * vir_call_primitive_string_result(void) {

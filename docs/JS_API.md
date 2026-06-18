@@ -60,6 +60,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/vir-value-codec.js` | JavaScript value encode/decode for Lean call arguments, results, and host imports. |
 | `runtime/vir-value-normalizers.js` | Input normalization helpers used by the value codec. |
 | `runtime/vir-lean-codec.js` | Structural `Lean.Expr` and level encode/decode helpers. |
+| `runtime/primitive-lanes.js` | Primitive-lane constants and result lifting helpers. |
 | `vir-host-bindings.js` | Public common/browser host binding factories and stable re-exports. |
 | `host-resource.js` | Opaque host-resource objects and externref root tables. |
 | `host/vir-host-resources.js` | Host-resource store, liveness, teardown, timers, callbacks, and shared binding helpers. |
