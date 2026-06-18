@@ -433,6 +433,24 @@ static uint8_t decode_call_effect(lean::vir_reader & reader) {
     return effect;
 }
 
+static lean::object * run_package_function(
+    lean::name const & fn,
+    size_t argc,
+    lean::object ** args) {
+    lean::ensure_ir_interpreter_initialized();
+    lean::elab_environment env(lean_box(0));
+    lean::options opts(lean_box(0));
+    return lean::ir::run_boxed(env, opts, fn, argc, args);
+}
+
+static lean::object * run_package_function(
+    lean::object * fn_obj,
+    size_t argc,
+    lean::object ** args) {
+    lean::name fn(fn_obj, true);
+    return run_package_function(fn, argc, args);
+}
+
 static char const * run_decoded_call(
     lean::name const & fn,
     bool has_boxed_decl,
@@ -440,13 +458,10 @@ static char const * run_decoded_call(
     uint8_t effect,
     std::vector<lean::object *> & args,
     bool value_only_result) {
-    lean::ensure_ir_interpreter_initialized();
     if (effect == 1) {
         args.push_back(lean_io_mk_world());
     }
-    lean::elab_environment env(lean_box(0));
-    lean::options opts(lean_box(0));
-    lean::object * result = lean::ir::run_boxed(env, opts, fn, args.size(), args.data());
+    lean::object * result = run_package_function(fn, args.size(), args.data());
     if (effect == 1) {
         if (!lean_io_result_is_ok(result)) {
             lean_dec(result);
@@ -701,14 +716,10 @@ extern "C" lean::object * vir_call_resolved_objects(
     for (uint32_t i = 0; i < argc; i++) {
         args.push_back(argv[i]);
     }
-    lean::ensure_ir_interpreter_initialized();
     if (signature->is_io) {
         args.push_back(lean_io_mk_world());
     }
-    lean::name fn(fn_obj, true);
-    lean::elab_environment env(lean_box(0));
-    lean::options opts(lean_box(0));
-    lean::object * result = lean::ir::run_boxed(env, opts, fn, args.size(), args.data());
+    lean::object * result = run_package_function(fn_obj, args.size(), args.data());
     if (signature->is_io) {
         if (!lean_io_result_is_ok(result)) {
             lean_dec(result);
@@ -803,11 +814,7 @@ static lean::object * run_direct_resolved_call(
     lean::object * fn_obj,
     size_t argc,
     lean::object ** args) {
-    lean::ensure_ir_interpreter_initialized();
-    lean::name fn(fn_obj, true);
-    lean::elab_environment env(lean_box(0));
-    lean::options opts(lean_box(0));
-    return lean::ir::run_boxed(env, opts, fn, argc, args);
+    return run_package_function(fn_obj, argc, args);
 }
 
 extern "C" uint32_t vir_call_resolved_unit_unit(uint32_t call_slot) {
