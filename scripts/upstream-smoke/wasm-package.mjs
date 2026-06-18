@@ -14,6 +14,7 @@ const requiredFunctionExports = [
   "vir_resolve_call",
   "vir_call",
   "vir_call_resolved",
+  "vir_call_resolved_objects",
   "vir_call_resolved_unit_unit",
   "vir_call_resolved_bool_bool",
   "vir_call_resolved_u32_u32",

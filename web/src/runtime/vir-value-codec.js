@@ -12,7 +12,6 @@ import {
   encodeTypeDescriptor,
   normalizeUint32,
   requireFunctionArgs,
-  requireFunctionResult,
   requireStructureFields,
   requireTypeField,
   requireWireTag,
@@ -67,10 +66,8 @@ export function encodeClosureCallPayload(type, args, options = {}) {
   const writer = new BinaryWriter();
   writer.u32(args.length);
   fnArgs.forEach((arg, index) => {
-    encodeValue(writer, arg.type, args[index], `callback argument ${arg.name}`, options);
+    encodeValuePayload(writer, arg.type, args[index], `callback argument ${arg.name}`, options);
   });
-  encodeTypeDescriptor(writer, requireFunctionResult(type, "callback"), "callback result");
-  writer.u8(interfaceEffectRuntimeTag(type.effect));
   return writer.take();
 }
 

@@ -69,7 +69,11 @@ extern "C" void vir_resource_push(__externref_t value);
 extern "C" uint32_t vir_resource_root(__externref_t value);
 extern "C" __externref_t vir_resource_get(uint32_t root_id);
 extern "C" void vir_resource_release(uint32_t root_id);
-extern "C" uint32_t vir_closure_root(object * value);
+extern "C" uint32_t vir_closure_root_with_signature(
+    object * value,
+    char const * signature_bytes,
+    uint32_t signature_len,
+    uint8_t is_io);
 extern "C" void vir_closure_push(uint32_t root_id);
 
 static object * mk_name_from_dotted_string(std::string const & text) {
@@ -113,6 +117,7 @@ static object * decode_level(vir_reader & r);
 static object * decode_expr(vir_reader & r);
 static void encode_level(vir_writer & w, object * value);
 static void encode_expr_payload(vir_writer & w, object * value);
+static void encode_function_signature(vir_writer & w, vir_type const & type);
 
 struct vir_resource_data {
     uint32_t root_id = 0;
@@ -1102,7 +1107,18 @@ void encode_value_payload(vir_writer & w, vir_type const & type, object * value,
         break;
     }
     case vir_wire_type::Function: {
-        uint32_t root_id = vir_closure_root(value);
+        vir_writer signature_writer;
+        encode_function_signature(signature_writer, type);
+        if (!signature_writer.ok) {
+            w.fail(signature_writer.error());
+            break;
+        }
+        std::string signature_bytes = signature_writer.take();
+        uint32_t root_id = vir_closure_root_with_signature(
+            value,
+            signature_bytes.data(),
+            static_cast<uint32_t>(signature_bytes.size()),
+            type.is_io ? 1 : 0);
         if (root_id == 0) {
             w.fail("missing Lean closure value");
         } else {
@@ -1227,6 +1243,18 @@ void encode_value_payload(vir_writer & w, vir_type const & type, object * value,
     default:
         break;
     }
+}
+
+static void encode_function_signature(vir_writer & w, vir_type const & type) {
+    if (type.tag != vir_wire_type::Function || type.args.empty()) {
+        w.fail("function wire type is missing a result type");
+        return;
+    }
+    w.u32(static_cast<uint32_t>(type.args.size() - 1));
+    for (size_t i = 0; i + 1 < type.args.size(); i++) {
+        encode_type(w, type.args[i]);
+    }
+    encode_type(w, type.args.back());
 }
 
 void encode_result_payload(vir_writer & w, vir_type const & type, object * value, bool has_boxed_decl) {

@@ -87,6 +87,10 @@ constructs real Lean `Expr` and `Level` runtime objects with computed data
 fields before calling the upstream interpreter. Metadata expression inputs are
 accepted by decoding their inner expression, and metadata results are reported
 with a structural `mdata` wrapper.
+This is intentionally temporary special handling. The desired direction is to
+cover `Lean.Expr` through the same generated inductive/structure layout path as
+ordinary recursive user types, rather than adding a separate permanent `Expr`
+object ABI lane.
 
 The first reusable pretty-printing component is deliberately
 `pretty-printer.irpkg`, which packages `Std.Format.pretty` rather than Lean's

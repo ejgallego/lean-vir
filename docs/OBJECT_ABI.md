@@ -3,8 +3,8 @@
 This note records the direction for replacing the C++ byte value codec with
 JavaScript-driven construction and inspection of Lean runtime objects.
 
-The current manifest-driven call path remains the compatibility boundary. The
-object ABI is an internal experimental surface that lets the JavaScript runtime
+The compact manifest-driven byte path remains the general boundary. The object
+ABI is an internal experimental surface that lets the JavaScript runtime
 lower common JS values into Lean objects, call the interpreter with object
 arguments, and lift the returned Lean object back to JS without descriptor bytes
 on every call.
@@ -29,6 +29,7 @@ The initial exported primitive surface is deliberately small:
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
 - `vir_obj_inc` / `vir_obj_dec`
+- `vir_call_resolved_objects`
 
 Strings and byte arrays return borrowed pointers into the Lean object. JavaScript
 must read the bytes while the object is still live. The pointer becomes invalid
@@ -37,9 +38,17 @@ after `vir_obj_dec` releases the object or after the runtime is torn down.
 ## Ownership
 
 The primitive constructors return an owned Lean object pointer. JavaScript owns
-that reference and must release it with `vir_obj_dec` unless a future call helper
+that reference and must release it with `vir_obj_dec` unless a call helper
 explicitly documents that it consumes ownership. `vir_obj_inc` can be used to
 retain an object across a helper call that consumes one reference.
+
+`vir_call_resolved_objects(slot, argv, argc)` consumes every owned object in the
+`argv` array once called, including early validation failures after a non-null
+`argv` pointer has been accepted. On success it returns an owned Lean object
+result that JavaScript must release with `vir_obj_dec` after lifting. If the
+returned pointer is `0`, JavaScript must inspect `vir_call_error_size`; Lean
+immediate scalar objects can also use `0`, so a non-empty error string is the
+failure signal.
 
 Immediate scalar objects are allowed. `vir_obj_inc` and `vir_obj_dec` are still
 the only public operations JS should use; Lean's runtime treats scalars as
@@ -67,16 +76,16 @@ sequenceDiagram
   participant IR as Lean IR interpreter
 
   JS->>ABI: lower args to owned objects
-  JS->>IR: vir_call_resolved_objects(slot, argc, argv)
+  JS->>IR: vir_call_resolved_objects(slot, argv, argc)
   IR-->>JS: owned result object
   JS->>ABI: lift result object
-  JS->>ABI: release args/result
+  JS->>ABI: release result
 ```
 
-The existing compact byte payload path remains the fallback while this lands.
-It handles structured values, resources, callbacks, host imports, and older
-packages. The direct scalar helpers are still useful for the hottest exact
-scalar signatures because they avoid object allocation entirely.
+The compact byte payload path remains the complete path while this lands. It
+handles structured values, resources, callbacks, and host imports. The direct
+scalar helpers are still useful for the hottest exact scalar signatures because
+they avoid object allocation entirely.
 
 ## Phases
 
@@ -105,3 +114,6 @@ scalar signatures because they avoid object allocation entirely.
 - Descriptor-free object calls must trust package metadata. The package version
   needs to stay tied to the generated signature/layout tables used by the JS
   lowering code.
+- The exact policy for when JS-facing bindings must use the object ABI instead
+  of shared scalar representations remains open. For now, the helper requires a
+  boxed package declaration and stays an internal runtime primitive.

@@ -41,6 +41,9 @@ const sourceIdentityPaths = [
   "scripts/generate-ir-package.sh",
   "tools/GeneratePackage.lean",
   "wasm/upstream_shim/shim.cpp",
+  "wasm/upstream_shim/signature_cache.cpp",
+  "wasm/upstream_shim/signature_cache.h",
+  "wasm/upstream_shim/object_abi.cpp",
   "wasm/upstream_shim/package_decl_provider.cpp",
 ];
 

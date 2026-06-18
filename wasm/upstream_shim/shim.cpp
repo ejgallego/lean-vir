@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 #include "decl_provider.h"
 #include "interface_codec.h"
+#include "signature_cache.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -13,6 +14,7 @@ Author: Emilio J. Gallego Arias
 
 #include <initializer_list>
 #include <string>
+#include <utility>
 #include <vector>
 
 #include "library/elab_environment.h"
@@ -55,141 +57,8 @@ static void ensure_ir_interpreter_initialized() {
     }
 }
 
-struct host_signature {
-    bool ok = false;
-    std::string error;
-    std::vector<vir_type> args;
-    vir_type result { vir_wire_type::Unit, {} };
-    bool is_io = false;
-};
-
-struct cached_signature {
-    uint32_t package_generation = 0;
-    uint32_t slot = UINT32_MAX;
-    char const * data = nullptr;
-    uint32_t size = 0;
-    bool is_io = false;
-    host_signature signature;
-};
-
-static std::vector<cached_signature> g_host_signature_cache;
-static std::vector<cached_signature> g_package_call_signature_cache;
-
-static host_signature decode_signature_bytes(
-    char const * data,
-    uint32_t size,
-    bool is_io,
-    char const * missing_message,
-    char const * trailing_message) {
-    if (data == nullptr) {
-        return { false, missing_message, {}, { vir_wire_type::Unit, {} }, is_io };
-    }
-    vir_reader reader(reinterpret_cast<uint8_t const *>(data), size);
-    uint32_t argc = reader.u32();
-    std::vector<vir_type> args;
-    args.reserve(argc);
-    for (uint32_t i = 0; i < argc; i++) {
-        args.push_back(decode_type(reader));
-    }
-    vir_type result = decode_type(reader);
-    if (!reader.ok) {
-        return { false, reader.error(), {}, { vir_wire_type::Unit, {} }, is_io };
-    }
-    if (!reader.at_end()) {
-        return { false, trailing_message, {}, { vir_wire_type::Unit, {} }, is_io };
-    }
-    return { true, "", args, result, is_io };
-}
-
-static host_signature decode_host_signature(uint32_t slot) {
-    return decode_signature_bytes(
-        vir::host_import_signature(slot),
-        vir::host_import_signature_size(slot),
-        vir::host_import_is_io(slot),
-        "missing JavaScript import signature",
-        "trailing bytes after JavaScript import signature");
-}
-
-static host_signature decode_package_call_signature(
-    char const * data,
-    uint32_t size,
-    bool is_io) {
-    return decode_signature_bytes(
-        data,
-        size,
-        is_io,
-        "missing package call signature",
-        "trailing bytes after package call signature");
-}
-
-static host_signature const * cached_host_signature(uint32_t slot) {
-    char const * data = vir::host_import_signature(slot);
-    uint32_t size = vir::host_import_signature_size(slot);
-    bool is_io = vir::host_import_is_io(slot);
-    uint32_t generation = vir::package_generation();
-    if (slot >= g_host_signature_cache.size()) {
-        g_host_signature_cache.resize(slot + 1);
-    }
-    cached_signature & cached = g_host_signature_cache[slot];
-    if (
-        cached.package_generation == generation &&
-        cached.slot == slot &&
-        cached.data == data &&
-        cached.size == size &&
-        cached.is_io == is_io) {
-        return &cached.signature;
-    }
-    cached.package_generation = generation;
-    cached.slot = slot;
-    cached.data = data;
-    cached.size = size;
-    cached.is_io = is_io;
-    cached.signature = decode_host_signature(slot);
-    return &cached.signature;
-}
-
-static host_signature const * cached_package_call_signature(uint32_t slot) {
-    char const * data = vir::package_call_signature(slot);
-    if (data == nullptr) {
-        return nullptr;
-    }
-    uint32_t size = vir::package_call_signature_size(slot);
-    bool is_io = vir::package_call_is_io(slot);
-    uint32_t generation = vir::package_generation();
-    size_t index = slot - 1;
-    if (index >= g_package_call_signature_cache.size()) {
-        g_package_call_signature_cache.resize(index + 1);
-    }
-    cached_signature & cached = g_package_call_signature_cache[index];
-    if (
-        cached.package_generation == generation &&
-        cached.slot == slot &&
-        cached.data == data &&
-        cached.size == size &&
-        cached.is_io == is_io) {
-        return &cached.signature;
-    }
-    cached.package_generation = generation;
-    cached.slot = slot;
-    cached.data = data;
-    cached.size = size;
-    cached.is_io = is_io;
-    cached.signature = decode_package_call_signature(data, size, is_io);
-    return &cached.signature;
-}
-
-static object * decode_host_result(vir_type const & expected, char const * bytes, uint32_t size, bool compact_payload) {
+static object * decode_host_result(vir_type const & expected, char const * bytes, uint32_t size) {
     vir_reader reader(reinterpret_cast<uint8_t const *>(bytes), size);
-    if (!compact_payload) {
-        vir_type actual = decode_type(reader);
-        if (!reader.ok) {
-            return lean_box(0);
-        }
-        if (!same_wire_type(expected, actual)) {
-            reader.fail("JavaScript import result type mismatch");
-            return lean_box(0);
-        }
-    }
     object * value = decode_value(reader, expected);
     if (!reader.ok || !reader.at_end()) {
         lean_dec(value);
@@ -201,7 +70,6 @@ static object * decode_host_result(vir_type const & expected, char const * bytes
 static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
     host_signature const * signature = cached_host_signature(slot);
     uint32_t erased_prefix_args = vir::host_import_erased_prefix_args(slot);
-    bool compact_payload = vir::package_format_version() >= 7;
     if (!signature->ok) {
         for (uint32_t i = 0; i < argc; i++) {
             lean_dec(args[i]);
@@ -217,13 +85,7 @@ static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
     vir_writer request;
     request.u32(static_cast<uint32_t>(signature->args.size()));
     for (size_t i = 0; i < signature->args.size(); i++) {
-        if (!compact_payload) {
-            encode_type(request, signature->args[i]);
-        }
         encode_value_payload(request, signature->args[i], args[erased_prefix_args + i]);
-    }
-    if (!compact_payload) {
-        encode_type(request, signature->result);
     }
     if (!request.ok) {
         for (uint32_t i = 0; i < argc; i++) {
@@ -237,7 +99,7 @@ static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
         reinterpret_cast<uint8_t const *>(request_bytes.data()),
         static_cast<uint32_t>(request_bytes.size()));
     uint32_t result_size = vir_js_call_result_size();
-    object * value = decode_host_result(signature->result, result_bytes, result_size, compact_payload);
+    object * value = decode_host_result(signature->result, result_bytes, result_size);
     if (result_bytes != nullptr) {
         vir_free_bytes(const_cast<char *>(result_bytes));
     }
@@ -370,150 +232,59 @@ static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
 static std::string g_call_result;
 static std::string g_call_error;
 static uint32_t g_direct_u32_result = 0;
-static std::vector<object *> g_closure_roots;
+struct closure_root {
+    object * value = nullptr;
+    host_signature signature;
+};
+
+static std::vector<closure_root> g_closure_roots;
 static std::vector<uint32_t> g_free_closure_root_ids;
 static std::string g_closure_call_result;
 static std::string g_closure_call_error;
-static std::string g_native_conversion_result;
 
-static std::string nat_to_decimal_for_native(object * value) {
-    if (lean_is_scalar(value)) {
-        return std::to_string(lean_unbox(value));
-    }
-    return mpz_value(value).to_string();
-}
-
-extern "C" uint32_t vir_native_bool_flip(uint32_t value) {
-    object * boxed = lean_box(value == 0 ? 0 : 1);
-    uint32_t result = lean_unbox(boxed) == 0 ? 1 : 0;
-    lean_dec(boxed);
-    return result;
-}
-
-extern "C" char const * vir_native_nat_bump(char const * text, uint32_t len) {
-    std::string input(text, text + len);
-    object * value = lean_cstr_to_nat(input.c_str());
-    object * result = lean_nat_succ(value);
-    g_native_conversion_result = nat_to_decimal_for_native(result);
-    lean_dec(value);
-    lean_dec(result);
-    return g_native_conversion_result.c_str();
-}
-
-extern "C" char const * vir_native_string_roundtrip(char const * text, uint32_t len) {
-    object * value = lean_mk_string_from_bytes(text, len);
-    size_t size = lean_string_size(value);
-    uint32_t out_len = static_cast<uint32_t>(size == 0 ? 0 : size - 1);
-    g_native_conversion_result.assign(lean_string_cstr(value), out_len);
-    lean_dec(value);
-    return g_native_conversion_result.c_str();
-}
-
-extern "C" uint32_t vir_native_uint32_bump(uint32_t value) {
-    object * boxed = lean_box_uint32(value);
-    uint32_t result = lean_uint32_add(lean_unbox_uint32(boxed), 1);
-    lean_dec(boxed);
-    object * result_boxed = lean_box_uint32(result);
-    uint32_t out = lean_unbox_uint32(result_boxed);
-    lean_dec(result_boxed);
-    return out;
-}
-
-extern "C" double vir_native_float_scale(double value) {
-    object * boxed = lean_box_float(value);
-    double result = lean_float_scaleb(lean_unbox_float(boxed), lean_box(2));
-    lean_dec(boxed);
-    object * result_boxed = lean_box_float(result);
-    double out = lean_unbox_float(result_boxed);
-    lean_dec(result_boxed);
-    return out;
-}
-
-extern "C" uint32_t vir_native_conversion_result_size(void) {
-    return static_cast<uint32_t>(g_native_conversion_result.size());
-}
-
-extern "C" object * vir_obj_bool(uint32_t value) {
-    return lean_box(value == 0 ? 0 : 1);
-}
-
-extern "C" uint32_t vir_obj_get_bool(object * value) {
-    return lean_unbox(value) == 0 ? 0 : 1;
-}
-
-extern "C" object * vir_obj_uint32(uint32_t value) {
-    return lean_box_uint32(value);
-}
-
-extern "C" uint32_t vir_obj_get_uint32(object * value) {
-    return lean_unbox_uint32(value);
-}
-
-extern "C" object * vir_obj_string(char const * text, uint32_t len) {
-    return lean_mk_string_from_bytes(text, len);
-}
-
-extern "C" char const * vir_obj_string_data(object * value) {
-    return lean_string_cstr(value);
-}
-
-extern "C" uint32_t vir_obj_string_size(object * value) {
-    size_t size = lean_string_size(value);
-    return static_cast<uint32_t>(size == 0 ? 0 : size - 1);
-}
-
-extern "C" object * vir_obj_byte_array(uint8_t const * values, uint32_t len) {
-    object * array = lean_alloc_sarray(1, len, len);
-    if (len != 0) {
-        memcpy(lean_sarray_cptr(array), values, len);
-    }
-    return array;
-}
-
-extern "C" uint8_t const * vir_obj_byte_array_data(object * value) {
-    return lean_sarray_cptr(value);
-}
-
-extern "C" uint32_t vir_obj_byte_array_size(object * value) {
-    return static_cast<uint32_t>(lean_sarray_size(value));
-}
-
-extern "C" void vir_obj_inc(object * value) {
-    lean_inc(value);
-}
-
-extern "C" void vir_obj_dec(object * value) {
-    lean_dec(value);
-}
-
-static object * closure_root_for_id(uint32_t root_id) {
+static closure_root * closure_root_for_id(uint32_t root_id) {
     if (root_id == 0 || root_id > g_closure_roots.size()) {
         return nullptr;
     }
-    return g_closure_roots[root_id - 1];
+    closure_root & root = g_closure_roots[root_id - 1];
+    return root.value == nullptr ? nullptr : &root;
 }
 
-extern "C" uint32_t vir_closure_root(object * value) {
+extern "C" uint32_t vir_closure_root_with_signature(
+    object * value,
+    char const * signature_bytes,
+    uint32_t signature_len,
+    uint8_t is_io) {
     if (value == nullptr) {
+        return 0;
+    }
+    host_signature signature = decode_signature_bytes(
+        signature_bytes,
+        signature_len,
+        is_io != 0,
+        "missing closure signature",
+        "trailing bytes after closure signature");
+    if (!signature.ok) {
         return 0;
     }
     lean_inc(value);
     if (!g_free_closure_root_ids.empty()) {
         uint32_t root_id = g_free_closure_root_ids.back();
         g_free_closure_root_ids.pop_back();
-        g_closure_roots[root_id - 1] = value;
+        g_closure_roots[root_id - 1] = { value, std::move(signature) };
         return root_id;
     }
-    g_closure_roots.push_back(value);
+    g_closure_roots.push_back({ value, std::move(signature) });
     return static_cast<uint32_t>(g_closure_roots.size());
 }
 
 extern "C" uint32_t vir_closure_release(uint32_t root_id) {
-    object * value = closure_root_for_id(root_id);
-    if (value == nullptr) {
+    closure_root * root = closure_root_for_id(root_id);
+    if (root == nullptr) {
         return 0;
     }
-    g_closure_roots[root_id - 1] = nullptr;
+    object * value = root->value;
+    g_closure_roots[root_id - 1] = {};
     g_free_closure_root_ids.push_back(root_id);
     lean_dec(value);
     return 1;
@@ -525,17 +296,6 @@ static void cleanup_closure_call_args(std::vector<object *> const & args) {
     }
 }
 
-static uint8_t decode_closure_call_effect(vir_reader & reader) {
-    uint8_t effect = 0;
-    if (reader.ok && !reader.at_end()) {
-        effect = reader.u8();
-        if (effect > 1) {
-            reader.fail("unsupported closure call effect tag " + std::to_string(effect));
-        }
-    }
-    return effect;
-}
-
 extern "C" char const * vir_closure_call(uint32_t root_id, uint8_t const * request, uint32_t request_len) {
     g_closure_call_result.clear();
     g_closure_call_error.clear();
@@ -543,27 +303,28 @@ extern "C" char const * vir_closure_call(uint32_t root_id, uint8_t const * reque
         g_closure_call_error = "closure call payload pointer is null";
         return nullptr;
     }
-    object * fn = closure_root_for_id(root_id);
-    if (fn == nullptr) {
+    closure_root * root = closure_root_for_id(root_id);
+    if (root == nullptr) {
         g_closure_call_error = "closure root id is not live";
         return nullptr;
     }
+    object * fn = root->value;
+    host_signature const & signature = root->signature;
 
     vir_reader reader(request, request_len);
     uint32_t argc = reader.u32();
+    if (argc != signature.args.size()) {
+        g_closure_call_error =
+            "closure argument count mismatch: signature expects " +
+            std::to_string(signature.args.size()) +
+            ", got " + std::to_string(argc);
+        return nullptr;
+    }
     std::vector<object *> args;
     args.reserve(argc + 1);
     for (uint32_t i = 0; i < argc; i++) {
-        vir_type arg_type = decode_type(reader);
-        if (!reader.ok) {
-            cleanup_closure_call_args(args);
-            g_closure_call_error = reader.error();
-            return nullptr;
-        }
-        args.push_back(decode_value(reader, arg_type));
+        args.push_back(decode_value(reader, signature.args[i]));
     }
-    vir_type result_type = decode_type(reader);
-    uint8_t effect = decode_closure_call_effect(reader);
     if (!reader.ok) {
         cleanup_closure_call_args(args);
         g_closure_call_error = reader.error();
@@ -576,11 +337,11 @@ extern "C" char const * vir_closure_call(uint32_t root_id, uint8_t const * reque
     }
 
     lean_inc(fn);
-    if (effect == 1) {
+    if (signature.is_io) {
         args.push_back(lean_io_mk_world());
     }
     object * result = apply_n(fn, static_cast<unsigned>(args.size()), args.data());
-    if (effect == 1) {
+    if (signature.is_io) {
         if (!lean_io_result_is_ok(result)) {
             lean_dec(result);
             g_closure_call_error = "IO callback failed";
@@ -589,7 +350,7 @@ extern "C" char const * vir_closure_call(uint32_t root_id, uint8_t const * reque
         result = lean_io_result_take_value(result);
     }
     vir_writer writer;
-    encode_result(writer, result_type, result, true);
+    encode_result_payload(writer, signature.result, result, true);
     if (!writer.ok) {
         lean_dec(result);
         g_closure_call_error = writer.error();
@@ -836,9 +597,91 @@ extern "C" char const * vir_call_resolved(
     bool has_boxed_decl = lean::vir::package_call_slot_has_boxed_decl(call_slot);
     lean::host_signature const * signature = lean::cached_package_call_signature(call_slot);
     if (signature == nullptr) {
-        return vir_call_core(fn, has_boxed_decl, request, request_len, result_tag);
+        lean::g_call_error = "resolved call requires a package-owned call signature";
+        return nullptr;
     }
     return vir_call_core(fn, has_boxed_decl, request, request_len, result_tag, signature);
+}
+
+static void cleanup_object_call_args(uint32_t argc, lean::object ** args) {
+    if (args == nullptr) {
+        return;
+    }
+    for (uint32_t i = 0; i < argc; i++) {
+        lean_dec(args[i]);
+    }
+}
+
+extern "C" lean::object * vir_call_resolved_objects(
+    uint32_t call_slot,
+    lean::object ** argv,
+    uint32_t argc) {
+    lean::g_call_result.clear();
+    lean::g_call_error.clear();
+    lean::g_direct_u32_result = 0;
+    if (argv == nullptr && argc != 0) {
+        lean::g_call_error = "object call argv pointer is null";
+        return nullptr;
+    }
+    if (!lean::vir::package_loaded()) {
+        cleanup_object_call_args(argc, argv);
+        lean::g_call_error = "no IR package has been loaded";
+        return nullptr;
+    }
+
+    lean::object * fn_obj = lean::vir::package_call_slot_name(call_slot);
+    if (fn_obj == nullptr) {
+        cleanup_object_call_args(argc, argv);
+        lean::g_call_error = "call slot is not registered";
+        return nullptr;
+    }
+    if (!lean::vir::package_call_slot_has_boxed_decl(call_slot)) {
+        cleanup_object_call_args(argc, argv);
+        lean::g_call_error = "object call requires a boxed package declaration";
+        return nullptr;
+    }
+    lean::host_signature const * signature = lean::cached_package_call_signature(call_slot);
+    if (signature == nullptr) {
+        cleanup_object_call_args(argc, argv);
+        lean::g_call_error = "object call requires a package-owned call signature";
+        return nullptr;
+    }
+    if (!signature->ok) {
+        cleanup_object_call_args(argc, argv);
+        lean::g_call_error = signature->error;
+        return nullptr;
+    }
+    if (argc != signature->args.size()) {
+        cleanup_object_call_args(argc, argv);
+        lean::g_call_error =
+            "object call argument count mismatch: package signature expects " +
+            std::to_string(signature->args.size()) +
+            ", got " + std::to_string(argc);
+        return nullptr;
+    }
+
+    std::vector<lean::object *> args;
+    args.reserve(argc + (signature->is_io ? 1 : 0));
+    for (uint32_t i = 0; i < argc; i++) {
+        args.push_back(argv[i]);
+    }
+    lean::ensure_ir_interpreter_initialized();
+    if (signature->is_io) {
+        args.push_back(lean_io_mk_world());
+    }
+    lean::name fn(fn_obj, true);
+    lean::elab_environment env(lean_box(0));
+    lean::options opts(lean_box(0));
+    lean::object * result = lean::ir::run_boxed(env, opts, fn, args.size(), args.data());
+    if (signature->is_io) {
+        if (!lean_io_result_is_ok(result)) {
+            lean_dec(result);
+            lean::g_call_error = "IO action failed";
+            return nullptr;
+        }
+        result = lean_io_result_take_value(result);
+    }
+    return result;
 }
 
 static bool direct_call_header(

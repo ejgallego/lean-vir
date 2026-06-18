@@ -151,15 +151,22 @@ uses `0` as the failure sentinel. Repeated calls then use
 
 In package format 7 and newer, the package contains a compact export signature
 table. `vir_call_resolved` uses that table to decode value-only argument
-payloads and to encode value-only result payloads. Older packages without the
-table keep using the descriptor-bearing payload accepted by `vir_call`.
+payloads and to encode value-only result payloads. Resolved calls without a
+package-owned signature fail instead of falling back to the descriptor-bearing
+payload accepted by `vir_call`.
 Package format 7 also uses package-owned host-import signatures for
 Lean-to-JavaScript calls: the shim sends value-only argument payloads through
-`env.vir_js_call`, and JavaScript returns a value-only result payload. Format 5
-and 6 host imports keep the descriptor-bearing host-import envelope. The shim
+`env.vir_js_call`, and JavaScript returns a value-only result payload. The shim
 caches decoded export and host-import signatures by package generation and
 slot, so compact signature bytes are decoded once per loaded package rather
 than on every call.
+
+`vir_call_resolved_objects(slot, argv, argc)` is the first direct object-call
+helper. It accepts an array of owned `lean_object *` arguments, requires a boxed
+package declaration, consumes those arguments once called, and returns an owned
+Lean object result on success. The helper keeps higher-level JS lowering out of
+the shim; JavaScript drives it through the `vir_obj_*` construction and
+inspection primitives while the broader JS boundary policy remains open.
 
 For a small set of exact pure scalar signatures, the JavaScript runtime can skip
 the byte payload entirely after slot resolution and call direct resolved-call
@@ -293,8 +300,10 @@ lookup.
 Function-valued host-import arguments use the same package-scoped policy. The
 generic result encoder roots the Lean closure in a small shim table, queues the
 internal root id through `env.vir_closure_push`, and emits no serialized
-`WIRE.FUNCTION` payload bytes. JavaScript wraps the queued root as a callable
-`VirCallback` object. The wrapper calls the internal closure root id through
+`WIRE.FUNCTION` payload bytes. The root stores the decoded function signature,
+so JavaScript callback invocation sends only argument payloads and receives only
+the result payload. JavaScript wraps the queued root as a callable `VirCallback`
+object. The wrapper calls the internal closure root id through
 `vir_closure_call` and must eventually release it through `vir_closure_release`.
 This keeps the Lean heap reference count explicit while avoiding any change to
 the upstream interpreter file.

@@ -16,10 +16,8 @@ import {
   isHostResource,
 } from "./host-resource.js";
 import {
-  decodeCallResult,
   decodeResolvedCallResult,
   decodeHostCallRequest,
-  encodeCallPayload,
   encodeClosureCallPayload,
   encodeHostCallResult,
   encodeResolvedCallPayload,
@@ -283,12 +281,11 @@ class VirHostState {
     }
 
     const request = this.readWasmBytes(requestPtr, requestLen);
-    const compactPayload = this.runtime?.usesCompactPackageFraming() === true;
     const codecOptions = this.runtime?.codecOptions ?? {};
     let args;
     let resultType;
     try {
-      ({ args, resultType } = decodeHostCallRequest(request, entry, codecOptions, { compactPayload }));
+      ({ args, resultType } = decodeHostCallRequest(request, entry, codecOptions, { compactPayload: true }));
       this.clearOutgoingClosureRootIds();
     } catch (error) {
       this.clearOutgoingClosureRootIds();
@@ -298,7 +295,7 @@ class VirHostState {
     if (isPromiseLike(value)) {
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
-    const result = encodeHostCallResult(resultType, value, entry, codecOptions, { compactPayload });
+    const result = encodeHostCallResult(resultType, value, entry, codecOptions, { compactPayload: true });
     const ptr = this.exports.vir_alloc_bytes(result.byteLength);
     new Uint8Array(this.exports.memory.buffer, ptr, result.byteLength).set(result);
     this.lastResultSize = result.byteLength;
@@ -470,12 +467,9 @@ export class VirRuntime {
     if (directResult !== DIRECT_CALL_UNAVAILABLE) {
       return directResult;
     }
-    const compactPayload = this.usesCompactPackageFraming();
     let payload;
     try {
-      payload = compactPayload
-        ? encodeResolvedCallPayload(entry, args, this.codecOptions)
-        : encodeCallPayload(entry, args, this.codecOptions);
+      payload = encodeResolvedCallPayload(entry, args, this.codecOptions);
     } catch (error) {
       this.hostState?.clearTransientQueues();
       throw error;
@@ -494,9 +488,7 @@ export class VirRuntime {
       }
       const resultLen = this.exports.vir_call_result_size();
       const resultBytes = this.readWasmBytes(resultPtr, resultLen);
-      return compactPayload
-        ? decodeResolvedCallResult(entry.result, resultBytes, this.codecOptions)
-        : decodeCallResult(entry.result, resultBytes, this.codecOptions);
+      return decodeResolvedCallResult(entry.result, resultBytes, this.codecOptions);
     } finally {
       this.freeBytes(payloadPtr);
       this.hostState?.clearTransientQueues();
@@ -504,7 +496,7 @@ export class VirRuntime {
   }
 
   tryDirectResolvedCall(entry, args, cache) {
-    if (!this.usesCompactPackageFraming() || entry.effect !== "pure" || entry.args.length !== 1) {
+    if (entry.effect !== "pure" || entry.args.length !== 1) {
       return DIRECT_CALL_UNAVAILABLE;
     }
     const argType = entry.args[0].type;
@@ -583,11 +575,6 @@ export class VirRuntime {
     }
   }
 
-  usesCompactPackageFraming() {
-    return Number.isInteger(this.packageMetadata?.packageFormatVersion) &&
-      this.packageMetadata.packageFormatVersion >= 7;
-  }
-
   lastCallError() {
     const len = this.exports.vir_call_error_size?.() ?? 0;
     return len === 0 ? "" : this.readWasmString(this.exports.vir_call_error(), len);
@@ -653,7 +640,7 @@ export class VirRuntime {
         throw new Error(this.lastClosureCallError() || "closure call failed");
       }
       const resultLen = this.exports.vir_closure_call_result_size();
-      return decodeCallResult(type.result, this.readWasmBytes(resultPtr, resultLen), this.codecOptions);
+      return decodeResolvedCallResult(type.result, this.readWasmBytes(resultPtr, resultLen), this.codecOptions);
     } finally {
       this.freeBytes(payloadPtr);
       this.hostState?.clearTransientQueues();

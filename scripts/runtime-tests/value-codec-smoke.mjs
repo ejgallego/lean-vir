@@ -72,6 +72,33 @@ function withObjectByteArray(runtime, bytes, body) {
     }
   }
 }
+
+function resolveEntrySlot(runtime, name) {
+  const entry = runtime.findManifestEntry(name);
+  assert.ok(entry, `missing manifest entry ${name}`);
+  return runtime.resolveCallSlot(entry, runtime.callCacheFor(entry));
+}
+
+function callResolvedObjects(runtime, name, args) {
+  const argvPtr = runtime.allocBytes(new Uint8Array(args.length * 4));
+  try {
+    const view = new DataView(runtime.exports.memory.buffer, argvPtr, args.length * 4);
+    args.forEach((arg, index) => view.setUint32(index * 4, arg, true));
+    const result = runtime.exports.vir_call_resolved_objects(
+      resolveEntrySlot(runtime, name),
+      argvPtr,
+      args.length,
+    );
+    const error = runtime.lastCallError();
+    if (error !== "") {
+      throw new Error(error);
+    }
+    return result;
+  } finally {
+    runtime.freeBytes(argvPtr);
+  }
+}
+
 const natType = { type: "Nat", wireTag: WIRE.NAT };
 const boolType = { type: "Bool", wireTag: WIRE.BOOL };
 const unitType = { type: "Unit", wireTag: WIRE.UNIT };
@@ -240,6 +267,14 @@ runtime.exports.vir_obj_dec(boolObject);
 const uint32Object = runtime.exports.vir_obj_uint32(0x7f00aa55);
 assert.equal(runtime.exports.vir_obj_get_uint32(uint32Object), 0x7f00aa55);
 runtime.exports.vir_obj_dec(uint32Object);
+const uint32CallResult = callResolvedObjects(runtime, "Vir.Fixtures.InterfaceShapes.uint32Bump", [
+  runtime.exports.vir_obj_uint32(41),
+]);
+try {
+  assert.equal(runtime.exports.vir_obj_get_uint32(uint32CallResult), 42);
+} finally {
+  runtime.exports.vir_obj_dec(uint32CallResult);
+}
 withObjectString(runtime, "Aé∀Z", (obj) => {
   const len = runtime.exports.vir_obj_string_size(obj);
   const data = runtime.exports.vir_obj_string_data(obj);

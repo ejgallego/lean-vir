@@ -128,6 +128,8 @@ support_sources=(
 shim_sources=(
   "wasm/upstream_shim/lean_object_constructors.cpp"
   "wasm/upstream_shim/interface_codec.cpp"
+  "wasm/upstream_shim/signature_cache.cpp"
+  "wasm/upstream_shim/object_abi.cpp"
   "wasm/upstream_shim/native_symbols.cpp"
   "wasm/upstream_shim/platform_stubs.cpp"
   "wasm/upstream_shim/shim.cpp"
@@ -137,6 +139,7 @@ shim_sources=(
 shim_deps=(
   "wasm/upstream_shim/decl_provider.h"
   "wasm/upstream_shim/interface_codec.h"
+  "wasm/upstream_shim/signature_cache.h"
   "wasm/upstream_shim/native_symbols_registry.inc"
 )
 
@@ -239,6 +242,7 @@ exports=(
   -Wl,--export=vir_resolve_call
   -Wl,--export=vir_call
   -Wl,--export=vir_call_resolved
+  -Wl,--export=vir_call_resolved_objects
   -Wl,--export=vir_call_resolved_unit_unit
   -Wl,--export=vir_call_resolved_bool_bool
   -Wl,--export=vir_call_resolved_u32_u32
@@ -503,8 +507,11 @@ report_start=$SECONDS
   echo "## Current Shim Scope"
   echo
   echo "\`wasm/upstream_shim/shim.cpp\` supplies the package call surface,"
-  echo "closure bridge, and declaration lookup hooks. \`interface_codec.cpp\`"
-  echo "supplies the JavaScript interface wire codec."
+  echo "closure bridge, and declaration lookup hooks. \`signature_cache.cpp\`"
+  echo "owns decoded package and host-import interface signatures."
+  echo "\`interface_codec.cpp\` supplies the JavaScript interface wire codec."
+  echo "\`object_abi.cpp\` supplies direct object conversion probes and owned"
+  echo "Lean object helpers used by runtime boundary tests."
   echo "\`wasm/upstream_shim/native_symbols.cpp\` supplies the explicit native"
   echo "extern wrappers plus generated registry include and restricted \`dlsym\` lookup;"
   echo "\`platform_stubs.cpp\`"
