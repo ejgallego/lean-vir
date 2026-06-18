@@ -175,12 +175,15 @@ helpers:
 - `vir_call_resolved_unit_unit`
 - `vir_call_resolved_bool_bool`
 - `vir_call_resolved_u32_u32`
+- `vir_call_resolved_string_string`
 - `vir_call_direct_u32_result`
 
 This currently covers `Unit -> Unit`, `Bool -> Bool`, and same-width
-`UInt8`/`UInt16`/`UInt32` calls. All other signatures, including structured
-values, resources, callbacks, and effectful calls, stay on the compact
-package-owned value-payload path.
+`UInt8`/`UInt16`/`UInt32` calls, plus `String -> String`. String direct calls
+construct the Lean string object directly and expose result UTF-8 bytes through
+`vir_call_result_size`. All other signatures, including structured values,
+resources, callbacks, and effectful calls, stay on the compact package-owned
+value-payload path.
 
 The shim still keeps `vir_call(name, len, payload, payloadLen, resultTag)` as a
 named entry point for diagnostics and benchmark comparisons, but the JavaScript

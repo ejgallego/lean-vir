@@ -883,6 +883,38 @@ extern "C" uint32_t vir_call_resolved_u32_u32(uint32_t call_slot, uint32_t value
     return 1;
 }
 
+extern "C" char const * vir_call_resolved_string_string(
+    uint32_t call_slot,
+    char const * text,
+    uint32_t len) {
+    lean::object * fn_obj = nullptr;
+    bool has_boxed_decl = false;
+    lean::host_signature const * signature = nullptr;
+    char const * label = "direct String -> String call";
+    if (text == nullptr && len != 0) {
+        lean::g_call_result.clear();
+        lean::g_call_error = "string argument pointer is null";
+        lean::g_direct_u32_result = 0;
+        return nullptr;
+    }
+    if (!direct_call_header(call_slot, label, &fn_obj, &has_boxed_decl, &signature)) {
+        return nullptr;
+    }
+    if (!direct_signature_1_1(*signature, lean::vir_wire_type::String, lean::vir_wire_type::String, label)) {
+        return nullptr;
+    }
+    lean::object * arg = lean_mk_string_from_bytes(text == nullptr ? "" : text, len);
+    lean::object * args[] = { arg };
+    lean::object * result = run_direct_resolved_call(fn_obj, 1, args);
+    size_t size = lean_string_size(result);
+    uint32_t out_len = static_cast<uint32_t>(size == 0 ? 0 : size - 1);
+    lean::g_call_result.assign(lean_string_cstr(result), out_len);
+    if (lean::call_result_is_owned(signature->result, has_boxed_decl)) {
+        lean_dec(result);
+    }
+    return lean::g_call_result.data();
+}
+
 extern "C" uint32_t vir_call_direct_u32_result(void) {
     return lean::g_direct_u32_result;
 }

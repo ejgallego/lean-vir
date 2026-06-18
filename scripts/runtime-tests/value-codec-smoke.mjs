@@ -99,6 +99,26 @@ function callResolvedObjects(runtime, name, args) {
   }
 }
 
+function callDirectString(runtime, name, input) {
+  const bytes = new TextEncoder().encode(input);
+  const ptr = runtime.allocBytes(bytes);
+  try {
+    const resultPtr = runtime.exports.vir_call_resolved_string_string(
+      resolveEntrySlot(runtime, name),
+      ptr,
+      bytes.byteLength,
+    );
+    const error = runtime.lastCallError();
+    if (error !== "") {
+      throw new Error(error);
+    }
+    const resultLen = runtime.exports.vir_call_result_size();
+    return runtime.readWasmString(resultPtr, resultLen);
+  } finally {
+    runtime.freeBytes(ptr);
+  }
+}
+
 const natType = { type: "Nat", wireTag: WIRE.NAT };
 const boolType = { type: "Bool", wireTag: WIRE.BOOL };
 const unitType = { type: "Unit", wireTag: WIRE.UNIT };
@@ -275,6 +295,10 @@ try {
 } finally {
   runtime.exports.vir_obj_dec(uint32CallResult);
 }
+assert.equal(
+  callDirectString(runtime, "Vir.Fixtures.InterfaceShapes.stringRoundtrip", "Aé∀Z"),
+  "Aé∀Z",
+);
 withObjectString(runtime, "Aé∀Z", (obj) => {
   const len = runtime.exports.vir_obj_string_size(obj);
   const data = runtime.exports.vir_obj_string_data(obj);
@@ -288,6 +312,7 @@ withObjectByteArray(runtime, [0, 65, 255, 17], (obj) => {
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.stringRoundtrip", "Aé∀Z"), "Aé∀Z");
 assert.equal(prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12), "[alpha,\n beta,\n gamma]");
 assert.equal(
   prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "fill", 28),

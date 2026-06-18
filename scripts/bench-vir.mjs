@@ -46,13 +46,14 @@ const fibIterations = 80;
 const dispatchIterations = 20000;
 const sortInput = [7, 3, 9, 1, 4, 1, 5, 2, 8, 6, 0, 10, 12, 11, 13, 14];
 const sortIterations = 2000;
-const hostScalarIterations = 5000;
-const callbackIterations = 5000;
-const domResourceIterations = 1000;
-const reactRootIterations = 500;
+const hostScalarIterations = 250;
+const callbackIterations = 1000;
+const domResourceIterations = 300;
+const reactRootIterations = 300;
 const scalarRecordIterations = 5000;
 const nestedRecordIterations = 3000;
 const recursiveValueIterations = 2000;
+const stringRoundtripIterations = 5000;
 const codecScalarRecordIterations = 20000;
 const codecNestedRecordIterations = 20000;
 const codecRecursiveValueIterations = 20000;
@@ -105,6 +106,7 @@ const recursiveJsonInput = {
     { fst: "ok", snd: { kind: "bool", value: false } },
   ],
 };
+const stringRoundtripInput = "lean-ir-wasm-Aé∀Z";
 const textEncoder = new TextEncoder();
 const args = parseArgs(process.argv.slice(2));
 
@@ -330,7 +332,7 @@ async function writeJsonReport(path, benchmarks) {
 
 const artifactCache = await ensureCachedBenchArtifacts({
   root,
-  artifactPaths: benchArtifactPaths,
+  artifactPaths: benchmarkArtifactPaths,
   options: args,
   build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
 });
@@ -486,6 +488,14 @@ const wasmRecursiveValue = benchWasmRepeated("recursive-value", recursiveValueIt
   return acc;
 });
 
+const wasmStringRoundtrip = benchWasmRepeated("string-roundtrip", stringRoundtripIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < stringRoundtripIterations; i++) {
+    acc += runtime.call("Vir.Fixtures.InterfaceShapes.stringRoundtrip", stringRoundtripInput).length;
+  }
+  return acc;
+});
+
 const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
   return Number(hostRuntime.call("HostInterop.titleHandshakeLoop", hostScalarIterations));
 });
@@ -546,6 +556,8 @@ console.log();
 printWasmRow(`nested record/list/option x ${nestedRecordIterations}`, wasmNestedRecord);
 console.log();
 printWasmRow(`recursive custom-inductive value x ${recursiveValueIterations}`, wasmRecursiveValue);
+console.log();
+printWasmRow(`string roundtrip x ${stringRoundtripIterations}`, wasmStringRoundtrip);
 console.log();
 console.log("Host/resource paths");
 console.log();
@@ -608,6 +620,11 @@ if (args.jsonPath !== null) {
       "recursive-value",
       `recursive custom-inductive value x ${recursiveValueIterations}`,
       wasmRecursiveValue,
+    ),
+    benchmarkReportRow(
+      "string-roundtrip",
+      `string roundtrip x ${stringRoundtripIterations}`,
+      wasmStringRoundtrip,
     ),
     benchmarkReportRow(
       "host-title",

@@ -286,6 +286,7 @@
       "entry": "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",
       "roots": [
         "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",
+        "Vir.Fixtures.InterfaceShapes.stringRoundtrip",
         "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength",
         "Vir.Fixtures.InterfaceShapes.listUInt32Sum",
         "Vir.Fixtures.InterfaceShapes.uint32Bump",

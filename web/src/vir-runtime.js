@@ -546,6 +546,27 @@ export class VirRuntime {
       return this.exports.vir_call_direct_u32_result();
     }
 
+    if (argTag === WIRE.STRING && resultTag === WIRE.STRING) {
+      if (typeof this.exports.vir_call_resolved_string_string !== "function") {
+        return DIRECT_CALL_UNAVAILABLE;
+      }
+      if (typeof args[0] !== "string") {
+        throw new Error(`${entry.entry} argument ${entry.args[0].name} must be a string`);
+      }
+      const bytes = textEncoder.encode(args[0]);
+      const ptr = this.allocBytes(bytes);
+      try {
+        const callSlot = this.resolveCallSlot(entry, cache);
+        const resultPtr = this.exports.vir_call_resolved_string_string(callSlot, ptr, bytes.byteLength);
+        if (resultPtr === 0) {
+          throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
+        }
+        return this.readWasmString(resultPtr, this.exports.vir_call_result_size());
+      } finally {
+        this.freeBytes(ptr);
+      }
+    }
+
     return DIRECT_CALL_UNAVAILABLE;
   }
 

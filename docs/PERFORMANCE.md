@@ -31,9 +31,9 @@ includes the `branchAndSub` top-level dispatch row with both named and resolved
 package call samples, pure-runtime controls (`fib` and `sort`), JavaScript
 codec-only rows plus end-to-end top-level value conversion rows for WIT-like
 scalar records, nested records/lists/options, and recursive custom inductives,
-plus host/resource rows for scalar host imports, callback root round trips, DOM
-listener resource churn, React root lifecycle work, and focused React `Html`
-render conversion.
+an exact `String -> String` round trip, plus host/resource rows for scalar host
+imports, callback root round trips, DOM listener resource churn, React root
+lifecycle work, and focused React `Html` render conversion.
 
 The `base-*` JSON rows are intended as the first regression surface for direct
 base-type conversion work. Each row has a `codec` sample for JavaScript request
@@ -45,12 +45,12 @@ from JavaScript where possible, so they stress boundary conversion without
 primarily measuring a deep recursive Lean `DomM` loop.
 
 The manifest runtime also has a narrow direct resolved-call fast path for exact
-pure `Unit -> Unit`, `Bool -> Bool`, and same-width `UInt8`/`UInt16`/`UInt32`
-signatures. Those rows still report under the normal `wasm` sample because the
-public API remains `vir.call(...)`; internally they bypass payload allocation,
-binary value encoding, and result byte decoding after the package slot is
-resolved. The `native` rows are still lower-bound probes that bypass package
-dispatch entirely.
+pure `Unit -> Unit`, `Bool -> Bool`, same-width `UInt8`/`UInt16`/`UInt32`, and
+`String -> String` signatures. Those rows still report under the normal `wasm`
+sample because the public API remains `vir.call(...)`; internally they bypass
+payload allocation, binary value encoding, and result byte decoding after the
+package slot is resolved. The `native` rows are still lower-bound probes that
+bypass package dispatch entirely.
 
 The machine-readable report schema is `lean-vir.bench.v1`. Benchmark rows are
 objects under the top-level `benchmarks` array. Every timed sample uses the same
@@ -101,7 +101,9 @@ prototype conversion probes for benchmarking, not the public package-call API.
 
 The `branchAndSub` row calls a tiny exported fixture through both descriptor-
 bearing `vir_call` and compact `vir_call_resolved`, so it is the focused check
-for package-owned ABI and call-slot dispatch changes. Compact host-import
+for package-owned ABI and call-slot dispatch changes. The direct resolved-call
+helpers now cover pure `Unit -> Unit`, `Bool -> Bool`, same-width
+`UInt8`/`UInt16`/`UInt32`, and `String -> String` calls. Compact host-import
 framing is more visible in the host/resource and React rows because those paths
 cross from Lean back into JavaScript. The broader `fib` and `sort` rows spend
 more time in Lean execution and should show smaller movement from boundary-only

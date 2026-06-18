@@ -4,6 +4,9 @@ namespace Vir.Fixtures.InterfaceShapes
 
 open Lean
 
+def stringRoundtrip (value : String) : String :=
+  value
+
 def arrayStringTotalLength (xs : Array String) : Nat :=
   xs.foldl (fun acc text => acc + text.length) 0
 
