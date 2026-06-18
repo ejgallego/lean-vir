@@ -66,6 +66,7 @@ static std::vector<decl_entry> g_entries;
 static std::vector<init_global_entry> g_init_entries;
 static std::vector<host_import_entry> g_host_imports;
 static std::vector<export_signature_entry> g_export_signatures;
+static std::vector<uint32_t> g_call_signature_indices;
 static std::string g_interface_manifest;
 static std::string g_last_error;
 static bool g_package_loaded = false;
@@ -775,6 +776,7 @@ static void clear_loaded_package() {
     g_init_entries.clear();
     g_host_imports.clear();
     g_export_signatures.clear();
+    g_call_signature_indices.clear();
     g_interface_manifest.clear();
     g_package_loaded = false;
     g_package_generation++;
@@ -860,10 +862,21 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "trailing bytes after IR package at byte " + std::to_string(r.pos());
         return false;
     }
+    std::vector<uint32_t> call_signature_indices(entries.size(), UINT32_MAX);
+    for (size_t i = 0; i < entries.size(); i++) {
+        object * call_name = entries[i].boxed_base ? entries[i].boxed_base : entries[i].name;
+        for (size_t j = 0; j < export_signatures.size(); j++) {
+            if (lean_name_eq(call_name, export_signatures[j].name)) {
+                call_signature_indices[i] = static_cast<uint32_t>(j);
+                break;
+            }
+        }
+    }
     g_entries = std::move(entries);
     g_init_entries = std::move(init_entries);
     g_host_imports = std::move(host_imports);
     g_export_signatures = std::move(export_signatures);
+    g_call_signature_indices = std::move(call_signature_indices);
     g_interface_manifest = std::move(interface_manifest);
     g_package_loaded = true;
     return true;
@@ -983,17 +996,14 @@ bool package_call_slot_has_boxed_decl(uint32_t slot) {
 }
 
 static export_signature_entry const * package_call_signature_entry(uint32_t slot) {
-    decl_entry const * entry = package_entry_for_call_slot(slot);
-    if (entry == nullptr) {
+    if (slot == 0 || slot > g_call_signature_indices.size()) {
         return nullptr;
     }
-    object * call_name = package_entry_call_name(*entry);
-    for (export_signature_entry const & signature : g_export_signatures) {
-        if (lean_name_eq(call_name, signature.name)) {
-            return &signature;
-        }
+    uint32_t signature_index = g_call_signature_indices[slot - 1];
+    if (signature_index == UINT32_MAX || signature_index >= g_export_signatures.size()) {
+        return nullptr;
     }
-    return nullptr;
+    return &g_export_signatures[signature_index];
 }
 
 char const * package_call_signature(uint32_t slot) {
