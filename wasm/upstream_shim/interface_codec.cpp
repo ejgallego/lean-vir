@@ -907,9 +907,7 @@ static void encode_unboxed_call_result(vir_writer & w, vir_type const & type, ob
     }
 }
 
-vir_arg decode_argument(vir_reader & r, bool has_boxed_decl) {
-    vir_type type = decode_type(r);
-    if (!r.ok) return { lean_box(0), true };
+vir_arg decode_argument_payload(vir_reader & r, vir_type const & type, bool has_boxed_decl) {
     if (!has_boxed_decl && needs_boxed_wasm32_call_boundary_type(type)) {
         r.fail("top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary");
         return { lean_box(0), true };
@@ -919,6 +917,12 @@ vir_arg decode_argument(vir_reader & r, bool has_boxed_decl) {
         return { decode_unboxed_call_argument(r, *unboxed_type), false };
     }
     return { decode_value(r, type), true };
+}
+
+vir_arg decode_argument(vir_reader & r, bool has_boxed_decl) {
+    vir_type type = decode_type(r);
+    if (!r.ok) return { lean_box(0), true };
+    return decode_argument_payload(r, type, has_boxed_decl);
 }
 
 static std::string int_to_decimal(object * value) {
@@ -1225,14 +1229,18 @@ void encode_value_payload(vir_writer & w, vir_type const & type, object * value,
     }
 }
 
-void encode_result(vir_writer & w, vir_type const & type, object * value, bool has_boxed_decl) {
-    encode_type(w, type);
+void encode_result_payload(vir_writer & w, vir_type const & type, object * value, bool has_boxed_decl) {
     vir_type const * unboxed_type = nullptr;
     if (!has_boxed_decl && is_unboxed_call_boundary_type(type, &unboxed_type)) {
         encode_unboxed_call_result(w, *unboxed_type, value);
     } else {
         encode_value_payload(w, type, value);
     }
+}
+
+void encode_result(vir_writer & w, vir_type const & type, object * value, bool has_boxed_decl) {
+    encode_type(w, type);
+    encode_result_payload(w, type, value, has_boxed_decl);
 }
 
 bool call_result_is_owned(vir_type const & type, bool has_boxed_decl) {

@@ -26,7 +26,12 @@ import {
   validateBenchmarkCacheOptions,
 } from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
-import { decodeCallResult, encodeCallPayload } from "../web/src/runtime/vir-value-codec.js";
+import {
+  decodeCallResult,
+  decodeResolvedCallResult,
+  encodeCallPayload,
+  encodeResolvedCallPayload,
+} from "../web/src/runtime/vir-value-codec.js";
 import {
   createVirRuntime as createNodeVirRuntime,
   createVirtualDocumentState,
@@ -377,28 +382,29 @@ function callRawResolved(entry, callSlot, payloadPtr, payloadLen) {
     throw new Error(runtime.lastCallError() || `resolved call failed: ${entry.entry}`);
   }
   const resultLen = runtime.exports.vir_call_result_size();
-  return decodeCallResult(entry.result, runtime.readWasmBytes(resultPtr, resultLen), runtime.codecOptions);
+  return decodeResolvedCallResult(entry.result, runtime.readWasmBytes(resultPtr, resultLen), runtime.codecOptions);
 }
 
 function benchTopLevelDispatch(entry) {
   const nameBytes = textEncoder.encode(entry.entry);
-  const payload = encodeCallPayload(entry, [], runtime.codecOptions);
+  const namedPayload = encodeCallPayload(entry, [], runtime.codecOptions);
+  const resolvedPayload = encodeResolvedCallPayload(entry, [], runtime.codecOptions);
   const callSlot = resolveRawCallSlot(entry, nameBytes);
   const namePtr = runtime.allocBytes(nameBytes);
-  const namedPayloadPtr = runtime.allocBytes(payload);
-  const resolvedPayloadPtr = runtime.allocBytes(payload);
+  const namedPayloadPtr = runtime.allocBytes(namedPayload);
+  const resolvedPayloadPtr = runtime.allocBytes(resolvedPayload);
   try {
     const named = benchWasmRepeated("named", dispatchIterations, () => {
       let acc = 0;
       for (let i = 0; i < dispatchIterations; i++) {
-        acc += Number(callRawNamed(entry, namePtr, nameBytes.byteLength, namedPayloadPtr, payload.byteLength));
+        acc += Number(callRawNamed(entry, namePtr, nameBytes.byteLength, namedPayloadPtr, namedPayload.byteLength));
       }
       return acc;
     });
     const resolved = benchWasmRepeated("resolved", dispatchIterations, () => {
       let acc = 0;
       for (let i = 0; i < dispatchIterations; i++) {
-        acc += Number(callRawResolved(entry, callSlot, resolvedPayloadPtr, payload.byteLength));
+        acc += Number(callRawResolved(entry, callSlot, resolvedPayloadPtr, resolvedPayload.byteLength));
       }
       return acc;
     });

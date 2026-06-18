@@ -181,9 +181,13 @@ Lean.Vir.Browser.Element` is a resource named `Lean.Vir.Browser.Element` and
 labeled `Element`; arbitrary markers remain generic `Js` resources. Naked marker
 types such as `Lean.Vir.Browser.Element` are rejected at package generation.
 
-The recursive type tree is embedded in the JSON manifest and sent as a compact
-internal descriptor in each `vir_call` payload. This is intentionally still an
-internal package ABI, not a committed component-model boundary.
+The recursive type tree is embedded in the JSON manifest and, for package
+format 7 and newer, also in a compact package-owned export signature table.
+Normal `vir_call_resolved` payloads carry only values; the WASM shim looks up
+the argument/result descriptors from the loaded package. The descriptor-bearing
+`vir_call` path remains available for diagnostics, compatibility with older
+packages, and benchmark comparison. This is intentionally still an internal
+package ABI, not a committed component-model boundary.
 
 Package loading validates every exported argument/result type before exposing
 the manifest to the UI or JS caller. The validator rejects unsupported wire
@@ -196,24 +200,21 @@ enters WASM.
 ## Current Trust Boundary
 
 The manifest and package payload are trusted in this prototype. The JavaScript
-runtime validates the embedded manifest before exposing entries, then sends the
-compact type descriptor from that manifest with each `vir_call` request. The
-WASM shim currently uses that descriptor to decode arguments, construct Lean
-runtime objects, and encode results; it does not yet independently bind the
-descriptor to a package-owned export table.
+runtime validates the embedded manifest before exposing entries. For format 7
+packages, the WASM shim uses the package-owned compact export signature table
+to decode arguments, construct Lean runtime objects, and encode compact result
+payloads for `vir_call_resolved`.
 
 This is acceptable for the current generated demo packages and local developer
 packages. It is not a hardened boundary for arbitrary remote `.irpkg` files.
 The WASM sandbox protects the host browser from native memory escape, but a
 malformed or intentionally hostile package can still trap the interpreter,
-consume CPU or WASM memory, make the tab unresponsive, or confuse result
-decoding by claiming an ABI that does not match the packaged Lean declaration.
+consume CPU or WASM memory, make the tab unresponsive, or publish package ABI
+metadata that does not match the packaged Lean declaration.
 
-The hardening path is to make the package provider own the ABI descriptors for
-each exported declaration, have `vir_call` look them up by entry name instead of
-accepting caller-provided result/layout descriptors, validate layout descriptors
-inside the WASM shim, and add size/depth/execution limits around package loading
-and calls.
+The remaining hardening path is to validate package-owned layout descriptors
+inside the WASM shim, reject inconsistent export/signature tables at load time,
+and add size/depth/execution limits around package loading and calls.
 
 ## WIT Direction
 

@@ -126,19 +126,19 @@ static void write_call_tail_nat(uint8_t *& cursor) {
 }
 
 static uint32_t parse_nat_result(char const * data, uint32_t len) {
-    if (data == nullptr || len < 5 || static_cast<uint8_t>(data[0]) != WIRE_NAT) {
+    if (data == nullptr || len < 4) {
         fprintf(stderr, "invalid Nat result payload\n");
         return 0;
     }
     uint8_t const * bytes = reinterpret_cast<uint8_t const *>(data);
-    uint32_t text_len = read_u32(bytes + 1);
-    if (text_len > len - 5) {
+    uint32_t text_len = read_u32(bytes);
+    if (text_len > len - 4) {
         fprintf(stderr, "invalid Nat result length\n");
         return 0;
     }
     uint32_t value = 0;
     for (uint32_t i = 0; i < text_len; i++) {
-        char c = data[5 + i];
+        char c = data[4 + i];
         if (c < '0' || c > '9') {
             fprintf(stderr, "invalid Nat result digit\n");
             return 0;
@@ -178,25 +178,21 @@ static uint32_t call_nat_resolved(uint32_t slot, char const * name, uint8_t cons
 }
 
 static uint32_t call_fib(uint32_t input) {
-    uint8_t payload[4 + 1 + 4 + 16 + 1 + 1];
+    uint8_t payload[4 + 4 + 16];
     uint8_t * cursor = payload;
     write_u32(cursor, 1);
-    write_nat_type(cursor);
     write_decimal(cursor, input);
-    write_call_tail_nat(cursor);
     return call_nat_resolved(g_fib_slot, "fib", payload, static_cast<uint32_t>(cursor - payload));
 }
 
 static uint32_t call_sort(uint32_t const * input, uint32_t len) {
-    uint8_t payload[4 + 2 + 4 + 64 * (4 + 16) + 1 + 1];
+    uint8_t payload[4 + 4 + 64 * (4 + 16)];
     uint8_t * cursor = payload;
     write_u32(cursor, 1);
-    write_array_nat_type(cursor);
     write_u32(cursor, len);
     for (uint32_t i = 0; i < len; i++) {
         write_decimal(cursor, input[i]);
     }
-    write_call_tail_nat(cursor);
     return call_nat_resolved(g_sort_slot, "SortDemo.demoFromArray", payload, static_cast<uint32_t>(cursor - payload));
 }
 

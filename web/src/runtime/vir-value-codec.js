@@ -50,6 +50,15 @@ export function encodeCallPayload(entry, args, options = {}) {
   return writer.take();
 }
 
+export function encodeResolvedCallPayload(entry, args, options = {}) {
+  const writer = new BinaryWriter();
+  writer.u32(args.length);
+  entry.args.forEach((arg, index) => {
+    encodeValuePayload(writer, arg.type, args[index], `${entry.entry} argument ${arg.name}`, options);
+  });
+  return writer.take();
+}
+
 export function encodeClosureCallPayload(type, args, options = {}) {
   const fnArgs = requireFunctionArgs(type, "callback");
   if (args.length !== fnArgs.length) {
@@ -71,6 +80,13 @@ export function decodeCallResult(type, bytes, options = {}) {
   if (!sameWireType(type, actualType)) {
     throw new Error(`result wire type mismatch: expected ${type.type ?? requireWireTag(type, "result")}, got tag ${actualType.wireTag}`);
   }
+  const value = decodeValuePayload(reader, type, options);
+  reader.requireEnd();
+  return value;
+}
+
+export function decodeResolvedCallResult(type, bytes, options = {}) {
+  const reader = new BinaryReader(bytes);
   const value = decodeValuePayload(reader, type, options);
   reader.requireEnd();
   return value;

@@ -15,10 +15,12 @@ import {
 } from "./host-resource.js";
 import {
   decodeCallResult,
+  decodeResolvedCallResult,
   decodeHostCallRequest,
   encodeCallPayload,
   encodeClosureCallPayload,
   encodeHostCallResult,
+  encodeResolvedCallPayload,
 } from "./runtime/vir-value-codec.js";
 
 export {
@@ -459,9 +461,12 @@ export class VirRuntime {
 
     const cache = this.callCacheFor(entry);
     this.hostState?.clearTransientQueues();
+    const compactPayload = this.usesPackageCallSignatures();
     let payload;
     try {
-      payload = encodeCallPayload(entry, args, this.codecOptions);
+      payload = compactPayload
+        ? encodeResolvedCallPayload(entry, args, this.codecOptions)
+        : encodeCallPayload(entry, args, this.codecOptions);
     } catch (error) {
       this.hostState?.clearTransientQueues();
       throw error;
@@ -479,7 +484,10 @@ export class VirRuntime {
         throw new Error(this.lastCallError() || `call failed: ${entry.entry}`);
       }
       const resultLen = this.exports.vir_call_result_size();
-      return decodeCallResult(entry.result, this.readWasmBytes(resultPtr, resultLen), this.codecOptions);
+      const resultBytes = this.readWasmBytes(resultPtr, resultLen);
+      return compactPayload
+        ? decodeResolvedCallResult(entry.result, resultBytes, this.codecOptions)
+        : decodeCallResult(entry.result, resultBytes, this.codecOptions);
     } finally {
       this.freeBytes(payloadPtr);
       this.hostState?.clearTransientQueues();
@@ -510,6 +518,11 @@ export class VirRuntime {
     } finally {
       this.freeBytes(namePtr);
     }
+  }
+
+  usesPackageCallSignatures() {
+    return Number.isInteger(this.packageMetadata?.packageFormatVersion) &&
+      this.packageMetadata.packageFormatVersion >= 7;
   }
 
   lastCallError() {

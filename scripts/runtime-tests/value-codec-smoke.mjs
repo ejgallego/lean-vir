@@ -17,7 +17,9 @@ import {
 import { BinaryWriter, encodeTypeDescriptor } from "../../web/src/runtime/vir-codec.js";
 import {
   decodeCallResult,
+  decodeResolvedCallResult,
   encodeCallPayload,
+  encodeResolvedCallPayload,
 } from "../../web/src/runtime/vir-value-codec.js";
 import { WIRE } from "../../web/src/runtime/wire-tags.js";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
@@ -48,6 +50,13 @@ const resourceArgPayload = encodeCallPayload(resourceEntry, [resourceArg], {
   pushIncomingResource: (value) => incomingResources.push(value),
 });
 assert.deepEqual([...resourceArgPayload], [1, 0, 0, 0, WIRE.RESOURCE, WIRE.UNIT, 0]);
+assert.equal(incomingResources.length, 1);
+assert.equal(incomingResources[0], resourceArg);
+incomingResources.length = 0;
+const resourceArgResolvedPayload = encodeResolvedCallPayload(resourceEntry, [resourceArg], {
+  pushIncomingResource: (value) => incomingResources.push(value),
+});
+assert.deepEqual([...resourceArgResolvedPayload], [1, 0, 0, 0]);
 assert.equal(incomingResources.length, 1);
 assert.equal(incomingResources[0], resourceArg);
 assert.throws(
@@ -95,6 +104,17 @@ assert.equal(
   "opaque-resource",
 );
 assert.equal(outgoingResourceTakes, 1);
+assert.equal(
+  decodeResolvedCallResult(resourceType, new Uint8Array(), {
+    takeOutgoingResource: (label) => {
+      assert.equal(label, "resource result");
+      outgoingResourceTakes += 1;
+      return "opaque-resource-compact";
+    },
+  }),
+  "opaque-resource-compact",
+);
+assert.equal(outgoingResourceTakes, 2);
 const callbackType = {
   type: "Function",
   wireTag: WIRE.FUNCTION,
@@ -136,7 +156,7 @@ const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", 
 });
 assert.equal(inspectedJson.status, 0, inspectedJson.stderr || inspectedJson.stdout);
 const inspectedInfo = JSON.parse(inspectedJson.stdout);
-assert.equal(inspectedInfo.package.version, 6);
+assert.equal(inspectedInfo.package.version, 7);
 assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
 assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
 assert.equal(inspectedInfo.manifest.hostImports.length, 0);

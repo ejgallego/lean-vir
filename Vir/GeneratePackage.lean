@@ -2470,7 +2470,7 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
 def collectPackageMetadata (generatedAt : String) (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
   {
     generator := "tools/GeneratePackage.lean"
-    packageFormatVersion := 6
+    packageFormatVersion := 7
     manifestVersion := 1
     leanVersion := Lean.versionString
     leanToolchain := Lean.toolchain
@@ -2845,6 +2845,14 @@ def emitHostImport (entry : HostImport) : EmitM Unit := do
     entry.args.forM (fun arg => emitInterfaceType arg.type)
     emitInterfaceType entry.result
 
+def emitInterfaceExportSignature (entry : InterfaceExport) : EmitM Unit := do
+  withEmitContext s!"while encoding interface export signature `{entry.entry}`" do
+    emitName entry.entry
+    emitBool entry.effect.isEffectful
+    emitU32 entry.args.size
+    entry.args.forM (fun arg => emitInterfaceType arg.type)
+    emitInterfaceType entry.result
+
 def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
   withEmitContext s!"while encoding initializer global `{entry.name}`" do
     emitName entry.name
@@ -2852,12 +2860,13 @@ def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
 
 def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit := do
   emitString "lean-vir-ir-package"
-  emitU32 6
+  emitU32 7
   emitU32 (closure.decls.size + closure.externs.size)
   closure.decls.forM emitDeclEntry
   closure.externs.forM emitExternEntry
   emitArray closure.initGlobals emitInitGlobal
   emitArray manifest.hostImports emitHostImport
+  emitArray manifest.exports emitInterfaceExportSignature
   emitString manifest.toJson
 
 def emitPackage (closure : Closure) (manifest : InterfaceManifest) : Except String ByteArray := do

@@ -56,9 +56,16 @@ struct host_import_entry {
     std::string signature;
 };
 
+struct export_signature_entry {
+    object * name;
+    bool is_io;
+    std::string signature;
+};
+
 static std::vector<decl_entry> g_entries;
 static std::vector<init_global_entry> g_init_entries;
 static std::vector<host_import_entry> g_host_imports;
+static std::vector<export_signature_entry> g_export_signatures;
 static std::string g_interface_manifest;
 static std::string g_last_error;
 static bool g_package_loaded = false;
@@ -716,6 +723,19 @@ public:
         return { n, target, symbol, arity, erased_prefix_args, is_io, bytes_from(signature_start, signature_end) };
     }
 
+    export_signature_entry export_signature() {
+        object * n = name();
+        bool is_io = boolean();
+        size_t signature_start = pos();
+        uint32_t argc = u32();
+        for (uint32_t i = 0; i < argc; i++) {
+            interface_type();
+        }
+        interface_type();
+        size_t signature_end = pos();
+        return { n, is_io, bytes_from(signature_start, signature_end) };
+    }
+
 private:
     std::string m_error;
     uint32_t m_version = 1;
@@ -747,9 +767,13 @@ static void clear_loaded_package() {
     for (host_import_entry const & entry : g_host_imports) {
         lean_dec(entry.name);
     }
+    for (export_signature_entry const & entry : g_export_signatures) {
+        lean_dec(entry.name);
+    }
     g_entries.clear();
     g_init_entries.clear();
     g_host_imports.clear();
+    g_export_signatures.clear();
     g_interface_manifest.clear();
     g_package_loaded = false;
 }
@@ -774,7 +798,7 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "invalid IR package magic `" + magic + "`";
         return false;
     }
-    if (version != 1 && version != 2 && version != 3 && version != 4 && version != 5 && version != 6) {
+    if (version != 1 && version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7) {
         g_last_error = "unsupported IR package version " + std::to_string(version);
         return false;
     }
@@ -807,6 +831,14 @@ static bool load_package(uint8_t const * data, size_t size) {
             host_imports.push_back(r.host_import());
         }
     }
+    std::vector<export_signature_entry> export_signatures;
+    if (version >= 7) {
+        uint32_t export_signature_count = r.u32();
+        export_signatures.reserve(export_signature_count);
+        for (uint32_t i = 0; i < export_signature_count; i++) {
+            export_signatures.push_back(r.export_signature());
+        }
+    }
     if (!r.ok) {
         g_last_error = r.error();
         return false;
@@ -826,6 +858,7 @@ static bool load_package(uint8_t const * data, size_t size) {
     g_entries = std::move(entries);
     g_init_entries = std::move(init_entries);
     g_host_imports = std::move(host_imports);
+    g_export_signatures = std::move(export_signatures);
     g_interface_manifest = std::move(interface_manifest);
     g_package_loaded = true;
     return true;
@@ -942,6 +975,35 @@ object * package_call_slot_name(uint32_t slot) {
 bool package_call_slot_has_boxed_decl(uint32_t slot) {
     decl_entry const * entry = package_entry_for_call_slot(slot);
     return entry != nullptr && entry->boxed_base != nullptr;
+}
+
+static export_signature_entry const * package_call_signature_entry(uint32_t slot) {
+    decl_entry const * entry = package_entry_for_call_slot(slot);
+    if (entry == nullptr) {
+        return nullptr;
+    }
+    object * call_name = package_entry_call_name(*entry);
+    for (export_signature_entry const & signature : g_export_signatures) {
+        if (lean_name_eq(call_name, signature.name)) {
+            return &signature;
+        }
+    }
+    return nullptr;
+}
+
+char const * package_call_signature(uint32_t slot) {
+    export_signature_entry const * signature = package_call_signature_entry(slot);
+    return signature == nullptr ? nullptr : signature->signature.data();
+}
+
+uint32_t package_call_signature_size(uint32_t slot) {
+    export_signature_entry const * signature = package_call_signature_entry(slot);
+    return signature == nullptr ? 0 : static_cast<uint32_t>(signature->signature.size());
+}
+
+bool package_call_is_io(uint32_t slot) {
+    export_signature_entry const * signature = package_call_signature_entry(slot);
+    return signature != nullptr && signature->is_io;
 }
 
 char const * find_host_import_symbol(object * n) {

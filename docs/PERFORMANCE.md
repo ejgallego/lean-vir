@@ -35,14 +35,67 @@ plus host/resource rows for scalar host imports, callback root round trips, DOM
 listener resource churn, React root lifecycle work, and focused React `Html`
 render conversion.
 
-The host/resource and React `Html` rows run loops inside Lean so they measure
-repeated host interop or render-conversion operations without mostly measuring
-repeated top-level `vir.call(...)` entry overhead.
+The `base-*` JSON rows are intended as the first regression surface for direct
+base-type conversion work. Each row has a `codec` sample for JavaScript request
+encoding and a `wasm` sample for the full top-level call. Rows with an
+implemented direct shim helper also have a `native` sample that calls the
+native conversion API directly, bypassing value payload decoding and `vir_call`
+dispatch. The scalar host/resource and React rows repeat one exported operation
+from JavaScript where possible, so they stress boundary conversion without
+primarily measuring a deep recursive Lean `DomM` loop.
 
-The `branchAndSub` row calls a tiny exported fixture through both `vir_call` and
-`vir_call_resolved`, so it is the focused check for call-slot dispatch changes.
-The broader `fib`, `sort`, host/resource, and React rows spend more time in Lean
-execution or host work and should show smaller movement from dispatch-only work.
+The machine-readable report schema is `lean-vir.bench.v1`. Benchmark rows are
+objects under the top-level `benchmarks` array. Every timed sample uses the same
+shape, regardless of whether it is named `codec`, `wasm`, `native`, `host`,
+`named`, `resolved`, or `js`:
+
+```json
+{
+  "label": "base-bool",
+  "iterations": 50000,
+  "medianMs": 1.07,
+  "checksum": 0
+}
+```
+
+The `base-*` conversion rows use this stable row shape:
+
+```json
+{
+  "name": "base-bool",
+  "title": "base Bool conversion boundary",
+  "codec": {
+    "label": "codec-base-bool",
+    "iterations": 50000,
+    "medianMs": 8.36,
+    "checksum": 0
+  },
+  "wasm": {
+    "label": "base-bool",
+    "iterations": 50000,
+    "medianMs": 185.0,
+    "checksum": 0
+  },
+  "native": {
+    "label": "native-base-bool",
+    "iterations": 50000,
+    "medianMs": 1.07,
+    "checksum": 0
+  }
+}
+```
+
+`native` is optional. Its absence means the row does not yet have a direct
+shim helper; it must not be interpreted as zero time or a failed benchmark.
+Today the native probe covers only the base scalar helpers exported by the
+WASI shim (`Bool`, `Nat`, `String`, `UInt32`, and `Float`). Those helpers are
+prototype conversion probes for benchmarking, not the public package-call API.
+
+The `branchAndSub` row calls a tiny exported fixture through both descriptor-
+bearing `vir_call` and compact `vir_call_resolved`, so it is the focused check
+for package-owned ABI and call-slot dispatch changes. The broader `fib`, `sort`,
+host/resource, and React rows spend more time in Lean execution or host work and
+should show smaller movement from dispatch-only work.
 `npm run bench:engines` remains a WASI command-module comparison across
 available engines for the broader `fib` and `sort` rows.
 
