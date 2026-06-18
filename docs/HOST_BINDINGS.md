@@ -38,7 +38,7 @@ non-browser environments.
 Browser `react.root.*` targets are provided by
 `lean-vir/react-host-bindings`. With that entry installed, React roots map to
 `ReactDOMClient.createRoot`, `root.render`, and `root.unmount`.
-`react.html.text` and `react.html.element` construct `ReactHtml` resources;
+`react.node.text` and `react.node.createElement` construct `ReactNode` resources;
 the browser binding uses `React.createElement`, while the virtual binding builds
 test-visible virtual React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
@@ -48,9 +48,9 @@ component. The hook bindings `react.useState`, `react.state.set`, and
 browser and virtual host resource store as React roots. Small `js.string`,
 `js.nat`, and `js.bool` helpers provide explicit scalar conversion for examples
 that need primitive React state without giving `react.useState` a scalar ABI.
-`Root.render` accepts a `ReactM (Lean.Vir.Js Html)` tree. The
+`Root.render` accepts a `ReactM (Lean.Vir.Js Node)` tree. The
 `react.root.render` host binding receives that render action as a releasable
-callback, invokes it to obtain the concrete `Js Html` resource, renders the
+callback, invokes it to obtain the concrete `Js Node` resource, renders the
 resource, and releases the render callback.
 
 ## Virtual Node Bindings

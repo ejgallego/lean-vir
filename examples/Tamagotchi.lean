@@ -377,13 +377,13 @@ def summaryLabel (state : Tamagotchi.PetState) (actionLabel : String) : String :
   s!"{displayName state} is {state.mood.label}; last {actionLabel}; " ++
     s!"care {state.care}/{Tamagotchi.maxCare}; turn {state.turns}"
 
-def emptySpan (classes : Array String) : ReactM (Lean.Vir.Js Html) :=
-  Html.spanWith
+def emptySpan (classes : Array String) : ReactM (Lean.Vir.Js Node) :=
+  Node.spanWith
     #[Property.classList classes, Property.ariaHidden true]
     #[]
     #[]
 
-def pixelPet : ReactM (Lean.Vir.Js Html) := do
+def pixelPet : ReactM (Lean.Vir.Js Node) := do
   let earLeft ← emptySpan #["pet-ear", "pet-ear-left"]
   let earRight ← emptySpan #["pet-ear", "pet-ear-right"]
   let body ← emptySpan #["pet-body"]
@@ -396,21 +396,21 @@ def pixelPet : ReactM (Lean.Vir.Js Html) := do
   let eyeRight ← emptySpan #["pet-eye", "pet-eye-right"]
   let mouth ← emptySpan #["pet-mouth"]
   let signal ← emptySpan #["pet-signal"]
-  Html.divWith
+  Node.divWith
     #[Property.classList #["pet-pixel-pet"], Property.ariaHidden true]
     #[]
     #[earLeft, earRight, body, tentacle1, tentacle2, tentacle3, tentacle4,
       tentacle5, eyeLeft, eyeRight, mouth, signal]
 
-def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Html) := do
+def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
   let artwork := Tamagotchi.normalizeArtwork state.artwork
   let moodLabel := state.mood.label
   let pet ← pixelPet
-  let screen ← Html.divWith #[Property.classList #["pet-screen"]] #[] #[pet]
+  let screen ← Node.divWith #[Property.classList #["pet-screen"]] #[] #[pet]
   let leftButton ← emptySpan #["pet-device-button", "pet-device-button-left"]
   let centerButton ← emptySpan #["pet-device-button", "pet-device-button-center"]
   let rightButton ← emptySpan #["pet-device-button", "pet-device-button-right"]
-  Html.divWith
+  Node.divWith
     #[
       Property.id "react-pet-device",
       Property.classList #["pet-device"],
@@ -422,22 +422,22 @@ def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Html) := do
     #[]
     #[screen, leftButton, centerButton, rightButton]
 
-def stat (key label value : String) : ReactM (Lean.Vir.Js Html) := do
-  let labelText ← Html.text label
-  let labelNode ← Html.spanWith #[] #[] #[labelText]
-  let valueText ← Html.text value
-  let valueNode ← Html.spanWith #[] #[] #[valueText]
-  Html.keyedDivWith key
+def stat (key label value : String) : ReactM (Lean.Vir.Js Node) := do
+  let labelText ← Node.text label
+  let labelNode ← Node.spanWith #[] #[] #[labelText]
+  let valueText ← Node.text value
+  let valueNode ← Node.spanWith #[] #[] #[valueText]
+  Node.keyedDivWith key
     #[Property.classList #["react-pet-stat"]]
     #[]
     #[labelNode, valueNode]
 
-partial def traceNodesAux (index : Nat) : List Tamagotchi.Mood → ReactM (Array (Lean.Vir.Js Html))
+partial def traceNodesAux (index : Nat) : List Tamagotchi.Mood → ReactM (Array (Lean.Vir.Js Node))
   | [] => pure #[]
   | mood :: rest => do
-      let text ← Html.text mood.label
+      let text ← Node.text mood.label
       let node ←
-        Html.keyedSpanWith
+        Node.keyedSpanWith
           (toString index)
           #[
             Property.classList #["react-pet-trace-token", "react-pet-trace-" ++ mood.label],
@@ -448,7 +448,7 @@ partial def traceNodesAux (index : Nat) : List Tamagotchi.Mood → ReactM (Array
       let restNodes ← traceNodesAux (index + 1) rest
       pure (#[node] ++ restNodes)
 
-def traceNodes (trace : List Tamagotchi.Mood) : ReactM (Array (Lean.Vir.Js Html)) :=
+def traceNodes (trace : List Tamagotchi.Mood) : ReactM (Array (Lean.Vir.Js Node)) :=
   traceNodesAux 0 trace
 
 def traceAriaLabel (trace : List Tamagotchi.Mood) : String :=
@@ -464,8 +464,8 @@ partial def renderInto
   let shownName := displayName state
   Root.render root do
     let actionButton := fun action => do
-      let text ← Html.text action.label
-      Html.keyedButtonWith
+      let text ← Node.text action.label
+      Node.keyedButtonWith
         action.label
         #[
           Property.id ("react-pet-action-" ++ action.label),
@@ -474,10 +474,10 @@ partial def renderInto
         ]
         #[EventHandler.onClick (renderInto root (Tamagotchi.nextState state action) action.label)]
         #[text]
-    let nameText ← Html.text "Name"
-    let nameLabel ← Html.labelWith #[Property.htmlFor "react-pet-name-input"] #[] #[nameText]
+    let nameText ← Node.text "Name"
+    let nameLabel ← Node.labelWith #[Property.htmlFor "react-pet-name-input"] #[] #[nameText]
     let nameInput ←
-      Html.input
+      Node.input
         #[
           Property.id "react-pet-name-input",
           Property.inputName "react-pet-name",
@@ -492,7 +492,7 @@ partial def renderInto
           | none => pure ()
           | some name => renderInto root { state with name := name } "rename"]
     let nameForm ←
-      Html.formWith
+      Node.formWith
         #[Property.id "react-pet-name-form"]
         #[EventHandler.onSubmitWith fun event => do
           Lean.Vir.Browser.Event.preventDefault event
@@ -500,7 +500,7 @@ partial def renderInto
           renderInto root { state with name := shownName } "rename"]
         #[nameLabel, nameInput]
     let artInput ←
-      Html.input
+      Node.input
         #[
           Property.id "react-pet-art-toggle",
           Property.type "checkbox",
@@ -513,30 +513,30 @@ partial def renderInto
               let artwork := Tamagotchi.artworkFromChecked checked
               let name := Tamagotchi.nameForArtworkChange state.artwork artwork state.name
               renderInto root { state with artwork := artwork, name := name } "artwork"]
-    let artText ← Html.text "Octopus"
-    let artSpan ← Html.spanWith #[] #[] #[artText]
+    let artText ← Node.text "Octopus"
+    let artSpan ← Node.spanWith #[] #[] #[artText]
     let artLabel ←
-      Html.labelWith
+      Node.labelWith
         #[Property.htmlFor "react-pet-art-toggle", Property.classList #["react-pet-toggle"]]
         #[]
         #[artInput, artSpan]
     let heading ←
-      Html.divWith
+      Node.divWith
         #[Property.classList #["react-pet-heading"]]
         #[]
         #[nameForm, artLabel]
     let deviceNode ← device state
-    let moodLabelText ← Html.text "Mood"
-    let moodLabelNode ← Html.spanWith #[] #[] #[moodLabelText]
-    let moodText ← Html.text state.mood.label
-    let moodValueNode ← Html.spanWith #[Property.id "react-pet-mood"] #[] #[moodText]
+    let moodLabelText ← Node.text "Mood"
+    let moodLabelNode ← Node.spanWith #[] #[] #[moodLabelText]
+    let moodText ← Node.text state.mood.label
+    let moodValueNode ← Node.spanWith #[Property.id "react-pet-mood"] #[] #[moodText]
     let moodReadout ←
-      Html.divWith
+      Node.divWith
         #[Property.classList #["pet-mood-readout"]]
         #[]
         #[moodLabelNode, moodValueNode]
     let petState ←
-      Html.divWith
+      Node.divWith
         #[Property.classList #["pet-state"]]
         #[]
         #[deviceNode, moodReadout]
@@ -545,19 +545,19 @@ partial def renderInto
     let turnStat ← stat "turn" "turn" (toString state.turns)
     let lastStat ← stat "last" "last" actionLabel
     let stats ←
-      Html.divWith
+      Node.divWith
         #[Property.classList #["react-pet-stats"]]
         #[]
         #[nameStat, careStat, turnStat, lastStat]
     let actionButtons ← actions.mapM actionButton
     let actionsNode ←
-      Html.divWith
+      Node.divWith
         #[Property.classList #["action-grid", "react-pet-actions"]]
         #[]
         actionButtons
     let traceNodeList ← traceNodes state.trace
     let trace ←
-      Html.divWith
+      Node.divWith
         #[
           Property.classList #["react-pet-trace"],
           Property.id "react-pet-trace",
@@ -566,24 +566,24 @@ partial def renderInto
         ]
         #[]
         traceNodeList
-    let summaryText ← Html.text (summaryLabel state actionLabel)
+    let summaryText ← Node.text (summaryLabel state actionLabel)
     let summary ←
-      Html.divWith
+      Node.divWith
         #[Property.classList #["react-pet-summary"], Property.id "react-pet-summary"]
         #[]
         #[summaryText]
-    let resetText ← Html.text "Reset"
+    let resetText ← Node.text "Reset"
     let reset ←
-      Html.buttonWith
+      Node.buttonWith
         #[Property.id "react-pet-reset"]
         #[EventHandler.onClick (renderInto root (Tamagotchi.initialState state.name state.artwork) "...")]
         #[resetText]
     let body ←
-      Html.divWith
+      Node.divWith
         #[Property.classList #["react-pet-body"]]
         #[]
         #[petState, stats, actionsNode, trace, summary, reset]
-    Html.divWith
+    Node.divWith
       #[
         Property.id "react-pet-widget",
         Property.classList #["react-pet-widget"],

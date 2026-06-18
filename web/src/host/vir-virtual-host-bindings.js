@@ -5,10 +5,10 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
-  createVirtualReactHtmlElementResource,
-  createVirtualReactHtmlTextResource,
-  createVirtualReactRootResource as createVirtualReactRootResourceFromHtml,
-} from "../react/vir-react-html.js";
+  createVirtualReactNodeElementResource,
+  createVirtualReactNodeTextResource,
+  createVirtualReactRootResource as createVirtualReactRootResourceFromNode,
+} from "../react/vir-react-node.js";
 import {
   createReactJsValueHostBindings,
   createReactStateHostBindings,
@@ -138,9 +138,9 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
     }),
     ...createReactRootResourceHostBindings(state.resources, (target) =>
       createVirtualReactRootResource(state.resources, target, reactHooks), {
-        createHtmlTextResource: (value) => createVirtualReactHtmlTextResource(state.resources, value),
-        createHtmlElementResource: (tag, key, props, handlers, children) =>
-          createVirtualReactHtmlElementResource(state.resources, reactHooks, tag, key, props, handlers, children),
+        createNodeTextResource: (value) => createVirtualReactNodeTextResource(state.resources, value),
+        createNodeElementResource: (tag, key, props, handlers, children) =>
+          createVirtualReactNodeElementResource(state.resources, reactHooks, tag, key, props, handlers, children),
       }),
     ...createReactJsValueHostBindings(state.resources),
     ...createReactStateHostBindings(state.resources, reactHookRuntime),
@@ -168,7 +168,7 @@ function createVirtualEventListenerResource(resources, target, eventName, callba
 }
 
 function createVirtualReactRootResource(resources, target, hooks) {
-  return createVirtualReactRootResourceFromHtml(resources, target, hooks);
+  return createVirtualReactRootResourceFromNode(resources, target, hooks);
 }
 
 function queryVirtualElementState(state, selector) {

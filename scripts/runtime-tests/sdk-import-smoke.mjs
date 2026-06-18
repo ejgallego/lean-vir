@@ -44,7 +44,7 @@ try {
   const codec = modules["runtime/vir-codec.js"];
   const leanCodec = modules["runtime/vir-lean-codec.js"];
   const valueCodec = modules["runtime/vir-value-codec.js"];
-  const reactHtml = modules["react/vir-react-html.js"];
+  const reactNode = modules["react/vir-react-node.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
   const wireTags = modules["runtime/wire-tags.js"];
 
@@ -55,7 +55,7 @@ try {
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof leanCodec.decodeExpr, "function");
   assert.equal(typeof valueCodec.decodeCallResult, "function");
-  assert.equal(typeof reactHtml.virtualReactTextContent, "function");
+  assert.equal(typeof reactNode.virtualReactTextContent, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
   assert.equal(wireTags.WIRE.NAT, 0);
 
@@ -78,8 +78,8 @@ try {
   const resources = hostBindings.createHostResourceState();
   const bindings = reactHostBindings.createBrowserReactHostBindings(resources);
   assert.equal(typeof reactHostBindings.createBrowserReactHostBindings, "function");
-  assert.equal(typeof bindings["react.html.text"], "function");
-  assert.equal(typeof bindings["react.html.element"], "function");
+  assert.equal(typeof bindings["react.node.text"], "function");
+  assert.equal(typeof bindings["react.node.createElement"], "function");
   assert.equal(typeof bindings["react.root.create"], "function");
   assert.equal(typeof bindings["react.root.render"], "function");
   assert.equal(typeof bindings["react.root.unmount"], "function");

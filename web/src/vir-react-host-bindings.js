@@ -12,10 +12,10 @@ import {
   createReactStateHostBindings,
 } from "./react/vir-react-hooks.js";
 import {
-  createBrowserReactHtmlElementResource,
-  createBrowserReactHtmlTextResource,
-  createBrowserReactRootResource as createBrowserReactRootResourceFromHtml,
-} from "./react/vir-react-html.js";
+  createBrowserReactNodeElementResource,
+  createBrowserReactNodeTextResource,
+  createBrowserReactRootResource as createBrowserReactRootResourceFromNode,
+} from "./react/vir-react-node.js";
 import {
   createHostResourceState,
   createReactHostHooks,
@@ -31,9 +31,9 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
   return {
     ...createReactRootResourceHostBindings(state, (target) =>
       createBrowserReactRootResource(state, ReactDOMClient.createRoot(target), React, hooks), {
-        createHtmlTextResource: (value) => createBrowserReactHtmlTextResource(state, value),
-        createHtmlElementResource: (tag, key, props, handlers, children) =>
-          createBrowserReactHtmlElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
+        createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
+        createNodeElementResource: (tag, key, props, handlers, children) =>
+          createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
       }),
     ...createReactJsValueHostBindings(state),
     ...createReactStateHostBindings(state, hookRuntime),
@@ -41,5 +41,5 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
 }
 
 function createBrowserReactRootResource(state, root, React, hooks) {
-  return createBrowserReactRootResourceFromHtml(state, root, React, hooks);
+  return createBrowserReactRootResourceFromNode(state, root, React, hooks);
 }

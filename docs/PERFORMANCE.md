@@ -35,7 +35,7 @@ codec-only rows, base boundary rows for `Unit`, `Bool`, `Nat`, `Int`,
 conversion rows for WIT-like scalar records, nested records/lists/options, and
 recursive custom inductives. It also includes host/resource rows for scalar host
 imports, callback root round trips, DOM listener resource churn, React root
-lifecycle work, and focused React `Html` render conversion.
+lifecycle work, and focused React `Node` render conversion.
 
 The `base-*` JSON rows are intended as the first regression surface for direct
 base-type conversion work. Each row has a `codec` sample for JavaScript request

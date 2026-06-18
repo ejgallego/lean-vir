@@ -31,9 +31,9 @@ For browser or React host work, read:
 
 1. `docs/LEAN_VIR_LIBRARY.md`
 2. `docs/HOST_BINDINGS.md`
-3. `docs/REACT_HTML.md`
+3. `docs/REACT_NODE.md`
 4. `web/src/host/vir-host-resources.js`
-5. `web/src/react/vir-react-html.js`
+5. `web/src/react/vir-react-node.js`
 6. `web/src/react/vir-react-hooks.js`
 
 For WASI/runtime boundary work, read:
@@ -190,7 +190,7 @@ flowchart TD
 
     subgraph JS["JavaScript runtime"]
         Callback["VirCallback"]
-        Owner["Host owner\nlistener / timer / ReactHtml / user binding"]
+        Owner["Host owner\nlistener / timer / ReactNode / user binding"]
     end
 
     Closure -->|"vir_closure_root"| ClosureRoot
@@ -230,7 +230,7 @@ sequenceDiagram
     Hooks->>React: React.useState(initial)
     React-->>Hooks: state value and setter
     Hooks-->>Lean: State (Lean.Vir.Js alpha)
-    Lean->>Host: Html.text / Html.element
+    Lean->>Host: Node.text / Node.createElement
     Host->>React: React.createElement(tag, props, ...children)
     Host-->>React: native React node
     React-->>Host: commit / later rerender
@@ -240,8 +240,8 @@ The current API intentionally follows ordinary React semantics. Render
 functions are authored in `ReactM`, DOM/root operations live in `DomM`, and
 real host IO remains outside the React component effect. `Root.render` is the
 host boundary for static tree rendering: the raw host import accepts a render
-action of type `ReactM (Lean.Vir.Js Html)`, invokes that action to obtain the
-concrete `Js Html`, renders it, and releases the render callback. This is a
+action of type `ReactM (Lean.Vir.Js Node)`, invokes that action to obtain the
+concrete `Js Node`, renders it, and releases the render callback. This is a
 shallow embedding: it aims to make existing React/ProofWidgets-style code
 portable before introducing higher-level safety abstractions.
 

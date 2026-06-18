@@ -142,7 +142,7 @@ Supported v1 types:
   `α` parameter is a Lean-side phantom shape;
 - Lean function values used as host callbacks;
 - `Lean.Expr`;
-- `Lean.Vir.React.Html` as an opaque JavaScript-owned resource under
+- `Lean.Vir.React.Node` as an opaque JavaScript-owned resource under
   `Lean.Vir.Js`.
 
 Large exact integer results are returned as decimal strings.

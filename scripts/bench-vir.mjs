@@ -761,7 +761,7 @@ const wasmReactRoot = benchWasmRepeated("react-root-lifecycle", reactRootIterati
   return acc;
 });
 
-const wasmReactTextRender = benchWasmRepeated("react-html-text-render", reactTextRenderIterations, () => {
+const wasmReactTextRender = benchWasmRepeated("react-node-text-render", reactTextRenderIterations, () => {
   let acc = 0;
   for (let i = 0; i < reactTextRenderIterations; i++) {
     acc += Number(hostRuntime.call("ReactCounter.renderWideTextLoop", "#bench-react", reactTextRenderWidth, 1));
@@ -769,7 +769,7 @@ const wasmReactTextRender = benchWasmRepeated("react-html-text-render", reactTex
   return acc;
 });
 
-const wasmReactCallbackRender = benchWasmRepeated("react-html-callback-render", reactCallbackRenderIterations, () => {
+const wasmReactCallbackRender = benchWasmRepeated("react-node-callback-render", reactCallbackRenderIterations, () => {
   let acc = 0;
   for (let i = 0; i < reactCallbackRenderIterations; i++) {
     acc += Number(hostRuntime.call("ReactCounter.renderCallbackTreeLoop", "#bench-react", reactCallbackRenderWidth, 1));
@@ -820,7 +820,7 @@ printWasmRow(`DOM listener resource create/remove x ${domResourceIterations}`, w
 console.log();
 printWasmRow(`React root mount/render/unmount x ${reactRootIterations}`, wasmReactRoot);
 console.log();
-console.log("React Html resource paths");
+console.log("React Node resource paths");
 console.log();
 printWasmRow(
   `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
@@ -895,12 +895,12 @@ if (args.jsonPath !== null) {
       wasmReactRoot,
     ),
     benchmarkReportRow(
-      "react-html-text-render",
+      "react-node-text-render",
       `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
       wasmReactTextRender,
     ),
     benchmarkReportRow(
-      "react-html-callback-render",
+      "react-node-callback-render",
       `React callback tree render ${reactCallbackRenderWidth} handlers x ${reactCallbackRenderIterations}`,
       wasmReactCallbackRender,
     ),

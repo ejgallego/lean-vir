@@ -6,23 +6,23 @@ Author: Emilio J. Gallego Arias
 
 import { isHostResource } from "../host-resource.js";
 
-const REACT_HTML_MAX_DEPTH = 128;
-const REACT_HTML_MAX_NODES = 10000;
+const REACT_NODE_MAX_DEPTH = 128;
+const REACT_NODE_MAX_NODES = 10000;
 
 export function createBrowserReactRootResource(state, root, React, hooks) {
   const createElement = requireReactCreateElement(React, "createBrowserReactRootResource");
   return createReactRootResource(state, hooks, {
-    commitHtml(_value, nextHtml) {
-      root.render(nextHtml.node);
+    commitNode(_value, nextNode) {
+      root.render(nextNode.node);
     },
-    createComponent(resources, rootHooks, renderCallback, renderHtml, disposePreviousHtml) {
+    createComponent(resources, rootHooks, renderCallback, renderNode, disposePreviousNode) {
       return createReactComponentResource(
         resources,
         renderCallback,
         rootHooks.hookRuntime,
-        renderHtml,
+        renderNode,
         null,
-        disposePreviousHtml);
+        disposePreviousNode);
     },
     commitComponent(_value, component) {
       root.render(createElement(component.Component));
@@ -36,10 +36,10 @@ export function createBrowserReactRootResource(state, root, React, hooks) {
 export function createVirtualReactRootResource(resources, target, hooks) {
   return createReactRootResource(resources, hooks, {
     initialState: { current: null },
-    commitHtml(value, nextHtml) {
-      updateVirtualReactRoot(target, value, nextHtml.node);
+    commitNode(value, nextNode) {
+      updateVirtualReactRoot(target, value, nextNode.node);
     },
-    createComponent(rootResources, rootHooks, renderCallback, renderHtml, disposePreviousHtml, value) {
+    createComponent(rootResources, rootHooks, renderCallback, renderNode, disposePreviousNode, value) {
       let component = null;
       const renderCurrent = () => {
         updateVirtualReactRoot(target, value, component.render());
@@ -48,9 +48,9 @@ export function createVirtualReactRootResource(resources, target, hooks) {
         rootResources,
         renderCallback,
         rootHooks.hookRuntime,
-        renderHtml,
+        renderNode,
         renderCurrent,
-        disposePreviousHtml);
+        disposePreviousNode);
       return component;
     },
     commitComponent(value, component) {
@@ -67,13 +67,13 @@ export function createVirtualReactRootResource(resources, target, hooks) {
 
 function createReactRootResource(resources, hooks, adapter) {
   const { addDisposable, removeDisposable, once } = requireReactHostHooks(hooks);
-  let currentHtml = null;
+  let currentNode = null;
   let currentComponent = null;
   const value = {
     ...(adapter.initialState ?? {}),
-    render(html) {
-      currentHtml = commitReactHtmlRender(resources, hooks, html, currentHtml, (nextHtml) => {
-        adapter.commitHtml(value, nextHtml);
+    render(node) {
+      currentNode = commitReactNodeRender(resources, hooks, node, currentNode, (nextNode) => {
+        adapter.commitNode(value, nextNode);
       });
       disposeReactComponent(currentComponent);
       currentComponent = null;
@@ -83,8 +83,8 @@ function createReactRootResource(resources, hooks, adapter) {
         resources,
         hooks,
         renderCallback,
-        (html) => resolveRenderedReactHtmlNode(resources, html),
-        (html) => queueReactHtmlRelease(resources, html, hooks),
+        (node) => resolveRenderedReactNodeValue(resources, node),
+        (node) => queueReactNodeRelease(resources, node, hooks),
         value);
       try {
         adapter.commitComponent(value, component);
@@ -92,8 +92,8 @@ function createReactRootResource(resources, hooks, adapter) {
         component.dispose();
         throw error;
       }
-      queueReactHtmlRelease(resources, currentHtml, hooks);
-      currentHtml = null;
+      queueReactNodeRelease(resources, currentNode, hooks);
+      currentNode = null;
       disposeReactComponent(currentComponent);
       currentComponent = component;
     },
@@ -101,8 +101,8 @@ function createReactRootResource(resources, hooks, adapter) {
       try {
         adapter.unmount?.(value);
       } finally {
-        releaseReactHtmlResource(resources, currentHtml);
-        currentHtml = null;
+        releaseReactNodeResource(resources, currentNode);
+        currentNode = null;
         disposeReactComponent(currentComponent);
         currentComponent = null;
         removeDisposable(resources, value);
@@ -113,30 +113,30 @@ function createReactRootResource(resources, hooks, adapter) {
   return value;
 }
 
-function commitReactHtmlRender(resources, hooks, html, currentHtml, commit) {
-  const sameHtml = currentHtml === html;
-  let nextHtml = null;
+function commitReactNodeRender(resources, hooks, node, currentNode, commit) {
+  const sameNode = currentNode === node;
+  let nextNode = null;
   let retained = false;
   try {
-    nextHtml = resolveReactHtmlResource(resources, html);
-    validateRenderableReactHtml(nextHtml);
-    if (!sameHtml) {
-      retainReactHtmlValue(nextHtml);
+    nextNode = resolveReactNodeResource(resources, node);
+    validateRenderableReactNode(nextNode);
+    if (!sameNode) {
+      retainReactNodeValue(nextNode);
       retained = true;
     }
-    commit(nextHtml);
+    commit(nextNode);
   } catch (error) {
     if (retained) {
-      releaseReactHtmlValue(resources, nextHtml);
-    } else if (!sameHtml && nextHtml?.refCount === 0) {
-      disposeReactHtml(resources, html);
+      releaseReactNodeValue(resources, nextNode);
+    } else if (!sameNode && nextNode?.refCount === 0) {
+      disposeReactNode(resources, node);
     }
     throw error;
   }
-  if (!sameHtml) {
-    queueReactHtmlRelease(resources, currentHtml, hooks);
+  if (!sameNode) {
+    queueReactNodeRelease(resources, currentNode, hooks);
   }
-  return html;
+  return node;
 }
 
 function updateVirtualReactRoot(target, value, nextTree) {
@@ -145,19 +145,19 @@ function updateVirtualReactRoot(target, value, nextTree) {
   target.textContent = virtualReactTextContent(nextTree);
 }
 
-export function createBrowserReactHtmlTextResource(resources, value) {
-  return createReactHtmlResource(resources, {
-    node: reactHtmlTextValue(value),
+export function createBrowserReactNodeTextResource(resources, value) {
+  return createReactNodeResource(resources, {
+    node: reactNodeTextValue(value),
   });
 }
 
-export function createBrowserReactHtmlElementResource(resources, createElement, hooks, tag, key, props, handlers, children) {
+export function createBrowserReactNodeElementResource(resources, createElement, hooks, tag, key, props, handlers, children) {
   if (typeof createElement !== "function") {
-    throw new Error("createBrowserReactHtmlElementResource requires a React.createElement-compatible function");
+    throw new Error("createBrowserReactNodeElementResource requires a React.createElement-compatible function");
   }
   const { callLeanEventCallback } = requireReactHostHooks(hooks);
-  return createReactHtmlElementResource(resources, tag, key, props, handlers, children, (fields, childEntries) => {
-    const { props: reactProps, callbacks } = reactPropsFromHtml(resources, fields, callLeanEventCallback, hooks);
+  return createReactNodeElementResource(resources, tag, key, props, handlers, children, (fields, childEntries) => {
+    const { props: reactProps, callbacks } = reactPropsFromNode(resources, fields, callLeanEventCallback, hooks);
     return {
       node: createElement(fields.tag, reactProps, ...childEntries.map((child) => child.value.node)),
       callbacks,
@@ -165,23 +165,23 @@ export function createBrowserReactHtmlElementResource(resources, createElement, 
   });
 }
 
-export function createVirtualReactHtmlTextResource(resources, value) {
-  return createReactHtmlResource(resources, {
-    node: { kind: "text", value: reactHtmlTextValue(value) },
+export function createVirtualReactNodeTextResource(resources, value) {
+  return createReactNodeResource(resources, {
+    node: { kind: "text", value: reactNodeTextValue(value) },
   });
 }
 
-export function createVirtualReactHtmlElementResource(resources, hooks, tag, key, props, handlers, children) {
+export function createVirtualReactNodeElementResource(resources, hooks, tag, key, props, handlers, children) {
   const { callLeanEventCallback } = requireReactHostHooks(hooks);
-  return createReactHtmlElementResource(resources, tag, key, props, handlers, children, (fields, childEntries) => {
+  return createReactNodeElementResource(resources, tag, key, props, handlers, children, (fields, childEntries) => {
     const { handlers: virtualHandlers, callbacks } =
-      virtualReactHandlersFromHtml(resources, fields, callLeanEventCallback, hooks);
+      virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, hooks);
     return {
       node: {
         kind: "element",
         tag: fields.tag,
         key: fields.key,
-        props: virtualReactPropsFromHtml(fields),
+        props: virtualReactPropsFromNode(fields),
         handlers: virtualHandlers,
         children: childEntries.map((child) => child.value.node),
       },
@@ -190,20 +190,20 @@ export function createVirtualReactHtmlElementResource(resources, hooks, tag, key
   });
 }
 
-export function createReactHtmlElementResource(resources, tag, key, props, handlers, children, createNode) {
-  const childEntries = resolveReactHtmlChildren(resources, children);
-  const stats = reactHtmlSubtreeStats(childEntries);
+export function createReactNodeElementResource(resources, tag, key, props, handlers, children, createNode) {
+  const childEntries = resolveReactNodeChildren(resources, children);
+  const stats = reactNodeSubtreeStats(childEntries);
   const fields = {
-    tag: reactHtmlName(tag, "element tag"),
-    key: reactHtmlKey(key),
-    props: reactHtmlArray(props, "props"),
-    handlers: reactHtmlArray(handlers, "handlers"),
+    tag: reactNodeName(tag, "element tag"),
+    key: reactNodeKey(key),
+    props: reactNodeArray(props, "props"),
+    handlers: reactNodeArray(handlers, "handlers"),
   };
   let callbacks = [];
   try {
     const created = createNode(fields, childEntries);
     callbacks = created.callbacks;
-    return createReactHtmlResource(resources, {
+    return createReactNodeResource(resources, {
       node: created.node,
       childEntries,
       callbacks,
@@ -215,10 +215,10 @@ export function createReactHtmlElementResource(resources, tag, key, props, handl
   }
 }
 
-export function createReactHtmlResource(resources, { node, childEntries = [], callbacks = [], nodeCount = 1, maxDepth = 0 }) {
+export function createReactNodeResource(resources, { node, childEntries = [], callbacks = [], nodeCount = 1, maxDepth = 0 }) {
   const children = childEntries.map((child) => child.value);
   const value = {
-    kind: "ReactHtml",
+    kind: "ReactNode",
     node,
     children,
     callbacks,
@@ -227,66 +227,66 @@ export function createReactHtmlResource(resources, { node, childEntries = [], ca
     refCount: 0,
     finalized: false,
     dispose() {
-      finalizeReactHtmlValue(resources, value);
+      finalizeReactNodeValue(resources, value);
       return undefined;
     },
   };
   for (const child of children) {
-    retainReactHtmlValue(child);
+    retainReactNodeValue(child);
   }
   resources.addDisposable(value);
   return value;
 }
 
-export function disposeReactHtml(resources, html) {
-  if (html === null || html === undefined) return;
-  if (isHostResource(html)) {
+export function disposeReactNode(resources, node) {
+  if (node === null || node === undefined) return;
+  if (isHostResource(node)) {
     if (typeof resources?.releaseResource !== "function") {
-      throw new Error("React Html disposal requires a host resource state");
+      throw new Error("React Node disposal requires a host resource state");
     }
-    const value = resolveReactHtmlResource(resources, html);
+    const value = resolveReactNodeResource(resources, node);
     value.dispose();
-    resources.releaseResource(html);
+    resources.releaseResource(node);
     return;
   }
-  if (typeof html.dispose === "function") {
-    html.dispose();
+  if (typeof node.dispose === "function") {
+    node.dispose();
   }
 }
 
-export function disposeUnownedReactHtml(resources, html) {
-  if (html === null || html === undefined || !isHostResource(html)) return;
-  const value = resolveReactHtmlResource(resources, html);
+export function disposeUnownedReactNode(resources, node) {
+  if (node === null || node === undefined || !isHostResource(node)) return;
+  const value = resolveReactNodeResource(resources, node);
   if (value.refCount === 0) {
-    disposeReactHtml(resources, html);
+    disposeReactNode(resources, node);
   }
 }
 
-export function resolveReactHtmlResource(resources, resource, label = "ReactHtml") {
+export function resolveReactNodeResource(resources, resource, label = "ReactNode") {
   const value = resources.resolveResource(resource, label);
-  if (value?.kind !== "ReactHtml") {
-    throw new Error("ReactHtml resource has invalid value");
+  if (value?.kind !== "ReactNode") {
+    throw new Error("ReactNode resource has invalid value");
   }
   return value;
 }
 
-export function retainReactHtmlValue(value) {
-  if (value?.kind !== "ReactHtml" || value.finalized) {
-    throw new Error("ReactHtml resource has invalid value");
+export function retainReactNodeValue(value) {
+  if (value?.kind !== "ReactNode" || value.finalized) {
+    throw new Error("ReactNode resource has invalid value");
   }
   value.refCount++;
 }
 
-export function releaseReactHtmlResource(resources, resource) {
+export function releaseReactNodeResource(resources, resource) {
   if (resource === null || resource === undefined) return;
-  releaseReactHtmlValue(resources, resolveReactHtmlResource(resources, resource));
+  releaseReactNodeValue(resources, resolveReactNodeResource(resources, resource));
 }
 
-export function queueReactHtmlRelease(resources, html, hooks = null) {
-  if (html === null || html === undefined) return;
-  const run = () => releaseReactHtmlResource(resources, html);
-  if (typeof hooks?.deferReactHtmlDispose === "function") {
-    hooks.deferReactHtmlDispose(run);
+export function queueReactNodeRelease(resources, node, hooks = null) {
+  if (node === null || node === undefined) return;
+  const run = () => releaseReactNodeResource(resources, node);
+  if (typeof hooks?.deferReactNodeDispose === "function") {
+    hooks.deferReactNodeDispose(run);
     return;
   }
   const queue =
@@ -296,30 +296,30 @@ export function queueReactHtmlRelease(resources, html, hooks = null) {
   queue(run);
 }
 
-export function flushReactHtmlDisposals(hooks) {
-  if (typeof hooks?.flushReactHtmlDisposals === "function") {
-    hooks.flushReactHtmlDisposals();
+export function flushReactNodeDisposals(hooks) {
+  if (typeof hooks?.flushReactNodeDisposals === "function") {
+    hooks.flushReactNodeDisposals();
   }
 }
 
-export function beginReactHtmlEventCallback(hooks) {
-  if (typeof hooks?.beginReactHtmlEventCallback === "function") {
-    hooks.beginReactHtmlEventCallback();
+export function beginReactNodeEventCallback(hooks) {
+  if (typeof hooks?.beginReactNodeEventCallback === "function") {
+    hooks.beginReactNodeEventCallback();
   }
 }
 
-export function endReactHtmlEventCallback(hooks) {
-  if (typeof hooks?.endReactHtmlEventCallback === "function") {
-    hooks.endReactHtmlEventCallback();
+export function endReactNodeEventCallback(hooks) {
+  if (typeof hooks?.endReactNodeEventCallback === "function") {
+    hooks.endReactNodeEventCallback();
   }
 }
 
-export function validateReactHtmlResourceLimits(html) {
-  if (html.maxDepth > REACT_HTML_MAX_DEPTH) {
-    throw new Error(`React Html exceeds maximum depth ${REACT_HTML_MAX_DEPTH}`);
+export function validateReactNodeResourceLimits(node) {
+  if (node.maxDepth > REACT_NODE_MAX_DEPTH) {
+    throw new Error(`React Node exceeds maximum depth ${REACT_NODE_MAX_DEPTH}`);
   }
-  if (html.nodeCount > REACT_HTML_MAX_NODES) {
-    throw new Error(`React Html exceeds maximum node count ${REACT_HTML_MAX_NODES}`);
+  if (node.nodeCount > REACT_NODE_MAX_NODES) {
+    throw new Error(`React Node exceeds maximum node count ${REACT_NODE_MAX_NODES}`);
   }
 }
 
@@ -330,24 +330,24 @@ export function virtualReactTextContent(node) {
   return "";
 }
 
-export function reactHtmlTextValue(value) {
+export function reactNodeTextValue(value) {
   if (typeof value !== "string") {
-    throw new Error("React Html text value must be a string");
+    throw new Error("React Node text value must be a string");
   }
   return value;
 }
 
-export function reactHtmlPropertyEntries(props) {
+export function reactNodePropertyEntries(props) {
   return props.map((prop) => {
-    const name = reactHtmlPropertyName(prop);
+    const name = reactNodePropertyName(prop);
     return [name, reactPropValue(prop?.value, name)];
   });
 }
 
-export function reactHtmlEventHandlerEntries(handlers) {
+export function reactNodeEventHandlerEntries(handlers) {
   return handlers.map((handler) => [
-    reactSafeObjectKey(reactHtmlNamedField(handler, "event handler"), "React Html event handler name"),
-    reactHtmlEventCallback(handler),
+    reactSafeObjectKey(reactNodeNamedField(handler, "event handler"), "React Node event handler name"),
+    reactNodeEventCallback(handler),
   ]);
 }
 
@@ -360,55 +360,55 @@ export function setReactObjectProperty(target, name, value) {
   });
 }
 
-function resolveRenderedReactHtml(resources, html) {
-  const nextHtml = resolveReactHtmlResource(resources, html);
-  validateRenderableReactHtml(nextHtml);
-  return nextHtml;
+function resolveRenderedReactNode(resources, node) {
+  const nextNode = resolveReactNodeResource(resources, node);
+  validateRenderableReactNode(nextNode);
+  return nextNode;
 }
 
-function validateRenderableReactHtml(nextHtml) {
-  if (nextHtml.finalized) {
-    throw new Error("ReactHtml resource has been disposed");
+function validateRenderableReactNode(nextNode) {
+  if (nextNode.finalized) {
+    throw new Error("ReactNode resource has been disposed");
   }
-  validateReactHtmlResourceLimits(nextHtml);
+  validateReactNodeResourceLimits(nextNode);
 }
 
-function resolveRenderedReactHtmlNode(resources, html) {
-  const nextHtml = resolveRenderedReactHtml(resources, html);
-  retainReactHtmlValue(nextHtml);
-  return nextHtml.node;
+function resolveRenderedReactNodeValue(resources, node) {
+  const nextNode = resolveRenderedReactNode(resources, node);
+  retainReactNodeValue(nextNode);
+  return nextNode.node;
 }
 
-function releaseReactHtmlValue(resources, value) {
-  if (value?.kind !== "ReactHtml" || value.finalized) return;
+function releaseReactNodeValue(resources, value) {
+  if (value?.kind !== "ReactNode" || value.finalized) return;
   value.refCount--;
   if (value.refCount > 0) {
     return;
   }
-  finalizeReactHtmlValue(resources, value);
+  finalizeReactNodeValue(resources, value);
 }
 
-function finalizeReactHtmlValue(resources, value) {
-  if (value?.kind !== "ReactHtml" || value.finalized) return;
+function finalizeReactNodeValue(resources, value) {
+  if (value?.kind !== "ReactNode" || value.finalized) return;
   value.finalized = true;
   value.refCount = 0;
   releaseReactCallbacks(value.callbacks);
   value.callbacks.length = 0;
   for (const child of value.children) {
-    releaseReactHtmlValue(resources, child);
+    releaseReactNodeValue(resources, child);
   }
   value.children.length = 0;
   resources.removeDisposable(value);
 }
 
-function resolveReactHtmlChildren(resources, children) {
-  return reactHtmlArray(children, "children").map((resource, index) => ({
+function resolveReactNodeChildren(resources, children) {
+  return reactNodeArray(children, "children").map((resource, index) => ({
     resource,
-    value: resolveReactHtmlResource(resources, resource, `React Html child[${index}]`),
+    value: resolveReactNodeResource(resources, resource, `React Node child[${index}]`),
   }));
 }
 
-function reactHtmlSubtreeStats(childEntries) {
+function reactNodeSubtreeStats(childEntries) {
   let nodeCount = 1;
   let maxDepth = 0;
   for (const child of childEntries) {
@@ -422,13 +422,13 @@ function createReactComponentResource(
     resources,
     renderCallback,
     hookRuntime,
-    renderHtml,
+    renderNode,
     scheduleRender = null,
-    disposePreviousHtml = queueReactHtmlRelease) {
+    disposePreviousNode = queueReactNodeRelease) {
   requireReactComponentRenderCallback(renderCallback);
   requireReactHookRuntime(hookRuntime);
   const componentState = hookRuntime.createComponentState(scheduleRender);
-  let currentHtml = null;
+  let currentNode = null;
   let disposed = false;
   const component = {
     Component() {
@@ -439,15 +439,15 @@ function createReactComponentResource(
         throw new Error("React component has been disposed");
       }
       return hookRuntime.withComponentRender(componentState, () => {
-        let html = null;
+        let node = null;
         try {
-          html = renderCallback(undefined);
-          const next = renderHtml(html);
-          disposePreviousHtml(currentHtml);
-          currentHtml = html;
+          node = renderCallback(undefined);
+          const next = renderNode(node);
+          disposePreviousNode(currentNode);
+          currentNode = node;
           return next;
         } catch (error) {
-          disposeReactHtml(resources, html);
+          disposeReactNode(resources, node);
           throw error;
         }
       });
@@ -455,8 +455,8 @@ function createReactComponentResource(
     dispose() {
       if (disposed) return;
       disposed = true;
-      releaseReactHtmlResource(resources, currentHtml);
-      currentHtml = null;
+      releaseReactNodeResource(resources, currentNode);
+      currentNode = null;
       hookRuntime.disposeComponent(componentState);
       renderCallback.release();
     },
@@ -470,96 +470,96 @@ function disposeReactComponent(component) {
   }
 }
 
-function reactPropsFromHtml(state, fields, callLeanEventCallback, hooks) {
+function reactPropsFromNode(state, fields, callLeanEventCallback, hooks) {
   const props = {};
   const callbacks = [];
   if (fields.key !== null && fields.key !== undefined) {
     props.key = fields.key;
   }
-  for (const [name, value] of reactHtmlPropertyEntries(fields.props)) {
+  for (const [name, value] of reactNodePropertyEntries(fields.props)) {
     setReactObjectProperty(props, name, value);
   }
-  for (const [name, callback] of reactHtmlEventHandlerEntries(fields.handlers)) {
+  for (const [name, callback] of reactNodeEventHandlerEntries(fields.handlers)) {
     callbacks.push(callback);
     setReactObjectProperty(props, name, (event) => {
-      beginReactHtmlEventCallback(hooks);
+      beginReactNodeEventCallback(hooks);
       try {
         return callLeanEventCallback(state, event, callback);
       } finally {
-        endReactHtmlEventCallback(hooks);
-        flushReactHtmlDisposals(hooks);
+        endReactNodeEventCallback(hooks);
+        flushReactNodeDisposals(hooks);
       }
     });
   }
   return { props, callbacks };
 }
 
-function virtualReactPropsFromHtml(fields) {
+function virtualReactPropsFromNode(fields) {
   const props = {};
-  for (const [name, value] of reactHtmlPropertyEntries(fields.props)) {
+  for (const [name, value] of reactNodePropertyEntries(fields.props)) {
     setReactObjectProperty(props, name, value);
   }
   return props;
 }
 
-function virtualReactHandlersFromHtml(resources, fields, callLeanEventCallback, hooks) {
+function virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, hooks) {
   const handlers = {};
   const callbacks = [];
-  for (const [name, callback] of reactHtmlEventHandlerEntries(fields.handlers)) {
+  for (const [name, callback] of reactNodeEventHandlerEntries(fields.handlers)) {
     callbacks.push(callback);
     setReactObjectProperty(handlers, name, (event = {}) => {
-      beginReactHtmlEventCallback(hooks);
+      beginReactNodeEventCallback(hooks);
       try {
         return callLeanEventCallback(resources, event, callback);
       } finally {
-        endReactHtmlEventCallback(hooks);
-        flushReactHtmlDisposals(hooks);
+        endReactNodeEventCallback(hooks);
+        flushReactNodeDisposals(hooks);
       }
     });
   }
   return { handlers, callbacks };
 }
 
-function reactHtmlKey(key) {
+function reactNodeKey(key) {
   if (key !== null && key !== undefined && typeof key !== "string") {
-    throw new Error("React Html element key must be a string or null");
+    throw new Error("React Node element key must be a string or null");
   }
   return key;
 }
 
-function reactHtmlArray(value, label) {
+function reactNodeArray(value, label) {
   if (!Array.isArray(value)) {
-    throw new Error(`React Html ${label} must be an array`);
+    throw new Error(`React Node ${label} must be an array`);
   }
   return value;
 }
 
-function reactHtmlPropertyName(prop) {
-  const name = reactHtmlNamedField(prop, "property");
+function reactNodePropertyName(prop) {
+  const name = reactNodeNamedField(prop, "property");
   if (name === "data-") {
-    throw new Error("React Html data-* property name must include a suffix");
+    throw new Error("React Node data-* property name must include a suffix");
   }
-  return reactSafeObjectKey(name, "React Html property name");
+  return reactSafeObjectKey(name, "React Node property name");
 }
 
-function reactHtmlNamedField(value, label) {
+function reactNodeNamedField(value, label) {
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`React Html ${label} must be an object`);
+    throw new Error(`React Node ${label} must be an object`);
   }
-  return reactHtmlName(value.name, `${label} name`);
+  return reactNodeName(value.name, `${label} name`);
 }
 
-function reactHtmlName(value, label) {
+function reactNodeName(value, label) {
   if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`React Html ${label} must be a non-empty string`);
+    throw new Error(`React Node ${label} must be a non-empty string`);
   }
   return value;
 }
 
-function reactHtmlEventCallback(handler) {
+function reactNodeEventCallback(handler) {
   const callback = handler?.callback;
   if (typeof callback !== "function" || typeof callback.release !== "function") {
-    throw new Error("React Html event handler callback must be a releasable function");
+    throw new Error("React Node event handler callback must be a releasable function");
   }
   return callback;
 }
@@ -723,11 +723,11 @@ function requireReactHookRuntime(hookRuntime) {
 
 export function requireReactHostHooks(hooks) {
   if (hooks === null || typeof hooks !== "object") {
-    throw new Error("React Html renderer requires host resource hooks");
+    throw new Error("React Node renderer requires host resource hooks");
   }
   for (const name of ["addDisposable", "removeDisposable", "callLeanEventCallback", "once"]) {
     if (typeof hooks[name] !== "function") {
-      throw new Error(`React Html renderer hook ${name} must be a function`);
+      throw new Error(`React Node renderer hook ${name} must be a function`);
     }
   }
   return hooks;

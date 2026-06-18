@@ -100,7 +100,7 @@ assert.throws(
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.throws(
   () => reactRuntime.call("ReactCounter.renderTooDeep", "#react-too-deep"),
-  /React Html exceeds maximum depth 128/,
+  /React Node exceeds maximum depth 128/,
 );
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 
@@ -109,9 +109,9 @@ ensureVirtualElementState(malformedReactDocumentState, "#react-malformed");
 const malformedReactHost = createVirtualDocumentHostBindings(malformedReactDocumentState);
 const malformedReactContainer = malformedReactHost["browser.document.querySelector"]("#react-malformed");
 const malformedReactRoot = malformedReactHost["react.root.create"](malformedReactContainer);
-const renderMalformedReactHtml = (html) => {
+const renderMalformedReactNode = (node) => {
   let released = false;
-  const render = Object.assign(() => html, {
+  const render = Object.assign(() => node, {
     release: () => {
       released = true;
       return true;
@@ -142,16 +142,16 @@ const renderMalformedReactHtml = (html) => {
   assert.equal(called, false);
   assert.equal(released, true);
 }
-const reactHtmlText = (value) => malformedReactHost["react.html.text"](value);
-const reactHtmlElement = ({
+const reactNodeText = (value) => malformedReactHost["react.node.text"](value);
+const reactNodeElement = ({
   tag = "div",
   key = null,
   props = [],
   handlers = [],
   children = [],
-} = {}) => malformedReactHost["react.html.element"](tag, key, props, handlers, children);
-const renderReactHtmlElement = (fields) => renderMalformedReactHtml(reactHtmlElement(fields));
-renderReactHtmlElement({
+} = {}) => malformedReactHost["react.node.createElement"](tag, key, props, handlers, children);
+const renderReactNodeElement = (fields) => renderMalformedReactNode(reactNodeElement(fields));
+renderReactNodeElement({
   props: [
     { name: "tabIndex", value: { kind: "int", value: "4" } },
     { name: "data-ratio", value: { kind: "float", value: 1.5 } },
@@ -164,156 +164,156 @@ assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactR
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.className, "alpha beta");
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.style.marginTop, "1px");
 assert.throws(
-  () => reactHtmlText(1),
-  /React Html text value must be a string/,
+  () => reactNodeText(1),
+  /React Node text value must be a string/,
 );
 assert.throws(
-  () => malformedReactHost["react.html.element"]("div", null, [], [], "children"),
-  /React Html children must be an array/,
+  () => malformedReactHost["react.node.createElement"]("div", null, [], [], "children"),
+  /React Node children must be an array/,
 );
 assert.throws(
-  () => renderReactHtmlElement({ children: [{}] }),
-  /React Html child\[0\] resource is not live/,
+  () => renderReactNodeElement({ children: [{}] }),
+  /React Node child\[0\] resource is not live/,
 );
 assert.throws(
-  () => renderReactHtmlElement({ tag: "" }),
-  /React Html element tag must be a non-empty string/,
+  () => renderReactNodeElement({ tag: "" }),
+  /React Node element tag must be a non-empty string/,
 );
 assert.throws(
-  () => renderReactHtmlElement({ key: 7 }),
-  /React Html element key must be a string or null/,
+  () => renderReactNodeElement({ key: 7 }),
+  /React Node element key must be a string or null/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: 1, value: { kind: "string", value: "bad" } }],
   }),
-  /React Html property name must be a non-empty string/,
+  /React Node property name must be a non-empty string/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "data-", value: { kind: "string", value: "bad" } }],
   }),
-  /React Html data-\* property name must include a suffix/,
+  /React Node data-\* property name must include a suffix/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "__proto__", value: { kind: "string", value: "bad" } }],
   }),
-  /React Html property name is not supported/,
+  /React Node property name is not supported/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "title", value: { kind: "string", value: false } }],
   }),
   /React PropValue\.string value must be a string/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "hidden", value: { kind: "bool", value: "false" } }],
   }),
   /React PropValue\.bool value must be a boolean/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "tabIndex", value: { kind: "int", value: "7.5" } }],
   }),
   /React PropValue\.int value must be a safe integer/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "tabIndex", value: { kind: "int", value: "9007199254740992" } }],
   }),
   /React PropValue\.int value must be a safe integer/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "value", value: { kind: "float", value: "1.5" } }],
   }),
   /React PropValue\.float value must be a finite number/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "title", value: { kind: "style", value: [] } }],
   }),
   /React PropValue\.style is only supported for the style prop/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: "margin-top: 1px" } }],
   }),
   /React PropValue\.style value must be an array/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: ["marginTop"] } }],
   }),
   /React PropValue\.style\[0\] must be an object/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: [{ name: "", value: "1px" }] } }],
   }),
   /React PropValue\.style\[0\]\.name must be a non-empty string/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: [{ name: "__proto__", value: "1px" }] } }],
   }),
   /React PropValue\.style\[0\]\.name is not supported/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: [{ name: "marginTop", value: 1 }] } }],
   }),
   /React PropValue\.style\[0\]\.value must be a string/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "title", value: { kind: "classList", value: [] } }],
   }),
   /React PropValue\.classList is only supported for the className prop/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "className", value: { kind: "classList", value: "alpha beta" } }],
   }),
   /React PropValue\.classList value must be an array/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "className", value: { kind: "classList", value: ["ok", ""] } }],
   }),
   /React PropValue\.classList\[1\] must be a non-empty token without whitespace/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "className", value: { kind: "classList", value: ["ok", "bad token"] } }],
   }),
   /React PropValue\.classList\[1\] must be a non-empty token without whitespace/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "data-x", value: { kind: "number", value: 1 } }],
   }),
   /React PropValue must be string, bool, int, float, style, or classList/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     handlers: [{ name: 1, callback: Object.assign(() => undefined, { release: () => undefined }) }],
   }),
-  /React Html event handler name must be a non-empty string/,
+  /React Node event handler name must be a non-empty string/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     handlers: [{ name: "__proto__", callback: Object.assign(() => undefined, { release: () => undefined }) }],
   }),
-  /React Html event handler name is not supported/,
+  /React Node event handler name is not supported/,
 );
 assert.throws(
-  () => renderReactHtmlElement({
+  () => renderReactNodeElement({
     handlers: [{ name: "onClick" }],
   }),
-  /React Html event handler callback must be a releasable function/,
+  /React Node event handler callback must be a releasable function/,
 );
 
 assert.equal(reactRuntime.call("ReactCounter.mount", "#react-dispose"), true);

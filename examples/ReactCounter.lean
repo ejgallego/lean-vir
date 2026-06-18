@@ -19,8 +19,8 @@ def counter : Component Unit :=
     let initial ← JsValue.ofNat 0
     let count ← Hooks.useState initial
     let countValue ← JsValue.toNat count.value
-    let text ← Html.text (label countValue)
-    Html.buttonWith
+    let text ← Node.text (label countValue)
+    Node.buttonWith
       #[Property.id "react-counter-button"]
       #[EventHandler.onClick do
         let next ← (JsValue.ofNat (countValue + 1)).run
@@ -29,8 +29,8 @@ def counter : Component Unit :=
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
   Root.render root do
-    let text ← Html.text (label value)
-    Html.buttonWith
+    let text ← Node.text (label value)
+    Node.buttonWith
       #[Property.id "react-counter-button"]
       #[EventHandler.onClick (renderInto root (value + 1))]
       #[text]
@@ -41,17 +41,17 @@ def mount (selector : String) : DomM Bool :=
 def mountDefault : DomM Bool :=
   mount "#react-counter-root"
 
-def staticTree : ReactM (Lean.Vir.Js Html) := do
-  let text ← Html.text "react:static"
-  Html.spanWith #[Property.id "react-static-label"] #[] #[text]
+def staticTree : ReactM (Lean.Vir.Js Node) := do
+  let text ← Node.text "react:static"
+  Node.spanWith #[Property.id "react-static-label"] #[] #[text]
 
 def renderStatic (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => do
     Root.render root staticTree
 
-def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Html) := do
-  let text ← Html.text ("item:" ++ toString index)
-  Html.spanWith
+def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Node) := do
+  let text ← Node.text ("item:" ++ toString index)
+  Node.spanWith
     #[
       Property.className "react-bench-text",
       Property.data "index" (toString index)
@@ -61,20 +61,20 @@ def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Html) := do
 
 partial def benchTextChildrenAux
     (index remaining : Nat)
-    (acc : Array (Lean.Vir.Js Html)) :
-    ReactM (Array (Lean.Vir.Js Html)) := do
+    (acc : Array (Lean.Vir.Js Node)) :
+    ReactM (Array (Lean.Vir.Js Node)) := do
   match remaining with
   | 0 => pure acc
   | n + 1 => do
       let span ← benchTextSpan index
       benchTextChildrenAux (index + 1) n (acc.push span)
 
-def benchTextChildren (count : Nat) : ReactM (Array (Lean.Vir.Js Html)) :=
+def benchTextChildren (count : Nat) : ReactM (Array (Lean.Vir.Js Node)) :=
   benchTextChildrenAux 0 count #[]
 
-def benchTextTree (count : Nat) : ReactM (Lean.Vir.Js Html) := do
+def benchTextTree (count : Nat) : ReactM (Lean.Vir.Js Node) := do
   let children ← benchTextChildren count
-  Html.divWith
+  Node.divWith
     #[Property.id "react-bench-text-tree", Property.className "react-bench-tree"]
     #[]
     children
@@ -94,9 +94,9 @@ def renderWideTextLoop (selector : String) (width count : Nat) : DomM Nat := do
       Root.unmount root
       pure rendered
 
-def benchCallbackButton (root : Lean.Vir.Js Root) (index : Nat) : ReactM (Lean.Vir.Js Html) := do
-  let text ← Html.text ("callback:" ++ toString index)
-  Html.buttonWith
+def benchCallbackButton (root : Lean.Vir.Js Root) (index : Nat) : ReactM (Lean.Vir.Js Node) := do
+  let text ← Node.text ("callback:" ++ toString index)
+  Node.buttonWith
     #[
       Property.className "react-bench-callback",
       Property.data "index" (toString index)
@@ -108,20 +108,20 @@ def benchCallbackButton (root : Lean.Vir.Js Root) (index : Nat) : ReactM (Lean.V
 partial def benchCallbackChildrenAux
     (root : Lean.Vir.Js Root)
     (index remaining : Nat)
-    (acc : Array (Lean.Vir.Js Html)) :
-    ReactM (Array (Lean.Vir.Js Html)) := do
+    (acc : Array (Lean.Vir.Js Node)) :
+    ReactM (Array (Lean.Vir.Js Node)) := do
   match remaining with
   | 0 => pure acc
   | n + 1 => do
       let button ← benchCallbackButton root index
       benchCallbackChildrenAux root (index + 1) n (acc.push button)
 
-def benchCallbackChildren (root : Lean.Vir.Js Root) (count : Nat) : ReactM (Array (Lean.Vir.Js Html)) :=
+def benchCallbackChildren (root : Lean.Vir.Js Root) (count : Nat) : ReactM (Array (Lean.Vir.Js Node)) :=
   benchCallbackChildrenAux root 0 count #[]
 
-def benchCallbackTree (root : Lean.Vir.Js Root) (count : Nat) : ReactM (Lean.Vir.Js Html) := do
+def benchCallbackTree (root : Lean.Vir.Js Root) (count : Nat) : ReactM (Lean.Vir.Js Node) := do
   let children ← benchCallbackChildren root count
-  Html.divWith
+  Node.divWith
     #[Property.id "react-bench-callback-tree", Property.className "react-bench-tree"]
     #[]
     children
@@ -161,12 +161,12 @@ def renderAfterUnmount (selector : String) : DomM Bool :=
     Root.unmount root
     renderInto root 0
 
-def nestedDivs (depth : Nat) : ReactM (Lean.Vir.Js Html) := do
+def nestedDivs (depth : Nat) : ReactM (Lean.Vir.Js Node) := do
   match depth with
-  | 0 => Html.text "deep"
+  | 0 => Node.text "deep"
   | n + 1 => do
       let child ← nestedDivs n
-      Html.div #[child]
+      Node.div #[child]
 
 def renderTooDeep (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => do
