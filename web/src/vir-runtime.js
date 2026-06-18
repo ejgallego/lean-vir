@@ -36,6 +36,12 @@ const textDecoder = new TextDecoder();
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 const virCallbackStates = new WeakMap();
 const DIRECT_CALL_UNAVAILABLE = Symbol("direct-call-unavailable");
+const PRIMITIVE_LANE = Object.freeze({
+  UNIT: 0,
+  U32: 1,
+  F64: 2,
+  STRING: 3,
+});
 
 export {
   roundTripInterfaceTypeDescriptor,
@@ -506,86 +512,95 @@ export class VirRuntime {
     const resultType = entry.result;
     const argTag = argType?.wireTag;
     const resultTag = resultType?.wireTag;
-
-    if (argTag === WIRE.UNIT && resultTag === WIRE.UNIT) {
-      if (typeof this.exports.vir_call_resolved_unit_unit !== "function") {
-        return DIRECT_CALL_UNAVAILABLE;
+    const argLane = primitiveLaneForTag(argTag);
+    const resultLane = primitiveLaneForTag(resultTag);
+    if (argLane === null || resultLane === null || resultTag !== argTag) {
+      return DIRECT_CALL_UNAVAILABLE;
+    }
+    if (typeof this.exports.vir_call_resolved_primitive !== "function") {
+      return DIRECT_CALL_UNAVAILABLE;
+    }
+    const callSlot = this.resolveCallSlot(entry, cache);
+    const label = `${entry.entry} argument ${entry.args[0].name}`;
+    const finish = () => {
+      if (this.exports.vir_call_resolved_primitive(callSlot, argLane, resultLane) === 0) {
+        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
       }
+      return this.readPrimitiveResult(resultLane, resultTag);
+    };
+
+    if (argLane === PRIMITIVE_LANE.UNIT) {
       if (args[0] !== undefined && args[0] !== null) {
-        throw new Error(`${entry.entry} argument ${entry.args[0].name} must be undefined or null`);
+        throw new Error(`${label} must be undefined or null`);
       }
-      const callSlot = this.resolveCallSlot(entry, cache);
-      if (this.exports.vir_call_resolved_unit_unit(callSlot) === 0) {
-        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
-      }
-      return undefined;
+      return finish();
     }
 
-    if (argTag === WIRE.BOOL && resultTag === WIRE.BOOL) {
-      if (typeof this.exports.vir_call_resolved_bool_bool !== "function") {
+    if (argLane === PRIMITIVE_LANE.U32) {
+      if (typeof this.exports.vir_call_primitive_set_u32 !== "function") {
         return DIRECT_CALL_UNAVAILABLE;
       }
-      if (typeof args[0] !== "boolean") {
-        throw new Error(`${entry.entry} argument ${entry.args[0].name} must be a boolean`);
-      }
-      const callSlot = this.resolveCallSlot(entry, cache);
-      if (this.exports.vir_call_resolved_bool_bool(callSlot, args[0] ? 1 : 0) === 0) {
-        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
-      }
-      return this.exports.vir_call_direct_u32_result() !== 0;
+      this.exports.vir_call_primitive_set_u32(normalizeDirectU32(args[0], argTag, label));
+      return finish();
     }
 
-    if (isDirectUnsignedTag(argTag) && resultTag === argTag) {
+    if (argLane === PRIMITIVE_LANE.F64) {
+      if (typeof this.exports.vir_call_primitive_set_f64 !== "function") {
+        return DIRECT_CALL_UNAVAILABLE;
+      }
+      this.exports.vir_call_primitive_set_f64(normalizeFloat(args[0], label));
+      return finish();
+    }
+
+    if (argLane === PRIMITIVE_LANE.STRING) {
       if (
-        typeof this.exports.vir_call_resolved_u32_u32 !== "function" ||
-        typeof this.exports.vir_call_direct_u32_result !== "function") {
-        return DIRECT_CALL_UNAVAILABLE;
-      }
-      const value = normalizeDirectUnsigned(args[0], argTag, `${entry.entry} argument ${entry.args[0].name}`);
-      const callSlot = this.resolveCallSlot(entry, cache);
-      if (this.exports.vir_call_resolved_u32_u32(callSlot, value) === 0) {
-        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
-      }
-      return this.exports.vir_call_direct_u32_result();
-    }
-
-    if (argTag === WIRE.STRING && resultTag === WIRE.STRING) {
-      if (typeof this.exports.vir_call_resolved_string_string !== "function") {
+        typeof this.exports.vir_call_primitive_set_string !== "function" ||
+        typeof this.exports.vir_call_primitive_string_result !== "function") {
         return DIRECT_CALL_UNAVAILABLE;
       }
       if (typeof args[0] !== "string") {
-        throw new Error(`${entry.entry} argument ${entry.args[0].name} must be a string`);
+        throw new Error(`${label} must be a string`);
       }
       const bytes = textEncoder.encode(args[0]);
       const ptr = this.allocBytes(bytes);
       try {
-        const callSlot = this.resolveCallSlot(entry, cache);
-        const resultPtr = this.exports.vir_call_resolved_string_string(callSlot, ptr, bytes.byteLength);
-        if (resultPtr === 0) {
+        if (this.exports.vir_call_primitive_set_string(ptr, bytes.byteLength) === 0) {
           throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
         }
-        return this.readWasmString(resultPtr, this.exports.vir_call_result_size());
+        return finish();
       } finally {
         this.freeBytes(ptr);
       }
     }
 
-    if (isDirectFloatTag(argTag) && resultTag === argTag) {
-      if (
-        typeof this.exports.vir_call_resolved_f64_f64 !== "function" ||
-        typeof this.exports.vir_call_direct_f64_result !== "function") {
-        return DIRECT_CALL_UNAVAILABLE;
-      }
-      const value = normalizeFloat(args[0], `${entry.entry} argument ${entry.args[0].name}`);
-      const callSlot = this.resolveCallSlot(entry, cache);
-      if (this.exports.vir_call_resolved_f64_f64(callSlot, value) === 0) {
-        throw new Error(this.lastCallError() || `direct call failed: ${entry.entry}`);
-      }
-      const result = this.exports.vir_call_direct_f64_result();
-      return argTag === WIRE.FLOAT32 ? Math.fround(result) : result;
-    }
-
     return DIRECT_CALL_UNAVAILABLE;
+  }
+
+  readPrimitiveResult(lane, tag) {
+    if (lane === PRIMITIVE_LANE.UNIT) {
+      return undefined;
+    }
+    if (lane === PRIMITIVE_LANE.U32) {
+      if (typeof this.exports.vir_call_primitive_u32_result !== "function") {
+        throw new Error("vir_call_primitive_u32_result export is missing");
+      }
+      const value = this.exports.vir_call_primitive_u32_result();
+      return tag === WIRE.BOOL ? value !== 0 : value;
+    }
+    if (lane === PRIMITIVE_LANE.F64) {
+      if (typeof this.exports.vir_call_primitive_f64_result !== "function") {
+        throw new Error("vir_call_primitive_f64_result export is missing");
+      }
+      const value = this.exports.vir_call_primitive_f64_result();
+      return tag === WIRE.FLOAT32 ? Math.fround(value) : value;
+    }
+    if (lane === PRIMITIVE_LANE.STRING) {
+      return this.readWasmString(
+        this.exports.vir_call_primitive_string_result(),
+        this.exports.vir_call_result_size(),
+      );
+    }
+    throw new Error(`unsupported primitive result lane ${lane}`);
   }
 
   callCacheFor(entry) {
@@ -804,15 +819,23 @@ function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
 }
 
-function isDirectUnsignedTag(tag) {
-  return tag === WIRE.UINT8 || tag === WIRE.UINT16 || tag === WIRE.UINT32;
+function primitiveLaneForTag(tag) {
+  if (tag === WIRE.UNIT) return PRIMITIVE_LANE.UNIT;
+  if (tag === WIRE.BOOL || tag === WIRE.UINT8 || tag === WIRE.UINT16 || tag === WIRE.UINT32) {
+    return PRIMITIVE_LANE.U32;
+  }
+  if (tag === WIRE.FLOAT || tag === WIRE.FLOAT32) return PRIMITIVE_LANE.F64;
+  if (tag === WIRE.STRING) return PRIMITIVE_LANE.STRING;
+  return null;
 }
 
-function isDirectFloatTag(tag) {
-  return tag === WIRE.FLOAT || tag === WIRE.FLOAT32;
-}
-
-function normalizeDirectUnsigned(value, tag, label) {
+function normalizeDirectU32(value, tag, label) {
+  if (tag === WIRE.BOOL) {
+    if (typeof value !== "boolean") {
+      throw new Error(`${label} must be a boolean`);
+    }
+    return value ? 1 : 0;
+  }
   if (tag === WIRE.UINT8) {
     if (!Number.isInteger(value) || value < 0 || value > 0xff) {
       throw new Error(`${label} must be an integer in 0..255`);
