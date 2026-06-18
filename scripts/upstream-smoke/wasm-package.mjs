@@ -25,6 +25,18 @@ const requiredFunctionExports = [
   "vir_package_interface_manifest_size",
   "vir_package_decl_count",
   "vir_upstream_target_pointer_bytes",
+  "vir_obj_bool",
+  "vir_obj_get_bool",
+  "vir_obj_uint32",
+  "vir_obj_get_uint32",
+  "vir_obj_string",
+  "vir_obj_string_data",
+  "vir_obj_string_size",
+  "vir_obj_byte_array",
+  "vir_obj_byte_array_data",
+  "vir_obj_byte_array_size",
+  "vir_obj_inc",
+  "vir_obj_dec",
 ];
 
 const invalidMagicPackage = Uint8Array.from([

@@ -30,6 +30,8 @@ top-level `README.md` remains the user-facing quickstart.
   unsupported surface.
 - [PERFORMANCE.md](PERFORMANCE.md): benchmark commands, artifact-cache
   behavior, and before/after comparisons.
+- [OBJECT_ABI.md](OBJECT_ABI.md): direct Lean object construction,
+  inspection, ownership, and codec-retirement roadmap.
 
 ## Roadmaps
 
@@ -40,3 +42,5 @@ top-level `README.md` remains the user-facing quickstart.
   infoview and ProofWidgets alignment.
 - [REACT_WASM_BINDINGS.md](REACT_WASM_BINDINGS.md): `externref`, JSPI, and
   related Wasm interop plan.
+- [OBJECT_ABI.md](OBJECT_ABI.md): staged plan for JS-driven Lean object
+  lowering/lifting.

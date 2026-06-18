@@ -196,6 +196,21 @@ comparison for future conversion work. They are not package exports, not
 general native lookup support, and not a replacement for the manifest-driven
 runtime API.
 
+The shim also exposes the first experimental direct Lean object ABI helpers:
+
+- `vir_obj_bool` / `vir_obj_get_bool`
+- `vir_obj_uint32` / `vir_obj_get_uint32`
+- `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
+- `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
+- `vir_obj_inc` / `vir_obj_dec`
+
+These helpers are not yet used for package calls. They are the first step
+toward moving value lowering/lifting out of the C++ descriptor codec and into
+the JavaScript runtime. Constructors return owned Lean object references.
+String and byte-array data pointers are borrowed and must be read before the
+object is released. See [OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and
+ownership rules.
+
 The current explicit native externs cover the small fixture/demo surface for
 `Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
 `Float`, `String`, and the helper externs reached by `Lean.Expr`/`Lean.Level`

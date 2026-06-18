@@ -259,6 +259,24 @@ exports=(
   -Wl,--export=vir_package_interface_manifest
   -Wl,--export=vir_package_interface_manifest_size
   -Wl,--export=vir_package_decl_count
+  -Wl,--export=vir_native_bool_flip
+  -Wl,--export=vir_native_nat_bump
+  -Wl,--export=vir_native_string_roundtrip
+  -Wl,--export=vir_native_uint32_bump
+  -Wl,--export=vir_native_float_scale
+  -Wl,--export=vir_native_conversion_result_size
+  -Wl,--export=vir_obj_bool
+  -Wl,--export=vir_obj_get_bool
+  -Wl,--export=vir_obj_uint32
+  -Wl,--export=vir_obj_get_uint32
+  -Wl,--export=vir_obj_string
+  -Wl,--export=vir_obj_string_data
+  -Wl,--export=vir_obj_string_size
+  -Wl,--export=vir_obj_byte_array
+  -Wl,--export=vir_obj_byte_array_data
+  -Wl,--export=vir_obj_byte_array_size
+  -Wl,--export=vir_obj_inc
+  -Wl,--export=vir_obj_dec
 )
 
 link_stamp="$obj_dir/link-flags.stamp"

@@ -31,6 +31,47 @@ const defaultPackagePath = publicArtifactPath(defaultPackageFile);
 const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
 const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
 const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
+function callNativeText(runtime, fn, input) {
+  const bytes = new TextEncoder().encode(input);
+  const ptr = runtime.allocBytes(bytes);
+  try {
+    const resultPtr = fn(ptr, bytes.byteLength);
+    const resultLen = runtime.exports.vir_native_conversion_result_size();
+    return runtime.readWasmString(resultPtr, resultLen);
+  } finally {
+    runtime.freeBytes(ptr);
+  }
+}
+
+function withObjectString(runtime, input, body) {
+  const bytes = new TextEncoder().encode(input);
+  const ptr = runtime.allocBytes(bytes);
+  let obj = 0;
+  try {
+    obj = runtime.exports.vir_obj_string(ptr, bytes.byteLength);
+    return body(obj);
+  } finally {
+    runtime.freeBytes(ptr);
+    if (obj !== 0) {
+      runtime.exports.vir_obj_dec(obj);
+    }
+  }
+}
+
+function withObjectByteArray(runtime, bytes, body) {
+  const view = Uint8Array.from(bytes);
+  const ptr = runtime.allocBytes(view);
+  let obj = 0;
+  try {
+    obj = runtime.exports.vir_obj_byte_array(ptr, view.byteLength);
+    return body(obj);
+  } finally {
+    runtime.freeBytes(ptr);
+    if (obj !== 0) {
+      runtime.exports.vir_obj_dec(obj);
+    }
+  }
+}
 const natType = { type: "Nat", wireTag: WIRE.NAT };
 const boolType = { type: "Bool", wireTag: WIRE.BOOL };
 const unitType = { type: "Unit", wireTag: WIRE.UNIT };
@@ -186,6 +227,29 @@ assert.equal(inspectedInfo.manifest.hostImports.length, 0);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");
+assert.equal(runtime.exports.vir_native_bool_flip(1), 0);
+assert.equal(callNativeText(runtime, runtime.exports.vir_native_nat_bump, "41"), "42");
+assert.equal(callNativeText(runtime, runtime.exports.vir_native_string_roundtrip, "ok"), "ok");
+assert.equal(runtime.exports.vir_native_uint32_bump(41), 42);
+assert.equal(runtime.exports.vir_native_float_scale(1.5), 6);
+const boolObject = runtime.exports.vir_obj_bool(1);
+assert.equal(runtime.exports.vir_obj_get_bool(boolObject), 1);
+runtime.exports.vir_obj_inc(boolObject);
+runtime.exports.vir_obj_dec(boolObject);
+runtime.exports.vir_obj_dec(boolObject);
+const uint32Object = runtime.exports.vir_obj_uint32(0x7f00aa55);
+assert.equal(runtime.exports.vir_obj_get_uint32(uint32Object), 0x7f00aa55);
+runtime.exports.vir_obj_dec(uint32Object);
+withObjectString(runtime, "Aé∀Z", (obj) => {
+  const len = runtime.exports.vir_obj_string_size(obj);
+  const data = runtime.exports.vir_obj_string_data(obj);
+  assert.equal(runtime.readWasmString(data, len), "Aé∀Z");
+});
+withObjectByteArray(runtime, [0, 65, 255, 17], (obj) => {
+  const len = runtime.exports.vir_obj_byte_array_size(obj);
+  const data = runtime.exports.vir_obj_byte_array_data(obj);
+  assert.deepEqual([...runtime.readWasmBytes(data, len)], [0, 65, 255, 17]);
+});
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");

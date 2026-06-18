@@ -1,0 +1,107 @@
+# Direct Lean Object ABI
+
+This note records the direction for replacing the C++ byte value codec with
+JavaScript-driven construction and inspection of Lean runtime objects.
+
+The current manifest-driven call path remains the compatibility boundary. The
+object ABI is an internal experimental surface that lets the JavaScript runtime
+lower common JS values into Lean objects, call the interpreter with object
+arguments, and lift the returned Lean object back to JS without descriptor bytes
+on every call.
+
+## Shape
+
+```mermaid
+flowchart LR
+  JSValue["JS value"] --> Lower["JS lowering helpers"]
+  Lower --> LeanObj["owned Lean object"]
+  LeanObj --> Call["resolved interpreter call"]
+  Call --> ResultObj["owned Lean result"]
+  ResultObj --> Lift["JS lifting helpers"]
+  Lift --> JSResult["JS result"]
+  ResultObj --> Release["vir_obj_dec"]
+```
+
+The initial exported primitive surface is deliberately small:
+
+- `vir_obj_bool` / `vir_obj_get_bool`
+- `vir_obj_uint32` / `vir_obj_get_uint32`
+- `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
+- `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
+- `vir_obj_inc` / `vir_obj_dec`
+
+Strings and byte arrays return borrowed pointers into the Lean object. JavaScript
+must read the bytes while the object is still live. The pointer becomes invalid
+after `vir_obj_dec` releases the object or after the runtime is torn down.
+
+## Ownership
+
+The primitive constructors return an owned Lean object pointer. JavaScript owns
+that reference and must release it with `vir_obj_dec` unless a future call helper
+explicitly documents that it consumes ownership. `vir_obj_inc` can be used to
+retain an object across a helper call that consumes one reference.
+
+Immediate scalar objects are allowed. `vir_obj_inc` and `vir_obj_dec` are still
+the only public operations JS should use; Lean's runtime treats scalars as
+no-ops for refcounting.
+
+Object pointers are scoped to one wasm runtime instance. They must not survive:
+
+- `VirRuntime.dispose`
+- package reload
+- wasm instance teardown
+- a future interpreter reset that releases package state
+
+Longer-lived values should use an explicit root table. Closure and host-resource
+roots already follow that pattern; object roots should use the same discipline
+when we add them.
+
+## Call Path Target
+
+The target call path is:
+
+```mermaid
+sequenceDiagram
+  participant JS as JavaScript runtime
+  participant ABI as vir_obj_* helpers
+  participant IR as Lean IR interpreter
+
+  JS->>ABI: lower args to owned objects
+  JS->>IR: vir_call_resolved_objects(slot, argc, argv)
+  IR-->>JS: owned result object
+  JS->>ABI: lift result object
+  JS->>ABI: release args/result
+```
+
+The existing compact byte payload path remains the fallback while this lands.
+It handles structured values, resources, callbacks, host imports, and older
+packages. The direct scalar helpers are still useful for the hottest exact
+scalar signatures because they avoid object allocation entirely.
+
+## Phases
+
+1. Base object primitives: Bool, UInt32, String, and ByteArray construction and
+   inspection, plus ownership tests.
+2. Object call helpers: resolved calls that accept already-lowered owned object
+   arguments and return an owned object result.
+3. Bulk builders: arrays, strings, and byte arrays with fewer intermediate
+   copies for common browser data.
+4. Generated layout support: structures and inductives lowered by package
+   metadata instead of ad hoc descriptors.
+5. Host import integration: rooted object handles for Lean-to-JS calls where JS
+   wants to inspect or retain Lean objects directly.
+6. Codec retirement: remove the C++ descriptor/value codec once JS-driven
+   lowering covers the manifest surface we need.
+
+## Risks
+
+- Refcount mistakes are correctness bugs. Tests should cover every helper that
+  transfers or consumes ownership.
+- Lean's boxed and unboxed representations are runtime details. The exported
+  helpers are the boundary; JavaScript should not infer layouts from pointer
+  values.
+- String conversion still copies between JS UTF-16 and Lean UTF-8. This ABI can
+  avoid descriptor overhead, but it does not make Lean strings share JS storage.
+- Descriptor-free object calls must trust package metadata. The package version
+  needs to stay tied to the generated signature/layout tables used by the JS
+  lowering code.
