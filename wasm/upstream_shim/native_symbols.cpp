@@ -880,10 +880,12 @@ extern "C" lean_object * lean_string_dec_lt___boxed(lean_object * a, lean_object
 }
 
 extern "C" lean_object * lean_string_compare___boxed(lean_object * a, lean_object * b) {
-    uint8_t result = lean_string_compare(a, b);
+    lean_object * result = lean_string_eq(a, b)
+        ? lean_box(1)
+        : lean_box(lean_string_lt(a, b) ? 0 : 2);
     lean_dec(a);
     lean_dec(b);
-    return lean_box(result);
+    return result;
 }
 
 extern "C" lean_object * lean_string_memcmp___boxed(

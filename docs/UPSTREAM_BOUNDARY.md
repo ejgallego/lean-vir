@@ -161,7 +161,20 @@ caches decoded export and host-import signatures by package generation and
 slot, so compact signature bytes are decoded once per loaded package rather
 than on every call.
 
-`vir_call_resolved_objects(slot, argv, argc)` is the first direct object-call
+The runtime currently has three call lanes:
+
+- The compact byte lane is the complete fallback. JavaScript encodes ordinary
+  manifest values with `runtime/vir-value-codec.js`, and the shim decodes them
+  with the package-owned signature table in `interface_codec.cpp`.
+- The primitive lane is a scalar fast path for exact pure one-argument
+  signatures. It bypasses the byte payload after slot resolution, but still
+  validates the package-owned signature before running the interpreter.
+- The object ABI lane accepts owned Lean object pointers produced by `vir_obj_*`
+  helpers. It is an internal runtime path for JS-driven lowering/lifting of
+  ordinary Lean values, not a public representation for JavaScript-owned host
+  objects.
+
+`vir_call_resolved_objects(slot, argv, argc)` is the first object ABI call
 helper. It accepts an array of owned `lean_object *` arguments, requires a boxed
 package declaration, consumes those arguments once called, and returns an owned
 Lean object result on success. The helper keeps higher-level JS lowering out of
@@ -194,7 +207,7 @@ The shim still keeps `vir_call(name, len, payload, payloadLen, resultTag)` as a
 named entry point for diagnostics and benchmark comparisons, but the JavaScript
 runtime requires the resolved-call exports.
 
-The shim also exposes the first experimental direct Lean object ABI helpers:
+The shim also exposes the first experimental Lean object ABI helpers:
 
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`

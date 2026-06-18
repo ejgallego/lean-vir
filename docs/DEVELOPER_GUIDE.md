@@ -12,7 +12,7 @@ objects while a call is running.
 | Lean API | `Vir/*.lean`, `examples/*.lean` | Public combinators, effect types, examples, and `@[vir_js]` declarations. |
 | Package generation | `Vir/GeneratePackage.lean` | Export closure selection, manifest type descriptors, host import metadata, and native extern registration. |
 | WASI boundary | `wasm/upstream_shim/` | `vir_call`, host-import trampolines, package decoding, native externs, closure roots, and WASI/runtime stubs. |
-| JavaScript runtime | `web/src/vir-runtime.js`, `web/src/value-codec.js` | Runtime construction, manifest validation, call payload encoding, result decoding, host import dispatch, and callback wrappers. |
+| JavaScript runtime | `web/src/vir-runtime.js`, `web/src/runtime/vir-value-codec.js` | Runtime construction, manifest validation, call payload encoding, result decoding, host import dispatch, and callback wrappers. |
 | Host resources | `web/src/host-resource.js`, `web/src/host/vir-host-resources.js` | JavaScript-owned object handles, externref roots, disposable host objects, DOM/timer/frame/React resource cleanup. |
 | React host | `web/src/react/`, `web/src/vir-react-host-bindings.js` | React element construction, root lifetime, function-component bridge, hooks, and callback retention. |
 | Browser demos | `web/src/`, `examples/`, `fixtures/` | Local demo entry points, smoke fixtures, and generated `.irpkg` inputs. |
@@ -24,7 +24,7 @@ For package/interface work, read:
 
 1. `docs/INTERFACE_PIPELINE.md`
 2. `Vir/GeneratePackage.lean`
-3. `web/src/value-codec.js`
+3. `web/src/runtime/vir-value-codec.js`
 4. `wasm/upstream_shim/interface_codec.cpp`
 
 For browser or React host work, read:
@@ -61,7 +61,7 @@ sequenceDiagram
     autonumber
     participant JS as JavaScript caller
     participant RT as VirRuntime
-    participant Codec as value-codec.js
+    participant Codec as vir-value-codec.js
     participant Wasm as vir_call_resolved
     participant Cpp as interface_codec.cpp
     participant IR as upstream ir_interpreter.cpp

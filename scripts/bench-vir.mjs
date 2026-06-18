@@ -280,9 +280,9 @@ function printConversionRow(name, codec, wasm, direct = null) {
   console.log(`  wasm call:  ${formatMs(wasm.medianMs)} total, ${formatMs(wasmPerCall)} / call`);
   if (direct !== null) {
     const directPerCall = direct.medianMs / direct.iterations;
-    console.log(`  direct api: ${formatMs(direct.medianMs)} total, ${formatMs(directPerCall)} / call`);
+    console.log(`  primitive api: ${formatMs(direct.medianMs)} total, ${formatMs(directPerCall)} / call`);
   }
-  const directChecksum = direct === null ? "" : ` direct=${direct.checksum}`;
+  const directChecksum = direct === null ? "" : ` primitive=${direct.checksum}`;
   console.log(`  checksums: codec=${codec.checksum} wasm=${wasm.checksum}${directChecksum}`);
 }
 
