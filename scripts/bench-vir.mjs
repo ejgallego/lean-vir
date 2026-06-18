@@ -32,6 +32,7 @@ import {
   encodeCallPayload,
   encodeResolvedCallPayload,
 } from "../web/src/runtime/vir-value-codec.js";
+import { WIRE } from "../web/src/runtime/wire-tags.js";
 import {
   createVirRuntime as createNodeVirRuntime,
   createVirtualDocumentState,
@@ -53,7 +54,10 @@ const reactRootIterations = 300;
 const scalarRecordIterations = 5000;
 const nestedRecordIterations = 3000;
 const recursiveValueIterations = 2000;
-const stringRoundtripIterations = 5000;
+const baseScalarIterations = 10000;
+const baseBlobIterations = 3000;
+const baseArrayIterations = 3000;
+const baseCodecIterations = 20000;
 const codecScalarRecordIterations = 20000;
 const codecNestedRecordIterations = 20000;
 const codecRecursiveValueIterations = 20000;
@@ -106,8 +110,17 @@ const recursiveJsonInput = {
     { fst: "ok", snd: { kind: "bool", value: false } },
   ],
 };
-const stringRoundtripInput = "lean-ir-wasm-Aé∀Z";
+const baseStringInput = "Lean IR boundary Aé∀Z ".repeat(8);
+const baseByteArrayInput = Uint8Array.from(Array.from({ length: 128 }, (_, index) => (index * 17) & 0xff));
+const baseArrayNatInput = Array.from({ length: 64 }, (_, index) => index + 1);
+const baseArrayStringInput = Array.from({ length: 32 }, (_, index) => `s${index}`);
 const textEncoder = new TextEncoder();
+const PRIMITIVE_LANE = Object.freeze({
+  UNIT: 0,
+  U32: 1,
+  F64: 2,
+  STRING: 3,
+});
 const args = parseArgs(process.argv.slice(2));
 
 function parseArgs(argv) {
@@ -262,6 +275,20 @@ function printJsRow(name, sample) {
   console.log(`  checksum:  ${sample.checksum}`);
 }
 
+function printConversionRow(name, codec, wasm, direct = null) {
+  const codecPerCall = codec.medianMs / codec.iterations;
+  const wasmPerCall = wasm.medianMs / wasm.iterations;
+  console.log(`${name}`);
+  console.log(`  js encode:  ${formatMs(codec.medianMs)} total, ${formatMs(codecPerCall)} / call`);
+  console.log(`  wasm call:  ${formatMs(wasm.medianMs)} total, ${formatMs(wasmPerCall)} / call`);
+  if (direct !== null) {
+    const directPerCall = direct.medianMs / direct.iterations;
+    console.log(`  direct api: ${formatMs(direct.medianMs)} total, ${formatMs(directPerCall)} / call`);
+  }
+  const directChecksum = direct === null ? "" : ` direct=${direct.checksum}`;
+  console.log(`  checksums: codec=${codec.checksum} wasm=${wasm.checksum}${directChecksum}`);
+}
+
 function benchmarkDispatchReportRow(name, title, named, resolved) {
   return {
     name,
@@ -288,6 +315,16 @@ function benchmarkJsReportRow(name, title, js) {
     name,
     title,
     js: benchmarkSampleReport(js),
+  };
+}
+
+function benchmarkConversionReportRow(name, title, codec, wasm, direct = null) {
+  return {
+    name,
+    title,
+    codec: benchmarkSampleReport(codec),
+    wasm: benchmarkSampleReport(wasm),
+    ...(direct === null ? {} : { direct: benchmarkSampleReport(direct) }),
   };
 }
 
@@ -356,6 +393,107 @@ function benchEncodeCallPayload(label, iterations, entry, args) {
   });
 }
 
+function benchBoundaryConversionCase(testCase) {
+  const entry = manifestEntry(testCase.entry);
+  const codec = benchEncodeCallPayload(`codec-${testCase.name}`, testCase.codecIterations ?? baseCodecIterations, entry, testCase.args);
+  const wasm = benchWasmRepeated(testCase.name, testCase.iterations, () => {
+    let acc = 0;
+    for (let i = 0; i < testCase.iterations; i++) {
+      acc += testCase.checksum(runtime.call(testCase.entry, ...testCase.args));
+    }
+    return acc;
+  });
+  const direct = typeof testCase.direct === "function" ? testCase.direct(testCase, entry) : null;
+  return { ...testCase, codec, wasm, direct };
+}
+
+function benchDirectPrimitiveCall(testCase, entry, lane) {
+  const callSlot = resolveRawCallSlot(entry, textEncoder.encode(entry.entry));
+  const stringBytes = lane === PRIMITIVE_LANE.STRING ? textEncoder.encode(testCase.args[0]) : null;
+  const stringPtr = stringBytes === null ? 0 : runtime.allocBytes(stringBytes);
+  try {
+    return benchWasmRepeated(`direct-${testCase.name}`, testCase.iterations, () => {
+      let acc = 0;
+      for (let i = 0; i < testCase.iterations; i++) {
+        setPrimitiveArg(lane, testCase.args[0], stringPtr, stringBytes?.byteLength ?? 0);
+        if (runtime.exports.vir_call_resolved_primitive(callSlot, lane, lane) === 0) {
+          throw new Error(runtime.lastCallError() || `direct primitive call failed: ${entry.entry}`);
+        }
+        acc += testCase.checksum(readPrimitiveResult(lane, entry.result.wireTag));
+      }
+      return acc;
+    });
+  } finally {
+    if (stringPtr !== 0) {
+      runtime.freeBytes(stringPtr);
+    }
+  }
+}
+
+function setPrimitiveArg(lane, value, stringPtr, stringLen) {
+  if (lane === PRIMITIVE_LANE.UNIT) {
+    return;
+  }
+  if (lane === PRIMITIVE_LANE.U32) {
+    runtime.exports.vir_call_primitive_set_u32(typeof value === "boolean" ? (value ? 1 : 0) : value);
+    return;
+  }
+  if (lane === PRIMITIVE_LANE.F64) {
+    runtime.exports.vir_call_primitive_set_f64(value);
+    return;
+  }
+  if (lane === PRIMITIVE_LANE.STRING) {
+    if (runtime.exports.vir_call_primitive_set_string(stringPtr, stringLen) === 0) {
+      throw new Error(runtime.lastCallError() || "direct primitive string argument failed");
+    }
+    return;
+  }
+  throw new Error(`unsupported primitive lane ${lane}`);
+}
+
+function readPrimitiveResult(lane, resultTag) {
+  if (lane === PRIMITIVE_LANE.UNIT) {
+    return undefined;
+  }
+  if (lane === PRIMITIVE_LANE.U32) {
+    const value = runtime.exports.vir_call_primitive_u32_result();
+    return resultTag === WIRE.BOOL ? value !== 0 : value;
+  }
+  if (lane === PRIMITIVE_LANE.F64) {
+    const value = runtime.exports.vir_call_primitive_f64_result();
+    return resultTag === WIRE.FLOAT32 ? Math.fround(value) : value;
+  }
+  if (lane === PRIMITIVE_LANE.STRING) {
+    return runtime.readWasmString(
+      runtime.exports.vir_call_primitive_string_result(),
+      runtime.exports.vir_call_result_size(),
+    );
+  }
+  throw new Error(`unsupported primitive lane ${lane}`);
+}
+
+function checksumNumber(value) {
+  return Number(value);
+}
+
+function checksumBool(value) {
+  return value === true ? 1 : 0;
+}
+
+function checksumString(value) {
+  if (typeof value !== "string") {
+    throw new Error(`expected benchmark string result, got ${typeof value}`);
+  }
+  return value.length;
+}
+
+function checksumByteArray(value) {
+  if (!(value instanceof Uint8Array)) {
+    throw new Error("expected benchmark ByteArray result to decode as Uint8Array");
+  }
+  return value.length + (value[0] ?? 0) + (value[value.length - 1] ?? 0);
+}
+
 function resolveRawCallSlot(entry, nameBytes) {
   const namePtr = runtime.allocBytes(nameBytes);
   try {
@@ -422,8 +560,139 @@ const dispatchEntry = manifestEntry("Vir.Fixtures.Basic.branchAndSub");
 const scalarRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileStatsScore");
 const nestedRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore");
 const recursiveValueEntry = manifestEntry("Vir.Fixtures.RecursiveTypes.jsonRootScore");
+const baseConversionCases = [
+  {
+    name: "base-unit",
+    title: `Unit -> Unit x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUnitRoundtrip",
+    args: [undefined],
+    iterations: baseScalarIterations,
+    checksum: (value) => value === undefined ? 1 : 0,
+    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.UNIT),
+  },
+  {
+    name: "base-bool",
+    title: `Bool -> Bool x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseBoolFlip",
+    args: [true],
+    iterations: baseScalarIterations,
+    checksum: checksumBool,
+    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.U32),
+  },
+  {
+    name: "base-nat",
+    title: `Nat -> Nat x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseNatBump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-int",
+    title: `Int -> Int x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseIntNegate",
+    args: [-41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-string",
+    title: `String -> String (${baseStringInput.length} code units) x ${baseBlobIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip",
+    args: [baseStringInput],
+    iterations: baseBlobIterations,
+    checksum: checksumString,
+    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.STRING),
+  },
+  {
+    name: "base-uint8",
+    title: `UInt8 -> UInt8 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUInt8Bump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.U32),
+  },
+  {
+    name: "base-uint16",
+    title: `UInt16 -> UInt16 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUInt16Bump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.U32),
+  },
+  {
+    name: "base-uint32",
+    title: `UInt32 -> UInt32 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.uint32Bump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.U32),
+  },
+  {
+    name: "base-uint64",
+    title: `UInt64 -> UInt64 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.uint64Bump",
+    args: ["41"],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-usize",
+    title: `USize -> USize x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUSizeBump",
+    args: ["41"],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-float",
+    title: `Float -> Float x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.floatScale",
+    args: [1.5],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.F64),
+  },
+  {
+    name: "base-float32",
+    title: `Float32 -> Float32 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.float32Roundtrip",
+    args: [1.25],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.F64),
+  },
+  {
+    name: "base-byte-array",
+    title: `ByteArray -> ByteArray (${baseByteArrayInput.length} bytes) x ${baseBlobIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip",
+    args: [baseByteArrayInput],
+    iterations: baseBlobIterations,
+    checksum: checksumByteArray,
+  },
+  {
+    name: "base-array-nat",
+    title: `Array Nat -> Nat (${baseArrayNatInput.length} items) x ${baseArrayIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseArrayNatSum",
+    args: [baseArrayNatInput],
+    iterations: baseArrayIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-array-string",
+    title: `Array String -> Nat (${baseArrayStringInput.length} items) x ${baseArrayIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength",
+    args: [baseArrayStringInput],
+    iterations: baseArrayIterations,
+    checksum: checksumNumber,
+  },
+];
 
 const dispatch = benchTopLevelDispatch(dispatchEntry);
+const baseConversionBenchmarks = baseConversionCases.map(benchBoundaryConversionCase);
 
 const wasmFib = benchWasmRepeated("fib", fibIterations, () => {
   let acc = 0;
@@ -488,16 +757,12 @@ const wasmRecursiveValue = benchWasmRepeated("recursive-value", recursiveValueIt
   return acc;
 });
 
-const wasmStringRoundtrip = benchWasmRepeated("string-roundtrip", stringRoundtripIterations, () => {
+const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
   let acc = 0;
-  for (let i = 0; i < stringRoundtripIterations; i++) {
-    acc += runtime.call("Vir.Fixtures.InterfaceShapes.stringRoundtrip", stringRoundtripInput).length;
+  for (let i = 0; i < hostScalarIterations; i++) {
+    acc += hostRuntime.call("HostInterop.titleHandshake", "bench").length;
   }
   return acc;
-});
-
-const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
-  return Number(hostRuntime.call("HostInterop.titleHandshakeLoop", hostScalarIterations));
 });
 
 const wasmCallback = benchWasmRepeated("callback-roundtrip", callbackIterations, () => {
@@ -505,29 +770,35 @@ const wasmCallback = benchWasmRepeated("callback-roundtrip", callbackIterations,
 });
 
 const wasmDomResource = benchWasmRepeated("dom-listener-resource", domResourceIterations, () => {
-  return Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEventLoop", "#bench-dom", domResourceIterations));
+  let acc = 0;
+  for (let i = 0; i < domResourceIterations; i++) {
+    acc += Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEvent", "#bench-dom"));
+  }
+  return acc;
 });
 
 const wasmReactRoot = benchWasmRepeated("react-root-lifecycle", reactRootIterations, () => {
-  return Number(hostRuntime.call("ReactCounter.mountAndUnmountLoop", "#bench-react", reactRootIterations));
+  let acc = 0;
+  for (let i = 0; i < reactRootIterations; i++) {
+    acc += hostRuntime.call("ReactCounter.mountAndUnmount", "#bench-react") ? 1 : 0;
+  }
+  return acc;
 });
 
-const wasmReactTextRender = benchWasmRepeated("react-html-text-render", reactTextRenderIterations, () => {
-  return Number(hostRuntime.call(
-    "ReactCounter.renderWideTextLoop",
-    "#bench-react",
-    reactTextRenderWidth,
-    reactTextRenderIterations,
-  ));
+const wasmReactTextRender = benchWasmRepeated("react-node-text-render", reactTextRenderIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < reactTextRenderIterations; i++) {
+    acc += Number(hostRuntime.call("ReactCounter.renderWideTextLoop", "#bench-react", reactTextRenderWidth, 1));
+  }
+  return acc;
 });
 
-const wasmReactCallbackRender = benchWasmRepeated("react-html-callback-render", reactCallbackRenderIterations, () => {
-  return Number(hostRuntime.call(
-    "ReactCounter.renderCallbackTreeLoop",
-    "#bench-react",
-    reactCallbackRenderWidth,
-    reactCallbackRenderIterations,
-  ));
+const wasmReactCallbackRender = benchWasmRepeated("react-node-callback-render", reactCallbackRenderIterations, () => {
+  let acc = 0;
+  for (let i = 0; i < reactCallbackRenderIterations; i++) {
+    acc += Number(hostRuntime.call("ReactCounter.renderCallbackTreeLoop", "#bench-react", reactCallbackRenderWidth, 1));
+  }
+  return acc;
 });
 
 console.log("# Lean VIR benchmark");
@@ -545,6 +816,12 @@ printRow(`sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort
 console.log();
 console.log("Top-level value conversion paths");
 console.log();
+console.log("Base value conversion paths");
+console.log();
+for (const testCase of baseConversionBenchmarks) {
+  printConversionRow(testCase.title, testCase.codec, testCase.wasm, testCase.direct);
+  console.log();
+}
 printJsRow(`JS codec scalar record/enums encode x ${codecScalarRecordIterations}`, jsCodecScalarRecord);
 console.log();
 printJsRow(`JS codec nested record/list/option encode x ${codecNestedRecordIterations}`, jsCodecNestedRecord);
@@ -557,8 +834,6 @@ printWasmRow(`nested record/list/option x ${nestedRecordIterations}`, wasmNested
 console.log();
 printWasmRow(`recursive custom-inductive value x ${recursiveValueIterations}`, wasmRecursiveValue);
 console.log();
-printWasmRow(`string roundtrip x ${stringRoundtripIterations}`, wasmStringRoundtrip);
-console.log();
 console.log("Host/resource paths");
 console.log();
 printWasmRow(`host scalar title handshake x ${hostScalarIterations}`, wasmHostScalar);
@@ -569,7 +844,7 @@ printWasmRow(`DOM listener resource create/remove x ${domResourceIterations}`, w
 console.log();
 printWasmRow(`React root mount/render/unmount x ${reactRootIterations}`, wasmReactRoot);
 console.log();
-console.log("React Html conversion paths");
+console.log("React Node resource paths");
 console.log();
 printWasmRow(
   `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
@@ -591,6 +866,8 @@ if (args.jsonPath !== null) {
     ),
     benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib),
     benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
+    ...baseConversionBenchmarks.map((testCase) =>
+      benchmarkConversionReportRow(testCase.name, testCase.title, testCase.codec, testCase.wasm, testCase.direct)),
     benchmarkJsReportRow(
       "codec-scalar-record",
       `JS codec scalar record/enums encode x ${codecScalarRecordIterations}`,
@@ -622,11 +899,6 @@ if (args.jsonPath !== null) {
       wasmRecursiveValue,
     ),
     benchmarkReportRow(
-      "string-roundtrip",
-      `string roundtrip x ${stringRoundtripIterations}`,
-      wasmStringRoundtrip,
-    ),
-    benchmarkReportRow(
       "host-title",
       `host scalar title handshake x ${hostScalarIterations}`,
       wasmHostScalar,
@@ -647,12 +919,12 @@ if (args.jsonPath !== null) {
       wasmReactRoot,
     ),
     benchmarkReportRow(
-      "react-html-text-render",
+      "react-node-text-render",
       `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
       wasmReactTextRender,
     ),
     benchmarkReportRow(
-      "react-html-callback-render",
+      "react-node-callback-render",
       `React callback tree render ${reactCallbackRenderWidth} handlers x ${reactCallbackRenderIterations}`,
       wasmReactCallbackRender,
     ),

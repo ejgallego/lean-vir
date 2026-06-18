@@ -37,18 +37,6 @@ const PRIMITIVE_LANE = Object.freeze({
   STRING: 3,
 });
 
-function callNativeText(runtime, fn, input) {
-  const bytes = new TextEncoder().encode(input);
-  const ptr = runtime.allocBytes(bytes);
-  try {
-    const resultPtr = fn(ptr, bytes.byteLength);
-    const resultLen = runtime.exports.vir_native_conversion_result_size();
-    return runtime.readWasmString(resultPtr, resultLen);
-  } finally {
-    runtime.freeBytes(ptr);
-  }
-}
-
 function withObjectString(runtime, input, body) {
   const bytes = new TextEncoder().encode(input);
   const ptr = runtime.allocBytes(bytes);
@@ -321,11 +309,6 @@ assert.equal(inspectedInfo.manifest.hostImports.length, 0);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");
-assert.equal(runtime.exports.vir_native_bool_flip(1), 0);
-assert.equal(callNativeText(runtime, runtime.exports.vir_native_nat_bump, "41"), "42");
-assert.equal(callNativeText(runtime, runtime.exports.vir_native_string_roundtrip, "ok"), "ok");
-assert.equal(runtime.exports.vir_native_uint32_bump(41), 42);
-assert.equal(runtime.exports.vir_native_float_scale(1.5), 6);
 const boolObject = runtime.exports.vir_obj_bool(1);
 assert.equal(runtime.exports.vir_obj_get_bool(boolObject), 1);
 runtime.exports.vir_obj_inc(boolObject);
@@ -343,7 +326,7 @@ try {
   runtime.exports.vir_obj_dec(uint32CallResult);
 }
 assert.equal(
-  callDirectString(runtime, "Vir.Fixtures.InterfaceShapes.stringRoundtrip", "Aé∀Z"),
+  callDirectString(runtime, "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "Aé∀Z"),
   "Aé∀Z",
 );
 assertPrimitiveStringArgConsumed(runtime, "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip");
@@ -365,7 +348,7 @@ withObjectByteArray(runtime, [0, 65, 255, 17], (obj) => {
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
-assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.stringRoundtrip", "Aé∀Z"), "Aé∀Z");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "Aé∀Z"), "Aé∀Z");
 assert.equal(prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12), "[alpha,\n beta,\n gamma]");
 assert.equal(
   prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "fill", 28),
@@ -461,13 +444,23 @@ assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 5), {
     value: "5",
   },
 });
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUnitRoundtrip", undefined), undefined);
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseBoolFlip", true), false);
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", 41), "42");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -41), "41");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "ok"), "ok");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUInt8Bump", 41), 42);
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUInt16Bump", 41), 42);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseArrayNatSum", [4, 5, 6]), "15");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint32Bump", 41), 42);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint64Bump", "18446744073709551615"), "0");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUSizeBump", "41"), "42");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScale", 1.5), 6);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScore", 3.25), "4");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.float32Roundtrip", 1.25), 1.25);
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [65, 66, 67]), Uint8Array.from([65, 66, 67]));
 const floatScaleEntry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.floatScale");
 assert.equal(floatScaleEntry.args[0].type.wireTag, 10);
 assert.equal(floatScaleEntry.result.wireTag, 10);
