@@ -23,6 +23,7 @@ import {
   encodeHostCallResult,
   encodeResolvedCallPayload,
 } from "../../web/src/runtime/vir-value-codec.js";
+import { PRIMITIVE_LANE } from "../../web/src/runtime/primitive-lanes.js";
 import { WIRE } from "../../web/src/runtime/wire-tags.js";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
 
@@ -31,12 +32,6 @@ const defaultPackagePath = publicArtifactPath(defaultPackageFile);
 const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
 const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
 const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
-const PRIMITIVE_LANE = Object.freeze({
-  U32: 1,
-  F64: 2,
-  STRING: 3,
-});
-
 function makeObjectString(runtime, input) {
   const bytes = new TextEncoder().encode(input);
   const ptr = runtime.allocBytes(bytes);

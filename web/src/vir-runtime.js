@@ -12,6 +12,11 @@ import {
 } from "./runtime/vir-codec.js";
 import { WIRE } from "./runtime/wire-tags.js";
 import {
+  PRIMITIVE_LANE,
+  primitiveLaneForTag,
+  readPrimitiveResult,
+} from "./runtime/primitive-lanes.js";
+import {
   ExternrefResourceRoots,
   isHostResource,
 } from "./host-resource.js";
@@ -36,12 +41,6 @@ const textDecoder = new TextDecoder();
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 const virCallbackStates = new WeakMap();
 const DIRECT_CALL_UNAVAILABLE = Symbol("direct-call-unavailable");
-const PRIMITIVE_LANE = Object.freeze({
-  UNIT: 0,
-  U32: 1,
-  F64: 2,
-  STRING: 3,
-});
 
 export {
   roundTripInterfaceTypeDescriptor,
@@ -577,30 +576,7 @@ export class VirRuntime {
   }
 
   readPrimitiveResult(lane, tag) {
-    if (lane === PRIMITIVE_LANE.UNIT) {
-      return undefined;
-    }
-    if (lane === PRIMITIVE_LANE.U32) {
-      if (typeof this.exports.vir_call_primitive_u32_result !== "function") {
-        throw new Error("vir_call_primitive_u32_result export is missing");
-      }
-      const value = this.exports.vir_call_primitive_u32_result();
-      return tag === WIRE.BOOL ? value !== 0 : value;
-    }
-    if (lane === PRIMITIVE_LANE.F64) {
-      if (typeof this.exports.vir_call_primitive_f64_result !== "function") {
-        throw new Error("vir_call_primitive_f64_result export is missing");
-      }
-      const value = this.exports.vir_call_primitive_f64_result();
-      return tag === WIRE.FLOAT32 ? Math.fround(value) : value;
-    }
-    if (lane === PRIMITIVE_LANE.STRING) {
-      return this.readWasmString(
-        this.exports.vir_call_primitive_string_result(),
-        this.exports.vir_call_result_size(),
-      );
-    }
-    throw new Error(`unsupported primitive result lane ${lane}`);
+    return readPrimitiveResult(this, lane, tag);
   }
 
   callCacheFor(entry) {
@@ -817,16 +793,6 @@ function disposeHostBindings(bindings) {
 
 function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
-}
-
-function primitiveLaneForTag(tag) {
-  if (tag === WIRE.UNIT) return PRIMITIVE_LANE.UNIT;
-  if (tag === WIRE.BOOL || tag === WIRE.UINT8 || tag === WIRE.UINT16 || tag === WIRE.UINT32) {
-    return PRIMITIVE_LANE.U32;
-  }
-  if (tag === WIRE.FLOAT || tag === WIRE.FLOAT32) return PRIMITIVE_LANE.F64;
-  if (tag === WIRE.STRING) return PRIMITIVE_LANE.STRING;
-  return null;
 }
 
 function normalizeDirectU32(value, tag, label) {
