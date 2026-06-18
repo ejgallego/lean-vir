@@ -115,6 +115,7 @@ The boxed wrappers remain handwritten in `native_symbols.cpp`.
     X("String.Internal.contains", "lean_string_contains", lean_string_contains___boxed) \
     X("String.decEq", "lean_string_dec_eq", lean_string_dec_eq___boxed) \
     X("String.decidableLT", "lean_string_dec_lt", lean_string_dec_lt___boxed) \
+    X("String.compare", "lean_string_compare", lean_string_compare___boxed) \
     X("String.Slice.Pattern.Internal.memcmpStr", "lean_string_memcmp", lean_string_memcmp___boxed) \
     X("Substring.Raw.Internal.beq", "lean_substring_beq", lean_substring_beq___boxed) \
     X("Lean.Name.beq", "lean_name_eq", lean_name_eq___boxed) \

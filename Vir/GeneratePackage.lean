@@ -899,6 +899,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_string_dec_lt"
   },
   {
+    name := `String.compare,
+    params := #[param 1 true .object, param 2 true .object],
+    resultType := .tagged,
+    symbol := "lean_string_compare"
+  },
+  {
     name := `String.Slice.Pattern.Internal.memcmpStr,
     params := #[param 1 true .object, param 2 true .object, param 3 true .tobject, param 4 true .tobject, param 5 true .tobject, param 6 false .erased, param 7 false .erased],
     resultType := .uint8,
