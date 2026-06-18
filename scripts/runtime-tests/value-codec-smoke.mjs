@@ -31,6 +31,12 @@ const defaultPackagePath = publicArtifactPath(defaultPackageFile);
 const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
 const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
 const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
+const PRIMITIVE_LANE = Object.freeze({
+  U32: 1,
+  F64: 2,
+  STRING: 3,
+});
+
 function callNativeText(runtime, fn, input) {
   const bytes = new TextEncoder().encode(input);
   const ptr = runtime.allocBytes(bytes);
@@ -102,33 +108,61 @@ function callDirectString(runtime, name, input) {
   const bytes = new TextEncoder().encode(input);
   const ptr = runtime.allocBytes(bytes);
   try {
-    const resultPtr = runtime.exports.vir_call_resolved_string_string(
+    assert.equal(runtime.exports.vir_call_primitive_set_string(ptr, bytes.byteLength), 1);
+    const result = runtime.exports.vir_call_resolved_primitive(
       resolveEntrySlot(runtime, name),
-      ptr,
-      bytes.byteLength,
+      PRIMITIVE_LANE.STRING,
+      PRIMITIVE_LANE.STRING,
     );
     const error = runtime.lastCallError();
     if (error !== "") {
       throw new Error(error);
     }
+    assert.equal(result, 1);
     const resultLen = runtime.exports.vir_call_result_size();
-    return runtime.readWasmString(resultPtr, resultLen);
+    return runtime.readWasmString(runtime.exports.vir_call_primitive_string_result(), resultLen);
+  } finally {
+    runtime.freeBytes(ptr);
+  }
+}
+
+function assertPrimitiveStringArgConsumed(runtime, name) {
+  const bytes = new TextEncoder().encode("stale");
+  const ptr = runtime.allocBytes(bytes);
+  try {
+    assert.equal(runtime.exports.vir_call_primitive_set_string(ptr, bytes.byteLength), 1);
+    assert.equal(
+      runtime.exports.vir_call_resolved_primitive(0xffffffff, PRIMITIVE_LANE.STRING, PRIMITIVE_LANE.STRING),
+      0,
+    );
+    assert.match(runtime.lastCallError(), /call slot is not registered/);
+    assert.equal(
+      runtime.exports.vir_call_resolved_primitive(
+        resolveEntrySlot(runtime, name),
+        PRIMITIVE_LANE.STRING,
+        PRIMITIVE_LANE.STRING,
+      ),
+      0,
+    );
+    assert.match(runtime.lastCallError(), /string argument is not set/);
   } finally {
     runtime.freeBytes(ptr);
   }
 }
 
 function callDirectFloat(runtime, name, input) {
-  const result = runtime.exports.vir_call_resolved_f64_f64(
+  runtime.exports.vir_call_primitive_set_f64(input);
+  const result = runtime.exports.vir_call_resolved_primitive(
     resolveEntrySlot(runtime, name),
-    input,
+    PRIMITIVE_LANE.F64,
+    PRIMITIVE_LANE.F64,
   );
   const error = runtime.lastCallError();
   if (error !== "") {
     throw new Error(error);
   }
   assert.equal(result, 1);
-  return runtime.exports.vir_call_direct_f64_result();
+  return runtime.exports.vir_call_primitive_f64_result();
 }
 
 const natType = { type: "Nat", wireTag: WIRE.NAT };
@@ -311,6 +345,7 @@ assert.equal(
   callDirectString(runtime, "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "Aé∀Z"),
   "Aé∀Z",
 );
+assertPrimitiveStringArgConsumed(runtime, "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip");
 assert.equal(callDirectFloat(runtime, "Vir.Fixtures.InterfaceShapes.floatScale", 1.5), 6);
 assert.equal(
   Math.fround(callDirectFloat(runtime, "Vir.Fixtures.InterfaceShapes.float32Roundtrip", 1.25)),
