@@ -9,6 +9,27 @@ lower common JS values into Lean objects, call the interpreter with object
 arguments, and lift the returned Lean object back to JS without descriptor bytes
 on every call.
 
+## Boundary Policy
+
+There are two distinct lanes:
+
+- JavaScript-owned objects with identity, lifetime, mutability, or host API
+  behavior cross as `Lean.Vir.Js α` resources. The `α` parameter is a Lean-side
+  phantom marker while the value remains in JavaScript. Known DOM/React markers
+  such as `Lean.Vir.Browser.Element`, `Lean.Vir.Browser.Event`, and
+  `Lean.Vir.React.Root` must appear under `Lean.Vir.Js`; naked marker types are
+  rejected by package generation.
+- Plain Lean values cross as ordinary manifest value types. This includes
+  scalars, strings, byte arrays, arrays, options, structures, and custom
+  inductives over supported fields. They are copied/lowered/lifted values, not
+  JavaScript identity handles.
+
+The object ABI does not change the public Lean signature policy. It is a lower
+runtime implementation path for the plain-value lane: JavaScript may eventually
+construct Lean objects directly for common manifest value types instead of
+sending descriptor-guided byte payloads. `Lean.Vir.Js α` remains the explicit
+resource lane for host-owned objects.
+
 ## Shape
 
 ```mermaid
@@ -114,6 +135,7 @@ they avoid object allocation entirely.
 - Descriptor-free object calls must trust package metadata. The package version
   needs to stay tied to the generated signature/layout tables used by the JS
   lowering code.
-- The exact policy for when JS-facing bindings must use the object ABI instead
-  of shared scalar representations remains open. For now, the helper requires a
-  boxed package declaration and stays an internal runtime primitive.
+- JS-facing bindings should choose between ordinary value types and
+  `Lean.Vir.Js α` resources based on semantics, not on the current lower-level
+  transport. The object ABI is an internal optimization path for ordinary value
+  types; it is not the public representation for JavaScript-owned objects.

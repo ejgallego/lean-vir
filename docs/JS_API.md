@@ -178,7 +178,9 @@ parameterized instances, nullary inductive enums, non-indexed custom inductives
 with nullary or runtime-payload constructors, opaque host resources, and
 `Lean.Expr`. `Lean.Vir.Js α` is an opaque `Js` resource for JavaScript-owned
 objects; the `α` parameter is not decoded while the value remains in the JS
-object lane. Host imports may additionally receive Lean function values as
+object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
+and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
+boundary. Host imports may additionally receive Lean function values as
 callbacks, including inside the recursive `Lean.Vir.React.Html` custom
 inductive tree. Exported Lean entrypoints and host imports may be pure or use a
 recognized synchronous effect. Raw custom host imports can use `IO α`; DOM and

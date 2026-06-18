@@ -210,13 +210,15 @@ The shim also exposes the first experimental direct Lean object ABI helpers:
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
 - `vir_obj_inc` / `vir_obj_dec`
+- `vir_call_resolved_objects`
 
-These helpers are not yet used for package calls. They are the first step
-toward moving value lowering/lifting out of the C++ descriptor codec and into
-the JavaScript runtime. Constructors return owned Lean object references.
-String and byte-array data pointers are borrowed and must be read before the
-object is released. See [OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and
-ownership rules.
+These helpers are still internal runtime primitives, not public Lean signature
+forms. They are the first step toward moving value lowering/lifting out of the
+C++ descriptor codec and into the JavaScript runtime. Constructors return owned
+Lean object references; `vir_call_resolved_objects` consumes owned arguments and
+returns an owned result. String and byte-array data pointers are borrowed and
+must be read before the object is released. See [OBJECT_ABI.md](OBJECT_ABI.md)
+for the staged plan and ownership rules.
 
 The current explicit native externs cover the small fixture/demo surface for
 `Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
