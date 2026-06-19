@@ -12,8 +12,7 @@ repositories.
 
 The runtime still targets a portable core `wasm32-wasip1` artifact:
 
-- JavaScript calls Lean through the resolved `vir_call_resolved`
-  byte-payload export after resolving a package-local entry slot.
+- JavaScript calls Lean through the generic `vir_call` byte-payload export.
 - Lean calls JavaScript through package-scoped `@[vir_js]` host imports routed
   to `env.vir_js_call`.
 - Opaque browser and React resources cross the JS/Wasm boundary through

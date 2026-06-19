@@ -11,10 +11,12 @@ package lookup, and temporary runtime glue live here instead.
   Lean closure roots, and `lean_ir_find_env_decl` hooks.
 - `signature_cache.h` and `signature_cache.cpp`: decoded package-call and
   host-import signatures keyed by the current loaded package generation.
-- `object_abi.cpp`: owned `lean_object *` helpers used by runtime boundary
-  tests and object-call experiments.
-- `interface_codec.h` and `interface_codec.cpp`: package-signature-guided
-  value encoding, callback payloads, and host `externref` resource objects.
+- `object_abi.cpp`: owned `lean_object *` helpers used by the runtime object
+  call path and boundary tests.
+- `resource_abi.h` and `resource_abi.cpp`: shared external resource class for
+  `Lean.Vir.Js α` values.
+- `interface_codec.h` and `interface_codec.cpp`: package signature and
+  callback root descriptor encoding.
 - `native_symbols.cpp`: handwritten native extern wrappers, restricted symbol
   lookup, and symbol-stem support for declarations carried in `.irpkg` files.
 - `native_symbols_registry.inc`: generated registry of native extern names from

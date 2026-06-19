@@ -35,7 +35,7 @@ import { invalidManifestCases } from "./manifest-invalid-cases.mjs";
 const { wasmBytes, irPackageBytes, hostPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();
 const hostlessImports = createVirImports(new WebAssembly.Module(wasmBytes));
 assert.throws(
-  () => hostlessImports.env.vir_js_call(0, 0, 0),
+  () => hostlessImports.env.vir_js_call_objects(0, 0, 0),
   /without an attached host state/,
 );
 

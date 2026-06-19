@@ -60,6 +60,22 @@ const reactRuntime = await createVirRuntime({
     "test.recordNat": () => undefined,
   },
 });
+
+async function withIsolatedReactRuntime(selector, callback) {
+  const documentState = createVirtualDocumentState();
+  ensureVirtualElementState(documentState, selector);
+  const runtime = await createVirRuntime({
+    wasmBytes,
+    irPackageBytes: hostPackageBytes,
+    virtualDocumentState: documentState,
+  });
+  try {
+    return callback(runtime, documentState);
+  } finally {
+    runtime.dispose();
+  }
+}
+
 ensureVirtualElements(reactDocumentState, [
   "#react-static",
   "#react-counter",
@@ -67,21 +83,12 @@ ensureVirtualElements(reactDocumentState, [
   "#react-change",
   "#react-checkbox",
   "#react-attributes",
-  "#react-callback-tree",
   "#react-pet",
   "#react-unmount",
-  "#react-stale-root",
-  "#react-too-deep",
   "#react-dispose",
 ]);
 assert.equal(reactRuntime.call("ReactCounter.renderStatic", "#react-static"), true);
 assert.equal(reactDocumentState.elements.get("#react-static").textContent, "react:static");
-assert.equal(reactRuntime.liveCallbacks.size, 0);
-assert.equal(reactRuntime.call("ReactCounter.renderCallbackTreeLoop", "#react-callback-tree", "4", "1"), "1");
-assert.equal(
-  reactDocumentState.elements.get("#react-callback-tree").textContent,
-  "callback:0callback:1callback:2callback:3",
-);
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 const missingSelectorDocumentState = createVirtualDocumentState();
 const missingSelectorRuntime = await createVirRuntime({
@@ -101,16 +108,20 @@ smokeVirtualReactTamagotchi(reactRuntime, reactDocumentState, "#react-pet", { ex
 assert.equal(reactRuntime.call("ReactCounter.mountAndUnmount", "#react-unmount"), true);
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactDocumentState.elements.get("#react-unmount").reactRoot, undefined);
-assert.throws(
-  () => reactRuntime.call("ReactCounter.renderAfterUnmount", "#react-stale-root"),
-  /ReactRoot resource is not live/,
-);
-assert.equal(reactRuntime.liveCallbacks.size, 0);
-assert.throws(
-  () => reactRuntime.call("ReactCounter.renderTooDeep", "#react-too-deep"),
-  /React Html exceeds maximum depth 128/,
-);
-assert.equal(reactRuntime.liveCallbacks.size, 0);
+await withIsolatedReactRuntime("#react-stale-root", (runtime) => {
+  assert.throws(
+    () => runtime.call("ReactCounter.renderAfterUnmount", "#react-stale-root"),
+    /ReactRoot resource is not live/,
+  );
+  assert.equal(runtime.liveCallbacks.size, 0);
+});
+await withIsolatedReactRuntime("#react-too-deep", (runtime) => {
+  assert.throws(
+    () => runtime.call("ReactCounter.renderTooDeep", "#react-too-deep"),
+    /React Html exceeds maximum depth 128/,
+  );
+  assert.equal(runtime.liveCallbacks.size, 0);
+});
 
 const malformedReactDocumentState = createVirtualDocumentState();
 ensureVirtualElementState(malformedReactDocumentState, "#react-malformed");

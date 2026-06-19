@@ -55,8 +55,10 @@ not a fork of Lean. It is split by responsibility:
 
 - `shim.cpp` owns the package call surface, host import trampolines, closure
   roots, and `lean_ir_find_env_decl` hooks.
-- `interface_codec.cpp` owns the JavaScript interface wire codec shared by
-  resolved package calls, JavaScript host imports, and Lean callback calls.
+- `interface_codec.cpp` owns the compact type descriptor and callback
+  signature codec used by package metadata and closure root metadata.
+- `resource_abi.cpp` owns the shared external resource class used by
+  `Lean.Vir.Js α` values.
 - `native_symbols.cpp` owns the explicit native extern wrappers, generated
   native registry include, restricted `dlsym` lookup, native symbol stem
   lookup, and C++ exception stubs.
@@ -81,14 +83,14 @@ Together they supply:
   hooks, and the few environment helpers pulled in by the interpreter.
 - the generic package call interface used by the JavaScript runtime for
   manifest-supported functions. The runtime resolves each export once with
-  `vir_resolve_call` and then calls `vir_call_resolved` with the cached slot.
+  `vir_resolve_call` and then calls `vir_call_resolved_objects` with the cached
+  slot.
 - package-scoped JavaScript host import trampolines for declarations marked
-  with `@[vir_js "..."]`, routed through `env.vir_js_call` and
-  `env.vir_js_call_result_size`.
+  with `@[vir_js "..."]`, routed through `env.vir_js_call_objects`.
 - Lean closure roots for function-valued host-import arguments. The shim owns
-  `vir_closure_call` and `vir_closure_release`, and queues new roots to
-  JavaScript with `env.vir_closure_push`; JavaScript owns the host-side lifetime
-  policy for `VirCallback` objects.
+  `vir_obj_closure_root`, `vir_closure_call_objects`, and
+  `vir_closure_release`; JavaScript owns the host-side lifetime policy for
+  `VirCallback` objects.
 - name construction primitives needed by `src/util/name.cpp`.
 
 The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
@@ -147,28 +149,18 @@ The browser runtime does not send a dotted Lean entry name on every call. After
 loading an `.irpkg`, it resolves a manifest export once with
 `vir_resolve_call(name, len)`. The returned slot is package-local, 1-based, and
 uses `0` as the failure sentinel. Repeated calls then use
-`vir_call_resolved(slot, payload, payloadLen)`.
+`vir_call_resolved_objects(slot, argv, argc)` with owned Lean object arguments.
 
 In package format 7 and newer, the package contains a compact export signature
-table. `vir_call_resolved` uses that table to decode value-only argument
-payloads and to encode value-only result payloads. Resolved calls without a
-package-owned signature fail.
+table. `vir_call_resolved_objects` uses that table to validate object argument
+counts, effect handling, and boxed wasm32 boundary requirements. Resolved calls
+without a package-owned signature fail.
 Package format 7 also uses package-owned host-import signatures for
-Lean-to-JavaScript calls: the shim sends value-only argument payloads through
-`env.vir_js_call`, and JavaScript returns a value-only result payload. The shim
-caches decoded export and host-import signatures by package generation and
-slot, so compact signature bytes are decoded once per loaded package rather
+Lean-to-JavaScript calls: the shim sends borrowed Lean object arguments through
+`env.vir_js_call_objects`, and JavaScript returns an owned Lean object result.
+The shim caches decoded export and host-import signatures by package generation
+and slot, so compact signature bytes are decoded once per loaded package rather
 than on every call.
-
-The runtime currently has two call lanes:
-
-- The object ABI lane accepts owned Lean object pointers produced by `vir_obj_*`
-  helpers. It is an internal runtime path for JS-driven lowering/lifting of
-  ordinary Lean values, not a public representation for JavaScript-owned host
-  objects.
-- The compact byte lane is the complete fallback. JavaScript encodes ordinary
-  manifest values with `runtime/vir-value-codec.js`, and the shim decodes them
-  with the package-owned signature table in `interface_codec.cpp`.
 
 `vir_call_resolved_objects(slot, argv, argc)` is the first object ABI call
 helper. It accepts an array of owned `lean_object *` arguments, consumes those
@@ -179,18 +171,23 @@ signature does not require a boxed wasm32 boundary for the top-level argument or
 result type. The helper keeps higher-level JS lowering out of the shim;
 JavaScript drives it through the `vir_obj_*` construction and inspection
 primitives while the broader JS boundary policy remains open.
-The JavaScript runtime currently selects this lane automatically for pure calls
-where every argument can be lowered from the supported object subset and the
-result can be lifted from it. Arguments and results support base values,
+The JavaScript runtime uses this lane for exported calls whose arguments can be
+lowered from the supported object subset and whose result can be lifted from it.
+Arguments and results support base values,
 `Array`, `List`, `Option`, `Prod`, and manifest-described structures, tagged
 unions, and custom inductive constructors whose fields recursively stay in this
 subset. Nontrivial constructors may mix object fields, raw `USize` slots, and
 packed scalar fields, including direct recursive references through supported
-fields. Resources, callbacks, effectful calls, and `Lean.Expr` values still use
-the compact byte lane for now.
+fields. Direct `Lean.Expr` values use the object lane:
+JavaScript lowers the structural expression object through constructor-backed
+`vir_obj_expr_*`, `vir_obj_level_*`, and literal helpers, and lifts the owned
+Lean result back to the same structural JavaScript shape. Resources, callbacks,
+and effectful calls also use object arguments/results.
 
-The shim only exposes resolved package calls for JavaScript-to-Lean byte
-payloads; the descriptor-bearing named payload format has been removed.
+The shim no longer exposes a JavaScript-to-Lean value byte payload call. The
+descriptor-bearing named payload format was removed earlier, and the resolved
+byte payload fallback has now been removed as well. `interface_codec.cpp` is a
+descriptor/signature codec, not a runtime value codec.
 
 The shim also exposes the first experimental Lean object ABI helpers:
 
@@ -203,6 +200,10 @@ The shim also exposes the first experimental Lean object ABI helpers:
 - `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
 - `vir_obj_tag` / `vir_obj_field`
 - `vir_obj_nat` / `vir_obj_nat_decimal`
+- `vir_obj_expr_*`, `vir_obj_level_*`, and `vir_obj_literal_*` for direct
+  `Lean.Expr` values
+- `vir_obj_resource` / `vir_obj_resource_externref`
+- `vir_obj_closure_root` for Lean function values crossing to JavaScript
 - `vir_obj_int` / `vir_obj_int_decimal`
 - `vir_obj_uint32` / `vir_obj_uint32_value`
 - `vir_obj_uint64` / `vir_obj_uint64_decimal`
@@ -294,28 +295,26 @@ distinct native stem in the shim because their boxed arities differ, but all
 three wrappers delegate to the same linked runtime helper,
 `lean_string_utf8_set`.
 `lean_object_constructors.cpp` also owns minimal `Lean.Expr`/`Lean.Level` object
-construction for the generic JavaScript interface path, so structural
-`Lean.Expr` values can be sent from JavaScript without depending on
-Lean-library exported constructor wrappers.
+construction for direct object-ABI calls, so JavaScript can lower structural
+boundary values into real `Lean.Expr` objects without depending on Lean-library
+exported constructor wrappers.
 
 JavaScript host imports deliberately do not widen the native extern policy.
 `Vir/GeneratePackage.lean` encodes `@[vir_js "..."]` extern declarations into
 the package manifest and assigns each one a finite trampoline symbol. The shim
 recognizes only those package-provided symbols, calls the single imported
-`env.vir_js_call` dispatcher, and still rejects unrelated dynamic symbol
+`env.vir_js_call_objects` dispatcher, and still rejects unrelated dynamic symbol
 lookup.
 
 Function-valued host-import arguments use the same package-scoped policy. The
-generic result encoder roots the Lean closure in a small shim table, queues the
-internal root id through `env.vir_closure_push`, and emits no serialized
-`WIRE.FUNCTION` payload bytes. The root stores the decoded function signature,
-so JavaScript callback invocation sends only argument payloads and receives only
-the result payload. JavaScript wraps the queued root as a callable `VirCallback`
-object. The wrapper calls the internal closure root id through
-`vir_closure_call` and must eventually release it through `vir_closure_release`.
-`vir_closure_call` copies the rooted signature before applying the Lean
-closure: executing the callback can register nested closures, and the closure
-root table is re-entrant and may reallocate while the callback is running.
+JavaScript runtime roots the Lean closure with `vir_obj_closure_root`, using the
+manifest function signature. The root stores the decoded function signature, so
+JavaScript callback invocation lowers callback arguments to owned objects and
+receives an owned object result through `vir_closure_call_objects`. JavaScript
+wraps the root as a callable `VirCallback` object and must eventually release it
+through `vir_closure_release`. The closure root table is re-entrant: executing a
+callback can register nested closures and may reallocate the table while a
+callback is running.
 This keeps the Lean heap reference count explicit while avoiding any change to
 the upstream interpreter file.
 

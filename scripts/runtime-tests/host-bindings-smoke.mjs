@@ -83,6 +83,27 @@ assert.throws(
 assert.equal(nestedCallbackErrorRuntime.liveCallbacks.size, 0);
 nestedCallbackErrorRuntime.dispose();
 
+let throwingCallback = null;
+const throwingBindingRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  hostBindings: {
+    "test.callNatCallback": (_input, callback) => {
+      throwingCallback = callback;
+      throw new Error("host binding boom");
+    },
+    "test.recordNat": () => undefined,
+  },
+});
+assert.throws(
+  () => throwingBindingRuntime.call("HostInterop.callbackRoundTrip", 1),
+  /host binding boom/,
+);
+assert.ok(throwingCallback);
+assert.equal(throwingCallback.released, true);
+assert.equal(throwingBindingRuntime.liveCallbacks.size, 0);
+throwingBindingRuntime.dispose();
+
 const lifecycleDocumentState = createVirtualDocumentState();
 const lifecycleRecords = [];
 const lifecycleRuntime = await createVirRuntime({

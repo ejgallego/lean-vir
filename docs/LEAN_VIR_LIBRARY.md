@@ -164,7 +164,7 @@ opaque jsBumpNat (n : Nat) : Nat
 
 `Vir.Js` provides `Lean.Vir.Js α`, an opaque resource handle for
 JavaScript-owned objects. The `α` parameter is a Lean-side phantom marker: while
-the value remains inside `Js`, the VIR codec transports it as one host resource
+the value remains inside `Js`, the runtime transports it as one host resource
 and does not decode the underlying `α`. This is the intended lane for
 polymorphic JavaScript object APIs that move objects around without inspecting
 their Lean representation.
@@ -357,7 +357,7 @@ The JSON manifest records effect labels as `pure`, `io`, `dom`, or `react`.
 
 Host imports are not native extern registrations. The package generator encodes
 them separately, the WASM shim maps them to finite trampolines, and the runtime
-dispatches them through `env.vir_js_call`.
+dispatches them through `env.vir_js_call_objects`.
 
 This keeps general native symbol lookup closed while allowing declarations in a
 package to call explicitly declared JavaScript bindings.

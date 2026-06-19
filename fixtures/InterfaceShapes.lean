@@ -7,6 +7,27 @@ open Lean
 def stringRoundtrip (value : String) : String :=
   value
 
+def baseUnitRoundtrip (value : Unit) : Unit :=
+  value
+
+def baseBoolFlip (value : Bool) : Bool :=
+  !value
+
+def baseNatBump (value : Nat) : Nat :=
+  value + 1
+
+def baseIntNegate (value : Int) : Int :=
+  -value
+
+def baseStringRoundtrip (value : String) : String :=
+  value
+
+def baseUInt8Bump (value : UInt8) : UInt8 :=
+  value + 1
+
+def baseUInt16Bump (value : UInt16) : UInt16 :=
+  value + 1
+
 def arrayStringTotalLength (xs : Array String) : Nat :=
   xs.foldl (fun acc text => acc + text.length) 0
 
@@ -27,6 +48,9 @@ def floatScore (value : Float) : Nat :=
 
 def float32Roundtrip (value : Float32) : Float32 :=
   value
+
+def baseUSizeBump (value : USize) : USize :=
+  value + 1
 
 def baseByteArrayRoundtrip (bytes : ByteArray) : ByteArray :=
   bytes
