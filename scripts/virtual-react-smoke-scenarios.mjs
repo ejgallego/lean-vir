@@ -75,7 +75,7 @@ export function smokeVirtualReactChangeInput(runtime, documentState, selector) {
 export function smokeVirtualReactSelectTextarea(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactInput.mountSelectTextarea", selector), true);
   const element = documentState.elements.get(selector);
-  assertLiveCallbacks(runtime, 2);
+  assertLiveCallbacks(runtime, 3);
   const widget = reactElementById(element, "react-select-textarea-widget");
   assert.equal(widget.tag, "main");
   const nav = reactElementById(element, "react-select-textarea-nav");
@@ -101,7 +101,7 @@ export function smokeVirtualReactSelectTextarea(runtime, documentState, selector
   reactElementById(element, "react-note-input").handlers.onChange(createVirtualEventState({
     currentTarget: createVirtualElementState({ value: "hello" }),
   }));
-  assertLiveCallbacks(runtime, 2);
+  assertLiveCallbacks(runtime, 3);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-select-textarea-output")),
     "note:hello; flavor:vanilla",
@@ -109,7 +109,7 @@ export function smokeVirtualReactSelectTextarea(runtime, documentState, selector
   reactElementById(element, "react-flavor-select").handlers.onChange(createVirtualEventState({
     currentTarget: createVirtualElementState({ value: "chocolate" }),
   }));
-  assertLiveCallbacks(runtime, 2);
+  assertLiveCallbacks(runtime, 3);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-select-textarea-output")),
     "note:hello; flavor:chocolate",
@@ -249,7 +249,7 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactProofWidget.mount", selector, proofSurfaceFixture), true);
   const element = documentState.elements.get(selector);
   const root = element.reactRoot;
-  assertLiveCallbacks(runtime, 8);
+  assertLiveCallbacks(runtime, 9);
   const widget = reactElementById(element, "react-proof-widget");
   assert.match(String(widget.props.style?.background ?? ""), /--vscode-editorWidget-background/);
   assert.equal(widget.props.style?.colorScheme, "light dark");
@@ -341,7 +341,7 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
     "Target copied",
   );
   reactElementById(element, "react-proof-goal-step").handlers.onClick({});
-  assertLiveCallbacks(runtime, 8);
+  assertLiveCallbacks(runtime, 9);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-selected-title")),
     "Induction step",
@@ -390,7 +390,7 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
   };
   assert.equal(runtime.call("ReactProofWidget.mount", selector, movedProofSurfaceFixture), true);
   assert.equal(element.reactRoot, root);
-  assertLiveCallbacks(runtime, 8);
+  assertLiveCallbacks(runtime, 9);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-summary")),
     "Induction step; 3 local hypotheses; 3 goals / 6 hypotheses at ReactProofWidget.lean:87:3",
@@ -406,7 +406,7 @@ export function smokeVirtualReactProofWidgetHello(runtime, documentState, select
   const element = documentState.elements.get(selector);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-hello-title")),
-    "Hello ProofWidget",
+    "Hello ProofWidget from IRIF",
   );
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-hello-summary")),

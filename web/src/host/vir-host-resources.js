@@ -12,6 +12,7 @@ import {
   releaseHostResource,
   requireExternrefTableSupport,
 } from "../host-resource.js";
+import { disposeReactNode } from "../react/vir-react-node.js";
 
 export class HostResourceState {
   constructor() {
@@ -215,9 +216,82 @@ export function createHtmlInputElementResourceHostBindings(resources, { fromElem
 }
 
 export function createReactRootResourceHostBindings(resources, createRootResource, {
+  querySelector = null,
   createNodeTextResource = null,
   createNodeElementResource = null,
 } = {}) {
+  const rootsByContainer = new WeakMap();
+  const rootsBySelector = new Map();
+
+  function forgetRoot(container, root) {
+    if (rootsByContainer.get(container) === root) {
+      rootsByContainer.delete(container);
+    }
+    for (const [selector, mounted] of rootsBySelector) {
+      if (mounted.root === root) {
+        rootsBySelector.delete(selector);
+      }
+    }
+  }
+
+  function rootForContainer(container) {
+    let root = rootsByContainer.get(container);
+    if (root !== undefined) {
+      return root;
+    }
+    root = createRootResource(container);
+    if (typeof root?.unmount !== "function") {
+      throw new Error("React root resource must provide an unmount function");
+    }
+    const unmount = root.unmount;
+    root.unmount = (...args) => {
+      try {
+        return unmount.apply(root, args);
+      } finally {
+        forgetRoot(container, root);
+      }
+    };
+    rootsByContainer.set(container, root);
+    return root;
+  }
+
+  function queryReactRootSelector(selector) {
+    if (typeof querySelector !== "function") {
+      throw new Error("react.root selector host bindings require a querySelector function");
+    }
+    return querySelector(selector);
+  }
+
+  function releaseRootResource(root) {
+    root.unmount();
+    resources.releaseValueResource(root);
+  }
+
+  function releaseLeanCallback(callback) {
+    if (typeof callback?.release === "function") {
+      callback.release();
+    }
+  }
+
+  function disposeUnrenderedReactNode(node) {
+    disposeReactNode(resources, node);
+  }
+
+  function selectorRoot(selector, onMissing) {
+    const target = queryReactRootSelector(selector);
+    if (target === null || target === undefined) {
+      onMissing();
+      return null;
+    }
+    const existing = rootsBySelector.get(selector);
+    if (existing !== undefined && existing.container !== target) {
+      releaseRootResource(existing.root);
+    }
+    const root = rootForContainer(target);
+    rootsBySelector.set(selector, { container: target, root });
+    return root;
+  }
+
   return {
     "react.node.text": (value) =>
       resources.resourceForValue(requireReactNodeTextResourceFactory(createNodeTextResource)(value)),
@@ -227,7 +301,7 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
-      return resources.resourceForValue(createRootResource(target));
+      return resources.resourceForValue(rootForContainer(target));
     },
     "react.root.render": (root, renderTree) => {
       const render = requireReactRenderCallback(renderTree);
@@ -245,11 +319,35 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       value.renderComponent(component);
       return undefined;
     },
+    "react.root.renderIntoSelector": (selector, node) => {
+      const root = selectorRoot(selector, () => disposeUnrenderedReactNode(node));
+      if (root === null) {
+        return false;
+      }
+      root.render(node);
+      return true;
+    },
+    "react.root.renderComponentIntoSelector": (selector, component) => {
+      const root = selectorRoot(selector, () => releaseLeanCallback(component));
+      if (root === null) {
+        return false;
+      }
+      root.renderComponent(component);
+      return true;
+    },
     "react.root.unmount": (root) => {
       const value = resources.resolveResource(root, "ReactRoot");
       value.unmount();
       resources.releaseResource(root);
       return undefined;
+    },
+    "react.root.unmountSelector": (selector) => {
+      const mounted = rootsBySelector.get(selector);
+      if (mounted === undefined) {
+        return false;
+      }
+      releaseRootResource(mounted.root);
+      return true;
     },
   };
 }

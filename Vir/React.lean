@@ -51,6 +51,9 @@ instance : MonadLift Lean.Vir.RuntimeM ReactM where
       unfold ReactM
       exact action
 
+instance : MonadLift ReactM Lean.Vir.Browser.DomM where
+  monadLift := ReactM.run
+
 instance : Nonempty (ReactM α) :=
   by
     unfold ReactM
@@ -697,6 +700,25 @@ def renderComponent
     Lean.Vir.Browser.DomM Unit :=
   renderComponentThunk root fun _ => component props
 
+@[vir_js "react.root.renderIntoSelector"]
+opaque renderIntoSelector
+    (selector : @& String)
+    (node : @& Lean.Vir.Js Node) :
+    Lean.Vir.Browser.DomM Bool
+
+@[vir_js "react.root.renderComponentIntoSelector"]
+opaque renderComponentIntoSelectorThunk
+    (selector : @& String)
+    (component : Unit → ReactM (Lean.Vir.Js Node)) :
+    Lean.Vir.Browser.DomM Bool
+
+def renderComponentIntoSelector
+    (selector : @& String)
+    (component : Component props)
+    (props : props) :
+    Lean.Vir.Browser.DomM Bool :=
+  renderComponentIntoSelectorThunk selector fun _ => component props
+
 /--
 Unmounts a React root and releases callbacks retained by its current render.
 
@@ -704,6 +726,9 @@ Reference: [React `root.unmount`](https://react.dev/reference/react-dom/client/c
 -/
 @[vir_js "react.root.unmount"]
 opaque unmount (root : @& Lean.Vir.Js Root) : Lean.Vir.Browser.DomM Unit
+
+@[vir_js "react.root.unmountSelector"]
+opaque unmountSelector (selector : @& String) : Lean.Vir.Browser.DomM Bool
 
 end Root
 

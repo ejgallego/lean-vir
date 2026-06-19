@@ -114,11 +114,11 @@ assert.equal(validateWidgetUnmountEntry(runtime, "ReactProofWidget.unmount").ent
 assert.equal(validateWidgetUnmountEntry(runtime, ""), null);
 assert.throws(
   () => validateWidgetEntry(runtime, "ReactCounter.mount"),
-  /String -> Surface -> IO Bool/,
+  /String -> Surface -> DomM Bool/,
 );
 assert.throws(
   () => validateWidgetUnmountEntry(runtime, "ReactProofWidget.mount"),
-  /String -> IO Bool/,
+  /String -> DomM Bool/,
 );
 assert.equal(
   taggedTextToPlain({ append: [{ text: "List " }, { tag: [{}, { text: "Nat" }] }] }),
@@ -314,6 +314,8 @@ const serviceConfig = {
 };
 const firstService = await loadRuntimeService({ rpcSession, config: serviceConfig });
 assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.root.create"], "function");
+assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.node.text"], "function");
+assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.node.createElement"], "function");
 assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.root.renderIntoSelector"], "function");
 assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.root.unmountSelector"], "function");
 const firstServiceAssetReadCount = assetReadCount;

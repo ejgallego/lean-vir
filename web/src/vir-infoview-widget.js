@@ -9,6 +9,7 @@ import { EditorContext, useRpcSession } from "@leanprover/infoview";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "./vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "./vir-runtime.js";
+import { isEffectfulInterfaceEffect } from "./runtime/interface-effects.js";
 import { WIRE } from "./runtime/wire-tags.js";
 
 const e = React.createElement;
@@ -256,13 +257,16 @@ export function validateWidgetEntry(runtime, entryName) {
     throw new Error(`VIR widget entry not found: ${entryName}`);
   }
   if (
-    entry.effect !== "io" ||
+    !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 2 ||
     entry.args[0]?.type?.wireTag !== WIRE.STRING ||
     entry.args[1]?.type?.wireTag !== WIRE.STRUCTURE ||
     entry.result?.wireTag !== WIRE.BOOL
   ) {
-    throw new Error(`VIR widget entry ${entryName} must have signature String -> Surface -> IO Bool`);
+    throw new Error(
+      `VIR widget entry ${entryName} must be an effectful String -> Surface -> Bool entry ` +
+        `(Lean: String -> Surface -> DomM Bool)`,
+    );
   }
   return entry;
 }
@@ -278,12 +282,15 @@ export function validateWidgetUnmountEntry(runtime, entryName) {
     throw new Error(`VIR widget unmount entry not found: ${entryName}`);
   }
   if (
-    entry.effect !== "io" ||
+    !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 1 ||
     entry.args[0]?.type?.wireTag !== WIRE.STRING ||
     entry.result?.wireTag !== WIRE.BOOL
   ) {
-    throw new Error(`VIR widget unmount entry ${entryName} must have signature String -> IO Bool`);
+    throw new Error(
+      `VIR widget unmount entry ${entryName} must be an effectful String -> Bool entry ` +
+        `(Lean: String -> DomM Bool)`,
+    );
   }
   return entry;
 }

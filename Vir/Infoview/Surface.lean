@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.Host
+import Vir.Browser
 
 namespace Lean.Vir.Infoview
 
@@ -68,7 +68,7 @@ The JavaScript host returns `false` instead of trapping when no clipboard API is
 available or when the write is rejected by the host.
 -/
 @[vir_js "infoview.clipboard.writeText"]
-opaque writeText (text : @& String) : IO Bool
+opaque writeText (text : @& String) : Lean.Vir.Browser.DomM Bool
 
 end Clipboard
 
@@ -82,10 +82,10 @@ available. The bundled infoview shell wires this command to
 `EditorConnection.revealPosition`.
 -/
 @[vir_js "infoview.command.revealPosition"]
-opaque revealPosition (position : @& DocumentPosition) : IO Bool
+opaque revealPosition (position : @& DocumentPosition) : Lean.Vir.Browser.DomM Bool
 
 /-- Reveals the cursor position carried by the current infoview surface. -/
-def revealCursor (surface : @& Surface) : IO Bool :=
+def revealCursor (surface : @& Surface) : Lean.Vir.Browser.DomM Bool :=
   revealPosition surface.cursor
 
 end Command

@@ -10,168 +10,518 @@ External imports are provided by the Lean infoview import map.
 import * as React2 from "react";
 import { EditorContext, useRpcSession } from "@leanprover/infoview";
 
-// web/src/react/vir-react-html.js
-var REACT_HTML_MAX_DEPTH = 128;
-var REACT_HTML_MAX_NODES = 1e4;
-var disposedReactHtmlRoots = /* @__PURE__ */ new WeakSet();
-function createBrowserReactRootResource(state, root, createElement3, hooks) {
-  if (typeof createElement3 !== "function") {
-    throw new Error("createBrowserReactRootResource requires a React.createElement-compatible function");
+// web/src/host-resource.js
+var EXTERNREF_TABLE_INITIAL_LENGTH = 1;
+var hostResourceState = /* @__PURE__ */ new WeakMap();
+var externrefTableSupport = null;
+function hasExternrefTableSupport() {
+  if (externrefTableSupport !== null) {
+    return externrefTableSupport;
   }
-  const { addDisposable, removeDisposable, callLeanEventCallback: callLeanEventCallback2, once: once2 } = requireReactHostHooks(hooks);
-  let currentHtml = null;
-  const value = {
-    render(html) {
-      let nextElement;
-      try {
-        nextElement = reactElementFromHtml(state, html, createElement3, callLeanEventCallback2);
-        root.render(nextElement);
-      } catch (error) {
-        disposeReactHtml(html);
-        throw error;
-      }
-      queueReactHtmlDispose(currentHtml);
-      currentHtml = html;
+  try {
+    const table = new WebAssembly.Table({
+      element: "externref",
+      initial: EXTERNREF_TABLE_INITIAL_LENGTH
+    });
+    const marker = { kind: "lean-vir.externref-table-probe" };
+    table.set(0, marker);
+    externrefTableSupport = table.get(0) === marker;
+  } catch {
+    externrefTableSupport = false;
+  }
+  return externrefTableSupport;
+}
+function requireExternrefTableSupport() {
+  if (!hasExternrefTableSupport()) {
+    throw new Error("Lean VIR React/browser host resources require WebAssembly externref support");
+  }
+}
+var HostResource = class {
+  constructor(value, label) {
+    hostResourceState.set(this, { value, label });
+    Object.freeze(this);
+  }
+};
+function createHostResource(value, label = null) {
+  if (value === null || value === void 0) {
+    throw new Error("host resource value must not be null");
+  }
+  return new HostResource(value, label);
+}
+function isHostResource(resource) {
+  return hostResourceState.has(resource);
+}
+function hostResourceValue(resource) {
+  return hostResourceState.get(resource)?.value;
+}
+function hostResourceLabel(resource) {
+  return hostResourceState.get(resource)?.label ?? null;
+}
+function hostResourceExternref(resource) {
+  return isHostResource(resource) && hostResourceValue(resource) !== null ? resource : null;
+}
+function normalizeHostResource(resource, label = "host resource") {
+  if (hostResourceExternref(resource) === null) {
+    throw new Error(`${label} must be a live host resource`);
+  }
+  return resource;
+}
+function releaseHostResource(resource) {
+  const state = hostResourceState.get(resource);
+  if (state !== void 0) {
+    state.value = null;
+  }
+}
+var ExternrefResourceRoots = class {
+  constructor({ initial = EXTERNREF_TABLE_INITIAL_LENGTH } = {}) {
+    requireExternrefTableSupport();
+    this.table = new WebAssembly.Table({ element: "externref", initial });
+    this.freeRootIds = [];
+  }
+  root(value) {
+    const resource = hostResourceExternref(value);
+    if (resource === null) {
+      return 0;
+    }
+    const rootId = this.freeRootIds.pop() ?? this.table.grow(1);
+    if (rootId <= 0 || rootId > 4294967295) {
+      throw new Error("Lean VIR externref resource root table exceeded the 32-bit root id range");
+    }
+    this.table.set(rootId, resource);
+    return rootId;
+  }
+  get(rootId) {
+    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
+      return null;
+    }
+    return this.table.get(rootId);
+  }
+  release(rootId) {
+    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
+      return void 0;
+    }
+    if (this.table.get(rootId) !== null) {
+      this.table.set(rootId, null);
+      this.freeRootIds.push(rootId);
+    }
+    return void 0;
+  }
+  clear() {
+    for (let rootId = 1; rootId < this.table.length; rootId += 1) {
+      this.table.set(rootId, null);
+    }
+    this.freeRootIds.length = 0;
+  }
+};
+
+// web/src/react/vir-react-node.js
+var REACT_NODE_MAX_DEPTH = 128;
+var REACT_NODE_MAX_NODES = 1e4;
+function createBrowserReactRootResource(state, root, React3, hooks) {
+  const createElement3 = requireReactCreateElement(React3, "createBrowserReactRootResource");
+  return createReactRootResource(state, hooks, {
+    commitNode(_value, nextNode) {
+      root.render(nextNode.node);
     },
-    unmount: once2(() => {
-      try {
-        root.unmount();
-      } finally {
-        disposeReactHtml(currentHtml);
-        currentHtml = null;
-        removeDisposable(state, value);
-      }
-    })
-  };
-  addDisposable(state, value);
-  return value;
-}
-function disposeReactHtml(html) {
-  if (html === null || html === void 0) return;
-  if (typeof html.dispose === "function") {
-    html.dispose();
-    return;
-  }
-  if (typeof html !== "object" || disposedReactHtmlRoots.has(html)) return;
-  disposedReactHtmlRoots.add(html);
-  releaseReactHtmlCallbacks(html);
-}
-function reactElementFromHtml(state, html, createElement3, callLeanEventCallback2) {
-  return mapReactHtml(html, {
-    text: (value) => value,
-    element: (fields, children) => {
-      const props = reactPropsFromHtml(state, fields, callLeanEventCallback2);
-      return createElement3(fields.tag, props, ...children());
+    createComponent(resources, rootHooks, renderCallback, renderNode, disposePreviousNode) {
+      return createReactComponentResource(
+        resources,
+        renderCallback,
+        rootHooks.hookRuntime,
+        renderNode,
+        null,
+        disposePreviousNode
+      );
+    },
+    commitComponent(_value, component) {
+      root.render(createElement3(component.Component));
+    },
+    unmount() {
+      root.unmount();
     }
   });
 }
-function reactPropsFromHtml(state, fields, callLeanEventCallback2) {
-  const props = {};
-  const key = reactHtmlKey(fields);
-  if (key !== null && key !== void 0) {
-    props.key = key;
-  }
-  for (const [name, value] of reactHtmlPropertyEntries(fields)) {
-    setReactObjectProperty(props, name, value);
-  }
-  for (const [name, callback] of reactHtmlEventHandlerEntries(fields)) {
-    setReactObjectProperty(props, name, (event) => callLeanEventCallback2(state, event, callback));
-  }
-  return props;
+function createReactRootResource(resources, hooks, adapter) {
+  const { addDisposable, removeDisposable, once: once2 } = requireReactHostHooks(hooks);
+  let currentNode = null;
+  let currentComponent = null;
+  const value = {
+    ...adapter.initialState ?? {},
+    render(node) {
+      currentNode = commitReactNodeRender(resources, hooks, node, currentNode, (nextNode) => {
+        adapter.commitNode(value, nextNode);
+      });
+      disposeReactComponent(currentComponent);
+      currentComponent = null;
+    },
+    renderComponent(renderCallback) {
+      const component = adapter.createComponent(
+        resources,
+        hooks,
+        renderCallback,
+        (node) => resolveRenderedReactNodeValue(resources, node),
+        (node) => queueReactNodeRelease(resources, node, hooks),
+        value
+      );
+      try {
+        adapter.commitComponent(value, component);
+      } catch (error) {
+        component.dispose();
+        throw error;
+      }
+      queueReactNodeRelease(resources, currentNode, hooks);
+      currentNode = null;
+      disposeReactComponent(currentComponent);
+      currentComponent = component;
+    },
+    unmount: once2(() => {
+      try {
+        adapter.unmount?.(value);
+      } finally {
+        releaseReactNodeResource(resources, currentNode);
+        currentNode = null;
+        disposeReactComponent(currentComponent);
+        currentComponent = null;
+        removeDisposable(resources, value);
+      }
+    })
+  };
+  addDisposable(resources, value);
+  return value;
 }
-function mapReactHtml(html, renderer) {
-  return mapReactHtmlNode(html, renderer, createReactHtmlTraversalContext(), 0);
-}
-function mapReactHtmlNode(html, renderer, context, depth) {
-  countReactHtmlNode(context, depth);
-  if (html?.kind === "text") {
-    return renderer.text(reactHtmlTextValue(html));
+function commitReactNodeRender(resources, hooks, node, currentNode, commit) {
+  const sameNode = currentNode === node;
+  let nextNode = null;
+  let retained = false;
+  try {
+    nextNode = resolveReactNodeResource(resources, node);
+    validateRenderableReactNode(nextNode);
+    if (!sameNode) {
+      retainReactNodeValue(nextNode);
+      retained = true;
+    }
+    commit(nextNode);
+  } catch (error) {
+    if (retained) {
+      releaseReactNodeValue(resources, nextNode);
+    } else if (!sameNode && nextNode?.refCount === 0) {
+      disposeReactNode(resources, node);
+    }
+    throw error;
   }
-  if (html?.kind !== "element") {
-    throw new Error("React Html node must be text or element");
+  if (!sameNode) {
+    queueReactNodeRelease(resources, currentNode, hooks);
   }
-  const fields = reactHtmlElementFields(html);
-  return renderer.element(fields, () => reactHtmlArray(fields.children, "children").map((child) => mapReactHtmlNode(child, renderer, context, depth + 1)));
+  return node;
 }
-function queueReactHtmlDispose(html) {
-  if (html === null || html === void 0) return;
-  const queue = typeof globalThis.queueMicrotask === "function" ? globalThis.queueMicrotask.bind(globalThis) : (callback) => Promise.resolve().then(callback);
-  queue(() => disposeReactHtml(html));
+function createBrowserReactNodeTextResource(resources, value) {
+  return createReactNodeResource(resources, {
+    node: reactNodeTextValue(value)
+  });
 }
-function createReactHtmlTraversalContext() {
-  return { nodeCount: 0 };
-}
-function countReactHtmlNode(context, depth) {
-  if (depth > REACT_HTML_MAX_DEPTH) {
-    throw new Error(`React Html exceeds maximum depth ${REACT_HTML_MAX_DEPTH}`);
+function createBrowserReactNodeElementResource(resources, createElement3, hooks, tag, key, props, handlers, children) {
+  if (typeof createElement3 !== "function") {
+    throw new Error("createBrowserReactNodeElementResource requires a React.createElement-compatible function");
   }
-  context.nodeCount++;
-  if (context.nodeCount > REACT_HTML_MAX_NODES) {
-    throw new Error(`React Html exceeds maximum node count ${REACT_HTML_MAX_NODES}`);
+  const { callLeanEventCallback: callLeanEventCallback2 } = requireReactHostHooks(hooks);
+  return createReactNodeElementResource(resources, tag, key, props, handlers, children, (fields, childEntries) => {
+    const { props: reactProps, callbacks } = reactPropsFromNode(resources, fields, callLeanEventCallback2, hooks);
+    return {
+      node: createElement3(fields.tag, reactProps, ...childEntries.map((child) => child.value.node)),
+      callbacks
+    };
+  });
+}
+function createReactNodeElementResource(resources, tag, key, props, handlers, children, createNode) {
+  const childEntries = resolveReactNodeChildren(resources, children);
+  const stats = reactNodeSubtreeStats(childEntries);
+  const fields = {
+    tag: reactNodeName(tag, "element tag"),
+    key: reactNodeKey(key),
+    props: reactNodeArray(props, "props"),
+    handlers: reactNodeArray(handlers, "handlers")
+  };
+  let callbacks = [];
+  try {
+    const created = createNode(fields, childEntries);
+    callbacks = created.callbacks;
+    return createReactNodeResource(resources, {
+      node: created.node,
+      childEntries,
+      callbacks,
+      ...stats
+    });
+  } catch (error) {
+    releaseReactCallbacks(callbacks);
+    throw error;
   }
 }
-function reactHtmlElementFields(html) {
-  const fields = html?.fields;
-  if (fields === null || typeof fields !== "object" || Array.isArray(fields)) {
-    throw new Error("React Html element fields must be an object");
+function createReactNodeResource(resources, { node, childEntries = [], callbacks = [], nodeCount = 1, maxDepth = 0 }) {
+  const children = childEntries.map((child) => child.value);
+  const value = {
+    kind: "ReactNode",
+    node,
+    children,
+    callbacks,
+    nodeCount,
+    maxDepth,
+    refCount: 0,
+    finalized: false,
+    dispose() {
+      finalizeReactNodeValue(resources, value);
+      return void 0;
+    }
+  };
+  for (const child of children) {
+    retainReactNodeValue(child);
   }
-  reactHtmlName(fields.tag, "element tag");
-  return fields;
+  resources.addDisposable(value);
+  return value;
 }
-function reactHtmlTextValue(html) {
-  if (typeof html.value !== "string") {
-    throw new Error("React Html text value must be a string");
+function disposeReactNode(resources, node) {
+  if (node === null || node === void 0) return;
+  if (isHostResource(node)) {
+    if (typeof resources?.releaseResource !== "function") {
+      throw new Error("React Node disposal requires a host resource state");
+    }
+    const value = resolveReactNodeResource(resources, node);
+    value.dispose();
+    resources.releaseResource(node);
+    return;
   }
-  return html.value;
-}
-function reactHtmlKey(fields) {
-  const key = Object.prototype.hasOwnProperty.call(fields, "key?") ? fields["key?"] : fields.key;
-  if (key !== null && key !== void 0 && typeof key !== "string") {
-    throw new Error("React Html element key must be a string or null");
+  if (typeof node.dispose === "function") {
+    node.dispose();
   }
-  return key;
 }
-function reactHtmlArray(value, label) {
-  if (!Array.isArray(value)) {
-    throw new Error(`React Html ${label} must be an array`);
+function resolveReactNodeResource(resources, resource, label = "ReactNode") {
+  const value = resources.resolveResource(resource, label);
+  if (value?.kind !== "ReactNode") {
+    throw new Error("ReactNode resource has invalid value");
   }
   return value;
 }
-function reactHtmlPropertyEntries(fields) {
-  return reactHtmlArray(fields.props, "props").map((prop) => {
-    const name = reactHtmlPropertyName(prop);
+function retainReactNodeValue(value) {
+  if (value?.kind !== "ReactNode" || value.finalized) {
+    throw new Error("ReactNode resource has invalid value");
+  }
+  value.refCount++;
+}
+function releaseReactNodeResource(resources, resource) {
+  if (resource === null || resource === void 0) return;
+  releaseReactNodeValue(resources, resolveReactNodeResource(resources, resource));
+}
+function queueReactNodeRelease(resources, node, hooks = null) {
+  if (node === null || node === void 0) return;
+  const run = () => releaseReactNodeResource(resources, node);
+  if (typeof hooks?.deferReactNodeDispose === "function") {
+    hooks.deferReactNodeDispose(run);
+    return;
+  }
+  const queue = typeof globalThis.queueMicrotask === "function" ? globalThis.queueMicrotask.bind(globalThis) : (callback) => Promise.resolve().then(callback);
+  queue(run);
+}
+function flushReactNodeDisposals(hooks) {
+  if (typeof hooks?.flushReactNodeDisposals === "function") {
+    hooks.flushReactNodeDisposals();
+  }
+}
+function beginReactNodeEventCallback(hooks) {
+  if (typeof hooks?.beginReactNodeEventCallback === "function") {
+    hooks.beginReactNodeEventCallback();
+  }
+}
+function endReactNodeEventCallback(hooks) {
+  if (typeof hooks?.endReactNodeEventCallback === "function") {
+    hooks.endReactNodeEventCallback();
+  }
+}
+function validateReactNodeResourceLimits(node) {
+  if (node.maxDepth > REACT_NODE_MAX_DEPTH) {
+    throw new Error(`React Node exceeds maximum depth ${REACT_NODE_MAX_DEPTH}`);
+  }
+  if (node.nodeCount > REACT_NODE_MAX_NODES) {
+    throw new Error(`React Node exceeds maximum node count ${REACT_NODE_MAX_NODES}`);
+  }
+}
+function reactNodeTextValue(value) {
+  if (typeof value !== "string") {
+    throw new Error("React Node text value must be a string");
+  }
+  return value;
+}
+function reactNodePropertyEntries(props) {
+  return props.map((prop) => {
+    const name = reactNodePropertyName(prop);
     return [name, reactPropValue(prop?.value, name)];
   });
 }
-function reactHtmlEventHandlerEntries(fields) {
-  return reactHtmlArray(fields.handlers, "handlers").map((handler) => [
-    reactSafeObjectKey(reactHtmlNamedField(handler, "event handler"), "React Html event handler name"),
-    reactHtmlEventCallback(handler)
+function reactNodeEventHandlerEntries(handlers) {
+  return handlers.map((handler) => [
+    reactSafeObjectKey(reactNodeNamedField(handler, "event handler"), "React Node event handler name"),
+    reactNodeEventCallback(handler)
   ]);
 }
-function reactHtmlPropertyName(prop) {
-  const name = reactHtmlNamedField(prop, "property");
-  if (name === "data-") {
-    throw new Error("React Html data-* property name must include a suffix");
-  }
-  return reactSafeObjectKey(name, "React Html property name");
+function setReactObjectProperty(target, name, value) {
+  Object.defineProperty(target, name, {
+    value,
+    enumerable: true,
+    configurable: true,
+    writable: true
+  });
 }
-function reactHtmlNamedField(value, label) {
-  if (value === null || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error(`React Html ${label} must be an object`);
-  }
-  return reactHtmlName(value.name, `${label} name`);
+function resolveRenderedReactNode(resources, node) {
+  const nextNode = resolveReactNodeResource(resources, node);
+  validateRenderableReactNode(nextNode);
+  return nextNode;
 }
-function reactHtmlName(value, label) {
-  if (typeof value !== "string" || value.length === 0) {
-    throw new Error(`React Html ${label} must be a non-empty string`);
+function validateRenderableReactNode(nextNode) {
+  if (nextNode.finalized) {
+    throw new Error("ReactNode resource has been disposed");
+  }
+  validateReactNodeResourceLimits(nextNode);
+}
+function resolveRenderedReactNodeValue(resources, node) {
+  const nextNode = resolveRenderedReactNode(resources, node);
+  retainReactNodeValue(nextNode);
+  return nextNode.node;
+}
+function releaseReactNodeValue(resources, value) {
+  if (value?.kind !== "ReactNode" || value.finalized) return;
+  value.refCount--;
+  if (value.refCount > 0) {
+    return;
+  }
+  finalizeReactNodeValue(resources, value);
+}
+function finalizeReactNodeValue(resources, value) {
+  if (value?.kind !== "ReactNode" || value.finalized) return;
+  value.finalized = true;
+  value.refCount = 0;
+  releaseReactCallbacks(value.callbacks);
+  value.callbacks.length = 0;
+  for (const child of value.children) {
+    releaseReactNodeValue(resources, child);
+  }
+  value.children.length = 0;
+  resources.removeDisposable(value);
+}
+function resolveReactNodeChildren(resources, children) {
+  return reactNodeArray(children, "children").map((resource, index) => ({
+    resource,
+    value: resolveReactNodeResource(resources, resource, `React Node child[${index}]`)
+  }));
+}
+function reactNodeSubtreeStats(childEntries) {
+  let nodeCount = 1;
+  let maxDepth = 0;
+  for (const child of childEntries) {
+    nodeCount += child.value.nodeCount;
+    maxDepth = Math.max(maxDepth, child.value.maxDepth + 1);
+  }
+  return { nodeCount, maxDepth };
+}
+function createReactComponentResource(resources, renderCallback, hookRuntime, renderNode, scheduleRender = null, disposePreviousNode = queueReactNodeRelease) {
+  requireReactComponentRenderCallback(renderCallback);
+  requireReactHookRuntime(hookRuntime);
+  const componentState = hookRuntime.createComponentState(scheduleRender);
+  let currentNode = null;
+  let disposed = false;
+  const component = {
+    Component() {
+      return component.render();
+    },
+    render() {
+      if (disposed) {
+        throw new Error("React component has been disposed");
+      }
+      return hookRuntime.withComponentRender(componentState, () => {
+        let node = null;
+        try {
+          node = renderCallback(void 0);
+          const next = renderNode(node);
+          disposePreviousNode(currentNode);
+          currentNode = node;
+          return next;
+        } catch (error) {
+          disposeReactNode(resources, node);
+          throw error;
+        }
+      });
+    },
+    dispose() {
+      if (disposed) return;
+      disposed = true;
+      releaseReactNodeResource(resources, currentNode);
+      currentNode = null;
+      hookRuntime.disposeComponent(componentState);
+      renderCallback.release();
+    }
+  };
+  return component;
+}
+function disposeReactComponent(component) {
+  if (component !== null && component !== void 0) {
+    component.dispose();
+  }
+}
+function reactPropsFromNode(state, fields, callLeanEventCallback2, hooks) {
+  const props = {};
+  const callbacks = [];
+  if (fields.key !== null && fields.key !== void 0) {
+    props.key = fields.key;
+  }
+  for (const [name, value] of reactNodePropertyEntries(fields.props)) {
+    setReactObjectProperty(props, name, value);
+  }
+  for (const [name, callback] of reactNodeEventHandlerEntries(fields.handlers)) {
+    callbacks.push(callback);
+    setReactObjectProperty(props, name, (event) => {
+      beginReactNodeEventCallback(hooks);
+      try {
+        return callLeanEventCallback2(state, event, callback);
+      } finally {
+        endReactNodeEventCallback(hooks);
+        flushReactNodeDisposals(hooks);
+      }
+    });
+  }
+  return { props, callbacks };
+}
+function reactNodeKey(key) {
+  if (key !== null && key !== void 0 && typeof key !== "string") {
+    throw new Error("React Node element key must be a string or null");
+  }
+  return key;
+}
+function reactNodeArray(value, label) {
+  if (!Array.isArray(value)) {
+    throw new Error(`React Node ${label} must be an array`);
   }
   return value;
 }
-function reactHtmlEventCallback(handler) {
+function reactNodePropertyName(prop) {
+  const name = reactNodeNamedField(prop, "property");
+  if (name === "data-") {
+    throw new Error("React Node data-* property name must include a suffix");
+  }
+  return reactSafeObjectKey(name, "React Node property name");
+}
+function reactNodeNamedField(value, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(`React Node ${label} must be an object`);
+  }
+  return reactNodeName(value.name, `${label} name`);
+}
+function reactNodeName(value, label) {
+  if (typeof value !== "string" || value.length === 0) {
+    throw new Error(`React Node ${label} must be a non-empty string`);
+  }
+  return value;
+}
+function reactNodeEventCallback(handler) {
   const callback = handler?.callback;
   if (typeof callback !== "function" || typeof callback.release !== "function") {
-    throw new Error("React Html event handler callback must be a releasable function");
+    throw new Error("React Node event handler callback must be a releasable function");
   }
   return callback;
 }
@@ -252,20 +602,6 @@ function reactStyleName(value, label) {
   }
   return reactSafeObjectKey(value, label);
 }
-function reactSafeObjectKey(value, label) {
-  if (value === "__proto__" || value === "prototype" || value === "constructor") {
-    throw new Error(`${label} is not supported`);
-  }
-  return value;
-}
-function setReactObjectProperty(target, name, value) {
-  Object.defineProperty(target, name, {
-    value,
-    enumerable: true,
-    configurable: true,
-    writable: true
-  });
-}
 function reactStyleEntryValue(value, label) {
   if (typeof value !== "string") {
     throw new Error(`${label} must be a string`);
@@ -293,146 +629,80 @@ function reactClassToken(value, index) {
   }
   return value;
 }
-function releaseReactHtmlCallbacks(html) {
-  if (html === null || typeof html !== "object" || html.kind !== "element") return;
-  const fields = html.fields;
-  if (fields === null || typeof fields !== "object" || Array.isArray(fields)) return;
-  if (Array.isArray(fields.handlers)) {
-    for (const handler of fields.handlers) {
-      if (typeof handler?.callback?.release === "function") {
-        handler.callback.release();
-      }
-    }
+function reactSafeObjectKey(value, label) {
+  if (value === "__proto__" || value === "prototype" || value === "constructor") {
+    throw new Error(`${label} is not supported`);
   }
-  if (Array.isArray(fields.children)) {
-    for (const child of fields.children) {
-      releaseReactHtmlCallbacks(child);
+  return value;
+}
+function releaseReactCallbacks(callbacks) {
+  for (const callback of callbacks) {
+    if (typeof callback?.release === "function") {
+      callback.release();
     }
   }
 }
+function requireReactCreateElement(React3, label) {
+  if (typeof React3 === "function") {
+    return React3;
+  }
+  if (typeof React3?.createElement !== "function") {
+    throw new Error(`${label} requires a React.createElement-compatible function`);
+  }
+  return React3.createElement.bind(React3);
+}
+function requireReactComponentRenderCallback(renderCallback) {
+  if (typeof renderCallback !== "function" || typeof renderCallback.release !== "function") {
+    throw new Error("React component render callback must be a releasable function");
+  }
+}
+function requireReactHookRuntime(hookRuntime) {
+  if (hookRuntime === null || typeof hookRuntime !== "object") {
+    throw new Error("React component renderer requires a hook runtime");
+  }
+  for (const name of ["createComponentState", "withComponentRender", "disposeComponent"]) {
+    if (typeof hookRuntime[name] !== "function") {
+      throw new Error(`React hook runtime ${name} must be a function`);
+    }
+  }
+  return hookRuntime;
+}
 function requireReactHostHooks(hooks) {
   if (hooks === null || typeof hooks !== "object") {
-    throw new Error("React Html renderer requires host resource hooks");
+    throw new Error("React Node renderer requires host resource hooks");
   }
   for (const name of ["addDisposable", "removeDisposable", "callLeanEventCallback", "once"]) {
     if (typeof hooks[name] !== "function") {
-      throw new Error(`React Html renderer hook ${name} must be a function`);
+      throw new Error(`React Node renderer hook ${name} must be a function`);
     }
   }
   return hooks;
 }
-
-// web/src/host-resource.js
-var EXTERNREF_TABLE_INITIAL_LENGTH = 1;
-var hostResourceState = /* @__PURE__ */ new WeakMap();
-var externrefTableSupport = null;
-function hasExternrefTableSupport() {
-  if (externrefTableSupport !== null) {
-    return externrefTableSupport;
-  }
-  try {
-    const table = new WebAssembly.Table({
-      element: "externref",
-      initial: EXTERNREF_TABLE_INITIAL_LENGTH
-    });
-    const marker = { kind: "lean-vir.externref-table-probe" };
-    table.set(0, marker);
-    externrefTableSupport = table.get(0) === marker;
-  } catch {
-    externrefTableSupport = false;
-  }
-  return externrefTableSupport;
-}
-function requireExternrefTableSupport() {
-  if (!hasExternrefTableSupport()) {
-    throw new Error("Lean VIR React/browser host resources require WebAssembly externref support");
-  }
-}
-var HostResource = class {
-  constructor(value, label) {
-    hostResourceState.set(this, { value, label });
-    Object.freeze(this);
-  }
-};
-function createHostResource(value, label = null) {
-  if (value === null || value === void 0) {
-    throw new Error("host resource value must not be null");
-  }
-  if (typeof value !== "object" && typeof value !== "function") {
-    throw new Error("host resource value must be an object");
-  }
-  return new HostResource(value, label);
-}
-function isHostResource(resource) {
-  return hostResourceState.has(resource);
-}
-function hostResourceValue(resource) {
-  return hostResourceState.get(resource)?.value;
-}
-function hostResourceLabel(resource) {
-  return hostResourceState.get(resource)?.label ?? null;
-}
-function hostResourceExternref(resource) {
-  return isHostResource(resource) && hostResourceValue(resource) !== null ? resource : null;
-}
-function releaseHostResource(resource) {
-  const state = hostResourceState.get(resource);
-  if (state !== void 0) {
-    state.value = null;
-  }
-}
-var ExternrefResourceRoots = class {
-  constructor({ initial = EXTERNREF_TABLE_INITIAL_LENGTH } = {}) {
-    requireExternrefTableSupport();
-    this.table = new WebAssembly.Table({ element: "externref", initial });
-    this.freeRootIds = [];
-  }
-  root(value) {
-    const resource = hostResourceExternref(value);
-    if (resource === null) {
-      return 0;
-    }
-    const rootId = this.freeRootIds.pop() ?? this.table.grow(1);
-    if (rootId <= 0 || rootId > 4294967295) {
-      throw new Error("Lean VIR externref resource root table exceeded the 32-bit root id range");
-    }
-    this.table.set(rootId, resource);
-    return rootId;
-  }
-  get(rootId) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
-      return null;
-    }
-    return this.table.get(rootId);
-  }
-  release(rootId) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
-      return void 0;
-    }
-    if (this.table.get(rootId) !== null) {
-      this.table.set(rootId, null);
-      this.freeRootIds.push(rootId);
-    }
-    return void 0;
-  }
-  clear() {
-    for (let rootId = 1; rootId < this.table.length; rootId += 1) {
-      this.table.set(rootId, null);
-    }
-    this.freeRootIds.length = 0;
-  }
-};
 
 // web/src/host/vir-host-resources.js
 var HostResourceState = class {
   constructor() {
     requireExternrefTableSupport();
     this.resources = /* @__PURE__ */ new WeakMap();
+    this.primitiveResources = /* @__PURE__ */ new Map();
     this.liveResources = /* @__PURE__ */ new Set();
+    this.temporaryResourceScopes = [];
     this.disposables = /* @__PURE__ */ new Set();
   }
   resourceForValue(value) {
     if (value === null || value === void 0) return null;
+    if (this.temporaryResourceScopes.length !== 0) {
+      return this.temporaryResourceForValue(value);
+    }
+    if (!isWeakMapKey(value)) {
+      let resource2 = this.primitiveResources.get(value);
+      if (!isHostResource(resource2) || hostResourceValue(resource2) === null) {
+        resource2 = createHostResource(value);
+        this.primitiveResources.set(value, resource2);
+      }
+      this.liveResources.add(resource2);
+      return resource2;
+    }
     let resource = this.resources.get(value);
     if (!isHostResource(resource) || hostResourceValue(resource) === null) {
       resource = createHostResource(value);
@@ -441,10 +711,39 @@ var HostResourceState = class {
     this.liveResources.add(resource);
     return resource;
   }
+  temporaryResourceForValue(value) {
+    if (value === null || value === void 0) return null;
+    const resource = createHostResource(value);
+    this.liveResources.add(resource);
+    const scope = this.temporaryResourceScopes.at(-1);
+    if (scope !== void 0) {
+      scope.add(resource);
+    }
+    return resource;
+  }
+  withTemporaryResourceScope(run) {
+    const scope = /* @__PURE__ */ new Set();
+    this.temporaryResourceScopes.push(scope);
+    try {
+      return run();
+    } finally {
+      this.temporaryResourceScopes.pop();
+      for (const resource of Array.from(scope)) {
+        this.releaseResource(resource);
+      }
+      scope.clear();
+    }
+  }
   releaseResource(resource) {
     const value = hostResourceValue(resource);
-    if (value !== null && value !== void 0) {
-      this.resources.delete(value);
+    if (isWeakMapKey(value)) {
+      if (this.resources.get(value) === resource) {
+        this.resources.delete(value);
+      }
+    } else if (value !== null && value !== void 0) {
+      if (this.primitiveResources.get(value) === resource) {
+        this.primitiveResources.delete(value);
+      }
     }
     if (isHostResource(resource)) {
       this.liveResources.delete(resource);
@@ -453,6 +752,13 @@ var HostResourceState = class {
     return void 0;
   }
   releaseValueResource(value) {
+    if (!isWeakMapKey(value)) {
+      const resource2 = this.primitiveResources.get(value);
+      if (resource2 !== void 0) {
+        this.releaseResource(resource2);
+      }
+      return void 0;
+    }
     const resource = this.resources.get(value);
     if (resource !== void 0) {
       this.releaseResource(resource);
@@ -467,6 +773,15 @@ var HostResourceState = class {
     this.disposables.delete(value);
     return void 0;
   }
+  // Debug-only lifecycle visibility for runtime tests; not a stable host API.
+  debugResourceCounts() {
+    return {
+      live: this.liveResources.size,
+      primitives: this.primitiveResources.size,
+      temporaryScopes: this.temporaryResourceScopes.length,
+      disposables: this.disposables.size
+    };
+  }
   resolveResource(resource, label) {
     const value = hostResourceValue(resource);
     if (value === null || value === void 0 || !this.liveResources.has(resource)) {
@@ -476,7 +791,9 @@ var HostResourceState = class {
   }
   dispose() {
     for (const value of Array.from(this.disposables)) {
-      if (typeof value.remove === "function") {
+      if (typeof value.dispose === "function") {
+        value.dispose();
+      } else if (typeof value.remove === "function") {
         value.remove();
       } else if (typeof value.clear === "function") {
         value.clear();
@@ -491,10 +808,15 @@ var HostResourceState = class {
       this.releaseResource(resource);
     }
     this.resources = /* @__PURE__ */ new WeakMap();
+    this.primitiveResources.clear();
     this.liveResources.clear();
+    this.temporaryResourceScopes.length = 0;
     return void 0;
   }
 };
+function isWeakMapKey(value) {
+  return typeof value === "object" && value !== null || typeof value === "function";
+}
 function createHostResourceState() {
   return new HostResourceState();
 }
@@ -540,14 +862,12 @@ function createHtmlInputElementResourceHostBindings(resources, { fromElement }) 
   };
 }
 function createReactRootResourceHostBindings(resources, createRootResource, {
-  querySelector = null
+  querySelector = null,
+  createNodeTextResource = null,
+  createNodeElementResource = null
 } = {}) {
   const rootsByContainer = /* @__PURE__ */ new WeakMap();
   const rootsBySelector = /* @__PURE__ */ new Map();
-  function releaseRootResource(root) {
-    root.unmount();
-    resources.releaseValueResource(root);
-  }
   function forgetRoot(container, root) {
     if (rootsByContainer.get(container) === root) {
       rootsByContainer.delete(container);
@@ -584,46 +904,78 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     }
     return querySelector(selector);
   }
+  function releaseRootResource(root) {
+    root.unmount();
+    resources.releaseValueResource(root);
+  }
+  function releaseLeanCallback(callback) {
+    if (typeof callback?.release === "function") {
+      callback.release();
+    }
+  }
+  function disposeUnrenderedReactNode(node) {
+    disposeReactNode(resources, node);
+  }
+  function selectorRoot(selector, onMissing) {
+    const target = queryReactRootSelector(selector);
+    if (target === null || target === void 0) {
+      onMissing();
+      return null;
+    }
+    const existing = rootsBySelector.get(selector);
+    if (existing !== void 0 && existing.container !== target) {
+      releaseRootResource(existing.root);
+    }
+    const root = rootForContainer(target);
+    rootsBySelector.set(selector, { container: target, root });
+    return root;
+  }
   return {
+    "react.node.text": (value) => resources.resourceForValue(requireReactNodeTextResourceFactory(createNodeTextResource)(value)),
+    "react.node.createElement": (tag, key, props, handlers, children) => resources.resourceForValue(
+      requireReactNodeElementResourceFactory(createNodeElementResource)(tag, key, props, handlers, children)
+    ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
       return resources.resourceForValue(rootForContainer(target));
     },
-    "react.root.render": (root, html) => {
+    "react.root.render": (root, renderTree) => {
+      const render = requireReactRenderCallback(renderTree);
       try {
         const value = resources.resolveResource(root, "ReactRoot");
-        value.render(html);
-      } catch (error) {
-        disposeReactHtml(html);
-        throw error;
+        const node = render();
+        value.render(node);
+        return void 0;
+      } finally {
+        render.release();
       }
+    },
+    "react.root.renderComponent": (root, component) => {
+      const value = resources.resolveResource(root, "ReactRoot");
+      value.renderComponent(component);
       return void 0;
+    },
+    "react.root.renderIntoSelector": (selector, node) => {
+      const root = selectorRoot(selector, () => disposeUnrenderedReactNode(node));
+      if (root === null) {
+        return false;
+      }
+      root.render(node);
+      return true;
+    },
+    "react.root.renderComponentIntoSelector": (selector, component) => {
+      const root = selectorRoot(selector, () => releaseLeanCallback(component));
+      if (root === null) {
+        return false;
+      }
+      root.renderComponent(component);
+      return true;
     },
     "react.root.unmount": (root) => {
       const value = resources.resolveResource(root, "ReactRoot");
       value.unmount();
       resources.releaseResource(root);
       return void 0;
-    },
-    "react.root.renderIntoSelector": (selector, html) => {
-      const target = queryReactRootSelector(selector);
-      if (target === null || target === void 0) {
-        disposeReactHtml(html);
-        return false;
-      }
-      const existing = rootsBySelector.get(selector);
-      if (existing !== void 0 && existing.container !== target) {
-        releaseRootResource(existing.root);
-      }
-      const root = rootForContainer(target);
-      rootsBySelector.set(selector, { container: target, root });
-      try {
-        root.render(html);
-      } catch (error) {
-        disposeReactHtml(html);
-        throw error;
-      }
-      return true;
     },
     "react.root.unmountSelector": (selector) => {
       const mounted = rootsBySelector.get(selector);
@@ -634,6 +986,24 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
       return true;
     }
   };
+}
+function requireReactRenderCallback(renderTree) {
+  if (typeof renderTree !== "function" || typeof renderTree.release !== "function") {
+    throw new Error("react.root.render requires a releasable render callback");
+  }
+  return renderTree;
+}
+function requireReactNodeTextResourceFactory(factory) {
+  if (typeof factory !== "function") {
+    throw new Error("react.node.text host binding requires a React Node text resource factory");
+  }
+  return factory;
+}
+function requireReactNodeElementResourceFactory(factory) {
+  if (typeof factory !== "function") {
+    throw new Error("react.node.createElement host binding requires a React Node element resource factory");
+  }
+  return factory;
 }
 function createTimerResourceHostBindings(resources) {
   return {
@@ -745,12 +1115,205 @@ function performanceNow() {
   return globalThis.performance?.now?.() ?? Date.now();
 }
 function createReactHostHooks() {
+  let eventDepth = 0;
+  const deferredReactNodeDisposals = [];
+  const flushReactNodeDisposals2 = () => {
+    if (eventDepth !== 0) return void 0;
+    const pending = deferredReactNodeDisposals.splice(0);
+    for (const dispose of pending) {
+      dispose();
+    }
+    return void 0;
+  };
   return {
     addDisposable: (state, value) => state.addDisposable(value),
     removeDisposable: (state, value) => state.removeDisposable(value),
     callLeanEventCallback,
+    beginReactNodeEventCallback: () => {
+      eventDepth++;
+      return void 0;
+    },
+    endReactNodeEventCallback: () => {
+      eventDepth = Math.max(0, eventDepth - 1);
+      return void 0;
+    },
+    deferReactNodeDispose: (dispose) => {
+      if (typeof dispose !== "function") {
+        throw new Error("React Node deferred disposal must be a function");
+      }
+      if (eventDepth === 0) {
+        const queue = typeof globalThis.queueMicrotask === "function" ? globalThis.queueMicrotask.bind(globalThis) : (callback) => Promise.resolve().then(callback);
+        queue(dispose);
+        return void 0;
+      }
+      deferredReactNodeDisposals.push(dispose);
+      return void 0;
+    },
+    flushReactNodeDisposals: flushReactNodeDisposals2,
     once
   };
+}
+
+// web/src/react/vir-react-hooks.js
+function createBrowserReactHookRuntime(resources, React3) {
+  const setters = /* @__PURE__ */ new WeakMap();
+  let currentComponent = null;
+  return {
+    createComponentState() {
+      return { setters: /* @__PURE__ */ new Set() };
+    },
+    withComponentRender(componentState, render) {
+      const previous = currentComponent;
+      currentComponent = componentState;
+      try {
+        return render();
+      } finally {
+        currentComponent = previous;
+      }
+    },
+    disposeComponent(componentState) {
+      for (const setter of componentState?.setters ?? []) {
+        resources.releaseValueResource(setter);
+      }
+      componentState?.setters?.clear();
+    },
+    useState(initial) {
+      if (typeof React3?.useState !== "function") {
+        throw new Error("React.useState is not available");
+      }
+      const [value, setState] = React3.useState(initial);
+      const setter = stateSetterFor(setters, setState);
+      currentComponent?.setters?.add(setter);
+      return stateResult(resources, value, setter);
+    }
+  };
+}
+function createReactStateHostBindings(resources, hookRuntime) {
+  return {
+    "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
+    "react.state.set": (setter, value) => setStateValue(resources, setter, value),
+    "react.state.modify": (setter, update) => modifyStateValue(resources, setter, update)
+  };
+}
+function createReactJsValueHostBindings(resources) {
+  const bindings = {};
+  for (const [target, codec] of Object.entries(jsValueCodecs)) {
+    bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
+    bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
+  }
+  return bindings;
+}
+function stateSetterFor(setters, setState) {
+  let setter = setters.get(setState);
+  if (setter === void 0) {
+    setter = {
+      set: (next) => setState(next)
+    };
+    setters.set(setState, setter);
+  }
+  return setter;
+}
+function stateResult(resources, value, setter) {
+  return {
+    value: resources.resourceForValue(value),
+    setter: resources.resourceForValue(setter)
+  };
+}
+function setStateValue(resources, setter, value) {
+  resources.resolveResource(setter, "ReactStateSetter").set(reactStatePayload(resources, value));
+  return void 0;
+}
+function modifyStateValue(resources, setter, update) {
+  const stateSetter = resources.resolveResource(setter, "ReactStateSetter");
+  let released = false;
+  const retainedUpdate = {
+    remove() {
+      if (released) return;
+      released = true;
+      update.release();
+      resources.removeDisposable(retainedUpdate);
+    }
+  };
+  resources.addDisposable(retainedUpdate);
+  try {
+    stateSetter.set((previous) => {
+      try {
+        return withStateUpdaterResourceScope(resources, () => {
+          const previousResource = resources.temporaryResourceForValue(previous);
+          return reactStatePayload(resources, update(previousResource));
+        });
+      } finally {
+        retainedUpdate.remove();
+      }
+    });
+  } catch (error) {
+    retainedUpdate.remove();
+    throw error;
+  }
+  return void 0;
+}
+function withStateUpdaterResourceScope(resources, run) {
+  if (typeof resources.withTemporaryResourceScope !== "function" || typeof resources.temporaryResourceForValue !== "function") {
+    throw new Error("react.state.modify requires temporary host resource support");
+  }
+  return resources.withTemporaryResourceScope(run);
+}
+function reactStatePayload(resources, value) {
+  return isHostResource(value) ? resources.resolveResource(value, "Js") : value;
+}
+var jsValueCodecs = {
+  "js.string": {
+    toJs: jsStringValue,
+    fromJs: jsStringPayload
+  },
+  "js.nat": {
+    toJs: jsNatValue,
+    fromJs: jsNatPayload
+  },
+  "js.bool": {
+    toJs: jsBoolValue,
+    fromJs: jsBoolPayload
+  }
+};
+function jsStringValue(value) {
+  if (typeof value !== "string") {
+    throw new Error("js.string expects a string");
+  }
+  return value;
+}
+function jsStringPayload(value) {
+  if (typeof value !== "string") {
+    throw new Error("js.string.value expects a JS string");
+  }
+  return value;
+}
+function jsNatValue(value) {
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
+    throw new Error("js.nat expects a natural number");
+  }
+  const text = String(value);
+  if (!/^(0|[1-9][0-9]*)$/.test(text)) {
+    throw new Error("js.nat expects a natural number");
+  }
+  return BigInt(text);
+}
+function jsNatPayload(value) {
+  if (typeof value !== "bigint" || value < 0n) {
+    throw new Error("js.nat.value expects a JS natural number");
+  }
+  return value;
+}
+function jsBoolValue(value) {
+  if (typeof value !== "boolean") {
+    throw new Error("js.bool expects a boolean");
+  }
+  return value;
+}
+function jsBoolPayload(value) {
+  if (typeof value !== "boolean") {
+    throw new Error("js.bool.value expects a JS boolean");
+  }
+  return value;
 }
 
 // web/src/vir-host-bindings.js
@@ -1019,18 +1582,47 @@ import { createRoot } from "react-dom";
 function createBrowserReactHostBindings(state = createHostResourceState(), {
   querySelector = queryBrowserElement
 } = {}) {
-  return createReactRootResourceHostBindings(state, (target) => createBrowserReactRootResource2(state, createRoot(target), React.createElement), {
-    querySelector
-  });
+  const hookRuntime = createBrowserReactHookRuntime(state, React);
+  const hooks = {
+    ...createReactHostHooks(),
+    hookRuntime
+  };
+  return {
+    ...createReactRootResourceHostBindings(state, (target) => createBrowserReactRootResource2(state, createRoot(target), React, hooks), {
+      querySelector,
+      createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
+      createNodeElementResource: (tag, key, props, handlers, children) => createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, key, props, handlers, children)
+    }),
+    ...createReactJsValueHostBindings(state),
+    ...createReactStateHostBindings(state, hookRuntime)
+  };
 }
-function createBrowserReactRootResource2(state, root, createElement3) {
-  return createBrowserReactRootResource(state, root, createElement3, createReactHostHooks());
+function createBrowserReactRootResource2(state, root, React3, hooks) {
+  return createBrowserReactRootResource(state, root, React3, hooks);
 }
 function queryBrowserElement(selector) {
   if (!globalThis.document) {
     throw new Error("React selector host bindings require globalThis.document");
   }
   return globalThis.document.querySelector(selector);
+}
+
+// web/src/runtime/interface-effects.js
+var EFFECT_LABELS = /* @__PURE__ */ new Set(["pure", "runtime", "io", "dom", "react"]);
+function isInterfaceEffectLabel(effect) {
+  return EFFECT_LABELS.has(effect);
+}
+function requireInterfaceEffect(effect, label) {
+  if (!isInterfaceEffectLabel(effect)) {
+    throw new Error(`${label} must be one of pure, runtime, io, dom, or react`);
+  }
+  return effect;
+}
+function isEffectfulInterfaceEffect(effect) {
+  return requireInterfaceEffect(effect, "effect") !== "pure";
+}
+function interfaceEffectRuntimeTag(effect) {
+  return isEffectfulInterfaceEffect(effect) ? 1 : 0;
 }
 
 // web/src/runtime/wire-tags.js
@@ -1108,6 +1700,7 @@ function validateInterfaceManifest(manifest) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
   validateManifestExports(manifest.exports);
+  validateManifestHostImports(manifest.hostImports ?? []);
   return manifest;
 }
 function validateManifestExports(exports) {
@@ -1123,6 +1716,7 @@ function validateManifestExports(exports) {
     requireOptionalString(entry.id, `${label}.id`);
     requireOptionalString(entry.jsName, `${label}.jsName`);
     requireOptionalString(entry.source, `${label}.source`);
+    requireInterfaceEffect(entry.effect, `${label}.effect`);
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== void 0) requireUnique(ids, entry.id, `${label}.id`);
     if (entry.jsName !== void 0) requireUnique(jsNames, entry.jsName, `${label}.jsName`);
@@ -1138,6 +1732,15 @@ function validateManifestExports(exports) {
       validateInterfaceRootType(arg.type, `${argLabel}.type`);
     });
     validateInterfaceRootType(entry.result, `${label}.result`);
+  });
+}
+function validateManifestHostImports(hostImports) {
+  hostImports.forEach((entry, index) => {
+    const label = `embedded interface manifest hostImports[${index}]`;
+    if (!isRecord(entry)) {
+      throw new Error(`${label} must be an object`);
+    }
+    requireInterfaceEffect(entry.effect, `${label}.effect`);
   });
 }
 function requireUnique(seen, value, label, owner = "interface export") {
@@ -1418,9 +2021,7 @@ function validateFunctionType(type, label) {
   if (type.kind !== "function") {
     throw new Error(`${label}.kind must be function`);
   }
-  if (type.effect !== "pure" && type.effect !== "io") {
-    throw new Error(`${label}.effect must be pure or io`);
-  }
+  requireInterfaceEffect(type.effect, `${label}.effect`);
   if (!Array.isArray(type.args)) {
     throw new Error(`${label}.args must be an array`);
   }
@@ -1466,8 +2067,6 @@ function requireUniqueStructureField(seen, value, label) {
 }
 
 // web/src/runtime/vir-codec.js
-var textEncoder = new TextEncoder();
-var textDecoder = new TextDecoder();
 function asBytes(bytes, label) {
   if (bytes instanceof Uint8Array) {
     return bytes;
@@ -1479,234 +2078,6 @@ function asBytes(bytes, label) {
     return new Uint8Array(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   }
   throw new Error(`${label} must be an ArrayBuffer or Uint8Array`);
-}
-var BinaryWriter = class {
-  constructor() {
-    this.bytes = [];
-  }
-  u8(value) {
-    this.bytes.push(value & 255);
-  }
-  u32(value) {
-    const normalized = normalizeUint32(value, "u32");
-    this.bytes.push(
-      normalized & 255,
-      normalized >>> 8 & 255,
-      normalized >>> 16 & 255,
-      normalized >>> 24 & 255
-    );
-  }
-  rawBytes(bytes) {
-    for (const byte of bytes) {
-      this.u8(byte);
-    }
-  }
-  f64(value) {
-    const buffer = new ArrayBuffer(8);
-    new DataView(buffer).setFloat64(0, value, true);
-    this.rawBytes(new Uint8Array(buffer));
-  }
-  f32(value) {
-    const buffer = new ArrayBuffer(4);
-    new DataView(buffer).setFloat32(0, value, true);
-    this.rawBytes(new Uint8Array(buffer));
-  }
-  bytesValue(bytes) {
-    const view = asBytes(bytes, "bytes");
-    this.u32(view.byteLength);
-    this.rawBytes(view);
-  }
-  string(value) {
-    this.bytesValue(textEncoder.encode(value));
-  }
-  take() {
-    return Uint8Array.from(this.bytes);
-  }
-};
-var BinaryReader = class {
-  constructor(bytes) {
-    this.bytes = asBytes(bytes, "result bytes");
-    this.offset = 0;
-  }
-  u8() {
-    if (this.offset >= this.bytes.byteLength) {
-      throw new Error("unexpected end of result payload");
-    }
-    return this.bytes[this.offset++];
-  }
-  u32() {
-    const b0 = this.u8();
-    const b1 = this.u8();
-    const b2 = this.u8();
-    const b3 = this.u8();
-    return (b0 | b1 << 8 | b2 << 16 | b3 << 24) >>> 0;
-  }
-  rawBytes(len) {
-    if (len > this.bytes.byteLength - this.offset) {
-      throw new Error("result byte length exceeds payload");
-    }
-    const out = this.bytes.slice(this.offset, this.offset + len);
-    this.offset += len;
-    return out;
-  }
-  f64() {
-    const buffer = new ArrayBuffer(8);
-    new Uint8Array(buffer).set(this.rawBytes(8));
-    return new DataView(buffer).getFloat64(0, true);
-  }
-  f32() {
-    const buffer = new ArrayBuffer(4);
-    new Uint8Array(buffer).set(this.rawBytes(4));
-    return new DataView(buffer).getFloat32(0, true);
-  }
-  bytesValue() {
-    const len = this.u32();
-    return this.rawBytes(len);
-  }
-  string() {
-    return textDecoder.decode(this.bytesValue());
-  }
-  requireEnd() {
-    if (this.offset !== this.bytes.byteLength) {
-      throw new Error("trailing bytes after result payload");
-    }
-  }
-};
-function encodeTypeDescriptor(writer, type, label) {
-  const tag = requireWireTag(type, label);
-  writer.u8(tag);
-  switch (tag) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
-      encodeTypeDescriptor(writer, requireTypeField(type, "element", label), `${label}.element`);
-      return;
-    case WIRE.PROD:
-      encodeTypeDescriptor(writer, requireTypeField(type, "fst", label), `${label}.fst`);
-      encodeTypeDescriptor(writer, requireTypeField(type, "snd", label), `${label}.snd`);
-      return;
-    case WIRE.STRUCTURE: {
-      const fields = requireStructureFields(type, label);
-      encodeRuntimeCounts(writer, type, label);
-      writer.u32(requireStructureTrivialFieldIndex(type, label));
-      writer.u32(fields.length);
-      fields.forEach((field) => encodeFieldDescriptor(writer, field, `${label}.${field.name}`));
-      return;
-    }
-    case WIRE.TAGGED_UNION: {
-      const constructors = requireTaggedUnionConstructors(type, label);
-      writer.u32(constructors.length);
-      constructors.forEach((ctor) => {
-        encodeRuntimeCounts(writer, ctor, `${label}.${ctor.jsName}`);
-        encodeStructureFieldLayout(writer, ctor.layout, `${label}.${ctor.jsName}`);
-        encodeTypeDescriptor(writer, ctor.type, `${label}.${ctor.jsName}`);
-      });
-      return;
-    }
-    case WIRE.CUSTOM_INDUCTIVE: {
-      const constructors = requireCustomInductiveConstructors(type, label);
-      writer.u32(constructors.length);
-      constructors.forEach((ctor) => encodeCustomInductiveConstructorDescriptor(writer, ctor, `${label}.${ctor.jsName}`));
-      return;
-    }
-    case WIRE.RECURSIVE_SELF:
-      return;
-    case WIRE.FUNCTION: {
-      const args = requireFunctionArgs(type, label);
-      writer.u8(type.effect === "io" ? 1 : 0);
-      writer.u32(args.length);
-      args.forEach((arg, index) => encodeTypeDescriptor(writer, arg.type, `${label}.args[${index}]`));
-      encodeTypeDescriptor(writer, requireFunctionResult(type, label), `${label}.result`);
-      return;
-    }
-    default:
-      return;
-  }
-}
-function encodeFieldDescriptor(writer, field, label) {
-  encodeStructureFieldLayout(writer, field.layout, label);
-  encodeTypeDescriptor(writer, field.type, label);
-}
-function encodeCustomInductiveConstructorDescriptor(writer, ctor, label) {
-  encodeRuntimeCounts(writer, ctor, label);
-  writer.u32(ctor.fields.length);
-  ctor.fields.forEach((field) => encodeFieldDescriptor(writer, field, `${label}.${field.name}`));
-}
-function decodeTypeDescriptor(reader) {
-  const tag = reader.u8();
-  switch (tag) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
-      return { wireTag: tag, element: decodeTypeDescriptor(reader) };
-    case WIRE.PROD:
-      return { wireTag: tag, fst: decodeTypeDescriptor(reader), snd: decodeTypeDescriptor(reader) };
-    case WIRE.STRUCTURE: {
-      const counts = decodeRuntimeCounts(reader);
-      const trivialFieldIndex = decodeStructureTrivialFieldIndex(reader.u32());
-      const len = reader.u32();
-      return {
-        wireTag: tag,
-        ...counts,
-        ...trivialFieldIndex === null ? {} : { trivialFieldIndex },
-        fields: decodeFieldDescriptors(reader, len)
-      };
-    }
-    case WIRE.TAGGED_UNION: {
-      const len = reader.u32();
-      return {
-        wireTag: tag,
-        constructors: Array.from({ length: len }, () => ({
-          ...decodeRuntimeCounts(reader),
-          layout: decodeStructureFieldLayout(reader),
-          type: decodeTypeDescriptor(reader)
-        }))
-      };
-    }
-    case WIRE.CUSTOM_INDUCTIVE: {
-      const len = reader.u32();
-      return {
-        wireTag: tag,
-        constructors: Array.from({ length: len }, () => {
-          const counts = decodeRuntimeCounts(reader);
-          const fieldLen = reader.u32();
-          return {
-            ...counts,
-            fields: decodeFieldDescriptors(reader, fieldLen)
-          };
-        })
-      };
-    }
-    case WIRE.RECURSIVE_SELF:
-      return { wireTag: tag };
-    case WIRE.FUNCTION: {
-      const effect = reader.u8() === 0 ? "pure" : "io";
-      const len = reader.u32();
-      return {
-        wireTag: tag,
-        effect,
-        args: Array.from({ length: len }, (_, index) => ({
-          name: `arg${index + 1}`,
-          type: decodeTypeDescriptor(reader)
-        })),
-        result: decodeTypeDescriptor(reader)
-      };
-    }
-    default:
-      return { wireTag: tag };
-  }
-}
-function decodeFieldDescriptors(reader, len) {
-  return Array.from({ length: len }, () => ({
-    layout: decodeStructureFieldLayout(reader),
-    type: decodeTypeDescriptor(reader)
-  }));
-}
-function requireWireTag(type, label) {
-  if (!Number.isInteger(type?.wireTag)) {
-    throw new Error(`${label} is missing a manifest wireTag`);
-  }
-  return type.wireTag;
 }
 function requireTypeField(type, field, label) {
   const child = type?.[field];
@@ -1721,62 +2092,6 @@ function requireStructureCount(type, field, label) {
     throw new Error(`${label} has invalid manifest structure ${field}`);
   }
   return value;
-}
-function encodeRuntimeCounts(writer, type, label) {
-  requireRuntimeCounts(type, label);
-  writer.u32(type.objectFieldCount);
-  writer.u32(type.usizeFieldCount);
-  writer.u32(type.scalarByteSize);
-}
-function decodeRuntimeCounts(reader) {
-  return {
-    objectFieldCount: reader.u32(),
-    usizeFieldCount: reader.u32(),
-    scalarByteSize: reader.u32()
-  };
-}
-function sameRuntimeCounts(expected, actual, label) {
-  return requireStructureCount(expected, "objectFieldCount", label) === actual?.objectFieldCount && requireStructureCount(expected, "usizeFieldCount", label) === actual?.usizeFieldCount && requireStructureCount(expected, "scalarByteSize", label) === actual?.scalarByteSize;
-}
-function requireStructureTrivialFieldIndex(type, label) {
-  const value = type?.trivialFieldIndex;
-  const fields = requireStructureFields(type, label);
-  return normalizeStructureTrivialFieldIndex(value, fields.length, label);
-}
-function normalizeStructureTrivialFieldIndex(value, fieldCount, label) {
-  if (value === void 0 || value === null) {
-    return 4294967295;
-  }
-  if (!Number.isInteger(value) || value < 0 || value >= fieldCount) {
-    throw new Error(`${label} has invalid manifest structure trivialFieldIndex`);
-  }
-  return value;
-}
-function decodeStructureTrivialFieldIndex(value) {
-  return value === 4294967295 ? null : value;
-}
-function encodeStructureFieldLayout(writer, layout, label) {
-  const checked = requireStructureFieldLayout(layout, label);
-  writer.u8(checked.tag);
-  writer.u32(checked.index ?? 0);
-  writer.u32(checked.size ?? 0);
-  writer.u32(checked.offset ?? 0);
-}
-function decodeStructureFieldLayout(reader) {
-  const tag = reader.u8();
-  const index = reader.u32();
-  const size = reader.u32();
-  const offset = reader.u32();
-  switch (tag) {
-    case 0:
-      return { kind: "object", index };
-    case 1:
-      return { kind: "usize", index };
-    case 2:
-      return { kind: "scalar", size, offset };
-    default:
-      throw new Error(`unsupported result structure field layout tag ${tag}`);
-  }
 }
 function requireStructureFieldLayout(layout, label) {
   if (layout?.kind === "object" && Number.isInteger(layout.index) && layout.index >= 0) {
@@ -1801,60 +2116,6 @@ function requireStructureFields(type, label) {
     requireStructureFieldLayout(field.layout, `${label}.${field.name}`);
   }
   return type.fields;
-}
-function sameWireType(expected, actual) {
-  if (requireWireTag(expected, "expected result") !== actual?.wireTag) return false;
-  switch (expected.wireTag) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
-      return sameWireType(requireTypeField(expected, "element", "expected result"), actual.element);
-    case WIRE.PROD:
-      return sameWireType(requireTypeField(expected, "fst", "expected result"), actual.fst) && sameWireType(requireTypeField(expected, "snd", "expected result"), actual.snd);
-    case WIRE.STRUCTURE: {
-      const fields = requireStructureFields(expected, "expected result");
-      if (!Array.isArray(actual?.fields) || fields.length !== actual.fields.length) return false;
-      if (!sameRuntimeCounts(expected, actual, "expected result") || requireStructureTrivialFieldIndex(expected, "expected result") !== normalizeStructureTrivialFieldIndex(actual?.trivialFieldIndex, actual.fields.length, "actual result")) {
-        return false;
-      }
-      return fields.every((field, index) => sameStructureFieldLayout(field.layout, actual.fields[index]?.layout) && sameWireType(field.type, actual.fields[index]?.type));
-    }
-    case WIRE.TAGGED_UNION: {
-      const constructors = requireTaggedUnionConstructors(expected, "expected result");
-      if (!Array.isArray(actual?.constructors) || constructors.length !== actual.constructors.length) return false;
-      return constructors.every((ctor, index) => {
-        const actualCtor = actual.constructors[index];
-        return sameRuntimeCounts(ctor, actualCtor, "expected result") && sameStructureFieldLayout(ctor.layout, actualCtor?.layout) && sameWireType(ctor.type, actualCtor?.type);
-      });
-    }
-    case WIRE.CUSTOM_INDUCTIVE: {
-      const constructors = requireCustomInductiveConstructors(expected, "expected result");
-      if (!Array.isArray(actual?.constructors) || constructors.length !== actual.constructors.length) return false;
-      return constructors.every((ctor, index) => {
-        const actualCtor = actual.constructors[index];
-        if (!sameRuntimeCounts(ctor, actualCtor, "expected result") || !Array.isArray(actualCtor?.fields) || ctor.fields.length !== actualCtor.fields.length) {
-          return false;
-        }
-        return ctor.fields.every((field, fieldIndex) => sameStructureFieldLayout(field.layout, actualCtor.fields[fieldIndex]?.layout) && sameWireType(field.type, actualCtor.fields[fieldIndex]?.type));
-      });
-    }
-    case WIRE.RECURSIVE_SELF:
-      return true;
-    case WIRE.FUNCTION: {
-      const args = requireFunctionArgs(expected, "expected result");
-      if (expected.effect !== actual?.effect || !Array.isArray(actual?.args) || args.length !== actual.args.length) {
-        return false;
-      }
-      return args.every((arg, index) => sameWireType(arg.type, actual.args[index]?.type)) && sameWireType(requireFunctionResult(expected, "expected result"), actual.result);
-    }
-    default:
-      return true;
-  }
-}
-function sameStructureFieldLayout(expected, actual) {
-  const lhs = requireStructureFieldLayout(expected, "expected result field");
-  const rhs = requireStructureFieldLayout(actual, "actual result field");
-  return lhs.tag === rhs.tag && (lhs.index ?? 0) === (rhs.index ?? 0) && (lhs.size ?? 0) === (rhs.size ?? 0) && (lhs.offset ?? 0) === (rhs.offset ?? 0);
 }
 function requireTaggedUnionConstructors(type, label) {
   if (!Array.isArray(type?.constructors) || type.constructors.length === 0) {
@@ -1904,9 +2165,7 @@ function requireRuntimeCounts(type, label) {
   requireStructureCount(type, "scalarByteSize", label);
 }
 function requireFunctionArgs(type, label) {
-  if (type?.effect !== "pure" && type?.effect !== "io") {
-    throw new Error(`${label} has invalid manifest function effect`);
-  }
+  requireInterfaceEffect(type?.effect, `${label} effect`);
   if (!Array.isArray(type?.args)) {
     throw new Error(`${label} is missing manifest function args`);
   }
@@ -1969,267 +2228,8 @@ function normalizeUint32(value, label) {
   return value >>> 0;
 }
 
-// web/src/runtime/vir-lean-codec.js
-function encodeExpr(writer, value, label) {
-  if (typeof value === "string") {
-    value = { kind: "const", name: value, levels: [] };
-  }
-  switch (value?.kind) {
-    case "bvar":
-      writer.u8(0);
-      writer.string(normalizeDecimal(value.index ?? value.deBruijnIndex, `${label}.index`, { signed: false }));
-      return;
-    case "fvar":
-      writer.u8(1);
-      writer.string(requireString2(value.name, `${label}.name`));
-      return;
-    case "mvar":
-      writer.u8(2);
-      writer.string(requireString2(value.name, `${label}.name`));
-      return;
-    case "sort":
-      writer.u8(3);
-      encodeLevel(writer, value.level ?? value.u, `${label}.level`);
-      return;
-    case "const":
-      writer.u8(4);
-      writer.string(requireString2(value.name, `${label}.name`));
-      encodeLevels(writer, value.levels ?? [], `${label}.levels`);
-      return;
-    case "app":
-      writer.u8(5);
-      encodeExpr(writer, value.fn, `${label}.fn`);
-      encodeExpr(writer, value.arg, `${label}.arg`);
-      return;
-    case "lam":
-    case "lambda":
-      writer.u8(6);
-      writer.string(requireString2(value.name ?? value.binderName, `${label}.name`));
-      encodeExpr(writer, value.type ?? value.binderType, `${label}.type`);
-      encodeExpr(writer, value.body, `${label}.body`);
-      writer.u8(normalizeBinderInfo(value.binderInfo ?? "default", `${label}.binderInfo`));
-      return;
-    case "forall":
-    case "forallE":
-      writer.u8(7);
-      writer.string(requireString2(value.name ?? value.binderName, `${label}.name`));
-      encodeExpr(writer, value.type ?? value.binderType, `${label}.type`);
-      encodeExpr(writer, value.body, `${label}.body`);
-      writer.u8(normalizeBinderInfo(value.binderInfo ?? "default", `${label}.binderInfo`));
-      return;
-    case "let":
-    case "letE":
-      writer.u8(8);
-      writer.string(requireString2(value.name ?? value.declName, `${label}.name`));
-      encodeExpr(writer, value.type, `${label}.type`);
-      encodeExpr(writer, value.value, `${label}.value`);
-      encodeExpr(writer, value.body, `${label}.body`);
-      writer.u8(value.nondep ? 1 : 0);
-      return;
-    case "lit":
-      writer.u8(9);
-      encodeLiteral(writer, value.literal ?? value.value, `${label}.literal`);
-      return;
-    case "mdata":
-      writer.u8(10);
-      encodeExpr(writer, value.expr, `${label}.expr`);
-      return;
-    case "proj":
-      writer.u8(11);
-      writer.string(requireString2(value.typeName, `${label}.typeName`));
-      writer.string(normalizeDecimal(value.index ?? value.idx, `${label}.index`, { signed: false }));
-      encodeExpr(writer, value.struct ?? value.expr, `${label}.struct`);
-      return;
-    default:
-      throw new Error(`${label} has unsupported Lean.Expr kind ${value?.kind}`);
-  }
-}
-function decodeExpr(reader) {
-  const kind = reader.u8();
-  switch (kind) {
-    case 0:
-      return { kind: "bvar", index: reader.string() };
-    case 1:
-      return { kind: "fvar", name: reader.string() };
-    case 2:
-      return { kind: "mvar", name: reader.string() };
-    case 3:
-      return { kind: "sort", level: decodeLevel(reader) };
-    case 4:
-      return { kind: "const", name: reader.string(), levels: decodeLevels(reader) };
-    case 5:
-      return { kind: "app", fn: decodeExpr(reader), arg: decodeExpr(reader) };
-    case 6:
-      return {
-        kind: "lam",
-        name: reader.string(),
-        type: decodeExpr(reader),
-        body: decodeExpr(reader),
-        binderInfo: decodeBinderInfo(reader.u8())
-      };
-    case 7:
-      return {
-        kind: "forall",
-        name: reader.string(),
-        type: decodeExpr(reader),
-        body: decodeExpr(reader),
-        binderInfo: decodeBinderInfo(reader.u8())
-      };
-    case 8:
-      return {
-        kind: "let",
-        name: reader.string(),
-        type: decodeExpr(reader),
-        value: decodeExpr(reader),
-        body: decodeExpr(reader),
-        nondep: reader.u8() !== 0
-      };
-    case 9:
-      return { kind: "lit", literal: decodeLiteral(reader) };
-    case 10:
-      return { kind: "mdata", expr: decodeExpr(reader) };
-    case 11:
-      return { kind: "proj", typeName: reader.string(), index: reader.string(), struct: decodeExpr(reader) };
-    default:
-      throw new Error(`unsupported Lean.Expr result kind ${kind}`);
-  }
-}
-function encodeLevel(writer, value, label) {
-  const level = typeof value === "string" ? { kind: value } : value ?? { kind: "zero" };
-  switch (level.kind) {
-    case "zero":
-      writer.u8(0);
-      return;
-    case "succ":
-      writer.u8(1);
-      encodeLevel(writer, level.of ?? level.level, `${label}.of`);
-      return;
-    case "max":
-      writer.u8(2);
-      encodeLevel(writer, level.left ?? level.lhs, `${label}.left`);
-      encodeLevel(writer, level.right ?? level.rhs, `${label}.right`);
-      return;
-    case "imax":
-      writer.u8(3);
-      encodeLevel(writer, level.left ?? level.lhs, `${label}.left`);
-      encodeLevel(writer, level.right ?? level.rhs, `${label}.right`);
-      return;
-    case "param":
-      writer.u8(4);
-      writer.string(requireString2(level.name, `${label}.name`));
-      return;
-    case "mvar":
-      writer.u8(5);
-      writer.string(requireString2(level.name, `${label}.name`));
-      return;
-    default:
-      throw new Error(`${label} has unsupported Lean.Level kind ${level.kind}`);
-  }
-}
-function decodeLevel(reader) {
-  const kind = reader.u8();
-  switch (kind) {
-    case 0:
-      return { kind: "zero" };
-    case 1:
-      return { kind: "succ", of: decodeLevel(reader) };
-    case 2:
-      return { kind: "max", left: decodeLevel(reader), right: decodeLevel(reader) };
-    case 3:
-      return { kind: "imax", left: decodeLevel(reader), right: decodeLevel(reader) };
-    case 4:
-      return { kind: "param", name: reader.string() };
-    case 5:
-      return { kind: "mvar", name: reader.string() };
-    default:
-      throw new Error(`unsupported Lean.Level result kind ${kind}`);
-  }
-}
-function encodeLevels(writer, levels, label) {
-  const values = levels == null ? [] : normalizeArray(levels, label);
-  writer.u32(values.length);
-  values.forEach((level, index) => encodeLevel(writer, level, `${label}[${index}]`));
-}
-function decodeLevels(reader) {
-  const len = reader.u32();
-  return Array.from({ length: len }, () => decodeLevel(reader));
-}
-function encodeLiteral(writer, value, label) {
-  const literal = typeof value === "string" || typeof value === "number" || typeof value === "bigint" ? { kind: typeof value === "string" ? "string" : "nat", value } : value;
-  switch (literal?.kind) {
-    case "nat":
-      writer.u8(0);
-      writer.string(normalizeDecimal(literal.value, `${label}.value`, { signed: false }));
-      return;
-    case "string":
-      writer.u8(1);
-      writer.string(requireString2(literal.value, `${label}.value`));
-      return;
-    default:
-      throw new Error(`${label} has unsupported Lean.Literal kind ${literal?.kind}`);
-  }
-}
-function decodeLiteral(reader) {
-  const kind = reader.u8();
-  switch (kind) {
-    case 0:
-      return { kind: "nat", value: reader.string() };
-    case 1:
-      return { kind: "string", value: reader.string() };
-    default:
-      throw new Error(`unsupported Lean.Literal result kind ${kind}`);
-  }
-}
-function normalizeBinderInfo(value, label) {
-  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 3) return value;
-  switch (value) {
-    case "default":
-      return 0;
-    case "implicit":
-      return 1;
-    case "strictImplicit":
-      return 2;
-    case "instImplicit":
-      return 3;
-    default:
-      throw new Error(`${label} must be default, implicit, strictImplicit, or instImplicit`);
-  }
-}
-function decodeBinderInfo(value) {
-  return ["default", "implicit", "strictImplicit", "instImplicit"][value] ?? String(value);
-}
-function normalizeDecimal(value, label, { signed }) {
-  if (typeof value === "bigint") {
-    if (!signed && value < 0n) throw new Error(`${label} must be non-negative`);
-    return value.toString();
-  }
-  if (typeof value === "number") {
-    if (!Number.isSafeInteger(value)) throw new Error(`${label} must be a safe integer or decimal string`);
-    if (!signed && value < 0) throw new Error(`${label} must be non-negative`);
-    return String(value);
-  }
-  if (typeof value === "string") {
-    const pattern = signed ? /^-?\d+$/ : /^\d+$/;
-    if (!pattern.test(value.trim())) throw new Error(`${label} must be a decimal string`);
-    return value.trim();
-  }
-  throw new Error(`${label} must be an integer, BigInt, or decimal string`);
-}
-function normalizeArray(value, label) {
-  if (value == null || typeof value[Symbol.iterator] !== "function") {
-    throw new Error(`${label} must be iterable`);
-  }
-  return Array.from(value);
-}
-function requireString2(value, label) {
-  if (typeof value !== "string") {
-    throw new Error(`${label} must be a string`);
-  }
-  return value;
-}
-
 // web/src/runtime/vir-value-normalizers.js
-function normalizeDecimal2(value, label, { signed }) {
+function normalizeDecimal(value, label, { signed }) {
   if (typeof value === "bigint") {
     if (!signed && value < 0n) throw new Error(`${label} must be non-negative`);
     return value.toString();
@@ -2272,14 +2272,7 @@ function normalizeInteger(value, label, min, max) {
   }
   return value;
 }
-function normalizeHostResource(value, label) {
-  const ref = hostResourceExternref(value);
-  if (ref === null) {
-    throw new Error(`${label} must be a live host resource`);
-  }
-  return ref;
-}
-function normalizeArray2(value, label) {
+function normalizeArray(value, label) {
   if (value == null || typeof value[Symbol.iterator] !== "function") {
     throw new Error(`${label} must be iterable`);
   }
@@ -2492,304 +2485,79 @@ function hasOwn(value, key) {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-// web/src/runtime/vir-value-codec.js
-function encodeCallPayload(entry, args, options = {}) {
-  const writer = new BinaryWriter();
-  writer.u32(args.length);
-  entry.args.forEach((arg, index) => {
-    encodeValue(writer, arg.type, args[index], `${entry.entry} argument ${arg.name}`, options);
-  });
-  encodeTypeDescriptor(writer, entry.result, `${entry.entry} result`);
-  writer.u8(entry.effect === "io" ? 1 : 0);
-  return writer.take();
-}
-function encodeClosureCallPayload(type, args, options = {}) {
-  const fnArgs = requireFunctionArgs(type, "callback");
-  if (args.length !== fnArgs.length) {
-    throw new Error(`callback expects ${fnArgs.length} arguments, got ${args.length}`);
-  }
-  const writer = new BinaryWriter();
-  writer.u32(args.length);
-  fnArgs.forEach((arg, index) => {
-    encodeValue(writer, arg.type, args[index], `callback argument ${arg.name}`, options);
-  });
-  encodeTypeDescriptor(writer, requireFunctionResult(type, "callback"), "callback result");
-  writer.u8(type.effect === "io" ? 1 : 0);
-  return writer.take();
-}
-function decodeCallResult(type, bytes, options = {}) {
-  const reader = new BinaryReader(bytes);
-  const actualType = decodeTypeDescriptor(reader);
-  if (!sameWireType(type, actualType)) {
-    throw new Error(`result wire type mismatch: expected ${type.type ?? requireWireTag(type, "result")}, got tag ${actualType.wireTag}`);
-  }
-  const value = decodeValuePayload(reader, type, options);
-  reader.requireEnd();
-  return value;
-}
-function decodeHostCallRequest(bytes, entry, options = {}) {
-  const reader = new BinaryReader(bytes);
-  const argc = reader.u32();
-  if (argc !== entry.args.length) {
-    throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argc}`);
-  }
-  const args = entry.args.map((arg, index) => {
-    const actualType = decodeTypeDescriptor(reader);
-    if (!sameWireType(arg.type, actualType)) {
-      throw new Error(`Vir host import ${entry.target} argument ${arg.name ?? index} type mismatch`);
-    }
-    return decodeValuePayload(reader, arg.type, options);
-  });
-  const actualResult = decodeTypeDescriptor(reader);
-  if (!sameWireType(entry.result, actualResult)) {
-    throw new Error(`Vir host import ${entry.target} result type mismatch`);
-  }
-  reader.requireEnd();
-  return { args, resultType: entry.result };
-}
-function encodeHostCallResult(type, value, entry, options = {}) {
-  const writer = new BinaryWriter();
-  encodeTypeDescriptor(writer, type, `${entry.target} result`);
-  encodeValuePayload(writer, type, value, `${entry.target} result`, options);
-  return writer.take();
-}
-function encodeValue(writer, type, value, label, options) {
-  encodeTypeDescriptor(writer, type, label);
-  encodeValuePayload(writer, type, value, label, options);
-}
-function encodeValuePayload(writer, type, value, label, options = {}, selfType = null) {
-  const tag = requireWireTag(type, label);
-  switch (tag) {
-    case WIRE.RECURSIVE_SELF:
-      if (selfType === null) {
-        throw new Error(`${label} has a recursive self reference without an enclosing type`);
-      }
-      encodeValuePayload(writer, selfType, value, label, options, selfType);
-      return;
-    case WIRE.UNIT:
-      if (value !== void 0 && value !== null) throw new Error(`${label} must be undefined or null`);
-      return;
-    case WIRE.RESOURCE:
-      if (typeof options.pushIncomingResource !== "function") {
-        throw new Error(`${label} cannot be encoded without an attached resource queue`);
-      }
-      options.pushIncomingResource(normalizeHostResource(value, label));
-      return;
-    case WIRE.FUNCTION:
-      throw new Error(`${label} cannot be a JavaScript function in v1`);
-    case WIRE.NAT:
-      writer.string(normalizeDecimal2(value, label, { signed: false }));
-      return;
-    case WIRE.INT:
-      writer.string(normalizeDecimal2(value, label, { signed: true }));
-      return;
-    case WIRE.BOOL:
-      if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
-      writer.u8(value ? 1 : 0);
-      return;
-    case WIRE.STRING:
-      if (typeof value !== "string") throw new Error(`${label} must be a string`);
-      writer.string(value);
-      return;
-    case WIRE.UINT8:
-      writer.u8(normalizeInteger(value, label, 0, 255));
-      return;
-    case WIRE.UINT16:
-      writer.u32(normalizeInteger(value, label, 0, 65535));
-      return;
-    case WIRE.UINT32:
-      writer.u32(normalizeUint32(value, label));
-      return;
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-      writer.string(normalizeDecimal2(value, label, { signed: false }));
-      return;
-    case WIRE.BYTE_ARRAY:
-      writer.bytesValue(asByteArrayBytes(value));
-      return;
-    case WIRE.FLOAT:
-      writer.f64(normalizeFloat(value, label));
-      return;
-    case WIRE.FLOAT32:
-      writer.f32(normalizeFloat(value, label));
-      return;
-    case WIRE.SIMPLE_ENUM:
-      writer.u32(normalizeEnum(value, type, label));
-      return;
-    case WIRE.EXPR:
-      encodeExpr(writer, value, label);
-      return;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-      encodeSequencePayload(writer, type, value, label, options, selfType);
-      return;
-    case WIRE.OPTION: {
-      const option = normalizeOption(value, label);
-      writer.u8(option.some ? 1 : 0);
-      if (option.some) {
-        encodeValuePayload(writer, requireTypeField(type, "element", label), option.value, `${label}.value`, options, selfType);
-      }
-      return;
-    }
-    case WIRE.PROD: {
-      const pair = normalizePair(value, label);
-      encodeValuePayload(writer, requireTypeField(type, "fst", label), pair.fst, `${label}.fst`, options, selfType);
-      encodeValuePayload(writer, requireTypeField(type, "snd", label), pair.snd, `${label}.snd`, options, selfType);
-      return;
-    }
-    case WIRE.STRUCTURE: {
-      const fields = requireStructureFields(type, label);
-      const record = normalizeStructure(value, fields, label);
-      encodeNamedFieldPayloads(writer, fields, record, label, type, options);
-      return;
-    }
-    case WIRE.TAGGED_UNION: {
-      const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
-      writer.u32(index);
-      encodeValuePayload(writer, ctor.type, payload, `${label}.${ctor.jsName}`, options, selfType);
-      return;
-    }
-    case WIRE.CUSTOM_INDUCTIVE: {
-      const { index, ctor, fields } = normalizeCustomInductive(value, type, label);
-      writer.u32(index);
-      encodeNamedFieldPayloads(writer, ctor.fields, fields, `${label}.${ctor.jsName}`, type, options);
-      return;
-    }
-    default:
-      throw new Error(`${label} has unsupported wire tag ${tag}`);
-  }
-}
-function encodeSequencePayload(writer, type, value, label, options, selfType) {
-  const values = normalizeArray2(value, label);
-  writer.u32(values.length);
-  const elementType = requireTypeField(type, "element", label);
-  values.forEach((item, itemIndex) => encodeValuePayload(writer, elementType, item, `${label}[${itemIndex}]`, options, selfType));
-}
-function encodeNamedFieldPayloads(writer, fields, values, label, selfType, options) {
-  fields.forEach((field) => encodeValuePayload(writer, field.type, values[field.name], `${label}.${field.name}`, options, selfType));
-}
-function decodeValuePayload(reader, type, options = {}, selfType = null) {
-  const expectedTag = requireWireTag(type, "result");
-  let value;
-  switch (expectedTag) {
-    case WIRE.RECURSIVE_SELF:
-      if (selfType === null) {
-        throw new Error("recursive self result decoded without an enclosing type");
-      }
-      value = decodeValuePayload(reader, selfType, options, selfType);
-      break;
-    case WIRE.UNIT:
-      value = void 0;
-      break;
-    case WIRE.RESOURCE:
-      if (typeof options.takeOutgoingResource !== "function") {
-        throw new Error("resource value decoded without an attached resource queue");
-      }
-      value = options.takeOutgoingResource("resource result");
-      break;
-    case WIRE.FUNCTION:
-      if (typeof options.createCallback !== "function") {
-        throw new Error("function value decoded without an attached VirRuntime");
-      }
-      if (typeof options.takeOutgoingClosureRootId !== "function") {
-        throw new Error("function value decoded without an attached closure root queue");
-      }
-      value = options.createCallback(options.takeOutgoingClosureRootId("function result"), type);
-      break;
-    case WIRE.NAT:
-    case WIRE.INT:
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-      value = reader.string();
-      break;
-    case WIRE.BOOL:
-      value = reader.u8() !== 0;
-      break;
-    case WIRE.STRING:
-      value = reader.string();
-      break;
-    case WIRE.UINT8:
-      value = reader.u8();
-      break;
-    case WIRE.UINT16:
-    case WIRE.UINT32:
-      value = reader.u32();
-      break;
-    case WIRE.BYTE_ARRAY:
-      value = reader.bytesValue();
-      break;
-    case WIRE.FLOAT:
-      value = reader.f64();
-      break;
-    case WIRE.FLOAT32:
-      value = reader.f32();
-      break;
-    case WIRE.SIMPLE_ENUM:
-      value = enumValue(type, reader.u32());
-      break;
-    case WIRE.EXPR:
-      value = decodeExpr(reader);
-      break;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-      value = decodeSequencePayload(reader, type, options, selfType);
-      break;
-    case WIRE.OPTION:
-      value = reader.u8() === 0 ? null : decodeValuePayload(reader, requireTypeField(type, "element", "result"), options, selfType);
-      break;
-    case WIRE.PROD:
-      value = {
-        fst: decodeValuePayload(reader, requireTypeField(type, "fst", "result"), options, selfType),
-        snd: decodeValuePayload(reader, requireTypeField(type, "snd", "result"), options, selfType)
-      };
-      break;
-    case WIRE.STRUCTURE: {
-      value = decodeNamedFieldPayloads(reader, requireStructureFields(type, "result"), options, type);
-      value = flattenStructureSubobjects(type, value);
-      break;
-    }
-    case WIRE.TAGGED_UNION: {
-      const index = reader.u32();
-      const ctor = taggedUnionConstructorAt(type, index, "result");
-      value = {
-        kind: ctor.jsName,
-        value: decodeValuePayload(reader, ctor.type, options, selfType)
-      };
-      break;
-    }
-    case WIRE.CUSTOM_INDUCTIVE: {
-      const index = reader.u32();
-      const ctor = customInductiveConstructorAt(type, index, "result");
-      const fields = decodeNamedFieldPayloads(reader, ctor.fields, options, type);
-      value = ctor.fields.length === 0 ? { kind: ctor.jsName } : {
-        kind: ctor.jsName,
-        ...ctor.fields.length === 1 ? { value: fields[ctor.fields[0].name] } : { fields }
-      };
-      break;
-    }
-    default:
-      throw new Error(`unsupported result wire tag ${expectedTag}`);
-  }
-  return value;
-}
-function decodeSequencePayload(reader, type, options, selfType) {
-  const len = reader.u32();
-  const elementType = requireTypeField(type, "element", "result");
-  return Array.from({ length: len }, () => decodeValuePayload(reader, elementType, options, selfType));
-}
-function decodeNamedFieldPayloads(reader, fields, options, selfType) {
-  const values = {};
-  for (const field of fields) {
-    values[field.name] = decodeValuePayload(reader, field.type, options, selfType);
-  }
-  return values;
-}
-
 // web/src/vir-runtime.js
-var textEncoder2 = new TextEncoder();
-var textDecoder2 = new TextDecoder();
+var textEncoder = new TextEncoder();
+var textDecoder = new TextDecoder();
+var MAX_UINT32 = 0xffffffffn;
+var MAX_UINT64 = 0xffffffffffffffffn;
 var VIR_HOST_DISPOSE2 = /* @__PURE__ */ Symbol.for("lean-vir.hostDispose");
 var virCallbackStates = /* @__PURE__ */ new WeakMap();
+var objectLayoutPlanCache = /* @__PURE__ */ new WeakMap();
+var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
+var OBJECT_VALUE_EXPORTS = [
+  "vir_obj_array",
+  "vir_obj_array_get",
+  "vir_obj_array_size",
+  "vir_obj_byte_array",
+  "vir_obj_byte_array_data",
+  "vir_obj_byte_array_size",
+  "vir_obj_ctor",
+  "vir_obj_ctor_layout",
+  "vir_obj_ctor_scalar_data",
+  "vir_obj_ctor_usize_decimal",
+  "vir_obj_closure_root",
+  "vir_obj_decimal_size",
+  "vir_obj_expr_app",
+  "vir_obj_expr_bvar",
+  "vir_obj_expr_const",
+  "vir_obj_expr_forall",
+  "vir_obj_expr_fvar",
+  "vir_obj_expr_lambda",
+  "vir_obj_expr_let",
+  "vir_obj_expr_lit",
+  "vir_obj_expr_mvar",
+  "vir_obj_expr_proj",
+  "vir_obj_expr_scalar_u8",
+  "vir_obj_expr_sort",
+  "vir_obj_field",
+  "vir_obj_float",
+  "vir_obj_float_value",
+  "vir_obj_float32",
+  "vir_obj_float32_value",
+  "vir_obj_int",
+  "vir_obj_int_decimal",
+  "vir_obj_level_imax",
+  "vir_obj_level_max",
+  "vir_obj_level_mvar",
+  "vir_obj_level_param",
+  "vir_obj_level_succ",
+  "vir_obj_level_zero",
+  "vir_obj_list",
+  "vir_obj_list_head",
+  "vir_obj_list_is_nil",
+  "vir_obj_list_tail",
+  "vir_obj_literal_nat",
+  "vir_obj_literal_string",
+  "vir_obj_name_string",
+  "vir_obj_name_string_size",
+  "vir_obj_resource",
+  "vir_obj_resource_externref",
+  "vir_obj_nat",
+  "vir_obj_nat_decimal",
+  "vir_obj_is_scalar",
+  "vir_obj_scalar",
+  "vir_obj_scalar_value",
+  "vir_obj_string",
+  "vir_obj_string_data",
+  "vir_obj_string_size",
+  "vir_obj_tag",
+  "vir_obj_uint32",
+  "vir_obj_uint32_value",
+  "vir_obj_uint64",
+  "vir_obj_uint64_decimal",
+  "vir_obj_usize",
+  "vir_obj_usize_decimal"
+];
 async function fetchBytes(path, init = { cache: "no-store" }) {
   const response = await fetch(path, init);
   if (!response.ok) {
@@ -2806,7 +2574,7 @@ function createVirImports(module, overrides = {}, hostState = null) {
         if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
           throw new Error(`WASI proc_exit(${args[0]})`);
         }
-        if (spec.module === "env" && spec.name === "vir_js_call") {
+        if (spec.module === "env" && spec.name === "vir_js_call_objects") {
           throw new Error("Vir JavaScript host import called without an attached host state");
         }
         return 0;
@@ -2821,14 +2589,17 @@ function createVirImports(module, overrides = {}, hostState = null) {
   }
   if (hostState !== null) {
     imports.env ??= {};
-    imports.env.vir_js_call = (slot, requestPtr, requestLen) => hostState.call(slot, requestPtr, requestLen);
-    imports.env.vir_js_call_result_size = () => hostState.resultSize();
-    imports.env.vir_resource_take = () => hostState.takeIncomingResource();
-    imports.env.vir_resource_push = (value) => hostState.pushOutgoingResource(value);
+    imports.env.vir_js_call_objects = (slot, argvPtr, argc) => {
+      try {
+        return hostState.callObjects(slot, argvPtr, argc);
+      } catch (error) {
+        hostState.recordCallError(error);
+        return 0;
+      }
+    };
     imports.env.vir_resource_root = (value) => hostState.rootResource(value);
     imports.env.vir_resource_get = (rootId) => hostState.getRootedResource(rootId);
     imports.env.vir_resource_release = (rootId) => hostState.releaseRootedResource(rootId);
-    imports.env.vir_closure_push = (rootId) => hostState.pushOutgoingClosureRootId(rootId);
   }
   return imports;
 }
@@ -2900,13 +2671,10 @@ var VirHostState = class {
     this.manifest = null;
     this.hostImports = [];
     this.userBindings = hostBindings;
-    this.lastResultSize = 0;
     this.defaultBindings = defaultHostBindings;
     this.runtime = null;
-    this.incomingResources = [];
-    this.outgoingResources = [];
-    this.outgoingClosureRootIds = [];
     this.resourceRoots = new ExternrefResourceRoots();
+    this.callError = null;
   }
   attach(exports) {
     this.exports = exports;
@@ -2918,55 +2686,18 @@ var VirHostState = class {
     this.manifest = manifest;
     this.hostImports = manifest?.hostImports ?? [];
   }
-  resultSize() {
-    return this.lastResultSize;
-  }
-  pushIncomingResource(value) {
-    this.incomingResources.push(value);
-  }
-  takeIncomingResource() {
-    return this.incomingResources.shift() ?? null;
-  }
-  clearIncomingResources() {
-    this.incomingResources.length = 0;
-  }
-  pushOutgoingResource(value) {
-    this.outgoingResources.push(value);
-  }
-  takeOutgoingResource(label) {
-    const value = this.outgoingResources.shift() ?? null;
-    if (!isHostResource(value)) {
-      throw new Error(`${label} did not receive an externref resource`);
-    }
-    return value;
-  }
-  clearOutgoingResources() {
-    this.outgoingResources.length = 0;
-  }
-  pushOutgoingClosureRootId(rootId) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId > 4294967295) {
-      throw new Error("Lean VIR closure root id must be a positive 32-bit integer");
-    }
-    this.outgoingClosureRootIds.push(rootId);
-    return void 0;
-  }
-  takeOutgoingClosureRootId(label) {
-    const rootId = this.outgoingClosureRootIds.shift() ?? 0;
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId > 4294967295) {
-      throw new Error(`${label} did not receive a live closure root id`);
-    }
-    return rootId;
-  }
-  clearOutgoingClosureRootIds() {
-    const rootIds = this.outgoingClosureRootIds.splice(0);
-    for (const rootId of rootIds) {
-      this.exports?.vir_closure_release?.(rootId);
-    }
-  }
   clearTransientQueues() {
-    this.clearIncomingResources();
-    this.clearOutgoingResources();
-    this.clearOutgoingClosureRootIds();
+  }
+  clearCallError() {
+    this.callError = null;
+  }
+  recordCallError(error) {
+    this.callError = error instanceof Error ? error : new Error(String(error));
+  }
+  takeCallError() {
+    const error = this.callError;
+    this.callError = null;
+    return error;
   }
   rootResource(value) {
     return this.resourceRoots.root(value);
@@ -2980,9 +2711,12 @@ var VirHostState = class {
   clearResourceRoots() {
     this.resourceRoots.clear();
   }
-  call(slot, requestPtr, requestLen) {
+  callObjects(slot, argvPtr, argc) {
     if (this.exports === null) {
       throw new Error("Vir host import called before WASM exports were attached");
+    }
+    if (this.runtime === null) {
+      throw new Error("Vir host import called before runtime was attached");
     }
     const entry = this.hostImports[slot] ?? null;
     if (entry === null) {
@@ -2992,34 +2726,47 @@ var VirHostState = class {
     if (typeof binding !== "function") {
       throw new Error(`Vir host import binding not found: ${entry.target}`);
     }
-    const request = this.readWasmBytes(requestPtr, requestLen);
-    let args;
-    let resultType;
+    const args = [];
+    const liftedCallbacks = [];
     try {
-      ({ args, resultType } = decodeHostCallRequest(request, entry, this.runtime?.codecOptions ?? {}));
-      this.clearOutgoingClosureRootIds();
+      const argObjects = this.readObjectArgv(argvPtr, argc);
+      if (argObjects.length !== entry.args.length) {
+        throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
+      }
+      entry.args.forEach((arg, index) => {
+        const value2 = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        if (isVirCallback(value2)) {
+          liftedCallbacks.push(value2);
+        }
+        args.push(value2);
+      });
     } catch (error) {
-      this.clearOutgoingClosureRootIds();
+      releaseCallbacks(liftedCallbacks);
       throw error;
     }
-    const value = binding(...args);
+    let value;
+    try {
+      value = binding(...args);
+    } catch (error) {
+      releaseCallbacks(liftedCallbacks);
+      throw error;
+    }
     if (isPromiseLike(value)) {
+      releaseCallbacks(liftedCallbacks);
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
-    const result = encodeHostCallResult(resultType, value, entry, this.runtime?.codecOptions ?? {});
-    const ptr = this.exports.vir_alloc_bytes(result.byteLength);
-    new Uint8Array(this.exports.memory.buffer, ptr, result.byteLength).set(result);
-    this.lastResultSize = result.byteLength;
-    return ptr;
+    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
   }
-  readWasmBytes(ptr, len) {
-    if (ptr === 0 && len !== 0) {
-      throw new Error("Vir host import request pointer is null");
+  readObjectArgv(argvPtr, argc) {
+    if (argvPtr === 0 && argc !== 0) {
+      throw new Error("Vir host import object argv pointer is null");
     }
-    return new Uint8Array(this.exports.memory.buffer, ptr, len).slice();
+    const view = new DataView(this.exports.memory.buffer, argvPtr, argc * 4);
+    return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
   }
   dispose() {
     this.clearTransientQueues();
+    this.clearCallError();
     this.clearResourceRoots();
     disposeHostBindings(this.userBindings);
     disposeHostBindings(this.defaultBindings);
@@ -3033,10 +2780,10 @@ var VirRuntime = class {
     this.packageInfo = packageInfo;
     this.interfaceManifest = null;
     this.packageMetadata = null;
+    this.boxedCallEntryNames = /* @__PURE__ */ new Set();
     this.exportsByName = /* @__PURE__ */ Object.create(null);
     this.entriesByName = /* @__PURE__ */ Object.create(null);
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
-    this.codecOptions = valueCodecOptions(this);
     this.disposed = false;
     this.liveCallbacks = /* @__PURE__ */ new Set();
     this.hostState?.attachRuntime(this);
@@ -3047,6 +2794,7 @@ var VirRuntime = class {
       this.interfaceManifest = this.readPackageManifest();
       this.hostState?.setManifest(this.interfaceManifest);
       this.packageMetadata = this.interfaceManifest.metadata;
+      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
     }
   }
@@ -3083,6 +2831,7 @@ var VirRuntime = class {
       this.interfaceManifest = this.readPackageManifest();
       this.hostState?.setManifest(this.interfaceManifest);
       this.packageMetadata = this.interfaceManifest.metadata;
+      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
       this.packageInfo = {
         count: providerCount ?? count,
@@ -3101,6 +2850,7 @@ var VirRuntime = class {
     this.interfaceManifest = null;
     this.hostState?.setManifest(null);
     this.packageMetadata = null;
+    this.boxedCallEntryNames = /* @__PURE__ */ new Set();
     this.exportsByName = /* @__PURE__ */ Object.create(null);
     this.entriesByName = /* @__PURE__ */ Object.create(null);
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
@@ -3128,7 +2878,7 @@ var VirRuntime = class {
       registerManifestEntryKey(this.entriesByName, entry.id, entry);
       registerManifestEntryKey(this.entriesByName, entry.jsName, entry);
       this.entryCallCache.set(entry, {
-        nameBytes: textEncoder2.encode(entry.entry)
+        nameBytes: textEncoder.encode(entry.entry)
       });
       if (entry.jsName && isIdentifier(entry.jsName)) {
         this.exportsByName[entry.jsName] = (...args) => this.callEntry(entry, args);
@@ -3148,43 +2898,1213 @@ var VirRuntime = class {
   callEntry(entry, args) {
     this.requireLiveRuntime();
     this.requireFunction("vir_resolve_call");
-    this.requireFunction("vir_call_resolved");
-    this.requireFunction("vir_call_result_size");
     if (args.length !== entry.args.length) {
       throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
     }
     const cache = this.callCacheFor(entry);
     this.hostState?.clearTransientQueues();
-    let payload;
     try {
-      payload = encodeCallPayload(entry, args, this.codecOptions);
-    } catch (error) {
-      this.hostState?.clearTransientQueues();
-      throw error;
-    }
-    const payloadPtr = this.allocBytes(payload);
-    try {
-      const callSlot = this.resolveCallSlot(entry, cache);
-      const resultPtr = this.exports.vir_call_resolved(
-        callSlot,
-        payloadPtr,
-        payload.byteLength,
-        entry.result.wireTag
-      );
-      if (resultPtr === 0) {
-        throw new Error(this.lastCallError() || `call failed: ${entry.entry}`);
+      const objectResult = this.tryObjectResolvedCall(entry, args, cache);
+      if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
+        return objectResult;
       }
-      const resultLen = this.exports.vir_call_result_size();
-      return decodeCallResult(entry.result, this.readWasmBytes(resultPtr, resultLen), this.codecOptions);
+      throw new Error(`object ABI does not support interface entry ${entry.entry}`);
     } finally {
-      this.freeBytes(payloadPtr);
       this.hostState?.clearTransientQueues();
     }
+  }
+  tryObjectResolvedCall(entry, args, cache) {
+    const plan = this.objectCallPlanFor(entry, cache);
+    if (plan === null) {
+      return OBJECT_CALL_UNAVAILABLE;
+    }
+    if (!this.hasObjectValueExports()) {
+      return OBJECT_CALL_UNAVAILABLE;
+    }
+    const argObjs = [];
+    try {
+      for (let index = 0; index < plan.args.length; index++) {
+        const arg = plan.args[index];
+        argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
+      }
+      return this.callResolvedObjects(entry, cache, argObjs, (resultObj) => this.liftObjectValue(plan.resultType, resultObj, `${entry.entry} result`));
+    } finally {
+      this.releaseOwnedObjects(argObjs);
+    }
+  }
+  objectCallPlanFor(entry, cache) {
+    if (cache.objectCallPlan !== void 0) {
+      return cache.objectCallPlan;
+    }
+    const resultType = entry.result;
+    if (!objectResultSupported(resultType) || !entry.args.every((arg) => objectArgumentSupported(arg.type))) {
+      cache.objectCallPlan = null;
+      return null;
+    }
+    const hasBoxedDecl = this.boxedCallEntryNames.has(entry.entry);
+    if (!hasBoxedDecl && (objectTypeNeedsBoxedBoundary(resultType) || entry.args.some((arg) => objectTypeNeedsBoxedBoundary(arg.type)))) {
+      cache.objectCallPlan = null;
+      return null;
+    }
+    cache.objectCallPlan = {
+      args: entry.args,
+      resultType
+    };
+    return cache.objectCallPlan;
+  }
+  hasObjectValueExports() {
+    return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
+  }
+  makeObjectValue(type, value, label, selfType = null) {
+    const tag = type?.wireTag;
+    switch (tag) {
+      case WIRE.RECURSIVE_SELF:
+        if (selfType === null) {
+          throw new Error(`${label} has a recursive self reference without an enclosing type`);
+        }
+        return this.makeObjectValue(selfType, value, label, selfType);
+      case WIRE.UNIT:
+        if (value !== void 0 && value !== null) throw new Error(`${label} must be undefined or null`);
+        return this.makeObjectScalar(0, label);
+      case WIRE.RESOURCE:
+        return this.makeObjectResource(value, label);
+      case WIRE.FUNCTION:
+        throw new Error(`${label} cannot be a JavaScript function in v1`);
+      case WIRE.BOOL:
+        if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
+        return this.makeObjectScalar(value ? 1 : 0, label);
+      case WIRE.UINT8:
+        return this.makeObjectScalar(normalizeInteger(value, label, 0, 255), label);
+      case WIRE.UINT16:
+        return this.makeObjectScalar(normalizeInteger(value, label, 0, 65535), label);
+      case WIRE.SIMPLE_ENUM:
+        return this.makeObjectScalar(normalizeEnum(value, type, label), label);
+      case WIRE.NAT:
+        return this.makeObjectDecimal("vir_obj_nat", normalizeDecimal(value, label, { signed: false }), label);
+      case WIRE.INT:
+        return this.makeObjectDecimal("vir_obj_int", normalizeDecimal(value, label, { signed: true }), label);
+      case WIRE.STRING:
+        return this.makeObjectString(value, label);
+      case WIRE.UINT32:
+        return this.makeObjectUint32(value, label);
+      case WIRE.UINT64:
+        return this.makeObjectDecimal(
+          "vir_obj_uint64",
+          normalizeBoundedUnsignedDecimal(value, label, MAX_UINT64, "UInt64"),
+          label
+        );
+      case WIRE.USIZE:
+        return this.makeObjectDecimal(
+          "vir_obj_usize",
+          normalizeBoundedUnsignedDecimal(value, label, this.usizeMaxValue(), "USize"),
+          label
+        );
+      case WIRE.BYTE_ARRAY:
+        return this.makeObjectByteArray(value, label);
+      case WIRE.FLOAT:
+        return this.makeObjectFloat(value, label);
+      case WIRE.FLOAT32:
+        return this.makeObjectFloat32(value, label);
+      case WIRE.EXPR:
+        return this.makeObjectExpr(value, label);
+      case WIRE.ARRAY:
+      case WIRE.LIST:
+        return this.makeObjectSequenceValue(type, value, label, selfType);
+      case WIRE.OPTION:
+        return this.makeObjectOptionValue(type, value, label, selfType);
+      case WIRE.PROD:
+        return this.makeObjectProdValue(type, value, label, selfType);
+      case WIRE.STRUCTURE:
+        return this.makeObjectStructureValue(type, value, label);
+      case WIRE.TAGGED_UNION:
+        return this.makeObjectTaggedUnionValue(type, value, label);
+      case WIRE.CUSTOM_INDUCTIVE:
+        return this.makeObjectCustomInductiveValue(type, value, label);
+      default:
+        throw new Error(`${label} has unsupported object ABI argument type`);
+    }
+  }
+  makeObjectSequenceValue(sequenceType, value, label, selfType) {
+    const sequenceTag = sequenceType?.wireTag;
+    const builderName = sequenceTag === WIRE.ARRAY ? "vir_obj_array" : sequenceTag === WIRE.LIST ? "vir_obj_list" : null;
+    if (builderName === null) {
+      throw new Error(`${label} has unsupported object ABI sequence type`);
+    }
+    const values = normalizeArray(value, label);
+    if (values.length > 4294967295) {
+      throw new Error(`${label} has too many elements`);
+    }
+    const elementType = requireTypeField(sequenceType, "element", label);
+    const elementObjs = [];
+    try {
+      for (let index = 0; index < values.length; index++) {
+        elementObjs.push(this.makeObjectValue(elementType, values[index], `${label}[${index}]`, selfType));
+      }
+      return this.makeObjectSequenceFromOwnedElements(builderName, elementObjs, label);
+    } finally {
+      this.releaseOwnedObjects(elementObjs);
+    }
+  }
+  makeObjectOptionValue(type, value, label, selfType) {
+    const option = normalizeOption(value, label);
+    if (!option.some) {
+      return this.makeObjectScalar(0, label);
+    }
+    const fields = [
+      this.makeObjectValue(requireTypeField(type, "element", label), option.value, `${label}.value`, selfType)
+    ];
+    try {
+      return this.makeObjectCtorFromOwnedFields(1, fields, label);
+    } finally {
+      this.releaseOwnedObjects(fields);
+    }
+  }
+  makeObjectProdValue(type, value, label, selfType) {
+    const pair = normalizePair(value, label);
+    const fields = [];
+    try {
+      fields.push(this.makeObjectValue(requireTypeField(type, "fst", label), pair.fst, `${label}.fst`, selfType));
+      fields.push(this.makeObjectValue(requireTypeField(type, "snd", label), pair.snd, `${label}.snd`, selfType));
+      return this.makeObjectCtorFromOwnedFields(0, fields, label);
+    } finally {
+      this.releaseOwnedObjects(fields);
+    }
+  }
+  makeObjectStructureValue(type, value, label) {
+    const fields = requireStructureFields(type, label);
+    const record = normalizeStructure(value, fields, label);
+    const trivial = trivialStructureField(type, fields);
+    if (trivial !== null) {
+      return this.makeObjectValue(trivial.type, record[trivial.name], `${label}.${trivial.name}`, type);
+    }
+    return this.makeObjectCtorFromLayout(0, type, fields, record, label, type);
+  }
+  makeObjectTaggedUnionValue(type, value, label) {
+    const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
+    const field = taggedUnionField(ctor);
+    return this.makeObjectCtorFromLayout(index, ctor, [field], { [field.name]: payload }, label, type);
+  }
+  makeObjectCustomInductiveValue(type, value, label) {
+    const { index, ctor, fields } = normalizeCustomInductive(value, type, label);
+    if (ctor.fields.length === 0) {
+      return this.makeObjectScalar(index, label);
+    }
+    return this.makeObjectCtorFromLayout(index, ctor, ctor.fields, fields, label, type);
+  }
+  makeObjectCtorFromLayout(tag, owner, fields, values, label, selfType) {
+    const plan = objectLayoutPlan(owner, fields, label);
+    const layout = objectLayoutSlotsFromPlan(plan);
+    try {
+      for (const fieldPlan of plan.fields) {
+        const field = fieldPlan.field;
+        this.writeObjectLayoutField(layout, fieldPlan, values[field.name], `${label}.${field.name}`, selfType);
+      }
+      return this.makeObjectCtorFromOwnedLayout(tag, layout, label);
+    } finally {
+      this.releaseOwnedObjects(layout.objectFields);
+    }
+  }
+  writeObjectLayoutField(layout, fieldPlan, value, label, selfType) {
+    const field = fieldPlan.field;
+    switch (fieldPlan.kind) {
+      case "object":
+        layout.objectFields[fieldPlan.index] = this.makeObjectValue(field.type, value, label, selfType);
+        return;
+      case "usize":
+        layout.usizeFields[fieldPlan.index] = normalizeBoundedUnsignedBigInt(value, label, this.usizeMaxValue(), "USize");
+        return;
+      case "scalar":
+        writeObjectScalarField(layout.scalarBytes, field.type, field.layout, value, label, fieldPlan.offset);
+        return;
+      default:
+        throw new Error(`${label} has unsupported object ABI layout`);
+    }
+  }
+  makeObjectScalar(value, label) {
+    const argObj = this.exports.vir_obj_scalar(value);
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean scalar object`);
+    }
+    return argObj;
+  }
+  makeObjectDecimal(constructorName, decimal, label) {
+    const bytes = textEncoder.encode(decimal);
+    const inputPtr = this.allocBytes(bytes);
+    try {
+      const argObj = this.exports[constructorName](inputPtr, bytes.byteLength);
+      if (argObj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean object`);
+      }
+      return argObj;
+    } finally {
+      this.freeBytes(inputPtr);
+    }
+  }
+  makeObjectByteArray(value, label) {
+    const bytes = asByteArrayBytes(value);
+    const inputPtr = this.allocBytes(bytes);
+    try {
+      const argObj = this.exports.vir_obj_byte_array(inputPtr, bytes.byteLength);
+      if (argObj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean ByteArray object`);
+      }
+      return argObj;
+    } finally {
+      this.freeBytes(inputPtr);
+    }
+  }
+  makeObjectString(value, label) {
+    return this.withWasmString(value, label, (inputPtr, inputLen) => {
+      const argObj = this.exports.vir_obj_string(inputPtr, inputLen);
+      if (argObj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean string object`);
+      }
+      return argObj;
+    });
+  }
+  makeObjectStringConstructor(constructorName, value, stringLabel, objectLabel) {
+    return this.withWasmString(requireString2(value, stringLabel), stringLabel, (inputPtr, inputLen) => {
+      const obj = this.exports[constructorName](inputPtr, inputLen);
+      if (obj === 0) {
+        throw new Error(`${objectLabel} could not be lowered to a Lean object`);
+      }
+      return obj;
+    });
+  }
+  withWasmString(value, label, callback) {
+    const bytes = textEncoder.encode(requireString2(value, label));
+    const inputPtr = this.allocBytes(bytes);
+    try {
+      return callback(inputPtr, bytes.byteLength);
+    } finally {
+      this.freeBytes(inputPtr);
+    }
+  }
+  makeObjectUint32(value, label) {
+    const argObj = this.exports.vir_obj_uint32(normalizeUint32(value, label));
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean UInt32 object`);
+    }
+    return argObj;
+  }
+  makeObjectFloat(value, label) {
+    const argObj = this.exports.vir_obj_float(normalizeFloat(value, label));
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean Float object`);
+    }
+    return argObj;
+  }
+  makeObjectFloat32(value, label) {
+    const argObj = this.exports.vir_obj_float32(Math.fround(normalizeFloat(value, label)));
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean Float32 object`);
+    }
+    return argObj;
+  }
+  makeObjectResource(value, label) {
+    const resource = normalizeHostResource(value, label);
+    const argObj = this.exports.vir_obj_resource(resource);
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean host resource object`);
+    }
+    return argObj;
+  }
+  makeObjectExpr(value, label) {
+    const expr = typeof value === "string" ? { kind: "const", name: value, levels: [] } : value;
+    switch (expr?.kind) {
+      case "bvar":
+        return this.makeObjectDecimal(
+          "vir_obj_expr_bvar",
+          normalizeDecimal(expr.index ?? expr.deBruijnIndex, `${label}.index`, { signed: false }),
+          label
+        );
+      case "fvar":
+        return this.makeObjectStringConstructor("vir_obj_expr_fvar", expr.name, `${label}.name`, label);
+      case "mvar":
+        return this.makeObjectStringConstructor("vir_obj_expr_mvar", expr.name, `${label}.name`, label);
+      case "sort": {
+        let level = this.makeObjectLevel(expr.level ?? expr.u, `${label}.level`);
+        try {
+          const obj = this.exports.vir_obj_expr_sort(level);
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr sort object`);
+          level = 0;
+          return obj;
+        } finally {
+          this.releaseOwnedObjects([level]);
+        }
+      }
+      case "const": {
+        let levels = this.makeObjectLevelList(expr.levels ?? [], `${label}.levels`);
+        try {
+          return this.withWasmString(requireString2(expr.name, `${label}.name`), `${label}.name`, (namePtr, nameLen) => {
+            const obj = this.exports.vir_obj_expr_const(namePtr, nameLen, levels);
+            if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr const object`);
+            levels = 0;
+            return obj;
+          });
+        } finally {
+          this.releaseOwnedObjects([levels]);
+        }
+      }
+      case "app":
+        return this.makeObjectExprBinary("vir_obj_expr_app", expr.fn, `${label}.fn`, expr.arg, `${label}.arg`, label);
+      case "lam":
+      case "lambda":
+        return this.makeObjectExprBinding(
+          "vir_obj_expr_lambda",
+          expr.name ?? expr.binderName,
+          expr.type ?? expr.binderType,
+          expr.body,
+          normalizeBinderInfo(expr.binderInfo ?? "default", `${label}.binderInfo`),
+          label
+        );
+      case "forall":
+      case "forallE":
+        return this.makeObjectExprBinding(
+          "vir_obj_expr_forall",
+          expr.name ?? expr.binderName,
+          expr.type ?? expr.binderType,
+          expr.body,
+          normalizeBinderInfo(expr.binderInfo ?? "default", `${label}.binderInfo`),
+          label
+        );
+      case "let":
+      case "letE":
+        return this.makeObjectExprLet(expr, label);
+      case "lit": {
+        let literal = this.makeObjectLiteral(expr.literal ?? expr.value, `${label}.literal`);
+        try {
+          const obj = this.exports.vir_obj_expr_lit(literal);
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr literal object`);
+          literal = 0;
+          return obj;
+        } finally {
+          this.releaseOwnedObjects([literal]);
+        }
+      }
+      case "mdata":
+        return this.makeObjectExpr(expr.expr, `${label}.expr`);
+      case "proj":
+        return this.makeObjectExprProj(expr, label);
+      default:
+        throw new Error(`${label} has unsupported Lean.Expr kind ${expr?.kind}`);
+    }
+  }
+  makeObjectLevel(value, label) {
+    const level = typeof value === "string" ? { kind: value } : value ?? { kind: "zero" };
+    switch (level.kind) {
+      case "zero": {
+        const obj = this.exports.vir_obj_level_zero();
+        if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Level zero object`);
+        return obj;
+      }
+      case "succ": {
+        let child = this.makeObjectLevel(level.of ?? level.level, `${label}.of`);
+        try {
+          const obj = this.exports.vir_obj_level_succ(child);
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Level succ object`);
+          child = 0;
+          return obj;
+        } finally {
+          this.releaseOwnedObjects([child]);
+        }
+      }
+      case "max":
+        return this.makeObjectLevelBinary(
+          "vir_obj_level_max",
+          level.left ?? level.lhs,
+          `${label}.left`,
+          level.right ?? level.rhs,
+          `${label}.right`,
+          label
+        );
+      case "imax":
+        return this.makeObjectLevelBinary(
+          "vir_obj_level_imax",
+          level.left ?? level.lhs,
+          `${label}.left`,
+          level.right ?? level.rhs,
+          `${label}.right`,
+          label
+        );
+      case "param":
+        return this.makeObjectStringConstructor("vir_obj_level_param", level.name, `${label}.name`, label);
+      case "mvar":
+        return this.makeObjectStringConstructor("vir_obj_level_mvar", level.name, `${label}.name`, label);
+      default:
+        throw new Error(`${label} has unsupported Lean.Level kind ${level.kind}`);
+    }
+  }
+  makeObjectLevelList(levels, label) {
+    const values = levels == null ? [] : normalizeArray(levels, label);
+    const levelObjs = [];
+    try {
+      values.forEach((level, index) => {
+        levelObjs.push(this.makeObjectLevel(level, `${label}[${index}]`));
+      });
+      return this.makeObjectSequenceFromOwnedElements("vir_obj_list", levelObjs, label);
+    } finally {
+      this.releaseOwnedObjects(levelObjs);
+    }
+  }
+  makeObjectLiteral(value, label) {
+    const literal = typeof value === "string" || typeof value === "number" || typeof value === "bigint" ? { kind: typeof value === "string" ? "string" : "nat", value } : value;
+    switch (literal?.kind) {
+      case "nat":
+        return this.makeObjectDecimal(
+          "vir_obj_literal_nat",
+          normalizeDecimal(literal.value, `${label}.value`, { signed: false }),
+          label
+        );
+      case "string":
+        return this.makeObjectStringConstructor("vir_obj_literal_string", literal.value, `${label}.value`, label);
+      default:
+        throw new Error(`${label} has unsupported Lean.Literal kind ${literal?.kind}`);
+    }
+  }
+  makeObjectLevelBinary(constructorName, leftValue, leftLabel, rightValue, rightLabel, label) {
+    let left = this.makeObjectLevel(leftValue, leftLabel);
+    let right = 0;
+    try {
+      right = this.makeObjectLevel(rightValue, rightLabel);
+      const obj = this.exports[constructorName](left, right);
+      if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Level object`);
+      left = 0;
+      right = 0;
+      return obj;
+    } finally {
+      this.releaseOwnedObjects([left, right]);
+    }
+  }
+  makeObjectExprBinary(constructorName, leftValue, leftLabel, rightValue, rightLabel, label) {
+    let left = this.makeObjectExpr(leftValue, leftLabel);
+    let right = 0;
+    try {
+      right = this.makeObjectExpr(rightValue, rightLabel);
+      const obj = this.exports[constructorName](left, right);
+      if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr object`);
+      left = 0;
+      right = 0;
+      return obj;
+    } finally {
+      this.releaseOwnedObjects([left, right]);
+    }
+  }
+  makeObjectExprBinding(constructorName, name, typeValue, bodyValue, binderInfo, label) {
+    let type = this.makeObjectExpr(typeValue, `${label}.type`);
+    let body = 0;
+    try {
+      body = this.makeObjectExpr(bodyValue, `${label}.body`);
+      return this.withWasmString(requireString2(name, `${label}.name`), `${label}.name`, (namePtr, nameLen) => {
+        const obj = this.exports[constructorName](namePtr, nameLen, type, body, binderInfo);
+        if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr binding object`);
+        type = 0;
+        body = 0;
+        return obj;
+      });
+    } finally {
+      this.releaseOwnedObjects([type, body]);
+    }
+  }
+  makeObjectExprLet(expr, label) {
+    let type = this.makeObjectExpr(expr.type, `${label}.type`);
+    let value = 0;
+    let body = 0;
+    try {
+      value = this.makeObjectExpr(expr.value, `${label}.value`);
+      body = this.makeObjectExpr(expr.body, `${label}.body`);
+      return this.withWasmString(
+        requireString2(expr.name ?? expr.declName, `${label}.name`),
+        `${label}.name`,
+        (namePtr, nameLen) => {
+          const obj = this.exports.vir_obj_expr_let(
+            namePtr,
+            nameLen,
+            type,
+            value,
+            body,
+            expr.nondep ? 1 : 0
+          );
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr let object`);
+          type = 0;
+          value = 0;
+          body = 0;
+          return obj;
+        }
+      );
+    } finally {
+      this.releaseOwnedObjects([type, value, body]);
+    }
+  }
+  makeObjectExprProj(expr, label) {
+    let structure = this.makeObjectExpr(expr.struct ?? expr.expr, `${label}.struct`);
+    try {
+      return this.withWasmString(requireString2(expr.typeName, `${label}.typeName`), `${label}.typeName`, (typeNamePtr, typeNameLen) => this.withWasmString(
+        normalizeDecimal(expr.index ?? expr.idx, `${label}.index`, { signed: false }),
+        `${label}.index`,
+        (indexPtr, indexLen) => {
+          const obj = this.exports.vir_obj_expr_proj(typeNamePtr, typeNameLen, indexPtr, indexLen, structure);
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr proj object`);
+          structure = 0;
+          return obj;
+        }
+      ));
+    } finally {
+      this.releaseOwnedObjects([structure]);
+    }
+  }
+  makeObjectSequenceFromOwnedElements(builderName, elementObjs, label) {
+    let valuesPtr = 0;
+    try {
+      if (elementObjs.length !== 0) {
+        valuesPtr = this.allocByteLength(elementObjs.length * 4, `${label} pointer array`);
+        this.writePointerArray(valuesPtr, elementObjs);
+      }
+      const sequenceObj = this.exports[builderName](valuesPtr, elementObjs.length);
+      if (sequenceObj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean sequence object`);
+      }
+      elementObjs.length = 0;
+      return sequenceObj;
+    } finally {
+      if (valuesPtr !== 0) {
+        this.freeBytes(valuesPtr);
+      }
+    }
+  }
+  makeObjectCtorFromOwnedFields(tag, fields, label) {
+    let fieldsPtr = 0;
+    try {
+      if (fields.length !== 0) {
+        fieldsPtr = this.allocByteLength(fields.length * 4, `${label} field pointer array`);
+        this.writePointerArray(fieldsPtr, fields);
+      }
+      const obj = this.exports.vir_obj_ctor(tag, fieldsPtr, fields.length);
+      if (obj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean constructor object`);
+      }
+      fields.length = 0;
+      return obj;
+    } finally {
+      if (fieldsPtr !== 0) {
+        this.freeBytes(fieldsPtr);
+      }
+    }
+  }
+  makeObjectCtorFromOwnedLayout(tag, layout, label) {
+    let objectFieldsPtr = 0;
+    let usizeFieldsPtr = 0;
+    let scalarFieldsPtr = 0;
+    try {
+      if (layout.objectFields.length !== 0) {
+        objectFieldsPtr = this.allocByteLength(layout.objectFields.length * 4, `${label} object field pointer array`);
+        this.writePointerArray(objectFieldsPtr, layout.objectFields);
+      }
+      if (layout.usizeFields.length !== 0) {
+        const pointerBytes = this.targetPointerBytes();
+        usizeFieldsPtr = this.allocByteLength(
+          layout.usizeFields.length * pointerBytes,
+          `${label} usize field array`
+        );
+        const view = new DataView(this.exports.memory.buffer, usizeFieldsPtr, layout.usizeFields.length * pointerBytes);
+        for (let index = 0; index < layout.usizeFields.length; index++) {
+          const value = layout.usizeFields[index];
+          if (pointerBytes === 4) {
+            view.setUint32(index * pointerBytes, Number(value), true);
+          } else {
+            view.setBigUint64(index * pointerBytes, value, true);
+          }
+        }
+      }
+      if (layout.scalarBytes.byteLength !== 0) {
+        scalarFieldsPtr = this.allocBytes(layout.scalarBytes);
+      }
+      const obj = this.exports.vir_obj_ctor_layout(
+        tag,
+        objectFieldsPtr,
+        layout.objectFields.length,
+        usizeFieldsPtr,
+        layout.usizeFields.length,
+        scalarFieldsPtr,
+        layout.scalarBytes.byteLength
+      );
+      if (obj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean constructor object`);
+      }
+      layout.objectFields.length = 0;
+      return obj;
+    } finally {
+      if (objectFieldsPtr !== 0) {
+        this.freeBytes(objectFieldsPtr);
+      }
+      if (usizeFieldsPtr !== 0) {
+        this.freeBytes(usizeFieldsPtr);
+      }
+      if (scalarFieldsPtr !== 0) {
+        this.freeBytes(scalarFieldsPtr);
+      }
+    }
+  }
+  releaseOwnedObjects(objects) {
+    for (const obj of objects) {
+      if (obj !== 0) {
+        this.exports.vir_obj_dec(obj);
+      }
+    }
+    objects.length = 0;
+  }
+  callResolvedObjects(entry, cache, argObjs, liftResult) {
+    const callSlot = this.resolveCallSlot(entry, cache);
+    let argvPtr = 0;
+    let resultObj = 0;
+    try {
+      this.hostState?.clearCallError();
+      if (argObjs.length !== 0) {
+        argvPtr = this.allocByteLength(argObjs.length * 4, `${entry.entry} argv pointer array`);
+        this.writePointerArray(argvPtr, argObjs);
+      }
+      resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+      argObjs.length = 0;
+      const hostError = this.hostState?.takeCallError();
+      if (hostError) {
+        throw hostError;
+      }
+      const error = this.lastCallError();
+      if (error !== "") {
+        throw new Error(error);
+      }
+      if (resultObj === 0) {
+        throw new Error(`object call failed: ${entry.entry}`);
+      }
+      return liftResult(resultObj);
+    } finally {
+      if (argvPtr !== 0) {
+        this.freeBytes(argvPtr);
+      }
+      if (resultObj !== 0) {
+        this.exports.vir_obj_dec(resultObj);
+      }
+    }
+  }
+  hasObjectCallExports(...names) {
+    return typeof this.exports.vir_call_resolved_objects === "function" && typeof this.exports.vir_obj_dec === "function" && names.every((name) => typeof this.exports[name] === "function");
+  }
+  readObjectByteArray(obj) {
+    return this.readWasmBytes(
+      this.exports.vir_obj_byte_array_data(obj),
+      this.exports.vir_obj_byte_array_size(obj)
+    );
+  }
+  readObjectString(obj) {
+    return this.readWasmString(
+      this.exports.vir_obj_string_data(obj),
+      this.exports.vir_obj_string_size(obj)
+    );
+  }
+  readObjectDecimal(obj, decimalName) {
+    const data = this.exports[decimalName](obj);
+    const len = this.exports.vir_obj_decimal_size();
+    return this.readWasmString(data, len);
+  }
+  readObjectName(obj) {
+    const data = this.exports.vir_obj_name_string(obj);
+    const len = this.exports.vir_obj_name_string_size();
+    return this.readWasmString(data, len);
+  }
+  readObjectScalar(obj, label) {
+    if (this.exports.vir_obj_is_scalar(obj) === 0) {
+      throw new Error(`${label} is not a Lean scalar object`);
+    }
+    return this.exports.vir_obj_scalar_value(obj) >>> 0;
+  }
+  ownedObjectField(obj, index, label) {
+    const field = this.exports.vir_obj_field(obj, index);
+    if (field === 0) {
+      throw new Error(`${label} field ${index} is unavailable`);
+    }
+    return field;
+  }
+  withOwnedObjectField(obj, index, label, callback) {
+    const field = this.ownedObjectField(obj, index, label);
+    try {
+      return callback(field);
+    } finally {
+      this.exports.vir_obj_dec(field);
+    }
+  }
+  withOwnedObjectFields(obj, indexes, label, callback) {
+    const fields = [];
+    try {
+      for (const index of indexes) {
+        fields.push(this.ownedObjectField(obj, index, label));
+      }
+      return callback(fields);
+    } finally {
+      this.releaseOwnedObjects(fields);
+    }
+  }
+  liftObjectExpr(obj, label) {
+    const kind = this.exports.vir_obj_tag(obj);
+    switch (kind) {
+      case 0:
+        return this.withOwnedObjectField(obj, 0, label, (index) => ({
+          kind: "bvar",
+          index: this.readObjectDecimal(index, "vir_obj_nat_decimal")
+        }));
+      case 1:
+        return this.withOwnedObjectField(obj, 0, label, (name) => ({
+          kind: "fvar",
+          name: this.readObjectName(name)
+        }));
+      case 2:
+        return this.withOwnedObjectField(obj, 0, label, (name) => ({
+          kind: "mvar",
+          name: this.readObjectName(name)
+        }));
+      case 3:
+        return this.withOwnedObjectField(obj, 0, label, (level) => ({
+          kind: "sort",
+          level: this.liftObjectLevel(level, `${label}.level`)
+        }));
+      case 4:
+        return this.withOwnedObjectFields(obj, [0, 1], label, ([name, levels]) => ({
+          kind: "const",
+          name: this.readObjectName(name),
+          levels: this.liftObjectLevelList(levels, `${label}.levels`)
+        }));
+      case 5:
+        return this.withOwnedObjectFields(obj, [0, 1], label, ([fn, arg]) => ({
+          kind: "app",
+          fn: this.liftObjectExpr(fn, `${label}.fn`),
+          arg: this.liftObjectExpr(arg, `${label}.arg`)
+        }));
+      case 6:
+        return this.withOwnedObjectFields(obj, [0, 1, 2], label, ([name, type, body]) => ({
+          kind: "lam",
+          name: this.readObjectName(name),
+          type: this.liftObjectExpr(type, `${label}.type`),
+          body: this.liftObjectExpr(body, `${label}.body`),
+          binderInfo: decodeBinderInfo(this.exports.vir_obj_expr_scalar_u8(obj, 3))
+        }));
+      case 7:
+        return this.withOwnedObjectFields(obj, [0, 1, 2], label, ([name, type, body]) => ({
+          kind: "forall",
+          name: this.readObjectName(name),
+          type: this.liftObjectExpr(type, `${label}.type`),
+          body: this.liftObjectExpr(body, `${label}.body`),
+          binderInfo: decodeBinderInfo(this.exports.vir_obj_expr_scalar_u8(obj, 3))
+        }));
+      case 8:
+        return this.withOwnedObjectFields(obj, [0, 1, 2, 3], label, ([name, type, value, body]) => ({
+          kind: "let",
+          name: this.readObjectName(name),
+          type: this.liftObjectExpr(type, `${label}.type`),
+          value: this.liftObjectExpr(value, `${label}.value`),
+          body: this.liftObjectExpr(body, `${label}.body`),
+          nondep: this.exports.vir_obj_expr_scalar_u8(obj, 4) !== 0
+        }));
+      case 9:
+        return this.withOwnedObjectField(obj, 0, label, (literal) => ({
+          kind: "lit",
+          literal: this.liftObjectLiteral(literal, `${label}.literal`)
+        }));
+      case 10:
+        return this.withOwnedObjectField(obj, 1, label, (expr) => ({
+          kind: "mdata",
+          expr: this.liftObjectExpr(expr, `${label}.expr`)
+        }));
+      case 11:
+        return this.withOwnedObjectFields(obj, [0, 1, 2], label, ([typeName, index, structure]) => ({
+          kind: "proj",
+          typeName: this.readObjectName(typeName),
+          index: this.readObjectDecimal(index, "vir_obj_nat_decimal"),
+          struct: this.liftObjectExpr(structure, `${label}.struct`)
+        }));
+      default:
+        throw new Error(`${label} has unsupported Lean.Expr result kind ${kind}`);
+    }
+  }
+  liftObjectLevel(obj, label) {
+    if (this.exports.vir_obj_is_scalar(obj) !== 0) {
+      return { kind: "zero" };
+    }
+    const kind = this.exports.vir_obj_tag(obj);
+    switch (kind) {
+      case 0:
+        return { kind: "zero" };
+      case 1:
+        return this.withOwnedObjectField(obj, 0, label, (child) => ({
+          kind: "succ",
+          of: this.liftObjectLevel(child, `${label}.of`)
+        }));
+      case 2:
+        return this.withOwnedObjectFields(obj, [0, 1], label, ([left, right]) => ({
+          kind: "max",
+          left: this.liftObjectLevel(left, `${label}.left`),
+          right: this.liftObjectLevel(right, `${label}.right`)
+        }));
+      case 3:
+        return this.withOwnedObjectFields(obj, [0, 1], label, ([left, right]) => ({
+          kind: "imax",
+          left: this.liftObjectLevel(left, `${label}.left`),
+          right: this.liftObjectLevel(right, `${label}.right`)
+        }));
+      case 4:
+        return this.withOwnedObjectField(obj, 0, label, (name) => ({
+          kind: "param",
+          name: this.readObjectName(name)
+        }));
+      case 5:
+        return this.withOwnedObjectField(obj, 0, label, (name) => ({
+          kind: "mvar",
+          name: this.readObjectName(name)
+        }));
+      default:
+        throw new Error(`${label} has unsupported Lean.Level result kind ${kind}`);
+    }
+  }
+  liftObjectLevelList(obj, label) {
+    const values = [];
+    let cursor = obj;
+    let ownsCursor = false;
+    try {
+      while (this.exports.vir_obj_list_is_nil(cursor) === 0) {
+        const index = values.length;
+        const head = this.exports.vir_obj_list_head(cursor);
+        if (head === 0) {
+          throw new Error(`${label}[${index}] is unavailable`);
+        }
+        try {
+          values.push(this.liftObjectLevel(head, `${label}[${index}]`));
+        } finally {
+          this.exports.vir_obj_dec(head);
+        }
+        let tail = this.exports.vir_obj_list_tail(cursor);
+        try {
+          if (tail === 0) {
+            throw new Error(`${label} tail after index ${index} is unavailable`);
+          }
+          if (ownsCursor) {
+            this.exports.vir_obj_dec(cursor);
+          }
+          cursor = tail;
+          ownsCursor = true;
+          tail = 0;
+        } finally {
+          if (tail !== 0) {
+            this.exports.vir_obj_dec(tail);
+          }
+        }
+      }
+      return values;
+    } finally {
+      if (ownsCursor) {
+        this.exports.vir_obj_dec(cursor);
+      }
+    }
+  }
+  liftObjectLiteral(obj, label) {
+    const kind = this.exports.vir_obj_tag(obj);
+    switch (kind) {
+      case 0:
+        return this.withOwnedObjectField(obj, 0, label, (value) => ({
+          kind: "nat",
+          value: this.readObjectDecimal(value, "vir_obj_nat_decimal")
+        }));
+      case 1:
+        return this.withOwnedObjectField(obj, 0, label, (value) => ({
+          kind: "string",
+          value: this.readObjectString(value)
+        }));
+      default:
+        throw new Error(`${label} has unsupported Lean.Literal result kind ${kind}`);
+    }
+  }
+  liftObjectValue(type, obj, label, selfType = null) {
+    const tag = type?.wireTag;
+    switch (tag) {
+      case WIRE.RECURSIVE_SELF:
+        if (selfType === null) {
+          throw new Error(`${label} has a recursive self reference without an enclosing type`);
+        }
+        return this.liftObjectValue(selfType, obj, label, selfType);
+      case WIRE.UNIT:
+        return void 0;
+      case WIRE.RESOURCE:
+        return this.liftObjectResource(obj, label);
+      case WIRE.FUNCTION:
+        return this.liftObjectFunction(type, obj, label);
+      case WIRE.BOOL:
+        return this.readObjectScalar(obj, label) !== 0;
+      case WIRE.UINT8:
+        return this.readBoundedObjectScalar(obj, label, 255);
+      case WIRE.UINT16:
+        return this.readBoundedObjectScalar(obj, label, 65535);
+      case WIRE.SIMPLE_ENUM:
+        return enumValue(type, this.readObjectScalar(obj, label));
+      case WIRE.NAT:
+        return this.readObjectDecimal(obj, "vir_obj_nat_decimal");
+      case WIRE.INT:
+        return this.readObjectDecimal(obj, "vir_obj_int_decimal");
+      case WIRE.STRING:
+        return this.readObjectString(obj);
+      case WIRE.UINT32:
+        return this.exports.vir_obj_uint32_value(obj) >>> 0;
+      case WIRE.UINT64:
+        return this.readObjectDecimal(obj, "vir_obj_uint64_decimal");
+      case WIRE.USIZE:
+        return this.readObjectDecimal(obj, "vir_obj_usize_decimal");
+      case WIRE.BYTE_ARRAY:
+        return this.readObjectByteArray(obj);
+      case WIRE.FLOAT:
+        return this.exports.vir_obj_float_value(obj);
+      case WIRE.FLOAT32:
+        return Math.fround(this.exports.vir_obj_float32_value(obj));
+      case WIRE.EXPR:
+        return this.liftObjectExpr(obj, label);
+      case WIRE.ARRAY:
+        return this.liftObjectArrayValue(type, obj, label, selfType);
+      case WIRE.LIST:
+        return this.liftObjectListValue(type, obj, label, selfType);
+      case WIRE.OPTION:
+        return this.liftObjectOptionValue(type, obj, label, selfType);
+      case WIRE.PROD:
+        return this.liftObjectProdValue(type, obj, label, selfType);
+      case WIRE.STRUCTURE:
+        return this.liftObjectStructureValue(type, obj, label);
+      case WIRE.TAGGED_UNION:
+        return this.liftObjectTaggedUnionValue(type, obj, label);
+      case WIRE.CUSTOM_INDUCTIVE:
+        return this.liftObjectCustomInductiveValue(type, obj, label);
+      default:
+        throw new Error(`${label} has unsupported object ABI result type`);
+    }
+  }
+  readBoundedObjectScalar(obj, label, max) {
+    const value = this.readObjectScalar(obj, label);
+    if (value > max) {
+      throw new Error(`${label} scalar value ${value} exceeds ${max}`);
+    }
+    return value;
+  }
+  liftObjectResource(obj, label) {
+    const resource = this.exports.vir_obj_resource_externref(obj);
+    if (isHostResource(resource)) {
+      return resource;
+    }
+    if (this.exports.vir_obj_is_scalar(obj) === 0 && this.exports.vir_obj_tag(obj) === 0) {
+      const field = this.exports.vir_obj_field(obj, 0);
+      if (field !== 0) {
+        try {
+          const nested = this.exports.vir_obj_resource_externref(field);
+          if (isHostResource(nested)) {
+            return nested;
+          }
+        } finally {
+          this.exports.vir_obj_dec(field);
+        }
+      }
+    }
+    throw new Error(`${label} did not lift to a live host resource`);
+  }
+  liftObjectFunction(type, obj, label) {
+    const args = requireFunctionArgs(type, label);
+    requireFunctionResult(type, label);
+    const rootId = this.exports.vir_obj_closure_root(
+      obj,
+      args.length,
+      interfaceEffectRuntimeTag(type.effect)
+    );
+    if (rootId === 0) {
+      throw new Error(`${label} could not be rooted as a Lean callback`);
+    }
+    return createVirCallback(this, rootId, type);
+  }
+  liftObjectArrayValue(type, obj, label, selfType) {
+    const len = this.exports.vir_obj_array_size(obj);
+    const elementType = requireTypeField(type, "element", label);
+    const values = [];
+    for (let index = 0; index < len; index++) {
+      const element = this.exports.vir_obj_array_get(obj, index);
+      if (element === 0) {
+        throw new Error(`${label}[${index}] is unavailable`);
+      }
+      try {
+        values.push(this.liftObjectValue(elementType, element, `${label}[${index}]`, selfType));
+      } finally {
+        this.exports.vir_obj_dec(element);
+      }
+    }
+    return values;
+  }
+  liftObjectListValue(type, obj, label, selfType) {
+    const elementType = requireTypeField(type, "element", label);
+    const values = [];
+    let cursor = obj;
+    let ownsCursor = false;
+    try {
+      while (this.exports.vir_obj_list_is_nil(cursor) === 0) {
+        const index = values.length;
+        const head = this.exports.vir_obj_list_head(cursor);
+        if (head === 0) {
+          throw new Error(`${label}[${index}] is unavailable`);
+        }
+        try {
+          values.push(this.liftObjectValue(elementType, head, `${label}[${index}]`, selfType));
+        } finally {
+          this.exports.vir_obj_dec(head);
+        }
+        let tail = this.exports.vir_obj_list_tail(cursor);
+        try {
+          if (tail === 0) {
+            throw new Error(`${label} tail after index ${index} is unavailable`);
+          }
+          if (ownsCursor) {
+            this.exports.vir_obj_dec(cursor);
+          }
+          cursor = tail;
+          ownsCursor = true;
+          tail = 0;
+        } finally {
+          if (tail !== 0) {
+            this.exports.vir_obj_dec(tail);
+          }
+        }
+      }
+      return values;
+    } finally {
+      if (ownsCursor) {
+        this.exports.vir_obj_dec(cursor);
+      }
+    }
+  }
+  liftObjectOptionValue(type, obj, label, selfType) {
+    const tag = this.exports.vir_obj_tag(obj);
+    if (tag === 0) {
+      return null;
+    }
+    if (tag !== 1) {
+      throw new Error(`${label} has unexpected Option constructor tag ${tag}`);
+    }
+    const field = this.ownedObjectField(obj, 0, label);
+    try {
+      return this.liftObjectValue(requireTypeField(type, "element", label), field, `${label}.value`, selfType);
+    } finally {
+      this.exports.vir_obj_dec(field);
+    }
+  }
+  liftObjectProdValue(type, obj, label, selfType) {
+    const fst = this.ownedObjectField(obj, 0, label);
+    try {
+      const snd = this.ownedObjectField(obj, 1, label);
+      try {
+        return {
+          fst: this.liftObjectValue(requireTypeField(type, "fst", label), fst, `${label}.fst`, selfType),
+          snd: this.liftObjectValue(requireTypeField(type, "snd", label), snd, `${label}.snd`, selfType)
+        };
+      } finally {
+        this.exports.vir_obj_dec(snd);
+      }
+    } finally {
+      this.exports.vir_obj_dec(fst);
+    }
+  }
+  liftObjectStructureValue(type, obj, label) {
+    const fields = requireStructureFields(type, label);
+    const trivial = trivialStructureField(type, fields);
+    if (trivial !== null) {
+      return { [trivial.name]: this.liftObjectValue(trivial.type, obj, `${label}.${trivial.name}`, type) };
+    }
+    const plan = objectLayoutPlan(type, fields, label);
+    const values = {};
+    for (const fieldPlan of plan.fields) {
+      const field = fieldPlan.field;
+      values[field.name] = this.liftObjectLayoutField(type, obj, fieldPlan, `${label}.${field.name}`);
+    }
+    return flattenStructureSubobjects(type, values);
+  }
+  liftObjectTaggedUnionValue(type, obj, label) {
+    const tag = this.exports.vir_obj_tag(obj);
+    const ctor = taggedUnionConstructorAt(type, tag, label);
+    const field = taggedUnionField(ctor);
+    const plan = objectLayoutPlan(ctor, [field], label);
+    return {
+      kind: ctor.jsName,
+      value: this.liftObjectLayoutField(ctor, obj, plan.fields[0], `${label}.${ctor.jsName}`, type)
+    };
+  }
+  liftObjectCustomInductiveValue(type, obj, label) {
+    const tag = this.exports.vir_obj_tag(obj);
+    const ctor = customInductiveConstructorAt(type, tag, label);
+    if (ctor.fields.length === 0) {
+      return { kind: ctor.jsName };
+    }
+    const plan = objectLayoutPlan(ctor, ctor.fields, `${label}.${ctor.jsName}`);
+    const values = {};
+    for (const fieldPlan of plan.fields) {
+      const field = fieldPlan.field;
+      values[field.name] = this.liftObjectLayoutField(
+        ctor,
+        obj,
+        fieldPlan,
+        `${label}.${ctor.jsName}.${field.name}`,
+        type
+      );
+    }
+    return ctor.fields.length === 1 ? {
+      kind: ctor.jsName,
+      value: values[ctor.fields[0].name]
+    } : {
+      kind: ctor.jsName,
+      fields: values
+    };
+  }
+  liftObjectLayoutField(owner, obj, fieldPlan, label, selfType = owner) {
+    const field = fieldPlan.field;
+    switch (fieldPlan.kind) {
+      case "object": {
+        const fieldObj = this.ownedObjectField(obj, fieldPlan.index, label);
+        try {
+          return this.liftObjectValue(field.type, fieldObj, label, selfType);
+        } finally {
+          this.exports.vir_obj_dec(fieldObj);
+        }
+      }
+      case "usize":
+        return this.readObjectUSizeField(obj, field.layout.index, label);
+      case "scalar":
+        return this.readObjectScalarField(owner, obj, field.type, field.layout, label, fieldPlan.offset);
+      default:
+        throw new Error(`${label} has unsupported object ABI layout`);
+    }
+  }
+  readObjectUSizeField(obj, index, label) {
+    const data = this.exports.vir_obj_ctor_usize_decimal(obj, index);
+    if (data === 0) {
+      throw new Error(`${label} USize field ${index} is unavailable`);
+    }
+    return this.readWasmString(data, this.exports.vir_obj_decimal_size());
+  }
+  readObjectScalarField(owner, obj, type, layout, label, offset = null) {
+    const data = this.exports.vir_obj_ctor_scalar_data(obj, owner.usizeFieldCount);
+    if (data === 0) {
+      throw new Error(`${label} scalar data is unavailable`);
+    }
+    return readObjectScalarField(
+      new DataView(this.exports.memory.buffer, data, owner.scalarByteSize),
+      type,
+      layout,
+      label,
+      offset
+    );
+  }
+  usizeMaxValue() {
+    return this.targetPointerBytes() === 4 ? MAX_UINT32 : MAX_UINT64;
   }
   callCacheFor(entry) {
     let cache = this.entryCallCache.get(entry);
     if (cache === void 0) {
-      cache = { nameBytes: textEncoder2.encode(entry.entry) };
+      cache = { nameBytes: textEncoder.encode(entry.entry) };
       this.entryCallCache.set(entry, cache);
     }
     return cache;
@@ -3210,17 +4130,33 @@ var VirRuntime = class {
     return len === 0 ? "" : this.readWasmString(this.exports.vir_call_error(), len);
   }
   allocBytes(bytes) {
-    this.requireFunction("vir_alloc_bytes");
     const view = asBytes(bytes, "bytes");
-    const ptr = this.exports.vir_alloc_bytes(view.byteLength);
+    const ptr = this.allocByteLength(view.byteLength, "bytes");
     new Uint8Array(this.exports.memory.buffer, ptr, view.byteLength).set(view);
     return ptr;
+  }
+  allocByteLength(byteLength, label) {
+    this.requireFunction("vir_alloc_bytes");
+    if (!Number.isInteger(byteLength) || byteLength < 0) {
+      throw new Error(`${label} byte length must be a non-negative integer`);
+    }
+    const ptr = this.exports.vir_alloc_bytes(byteLength);
+    if (ptr === 0 && byteLength !== 0) {
+      throw new Error(`${label} allocation failed`);
+    }
+    return ptr;
+  }
+  writePointerArray(ptr, values) {
+    const view = new DataView(this.exports.memory.buffer, ptr, values.length * 4);
+    for (let index = 0; index < values.length; index++) {
+      view.setUint32(index * 4, values[index], true);
+    }
   }
   freeBytes(ptr) {
     this.exports.vir_free_bytes?.(ptr);
   }
   readWasmString(ptr, len) {
-    return textDecoder2.decode(new Uint8Array(this.exports.memory.buffer, ptr, len));
+    return textDecoder.decode(new Uint8Array(this.exports.memory.buffer, ptr, len));
   }
   readWasmBytes(ptr, len) {
     return new Uint8Array(this.exports.memory.buffer, ptr, len).slice();
@@ -3243,27 +4179,44 @@ var VirRuntime = class {
   }
   callClosure(rootId, type, args) {
     this.requireLiveRuntime();
-    this.requireFunction("vir_closure_call");
-    this.requireFunction("vir_closure_call_result_size");
+    this.requireFunction("vir_closure_call_objects");
     this.hostState?.clearTransientQueues();
-    let payload;
-    try {
-      payload = encodeClosureCallPayload(type, args, this.codecOptions);
-    } catch (error) {
-      this.hostState?.clearTransientQueues();
-      throw error;
+    const fnArgs = requireFunctionArgs(type, "callback");
+    if (args.length !== fnArgs.length) {
+      throw new Error(`callback expects ${fnArgs.length} arguments, got ${args.length}`);
     }
-    const payloadPtr = this.allocBytes(payload);
+    const argObjs = [];
     try {
-      const resultPtr = this.exports.vir_closure_call(rootId, payloadPtr, payload.byteLength);
-      if (resultPtr === 0) {
+      fnArgs.forEach((arg, index) => {
+        argObjs.push(this.makeObjectValue(arg.type, args[index], `callback argument ${arg.name}`));
+      });
+      return this.callClosureObjects(rootId, type, argObjs);
+    } finally {
+      this.releaseOwnedObjects(argObjs);
+      this.hostState?.clearTransientQueues();
+    }
+  }
+  callClosureObjects(rootId, type, argObjs) {
+    let argvPtr = 0;
+    let resultObj = 0;
+    try {
+      if (argObjs.length !== 0) {
+        argvPtr = this.allocByteLength(argObjs.length * 4, "callback argv pointer array");
+        this.writePointerArray(argvPtr, argObjs);
+      }
+      resultObj = this.exports.vir_closure_call_objects(rootId, argvPtr, argObjs.length);
+      argObjs.length = 0;
+      if (resultObj === 0) {
         throw new Error(this.lastClosureCallError() || "closure call failed");
       }
-      const resultLen = this.exports.vir_closure_call_result_size();
-      return decodeCallResult(type.result, this.readWasmBytes(resultPtr, resultLen), this.codecOptions);
+      return this.liftObjectValue(requireFunctionResult(type, "callback"), resultObj, "callback result");
     } finally {
-      this.freeBytes(payloadPtr);
-      this.hostState?.clearTransientQueues();
+      if (argvPtr !== 0) {
+        this.freeBytes(argvPtr);
+      }
+      if (resultObj !== 0) {
+        this.exports.vir_obj_dec(resultObj);
+      }
     }
   }
   releaseClosure(rootId) {
@@ -3338,23 +4291,443 @@ function requireVirCallbackState(callback) {
   }
   return state;
 }
-function valueCodecOptions(runtime) {
-  return runtime === null ? {} : {
-    createCallback: (rootId, type) => createVirCallback(runtime, rootId, type),
-    pushIncomingResource: (value) => requireVirHostState(runtime).pushIncomingResource(value),
-    takeOutgoingResource: (label) => requireVirHostState(runtime).takeOutgoingResource(label),
-    takeOutgoingClosureRootId: (label) => requireVirHostState(runtime).takeOutgoingClosureRootId(label)
-  };
-}
-function requireVirHostState(runtime) {
-  if (runtime.hostState === null) {
-    throw new Error("VirRuntime is missing an attached host state");
-  }
-  return runtime.hostState;
-}
 function registerManifestEntryKey(map, key, entry) {
   if (typeof key === "string" && key !== "" && map[key] === void 0) {
     map[key] = entry;
+  }
+}
+function boxedCallEntryNames(manifest) {
+  const names = /* @__PURE__ */ new Set();
+  for (const target of manifest?.metadata?.targets ?? []) {
+    for (const root of target?.resolvedRoots ?? []) {
+      if (typeof root === "string" && root.endsWith("._boxed")) {
+        names.add(root.slice(0, -"._boxed".length));
+      }
+    }
+  }
+  return names;
+}
+function objectArgumentSupported(type, selfType = null) {
+  const tag = type?.wireTag;
+  switch (tag) {
+    case WIRE.RECURSIVE_SELF:
+      return selfType !== null;
+    case WIRE.UNIT:
+    case WIRE.RESOURCE:
+    case WIRE.BOOL:
+    case WIRE.NAT:
+    case WIRE.INT:
+    case WIRE.STRING:
+    case WIRE.UINT8:
+    case WIRE.UINT16:
+    case WIRE.UINT32:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
+    case WIRE.BYTE_ARRAY:
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
+    case WIRE.EXPR:
+    case WIRE.SIMPLE_ENUM:
+      return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      return objectArgumentSupported(requireTypeField(type, "element", "object argument"), selfType);
+    case WIRE.PROD:
+      return objectArgumentSupported(requireTypeField(type, "fst", "object argument"), selfType) && objectArgumentSupported(requireTypeField(type, "snd", "object argument"), selfType);
+    case WIRE.STRUCTURE:
+      return objectStructureSupported(type, objectArgumentSupported);
+    case WIRE.TAGGED_UNION:
+      return objectTaggedUnionSupported(type, objectArgumentSupported);
+    case WIRE.CUSTOM_INDUCTIVE:
+      return objectCustomInductiveSupported(type, objectArgumentSupported);
+    default:
+      return false;
+  }
+}
+function objectResultSupported(type, selfType = null) {
+  const tag = type?.wireTag;
+  switch (tag) {
+    case WIRE.RECURSIVE_SELF:
+      return selfType !== null;
+    case WIRE.UNIT:
+    case WIRE.RESOURCE:
+    case WIRE.FUNCTION:
+    case WIRE.BOOL:
+    case WIRE.NAT:
+    case WIRE.INT:
+    case WIRE.STRING:
+    case WIRE.UINT8:
+    case WIRE.UINT16:
+    case WIRE.UINT32:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
+    case WIRE.BYTE_ARRAY:
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
+    case WIRE.EXPR:
+    case WIRE.SIMPLE_ENUM:
+      return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      return objectResultSupported(requireTypeField(type, "element", "object result"), selfType);
+    case WIRE.PROD:
+      return objectResultSupported(requireTypeField(type, "fst", "object result"), selfType) && objectResultSupported(requireTypeField(type, "snd", "object result"), selfType);
+    case WIRE.STRUCTURE:
+      return objectStructureSupported(type, objectResultSupported);
+    case WIRE.TAGGED_UNION:
+      return objectTaggedUnionSupported(type, objectResultSupported);
+    case WIRE.CUSTOM_INDUCTIVE:
+      return objectCustomInductiveSupported(type, objectResultSupported);
+    default:
+      return false;
+  }
+}
+function objectTypeNeedsBoxedBoundary(type) {
+  switch (type?.wireTag) {
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
+    case WIRE.UINT64:
+      return true;
+    case WIRE.STRUCTURE: {
+      const fields = requireStructureFields(type, "object boundary");
+      const trivial = trivialStructureField(type, fields);
+      return trivial !== null && objectTypeNeedsBoxedBoundary(trivial.type);
+    }
+    default:
+      return false;
+  }
+}
+function objectStructureSupported(type, fieldSupported) {
+  const fields = requireStructureFields(type, "object structure");
+  const trivial = trivialStructureField(type, fields);
+  if (trivial !== null) {
+    return fieldSupported(trivial.type, type);
+  }
+  return objectLayoutSupported(type, fields, fieldSupported, type);
+}
+function objectTaggedUnionSupported(type, fieldSupported) {
+  return requireTaggedUnionConstructors(type, "object tagged union").every((ctor) => objectLayoutSupported(ctor, [taggedUnionField(ctor)], fieldSupported, type));
+}
+function objectCustomInductiveSupported(type, fieldSupported) {
+  return requireCustomInductiveConstructors(type, "object custom inductive").every((ctor) => {
+    if (ctor.fields.length === 0) {
+      const counts = objectRuntimeCounts(ctor, "object custom inductive");
+      return counts.objectFieldCount === 0 && counts.usizeFieldCount === 0 && counts.scalarByteSize === 0;
+    }
+    return objectLayoutSupported(ctor, ctor.fields, fieldSupported, type);
+  });
+}
+function objectLayoutSupported(owner, fields, fieldSupported, selfType) {
+  let plan;
+  try {
+    plan = objectLayoutPlan(owner, fields, "object layout");
+  } catch {
+    return false;
+  }
+  return plan.fields.every((fieldPlan) => objectFieldPlanSupported(fieldPlan, fieldSupported, selfType));
+}
+function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
+  const field = fieldPlan.field;
+  switch (fieldPlan.kind) {
+    case "object":
+      return fieldSupported(field.type, selfType);
+    case "usize":
+      return field.type?.wireTag === WIRE.USIZE;
+    case "scalar":
+      return objectScalarFieldSupported(field.type, field.layout);
+    default:
+      return false;
+  }
+}
+function trivialStructureField(type, fields) {
+  const index = type?.trivialFieldIndex;
+  if (!Number.isInteger(index)) {
+    return null;
+  }
+  if (index < 0 || index >= fields.length) {
+    throw new Error(`${type?.type ?? "structure"} has invalid trivial field index`);
+  }
+  return fields[index];
+}
+function taggedUnionField(ctor) {
+  return {
+    name: ctor.jsName,
+    type: ctor.type,
+    layout: ctor.layout
+  };
+}
+function objectLayoutSlotsFromPlan(plan) {
+  return {
+    objectFields: Array(plan.objectFieldCount).fill(0),
+    usizeFields: Array(plan.usizeFieldCount).fill(0n),
+    scalarBytes: new Uint8Array(plan.scalarByteSize)
+  };
+}
+function objectLayoutPlan(owner, fields, label) {
+  const cacheable = owner !== null && (typeof owner === "object" || typeof owner === "function");
+  let cachedPlans;
+  if (cacheable) {
+    cachedPlans = objectLayoutPlanCache.get(owner);
+    if (cachedPlans !== void 0) {
+      for (const plan2 of cachedPlans) {
+        if (objectLayoutPlanMatches(plan2, fields)) {
+          return plan2;
+        }
+      }
+    }
+  }
+  const counts = objectRuntimeCounts(owner, label);
+  const fieldPlans = [];
+  const seenObjects = /* @__PURE__ */ new Set();
+  const seenUSize = /* @__PURE__ */ new Set();
+  const seenScalarBytes = /* @__PURE__ */ new Set();
+  for (const field of fields) {
+    const fieldLabel = `${label}.${field.name ?? "field"}`;
+    switch (field.layout.kind) {
+      case "object": {
+        const index = objectLayoutIndex(owner, field.layout, fieldLabel);
+        if (index === null) {
+          throw new Error(`${fieldLabel} has unsupported object ABI layout`);
+        }
+        if (seenObjects.has(index)) {
+          throw new Error(`${fieldLabel} duplicates object field index ${index}`);
+        }
+        seenObjects.add(index);
+        fieldPlans.push({ field, kind: "object", index });
+        break;
+      }
+      case "usize": {
+        const index = usizeLayoutIndex(owner, field.layout, fieldLabel);
+        if (index === null) {
+          throw new Error(`${fieldLabel} has unsupported object ABI layout`);
+        }
+        if (seenUSize.has(index)) {
+          throw new Error(`${fieldLabel} duplicates USize field index ${field.layout.index}`);
+        }
+        seenUSize.add(index);
+        fieldPlans.push({ field, kind: "usize", index });
+        break;
+      }
+      case "scalar": {
+        const offset = scalarLayoutOffset(field.layout, counts.scalarByteSize, fieldLabel);
+        for (let index = field.layout.offset; index < field.layout.offset + field.layout.size; index++) {
+          if (seenScalarBytes.has(index)) {
+            throw new Error(`${fieldLabel} overlaps scalar byte ${index}`);
+          }
+          seenScalarBytes.add(index);
+        }
+        fieldPlans.push({ field, kind: "scalar", offset });
+        break;
+      }
+      default:
+        throw new Error(`${fieldLabel} has unsupported object ABI layout`);
+    }
+  }
+  const plan = {
+    objectFieldCount: counts.objectFieldCount,
+    usizeFieldCount: counts.usizeFieldCount,
+    scalarByteSize: counts.scalarByteSize,
+    fields: fieldPlans
+  };
+  if (!cacheable) {
+    return plan;
+  }
+  if (cachedPlans === void 0) {
+    objectLayoutPlanCache.set(owner, [plan]);
+  } else {
+    cachedPlans.push(plan);
+  }
+  return plan;
+}
+function objectLayoutPlanMatches(plan, fields) {
+  if (plan.fields.length !== fields.length) {
+    return false;
+  }
+  for (let index = 0; index < fields.length; index++) {
+    if (!sameLayoutField(plan.fields[index].field, fields[index])) {
+      return false;
+    }
+  }
+  return true;
+}
+function sameLayoutField(lhs, rhs) {
+  return lhs === rhs || lhs?.name === rhs?.name && lhs?.type === rhs?.type && sameLayout(lhs?.layout, rhs?.layout);
+}
+function sameLayout(lhs, rhs) {
+  return lhs === rhs || lhs?.kind === rhs?.kind && lhs?.index === rhs?.index && lhs?.offset === rhs?.offset && lhs?.size === rhs?.size;
+}
+function objectRuntimeCounts(owner, label) {
+  const objectFieldCount = owner?.objectFieldCount;
+  const usizeFieldCount = owner?.usizeFieldCount;
+  const scalarByteSize = owner?.scalarByteSize;
+  if (!Number.isInteger(objectFieldCount) || objectFieldCount < 0 || !Number.isInteger(usizeFieldCount) || usizeFieldCount < 0 || !Number.isInteger(scalarByteSize) || scalarByteSize < 0) {
+    throw new Error(`${label} has unsupported object ABI runtime counts`);
+  }
+  return { objectFieldCount, usizeFieldCount, scalarByteSize };
+}
+function objectLayoutIndex(owner, layout, label) {
+  if (layout?.kind !== "object" || !Number.isInteger(layout.index)) {
+    return null;
+  }
+  const { objectFieldCount } = objectRuntimeCounts(owner, label);
+  return layout.index >= 0 && layout.index < objectFieldCount ? layout.index : null;
+}
+function usizeLayoutIndex(owner, layout, label) {
+  if (layout?.kind !== "usize" || !Number.isInteger(layout.index)) {
+    return null;
+  }
+  const { objectFieldCount, usizeFieldCount } = objectRuntimeCounts(owner, label);
+  const index = layout.index - objectFieldCount;
+  return index >= 0 && index < usizeFieldCount ? index : null;
+}
+function scalarLayoutOffset(layout, scalarByteSize, label) {
+  if (layout?.kind !== "scalar" || !Number.isInteger(layout.offset) || !Number.isInteger(layout.size) || layout.offset < 0 || layout.size <= 0 || layout.offset + layout.size > scalarByteSize) {
+    throw new Error(`${label} has unsupported object ABI scalar layout`);
+  }
+  return layout.offset;
+}
+function objectScalarFieldSupported(type, layout) {
+  if (layout?.kind !== "scalar") {
+    return false;
+  }
+  switch (type?.wireTag) {
+    case WIRE.BOOL:
+    case WIRE.SIMPLE_ENUM:
+      return [1, 2, 4, 8].includes(layout.size);
+    case WIRE.UINT8:
+      return layout.size === 1;
+    case WIRE.UINT16:
+      return layout.size === 2;
+    case WIRE.UINT32:
+    case WIRE.FLOAT32:
+      return layout.size === 4;
+    case WIRE.UINT64:
+    case WIRE.FLOAT:
+      return layout.size === 8;
+    default:
+      return false;
+  }
+}
+function writeObjectScalarField(bytes, type, layout, value, label, offset = null) {
+  offset ??= scalarLayoutOffset(layout, bytes.byteLength, label);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  switch (type?.wireTag) {
+    case WIRE.BOOL:
+      if (typeof value !== "boolean") {
+        throw new Error(`${label} must be a boolean`);
+      }
+      writeScalarUnsigned(view, offset, layout.size, value ? 1n : 0n, label);
+      return;
+    case WIRE.UINT8:
+      requireScalarSize(layout, 1, label);
+      view.setUint8(offset, normalizeInteger(value, label, 0, 255));
+      return;
+    case WIRE.UINT16:
+      requireScalarSize(layout, 2, label);
+      view.setUint16(offset, normalizeInteger(value, label, 0, 65535), true);
+      return;
+    case WIRE.UINT32:
+      requireScalarSize(layout, 4, label);
+      view.setUint32(offset, normalizeUint32(value, label), true);
+      return;
+    case WIRE.UINT64:
+      requireScalarSize(layout, 8, label);
+      view.setBigUint64(offset, normalizeBoundedUnsignedBigInt(value, label, MAX_UINT64, "UInt64"), true);
+      return;
+    case WIRE.FLOAT:
+      requireScalarSize(layout, 8, label);
+      view.setFloat64(offset, normalizeFloat(value, label), true);
+      return;
+    case WIRE.FLOAT32:
+      requireScalarSize(layout, 4, label);
+      view.setFloat32(offset, Math.fround(normalizeFloat(value, label)), true);
+      return;
+    case WIRE.SIMPLE_ENUM:
+      writeScalarUnsigned(view, offset, layout.size, BigInt(normalizeEnum(value, type, label)), label);
+      return;
+    default:
+      throw new Error(`${label} has unsupported object ABI scalar type`);
+  }
+}
+function readObjectScalarField(view, type, layout, label, offset = null) {
+  offset ??= scalarLayoutOffset(layout, view.byteLength, label);
+  switch (type?.wireTag) {
+    case WIRE.BOOL:
+      return readScalarUnsigned(view, offset, layout.size, label) !== 0n;
+    case WIRE.UINT8:
+      requireScalarSize(layout, 1, label);
+      return view.getUint8(offset);
+    case WIRE.UINT16:
+      requireScalarSize(layout, 2, label);
+      return view.getUint16(offset, true);
+    case WIRE.UINT32:
+      requireScalarSize(layout, 4, label);
+      return view.getUint32(offset, true);
+    case WIRE.UINT64:
+      requireScalarSize(layout, 8, label);
+      return view.getBigUint64(offset, true).toString();
+    case WIRE.FLOAT:
+      requireScalarSize(layout, 8, label);
+      return view.getFloat64(offset, true);
+    case WIRE.FLOAT32:
+      requireScalarSize(layout, 4, label);
+      return Math.fround(view.getFloat32(offset, true));
+    case WIRE.SIMPLE_ENUM: {
+      const tag = readScalarUnsigned(view, offset, layout.size, label);
+      if (tag > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new Error(`${label} enum tag is too large for JavaScript`);
+      }
+      return enumValue(type, Number(tag));
+    }
+    default:
+      throw new Error(`${label} has unsupported object ABI scalar type`);
+  }
+}
+function requireScalarSize(layout, expected, label) {
+  if (layout.size !== expected) {
+    throw new Error(`${label} has scalar size ${layout.size}, expected ${expected}`);
+  }
+}
+function writeScalarUnsigned(view, offset, size, value, label) {
+  const normalized = typeof value === "bigint" ? value : BigInt(value);
+  if (normalized < 0n) {
+    throw new Error(`${label} must be non-negative`);
+  }
+  switch (size) {
+    case 1:
+      if (normalized > 0xffn) throw new Error(`${label} exceeds UInt8 scalar field size`);
+      view.setUint8(offset, Number(normalized));
+      return;
+    case 2:
+      if (normalized > 0xffffn) throw new Error(`${label} exceeds UInt16 scalar field size`);
+      view.setUint16(offset, Number(normalized), true);
+      return;
+    case 4:
+      if (normalized > MAX_UINT32) throw new Error(`${label} exceeds UInt32 scalar field size`);
+      view.setUint32(offset, Number(normalized), true);
+      return;
+    case 8:
+      if (normalized > MAX_UINT64) throw new Error(`${label} exceeds UInt64 scalar field size`);
+      view.setBigUint64(offset, normalized, true);
+      return;
+    default:
+      throw new Error(`${label} has unsupported scalar field size ${size}`);
+  }
+}
+function readScalarUnsigned(view, offset, size, label) {
+  switch (size) {
+    case 1:
+      return BigInt(view.getUint8(offset));
+    case 2:
+      return BigInt(view.getUint16(offset, true));
+    case 4:
+      return BigInt(view.getUint32(offset, true));
+    case 8:
+      return view.getBigUint64(offset, true);
+    default:
+      throw new Error(`${label} has unsupported scalar field size ${size}`);
   }
 }
 function disposeHostBindings(bindings) {
@@ -3366,6 +4739,50 @@ function disposeHostBindings(bindings) {
 }
 function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
+}
+function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {
+  const decimal = normalizeDecimal(value, label, { signed: false });
+  const normalized = BigInt(decimal);
+  if (normalized > max) {
+    throw new Error(`${label} is out of range for ${typeName}`);
+  }
+  return decimal;
+}
+function normalizeBoundedUnsignedBigInt(value, label, max, typeName) {
+  return BigInt(normalizeBoundedUnsignedDecimal(value, label, max, typeName));
+}
+function normalizeBinderInfo(value, label) {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 3) return value;
+  switch (value) {
+    case "default":
+      return 0;
+    case "implicit":
+      return 1;
+    case "strictImplicit":
+      return 2;
+    case "instImplicit":
+      return 3;
+    default:
+      throw new Error(`${label} must be default, implicit, strictImplicit, or instImplicit`);
+  }
+}
+function decodeBinderInfo(value) {
+  return ["default", "implicit", "strictImplicit", "instImplicit"][value] ?? String(value);
+}
+function requireString2(value, label) {
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string`);
+  }
+  return value;
+}
+function isVirCallback(value) {
+  return typeof value === "function" && virCallbackStates.has(value);
+}
+function releaseCallbacks(callbacks) {
+  for (const callback of callbacks) {
+    callback.release();
+  }
+  callbacks.length = 0;
 }
 function lookupHostBinding(target, userBindings, defaultBindings) {
   if (userBindings instanceof Map && userBindings.has(target)) {
@@ -3602,8 +5019,10 @@ function validateWidgetEntry(runtime, entryName) {
   if (entry === null || entry === void 0) {
     throw new Error(`VIR widget entry not found: ${entryName}`);
   }
-  if (entry.effect !== "io" || entry.args?.length !== 2 || entry.args[0]?.type?.wireTag !== WIRE.STRING || entry.args[1]?.type?.wireTag !== WIRE.STRUCTURE || entry.result?.wireTag !== WIRE.BOOL) {
-    throw new Error(`VIR widget entry ${entryName} must have signature String -> Surface -> IO Bool`);
+  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 2 || entry.args[0]?.type?.wireTag !== WIRE.STRING || entry.args[1]?.type?.wireTag !== WIRE.STRUCTURE || entry.result?.wireTag !== WIRE.BOOL) {
+    throw new Error(
+      `VIR widget entry ${entryName} must be an effectful String -> Surface -> Bool entry (Lean: String -> Surface -> DomM Bool)`
+    );
   }
   return entry;
 }
@@ -3615,8 +5034,10 @@ function validateWidgetUnmountEntry(runtime, entryName) {
   if (entry === null || entry === void 0) {
     throw new Error(`VIR widget unmount entry not found: ${entryName}`);
   }
-  if (entry.effect !== "io" || entry.args?.length !== 1 || entry.args[0]?.type?.wireTag !== WIRE.STRING || entry.result?.wireTag !== WIRE.BOOL) {
-    throw new Error(`VIR widget unmount entry ${entryName} must have signature String -> IO Bool`);
+  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 1 || entry.args[0]?.type?.wireTag !== WIRE.STRING || entry.result?.wireTag !== WIRE.BOOL) {
+    throw new Error(
+      `VIR widget unmount entry ${entryName} must be an effectful String -> Bool entry (Lean: String -> DomM Bool)`
+    );
   }
   return entry;
 }

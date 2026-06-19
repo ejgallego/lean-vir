@@ -139,8 +139,19 @@ def renderComponent
     (props : props) :
     Lean.Vir.Browser.DomM Unit
 
+def renderIntoSelector (selector : String) (node : @& Lean.Vir.Js Node) :
+  Lean.Vir.Browser.DomM Bool
+
+def renderComponentIntoSelector
+    (selector : String)
+    (component : Component props)
+    (props : props) :
+    Lean.Vir.Browser.DomM Bool
+
 @[vir_js "react.root.unmount"]
 opaque unmount (root : @& Lean.Vir.Js Root) : Lean.Vir.Browser.DomM Unit
+
+def unmountSelector (selector : String) : Lean.Vir.Browser.DomM Bool
 
 end Root
 end Lean.Vir.React
@@ -249,6 +260,10 @@ The browser React host binding is exposed from
 - `js.string`, `js.nat`, and `js.bool` convert Lean scalar values into explicit
   `Lean.Vir.Js α` values through `RuntimeM` for examples that need primitive
   React state.
+- `react.root.renderIntoSelector` and
+  `react.root.renderComponentIntoSelector` create or reuse a host-owned React
+  root for a selector. This is the infoview/proof-widget path where the shell
+  owns the DOM mount element and Lean supplies the current tree or component.
 - `react.state.set` and `react.state.modify` call the retained React setter;
   both are `RuntimeM`, and `modify` retains the Lean updater callback until
   React invokes it or the runtime is disposed.
@@ -257,6 +272,7 @@ The browser React host binding is exposed from
   [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 - `react.root.unmount` calls `root.unmount()` and releases callbacks retained
   by the current render.
+- `react.root.unmountSelector` unmounts and forgets a selector-owned root.
 - Rendering a new tree into the same browser root queues callbacks retained by
   the previous tree for microtask release after React has been given the
   replacement tree. Event-triggered rerenders defer stale callback release

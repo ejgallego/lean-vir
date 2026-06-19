@@ -9,17 +9,20 @@ import Vir.React
 
 namespace ReactProofWidget
 
+open Lean.Vir
 open Lean.Vir.React
+open Lean.Vir.Browser (DomM)
 open Lean.Vir.Infoview (Hypothesis Goal SelectedLocation Surface)
 
 -- Keep this example independent from any future ProofWidgets compatibility DSL.
-def codeText (props : Array Property) (value : String) : Html :=
-  Html.codeWith props #[] #[.text value]
+def codeText (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) := do
+  let text ← Node.text value
+  Node.codeWith props #[] #[text]
 
 namespace UiStyle
 
 def style (entries : Array (String × String)) : Property :=
-  Property.style <| entries.map fun (name, value) => { name, value }
+  Property.stylePairs entries
 
 def vscodeColor (name fallback : String) : String :=
   "var(--vscode-" ++ name ++ ", " ++ fallback ++ ")"
@@ -450,16 +453,22 @@ structure WidgetState where
   selectedGoalId : String
   actionStatus : String
 
-structure WidgetStateEntry where
-  selector : String
-  state : WidgetState
+structure WidgetStateHook where
+  selectedGoalId : State (Lean.Vir.Js String)
+  actionStatus : State (Lean.Vir.Js String)
+  value : WidgetState
 
-initialize widgetStates : IO.Ref (Array WidgetStateEntry) ← IO.mkRef #[]
+def selectedLocationGoalId? (surface : Surface) : Option String :=
+  surface.selectedLocations.find? fun selectedId =>
+    surface.goals.any (fun goal => goal.id == selectedId)
 
 def initialSelectedGoalId (surface : Surface) : String :=
-  match surface.goals[0]? with
-  | some goal => goal.id
-  | none => ""
+  match selectedLocationGoalId? surface with
+  | some selectedId => selectedId
+  | none =>
+      match surface.goals[0]? with
+      | some goal => goal.id
+      | none => ""
 
 def initialState (surface : Surface) : WidgetState :=
   { selectedGoalId := initialSelectedGoalId surface, actionStatus := "Ready" }
@@ -474,42 +483,40 @@ def hasGoalId (surface : Surface) (selectedId : String) : Bool :=
 
 def reconcileState (surface : Surface) (state : WidgetState) : WidgetState :=
   if hasGoalId surface state.selectedGoalId then
-    { state with actionStatus := "Ready" }
+    state
   else
     { selectedGoalId := initialSelectedGoalId surface, actionStatus := "Ready" }
 
-def rememberState (selector : String) (state : WidgetState) : IO Unit := do
-  let next : WidgetStateEntry := { selector, state }
-  let mounted ← widgetStates.get
-  let mut found := false
-  let mut updated := #[]
-  for item in mounted do
-    if item.selector == selector then
-      if found then
-        pure ()
-      else
-        found := true
-        updated := updated.push next
-    else
-      updated := updated.push item
-  widgetStates.set <| if found then updated else updated.push next
+def useWidgetState (surface : Surface) : ReactM WidgetStateHook := do
+  let initial := initialState surface
+  let initialGoalId ← JsValue.ofString initial.selectedGoalId
+  let selectedGoalId ← Hooks.useState initialGoalId
+  let initialStatus ← JsValue.ofString initial.actionStatus
+  let actionStatus ← Hooks.useState initialStatus
+  let selectedGoalValue ← JsValue.toString selectedGoalId.value
+  let actionStatusValue ← JsValue.toString actionStatus.value
+  let value := reconcileState surface {
+    selectedGoalId := selectedGoalValue,
+    actionStatus := actionStatusValue
+  }
+  pure { selectedGoalId, actionStatus, value }
 
-def findState? (selector : String) : IO (Option WidgetState) := do
-  return (← widgetStates.get).find? (fun mounted => mounted.selector == selector) |>.map (·.state)
+def setStringState (state : State (Lean.Vir.Js String)) (value : String) : DomM Unit := do
+  let next ← JsValue.ofString value
+  State.set state next
 
-def takeState? (selector : String) : IO (Option WidgetState) := do
-  let mounted ← widgetStates.get
-  let mut found := none
-  let mut rest := #[]
-  for item in mounted do
-    if item.selector == selector then
-      match found with
-      | none => found := some item.state
-      | some _ => pure ()
-    else
-      rest := rest.push item
-  widgetStates.set rest
-  return found
+def commit
+    (surface : Surface) (state : WidgetStateHook)
+    (update : WidgetState → WidgetState) : DomM Unit := do
+  let next := reconcileState surface (update state.value)
+  if next.selectedGoalId != state.value.selectedGoalId then
+    setStringState state.selectedGoalId next.selectedGoalId
+  else
+    pure ()
+  if next.actionStatus != state.value.actionStatus then
+    setStringState state.actionStatus next.actionStatus
+  else
+    pure ()
 
 def plural (count : Nat) (one many : String) : String :=
   if count == 1 then one else many
@@ -562,16 +569,19 @@ def selectedLocationCountLabel (surface : Surface) : String :=
 def selectedLocationIdsLabel (surface : Surface) : String :=
   commaList surface.selectedLocations "none"
 
-def apiChip (accent label value : String) : Html :=
-  Html.spanWith
+def apiChip (accent label value : String) : ReactM (Lean.Vir.Js Node) := do
+  let name ← codeText #[Property.classList #["react-proof-api-name"], apiNameStyle] label
+  let valueText ← Node.text value
+  let valueNode ← Node.spanWith #[Property.classList #["react-proof-api-value"], apiValueStyle] #[] #[valueText]
+  Node.spanWith
     #[Property.classList #["react-proof-api-chip"], apiChipStyle accent]
     #[]
     #[
-      codeText #[Property.classList #["react-proof-api-name"], apiNameStyle] label,
-      Html.spanWith #[Property.classList #["react-proof-api-value"], apiValueStyle] #[] #[.text value]
+      name,
+      valueNode
     ]
 
-def apiStrip (surface : Surface) (goal? : Option Goal) : Html :=
+def apiStrip (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js Node) := do
   let selectedGoalLabel :=
     match goal? with
     | none => "none"
@@ -580,7 +590,14 @@ def apiStrip (surface : Surface) (goal? : Option Goal) : Html :=
     match goal? with
     | none => "0 fvars"
     | some goal => s!"{fvarCount goal} fvars"
-  Html.navWith
+  let goals ← apiChip blueFg "Surface.goals" s!"{surface.goals.size}"
+  let selections ← apiChip greenFg "Surface.selections" (selectedLocationCountLabel surface)
+  let target ← apiChip purpleFg "Goal.target" selectedGoalLabel
+  let fvars ← apiChip orangeFg "Hypothesis.fvarIds" selectedFvars
+  let clicks ← apiChip linkFg "React.onClick" "goal tabs"
+  let clipboard ← apiChip blueFg "Clipboard.writeText" "copy actions"
+  let reveal ← apiChip greenFg "Command.revealPosition" "cursor"
+  Node.navWith
     #[
       Property.id "react-proof-api-strip",
       Property.classList #["react-proof-api-strip"],
@@ -589,13 +606,13 @@ def apiStrip (surface : Surface) (goal? : Option Goal) : Html :=
     ]
     #[]
     #[
-      apiChip blueFg "Surface.goals" s!"{surface.goals.size}",
-      apiChip greenFg "Surface.selections" (selectedLocationCountLabel surface),
-      apiChip purpleFg "Goal.target" selectedGoalLabel,
-      apiChip orangeFg "Hypothesis.fvarIds" selectedFvars,
-      apiChip linkFg "React.onClick" "goal tabs",
-      apiChip blueFg "Clipboard.writeText" "copy actions",
-      apiChip greenFg "Command.revealPosition" "cursor"
+      goals,
+      selections,
+      target,
+      fvars,
+      clicks,
+      clipboard,
+      reveal
     ]
 
 def hypothesisLabel (hypothesis : Hypothesis) : String :=
@@ -669,52 +686,63 @@ def commandStatus (label : String) (ok : Bool) : String :=
   else
     label ++ " unavailable"
 
-def tokenView (value : String) : Html :=
+def tokenView (value : String) : ReactM (Lean.Vir.Js Node) :=
   codeText #[Property.classList #["react-proof-token"], inlineTokenStyle] value
 
-def tokenListView (values : Array String) (fallback : String) : Array Html :=
+def tokenListView (values : Array String) (fallback : String) : ReactM (Array (Lean.Vir.Js Node)) :=
   match values.toList with
-  | [] => #[tokenView fallback]
-  | _ => values.map tokenView
+  | [] => do
+      let token ← tokenView fallback
+      pure #[token]
+  | _ => values.mapM tokenView
 
-def hypothesisChildren (hypothesis : Hypothesis) : Array Html :=
-  let valueSuffix :=
+def hypothesisChildren (hypothesis : Hypothesis) : ReactM (Array (Lean.Vir.Js Node)) := do
+  let valueSuffix ←
     match hypothesis.value with
-    | none => #[]
-    | some value =>
-        #[
-          Html.span #[.text " := "],
-          codeText #[Property.classList #["react-proof-hypothesis-value"], codeStyle] value
-        ]
-  #[
-    Html.spanWith #[Property.classList #["react-proof-hypothesis-line"], hypothesisLineStyle] #[] <|
+    | none => pure #[]
+    | some value => do
+        let sepText ← Node.text " := "
+        let sep ← Node.span #[sepText]
+        let valueNode ← codeText #[Property.classList #["react-proof-hypothesis-value"], codeStyle] value
+        pure #[sep, valueNode]
+  let name ← codeText #[Property.classList #["react-proof-hypothesis-name"], codeStyle] (hypothesisLabel hypothesis)
+  let colonText ← Node.text " : "
+  let colon ← Node.span #[colonText]
+  let typeNode ← codeText #[Property.classList #["react-proof-hypothesis-type"], codeStyle] hypothesis.type
+  let line ← Node.spanWith #[Property.classList #["react-proof-hypothesis-line"], hypothesisLineStyle] #[] <|
       #[
-        codeText #[Property.classList #["react-proof-hypothesis-name"], codeStyle] (hypothesisLabel hypothesis),
-        Html.span #[.text " : "],
-        codeText #[Property.classList #["react-proof-hypothesis-type"], codeStyle] hypothesis.type
-      ] ++ valueSuffix,
-    Html.spanWith #[Property.classList #["react-proof-hypothesis-meta"], hypothesisMetaStyle] #[] <|
-      #[Html.span #[.text "fvarIds"]] ++ tokenListView hypothesis.fvarIds "none"
-  ]
+        name,
+        colon,
+        typeNode
+      ] ++ valueSuffix
+  let fvarText ← Node.text "fvarIds"
+  let fvarLabel ← Node.span #[fvarText]
+  let fvars ← tokenListView hypothesis.fvarIds "none"
+  let metaNode ← Node.spanWith #[Property.classList #["react-proof-hypothesis-meta"], hypothesisMetaStyle] #[] <|
+    #[fvarLabel] ++ fvars
+  pure #[line, metaNode]
 
-def hypothesisView (hypothesis : Hypothesis) : Html :=
-  Html.keyedLiWith hypothesis.id
+def hypothesisView (hypothesis : Hypothesis) : ReactM (Lean.Vir.Js Node) := do
+  let children ← hypothesisChildren hypothesis
+  Node.keyedLiWith hypothesis.id
     #[Property.classList #["react-proof-hypothesis"], Property.role "listitem", hypothesisStyle]
     #[]
-    (hypothesisChildren hypothesis)
+    children
 
-def hypothesesView (goal : Goal) : Html :=
+def hypothesesView (goal : Goal) : ReactM (Lean.Vir.Js Node) := do
   if goal.hypotheses.isEmpty then
-    Html.pWith
+    let text ← Node.text "No local hypotheses."
+    Node.pWith
       #[
         Property.id "react-proof-hypotheses",
         Property.classList #["react-proof-hypotheses", "is-empty"],
         emptyStateStyle
       ]
       #[]
-      #[.text "No local hypotheses."]
+      #[text]
   else
-    Html.ulWith
+    let hypotheses ← goal.hypotheses.mapM hypothesisView
+    Node.ulWith
       #[
         Property.id "react-proof-hypotheses",
         Property.classList #["react-proof-hypotheses"],
@@ -723,7 +751,7 @@ def hypothesesView (goal : Goal) : Html :=
         hypothesesListStyle
       ]
       #[]
-      (goal.hypotheses.map hypothesisView)
+      hypotheses
 
 def selectedClasses (selected : Bool) : Array String :=
   if selected then
@@ -732,49 +760,54 @@ def selectedClasses (selected : Bool) : Array String :=
     #["react-proof-goal"]
 
 def goalButton
-    (selectGoal : String → IO Unit)
+    (selectGoal : String → DomM Unit)
     (selectedId : String)
-    (goal : Goal) : Html :=
+    (goal : Goal) : ReactM (Lean.Vir.Js Node) := do
   let selected := goal.id == selectedId
-  Html.keyedLiWith goal.id
+  let titleText ← Node.text goal.title
+  let title ← Node.spanWith
+    #[Property.classList #["react-proof-goal-title"]]
+    #[]
+    #[titleText]
+  let statusText ← Node.text goal.status
+  let status ← Node.spanWith
+    #[Property.classList #["react-proof-goal-status"], badgeStyle]
+    #[]
+    #[statusText]
+  let top ← Node.spanWith #[Property.classList #["react-proof-goal-top"], goalButtonTopStyle] #[] #[
+    title,
+    status
+  ]
+  let metaText ← Node.text (goalKindLabel goal ++ " · " ++ goalIdentity goal ++ " · " ++ s!"{goal.hypotheses.size} local")
+  let metaNode ← Node.spanWith
+    #[Property.classList #["react-proof-goal-meta"], goalMetaStyle]
+    #[]
+    #[metaText]
+  let targetText ← Node.text goal.target
+  let target ← Node.spanWith
+    #[Property.classList #["react-proof-goal-target"], goalTargetPreviewStyle]
+    #[]
+    #[targetText]
+  let button ← Node.buttonWith
+    #[
+      Property.id ("react-proof-goal-" ++ goal.id),
+      Property.classList (selectedClasses selected),
+      Property.ariaPressed selected,
+      Property.ariaSelected selected,
+      Property.title goal.status,
+      Property.data "goal" goal.id,
+      goalButtonStyle selected
+    ]
+    #[EventHandler.onClick (selectGoal goal.id)]
+    #[top, metaNode, target]
+  Node.keyedLiWith goal.id
     #[Property.classList #["react-proof-goal-item"], Property.role "listitem"]
     #[]
-    #[
-      Html.buttonWith
-        #[
-          Property.id ("react-proof-goal-" ++ goal.id),
-          Property.classList (selectedClasses selected),
-          Property.ariaPressed selected,
-          Property.ariaSelected selected,
-          Property.title goal.status,
-          Property.data "goal" goal.id,
-          goalButtonStyle selected
-        ]
-        #[EventHandler.onClick (selectGoal goal.id)]
-        #[
-          Html.spanWith #[Property.classList #["react-proof-goal-top"], goalButtonTopStyle] #[] #[
-            Html.spanWith
-              #[Property.classList #["react-proof-goal-title"]]
-              #[]
-              #[.text goal.title],
-            Html.spanWith
-              #[Property.classList #["react-proof-goal-status"], badgeStyle]
-              #[]
-              #[.text goal.status]
-          ],
-          Html.spanWith
-            #[Property.classList #["react-proof-goal-meta"], goalMetaStyle]
-            #[]
-            #[.text (goalKindLabel goal ++ " · " ++ goalIdentity goal ++ " · " ++ s!"{goal.hypotheses.size} local")],
-          Html.spanWith
-            #[Property.classList #["react-proof-goal-target"], goalTargetPreviewStyle]
-            #[]
-            #[.text goal.target]
-        ]
-    ]
+    #[button]
 
-def goalList (surface : Surface) (selectGoal : String → IO Unit) (selectedId : String) : Html :=
-  Html.ulWith
+def goalList (surface : Surface) (selectGoal : String → DomM Unit) (selectedId : String) : ReactM (Lean.Vir.Js Node) := do
+  let goals ← surface.goals.mapM (goalButton selectGoal selectedId)
+  Node.ulWith
     #[
       Property.id "react-proof-goal-list",
       Property.classList #["react-proof-goal-list"],
@@ -783,7 +816,7 @@ def goalList (surface : Surface) (selectGoal : String → IO Unit) (selectedId :
       goalListStyle
     ]
     #[]
-    (surface.goals.map (goalButton selectGoal selectedId))
+    goals
 
 def summaryText (surface : Surface) (goal : Goal) : String :=
   let goalCount := surface.goals.size
@@ -791,10 +824,14 @@ def summaryText (surface : Surface) (goal : Goal) : String :=
   let totalHypCount := hypothesisCount surface
   s!"{goal.title}; {hypCount} local {plural hypCount "hypothesis" "hypotheses"}; {goalCount} {plural goalCount "goal" "goals"} / {totalHypCount} {plural totalHypCount "hypothesis" "hypotheses"} at {cursorLabel surface}"
 
-def metricView (label value : String) : Html :=
-  Html.divWith #[Property.classList #["react-proof-metric"], metricStyle] #[] #[
-    Html.spanWith #[Property.classList #["react-proof-metric-label"], metricLabelStyle] #[] #[.text label],
-    Html.strongWith #[Property.classList #["react-proof-metric-value"], metricValueStyle] #[] #[.text value]
+def metricView (label value : String) : ReactM (Lean.Vir.Js Node) := do
+  let labelText ← Node.text label
+  let labelNode ← Node.spanWith #[Property.classList #["react-proof-metric-label"], metricLabelStyle] #[] #[labelText]
+  let valueText ← Node.text value
+  let valueNode ← Node.strongWith #[Property.classList #["react-proof-metric-value"], metricValueStyle] #[] #[valueText]
+  Node.divWith #[Property.classList #["react-proof-metric"], metricStyle] #[] #[
+    labelNode,
+    valueNode
   ]
 
 def selectedHypothesisCountLabel (goal? : Option Goal) : String :=
@@ -802,23 +839,37 @@ def selectedHypothesisCountLabel (goal? : Option Goal) : String :=
   | none => "0 local"
   | some goal => s!"{goal.hypotheses.size} local"
 
-def metricGrid (surface : Surface) (goal? : Option Goal) : Html :=
+def metricGrid (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js Node) := do
   let goalCount := surface.goals.size
-  Html.divWith #[Property.id "react-proof-metrics", Property.classList #["react-proof-metrics"], metricGridStyle] #[] #[
-    metricView "Goals" s!"{goalCount} {plural goalCount "goal" "goals"}",
-    metricView "Context" (selectedHypothesisCountLabel goal?),
-    metricView "Selection" (selectedLocationCountLabel surface),
-    metricView "Cursor" (cursorLabel surface)
+  let goals ← metricView "Goals" s!"{goalCount} {plural goalCount "goal" "goals"}"
+  let context ← metricView "Context" (selectedHypothesisCountLabel goal?)
+  let selection ← metricView "Selection" (selectedLocationCountLabel surface)
+  let cursor ← metricView "Cursor" (cursorLabel surface)
+  Node.divWith #[Property.id "react-proof-metrics", Property.classList #["react-proof-metrics"], metricGridStyle] #[] #[
+    goals,
+    context,
+    selection,
+    cursor
   ]
 
-def surfaceCell (label value : String) : Html :=
-  Html.divWith #[Property.classList #["react-proof-surface-cell"], surfaceCellStyle] #[] #[
-    Html.spanWith #[Property.classList #["react-proof-surface-label"], surfaceCellLabelStyle] #[] #[.text label],
-    Html.spanWith #[Property.classList #["react-proof-surface-value"], surfaceCellValueStyle] #[] #[.text value]
+def surfaceCell (label value : String) : ReactM (Lean.Vir.Js Node) := do
+  let labelText ← Node.text label
+  let labelNode ← Node.spanWith #[Property.classList #["react-proof-surface-label"], surfaceCellLabelStyle] #[] #[labelText]
+  let valueText ← Node.text value
+  let valueNode ← Node.spanWith #[Property.classList #["react-proof-surface-value"], surfaceCellValueStyle] #[] #[valueText]
+  Node.divWith #[Property.classList #["react-proof-surface-cell"], surfaceCellStyle] #[] #[
+    labelNode,
+    valueNode
   ]
 
-def surfacePanel (surface : Surface) (goal : Goal) : Html :=
-  Html.divWith
+def surfacePanel (surface : Surface) (goal : Goal) : ReactM (Lean.Vir.Js Node) := do
+  let selected ← surfaceCell "Selected" (selectionSummary surface)
+  let selectedLocations ← surfaceCell "selectedLocations" (selectedLocationIdsLabel surface)
+  let mvarId ← surfaceCell "mvarId" (optionLabel goal.mvarId)
+  let userName ← surfaceCell "userName" (optionLabel goal.userName)
+  let kind ← surfaceCell "kind" goal.kind
+  let fvarIds ← surfaceCell "fvarIds" s!"{fvarCount goal}"
+  Node.divWith
     #[
       Property.id "react-proof-surface-panel",
       Property.classList #["react-proof-surface-panel"],
@@ -827,12 +878,12 @@ def surfacePanel (surface : Surface) (goal : Goal) : Html :=
     ]
     #[]
     #[
-      surfaceCell "Selected" (selectionSummary surface),
-      surfaceCell "selectedLocations" (selectedLocationIdsLabel surface),
-      surfaceCell "mvarId" (optionLabel goal.mvarId),
-      surfaceCell "userName" (optionLabel goal.userName),
-      surfaceCell "kind" goal.kind,
-      surfaceCell "fvarIds" s!"{fvarCount goal}"
+      selected,
+      selectedLocations,
+      mvarId,
+      userName,
+      kind,
+      fvarIds
     ]
 
 def headerSummary (surface : Surface) (goal? : Option Goal) : String :=
@@ -840,34 +891,51 @@ def headerSummary (surface : Surface) (goal? : Option Goal) : String :=
   | none => "No proof goals at " ++ cursorLabel surface
   | some goal => summaryText surface goal
 
-def surfaceHeader (surface : Surface) (goal? : Option Goal) : Html :=
-  Html.headerWith #[Property.classList #["react-proof-header"], headerStyle] #[] #[
-    Html.divWith #[Property.classList #["react-proof-heading"]] #[] #[
-      Html.pWith #[Property.classList #["react-proof-eyebrow"], eyebrowStyle] #[] #[.text "Live Lean infoview"],
-      Html.h3With #[headingStyle] #[] #[.text "Live ProofWidget"],
-      Html.pWith #[Property.classList #["react-proof-source"], sourceStyle] #[] #[
-        Html.spanWith #[Property.classList #["react-proof-module"], badgeStyle] #[] #[.text "VIR"],
-        Html.spanWith #[Property.classList #["react-proof-runtime"], badgeStyle] #[] #[.text "React"],
-        Html.spanWith #[Property.classList #["react-proof-live"], badgeStyle] #[] #[.text "live"],
-        Html.spanWith #[Property.classList #["react-proof-range"], badgeStyle] #[] #[.text (cursorLabel surface)]
-      ],
-      Html.pWith
-        #[
-          Property.id "react-proof-summary",
-          Property.classList #["react-proof-summary"],
-          Property.ariaLive "polite",
-        summaryStyle
-      ]
-      #[]
-      #[.text (headerSummary surface goal?)]
-    ],
-    Html.divWith #[Property.classList #["react-proof-header-side"]] #[] #[
-      metricGrid surface goal?
+def surfaceHeader (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js Node) := do
+  let eyebrowText ← Node.text "Live Lean infoview"
+  let eyebrow ← Node.pWith #[Property.classList #["react-proof-eyebrow"], eyebrowStyle] #[] #[eyebrowText]
+  let titleText ← Node.text "Live ProofWidget"
+  let title ← Node.h3With #[headingStyle] #[] #[titleText]
+  let moduleText ← Node.text "VIR"
+  let moduleBadge ← Node.spanWith #[Property.classList #["react-proof-module"], badgeStyle] #[] #[moduleText]
+  let runtimeText ← Node.text "React"
+  let runtimeBadge ← Node.spanWith #[Property.classList #["react-proof-runtime"], badgeStyle] #[] #[runtimeText]
+  let liveText ← Node.text "live"
+  let liveBadge ← Node.spanWith #[Property.classList #["react-proof-live"], badgeStyle] #[] #[liveText]
+  let rangeText ← Node.text (cursorLabel surface)
+  let rangeBadge ← Node.spanWith #[Property.classList #["react-proof-range"], badgeStyle] #[] #[rangeText]
+  let source ← Node.pWith #[Property.classList #["react-proof-source"], sourceStyle] #[] #[
+    moduleBadge,
+    runtimeBadge,
+    liveBadge,
+    rangeBadge
+  ]
+  let summary ← Node.text (headerSummary surface goal?)
+  let summaryNode ← Node.pWith
+    #[
+      Property.id "react-proof-summary",
+      Property.classList #["react-proof-summary"],
+      Property.ariaLive "polite",
+      summaryStyle
     ]
+    #[]
+    #[summary]
+  let heading ← Node.divWith #[Property.classList #["react-proof-heading"]] #[] #[
+    eyebrow,
+    title,
+    source,
+    summaryNode
+  ]
+  let metrics ← metricGrid surface goal?
+  let side ← Node.divWith #[Property.classList #["react-proof-header-side"]] #[] #[metrics]
+  Node.headerWith #[Property.classList #["react-proof-header"], headerStyle] #[] #[
+    heading,
+    side
   ]
 
-def actionButton (id label : String) (onClick : IO Unit) : Html :=
-  Html.buttonWith
+def actionButton (id label : String) (onClick : DomM Unit) : ReactM (Lean.Vir.Js Node) := do
+  let text ← Node.text label
+  Node.buttonWith
     #[
       Property.id id,
       Property.classList #["react-proof-action"],
@@ -875,41 +943,54 @@ def actionButton (id label : String) (onClick : IO Unit) : Html :=
       actionButtonStyle
     ]
     #[EventHandler.onClick onClick]
-    #[.text label]
+    #[text]
 
 def actionBar
     (goal : Goal)
-    (revealCursor : IO Unit)
-    (copyCursor : IO Unit)
-    (copySelection : IO Unit)
-    (copyTarget : Goal → IO Unit)
-    (copyContext : Goal → IO Unit)
-    (actionStatus : String) : Html :=
-  Html.divWith
+    (revealCursor : DomM Unit)
+    (copyCursor : DomM Unit)
+    (copySelection : DomM Unit)
+    (copyTarget : Goal → DomM Unit)
+    (copyContext : Goal → DomM Unit)
+    (actionStatus : String) : ReactM (Lean.Vir.Js Node) := do
+  let reveal ← actionButton "react-proof-reveal-cursor" "Reveal cursor" revealCursor
+  let cursor ← actionButton "react-proof-copy-cursor" "Copy cursor" copyCursor
+  let selection ← actionButton "react-proof-copy-selection" "Copy selection" copySelection
+  let target ← actionButton "react-proof-copy-target" "Copy target" (copyTarget goal)
+  let context ← actionButton "react-proof-copy-context" "Copy context" (copyContext goal)
+  let statusText ← Node.text actionStatus
+  let status ← Node.spanWith
+    #[
+      Property.id "react-proof-action-status",
+      Property.classList #["react-proof-action-status"],
+      Property.ariaLive "polite",
+      actionStatusStyle
+    ]
+    #[]
+    #[statusText]
+  Node.divWith
     #[
       Property.classList #["react-proof-actions"],
       actionBarStyle
     ]
     #[]
     #[
-      actionButton "react-proof-reveal-cursor" "Reveal cursor" revealCursor,
-      actionButton "react-proof-copy-cursor" "Copy cursor" copyCursor,
-      actionButton "react-proof-copy-selection" "Copy selection" copySelection,
-      actionButton "react-proof-copy-target" "Copy target" (copyTarget goal),
-      actionButton "react-proof-copy-context" "Copy context" (copyContext goal),
-      Html.spanWith
-        #[
-          Property.id "react-proof-action-status",
-          Property.classList #["react-proof-action-status"],
-          Property.ariaLive "polite",
-          actionStatusStyle
-        ]
-        #[]
-        #[.text actionStatus]
+      reveal,
+      cursor,
+      selection,
+      target,
+      context,
+      status
     ]
 
-def emptyView (surface : Surface) : Html :=
-  Html.sectionWith
+def emptyView (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
+  let header ← surfaceHeader surface none
+  let apis ← apiStrip surface none
+  let emptyText ← Node.text "The current infoview snapshot has no goals."
+  let empty ← Node.pWith #[Property.classList #["react-proof-empty"], emptyStateStyle] #[] #[
+    emptyText
+  ]
+  Node.sectionWith
     #[
       Property.id "react-proof-widget",
       Property.classList #["react-proof-widget"],
@@ -919,23 +1000,41 @@ def emptyView (surface : Surface) : Html :=
     ]
     #[]
     #[
-      surfaceHeader surface none,
-      apiStrip surface none,
-      Html.pWith #[Property.classList #["react-proof-empty"], emptyStateStyle] #[] #[
-        .text "The current infoview snapshot has no goals."
-      ]
+      header,
+      apis,
+      empty
     ]
 
 def detailView
     (surface : Surface)
     (goal : Goal)
-    (revealCursor : IO Unit)
-    (copyCursor : IO Unit)
-    (copySelection : IO Unit)
-    (copyTarget : Goal → IO Unit)
-    (copyContext : Goal → IO Unit)
-    (actionStatus : String) : Html :=
-  Html.articleWith
+    (revealCursor : DomM Unit)
+    (copyCursor : DomM Unit)
+    (copySelection : DomM Unit)
+    (copyTarget : Goal → DomM Unit)
+    (copyContext : Goal → DomM Unit)
+    (actionStatus : String) : ReactM (Lean.Vir.Js Node) := do
+  let titleText ← Node.text goal.title
+  let title ← Node.h3With #[Property.id "react-proof-selected-title", headingStyle] #[] #[titleText]
+  let statusText ← Node.text goal.status
+  let status ← Node.spanWith #[Property.id "react-proof-selected-status", badgeStyle] #[] #[statusText]
+  let kindText ← Node.text (" " ++ goalKindLabel goal ++ " · " ++ selectionSummary surface)
+  let kind ← Node.spanWith #[Property.classList #["react-proof-selected-kind"], goalMetaStyle] #[] #[
+    kindText
+  ]
+  let statusLine ← Node.pWith #[Property.classList #["react-proof-status-line"]] #[] #[status, kind]
+  let surfacePanelNode ← surfacePanel surface goal
+  let actions ← actionBar goal revealCursor copyCursor copySelection copyTarget copyContext actionStatus
+  let targetLabelText ← Node.text "Target"
+  let targetLabel ← Node.pWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] #[] #[targetLabelText]
+  let targetCode ← codeText #[Property.id "react-proof-target-code", codeStyle] goal.target
+  let target ← Node.preWith #[Property.id "react-proof-target", Property.classList #["react-proof-target"], targetStyle] #[] #[
+    targetCode
+  ]
+  let contextLabelText ← Node.text "Local context"
+  let contextLabel ← Node.pWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] #[] #[contextLabelText]
+  let hypotheses ← hypothesesView goal
+  Node.articleWith
     #[
       Property.id "react-proof-detail",
       Property.classList #["react-proof-detail"],
@@ -944,36 +1043,54 @@ def detailView
     ]
     #[]
     #[
-      Html.h3With #[Property.id "react-proof-selected-title", headingStyle] #[] #[.text goal.title],
-      Html.pWith #[Property.classList #["react-proof-status-line"]] #[] #[
-        Html.spanWith #[Property.id "react-proof-selected-status", badgeStyle] #[] #[.text goal.status],
-        Html.spanWith #[Property.classList #["react-proof-selected-kind"], goalMetaStyle] #[] #[
-          .text (" " ++ goalKindLabel goal ++ " · " ++ selectionSummary surface)
-        ]
-      ],
-      surfacePanel surface goal,
-      actionBar goal revealCursor copyCursor copySelection copyTarget copyContext actionStatus,
-      Html.pWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] #[] #[.text "Target"],
-      Html.preWith #[Property.id "react-proof-target", Property.classList #["react-proof-target"], targetStyle] #[] #[
-        codeText #[Property.id "react-proof-target-code", codeStyle] goal.target
-      ],
-      Html.pWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] #[] #[.text "Local context"],
-      hypothesesView goal
+      title,
+      statusLine,
+      surfacePanelNode,
+      actions,
+      targetLabel,
+      target,
+      contextLabel,
+      hypotheses
     ]
 
-def view
-    (surface : Surface)
-    (selectGoal : String → IO Unit)
-    (revealCursor : IO Unit)
-    (copyCursor : IO Unit)
-    (copySelection : IO Unit)
-    (copyTarget : Goal → IO Unit)
-    (copyContext : Goal → IO Unit)
-    (state : WidgetState) : Html :=
-  match selectedGoal? surface state.selectedGoalId with
-  | none => emptyView surface
+structure ViewProps where
+  surface : Surface
+  selectGoal : String → DomM Unit
+  revealCursor : DomM Unit
+  copyCursor : DomM Unit
+  copySelection : DomM Unit
+  copyTarget : Goal → DomM Unit
+  copyContext : Goal → DomM Unit
+  state : WidgetState
+
+def View : Component ViewProps := fun props => do
+  match selectedGoal? props.surface props.state.selectedGoalId with
+  | none => emptyView props.surface
   | some goal =>
-      Html.sectionWith
+      let header ← surfaceHeader props.surface (some goal)
+      let apis ← apiStrip props.surface (some goal)
+      let goalsText ← Node.text "Goals"
+      let goalsLabel ← Node.pWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] #[] #[goalsText]
+      let goals ← goalList props.surface props.selectGoal props.state.selectedGoalId
+      let sidebar ← Node.divWith #[Property.classList #["react-proof-sidebar"], sidebarStyle] #[] #[
+        goalsLabel,
+        goals
+      ]
+      let detail ← detailView
+        props.surface
+        goal
+        props.revealCursor
+        props.copyCursor
+        props.copySelection
+        props.copyTarget
+        props.copyContext
+        props.state.actionStatus
+      let main ← Node.divWith #[Property.classList #["react-proof-main"], mainStyle] #[] #[detail]
+      let layout ← Node.divWith #[Property.classList #["react-proof-layout"], layoutStyle] #[] #[
+        sidebar,
+        main
+      ]
+      Node.sectionWith
         #[
           Property.id "react-proof-widget",
           Property.classList #["react-proof-widget"],
@@ -983,69 +1100,72 @@ def view
         ]
         #[]
         #[
-          surfaceHeader surface (some goal),
-          apiStrip surface (some goal),
-          Html.divWith #[Property.classList #["react-proof-layout"], layoutStyle] #[] #[
-            Html.divWith #[Property.classList #["react-proof-sidebar"], sidebarStyle] #[] #[
-              Html.pWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] #[] #[.text "Goals"],
-              goalList surface selectGoal state.selectedGoalId
-            ],
-            Html.divWith #[Property.classList #["react-proof-main"], mainStyle] #[] #[
-              detailView surface goal revealCursor copyCursor copySelection copyTarget copyContext state.actionStatus
-            ]
-          ]
+          header,
+          apis,
+          layout
         ]
 
-partial def renderInto
-    (selector : String)
+def view
     (surface : Surface)
-    (state : WidgetState) : IO Bool :=
-  let commit (nextState : WidgetState) : IO Unit := do
-    rememberState selector nextState
-    let _ ← renderInto selector surface nextState
-    pure ()
-  let selectGoal (nextId : String) : IO Unit :=
-    commit { state with selectedGoalId := nextId, actionStatus := "Ready" }
-  let revealCursor : IO Unit := do
+    (selectGoal : String → DomM Unit)
+    (revealCursor : DomM Unit)
+    (copyCursor : DomM Unit)
+    (copySelection : DomM Unit)
+    (copyTarget : Goal → DomM Unit)
+    (copyContext : Goal → DomM Unit)
+    (state : WidgetState) : ReactM (Lean.Vir.Js Node) :=
+  Node.component View {
+    surface,
+    selectGoal,
+    revealCursor,
+    copyCursor,
+    copySelection,
+    copyTarget,
+    copyContext,
+    state
+  }
+
+def renderView (surface : Surface) (stateHook : WidgetStateHook) : ReactM (Lean.Vir.Js Node) := do
+  let state := stateHook.value
+  let selectGoal (nextId : String) : DomM Unit :=
+    commit surface stateHook fun state => { state with selectedGoalId := nextId, actionStatus := "Ready" }
+  let revealCursor : DomM Unit := do
     let ok ← Lean.Vir.Infoview.Command.revealCursor surface
-    commit { state with actionStatus := commandStatus "Reveal cursor" ok }
-  let copyCursor : IO Unit := do
+    commit surface stateHook fun state => { state with actionStatus := commandStatus "Reveal cursor" ok }
+  let copyCursor : DomM Unit := do
     let ok ← Lean.Vir.Infoview.Clipboard.writeText (cursorClipboardText surface)
-    commit { state with actionStatus := copyStatus "Cursor" ok }
-  let copySelection : IO Unit := do
+    commit surface stateHook fun state => { state with actionStatus := copyStatus "Cursor" ok }
+  let copySelection : DomM Unit := do
     let ok ← Lean.Vir.Infoview.Clipboard.writeText (selectionClipboardText surface)
-    commit { state with actionStatus := copyStatus "Selection" ok }
-  let copyTarget (goal : Goal) : IO Unit := do
+    commit surface stateHook fun state => { state with actionStatus := copyStatus "Selection" ok }
+  let copyTarget (goal : Goal) : DomM Unit := do
     let ok ← Lean.Vir.Infoview.Clipboard.writeText goal.target
-    commit { state with actionStatus := copyStatus "Target" ok }
-  let copyContext (goal : Goal) : IO Unit := do
+    commit surface stateHook fun state => { state with actionStatus := copyStatus "Target" ok }
+  let copyContext (goal : Goal) : DomM Unit := do
     let ok ← Lean.Vir.Infoview.Clipboard.writeText (goalClipboardText surface goal)
-    commit { state with actionStatus := copyStatus "Context" ok }
-  Root.renderIntoSelector selector <|
-    view
-      surface
-      selectGoal
-      revealCursor
-      copyCursor
-      copySelection
-      copyTarget
-      copyContext
-      state
+    commit surface stateHook fun state => { state with actionStatus := copyStatus "Context" ok }
+  view
+    surface
+    selectGoal
+    revealCursor
+    copyCursor
+    copySelection
+    copyTarget
+    copyContext
+    state
 
-def mount (selector : String) (surface : Surface) : IO Bool := do
-  let state ←
-    match ← findState? selector with
-    | some previous => pure (reconcileState surface previous)
-    | none => pure (initialState surface)
-  let mounted ← renderInto selector surface state
-  if mounted then
-    rememberState selector state
-  pure mounted
+def App : Component Surface := fun surface => do
+  let state ← useWidgetState surface
+  renderView surface state
 
-def unmount (selector : String) : IO Bool := do
-  let previous ← takeState? selector
-  let unmounted ← Root.unmountSelector selector
-  pure <| unmounted || previous.isSome
+def app (surface : Surface) : ReactM (Lean.Vir.Js Node) :=
+  Node.component App surface
+
+def mount (selector : String) (surface : Surface) : DomM Bool := do
+  Root.renderComponentIntoSelector selector App surface
+
+def unmount (selector : String) : DomM Bool :=
+  Root.unmountSelector selector
 
 def irPackage : Lean.Vir.Infoview.IRPackage where
   roots := #[

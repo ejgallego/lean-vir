@@ -53,6 +53,11 @@ without giving `react.useState` a scalar ABI.
 `react.root.render` host binding receives that render action as a releasable
 callback, invokes it to obtain the concrete `Js Node` resource, renders the
 resource, and releases the render callback.
+`react.root.renderIntoSelector`,
+`react.root.renderComponentIntoSelector`, and `react.root.unmountSelector`
+provide the proof-widget path: the JavaScript host owns and reuses the React
+root for a selector, while Lean supplies either a `ReactNode` resource or a
+function component render callback.
 
 ## Virtual Node Bindings
 

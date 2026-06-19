@@ -31,11 +31,19 @@ import {
 
 const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 
-export function createVirtualDocumentState({ title = "", elements = new Map(), resources = createHostResourceState() } = {}) {
+export function createVirtualDocumentState({
+  title = "",
+  elements = new Map(),
+  resources = createHostResourceState(),
+  clipboardText = "",
+  clipboardWrites = [],
+  revealedPosition = null,
+  infoviewCommands = [],
+} = {}) {
   if (!(elements instanceof Map)) {
     throw new Error("virtual document elements must be a Map");
   }
-  return { title, elements, resources };
+  return { title, elements, resources, clipboardText, clipboardWrites, revealedPosition, infoviewCommands };
 }
 
 export function createVirtualElementState({
@@ -97,6 +105,8 @@ export function createVirtualEventHostBindings(state = createVirtualDocumentStat
       stopPropagationOnEvent(state.resources.resolveResource(event, "Event"));
       return undefined;
     },
+    "browser.event.formValue": (event) =>
+      formControlEventValue(state.resources.resolveResource(event, "Event")),
   };
 }
 
@@ -138,12 +148,29 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
     }),
     ...createReactRootResourceHostBindings(state.resources, (target) =>
       createVirtualReactRootResource(state.resources, target, reactHooks), {
+        querySelector: (selector) => queryVirtualElementState(state, selector),
         createNodeTextResource: (value) => createVirtualReactNodeTextResource(state.resources, value),
         createNodeElementResource: (tag, key, props, handlers, children) =>
           createVirtualReactNodeElementResource(state.resources, reactHooks, tag, key, props, handlers, children),
       }),
     ...createReactJsValueHostBindings(state.resources),
     ...createReactStateHostBindings(state.resources, reactHookRuntime),
+    "infoview.clipboard.writeText": (text) => {
+      state.clipboardText = text;
+      state.clipboardWrites ??= [];
+      state.clipboardWrites.push(text);
+      return true;
+    },
+    "infoview.command.revealPosition": (position) => {
+      const normalized = normalizeInfoviewDocumentPosition(position);
+      if (normalized === null) {
+        return false;
+      }
+      state.revealedPosition = normalized;
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "revealPosition", position: normalized });
+      return true;
+    },
     [VIR_HOST_DISPOSE]: () => state.resources.dispose(),
   };
 }
@@ -207,6 +234,49 @@ function virtualEventElementResource(state, event, field) {
   }
   if (typeof value === "object") {
     return state.resources.resourceForValue(value);
+  }
+  return null;
+}
+
+function formControlEventValue(event) {
+  const currentValue = formControlValue(event?.currentTarget);
+  if (currentValue !== null) return currentValue;
+  return formControlValue(event?.target);
+}
+
+function formControlValue(value) {
+  if (value === null || typeof value !== "object" || !("value" in value)) {
+    return null;
+  }
+  return String(value.value ?? "");
+}
+
+function normalizeInfoviewDocumentPosition(position) {
+  if (position === null || typeof position !== "object") {
+    return null;
+  }
+  const uri = typeof position.uri === "string" ? position.uri : "";
+  if (uri.length === 0) {
+    return null;
+  }
+  const line = nonNegativeInteger(position.line);
+  const character = nonNegativeInteger(position.character);
+  if (line === null || character === null) {
+    return null;
+  }
+  return { uri, line, character };
+}
+
+function nonNegativeInteger(value) {
+  if (typeof value === "bigint") {
+    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+  }
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : null;
   }
   return null;
 }

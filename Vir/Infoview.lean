@@ -330,10 +330,10 @@ def buildIRPackage (params : IRPackageRequest) : RequestM (RequestTask IRPackage
 /--
 Props for the minimal VIR infoview shell.
 
-The `.irpkg` entry must have signature `String -> Surface -> IO Bool`; the
+The `.irpkg` entry must have signature `String -> Surface -> DomM Bool`; the
 shell passes a fresh DOM selector for its nested mount element and a
 JavaScript-built surface structure from the real infoview panel props.
-If `unmountEntry` is set, it must have signature `String -> IO Bool` and is
+If `unmountEntry` is set, it must have signature `String -> DomM Bool` and is
 called when the shell unmounts its nested element while keeping the runtime
 service alive for later remounts.
 -/
