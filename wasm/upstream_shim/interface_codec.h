@@ -249,12 +249,9 @@ vir_type decode_type(vir_reader & r);
 void encode_type(vir_writer & w, vir_type const & type);
 object * decode_value(vir_reader & r, vir_type const & type, vir_type const * self_type = nullptr);
 void encode_value_payload(vir_writer & w, vir_type const & type, object * value, vir_type const * self_type = nullptr);
-vir_arg decode_argument(vir_reader & r, bool has_boxed_decl);
 vir_arg decode_argument_payload(vir_reader & r, vir_type const & type, bool has_boxed_decl);
 bool needs_boxed_wasm32_call_boundary_type(vir_type const & type);
 void encode_result_payload(vir_writer & w, vir_type const & type, object * value, bool has_boxed_decl);
-void encode_result(vir_writer & w, vir_type const & type, object * value, bool has_boxed_decl);
 bool call_result_is_owned(vir_type const & type, bool has_boxed_decl);
-bool same_wire_type(vir_type const & lhs, vir_type const & rhs);
 
 }

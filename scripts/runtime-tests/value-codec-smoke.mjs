@@ -14,12 +14,10 @@ import {
 import {
   createHostResourceState,
 } from "../../web/src/host/vir-host-resources.js";
-import { BinaryWriter, encodeTypeDescriptor } from "../../web/src/runtime/vir-codec.js";
+import { BinaryWriter } from "../../web/src/runtime/vir-codec.js";
 import {
-  decodeCallResult,
   decodeHostCallRequest,
   decodeResolvedCallResult,
-  encodeCallPayload,
   encodeHostCallResult,
   encodeResolvedCallPayload,
 } from "../../web/src/runtime/vir-value-codec.js";
@@ -111,13 +109,6 @@ assert.equal("handle" in resourceArg, false);
 assert.equal(Object.hasOwn(resourceArg, "value"), false);
 assert.equal("value" in resourceArg, false);
 const incomingResources = [];
-const resourceArgPayload = encodeCallPayload(resourceEntry, [resourceArg], {
-  pushIncomingResource: (value) => incomingResources.push(value),
-});
-assert.deepEqual([...resourceArgPayload], [1, 0, 0, 0, WIRE.RESOURCE, WIRE.UNIT, 0]);
-assert.equal(incomingResources.length, 1);
-assert.equal(incomingResources[0], resourceArg);
-incomingResources.length = 0;
 const resourceArgResolvedPayload = encodeResolvedCallPayload(resourceEntry, [resourceArg], {
   pushIncomingResource: (value) => incomingResources.push(value),
 });
@@ -125,19 +116,19 @@ assert.deepEqual([...resourceArgResolvedPayload], [1, 0, 0, 0]);
 assert.equal(incomingResources.length, 1);
 assert.equal(incomingResources[0], resourceArg);
 assert.throws(
-  () => encodeCallPayload(resourceEntry, [{ handle: 1 }], { pushIncomingResource: () => undefined }),
+  () => encodeResolvedCallPayload(resourceEntry, [{ handle: 1 }], { pushIncomingResource: () => undefined }),
   /resourceArg argument arg1 must be a live host resource/,
 );
 releaseHostResource(resourceArg);
 assert.throws(
-  () => encodeCallPayload(resourceEntry, [resourceArg], { pushIncomingResource: () => undefined }),
+  () => encodeResolvedCallPayload(resourceEntry, [resourceArg], { pushIncomingResource: () => undefined }),
   /resourceArg argument arg1 must be a live host resource/,
 );
 const resourceStore = createHostResourceState();
 const staleStoreResource = resourceStore.resourceForValue({ name: "stale" });
 resourceStore.dispose();
 assert.throws(
-  () => encodeCallPayload(resourceEntry, [staleStoreResource], { pushIncomingResource: () => undefined }),
+  () => encodeResolvedCallPayload(resourceEntry, [staleStoreResource], { pushIncomingResource: () => undefined }),
   /resourceArg argument arg1 must be a live host resource/,
 );
 const roots = new ExternrefResourceRoots();
@@ -155,20 +146,7 @@ roots.clear();
 assert.equal(roots.get(secondRootId), null);
 releaseHostResource(secondRootResource);
 assert.equal(roots.root(secondRootResource), 0);
-const resourceResultWriter = new BinaryWriter();
-encodeTypeDescriptor(resourceResultWriter, resourceType, "resource result");
 let outgoingResourceTakes = 0;
-assert.equal(
-  decodeCallResult(resourceType, resourceResultWriter.take(), {
-    takeOutgoingResource: (label) => {
-      assert.equal(label, "resource result");
-      outgoingResourceTakes += 1;
-      return "opaque-resource";
-    },
-  }),
-  "opaque-resource",
-);
-assert.equal(outgoingResourceTakes, 1);
 assert.equal(
   decodeResolvedCallResult(resourceType, new Uint8Array(), {
     takeOutgoingResource: (label) => {
@@ -179,7 +157,7 @@ assert.equal(
   }),
   "opaque-resource-compact",
 );
-assert.equal(outgoingResourceTakes, 2);
+assert.equal(outgoingResourceTakes, 1);
 const boolHostEntry = {
   target: "test.boolHost",
   args: [{ name: "flag", type: boolType }],
@@ -189,16 +167,12 @@ const compactHostRequest = new BinaryWriter();
 compactHostRequest.u32(1);
 compactHostRequest.u8(1);
 assert.deepEqual(
-  decodeHostCallRequest(compactHostRequest.take(), boolHostEntry, {}, { compactPayload: true }),
+  decodeHostCallRequest(compactHostRequest.take(), boolHostEntry, {}),
   { args: [true], resultType: boolType },
 );
 assert.equal(
-  decodeResolvedCallResult(boolType, encodeHostCallResult(boolType, false, boolHostEntry, {}, { compactPayload: true })),
+  decodeResolvedCallResult(boolType, encodeHostCallResult(boolType, false, boolHostEntry, {})),
   false,
-);
-assert.equal(
-  decodeCallResult(boolType, encodeHostCallResult(boolType, true, boolHostEntry)),
-  true,
 );
 const callbackType = {
   type: "Function",
@@ -207,10 +181,8 @@ const callbackType = {
   args: [{ name: "input", type: natType }],
   result: natType,
 };
-const callbackResultWriter = new BinaryWriter();
-encodeTypeDescriptor(callbackResultWriter, callbackType, "callback result");
 let closureRootTakes = 0;
-const callbackResult = decodeCallResult(callbackType, callbackResultWriter.take(), {
+const callbackResult = decodeResolvedCallResult(callbackType, new Uint8Array(), {
   takeOutgoingClosureRootId: (label) => {
     assert.equal(label, "function result");
     closureRootTakes += 1;

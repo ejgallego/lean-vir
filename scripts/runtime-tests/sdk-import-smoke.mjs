@@ -54,7 +54,7 @@ try {
   assert.equal(typeof hostBindings.createHostResourceState, "function");
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof leanCodec.decodeExpr, "function");
-  assert.equal(typeof valueCodec.decodeCallResult, "function");
+  assert.equal(typeof valueCodec.decodeResolvedCallResult, "function");
   assert.equal(typeof reactHtml.virtualReactTextContent, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
   assert.equal(wireTags.WIRE.NAT, 0);

@@ -347,7 +347,7 @@ class VirHostState {
     let args;
     let resultType;
     try {
-      ({ args, resultType } = decodeHostCallRequest(request, entry, codecOptions, { compactPayload: true }));
+      ({ args, resultType } = decodeHostCallRequest(request, entry, codecOptions));
       this.clearOutgoingClosureRootIds();
     } catch (error) {
       this.clearOutgoingClosureRootIds();
@@ -357,7 +357,7 @@ class VirHostState {
     if (isPromiseLike(value)) {
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
-    const result = encodeHostCallResult(resultType, value, entry, codecOptions, { compactPayload: true });
+    const result = encodeHostCallResult(resultType, value, entry, codecOptions);
     const ptr = this.exports.vir_alloc_bytes(result.byteLength);
     new Uint8Array(this.exports.memory.buffer, ptr, result.byteLength).set(result);
     this.lastResultSize = result.byteLength;

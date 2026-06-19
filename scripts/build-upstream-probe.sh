@@ -240,7 +240,6 @@ exports=(
   -Wl,--export=lean_run_mod_init_core
   -Wl,--export=vir_upstream_target_pointer_bytes
   -Wl,--export=vir_resolve_call
-  -Wl,--export=vir_call
   -Wl,--export=vir_call_resolved
   -Wl,--export=vir_call_resolved_objects
   -Wl,--export=vir_call_result_size

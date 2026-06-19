@@ -13,8 +13,8 @@ package lookup, and temporary runtime glue live here instead.
   host-import signatures keyed by the current loaded package generation.
 - `object_abi.cpp`: owned `lean_object *` helpers used by runtime boundary
   tests and object-call experiments.
-- `interface_codec.h` and `interface_codec.cpp`: the `vir_call` wire codec,
-  type/value encoding, callback payloads, and host `externref` resource objects.
+- `interface_codec.h` and `interface_codec.cpp`: package-signature-guided
+  value encoding, callback payloads, and host `externref` resource objects.
 - `native_symbols.cpp`: handwritten native extern wrappers, restricted symbol
   lookup, and symbol-stem support for declarations carried in `.irpkg` files.
 - `native_symbols_registry.inc`: generated registry of native extern names from

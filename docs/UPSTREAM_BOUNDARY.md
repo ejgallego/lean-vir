@@ -56,7 +56,7 @@ not a fork of Lean. It is split by responsibility:
 - `shim.cpp` owns the package call surface, host import trampolines, closure
   roots, and `lean_ir_find_env_decl` hooks.
 - `interface_codec.cpp` owns the JavaScript interface wire codec shared by
-  `vir_call`, JavaScript host imports, and Lean callback calls.
+  resolved package calls, JavaScript host imports, and Lean callback calls.
 - `native_symbols.cpp` owns the explicit native extern wrappers, generated
   native registry include, restricted `dlsym` lookup, native symbol stem
   lookup, and C++ exception stubs.
@@ -152,8 +152,7 @@ uses `0` as the failure sentinel. Repeated calls then use
 In package format 7 and newer, the package contains a compact export signature
 table. `vir_call_resolved` uses that table to decode value-only argument
 payloads and to encode value-only result payloads. Resolved calls without a
-package-owned signature fail instead of falling back to the descriptor-bearing
-payload accepted by `vir_call`.
+package-owned signature fail.
 Package format 7 also uses package-owned host-import signatures for
 Lean-to-JavaScript calls: the shim sends value-only argument payloads through
 `env.vir_js_call`, and JavaScript returns a value-only result payload. The shim
@@ -190,9 +189,8 @@ packed scalar fields, including direct recursive references through supported
 fields. Resources, callbacks, effectful calls, and `Lean.Expr` values still use
 the compact byte lane for now.
 
-The shim still keeps `vir_call(name, len, payload, payloadLen, resultTag)` as a
-named entry point for diagnostics and benchmark comparisons, but the JavaScript
-runtime requires the resolved-call exports.
+The shim only exposes resolved package calls for JavaScript-to-Lean byte
+payloads; the descriptor-bearing named payload format has been removed.
 
 The shim also exposes the first experimental Lean object ABI helpers:
 

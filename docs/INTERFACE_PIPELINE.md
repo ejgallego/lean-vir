@@ -185,10 +185,8 @@ The recursive type tree is embedded in the JSON manifest and, for package
 format 7 and newer, also in a compact package-owned export signature table.
 Normal `vir_call_resolved` payloads carry only values; the WASM shim looks up
 the argument/result descriptors from the loaded package. The descriptor-bearing
-`vir_call` path remains available for diagnostics and benchmark comparison, but
-normal runtime dispatch no longer falls back to it after slot resolution. This
-is intentionally still an internal package ABI, not a committed component-model
-boundary.
+named call format has been removed; this is intentionally still an internal
+package ABI, not a committed component-model boundary.
 Lean-to-JavaScript host imports use the same package-owned signature idea in
 format 7: the shim and `VirHostState` exchange value-only request and result
 payloads for package-declared host imports.

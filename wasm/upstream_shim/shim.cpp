@@ -421,17 +421,6 @@ static void cleanup_call_args(std::vector<lean::vir_arg> const & args) {
     }
 }
 
-static uint8_t decode_call_effect(lean::vir_reader & reader) {
-    uint8_t effect = 0;
-    if (reader.ok && !reader.at_end()) {
-        effect = reader.u8();
-        if (effect > 1) {
-            reader.fail("unsupported call effect tag " + std::to_string(effect));
-        }
-    }
-    return effect;
-}
-
 static lean::object * run_package_function(
     lean::name const & fn,
     size_t argc,
@@ -455,8 +444,7 @@ static char const * run_decoded_call(
     bool has_boxed_decl,
     lean::vir_type const & result_type,
     uint8_t effect,
-    std::vector<lean::object *> & args,
-    bool value_only_result) {
+    std::vector<lean::object *> & args) {
     if (effect == 1) {
         args.push_back(lean_io_mk_world());
     }
@@ -470,11 +458,7 @@ static char const * run_decoded_call(
         result = lean_io_result_take_value(result);
     }
     lean::vir_writer writer;
-    if (value_only_result) {
-        lean::encode_result_payload(writer, result_type, result, has_boxed_decl);
-    } else {
-        lean::encode_result(writer, result_type, result, has_boxed_decl);
-    }
+    lean::encode_result_payload(writer, result_type, result, has_boxed_decl);
     if (!writer.ok) {
         if (lean::call_result_is_owned(result_type, has_boxed_decl)) {
             lean_dec(result);
@@ -487,41 +471,6 @@ static char const * run_decoded_call(
     }
     lean::g_call_result = writer.take();
     return lean::g_call_result.data();
-}
-
-static char const * vir_call_descriptor_core(
-    lean::name const & fn,
-    bool has_boxed_decl,
-    uint8_t const * request,
-    uint32_t request_len) {
-    lean::vir_reader reader(request, request_len);
-    uint32_t argc = reader.u32();
-    std::vector<lean::vir_arg> decoded_args;
-    std::vector<lean::object *> args;
-    decoded_args.reserve(argc);
-    args.reserve(argc);
-    for (uint32_t i = 0; i < argc; i++) {
-        decoded_args.push_back(lean::decode_argument(reader, has_boxed_decl));
-        args.push_back(decoded_args.back().value);
-    }
-    lean::vir_type result_type = lean::decode_type(reader);
-    uint8_t effect = decode_call_effect(reader);
-    if (!reader.ok) {
-        lean::g_call_error = reader.error();
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-    if (!has_boxed_decl && lean::needs_boxed_wasm32_call_boundary_type(result_type)) {
-        lean::g_call_error = "top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary";
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-    if (!reader.at_end()) {
-        lean::g_call_error = "trailing bytes after call payload";
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-    return run_decoded_call(fn, has_boxed_decl, result_type, effect, args, false);
 }
 
 static char const * vir_call_resolved_core(
@@ -571,8 +520,7 @@ static char const * vir_call_resolved_core(
         has_boxed_decl,
         signature.result,
         signature.is_io ? 1 : 0,
-        args,
-        true);
+        args);
 }
 
 extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len) {
@@ -592,33 +540,6 @@ extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len) 
         lean::g_call_error = "call entry not found";
     }
     return slot;
-}
-
-extern "C" char const * vir_call(
-    char const * name_text,
-    uint32_t name_len,
-    uint8_t const * request,
-    uint32_t request_len,
-    uint8_t result_tag) {
-    lean::g_call_result.clear();
-    lean::g_call_error.clear();
-    if (name_text == nullptr) {
-        lean::g_call_error = "call name pointer is null";
-        return nullptr;
-    }
-    if (request == nullptr && request_len != 0) {
-        lean::g_call_error = "call payload pointer is null";
-        return nullptr;
-    }
-    if (!lean::vir::package_loaded()) {
-        lean::g_call_error = "no IR package has been loaded";
-        return nullptr;
-    }
-
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
-    bool has_boxed_decl = lean::vir::find_package_boxed_decl(fn.to_obj_arg()) != nullptr;
-    (void) result_tag;
-    return vir_call_descriptor_core(fn, has_boxed_decl, request, request_len);
 }
 
 extern "C" char const * vir_call_resolved(
