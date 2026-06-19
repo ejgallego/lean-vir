@@ -7,7 +7,8 @@ the top-level `README.md`. A narrower map of script entry points lives in
 This document owns setup, generated-artifact policy, validation command
 selection, and CI shape. Package config and manifest semantics live in
 `docs/INTERFACE_PIPELINE.md`; architecture status lives in
-`docs/IMPLEMENTATION_NOTES.md`.
+`docs/IMPLEMENTATION_NOTES.md`; package generator internals live in
+`docs/GENERATE_PACKAGE.md`.
 
 The repository-local harness has three jobs:
 

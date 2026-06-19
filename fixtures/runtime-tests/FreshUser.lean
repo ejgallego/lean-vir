@@ -46,6 +46,9 @@ inductive FreshJson where
   | array (items : List FreshJson)
   | object (entries : List (String × FreshJson))
 
+abbrev FreshUserId := Nat
+
+def freshAliasBump (n : FreshUserId) : FreshUserId := n + 9
 def freshBump (n : Nat) : Nat := n + 7
 def freshSum (xs : Array Nat) : Nat := xs.foldl (fun acc n => acc + n) 0
 def freshPairSum (p : Nat × Nat) : Nat := p.fst + p.snd

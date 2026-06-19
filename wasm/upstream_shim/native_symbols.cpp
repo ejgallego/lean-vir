@@ -1371,7 +1371,7 @@ extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_ob
     return result;
 }
 
-// Generated from tools/GeneratePackage.lean nativeExterns; keep wrappers handwritten above.
+// Generated from Vir/GeneratePackage/NativeExterns.lean nativeExterns; keep wrappers handwritten above.
 #include "native_symbols_registry.inc"
 
 struct NativeSymbol {
