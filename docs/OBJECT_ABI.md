@@ -47,8 +47,9 @@ The initial exported object helper surface is deliberately small:
 
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
-- `vir_obj_array`
-- `vir_obj_list`
+- `vir_obj_array` / `vir_obj_array_size` / `vir_obj_array_get`
+- `vir_obj_list` / `vir_obj_list_is_nil` / `vir_obj_list_head` /
+  `vir_obj_list_tail`
 - `vir_obj_ctor`
 - `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
 - `vir_obj_tag` / `vir_obj_field`
@@ -74,6 +75,8 @@ owned Lean array object. If it fails before consuming them, JavaScript still own
 the element references and must release them.
 `vir_obj_list` follows the same ownership rule and builds a Lean list in input
 order.
+`vir_obj_array_get`, `vir_obj_list_head`, and `vir_obj_list_tail` return new
+owned references that JavaScript must release after lifting.
 `vir_obj_ctor` consumes owned field references and returns one owned constructor
 object with object fields only. If construction fails before consuming fields,
 JavaScript still owns the field references. `vir_obj_field` returns a new owned
@@ -133,13 +136,12 @@ handles structured values, resources, callbacks, and host imports. Primitive
 lane helpers are still useful for the hottest exact scalar signatures because
 they avoid both byte payloads and object allocation.
 The automatic object-lane selection in `VirRuntime.call` covers pure unary calls
-whose argument can be lowered from the current object subset and whose result can
-be lifted from it. Arguments currently support base values, `Array`, `List`,
-`Option`, and `Prod`; sequence and product fields are lowered recursively.
-Results currently support base values, `Option`, and `Prod`; array/list result
-inspection still falls back to the byte codec. Decimal scalar calls lower through
-the corresponding `vir_obj_*` constructor, call `vir_call_resolved_objects`, lift
-the result with the matching decimal inspection helper plus
+whose argument can be lowered from the current object subset and whose result
+can be lifted from it. Arguments and results currently support base values,
+`Array`, `List`, `Option`, and `Prod`; sequence and product fields are lowered
+or lifted recursively. Decimal scalar calls lower through the corresponding
+`vir_obj_*` constructor, call `vir_call_resolved_objects`, lift the result with
+the matching decimal inspection helper plus
 `vir_obj_decimal_size`, and release the owned result with `vir_obj_dec`.
 Byte-array calls use `vir_obj_byte_array` and lift the result with
 `vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each

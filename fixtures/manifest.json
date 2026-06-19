@@ -303,6 +303,8 @@
         "Vir.Fixtures.InterfaceShapes.float32Roundtrip",
         "Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip",
         "Vir.Fixtures.InterfaceShapes.baseArrayNatSum",
+        "Vir.Fixtures.InterfaceShapes.arrayNatBumpAll",
+        "Vir.Fixtures.InterfaceShapes.listStringBangAll",
         "Vir.Fixtures.InterfaceShapes.optionNatBump",
         "Vir.Fixtures.InterfaceShapes.optionStringBang",
         "Vir.Fixtures.InterfaceShapes.optionNatScore",

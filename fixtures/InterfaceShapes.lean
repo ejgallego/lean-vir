@@ -55,6 +55,12 @@ def baseByteArrayRoundtrip (bytes : ByteArray) : ByteArray :=
 def baseArrayNatSum (xs : Array Nat) : Nat :=
   xs.foldl (fun acc value => acc + value) 0
 
+def arrayNatBumpAll (xs : Array Nat) : Array Nat :=
+  xs.map (fun value => value + 1)
+
+def listStringBangAll (xs : List String) : List String :=
+  xs.map (fun value => value ++ "!")
+
 def optionNatBump : Option Nat → Option Nat
   | none => some 0
   | some value => some (value + 1)
