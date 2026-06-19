@@ -61,14 +61,10 @@ mkdir -p "$overlay_include/lean"
 mkdir -p web/public
 
 cat > "$allowed_undefined" <<'EOF'
-vir_js_call
-vir_js_call_result_size
-vir_closure_push
+vir_js_call_objects
 vir_resource_get
-vir_resource_push
 vir_resource_release
 vir_resource_root
-vir_resource_take
 EOF
 
 package_start=$SECONDS
@@ -127,7 +123,11 @@ support_sources=(
 
 shim_sources=(
   "wasm/upstream_shim/lean_object_constructors.cpp"
-  "wasm/upstream_shim/interface_codec.cpp"
+  "wasm/upstream_shim/resource_abi.cpp"
+  "wasm/upstream_shim/call_signature_summary.cpp"
+  "wasm/upstream_shim/name_utils.cpp"
+  "wasm/upstream_shim/signature_cache.cpp"
+  "wasm/upstream_shim/object_abi.cpp"
   "wasm/upstream_shim/native_symbols.cpp"
   "wasm/upstream_shim/platform_stubs.cpp"
   "wasm/upstream_shim/shim.cpp"
@@ -136,7 +136,10 @@ shim_sources=(
 
 shim_deps=(
   "wasm/upstream_shim/decl_provider.h"
-  "wasm/upstream_shim/interface_codec.h"
+  "wasm/upstream_shim/call_signature_summary.h"
+  "wasm/upstream_shim/name_utils.h"
+  "wasm/upstream_shim/resource_abi.h"
+  "wasm/upstream_shim/signature_cache.h"
   "wasm/upstream_shim/native_symbols_registry.inc"
 )
 
@@ -237,13 +240,10 @@ exports=(
   -Wl,--export=lean_run_mod_init_core
   -Wl,--export=vir_upstream_target_pointer_bytes
   -Wl,--export=vir_resolve_call
-  -Wl,--export=vir_call
-  -Wl,--export=vir_call_resolved
-  -Wl,--export=vir_call_result_size
+  -Wl,--export=vir_call_resolved_objects
   -Wl,--export=vir_call_error
   -Wl,--export=vir_call_error_size
-  -Wl,--export=vir_closure_call
-  -Wl,--export=vir_closure_call_result_size
+  -Wl,--export=vir_closure_call_objects
   -Wl,--export=vir_closure_call_error
   -Wl,--export=vir_closure_call_error_size
   -Wl,--export=vir_closure_release
@@ -255,6 +255,70 @@ exports=(
   -Wl,--export=vir_package_interface_manifest
   -Wl,--export=vir_package_interface_manifest_size
   -Wl,--export=vir_package_decl_count
+  -Wl,--export=vir_obj_string
+  -Wl,--export=vir_obj_string_data
+  -Wl,--export=vir_obj_string_size
+  -Wl,--export=vir_obj_byte_array
+  -Wl,--export=vir_obj_byte_array_data
+  -Wl,--export=vir_obj_byte_array_size
+  -Wl,--export=vir_obj_array
+  -Wl,--export=vir_obj_array_size
+  -Wl,--export=vir_obj_array_get
+  -Wl,--export=vir_obj_ctor
+  -Wl,--export=vir_obj_ctor_layout
+  -Wl,--export=vir_obj_ctor_usize_decimal
+  -Wl,--export=vir_obj_ctor_scalar_data
+  -Wl,--export=vir_obj_closure_root
+  -Wl,--export=vir_obj_expr_app
+  -Wl,--export=vir_obj_expr_bvar
+  -Wl,--export=vir_obj_expr_const
+  -Wl,--export=vir_obj_expr_forall
+  -Wl,--export=vir_obj_expr_fvar
+  -Wl,--export=vir_obj_expr_lambda
+  -Wl,--export=vir_obj_expr_let
+  -Wl,--export=vir_obj_expr_lit
+  -Wl,--export=vir_obj_expr_mvar
+  -Wl,--export=vir_obj_expr_proj
+  -Wl,--export=vir_obj_expr_scalar_u8
+  -Wl,--export=vir_obj_expr_sort
+  -Wl,--export=vir_obj_level_imax
+  -Wl,--export=vir_obj_level_max
+  -Wl,--export=vir_obj_level_mvar
+  -Wl,--export=vir_obj_level_param
+  -Wl,--export=vir_obj_level_succ
+  -Wl,--export=vir_obj_level_zero
+  -Wl,--export=vir_obj_list
+  -Wl,--export=vir_obj_list_is_nil
+  -Wl,--export=vir_obj_list_head
+  -Wl,--export=vir_obj_list_tail
+  -Wl,--export=vir_obj_literal_nat
+  -Wl,--export=vir_obj_literal_string
+  -Wl,--export=vir_obj_name_string
+  -Wl,--export=vir_obj_name_string_size
+  -Wl,--export=vir_obj_resource
+  -Wl,--export=vir_obj_resource_externref
+  -Wl,--export=vir_obj_scalar
+  -Wl,--export=vir_obj_is_scalar
+  -Wl,--export=vir_obj_scalar_value
+  -Wl,--export=vir_obj_tag
+  -Wl,--export=vir_obj_field
+  -Wl,--export=vir_obj_nat
+  -Wl,--export=vir_obj_nat_decimal
+  -Wl,--export=vir_obj_int
+  -Wl,--export=vir_obj_int_decimal
+  -Wl,--export=vir_obj_uint32
+  -Wl,--export=vir_obj_uint32_value
+  -Wl,--export=vir_obj_uint64
+  -Wl,--export=vir_obj_uint64_decimal
+  -Wl,--export=vir_obj_usize
+  -Wl,--export=vir_obj_usize_decimal
+  -Wl,--export=vir_obj_float
+  -Wl,--export=vir_obj_float_value
+  -Wl,--export=vir_obj_float32
+  -Wl,--export=vir_obj_float32_value
+  -Wl,--export=vir_obj_decimal_size
+  -Wl,--export=vir_obj_inc
+  -Wl,--export=vir_obj_dec
 )
 
 link_stamp="$obj_dir/link-flags.stamp"
@@ -481,8 +545,13 @@ report_start=$SECONDS
   echo "## Current Shim Scope"
   echo
   echo "\`wasm/upstream_shim/shim.cpp\` supplies the package call surface,"
-  echo "closure bridge, and declaration lookup hooks. \`interface_codec.cpp\`"
-  echo "supplies the JavaScript interface wire codec."
+  echo "closure bridge, and declaration lookup hooks. \`signature_cache.cpp\`"
+  echo "owns cached package-call signature summaries."
+  echo "\`call_signature_summary.cpp\` streams compact package signatures to compute"
+  echo "arity and boxed-boundary requirements. \`name_utils.cpp\` contains shared"
+  echo "Lean name construction helpers. \`object_abi.cpp\` and \`resource_abi.cpp\` supply"
+  echo "owned Lean object and JavaScript resource helpers used by the runtime"
+  echo "object-call path."
   echo "\`wasm/upstream_shim/native_symbols.cpp\` supplies the explicit native"
   echo "extern wrappers plus generated registry include and restricted \`dlsym\` lookup;"
   echo "\`platform_stubs.cpp\`"

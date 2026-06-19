@@ -26,7 +26,6 @@ import {
   validateBenchmarkCacheOptions,
 } from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
-import { decodeCallResult, encodeCallPayload } from "../web/src/runtime/vir-value-codec.js";
 import {
   createVirRuntime as createNodeVirRuntime,
   createVirtualDocumentState,
@@ -41,16 +40,20 @@ const fibIterations = 80;
 const dispatchIterations = 20000;
 const sortInput = [7, 3, 9, 1, 4, 1, 5, 2, 8, 6, 0, 10, 12, 11, 13, 14];
 const sortIterations = 2000;
-const hostScalarIterations = 5000;
-const callbackIterations = 5000;
-const domResourceIterations = 1000;
+const hostScalarIterations = 250;
+const callbackIterations = 1000;
+const domResourceIterations = 300;
 const reactRootIterations = 500;
 const scalarRecordIterations = 5000;
 const nestedRecordIterations = 3000;
 const recursiveValueIterations = 2000;
-const codecScalarRecordIterations = 20000;
-const codecNestedRecordIterations = 20000;
-const codecRecursiveValueIterations = 20000;
+const baseScalarIterations = 10000;
+const baseBlobIterations = 3000;
+const baseArrayIterations = 3000;
+const baseLowerIterations = 20000;
+const lowerScalarRecordIterations = 20000;
+const lowerNestedRecordIterations = 20000;
+const lowerRecursiveValueIterations = 20000;
 const reactTextRenderIterations = 300;
 const reactTextRenderWidth = 40;
 const reactCallbackRenderIterations = 200;
@@ -100,6 +103,10 @@ const recursiveJsonInput = {
     { fst: "ok", snd: { kind: "bool", value: false } },
   ],
 };
+const baseStringInput = "Lean IR boundary Aé∀Z ".repeat(8);
+const baseByteArrayInput = Uint8Array.from(Array.from({ length: 128 }, (_, index) => (index * 17) & 0xff));
+const baseArrayNatInput = Array.from({ length: 64 }, (_, index) => index + 1);
+const baseArrayStringInput = Array.from({ length: 32 }, (_, index) => `s${index}`);
 const textEncoder = new TextEncoder();
 const args = parseArgs(process.argv.slice(2));
 
@@ -233,34 +240,43 @@ function printWasmRow(name, sample) {
   console.log(`  checksum:  ${sample.checksum}`);
 }
 
-function printDispatchRow(name, named, resolved) {
-  const namedPerCall = named.medianMs / named.iterations;
-  const resolvedPerCall = resolved.medianMs / resolved.iterations;
-  const deltaPct = ((resolvedPerCall - namedPerCall) / namedPerCall) * 100;
+function printDispatchRow(name, resolveEachCall, cachedSlot) {
+  const resolveEachPerCall = resolveEachCall.medianMs / resolveEachCall.iterations;
+  const cachedPerCall = cachedSlot.medianMs / cachedSlot.iterations;
+  const deltaPct = ((cachedPerCall - resolveEachPerCall) / resolveEachPerCall) * 100;
   const sign = deltaPct >= 0 ? "+" : "";
-  const speed = namedPerCall / resolvedPerCall;
+  const speed = resolveEachPerCall / cachedPerCall;
   console.log(`${name}`);
-  console.log(`  named ABI:    ${formatMs(named.medianMs)} total, ${formatMs(namedPerCall)} / call`);
+  console.log(`  resolve+call: ${formatMs(resolveEachCall.medianMs)} total, ${formatMs(resolveEachPerCall)} / call`);
   console.log(
-    `  resolved ABI: ${formatMs(resolved.medianMs)} total, ${formatMs(resolvedPerCall)} / call ` +
+    `  cached slot:  ${formatMs(cachedSlot.medianMs)} total, ${formatMs(cachedPerCall)} / call ` +
       `(${sign}${deltaPct.toFixed(1)}%, ${speed.toFixed(2)}x speed)`,
   );
-  console.log(`  checksums:    named=${named.checksum} resolved=${resolved.checksum}`);
+  console.log(`  checksums:    resolve+call=${resolveEachCall.checksum} cached=${cachedSlot.checksum}`);
 }
 
 function printJsRow(name, sample) {
   const perCall = sample.medianMs / sample.iterations;
   console.log(`${name}`);
-  console.log(`  js codec:  ${formatMs(sample.medianMs)} total, ${formatMs(perCall)} / call`);
+  console.log(`  js lower:  ${formatMs(sample.medianMs)} total, ${formatMs(perCall)} / call`);
   console.log(`  checksum:  ${sample.checksum}`);
 }
 
-function benchmarkDispatchReportRow(name, title, named, resolved) {
+function printConversionRow(name, lower, wasm) {
+  const lowerPerCall = lower.medianMs / lower.iterations;
+  const wasmPerCall = wasm.medianMs / wasm.iterations;
+  console.log(`${name}`);
+  console.log(`  js lower:  ${formatMs(lower.medianMs)} total, ${formatMs(lowerPerCall)} / call`);
+  console.log(`  wasm call:  ${formatMs(wasm.medianMs)} total, ${formatMs(wasmPerCall)} / call`);
+  console.log(`  checksums: lower=${lower.checksum} wasm=${wasm.checksum}`);
+}
+
+function benchmarkDispatchReportRow(name, title, resolveEachCall, cachedSlot) {
   return {
     name,
     title,
-    named: benchmarkSampleReport(named),
-    resolved: benchmarkSampleReport(resolved),
+    resolveEachCall: benchmarkSampleReport(resolveEachCall),
+    cachedSlot: benchmarkSampleReport(cachedSlot),
   };
 }
 
@@ -281,6 +297,15 @@ function benchmarkJsReportRow(name, title, js) {
     name,
     title,
     js: benchmarkSampleReport(js),
+  };
+}
+
+function benchmarkConversionReportRow(name, title, lower, wasm) {
+  return {
+    name,
+    title,
+    lower: benchmarkSampleReport(lower),
+    wasm: benchmarkSampleReport(wasm),
   };
 }
 
@@ -325,7 +350,7 @@ async function writeJsonReport(path, benchmarks) {
 
 const artifactCache = await ensureCachedBenchArtifacts({
   root,
-  artifactPaths: benchArtifactPaths,
+  artifactPaths: benchmarkArtifactPaths,
   options: args,
   build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
 });
@@ -339,73 +364,111 @@ function manifestEntry(name) {
   return entry;
 }
 
-function benchEncodeCallPayload(label, iterations, entry, args) {
+function benchLowerCallObjects(label, iterations, entry, args) {
   return benchJsRepeated(label, iterations, () => {
     let acc = 0;
     for (let i = 0; i < iterations; i++) {
-      acc += encodeCallPayload(entry, args, runtime.codecOptions).byteLength;
+      const objects = [];
+      try {
+        entry.args.forEach((arg, index) => {
+          const obj = runtime.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`);
+          objects.push(obj);
+          acc += obj === 0 ? 0 : 1;
+        });
+      } finally {
+        runtime.releaseOwnedObjects(objects);
+      }
     }
     return acc;
   });
 }
 
+function benchBoundaryConversionCase(testCase) {
+  const entry = manifestEntry(testCase.entry);
+  const lower = benchLowerCallObjects(`lower-${testCase.name}`, testCase.lowerIterations ?? baseLowerIterations, entry, testCase.args);
+  const wasm = benchWasmRepeated(testCase.name, testCase.iterations, () => {
+    let acc = 0;
+    for (let i = 0; i < testCase.iterations; i++) {
+      acc += testCase.checksum(runtime.call(testCase.entry, ...testCase.args));
+    }
+    return acc;
+  });
+  return { ...testCase, lower, wasm };
+}
+
+function checksumNumber(value) {
+  return Number(value);
+}
+
+function checksumBool(value) {
+  return value === true ? 1 : 0;
+}
+
+function checksumString(value) {
+  if (typeof value !== "string") {
+    throw new Error(`expected benchmark string result, got ${typeof value}`);
+  }
+  return value.length;
+}
+
+function checksumByteArray(value) {
+  if (!(value instanceof Uint8Array)) {
+    throw new Error("expected benchmark ByteArray result to decode as Uint8Array");
+  }
+  return value.length + (value[0] ?? 0) + (value[value.length - 1] ?? 0);
+}
+
 function resolveRawCallSlot(entry, nameBytes) {
   const namePtr = runtime.allocBytes(nameBytes);
   try {
-    const callSlot = runtime.exports.vir_resolve_call(namePtr, nameBytes.byteLength) >>> 0;
-    if (callSlot === 0) {
-      throw new Error(runtime.lastCallError() || `call entry not found: ${entry.entry}`);
-    }
-    return callSlot;
+    return resolveRawCallSlotPtr(entry, namePtr, nameBytes.byteLength);
   } finally {
     runtime.freeBytes(namePtr);
   }
 }
 
-function callRawNamed(entry, namePtr, nameLen, payloadPtr, payloadLen) {
-  const resultPtr = runtime.exports.vir_call(namePtr, nameLen, payloadPtr, payloadLen, entry.result.wireTag);
-  if (resultPtr === 0) {
-    throw new Error(runtime.lastCallError() || `named call failed: ${entry.entry}`);
+function resolveRawCallSlotPtr(entry, namePtr, nameLen) {
+  const callSlot = runtime.exports.vir_resolve_call(namePtr, nameLen) >>> 0;
+  if (callSlot === 0) {
+    throw new Error(runtime.lastCallError() || `call entry not found: ${entry.entry}`);
   }
-  const resultLen = runtime.exports.vir_call_result_size();
-  return decodeCallResult(entry.result, runtime.readWasmBytes(resultPtr, resultLen), runtime.codecOptions);
+  return callSlot;
 }
 
-function callRawResolved(entry, callSlot, payloadPtr, payloadLen) {
-  const resultPtr = runtime.exports.vir_call_resolved(callSlot, payloadPtr, payloadLen, entry.result.wireTag);
-  if (resultPtr === 0) {
+function callRawResolvedObjects(entry, callSlot) {
+  const resultObj = runtime.exports.vir_call_resolved_objects(callSlot, 0, 0);
+  if (resultObj === 0) {
     throw new Error(runtime.lastCallError() || `resolved call failed: ${entry.entry}`);
   }
-  const resultLen = runtime.exports.vir_call_result_size();
-  return decodeCallResult(entry.result, runtime.readWasmBytes(resultPtr, resultLen), runtime.codecOptions);
+  try {
+    return runtime.liftObjectValue(entry.result, resultObj, `${entry.entry} result`);
+  } finally {
+    runtime.exports.vir_obj_dec(resultObj);
+  }
 }
 
 function benchTopLevelDispatch(entry) {
   const nameBytes = textEncoder.encode(entry.entry);
-  const payload = encodeCallPayload(entry, [], runtime.codecOptions);
   const callSlot = resolveRawCallSlot(entry, nameBytes);
   const namePtr = runtime.allocBytes(nameBytes);
-  const namedPayloadPtr = runtime.allocBytes(payload);
-  const resolvedPayloadPtr = runtime.allocBytes(payload);
   try {
-    const named = benchWasmRepeated("named", dispatchIterations, () => {
+    const resolveEachCall = benchWasmRepeated("resolve-each-call", dispatchIterations, () => {
       let acc = 0;
       for (let i = 0; i < dispatchIterations; i++) {
-        acc += Number(callRawNamed(entry, namePtr, nameBytes.byteLength, namedPayloadPtr, payload.byteLength));
+        const resolvedSlot = resolveRawCallSlotPtr(entry, namePtr, nameBytes.byteLength);
+        acc += Number(callRawResolvedObjects(entry, resolvedSlot));
       }
       return acc;
     });
-    const resolved = benchWasmRepeated("resolved", dispatchIterations, () => {
+    const cachedSlot = benchWasmRepeated("cached-slot", dispatchIterations, () => {
       let acc = 0;
       for (let i = 0; i < dispatchIterations; i++) {
-        acc += Number(callRawResolved(entry, callSlot, resolvedPayloadPtr, payload.byteLength));
+        acc += Number(callRawResolvedObjects(entry, callSlot));
       }
       return acc;
     });
-    return { named, resolved };
+    return { resolveEachCall, cachedSlot };
   } finally {
-    runtime.freeBytes(resolvedPayloadPtr);
-    runtime.freeBytes(namedPayloadPtr);
     runtime.freeBytes(namePtr);
   }
 }
@@ -414,8 +477,131 @@ const dispatchEntry = manifestEntry("Vir.Fixtures.Basic.branchAndSub");
 const scalarRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileStatsScore");
 const nestedRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore");
 const recursiveValueEntry = manifestEntry("Vir.Fixtures.RecursiveTypes.jsonRootScore");
+const baseConversionCases = [
+  {
+    name: "base-unit",
+    title: `Unit -> Unit x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUnitRoundtrip",
+    args: [undefined],
+    iterations: baseScalarIterations,
+    checksum: (value) => value === undefined ? 1 : 0,
+  },
+  {
+    name: "base-bool",
+    title: `Bool -> Bool x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseBoolFlip",
+    args: [true],
+    iterations: baseScalarIterations,
+    checksum: checksumBool,
+  },
+  {
+    name: "base-nat",
+    title: `Nat -> Nat x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseNatBump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-int",
+    title: `Int -> Int x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseIntNegate",
+    args: [-41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-string",
+    title: `String -> String (${baseStringInput.length} code units) x ${baseBlobIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip",
+    args: [baseStringInput],
+    iterations: baseBlobIterations,
+    checksum: checksumString,
+  },
+  {
+    name: "base-uint8",
+    title: `UInt8 -> UInt8 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUInt8Bump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-uint16",
+    title: `UInt16 -> UInt16 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUInt16Bump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-uint32",
+    title: `UInt32 -> UInt32 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.uint32Bump",
+    args: [41],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-uint64",
+    title: `UInt64 -> UInt64 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.uint64Bump",
+    args: ["41"],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-usize",
+    title: `USize -> USize x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseUSizeBump",
+    args: ["41"],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-float",
+    title: `Float -> Float x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.floatScale",
+    args: [1.5],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-float32",
+    title: `Float32 -> Float32 x ${baseScalarIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.float32Roundtrip",
+    args: [1.25],
+    iterations: baseScalarIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-byte-array",
+    title: `ByteArray -> ByteArray (${baseByteArrayInput.length} bytes) x ${baseBlobIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip",
+    args: [baseByteArrayInput],
+    iterations: baseBlobIterations,
+    checksum: checksumByteArray,
+  },
+  {
+    name: "base-array-nat",
+    title: `Array Nat -> Nat (${baseArrayNatInput.length} items) x ${baseArrayIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.baseArrayNatSum",
+    args: [baseArrayNatInput],
+    iterations: baseArrayIterations,
+    checksum: checksumNumber,
+  },
+  {
+    name: "base-array-string",
+    title: `Array String -> Nat (${baseArrayStringInput.length} items) x ${baseArrayIterations}`,
+    entry: "Vir.Fixtures.InterfaceShapes.arrayStringTotalLength",
+    args: [baseArrayStringInput],
+    iterations: baseArrayIterations,
+    checksum: checksumNumber,
+  },
+];
 
 const dispatch = benchTopLevelDispatch(dispatchEntry);
+const baseConversionBenchmarks = baseConversionCases.map(benchBoundaryConversionCase);
 
 const wasmFib = benchWasmRepeated("fib", fibIterations, () => {
   let acc = 0;
@@ -435,23 +621,23 @@ const wasmSort = benchWasmRepeated("sort", sortIterations, () => {
 });
 const hostSort = benchHostIr("sort", sortIterations, ["sort", String(sortIterations), sortInput.join(",")]);
 
-const jsCodecScalarRecord = benchEncodeCallPayload(
-  "codec-scalar-record",
-  codecScalarRecordIterations,
+const jsLowerScalarRecord = benchLowerCallObjects(
+  "lower-scalar-record",
+  lowerScalarRecordIterations,
   scalarRecordEntry,
   [profileStatsInput],
 );
 
-const jsCodecNestedRecord = benchEncodeCallPayload(
-  "codec-nested-record",
-  codecNestedRecordIterations,
+const jsLowerNestedRecord = benchLowerCallObjects(
+  "lower-nested-record",
+  lowerNestedRecordIterations,
   nestedRecordEntry,
   [profileEnvelopeInput],
 );
 
-const jsCodecRecursiveValue = benchEncodeCallPayload(
-  "codec-recursive-value",
-  codecRecursiveValueIterations,
+const jsLowerRecursiveValue = benchLowerCallObjects(
+  "lower-recursive-value",
+  lowerRecursiveValueIterations,
   recursiveValueEntry,
   [recursiveJsonInput],
 );
@@ -481,7 +667,11 @@ const wasmRecursiveValue = benchWasmRepeated("recursive-value", recursiveValueIt
 });
 
 const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
-  return Number(hostRuntime.call("HostInterop.titleHandshakeLoop", hostScalarIterations));
+  let acc = 0;
+  for (let i = 0; i < hostScalarIterations; i++) {
+    acc += hostRuntime.call("HostInterop.titleHandshake", "bench").length;
+  }
+  return acc;
 });
 
 const wasmCallback = benchWasmRepeated("callback-roundtrip", callbackIterations, () => {
@@ -489,7 +679,11 @@ const wasmCallback = benchWasmRepeated("callback-roundtrip", callbackIterations,
 });
 
 const wasmDomResource = benchWasmRepeated("dom-listener-resource", domResourceIterations, () => {
-  return Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEventLoop", "#bench-dom", domResourceIterations));
+  let acc = 0;
+  for (let i = 0; i < domResourceIterations; i++) {
+    acc += Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEvent", "#bench-dom"));
+  }
+  return acc;
 });
 
 const wasmReactRoot = benchWasmRepeated("react-root-lifecycle", reactRootIterations, () => {
@@ -521,7 +715,7 @@ console.log("Host timings exclude Lean frontend startup.");
 console.log();
 console.log("Pure runtime controls");
 console.log();
-printDispatchRow(`top-level dispatch branchAndSub x ${dispatchIterations}`, dispatch.named, dispatch.resolved);
+printDispatchRow(`top-level dispatch branchAndSub x ${dispatchIterations}`, dispatch.resolveEachCall, dispatch.cachedSlot);
 console.log();
 printRow(`fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib);
 console.log();
@@ -529,11 +723,17 @@ printRow(`sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort
 console.log();
 console.log("Top-level value conversion paths");
 console.log();
-printJsRow(`JS codec scalar record/enums encode x ${codecScalarRecordIterations}`, jsCodecScalarRecord);
+console.log("Base value conversion paths");
 console.log();
-printJsRow(`JS codec nested record/list/option encode x ${codecNestedRecordIterations}`, jsCodecNestedRecord);
+for (const testCase of baseConversionBenchmarks) {
+  printConversionRow(testCase.title, testCase.lower, testCase.wasm);
+  console.log();
+}
+printJsRow(`JS object scalar record/enums lower x ${lowerScalarRecordIterations}`, jsLowerScalarRecord);
 console.log();
-printJsRow(`JS codec recursive custom-inductive encode x ${codecRecursiveValueIterations}`, jsCodecRecursiveValue);
+printJsRow(`JS object nested record/list/option lower x ${lowerNestedRecordIterations}`, jsLowerNestedRecord);
+console.log();
+printJsRow(`JS object recursive custom-inductive lower x ${lowerRecursiveValueIterations}`, jsLowerRecursiveValue);
 console.log();
 printWasmRow(`scalar record/enums x ${scalarRecordIterations}`, wasmScalarRecord);
 console.log();
@@ -568,25 +768,27 @@ if (args.jsonPath !== null) {
     benchmarkDispatchReportRow(
       "top-level-dispatch",
       `top-level dispatch branchAndSub x ${dispatchIterations}`,
-      dispatch.named,
-      dispatch.resolved,
+      dispatch.resolveEachCall,
+      dispatch.cachedSlot,
     ),
     benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib),
     benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
+    ...baseConversionBenchmarks.map((testCase) =>
+      benchmarkConversionReportRow(testCase.name, testCase.title, testCase.lower, testCase.wasm)),
     benchmarkJsReportRow(
-      "codec-scalar-record",
-      `JS codec scalar record/enums encode x ${codecScalarRecordIterations}`,
-      jsCodecScalarRecord,
+      "lower-scalar-record",
+      `JS object scalar record/enums lower x ${lowerScalarRecordIterations}`,
+      jsLowerScalarRecord,
     ),
     benchmarkJsReportRow(
-      "codec-nested-record",
-      `JS codec nested record/list/option encode x ${codecNestedRecordIterations}`,
-      jsCodecNestedRecord,
+      "lower-nested-record",
+      `JS object nested record/list/option lower x ${lowerNestedRecordIterations}`,
+      jsLowerNestedRecord,
     ),
     benchmarkJsReportRow(
-      "codec-recursive-value",
-      `JS codec recursive custom-inductive encode x ${codecRecursiveValueIterations}`,
-      jsCodecRecursiveValue,
+      "lower-recursive-value",
+      `JS object recursive custom-inductive lower x ${lowerRecursiveValueIterations}`,
+      jsLowerRecursiveValue,
     ),
     benchmarkReportRow(
       "scalar-record",

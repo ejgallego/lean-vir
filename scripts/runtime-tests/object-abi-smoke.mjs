@@ -14,11 +14,6 @@ import {
 import {
   createHostResourceState,
 } from "../../web/src/host/vir-host-resources.js";
-import { BinaryWriter, encodeTypeDescriptor } from "../../web/src/runtime/vir-codec.js";
-import {
-  decodeCallResult,
-  encodeCallPayload,
-} from "../../web/src/runtime/vir-value-codec.js";
 import { WIRE } from "../../web/src/runtime/wire-tags.js";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
 
@@ -27,15 +22,93 @@ const defaultPackagePath = publicArtifactPath(defaultPackageFile);
 const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
 const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
 const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
-const natType = { type: "Nat", wireTag: WIRE.NAT };
-const unitType = { type: "Unit", wireTag: WIRE.UNIT };
+function makeObjectString(runtime, input) {
+  const bytes = new TextEncoder().encode(input);
+  const ptr = runtime.allocBytes(bytes);
+  try {
+    return runtime.exports.vir_obj_string(ptr, bytes.byteLength);
+  } finally {
+    runtime.freeBytes(ptr);
+  }
+}
+
+function withObjectString(runtime, input, body) {
+  let obj = makeObjectString(runtime, input);
+  try {
+    return body(obj);
+  } finally {
+    if (obj !== 0) {
+      runtime.exports.vir_obj_dec(obj);
+    }
+  }
+}
+
+function withObjectByteArray(runtime, bytes, body) {
+  const view = Uint8Array.from(bytes);
+  const ptr = runtime.allocBytes(view);
+  let obj = 0;
+  try {
+    obj = runtime.exports.vir_obj_byte_array(ptr, view.byteLength);
+    return body(obj);
+  } finally {
+    runtime.freeBytes(ptr);
+    if (obj !== 0) {
+      runtime.exports.vir_obj_dec(obj);
+    }
+  }
+}
+
+function resolveEntrySlot(runtime, name) {
+  const entry = runtime.findManifestEntry(name);
+  assert.ok(entry, `missing manifest entry ${name}`);
+  return runtime.resolveCallSlot(entry, runtime.callCacheFor(entry));
+}
+
+function callResolvedObjects(runtime, name, args) {
+  const argvPtr = runtime.allocBytes(new Uint8Array(args.length * 4));
+  try {
+    const view = new DataView(runtime.exports.memory.buffer, argvPtr, args.length * 4);
+    args.forEach((arg, index) => view.setUint32(index * 4, arg, true));
+    const result = runtime.exports.vir_call_resolved_objects(
+      resolveEntrySlot(runtime, name),
+      argvPtr,
+      args.length,
+    );
+    const error = runtime.lastCallError();
+    if (error !== "") {
+      throw new Error(error);
+    }
+    return result;
+  } finally {
+    runtime.freeBytes(argvPtr);
+  }
+}
+
+function withCallLaneCounters(runtime, body) {
+  const originalExports = runtime.exports;
+  const counters = { objectCalls: 0, bytePayloadCalls: 0 };
+  runtime.exports = Object.fromEntries(
+    Reflect.ownKeys(originalExports).map((key) => [key, originalExports[key]]),
+  );
+  runtime.exports.vir_call_resolved_objects = (...args) => {
+    counters.objectCalls++;
+    return originalExports.vir_call_resolved_objects(...args);
+  };
+  runtime.exports.vir_call_resolved = (...args) => {
+    counters.bytePayloadCalls++;
+    throw new Error(`unexpected byte-payload call with ${args.length} arguments`);
+  };
+  try {
+    body(counters);
+    return counters;
+  } finally {
+    runtime.exports = originalExports;
+  }
+}
+
 const resourceType = { type: "Resource", wireTag: WIRE.RESOURCE };
-const resourceEntry = {
-  entry: "resourceArg",
-  args: [{ name: "arg1", type: resourceType }],
-  result: unitType,
-  effect: "pure",
-};
+assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
+assert.equal(typeof runtime.exports.vir_call_result_size, "undefined");
 const resourceValue = { name: "resource" };
 const resourceArg = createHostResource(resourceValue);
 assert.deepEqual(Object.keys(resourceArg), []);
@@ -43,28 +116,22 @@ assert.equal(Object.hasOwn(resourceArg, "handle"), false);
 assert.equal("handle" in resourceArg, false);
 assert.equal(Object.hasOwn(resourceArg, "value"), false);
 assert.equal("value" in resourceArg, false);
-const incomingResources = [];
-const resourceArgPayload = encodeCallPayload(resourceEntry, [resourceArg], {
-  pushIncomingResource: (value) => incomingResources.push(value),
-});
-assert.deepEqual([...resourceArgPayload], [1, 0, 0, 0, WIRE.RESOURCE, WIRE.UNIT, 0]);
-assert.equal(incomingResources.length, 1);
-assert.equal(incomingResources[0], resourceArg);
-assert.throws(
-  () => encodeCallPayload(resourceEntry, [{ handle: 1 }], { pushIncomingResource: () => undefined }),
-  /resourceArg argument arg1 must be a live host resource/,
-);
+let resourceObj = runtime.makeObjectValue(resourceType, resourceArg, "resource argument");
+try {
+  assert.equal(runtime.liftObjectValue(resourceType, resourceObj, "resource result"), resourceArg);
+} finally {
+  runtime.exports.vir_obj_dec(resourceObj);
+  resourceObj = 0;
+}
+assert.throws(() => runtime.makeObjectValue(resourceType, { handle: 1 }, "resource argument"), /resource argument must be a live host resource/);
 releaseHostResource(resourceArg);
-assert.throws(
-  () => encodeCallPayload(resourceEntry, [resourceArg], { pushIncomingResource: () => undefined }),
-  /resourceArg argument arg1 must be a live host resource/,
-);
+assert.throws(() => runtime.makeObjectValue(resourceType, resourceArg, "resource argument"), /resource argument must be a live host resource/);
 const resourceStore = createHostResourceState();
 const staleStoreResource = resourceStore.resourceForValue({ name: "stale" });
 resourceStore.dispose();
 assert.throws(
-  () => encodeCallPayload(resourceEntry, [staleStoreResource], { pushIncomingResource: () => undefined }),
-  /resourceArg argument arg1 must be a live host resource/,
+  () => runtime.makeObjectValue(resourceType, staleStoreResource, "resource argument"),
+  /resource argument must be a live host resource/,
 );
 const roots = new ExternrefResourceRoots();
 const firstRootResource = createHostResource({ name: "first" });
@@ -81,41 +148,6 @@ roots.clear();
 assert.equal(roots.get(secondRootId), null);
 releaseHostResource(secondRootResource);
 assert.equal(roots.root(secondRootResource), 0);
-const resourceResultWriter = new BinaryWriter();
-encodeTypeDescriptor(resourceResultWriter, resourceType, "resource result");
-let outgoingResourceTakes = 0;
-assert.equal(
-  decodeCallResult(resourceType, resourceResultWriter.take(), {
-    takeOutgoingResource: (label) => {
-      assert.equal(label, "resource result");
-      outgoingResourceTakes += 1;
-      return "opaque-resource";
-    },
-  }),
-  "opaque-resource",
-);
-assert.equal(outgoingResourceTakes, 1);
-const callbackType = {
-  type: "Function",
-  wireTag: WIRE.FUNCTION,
-  effect: "io",
-  args: [{ name: "input", type: natType }],
-  result: natType,
-};
-const callbackResultWriter = new BinaryWriter();
-encodeTypeDescriptor(callbackResultWriter, callbackType, "callback result");
-let closureRootTakes = 0;
-const callbackResult = decodeCallResult(callbackType, callbackResultWriter.take(), {
-  takeOutgoingClosureRootId: (label) => {
-    assert.equal(label, "function result");
-    closureRootTakes += 1;
-    return 7;
-  },
-  createCallback: (rootId, type) => ({ rootId, type }),
-});
-assert.equal(callbackResult.rootId, 7);
-assert.equal(callbackResult.type, callbackType);
-assert.equal(closureRootTakes, 1);
 const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", defaultPackagePath], {
   encoding: "utf8",
 });
@@ -136,16 +168,244 @@ const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", 
 });
 assert.equal(inspectedJson.status, 0, inspectedJson.stderr || inspectedJson.stdout);
 const inspectedInfo = JSON.parse(inspectedJson.stdout);
-assert.equal(inspectedInfo.package.version, 6);
+assert.equal(inspectedInfo.package.version, 7);
 assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
 assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
 assert.equal(inspectedInfo.manifest.hostImports.length, 0);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");
 assert.equal(runtime.call("SortDemo.demo"), "192");
 assert.equal(runtime.call("fib", 12), "144");
+const stringCallResult = callResolvedObjects(runtime, "Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", [
+  makeObjectString(runtime, "object-call"),
+]);
+try {
+  const len = runtime.exports.vir_obj_string_size(stringCallResult);
+  const data = runtime.exports.vir_obj_string_data(stringCallResult);
+  assert.equal(runtime.readWasmString(data, len), "object-call");
+} finally {
+  runtime.exports.vir_obj_dec(stringCallResult);
+}
+withObjectString(runtime, "Aé∀Z", (obj) => {
+  runtime.exports.vir_obj_inc(obj);
+  runtime.exports.vir_obj_dec(obj);
+  const len = runtime.exports.vir_obj_string_size(obj);
+  const data = runtime.exports.vir_obj_string_data(obj);
+  assert.equal(runtime.readWasmString(data, len), "Aé∀Z");
+});
+withObjectByteArray(runtime, [0, 65, 255, 17], (obj) => {
+  const len = runtime.exports.vir_obj_byte_array_size(obj);
+  const data = runtime.exports.vir_obj_byte_array_data(obj);
+  assert.deepEqual([...runtime.readWasmBytes(data, len)], [0, 65, 255, 17]);
+});
+const objectCounters = withCallLaneCounters(runtime, () => {
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", 41), "42");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -41), "41");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint64Bump", "18446744073709551615"), "0");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUSizeBump", "41"), "42");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseArrayNatSum", [4, 5, 6]), "15");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.arrayNatBumpAll", [4, 5]), ["5", "6"]);
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.listStringBangAll", ["a", "bc"]), ["a!", "bc!"]);
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { some: 41 }), "42");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null), "empty");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", [4, 5, 6]), "15");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSwap", { fst: 2, snd: 9 }), {
+    fst: "9",
+    snd: "2",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSum", [4, 5]), "9");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listProdNatStringScore", [
+    { fst: 4, snd: "ab" },
+    [5, "c"],
+  ]), "12");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.prodStringNatSwap", { fst: "ok", snd: 6 }), {
+    fst: "7",
+    snd: "ok!",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
+    nickname: "lean",
+    points: 4,
+    tags: ["ir", "wasm"],
+  }), "14");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileBump", {
+    nickname: "lean",
+    points: 4,
+    tags: ["ir", "wasm"],
+  }), {
+    nickname: "lean!",
+    points: "6",
+    tags: ["ir", "wasm"],
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileSummary", {
+    nickname: "lean",
+    points: 4,
+    tags: ["ir", "wasm"],
+  }), {
+    label: "lean:2",
+    total: "14",
+    bonus: "14",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore", {
+    profile: {
+      nickname: "lean",
+      points: 4,
+      tags: ["ir", "wasm"],
+    },
+    summary: {
+      label: "lean:2",
+      total: 14,
+      bonus: 14,
+    },
+  }), "48");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsBump", {
+    enabled: true,
+    level: 2,
+    score16: 30,
+    visits: 400,
+    quota: 5,
+    checksum: 6000,
+    tier: "pro",
+    note: "ok",
+  }), {
+    enabled: false,
+    level: 3,
+    score16: 32,
+    visits: 403,
+    quota: "9",
+    checksum: "6005",
+    tier: "elite",
+    note: "ok!",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsScore", {
+    enabled: true,
+    level: 2,
+    score16: 30,
+    visits: 400,
+    quota: 5,
+    checksum: 6000,
+    tier: "pro",
+    note: "ok",
+  }), "6549");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxNatBump", { value: 41 }), {
+    value: "42",
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", { value: 41 }), {
+    value: 42,
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint64BoxBump", {
+    value: "18446744073709551615",
+  }), {
+    value: "0",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.taggedArrayScore", {
+    label: "ab",
+    payload: ["x", "yz"],
+  }), "5");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.taggedProfileBump", {
+    label: "profile",
+    payload: {
+      nickname: "lean",
+      points: 4,
+      tags: ["ir", "wasm"],
+    },
+  }), {
+    label: "profile!",
+    payload: {
+      nickname: "lean!",
+      points: "6",
+      tags: ["ir", "wasm"],
+    },
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.meteredBoxBump", {
+    active: false,
+    count: 3,
+    payload: { value: 4 },
+  }), {
+    active: true,
+    count: 4,
+    payload: { value: "7" },
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.extendedProfileBump", {
+    nickname: "lean",
+    active: true,
+    visits: 5,
+    score: 7,
+    tags: ["ir"],
+  }), {
+    nickname: "lean!",
+    active: false,
+    visits: 6,
+    score: "8",
+    tags: ["ir", "extended"],
+  });
+  assert.equal(runtime.call("Vir.Fixtures.RecursiveTypes.treeRootScore", {
+    kind: "branch",
+    fields: {
+      left: { kind: "leaf", value: 4 },
+      right: {
+        kind: "branch",
+        fields: {
+          left: { kind: "leaf", value: 5 },
+          right: { kind: "leaf", value: 6 },
+        },
+      },
+    },
+  }), "515");
+  assert.equal(runtime.call("Vir.Fixtures.RecursiveTypes.chainRootScore", {
+    label: "browser",
+    next: {
+      label: "leaf",
+      next: null,
+    },
+  }), "211");
+  assert.equal(runtime.call("Vir.Fixtures.RecursiveTypes.jsonRootScore", {
+    kind: "object",
+    value: [
+      { fst: "flag", snd: { kind: "bool", value: true } },
+      { fst: "empty", snd: { kind: "null" } },
+    ],
+  }), "22");
+  assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 0), {
+    kind: "inl",
+    value: "10",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.ListOption.sumScore", { kind: "inr", value: 7 }), "70");
+  assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 5), {
+    kind: "ok",
+    value: {
+      kind: "inr",
+      value: "5",
+    },
+  });
+  assert.deepEqual(
+    runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [65, 66, 67]),
+    Uint8Array.from([65, 66, 67]),
+  );
+});
+assert.equal(objectCounters.objectCalls, 36);
+assert.equal(objectCounters.bytePayloadCalls, 0);
+
+const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
+  assert.match(
+    prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyPreview"),
+    /^wide group:\nhello world/,
+  );
+  assert.match(
+    prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyAtWidth", 8),
+    /group:\nhello\nworld/,
+  );
+  assert.equal(
+    prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12),
+    "[alpha,\n beta,\n gamma]",
+  );
+});
+assert.equal(prettyCounters.objectCalls, 3);
+assert.equal(prettyCounters.bytePayloadCalls, 0);
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "Aé∀Z"), "Aé∀Z");
 assert.equal(prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12), "[alpha,\n beta,\n gamma]");
 assert.equal(
   prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "fill", 28),
@@ -220,6 +480,19 @@ assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", { kind: "
   kind: "bvar",
   index: "5",
 });
+const exprObjectCounters = withCallLaneCounters(leanRuntime, () => {
+  assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.constNatExpr"), {
+    kind: "const",
+    name: "Nat",
+    levels: [],
+  });
+  assert.equal(
+    leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }),
+    "5",
+  );
+});
+assert.equal(exprObjectCounters.objectCalls, 2);
+assert.equal(exprObjectCounters.bytePayloadCalls, 0);
 assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 0), {
   kind: "inl",
   value: "10",
@@ -241,13 +514,25 @@ assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 5), {
     value: "5",
   },
 });
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUnitRoundtrip", undefined), undefined);
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseBoolFlip", true), false);
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", 41), "42");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -41), "41");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "ok"), "ok");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUInt8Bump", 41), 42);
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUInt16Bump", 41), 42);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseArrayNatSum", [4, 5, 6]), "15");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.arrayNatBumpAll", [4, 5]), ["5", "6"]);
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.listStringBangAll", ["a", "bc"]), ["a!", "bc!"]);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint32Bump", 41), 42);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint64Bump", "18446744073709551615"), "0");
+assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUSizeBump", "41"), "42");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScale", 1.5), 6);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScore", 3.25), "4");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.float32Roundtrip", 1.25), 1.25);
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [65, 66, 67]), Uint8Array.from([65, 66, 67]));
 const floatScaleEntry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.floatScale");
 assert.equal(floatScaleEntry.args[0].type.wireTag, 10);
 assert.equal(floatScaleEntry.result.wireTag, 10);
@@ -525,4 +810,4 @@ runtime.dispose();
 prettyRuntime.dispose();
 leanRuntime.dispose();
 
-console.log("vir runtime value codec smoke ok");
+console.log("vir runtime object ABI smoke ok");

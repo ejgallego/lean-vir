@@ -40,8 +40,22 @@ const sourceIdentityPaths = [
   "scripts/generate-browser-package.mjs",
   "scripts/generate-ir-package.sh",
   "tools/GeneratePackage.lean",
+  "wasm/upstream_shim/decl_provider.h",
+  "wasm/upstream_shim/call_signature_summary.cpp",
+  "wasm/upstream_shim/call_signature_summary.h",
+  "wasm/upstream_shim/lean_object_constructors.cpp",
+  "wasm/upstream_shim/name_utils.cpp",
+  "wasm/upstream_shim/name_utils.h",
+  "wasm/upstream_shim/native_symbols.cpp",
+  "wasm/upstream_shim/native_symbols_registry.inc",
   "wasm/upstream_shim/shim.cpp",
+  "wasm/upstream_shim/signature_cache.cpp",
+  "wasm/upstream_shim/signature_cache.h",
+  "wasm/upstream_shim/object_abi.cpp",
   "wasm/upstream_shim/package_decl_provider.cpp",
+  "wasm/upstream_shim/platform_stubs.cpp",
+  "wasm/upstream_shim/resource_abi.cpp",
+  "wasm/upstream_shim/resource_abi.h",
 ];
 
 export async function ensureCachedBenchArtifacts({

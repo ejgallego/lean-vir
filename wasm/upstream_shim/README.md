@@ -9,8 +9,16 @@ package lookup, and temporary runtime glue live here instead.
 
 - `shim.cpp`: package call entry points, JavaScript host-import trampolines,
   Lean closure roots, and `lean_ir_find_env_decl` hooks.
-- `interface_codec.h` and `interface_codec.cpp`: the `vir_call` wire codec,
-  type/value encoding, callback payloads, and host `externref` resource objects.
+- `signature_cache.h` and `signature_cache.cpp`: package-call signature
+  summaries keyed by the current loaded package generation.
+- `object_abi.cpp`: owned `lean_object *` helpers used by the runtime object
+  call path and boundary tests.
+- `resource_abi.h` and `resource_abi.cpp`: shared external resource class for
+  `Lean.Vir.Js α` values.
+- `call_signature_summary.h` and `call_signature_summary.cpp`: streaming package-call
+  signature parser used to compute call arity and boxed-boundary requirements.
+- `name_utils.h` and `name_utils.cpp`: shared Lean `Name` helpers for package
+  call resolution and object construction.
 - `native_symbols.cpp`: handwritten native extern wrappers, restricted symbol
   lookup, and symbol-stem support for declarations carried in `.irpkg` files.
 - `native_symbols_registry.inc`: generated registry of native extern names from

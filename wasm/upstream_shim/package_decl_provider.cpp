@@ -53,15 +53,28 @@ struct host_import_entry {
     uint32_t arity;
     uint32_t erased_prefix_args;
     bool is_io;
+};
+
+struct export_signature_entry {
+    object * name;
+    bool is_io;
     std::string signature;
 };
 
 static std::vector<decl_entry> g_entries;
 static std::vector<init_global_entry> g_init_entries;
 static std::vector<host_import_entry> g_host_imports;
+static std::vector<export_signature_entry> g_export_signatures;
+static std::vector<uint32_t> g_call_signature_indices;
 static std::string g_interface_manifest;
 static std::string g_last_error;
 static bool g_package_loaded = false;
+static uint32_t g_package_generation = 1;
+static uint32_t g_package_format_version = 0;
+
+static bool supported_package_version(uint32_t version) {
+    return 1 <= version && version <= 7;
+}
 
 static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
     object * obj = lean_alloc_ctor(tag, fields.size(), scalar_size);
@@ -699,6 +712,16 @@ public:
         }
     }
 
+    std::string signature_bytes() {
+        size_t signature_start = pos();
+        uint32_t argc = u32();
+        for (uint32_t i = 0; i < argc; i++) {
+            interface_type();
+        }
+        interface_type();
+        return bytes_from(signature_start, pos());
+    }
+
     host_import_entry host_import() {
         object * n = name();
         std::string target = string();
@@ -706,14 +729,14 @@ public:
         uint32_t arity = u32();
         uint32_t erased_prefix_args = m_version >= 6 ? u32() : 0;
         bool is_io = boolean();
-        size_t signature_start = pos();
-        uint32_t argc = u32();
-        for (uint32_t i = 0; i < argc; i++) {
-            interface_type();
-        }
-        interface_type();
-        size_t signature_end = pos();
-        return { n, target, symbol, arity, erased_prefix_args, is_io, bytes_from(signature_start, signature_end) };
+        signature_bytes();
+        return { n, target, symbol, arity, erased_prefix_args, is_io };
+    }
+
+    export_signature_entry export_signature() {
+        object * n = name();
+        bool is_io = boolean();
+        return { n, is_io, signature_bytes() };
     }
 
 private:
@@ -747,11 +770,21 @@ static void clear_loaded_package() {
     for (host_import_entry const & entry : g_host_imports) {
         lean_dec(entry.name);
     }
+    for (export_signature_entry const & entry : g_export_signatures) {
+        lean_dec(entry.name);
+    }
     g_entries.clear();
     g_init_entries.clear();
     g_host_imports.clear();
+    g_export_signatures.clear();
+    g_call_signature_indices.clear();
     g_interface_manifest.clear();
     g_package_loaded = false;
+    g_package_format_version = 0;
+    g_package_generation++;
+    if (g_package_generation == 0) {
+        g_package_generation = 1;
+    }
 }
 
 static bool load_package(uint8_t const * data, size_t size) {
@@ -774,7 +807,7 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "invalid IR package magic `" + magic + "`";
         return false;
     }
-    if (version != 1 && version != 2 && version != 3 && version != 4 && version != 5 && version != 6) {
+    if (!supported_package_version(version)) {
         g_last_error = "unsupported IR package version " + std::to_string(version);
         return false;
     }
@@ -807,6 +840,14 @@ static bool load_package(uint8_t const * data, size_t size) {
             host_imports.push_back(r.host_import());
         }
     }
+    std::vector<export_signature_entry> export_signatures;
+    if (version >= 7) {
+        uint32_t export_signature_count = r.u32();
+        export_signatures.reserve(export_signature_count);
+        for (uint32_t i = 0; i < export_signature_count; i++) {
+            export_signatures.push_back(r.export_signature());
+        }
+    }
     if (!r.ok) {
         g_last_error = r.error();
         return false;
@@ -823,11 +864,24 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "trailing bytes after IR package at byte " + std::to_string(r.pos());
         return false;
     }
+    std::vector<uint32_t> call_signature_indices(entries.size(), UINT32_MAX);
+    for (size_t i = 0; i < entries.size(); i++) {
+        object * call_name = entries[i].boxed_base ? entries[i].boxed_base : entries[i].name;
+        for (size_t j = 0; j < export_signatures.size(); j++) {
+            if (lean_name_eq(call_name, export_signatures[j].name)) {
+                call_signature_indices[i] = static_cast<uint32_t>(j);
+                break;
+            }
+        }
+    }
     g_entries = std::move(entries);
     g_init_entries = std::move(init_entries);
     g_host_imports = std::move(host_imports);
+    g_export_signatures = std::move(export_signatures);
+    g_call_signature_indices = std::move(call_signature_indices);
     g_interface_manifest = std::move(interface_manifest);
     g_package_loaded = true;
+    g_package_format_version = version;
     return true;
 }
 
@@ -944,6 +998,32 @@ bool package_call_slot_has_boxed_decl(uint32_t slot) {
     return entry != nullptr && entry->boxed_base != nullptr;
 }
 
+static export_signature_entry const * package_call_signature_entry(uint32_t slot) {
+    if (slot == 0 || slot > g_call_signature_indices.size()) {
+        return nullptr;
+    }
+    uint32_t signature_index = g_call_signature_indices[slot - 1];
+    if (signature_index == UINT32_MAX || signature_index >= g_export_signatures.size()) {
+        return nullptr;
+    }
+    return &g_export_signatures[signature_index];
+}
+
+char const * package_call_signature(uint32_t slot) {
+    export_signature_entry const * signature = package_call_signature_entry(slot);
+    return signature == nullptr ? nullptr : signature->signature.data();
+}
+
+uint32_t package_call_signature_size(uint32_t slot) {
+    export_signature_entry const * signature = package_call_signature_entry(slot);
+    return signature == nullptr ? 0 : static_cast<uint32_t>(signature->signature.size());
+}
+
+bool package_call_is_io(uint32_t slot) {
+    export_signature_entry const * signature = package_call_signature_entry(slot);
+    return signature != nullptr && signature->is_io;
+}
+
 char const * find_host_import_symbol(object * n) {
     for (host_import_entry const & entry : g_host_imports) {
         if (lean_name_eq(n, entry.name)) {
@@ -980,20 +1060,6 @@ uint32_t host_import_erased_prefix_args(uint32_t slot) {
     return g_host_imports[slot].erased_prefix_args;
 }
 
-char const * host_import_signature(uint32_t slot) {
-    if (slot >= g_host_imports.size()) {
-        return nullptr;
-    }
-    return g_host_imports[slot].signature.data();
-}
-
-uint32_t host_import_signature_size(uint32_t slot) {
-    if (slot >= g_host_imports.size()) {
-        return 0;
-    }
-    return static_cast<uint32_t>(g_host_imports[slot].signature.size());
-}
-
 bool host_import_is_io(uint32_t slot) {
     if (slot >= g_host_imports.size()) {
         return false;
@@ -1007,6 +1073,14 @@ uint32_t package_decl_count() {
 
 bool package_loaded() {
     return g_package_loaded;
+}
+
+uint32_t package_generation() {
+    return g_package_generation;
+}
+
+uint32_t package_format_version() {
+    return g_package_format_version;
 }
 
 char const * last_package_error() {

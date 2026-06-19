@@ -19,16 +19,19 @@ object * find_package_init_name(object * name);
 uint32_t package_call_slot_for_name(object * name);
 object * package_call_slot_name(uint32_t slot);
 bool package_call_slot_has_boxed_decl(uint32_t slot);
+char const * package_call_signature(uint32_t slot);
+uint32_t package_call_signature_size(uint32_t slot);
+bool package_call_is_io(uint32_t slot);
 char const * find_host_import_symbol(object * name);
 int32_t host_import_slot_for_symbol(char const * symbol);
 uint32_t host_import_arity(uint32_t slot);
 uint32_t host_import_erased_prefix_args(uint32_t slot);
 void * host_import_trampoline(char const * symbol);
-char const * host_import_signature(uint32_t slot);
-uint32_t host_import_signature_size(uint32_t slot);
 bool host_import_is_io(uint32_t slot);
 uint32_t package_decl_count();
 bool package_loaded();
+uint32_t package_generation();
+uint32_t package_format_version();
 
 }
 
