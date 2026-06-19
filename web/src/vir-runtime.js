@@ -547,7 +547,6 @@ export class VirRuntime {
         callSlot,
         payloadPtr,
         payload.byteLength,
-        entry.result.wireTag,
       );
       if (resultPtr === 0) {
         throw new Error(this.lastCallError() || `call failed: ${entry.entry}`);

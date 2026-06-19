@@ -609,8 +609,7 @@ extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len) 
 extern "C" char const * vir_call_resolved(
     uint32_t call_slot,
     uint8_t const * request,
-    uint32_t request_len,
-    uint8_t result_tag) {
+    uint32_t request_len) {
     lean::g_call_result.clear();
     lean::g_call_error.clear();
     if (request == nullptr && request_len != 0) {
@@ -634,7 +633,6 @@ extern "C" char const * vir_call_resolved(
         lean::g_call_error = "resolved call requires a package-owned call signature";
         return nullptr;
     }
-    (void) result_tag;
     return vir_call_resolved_core(fn, has_boxed_decl, request, request_len, *signature);
 }
 

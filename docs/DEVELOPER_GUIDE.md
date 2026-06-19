@@ -71,7 +71,7 @@ sequenceDiagram
     RT->>Wasm: vir_resolve_call(name) on first use
     RT->>Codec: encode value-only args with manifest descriptor
     Codec-->>RT: byte payload
-    RT->>Wasm: vir_call_resolved(slot, payload, resultTag)
+    RT->>Wasm: vir_call_resolved(slot, payload)
     Wasm->>Cpp: decode payload into Lean objects
     Cpp->>IR: evaluate packaged Lean declaration
     IR-->>Cpp: Lean result object

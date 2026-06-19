@@ -431,7 +431,7 @@ function resolveRawCallSlotPtr(entry, namePtr, nameLen) {
 }
 
 function callRawResolved(entry, callSlot, payloadPtr, payloadLen) {
-  const resultPtr = runtime.exports.vir_call_resolved(callSlot, payloadPtr, payloadLen, entry.result.wireTag);
+  const resultPtr = runtime.exports.vir_call_resolved(callSlot, payloadPtr, payloadLen);
   if (resultPtr === 0) {
     throw new Error(runtime.lastCallError() || `resolved call failed: ${entry.entry}`);
   }

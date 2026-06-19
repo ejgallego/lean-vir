@@ -16,8 +16,7 @@ extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len);
 extern "C" char const * vir_call_resolved(
     uint32_t call_slot,
     uint8_t const * request,
-    uint32_t request_len,
-    uint8_t result_tag);
+    uint32_t request_len);
 extern "C" uint32_t vir_call_result_size(void);
 extern "C" char const * vir_call_error(void);
 extern "C" uint32_t vir_call_error_size(void);
@@ -163,7 +162,7 @@ static uint32_t resolve_call_slot(char const * name) {
 }
 
 static uint32_t call_nat_resolved(uint32_t slot, char const * name, uint8_t const * payload, uint32_t payload_len) {
-    char const * result = vir_call_resolved(slot, payload, payload_len, 0);
+    char const * result = vir_call_resolved(slot, payload, payload_len);
     if (result == nullptr) {
         uint32_t error_len = vir_call_error_size();
         fprintf(stderr, "vir_call_resolved(%s) failed", name);
