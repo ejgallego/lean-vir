@@ -144,8 +144,8 @@ The compact byte payload path remains the complete path while this lands. It
 handles structured values, resources, callbacks, and host imports. Primitive
 lane helpers are still useful for the hottest exact scalar signatures because
 they avoid both byte payloads and object allocation.
-The automatic object-lane selection in `VirRuntime.call` covers pure unary calls
-whose argument can be lowered from the current object subset and whose result
+The automatic object-lane selection in `VirRuntime.call` covers pure calls
+whose arguments can be lowered from the current object subset and whose result
 can be lifted from it. Arguments and results currently support base values,
 `Array`, `List`, `Option`, `Prod`, and manifest-described structures, tagged
 unions, and custom inductive constructors whose fields recursively stay in this

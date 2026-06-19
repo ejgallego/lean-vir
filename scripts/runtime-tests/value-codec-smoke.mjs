@@ -519,6 +519,39 @@ try {
 }
 assert.equal(objectCalls, 33);
 assert.equal(codecFallbackCalls, 0);
+
+const prettyObjectCallExports = prettyRuntime.exports;
+let prettyObjectCalls = 0;
+let prettyCodecFallbackCalls = 0;
+prettyRuntime.exports = Object.fromEntries(
+  Reflect.ownKeys(prettyObjectCallExports).map((key) => [key, prettyObjectCallExports[key]]),
+);
+prettyRuntime.exports.vir_call_resolved_objects = (...args) => {
+  prettyObjectCalls++;
+  return prettyObjectCallExports.vir_call_resolved_objects(...args);
+};
+prettyRuntime.exports.vir_call_resolved = (...args) => {
+  prettyCodecFallbackCalls++;
+  return prettyObjectCallExports.vir_call_resolved(...args);
+};
+try {
+  assert.match(
+    prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyPreview"),
+    /^wide group:\nhello world/,
+  );
+  assert.match(
+    prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyAtWidth", 8),
+    /group:\nhello\nworld/,
+  );
+  assert.equal(
+    prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12),
+    "[alpha,\n beta,\n gamma]",
+  );
+} finally {
+  prettyRuntime.exports = prettyObjectCallExports;
+}
+assert.equal(prettyObjectCalls, 3);
+assert.equal(prettyCodecFallbackCalls, 0);
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
