@@ -286,6 +286,9 @@ Lean.Vir.React.State.modify count fun previous => do
   Lean.Vir.JsValue.ofNat (value + 1)
 ```
 
+State value, updater-local, and scalar `JsValue` resource ownership is
+documented in [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
+
 The intended v0 authoring surface is a DOM-like helper set over that `Js Node`
 resource ABI: named property helpers, named event-handler helpers, and keyed
 or unkeyed constructors for the currently blessed elements. The

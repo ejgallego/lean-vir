@@ -19,11 +19,15 @@ export class HostResourceState {
     this.resources = new WeakMap();
     this.primitiveResources = new Map();
     this.liveResources = new Set();
+    this.temporaryResourceScopes = [];
     this.disposables = new Set();
   }
 
   resourceForValue(value) {
     if (value === null || value === undefined) return null;
+    if (this.temporaryResourceScopes.length !== 0) {
+      return this.temporaryResourceForValue(value);
+    }
     if (!isWeakMapKey(value)) {
       let resource = this.primitiveResources.get(value);
       if (!isHostResource(resource) || hostResourceValue(resource) === null) {
@@ -42,12 +46,41 @@ export class HostResourceState {
     return resource;
   }
 
+  temporaryResourceForValue(value) {
+    if (value === null || value === undefined) return null;
+    const resource = createHostResource(value);
+    this.liveResources.add(resource);
+    const scope = this.temporaryResourceScopes.at(-1);
+    if (scope !== undefined) {
+      scope.add(resource);
+    }
+    return resource;
+  }
+
+  withTemporaryResourceScope(run) {
+    const scope = new Set();
+    this.temporaryResourceScopes.push(scope);
+    try {
+      return run();
+    } finally {
+      this.temporaryResourceScopes.pop();
+      for (const resource of Array.from(scope)) {
+        this.releaseResource(resource);
+      }
+      scope.clear();
+    }
+  }
+
   releaseResource(resource) {
     const value = hostResourceValue(resource);
     if (isWeakMapKey(value)) {
-      this.resources.delete(value);
+      if (this.resources.get(value) === resource) {
+        this.resources.delete(value);
+      }
     } else if (value !== null && value !== undefined) {
-      this.primitiveResources.delete(value);
+      if (this.primitiveResources.get(value) === resource) {
+        this.primitiveResources.delete(value);
+      }
     }
     if (isHostResource(resource)) {
       this.liveResources.delete(resource);
@@ -81,6 +114,15 @@ export class HostResourceState {
     return undefined;
   }
 
+  debugResourceCounts() {
+    return {
+      live: this.liveResources.size,
+      primitives: this.primitiveResources.size,
+      temporaryScopes: this.temporaryResourceScopes.length,
+      disposables: this.disposables.size,
+    };
+  }
+
   resolveResource(resource, label) {
     const value = hostResourceValue(resource);
     if (value === null || value === undefined || !this.liveResources.has(resource)) {
@@ -110,6 +152,7 @@ export class HostResourceState {
     this.resources = new WeakMap();
     this.primitiveResources.clear();
     this.liveResources.clear();
+    this.temporaryResourceScopes.length = 0;
     return undefined;
   }
 }

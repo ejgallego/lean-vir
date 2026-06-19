@@ -178,6 +178,9 @@ Important details:
   path before clearing the resource roots.
 - Stale resources are invalidated. Passing a released resource back through a
   host binding is an error instead of silently reusing the JavaScript value.
+- The canonical host-resource ownership policy, including callback-local
+  handles and deferred React scalar-state questions, is maintained in
+  [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 
 Lean closure ownership is symmetric but not identical:
 

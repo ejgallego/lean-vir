@@ -52,7 +52,7 @@ as internal closure root ids before JavaScript decodes `VirCallback` values.
 Lean resource values are external objects whose finalizers release the host
 root table entry.
 
-Current resource ownership is:
+The resource transport shape is:
 
 ```text
 JavaScript HostResource object
@@ -73,7 +73,8 @@ Lean external object
 
 The JavaScript API treats resources as opaque runtime objects and does not
 accept raw numeric resource tokens or expose a supported numeric `.handle`
-field.
+field. The host-side lifetime and ownership policy is documented in
+[HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 
 `externref` replaces opaque resource transport, not the entire call ABI. Plain
 scalars and structured Lean values still use the manifest-described byte
@@ -140,6 +141,8 @@ The intended alignment is:
   resources close to WIT's value/resource categories;
 - keep JavaScript resource/runtime effects such as scalar boxing and resource
   identity under `RuntimeM`, separate from both raw `IO` and DOM/root mutation;
+- keep the host-side resource ownership policy centralized in
+  [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy);
 - keep the initial
   `Component props := props -> ReactM (Lean.Vir.Js Node)` boundary shallow and
   React-like while treating future node-sharing or batching encodings as an

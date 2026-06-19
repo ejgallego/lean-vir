@@ -151,9 +151,11 @@ function modifyStateValue(resources, setter, update) {
   resources.addDisposable(retainedUpdate);
   try {
     stateSetter.set((previous) => {
-      const previousResource = resources.resourceForValue(previous);
       try {
-        return reactStatePayload(resources, update(previousResource));
+        return withStateUpdaterResourceScope(resources, () => {
+          const previousResource = resources.temporaryResourceForValue(previous);
+          return reactStatePayload(resources, update(previousResource));
+        });
       } finally {
         retainedUpdate.remove();
       }
@@ -163,6 +165,14 @@ function modifyStateValue(resources, setter, update) {
     throw error;
   }
   return undefined;
+}
+
+function withStateUpdaterResourceScope(resources, run) {
+  if (typeof resources.withTemporaryResourceScope !== "function" ||
+      typeof resources.temporaryResourceForValue !== "function") {
+    throw new Error("react.state.modify requires temporary host resource support");
+  }
+  return resources.withTemporaryResourceScope(run);
 }
 
 function reactStatePayload(resources, value) {

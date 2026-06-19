@@ -11,8 +11,15 @@ import {
   ensureVirtualElementState,
 } from "../../web/src/vir-runtime-node.js";
 import {
+  createHostResourceState,
+} from "../../web/src/host/vir-host-resources.js";
+import {
   createBrowserHostBindings,
 } from "../../web/src/vir-host-bindings.js";
+import {
+  createReactJsValueHostBindings,
+  createReactStateHostBindings,
+} from "../../web/src/react/vir-react-hooks.js";
 import {
   assert,
   readRuntimeArtifacts,
@@ -42,6 +49,92 @@ assert.throws(
   () => createBrowserHostBindings({ reactHostBindings: "react.root.create" }),
   /reactHostBindings must be a host binding object/,
 );
+
+function createReactStateSmokeBindings() {
+  const resources = createHostResourceState();
+  return {
+    resources,
+    jsBindings: createReactJsValueHostBindings(resources),
+    stateBindings: createReactStateHostBindings(resources, {
+      useState() {
+        throw new Error("useState should not be called by this smoke");
+      },
+    }),
+  };
+}
+
+function assertNatResourceReleased(jsBindings, resource) {
+  assert.throws(() => jsBindings["js.nat.value"](resource), /Js resource is not live/);
+}
+
+{
+  const { resources, jsBindings, stateBindings } = createReactStateSmokeBindings();
+  const retainedZero = resources.resourceForValue(0n);
+  let stateValue = 0n;
+  const setter = resources.resourceForValue({
+    set(next) {
+      stateValue = typeof next === "function" ? next(stateValue) : next;
+    },
+  });
+  const liveBeforeModify = resources.debugResourceCounts().live;
+  let released = false;
+  let previousResource = null;
+  let nextResource = null;
+  const updater = Object.assign((previous) => {
+    previousResource = previous;
+    assert.equal(jsBindings["js.nat.value"](previous), 0n);
+    nextResource = jsBindings["js.nat"](1n);
+    return nextResource;
+  }, {
+    release() {
+      released = true;
+    },
+  });
+  stateBindings["react.state.modify"](setter, updater);
+  assert.equal(stateValue, 1n);
+  assert.equal(released, true);
+  assertNatResourceReleased(jsBindings, previousResource);
+  assertNatResourceReleased(jsBindings, nextResource);
+  assert.equal(resources.resolveResource(retainedZero, "Js"), 0n);
+  assert.equal(resources.resourceForValue(0n), retainedZero);
+  assert.equal(resources.debugResourceCounts().live, liveBeforeModify);
+  resources.releaseResource(setter);
+  resources.releaseResource(retainedZero);
+}
+
+{
+  const { resources, jsBindings, stateBindings } = createReactStateSmokeBindings();
+  let stateValue = 2n;
+  const setter = resources.resourceForValue({
+    set(next) {
+      stateValue = typeof next === "function" ? next(stateValue) : next;
+    },
+  });
+  const liveBeforeModify = resources.debugResourceCounts().live;
+  let released = false;
+  let previousResource = null;
+  let nextResource = null;
+  const updater = Object.assign((previous) => {
+    previousResource = previous;
+    assert.equal(jsBindings["js.nat.value"](previous), 2n);
+    nextResource = jsBindings["js.nat"](3n);
+    throw new Error("state updater failed");
+  }, {
+    release() {
+      released = true;
+    },
+  });
+  assert.throws(
+    () => stateBindings["react.state.modify"](setter, updater),
+    /state updater failed/,
+  );
+  assert.equal(stateValue, 2n);
+  assert.equal(released, true);
+  assertNatResourceReleased(jsBindings, previousResource);
+  assertNatResourceReleased(jsBindings, nextResource);
+  assert.equal(resources.debugResourceCounts().live, liveBeforeModify);
+  resources.releaseResource(setter);
+}
 
 const reactDocumentState = createVirtualDocumentState();
 const reactRuntime = await createVirRuntime({

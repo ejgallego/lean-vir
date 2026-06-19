@@ -126,6 +126,58 @@ objects; its `dispose()` method performs the built-in teardown.
 See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for diagrams of the
 `Lean.Vir.Js α` resource path and the separate `VirCallback` closure-root path.
 
+### Resource Ownership Policy
+
+The default rule is retained ownership. A binding that calls
+`resourceForValue(value)` creates or reuses a live `HostResource` wrapper that
+remains valid until the binding-specific cleanup path releases it, the package
+is reloaded, or the runtime is disposed. Object and function values are
+interned by identity through a `WeakMap`; primitive values are interned by
+value. Releasing a resource invalidates that wrapper, and the store only removes
+an interned mapping when the released wrapper is the current mapping for that
+JavaScript value.
+
+Built-in retained resources include DOM elements, React roots, React state
+setters, React node resources, event listeners, timers, and animation frames.
+Their API cleanup is owned by the binding that created them: listener removal,
+timer/frame cancellation, React root unmounting, React node callback release,
+and final runtime/package teardown all go through the shared resource store.
+
+Some resources are callback-local rather than retained:
+
+- DOM and React event objects are callback-scoped. The event resource is
+  released after the Lean callback returns. Event targets and current targets
+  may be returned as separate element resources by the event host bindings.
+- `react.state.modify` runs its functional updater in a temporary resource
+  scope. The `previous : Lean.Vir.Js α` handle passed to the updater is
+  callback-local. `Lean.Vir.JsValue` resources allocated while computing the
+  updater result are consumed after the host extracts the next JavaScript state
+  payload. Lean code must not retain those updater-local handles for later use.
+
+`VirCallback` values follow a separate ownership lane. JavaScript receives a
+callable wrapper around a rooted Lean closure. A host binding that stores the
+callback must call `callback.release()` at its natural lifetime boundary, or
+let package reload/runtime disposal release any remaining live callbacks.
+
+### Deferred Ownership Questions
+
+The current React scalar-state story is intentionally conservative and will
+need a focused pass once the API and examples are more mature:
+
+- `react.useState` currently returns its render-time `state.value` as a retained
+  `Lean.Vir.Js α` resource. For scalar state, repeated renders can therefore
+  retain wrappers for distinct primitive values until component unmount or
+  runtime teardown.
+- `react.state.set` consumes a `Lean.Vir.Js α` value as the next JavaScript
+  state payload, but does not yet distinguish an owned temporary scalar wrapper
+  from a retained handle. Examples that call `JsValue.ofString`, `ofNat`, or
+  `ofBool` immediately before `State.set` may retain those scalar wrappers
+  longer than necessary.
+- A future cleanup should decide whether render-time state values and
+  direct-set scalar values need a scoped borrowed/owned API, debug resource
+  counters, or a small retain/release discipline instead of relying on runtime
+  teardown.
+
 `vir.dispose()` tears down runtime-side host state:
 
 - built-in browser bindings remove live event listeners, clear pending timers,

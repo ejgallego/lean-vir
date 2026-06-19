@@ -183,7 +183,9 @@ The public state surface is resource-typed: `Hooks.useState`, `State.set`, and
 explicitly with `JsValue` helpers before crossing the React hook boundary.
 `State.set` and `State.modify` are `RuntimeM` operations because they call a
 retained JavaScript React setter resource; `modify` passes a monadic functional
-updater to React's setter.
+updater to React's setter. The resource ownership policy for state values,
+updater-local handles, and scalar `JsValue` wrappers is centralized in
+[HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 
 ```lean
 State.modify count fun previous => do
@@ -250,6 +252,9 @@ The browser React host binding is exposed from
 - `react.state.set` and `react.state.modify` call the retained React setter;
   both are `RuntimeM`, and `modify` retains the Lean updater callback until
   React invokes it or the runtime is disposed.
+- `react.state.modify` updater-local resource lifetime is documented with the
+  shared host ownership rules in
+  [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 - `react.root.unmount` calls `root.unmount()` and releases callbacks retained
   by the current render.
 - Rendering a new tree into the same browser root queues callbacks retained by
