@@ -181,14 +181,14 @@ and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary. Host imports may additionally receive Lean function values as
 callbacks, including event handlers retained by `Lean.Vir.React.Node` resources
 created through `react.node.createElement`. Exported Lean entrypoints and host
-imports may be pure or use a
-recognized synchronous effect. Raw custom host imports can use `IO α`; DOM and
-React-root imports use `Lean.Vir.Browser.DomM α`; React render-construction
-imports use `Lean.Vir.React.ReactM α`. Effect failures currently surface as
-call failures.
-The JSON manifest records those as `effect: "pure"`, `"io"`, `"dom"`, or
-`"react"` for tooling and documentation. The wasm call payload still lowers
-them to pure versus effectful execution.
+imports may be pure or use a recognized synchronous effect. JavaScript
+resource/runtime APIs use `Lean.Vir.RuntimeM α`; raw custom host imports can
+use `IO α`; DOM and React-root imports use `Lean.Vir.Browser.DomM α`; React
+render-construction imports use `Lean.Vir.React.ReactM α`. Effect failures
+currently surface as call failures.
+The JSON manifest records those as `effect: "pure"`, `"runtime"`, `"io"`,
+`"dom"`, or `"react"` for tooling and documentation. The wasm call payload
+still lowers them to pure versus effectful execution.
 
 Large exact integer values are returned as decimal strings. ByteArray results
 are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript

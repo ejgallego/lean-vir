@@ -138,6 +138,8 @@ The intended alignment is:
   `ReactRoot` as resource-like handles;
 - keep records, variants/enums, lists, options, strings, numeric scalars, and
   resources close to WIT's value/resource categories;
+- keep JavaScript resource/runtime effects such as scalar boxing and resource
+  identity under `RuntimeM`, separate from both raw `IO` and DOM/root mutation;
 - keep the initial
   `Component props := props -> ReactM (Lean.Vir.Js Node)` boundary shallow and
   React-like while treating future node-sharing or batching encodings as an

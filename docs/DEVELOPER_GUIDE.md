@@ -236,21 +236,22 @@ sequenceDiagram
     React-->>Host: commit / later rerender
 ```
 
-The current API intentionally follows ordinary React semantics. Render
-functions are authored in `ReactM`, DOM/root operations live in `DomM`, and
-real host IO remains outside the React component effect. `Root.render` is the
-host boundary for static tree rendering: the raw host import accepts a render
-action of type `ReactM (Lean.Vir.Js Node)`, invokes that action to obtain the
-concrete `Js Node`, renders it, and releases the render callback. This is a
-shallow embedding: it aims to make existing React/ProofWidgets-style code
-portable before introducing higher-level safety abstractions.
+The current API intentionally follows ordinary React semantics. JavaScript
+resource/runtime operations live in `RuntimeM`, render functions are authored
+in `ReactM`, DOM/root operations live in `DomM`, and real host IO remains
+outside the React component effect. `Root.render` is the host boundary for
+static tree rendering: the raw host import accepts a render action of type
+`ReactM (Lean.Vir.Js Node)`, invokes that action to obtain the concrete
+`Js Node`, renders it, and releases the render callback. This is a shallow
+embedding: it aims to make existing React/ProofWidgets-style code portable
+before introducing higher-level safety abstractions.
 
 ## Adding A Host Import
 
 Use this checklist when adding a new host-backed primitive:
 
 1. Add the Lean declaration with the narrowest effect that matches the
-   operation: pure, `DomM`, or `ReactM`.
+   operation: pure, `RuntimeM`, `IO`, `DomM`, or `ReactM`.
 2. Make JavaScript-owned objects appear as `Lean.Vir.Js α`, not as naked marker
    types.
 3. Run or update package-generation tests so `Vir/GeneratePackage.lean`

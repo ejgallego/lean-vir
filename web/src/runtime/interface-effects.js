@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-const EFFECT_LABELS = new Set(["pure", "io", "dom", "react"]);
+const EFFECT_LABELS = new Set(["pure", "runtime", "io", "dom", "react"]);
 
 export function isInterfaceEffectLabel(effect) {
   return EFFECT_LABELS.has(effect);
@@ -12,7 +12,7 @@ export function isInterfaceEffectLabel(effect) {
 
 export function requireInterfaceEffect(effect, label) {
   if (!isInterfaceEffectLabel(effect)) {
-    throw new Error(`${label} must be one of pure, io, dom, or react`);
+    throw new Error(`${label} must be one of pure, runtime, io, dom, or react`);
   }
   return effect;
 }
@@ -36,6 +36,8 @@ export function formatInterfaceEffect(effect) {
   switch (requireInterfaceEffect(effect, "effect")) {
     case "pure":
       return "";
+    case "runtime":
+      return "RuntimeM";
     case "io":
       return "IO";
     case "dom":

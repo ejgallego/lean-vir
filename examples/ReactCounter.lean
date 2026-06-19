@@ -8,6 +8,7 @@ import Vir.React
 
 namespace ReactCounter
 
+open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
@@ -23,8 +24,9 @@ def counter : Component Unit :=
     Node.buttonWith
       #[Property.id "react-counter-button"]
       #[EventHandler.onClick do
-        let next ← (JsValue.ofNat (countValue + 1)).run
-        (State.set count next).run]
+        State.modify count fun previous => do
+          let value ← JsValue.toNat previous
+          JsValue.ofNat (value + 1)]
       #[text]
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do

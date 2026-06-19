@@ -14,9 +14,10 @@ The flow is:
 
 Start with an ordinary Lean file. Exported declarations can be pure functions
 or recognized synchronous effects, as long as their argument and result types
-are part of the current browser interface surface. Use raw `IO` for ordinary
-host IO boundaries, `Lean.Vir.Browser.DomM` for DOM code, and
-`Lean.Vir.React.ReactM` for React render-construction code.
+are part of the current browser interface surface. Use `Lean.Vir.RuntimeM` for
+JavaScript resource/runtime effects, raw `IO` for ordinary host IO boundaries,
+`Lean.Vir.Browser.DomM` for DOM code, and `Lean.Vir.React.ReactM` for React
+render-construction code.
 
 ```lean
 namespace MyApp

@@ -152,14 +152,16 @@ one and the compiler did not produce it, package generation fails with an
 explicit wasm32 boundary diagnostic.
 
 Pure functions and recognized synchronous effects are supported on both
-exported entrypoints and host imports. Raw custom host imports can use `IO α`;
-browser APIs use `Lean.Vir.Browser.DomM α`; React render-construction APIs use
+exported entrypoints and host imports. JavaScript resource/runtime APIs use
+`Lean.Vir.RuntimeM α`; raw custom host imports can use `IO α`; browser APIs use
+`Lean.Vir.Browser.DomM α`; React render-construction APIs use
 `Lean.Vir.React.ReactM α`. Host imports are currently synchronous, with at most
 64 imported declarations and IR arity at most 6. Leading erased type parameters
 on host imports are recorded in package format 6 and newer and skipped before
 JavaScript-visible arguments.
-The embedded JSON manifest preserves the effect labels as `pure`, `io`, `dom`,
-or `react`; the binary call path currently consumes only pure versus effectful.
+The embedded JSON manifest preserves the effect labels as `pure`, `runtime`,
+`io`, `dom`, or `react`; the binary call path currently consumes only pure
+versus effectful.
 
 `/dev.html` generates enum select controls and JSON textareas for structural
 `Lean.Expr`, user-defined structures, and manifest-supported compound values

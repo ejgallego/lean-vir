@@ -14,6 +14,8 @@ diagrams. The short model is:
   it at the DOM/root boundary.
 - `Root.renderComponent` wraps that Lean function in a real JavaScript React
   function component, so hooks run under React's dispatcher.
+- `RuntimeM` is for JavaScript resource/runtime operations such as scalar
+  boxing and React setter calls; it lifts into `ReactM` and `DomM`.
 - `ReactM` is for render-safe React construction; root and DOM lifetime
   operations remain in `DomM`.
 - `Node`, `Root`, state setters, events, and primitive JavaScript state values
@@ -29,7 +31,7 @@ resource ABI:
 ```lean
 namespace Lean.Vir.React
 
-@[irreducible] def ReactM (α : Type) : Type := Lean.Vir.Browser.DomM α
+@[irreducible] def ReactM (α : Type) : Type := Lean.Vir.RuntimeM α
 
 opaque Root : Type
 opaque StateSetter (α : Type) : Type
@@ -63,16 +65,20 @@ structure State (α : Type) where
 abbrev Component (props : Type := Unit) : Type :=
   props → ReactM (Lean.Vir.Js Node)
 
-namespace JsValue
+end Lean.Vir.React
 
-def ofString (value : String) : ReactM (Lean.Vir.Js String)
-def toString (value : Lean.Vir.Js String) : ReactM String
-def ofNat (value : Nat) : ReactM (Lean.Vir.Js Nat)
-def toNat (value : Lean.Vir.Js Nat) : ReactM Nat
-def ofBool (value : Bool) : ReactM (Lean.Vir.Js Bool)
-def toBool (value : Lean.Vir.Js Bool) : ReactM Bool
+namespace Lean.Vir.JsValue
 
-end JsValue
+def ofString (value : String) : Lean.Vir.RuntimeM (Lean.Vir.Js String)
+def toString (value : Lean.Vir.Js String) : Lean.Vir.RuntimeM String
+def ofNat (value : Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
+def toNat (value : Lean.Vir.Js Nat) : Lean.Vir.RuntimeM Nat
+def ofBool (value : Bool) : Lean.Vir.RuntimeM (Lean.Vir.Js Bool)
+def toBool (value : Lean.Vir.Js Bool) : Lean.Vir.RuntimeM Bool
+
+end Lean.Vir.JsValue
+
+namespace Lean.Vir.React
 
 namespace Hooks
 
@@ -82,11 +88,14 @@ end Hooks
 
 namespace State
 
-def set (state : State (Lean.Vir.Js α)) (value : Lean.Vir.Js α) : ReactM Unit
+def set
+    (state : State (Lean.Vir.Js α))
+    (value : Lean.Vir.Js α) :
+    Lean.Vir.RuntimeM Unit
 def modify
     (state : State (Lean.Vir.Js α))
-    (update : Lean.Vir.Js α → Lean.Vir.Js α) :
-    ReactM Unit
+    (update : Lean.Vir.Js α → Lean.Vir.RuntimeM (Lean.Vir.Js α)) :
+    Lean.Vir.RuntimeM Unit
 
 end State
 
@@ -146,15 +155,21 @@ known `Property`, `PropValue`, and `EventHandler` payload shapes directly; the
 React-specific boundary is the native React node resource and callback
 ownership policy, not a private recursive wire codec.
 
+`Lean.Vir.RuntimeM` is the JavaScript runtime/resource effect: it can allocate
+or inspect `Lean.Vir.Js ...` values and update VIR runtime bookkeeping, but it
+does not represent DOM/root mutation or arbitrary host `IO`. `ReactM` lifts
+`RuntimeM` so component code can box scalar state and call React setter
+resources without gaining access to raw `IO`.
+
 `Lean.Vir.Browser.DomM` is the browser/DOM effect used by React root lifetime
 operations and event callbacks. `ReactM` is the narrower render-construction
-effect reserved for React component APIs and static tree construction;
+effect reserved for React component APIs and static tree construction.
 `Root.render` is itself the host boundary and receives a `ReactM` tree action.
 The JavaScript host invokes that render action to obtain the concrete `Js Node`
 resource, renders it into the root, and releases the render callback. The
-current runtime uses the same synchronous host-call representation for both
-effects, so `ReactM` is an irreducible Lean-side effect marker rather than a
-distinct runtime wrapper.
+current runtime uses the same synchronous host-call representation for all
+recognized effects, so these are irreducible Lean-side effect markers rather
+than distinct runtime wrappers.
 
 `Root.renderComponent` wraps the Lean function in a real JavaScript React
 function component. Hooks therefore run under React's normal dispatcher instead
@@ -166,7 +181,15 @@ The public state surface is resource-typed: `Hooks.useState`, `State.set`, and
 `State.modify` operate on `Lean.Vir.Js α` values. There are deliberately no
 `String`, `Nat`, or `Bool` `useState` overloads; scalar values must be converted
 explicitly with `JsValue` helpers before crossing the React hook boundary.
-`State.modify` passes a functional updater to React's setter.
+`State.set` and `State.modify` are `RuntimeM` operations because they call a
+retained JavaScript React setter resource; `modify` passes a monadic functional
+updater to React's setter.
+
+```lean
+State.modify count fun previous => do
+  let value ← Lean.Vir.JsValue.toNat previous
+  Lean.Vir.JsValue.ofNat (value + 1)
+```
 
 ## Blessed Helpers
 
@@ -222,10 +245,11 @@ The browser React host binding is exposed from
 - `react.useState` calls `React.useState` while rendering a component. Its ABI
   is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
 - `js.string`, `js.nat`, and `js.bool` convert Lean scalar values into explicit
-  `Lean.Vir.Js α` values for examples that need primitive React state.
+  `Lean.Vir.Js α` values through `RuntimeM` for examples that need primitive
+  React state.
 - `react.state.set` and `react.state.modify` call the retained React setter;
-  `modify` retains the Lean updater callback until React invokes it or the
-  runtime is disposed.
+  both are `RuntimeM`, and `modify` retains the Lean updater callback until
+  React invokes it or the runtime is disposed.
 - `react.root.unmount` calls `root.unmount()` and releases callbacks retained
   by the current render.
 - Rendering a new tree into the same browser root queues callbacks retained by

@@ -43,11 +43,12 @@ the browser binding uses `React.createElement`, while the virtual binding builds
 test-visible virtual React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
 `Root.renderComponent root component props` API in a real React function
-component. The hook bindings `react.useState`, `react.state.set`, and
-`react.state.modify` operate on `Lean.Vir.Js α` resources and share the same
-browser and virtual host resource store as React roots. Small `js.string`,
-`js.nat`, and `js.bool` helpers provide explicit scalar conversion for examples
-that need primitive React state without giving `react.useState` a scalar ABI.
+component. The hook binding `react.useState` is a render-time `ReactM`
+operation. `react.state.set`, `react.state.modify`, and small `js.string`,
+`js.nat`, and `js.bool` scalar helpers are `RuntimeM` operations over
+`Lean.Vir.Js α` resources and share the same browser and virtual host resource
+store as React roots. The scalar helpers let examples use primitive React state
+without giving `react.useState` a scalar ABI.
 `Root.render` accepts a `ReactM (Lean.Vir.Js Node)` tree. The
 `react.root.render` host binding receives that render action as a releasable
 callback, invokes it to obtain the concrete `Js Node` resource, renders the

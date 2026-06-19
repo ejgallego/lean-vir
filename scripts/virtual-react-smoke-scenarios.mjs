@@ -21,6 +21,9 @@ export function smokeVirtualReactCounter(runtime, documentState, selector) {
   reactElementById(element, "react-counter-button").handlers.onClick({});
   assert.equal(element.textContent, "react:1");
   assertLiveCallbacks(runtime, 2);
+  reactElementById(element, "react-counter-button").handlers.onClick({});
+  assert.equal(element.textContent, "react:2");
+  assertLiveCallbacks(runtime, 2);
   element.reactRoot.unmount();
   assertUnmountCleanup(runtime, element);
 }

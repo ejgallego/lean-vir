@@ -87,9 +87,10 @@ const runtime = await factory.createRuntime({ irPackageBytes: bytes });
 const result = runtime.call("Quickstart.double", 21);
 ```
 
-The manifest-driven call path supports pure declarations and `IO` actions over
-the currently supported scalar, array/list, option, product, sum, except,
-structure, enum, `ByteArray`, and `Lean.Expr` shapes. See
+The manifest-driven call path supports pure declarations and recognized
+synchronous effects (`RuntimeM`, `IO`, `DomM`, and `ReactM`) over the currently
+supported scalar, array/list, option, product, sum, except, structure, enum,
+`ByteArray`, and `Lean.Expr` shapes. See
 [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for the full JavaScript
 guide, including `Sum` and `Except` result shapes.
 

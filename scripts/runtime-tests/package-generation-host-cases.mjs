@@ -49,6 +49,20 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     "def freshReactValue : Lean.Vir.React.ReactM Nat :=",
     "  freshReactValueHost",
     "",
+    "@[vir_js \"test.runtime.value\"]",
+    "opaque freshRuntimeValueHost : Lean.Vir.RuntimeM Nat",
+    "",
+    "def freshRuntimeValue : Lean.Vir.RuntimeM Nat :=",
+    "  freshRuntimeValueHost",
+    "",
+    "def freshRuntimeInDom : Lean.Vir.Browser.DomM Nat := do",
+    "  let value ← freshRuntimeValueHost",
+    "  pure (value + 1)",
+    "",
+    "def freshRuntimeInReact : Lean.Vir.React.ReactM Nat := do",
+    "  let value ← freshRuntimeValueHost",
+    "  pure (value + 2)",
+    "",
   ].join("\n"));
 
   generateIrPackage(hostSource, hostPackage);
@@ -59,18 +73,26 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     virtualDocumentState: freshHostDocumentState,
     hostBindings: {
       "test.react.value": () => "7",
+      "test.runtime.value": () => "9",
     },
   });
   const hostRuntime = await hostFactory.createRuntime({ irPackageBytes: await readFile(hostPackage) });
-  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 9);
+  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 10);
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshEchoBang")?.effect, "pure");
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshTitleRoundtrip")?.effect, "dom");
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshReactValue")?.effect, "react");
+  assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshRuntimeValue")?.effect, "runtime");
+  assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshRuntimeInDom")?.effect, "dom");
+  assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshRuntimeInReact")?.effect, "react");
   assert.equal(hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "browser.document.setTitle")?.effect, "dom");
   assert.equal(hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.react.value")?.effect, "react");
+  assert.equal(hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.runtime.value")?.effect, "runtime");
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
   assert.equal(hostRuntime.call("freshTitleRoundtrip", "Lean.Vir"), "Lean.Vir");
   assert.equal(hostRuntime.call("freshReactValue"), "7");
+  assert.equal(hostRuntime.call("freshRuntimeValue"), "9");
+  assert.equal(hostRuntime.call("freshRuntimeInDom"), "10");
+  assert.equal(hostRuntime.call("freshRuntimeInReact"), "11");
   assert.deepEqual(hostRuntime.call("freshElementRoundtrip", "element"), {
     fst: "element",
     snd: "element!",
@@ -146,15 +168,15 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     "import Vir.Js",
     "",
     "@[vir_js \"test.js.id\"]",
-    "private opaque jsId {α : Type} (value : @& Lean.Vir.Js α) : IO (Lean.Vir.Js α)",
+    "private opaque jsId {α : Type} (value : @& Lean.Vir.Js α) : Lean.Vir.RuntimeM (Lean.Vir.Js α)",
     "",
     "@[vir_js \"test.js.length\"]",
-    "private opaque jsLength {α : Type} (value : @& Lean.Vir.Js (Array α)) : IO Nat",
+    "private opaque jsLength {α : Type} (value : @& Lean.Vir.Js (Array α)) : Lean.Vir.RuntimeM Nat",
     "",
-    "def freshJsIdNat (value : Lean.Vir.Js Nat) : IO (Lean.Vir.Js Nat) :=",
+    "def freshJsIdNat (value : Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat) :=",
     "  jsId value",
     "",
-    "def freshJsLengthNatArray (value : Lean.Vir.Js (Array Nat)) : IO Nat :=",
+    "def freshJsLengthNatArray (value : Lean.Vir.Js (Array Nat)) : Lean.Vir.RuntimeM Nat :=",
     "  jsLength value",
     "",
   ].join("\n"));
@@ -167,13 +189,13 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     },
   }).createRuntime({ irPackageBytes: await readFile(jsObjectPackage) });
   const jsIdImport = jsObjectRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.js.id");
-  assert.equal(jsIdImport?.effect, "io");
+  assert.equal(jsIdImport?.effect, "runtime");
   assert.equal(jsIdImport?.arity, 3);
   assert.equal(jsIdImport?.erasedPrefixArgs, 1);
   assert.equal(jsIdImport?.args.length, 1);
   assert.equal(jsIdImport?.args[0]?.type?.type, "Js");
   const jsLengthImport = jsObjectRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.js.length");
-  assert.equal(jsLengthImport?.effect, "io");
+  assert.equal(jsLengthImport?.effect, "runtime");
   assert.equal(jsLengthImport?.arity, 3);
   assert.equal(jsLengthImport?.erasedPrefixArgs, 1);
   assert.equal(jsLengthImport?.args.length, 1);

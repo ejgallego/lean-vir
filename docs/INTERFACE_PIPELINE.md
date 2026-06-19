@@ -145,11 +145,11 @@ written into the same constructor scalar slots as compiled Lean code.
 Function-valued interface types are used for Lean callbacks passed to
 JavaScript host imports. Their descriptors record the callback argument list,
 result type, and whether applying the callback returns a synchronous effect
-(`IO`, `DomM`, or `ReactM`). JavaScript receives these values as `VirCallback`
-objects. The `WIRE.FUNCTION` value payload carries no serialized numeric token;
-the runtime receives the internal closure root id through a side channel and
-releases the rooted Lean closure when the host-owned registration is done with
-it.
+(`RuntimeM`, `IO`, `DomM`, or `ReactM`). JavaScript receives these values as
+`VirCallback` objects. The `WIRE.FUNCTION` value payload carries no serialized
+numeric token; the runtime receives the internal closure root id through a side
+channel and releases the rooted Lean closure when the host-owned registration
+is done with it.
 
 `Lean.Vir.React.Node` is a JavaScript-owned resource marker. The recursive
 structure of the rendered tree lives in the host resource graph created by
@@ -158,18 +158,19 @@ ordinary `Property`, `PropValue`, and `EventHandler` payloads that those host
 imports receive.
 
 Entry points and host imports can be pure functions or synchronous effect
-actions. Raw custom host imports can use `IO α`; browser APIs use
-`Lean.Vir.Browser.DomM α`; React component construction uses
-`Lean.Vir.React.ReactM α`. For Lean-to-JavaScript calls, import `Vir.Host` and
-mark an opaque declaration with `@[vir_js "target.name"]`, or use the starter
-declarations in `Vir.Common` and `Vir.Browser`. The manifest records each host
-import under `hostImports` with its slot, Lean name, JavaScript target,
-generated WASM symbol, low-level IR arity, leading erased argument count,
-JavaScript-visible arguments, result type, and effect.
+actions. JavaScript resource/runtime APIs use `Lean.Vir.RuntimeM α`; raw custom
+host imports can use `IO α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
+component construction uses `Lean.Vir.React.ReactM α`. For
+Lean-to-JavaScript calls, import `Vir.Host` and mark an opaque declaration with
+`@[vir_js "target.name"]`, or use the starter declarations in `Vir.Common` and
+`Vir.Browser`. The manifest records each host import under `hostImports` with
+its slot, Lean name, JavaScript target, generated WASM symbol, low-level IR
+arity, leading erased argument count, JavaScript-visible arguments, result
+type, and effect.
 The JSON manifest keeps the source-level effect classification for review and
-tooling: `pure`, `io`, `dom`, or `react`. The compact wasm call descriptor still
-lowers that to the runtime distinction the shim needs today: pure versus
-effectful.
+tooling: `pure`, `runtime`, `io`, `dom`, or `react`. The compact wasm call
+descriptor still lowers that to the runtime distinction the shim needs today:
+pure versus effectful.
 
 `Lean.Vir.Js α` is always represented as the generic `Js` resource. Its type
 parameter is a Lean-side phantom while the value remains in the JavaScript

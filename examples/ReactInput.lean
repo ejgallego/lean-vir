@@ -8,6 +8,7 @@ import Vir.React
 
 namespace ReactInput
 
+open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
@@ -33,8 +34,8 @@ def inputComponent : Component Unit :=
           match ← Lean.Vir.Browser.Event.inputValue? event with
           | none => pure ()
           | some next => do
-              let nextValue ← (JsValue.ofString next).run
-              (State.set name nextValue).run]
+              let nextValue ← JsValue.ofString next
+              State.set name nextValue]
     let outputText ← Node.text nameValue
     let output ← Node.spanWith #[Property.id "react-name-output"] #[] #[outputText]
     Node.divWith #[Property.id "react-input-widget"] #[] #[label, input, output]
@@ -61,8 +62,8 @@ def changeInputComponent : Component Unit :=
           match ← Lean.Vir.Browser.Event.inputValue? event with
           | none => pure ()
           | some next => do
-              let nextValue ← (JsValue.ofString next).run
-              (State.set value nextValue).run]
+              let nextValue ← JsValue.ofString next
+              State.set value nextValue]
     let outputText ← Node.text currentValue
     let output ← Node.spanWith #[Property.id "react-change-output"] #[] #[outputText]
     Node.formWith
@@ -88,8 +89,8 @@ def checkboxComponent : Component Unit :=
           match ← Lean.Vir.Browser.Event.inputChecked? event with
           | none => pure ()
           | some next => do
-              let nextValue ← (JsValue.ofBool next).run
-              (State.set checked nextValue).run]
+              let nextValue ← JsValue.ofBool next
+              State.set checked nextValue]
     let outputText ← Node.text (checkedLabel checkedValue)
     let output ←
       Node.labelWith

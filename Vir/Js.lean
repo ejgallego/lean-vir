@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.Host
+import Vir.Runtime
 
 namespace Lean.Vir
 
@@ -18,5 +19,27 @@ This lets polymorphic JavaScript APIs share one resource ABI when they only
 move JS objects around.
 -/
 opaque Js (α : Type) : Type
+
+namespace JsValue
+
+@[vir_js "js.string"]
+opaque ofString (value : @& String) : RuntimeM (Js String)
+
+@[vir_js "js.string.value"]
+opaque toString (value : @& Js String) : RuntimeM String
+
+@[vir_js "js.nat"]
+opaque ofNat (value : Nat) : RuntimeM (Js Nat)
+
+@[vir_js "js.nat.value"]
+opaque toNat (value : @& Js Nat) : RuntimeM Nat
+
+@[vir_js "js.bool"]
+opaque ofBool (value : Bool) : RuntimeM (Js Bool)
+
+@[vir_js "js.bool.value"]
+opaque toBool (value : @& Js Bool) : RuntimeM Bool
+
+end JsValue
 
 end Lean.Vir

@@ -27,6 +27,7 @@ abbrev RecursiveSeen := Array (Name × String)
 
 inductive InterfaceEffect where
   | pure
+  | runtime
   | io
   | dom
   | react
@@ -34,6 +35,7 @@ inductive InterfaceEffect where
 
 def InterfaceEffect.label : InterfaceEffect → String
   | .pure => "pure"
+  | .runtime => "runtime"
   | .io => "io"
   | .dom => "dom"
   | .react => "react"
@@ -44,6 +46,7 @@ def InterfaceEffect.isEffectful : InterfaceEffect → Bool
 
 def InterfaceEffect.display : InterfaceEffect → String
   | .pure => ""
+  | .runtime => "RuntimeM"
   | .io => "IO"
   | .dom => "DomM"
   | .react => "ReactM"
@@ -2001,6 +2004,7 @@ def effectResult? (e : Lean.Expr) : Option (InterfaceEffect × Lean.Expr) :=
   let (fn, args) := e.getAppFnArgs
   match fn, Array.toList args with
   | `IO, [result] => some (.io, result)
+  | `Lean.Vir.RuntimeM, [result] => some (.runtime, result)
   | `Lean.Vir.Browser.DomM, [result] => some (.dom, result)
   | `Lean.Vir.React.ReactM, [result] => some (.react, result)
   | _, _ => none

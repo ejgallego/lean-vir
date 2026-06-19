@@ -16,13 +16,12 @@ allocate React-side resources exposed by this module, but arbitrary host `IO`
 must stay outside the render surface unless the API exposes a render-safe
 operation for it.
 
-The current runtime lowers `ReactM` through the same synchronous host-call ABI
-as `DomM`, so this is an irreducible effect marker rather than a separate
-runtime representation. Use `ReactM.run` only at explicit root/event boundaries
-that already live in `DomM`.
+The current runtime lowers `ReactM` through `Lean.Vir.RuntimeM`, so this is an
+irreducible effect marker rather than a separate runtime representation. Use
+`ReactM.run` only at explicit root boundaries that already live in `DomM`.
 -/
 @[irreducible] def ReactM (α : Type) : Type :=
-  Lean.Vir.Browser.DomM α
+  Lean.Vir.RuntimeM α
 
 namespace ReactM
 
@@ -30,28 +29,27 @@ namespace ReactM
 def run (action : ReactM α) : Lean.Vir.Browser.DomM α :=
   by
     unfold ReactM at action
+    unfold Lean.Vir.Browser.DomM
     exact action
 
-protected def pure (value : α) : ReactM α :=
-  by
-    unfold ReactM
-    exact pure value
-
-protected def bind (action : ReactM α) (next : α → ReactM β) : ReactM β :=
-  by
-    unfold ReactM
-    exact do
-      let value ← action.run
-      (next value).run
-
-protected def map (f : α → β) (action : ReactM α) : ReactM β :=
-  by
-    unfold ReactM
-    exact f <$> action.run
-
 instance : Monad ReactM where
-  pure := ReactM.pure
-  bind := ReactM.bind
+  pure value :=
+    by
+      unfold ReactM
+      exact pure value
+  bind action next :=
+    by
+      unfold ReactM at action
+      unfold ReactM
+      exact action >>= fun value => by
+        unfold ReactM at next
+        exact next value
+
+instance : MonadLift Lean.Vir.RuntimeM ReactM where
+  monadLift action :=
+    by
+      unfold ReactM
+      exact action
 
 instance : Nonempty (ReactM α) :=
   by
@@ -115,28 +113,6 @@ structure EventHandler where
 structure State (α : Type) where
   value : α
   setter : Lean.Vir.Js (StateSetter α)
-
-namespace JsValue
-
-@[vir_js "js.string"]
-opaque ofString (value : @& String) : ReactM (Lean.Vir.Js String)
-
-@[vir_js "js.string.value"]
-opaque toString (value : @& Lean.Vir.Js String) : ReactM String
-
-@[vir_js "js.nat"]
-opaque ofNat (value : Nat) : ReactM (Lean.Vir.Js Nat)
-
-@[vir_js "js.nat.value"]
-opaque toNat (value : @& Lean.Vir.Js Nat) : ReactM Nat
-
-@[vir_js "js.bool"]
-opaque ofBool (value : Bool) : ReactM (Lean.Vir.Js Bool)
-
-@[vir_js "js.bool.value"]
-opaque toBool (value : @& Lean.Vir.Js Bool) : ReactM Bool
-
-end JsValue
 
 /--
 React node object class created by the JavaScript host through React's public
@@ -426,13 +402,13 @@ namespace StateSetter
 opaque set {α : Type}
     (setter : @& Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
     (value : @& Lean.Vir.Js α) :
-    ReactM Unit
+    Lean.Vir.RuntimeM Unit
 
 @[vir_js "react.state.modify"]
 opaque modify {α : Type}
     (setter : @& Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
-    (update : Lean.Vir.Js α → Lean.Vir.Js α) :
-    ReactM Unit
+    (update : Lean.Vir.Js α → Lean.Vir.RuntimeM (Lean.Vir.Js α)) :
+    Lean.Vir.RuntimeM Unit
 
 end StateSetter
 
@@ -445,10 +421,13 @@ end Hooks
 
 namespace State
 
-def set (state : State (Lean.Vir.Js α)) (value : Lean.Vir.Js α) : ReactM Unit :=
+def set (state : State (Lean.Vir.Js α)) (value : Lean.Vir.Js α) : Lean.Vir.RuntimeM Unit :=
   StateSetter.set state.setter value
 
-def modify (state : State (Lean.Vir.Js α)) (update : Lean.Vir.Js α → Lean.Vir.Js α) : ReactM Unit :=
+def modify
+    (state : State (Lean.Vir.Js α))
+    (update : Lean.Vir.Js α → Lean.Vir.RuntimeM (Lean.Vir.Js α)) :
+    Lean.Vir.RuntimeM Unit :=
   StateSetter.modify state.setter update
 
 end State

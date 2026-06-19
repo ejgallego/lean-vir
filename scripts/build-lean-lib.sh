@@ -60,6 +60,7 @@ build_module() {
 }
 
 build_module Vir/Host.lean
+build_module Vir/Runtime.lean
 build_module Vir/Js.lean
 build_module Vir/Common.lean
 build_module Vir/Browser.lean
