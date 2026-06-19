@@ -43,7 +43,7 @@ def reportFor (_targets : Array Target) (closure : Closure) (manifest : Interfac
         if entry.erasedPrefixArgs == 0 then ""
         else s!" erasedPrefixArgs={entry.erasedPrefixArgs}"
       s!"- slot {entry.slot}: `{entry.name}` -> `{entry.target}` via `{entry.symbol}` arity={entry.arity}{erased} : ({", ".intercalate args.toList}) -> {effect}{entry.result.label}"
-  let interfaceDiagnosticLines :=
+  let packageDiagnosticLines :=
     if manifest.diagnostics.isEmpty then #["None."] else manifest.diagnostics.map fun diagnostic =>
       s!"- `{diagnostic.name}` from `{diagnostic.source}`: {diagnostic.reason}"
   "# Generated IR Package Report\n\n"
@@ -77,7 +77,7 @@ def reportFor (_targets : Array Target) (closure : Closure) (manifest : Interfac
   ++ "\n".intercalate unsupportedInitGlobalLines.toList ++ "\n\n"
   ++ "## Interface Exports\n\n"
   ++ "\n".intercalate interfaceExportLines.toList ++ "\n\n"
-  ++ "## Interface Diagnostics\n\n"
-  ++ "\n".intercalate interfaceDiagnosticLines.toList ++ "\n"
+  ++ "## Package Diagnostics\n\n"
+  ++ "\n".intercalate packageDiagnosticLines.toList ++ "\n"
 
 end Vir.GeneratePackage

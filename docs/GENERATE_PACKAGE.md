@@ -24,7 +24,9 @@ Targets have one of three modes:
 ## Module Map
 
 - `Vir.GeneratePackage.Basic`: shared data structures, package metadata
-  shapes, and default browser targets.
+  shapes, package ABI limits, and default browser targets.
+- `Vir.GeneratePackage.PackageFormat`: current package and interface manifest
+  version constants used by generated metadata.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures.
 - `Vir.GeneratePackage.Frontend`: Lean frontend loading, source preprocessing,
@@ -33,7 +35,9 @@ Targets have one of three modes:
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface`: interface type classification, export and
   host-import signature extraction, host effect recognition, boxed-boundary
-  checks, and JSON helpers shared by the manifest.
+  checks, and interface JSON encoders.
+- `Vir.GeneratePackage.Json`: small JSON string, array, object, and primitive
+  encoders shared by interface and manifest serialization.
 - `Vir.GeneratePackage.Manifest`: package metadata, interface manifest
   collection, duplicate export diagnostics, and manifest JSON encoding.
 - `Vir.GeneratePackage.Emit`: binary `.irpkg` encoding.
@@ -93,6 +97,61 @@ That retry is deliberately conservative: the classifier first tries the source
 type as written, then unfolds only abbrev heads whose outer type shape is not
 already supported. This preserves existing primitive, container, resource, and
 effect handling while allowing simple type aliases and effect aliases to pass.
+
+## Version Bump Checklist
+
+Version constants are intentionally small and explicit:
+
+- `Vir.GeneratePackage.PackageFormat` owns the Lean generator's
+  `packageFormatVersion` and `manifestVersion` metadata values.
+- `scripts/package-versions.mjs` owns the JavaScript-side expectations for
+  package format, interface manifest, and runtime ABI versions.
+
+Bump `packageFormatVersion` when the binary `.irpkg` encoding or decoder
+contract changes incompatibly. Update the JavaScript package-format constant,
+runtime decoder checks, and package fixture expectations in the same PR.
+
+Bump `manifestVersion` when embedded manifest fields, descriptor shapes, or
+their semantics change incompatibly for JavaScript callers. Update the
+manifest validator, runtime smoke tests, and `docs/INTERFACE_PIPELINE.md`
+alongside the generator change.
+
+Bump `runtimeAbiVersion` when the SDK artifact compatibility changes outside
+the embedded package/manifest schema, such as a WASM host ABI or JavaScript
+runtime contract change. That value is currently recorded in the SDK artifact
+metadata, not in generated `.irpkg` manifests.
+
+After any version bump, run at least:
+
+```bash
+lake build vir_irpkg
+npm run build:demo
+npm run test:runtime -- package-generation
+```
+
+## Troubleshooting
+
+The generated report groups the common package failures by where generation
+stopped:
+
+- `Missing IR Declarations`: a requested root or closure dependency was not
+  present in the loaded source environments. Check the target source path,
+  imports, explicit root names, and whether a package-only support target is
+  needed.
+- `Missing Native Extern Registrations`: the closure reached a Lean runtime
+  primitive that needs a local demo shim. Add the registration in
+  `Vir.GeneratePackage.NativeExterns`, then rerun the boundary-registry check.
+- `Package Diagnostics`: a requested export or host import could not be
+  represented in the manifest. Typical causes are unsupported argument/result
+  types, duplicate export ids or JavaScript names, and declaration-name
+  collisions across targets.
+- Boxed boundary diagnostics: top-level `Float`, `Float32`, `UInt64`, and
+  trivial wrappers over them require a generated `_boxed` declaration for the
+  wasm32 interpreter call boundary. The generator auto-includes the boxed
+  declaration when it exists, and reports this diagnostic when it does not.
+- `#eval` preprocessing: top-level `#eval` command lines are dropped by default
+  so examples do not run during generation. Internal callers that need them can
+  set `Target.dropEvalCommands := false`.
 
 ## Focused Checks
 

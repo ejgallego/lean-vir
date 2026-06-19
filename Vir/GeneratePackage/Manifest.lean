@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.GeneratePackage.Interface
+import Vir.GeneratePackage.PackageFormat
 
 open Lean
 
@@ -29,8 +30,8 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
 def collectPackageMetadata (generatedAt : String) (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
   {
     generator := "tools/GeneratePackage.lean"
-    packageFormatVersion := 7
-    manifestVersion := 1
+    packageFormatVersion := currentPackageFormatVersion
+    manifestVersion := currentInterfaceManifestVersion
     leanVersion := Lean.versionString
     leanToolchain := Lean.toolchain
     leanGithash := Lean.githash
@@ -39,7 +40,7 @@ def collectPackageMetadata (generatedAt : String) (targets : Array Target) (inde
   }
 
 def duplicateInterfaceExportDiagnostic? (exports : Array InterfaceExport) (entry : InterfaceExport) :
-    Option InterfaceDiagnostic :=
+    Option PackageDiagnostic :=
   match exports.find? (fun existing => existing.id == entry.id) with
   | some existing =>
       some {
@@ -62,11 +63,11 @@ def collectInterfaceManifest
     (targets : Array Target)
     (index : DeclIndex)
     (hostImports : Array HostImport)
-    (hostDiagnostics : Array InterfaceDiagnostic) : IO InterfaceManifest := do
+    (hostDiagnostics : Array PackageDiagnostic) : IO InterfaceManifest := do
   let mut manifest : InterfaceManifest := {
     metadata := metadata,
     hostImports := hostImports,
-    diagnostics := hostDiagnostics ++ index.diagnostics.map (·.toInterfaceDiagnostic)
+    diagnostics := hostDiagnostics ++ index.diagnostics.map (·.toPackageDiagnostic)
   }
   for target in targets do
     let source := target.source.toString
@@ -125,7 +126,7 @@ def HostImport.toJson (entry : HostImport) : String :=
     ("effect", entry.effect.toJson)
   ]
 
-def InterfaceDiagnostic.toJson (diagnostic : InterfaceDiagnostic) : String :=
+def PackageDiagnostic.toJson (diagnostic : PackageDiagnostic) : String :=
   jsonObject #[
     ("name", jsonName diagnostic.name),
     ("source", jsonString diagnostic.source),
@@ -161,7 +162,7 @@ def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
     ("metadata", manifest.metadata.toJson),
     ("exports", jsonArray (manifest.exports.map InterfaceExport.toJson)),
     ("hostImports", jsonArray (manifest.hostImports.map HostImport.toJson)),
-    ("diagnostics", jsonArray (manifest.diagnostics.map InterfaceDiagnostic.toJson))
+    ("diagnostics", jsonArray (manifest.diagnostics.map PackageDiagnostic.toJson))
   ]
 
 end Vir.GeneratePackage
