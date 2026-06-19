@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.GeneratePackage.Closure
+import Vir.GeneratePackage.Json
 
 open Lean
 
@@ -77,35 +78,6 @@ partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
       | some (_, fieldType, _, _) => fieldType.needsBoxedCallBoundary
       | none => false
   | _ => false
-
-def jsonEscape (text : String) : String :=
-  text.foldl (fun out c =>
-    match c with
-    | '"' => out ++ "\\\""
-    | '\\' => out ++ "\\\\"
-    | '\n' => out ++ "\\n"
-    | '\r' => out ++ "\\r"
-    | '\t' => out ++ "\\t"
-    | _ => out.push c) ""
-
-def jsonString (text : String) : String :=
-  "\"" ++ jsonEscape text ++ "\""
-
-def jsonArray (items : Array String) : String :=
-  "[" ++ ",".intercalate items.toList ++ "]"
-
-def jsonObject (fields : Array (String × String)) : String :=
-  let entries := fields.map fun (name, value) => jsonString name ++ ":" ++ value
-  "{" ++ ",".intercalate entries.toList ++ "}"
-
-def jsonBool (value : Bool) : String :=
-  if value then "true" else "false"
-
-def jsonNat (value : Nat) : String :=
-  toString value
-
-def jsonName (name : Name) : String :=
-  jsonString name.toString
 
 def ctorShortName (inductiveName ctorName : Name) : String :=
   let prefixText := inductiveName.toString ++ "."
@@ -836,7 +808,7 @@ def boxedBoundaryDiagnostic (name : Name) : String :=
   s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
 
 def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
-    CoreM (Except InterfaceDiagnostic InterfaceExport) := do
+    CoreM (Except PackageDiagnostic InterfaceExport) := do
   if isPrivateName name then
     return .error { name, source, reason := "private declarations are not exported" }
   else
@@ -877,7 +849,7 @@ def declParamCount : Decl → Nat
   | .extern _ params _ _ => params.size
 
 def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
-    CoreM (Except InterfaceDiagnostic HostImport) := do
+    CoreM (Except PackageDiagnostic HostImport) := do
   let some target := virJsTargetFromDecl? loaded.decl
     | return .error { name := loaded.decl.name, source := loaded.source, reason := "declaration is not a Vir JavaScript import" }
   if slot >= maxHostImportSlots then
@@ -917,10 +889,10 @@ def runCoreForSource (source : String) (env : Environment) (x : CoreM α) : IO �
     { fileName := source, fileMap := default }
     { env := env }
 
-def collectHostImports (index : DeclIndex) (closure : Closure) : IO (Array HostImport × Array InterfaceDiagnostic) := do
+def collectHostImports (index : DeclIndex) (closure : Closure) : IO (Array HostImport × Array PackageDiagnostic) := do
   let mut seen : NameSet := {}
   let mut imports : Array HostImport := #[]
-  let mut diagnostics : Array InterfaceDiagnostic := #[]
+  let mut diagnostics : Array PackageDiagnostic := #[]
   for loaded in closure.decls do
     if isVirJsDecl loaded.decl && !seen.contains loaded.decl.name then
       seen := seen.insert loaded.decl.name

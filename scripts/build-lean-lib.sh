@@ -65,9 +65,11 @@ build_module Vir/Common.lean
 build_module Vir/Browser.lean
 build_module Vir/React.lean
 build_module Vir/GeneratePackage/Basic.lean
+build_module Vir/GeneratePackage/PackageFormat.lean
 build_module Vir/GeneratePackage/NativeExterns.lean
 build_module Vir/GeneratePackage/Frontend.lean
 build_module Vir/GeneratePackage/Closure.lean
+build_module Vir/GeneratePackage/Json.lean
 build_module Vir/GeneratePackage/Interface.lean
 build_module Vir/GeneratePackage/Manifest.lean
 build_module Vir/GeneratePackage/Emit.lean

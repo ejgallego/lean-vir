@@ -20,6 +20,7 @@ import {
   localPackageFiles,
 } from "./browser-package-config.mjs";
 import { isGeneratedPublicFile } from "./file-utils.mjs";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
 import { sdkArchiveEntries } from "./sdk-payloads.mjs";
 
 const distDir = new URL("../web/dist/", import.meta.url);
@@ -94,9 +95,9 @@ async function assertSdkBundle(path) {
   }
   const { stdout: manifestText } = await execFileAsync("tar", ["-xOzf", archivePath, "lean-vir-sdk/lean-vir-artifact.json"]);
   const manifest = JSON.parse(manifestText);
-  assert.equal(manifest.packageFormatVersion, 7);
-  assert.equal(manifest.manifestVersion, 1);
-  assert.equal(manifest.runtimeAbiVersion, 1);
+  assert.equal(manifest.packageFormatVersion, PACKAGE_FORMAT_VERSION);
+  assert.equal(manifest.manifestVersion, INTERFACE_MANIFEST_VERSION);
+  assert.equal(manifest.runtimeAbiVersion, RUNTIME_ABI_VERSION);
   assert.ok(Array.isArray(manifest.files));
 }
 
