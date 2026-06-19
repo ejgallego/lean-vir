@@ -29,6 +29,12 @@ real infoview surface, render goals/selections, use host commands, and reload a
 fresh IR package. It is not yet a faithful port of an upstream ProofWidgets
 demo.
 
+The first compatibility slice is `Vir.ProofWidgets.Html`, backed directly by
+native `ReactNode` resources instead of a second recursive HTML tree. The
+`examples/ProofWidgetsHtml.lean` demo uses `Html.text`, `Html.element`,
+`Html.ofComponent`, `Attr`, and `Handler` aliases in an upstream-recognizable
+shape and is included in the `demo-host.irpkg` runtime smoke package.
+
 Before attempting a port, keep the authoring model shallow and familiar:
 
 - Lean users provide a React component and widget props are derived around it.
@@ -36,6 +42,15 @@ Before attempting a port, keep the authoring model shallow and familiar:
 - Reloads should follow fresh IR package revisions, not cursor-only movement.
 - The binding layer should model React and DOM operations directly through
   `ReactM` and `DomM`, not via unrestricted `IO`.
+
+Known first-slice limits:
+
+- `Html.ofComponent` currently renders a Lean function component with props;
+  child-bearing component helpers are intentionally not exposed until the React
+  component props model supports them directly.
+- Attribute values are `Lean.Vir.React.Property`, not arbitrary JSON props.
+- JSX syntax is intentionally deferred until the combinator surface has at least
+  one faithful upstream-style port.
 
 ## External JavaScript Libraries
 

@@ -308,10 +308,14 @@ text input, checkbox state, form submit handling, and action callbacks.
 `examples/ReactProofWidget.lean` is the fuller proof-widget-shaped React
 example. It compiles into `demo-host.irpkg`, displays on `react.html`, and can
 also be loaded as a live infoview widget through `show_panel_widgets`.
+`Vir.ProofWidgets.Html` adds the first shallow ProofWidgets-style authoring
+facade over the same native React node ABI. `examples/ProofWidgetsHtml.lean`
+uses `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, and `Handler`
+aliases and is included in the host package as a compatibility regression.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
-`docs/REACT_PROOFWIDGETS_ROADMAP.md`.
+`docs/REACT_PROOFWIDGETS_ROADMAP.md` and `docs/PROOFWIDGETS_PORTING.md`.
 
 The `Vir.Infoview` module provides the first infoview-facing shell:
 

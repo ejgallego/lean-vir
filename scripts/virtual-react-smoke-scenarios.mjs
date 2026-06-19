@@ -175,6 +175,29 @@ export function smokeVirtualReactAttributes(runtime, documentState, selector, {
   assertUnmountCleanup(runtime, element);
 }
 
+export function smokeVirtualProofWidgetsHtml(runtime, documentState, selector) {
+  assert.equal(runtime.call("ProofWidgetsHtml.mount", selector), true);
+  const element = documentState.elements.get(selector);
+  assertLiveCallbacks(runtime, 1);
+  const widget = reactElementById(element, "proofwidgets-html-demo");
+  assert.equal(widget.tag, "section");
+  assert.equal(widget.props.role, "region");
+  assert.equal(widget.props["aria-label"], "ProofWidgets HTML facade demo");
+  assert.equal(widget.props["data-testid"], "proofwidgets-html");
+  assert.equal(widget.props.className, "pw-html-demo is-live");
+  assert.equal(
+    virtualReactTextContent(reactElementById(element, "proofwidgets-html-demo")),
+    "ProofWidgets-style HtmlThis tree is written through a shallow Html facade and rendered as native React nodes.Elements5Components1TextnativeHtml.element \"section\" attrs children",
+  );
+  const stats = widget.children[2];
+  assert.equal(stats.tag, "ul");
+  assert.equal(stats.children.length, 3);
+  assert.equal(stats.children[0].props["data-label"], "Elements");
+  assert.equal(stats.children[1].props["data-label"], "Components");
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
 export function smokeVirtualReactTamagotchi(runtime, documentState, selector, {
   extended = false,
 } = {}) {

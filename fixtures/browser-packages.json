@@ -109,6 +109,13 @@
           ]
         },
         {
+          "source": "examples/ProofWidgetsHtml.lean",
+          "roots": [
+            "ProofWidgetsHtml.mount",
+            "ProofWidgetsHtml.mountDefault"
+          ]
+        },
+        {
           "source": "examples/ReactProofWidgetHello.lean",
           "roots": [
             "ReactProofWidgetHello.mount",
