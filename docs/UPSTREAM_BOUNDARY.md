@@ -181,9 +181,10 @@ Lean object result on success. The helper keeps higher-level JS lowering out of
 the shim; JavaScript drives it through the `vir_obj_*` construction and
 inspection primitives while the broader JS boundary policy remains open.
 The JavaScript runtime currently selects this lane automatically for exact
-pure same-type calls over `Nat`, `Int`, `UInt64`, `USize`, and `ByteArray` when
-the package includes the generated `_boxed` declaration for that entry; other
-structured values still use the compact byte lane.
+pure same-type calls over `Nat`, `Int`, `UInt64`, `USize`, and `ByteArray`, plus
+the shallow `Array Nat -> Nat` and `Array String -> Nat` cases, when the package
+includes the generated `_boxed` declaration for that entry; other structured
+values still use the compact byte lane.
 
 For a small set of exact pure scalar signatures, the JavaScript runtime can skip
 the byte payload entirely after slot resolution and call the primitive lane API:
@@ -215,6 +216,7 @@ The shim also exposes the first experimental Lean object ABI helpers:
 
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
+- `vir_obj_array`
 - `vir_obj_nat` / `vir_obj_nat_decimal`
 - `vir_obj_int` / `vir_obj_int_decimal`
 - `vir_obj_uint64` / `vir_obj_uint64_decimal`
@@ -230,8 +232,9 @@ Lean object references; `vir_call_resolved_objects` consumes owned arguments and
 returns an owned result. String and byte-array data pointers are borrowed and
 must be read before the object is released. Decimal scalar inspection uses a
 shim-owned scratch buffer that must be read before the next decimal inspection
-call. See [OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and ownership
-rules.
+call. `vir_obj_array` consumes owned element references and returns one owned
+array object. See [OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and
+ownership rules.
 
 The current explicit native externs cover the small fixture/demo surface for
 `Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,

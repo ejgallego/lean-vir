@@ -35,6 +35,7 @@ const requiredFunctionExports = [
   "vir_obj_byte_array",
   "vir_obj_byte_array_data",
   "vir_obj_byte_array_size",
+  "vir_obj_array",
   "vir_obj_nat",
   "vir_obj_nat_decimal",
   "vir_obj_int",
