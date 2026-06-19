@@ -180,6 +180,9 @@ package declaration, consumes those arguments once called, and returns an owned
 Lean object result on success. The helper keeps higher-level JS lowering out of
 the shim; JavaScript drives it through the `vir_obj_*` construction and
 inspection primitives while the broader JS boundary policy remains open.
+The JavaScript runtime currently selects this lane automatically for exact
+pure `ByteArray -> ByteArray` calls; other structured values still use the
+compact byte lane.
 
 For a small set of exact pure scalar signatures, the JavaScript runtime can skip
 the byte payload entirely after slot resolution and call the primitive lane API:

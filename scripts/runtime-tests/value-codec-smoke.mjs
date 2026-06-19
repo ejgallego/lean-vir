@@ -342,6 +342,30 @@ withObjectByteArray(runtime, [0, 65, 255, 17], (obj) => {
   const data = runtime.exports.vir_obj_byte_array_data(obj);
   assert.deepEqual([...runtime.readWasmBytes(data, len)], [0, 65, 255, 17]);
 });
+const byteArrayObjectCallExports = runtime.exports;
+let byteArrayObjectCalls = 0;
+let byteArrayCodecFallbackCalls = 0;
+runtime.exports = Object.fromEntries(
+  Reflect.ownKeys(byteArrayObjectCallExports).map((key) => [key, byteArrayObjectCallExports[key]]),
+);
+runtime.exports.vir_call_resolved_objects = (...args) => {
+  byteArrayObjectCalls++;
+  return byteArrayObjectCallExports.vir_call_resolved_objects(...args);
+};
+runtime.exports.vir_call_resolved = (...args) => {
+  byteArrayCodecFallbackCalls++;
+  return byteArrayObjectCallExports.vir_call_resolved(...args);
+};
+try {
+  assert.deepEqual(
+    runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [65, 66, 67]),
+    Uint8Array.from([65, 66, 67]),
+  );
+} finally {
+  runtime.exports = byteArrayObjectCallExports;
+}
+assert.equal(byteArrayObjectCalls, 1);
+assert.equal(byteArrayCodecFallbackCalls, 0);
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");

@@ -105,6 +105,11 @@ The compact byte payload path remains the complete path while this lands. It
 handles structured values, resources, callbacks, and host imports. Primitive
 lane helpers are still useful for the hottest exact scalar signatures because
 they avoid both byte payloads and object allocation.
+The first automatic object-lane selection in `VirRuntime.call` is exact pure
+`ByteArray -> ByteArray`, which lowers the argument with `vir_obj_byte_array`,
+calls `vir_call_resolved_objects`, lifts the result with
+`vir_obj_byte_array_data` / `vir_obj_byte_array_size`, and releases the owned
+result with `vir_obj_dec`.
 
 ## Phases
 
