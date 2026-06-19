@@ -142,12 +142,13 @@ end JsValue
 React node object class created by the JavaScript host through React's public
 APIs.
 
-Lean code builds values of this marker through `Html.text` and `Html.element`.
-At the host boundary these are typed `Lean.Vir.Js Html` resources, so React
+Lean code builds values of this marker through `Node.text` and
+`Node.createElement`.
+At the host boundary these are typed `Lean.Vir.Js Node` resources, so React
 nodes are constructed once with `React.createElement` instead of decoded from a
 private recursive tree on every render.
 -/
-opaque Html : Type
+opaque Node : Type
 
 /--
 A React function component authored in Lean.
@@ -156,7 +157,7 @@ The JavaScript host wraps this function in a real React function component, so
 React hooks exposed by this module run under React's normal hook dispatcher.
 -/
 abbrev Component (props : Type := Unit) : Type :=
-  props → ReactM (Lean.Vir.Js Html)
+  props → ReactM (Lean.Vir.Js Node)
 
 namespace Property
 
@@ -452,30 +453,30 @@ def modify (state : State (Lean.Vir.Js α)) (update : Lean.Vir.Js α → Lean.Vi
 
 end State
 
-namespace Html
+namespace Node
 
-@[vir_js "react.html.text"]
-opaque text (value : @& String) : ReactM (Lean.Vir.Js Html)
+@[vir_js "react.node.text"]
+opaque text (value : @& String) : ReactM (Lean.Vir.Js Node)
 
-@[vir_js "react.html.element"]
-opaque element
+@[vir_js "react.node.createElement"]
+opaque createElement
     (tag : @& String)
     (key? : Option String)
     (props : Array Property)
     (handlers : Array EventHandler)
-    (children : Array (Lean.Vir.Js Html)) :
-    ReactM (Lean.Vir.Js Html)
+    (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node)
 
 /-- Renders a Lean function component with typed props. -/
-def component (component : Component props) (props : props) : ReactM (Lean.Vir.Js Html) :=
+def component (component : Component props) (props : props) : ReactM (Lean.Vir.Js Node) :=
   component props
 
 /-- ProofWidgets-style alias for rendering a Lean function component. -/
-def ofComponent (component : Component props) (props : props) : ReactM (Lean.Vir.Js Html) :=
-  Html.component component props
+def ofComponent (component : Component props) (props : props) : ReactM (Lean.Vir.Js Node) :=
+  Node.component component props
 
 /-- Renders a nullary Lean function component. -/
-def componentUnit (component : Component Unit) : ReactM (Lean.Vir.Js Html) :=
+def componentUnit (component : Component Unit) : ReactM (Lean.Vir.Js Node) :=
   component ()
 
 /-- Raw element escape hatch. Prefer named helpers in the v0 DOM-like surface. -/
@@ -483,75 +484,75 @@ def elementWith
     (tag : String)
     (props : Array Property := #[])
     (handlers : Array EventHandler := #[])
-    (children : Array (Lean.Vir.Js Html) := #[]) :
-    ReactM (Lean.Vir.Js Html) :=
-  element tag none props handlers children
+    (children : Array (Lean.Vir.Js Node) := #[]) :
+    ReactM (Lean.Vir.Js Node) :=
+  createElement tag none props handlers children
 
 /-- Raw keyed element escape hatch. Prefer named helpers in the v0 DOM-like surface. -/
 def keyedElementWith
     (tag key : String)
     (props : Array Property := #[])
     (handlers : Array EventHandler := #[])
-    (children : Array (Lean.Vir.Js Html) := #[]) :
-    ReactM (Lean.Vir.Js Html) :=
-  element tag (some key) props handlers children
+    (children : Array (Lean.Vir.Js Node) := #[]) :
+    ReactM (Lean.Vir.Js Node) :=
+  createElement tag (some key) props handlers children
 
-private def childElement (tag : String) (children : Array (Lean.Vir.Js Html)) :
-    ReactM (Lean.Vir.Js Html) :=
+private def childElement (tag : String) (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node) :=
   elementWith tag #[] #[] children
 
-private def keyedChildElement (tag key : String) (children : Array (Lean.Vir.Js Html)) :
-    ReactM (Lean.Vir.Js Html) :=
+private def keyedChildElement (tag key : String) (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node) :=
   keyedElementWith tag key #[] #[] children
 
 private def childElementWith
     (tag : String)
     (props : Array Property := #[])
     (handlers : Array EventHandler := #[])
-    (children : Array (Lean.Vir.Js Html) := #[]) :
-    ReactM (Lean.Vir.Js Html) :=
+    (children : Array (Lean.Vir.Js Node) := #[]) :
+    ReactM (Lean.Vir.Js Node) :=
   elementWith tag props handlers children
 
 private def keyedChildElementWith
     (tag key : String)
     (props : Array Property := #[])
     (handlers : Array EventHandler := #[])
-    (children : Array (Lean.Vir.Js Html) := #[]) :
-    ReactM (Lean.Vir.Js Html) :=
+    (children : Array (Lean.Vir.Js Node) := #[]) :
+    ReactM (Lean.Vir.Js Node) :=
   keyedElementWith tag key props handlers children
 
-local macro "htmlChildElement " plain:ident keyed:ident withName:ident keyedWith:ident tag:str : command => do
+local macro "nodeChildElement " plain:ident keyed:ident withName:ident keyedWith:ident tag:str : command => do
   let keyName := Lean.mkIdent `key
   let propsName := Lean.mkIdent `props
   let handlersName := Lean.mkIdent `handlers
   let childrenName := Lean.mkIdent `children
   `(
       section
-      def $plain ($childrenName : Array (Lean.Vir.Js Html)) : ReactM (Lean.Vir.Js Html) :=
+      def $plain ($childrenName : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
         childElement $tag $childrenName
 
-      def $keyed ($keyName : String) ($childrenName : Array (Lean.Vir.Js Html)) :
-          ReactM (Lean.Vir.Js Html) :=
+      def $keyed ($keyName : String) ($childrenName : Array (Lean.Vir.Js Node)) :
+          ReactM (Lean.Vir.Js Node) :=
         keyedChildElement $tag $keyName $childrenName
 
       def $withName
           ($propsName : Array Property := #[])
           ($handlersName : Array EventHandler := #[])
-          ($childrenName : Array (Lean.Vir.Js Html) := #[]) :
-          ReactM (Lean.Vir.Js Html) :=
+          ($childrenName : Array (Lean.Vir.Js Node) := #[]) :
+          ReactM (Lean.Vir.Js Node) :=
         childElementWith $tag $propsName $handlersName $childrenName
 
       def $keyedWith
           ($keyName : String)
           ($propsName : Array Property := #[])
           ($handlersName : Array EventHandler := #[])
-          ($childrenName : Array (Lean.Vir.Js Html) := #[]) :
-          ReactM (Lean.Vir.Js Html) :=
+          ($childrenName : Array (Lean.Vir.Js Node) := #[]) :
+          ReactM (Lean.Vir.Js Node) :=
         keyedChildElementWith $tag $keyName $propsName $handlersName $childrenName
       end
     )
 
-local macro "htmlEmptyElement " plain:ident keyed:ident tag:str : command => do
+local macro "nodeEmptyElement " plain:ident keyed:ident tag:str : command => do
   let keyName := Lean.mkIdent `key
   let propsName := Lean.mkIdent `props
   let handlersName := Lean.mkIdent `handlers
@@ -560,97 +561,97 @@ local macro "htmlEmptyElement " plain:ident keyed:ident tag:str : command => do
       def $plain
           ($propsName : Array Property := #[])
           ($handlersName : Array EventHandler := #[]) :
-          ReactM (Lean.Vir.Js Html) :=
+          ReactM (Lean.Vir.Js Node) :=
         elementWith $tag $propsName $handlersName #[]
 
       def $keyed
           ($keyName : String)
           ($propsName : Array Property := #[])
           ($handlersName : Array EventHandler := #[]) :
-          ReactM (Lean.Vir.Js Html) :=
+          ReactM (Lean.Vir.Js Node) :=
         keyedElementWith $tag $keyName $propsName $handlersName #[]
       end
     )
 
-local macro "htmlButtonElement " plain:ident keyed:ident withName:ident keyedWith:ident : command => do
+local macro "nodeButtonElement " plain:ident keyed:ident withName:ident keyedWith:ident : command => do
   let keyName := Lean.mkIdent `key
   let propsName := Lean.mkIdent `props
   let handlersName := Lean.mkIdent `handlers
   let childrenName := Lean.mkIdent `children
   `(
       section
-      def $plain ($childrenName : Array (Lean.Vir.Js Html)) : ReactM (Lean.Vir.Js Html) :=
+      def $plain ($childrenName : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
         elementWith "button" #[Property.type "button"] #[] $childrenName
 
-      def $keyed ($keyName : String) ($childrenName : Array (Lean.Vir.Js Html)) :
-          ReactM (Lean.Vir.Js Html) :=
+      def $keyed ($keyName : String) ($childrenName : Array (Lean.Vir.Js Node)) :
+          ReactM (Lean.Vir.Js Node) :=
         keyedElementWith "button" $keyName #[Property.type "button"] #[] $childrenName
 
       def $withName
           ($propsName : Array Property := #[])
           ($handlersName : Array EventHandler := #[])
-          ($childrenName : Array (Lean.Vir.Js Html) := #[]) :
-          ReactM (Lean.Vir.Js Html) :=
+          ($childrenName : Array (Lean.Vir.Js Node) := #[]) :
+          ReactM (Lean.Vir.Js Node) :=
         elementWith "button" (#[Property.type "button"] ++ $propsName) $handlersName $childrenName
 
       def $keyedWith
           ($keyName : String)
           ($propsName : Array Property := #[])
           ($handlersName : Array EventHandler := #[])
-          ($childrenName : Array (Lean.Vir.Js Html) := #[]) :
-          ReactM (Lean.Vir.Js Html) :=
+          ($childrenName : Array (Lean.Vir.Js Node) := #[]) :
+          ReactM (Lean.Vir.Js Node) :=
         keyedElementWith "button" $keyName (#[Property.type "button"] ++ $propsName) $handlersName $childrenName
       end
     )
 
-htmlChildElement div keyedDiv divWith keyedDivWith "div"
-htmlChildElement span keyedSpan spanWith keyedSpanWith "span"
-htmlChildElement a keyedA aWith keyedAWith "a"
-htmlEmptyElement img keyedImg "img"
-htmlEmptyElement br keyedBr "br"
-htmlEmptyElement hr keyedHr "hr"
-htmlEmptyElement input keyedInput "input"
-htmlEmptyElement textarea keyedTextarea "textarea"
-htmlChildElement label keyedLabel labelWith keyedLabelWith "label"
-htmlChildElement form keyedForm formWith keyedFormWith "form"
-htmlChildElement select keyedSelect selectWith keyedSelectWith "select"
-htmlChildElement option keyedOption optionWith keyedOptionWith "option"
-htmlChildElement fieldset keyedFieldset fieldsetWith keyedFieldsetWith "fieldset"
-htmlChildElement legend keyedLegend legendWith keyedLegendWith "legend"
-htmlChildElement «section» keyedSection sectionWith keyedSectionWith "section"
-htmlChildElement article keyedArticle articleWith keyedArticleWith "article"
-htmlChildElement aside keyedAside asideWith keyedAsideWith "aside"
-htmlChildElement header keyedHeader headerWith keyedHeaderWith "header"
-htmlChildElement footer keyedFooter footerWith keyedFooterWith "footer"
-htmlChildElement nav keyedNav navWith keyedNavWith "nav"
-htmlChildElement main keyedMain mainWith keyedMainWith "main"
-htmlChildElement ul keyedUl ulWith keyedUlWith "ul"
-htmlChildElement ol keyedOl olWith keyedOlWith "ol"
-htmlChildElement li keyedLi liWith keyedLiWith "li"
-htmlChildElement dl keyedDl dlWith keyedDlWith "dl"
-htmlChildElement dt keyedDt dtWith keyedDtWith "dt"
-htmlChildElement dd keyedDd ddWith keyedDdWith "dd"
-htmlChildElement p keyedP pWith keyedPWith "p"
-htmlChildElement pre keyedPre preWith keyedPreWith "pre"
-htmlChildElement code keyedCode codeWith keyedCodeWith "code"
-htmlChildElement strong keyedStrong strongWith keyedStrongWith "strong"
-htmlChildElement em keyedEm emWith keyedEmWith "em"
-htmlChildElement small keyedSmall smallWith keyedSmallWith "small"
-htmlChildElement table keyedTable tableWith keyedTableWith "table"
-htmlChildElement thead keyedThead theadWith keyedTheadWith "thead"
-htmlChildElement tbody keyedTbody tbodyWith keyedTbodyWith "tbody"
-htmlChildElement tr keyedTr trWith keyedTrWith "tr"
-htmlChildElement th keyedTh thWith keyedThWith "th"
-htmlChildElement td keyedTd tdWith keyedTdWith "td"
-htmlChildElement h1 keyedH1 h1With keyedH1With "h1"
-htmlChildElement h2 keyedH2 h2With keyedH2With "h2"
-htmlChildElement h3 keyedH3 h3With keyedH3With "h3"
-htmlChildElement h4 keyedH4 h4With keyedH4With "h4"
-htmlChildElement h5 keyedH5 h5With keyedH5With "h5"
-htmlChildElement h6 keyedH6 h6With keyedH6With "h6"
-htmlButtonElement button keyedButton buttonWith keyedButtonWith
+nodeChildElement div keyedDiv divWith keyedDivWith "div"
+nodeChildElement span keyedSpan spanWith keyedSpanWith "span"
+nodeChildElement a keyedA aWith keyedAWith "a"
+nodeEmptyElement img keyedImg "img"
+nodeEmptyElement br keyedBr "br"
+nodeEmptyElement hr keyedHr "hr"
+nodeEmptyElement input keyedInput "input"
+nodeEmptyElement textarea keyedTextarea "textarea"
+nodeChildElement label keyedLabel labelWith keyedLabelWith "label"
+nodeChildElement form keyedForm formWith keyedFormWith "form"
+nodeChildElement select keyedSelect selectWith keyedSelectWith "select"
+nodeChildElement option keyedOption optionWith keyedOptionWith "option"
+nodeChildElement fieldset keyedFieldset fieldsetWith keyedFieldsetWith "fieldset"
+nodeChildElement legend keyedLegend legendWith keyedLegendWith "legend"
+nodeChildElement «section» keyedSection sectionWith keyedSectionWith "section"
+nodeChildElement article keyedArticle articleWith keyedArticleWith "article"
+nodeChildElement aside keyedAside asideWith keyedAsideWith "aside"
+nodeChildElement header keyedHeader headerWith keyedHeaderWith "header"
+nodeChildElement footer keyedFooter footerWith keyedFooterWith "footer"
+nodeChildElement nav keyedNav navWith keyedNavWith "nav"
+nodeChildElement main keyedMain mainWith keyedMainWith "main"
+nodeChildElement ul keyedUl ulWith keyedUlWith "ul"
+nodeChildElement ol keyedOl olWith keyedOlWith "ol"
+nodeChildElement li keyedLi liWith keyedLiWith "li"
+nodeChildElement dl keyedDl dlWith keyedDlWith "dl"
+nodeChildElement dt keyedDt dtWith keyedDtWith "dt"
+nodeChildElement dd keyedDd ddWith keyedDdWith "dd"
+nodeChildElement p keyedP pWith keyedPWith "p"
+nodeChildElement pre keyedPre preWith keyedPreWith "pre"
+nodeChildElement code keyedCode codeWith keyedCodeWith "code"
+nodeChildElement strong keyedStrong strongWith keyedStrongWith "strong"
+nodeChildElement em keyedEm emWith keyedEmWith "em"
+nodeChildElement small keyedSmall smallWith keyedSmallWith "small"
+nodeChildElement table keyedTable tableWith keyedTableWith "table"
+nodeChildElement thead keyedThead theadWith keyedTheadWith "thead"
+nodeChildElement tbody keyedTbody tbodyWith keyedTbodyWith "tbody"
+nodeChildElement tr keyedTr trWith keyedTrWith "tr"
+nodeChildElement th keyedTh thWith keyedThWith "th"
+nodeChildElement td keyedTd tdWith keyedTdWith "td"
+nodeChildElement h1 keyedH1 h1With keyedH1With "h1"
+nodeChildElement h2 keyedH2 h2With keyedH2With "h2"
+nodeChildElement h3 keyedH3 h3With keyedH3With "h3"
+nodeChildElement h4 keyedH4 h4With keyedH4With "h4"
+nodeChildElement h5 keyedH5 h5With keyedH5With "h5"
+nodeChildElement h6 keyedH6 h6With keyedH6With "h6"
+nodeButtonElement button keyedButton buttonWith keyedButtonWith
 
-end Html
+end Node
 
 namespace Root
 
@@ -695,7 +696,7 @@ root is rerendered, unmounted, or the owning runtime is disposed.
 @[vir_js "react.root.render"]
 opaque render
     (root : @& Lean.Vir.Js Root)
-    (html : ReactM (Lean.Vir.Js Html)) :
+    (node : ReactM (Lean.Vir.Js Node)) :
     Lean.Vir.Browser.DomM Unit
 
 /--
@@ -707,7 +708,7 @@ as `Hooks.useState` are evaluated by React during the component render.
 @[vir_js "react.root.renderComponent"]
 opaque renderComponentThunk
     (root : @& Lean.Vir.Js Root)
-    (component : Unit → ReactM (Lean.Vir.Js Html)) :
+    (component : Unit → ReactM (Lean.Vir.Js Node)) :
     Lean.Vir.Browser.DomM Unit
 
 def renderComponent

@@ -19,10 +19,10 @@ def inputComponent : Component Unit :=
     let initial ← JsValue.ofString ""
     let name ← Hooks.useState initial
     let nameValue ← JsValue.toString name.value
-    let labelText ← Html.text "name:"
-    let label ← Html.labelWith #[Property.htmlFor "react-name-input"] #[] #[labelText]
+    let labelText ← Node.text "name:"
+    let label ← Node.labelWith #[Property.htmlFor "react-name-input"] #[] #[labelText]
     let input ←
-      Html.input
+      Node.input
         #[
           Property.id "react-name-input",
           Property.type "text",
@@ -35,19 +35,19 @@ def inputComponent : Component Unit :=
           | some next => do
               let nextValue ← (JsValue.ofString next).run
               (State.set name nextValue).run]
-    let outputText ← Html.text nameValue
-    let output ← Html.spanWith #[Property.id "react-name-output"] #[] #[outputText]
-    Html.divWith #[Property.id "react-input-widget"] #[] #[label, input, output]
+    let outputText ← Node.text nameValue
+    let output ← Node.spanWith #[Property.id "react-name-output"] #[] #[outputText]
+    Node.divWith #[Property.id "react-input-widget"] #[] #[label, input, output]
 
 def changeInputComponent : Component Unit :=
   fun _ => do
     let initial ← JsValue.ofString ""
     let value ← Hooks.useState initial
     let currentValue ← JsValue.toString value.value
-    let labelText ← Html.text "change:"
-    let label ← Html.labelWith #[Property.htmlFor "react-change-input"] #[] #[labelText]
+    let labelText ← Node.text "change:"
+    let label ← Node.labelWith #[Property.htmlFor "react-change-input"] #[] #[labelText]
     let input ←
-      Html.input
+      Node.input
         #[
           Property.id "react-change-input",
           Property.inputName "change",
@@ -63,9 +63,9 @@ def changeInputComponent : Component Unit :=
           | some next => do
               let nextValue ← (JsValue.ofString next).run
               (State.set value nextValue).run]
-    let outputText ← Html.text currentValue
-    let output ← Html.spanWith #[Property.id "react-change-output"] #[] #[outputText]
-    Html.formWith
+    let outputText ← Node.text currentValue
+    let output ← Node.spanWith #[Property.id "react-change-output"] #[] #[outputText]
+    Node.formWith
       #[Property.id "react-change-widget"]
       #[EventHandler.onSubmitWith fun event => do
         Lean.Vir.Browser.Event.preventDefault event
@@ -78,7 +78,7 @@ def checkboxComponent : Component Unit :=
     let checked ← Hooks.useState initial
     let checkedValue ← JsValue.toBool checked.value
     let input ←
-      Html.input
+      Node.input
         #[
           Property.id "react-checkbox-input",
           Property.type "checkbox",
@@ -90,19 +90,19 @@ def checkboxComponent : Component Unit :=
           | some next => do
               let nextValue ← (JsValue.ofBool next).run
               (State.set checked nextValue).run]
-    let outputText ← Html.text (checkedLabel checkedValue)
+    let outputText ← Node.text (checkedLabel checkedValue)
     let output ←
-      Html.labelWith
+      Node.labelWith
         #[Property.id "react-checkbox-output", Property.htmlFor "react-checkbox-input"]
         #[]
         #[outputText]
-    Html.divWith #[Property.id "react-checkbox-widget"] #[] #[input, output]
+    Node.divWith #[Property.id "react-checkbox-widget"] #[] #[input, output]
 
 def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
   Root.render root do
-    let labelText ← Html.text "attrs:"
+    let labelText ← Node.text "attrs:"
     let label ←
-      Html.keyedLabelWith
+      Node.keyedLabelWith
         "attributes-label"
         #[
           Property.id "react-attributes-label",
@@ -111,7 +111,7 @@ def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
         #[]
         #[labelText]
     let input ←
-      Html.keyedInput
+      Node.keyedInput
         "attributes-input"
         #[
           Property.id "react-attributes-input",
@@ -121,9 +121,9 @@ def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
           Property.disabled true
         ]
         #[]
-    let outputText ← Html.text "attrs"
+    let outputText ← Node.text "attrs"
     let output ←
-      Html.keyedSpanWith
+      Node.keyedSpanWith
         "attributes-output"
         #[
           Property.id "react-attributes-output",
@@ -131,7 +131,7 @@ def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
         ]
         #[]
         #[outputText]
-    Html.divWith
+    Node.divWith
       #[
         Property.id "react-attributes-widget",
         Property.role "group",

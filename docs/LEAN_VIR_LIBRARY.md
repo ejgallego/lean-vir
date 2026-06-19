@@ -219,7 +219,7 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame)`
 - `Lean.Vir.Browser.Animation.cancelAnimationFrame : @& Lean.Vir.Js Lean.Vir.Browser.AnimationFrame -> Lean.Vir.Browser.DomM Unit`
 
-`Vir.React` provides the first React-specific imports and a native `ReactHtml`
+`Vir.React` provides the first React-specific imports and a native `ReactNode`
 resource surface. React root lifetime operations and event callbacks use
 `Lean.Vir.Browser.DomM`; `Lean.Vir.React.ReactM` is the narrower
 render-construction effect for React component APIs.
@@ -227,40 +227,40 @@ render-construction effect for React component APIs.
 - object marker: `Lean.Vir.React.Root`
 - object marker: `Lean.Vir.React.StateSetter α`
 - object marker: `Lean.Vir.React.Props`
-- `Lean.Vir.React.Html`
+- `Lean.Vir.React.Node`
 - `Lean.Vir.React.Property`
 - `Lean.Vir.React.PropValue`
 - `Lean.Vir.React.EventHandler`
 - `Lean.Vir.React.State α`
-- `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html)`
+- `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.JsValue.ofString : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js String)`
 - `Lean.Vir.React.JsValue.toString : @& Lean.Vir.Js String -> Lean.Vir.React.ReactM String`
 - `Lean.Vir.React.JsValue.ofNat : Nat -> Lean.Vir.React.ReactM (Lean.Vir.Js Nat)`
 - `Lean.Vir.React.JsValue.toNat : @& Lean.Vir.Js Nat -> Lean.Vir.React.ReactM Nat`
 - `Lean.Vir.React.JsValue.ofBool : Bool -> Lean.Vir.React.ReactM (Lean.Vir.Js Bool)`
 - `Lean.Vir.React.JsValue.toBool : @& Lean.Vir.Js Bool -> Lean.Vir.React.ReactM Bool`
-- `Lean.Vir.React.Html.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html)`
-- `Lean.Vir.React.Html.element : @& String -> Option String -> Array Lean.Vir.React.Property -> Array Lean.Vir.React.EventHandler -> Array (Lean.Vir.Js Lean.Vir.React.Html) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html)`
+- `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Node.createElement : @& String -> Option String -> Array Lean.Vir.React.Property -> Array Lean.Vir.React.EventHandler -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
 - `Lean.Vir.React.Root.createFromSelector : String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.React.Root))`
 - `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
-- `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Html) -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.React.Root.render : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
 - `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.React.ReactM Unit`
 - `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.Js α) -> Lean.Vir.React.ReactM Unit`
 
-`Html` is an opaque JavaScript-owned object marker. Lean constructs values with
-`Html.text` and `Html.element`, which call `react.html.text` and
-`react.html.element`; browser hosts construct native React nodes with
+`Node` is an opaque JavaScript-owned renderable marker. Lean constructs values with
+`Node.text` and `Node.createElement`, which call `react.node.text` and
+`react.node.createElement`; browser hosts construct native React nodes with
 `React.createElement` at that point. Rendering retains any Lean event callbacks
 embedded in the resource graph until the root is rerendered, unmounted, the
 package is reloaded, or the runtime is disposed.
 
 `Root.render` is the host boundary for rendering a `ReactM` tree into an
 existing root. The JavaScript host invokes the received render action to obtain
-the concrete `Js Html` resource and releases that render callback after the
+the concrete `Js Node` resource and releases that render callback after the
 render attempt. `Root.renderComponent` wraps a Lean `Component props` plus
 concrete props in a real JavaScript React function component. The public hook
 surface is
@@ -270,12 +270,12 @@ helpers when a component needs scalar state. State setters are typed JavaScript
 resources and must cross public signatures as `Lean.Vir.Js
 (Lean.Vir.React.StateSetter α)`.
 
-The intended v0 authoring surface is a DOM-like helper set over that `Js Html`
+The intended v0 authoring surface is a DOM-like helper set over that `Js Node`
 resource ABI: named property helpers, named event-handler helpers, and keyed
 or unkeyed constructors for the currently blessed elements. The
 generic scalar prop, event, and element helpers remain intentional escape
 hatches for demos that need a DOM case not yet covered by the named surface.
-`docs/REACT_HTML.md` is the canonical reference for helper names, prop
+`docs/REACT_NODE.md` is the canonical reference for helper names, prop
 mappings, validation rules, callback ownership, and the JavaScript renderer
 contract.
 
@@ -287,7 +287,7 @@ keeps both demos: `Tamagotchi` is the non-React DOM-hosted version, and
 `ReactTamagotchi` reuses the same model with a keyed React tree, controlled
 text input, checkbox state, form submit handling, and action callbacks.
 
-The standalone React HTML renderer status is tracked in `docs/REACT_HTML.md`.
+The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
@@ -347,7 +347,7 @@ JavaScript-provided function values are not accepted as Lean arguments in this
 phase.
 
 `Element.addEventListener`, `Timer.setTimeout`,
-`Animation.requestAnimationFrame`, and raw React HTML rendering use the callback ABI.
+`Animation.requestAnimationFrame`, and raw React Node rendering use the callback ABI.
 Event resources are valid only during the callback. Listener, timeout, frame,
 and React root resources own their retained callbacks until removal,
 cancellation, firing, rerender, unmount, package reload, or runtime disposal. See
@@ -372,7 +372,7 @@ entrypoints:
   browser and React object markers
 - Lean function values used as host callbacks
 - `Lean.Expr`
-- `Lean.Vir.React.Html` as an opaque JavaScript-owned resource under
+- `Lean.Vir.React.Node` as an opaque JavaScript-owned resource under
   `Lean.Vir.Js`
 
 Imports may be pure functions or synchronous effect actions. Raw custom host

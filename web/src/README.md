@@ -33,7 +33,7 @@ unrelated responsibilities.
   timers, callbacks, and shared host-binding helpers.
 - `host/vir-virtual-host-bindings.js`: virtual document, event, element, and
   React host bindings for Node tests/tools.
-- `react/vir-react-html.js`: `Lean.Vir.React.Html` resource construction,
+- `react/vir-react-node.js`: `Lean.Vir.React.Node` resource construction,
   native/virtual React node creation, validation, virtual text rendering, and
   callback release.
 - `react/vir-react-hooks.js`: shared React component hook runtime and typed

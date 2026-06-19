@@ -110,8 +110,8 @@ React authoring ergonomics can improve independently of Wasm extensions:
 - expand blessed `Property` and `EventHandler` helpers for common DOM/React
   props and events;
 - document app patterns for controlled inputs, form submission, state updates,
-  and component-like helper functions over `Html`;
-- keep `Html`, `Property`, `PropValue`, `EventHandler`, and `Root` object
+  and component-like helper functions over `Node`;
+- keep `Node`, `Property`, `PropValue`, `EventHandler`, and `Root` object
   markers as the stable Lean-facing shape while the lower boundary evolves;
 - continue testing rapid rerender, unmount, package reload, and runtime dispose
   cleanup for retained callbacks.
@@ -124,22 +124,22 @@ registration.
 
 The current runtime should stay morally aligned with WIT even while the browser
 artifact remains a core `wasm32-wasip1` module. WIT already has enums and
-variants, so the main mismatch for `Lean.Vir.React.Html` is not enum support.
-The current `Html` marker is now resource-like: Lean constructs a
-JavaScript-owned `ReactHtml` through `react.html.text` and
-`react.html.element`, and event-handler records passed to construction can
+variants, so the main mismatch for `Lean.Vir.React.Node` is not enum support.
+The current `Node` marker is resource-like: Lean constructs a
+JavaScript-owned `ReactNode` through `react.node.text` and
+`react.node.createElement`, and event-handler records passed to construction can
 embed callback closures.
 
 The intended alignment is:
 
-- keep `Lean.Vir.Js Lean.Vir.React.Html` as the shallow native-node resource
+- keep `Lean.Vir.Js Lean.Vir.React.Node` as the shallow native-node resource
   authored through Lean combinators;
 - treat browser values such as `Element`, callback-scoped `Event`, and
   `ReactRoot` as resource-like handles;
 - keep records, variants/enums, lists, options, strings, numeric scalars, and
   resources close to WIT's value/resource categories;
 - keep the initial
-  `Component props := props -> ReactM (Lean.Vir.Js Html)` boundary shallow and
+  `Component props := props -> ReactM (Lean.Vir.Js Node)` boundary shallow and
   React-like while treating future node-sharing or batching encodings as an
   optimization question, not a user-facing API requirement.
 

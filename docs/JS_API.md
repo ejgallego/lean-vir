@@ -37,7 +37,7 @@ import {
 } from "lean-vir/host-bindings";
 ```
 
-Browser apps that render `Lean.Vir.React.Html` import the React binding factory
+Browser apps that render `Lean.Vir.React.Node` import the React binding factory
 from the separate React entry point:
 
 ```js
@@ -62,7 +62,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `host-resource.js` | Opaque host-resource objects and externref root tables. |
 | `host/vir-host-resources.js` | Host-resource store, liveness, teardown, timers, callbacks, and shared binding helpers. |
 | `host/vir-virtual-host-bindings.js` | Virtual document/event/React host bindings for Node tests/tools. |
-| `react/vir-react-html.js` | React HTML tree validation, conversion, callback release, and virtual text helpers. |
+| `react/vir-react-node.js` | React Node tree validation, conversion, callback release, and virtual text helpers. |
 | `react/vir-react-hooks.js` | Shared React component hook runtime and typed state setter host bindings. |
 | `vir-react-host-bindings.js` | Browser React root/component/hook bindings; imports `react` and `react-dom/client`. |
 | `runtime/interface-manifest.js` | Manifest validation, diagnostics, and type formatting helpers. |
@@ -179,8 +179,8 @@ objects; the `α` parameter is not decoded while the value remains in the JS
 object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
 and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary. Host imports may additionally receive Lean function values as
-callbacks, including event handlers retained by `Lean.Vir.React.Html` resources
-created through `react.html.element`. Exported Lean entrypoints and host
+callbacks, including event handlers retained by `Lean.Vir.React.Node` resources
+created through `react.node.createElement`. Exported Lean entrypoints and host
 imports may be pure or use a
 recognized synchronous effect. Raw custom host imports can use `IO α`; DOM and
 React-root imports use `Lean.Vir.Browser.DomM α`; React render-construction
@@ -288,14 +288,14 @@ const vir = await createVirRuntime({
 console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
 ```
 
-Browser React root, native Html construction, component, and hook targets are
+Browser React root, native Node construction, component, and hook targets are
 provided by `lean-vir/react-host-bindings`.
 Use the `defaultHostBindings` composition shown above when a browser package
-calls `Lean.Vir.React.Root.*`, `Lean.Vir.React.Html.*`, or
+calls `Lean.Vir.React.Root.*`, `Lean.Vir.React.Node.*`, or
 `Lean.Vir.React.Hooks.*`. The browser runtime requires `globalThis.document`
 for `browser.document.*` targets. In Node, use `lean-vir/vir-runtime-node` or
 pass explicit `hostBindings`; the Node wrapper provides virtual document,
-event, ReactHtml, and React state for tests/tools.
+event, ReactNode, and React state for tests/tools.
 
 Custom target bindings are passed through `hostBindings`; user bindings
 override defaults. Bindings receive decoded JavaScript values and return a value

@@ -63,8 +63,8 @@ follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
 
 The browser-facing direction now includes a standalone React rendering slice.
 Lean code can create a React root from a browser element, construct native
-React nodes through `Html.text`/`Html.element`, render the resulting
-`Lean.Vir.Js Lean.Vir.React.Html` resource, and retain Lean callbacks inside
+React nodes through `Node.text`/`Node.createElement`, render the resulting
+`Lean.Vir.Js Lean.Vir.React.Node` resource, and retain Lean callbacks inside
 React event handlers. The Lean library exposes a DOM-like helper set for common
 props, events, keyed labels, forms, inputs, buttons, style objects, class
 lists, and text containers, with examples covering button clicks in
@@ -79,7 +79,7 @@ Controlled text handlers use `Event.inputValue?` and checkbox handlers use
 Node document mirrors DOM `querySelector` for missing selectors; tests that
 need fixtures explicitly pre-seed them. Root rerender, unmount, package reload,
 and runtime disposal reuse the existing resource and callback lifetime model.
-Current standalone React HTML status is tracked in `docs/REACT_HTML.md`; full
+Current standalone React Node status is tracked in `docs/REACT_NODE.md`; full
 Lean infoview RPC compatibility remains follow-up work tracked in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 

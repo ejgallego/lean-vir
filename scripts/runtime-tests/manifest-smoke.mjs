@@ -154,8 +154,8 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "js.nat.value",
   "js.string",
   "js.string.value",
-  "react.html.element",
-  "react.html.text",
+  "react.node.createElement",
+  "react.node.text",
   "react.root.create",
   "react.root.render",
   "react.root.renderComponent",
@@ -191,10 +191,10 @@ assert.equal(
     ?.args[1]?.type?.result?.type,
   "Js",
 );
-const reactHtmlType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.html.element")
+const reactNodeType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.createElement")
   ?.args[2]?.type;
 const reactPropValueType = findTypeDescriptor(
-  reactHtmlType,
+  reactNodeType,
   (type) => type.kind === "customInductive" && typeof type.name === "string" && type.name.endsWith(".PropValue"),
 );
 assert.deepEqual(

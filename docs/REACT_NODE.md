@@ -1,4 +1,4 @@
-# React HTML Renderer
+# React Node Renderer
 
 This note tracks the standalone React renderer that Vir exposes today. It
 is intentionally separate from the future ProofWidgets compatibility work in
@@ -8,15 +8,15 @@ For implementors, [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) has the React
 component call-flow diagram and the shared host-resource/closure ownership
 diagrams. The short model is:
 
-- `Component props := props -> ReactM (Lean.Vir.Js Html)` is a Lean-authored
+- `Component props := props -> ReactM (Lean.Vir.Js Node)` is a Lean-authored
   React function component.
-- `Root.render root tree` takes a `ReactM (Lean.Vir.Js Html)` tree and lowers
+- `Root.render root tree` takes a `ReactM (Lean.Vir.Js Node)` tree and lowers
   it at the DOM/root boundary.
 - `Root.renderComponent` wraps that Lean function in a real JavaScript React
   function component, so hooks run under React's dispatcher.
 - `ReactM` is for render-safe React construction; root and DOM lifetime
   operations remain in `DomM`.
-- `Html`, `Root`, state setters, events, and primitive JavaScript state values
+- `Node`, `Root`, state setters, events, and primitive JavaScript state values
   are JavaScript-owned resources that cross as `Lean.Vir.Js α`.
 - Event and updater closures are Lean-owned closures that cross to JavaScript
   as releasable `VirCallback` objects.
@@ -34,7 +34,7 @@ namespace Lean.Vir.React
 opaque Root : Type
 opaque StateSetter (α : Type) : Type
 opaque Props : Type
-opaque Html : Type
+opaque Node : Type
 
 inductive PropValue where
   | string : String → PropValue
@@ -61,7 +61,7 @@ structure State (α : Type) where
   setter : Lean.Vir.Js (StateSetter α)
 
 abbrev Component (props : Type := Unit) : Type :=
-  props → ReactM (Lean.Vir.Js Html)
+  props → ReactM (Lean.Vir.Js Node)
 
 namespace JsValue
 
@@ -90,21 +90,21 @@ def modify
 
 end State
 
-namespace Html
+namespace Node
 
-@[vir_js "react.html.text"]
-opaque text (value : @& String) : ReactM (Lean.Vir.Js Html)
+@[vir_js "react.node.text"]
+opaque text (value : @& String) : ReactM (Lean.Vir.Js Node)
 
-@[vir_js "react.html.element"]
-opaque element
+@[vir_js "react.node.createElement"]
+opaque createElement
     (tag : @& String)
     (key? : Option String)
     (props : Array Property)
     (handlers : Array EventHandler)
-    (children : Array (Lean.Vir.Js Html)) :
-    ReactM (Lean.Vir.Js Html)
+    (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node)
 
-end Html
+end Node
 
 namespace Root
 
@@ -121,7 +121,7 @@ def mountFromSelector
     Lean.Vir.Browser.DomM Bool := ...
 
 @[vir_js "react.root.render"]
-opaque render (root : @& Lean.Vir.Js Root) (html : ReactM (Lean.Vir.Js Html)) :
+opaque render (root : @& Lean.Vir.Js Root) (node : ReactM (Lean.Vir.Js Node)) :
   Lean.Vir.Browser.DomM Unit := ...
 
 def renderComponent
@@ -137,9 +137,9 @@ end Root
 end Lean.Vir.React
 ```
 
-`Lean.Vir.React.Html` is an opaque JavaScript-owned object marker and crosses
-the host boundary as `Lean.Vir.Js Html`. Lean builds nodes through
-`react.html.text` and `react.html.element`; the browser host constructs native
+`Lean.Vir.React.Node` is an opaque JavaScript-owned object marker and crosses
+the host boundary as `Lean.Vir.Js Node`. Lean builds nodes through
+`react.node.text` and `react.node.createElement`; the browser host constructs native
 React nodes immediately with `React.createElement`, while the virtual test host
 constructs equivalent virtual nodes. The package generator still represents the
 known `Property`, `PropValue`, and `EventHandler` payload shapes directly; the
@@ -150,7 +150,7 @@ ownership policy, not a private recursive wire codec.
 operations and event callbacks. `ReactM` is the narrower render-construction
 effect reserved for React component APIs and static tree construction;
 `Root.render` is itself the host boundary and receives a `ReactM` tree action.
-The JavaScript host invokes that render action to obtain the concrete `Js Html`
+The JavaScript host invokes that render action to obtain the concrete `Js Node`
 resource, renders it into the root, and releases the render callback. The
 current runtime uses the same synchronous host-call representation for both
 effects, so `ReactM` is an irreducible Lean-side effect marker rather than a
@@ -159,7 +159,7 @@ distinct runtime wrapper.
 `Root.renderComponent` wraps the Lean function in a real JavaScript React
 function component. Hooks therefore run under React's normal dispatcher instead
 of being simulated by the Lean runtime. Components are props-taking functions:
-`Component props := props → ReactM (Lean.Vir.Js Html)`, and no-props
+`Component props := props → ReactM (Lean.Vir.Js Node)`, and no-props
 components use `Component Unit` plus `()` at the render call.
 
 The public state surface is resource-typed: `Hooks.useState`, `State.set`, and
@@ -198,7 +198,7 @@ React's `key` for list-like children while preserving the same props, handlers,
 and children conventions as their unkeyed counterparts.
 
 `Property.string`/`bool`/`int`/`float`, `EventHandler.on`/`onUnit`, and
-`Html.elementWith`/`keyedElementWith` remain intentional escape hatches for
+`Node.elementWith`/`keyedElementWith` remain intentional escape hatches for
 unblessed scalar prop names, event names, and tags. `PropValue.style` and
 `PropValue.classList` are intentionally constrained to the `style` and
 `className` props by the host renderer.
@@ -209,12 +209,12 @@ The browser React host binding is exposed from
 `lean-vir/react-host-bindings`. It owns a React root resource:
 
 - `react.root.create` calls `ReactDOM.createRoot(container)`.
-- `react.html.text` creates a `ReactHtml` resource for a string node.
-- `react.html.element` validates props/handlers/children, calls
-  `React.createElement(tag, props, ...children)`, and returns a `ReactHtml`
+- `react.node.text` creates a `ReactNode` resource for a string node.
+- `react.node.createElement` validates props/handlers/children, calls
+  `React.createElement(tag, props, ...children)`, and returns a `ReactNode`
   resource.
 - `react.root.render` invokes the received Lean `ReactM` render action, renders
-  the retained native React node held by the resulting `ReactHtml` resource,
+  the retained native React node held by the resulting `ReactNode` resource,
   and releases the render callback.
 - `react.root.renderComponent` wraps a Lean thunk produced from
   `Component props` plus concrete props in a JavaScript React function
@@ -255,10 +255,10 @@ helpers check `currentTarget` first, then fall back to `target`.
 ## Implemented Slice
 
 1. Added `react` and `react-dom` dependencies to the Vite app.
-2. Added `Vir/React.lean` with `Root`, opaque `Html`, `Property`,
-   `PropValue`, `EventHandler`, native Html construction, and root
+2. Added `Vir/React.lean` with `Root`, opaque `Node`, `Property`,
+   `PropValue`, `EventHandler`, native Node construction, and root
    create/render/unmount host imports.
-3. Added `ReactHtml` resource typing so Lean cannot bind a JavaScript-backed
+3. Added `ReactNode` resource typing so Lean cannot bind a JavaScript-backed
    React node without the marker appearing under `Lean.Vir.Js`.
 4. Added JavaScript React node validation with depth and node-count limits
    before rendering.
@@ -271,9 +271,9 @@ helpers check `currentTarget` first, then fall back to `target`.
 8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger stateful
    example that shares the non-React Tamagotchi model, renders a keyed React
    tree, and handles controlled input, checkbox, submit, and action callbacks.
-9. Added runtime tests for nested callbacks inside `ReactHtml`, hook-backed
+9. Added runtime tests for nested callbacks inside `ReactNode`, hook-backed
    component rerenders, root rerender cleanup, unmount cleanup, package reload
-   cleanup, runtime dispose, malformed Html construction, depth limits, missing selectors, and input-event
+   cleanup, runtime dispose, malformed Node construction, depth limits, missing selectors, and input-event
    target fallback. Virtual `Document.querySelector` follows DOM semantics, so
    tests pre-seed expected fixtures with `ensureVirtualElementState`. Virtual
    React callback tests find nodes by DOM-like `id` props instead of child

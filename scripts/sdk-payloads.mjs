@@ -18,7 +18,7 @@ export const SDK_PAYLOADS = [
   ["js/runtime/wire-tags.js", "web/src/runtime/wire-tags.js"],
   ["js/host/vir-host-resources.js", "web/src/host/vir-host-resources.js"],
   ["js/host/vir-virtual-host-bindings.js", "web/src/host/vir-virtual-host-bindings.js"],
-  ["js/react/vir-react-html.js", "web/src/react/vir-react-html.js"],
+  ["js/react/vir-react-node.js", "web/src/react/vir-react-node.js"],
   ["js/react/vir-react-hooks.js", "web/src/react/vir-react-hooks.js"],
 ];
 

@@ -16,7 +16,7 @@ ownership diagrams.
 - Browser or React host work: read
   [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md),
   [HOST_BINDINGS.md](HOST_BINDINGS.md),
-  [REACT_HTML.md](REACT_HTML.md), `web/src/host/vir-host-resources.js`, and
+  [REACT_NODE.md](REACT_NODE.md), `web/src/host/vir-host-resources.js`, and
   `web/src/react/`.
 - WASI/runtime boundary work: read
   [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md),
@@ -29,7 +29,7 @@ ownership diagrams.
 - [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md) owns the public Lean API inventory.
 - [HOST_BINDINGS.md](HOST_BINDINGS.md) owns JavaScript host target behavior and
   resource cleanup rules.
-- [REACT_HTML.md](REACT_HTML.md) owns React-specific authoring conventions and
+- [REACT_NODE.md](REACT_NODE.md) owns React-specific authoring conventions and
   renderer details.
 - [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) owns implementation paths, call-flow
   diagrams, and object ownership.
@@ -72,7 +72,7 @@ ownership diagrams.
 
 - [EVENT_CALLBACK_ROADMAP.md](EVENT_CALLBACK_ROADMAP.md): callback/resource
   ownership direction.
-- [REACT_HTML.md](REACT_HTML.md): current Lean-authored React HTML surface.
+- [REACT_NODE.md](REACT_NODE.md): current Lean-authored React Node surface.
 - [REACT_PROOFWIDGETS_ROADMAP.md](REACT_PROOFWIDGETS_ROADMAP.md): future
   infoview and ProofWidgets alignment.
 - [REACT_WASM_BINDINGS.md](REACT_WASM_BINDINGS.md): `externref`, JSPI, and

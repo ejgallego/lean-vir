@@ -115,7 +115,7 @@ The embedded manifest currently supports:
   container shapes;
 - direct `Lean.Expr`, represented at the JavaScript boundary as structural
   expression objects;
-- `Lean.Vir.React.Html`, represented as an opaque `Lean.Vir.Js` resource whose
+- `Lean.Vir.React.Node`, represented as an opaque `Lean.Vir.Js` resource whose
   native React node is constructed by the React host bindings.
 
 Large exact integer values are returned to JavaScript as decimal strings to
@@ -151,9 +151,9 @@ the runtime receives the internal closure root id through a side channel and
 releases the rooted Lean closure when the host-owned registration is done with
 it.
 
-`Lean.Vir.React.Html` is a JavaScript-owned resource marker. The recursive
+`Lean.Vir.React.Node` is a JavaScript-owned resource marker. The recursive
 structure of the rendered tree lives in the host resource graph created by
-`react.html.text` and `react.html.element`; the manifest still describes the
+`react.node.text` and `react.node.createElement`; the manifest still describes the
 ordinary `Property`, `PropValue`, and `EventHandler` payloads that those host
 imports receive.
 

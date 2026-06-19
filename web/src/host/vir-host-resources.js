@@ -171,15 +171,15 @@ export function createHtmlInputElementResourceHostBindings(resources, { fromElem
 }
 
 export function createReactRootResourceHostBindings(resources, createRootResource, {
-  createHtmlTextResource = null,
-  createHtmlElementResource = null,
+  createNodeTextResource = null,
+  createNodeElementResource = null,
 } = {}) {
   return {
-    "react.html.text": (value) =>
-      resources.resourceForValue(requireReactHtmlTextResourceFactory(createHtmlTextResource)(value)),
-    "react.html.element": (tag, key, props, handlers, children) =>
+    "react.node.text": (value) =>
+      resources.resourceForValue(requireReactNodeTextResourceFactory(createNodeTextResource)(value)),
+    "react.node.createElement": (tag, key, props, handlers, children) =>
       resources.resourceForValue(
-        requireReactHtmlElementResourceFactory(createHtmlElementResource)(tag, key, props, handlers, children)
+        requireReactNodeElementResourceFactory(createNodeElementResource)(tag, key, props, handlers, children)
       ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
@@ -189,8 +189,8 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       const render = requireReactRenderCallback(renderTree);
       try {
         const value = resources.resolveResource(root, "ReactRoot");
-        const html = render();
-        value.render(html);
+        const node = render();
+        value.render(node);
         return undefined;
       } finally {
         render.release();
@@ -217,16 +217,16 @@ function requireReactRenderCallback(renderTree) {
   return renderTree;
 }
 
-function requireReactHtmlTextResourceFactory(factory) {
+function requireReactNodeTextResourceFactory(factory) {
   if (typeof factory !== "function") {
-    throw new Error("react.html.text host binding requires a React Html text resource factory");
+    throw new Error("react.node.text host binding requires a React Node text resource factory");
   }
   return factory;
 }
 
-function requireReactHtmlElementResourceFactory(factory) {
+function requireReactNodeElementResourceFactory(factory) {
   if (typeof factory !== "function") {
-    throw new Error("react.html.element host binding requires a React Html element resource factory");
+    throw new Error("react.node.createElement host binding requires a React Node element resource factory");
   }
   return factory;
 }
@@ -355,10 +355,10 @@ export function performanceNow() {
 
 export function createReactHostHooks() {
   let eventDepth = 0;
-  const deferredReactHtmlDisposals = [];
-  const flushReactHtmlDisposals = () => {
+  const deferredReactNodeDisposals = [];
+  const flushReactNodeDisposals = () => {
     if (eventDepth !== 0) return undefined;
-    const pending = deferredReactHtmlDisposals.splice(0);
+    const pending = deferredReactNodeDisposals.splice(0);
     for (const dispose of pending) {
       dispose();
     }
@@ -368,17 +368,17 @@ export function createReactHostHooks() {
     addDisposable: (state, value) => state.addDisposable(value),
     removeDisposable: (state, value) => state.removeDisposable(value),
     callLeanEventCallback,
-    beginReactHtmlEventCallback: () => {
+    beginReactNodeEventCallback: () => {
       eventDepth++;
       return undefined;
     },
-    endReactHtmlEventCallback: () => {
+    endReactNodeEventCallback: () => {
       eventDepth = Math.max(0, eventDepth - 1);
       return undefined;
     },
-    deferReactHtmlDispose: (dispose) => {
+    deferReactNodeDispose: (dispose) => {
       if (typeof dispose !== "function") {
-        throw new Error("React Html deferred disposal must be a function");
+        throw new Error("React Node deferred disposal must be a function");
       }
       if (eventDepth === 0) {
         const queue =
@@ -388,10 +388,10 @@ export function createReactHostHooks() {
         queue(dispose);
         return undefined;
       }
-      deferredReactHtmlDisposals.push(dispose);
+      deferredReactNodeDisposals.push(dispose);
       return undefined;
     },
-    flushReactHtmlDisposals,
+    flushReactNodeDisposals,
     once,
   };
 }
