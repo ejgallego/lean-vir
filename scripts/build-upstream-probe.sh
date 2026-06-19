@@ -272,6 +272,15 @@ exports=(
   -Wl,--export=vir_obj_byte_array
   -Wl,--export=vir_obj_byte_array_data
   -Wl,--export=vir_obj_byte_array_size
+  -Wl,--export=vir_obj_nat
+  -Wl,--export=vir_obj_nat_decimal
+  -Wl,--export=vir_obj_int
+  -Wl,--export=vir_obj_int_decimal
+  -Wl,--export=vir_obj_uint64
+  -Wl,--export=vir_obj_uint64_decimal
+  -Wl,--export=vir_obj_usize
+  -Wl,--export=vir_obj_usize_decimal
+  -Wl,--export=vir_obj_decimal_size
   -Wl,--export=vir_obj_inc
   -Wl,--export=vir_obj_dec
 )

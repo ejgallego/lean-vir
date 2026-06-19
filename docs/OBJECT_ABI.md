@@ -47,12 +47,20 @@ The initial exported object helper surface is deliberately small:
 
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
+- `vir_obj_nat` / `vir_obj_nat_decimal`
+- `vir_obj_int` / `vir_obj_int_decimal`
+- `vir_obj_uint64` / `vir_obj_uint64_decimal`
+- `vir_obj_usize` / `vir_obj_usize_decimal`
+- `vir_obj_decimal_size`
 - `vir_obj_inc` / `vir_obj_dec`
 - `vir_call_resolved_objects`
 
 Strings and byte arrays return borrowed pointers into the Lean object. JavaScript
 must read the bytes while the object is still live. The pointer becomes invalid
 after `vir_obj_dec` releases the object or after the runtime is torn down.
+The decimal scalar inspection helpers return a borrowed pointer into a shim-owned
+scratch buffer; JavaScript must read it before the next decimal inspection helper
+call or runtime teardown.
 
 ## Ownership
 
@@ -64,14 +72,13 @@ retain an object across a helper call that consumes one reference.
 `vir_call_resolved_objects(slot, argv, argc)` consumes every owned object in the
 `argv` array once called, including early validation failures after a non-null
 `argv` pointer has been accepted. On success it returns an owned Lean object
-result that JavaScript must release with `vir_obj_dec` after lifting. If the
-returned pointer is `0`, JavaScript must inspect `vir_call_error_size`; Lean
-immediate scalar objects can also use `0`, so a non-empty error string is the
-failure signal.
+result that JavaScript must release with `vir_obj_dec` after lifting. A returned
+pointer of `0` is the null failure sentinel; JavaScript should inspect
+`vir_call_error_size` for the diagnostic.
 
-Immediate scalar objects are allowed. `vir_obj_inc` and `vir_obj_dec` are still
-the only public operations JS should use; Lean's runtime treats scalars as
-no-ops for refcounting.
+Immediate scalar objects are allowed. They are still non-null object values at
+the ABI boundary. `vir_obj_inc` and `vir_obj_dec` are the only public operations
+JS should use; Lean's runtime treats scalars as no-ops for refcounting.
 
 Object pointers are scoped to one wasm runtime instance. They must not survive:
 
@@ -105,16 +112,19 @@ The compact byte payload path remains the complete path while this lands. It
 handles structured values, resources, callbacks, and host imports. Primitive
 lane helpers are still useful for the hottest exact scalar signatures because
 they avoid both byte payloads and object allocation.
-The first automatic object-lane selection in `VirRuntime.call` is exact pure
-`ByteArray -> ByteArray`, which lowers the argument with `vir_obj_byte_array`,
-calls `vir_call_resolved_objects`, lifts the result with
-`vir_obj_byte_array_data` / `vir_obj_byte_array_size`, and releases the owned
-result with `vir_obj_dec`.
+The first automatic object-lane selections in `VirRuntime.call` are exact pure
+same-type calls for `Nat`, `Int`, `UInt64`, `USize`, and `ByteArray` when the
+package includes the generated `_boxed` declaration for that entry. Decimal
+scalar calls lower through the corresponding `vir_obj_*` constructor, call
+`vir_call_resolved_objects`, lift the result with the matching decimal
+inspection helper plus `vir_obj_decimal_size`, and release the owned result with
+`vir_obj_dec`. Byte-array calls use `vir_obj_byte_array` and lift the result with
+`vir_obj_byte_array_data` / `vir_obj_byte_array_size`.
 
 ## Phases
 
-1. Base object primitives: String and ByteArray construction and inspection,
-   plus ownership tests.
+1. Base object primitives: String, decimal scalar, and ByteArray construction
+   and inspection, plus ownership tests.
 2. Object call helpers: resolved calls that accept already-lowered owned object
    arguments and return an owned object result.
 3. Bulk builders: arrays, strings, and byte arrays with fewer intermediate

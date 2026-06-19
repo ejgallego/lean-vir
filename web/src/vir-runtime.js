@@ -29,6 +29,7 @@ import {
 } from "./runtime/vir-value-codec.js";
 import {
   asByteArrayBytes,
+  normalizeDecimal,
   normalizeFloat,
 } from "./runtime/vir-value-normalizers.js";
 
@@ -39,6 +40,8 @@ export {
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
+const MAX_UINT32 = 0xffffffffn;
+const MAX_UINT64 = 0xffffffffffffffffn;
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 const virCallbackStates = new WeakMap();
 const FAST_CALL_UNAVAILABLE = Symbol("fast-call-unavailable");
@@ -334,6 +337,7 @@ export class VirRuntime {
     this.packageInfo = packageInfo;
     this.interfaceManifest = null;
     this.packageMetadata = null;
+    this.boxedCallEntryNames = new Set();
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
@@ -350,6 +354,7 @@ export class VirRuntime {
       this.interfaceManifest = this.readPackageManifest();
       this.hostState?.setManifest(this.interfaceManifest);
       this.packageMetadata = this.interfaceManifest.metadata;
+      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
     }
   }
@@ -391,6 +396,7 @@ export class VirRuntime {
       this.interfaceManifest = this.readPackageManifest();
       this.hostState?.setManifest(this.interfaceManifest);
       this.packageMetadata = this.interfaceManifest.metadata;
+      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
       this.packageInfo = {
         count: providerCount ?? count,
@@ -410,6 +416,7 @@ export class VirRuntime {
     this.interfaceManifest = null;
     this.hostState?.setManifest(null);
     this.packageMetadata = null;
+    this.boxedCallEntryNames = new Set();
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
@@ -584,29 +591,94 @@ export class VirRuntime {
     if (entry.effect !== "pure" || entry.args.length !== 1) {
       return FAST_CALL_UNAVAILABLE;
     }
-    const argTag = entry.args[0].type?.wireTag;
-    const resultTag = entry.result?.wireTag;
-    if (argTag !== WIRE.BYTE_ARRAY || resultTag !== WIRE.BYTE_ARRAY) {
+    if (!this.boxedCallEntryNames.has(entry.entry)) {
       return FAST_CALL_UNAVAILABLE;
     }
-    if (
-      typeof this.exports.vir_call_resolved_objects !== "function" ||
-      typeof this.exports.vir_obj_byte_array !== "function" ||
-      typeof this.exports.vir_obj_byte_array_data !== "function" ||
-      typeof this.exports.vir_obj_byte_array_size !== "function" ||
-      typeof this.exports.vir_obj_dec !== "function") {
+    const argTag = entry.args[0].type?.wireTag;
+    const resultTag = entry.result?.wireTag;
+    if (argTag !== resultTag) {
+      return FAST_CALL_UNAVAILABLE;
+    }
+    if (argTag === WIRE.BYTE_ARRAY) {
+      return this.tryObjectByteArrayCall(entry, args, cache);
+    }
+    if (argTag === WIRE.NAT) {
+      return this.tryObjectDecimalCall(entry, args, cache, {
+        constructorName: "vir_obj_nat",
+        decimalName: "vir_obj_nat_decimal",
+        decimal: normalizeDecimal(args[0], `${entry.entry} argument ${entry.args[0].name}`, { signed: false }),
+      });
+    }
+    if (argTag === WIRE.INT) {
+      return this.tryObjectDecimalCall(entry, args, cache, {
+        constructorName: "vir_obj_int",
+        decimalName: "vir_obj_int_decimal",
+        decimal: normalizeDecimal(args[0], `${entry.entry} argument ${entry.args[0].name}`, { signed: true }),
+      });
+    }
+    if (argTag === WIRE.UINT64) {
+      const label = `${entry.entry} argument ${entry.args[0].name}`;
+      return this.tryObjectDecimalCall(entry, args, cache, {
+        constructorName: "vir_obj_uint64",
+        decimalName: "vir_obj_uint64_decimal",
+        decimal: normalizeBoundedUnsignedDecimal(args[0], label, MAX_UINT64, "UInt64"),
+      });
+    }
+    if (argTag === WIRE.USIZE) {
+      const label = `${entry.entry} argument ${entry.args[0].name}`;
+      return this.tryObjectDecimalCall(entry, args, cache, {
+        constructorName: "vir_obj_usize",
+        decimalName: "vir_obj_usize_decimal",
+        decimal: normalizeBoundedUnsignedDecimal(args[0], label, this.usizeMaxValue(), "USize"),
+      });
+    }
+    return FAST_CALL_UNAVAILABLE;
+  }
+
+  tryObjectByteArrayCall(entry, args, cache) {
+    if (!this.hasObjectCallExports(
+      "vir_obj_byte_array",
+      "vir_obj_byte_array_data",
+      "vir_obj_byte_array_size",
+    )) {
       return FAST_CALL_UNAVAILABLE;
     }
 
     const bytes = asByteArrayBytes(args[0]);
-    const callSlot = this.resolveCallSlot(entry, cache);
     const inputPtr = this.allocBytes(bytes);
-    let argObj = 0;
+    try {
+      const argObj = this.exports.vir_obj_byte_array(inputPtr, bytes.byteLength);
+      return this.callResolvedObjectUnary(entry, cache, argObj, (resultObj) =>
+        this.readObjectByteArray(resultObj));
+    } finally {
+      this.freeBytes(inputPtr);
+    }
+  }
+
+  tryObjectDecimalCall(entry, args, cache, { constructorName, decimalName, decimal }) {
+    if (!this.hasObjectCallExports(constructorName, decimalName, "vir_obj_decimal_size")) {
+      return FAST_CALL_UNAVAILABLE;
+    }
+    const bytes = textEncoder.encode(decimal);
+    const inputPtr = this.allocBytes(bytes);
+    try {
+      const argObj = this.exports[constructorName](inputPtr, bytes.byteLength);
+      if (argObj === 0) {
+        throw new Error(`${entry.entry} argument ${entry.args[0].name} could not be lowered to a Lean object`);
+      }
+      return this.callResolvedObjectUnary(entry, cache, argObj, (resultObj) =>
+        this.readObjectDecimal(resultObj, decimalName));
+    } finally {
+      this.freeBytes(inputPtr);
+    }
+  }
+
+  callResolvedObjectUnary(entry, cache, argObj, liftResult) {
+    const callSlot = this.resolveCallSlot(entry, cache);
     let argvPtr = 0;
     let resultObj = 0;
     let callStarted = false;
     try {
-      argObj = this.exports.vir_obj_byte_array(inputPtr, bytes.byteLength);
       argvPtr = this.allocBytes(new Uint8Array(4));
       new DataView(this.exports.memory.buffer, argvPtr, 4).setUint32(0, argObj, true);
       resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, 1);
@@ -619,9 +691,8 @@ export class VirRuntime {
       if (resultObj === 0) {
         throw new Error(`object call failed: ${entry.entry}`);
       }
-      return this.readObjectByteArray(resultObj);
+      return liftResult(resultObj);
     } finally {
-      this.freeBytes(inputPtr);
       if (argvPtr !== 0) {
         this.freeBytes(argvPtr);
       }
@@ -634,6 +705,14 @@ export class VirRuntime {
     }
   }
 
+  hasObjectCallExports(...names) {
+    return (
+      typeof this.exports.vir_call_resolved_objects === "function" &&
+      typeof this.exports.vir_obj_dec === "function" &&
+      names.every((name) => typeof this.exports[name] === "function")
+    );
+  }
+
   readPrimitiveResult(lane, tag) {
     return readPrimitiveResult(this, lane, tag);
   }
@@ -643,6 +722,16 @@ export class VirRuntime {
       this.exports.vir_obj_byte_array_data(obj),
       this.exports.vir_obj_byte_array_size(obj),
     );
+  }
+
+  readObjectDecimal(obj, decimalName) {
+    const data = this.exports[decimalName](obj);
+    const len = this.exports.vir_obj_decimal_size();
+    return this.readWasmString(data, len);
+  }
+
+  usizeMaxValue() {
+    return this.targetPointerBytes() === 4 ? MAX_UINT32 : MAX_UINT64;
   }
 
   callCacheFor(entry) {
@@ -849,6 +938,18 @@ function registerManifestEntryKey(map, key, entry) {
   }
 }
 
+function boxedCallEntryNames(manifest) {
+  const names = new Set();
+  for (const target of manifest?.metadata?.targets ?? []) {
+    for (const root of target?.resolvedRoots ?? []) {
+      if (typeof root === "string" && root.endsWith("._boxed")) {
+        names.add(root.slice(0, -("._boxed".length)));
+      }
+    }
+  }
+  return names;
+}
+
 function disposeHostBindings(bindings) {
   if (bindings === null || bindings === undefined) return;
   const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;
@@ -881,6 +982,14 @@ function normalizeDirectU32(value, tag, label) {
     return value;
   }
   return normalizeUint32(value, label);
+}
+
+function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {
+  const decimal = normalizeDecimal(value, label, { signed: false });
+  if (BigInt(decimal) > max) {
+    throw new Error(`${label} is out of range for ${typeName}`);
+  }
+  return decimal;
 }
 
 function lookupHostBinding(target, userBindings, defaultBindings) {
