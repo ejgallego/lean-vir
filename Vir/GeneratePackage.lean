@@ -27,6 +27,7 @@ abbrev RecursiveSeen := Array (Name × String)
 
 inductive InterfaceEffect where
   | pure
+  | runtime
   | io
   | dom
   | react
@@ -34,6 +35,7 @@ inductive InterfaceEffect where
 
 def InterfaceEffect.label : InterfaceEffect → String
   | .pure => "pure"
+  | .runtime => "runtime"
   | .io => "io"
   | .dom => "dom"
   | .react => "react"
@@ -44,6 +46,7 @@ def InterfaceEffect.isEffectful : InterfaceEffect → Bool
 
 def InterfaceEffect.display : InterfaceEffect → String
   | .pure => ""
+  | .runtime => "RuntimeM"
   | .io => "IO"
   | .dom => "DomM"
   | .react => "ReactM"
@@ -1451,7 +1454,7 @@ def isNativeExternCandidate (n : Name) : Bool :=
 
 def jsExternPrefix : String := "__vir_js:"
 
-def maxHostImportSlots : Nat := 32
+def maxHostImportSlots : Nat := 64
 
 def maxHostImportArity : Nat := 6
 
@@ -1880,11 +1883,6 @@ def constName? (e : Lean.Expr) : Option Name :=
   | .const n _ => some n
   | _ => none
 
-def headConstName? (e : Lean.Expr) : Option Name :=
-  match (stripMData e).getAppFn with
-  | .const n _ => some n
-  | _ => none
-
 def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   match constName? e with
   | some `Unit => some .unit
@@ -1901,27 +1899,6 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `USize => some .usize
   | some `ByteArray => some .byteArray
   | some `Lean.Expr => some .expr
-  | _ => none
-
-def jsResourceMarker? (e : Lean.Expr) : Option (Name × String) := do
-  let name ← constName? e
-  match name with
-  | `Lean.Vir.Browser.Element => some (name, "Element")
-  | `Lean.Vir.Browser.Event => some (name, "Event")
-  | `Lean.Vir.Browser.EventListener => some (name, "EventListener")
-  | `Lean.Vir.Browser.HTMLInputElement => some (name, "HTMLInputElement")
-  | `Lean.Vir.Browser.Timeout => some (name, "Timeout")
-  | `Lean.Vir.Browser.AnimationFrame => some (name, "AnimationFrame")
-  | `Lean.Vir.React.Root => some (name, "ReactRoot")
-  | _ => none
-
-def resourceInterfaceType? (_env : Environment) (e : Lean.Expr) : Option InterfaceType :=
-  let (fn, args) := (stripMData e).getAppFnArgs
-  match fn with
-  | `Lean.Vir.Js =>
-      match args[0]? >>= jsResourceMarker? with
-      | some (name, label) => some (.resource name label)
-      | none => some (.resource `Lean.Vir.Js "Js")
   | _ => none
 
 def simpleEnumType? (env : Environment) (e : Lean.Expr) : Option InterfaceType := do
@@ -2027,6 +2004,7 @@ def effectResult? (e : Lean.Expr) : Option (InterfaceEffect × Lean.Expr) :=
   let (fn, args) := e.getAppFnArgs
   match fn, Array.toList args with
   | `IO, [result] => some (.io, result)
+  | `Lean.Vir.RuntimeM, [result] => some (.runtime, result)
   | `Lean.Vir.Browser.DomM, [result] => some (.dom, result)
   | `Lean.Vir.React.ReactM, [result] => some (.react, result)
   | _, _ => none
@@ -2216,7 +2194,7 @@ partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : C
   | .forallE .. => functionType e
   | _ =>
       let env ← getEnv
-      match simpleInterfaceType? e <|> resourceInterfaceType? env e with
+      match simpleInterfaceType? e with
       | some ty => return .ok ty
       | none =>
           if effectResult? e |>.isSome then
@@ -2224,6 +2202,8 @@ partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : C
           else
             let (fn, args) := e.getAppFnArgs
             match fn, Array.toList args with
+            | `Lean.Vir.Js, [_] =>
+                return .ok (.resource `Lean.Vir.Js "Js")
             | `Array, [arg] =>
                 match ← interfaceType arg seenTypes with
                 | .ok ty => return .ok (.array ty)
@@ -2257,9 +2237,7 @@ partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : C
                 match simpleEnumType? env e with
                 | some ty => return .ok ty
                 | none =>
-                    if let some (markerName, _) := jsResourceMarker? e then
-                      return .error s!"JavaScript object marker `{markerName}` must appear under `Lean.Vir.Js`; use `Lean.Vir.Js {markerName}` at the boundary"
-                    else if (getStructureInfo? env fn).isSome then
+                    if (getStructureInfo? env fn).isSome then
                       structureType seenTypes e
                     else
                       inductiveType seenTypes e

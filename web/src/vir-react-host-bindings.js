@@ -6,7 +6,16 @@ Author: Emilio J. Gallego Arias
 
 import * as React from "react";
 import * as ReactDOMClient from "react-dom/client";
-import { createBrowserReactRootResource as createBrowserReactRootResourceFromHtml } from "./react/vir-react-html.js";
+import {
+  createBrowserReactHookRuntime,
+  createReactJsValueHostBindings,
+  createReactStateHostBindings,
+} from "./react/vir-react-hooks.js";
+import {
+  createBrowserReactNodeElementResource,
+  createBrowserReactNodeTextResource,
+  createBrowserReactRootResource as createBrowserReactRootResourceFromNode,
+} from "./react/vir-react-node.js";
 import {
   createHostResourceState,
   createReactHostHooks,
@@ -14,10 +23,23 @@ import {
 } from "./host/vir-host-resources.js";
 
 export function createBrowserReactHostBindings(state = createHostResourceState()) {
-  return createReactRootResourceHostBindings(state, (target) =>
-    createBrowserReactRootResource(state, ReactDOMClient.createRoot(target), React.createElement));
+  const hookRuntime = createBrowserReactHookRuntime(state, React);
+  const hooks = {
+    ...createReactHostHooks(),
+    hookRuntime,
+  };
+  return {
+    ...createReactRootResourceHostBindings(state, (target) =>
+      createBrowserReactRootResource(state, ReactDOMClient.createRoot(target), React, hooks), {
+        createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
+        createNodeElementResource: (tag, key, props, handlers, children) =>
+          createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
+      }),
+    ...createReactJsValueHostBindings(state),
+    ...createReactStateHostBindings(state, hookRuntime),
+  };
 }
 
-function createBrowserReactRootResource(state, root, createElement) {
-  return createBrowserReactRootResourceFromHtml(state, root, createElement, createReactHostHooks());
+function createBrowserReactRootResource(state, root, React, hooks) {
+  return createBrowserReactRootResourceFromNode(state, root, React, hooks);
 }

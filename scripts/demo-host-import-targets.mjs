@@ -1,0 +1,46 @@
+/*
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+*/
+
+export const demoHostImportTargets = [
+  "browser.animation.cancelAnimationFrame",
+  "browser.animation.requestAnimationFrame",
+  "browser.document.getTitle",
+  "browser.document.querySelector",
+  "browser.document.setTitle",
+  "browser.element.addEventListener",
+  "browser.element.getAttribute",
+  "browser.element.removeEventListener",
+  "browser.element.setAttribute",
+  "browser.element.setTextContent",
+  "browser.event.currentTarget",
+  "browser.event.preventDefault",
+  "browser.event.stopPropagation",
+  "browser.event.target",
+  "browser.htmlInputElement.fromElement",
+  "browser.htmlInputElement.getChecked",
+  "browser.htmlInputElement.getValue",
+  "browser.htmlInputElement.setChecked",
+  "browser.htmlInputElement.setValue",
+  "browser.timer.clearTimeout",
+  "browser.timer.setTimeout",
+  "js.bool",
+  "js.bool.value",
+  "js.nat",
+  "js.nat.value",
+  "js.string",
+  "js.string.value",
+  "react.node.createElement",
+  "react.node.text",
+  "react.root.create",
+  "react.root.render",
+  "react.root.renderComponent",
+  "react.root.unmount",
+  "react.state.modify",
+  "react.state.set",
+  "react.useState",
+  "test.callNatCallback",
+  "test.recordNat",
+];

@@ -201,6 +201,10 @@ export function decodeTypeDescriptor(reader) {
     case WIRE.RECURSIVE_SELF:
       return { wireTag: tag };
     case WIRE.FUNCTION: {
+      // Compact wasm descriptors only need the execution lane distinction:
+      // pure callbacks use direct application, every source-level effect label
+      // (`runtime`, `io`, `dom`, `react`) uses the effectful callback lane.
+      // The JSON manifest preserves the richer label for tooling and review.
       const effect = reader.u8() === 0 ? "pure" : "io";
       const len = reader.u32();
       return {

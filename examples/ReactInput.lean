@@ -8,78 +8,131 @@ import Vir.React
 
 namespace ReactInput
 
+open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
 def checkedLabel (checked : Bool) : String :=
   "checked:" ++ toString checked
 
-partial def renderInputInto (root : Lean.Vir.Js Root) (value : String) : DomM Unit := do
-  Root.render root <|
-    Html.divWith #[Property.id "react-input-widget"] #[] #[
-      Html.labelWith #[Property.htmlFor "react-name-input"] #[] #[.text "name:"],
-      Html.input
+def inputComponent : Component Unit :=
+  fun _ => do
+    let initial ← JsValue.ofString ""
+    let name ← Hooks.useState initial
+    let nameValue ← JsValue.toString name.value
+    let labelText ← Node.text "name:"
+    let label ← Node.labelWith #[Property.htmlFor "react-name-input"] #[] #[labelText]
+    let input ←
+      Node.input
         #[
           Property.id "react-name-input",
           Property.type "text",
-          Property.inputValue value,
+          Property.inputValue nameValue,
           Property.placeholder "name"
         ]
         #[EventHandler.onInput fun event => do
           match ← Lean.Vir.Browser.Event.inputValue? event with
-          | none => renderInputInto root value
-          | some next => renderInputInto root next],
-      Html.spanWith #[Property.id "react-name-output"] #[] #[.text value]
-    ]
+          | none => pure ()
+          | some next => do
+              let nextValue ← JsValue.ofString next
+              State.set name nextValue]
+    let outputText ← Node.text nameValue
+    let output ← Node.spanWith #[Property.id "react-name-output"] #[] #[outputText]
+    Node.divWith #[Property.id "react-input-widget"] #[] #[label, input, output]
 
-partial def renderChangeInputInto (root : Lean.Vir.Js Root) (value : String) : DomM Unit := do
-  Root.render root <|
-    Html.formWith
+def changeInputComponent : Component Unit :=
+  fun _ => do
+    let initial ← JsValue.ofString ""
+    let value ← Hooks.useState initial
+    let currentValue ← JsValue.toString value.value
+    let labelText ← Node.text "change:"
+    let label ← Node.labelWith #[Property.htmlFor "react-change-input"] #[] #[labelText]
+    let input ←
+      Node.input
+        #[
+          Property.id "react-change-input",
+          Property.inputName "change",
+          Property.type "text",
+          Property.inputValue currentValue,
+          Property.placeholder "change"
+        ]
+        #[EventHandler.onChange fun event => do
+          Lean.Vir.Browser.Event.preventDefault event
+          Lean.Vir.Browser.Event.stopPropagation event
+          match ← Lean.Vir.Browser.Event.inputValue? event with
+          | none => pure ()
+          | some next => do
+              let nextValue ← JsValue.ofString next
+              State.set value nextValue]
+    let outputText ← Node.text currentValue
+    let output ← Node.spanWith #[Property.id "react-change-output"] #[] #[outputText]
+    Node.formWith
       #[Property.id "react-change-widget"]
       #[EventHandler.onSubmitWith fun event => do
         Lean.Vir.Browser.Event.preventDefault event
         Lean.Vir.Browser.Event.stopPropagation event]
-      #[
-        Html.labelWith #[Property.htmlFor "react-change-input"] #[] #[.text "change:"],
-        Html.input
-          #[
-            Property.id "react-change-input",
-            Property.inputName "change",
-            Property.type "text",
-            Property.inputValue value,
-            Property.placeholder "change"
-          ]
-          #[EventHandler.onChange fun event => do
-            Lean.Vir.Browser.Event.preventDefault event
-            Lean.Vir.Browser.Event.stopPropagation event
-            match ← Lean.Vir.Browser.Event.inputValue? event with
-            | none => renderChangeInputInto root value
-            | some next => renderChangeInputInto root next],
-        Html.spanWith #[Property.id "react-change-output"] #[] #[.text value]
-      ]
+      #[label, input, output]
 
-partial def renderCheckboxInto (root : Lean.Vir.Js Root) (checked : Bool) : DomM Unit := do
-  Root.render root <|
-    Html.divWith #[Property.id "react-checkbox-widget"] #[] #[
-      Html.input
+def checkboxComponent : Component Unit :=
+  fun _ => do
+    let initial ← JsValue.ofBool false
+    let checked ← Hooks.useState initial
+    let checkedValue ← JsValue.toBool checked.value
+    let input ←
+      Node.input
         #[
           Property.id "react-checkbox-input",
           Property.type "checkbox",
-          Property.checked checked
+          Property.checked checkedValue
         ]
         #[EventHandler.onChange fun event => do
           match ← Lean.Vir.Browser.Event.inputChecked? event with
-          | none => renderCheckboxInto root checked
-          | some next => renderCheckboxInto root next],
-      Html.labelWith
+          | none => pure ()
+          | some next => do
+              let nextValue ← JsValue.ofBool next
+              State.set checked nextValue]
+    let outputText ← Node.text (checkedLabel checkedValue)
+    let output ←
+      Node.labelWith
         #[Property.id "react-checkbox-output", Property.htmlFor "react-checkbox-input"]
         #[]
-        #[.text (checkedLabel checked)]
-    ]
+        #[outputText]
+    Node.divWith #[Property.id "react-checkbox-widget"] #[] #[input, output]
 
 def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
-  Root.render root <|
-    Html.divWith
+  Root.render root do
+    let labelText ← Node.text "attrs:"
+    let label ←
+      Node.keyedLabelWith
+        "attributes-label"
+        #[
+          Property.id "react-attributes-label",
+          Property.htmlFor "react-attributes-input"
+        ]
+        #[]
+        #[labelText]
+    let input ←
+      Node.keyedInput
+        "attributes-input"
+        #[
+          Property.id "react-attributes-input",
+          Property.inputName "attributes",
+          Property.type "checkbox",
+          Property.checked true,
+          Property.disabled true
+        ]
+        #[]
+    let outputText ← Node.text "attrs"
+    let output ←
+      Node.keyedSpanWith
+        "attributes-output"
+        #[
+          Property.id "react-attributes-output",
+          Property.title "attribute output"
+        ]
+        #[]
+        #[outputText]
+    Node.divWith
       #[
         Property.id "react-attributes-widget",
         Property.role "group",
@@ -94,43 +147,16 @@ def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
         ]
       ]
       #[]
-      #[
-        Html.keyedLabelWith
-          "attributes-label"
-          #[
-            Property.id "react-attributes-label",
-            Property.htmlFor "react-attributes-input"
-          ]
-          #[]
-          #[.text "attrs:"],
-        Html.keyedInput
-          "attributes-input"
-          #[
-            Property.id "react-attributes-input",
-            Property.inputName "attributes",
-            Property.type "checkbox",
-            Property.checked true,
-            Property.disabled true
-          ]
-          #[],
-        Html.keyedSpanWith
-          "attributes-output"
-          #[
-            Property.id "react-attributes-output",
-            Property.title "attribute output"
-          ]
-          #[]
-          #[.text "attrs"]
-      ]
+      #[label, input, output]
 
 def mountInput (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => renderInputInto root ""
+  Root.mountFromSelector selector fun root => Root.renderComponent root inputComponent ()
 
 def mountChangeInput (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => renderChangeInputInto root ""
+  Root.mountFromSelector selector fun root => Root.renderComponent root changeInputComponent ()
 
 def mountCheckbox (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => renderCheckboxInto root false
+  Root.mountFromSelector selector fun root => Root.renderComponent root checkboxComponent ()
 
 def mountAttributes (selector : String) : DomM Bool :=
   Root.mountFromSelector selector renderAttributesInto

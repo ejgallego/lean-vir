@@ -10,7 +10,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].effect = "sideEffect";
     },
-    pattern: /exports\[0\]\.effect must be one of pure, io, dom, or react/,
+    pattern: /exports\[0\]\.effect must be one of pure, runtime, io, dom, or react/,
   },
   {
     name: "unsupported wire tag",

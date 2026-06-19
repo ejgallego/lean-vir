@@ -17,10 +17,13 @@ export function smokeVirtualReactCounter(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactCounter.mount", selector), true);
   const element = documentState.elements.get(selector);
   assert.equal(element.textContent, "react:0");
-  assertLiveCallbacks(runtime, 1);
+  assertLiveCallbacks(runtime, 2);
   reactElementById(element, "react-counter-button").handlers.onClick({});
   assert.equal(element.textContent, "react:1");
-  assertLiveCallbacks(runtime, 1);
+  assertLiveCallbacks(runtime, 2);
+  reactElementById(element, "react-counter-button").handlers.onClick({});
+  assert.equal(element.textContent, "react:2");
+  assertLiveCallbacks(runtime, 2);
   element.reactRoot.unmount();
   assertUnmountCleanup(runtime, element);
 }
@@ -29,7 +32,7 @@ export function smokeVirtualReactInput(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactInput.mountInput", selector), true);
   const element = documentState.elements.get(selector);
   assert.equal(element.textContent, "name:");
-  assertLiveCallbacks(runtime, 1);
+  assertLiveCallbacks(runtime, 2);
   const currentTarget = createVirtualElementState({ value: "Ada" });
   documentState.elements.set("#react-name-input", currentTarget);
   reactElementById(element, "react-name-input").handlers.onInput(createVirtualEventState({
@@ -37,12 +40,12 @@ export function smokeVirtualReactInput(runtime, documentState, selector) {
     target: createVirtualElementState({ value: "unused-target" }),
   }));
   assert.equal(element.textContent, "name:Ada");
-  assertLiveCallbacks(runtime, 1);
+  assertLiveCallbacks(runtime, 2);
   reactElementById(element, "react-name-input").handlers.onInput(createVirtualEventState({
     target: createVirtualElementState({ value: "Target" }),
   }));
   assert.equal(element.textContent, "name:Target");
-  assertLiveCallbacks(runtime, 1);
+  assertLiveCallbacks(runtime, 2);
   element.reactRoot.unmount();
   assertUnmountCleanup(runtime, element);
 }
@@ -51,12 +54,12 @@ export function smokeVirtualReactChangeInput(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactInput.mountChangeInput", selector), true);
   const element = documentState.elements.get(selector);
   assert.equal(element.textContent, "change:");
-  assertLiveCallbacks(runtime, 2);
+  assertLiveCallbacks(runtime, 3);
   const submitEvent = createVirtualEventState();
   reactElementById(element, "react-change-widget").handlers.onSubmit(submitEvent);
   assert.equal(submitEvent.defaultPrevented, true);
   assert.equal(submitEvent.propagationStopped, true);
-  assertLiveCallbacks(runtime, 2);
+  assertLiveCallbacks(runtime, 3);
   const changeEvent = createVirtualEventState({
     currentTarget: createVirtualElementState({ value: "Grace" }),
   });
@@ -64,7 +67,7 @@ export function smokeVirtualReactChangeInput(runtime, documentState, selector) {
   assert.equal(element.textContent, "change:Grace");
   assert.equal(changeEvent.defaultPrevented, true);
   assert.equal(changeEvent.propagationStopped, true);
-  assertLiveCallbacks(runtime, 2);
+  assertLiveCallbacks(runtime, 3);
   element.reactRoot.unmount();
   assertUnmountCleanup(runtime, element);
 }
@@ -73,17 +76,17 @@ export function smokeVirtualReactCheckbox(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactInput.mountCheckbox", selector), true);
   const element = documentState.elements.get(selector);
   assert.equal(element.textContent, "checked:false");
-  assertLiveCallbacks(runtime, 1);
+  assertLiveCallbacks(runtime, 2);
   reactElementById(element, "react-checkbox-input").handlers.onChange(createVirtualEventState({
     currentTarget: createVirtualElementState({ checked: true }),
   }));
   assert.equal(element.textContent, "checked:true");
-  assertLiveCallbacks(runtime, 1);
+  assertLiveCallbacks(runtime, 2);
   reactElementById(element, "react-checkbox-input").handlers.onChange(createVirtualEventState({
     target: createVirtualElementState({ checked: false }),
   }));
   assert.equal(element.textContent, "checked:false");
-  assertLiveCallbacks(runtime, 1);
+  assertLiveCallbacks(runtime, 2);
   element.reactRoot.unmount();
   assertUnmountCleanup(runtime, element);
 }

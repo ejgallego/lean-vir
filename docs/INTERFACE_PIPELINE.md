@@ -115,8 +115,8 @@ The embedded manifest currently supports:
   container shapes;
 - direct `Lean.Expr`, represented at the JavaScript boundary as structural
   expression objects;
-- `Lean.Vir.React.Html`, represented through the same recursive custom
-  inductive surface and rendered by the React host bindings.
+- `Lean.Vir.React.Node`, represented as an opaque `Lean.Vir.Js` resource whose
+  native React node is constructed by the React host bindings.
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
@@ -145,42 +145,41 @@ written into the same constructor scalar slots as compiled Lean code.
 Function-valued interface types are used for Lean callbacks passed to
 JavaScript host imports. Their descriptors record the callback argument list,
 result type, and whether applying the callback returns a synchronous effect
-(`IO`, `DomM`, or `ReactM`). JavaScript receives these values as `VirCallback`
-objects. The `WIRE.FUNCTION` value payload carries no serialized numeric token;
-the runtime receives the internal closure root id through a side channel and
-releases the rooted Lean closure when the host-owned registration is done with
-it.
+(`RuntimeM`, `IO`, `DomM`, or `ReactM`). JavaScript receives these values as
+`VirCallback` objects. The `WIRE.FUNCTION` value payload carries no serialized
+numeric token; the runtime receives the internal closure root id through a side
+channel and releases the rooted Lean closure when the host-owned registration
+is done with it.
 
-`Lean.Vir.React.Html` now uses the same improved custom-inductive and
-`recursiveSelf` descriptor support as other non-indexed recursive inductives.
-The React-specific boundary is the host renderer and callback ownership policy,
-not a separate private `reactHtml` wire type.
+`Lean.Vir.React.Node` is a JavaScript-owned resource marker. The recursive
+structure of the rendered tree lives in the host resource graph created by
+`react.node.text` and `react.node.createElement`; the manifest still describes the
+ordinary `Property`, `PropValue`, and `EventHandler` payloads that those host
+imports receive.
 
 Entry points and host imports can be pure functions or synchronous effect
-actions. Raw custom host imports can use `IO α`; browser APIs use
-`Lean.Vir.Browser.DomM α`; React component construction uses
-`Lean.Vir.React.ReactM α`. For Lean-to-JavaScript calls, import `Vir.Host` and
-mark an opaque declaration with `@[vir_js "target.name"]`, or use the starter
-declarations in `Vir.Common` and `Vir.Browser`. The manifest records each host
-import under `hostImports` with its slot, Lean name, JavaScript target,
-generated WASM symbol, low-level IR arity, leading erased argument count,
-JavaScript-visible arguments, result type, and effect.
+actions. JavaScript resource/runtime APIs use `Lean.Vir.RuntimeM α`; raw custom
+host imports can use `IO α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
+component construction uses `Lean.Vir.React.ReactM α`. For
+Lean-to-JavaScript calls, import `Vir.Host` and mark an opaque declaration with
+`@[vir_js "target.name"]`, or use the starter declarations in `Vir.Common` and
+`Vir.Browser`. The manifest records each host import under `hostImports` with
+its slot, Lean name, JavaScript target, generated WASM symbol, low-level IR
+arity, leading erased argument count, JavaScript-visible arguments, result
+type, and effect.
 The JSON manifest keeps the source-level effect classification for review and
-tooling: `pure`, `io`, `dom`, or `react`. The compact wasm call descriptor still
-lowers that to the runtime distinction the shim needs today: pure versus
-effectful.
+tooling: `pure`, `runtime`, `io`, `dom`, or `react`. The compact wasm call
+descriptor still lowers that to the runtime distinction the shim needs today:
+pure versus effectful.
 
-`Lean.Vir.Js α` is represented as a `Js` resource. Its type parameter is a
-Lean-side phantom while the value remains in the JavaScript object lane. This
-lets a polymorphic host import such as a JavaScript array helper share one
-resource ABI. Decoding `α` itself still requires a concrete supported interface
-type or future explicit ABI descriptor.
-
-Built-in browser and React object markers must appear under the same `Js`
-boundary type and keep DOM-like manifest labels. For example, `Lean.Vir.Js
-Lean.Vir.Browser.Element` is a resource named `Lean.Vir.Browser.Element` and
-labeled `Element`; arbitrary markers remain generic `Js` resources. Naked marker
-types such as `Lean.Vir.Browser.Element` are rejected at package generation.
+`Lean.Vir.Js α` is always represented as the generic `Js` resource. Its type
+parameter is a Lean-side phantom while the value remains in the JavaScript
+externref lane. This lets browser, React, scalar-wrapper, and future
+polymorphic JavaScript helpers share one resource ABI. The marker-specific
+protocol and lifetime policy live in the Lean API and JavaScript host bindings,
+not in the manifest resource descriptor. Naked marker types such as
+`Lean.Vir.Browser.Element` remain unsupported boundary types because they do not
+cross as `Lean.Vir.Js α`.
 
 The recursive type tree is embedded in the JSON manifest and, for package
 format 7 and newer, also in a compact package-owned export signature table.

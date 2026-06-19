@@ -11,11 +11,17 @@ import {
   ensureVirtualElementState,
 } from "../../web/src/vir-runtime-node.js";
 import {
+  createHostResourceState,
+} from "../../web/src/host/vir-host-resources.js";
+import {
   createBrowserHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import {
+  createReactJsValueHostBindings,
+  createReactStateHostBindings,
+} from "../../web/src/react/vir-react-hooks.js";
+import {
   assert,
-  reactHtmlElement,
   readRuntimeArtifacts,
 } from "./shared.mjs";
 import {
@@ -43,6 +49,92 @@ assert.throws(
   () => createBrowserHostBindings({ reactHostBindings: "react.root.create" }),
   /reactHostBindings must be a host binding object/,
 );
+
+function createReactStateSmokeBindings() {
+  const resources = createHostResourceState();
+  return {
+    resources,
+    jsBindings: createReactJsValueHostBindings(resources),
+    stateBindings: createReactStateHostBindings(resources, {
+      useState() {
+        throw new Error("useState should not be called by this smoke");
+      },
+    }),
+  };
+}
+
+function assertNatResourceReleased(jsBindings, resource) {
+  assert.throws(() => jsBindings["js.nat.value"](resource), /Js resource is not live/);
+}
+
+{
+  const { resources, jsBindings, stateBindings } = createReactStateSmokeBindings();
+  const retainedZero = resources.resourceForValue(0n);
+  let stateValue = 0n;
+  const setter = resources.resourceForValue({
+    set(next) {
+      stateValue = typeof next === "function" ? next(stateValue) : next;
+    },
+  });
+  const liveBeforeModify = resources.debugResourceCounts().live;
+  let released = false;
+  let previousResource = null;
+  let nextResource = null;
+  const updater = Object.assign((previous) => {
+    previousResource = previous;
+    assert.equal(jsBindings["js.nat.value"](previous), 0n);
+    nextResource = jsBindings["js.nat"](1n);
+    return nextResource;
+  }, {
+    release() {
+      released = true;
+    },
+  });
+  stateBindings["react.state.modify"](setter, updater);
+  assert.equal(stateValue, 1n);
+  assert.equal(released, true);
+  assertNatResourceReleased(jsBindings, previousResource);
+  assertNatResourceReleased(jsBindings, nextResource);
+  assert.equal(resources.resolveResource(retainedZero, "Js"), 0n);
+  assert.equal(resources.resourceForValue(0n), retainedZero);
+  assert.equal(resources.debugResourceCounts().live, liveBeforeModify);
+  resources.releaseResource(setter);
+  resources.releaseResource(retainedZero);
+}
+
+{
+  const { resources, jsBindings, stateBindings } = createReactStateSmokeBindings();
+  let stateValue = 2n;
+  const setter = resources.resourceForValue({
+    set(next) {
+      stateValue = typeof next === "function" ? next(stateValue) : next;
+    },
+  });
+  const liveBeforeModify = resources.debugResourceCounts().live;
+  let released = false;
+  let previousResource = null;
+  let nextResource = null;
+  const updater = Object.assign((previous) => {
+    previousResource = previous;
+    assert.equal(jsBindings["js.nat.value"](previous), 2n);
+    nextResource = jsBindings["js.nat"](3n);
+    throw new Error("state updater failed");
+  }, {
+    release() {
+      released = true;
+    },
+  });
+  assert.throws(
+    () => stateBindings["react.state.modify"](setter, updater),
+    /state updater failed/,
+  );
+  assert.equal(stateValue, 2n);
+  assert.equal(released, true);
+  assertNatResourceReleased(jsBindings, previousResource);
+  assertNatResourceReleased(jsBindings, nextResource);
+  assert.equal(resources.debugResourceCounts().live, liveBeforeModify);
+  resources.releaseResource(setter);
+}
 
 const reactDocumentState = createVirtualDocumentState();
 const reactRuntime = await createVirRuntime({
@@ -101,7 +193,7 @@ assert.throws(
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.throws(
   () => reactRuntime.call("ReactCounter.renderTooDeep", "#react-too-deep"),
-  /React Html exceeds maximum depth 128/,
+  /React Node exceeds maximum depth 128/,
 );
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 
@@ -110,170 +202,215 @@ ensureVirtualElementState(malformedReactDocumentState, "#react-malformed");
 const malformedReactHost = createVirtualDocumentHostBindings(malformedReactDocumentState);
 const malformedReactContainer = malformedReactHost["browser.document.querySelector"]("#react-malformed");
 const malformedReactRoot = malformedReactHost["react.root.create"](malformedReactContainer);
-const renderMalformedReactHtml = (html) => malformedReactHost["react.root.render"](malformedReactRoot, html);
-renderMalformedReactHtml(reactHtmlElement({
+const renderMalformedReactNode = (node) => {
+  let released = false;
+  const render = Object.assign(() => node, {
+    release: () => {
+      released = true;
+      return true;
+    },
+  });
+  try {
+    return malformedReactHost["react.root.render"](malformedReactRoot, render);
+  } finally {
+    assert.equal(released, true);
+  }
+};
+{
+  let called = false;
+  let released = false;
+  const render = Object.assign(() => {
+    called = true;
+    throw new Error("render callback should not be invoked for a stale root");
+  }, {
+    release: () => {
+      released = true;
+      return true;
+    },
+  });
+  assert.throws(
+    () => malformedReactHost["react.root.render"]({}, render),
+    /ReactRoot resource is not live/,
+  );
+  assert.equal(called, false);
+  assert.equal(released, true);
+}
+const reactNodeText = (value) => malformedReactHost["react.node.text"](value);
+const reactNodeElement = ({
+  tag = "div",
+  key = null,
+  props = [],
+  handlers = [],
+  children = [],
+} = {}) => malformedReactHost["react.node.createElement"](tag, key, props, handlers, children);
+const renderReactNodeElement = (fields) => renderMalformedReactNode(reactNodeElement(fields));
+renderReactNodeElement({
   props: [
     { name: "tabIndex", value: { kind: "int", value: "4" } },
     { name: "data-ratio", value: { kind: "float", value: 1.5 } },
     { name: "className", value: { kind: "classList", value: ["alpha", "beta", "alpha"] } },
     { name: "style", value: { kind: "style", value: [{ name: "marginTop", value: "1px" }] } },
   ],
-}));
+});
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.tabIndex, 4);
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props["data-ratio"], 1.5);
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.className, "alpha beta");
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.style.marginTop, "1px");
 assert.throws(
-  () => renderMalformedReactHtml({ kind: "text", value: 1 }),
-  /React Html text value must be a string/,
+  () => reactNodeText(1),
+  /React Node text value must be a string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml({ kind: "element", fields: null }),
-  /React Html element fields must be an object/,
+  () => malformedReactHost["react.node.createElement"]("div", null, [], [], "children"),
+  /React Node children must be an array/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({ tag: "" })),
-  /React Html element tag must be a non-empty string/,
+  () => renderReactNodeElement({ children: [{}] }),
+  /React Node child\[0\] resource is not live/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({ "key?": 7 })),
-  /React Html element key must be a string or null/,
+  () => renderReactNodeElement({ tag: "" }),
+  /React Node element tag must be a non-empty string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({ key: 7 }),
+  /React Node element key must be a string or null/,
+);
+assert.throws(
+  () => renderReactNodeElement({
     props: [{ name: 1, value: { kind: "string", value: "bad" } }],
-  })),
-  /React Html property name must be a non-empty string/,
+  }),
+  /React Node property name must be a non-empty string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "data-", value: { kind: "string", value: "bad" } }],
-  })),
-  /React Html data-\* property name must include a suffix/,
+  }),
+  /React Node data-\* property name must include a suffix/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "__proto__", value: { kind: "string", value: "bad" } }],
-  })),
-  /React Html property name is not supported/,
+  }),
+  /React Node property name is not supported/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "title", value: { kind: "string", value: false } }],
-  })),
+  }),
   /React PropValue\.string value must be a string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "hidden", value: { kind: "bool", value: "false" } }],
-  })),
+  }),
   /React PropValue\.bool value must be a boolean/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "tabIndex", value: { kind: "int", value: "7.5" } }],
-  })),
+  }),
   /React PropValue\.int value must be a safe integer/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "tabIndex", value: { kind: "int", value: "9007199254740992" } }],
-  })),
+  }),
   /React PropValue\.int value must be a safe integer/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "value", value: { kind: "float", value: "1.5" } }],
-  })),
+  }),
   /React PropValue\.float value must be a finite number/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "title", value: { kind: "style", value: [] } }],
-  })),
+  }),
   /React PropValue\.style is only supported for the style prop/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: "margin-top: 1px" } }],
-  })),
+  }),
   /React PropValue\.style value must be an array/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: ["marginTop"] } }],
-  })),
+  }),
   /React PropValue\.style\[0\] must be an object/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: [{ name: "", value: "1px" }] } }],
-  })),
+  }),
   /React PropValue\.style\[0\]\.name must be a non-empty string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: [{ name: "__proto__", value: "1px" }] } }],
-  })),
+  }),
   /React PropValue\.style\[0\]\.name is not supported/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "style", value: { kind: "style", value: [{ name: "marginTop", value: 1 }] } }],
-  })),
+  }),
   /React PropValue\.style\[0\]\.value must be a string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "title", value: { kind: "classList", value: [] } }],
-  })),
+  }),
   /React PropValue\.classList is only supported for the className prop/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "className", value: { kind: "classList", value: "alpha beta" } }],
-  })),
+  }),
   /React PropValue\.classList value must be an array/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "className", value: { kind: "classList", value: ["ok", ""] } }],
-  })),
+  }),
   /React PropValue\.classList\[1\] must be a non-empty token without whitespace/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "className", value: { kind: "classList", value: ["ok", "bad token"] } }],
-  })),
+  }),
   /React PropValue\.classList\[1\] must be a non-empty token without whitespace/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     props: [{ name: "data-x", value: { kind: "number", value: 1 } }],
-  })),
+  }),
   /React PropValue must be string, bool, int, float, style, or classList/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     handlers: [{ name: 1, callback: Object.assign(() => undefined, { release: () => undefined }) }],
-  })),
-  /React Html event handler name must be a non-empty string/,
+  }),
+  /React Node event handler name must be a non-empty string/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     handlers: [{ name: "__proto__", callback: Object.assign(() => undefined, { release: () => undefined }) }],
-  })),
-  /React Html event handler name is not supported/,
+  }),
+  /React Node event handler name is not supported/,
 );
 assert.throws(
-  () => renderMalformedReactHtml(reactHtmlElement({
+  () => renderReactNodeElement({
     handlers: [{ name: "onClick" }],
-  })),
-  /React Html event handler callback must be a releasable function/,
+  }),
+  /React Node event handler callback must be a releasable function/,
 );
 
 assert.equal(reactRuntime.call("ReactCounter.mount", "#react-dispose"), true);
-assert.equal(reactRuntime.liveCallbacks.size, 1);
+assert.equal(reactRuntime.liveCallbacks.size, 2);
 reactRuntime.dispose();
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.throws(() => reactRuntime.call("ReactCounter.mount", "#react-disposed"), /disposed/);
@@ -296,7 +433,7 @@ const reactReloadRuntime = await createVirRuntime({
 });
 ensureVirtualElementState(reactReloadDocumentState, "#react-reload");
 assert.equal(reactReloadRuntime.call("ReactCounter.mount", "#react-reload"), true);
-assert.equal(reactReloadRuntime.liveCallbacks.size, 1);
+assert.equal(reactReloadRuntime.liveCallbacks.size, 2);
 reactReloadRuntime.loadIrPackageBytes(irPackageBytes);
 assert.equal(reactReloadRuntime.liveCallbacks.size, 0);
 assert.equal(reactReloadDocumentState.elements.get("#react-reload").reactRoot, undefined);

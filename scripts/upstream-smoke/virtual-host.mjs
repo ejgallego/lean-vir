@@ -12,6 +12,7 @@ import {
   ensureTamagotchiVirtualDom,
   ensureVirtualElements,
 } from "../virtual-fixtures.mjs";
+import { demoHostImportTargets } from "../demo-host-import-targets.mjs";
 import {
   smokeVirtualReactAttributes,
   smokeVirtualReactChangeInput,
@@ -28,8 +29,12 @@ export async function smokeVirtualHostRuntime(context) {
     irPackageBytes: context.hostPackageBytes,
     virtualDocumentState: hostDocumentState,
   });
-  if (hostRuntime.packageInfo.hostImports !== 26) {
-    throw new Error(`expected 26 stock package host imports, got ${hostRuntime.packageInfo.hostImports}`);
+  const actualHostImportTargets = hostRuntime.interfaceManifest.hostImports.map((entry) => entry.target).sort();
+  if (hostRuntime.packageInfo.hostImports !== demoHostImportTargets.length ||
+      JSON.stringify(actualHostImportTargets) !== JSON.stringify(demoHostImportTargets)) {
+    throw new Error(
+      `unexpected stock package host imports: expected ${JSON.stringify(demoHostImportTargets)}, got ${JSON.stringify(actualHostImportTargets)}`,
+    );
   }
   const hostTitle = hostRuntime.call("HostInterop.titleHandshake", "smoke");
   if (hostTitle !== "Lean VIR host: smoke") {

@@ -4,7 +4,16 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createVirtualReactRootResource as createVirtualReactRootResourceFromHtml } from "../react/vir-react-html.js";
+import {
+  createVirtualReactNodeElementResource,
+  createVirtualReactNodeTextResource,
+  createVirtualReactRootResource as createVirtualReactRootResourceFromNode,
+} from "../react/vir-react-node.js";
+import {
+  createReactJsValueHostBindings,
+  createReactStateHostBindings,
+  createVirtualReactHookRuntime,
+} from "../react/vir-react-hooks.js";
 import { isHostResource } from "../host-resource.js";
 import {
   callLeanEventCallback,
@@ -96,6 +105,11 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
     throw new Error("virtual document state must have an elements Map");
   }
   state.resources ??= createHostResourceState();
+  const reactHookRuntime = createVirtualReactHookRuntime(state.resources);
+  const reactHooks = {
+    ...createReactHostHooks(),
+    hookRuntime: reactHookRuntime,
+  };
   return {
     "browser.document.getTitle": () => state.title,
     "browser.document.setTitle": (title) => {
@@ -123,7 +137,13 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       cancelFrame: globalThis.clearTimeout.bind(globalThis),
     }),
     ...createReactRootResourceHostBindings(state.resources, (target) =>
-      createVirtualReactRootResource(state.resources, target)),
+      createVirtualReactRootResource(state.resources, target, reactHooks), {
+        createNodeTextResource: (value) => createVirtualReactNodeTextResource(state.resources, value),
+        createNodeElementResource: (tag, key, props, handlers, children) =>
+          createVirtualReactNodeElementResource(state.resources, reactHooks, tag, key, props, handlers, children),
+      }),
+    ...createReactJsValueHostBindings(state.resources),
+    ...createReactStateHostBindings(state.resources, reactHookRuntime),
     [VIR_HOST_DISPOSE]: () => state.resources.dispose(),
   };
 }
@@ -147,8 +167,8 @@ function createVirtualEventListenerResource(resources, target, eventName, callba
   return listener;
 }
 
-function createVirtualReactRootResource(resources, target) {
-  return createVirtualReactRootResourceFromHtml(resources, target, createReactHostHooks());
+function createVirtualReactRootResource(resources, target, hooks) {
+  return createVirtualReactRootResourceFromNode(resources, target, hooks);
 }
 
 function queryVirtualElementState(state, selector) {

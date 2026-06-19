@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { disposeReactHtml } from "../react/vir-react-html.js";
 import {
   createHostResource,
   hostResourceLabel,
@@ -18,12 +17,26 @@ export class HostResourceState {
   constructor() {
     requireExternrefTableSupport();
     this.resources = new WeakMap();
+    this.primitiveResources = new Map();
     this.liveResources = new Set();
+    this.temporaryResourceScopes = [];
     this.disposables = new Set();
   }
 
   resourceForValue(value) {
     if (value === null || value === undefined) return null;
+    if (this.temporaryResourceScopes.length !== 0) {
+      return this.temporaryResourceForValue(value);
+    }
+    if (!isWeakMapKey(value)) {
+      let resource = this.primitiveResources.get(value);
+      if (!isHostResource(resource) || hostResourceValue(resource) === null) {
+        resource = createHostResource(value);
+        this.primitiveResources.set(value, resource);
+      }
+      this.liveResources.add(resource);
+      return resource;
+    }
     let resource = this.resources.get(value);
     if (!isHostResource(resource) || hostResourceValue(resource) === null) {
       resource = createHostResource(value);
@@ -33,10 +46,41 @@ export class HostResourceState {
     return resource;
   }
 
+  temporaryResourceForValue(value) {
+    if (value === null || value === undefined) return null;
+    const resource = createHostResource(value);
+    this.liveResources.add(resource);
+    const scope = this.temporaryResourceScopes.at(-1);
+    if (scope !== undefined) {
+      scope.add(resource);
+    }
+    return resource;
+  }
+
+  withTemporaryResourceScope(run) {
+    const scope = new Set();
+    this.temporaryResourceScopes.push(scope);
+    try {
+      return run();
+    } finally {
+      this.temporaryResourceScopes.pop();
+      for (const resource of Array.from(scope)) {
+        this.releaseResource(resource);
+      }
+      scope.clear();
+    }
+  }
+
   releaseResource(resource) {
     const value = hostResourceValue(resource);
-    if (value !== null && value !== undefined) {
-      this.resources.delete(value);
+    if (isWeakMapKey(value)) {
+      if (this.resources.get(value) === resource) {
+        this.resources.delete(value);
+      }
+    } else if (value !== null && value !== undefined) {
+      if (this.primitiveResources.get(value) === resource) {
+        this.primitiveResources.delete(value);
+      }
     }
     if (isHostResource(resource)) {
       this.liveResources.delete(resource);
@@ -46,6 +90,13 @@ export class HostResourceState {
   }
 
   releaseValueResource(value) {
+    if (!isWeakMapKey(value)) {
+      const resource = this.primitiveResources.get(value);
+      if (resource !== undefined) {
+        this.releaseResource(resource);
+      }
+      return undefined;
+    }
     const resource = this.resources.get(value);
     if (resource !== undefined) {
       this.releaseResource(resource);
@@ -63,6 +114,16 @@ export class HostResourceState {
     return undefined;
   }
 
+  // Debug-only lifecycle visibility for runtime tests; not a stable host API.
+  debugResourceCounts() {
+    return {
+      live: this.liveResources.size,
+      primitives: this.primitiveResources.size,
+      temporaryScopes: this.temporaryResourceScopes.length,
+      disposables: this.disposables.size,
+    };
+  }
+
   resolveResource(resource, label) {
     const value = hostResourceValue(resource);
     if (value === null || value === undefined || !this.liveResources.has(resource)) {
@@ -73,7 +134,9 @@ export class HostResourceState {
 
   dispose() {
     for (const value of Array.from(this.disposables)) {
-      if (typeof value.remove === "function") {
+      if (typeof value.dispose === "function") {
+        value.dispose();
+      } else if (typeof value.remove === "function") {
         value.remove();
       } else if (typeof value.clear === "function") {
         value.clear();
@@ -88,9 +151,15 @@ export class HostResourceState {
       this.releaseResource(resource);
     }
     this.resources = new WeakMap();
+    this.primitiveResources.clear();
     this.liveResources.clear();
+    this.temporaryResourceScopes.length = 0;
     return undefined;
   }
+}
+
+function isWeakMapKey(value) {
+  return (typeof value === "object" && value !== null) || typeof value === "function";
 }
 
 export function createHostResourceState() {
@@ -145,20 +214,35 @@ export function createHtmlInputElementResourceHostBindings(resources, { fromElem
   };
 }
 
-export function createReactRootResourceHostBindings(resources, createRootResource) {
+export function createReactRootResourceHostBindings(resources, createRootResource, {
+  createNodeTextResource = null,
+  createNodeElementResource = null,
+} = {}) {
   return {
+    "react.node.text": (value) =>
+      resources.resourceForValue(requireReactNodeTextResourceFactory(createNodeTextResource)(value)),
+    "react.node.createElement": (tag, key, props, handlers, children) =>
+      resources.resourceForValue(
+        requireReactNodeElementResourceFactory(createNodeElementResource)(tag, key, props, handlers, children)
+      ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
       return resources.resourceForValue(createRootResource(target));
     },
-    "react.root.render": (root, html) => {
+    "react.root.render": (root, renderTree) => {
+      const render = requireReactRenderCallback(renderTree);
       try {
         const value = resources.resolveResource(root, "ReactRoot");
-        value.render(html);
-      } catch (error) {
-        disposeReactHtml(html);
-        throw error;
+        const node = render();
+        value.render(node);
+        return undefined;
+      } finally {
+        render.release();
       }
+    },
+    "react.root.renderComponent": (root, component) => {
+      const value = resources.resolveResource(root, "ReactRoot");
+      value.renderComponent(component);
       return undefined;
     },
     "react.root.unmount": (root) => {
@@ -168,6 +252,27 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       return undefined;
     },
   };
+}
+
+function requireReactRenderCallback(renderTree) {
+  if (typeof renderTree !== "function" || typeof renderTree.release !== "function") {
+    throw new Error("react.root.render requires a releasable render callback");
+  }
+  return renderTree;
+}
+
+function requireReactNodeTextResourceFactory(factory) {
+  if (typeof factory !== "function") {
+    throw new Error("react.node.text host binding requires a React Node text resource factory");
+  }
+  return factory;
+}
+
+function requireReactNodeElementResourceFactory(factory) {
+  if (typeof factory !== "function") {
+    throw new Error("react.node.createElement host binding requires a React Node element resource factory");
+  }
+  return factory;
 }
 
 export function createTimerResourceHostBindings(resources) {
@@ -293,10 +398,44 @@ export function performanceNow() {
 }
 
 export function createReactHostHooks() {
+  let eventDepth = 0;
+  const deferredReactNodeDisposals = [];
+  const flushReactNodeDisposals = () => {
+    if (eventDepth !== 0) return undefined;
+    const pending = deferredReactNodeDisposals.splice(0);
+    for (const dispose of pending) {
+      dispose();
+    }
+    return undefined;
+  };
   return {
     addDisposable: (state, value) => state.addDisposable(value),
     removeDisposable: (state, value) => state.removeDisposable(value),
     callLeanEventCallback,
+    beginReactNodeEventCallback: () => {
+      eventDepth++;
+      return undefined;
+    },
+    endReactNodeEventCallback: () => {
+      eventDepth = Math.max(0, eventDepth - 1);
+      return undefined;
+    },
+    deferReactNodeDispose: (dispose) => {
+      if (typeof dispose !== "function") {
+        throw new Error("React Node deferred disposal must be a function");
+      }
+      if (eventDepth === 0) {
+        const queue =
+          typeof globalThis.queueMicrotask === "function"
+            ? globalThis.queueMicrotask.bind(globalThis)
+            : (callback) => Promise.resolve().then(callback);
+        queue(dispose);
+        return undefined;
+      }
+      deferredReactNodeDisposals.push(dispose);
+      return undefined;
+    },
+    flushReactNodeDisposals,
     once,
   };
 }

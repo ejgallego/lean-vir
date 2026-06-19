@@ -2,7 +2,7 @@
 
 This note records the path from Vir's standalone React renderer toward
 richer ProofWidgets compatibility. The implemented renderer and its current
-API are tracked separately in `docs/REACT_HTML.md`; this file focuses on the
+API are tracked separately in `docs/REACT_NODE.md`; this file focuses on the
 future infoview/RPC and ProofWidgets-style layers.
 
 ## External Shape
@@ -28,7 +28,7 @@ TypeScript/React assets and splices the bundled JavaScript into Lean modules:
 For Vir, full infoview compatibility remains a follow-up target. We do not
 yet have the Lean server snapshot/RPC layer, document positions, or proof-script
 edit channel that real ProofWidgets can rely on. The first useful target is the
-standalone React renderer documented in `docs/REACT_HTML.md`.
+standalone React renderer documented in `docs/REACT_NODE.md`.
 
 ## Current Vir Fit
 
@@ -47,10 +47,10 @@ The main remaining mismatch for richer ProofWidgets-style data is structural:
 direct recursive structures and simple non-indexed recursive inductives with
 nullary or runtime-payload constructors can now cross the boundary, but mutual
 recursion, non-uniform recursion, and inherited recursive structures remain
-outside the general manifest surface. The current React `Html` tree fits the
-supported recursive-inductive surface; broader ProofWidgets compatibility must
-still keep callback ownership and renderer-specific cleanup inside a narrow
-audited ABI.
+outside the general manifest surface. The current standalone renderer now uses
+a native `ReactNode` resource rather than a recursive `Html` tree; broader
+ProofWidgets compatibility must still keep callback ownership and
+renderer-specific cleanup inside a narrow audited ABI.
 
 This roadmap assumes the current `main` branch repository setup: Lean
 `v4.31.0`, the local WASI SDK from `npm run install:wasi`, and the small
@@ -62,9 +62,10 @@ state is uncertain.
 ## Current Standalone Renderer
 
 The current standalone renderer is implemented and documented in
-`docs/REACT_HTML.md`. In short, Lean can render a recursive DOM-like `Html`
-tree into a browser React root, retain Lean callbacks in event handlers, and
-release them on rerender, unmount, package reload, or runtime disposal.
+`docs/REACT_NODE.md`. In short, Lean can construct `ReactNode` resources
+through DOM-like combinators, render them into a browser React root, retain
+Lean callbacks in event handlers, and release them on rerender, unmount,
+package reload, or runtime disposal.
 
 That renderer deliberately avoids full infoview compatibility. It validates the
 host-resource and callback-lifetime model first. Resource values now cross the
@@ -80,7 +81,7 @@ A realistic path has three layers:
    widgets from Lean without a Lean server.
 2. **ProofWidgets-style HTML subset.** Provide a Lean DSL close to
    `ProofWidgets.Data.Html` / JSX-like usage and compile it to this narrow
-   `Html`.
+   `ReactNode` surface.
    This should cover text, attributes, children, basic events, and reusable
    Lean components.
 3. **Infoview/RPC compatibility.** Add document positions, snapshot-aware RPC,

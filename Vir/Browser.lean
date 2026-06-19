@@ -11,7 +11,7 @@ namespace Lean.Vir.Browser
 
 /-- Browser/DOM effect used by Lean-authored browser code. -/
 @[irreducible] def DomM (α : Type) : Type :=
-  IO α
+  Lean.Vir.RuntimeM α
 
 namespace DomM
 
@@ -19,33 +19,31 @@ namespace DomM
 def run (action : DomM α) : IO α :=
   by
     unfold DomM at action
-    exact action
-
-protected def pure (value : α) : DomM α :=
-  by
-    unfold DomM
-    exact pure value
-
-protected def bind (action : DomM α) (next : α → DomM β) : DomM β :=
-  by
-    unfold DomM
-    exact do
-      let value ← action.run
-      (next value).run
-
-protected def map (f : α → β) (action : DomM α) : DomM β :=
-  by
-    unfold DomM
-    exact f <$> action.run
+    exact action.run
 
 instance : Monad DomM where
-  pure := DomM.pure
-  bind := DomM.bind
+  pure value :=
+    by
+      unfold DomM
+      exact pure value
+  bind action next :=
+    by
+      unfold DomM at action
+      unfold DomM
+      exact action >>= fun value => by
+        unfold DomM at next
+        exact next value
+
+instance : MonadLift Lean.Vir.RuntimeM DomM where
+  monadLift action :=
+    by
+      unfold DomM
+      exact action
 
 instance : Nonempty (DomM α) :=
   by
     unfold DomM
-    exact ⟨throw (IO.userError "unreachable DomM placeholder")⟩
+    infer_instance
 
 end DomM
 

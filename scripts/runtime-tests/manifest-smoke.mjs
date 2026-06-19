@@ -30,6 +30,7 @@ import {
   findTypeDescriptor,
   readRuntimeArtifacts,
 } from "./shared.mjs";
+import { demoHostImportTargets } from "../demo-host-import-targets.mjs";
 import { invalidManifestCases } from "./manifest-invalid-cases.mjs";
 
 const { wasmBytes, irPackageBytes, hostPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();
@@ -78,6 +79,9 @@ assert.equal(typeof createExportedHostResourceState, "function");
   });
   try {
     const resources = createExportedHostResourceState();
+    const primitiveResource = resources.resourceForValue(false);
+    assert.equal(resources.resolveResource(primitiveResource, "Js"), false);
+    assert.equal(resources.resourceForValue(false), primitiveResource);
     const documentBindings = createExportedBrowserDocumentHostBindings(resources);
     const elementBindings = createExportedBrowserElementHostBindings(resources);
     const sharedElement = documentBindings["browser.document.querySelector"]("#shared");
@@ -100,7 +104,7 @@ assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
-assert.equal(hostRuntime.packageInfo.hostImports, 26);
+assert.equal(hostRuntime.packageInfo.hostImports, demoHostImportTargets.length);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 7);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -123,43 +127,53 @@ for (const { name, mutate, pattern } of invalidManifestCases) {
     throw error;
   }
 }
-assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), [
-  "browser.animation.cancelAnimationFrame",
-  "browser.animation.requestAnimationFrame",
-  "browser.document.getTitle",
-  "browser.document.querySelector",
-  "browser.document.setTitle",
-  "browser.element.addEventListener",
-  "browser.element.getAttribute",
-  "browser.element.removeEventListener",
-  "browser.element.setAttribute",
-  "browser.element.setTextContent",
-  "browser.event.currentTarget",
-  "browser.event.preventDefault",
-  "browser.event.stopPropagation",
-  "browser.event.target",
-  "browser.htmlInputElement.fromElement",
-  "browser.htmlInputElement.getChecked",
-  "browser.htmlInputElement.getValue",
-  "browser.htmlInputElement.setChecked",
-  "browser.htmlInputElement.setValue",
-  "browser.timer.clearTimeout",
-  "browser.timer.setTimeout",
-  "react.root.create",
-  "react.root.render",
-  "react.root.unmount",
-  "test.callNatCallback",
-  "test.recordNat",
-]);
+assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), demoHostImportTargets);
+const reactUseStateImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useState");
+assert.equal(reactUseStateImports.length, 1);
+assert.equal(reactUseStateImports[0]?.effect, "react");
+assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
+assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
+assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
+assert.equal(reactUseStateImports[0]?.result?.fields?.find((field) => field.name === "value")?.type?.type, "Js");
+for (const target of [
+  "js.string",
+  "js.string.value",
+  "js.nat",
+  "js.nat.value",
+  "js.bool",
+  "js.bool.value",
+  "react.state.modify",
+  "react.state.set",
+]) {
+  assert.equal(
+    hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === target)?.effect,
+    "runtime",
+  );
+}
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
     ?.args[1]?.type?.kind,
-  "customInductive",
+  "function",
 );
-const reactHtmlType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
-  ?.args[1]?.type;
+assert.equal(
+  hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
+    ?.args[1]?.type?.effect,
+  "react",
+);
+assert.equal(
+  hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
+    ?.args[1]?.type?.args?.length,
+  0,
+);
+assert.equal(
+  hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
+    ?.args[1]?.type?.result?.type,
+  "Js",
+);
+const reactNodeType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.createElement")
+  ?.args[2]?.type;
 const reactPropValueType = findTypeDescriptor(
-  reactHtmlType,
+  reactNodeType,
   (type) => type.kind === "customInductive" && typeof type.name === "string" && type.name.endsWith(".PropValue"),
 );
 assert.deepEqual(

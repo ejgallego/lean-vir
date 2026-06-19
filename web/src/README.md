@@ -13,11 +13,11 @@ unrelated responsibilities.
   React host bindings.
 - `vir-host-bindings.js`: public common/browser host-binding factories and
   stable re-exports.
-- `vir-react-host-bindings.js`: browser `react.root.*` bindings. This entry
-  imports `react` and `react-dom/client`; keep React dependencies out of the
-  generic runtime and host-binding entry points.
+- `vir-react-host-bindings.js`: browser React root, component, and hook
+  bindings. This entry imports `react` and `react-dom/client`; keep React
+  dependencies out of the generic runtime and host-binding entry points.
 - `browser-react-runtime.js`: browser convenience factory that composes generic
-  browser bindings with React root bindings.
+  browser bindings with React bindings.
 
 ## Runtime Internals
 
@@ -33,8 +33,11 @@ unrelated responsibilities.
   timers, callbacks, and shared host-binding helpers.
 - `host/vir-virtual-host-bindings.js`: virtual document, event, element, and
   React host bindings for Node tests/tools.
-- `react/vir-react-html.js`: `Lean.Vir.React.Html` validation, conversion,
-  virtual text rendering, and callback release.
+- `react/vir-react-node.js`: `Lean.Vir.React.Node` resource construction,
+  native/virtual React node creation, validation, virtual text rendering, and
+  callback release.
+- `react/vir-react-hooks.js`: shared React component hook runtime and typed
+  state setter host bindings for browser and virtual React roots.
 
 ## Demo And Page Modules
 

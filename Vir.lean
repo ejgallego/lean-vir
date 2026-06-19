@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.Host
+import Vir.Runtime
 import Vir.Js
 import Vir.Common
 import Vir.Browser
