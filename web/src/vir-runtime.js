@@ -8,8 +8,13 @@ import { validateInterfaceManifest } from "./runtime/interface-manifest.js";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
 import {
   asBytes,
+  customInductiveConstructorAt,
   normalizeUint32,
+  requireCustomInductiveConstructors,
+  requireStructureFields,
+  requireTaggedUnionConstructors,
   requireTypeField,
+  taggedUnionConstructorAt,
 } from "./runtime/vir-codec.js";
 import { WIRE } from "./runtime/wire-tags.js";
 import {
@@ -31,13 +36,17 @@ import {
 import {
   asByteArrayBytes,
   enumValue,
+  flattenStructureSubobjects,
   normalizeArray,
+  normalizeCustomInductive,
   normalizeDecimal,
   normalizeEnum,
   normalizeFloat,
   normalizeInteger,
   normalizeOption,
   normalizePair,
+  normalizeStructure,
+  normalizeTaggedUnion,
 } from "./runtime/vir-value-normalizers.js";
 
 export {
@@ -712,6 +721,12 @@ export class VirRuntime {
         return this.makeObjectOptionValue(type, value, label, selfType);
       case WIRE.PROD:
         return this.makeObjectProdValue(type, value, label, selfType);
+      case WIRE.STRUCTURE:
+        return this.makeObjectStructureValue(type, value, label);
+      case WIRE.TAGGED_UNION:
+        return this.makeObjectTaggedUnionValue(type, value, label);
+      case WIRE.CUSTOM_INDUCTIVE:
+        return this.makeObjectCustomInductiveValue(type, value, label);
       default:
         throw new Error(`${label} has unsupported object ABI argument type`);
     }
@@ -767,6 +782,63 @@ export class VirRuntime {
       return this.makeObjectCtorFromOwnedFields(0, fields, label);
     } finally {
       this.releaseOwnedObjects(fields);
+    }
+  }
+
+  makeObjectStructureValue(type, value, label) {
+    const fields = requireStructureFields(type, label);
+    const record = normalizeStructure(value, fields, label);
+    const trivial = trivialStructureField(type, fields);
+    if (trivial !== null) {
+      return this.makeObjectValue(trivial.type, record[trivial.name], `${label}.${trivial.name}`, type);
+    }
+    const ownedFields = objectFieldSlots(type, fields, label);
+    try {
+      for (const field of fields) {
+        ownedFields[field.layout.index] = this.makeObjectValue(
+          field.type,
+          record[field.name],
+          `${label}.${field.name}`,
+          type,
+        );
+      }
+      return this.makeObjectCtorFromOwnedFields(0, ownedFields, label);
+    } finally {
+      this.releaseOwnedObjects(ownedFields);
+    }
+  }
+
+  makeObjectTaggedUnionValue(type, value, label) {
+    const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
+    if (!taggedUnionConstructorObjectOnly(ctor)) {
+      throw new Error(`${label}.${ctor.jsName} has unsupported object ABI layout`);
+    }
+    const fields = [this.makeObjectValue(ctor.type, payload, `${label}.${ctor.jsName}`, type)];
+    try {
+      return this.makeObjectCtorFromOwnedFields(index, fields, label);
+    } finally {
+      this.releaseOwnedObjects(fields);
+    }
+  }
+
+  makeObjectCustomInductiveValue(type, value, label) {
+    const { index, ctor, fields } = normalizeCustomInductive(value, type, label);
+    if (ctor.fields.length === 0) {
+      return this.makeObjectScalar(index, label);
+    }
+    const ownedFields = objectFieldSlots(ctor, ctor.fields, `${label}.${ctor.jsName}`);
+    try {
+      for (const field of ctor.fields) {
+        ownedFields[field.layout.index] = this.makeObjectValue(
+          field.type,
+          fields[field.name],
+          `${label}.${ctor.jsName}.${field.name}`,
+          type,
+        );
+      }
+      return this.makeObjectCtorFromOwnedFields(index, ownedFields, label);
+    } finally {
+      this.releaseOwnedObjects(ownedFields);
     }
   }
 
@@ -1021,6 +1093,12 @@ export class VirRuntime {
         return this.liftObjectOptionValue(type, obj, label, selfType);
       case WIRE.PROD:
         return this.liftObjectProdValue(type, obj, label, selfType);
+      case WIRE.STRUCTURE:
+        return this.liftObjectStructureValue(type, obj, label);
+      case WIRE.TAGGED_UNION:
+        return this.liftObjectTaggedUnionValue(type, obj, label);
+      case WIRE.CUSTOM_INDUCTIVE:
+        return this.liftObjectCustomInductiveValue(type, obj, label);
       default:
         throw new Error(`${label} has unsupported object ABI result type`);
     }
@@ -1126,6 +1204,66 @@ export class VirRuntime {
     } finally {
       this.exports.vir_obj_dec(fst);
     }
+  }
+
+  liftObjectStructureValue(type, obj, label) {
+    const fields = requireStructureFields(type, label);
+    const trivial = trivialStructureField(type, fields);
+    if (trivial !== null) {
+      return { [trivial.name]: this.liftObjectValue(trivial.type, obj, `${label}.${trivial.name}`, type) };
+    }
+    const values = {};
+    for (const field of fields) {
+      const fieldObj = this.ownedObjectField(obj, field.layout.index, `${label}.${field.name}`);
+      try {
+        values[field.name] = this.liftObjectValue(field.type, fieldObj, `${label}.${field.name}`, type);
+      } finally {
+        this.exports.vir_obj_dec(fieldObj);
+      }
+    }
+    return flattenStructureSubobjects(type, values);
+  }
+
+  liftObjectTaggedUnionValue(type, obj, label) {
+    const tag = this.exports.vir_obj_tag(obj);
+    const ctor = taggedUnionConstructorAt(type, tag, label);
+    if (!taggedUnionConstructorObjectOnly(ctor)) {
+      throw new Error(`${label}.${ctor.jsName} has unsupported object ABI layout`);
+    }
+    const field = this.ownedObjectField(obj, ctor.layout.index, `${label}.${ctor.jsName}`);
+    try {
+      return {
+        kind: ctor.jsName,
+        value: this.liftObjectValue(ctor.type, field, `${label}.${ctor.jsName}`, type),
+      };
+    } finally {
+      this.exports.vir_obj_dec(field);
+    }
+  }
+
+  liftObjectCustomInductiveValue(type, obj, label) {
+    const tag = this.exports.vir_obj_tag(obj);
+    const ctor = customInductiveConstructorAt(type, tag, label);
+    if (ctor.fields.length === 0) {
+      return { kind: ctor.jsName };
+    }
+    objectFieldSlots(ctor, ctor.fields, `${label}.${ctor.jsName}`);
+    const values = {};
+    for (const field of ctor.fields) {
+      const fieldObj = this.ownedObjectField(obj, field.layout.index, `${label}.${ctor.jsName}.${field.name}`);
+      try {
+        values[field.name] = this.liftObjectValue(field.type, fieldObj, `${label}.${ctor.jsName}.${field.name}`, type);
+      } finally {
+        this.exports.vir_obj_dec(fieldObj);
+      }
+    }
+    return ctor.fields.length === 1 ? {
+      kind: ctor.jsName,
+      value: values[ctor.fields[0].name],
+    } : {
+      kind: ctor.jsName,
+      fields: values,
+    };
   }
 
   usizeMaxValue() {
@@ -1352,7 +1490,7 @@ function objectArgumentSupported(type, selfType = null) {
   const tag = type?.wireTag;
   switch (tag) {
     case WIRE.RECURSIVE_SELF:
-      return selfType !== null && objectArgumentSupported(selfType, selfType);
+      return false;
     case WIRE.UNIT:
     case WIRE.BOOL:
     case WIRE.NAT:
@@ -1375,6 +1513,12 @@ function objectArgumentSupported(type, selfType = null) {
     case WIRE.PROD:
       return objectArgumentSupported(requireTypeField(type, "fst", "object argument"), selfType) &&
         objectArgumentSupported(requireTypeField(type, "snd", "object argument"), selfType);
+    case WIRE.STRUCTURE:
+      return objectStructureSupported(type, objectArgumentSupported);
+    case WIRE.TAGGED_UNION:
+      return objectTaggedUnionSupported(type, objectArgumentSupported);
+    case WIRE.CUSTOM_INDUCTIVE:
+      return objectCustomInductiveSupported(type, objectArgumentSupported);
     default:
       return false;
   }
@@ -1384,7 +1528,7 @@ function objectResultSupported(type, selfType = null) {
   const tag = type?.wireTag;
   switch (tag) {
     case WIRE.RECURSIVE_SELF:
-      return selfType !== null && objectResultSupported(selfType, selfType);
+      return false;
     case WIRE.UNIT:
     case WIRE.BOOL:
     case WIRE.NAT:
@@ -1407,6 +1551,12 @@ function objectResultSupported(type, selfType = null) {
     case WIRE.PROD:
       return objectResultSupported(requireTypeField(type, "fst", "object result"), selfType) &&
         objectResultSupported(requireTypeField(type, "snd", "object result"), selfType);
+    case WIRE.STRUCTURE:
+      return objectStructureSupported(type, objectResultSupported);
+    case WIRE.TAGGED_UNION:
+      return objectTaggedUnionSupported(type, objectResultSupported);
+    case WIRE.CUSTOM_INDUCTIVE:
+      return objectCustomInductiveSupported(type, objectResultSupported);
     default:
       return false;
   }
@@ -1418,9 +1568,94 @@ function objectTypeNeedsBoxedBoundary(type) {
     case WIRE.FLOAT32:
     case WIRE.UINT64:
       return true;
+    case WIRE.STRUCTURE: {
+      const fields = requireStructureFields(type, "object boundary");
+      const trivial = trivialStructureField(type, fields);
+      return trivial !== null && objectTypeNeedsBoxedBoundary(trivial.type);
+    }
     default:
       return false;
   }
+}
+
+function objectStructureSupported(type, fieldSupported) {
+  const fields = requireStructureFields(type, "object structure");
+  const trivial = trivialStructureField(type, fields);
+  if (trivial !== null) {
+    return fieldSupported(trivial.type, type);
+  }
+  if (!objectRuntimeCountsOnly(type, fields.length)) {
+    return false;
+  }
+  return fields.every((field) =>
+    objectLayoutIndex(field.layout, fields.length) !== null &&
+    fieldSupported(field.type, type));
+}
+
+function objectTaggedUnionSupported(type, fieldSupported) {
+  return requireTaggedUnionConstructors(type, "object tagged union").every((ctor) =>
+    taggedUnionConstructorObjectOnly(ctor) &&
+    fieldSupported(ctor.type, type));
+}
+
+function objectCustomInductiveSupported(type, fieldSupported) {
+  return requireCustomInductiveConstructors(type, "object custom inductive").every((ctor) => {
+    if (ctor.fields.length === 0) {
+      return objectRuntimeCountsOnly(ctor, 0);
+    }
+    return objectRuntimeCountsOnly(ctor, ctor.fields.length) &&
+      ctor.fields.every((field) =>
+        objectLayoutIndex(field.layout, ctor.fields.length) !== null &&
+        fieldSupported(field.type, type));
+  });
+}
+
+function trivialStructureField(type, fields) {
+  const index = type?.trivialFieldIndex;
+  if (!Number.isInteger(index)) {
+    return null;
+  }
+  if (index < 0 || index >= fields.length) {
+    throw new Error(`${type?.type ?? "structure"} has invalid trivial field index`);
+  }
+  return fields[index];
+}
+
+function objectFieldSlots(owner, fields, label) {
+  if (!objectRuntimeCountsOnly(owner, fields.length)) {
+    throw new Error(`${label} has unsupported object ABI runtime counts`);
+  }
+  const slots = Array(fields.length).fill(0);
+  const seen = new Set();
+  for (const field of fields) {
+    const index = objectLayoutIndex(field.layout, fields.length);
+    if (index === null) {
+      throw new Error(`${label}.${field.name ?? "field"} has unsupported object ABI layout`);
+    }
+    if (seen.has(index)) {
+      throw new Error(`${label}.${field.name ?? "field"} duplicates object field index ${index}`);
+    }
+    seen.add(index);
+    slots[index] = 0;
+  }
+  return slots;
+}
+
+function taggedUnionConstructorObjectOnly(ctor) {
+  return objectRuntimeCountsOnly(ctor, 1) && objectLayoutIndex(ctor.layout, 1) !== null;
+}
+
+function objectRuntimeCountsOnly(owner, objectFieldCount) {
+  return owner?.objectFieldCount === objectFieldCount &&
+    (owner?.usizeFieldCount ?? 0) === 0 &&
+    (owner?.scalarByteSize ?? 0) === 0;
+}
+
+function objectLayoutIndex(layout, objectFieldCount) {
+  if (layout?.kind !== "object" || !Number.isInteger(layout.index)) {
+    return null;
+  }
+  return layout.index >= 0 && layout.index < objectFieldCount ? layout.index : null;
 }
 
 function disposeHostBindings(bindings) {

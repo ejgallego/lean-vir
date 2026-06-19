@@ -186,8 +186,10 @@ primitives while the broader JS boundary policy remains open.
 The JavaScript runtime currently selects this lane automatically for pure unary
 calls where the argument can be lowered from the supported object subset and the
 result can be lifted from it. Arguments and results support base values,
-`Array`, `List`, `Option`, and `Prod`. Other structured values still use the
-compact byte lane.
+`Array`, `List`, `Option`, `Prod`, object-field-only structures,
+object-field-only tagged unions, and object-field-only custom inductive
+constructors. Structures and constructors with scalar or `USize` runtime fields
+still use the compact byte lane, as do recursive-self descriptors for now.
 
 For a small set of exact pure scalar signatures, the JavaScript runtime can skip
 the byte payload entirely after slot resolution and call the primitive lane API:
