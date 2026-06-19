@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import * as React from "react";
-import * as ReactDOMClient from "react-dom/client";
+import * as ReactDOMClient from "./vir-react-dom-client.js";
 import {
   createBrowserReactHookRuntime,
   createReactJsValueHostBindings,
@@ -22,7 +22,9 @@ import {
   createReactRootResourceHostBindings,
 } from "./host/vir-host-resources.js";
 
-export function createBrowserReactHostBindings(state = createHostResourceState()) {
+export function createBrowserReactHostBindings(state = createHostResourceState(), {
+  querySelector = queryBrowserElement,
+} = {}) {
   const hookRuntime = createBrowserReactHookRuntime(state, React);
   const hooks = {
     ...createReactHostHooks(),
@@ -31,6 +33,7 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
   return {
     ...createReactRootResourceHostBindings(state, (target) =>
       createBrowserReactRootResource(state, ReactDOMClient.createRoot(target), React, hooks), {
+        querySelector,
         createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
         createNodeElementResource: (tag, key, props, handlers, children) =>
           createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
@@ -42,4 +45,11 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
 
 function createBrowserReactRootResource(state, root, React, hooks) {
   return createBrowserReactRootResourceFromNode(state, root, React, hooks);
+}
+
+function queryBrowserElement(selector) {
+  if (!globalThis.document) {
+    throw new Error("React selector host bindings require globalThis.document");
+  }
+  return globalThis.document.querySelector(selector);
 }

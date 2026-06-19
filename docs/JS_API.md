@@ -319,7 +319,8 @@ def bumpFromJs (n : Nat) : Nat :=
 ```
 
 Bind custom targets when constructing the runtime. User bindings override the
-default `common.*`, `browser.*`, and `react.root.*` bindings:
+default `common.*`, `browser.*`, and `react.*` bindings, including selector
+helpers such as `react.root.renderComponentIntoSelector`:
 
 ```js
 const vir = await createVirRuntime({

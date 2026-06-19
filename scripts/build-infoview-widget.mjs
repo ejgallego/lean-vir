@@ -68,6 +68,10 @@ const result = await esbuild.build({
 
 assert.equal(result.outputFiles.length, 1);
 const bundle = result.outputFiles[0].text;
+if (/from\s*["']react-dom\/client["']/.test(bundle)) {
+  console.error("infoview widget bundle must import react-dom, not react-dom/client");
+  process.exit(1);
+}
 
 if (check) {
   const existing = await readFile(outFile, "utf8").catch((error) => {

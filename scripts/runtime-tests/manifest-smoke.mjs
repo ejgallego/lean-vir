@@ -103,7 +103,7 @@ assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
 assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
-assert.equal(hostRuntime.packageInfo.hostImports, 37);
+assert.equal(hostRuntime.packageInfo.hostImports, 42);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
 assert.equal(runtime.packageMetadata.packageFormatVersion, 7);
 assert.equal(runtime.packageMetadata.manifestVersion, 1);
@@ -138,6 +138,7 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "browser.element.setAttribute",
   "browser.element.setTextContent",
   "browser.event.currentTarget",
+  "browser.event.formValue",
   "browser.event.preventDefault",
   "browser.event.stopPropagation",
   "browser.event.target",
@@ -148,6 +149,8 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "browser.htmlInputElement.setValue",
   "browser.timer.clearTimeout",
   "browser.timer.setTimeout",
+  "infoview.clipboard.writeText",
+  "infoview.command.revealPosition",
   "js.bool",
   "js.bool.value",
   "js.nat",
@@ -159,7 +162,9 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
   "react.root.create",
   "react.root.render",
   "react.root.renderComponent",
+  "react.root.renderComponentIntoSelector",
   "react.root.unmount",
+  "react.root.unmountSelector",
   "react.state.set",
   "react.useState",
   "test.callNatCallback",
@@ -167,10 +172,10 @@ assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.
 ]);
 const reactUseStateImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useState");
 assert.equal(reactUseStateImports.length, 1);
-assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
-assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
-assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
-assert.equal(reactUseStateImports[0]?.result?.fields?.find((field) => field.name === "value")?.type?.type, "Js");
+const reactUseStateResourceImport = reactUseStateImports[0];
+assert.equal(reactUseStateResourceImport?.args[0]?.type?.name, "Lean.Vir.Js");
+assert.equal(reactUseStateResourceImport?.args[0]?.type?.type, "Js");
+assert.equal(reactUseStateResourceImport?.result?.fields?.find((field) => field.name === "value")?.type?.type, "Js");
 assert.equal(
   hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.root.render")
     ?.args[1]?.type?.kind,

@@ -10,12 +10,13 @@ import Vir.React
 namespace ReactProofWidgetHello
 
 open Lean.Vir.React
+open Lean.Vir.Browser (DomM)
 open Lean.Vir.Infoview (Goal Hypothesis Surface)
 
 namespace Style
 
 def style (entries : Array (String × String)) : Property :=
-  Property.style <| entries.map fun (name, value) => { name, value }
+  Property.stylePairs entries
 
 def vscodeColor (name fallback : String) : String :=
   "var(--vscode-" ++ name ++ ", " ++ fallback ++ ")"
@@ -138,44 +139,69 @@ def firstHypothesisSummary (goal : Goal) : String :=
   | none => "No local hypotheses."
   | some hypothesis => hypothesisLabel hypothesis ++ " : " ++ hypothesis.type
 
-def metric (label value : String) : Html :=
-  Html.divWith #[Style.metric] #[] #[
-    Html.spanWith #[Style.metricLabel] #[] #[.text label],
-    Html.strongWith #[Style.metricValue] #[] #[.text value]
+def metric (label value : String) : ReactM (Lean.Vir.Js Node) := do
+  let labelText ← Node.text label
+  let labelNode ← Node.spanWith #[Style.metricLabel] #[] #[labelText]
+  let valueText ← Node.text value
+  let valueNode ← Node.strongWith #[Style.metricValue] #[] #[valueText]
+  Node.divWith #[Style.metric] #[] #[
+    labelNode,
+    valueNode
   ]
 
-def metrics (surface : Surface) : Html :=
+def metrics (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
   let goalCount := surface.goals.size
   let hypCount := hypothesisCount surface
   let selectionCount := surface.selections.size
-  Html.divWith #[Property.id "react-proof-hello-metrics", Style.grid] #[] #[
-    metric "Goals" s!"{goalCount} {plural goalCount "goal" "goals"}",
-    metric "Hypotheses" s!"{hypCount}",
-    metric "Selection" s!"{selectionCount}",
-    metric "Cursor" surface.cursor.label
+  let goals ← metric "Goals" s!"{goalCount} {plural goalCount "goal" "goals"}"
+  let hypotheses ← metric "Hypotheses" s!"{hypCount}"
+  let selection ← metric "Selection" s!"{selectionCount}"
+  let cursor ← metric "Cursor" surface.cursor.label
+  Node.divWith #[Property.id "react-proof-hello-metrics", Style.grid] #[] #[
+    goals,
+    hypotheses,
+    selection,
+    cursor
   ]
 
-def goalDetails (surface : Surface) : Html :=
+def goalDetails (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
   match surface.goals[0]? with
   | none =>
-      Html.pWith #[Property.id "react-proof-hello-empty", Style.summary] #[] #[
-        .text "Move the cursor into a proof to see its first goal."
+      let text ← Node.text "Move the cursor into a proof to see its first goal."
+      Node.pWith #[Property.id "react-proof-hello-empty", Style.summary] #[] #[
+        text
       ]
   | some goal =>
-      Html.articleWith #[Property.id "react-proof-hello-goal"] #[] #[
-        Html.pWith #[Property.id "react-proof-hello-goal-title", Style.summary] #[] #[
-          .text (goalSummary goal)
-        ],
-        Html.preWith #[Property.id "react-proof-hello-target", Style.pre] #[] #[
-          .text goal.target
-        ],
-        Html.pWith #[Property.id "react-proof-hello-hypothesis", Style.summary] #[] #[
-          .text (firstHypothesisSummary goal)
-        ]
+      let titleText ← Node.text (goalSummary goal)
+      let title ← Node.pWith #[Property.id "react-proof-hello-goal-title", Style.summary] #[] #[
+        titleText
+      ]
+      let targetText ← Node.text goal.target
+      let target ← Node.preWith #[Property.id "react-proof-hello-target", Style.pre] #[] #[
+        targetText
+      ]
+      let hypothesisText ← Node.text (firstHypothesisSummary goal)
+      let hypothesis ← Node.pWith #[Property.id "react-proof-hello-hypothesis", Style.summary] #[] #[
+        hypothesisText
+      ]
+      Node.articleWith #[Property.id "react-proof-hello-goal"] #[] #[
+        title,
+        target,
+        hypothesis
       ]
 
-def view (surface : Surface) : Html :=
-  Html.sectionWith
+def View : Component Surface := fun surface => do
+  let titleText ← Node.text "Hello ProofWidget from IRIF"
+  let title ← Node.h3With #[Property.id "react-proof-hello-title", Style.title] #[] #[
+    titleText
+  ]
+  let summaryText ← Node.text (firstGoalSummary surface)
+  let summary ← Node.pWith #[Property.id "react-proof-hello-summary", Style.summary] #[] #[
+    summaryText
+  ]
+  let metricsNode ← metrics surface
+  let details ← goalDetails surface
+  Node.sectionWith
     #[
       Property.id "react-proof-hello",
       Property.role "region",
@@ -184,23 +210,22 @@ def view (surface : Surface) : Html :=
     ]
     #[]
     #[
-      Html.h3With #[Property.id "react-proof-hello-title", Style.title] #[] #[
-        .text "Hello ProofWidget"
-      ],
-      Html.pWith #[Property.id "react-proof-hello-summary", Style.summary] #[] #[
-        .text (firstGoalSummary surface)
-      ],
-      metrics surface,
-      goalDetails surface
+      title,
+      summary,
+      metricsNode,
+      details
     ]
 
-def render (surface : Surface) : Html :=
+def view (surface : Surface) : ReactM (Lean.Vir.Js Node) :=
+  Node.component View surface
+
+def render (surface : Surface) : ReactM (Lean.Vir.Js Node) :=
   view surface
 
-def mount (selector : String) (surface : Surface) : IO Bool := do
-  Root.renderIntoSelector selector (render surface)
+def mount (selector : String) (surface : Surface) : DomM Bool := do
+  Root.renderComponentIntoSelector selector View surface
 
-def unmount (selector : String) : IO Bool :=
+def unmount (selector : String) : DomM Bool :=
   Root.unmountSelector selector
 
 def irPackage : Lean.Vir.Infoview.IRPackage where
@@ -225,8 +250,8 @@ end ReactProofWidgetHello
 This is the smallest live VIR proof-widget example. It demonstrates the
 required shape:
 
-- a `String -> Surface -> IO Bool` mount entry;
-- a matching `String -> IO Bool` unmount entry;
+- a `String -> Surface -> DomM Bool` mount entry;
+- a matching `String -> DomM Bool` unmount entry;
 - a file-local `IRPackage` that names those entries;
 - a `show_panel_widgets` command that loads the package in the infoview.
 

@@ -376,7 +376,7 @@ returns `some value` for `HTMLInputElement`, `HTMLTextAreaElement`, and
 `HTMLSelectElement` targets, and `none` for other elements.
 -/
 @[vir_js "browser.event.formValue"]
-opaque formValue? (event : @& Event) : IO (Option String)
+opaque formValue? (event : @& Lean.Vir.Js Event) : DomM (Option String)
 
 /--
 Returns the current checked state for an input-like event.

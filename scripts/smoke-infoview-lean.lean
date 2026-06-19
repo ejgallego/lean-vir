@@ -1,6 +1,27 @@
 import Vir.Infoview
+import Vir.React
 
 namespace SmokeInfoviewLean
+
+/--
+error: failed to synthesize
+  MonadLift IO Lean.Vir.React.ReactM
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+-/
+#guard_msgs in
+#synth MonadLift IO Lean.Vir.React.ReactM
+
+/--
+error: failed to synthesize
+  MonadLift IO Lean.Vir.Browser.DomM
+
+Hint: Additional diagnostic information may be available using the `set_option diagnostics true` command.
+-/
+#guard_msgs in
+#synth MonadLift IO Lean.Vir.Browser.DomM
+
+example : MonadLift Lean.Vir.React.ReactM Lean.Vir.Browser.DomM := inferInstance
 
 def expect (label : String) (ok : Bool) : IO Unit := do
   unless ok do
@@ -35,6 +56,10 @@ def expectRootsError (roots : Array String) : IO Unit := do
   expect "base64 Lean" (Lean.Vir.Infoview.base64Encode "Lean".toUTF8 == "TGVhbg==")
   expect "embedded widget bundle has cursor surface" <|
     1 < (Lean.Vir.Infoview.widget.javascript.splitOn "documentPositionFromInfoviewPosition").length
+  expect "embedded widget bundle uses infoview react-dom external" <|
+    1 < (Lean.Vir.Infoview.widget.javascript.splitOn "from \"react-dom\"").length
+  expect "embedded widget bundle avoids react-dom/client" <|
+    (Lean.Vir.Infoview.widget.javascript.splitOn "react-dom/client").length == 1
   expectPathOk "web/public/demo-host.irpkg" "web/public/demo-host.irpkg"
   expectPathError ""
   expectPathError "/tmp/demo-host.irpkg"

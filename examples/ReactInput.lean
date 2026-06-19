@@ -14,6 +14,9 @@ open Lean.Vir.React
 def checkedLabel (checked : Bool) : String :=
   "checked:" ++ toString checked
 
+def selectTextareaLabel (note flavor : String) : String :=
+  "note:" ++ note ++ "; flavor:" ++ flavor
+
 def inputComponent : Component Unit :=
   fun _ => do
     let initial ← JsValue.ofString ""
@@ -98,6 +101,76 @@ def checkboxComponent : Component Unit :=
         #[outputText]
     Node.divWith #[Property.id "react-checkbox-widget"] #[] #[input, output]
 
+def selectTextareaComponent : Component Unit :=
+  fun _ => do
+    let initialNote ← JsValue.ofString "draft"
+    let note ← Hooks.useState initialNote
+    let noteValue ← JsValue.toString note.value
+    let initialFlavor ← JsValue.ofString "vanilla"
+    let flavor ← Hooks.useState initialFlavor
+    let flavorValue ← JsValue.toString flavor.value
+    let sectionText ← Node.text "fields"
+    let sectionNode ← Node.spanWith #[Property.classList #["react-select-textarea-section"]] #[] #[sectionText]
+    let choiceText ← Node.text flavorValue
+    let choice ← Node.spanWith #[Property.classList #["react-select-textarea-choice"]] #[] #[choiceText]
+    let nav ← Node.navWith
+      #[Property.id "react-select-textarea-nav", Property.ariaLabel "React textarea fixture"]
+      #[]
+      #[sectionNode, choice]
+    let noteLabelText ← Node.text "note:"
+    let noteLabel ← Node.labelWith #[Property.htmlFor "react-note-input"] #[] #[noteLabelText]
+    let noteInput ←
+      Node.textarea
+        #[
+          Property.id "react-note-input",
+          Property.inputName "note",
+          Property.inputValue noteValue,
+          Property.rows 3,
+          Property.cols 24,
+          Property.placeholder "note"
+        ]
+        #[EventHandler.onChange fun event => do
+          match ← Lean.Vir.Browser.Event.formValue? event with
+          | none => pure ()
+          | some next => do
+              let nextValue ← (JsValue.ofString next).run
+              (State.set note nextValue).run]
+    let flavorLabelText ← Node.text "flavor:"
+    let flavorLabel ← Node.labelWith #[Property.htmlFor "react-flavor-select"] #[] #[flavorLabelText]
+    let vanillaText ← Node.text "vanilla"
+    let vanilla ← Node.keyedOptionWith "vanilla" #[Property.inputValue "vanilla"] #[] #[vanillaText]
+    let chocolateText ← Node.text "chocolate"
+    let chocolate ← Node.keyedOptionWith "chocolate" #[Property.inputValue "chocolate"] #[] #[chocolateText]
+    let strawberryText ← Node.text "strawberry"
+    let strawberry ← Node.keyedOptionWith "strawberry" #[Property.inputValue "strawberry"] #[] #[strawberryText]
+    let select ←
+      Node.selectWith
+        #[
+          Property.id "react-flavor-select",
+          Property.inputName "flavor",
+          Property.inputValue flavorValue
+        ]
+        #[EventHandler.onChange fun event => do
+          match ← Lean.Vir.Browser.Event.formValue? event with
+          | none => pure ()
+          | some next => do
+              let nextValue ← (JsValue.ofString next).run
+              (State.set flavor nextValue).run]
+        #[vanilla, chocolate, strawberry]
+    let outputText ← Node.text (selectTextareaLabel noteValue flavorValue)
+    let output ← Node.spanWith
+      #[Property.id "react-select-textarea-output"]
+      #[]
+      #[outputText]
+    Node.mainWith #[Property.id "react-select-textarea-widget"] #[] #[
+      nav,
+      noteLabel,
+      noteInput,
+      flavorLabel,
+      select,
+      output
+    ]
+
 def renderAttributesInto (root : Lean.Vir.Js Root) : DomM Unit := do
   Root.render root do
     let labelText ← Node.text "attrs:"
@@ -153,6 +226,9 @@ def mountInput (selector : String) : DomM Bool :=
 
 def mountChangeInput (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root changeInputComponent ()
+
+def mountSelectTextarea (selector : String) : DomM Bool :=
+  Root.mountFromSelector selector fun root => Root.renderComponent root selectTextareaComponent ()
 
 def mountCheckbox (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root checkboxComponent ()

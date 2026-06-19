@@ -282,7 +282,7 @@ contract.
 The React browser fixtures are split by intent: `examples/ReactCounter.lean`
 contains the hook-backed counter, static render, lifecycle, and stress cases, while
 `examples/ReactInput.lean` contains hook-backed controlled text, change,
-submit, attribute-conformance, and checkbox callbacks. `examples/Tamagotchi.lean`
+submit, textarea/select, attribute-conformance, and checkbox callbacks. `examples/Tamagotchi.lean`
 keeps both demos: `Tamagotchi` is the non-React DOM-hosted version, and
 `ReactTamagotchi` reuses the same model with a keyed React tree, controlled
 text input, checkbox state, form submit handling, and action callbacks.
@@ -302,7 +302,7 @@ The `Vir.Infoview` module provides the first infoview-facing shell:
 
 `WidgetProps` points the infoview widget at a VIR runtime module URL, the
 `vir-upstream.wasm` URL, an `.irpkg` URL, and an entry name. The entry must have
-signature `String -> IO Bool`; the shell creates a nested mount element, passes
+signature `String -> DomM Bool`; the shell creates a nested mount element, passes
 its selector to the entry, and disposes the VIR runtime when the infoview widget
 unmounts. `examples/InfoviewVirWidget.lean` is the local smoke example for this
 path. `node scripts/smoke-infoview-widget.mjs` checks that the shell module
