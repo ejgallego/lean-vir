@@ -28,6 +28,7 @@ import {
   encodeResolvedCallPayload,
 } from "./runtime/vir-value-codec.js";
 import {
+  asByteArrayBytes,
   normalizeFloat,
 } from "./runtime/vir-value-normalizers.js";
 
@@ -40,7 +41,7 @@ const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 const virCallbackStates = new WeakMap();
-const DIRECT_CALL_UNAVAILABLE = Symbol("direct-call-unavailable");
+const FAST_CALL_UNAVAILABLE = Symbol("fast-call-unavailable");
 
 export {
   roundTripInterfaceTypeDescriptor,
@@ -471,9 +472,13 @@ export class VirRuntime {
 
     const cache = this.callCacheFor(entry);
     this.hostState?.clearTransientQueues();
-    const directResult = this.tryDirectResolvedCall(entry, args, cache);
-    if (directResult !== DIRECT_CALL_UNAVAILABLE) {
-      return directResult;
+    const primitiveResult = this.tryPrimitiveResolvedCall(entry, args, cache);
+    if (primitiveResult !== FAST_CALL_UNAVAILABLE) {
+      return primitiveResult;
+    }
+    const objectResult = this.tryObjectResolvedCall(entry, args, cache);
+    if (objectResult !== FAST_CALL_UNAVAILABLE) {
+      return objectResult;
     }
     let payload;
     try {
@@ -503,9 +508,9 @@ export class VirRuntime {
     }
   }
 
-  tryDirectResolvedCall(entry, args, cache) {
+  tryPrimitiveResolvedCall(entry, args, cache) {
     if (entry.effect !== "pure" || entry.args.length !== 1) {
-      return DIRECT_CALL_UNAVAILABLE;
+      return FAST_CALL_UNAVAILABLE;
     }
     const argType = entry.args[0].type;
     const resultType = entry.result;
@@ -514,10 +519,10 @@ export class VirRuntime {
     const argLane = primitiveLaneForTag(argTag);
     const resultLane = primitiveLaneForTag(resultTag);
     if (argLane === null || resultLane === null || resultTag !== argTag) {
-      return DIRECT_CALL_UNAVAILABLE;
+      return FAST_CALL_UNAVAILABLE;
     }
     if (typeof this.exports.vir_call_resolved_primitive !== "function") {
-      return DIRECT_CALL_UNAVAILABLE;
+      return FAST_CALL_UNAVAILABLE;
     }
     const callSlot = this.resolveCallSlot(entry, cache);
     const label = `${entry.entry} argument ${entry.args[0].name}`;
@@ -537,7 +542,7 @@ export class VirRuntime {
 
     if (argLane === PRIMITIVE_LANE.U32) {
       if (typeof this.exports.vir_call_primitive_set_u32 !== "function") {
-        return DIRECT_CALL_UNAVAILABLE;
+        return FAST_CALL_UNAVAILABLE;
       }
       this.exports.vir_call_primitive_set_u32(normalizeDirectU32(args[0], argTag, label));
       return finish();
@@ -545,7 +550,7 @@ export class VirRuntime {
 
     if (argLane === PRIMITIVE_LANE.F64) {
       if (typeof this.exports.vir_call_primitive_set_f64 !== "function") {
-        return DIRECT_CALL_UNAVAILABLE;
+        return FAST_CALL_UNAVAILABLE;
       }
       this.exports.vir_call_primitive_set_f64(normalizeFloat(args[0], label));
       return finish();
@@ -555,7 +560,7 @@ export class VirRuntime {
       if (
         typeof this.exports.vir_call_primitive_set_string !== "function" ||
         typeof this.exports.vir_call_primitive_string_result !== "function") {
-        return DIRECT_CALL_UNAVAILABLE;
+        return FAST_CALL_UNAVAILABLE;
       }
       if (typeof args[0] !== "string") {
         throw new Error(`${label} must be a string`);
@@ -572,11 +577,72 @@ export class VirRuntime {
       }
     }
 
-    return DIRECT_CALL_UNAVAILABLE;
+    return FAST_CALL_UNAVAILABLE;
+  }
+
+  tryObjectResolvedCall(entry, args, cache) {
+    if (entry.effect !== "pure" || entry.args.length !== 1) {
+      return FAST_CALL_UNAVAILABLE;
+    }
+    const argTag = entry.args[0].type?.wireTag;
+    const resultTag = entry.result?.wireTag;
+    if (argTag !== WIRE.BYTE_ARRAY || resultTag !== WIRE.BYTE_ARRAY) {
+      return FAST_CALL_UNAVAILABLE;
+    }
+    if (
+      typeof this.exports.vir_call_resolved_objects !== "function" ||
+      typeof this.exports.vir_obj_byte_array !== "function" ||
+      typeof this.exports.vir_obj_byte_array_data !== "function" ||
+      typeof this.exports.vir_obj_byte_array_size !== "function" ||
+      typeof this.exports.vir_obj_dec !== "function") {
+      return FAST_CALL_UNAVAILABLE;
+    }
+
+    const bytes = asByteArrayBytes(args[0]);
+    const callSlot = this.resolveCallSlot(entry, cache);
+    const inputPtr = this.allocBytes(bytes);
+    let argObj = 0;
+    let argvPtr = 0;
+    let resultObj = 0;
+    let callStarted = false;
+    try {
+      argObj = this.exports.vir_obj_byte_array(inputPtr, bytes.byteLength);
+      argvPtr = this.allocBytes(new Uint8Array(4));
+      new DataView(this.exports.memory.buffer, argvPtr, 4).setUint32(0, argObj, true);
+      resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, 1);
+      callStarted = true;
+      argObj = 0;
+      const error = this.lastCallError();
+      if (error !== "") {
+        throw new Error(error);
+      }
+      if (resultObj === 0) {
+        throw new Error(`object call failed: ${entry.entry}`);
+      }
+      return this.readObjectByteArray(resultObj);
+    } finally {
+      this.freeBytes(inputPtr);
+      if (argvPtr !== 0) {
+        this.freeBytes(argvPtr);
+      }
+      if (!callStarted && argObj !== 0) {
+        this.exports.vir_obj_dec(argObj);
+      }
+      if (resultObj !== 0) {
+        this.exports.vir_obj_dec(resultObj);
+      }
+    }
   }
 
   readPrimitiveResult(lane, tag) {
     return readPrimitiveResult(this, lane, tag);
+  }
+
+  readObjectByteArray(obj) {
+    return this.readWasmBytes(
+      this.exports.vir_obj_byte_array_data(obj),
+      this.exports.vir_obj_byte_array_size(obj),
+    );
   }
 
   callCacheFor(entry) {

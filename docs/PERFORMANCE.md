@@ -54,6 +54,10 @@ public API remains `vir.call(...)`; internally they bypass payload allocation,
 binary value encoding, and result byte decoding after the package slot is
 resolved. The `direct` rows expose the same primitive-lane path explicitly for
 benchmarking.
+Exact pure `ByteArray -> ByteArray` calls use the object ABI lane through the
+normal `wasm` sample: JavaScript lowers the input with `vir_obj_byte_array`,
+calls `vir_call_resolved_objects`, and lifts the owned result with the
+byte-array inspection helpers.
 
 The machine-readable report schema is `lean-vir.bench.v1`. Benchmark rows are
 objects under the top-level `benchmarks` array. Every timed sample uses the same
