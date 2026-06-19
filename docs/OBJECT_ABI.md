@@ -49,11 +49,16 @@ The initial exported object helper surface is deliberately small:
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
 - `vir_obj_array`
 - `vir_obj_list`
+- `vir_obj_ctor`
+- `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
+- `vir_obj_tag` / `vir_obj_field`
 - `vir_obj_nat` / `vir_obj_nat_decimal`
 - `vir_obj_int` / `vir_obj_int_decimal`
-- `vir_obj_uint32`
+- `vir_obj_uint32` / `vir_obj_uint32_value`
 - `vir_obj_uint64` / `vir_obj_uint64_decimal`
 - `vir_obj_usize` / `vir_obj_usize_decimal`
+- `vir_obj_float` / `vir_obj_float_value`
+- `vir_obj_float32` / `vir_obj_float32_value`
 - `vir_obj_decimal_size`
 - `vir_obj_inc` / `vir_obj_dec`
 - `vir_call_resolved_objects`
@@ -69,6 +74,10 @@ owned Lean array object. If it fails before consuming them, JavaScript still own
 the element references and must release them.
 `vir_obj_list` follows the same ownership rule and builds a Lean list in input
 order.
+`vir_obj_ctor` consumes owned field references and returns one owned constructor
+object with object fields only. If construction fails before consuming fields,
+JavaScript still owns the field references. `vir_obj_field` returns a new owned
+reference to the requested object field, so JavaScript must release it.
 
 ## Ownership
 
@@ -82,7 +91,10 @@ retain an object across a helper call that consumes one reference.
 `argv` pointer has been accepted. On success it returns an owned Lean object
 result that JavaScript must release with `vir_obj_dec` after lifting. A returned
 pointer of `0` is the null failure sentinel; JavaScript should inspect
-`vir_call_error_size` for the diagnostic.
+`vir_call_error_size` for the diagnostic. The helper uses a generated `_boxed`
+declaration when the package has one. If there is no `_boxed` declaration, it
+may call the base declaration only when the package signature does not require a
+boxed wasm32 boundary for the top-level argument or result type.
 
 Immediate scalar objects are allowed. They are still non-null object values at
 the ABI boundary. `vir_obj_inc` and `vir_obj_dec` are the only public operations
@@ -120,18 +132,19 @@ The compact byte payload path remains the complete path while this lands. It
 handles structured values, resources, callbacks, and host imports. Primitive
 lane helpers are still useful for the hottest exact scalar signatures because
 they avoid both byte payloads and object allocation.
-The first automatic object-lane selections in `VirRuntime.call` are exact pure
-same-type calls for `Nat`, `Int`, `UInt64`, `USize`, and `ByteArray`, plus the
-shallow `Array Nat -> Nat`, `Array String -> Nat`, and `List UInt32 -> Nat`
-cases, when the package includes the generated `_boxed` declaration for that
-entry. Decimal scalar calls lower through the corresponding `vir_obj_*`
-constructor, call
-`vir_call_resolved_objects`, lift the result with the matching decimal
-inspection helper plus `vir_obj_decimal_size`, and release the owned result with
-`vir_obj_dec`. Byte-array calls use `vir_obj_byte_array` and lift the result with
+The automatic object-lane selection in `VirRuntime.call` covers pure unary calls
+whose argument can be lowered from the current object subset and whose result can
+be lifted from it. Arguments currently support base values, `Array`, `List`,
+`Option`, and `Prod`; sequence and product fields are lowered recursively.
+Results currently support base values, `Option`, and `Prod`; array/list result
+inspection still falls back to the byte codec. Decimal scalar calls lower through
+the corresponding `vir_obj_*` constructor, call `vir_call_resolved_objects`, lift
+the result with the matching decimal inspection helper plus
+`vir_obj_decimal_size`, and release the owned result with `vir_obj_dec`.
+Byte-array calls use `vir_obj_byte_array` and lift the result with
 `vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each
-supported element to an owned object, pack those objects with `vir_obj_array` or
-`vir_obj_list`, and lift the `Nat` result through `vir_obj_nat_decimal`.
+supported element to an owned object and pack those objects with `vir_obj_array`
+or `vir_obj_list`.
 
 ## Phases
 

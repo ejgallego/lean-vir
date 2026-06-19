@@ -96,6 +96,25 @@ extern "C" lean::object * vir_obj_array(lean::object ** values, uint32_t len) {
     return array;
 }
 
+extern "C" lean::object * vir_obj_ctor(uint32_t tag, lean::object ** fields, uint32_t len) {
+    if (fields == nullptr && len != 0) {
+        return nullptr;
+    }
+    if (tag > std::numeric_limits<uint8_t>::max()) {
+        return nullptr;
+    }
+    for (uint32_t i = 0; i < len; i++) {
+        if (fields[i] == nullptr) {
+            return nullptr;
+        }
+    }
+    lean::object * obj = lean_alloc_ctor(static_cast<uint8_t>(tag), len, 0);
+    for (uint32_t i = 0; i < len; i++) {
+        lean_ctor_set(obj, i, fields[i]);
+    }
+    return obj;
+}
+
 extern "C" lean::object * vir_obj_list(lean::object ** values, uint32_t len) {
     if (values == nullptr && len != 0) {
         return nullptr;
@@ -113,6 +132,31 @@ extern "C" lean::object * vir_obj_list(lean::object ** values, uint32_t len) {
         out = cons;
     }
     return out;
+}
+
+extern "C" lean::object * vir_obj_scalar(uint32_t value) {
+    return lean_box(value);
+}
+
+extern "C" uint32_t vir_obj_is_scalar(lean::object * value) {
+    return lean_is_scalar(value) ? 1 : 0;
+}
+
+extern "C" uint32_t vir_obj_scalar_value(lean::object * value) {
+    return static_cast<uint32_t>(lean_unbox(value));
+}
+
+extern "C" uint32_t vir_obj_tag(lean::object * value) {
+    return static_cast<uint32_t>(lean_obj_tag(value));
+}
+
+extern "C" lean::object * vir_obj_field(lean::object * value, uint32_t index) {
+    if (lean_is_scalar(value) || index >= lean_ctor_num_objs(value)) {
+        return nullptr;
+    }
+    lean::object * field = lean_ctor_get(value, index);
+    lean_inc(field);
+    return field;
 }
 
 extern "C" lean::object * vir_obj_nat(char const * text, uint32_t len) {
@@ -150,6 +194,10 @@ extern "C" lean::object * vir_obj_uint32(uint32_t value) {
     return lean_box_uint32(value);
 }
 
+extern "C" uint32_t vir_obj_uint32_value(lean::object * value) {
+    return lean_unbox_uint32(value);
+}
+
 extern "C" lean::object * vir_obj_uint64(char const * text, uint32_t len) {
     uint64_t value = 0;
     if (!parse_u64(text, len, value)) {
@@ -174,6 +222,22 @@ extern "C" lean::object * vir_obj_usize(char const * text, uint32_t len) {
 extern "C" char const * vir_obj_usize_decimal(lean::object * value) {
     g_obj_decimal_result = std::to_string(lean_unbox_usize(value));
     return g_obj_decimal_result.c_str();
+}
+
+extern "C" lean::object * vir_obj_float(double value) {
+    return lean_box_float(value);
+}
+
+extern "C" double vir_obj_float_value(lean::object * value) {
+    return lean_unbox_float(value);
+}
+
+extern "C" lean::object * vir_obj_float32(float value) {
+    return lean_box_float32(value);
+}
+
+extern "C" float vir_obj_float32_value(lean::object * value) {
+    return lean_unbox_float32(value);
 }
 
 extern "C" uint32_t vir_obj_decimal_size(void) {

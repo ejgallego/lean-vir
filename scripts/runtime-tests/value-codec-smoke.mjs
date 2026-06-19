@@ -364,6 +364,22 @@ try {
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseArrayNatSum", [4, 5, 6]), "15");
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { some: 41 }), "42");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null), "empty");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", [4, 5, 6]), "15");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSwap", { fst: 2, snd: 9 }), {
+    fst: "9",
+    snd: "2",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.prodNatNatSum", [4, 5]), "9");
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listProdNatStringScore", [
+    { fst: 4, snd: "ab" },
+    [5, "c"],
+  ]), "12");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.prodStringNatSwap", { fst: "ok", snd: 6 }), {
+    fst: "7",
+    snd: "ok!",
+  });
   assert.deepEqual(
     runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [65, 66, 67]),
     Uint8Array.from([65, 66, 67]),
@@ -371,7 +387,7 @@ try {
 } finally {
   runtime.exports = objectCallExports;
 }
-assert.equal(objectCalls, 8);
+assert.equal(objectCalls, 15);
 assert.equal(codecFallbackCalls, 0);
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");

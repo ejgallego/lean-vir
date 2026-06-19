@@ -54,14 +54,16 @@ public API remains `vir.call(...)`; internally they bypass payload allocation,
 binary value encoding, and result byte decoding after the package slot is
 resolved. The `direct` rows expose the same primitive-lane path explicitly for
 benchmarking.
-Exact pure same-type calls over `Nat`, `Int`, `UInt64`, `USize`, and
-`ByteArray`, plus the shallow `Array Nat -> Nat` and `Array String -> Nat`
-cases, and the `List UInt32 -> Nat` interface smoke case, use the object ABI
-lane through the normal `wasm` sample when the package includes the generated
-`_boxed` declaration for the entry. JavaScript lowers the input with the
-matching `vir_obj_*` constructor, `vir_obj_array`, or `vir_obj_list`, calls
-`vir_call_resolved_objects`, and lifts the owned result with the decimal scalar
-or byte-array inspection helpers.
+Pure unary calls over the supported object subset use the object ABI lane
+through the normal `wasm` sample. The runtime currently lowers base arguments,
+`Array`, `List`, `Option`, and `Prod`, and lifts base, `Option`, and `Prod`
+results. The no-fallback runtime smoke covers decimal scalars, `ByteArray`,
+`Array Nat -> Nat`, `Array String -> Nat`, `List UInt32 -> Nat`, `Option`
+arguments/results, `Prod` arguments/results, and a nested `List (Nat × String)`
+argument. JavaScript lowers inputs with the matching `vir_obj_*` constructor,
+`vir_obj_array`, `vir_obj_list`, or `vir_obj_ctor`, calls
+`vir_call_resolved_objects`, and lifts the owned result with the matching
+inspection helpers.
 
 The machine-readable report schema is `lean-vir.bench.v1`. Benchmark rows are
 objects under the top-level `benchmarks` array. Every timed sample uses the same

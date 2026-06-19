@@ -9,6 +9,7 @@ import { createBrowserHostBindings } from "./vir-host-bindings.js";
 import {
   asBytes,
   normalizeUint32,
+  requireTypeField,
 } from "./runtime/vir-codec.js";
 import { WIRE } from "./runtime/wire-tags.js";
 import {
@@ -29,9 +30,14 @@ import {
 } from "./runtime/vir-value-codec.js";
 import {
   asByteArrayBytes,
+  enumValue,
   normalizeArray,
   normalizeDecimal,
+  normalizeEnum,
   normalizeFloat,
+  normalizeInteger,
+  normalizeOption,
+  normalizePair,
 } from "./runtime/vir-value-normalizers.js";
 
 export {
@@ -46,6 +52,37 @@ const MAX_UINT64 = 0xffffffffffffffffn;
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 const virCallbackStates = new WeakMap();
 const FAST_CALL_UNAVAILABLE = Symbol("fast-call-unavailable");
+const OBJECT_VALUE_EXPORTS = [
+  "vir_obj_array",
+  "vir_obj_byte_array",
+  "vir_obj_byte_array_data",
+  "vir_obj_byte_array_size",
+  "vir_obj_ctor",
+  "vir_obj_decimal_size",
+  "vir_obj_field",
+  "vir_obj_float",
+  "vir_obj_float_value",
+  "vir_obj_float32",
+  "vir_obj_float32_value",
+  "vir_obj_int",
+  "vir_obj_int_decimal",
+  "vir_obj_list",
+  "vir_obj_nat",
+  "vir_obj_nat_decimal",
+  "vir_obj_is_scalar",
+  "vir_obj_scalar",
+  "vir_obj_scalar_value",
+  "vir_obj_string",
+  "vir_obj_string_data",
+  "vir_obj_string_size",
+  "vir_obj_tag",
+  "vir_obj_uint32",
+  "vir_obj_uint32_value",
+  "vir_obj_uint64",
+  "vir_obj_uint64_decimal",
+  "vir_obj_usize",
+  "vir_obj_usize_decimal",
+];
 
 export {
   roundTripInterfaceTypeDescriptor,
@@ -592,131 +629,148 @@ export class VirRuntime {
     if (entry.effect !== "pure" || entry.args.length !== 1) {
       return FAST_CALL_UNAVAILABLE;
     }
-    if (!this.boxedCallEntryNames.has(entry.entry)) {
+    const argType = entry.args[0].type;
+    const resultType = entry.result;
+    if (!objectArgumentSupported(argType) || !objectResultSupported(resultType)) {
       return FAST_CALL_UNAVAILABLE;
     }
-    const argTag = entry.args[0].type?.wireTag;
-    const resultTag = entry.result?.wireTag;
-    if ((argTag === WIRE.ARRAY || argTag === WIRE.LIST) && resultTag === WIRE.NAT) {
-      return this.tryObjectSequenceToNatCall(entry, args, cache);
-    }
-    if (argTag !== resultTag) {
+    const hasBoxedDecl = this.boxedCallEntryNames.has(entry.entry);
+    if (
+      !hasBoxedDecl &&
+      (objectTypeNeedsBoxedBoundary(argType) || objectTypeNeedsBoxedBoundary(resultType))
+    ) {
       return FAST_CALL_UNAVAILABLE;
     }
-    if (argTag === WIRE.BYTE_ARRAY) {
-      return this.tryObjectByteArrayCall(entry, args, cache);
-    }
-    if (argTag === WIRE.NAT) {
-      return this.tryObjectDecimalCall(entry, args, cache, {
-        constructorName: "vir_obj_nat",
-        decimalName: "vir_obj_nat_decimal",
-        decimal: normalizeDecimal(args[0], `${entry.entry} argument ${entry.args[0].name}`, { signed: false }),
-      });
-    }
-    if (argTag === WIRE.INT) {
-      return this.tryObjectDecimalCall(entry, args, cache, {
-        constructorName: "vir_obj_int",
-        decimalName: "vir_obj_int_decimal",
-        decimal: normalizeDecimal(args[0], `${entry.entry} argument ${entry.args[0].name}`, { signed: true }),
-      });
-    }
-    if (argTag === WIRE.UINT64) {
-      const label = `${entry.entry} argument ${entry.args[0].name}`;
-      return this.tryObjectDecimalCall(entry, args, cache, {
-        constructorName: "vir_obj_uint64",
-        decimalName: "vir_obj_uint64_decimal",
-        decimal: normalizeBoundedUnsignedDecimal(args[0], label, MAX_UINT64, "UInt64"),
-      });
-    }
-    if (argTag === WIRE.USIZE) {
-      const label = `${entry.entry} argument ${entry.args[0].name}`;
-      return this.tryObjectDecimalCall(entry, args, cache, {
-        constructorName: "vir_obj_usize",
-        decimalName: "vir_obj_usize_decimal",
-        decimal: normalizeBoundedUnsignedDecimal(args[0], label, this.usizeMaxValue(), "USize"),
-      });
-    }
-    return FAST_CALL_UNAVAILABLE;
-  }
-
-  tryObjectByteArrayCall(entry, args, cache) {
-    if (!this.hasObjectCallExports(
-      "vir_obj_byte_array",
-      "vir_obj_byte_array_data",
-      "vir_obj_byte_array_size",
-    )) {
+    if (!this.hasObjectValueExports()) {
       return FAST_CALL_UNAVAILABLE;
     }
-
-    const bytes = asByteArrayBytes(args[0]);
-    const inputPtr = this.allocBytes(bytes);
-    try {
-      const argObj = this.exports.vir_obj_byte_array(inputPtr, bytes.byteLength);
-      return this.callResolvedObjectUnary(entry, cache, argObj, (resultObj) =>
-        this.readObjectByteArray(resultObj));
-    } finally {
-      this.freeBytes(inputPtr);
-    }
-  }
-
-  tryObjectDecimalCall(entry, args, cache, { constructorName, decimalName, decimal }) {
-    if (!this.hasObjectCallExports(constructorName, decimalName, "vir_obj_decimal_size")) {
-      return FAST_CALL_UNAVAILABLE;
-    }
-    const argObj = this.makeObjectDecimal(
-      constructorName,
-      decimal,
-      `${entry.entry} argument ${entry.args[0].name}`,
-    );
+    const label = `${entry.entry} argument ${entry.args[0].name}`;
+    const argObj = this.makeObjectValue(argType, args[0], label);
     return this.callResolvedObjectUnary(entry, cache, argObj, (resultObj) =>
-      this.readObjectDecimal(resultObj, decimalName));
+      this.liftObjectValue(resultType, resultObj, `${entry.entry} result`));
   }
 
-  tryObjectSequenceToNatCall(entry, args, cache) {
-    const sequenceType = entry.args[0].type;
+  hasObjectValueExports() {
+    return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
+  }
+
+  makeObjectValue(type, value, label, selfType = null) {
+    const tag = type?.wireTag;
+    switch (tag) {
+      case WIRE.RECURSIVE_SELF:
+        if (selfType === null) {
+          throw new Error(`${label} has a recursive self reference without an enclosing type`);
+        }
+        return this.makeObjectValue(selfType, value, label, selfType);
+      case WIRE.UNIT:
+        if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
+        return this.makeObjectScalar(0, label);
+      case WIRE.BOOL:
+        if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
+        return this.makeObjectScalar(value ? 1 : 0, label);
+      case WIRE.UINT8:
+        return this.makeObjectScalar(normalizeInteger(value, label, 0, 0xff), label);
+      case WIRE.UINT16:
+        return this.makeObjectScalar(normalizeInteger(value, label, 0, 0xffff), label);
+      case WIRE.SIMPLE_ENUM:
+        return this.makeObjectScalar(normalizeEnum(value, type, label), label);
+      case WIRE.NAT:
+        return this.makeObjectDecimal("vir_obj_nat", normalizeDecimal(value, label, { signed: false }), label);
+      case WIRE.INT:
+        return this.makeObjectDecimal("vir_obj_int", normalizeDecimal(value, label, { signed: true }), label);
+      case WIRE.STRING:
+        return this.makeObjectString(value, label);
+      case WIRE.UINT32:
+        return this.makeObjectUint32(value, label);
+      case WIRE.UINT64:
+        return this.makeObjectDecimal(
+          "vir_obj_uint64",
+          normalizeBoundedUnsignedDecimal(value, label, MAX_UINT64, "UInt64"),
+          label,
+        );
+      case WIRE.USIZE:
+        return this.makeObjectDecimal(
+          "vir_obj_usize",
+          normalizeBoundedUnsignedDecimal(value, label, this.usizeMaxValue(), "USize"),
+          label,
+        );
+      case WIRE.BYTE_ARRAY:
+        return this.makeObjectByteArray(value, label);
+      case WIRE.FLOAT:
+        return this.makeObjectFloat(value, label);
+      case WIRE.FLOAT32:
+        return this.makeObjectFloat32(value, label);
+      case WIRE.ARRAY:
+      case WIRE.LIST:
+        return this.makeObjectSequenceValue(type, value, label, selfType);
+      case WIRE.OPTION:
+        return this.makeObjectOptionValue(type, value, label, selfType);
+      case WIRE.PROD:
+        return this.makeObjectProdValue(type, value, label, selfType);
+      default:
+        throw new Error(`${label} has unsupported object ABI argument type`);
+    }
+  }
+
+  makeObjectSequenceValue(sequenceType, value, label, selfType) {
     const sequenceTag = sequenceType?.wireTag;
     const builderName =
       sequenceTag === WIRE.ARRAY ? "vir_obj_array" :
       sequenceTag === WIRE.LIST ? "vir_obj_list" :
       null;
     if (builderName === null) {
-      return FAST_CALL_UNAVAILABLE;
+      throw new Error(`${label} has unsupported object ABI sequence type`);
     }
-    const elementTag = sequenceType?.element?.wireTag;
-    const elementConstructorName =
-      elementTag === WIRE.NAT ? "vir_obj_nat" :
-      elementTag === WIRE.STRING ? "vir_obj_string" :
-      elementTag === WIRE.UINT32 ? "vir_obj_uint32" :
-      null;
-    if (elementConstructorName === null) {
-      return FAST_CALL_UNAVAILABLE;
-    }
-    if (!this.hasObjectCallExports(
-      builderName,
-      elementConstructorName,
-      "vir_obj_nat_decimal",
-      "vir_obj_decimal_size",
-    )) {
-      return FAST_CALL_UNAVAILABLE;
-    }
-
-    const label = `${entry.entry} argument ${entry.args[0].name}`;
-    const values = normalizeArray(args[0], label);
+    const values = normalizeArray(value, label);
     if (values.length > 0xffffffff) {
       throw new Error(`${label} has too many elements`);
     }
 
+    const elementType = requireTypeField(sequenceType, "element", label);
     const elementObjs = [];
     try {
       values.forEach((value, index) => {
-        elementObjs.push(this.makeObjectForSequenceElement(sequenceType.element, value, `${label}[${index}]`));
+        elementObjs.push(this.makeObjectValue(elementType, value, `${label}[${index}]`, selfType));
       });
-      const sequenceObj = this.makeObjectSequenceFromOwnedElements(builderName, elementObjs, label);
-      return this.callResolvedObjectUnary(entry, cache, sequenceObj, (resultObj) =>
-        this.readObjectDecimal(resultObj, "vir_obj_nat_decimal"));
+      return this.makeObjectSequenceFromOwnedElements(builderName, elementObjs, label);
     } finally {
       this.releaseOwnedObjects(elementObjs);
     }
+  }
+
+  makeObjectOptionValue(type, value, label, selfType) {
+    const option = normalizeOption(value, label);
+    if (!option.some) {
+      return this.makeObjectScalar(0, label);
+    }
+    const fields = [
+      this.makeObjectValue(requireTypeField(type, "element", label), option.value, `${label}.value`, selfType),
+    ];
+    try {
+      return this.makeObjectCtorFromOwnedFields(1, fields, label);
+    } finally {
+      this.releaseOwnedObjects(fields);
+    }
+  }
+
+  makeObjectProdValue(type, value, label, selfType) {
+    const pair = normalizePair(value, label);
+    const fields = [];
+    try {
+      fields.push(this.makeObjectValue(requireTypeField(type, "fst", label), pair.fst, `${label}.fst`, selfType));
+      fields.push(this.makeObjectValue(requireTypeField(type, "snd", label), pair.snd, `${label}.snd`, selfType));
+      return this.makeObjectCtorFromOwnedFields(0, fields, label);
+    } finally {
+      this.releaseOwnedObjects(fields);
+    }
+  }
+
+  makeObjectScalar(value, label) {
+    const argObj = this.exports.vir_obj_scalar(value);
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean scalar object`);
+    }
+    return argObj;
   }
 
   makeObjectDecimal(constructorName, decimal, label) {
@@ -726,6 +780,20 @@ export class VirRuntime {
       const argObj = this.exports[constructorName](inputPtr, bytes.byteLength);
       if (argObj === 0) {
         throw new Error(`${label} could not be lowered to a Lean object`);
+      }
+      return argObj;
+    } finally {
+      this.freeBytes(inputPtr);
+    }
+  }
+
+  makeObjectByteArray(value, label) {
+    const bytes = asByteArrayBytes(value);
+    const inputPtr = this.allocBytes(bytes);
+    try {
+      const argObj = this.exports.vir_obj_byte_array(inputPtr, bytes.byteLength);
+      if (argObj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean ByteArray object`);
       }
       return argObj;
     } finally {
@@ -758,22 +826,20 @@ export class VirRuntime {
     return argObj;
   }
 
-  makeObjectForSequenceElement(type, value, label) {
-    const tag = type?.wireTag;
-    if (tag === WIRE.NAT) {
-      return this.makeObjectDecimal(
-        "vir_obj_nat",
-        normalizeDecimal(value, label, { signed: false }),
-        label,
-      );
+  makeObjectFloat(value, label) {
+    const argObj = this.exports.vir_obj_float(normalizeFloat(value, label));
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean Float object`);
     }
-    if (tag === WIRE.STRING) {
-      return this.makeObjectString(value, label);
+    return argObj;
+  }
+
+  makeObjectFloat32(value, label) {
+    const argObj = this.exports.vir_obj_float32(Math.fround(normalizeFloat(value, label)));
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean Float32 object`);
     }
-    if (tag === WIRE.UINT32) {
-      return this.makeObjectUint32(value, label);
-    }
-    throw new Error(`${label} has unsupported object sequence element type`);
+    return argObj;
   }
 
   makeObjectSequenceFromOwnedElements(builderName, elementObjs, label) {
@@ -793,6 +859,27 @@ export class VirRuntime {
     } finally {
       if (valuesPtr !== 0) {
         this.freeBytes(valuesPtr);
+      }
+    }
+  }
+
+  makeObjectCtorFromOwnedFields(tag, fields, label) {
+    let fieldsPtr = 0;
+    try {
+      if (fields.length !== 0) {
+        fieldsPtr = this.allocBytes(new Uint8Array(fields.length * 4));
+        const view = new DataView(this.exports.memory.buffer, fieldsPtr, fields.length * 4);
+        fields.forEach((obj, index) => view.setUint32(index * 4, obj, true));
+      }
+      const obj = this.exports.vir_obj_ctor(tag, fieldsPtr, fields.length);
+      if (obj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean constructor object`);
+      }
+      fields.length = 0;
+      return obj;
+    } finally {
+      if (fieldsPtr !== 0) {
+        this.freeBytes(fieldsPtr);
       }
     }
   }
@@ -857,10 +944,118 @@ export class VirRuntime {
     );
   }
 
+  readObjectString(obj) {
+    return this.readWasmString(
+      this.exports.vir_obj_string_data(obj),
+      this.exports.vir_obj_string_size(obj),
+    );
+  }
+
   readObjectDecimal(obj, decimalName) {
     const data = this.exports[decimalName](obj);
     const len = this.exports.vir_obj_decimal_size();
     return this.readWasmString(data, len);
+  }
+
+  readObjectScalar(obj, label) {
+    if (this.exports.vir_obj_is_scalar(obj) === 0) {
+      throw new Error(`${label} is not a Lean scalar object`);
+    }
+    return this.exports.vir_obj_scalar_value(obj) >>> 0;
+  }
+
+  ownedObjectField(obj, index, label) {
+    const field = this.exports.vir_obj_field(obj, index);
+    if (field === 0) {
+      throw new Error(`${label} field ${index} is unavailable`);
+    }
+    return field;
+  }
+
+  liftObjectValue(type, obj, label, selfType = null) {
+    const tag = type?.wireTag;
+    switch (tag) {
+      case WIRE.RECURSIVE_SELF:
+        if (selfType === null) {
+          throw new Error(`${label} has a recursive self reference without an enclosing type`);
+        }
+        return this.liftObjectValue(selfType, obj, label, selfType);
+      case WIRE.UNIT:
+        return undefined;
+      case WIRE.BOOL:
+        return this.readObjectScalar(obj, label) !== 0;
+      case WIRE.UINT8:
+        return this.readBoundedObjectScalar(obj, label, 0xff);
+      case WIRE.UINT16:
+        return this.readBoundedObjectScalar(obj, label, 0xffff);
+      case WIRE.SIMPLE_ENUM:
+        return enumValue(type, this.readObjectScalar(obj, label));
+      case WIRE.NAT:
+        return this.readObjectDecimal(obj, "vir_obj_nat_decimal");
+      case WIRE.INT:
+        return this.readObjectDecimal(obj, "vir_obj_int_decimal");
+      case WIRE.STRING:
+        return this.readObjectString(obj);
+      case WIRE.UINT32:
+        return this.exports.vir_obj_uint32_value(obj) >>> 0;
+      case WIRE.UINT64:
+        return this.readObjectDecimal(obj, "vir_obj_uint64_decimal");
+      case WIRE.USIZE:
+        return this.readObjectDecimal(obj, "vir_obj_usize_decimal");
+      case WIRE.BYTE_ARRAY:
+        return this.readObjectByteArray(obj);
+      case WIRE.FLOAT:
+        return this.exports.vir_obj_float_value(obj);
+      case WIRE.FLOAT32:
+        return Math.fround(this.exports.vir_obj_float32_value(obj));
+      case WIRE.OPTION:
+        return this.liftObjectOptionValue(type, obj, label, selfType);
+      case WIRE.PROD:
+        return this.liftObjectProdValue(type, obj, label, selfType);
+      default:
+        throw new Error(`${label} has unsupported object ABI result type`);
+    }
+  }
+
+  readBoundedObjectScalar(obj, label, max) {
+    const value = this.readObjectScalar(obj, label);
+    if (value > max) {
+      throw new Error(`${label} scalar value ${value} exceeds ${max}`);
+    }
+    return value;
+  }
+
+  liftObjectOptionValue(type, obj, label, selfType) {
+    const tag = this.exports.vir_obj_tag(obj);
+    if (tag === 0) {
+      return null;
+    }
+    if (tag !== 1) {
+      throw new Error(`${label} has unexpected Option constructor tag ${tag}`);
+    }
+    const field = this.ownedObjectField(obj, 0, label);
+    try {
+      return this.liftObjectValue(requireTypeField(type, "element", label), field, `${label}.value`, selfType);
+    } finally {
+      this.exports.vir_obj_dec(field);
+    }
+  }
+
+  liftObjectProdValue(type, obj, label, selfType) {
+    const fst = this.ownedObjectField(obj, 0, label);
+    try {
+      const snd = this.ownedObjectField(obj, 1, label);
+      try {
+        return {
+          fst: this.liftObjectValue(requireTypeField(type, "fst", label), fst, `${label}.fst`, selfType),
+          snd: this.liftObjectValue(requireTypeField(type, "snd", label), snd, `${label}.snd`, selfType),
+        };
+      } finally {
+        this.exports.vir_obj_dec(snd);
+      }
+    } finally {
+      this.exports.vir_obj_dec(fst);
+    }
   }
 
   usizeMaxValue() {
@@ -1081,6 +1276,79 @@ function boxedCallEntryNames(manifest) {
     }
   }
   return names;
+}
+
+function objectArgumentSupported(type, selfType = null) {
+  const tag = type?.wireTag;
+  switch (tag) {
+    case WIRE.RECURSIVE_SELF:
+      return selfType !== null && objectArgumentSupported(selfType, selfType);
+    case WIRE.UNIT:
+    case WIRE.BOOL:
+    case WIRE.NAT:
+    case WIRE.INT:
+    case WIRE.STRING:
+    case WIRE.UINT8:
+    case WIRE.UINT16:
+    case WIRE.UINT32:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
+    case WIRE.BYTE_ARRAY:
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
+    case WIRE.SIMPLE_ENUM:
+      return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      return objectArgumentSupported(requireTypeField(type, "element", "object argument"), selfType);
+    case WIRE.PROD:
+      return objectArgumentSupported(requireTypeField(type, "fst", "object argument"), selfType) &&
+        objectArgumentSupported(requireTypeField(type, "snd", "object argument"), selfType);
+    default:
+      return false;
+  }
+}
+
+function objectResultSupported(type, selfType = null) {
+  const tag = type?.wireTag;
+  switch (tag) {
+    case WIRE.RECURSIVE_SELF:
+      return selfType !== null && objectResultSupported(selfType, selfType);
+    case WIRE.UNIT:
+    case WIRE.BOOL:
+    case WIRE.NAT:
+    case WIRE.INT:
+    case WIRE.STRING:
+    case WIRE.UINT8:
+    case WIRE.UINT16:
+    case WIRE.UINT32:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
+    case WIRE.BYTE_ARRAY:
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
+    case WIRE.SIMPLE_ENUM:
+      return true;
+    case WIRE.OPTION:
+      return objectResultSupported(requireTypeField(type, "element", "object result"), selfType);
+    case WIRE.PROD:
+      return objectResultSupported(requireTypeField(type, "fst", "object result"), selfType) &&
+        objectResultSupported(requireTypeField(type, "snd", "object result"), selfType);
+    default:
+      return false;
+  }
+}
+
+function objectTypeNeedsBoxedBoundary(type) {
+  switch (type?.wireTag) {
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
+    case WIRE.UINT64:
+      return true;
+    default:
+      return false;
+  }
 }
 
 function disposeHostBindings(bindings) {
