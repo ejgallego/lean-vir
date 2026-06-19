@@ -34,6 +34,7 @@ import {
   smokeVirtualReactCounter,
   smokeVirtualReactInput,
   smokeVirtualProofWidgetsHtml,
+  smokeVirtualProofWidgetsJsxSubset,
   smokeVirtualReactProofWidget,
   smokeVirtualReactProofWidgetHello,
   smokeVirtualReactSelectTextarea,
@@ -165,6 +166,7 @@ ensureVirtualElements(reactDocumentState, [
   "#react-checkbox",
   "#react-attributes",
   "#proofwidgets-html",
+  "#proofwidgets-jsx-subset",
   "#react-proof-hello",
   "#react-proof",
   "#react-pet",
@@ -192,6 +194,7 @@ smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select
 smokeVirtualReactCheckbox(reactRuntime, reactDocumentState, "#react-checkbox");
 smokeVirtualReactAttributes(reactRuntime, reactDocumentState, "#react-attributes", { assertKeys: true });
 smokeVirtualProofWidgetsHtml(reactRuntime, reactDocumentState, "#proofwidgets-html");
+smokeVirtualProofWidgetsJsxSubset(reactRuntime, reactDocumentState, "#proofwidgets-jsx-subset");
 smokeVirtualReactProofWidgetHello(reactRuntime, reactDocumentState, "#react-proof-hello");
 smokeVirtualReactProofWidget(reactRuntime, reactDocumentState, "#react-proof");
 smokeVirtualReactTamagotchi(reactRuntime, reactDocumentState, "#react-pet", { extended: true });

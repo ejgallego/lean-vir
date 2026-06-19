@@ -312,6 +312,8 @@ also be loaded as a live infoview widget through `show_panel_widgets`.
 facade over the same native React node ABI. `examples/ProofWidgetsHtml.lean`
 uses `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, and `Handler`
 aliases and is included in the host package as a compatibility regression.
+`examples/ProofWidgetsJsxSubset.lean` ports a tiny upstream JSX-shaped pattern
+with explicit combinators, including child-bearing `Html.ofComponent`.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in

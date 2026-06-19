@@ -198,6 +198,40 @@ export function smokeVirtualProofWidgetsHtml(runtime, documentState, selector) {
   assertUnmountCleanup(runtime, element);
 }
 
+export function smokeVirtualProofWidgetsJsxSubset(runtime, documentState, selector) {
+  assert.equal(runtime.call("ProofWidgetsJsxSubset.mount", selector), true);
+  const element = documentState.elements.get(selector);
+  assertLiveCallbacks(runtime, 2);
+  const widget = reactElementById(element, "proofwidgets-jsx-subset");
+  assert.equal(widget.tag, "section");
+  assert.equal(widget.props.role, "region");
+  assert.equal(widget.props["aria-label"], "ProofWidgets JSX subset combinator demo");
+  assert.equal(widget.props["data-testid"], "proofwidgets-jsx-subset");
+  const card = reactElementById(element, "proofwidgets-jsx-card");
+  assert.equal(card.tag, "section");
+  assert.equal(card.props["data-component"], "Card");
+  assert.equal(
+    virtualReactTextContent(card.children[0]),
+    "JSX-shaped combinators",
+  );
+  const badge = reactElementById(element, "proofwidgets-jsx-badge-info");
+  assert.equal(badge.props["data-tone"], "info");
+  assert.equal(virtualReactTextContent(badge), "component children");
+  assertLiveCallbacks(runtime, 2);
+  reactElementById(element, "proofwidgets-jsx-action").handlers.onClick({});
+  assert.equal(documentState.title, "ProofWidgets JSX subset clicked");
+  assertLiveCallbacks(runtime, 2);
+  const rows = reactElementById(element, "proofwidgets-jsx-rows");
+  assert.equal(rows.tag, "ul");
+  assert.equal(rows.children.length, 3);
+  assert.equal(rows.children[0].key, "tags");
+  assert.equal(rows.children[1].key, "components");
+  assert.equal(rows.children[2].key, "interpolation");
+  assert.match(virtualReactTextContent(rows), /3 rendered rows/);
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
 export function smokeVirtualReactTamagotchi(runtime, documentState, selector, {
   extended = false,
 } = {}) {

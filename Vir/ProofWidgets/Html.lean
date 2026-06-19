@@ -20,8 +20,23 @@ APIs instead of building a second recursive wire tree.
 abbrev Html : Type :=
   ReactM (Lean.Vir.Js Lean.Vir.React.Node)
 
+/--
+Props passed to a ProofWidgets-style component.
+
+`children` stays in `Html` form so child-bearing components can decide where to
+render nested markup, matching the usual `props.children` role without adding a
+second React tree representation.
+-/
+structure ComponentProps (props : Type) where
+  props : props
+  children : Array Html := #[]
+
 abbrev Component (props : Type := Unit) : Type :=
-  Lean.Vir.React.Component props
+  ComponentProps props → Html
+
+def componentProps {props : Type} (value : props) (children : Array Html := #[]) :
+    ComponentProps props :=
+  { props := value, children }
 
 abbrev Attr : Type :=
   Lean.Vir.React.Property
@@ -166,12 +181,17 @@ def keyedElement
 
 def ofComponent
     (component : Component props)
-    (props : props) :
+    (props : props)
+    (children : Array Html := #[]) :
     Html :=
-  Lean.Vir.React.Node.ofComponent component props
+  Lean.Vir.React.Node.ofComponent component (componentProps props children)
 
-def component (component : Component props) (props : props) : Html :=
-  ofComponent component props
+def component
+    (component : Component props)
+    (props : props)
+    (children : Array Html := #[]) :
+    Html :=
+  ofComponent component props children
 
 def div (children : Array Html) : Html :=
   element "div" #[] children

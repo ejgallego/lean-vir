@@ -16,15 +16,15 @@ structure StatProps where
   label : String
   value : String
 
-def Stat : Component StatProps := fun props =>
+def Stat : Component StatProps := fun ctx =>
   Html.liWith
     #[
       Attr.className "pw-html-stat",
-      Attr.data "label" props.label
+      Attr.data "label" ctx.props.label
     ]
     #[
-      Html.spanWith #[Attr.className "pw-html-stat-label"] #[Html.text props.label],
-      Html.strongWith #[Attr.className "pw-html-stat-value"] #[Html.text props.value]
+      Html.spanWith #[Attr.className "pw-html-stat-label"] #[Html.text ctx.props.label],
+      Html.strongWith #[Attr.className "pw-html-stat-value"] #[Html.text ctx.props.value]
     ]
 
 def View : Component Unit := fun _ =>
@@ -57,7 +57,7 @@ def View : Component Unit := fun _ =>
     ]
 
 def mount (selector : String) : DomM Bool :=
-  Lean.Vir.React.Root.renderComponentIntoSelector selector View ()
+  Lean.Vir.React.Root.renderComponentIntoSelector selector View (componentProps ())
 
 def mountDefault : DomM Bool :=
   mount "#proofwidgets-html-root"

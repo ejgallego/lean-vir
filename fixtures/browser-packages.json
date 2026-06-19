@@ -116,6 +116,13 @@
           ]
         },
         {
+          "source": "examples/ProofWidgetsJsxSubset.lean",
+          "roots": [
+            "ProofWidgetsJsxSubset.mount",
+            "ProofWidgetsJsxSubset.mountDefault"
+          ]
+        },
+        {
           "source": "examples/ReactProofWidgetHello.lean",
           "roots": [
             "ReactProofWidgetHello.mount",
