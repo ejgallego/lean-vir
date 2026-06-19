@@ -60,7 +60,7 @@ The generated report has separate sections for the two common failure modes:
 - `Unsupported Init Globals`: the closure reached a nullary declaration emitted
   from Lean initialization code whose body is top-level `unreachable`; these
   need an initialized-global provider rather than another normal IR declaration.
-- `Interface Diagnostics`: a requested export could not be mapped to the
+- `Package Diagnostics`: a requested export could not be mapped to the
   supported JavaScript interface surface. This is a loud failure; explicitly
   exclude or keep such declarations package-only if they are internal support
   roots.

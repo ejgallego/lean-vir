@@ -153,12 +153,12 @@ structure HostImport where
   result : InterfaceType
   effect : InterfaceEffect
 
-structure InterfaceDiagnostic where
+structure PackageDiagnostic where
   name : Name
   source : String
   reason : String
 
-def DeclIndexDiagnostic.toInterfaceDiagnostic (diagnostic : DeclIndexDiagnostic) : InterfaceDiagnostic :=
+def DeclIndexDiagnostic.toPackageDiagnostic (diagnostic : DeclIndexDiagnostic) : PackageDiagnostic :=
   {
     name := diagnostic.name
     source := diagnostic.source
@@ -187,7 +187,7 @@ structure InterfaceManifest where
   metadata : PackageMetadata
   exports : Array InterfaceExport := #[]
   hostImports : Array HostImport := #[]
-  diagnostics : Array InterfaceDiagnostic := #[]
+  diagnostics : Array PackageDiagnostic := #[]
 
 def defaultTargets : Array Target := #[
   {

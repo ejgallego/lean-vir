@@ -33,7 +33,9 @@ Targets have one of three modes:
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface`: interface type classification, export and
   host-import signature extraction, host effect recognition, boxed-boundary
-  checks, and JSON helpers shared by the manifest.
+  checks, and interface JSON encoders.
+- `Vir.GeneratePackage.Json`: small JSON string, array, object, and primitive
+  encoders shared by interface and manifest serialization.
 - `Vir.GeneratePackage.Manifest`: package metadata, interface manifest
   collection, duplicate export diagnostics, and manifest JSON encoding.
 - `Vir.GeneratePackage.Emit`: binary `.irpkg` encoding.
@@ -93,6 +95,30 @@ That retry is deliberately conservative: the classifier first tries the source
 type as written, then unfolds only abbrev heads whose outer type shape is not
 already supported. This preserves existing primitive, container, resource, and
 effect handling while allowing simple type aliases and effect aliases to pass.
+
+## Troubleshooting
+
+The generated report groups the common package failures by where generation
+stopped:
+
+- `Missing IR Declarations`: a requested root or closure dependency was not
+  present in the loaded source environments. Check the target source path,
+  imports, explicit root names, and whether a package-only support target is
+  needed.
+- `Missing Native Extern Registrations`: the closure reached a Lean runtime
+  primitive that needs a local demo shim. Add the registration in
+  `Vir.GeneratePackage.NativeExterns`, then rerun the boundary-registry check.
+- `Package Diagnostics`: a requested export or host import could not be
+  represented in the manifest. Typical causes are unsupported argument/result
+  types, duplicate export ids or JavaScript names, and declaration-name
+  collisions across targets.
+- Boxed boundary diagnostics: top-level `Float`, `Float32`, `UInt64`, and
+  trivial wrappers over them require a generated `_boxed` declaration for the
+  wasm32 interpreter call boundary. The generator auto-includes the boxed
+  declaration when it exists, and reports this diagnostic when it does not.
+- `#eval` preprocessing: top-level `#eval` command lines are dropped by default
+  so examples do not run during generation. Internal callers that need them can
+  set `Target.dropEvalCommands := false`.
 
 ## Focused Checks
 
