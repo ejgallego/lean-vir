@@ -1,0 +1,102 @@
+/-
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+-/
+
+import Vir.GeneratePackage.Basic
+
+open Lean
+
+namespace Vir.GeneratePackage
+
+open Lean.IR
+
+def jsExternPrefix : String := "__vir_js:"
+
+def maxHostImportSlots : Nat := 32
+
+def maxHostImportArity : Nat := 6
+
+def virJsTargetFromExternData? (data : ExternAttrData) : Option String :=
+  data.entries.findSome? fun entry =>
+    match entry with
+    | .standard _ symbol =>
+        if symbol.startsWith jsExternPrefix then
+          some (symbol.drop jsExternPrefix.length).toString
+        else
+          none
+    | _ => none
+
+def virJsTargetFromDecl? : Decl → Option String
+  | .extern _ _ _ data => virJsTargetFromExternData? data
+  | _ => none
+
+def isVirJsDecl (decl : Decl) : Bool :=
+  virJsTargetFromDecl? decl |>.isSome
+
+def dropEvalCommandLines (input : String) : String :=
+  "\n".intercalate <|
+    input.splitOn "\n" |>.filter fun line =>
+      !(line.trimAsciiStart.copy.startsWith "#eval")
+
+def frontendSource (target : Target) (contents : String) : String :=
+  if target.dropEvalCommands then
+    dropEvalCommandLines contents
+  else
+    contents
+
+def moduleNameFor (path : System.FilePath) : Name :=
+  .str (.str `VirIRInput (path.fileStem.getD "Input")) "Generated"
+
+unsafe def frontendEnv (target : Target) : IO Environment := do
+  -- Match Lean's CLI startup path: the frontend imports modules with loaded extensions.
+  enableInitializersExecution
+  let contents <- IO.FS.readFile target.source
+  let opts := Elab.async.set ({} : Options) false
+  let fileName := target.source.toString
+  match <- Elab.runFrontend (frontendSource target contents) opts fileName (moduleNameFor target.source) with
+  | some env => return env
+  | none => throw <| IO.userError s!"Lean frontend failed for {fileName}"
+
+unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
+  initSearchPath (← getBuildDir)
+  let mut index : DeclIndex := {}
+  for target in targets do
+    let env <- frontendEnv target
+    let mut names : Array Name := #[]
+    index := { index with envs := index.envs.push (target.source.toString, env) }
+    for decl in getDecls env do
+      names := names.push decl.name
+      let loaded := { source := target.source.toString, decl }
+      match index.localDecls.find? decl.name with
+      | some existing =>
+          if existing.source != loaded.source then
+            index := { index with diagnostics := index.diagnostics.push {
+              name := decl.name
+              source := loaded.source
+              reason := s!"declaration name collides with `{existing.source}`; package targets must use unique Lean declaration names"
+            } }
+      | none =>
+          index := { index with localDecls := index.localDecls.insert decl.name loaded }
+    index := { index with sourceDecls := index.sourceDecls.push (target.source.toString, names) }
+  return index
+
+def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
+  match index.localDecls.find? name with
+  | some decl => some decl
+  | none =>
+      index.envs.findSome? fun (source, env) => do
+        let decl <- findEnvDecl env name
+        match decl with
+        | .fdecl .. => some { source := s!"imported by {source}", decl }
+        | .extern .. =>
+            if isVirJsDecl decl then
+              some { source := s!"imported by {source}", decl }
+            else
+              none
+
+def DeclIndex.initFnNameFor? (index : DeclIndex) (name : Name) : Option Name :=
+  index.envs.findSome? fun (_, env) => getInitFnNameFor? env name
+
+end Vir.GeneratePackage

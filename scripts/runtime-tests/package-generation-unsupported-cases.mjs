@@ -4,7 +4,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { assertUnsupportedInterfaceSource } from "./shared.mjs";
+import {
+  assert,
+  assertUnsupportedInterfaceSource,
+  join,
+  readFile,
+  runVirIrpkg,
+  writeFile,
+} from "./shared.mjs";
 
 export async function runUnsupportedInterfaceSmoke(freshDir) {
   await assertUnsupportedInterfaceSource(freshDir, "UnsupportedInterfaces", [
@@ -76,4 +83,41 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /proofPayloadIdentity/,
     /field `proof` of constructor `ProofPayload\.mk` has erased or void runtime layout/,
   ], ["recursiveChildIdentity", "mutualLeftIdentity", "proofPayloadIdentity"]);
+
+  await assertUnsupportedInterfaceSource(freshDir, "DuplicateExportNames", [
+    "namespace Duplicate",
+    "def entry (n : Nat) : Nat := n + 1",
+    "end Duplicate",
+    "",
+    "def Duplicate_entry (n : Nat) : Nat := n + 2",
+    "",
+  ], [
+    /Duplicate\.entry/,
+    /Duplicate_entry/,
+    /interface export id `Duplicate_entry` duplicates/,
+  ]);
+
+  const leftSource = join(freshDir, "CollisionLeft.lean");
+  const rightSource = join(freshDir, "CollisionRight.lean");
+  const packagePath = join(freshDir, "CollisionTargets.irpkg");
+  const reportPath = join(freshDir, "CollisionTargets.report.md");
+  await writeFile(leftSource, "def collisionBump (n : Nat) : Nat := n + 1\n");
+  await writeFile(rightSource, "def collisionBump (n : Nat) : Nat := n + 2\n");
+  const generated = runVirIrpkg([
+    packagePath,
+    reportPath,
+    "--target",
+    leftSource,
+    "collisionBump",
+    "--target",
+    rightSource,
+    "collisionBump",
+  ]);
+  assert.notEqual(generated.status, 0, "duplicate target declarations unexpectedly generated successfully");
+  assert.match(generated.stderr, /package diagnostics/);
+  assert.match(generated.stderr, /collisionBump/);
+  assert.match(generated.stderr, /declaration name collides/);
+  const report = await readFile(reportPath, "utf8");
+  assert.match(report, /collisionBump/);
+  assert.match(report, /declaration name collides/);
 }

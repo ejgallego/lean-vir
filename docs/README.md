@@ -57,6 +57,8 @@ ownership diagrams.
 - [ADDING_DEMOS.md](ADDING_DEMOS.md): adding browser demos and package roots.
 - [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md): package configs, manifests,
   supported types, and interface internals.
+- [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md): Lean package generator module
+  map, data flow, and diagnostics.
 - [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md): upstream interpreter boundary
   and native externs.
 - [IMPLEMENTATION_NOTES.md](IMPLEMENTATION_NOTES.md): current architecture and
