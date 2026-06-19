@@ -51,6 +51,8 @@ The initial exported object helper surface is deliberately small:
 - `vir_obj_list` / `vir_obj_list_is_nil` / `vir_obj_list_head` /
   `vir_obj_list_tail`
 - `vir_obj_ctor`
+- `vir_obj_ctor_layout` / `vir_obj_ctor_usize_decimal` /
+  `vir_obj_ctor_scalar_data`
 - `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
 - `vir_obj_tag` / `vir_obj_field`
 - `vir_obj_nat` / `vir_obj_nat_decimal`
@@ -78,9 +80,16 @@ order.
 `vir_obj_array_get`, `vir_obj_list_head`, and `vir_obj_list_tail` return new
 owned references that JavaScript must release after lifting.
 `vir_obj_ctor` consumes owned field references and returns one owned constructor
-object with object fields only. If construction fails before consuming fields,
-JavaScript still owns the field references. `vir_obj_field` returns a new owned
-reference to the requested object field, so JavaScript must release it.
+object with object fields only. `vir_obj_ctor_layout` is the manifest-driven
+variant: JavaScript supplies dense object fields, dense `USize` slots, and the
+packed scalar-byte area described by the interface manifest. If construction
+fails before consuming object fields, JavaScript still owns those field
+references. `vir_obj_field` returns a new owned reference to the requested
+object field, so JavaScript must release it. `vir_obj_ctor_usize_decimal`
+returns a borrowed pointer into the same shim-owned decimal scratch buffer as
+the scalar decimal helpers. `vir_obj_ctor_scalar_data` returns a borrowed
+pointer into the live Lean object; JavaScript must read it before releasing the
+object.
 
 ## Ownership
 
@@ -138,13 +147,13 @@ they avoid both byte payloads and object allocation.
 The automatic object-lane selection in `VirRuntime.call` covers pure unary calls
 whose argument can be lowered from the current object subset and whose result
 can be lifted from it. Arguments and results currently support base values,
-`Array`, `List`, `Option`, `Prod`, object-field-only structures, object-field-
-only tagged unions, and object-field-only custom inductive constructors;
-sequence, product, record, and constructor fields are lowered or lifted
-recursively. Structures and constructors with scalar or `USize` runtime fields
-still fall back to the byte codec, as do recursive-self descriptors for now.
-Decimal scalar calls lower through the corresponding `vir_obj_*` constructor,
-call `vir_call_resolved_objects`, lift the result with the matching decimal
+`Array`, `List`, `Option`, `Prod`, and manifest-described structures, tagged
+unions, and custom inductive constructors whose fields recursively stay in this
+subset. Nontrivial constructors may mix object fields, raw `USize` slots, and
+packed scalar fields. Recursive-self descriptors still fall back to the byte
+codec for now, as do resources, callbacks, and `Lean.Expr` values. Decimal
+scalar calls lower through the corresponding `vir_obj_*` constructor, call
+`vir_call_resolved_objects`, lift the result with the matching decimal
 inspection helper plus
 `vir_obj_decimal_size`, and release the owned result with `vir_obj_dec`.
 Byte-array calls use `vir_obj_byte_array` and lift the result with
@@ -163,7 +172,8 @@ or `vir_obj_list`.
    object arrays and lists; generated metadata should eventually drive the
    general case.
 4. Generated layout support: structures and inductives lowered by package
-   metadata instead of ad hoc descriptors.
+   metadata instead of ad hoc descriptors, including object, `USize`, and scalar
+   runtime fields.
 5. Host import integration: rooted object handles for Lean-to-JS calls where JS
    wants to inspect or retain Lean objects directly.
 6. Codec retirement: remove the C++ descriptor/value codec once JS-driven

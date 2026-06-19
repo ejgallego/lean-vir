@@ -405,8 +405,57 @@ try {
     total: "14",
     bonus: "14",
   });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore", {
+    profile: {
+      nickname: "lean",
+      points: 4,
+      tags: ["ir", "wasm"],
+    },
+    summary: {
+      label: "lean:2",
+      total: 14,
+      bonus: 14,
+    },
+  }), "48");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsBump", {
+    enabled: true,
+    level: 2,
+    score16: 30,
+    visits: 400,
+    quota: 5,
+    checksum: 6000,
+    tier: "pro",
+    note: "ok",
+  }), {
+    enabled: false,
+    level: 3,
+    score16: 32,
+    visits: 403,
+    quota: "9",
+    checksum: "6005",
+    tier: "elite",
+    note: "ok!",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsScore", {
+    enabled: true,
+    level: 2,
+    score16: 30,
+    visits: 400,
+    quota: 5,
+    checksum: 6000,
+    tier: "pro",
+    note: "ok",
+  }), "6549");
   assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxNatBump", { value: 41 }), {
     value: "42",
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", { value: 41 }), {
+    value: 42,
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint64BoxBump", {
+    value: "18446744073709551615",
+  }), {
+    value: "0",
   });
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.taggedArrayScore", {
     label: "ab",
@@ -427,6 +476,28 @@ try {
       tags: ["ir", "wasm"],
     },
   });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.meteredBoxBump", {
+    active: false,
+    count: 3,
+    payload: { value: 4 },
+  }), {
+    active: true,
+    count: 4,
+    payload: { value: "7" },
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.extendedProfileBump", {
+    nickname: "lean",
+    active: true,
+    visits: 5,
+    score: 7,
+    tags: ["ir"],
+  }), {
+    nickname: "lean!",
+    active: false,
+    visits: 6,
+    score: "8",
+    tags: ["ir", "extended"],
+  });
   assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 0), {
     kind: "inl",
     value: "10",
@@ -446,7 +517,7 @@ try {
 } finally {
   runtime.exports = objectCallExports;
 }
-assert.equal(objectCalls, 26);
+assert.equal(objectCalls, 33);
 assert.equal(codecFallbackCalls, 0);
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
