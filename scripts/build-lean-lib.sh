@@ -71,6 +71,7 @@ build_module Vir/GeneratePackage/NativeExterns.lean
 build_module Vir/GeneratePackage/Frontend.lean
 build_module Vir/GeneratePackage/Closure.lean
 build_module Vir/GeneratePackage/Json.lean
+build_module Vir/GeneratePackage/Interface/Encode.lean
 build_module Vir/GeneratePackage/Interface.lean
 build_module Vir/GeneratePackage/Manifest.lean
 build_module Vir/GeneratePackage/Emit.lean

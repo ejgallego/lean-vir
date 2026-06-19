@@ -35,7 +35,9 @@ Targets have one of three modes:
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface`: interface type classification, export and
   host-import signature extraction, host effect recognition, boxed-boundary
-  checks, and interface JSON encoders.
+  checks, and export discovery.
+- `Vir.GeneratePackage.Interface.Encode`: interface labels, wire tags, and
+  descriptor JSON encoders.
 - `Vir.GeneratePackage.Json`: small JSON string, array, object, and primitive
   encoders shared by interface and manifest serialization.
 - `Vir.GeneratePackage.Manifest`: package metadata, interface manifest
