@@ -12,6 +12,7 @@ import {
   join,
   manifestEntry,
   readFile,
+  runVirIrpkg,
   spawnSync,
   writeFile,
 } from "./shared.mjs";
@@ -37,11 +38,13 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(freshManifest.metadata.targets[0].source, freshSource);
   assert.equal(freshManifest.metadata.targets[0].mode, "all");
   assert.deepEqual(freshManifest.metadata.targets[0].roots, []);
+  assert.equal(freshManifest.metadata.targets[0].dropEvalCommands, true);
   assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"));
   assertManifestTypeDescriptorsRoundTrip(freshManifest);
 
   const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
   assert.deepEqual(freshEntries, [
+    "freshAliasBump",
     "freshBoxBump",
     "freshBump",
     "freshChainDepth",
@@ -79,6 +82,48 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(freshInfo.manifest.metadata.targets[0].source, freshSource);
   assert.deepEqual(freshInfo.manifest.exports.map((entry) => entry.entry).sort(), freshEntries);
 
+  const aliasSource = join(freshDir, "AliasEdges.lean");
+  const aliasPackage = join(freshDir, "alias-edges.irpkg");
+  const aliasReport = join(freshDir, "alias-edges.report.md");
+  await writeFile(aliasSource, [
+    "abbrev AliasUserId := Nat",
+    "abbrev AliasNatArray := Array AliasUserId",
+    "abbrev AliasCallback := AliasUserId -> AliasUserId",
+    "abbrev AliasIO (α : Type) := IO α",
+    "",
+    "def aliasArraySum (xs : AliasNatArray) : AliasUserId :=",
+    "  xs.foldl (fun acc n => acc + n) 0",
+    "",
+    "def aliasCallbackApply (callback : AliasCallback) (n : AliasUserId) : AliasUserId :=",
+    "  callback n",
+    "",
+    "def aliasIoBump (n : AliasUserId) : AliasIO AliasUserId :=",
+    "  pure (n + 1)",
+    "",
+  ].join("\n"));
+  const aliasGenerated = runVirIrpkg([aliasPackage, aliasReport, "--target-all", aliasSource]);
+  assert.equal(aliasGenerated.status, 0, aliasGenerated.stderr || aliasGenerated.stdout);
+  const aliasInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", aliasPackage], {
+    encoding: "utf8",
+  });
+  assert.equal(aliasInspect.status, 0, aliasInspect.stderr || aliasInspect.stdout);
+  const aliasManifest = JSON.parse(aliasInspect.stdout).manifest;
+  const aliasArrayEntry = manifestEntry(aliasManifest, "aliasArraySum");
+  assert.equal(aliasArrayEntry.args[0].type.kind, "array");
+  assert.equal(aliasArrayEntry.args[0].type.element.type, "Nat");
+  assert.equal(aliasArrayEntry.result.type, "Nat");
+  const aliasCallbackEntry = manifestEntry(aliasManifest, "aliasCallbackApply");
+  assert.equal(aliasCallbackEntry.args[0].type.kind, "function");
+  assert.equal(aliasCallbackEntry.args[0].type.args[0].type.type, "Nat");
+  assert.equal(aliasCallbackEntry.args[0].type.result.type, "Nat");
+  const aliasIoEntry = manifestEntry(aliasManifest, "aliasIoBump");
+  assert.equal(aliasIoEntry.effect, "io");
+  assert.equal(aliasIoEntry.result.type, "Nat");
+
+  const freshAliasEntry = manifestEntry(freshManifest, "freshAliasBump");
+  assert.equal(freshAliasEntry.args[0].type.type, "Nat");
+  assert.equal(freshAliasEntry.result.type, "Nat");
+  assert.equal(freshRuntime.call("freshAliasBump", 3), "12");
   assert.equal(freshRuntime.call("freshBump", 35), "42");
   assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
   assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");

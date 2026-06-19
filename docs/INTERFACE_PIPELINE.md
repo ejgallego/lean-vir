@@ -2,7 +2,8 @@
 
 This document owns package config shape, generated manifest semantics, and the
 current interface surface. Command selection and CI shape live in
-`docs/HARNESS.md`; architecture status lives in `docs/IMPLEMENTATION_NOTES.md`.
+`docs/HARNESS.md`; architecture status lives in `docs/IMPLEMENTATION_NOTES.md`;
+the split package generator internals live in `docs/GENERATE_PACKAGE.md`.
 
 The developer path is package-driven:
 
@@ -21,7 +22,8 @@ That command:
 The generated `.irpkg` is the only browser artifact needed by `/dev.html`.
 After the package is loaded, the runner reads the embedded manifest and creates
 the UI entries automatically. The manifest metadata records the package format,
-Lean toolchain, generation time, source targets, and resolved roots.
+Lean toolchain, generation time, source targets, resolved roots, and whether the
+target dropped top-level `#eval` command lines before elaboration.
 
 `web/public/*.irpkg` files are generated local assets and are ignored by git.
 Pass multiple config files to reuse the same prepared `vir_irpkg` generator:
@@ -205,6 +207,12 @@ structure field layouts, bad `trivialFieldIndex` values, and duplicate export
 names. Runtime tests also round-trip every generated export type through the
 compact descriptor encoder/decoder so descriptor drift fails before a call
 enters WASM.
+
+The package generator also rejects ambiguous source-time names before writing a
+package. Different source targets in the same generator run must not define the
+same Lean declaration name, and exported entries must not produce the same
+manifest `id` or JavaScript name. Reducible type aliases are allowed at package
+boundaries when they reduce to a supported interface type.
 
 ## Current Trust Boundary
 
