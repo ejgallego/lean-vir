@@ -50,7 +50,7 @@
     "test:site": "npm run build:site && npm run test:pages",
     "test:pages": "node scripts/check-pages-artifact.mjs",
     "test:pages:browser": "node scripts/smoke-pages-browser.mjs",
-    "test:infoview": "npm run check:infoview-bundle && lake env lean scripts/smoke-infoview-lean.lean && node scripts/smoke-infoview-widget.mjs",
+    "test:infoview": "npm run check:infoview-bundle && lake build Vir.Infoview.ImportedHelperSmoke && lake env lean scripts/smoke-infoview-lean.lean && node scripts/smoke-infoview-widget.mjs",
     "test:runtime": "node scripts/test-vir-runtime.mjs",
     "test:runtime:lean": "node scripts/test-vir-runtime.mjs --group lean",
     "test:runtime:pure": "node scripts/test-vir-runtime.mjs --group pure",

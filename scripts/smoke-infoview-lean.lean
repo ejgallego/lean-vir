@@ -77,8 +77,32 @@ def smokeDecl (value : String) : Lean.IR.Decl :=
     (.vdecl smokeVar .object (.lit (.str value)) (.ret (.var smokeVar)))
     {}
 
-def smokeClosure (value : String) : Vir.GeneratePackage.Closure :=
-  { decls := #[{ source := "imported by smoke", decl := smokeDecl value }] }
+def importedHelperTargetSource : System.FilePath :=
+  "scripts/smoke-infoview-imported-helper-target.lean"
+
+unsafe def importedHelperClosure (root : Lean.Name) : IO Vir.GeneratePackage.Closure := do
+  let target : Vir.GeneratePackage.Target := {
+    source := importedHelperTargetSource
+    roots := #[root]
+  }
+  let index ← Vir.GeneratePackage.loadDeclIndex #[target]
+  return Vir.GeneratePackage.collectClosure #[target] index
+
+def loadedDecl? (closure : Vir.GeneratePackage.Closure) (name : Lean.Name) :
+    Option Vir.GeneratePackage.LoadedDecl :=
+  closure.decls.find? fun loaded => loaded.decl.name == name
+
+def expectImportedDecl
+    (label : String)
+    (closure : Vir.GeneratePackage.Closure)
+    (name : Lean.Name) : IO Lean.IR.Decl := do
+  match loadedDecl? closure name with
+  | none =>
+      throw <| IO.userError s!"infoview smoke failed: missing imported helper `{name}`"
+  | some loaded =>
+      expect s!"{label} is loaded through an imported module" <|
+        loaded.source.startsWith s!"imported by {importedHelperTargetSource}"
+      return loaded.decl
 
 #eval do
   expect "base64 vir" (Lean.Vir.Infoview.base64Encode "vir".toUTF8 == "dmly")
@@ -115,8 +139,23 @@ def smokeClosure (value : String) : Vir.GeneratePackage.Closure :=
   expect "IR decl hash tracks body literals" <|
     Lean.Vir.Infoview.irDeclHash (smokeDecl "before") !=
       Lean.Vir.Infoview.irDeclHash (smokeDecl "after")
-  expect "closure IR hash tracks imported helper bodies" <|
-    Lean.Vir.Infoview.closureIRHash (smokeClosure "before") !=
-      Lean.Vir.Infoview.closureIRHash (smokeClosure "after")
+  let beforeClosure ← importedHelperClosure `SmokeInfoviewImportedHelperTarget.before
+  let afterClosure ← importedHelperClosure `SmokeInfoviewImportedHelperTarget.after
+  let beforeDecl ←
+    expectImportedDecl
+      "before helper"
+      beforeClosure
+      `Lean.Vir.Infoview.ImportedHelperSmoke.labelBefore
+  let afterDecl ←
+    expectImportedDecl
+      "after helper"
+      afterClosure
+      `Lean.Vir.Infoview.ImportedHelperSmoke.labelAfter
+  expect "real imported helper IR hash tracks helper bodies" <|
+    Lean.Vir.Infoview.irDeclHash beforeDecl !=
+      Lean.Vir.Infoview.irDeclHash afterDecl
+  expect "real imported helper closure hash participates in reload token" <|
+    Lean.Vir.Infoview.closureIRHash beforeClosure !=
+      Lean.Vir.Infoview.closureIRHash afterClosure
 
 end SmokeInfoviewLean

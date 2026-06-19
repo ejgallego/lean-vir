@@ -78,6 +78,8 @@ ownership diagrams.
 - [EVENT_CALLBACK_ROADMAP.md](EVENT_CALLBACK_ROADMAP.md): callback/resource
   ownership direction.
 - [REACT_NODE.md](REACT_NODE.md): current Lean-authored React Node surface.
+- [PROOFWIDGETS_PORTING.md](PROOFWIDGETS_PORTING.md): first upstream
+  ProofWidgets porting targets and external JS library binding pressure.
 - [REACT_PROOFWIDGETS_ROADMAP.md](REACT_PROOFWIDGETS_ROADMAP.md): future
   infoview and ProofWidgets alignment.
 - [REACT_WASM_BINDINGS.md](REACT_WASM_BINDINGS.md): `externref`, JSPI, and
