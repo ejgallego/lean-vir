@@ -364,6 +364,8 @@ try {
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseArrayNatSum", [4, 5, 6]), "15");
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.arrayNatBumpAll", [4, 5]), ["5", "6"]);
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.listStringBangAll", ["a", "bc"]), ["a!", "bc!"]);
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { some: 41 }), "42");
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null), "empty");
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionArrayNatSum", [4, 5, 6]), "15");
@@ -387,7 +389,7 @@ try {
 } finally {
   runtime.exports = objectCallExports;
 }
-assert.equal(objectCalls, 15);
+assert.equal(objectCalls, 17);
 assert.equal(codecFallbackCalls, 0);
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
@@ -498,6 +500,8 @@ assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUInt16Bump", 41), 42
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.arrayStringTotalLength", ["a", "bc"]), "3");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseArrayNatSum", [4, 5, 6]), "15");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.listUInt32Sum", [1, 2, 3]), "6");
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.arrayNatBumpAll", [4, 5]), ["5", "6"]);
+assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.listStringBangAll", ["a", "bc"]), ["a!", "bc!"]);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint32Bump", 41), 42);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint64Bump", "18446744073709551615"), "0");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseUSizeBump", "41"), "42");

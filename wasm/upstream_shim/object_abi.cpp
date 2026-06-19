@@ -96,6 +96,17 @@ extern "C" lean::object * vir_obj_array(lean::object ** values, uint32_t len) {
     return array;
 }
 
+extern "C" uint32_t vir_obj_array_size(lean::object * value) {
+    return static_cast<uint32_t>(lean_array_size(value));
+}
+
+extern "C" lean::object * vir_obj_array_get(lean::object * value, uint32_t index) {
+    if (index >= lean_array_size(value)) {
+        return nullptr;
+    }
+    return lean_array_uget(value, index);
+}
+
 extern "C" lean::object * vir_obj_ctor(uint32_t tag, lean::object ** fields, uint32_t len) {
     if (fields == nullptr && len != 0) {
         return nullptr;
@@ -132,6 +143,28 @@ extern "C" lean::object * vir_obj_list(lean::object ** values, uint32_t len) {
         out = cons;
     }
     return out;
+}
+
+extern "C" uint32_t vir_obj_list_is_nil(lean::object * value) {
+    return lean_is_scalar(value) && lean_unbox(value) == 0 ? 1 : 0;
+}
+
+extern "C" lean::object * vir_obj_list_head(lean::object * value) {
+    if (lean_is_scalar(value) || lean_ctor_num_objs(value) < 2) {
+        return nullptr;
+    }
+    lean::object * head = lean_ctor_get(value, 0);
+    lean_inc(head);
+    return head;
+}
+
+extern "C" lean::object * vir_obj_list_tail(lean::object * value) {
+    if (lean_is_scalar(value) || lean_ctor_num_objs(value) < 2) {
+        return nullptr;
+    }
+    lean::object * tail = lean_ctor_get(value, 1);
+    lean_inc(tail);
+    return tail;
 }
 
 extern "C" lean::object * vir_obj_scalar(uint32_t value) {

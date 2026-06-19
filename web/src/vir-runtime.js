@@ -54,6 +54,8 @@ const virCallbackStates = new WeakMap();
 const FAST_CALL_UNAVAILABLE = Symbol("fast-call-unavailable");
 const OBJECT_VALUE_EXPORTS = [
   "vir_obj_array",
+  "vir_obj_array_get",
+  "vir_obj_array_size",
   "vir_obj_byte_array",
   "vir_obj_byte_array_data",
   "vir_obj_byte_array_size",
@@ -67,6 +69,9 @@ const OBJECT_VALUE_EXPORTS = [
   "vir_obj_int",
   "vir_obj_int_decimal",
   "vir_obj_list",
+  "vir_obj_list_head",
+  "vir_obj_list_is_nil",
+  "vir_obj_list_tail",
   "vir_obj_nat",
   "vir_obj_nat_decimal",
   "vir_obj_is_scalar",
@@ -1008,6 +1013,10 @@ export class VirRuntime {
         return this.exports.vir_obj_float_value(obj);
       case WIRE.FLOAT32:
         return Math.fround(this.exports.vir_obj_float32_value(obj));
+      case WIRE.ARRAY:
+        return this.liftObjectArrayValue(type, obj, label, selfType);
+      case WIRE.LIST:
+        return this.liftObjectListValue(type, obj, label, selfType);
       case WIRE.OPTION:
         return this.liftObjectOptionValue(type, obj, label, selfType);
       case WIRE.PROD:
@@ -1023,6 +1032,67 @@ export class VirRuntime {
       throw new Error(`${label} scalar value ${value} exceeds ${max}`);
     }
     return value;
+  }
+
+  liftObjectArrayValue(type, obj, label, selfType) {
+    const len = this.exports.vir_obj_array_size(obj);
+    const elementType = requireTypeField(type, "element", label);
+    const values = [];
+    for (let index = 0; index < len; index++) {
+      const element = this.exports.vir_obj_array_get(obj, index);
+      if (element === 0) {
+        throw new Error(`${label}[${index}] is unavailable`);
+      }
+      try {
+        values.push(this.liftObjectValue(elementType, element, `${label}[${index}]`, selfType));
+      } finally {
+        this.exports.vir_obj_dec(element);
+      }
+    }
+    return values;
+  }
+
+  liftObjectListValue(type, obj, label, selfType) {
+    const elementType = requireTypeField(type, "element", label);
+    const values = [];
+    let cursor = obj;
+    let ownsCursor = false;
+    try {
+      while (this.exports.vir_obj_list_is_nil(cursor) === 0) {
+        const index = values.length;
+        const head = this.exports.vir_obj_list_head(cursor);
+        if (head === 0) {
+          throw new Error(`${label}[${index}] is unavailable`);
+        }
+        try {
+          values.push(this.liftObjectValue(elementType, head, `${label}[${index}]`, selfType));
+        } finally {
+          this.exports.vir_obj_dec(head);
+        }
+
+        let tail = this.exports.vir_obj_list_tail(cursor);
+        try {
+          if (tail === 0) {
+            throw new Error(`${label} tail after index ${index} is unavailable`);
+          }
+          if (ownsCursor) {
+            this.exports.vir_obj_dec(cursor);
+          }
+          cursor = tail;
+          ownsCursor = true;
+          tail = 0;
+        } finally {
+          if (tail !== 0) {
+            this.exports.vir_obj_dec(tail);
+          }
+        }
+      }
+      return values;
+    } finally {
+      if (ownsCursor) {
+        this.exports.vir_obj_dec(cursor);
+      }
+    }
   }
 
   liftObjectOptionValue(type, obj, label, selfType) {
@@ -1330,6 +1400,8 @@ function objectResultSupported(type, selfType = null) {
     case WIRE.FLOAT32:
     case WIRE.SIMPLE_ENUM:
       return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
     case WIRE.OPTION:
       return objectResultSupported(requireTypeField(type, "element", "object result"), selfType);
     case WIRE.PROD:

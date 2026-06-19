@@ -185,9 +185,9 @@ JavaScript drives it through the `vir_obj_*` construction and inspection
 primitives while the broader JS boundary policy remains open.
 The JavaScript runtime currently selects this lane automatically for pure unary
 calls where the argument can be lowered from the supported object subset and the
-result can be lifted from it. Arguments support base values, `Array`, `List`,
-`Option`, and `Prod`; results support base values, `Option`, and `Prod`. Other
-structured values still use the compact byte lane.
+result can be lifted from it. Arguments and results support base values,
+`Array`, `List`, `Option`, and `Prod`. Other structured values still use the
+compact byte lane.
 
 For a small set of exact pure scalar signatures, the JavaScript runtime can skip
 the byte payload entirely after slot resolution and call the primitive lane API:
@@ -219,8 +219,9 @@ The shim also exposes the first experimental Lean object ABI helpers:
 
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
-- `vir_obj_array`
-- `vir_obj_list`
+- `vir_obj_array` / `vir_obj_array_size` / `vir_obj_array_get`
+- `vir_obj_list` / `vir_obj_list_is_nil` / `vir_obj_list_head` /
+  `vir_obj_list_tail`
 - `vir_obj_ctor`
 - `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
 - `vir_obj_tag` / `vir_obj_field`
@@ -243,8 +244,9 @@ returns an owned result. String and byte-array data pointers are borrowed and
 must be read before the object is released. Decimal scalar inspection uses a
 shim-owned scratch buffer that must be read before the next decimal inspection
 call. `vir_obj_array` and `vir_obj_list` consume owned element references and
-return one owned sequence object. `vir_obj_ctor` consumes owned object-field
-references, and `vir_obj_field` returns a new owned field reference. See
+return one owned sequence object. `vir_obj_array_get`, `vir_obj_list_head`,
+`vir_obj_list_tail`, and `vir_obj_field` return new owned references.
+`vir_obj_ctor` consumes owned object-field references. See
 [OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and ownership rules.
 
 The current explicit native externs cover the small fixture/demo surface for
