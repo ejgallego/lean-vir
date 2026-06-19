@@ -121,9 +121,37 @@ The embedded manifest currently supports:
   inductive surface and rendered by the React host bindings.
 
 The numeric `wireTag` table is part of the package ABI. Lean assigns tags in
-`Vir.GeneratePackage.Interface`; JavaScript validates and dispatches them in
-`web/src/runtime/wire-tags.js`. Run `npm run check:package-abi` after editing
-either side.
+`Vir.GeneratePackage.Interface.Encode`; JavaScript validates and dispatches
+them in `web/src/runtime/wire-tags.js`. Run `npm run check:package-abi` after
+editing either side.
+
+| Tag | JavaScript name | Lean interface type | Descriptor payload |
+| --- | --- | --- | --- |
+| 0 | `WIRE.NAT` | `Nat` | Primitive. |
+| 1 | `WIRE.INT` | `Int` | Primitive. |
+| 2 | `WIRE.BOOL` | `Bool` | Primitive. |
+| 3 | `WIRE.STRING` | `String` | Primitive. |
+| 4 | `WIRE.UINT8` | `UInt8` | Primitive. |
+| 5 | `WIRE.UINT16` | `UInt16` | Primitive. |
+| 6 | `WIRE.UINT32` | `UInt32` | Primitive. |
+| 7 | `WIRE.UINT64` | `UInt64` | Primitive. |
+| 8 | `WIRE.USIZE` | `USize` | Primitive. |
+| 9 | `WIRE.BYTE_ARRAY` | `ByteArray` | Primitive byte data. |
+| 10 | `WIRE.FLOAT` | `Float` | Primitive. |
+| 11 | `WIRE.FLOAT32` | `Float32` | Primitive. |
+| 14 | `WIRE.SIMPLE_ENUM` | Nullary inductive enum | Constructor names and tags. |
+| 15 | `WIRE.EXPR` | `Lean.Expr` | Structural expression object. |
+| 16 | `WIRE.ARRAY` | `Array α` | Element descriptor. |
+| 17 | `WIRE.LIST` | `List α` | Element descriptor. |
+| 18 | `WIRE.OPTION` | `Option α` | Element descriptor. |
+| 19 | `WIRE.PROD` | `α × β` | `fst` and `snd` descriptors. |
+| 20 | `WIRE.STRUCTURE` | Structure | Name, runtime layout counts, fields, optional trivial field. |
+| 21 | `WIRE.TAGGED_UNION` | `Sum` / `Except` | Constructor descriptors with payload layout. |
+| 22 | `WIRE.UNIT` | `Unit` | Primitive. |
+| 23 | `WIRE.RESOURCE` | `@[vir_js]` resource marker | Resource name. |
+| 24 | `WIRE.FUNCTION` | Callback function type | Argument descriptors, result descriptor, effect label. |
+| 25 | `WIRE.CUSTOM_INDUCTIVE` | Non-indexed custom inductive | Constructor descriptors and field layouts. |
+| 26 | `WIRE.RECURSIVE_SELF` | Recursive reference | Referenced owner name. |
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.

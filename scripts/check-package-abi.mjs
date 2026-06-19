@@ -88,7 +88,7 @@ if (!Number.isSafeInteger(RUNTIME_ABI_VERSION) || RUNTIME_ABI_VERSION < 1) {
   throw new Error(`runtime ABI version must be a positive safe integer, got ${RUNTIME_ABI_VERSION}`);
 }
 
-const interfaceSource = await readRepoText("Vir/GeneratePackage/Interface.lean");
+const interfaceSource = await readRepoText("Vir/GeneratePackage/Interface/Encode.lean");
 const leanTags = leanWireTags(interfaceSource);
 const jsTags = new Map(Object.entries(WIRE));
 

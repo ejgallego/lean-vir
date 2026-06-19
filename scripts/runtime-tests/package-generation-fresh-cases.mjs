@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { WIRE } from "../../web/src/runtime/wire-tags.js";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../package-versions.mjs";
 import {
   assert,
@@ -167,7 +168,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const freshWrapUInt32Entry = manifestEntry(freshManifest, "freshWrapUInt32Bump");
   assert.equal(freshWrapUInt32Entry.args[0].type.type, "FreshWrap UInt32");
-  assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].type.wireTag, 6);
+  assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].type.wireTag, WIRE.UINT32);
   assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].layout.kind, "object");
   assert.deepEqual(freshRuntime.call("freshWrapUInt32Bump", {
     label: "u",
@@ -188,7 +189,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const freshUInt64BoxEntry = manifestEntry(freshManifest, "freshUInt64BoxBump");
   assert.equal(freshUInt64BoxEntry.args[0].type.trivialFieldIndex, 0);
-  assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].type.wireTag, 7);
+  assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].type.wireTag, WIRE.UINT64);
   assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
   assert.deepEqual(freshRuntime.call("freshUInt64BoxBump", {
     value: "18446744073709551615",
@@ -232,9 +233,9 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     next: freshChain,
   });
   const freshChainEntry = manifestEntry(freshManifest, "freshChainIdentity");
-  assert.equal(freshChainEntry.args[0].type.wireTag, 20);
-  assert.equal(freshChainEntry.args[0].type.fields[1].type.wireTag, 18);
-  assert.equal(freshChainEntry.args[0].type.fields[1].type.element.wireTag, 26);
+  assert.equal(freshChainEntry.args[0].type.wireTag, WIRE.STRUCTURE);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.wireTag, WIRE.OPTION);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.element.wireTag, WIRE.RECURSIVE_SELF);
   assert.equal(freshChainEntry.args[0].type.fields[1].type.element.kind, "recursiveSelf");
 
   const freshTree = {
@@ -265,8 +266,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   });
   assert.equal(freshRuntime.call("freshTreeRootScore", freshTree), "12");
   const freshTreeEntry = manifestEntry(freshManifest, "freshTreeIdentity");
-  assert.equal(freshTreeEntry.args[0].type.wireTag, 25);
-  assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.wireTag, 26);
+  assert.equal(freshTreeEntry.args[0].type.wireTag, WIRE.CUSTOM_INDUCTIVE);
+  assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.wireTag, WIRE.RECURSIVE_SELF);
   assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.kind, "recursiveSelf");
 
   const term = {
@@ -330,10 +331,10 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     ],
   });
   const freshJsonEntry = manifestEntry(freshManifest, "freshJsonWeight");
-  assert.equal(freshJsonEntry.args[0].type.wireTag, 25);
+  assert.equal(freshJsonEntry.args[0].type.wireTag, WIRE.CUSTOM_INDUCTIVE);
   assert.equal(freshJsonEntry.args[0].type.constructors[0].fields.length, 0);
-  assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.wireTag, 26);
+  assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.wireTag, WIRE.RECURSIVE_SELF);
   assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.kind, "recursiveSelf");
-  assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.wireTag, 26);
+  assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.wireTag, WIRE.RECURSIVE_SELF);
   assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.kind, "recursiveSelf");
 }
