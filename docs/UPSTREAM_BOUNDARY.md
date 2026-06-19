@@ -161,18 +161,15 @@ caches decoded export and host-import signatures by package generation and
 slot, so compact signature bytes are decoded once per loaded package rather
 than on every call.
 
-The runtime currently has three call lanes:
+The runtime currently has two call lanes:
 
-- The compact byte lane is the complete fallback. JavaScript encodes ordinary
-  manifest values with `runtime/vir-value-codec.js`, and the shim decodes them
-  with the package-owned signature table in `interface_codec.cpp`.
-- The primitive lane is a scalar fast path for exact pure one-argument
-  signatures. It bypasses the byte payload after slot resolution, but still
-  validates the package-owned signature before running the interpreter.
 - The object ABI lane accepts owned Lean object pointers produced by `vir_obj_*`
   helpers. It is an internal runtime path for JS-driven lowering/lifting of
   ordinary Lean values, not a public representation for JavaScript-owned host
   objects.
+- The compact byte lane is the complete fallback. JavaScript encodes ordinary
+  manifest values with `runtime/vir-value-codec.js`, and the shim decodes them
+  with the package-owned signature table in `interface_codec.cpp`.
 
 `vir_call_resolved_objects(slot, argv, argc)` is the first object ABI call
 helper. It accepts an array of owned `lean_object *` arguments, consumes those
@@ -192,28 +189,6 @@ subset. Nontrivial constructors may mix object fields, raw `USize` slots, and
 packed scalar fields, including direct recursive references through supported
 fields. Resources, callbacks, effectful calls, and `Lean.Expr` values still use
 the compact byte lane for now.
-
-For a small set of exact pure scalar signatures, the JavaScript runtime can skip
-the byte payload entirely after slot resolution and call the primitive lane API:
-
-- `vir_call_primitive_set_u32`
-- `vir_call_primitive_set_f64`
-- `vir_call_primitive_set_string`
-- `vir_call_resolved_primitive`
-- `vir_call_primitive_u32_result`
-- `vir_call_primitive_f64_result`
-- `vir_call_primitive_string_result`
-
-The lane ids are `Unit`, `U32`, `F64`, and `String`. The shim still validates
-the selected package-owned signature before running the call; the lane ids do
-not replace package metadata. This currently covers `Unit -> Unit`, `Bool ->
-Bool`, and same-width `UInt8`/`UInt16`/`UInt32`, `Float`, and `Float32` calls,
-plus `String -> String`. String primitive calls construct the Lean string object
-directly and expose result UTF-8 bytes through `vir_call_result_size`. Floating
-primitive calls use the f64 result slot even for `Float32`, with the JavaScript
-runtime rounding back to single precision. All other signatures, including
-structured values, resources, callbacks, and effectful calls, stay on the
-compact package-owned value-payload path.
 
 The shim still keeps `vir_call(name, len, payload, payloadLen, resultTag)` as a
 named entry point for diagnostics and benchmark comparisons, but the JavaScript

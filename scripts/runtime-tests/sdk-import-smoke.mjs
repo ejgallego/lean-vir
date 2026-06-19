@@ -44,7 +44,6 @@ try {
   const codec = modules["runtime/vir-codec.js"];
   const leanCodec = modules["runtime/vir-lean-codec.js"];
   const valueCodec = modules["runtime/vir-value-codec.js"];
-  const primitiveLanes = modules["runtime/primitive-lanes.js"];
   const reactNode = modules["react/vir-react-node.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
   const wireTags = modules["runtime/wire-tags.js"];
@@ -56,7 +55,6 @@ try {
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof leanCodec.decodeExpr, "function");
   assert.equal(typeof valueCodec.decodeCallResult, "function");
-  assert.equal(primitiveLanes.PRIMITIVE_LANE.STRING, 3);
   assert.equal(typeof reactNode.virtualReactTextContent, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
   assert.equal(wireTags.WIRE.NAT, 0);

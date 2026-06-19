@@ -28,7 +28,6 @@ unrelated responsibilities.
 - `runtime/vir-value-normalizers.js`: JavaScript input normalization for the
   value codec.
 - `runtime/vir-lean-codec.js`: structural `Lean.Expr` and level encode/decode.
-- `runtime/primitive-lanes.js`: primitive-lane constants and result lifting.
 - `runtime/interface-manifest.js`: interface manifest validation, diagnostics,
   and type formatting helpers.
 - `runtime/wire-tags.js`: shared wire tag constants.

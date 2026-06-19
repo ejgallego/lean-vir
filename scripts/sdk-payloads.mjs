@@ -15,7 +15,6 @@ export const SDK_PAYLOADS = [
   ["js/runtime/vir-lean-codec.js", "web/src/runtime/vir-lean-codec.js"],
   ["js/runtime/vir-value-codec.js", "web/src/runtime/vir-value-codec.js"],
   ["js/runtime/vir-value-normalizers.js", "web/src/runtime/vir-value-normalizers.js"],
-  ["js/runtime/primitive-lanes.js", "web/src/runtime/primitive-lanes.js"],
   ["js/runtime/interface-effects.js", "web/src/runtime/interface-effects.js"],
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],
   ["js/runtime/wire-tags.js", "web/src/runtime/wire-tags.js"],
