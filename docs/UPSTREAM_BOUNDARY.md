@@ -147,7 +147,7 @@ The browser runtime does not send a dotted Lean entry name on every call. After
 loading an `.irpkg`, it resolves a manifest export once with
 `vir_resolve_call(name, len)`. The returned slot is package-local, 1-based, and
 uses `0` as the failure sentinel. Repeated calls then use
-`vir_call_resolved(slot, payload, payloadLen, resultTag)`.
+`vir_call_resolved(slot, payload, payloadLen)`.
 
 In package format 7 and newer, the package contains a compact export signature
 table. `vir_call_resolved` uses that table to decode value-only argument
