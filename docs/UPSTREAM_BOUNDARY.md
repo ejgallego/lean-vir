@@ -189,8 +189,9 @@ result can be lifted from it. Arguments and results support base values,
 `Array`, `List`, `Option`, `Prod`, and manifest-described structures, tagged
 unions, and custom inductive constructors whose fields recursively stay in this
 subset. Nontrivial constructors may mix object fields, raw `USize` slots, and
-packed scalar fields. Recursive-self descriptors still use the compact byte
-lane for now, as do resources, callbacks, and `Lean.Expr` values.
+packed scalar fields, including direct recursive references through supported
+fields. Resources, callbacks, effectful calls, and `Lean.Expr` values still use
+the compact byte lane for now.
 
 For a small set of exact pure scalar signatures, the JavaScript runtime can skip
 the byte payload entirely after slot resolution and call the primitive lane API:

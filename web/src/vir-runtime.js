@@ -1576,7 +1576,7 @@ function objectArgumentSupported(type, selfType = null) {
   const tag = type?.wireTag;
   switch (tag) {
     case WIRE.RECURSIVE_SELF:
-      return false;
+      return selfType !== null;
     case WIRE.UNIT:
     case WIRE.BOOL:
     case WIRE.NAT:
@@ -1614,7 +1614,7 @@ function objectResultSupported(type, selfType = null) {
   const tag = type?.wireTag;
   switch (tag) {
     case WIRE.RECURSIVE_SELF:
-      return false;
+      return selfType !== null;
     case WIRE.UNIT:
     case WIRE.BOOL:
     case WIRE.NAT:
