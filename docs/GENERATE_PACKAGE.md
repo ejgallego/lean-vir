@@ -106,6 +106,8 @@ Version constants are intentionally small and explicit:
   `packageFormatVersion` and `manifestVersion` metadata values.
 - `scripts/package-versions.mjs` owns the JavaScript-side expectations for
   package format, interface manifest, and runtime ABI versions.
+- `npm run check:package-abi` verifies those constants and the Lean/JavaScript
+  wire tag table agree.
 
 Bump `packageFormatVersion` when the binary `.irpkg` encoding or decoder
 contract changes incompatibly. Update the JavaScript package-format constant,
@@ -125,6 +127,7 @@ After any version bump, run at least:
 
 ```bash
 lake build vir_irpkg
+npm run check:package-abi
 npm run build:demo
 npm run test:runtime -- package-generation
 ```
@@ -159,6 +162,7 @@ Useful checks after generator edits:
 
 ```bash
 lake build vir_irpkg
+npm run check:package-abi
 npm run check:boundary-registry
 bash scripts/build-lean-lib.sh
 npm run generate:irpkg -- examples/Fib.lean /tmp/vir-fib.irpkg fib
