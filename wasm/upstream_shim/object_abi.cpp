@@ -80,6 +80,22 @@ extern "C" uint32_t vir_obj_byte_array_size(lean::object * value) {
     return static_cast<uint32_t>(lean_sarray_size(value));
 }
 
+extern "C" lean::object * vir_obj_array(lean::object ** values, uint32_t len) {
+    if (values == nullptr && len != 0) {
+        return nullptr;
+    }
+    for (uint32_t i = 0; i < len; i++) {
+        if (values[i] == nullptr) {
+            return nullptr;
+        }
+    }
+    lean::object * array = lean_alloc_array(len, len);
+    for (uint32_t i = 0; i < len; i++) {
+        lean_array_set_core(array, i, values[i]);
+    }
+    return array;
+}
+
 extern "C" lean::object * vir_obj_nat(char const * text, uint32_t len) {
     if (!is_decimal(text, len)) {
         return nullptr;

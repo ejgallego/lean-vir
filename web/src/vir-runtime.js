@@ -29,6 +29,7 @@ import {
 } from "./runtime/vir-value-codec.js";
 import {
   asByteArrayBytes,
+  normalizeArray,
   normalizeDecimal,
   normalizeFloat,
 } from "./runtime/vir-value-normalizers.js";
@@ -596,6 +597,9 @@ export class VirRuntime {
     }
     const argTag = entry.args[0].type?.wireTag;
     const resultTag = entry.result?.wireTag;
+    if (argTag === WIRE.ARRAY && resultTag === WIRE.NAT) {
+      return this.tryObjectArrayToNatCall(entry, args, cache);
+    }
     if (argTag !== resultTag) {
       return FAST_CALL_UNAVAILABLE;
     }
@@ -659,18 +663,124 @@ export class VirRuntime {
     if (!this.hasObjectCallExports(constructorName, decimalName, "vir_obj_decimal_size")) {
       return FAST_CALL_UNAVAILABLE;
     }
+    const argObj = this.makeObjectDecimal(
+      constructorName,
+      decimal,
+      `${entry.entry} argument ${entry.args[0].name}`,
+    );
+    return this.callResolvedObjectUnary(entry, cache, argObj, (resultObj) =>
+      this.readObjectDecimal(resultObj, decimalName));
+  }
+
+  tryObjectArrayToNatCall(entry, args, cache) {
+    const arrayType = entry.args[0].type;
+    const elementTag = arrayType?.element?.wireTag;
+    if (elementTag !== WIRE.NAT && elementTag !== WIRE.STRING) {
+      return FAST_CALL_UNAVAILABLE;
+    }
+    const elementConstructorName = elementTag === WIRE.NAT ? "vir_obj_nat" : "vir_obj_string";
+    if (!this.hasObjectCallExports(
+      "vir_obj_array",
+      elementConstructorName,
+      "vir_obj_nat_decimal",
+      "vir_obj_decimal_size",
+    )) {
+      return FAST_CALL_UNAVAILABLE;
+    }
+
+    const label = `${entry.entry} argument ${entry.args[0].name}`;
+    const values = normalizeArray(args[0], label);
+    if (values.length > 0xffffffff) {
+      throw new Error(`${label} has too many elements`);
+    }
+
+    const elementObjs = [];
+    try {
+      values.forEach((value, index) => {
+        elementObjs.push(this.makeObjectForArrayElement(arrayType.element, value, `${label}[${index}]`));
+      });
+      const arrayObj = this.makeObjectArrayFromOwnedElements(elementObjs, label);
+      return this.callResolvedObjectUnary(entry, cache, arrayObj, (resultObj) =>
+        this.readObjectDecimal(resultObj, "vir_obj_nat_decimal"));
+    } finally {
+      this.releaseOwnedObjects(elementObjs);
+    }
+  }
+
+  makeObjectDecimal(constructorName, decimal, label) {
     const bytes = textEncoder.encode(decimal);
     const inputPtr = this.allocBytes(bytes);
     try {
       const argObj = this.exports[constructorName](inputPtr, bytes.byteLength);
       if (argObj === 0) {
-        throw new Error(`${entry.entry} argument ${entry.args[0].name} could not be lowered to a Lean object`);
+        throw new Error(`${label} could not be lowered to a Lean object`);
       }
-      return this.callResolvedObjectUnary(entry, cache, argObj, (resultObj) =>
-        this.readObjectDecimal(resultObj, decimalName));
+      return argObj;
     } finally {
       this.freeBytes(inputPtr);
     }
+  }
+
+  makeObjectString(value, label) {
+    if (typeof value !== "string") {
+      throw new Error(`${label} must be a string`);
+    }
+    const bytes = textEncoder.encode(value);
+    const inputPtr = this.allocBytes(bytes);
+    try {
+      const argObj = this.exports.vir_obj_string(inputPtr, bytes.byteLength);
+      if (argObj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean string object`);
+      }
+      return argObj;
+    } finally {
+      this.freeBytes(inputPtr);
+    }
+  }
+
+  makeObjectForArrayElement(type, value, label) {
+    const tag = type?.wireTag;
+    if (tag === WIRE.NAT) {
+      return this.makeObjectDecimal(
+        "vir_obj_nat",
+        normalizeDecimal(value, label, { signed: false }),
+        label,
+      );
+    }
+    if (tag === WIRE.STRING) {
+      return this.makeObjectString(value, label);
+    }
+    throw new Error(`${label} has unsupported object-array element type`);
+  }
+
+  makeObjectArrayFromOwnedElements(elementObjs, label) {
+    let valuesPtr = 0;
+    try {
+      if (elementObjs.length !== 0) {
+        valuesPtr = this.allocBytes(new Uint8Array(elementObjs.length * 4));
+        const view = new DataView(this.exports.memory.buffer, valuesPtr, elementObjs.length * 4);
+        elementObjs.forEach((obj, index) => view.setUint32(index * 4, obj, true));
+      }
+      const arrayObj = this.exports.vir_obj_array(valuesPtr, elementObjs.length);
+      if (arrayObj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean array object`);
+      }
+      elementObjs.length = 0;
+      return arrayObj;
+    } finally {
+      if (valuesPtr !== 0) {
+        this.freeBytes(valuesPtr);
+      }
+    }
+  }
+
+  releaseOwnedObjects(objects) {
+    for (const obj of objects) {
+      if (obj !== 0) {
+        this.exports.vir_obj_dec(obj);
+      }
+    }
+    objects.length = 0;
   }
 
   callResolvedObjectUnary(entry, cache, argObj, liftResult) {

@@ -53,9 +53,10 @@ binary value encoding, and result byte decoding after the package slot is
 resolved. The `direct` rows expose the same primitive-lane path explicitly for
 benchmarking.
 Exact pure same-type calls over `Nat`, `Int`, `UInt64`, `USize`, and
-`ByteArray` use the object ABI lane through the normal `wasm` sample when the
-package includes the generated `_boxed` declaration for the entry: JavaScript
-lowers the input with the matching `vir_obj_*` constructor, calls
+`ByteArray`, plus the shallow `Array Nat -> Nat` and `Array String -> Nat`
+cases, use the object ABI lane through the normal `wasm` sample when the package
+includes the generated `_boxed` declaration for the entry. JavaScript lowers the
+input with the matching `vir_obj_*` constructor or `vir_obj_array`, calls
 `vir_call_resolved_objects`, and lifts the owned result with the decimal scalar
 or byte-array inspection helpers.
 
