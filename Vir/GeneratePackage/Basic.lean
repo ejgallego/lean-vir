@@ -48,6 +48,10 @@ def InterfaceEffect.display : InterfaceEffect → String
   | .dom => "DomM"
   | .react => "ReactM"
 
+def maxHostImportSlots : Nat := 32
+
+def maxHostImportArity : Nat := 6
+
 structure Target where
   source : System.FilePath
   roots : Array Name

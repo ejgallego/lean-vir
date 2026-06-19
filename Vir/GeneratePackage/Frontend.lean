@@ -14,10 +14,6 @@ open Lean.IR
 
 def jsExternPrefix : String := "__vir_js:"
 
-def maxHostImportSlots : Nat := 32
-
-def maxHostImportArity : Nat := 6
-
 def virJsTargetFromExternData? (data : ExternAttrData) : Option String :=
   data.entries.findSome? fun entry =>
     match entry with

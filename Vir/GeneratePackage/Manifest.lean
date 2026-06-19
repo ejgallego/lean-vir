@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.GeneratePackage.Interface
+import Vir.GeneratePackage.PackageFormat
 
 open Lean
 
@@ -29,8 +30,8 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
 def collectPackageMetadata (generatedAt : String) (targets : Array Target) (index : DeclIndex) : PackageMetadata :=
   {
     generator := "tools/GeneratePackage.lean"
-    packageFormatVersion := 7
-    manifestVersion := 1
+    packageFormatVersion := currentPackageFormatVersion
+    manifestVersion := currentInterfaceManifestVersion
     leanVersion := Lean.versionString
     leanToolchain := Lean.toolchain
     leanGithash := Lean.githash

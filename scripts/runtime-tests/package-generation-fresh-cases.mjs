@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../package-versions.mjs";
 import {
   assert,
   assertManifestTypeDescriptorsRoundTrip,
@@ -30,8 +31,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const freshRuntime = await factory.createRuntime({ irPackageBytes: await readFile(freshPackage) });
   const freshManifest = freshRuntime.interfaceManifest;
-  assert.equal(freshManifest.metadata.packageFormatVersion, 7);
-  assert.equal(freshManifest.metadata.manifestVersion, 1);
+  assert.equal(freshManifest.metadata.packageFormatVersion, PACKAGE_FORMAT_VERSION);
+  assert.equal(freshManifest.metadata.manifestVersion, INTERFACE_MANIFEST_VERSION);
   assert.match(freshManifest.metadata.leanToolchain, /leanprover\/lean4/);
   assert.ok(freshManifest.metadata.generatedAt.length > 0);
   assert.equal(freshManifest.metadata.targets.length, 1);

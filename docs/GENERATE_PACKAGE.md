@@ -24,7 +24,9 @@ Targets have one of three modes:
 ## Module Map
 
 - `Vir.GeneratePackage.Basic`: shared data structures, package metadata
-  shapes, and default browser targets.
+  shapes, package ABI limits, and default browser targets.
+- `Vir.GeneratePackage.PackageFormat`: current package and interface manifest
+  version constants used by generated metadata.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures.
 - `Vir.GeneratePackage.Frontend`: Lean frontend loading, source preprocessing,
@@ -95,6 +97,37 @@ That retry is deliberately conservative: the classifier first tries the source
 type as written, then unfolds only abbrev heads whose outer type shape is not
 already supported. This preserves existing primitive, container, resource, and
 effect handling while allowing simple type aliases and effect aliases to pass.
+
+## Version Bump Checklist
+
+Version constants are intentionally small and explicit:
+
+- `Vir.GeneratePackage.PackageFormat` owns the Lean generator's
+  `packageFormatVersion` and `manifestVersion` metadata values.
+- `scripts/package-versions.mjs` owns the JavaScript-side expectations for
+  package format, interface manifest, and runtime ABI versions.
+
+Bump `packageFormatVersion` when the binary `.irpkg` encoding or decoder
+contract changes incompatibly. Update the JavaScript package-format constant,
+runtime decoder checks, and package fixture expectations in the same PR.
+
+Bump `manifestVersion` when embedded manifest fields, descriptor shapes, or
+their semantics change incompatibly for JavaScript callers. Update the
+manifest validator, runtime smoke tests, and `docs/INTERFACE_PIPELINE.md`
+alongside the generator change.
+
+Bump `runtimeAbiVersion` when the SDK artifact compatibility changes outside
+the embedded package/manifest schema, such as a WASM host ABI or JavaScript
+runtime contract change. That value is currently recorded in the SDK artifact
+metadata, not in generated `.irpkg` manifests.
+
+After any version bump, run at least:
+
+```bash
+lake build vir_irpkg
+npm run build:demo
+npm run test:runtime -- package-generation
+```
 
 ## Troubleshooting
 

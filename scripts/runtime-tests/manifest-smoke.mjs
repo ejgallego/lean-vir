@@ -22,6 +22,7 @@ import {
   createVirtualEventState,
   ensureVirtualElementState,
 } from "../../web/src/vir-runtime-node.js";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../package-versions.mjs";
 import {
   assert,
   assertInvalidManifest,
@@ -102,8 +103,8 @@ assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface
 assert.equal(runtime.packageInfo.hostImports, 0);
 assert.equal(hostRuntime.packageInfo.hostImports, 26);
 assert.equal(runtime.packageInfo.metadata, runtime.packageMetadata);
-assert.equal(runtime.packageMetadata.packageFormatVersion, 7);
-assert.equal(runtime.packageMetadata.manifestVersion, 1);
+assert.equal(runtime.packageMetadata.packageFormatVersion, PACKAGE_FORMAT_VERSION);
+assert.equal(runtime.packageMetadata.manifestVersion, INTERFACE_MANIFEST_VERSION);
 assert.match(runtime.packageMetadata.leanToolchain, /leanprover\/lean4/);
 assert.ok(runtime.packageMetadata.generatedAt.length > 0);
 assert.ok(runtime.packageMetadata.targets.some((target) => target.source === "examples/Fib.lean"));
