@@ -114,6 +114,7 @@ export class HostResourceState {
     return undefined;
   }
 
+  // Debug-only lifecycle visibility for runtime tests; not a stable host API.
   debugResourceCounts() {
     return {
       live: this.liveResources.size,
