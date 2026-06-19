@@ -120,6 +120,11 @@ The embedded manifest currently supports:
 - `Lean.Vir.React.Html`, represented through the same recursive custom
   inductive surface and rendered by the React host bindings.
 
+The numeric `wireTag` table is part of the package ABI. Lean assigns tags in
+`Vir.GeneratePackage.Interface`; JavaScript validates and dispatches them in
+`web/src/runtime/wire-tags.js`. Run `npm run check:package-abi` after editing
+either side.
+
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
 Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them require
