@@ -56,15 +56,17 @@ resolved. The `direct` rows expose the same primitive-lane path explicitly for
 benchmarking.
 Pure unary calls over the supported object subset use the object ABI lane
 through the normal `wasm` sample. The runtime currently lowers base arguments,
-`Array`, `List`, `Option`, `Prod`, and object-field-only structure/constructor
-values, and lifts the same subset recursively. The no-fallback runtime smoke
-covers decimal scalars, `ByteArray`, `Array Nat -> Nat`, `Array String -> Nat`,
+`Array`, `List`, `Option`, `Prod`, and manifest-described
+structure/constructor values with object, `USize`, and scalar runtime fields,
+and lifts the same subset recursively. The no-fallback runtime smoke covers
+decimal scalars, `ByteArray`, `Array Nat -> Nat`, `Array String -> Nat`,
 `List UInt32 -> Nat`, `Array Nat -> Array Nat`, `List String -> List String`,
 `Option` arguments/results, `Prod` arguments/results, a nested
-`List (Nat × String)` argument, object-only `Profile` records, a trivial
-`Box Nat` wrapper, `Tagged Profile`, and `Sum`/`Except` tagged unions.
+`List (Nat × String)` argument, `Profile` records, `ProfileStats` mixed scalar
+records, trivial scalar wrappers, `Tagged Profile`, `Metered`, extended records,
+and `Sum`/`Except` tagged unions.
 JavaScript lowers inputs with the matching `vir_obj_*` constructor,
-`vir_obj_array`, `vir_obj_list`, or `vir_obj_ctor`, calls
+`vir_obj_array`, `vir_obj_list`, `vir_obj_ctor`, or `vir_obj_ctor_layout`, calls
 `vir_call_resolved_objects`, and lifts the owned result with the matching
 inspection helpers.
 

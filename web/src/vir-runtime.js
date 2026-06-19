@@ -69,6 +69,9 @@ const OBJECT_VALUE_EXPORTS = [
   "vir_obj_byte_array_data",
   "vir_obj_byte_array_size",
   "vir_obj_ctor",
+  "vir_obj_ctor_layout",
+  "vir_obj_ctor_scalar_data",
+  "vir_obj_ctor_usize_decimal",
   "vir_obj_decimal_size",
   "vir_obj_field",
   "vir_obj_float",
@@ -792,33 +795,13 @@ export class VirRuntime {
     if (trivial !== null) {
       return this.makeObjectValue(trivial.type, record[trivial.name], `${label}.${trivial.name}`, type);
     }
-    const ownedFields = objectFieldSlots(type, fields, label);
-    try {
-      for (const field of fields) {
-        ownedFields[field.layout.index] = this.makeObjectValue(
-          field.type,
-          record[field.name],
-          `${label}.${field.name}`,
-          type,
-        );
-      }
-      return this.makeObjectCtorFromOwnedFields(0, ownedFields, label);
-    } finally {
-      this.releaseOwnedObjects(ownedFields);
-    }
+    return this.makeObjectCtorFromLayout(0, type, fields, record, label, type);
   }
 
   makeObjectTaggedUnionValue(type, value, label) {
     const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
-    if (!taggedUnionConstructorObjectOnly(ctor)) {
-      throw new Error(`${label}.${ctor.jsName} has unsupported object ABI layout`);
-    }
-    const fields = [this.makeObjectValue(ctor.type, payload, `${label}.${ctor.jsName}`, type)];
-    try {
-      return this.makeObjectCtorFromOwnedFields(index, fields, label);
-    } finally {
-      this.releaseOwnedObjects(fields);
-    }
+    const field = taggedUnionField(ctor);
+    return this.makeObjectCtorFromLayout(index, ctor, [field], { [field.name]: payload }, label, type);
   }
 
   makeObjectCustomInductiveValue(type, value, label) {
@@ -826,19 +809,35 @@ export class VirRuntime {
     if (ctor.fields.length === 0) {
       return this.makeObjectScalar(index, label);
     }
-    const ownedFields = objectFieldSlots(ctor, ctor.fields, `${label}.${ctor.jsName}`);
+    return this.makeObjectCtorFromLayout(index, ctor, ctor.fields, fields, label, type);
+  }
+
+  makeObjectCtorFromLayout(tag, owner, fields, values, label, selfType) {
+    const layout = objectLayoutSlots(owner, fields, label);
     try {
-      for (const field of ctor.fields) {
-        ownedFields[field.layout.index] = this.makeObjectValue(
-          field.type,
-          fields[field.name],
-          `${label}.${ctor.jsName}.${field.name}`,
-          type,
-        );
+      for (const field of fields) {
+        this.writeObjectLayoutField(layout, owner, field, values[field.name], `${label}.${field.name}`, selfType);
       }
-      return this.makeObjectCtorFromOwnedFields(index, ownedFields, label);
+      return this.makeObjectCtorFromOwnedLayout(tag, layout, label);
     } finally {
-      this.releaseOwnedObjects(ownedFields);
+      this.releaseOwnedObjects(layout.objectFields);
+    }
+  }
+
+  writeObjectLayoutField(layout, owner, field, value, label, selfType) {
+    switch (field.layout.kind) {
+      case "object":
+        layout.objectFields[field.layout.index] = this.makeObjectValue(field.type, value, label, selfType);
+        return;
+      case "usize":
+        layout.usizeFields[usizeLayoutIndex(owner, field.layout, label)] =
+          normalizeBoundedUnsignedBigInt(value, label, this.usizeMaxValue(), "USize");
+        return;
+      case "scalar":
+        writeObjectScalarField(layout.scalarBytes, field.type, field.layout, value, label);
+        return;
+      default:
+        throw new Error(`${label} has unsupported object ABI layout`);
     }
   }
 
@@ -957,6 +956,58 @@ export class VirRuntime {
     } finally {
       if (fieldsPtr !== 0) {
         this.freeBytes(fieldsPtr);
+      }
+    }
+  }
+
+  makeObjectCtorFromOwnedLayout(tag, layout, label) {
+    let objectFieldsPtr = 0;
+    let usizeFieldsPtr = 0;
+    let scalarFieldsPtr = 0;
+    try {
+      if (layout.objectFields.length !== 0) {
+        objectFieldsPtr = this.allocBytes(new Uint8Array(layout.objectFields.length * 4));
+        const view = new DataView(this.exports.memory.buffer, objectFieldsPtr, layout.objectFields.length * 4);
+        layout.objectFields.forEach((obj, index) => view.setUint32(index * 4, obj, true));
+      }
+      if (layout.usizeFields.length !== 0) {
+        const pointerBytes = this.targetPointerBytes();
+        usizeFieldsPtr = this.allocBytes(new Uint8Array(layout.usizeFields.length * pointerBytes));
+        const view = new DataView(this.exports.memory.buffer, usizeFieldsPtr, layout.usizeFields.length * pointerBytes);
+        layout.usizeFields.forEach((value, index) => {
+          if (pointerBytes === 4) {
+            view.setUint32(index * pointerBytes, Number(value), true);
+          } else {
+            view.setBigUint64(index * pointerBytes, value, true);
+          }
+        });
+      }
+      if (layout.scalarBytes.byteLength !== 0) {
+        scalarFieldsPtr = this.allocBytes(layout.scalarBytes);
+      }
+      const obj = this.exports.vir_obj_ctor_layout(
+        tag,
+        objectFieldsPtr,
+        layout.objectFields.length,
+        usizeFieldsPtr,
+        layout.usizeFields.length,
+        scalarFieldsPtr,
+        layout.scalarBytes.byteLength,
+      );
+      if (obj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean constructor object`);
+      }
+      layout.objectFields.length = 0;
+      return obj;
+    } finally {
+      if (objectFieldsPtr !== 0) {
+        this.freeBytes(objectFieldsPtr);
+      }
+      if (usizeFieldsPtr !== 0) {
+        this.freeBytes(usizeFieldsPtr);
+      }
+      if (scalarFieldsPtr !== 0) {
+        this.freeBytes(scalarFieldsPtr);
       }
     }
   }
@@ -1214,12 +1265,7 @@ export class VirRuntime {
     }
     const values = {};
     for (const field of fields) {
-      const fieldObj = this.ownedObjectField(obj, field.layout.index, `${label}.${field.name}`);
-      try {
-        values[field.name] = this.liftObjectValue(field.type, fieldObj, `${label}.${field.name}`, type);
-      } finally {
-        this.exports.vir_obj_dec(fieldObj);
-      }
+      values[field.name] = this.liftObjectLayoutField(type, obj, field, `${label}.${field.name}`);
     }
     return flattenStructureSubobjects(type, values);
   }
@@ -1227,18 +1273,11 @@ export class VirRuntime {
   liftObjectTaggedUnionValue(type, obj, label) {
     const tag = this.exports.vir_obj_tag(obj);
     const ctor = taggedUnionConstructorAt(type, tag, label);
-    if (!taggedUnionConstructorObjectOnly(ctor)) {
-      throw new Error(`${label}.${ctor.jsName} has unsupported object ABI layout`);
-    }
-    const field = this.ownedObjectField(obj, ctor.layout.index, `${label}.${ctor.jsName}`);
-    try {
-      return {
-        kind: ctor.jsName,
-        value: this.liftObjectValue(ctor.type, field, `${label}.${ctor.jsName}`, type),
-      };
-    } finally {
-      this.exports.vir_obj_dec(field);
-    }
+    const field = taggedUnionField(ctor);
+    return {
+      kind: ctor.jsName,
+      value: this.liftObjectLayoutField(ctor, obj, field, `${label}.${ctor.jsName}`, type),
+    };
   }
 
   liftObjectCustomInductiveValue(type, obj, label) {
@@ -1247,15 +1286,16 @@ export class VirRuntime {
     if (ctor.fields.length === 0) {
       return { kind: ctor.jsName };
     }
-    objectFieldSlots(ctor, ctor.fields, `${label}.${ctor.jsName}`);
+    objectLayoutSlots(ctor, ctor.fields, `${label}.${ctor.jsName}`);
     const values = {};
     for (const field of ctor.fields) {
-      const fieldObj = this.ownedObjectField(obj, field.layout.index, `${label}.${ctor.jsName}.${field.name}`);
-      try {
-        values[field.name] = this.liftObjectValue(field.type, fieldObj, `${label}.${ctor.jsName}.${field.name}`, type);
-      } finally {
-        this.exports.vir_obj_dec(fieldObj);
-      }
+      values[field.name] = this.liftObjectLayoutField(
+        ctor,
+        obj,
+        field,
+        `${label}.${ctor.jsName}.${field.name}`,
+        type,
+      );
     }
     return ctor.fields.length === 1 ? {
       kind: ctor.jsName,
@@ -1264,6 +1304,47 @@ export class VirRuntime {
       kind: ctor.jsName,
       fields: values,
     };
+  }
+
+  liftObjectLayoutField(owner, obj, field, label, selfType = owner) {
+    switch (field.layout.kind) {
+      case "object": {
+        const fieldObj = this.ownedObjectField(obj, field.layout.index, label);
+        try {
+          return this.liftObjectValue(field.type, fieldObj, label, selfType);
+        } finally {
+          this.exports.vir_obj_dec(fieldObj);
+        }
+      }
+      case "usize":
+        usizeLayoutIndex(owner, field.layout, label);
+        return this.readObjectUSizeField(obj, field.layout.index, label);
+      case "scalar":
+        return this.readObjectScalarField(owner, obj, field.type, field.layout, label);
+      default:
+        throw new Error(`${label} has unsupported object ABI layout`);
+    }
+  }
+
+  readObjectUSizeField(obj, index, label) {
+    const data = this.exports.vir_obj_ctor_usize_decimal(obj, index);
+    if (data === 0) {
+      throw new Error(`${label} USize field ${index} is unavailable`);
+    }
+    return this.readWasmString(data, this.exports.vir_obj_decimal_size());
+  }
+
+  readObjectScalarField(owner, obj, type, layout, label) {
+    const data = this.exports.vir_obj_ctor_scalar_data(obj, owner.usizeFieldCount);
+    if (data === 0) {
+      throw new Error(`${label} scalar data is unavailable`);
+    }
+    return readObjectScalarField(
+      new DataView(this.exports.memory.buffer, data, owner.scalarByteSize),
+      type,
+      layout,
+      label,
+    );
   }
 
   usizeMaxValue() {
@@ -1584,30 +1665,46 @@ function objectStructureSupported(type, fieldSupported) {
   if (trivial !== null) {
     return fieldSupported(trivial.type, type);
   }
-  if (!objectRuntimeCountsOnly(type, fields.length)) {
-    return false;
-  }
-  return fields.every((field) =>
-    objectLayoutIndex(field.layout, fields.length) !== null &&
-    fieldSupported(field.type, type));
+  return objectLayoutSupported(type, fields, fieldSupported, type);
 }
 
 function objectTaggedUnionSupported(type, fieldSupported) {
   return requireTaggedUnionConstructors(type, "object tagged union").every((ctor) =>
-    taggedUnionConstructorObjectOnly(ctor) &&
-    fieldSupported(ctor.type, type));
+    objectLayoutSupported(ctor, [taggedUnionField(ctor)], fieldSupported, type));
 }
 
 function objectCustomInductiveSupported(type, fieldSupported) {
   return requireCustomInductiveConstructors(type, "object custom inductive").every((ctor) => {
     if (ctor.fields.length === 0) {
-      return objectRuntimeCountsOnly(ctor, 0);
+      const counts = objectRuntimeCounts(ctor, "object custom inductive");
+      return counts.objectFieldCount === 0 && counts.usizeFieldCount === 0 && counts.scalarByteSize === 0;
     }
-    return objectRuntimeCountsOnly(ctor, ctor.fields.length) &&
-      ctor.fields.every((field) =>
-        objectLayoutIndex(field.layout, ctor.fields.length) !== null &&
-        fieldSupported(field.type, type));
+    return objectLayoutSupported(ctor, ctor.fields, fieldSupported, type);
   });
+}
+
+function objectLayoutSupported(owner, fields, fieldSupported, selfType) {
+  try {
+    objectLayoutSlots(owner, fields, "object layout");
+  } catch {
+    return false;
+  }
+  return fields.every((field) => objectFieldLayoutSupported(owner, field, fieldSupported, selfType));
+}
+
+function objectFieldLayoutSupported(owner, field, fieldSupported, selfType) {
+  switch (field.layout.kind) {
+    case "object":
+      return objectLayoutIndex(owner, field.layout, field.name ?? "field") !== null &&
+        fieldSupported(field.type, selfType);
+    case "usize":
+      return field.type?.wireTag === WIRE.USIZE &&
+        usizeLayoutIndex(owner, field.layout, field.name ?? "field") !== null;
+    case "scalar":
+      return objectScalarFieldSupported(field.type, field.layout);
+    default:
+      return false;
+  }
 }
 
 function trivialStructureField(type, fields) {
@@ -1621,41 +1718,254 @@ function trivialStructureField(type, fields) {
   return fields[index];
 }
 
-function objectFieldSlots(owner, fields, label) {
-  if (!objectRuntimeCountsOnly(owner, fields.length)) {
+function taggedUnionField(ctor) {
+  return {
+    name: ctor.jsName,
+    type: ctor.type,
+    layout: ctor.layout,
+  };
+}
+
+function objectLayoutSlots(owner, fields, label) {
+  const counts = objectRuntimeCounts(owner, label);
+  const objectFields = Array(counts.objectFieldCount).fill(0);
+  const usizeFields = Array(counts.usizeFieldCount).fill(0n);
+  const scalarBytes = new Uint8Array(counts.scalarByteSize);
+  const seenObjects = new Set();
+  const seenUSize = new Set();
+  const seenScalarBytes = new Set();
+  for (const field of fields) {
+    const fieldLabel = `${label}.${field.name ?? "field"}`;
+    switch (field.layout.kind) {
+      case "object": {
+        const index = objectLayoutIndex(owner, field.layout, fieldLabel);
+        if (index === null) {
+          throw new Error(`${fieldLabel} has unsupported object ABI layout`);
+        }
+        if (seenObjects.has(index)) {
+          throw new Error(`${fieldLabel} duplicates object field index ${index}`);
+        }
+        seenObjects.add(index);
+        break;
+      }
+      case "usize": {
+        const index = usizeLayoutIndex(owner, field.layout, fieldLabel);
+        if (index === null) {
+          throw new Error(`${fieldLabel} has unsupported object ABI layout`);
+        }
+        if (seenUSize.has(index)) {
+          throw new Error(`${fieldLabel} duplicates USize field index ${field.layout.index}`);
+        }
+        seenUSize.add(index);
+        break;
+      }
+      case "scalar":
+        scalarLayoutOffset(field.layout, counts.scalarByteSize, fieldLabel);
+        for (let index = field.layout.offset; index < field.layout.offset + field.layout.size; index++) {
+          if (seenScalarBytes.has(index)) {
+            throw new Error(`${fieldLabel} overlaps scalar byte ${index}`);
+          }
+          seenScalarBytes.add(index);
+        }
+        break;
+      default:
+        throw new Error(`${fieldLabel} has unsupported object ABI layout`);
+    }
+  }
+  return { objectFields, usizeFields, scalarBytes };
+}
+
+function objectRuntimeCounts(owner, label) {
+  const objectFieldCount = owner?.objectFieldCount;
+  const usizeFieldCount = owner?.usizeFieldCount;
+  const scalarByteSize = owner?.scalarByteSize;
+  if (
+    !Number.isInteger(objectFieldCount) || objectFieldCount < 0 ||
+    !Number.isInteger(usizeFieldCount) || usizeFieldCount < 0 ||
+    !Number.isInteger(scalarByteSize) || scalarByteSize < 0
+  ) {
     throw new Error(`${label} has unsupported object ABI runtime counts`);
   }
-  const slots = Array(fields.length).fill(0);
-  const seen = new Set();
-  for (const field of fields) {
-    const index = objectLayoutIndex(field.layout, fields.length);
-    if (index === null) {
-      throw new Error(`${label}.${field.name ?? "field"} has unsupported object ABI layout`);
-    }
-    if (seen.has(index)) {
-      throw new Error(`${label}.${field.name ?? "field"} duplicates object field index ${index}`);
-    }
-    seen.add(index);
-    slots[index] = 0;
-  }
-  return slots;
+  return { objectFieldCount, usizeFieldCount, scalarByteSize };
 }
 
-function taggedUnionConstructorObjectOnly(ctor) {
-  return objectRuntimeCountsOnly(ctor, 1) && objectLayoutIndex(ctor.layout, 1) !== null;
-}
-
-function objectRuntimeCountsOnly(owner, objectFieldCount) {
-  return owner?.objectFieldCount === objectFieldCount &&
-    (owner?.usizeFieldCount ?? 0) === 0 &&
-    (owner?.scalarByteSize ?? 0) === 0;
-}
-
-function objectLayoutIndex(layout, objectFieldCount) {
+function objectLayoutIndex(owner, layout, label) {
   if (layout?.kind !== "object" || !Number.isInteger(layout.index)) {
     return null;
   }
+  const { objectFieldCount } = objectRuntimeCounts(owner, label);
   return layout.index >= 0 && layout.index < objectFieldCount ? layout.index : null;
+}
+
+function usizeLayoutIndex(owner, layout, label) {
+  if (layout?.kind !== "usize" || !Number.isInteger(layout.index)) {
+    return null;
+  }
+  const { objectFieldCount, usizeFieldCount } = objectRuntimeCounts(owner, label);
+  const index = layout.index - objectFieldCount;
+  return index >= 0 && index < usizeFieldCount ? index : null;
+}
+
+function scalarLayoutOffset(layout, scalarByteSize, label) {
+  if (
+    layout?.kind !== "scalar" ||
+    !Number.isInteger(layout.offset) ||
+    !Number.isInteger(layout.size) ||
+    layout.offset < 0 ||
+    layout.size <= 0 ||
+    layout.offset + layout.size > scalarByteSize
+  ) {
+    throw new Error(`${label} has unsupported object ABI scalar layout`);
+  }
+  return layout.offset;
+}
+
+function objectScalarFieldSupported(type, layout) {
+  if (layout?.kind !== "scalar") {
+    return false;
+  }
+  switch (type?.wireTag) {
+    case WIRE.BOOL:
+    case WIRE.SIMPLE_ENUM:
+      return [1, 2, 4, 8].includes(layout.size);
+    case WIRE.UINT8:
+      return layout.size === 1;
+    case WIRE.UINT16:
+      return layout.size === 2;
+    case WIRE.UINT32:
+    case WIRE.FLOAT32:
+      return layout.size === 4;
+    case WIRE.UINT64:
+    case WIRE.FLOAT:
+      return layout.size === 8;
+    default:
+      return false;
+  }
+}
+
+function writeObjectScalarField(bytes, type, layout, value, label) {
+  const offset = scalarLayoutOffset(layout, bytes.byteLength, label);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  switch (type?.wireTag) {
+    case WIRE.BOOL:
+      if (typeof value !== "boolean") {
+        throw new Error(`${label} must be a boolean`);
+      }
+      writeScalarUnsigned(view, offset, layout.size, value ? 1n : 0n, label);
+      return;
+    case WIRE.UINT8:
+      requireScalarSize(layout, 1, label);
+      view.setUint8(offset, normalizeInteger(value, label, 0, 0xff));
+      return;
+    case WIRE.UINT16:
+      requireScalarSize(layout, 2, label);
+      view.setUint16(offset, normalizeInteger(value, label, 0, 0xffff), true);
+      return;
+    case WIRE.UINT32:
+      requireScalarSize(layout, 4, label);
+      view.setUint32(offset, normalizeUint32(value, label), true);
+      return;
+    case WIRE.UINT64:
+      requireScalarSize(layout, 8, label);
+      view.setBigUint64(offset, normalizeBoundedUnsignedBigInt(value, label, MAX_UINT64, "UInt64"), true);
+      return;
+    case WIRE.FLOAT:
+      requireScalarSize(layout, 8, label);
+      view.setFloat64(offset, normalizeFloat(value, label), true);
+      return;
+    case WIRE.FLOAT32:
+      requireScalarSize(layout, 4, label);
+      view.setFloat32(offset, Math.fround(normalizeFloat(value, label)), true);
+      return;
+    case WIRE.SIMPLE_ENUM:
+      writeScalarUnsigned(view, offset, layout.size, BigInt(normalizeEnum(value, type, label)), label);
+      return;
+    default:
+      throw new Error(`${label} has unsupported object ABI scalar type`);
+  }
+}
+
+function readObjectScalarField(view, type, layout, label) {
+  const offset = scalarLayoutOffset(layout, view.byteLength, label);
+  switch (type?.wireTag) {
+    case WIRE.BOOL:
+      return readScalarUnsigned(view, offset, layout.size, label) !== 0n;
+    case WIRE.UINT8:
+      requireScalarSize(layout, 1, label);
+      return view.getUint8(offset);
+    case WIRE.UINT16:
+      requireScalarSize(layout, 2, label);
+      return view.getUint16(offset, true);
+    case WIRE.UINT32:
+      requireScalarSize(layout, 4, label);
+      return view.getUint32(offset, true);
+    case WIRE.UINT64:
+      requireScalarSize(layout, 8, label);
+      return view.getBigUint64(offset, true).toString();
+    case WIRE.FLOAT:
+      requireScalarSize(layout, 8, label);
+      return view.getFloat64(offset, true);
+    case WIRE.FLOAT32:
+      requireScalarSize(layout, 4, label);
+      return Math.fround(view.getFloat32(offset, true));
+    case WIRE.SIMPLE_ENUM: {
+      const tag = readScalarUnsigned(view, offset, layout.size, label);
+      if (tag > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new Error(`${label} enum tag is too large for JavaScript`);
+      }
+      return enumValue(type, Number(tag));
+    }
+    default:
+      throw new Error(`${label} has unsupported object ABI scalar type`);
+  }
+}
+
+function requireScalarSize(layout, expected, label) {
+  if (layout.size !== expected) {
+    throw new Error(`${label} has scalar size ${layout.size}, expected ${expected}`);
+  }
+}
+
+function writeScalarUnsigned(view, offset, size, value, label) {
+  const normalized = typeof value === "bigint" ? value : BigInt(value);
+  if (normalized < 0n) {
+    throw new Error(`${label} must be non-negative`);
+  }
+  switch (size) {
+    case 1:
+      if (normalized > 0xffn) throw new Error(`${label} exceeds UInt8 scalar field size`);
+      view.setUint8(offset, Number(normalized));
+      return;
+    case 2:
+      if (normalized > 0xffffn) throw new Error(`${label} exceeds UInt16 scalar field size`);
+      view.setUint16(offset, Number(normalized), true);
+      return;
+    case 4:
+      if (normalized > MAX_UINT32) throw new Error(`${label} exceeds UInt32 scalar field size`);
+      view.setUint32(offset, Number(normalized), true);
+      return;
+    case 8:
+      if (normalized > MAX_UINT64) throw new Error(`${label} exceeds UInt64 scalar field size`);
+      view.setBigUint64(offset, normalized, true);
+      return;
+    default:
+      throw new Error(`${label} has unsupported scalar field size ${size}`);
+  }
+}
+
+function readScalarUnsigned(view, offset, size, label) {
+  switch (size) {
+    case 1:
+      return BigInt(view.getUint8(offset));
+    case 2:
+      return BigInt(view.getUint16(offset, true));
+    case 4:
+      return BigInt(view.getUint32(offset, true));
+    case 8:
+      return view.getBigUint64(offset, true);
+    default:
+      throw new Error(`${label} has unsupported scalar field size ${size}`);
+  }
 }
 
 function disposeHostBindings(bindings) {
@@ -1694,10 +2004,15 @@ function normalizeDirectU32(value, tag, label) {
 
 function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {
   const decimal = normalizeDecimal(value, label, { signed: false });
-  if (BigInt(decimal) > max) {
+  const normalized = BigInt(decimal);
+  if (normalized > max) {
     throw new Error(`${label} is out of range for ${typeName}`);
   }
   return decimal;
+}
+
+function normalizeBoundedUnsignedBigInt(value, label, max, typeName) {
+  return BigInt(normalizeBoundedUnsignedDecimal(value, label, max, typeName));
 }
 
 function lookupHostBinding(target, userBindings, defaultBindings) {

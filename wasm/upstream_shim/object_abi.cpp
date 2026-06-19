@@ -126,6 +126,50 @@ extern "C" lean::object * vir_obj_ctor(uint32_t tag, lean::object ** fields, uin
     return obj;
 }
 
+extern "C" lean::object * vir_obj_ctor_layout(
+    uint32_t tag,
+    lean::object ** object_fields,
+    uint32_t object_field_count,
+    size_t const * usize_fields,
+    uint32_t usize_field_count,
+    uint8_t const * scalar_fields,
+    uint32_t scalar_byte_size) {
+    if (tag > std::numeric_limits<uint8_t>::max()) {
+        return nullptr;
+    }
+    if (object_fields == nullptr && object_field_count != 0) {
+        return nullptr;
+    }
+    if (usize_fields == nullptr && usize_field_count != 0) {
+        return nullptr;
+    }
+    if (scalar_fields == nullptr && scalar_byte_size != 0) {
+        return nullptr;
+    }
+    for (uint32_t i = 0; i < object_field_count; i++) {
+        if (object_fields[i] == nullptr) {
+            return nullptr;
+        }
+    }
+    if (
+        usize_field_count >
+            (std::numeric_limits<unsigned>::max() - scalar_byte_size) / sizeof(size_t)) {
+        return nullptr;
+    }
+    unsigned scalar_size = static_cast<unsigned>(usize_field_count * sizeof(size_t) + scalar_byte_size);
+    lean::object * obj = lean_alloc_ctor(static_cast<uint8_t>(tag), object_field_count, scalar_size);
+    for (uint32_t i = 0; i < object_field_count; i++) {
+        lean_ctor_set(obj, i, object_fields[i]);
+    }
+    for (uint32_t i = 0; i < usize_field_count; i++) {
+        lean_ctor_set_usize(obj, object_field_count + i, usize_fields[i]);
+    }
+    if (scalar_byte_size != 0) {
+        memcpy(lean_ctor_scalar_cptr(obj) + usize_field_count * sizeof(size_t), scalar_fields, scalar_byte_size);
+    }
+    return obj;
+}
+
 extern "C" lean::object * vir_obj_list(lean::object ** values, uint32_t len) {
     if (values == nullptr && len != 0) {
         return nullptr;
@@ -190,6 +234,21 @@ extern "C" lean::object * vir_obj_field(lean::object * value, uint32_t index) {
     lean::object * field = lean_ctor_get(value, index);
     lean_inc(field);
     return field;
+}
+
+extern "C" char const * vir_obj_ctor_usize_decimal(lean::object * value, uint32_t index) {
+    if (lean_is_scalar(value) || index < lean_ctor_num_objs(value)) {
+        return nullptr;
+    }
+    g_obj_decimal_result = std::to_string(lean_ctor_get_usize(value, index));
+    return g_obj_decimal_result.c_str();
+}
+
+extern "C" uint8_t const * vir_obj_ctor_scalar_data(lean::object * value, uint32_t usize_field_count) {
+    if (lean_is_scalar(value)) {
+        return nullptr;
+    }
+    return lean_ctor_scalar_cptr(value) + usize_field_count * sizeof(size_t);
 }
 
 extern "C" lean::object * vir_obj_nat(char const * text, uint32_t len) {
