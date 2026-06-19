@@ -669,6 +669,18 @@ static void cleanup_object_call_args(uint32_t argc, lean::object ** args) {
     }
 }
 
+static bool object_call_requires_boxed_decl(lean::host_signature const & signature) {
+    if (lean::needs_boxed_wasm32_call_boundary_type(signature.result)) {
+        return true;
+    }
+    for (lean::vir_type const & arg : signature.args) {
+        if (lean::needs_boxed_wasm32_call_boundary_type(arg)) {
+            return true;
+        }
+    }
+    return false;
+}
+
 extern "C" lean::object * vir_call_resolved_objects(
     uint32_t call_slot,
     lean::object ** argv,
@@ -693,11 +705,7 @@ extern "C" lean::object * vir_call_resolved_objects(
         lean::g_call_error = "call slot is not registered";
         return nullptr;
     }
-    if (!lean::vir::package_call_slot_has_boxed_decl(call_slot)) {
-        cleanup_object_call_args(argc, argv);
-        lean::g_call_error = "object call requires a boxed package declaration";
-        return nullptr;
-    }
+    bool has_boxed_decl = lean::vir::package_call_slot_has_boxed_decl(call_slot);
     lean::host_signature const * signature = lean::cached_package_call_signature(call_slot);
     if (signature == nullptr) {
         cleanup_object_call_args(argc, argv);
@@ -707,6 +715,11 @@ extern "C" lean::object * vir_call_resolved_objects(
     if (!signature->ok) {
         cleanup_object_call_args(argc, argv);
         lean::g_call_error = signature->error;
+        return nullptr;
+    }
+    if (!has_boxed_decl && object_call_requires_boxed_decl(*signature)) {
+        cleanup_object_call_args(argc, argv);
+        lean::g_call_error = "object call requires a boxed package declaration for this signature";
         return nullptr;
     }
     if (argc != signature->args.size()) {
