@@ -597,8 +597,8 @@ export class VirRuntime {
     }
     const argTag = entry.args[0].type?.wireTag;
     const resultTag = entry.result?.wireTag;
-    if (argTag === WIRE.ARRAY && resultTag === WIRE.NAT) {
-      return this.tryObjectArrayToNatCall(entry, args, cache);
+    if ((argTag === WIRE.ARRAY || argTag === WIRE.LIST) && resultTag === WIRE.NAT) {
+      return this.tryObjectSequenceToNatCall(entry, args, cache);
     }
     if (argTag !== resultTag) {
       return FAST_CALL_UNAVAILABLE;
@@ -672,15 +672,27 @@ export class VirRuntime {
       this.readObjectDecimal(resultObj, decimalName));
   }
 
-  tryObjectArrayToNatCall(entry, args, cache) {
-    const arrayType = entry.args[0].type;
-    const elementTag = arrayType?.element?.wireTag;
-    if (elementTag !== WIRE.NAT && elementTag !== WIRE.STRING) {
+  tryObjectSequenceToNatCall(entry, args, cache) {
+    const sequenceType = entry.args[0].type;
+    const sequenceTag = sequenceType?.wireTag;
+    const builderName =
+      sequenceTag === WIRE.ARRAY ? "vir_obj_array" :
+      sequenceTag === WIRE.LIST ? "vir_obj_list" :
+      null;
+    if (builderName === null) {
       return FAST_CALL_UNAVAILABLE;
     }
-    const elementConstructorName = elementTag === WIRE.NAT ? "vir_obj_nat" : "vir_obj_string";
+    const elementTag = sequenceType?.element?.wireTag;
+    const elementConstructorName =
+      elementTag === WIRE.NAT ? "vir_obj_nat" :
+      elementTag === WIRE.STRING ? "vir_obj_string" :
+      elementTag === WIRE.UINT32 ? "vir_obj_uint32" :
+      null;
+    if (elementConstructorName === null) {
+      return FAST_CALL_UNAVAILABLE;
+    }
     if (!this.hasObjectCallExports(
-      "vir_obj_array",
+      builderName,
       elementConstructorName,
       "vir_obj_nat_decimal",
       "vir_obj_decimal_size",
@@ -697,10 +709,10 @@ export class VirRuntime {
     const elementObjs = [];
     try {
       values.forEach((value, index) => {
-        elementObjs.push(this.makeObjectForArrayElement(arrayType.element, value, `${label}[${index}]`));
+        elementObjs.push(this.makeObjectForSequenceElement(sequenceType.element, value, `${label}[${index}]`));
       });
-      const arrayObj = this.makeObjectArrayFromOwnedElements(elementObjs, label);
-      return this.callResolvedObjectUnary(entry, cache, arrayObj, (resultObj) =>
+      const sequenceObj = this.makeObjectSequenceFromOwnedElements(builderName, elementObjs, label);
+      return this.callResolvedObjectUnary(entry, cache, sequenceObj, (resultObj) =>
         this.readObjectDecimal(resultObj, "vir_obj_nat_decimal"));
     } finally {
       this.releaseOwnedObjects(elementObjs);
@@ -738,7 +750,15 @@ export class VirRuntime {
     }
   }
 
-  makeObjectForArrayElement(type, value, label) {
+  makeObjectUint32(value, label) {
+    const argObj = this.exports.vir_obj_uint32(normalizeUint32(value, label));
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean UInt32 object`);
+    }
+    return argObj;
+  }
+
+  makeObjectForSequenceElement(type, value, label) {
     const tag = type?.wireTag;
     if (tag === WIRE.NAT) {
       return this.makeObjectDecimal(
@@ -750,10 +770,13 @@ export class VirRuntime {
     if (tag === WIRE.STRING) {
       return this.makeObjectString(value, label);
     }
-    throw new Error(`${label} has unsupported object-array element type`);
+    if (tag === WIRE.UINT32) {
+      return this.makeObjectUint32(value, label);
+    }
+    throw new Error(`${label} has unsupported object sequence element type`);
   }
 
-  makeObjectArrayFromOwnedElements(elementObjs, label) {
+  makeObjectSequenceFromOwnedElements(builderName, elementObjs, label) {
     let valuesPtr = 0;
     try {
       if (elementObjs.length !== 0) {
@@ -761,12 +784,12 @@ export class VirRuntime {
         const view = new DataView(this.exports.memory.buffer, valuesPtr, elementObjs.length * 4);
         elementObjs.forEach((obj, index) => view.setUint32(index * 4, obj, true));
       }
-      const arrayObj = this.exports.vir_obj_array(valuesPtr, elementObjs.length);
-      if (arrayObj === 0) {
-        throw new Error(`${label} could not be lowered to a Lean array object`);
+      const sequenceObj = this.exports[builderName](valuesPtr, elementObjs.length);
+      if (sequenceObj === 0) {
+        throw new Error(`${label} could not be lowered to a Lean sequence object`);
       }
       elementObjs.length = 0;
-      return arrayObj;
+      return sequenceObj;
     } finally {
       if (valuesPtr !== 0) {
         this.freeBytes(valuesPtr);

@@ -96,6 +96,25 @@ extern "C" lean::object * vir_obj_array(lean::object ** values, uint32_t len) {
     return array;
 }
 
+extern "C" lean::object * vir_obj_list(lean::object ** values, uint32_t len) {
+    if (values == nullptr && len != 0) {
+        return nullptr;
+    }
+    for (uint32_t i = 0; i < len; i++) {
+        if (values[i] == nullptr) {
+            return nullptr;
+        }
+    }
+    lean::object * out = lean_box(0);
+    for (uint32_t i = len; i > 0; i--) {
+        lean::object * cons = lean_alloc_ctor(1, 2, 0);
+        lean_ctor_set(cons, 0, values[i - 1]);
+        lean_ctor_set(cons, 1, out);
+        out = cons;
+    }
+    return out;
+}
+
 extern "C" lean::object * vir_obj_nat(char const * text, uint32_t len) {
     if (!is_decimal(text, len)) {
         return nullptr;
@@ -125,6 +144,10 @@ extern "C" char const * vir_obj_int_decimal(lean::object * value) {
         ? std::to_string(lean_scalar_to_int(value))
         : lean::mpz_value(value).to_string();
     return g_obj_decimal_result.c_str();
+}
+
+extern "C" lean::object * vir_obj_uint32(uint32_t value) {
+    return lean_box_uint32(value);
 }
 
 extern "C" lean::object * vir_obj_uint64(char const * text, uint32_t len) {

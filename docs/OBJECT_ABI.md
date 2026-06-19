@@ -48,8 +48,10 @@ The initial exported object helper surface is deliberately small:
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
 - `vir_obj_array`
+- `vir_obj_list`
 - `vir_obj_nat` / `vir_obj_nat_decimal`
 - `vir_obj_int` / `vir_obj_int_decimal`
+- `vir_obj_uint32`
 - `vir_obj_uint64` / `vir_obj_uint64_decimal`
 - `vir_obj_usize` / `vir_obj_usize_decimal`
 - `vir_obj_decimal_size`
@@ -65,6 +67,8 @@ call or runtime teardown.
 `vir_obj_array` consumes an array of owned Lean object pointers and returns one
 owned Lean array object. If it fails before consuming them, JavaScript still owns
 the element references and must release them.
+`vir_obj_list` follows the same ownership rule and builds a Lean list in input
+order.
 
 ## Ownership
 
@@ -118,15 +122,16 @@ lane helpers are still useful for the hottest exact scalar signatures because
 they avoid both byte payloads and object allocation.
 The first automatic object-lane selections in `VirRuntime.call` are exact pure
 same-type calls for `Nat`, `Int`, `UInt64`, `USize`, and `ByteArray`, plus the
-shallow `Array Nat -> Nat` and `Array String -> Nat` cases, when the package
-includes the generated `_boxed` declaration for that entry. Decimal scalar calls
-lower through the corresponding `vir_obj_*` constructor, call
+shallow `Array Nat -> Nat`, `Array String -> Nat`, and `List UInt32 -> Nat`
+cases, when the package includes the generated `_boxed` declaration for that
+entry. Decimal scalar calls lower through the corresponding `vir_obj_*`
+constructor, call
 `vir_call_resolved_objects`, lift the result with the matching decimal
 inspection helper plus `vir_obj_decimal_size`, and release the owned result with
 `vir_obj_dec`. Byte-array calls use `vir_obj_byte_array` and lift the result with
-`vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Array calls lower each
-supported element to an owned object, pack those objects with `vir_obj_array`,
-and lift the `Nat` result through `vir_obj_nat_decimal`.
+`vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each
+supported element to an owned object, pack those objects with `vir_obj_array` or
+`vir_obj_list`, and lift the `Nat` result through `vir_obj_nat_decimal`.
 
 ## Phases
 
@@ -135,8 +140,9 @@ and lift the `Nat` result through `vir_obj_nat_decimal`.
 2. Object call helpers: resolved calls that accept already-lowered owned object
    arguments and return an owned object result.
 3. Bulk builders: arrays, strings, and byte arrays with fewer intermediate
-   copies for common browser data. The first array builder handles shallow
-   object arrays; generated metadata should eventually drive the general case.
+   copies for common browser data. The first sequence builders handle shallow
+   object arrays and lists; generated metadata should eventually drive the
+   general case.
 4. Generated layout support: structures and inductives lowered by package
    metadata instead of ad hoc descriptors.
 5. Host import integration: rooted object handles for Lean-to-JS calls where JS
