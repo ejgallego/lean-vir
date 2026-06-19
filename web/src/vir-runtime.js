@@ -643,28 +643,35 @@ export class VirRuntime {
   }
 
   tryObjectResolvedCall(entry, args, cache) {
-    if (entry.effect !== "pure" || entry.args.length !== 1) {
+    if (entry.effect !== "pure") {
       return FAST_CALL_UNAVAILABLE;
     }
-    const argType = entry.args[0].type;
     const resultType = entry.result;
-    if (!objectArgumentSupported(argType) || !objectResultSupported(resultType)) {
+    if (!objectResultSupported(resultType) ||
+        !entry.args.every((arg) => objectArgumentSupported(arg.type))) {
       return FAST_CALL_UNAVAILABLE;
     }
     const hasBoxedDecl = this.boxedCallEntryNames.has(entry.entry);
     if (
       !hasBoxedDecl &&
-      (objectTypeNeedsBoxedBoundary(argType) || objectTypeNeedsBoxedBoundary(resultType))
+      (objectTypeNeedsBoxedBoundary(resultType) ||
+        entry.args.some((arg) => objectTypeNeedsBoxedBoundary(arg.type)))
     ) {
       return FAST_CALL_UNAVAILABLE;
     }
     if (!this.hasObjectValueExports()) {
       return FAST_CALL_UNAVAILABLE;
     }
-    const label = `${entry.entry} argument ${entry.args[0].name}`;
-    const argObj = this.makeObjectValue(argType, args[0], label);
-    return this.callResolvedObjectUnary(entry, cache, argObj, (resultObj) =>
-      this.liftObjectValue(resultType, resultObj, `${entry.entry} result`));
+    const argObjs = [];
+    try {
+      entry.args.forEach((arg, index) => {
+        argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
+      });
+      return this.callResolvedObjects(entry, cache, argObjs, (resultObj) =>
+        this.liftObjectValue(resultType, resultObj, `${entry.entry} result`));
+    } finally {
+      this.releaseOwnedObjects(argObjs);
+    }
   }
 
   hasObjectValueExports() {
@@ -1021,17 +1028,18 @@ export class VirRuntime {
     objects.length = 0;
   }
 
-  callResolvedObjectUnary(entry, cache, argObj, liftResult) {
+  callResolvedObjects(entry, cache, argObjs, liftResult) {
     const callSlot = this.resolveCallSlot(entry, cache);
     let argvPtr = 0;
     let resultObj = 0;
-    let callStarted = false;
     try {
-      argvPtr = this.allocBytes(new Uint8Array(4));
-      new DataView(this.exports.memory.buffer, argvPtr, 4).setUint32(0, argObj, true);
-      resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, 1);
-      callStarted = true;
-      argObj = 0;
+      if (argObjs.length !== 0) {
+        argvPtr = this.allocBytes(new Uint8Array(argObjs.length * 4));
+        const view = new DataView(this.exports.memory.buffer, argvPtr, argObjs.length * 4);
+        argObjs.forEach((argObj, index) => view.setUint32(index * 4, argObj, true));
+      }
+      resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+      argObjs.length = 0;
       const error = this.lastCallError();
       if (error !== "") {
         throw new Error(error);
@@ -1043,9 +1051,6 @@ export class VirRuntime {
     } finally {
       if (argvPtr !== 0) {
         this.freeBytes(argvPtr);
-      }
-      if (!callStarted && argObj !== 0) {
-        this.exports.vir_obj_dec(argObj);
       }
       if (resultObj !== 0) {
         this.exports.vir_obj_dec(resultObj);

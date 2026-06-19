@@ -183,8 +183,8 @@ signature does not require a boxed wasm32 boundary for the top-level argument or
 result type. The helper keeps higher-level JS lowering out of the shim;
 JavaScript drives it through the `vir_obj_*` construction and inspection
 primitives while the broader JS boundary policy remains open.
-The JavaScript runtime currently selects this lane automatically for pure unary
-calls where the argument can be lowered from the supported object subset and the
+The JavaScript runtime currently selects this lane automatically for pure calls
+where every argument can be lowered from the supported object subset and the
 result can be lifted from it. Arguments and results support base values,
 `Array`, `List`, `Option`, `Prod`, and manifest-described structures, tagged
 unions, and custom inductive constructors whose fields recursively stay in this

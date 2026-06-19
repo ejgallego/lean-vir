@@ -54,8 +54,8 @@ public API remains `vir.call(...)`; internally they bypass payload allocation,
 binary value encoding, and result byte decoding after the package slot is
 resolved. The `direct` rows expose the same primitive-lane path explicitly for
 benchmarking.
-Pure unary calls over the supported object subset use the object ABI lane
-through the normal `wasm` sample. The runtime currently lowers base arguments,
+Pure calls over the supported object subset use the object ABI lane through the
+normal `wasm` sample. The runtime currently lowers base arguments,
 `Array`, `List`, `Option`, `Prod`, and manifest-described
 structure/constructor values with object, `USize`, and scalar runtime fields,
 and lifts the same subset recursively. The no-fallback runtime smoke covers
@@ -64,7 +64,7 @@ decimal scalars, `ByteArray`, `Array Nat -> Nat`, `Array String -> Nat`,
 `Option` arguments/results, `Prod` arguments/results, a nested
 `List (Nat × String)` argument, `Profile` records, `ProfileStats` mixed scalar
 records, trivial scalar wrappers, `Tagged Profile`, `Metered`, extended records,
-and `Sum`/`Except` tagged unions.
+`Sum`/`Except` tagged unions, and nullary/unary/binary pretty-printer calls.
 JavaScript lowers inputs with the matching `vir_obj_*` constructor,
 `vir_obj_array`, `vir_obj_list`, `vir_obj_ctor`, or `vir_obj_ctor_layout`, calls
 `vir_call_resolved_objects`, and lifts the owned result with the matching
