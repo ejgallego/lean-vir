@@ -14,13 +14,6 @@ import {
 import {
   createHostResourceState,
 } from "../../web/src/host/vir-host-resources.js";
-import { BinaryWriter } from "../../web/src/runtime/vir-codec.js";
-import {
-  decodeHostCallRequest,
-  decodeResolvedCallResult,
-  encodeHostCallResult,
-  encodeResolvedCallPayload,
-} from "../../web/src/runtime/vir-value-codec.js";
 import { WIRE } from "../../web/src/runtime/wire-tags.js";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
 
@@ -93,7 +86,7 @@ function callResolvedObjects(runtime, name, args) {
 
 function withCallLaneCounters(runtime, body) {
   const originalExports = runtime.exports;
-  const counters = { objectCalls: 0, codecFallbackCalls: 0 };
+  const counters = { objectCalls: 0, bytePayloadCalls: 0 };
   runtime.exports = Object.fromEntries(
     Reflect.ownKeys(originalExports).map((key) => [key, originalExports[key]]),
   );
@@ -102,8 +95,8 @@ function withCallLaneCounters(runtime, body) {
     return originalExports.vir_call_resolved_objects(...args);
   };
   runtime.exports.vir_call_resolved = (...args) => {
-    counters.codecFallbackCalls++;
-    return originalExports.vir_call_resolved(...args);
+    counters.bytePayloadCalls++;
+    throw new Error(`unexpected byte-payload call with ${args.length} arguments`);
   };
   try {
     body(counters);
@@ -113,16 +106,9 @@ function withCallLaneCounters(runtime, body) {
   }
 }
 
-const natType = { type: "Nat", wireTag: WIRE.NAT };
-const boolType = { type: "Bool", wireTag: WIRE.BOOL };
-const unitType = { type: "Unit", wireTag: WIRE.UNIT };
 const resourceType = { type: "Resource", wireTag: WIRE.RESOURCE };
-const resourceEntry = {
-  entry: "resourceArg",
-  args: [{ name: "arg1", type: resourceType }],
-  result: unitType,
-  effect: "pure",
-};
+assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
+assert.equal(typeof runtime.exports.vir_call_result_size, "undefined");
 const resourceValue = { name: "resource" };
 const resourceArg = createHostResource(resourceValue);
 assert.deepEqual(Object.keys(resourceArg), []);
@@ -130,28 +116,22 @@ assert.equal(Object.hasOwn(resourceArg, "handle"), false);
 assert.equal("handle" in resourceArg, false);
 assert.equal(Object.hasOwn(resourceArg, "value"), false);
 assert.equal("value" in resourceArg, false);
-const incomingResources = [];
-const resourceArgResolvedPayload = encodeResolvedCallPayload(resourceEntry, [resourceArg], {
-  pushIncomingResource: (value) => incomingResources.push(value),
-});
-assert.deepEqual([...resourceArgResolvedPayload], [1, 0, 0, 0]);
-assert.equal(incomingResources.length, 1);
-assert.equal(incomingResources[0], resourceArg);
-assert.throws(
-  () => encodeResolvedCallPayload(resourceEntry, [{ handle: 1 }], { pushIncomingResource: () => undefined }),
-  /resourceArg argument arg1 must be a live host resource/,
-);
+let resourceObj = runtime.makeObjectValue(resourceType, resourceArg, "resource argument");
+try {
+  assert.equal(runtime.liftObjectValue(resourceType, resourceObj, "resource result"), resourceArg);
+} finally {
+  runtime.exports.vir_obj_dec(resourceObj);
+  resourceObj = 0;
+}
+assert.throws(() => runtime.makeObjectValue(resourceType, { handle: 1 }, "resource argument"), /resource argument must be a live host resource/);
 releaseHostResource(resourceArg);
-assert.throws(
-  () => encodeResolvedCallPayload(resourceEntry, [resourceArg], { pushIncomingResource: () => undefined }),
-  /resourceArg argument arg1 must be a live host resource/,
-);
+assert.throws(() => runtime.makeObjectValue(resourceType, resourceArg, "resource argument"), /resource argument must be a live host resource/);
 const resourceStore = createHostResourceState();
 const staleStoreResource = resourceStore.resourceForValue({ name: "stale" });
 resourceStore.dispose();
 assert.throws(
-  () => encodeResolvedCallPayload(resourceEntry, [staleStoreResource], { pushIncomingResource: () => undefined }),
-  /resourceArg argument arg1 must be a live host resource/,
+  () => runtime.makeObjectValue(resourceType, staleStoreResource, "resource argument"),
+  /resource argument must be a live host resource/,
 );
 const roots = new ExternrefResourceRoots();
 const firstRootResource = createHostResource({ name: "first" });
@@ -168,53 +148,6 @@ roots.clear();
 assert.equal(roots.get(secondRootId), null);
 releaseHostResource(secondRootResource);
 assert.equal(roots.root(secondRootResource), 0);
-let outgoingResourceTakes = 0;
-assert.equal(
-  decodeResolvedCallResult(resourceType, new Uint8Array(), {
-    takeOutgoingResource: (label) => {
-      assert.equal(label, "resource result");
-      outgoingResourceTakes += 1;
-      return "opaque-resource-compact";
-    },
-  }),
-  "opaque-resource-compact",
-);
-assert.equal(outgoingResourceTakes, 1);
-const boolHostEntry = {
-  target: "test.boolHost",
-  args: [{ name: "flag", type: boolType }],
-  result: boolType,
-};
-const compactHostRequest = new BinaryWriter();
-compactHostRequest.u32(1);
-compactHostRequest.u8(1);
-assert.deepEqual(
-  decodeHostCallRequest(compactHostRequest.take(), boolHostEntry, {}),
-  { args: [true], resultType: boolType },
-);
-assert.equal(
-  decodeResolvedCallResult(boolType, encodeHostCallResult(boolType, false, boolHostEntry, {})),
-  false,
-);
-const callbackType = {
-  type: "Function",
-  wireTag: WIRE.FUNCTION,
-  effect: "io",
-  args: [{ name: "input", type: natType }],
-  result: natType,
-};
-let closureRootTakes = 0;
-const callbackResult = decodeResolvedCallResult(callbackType, new Uint8Array(), {
-  takeOutgoingClosureRootId: (label) => {
-    assert.equal(label, "function result");
-    closureRootTakes += 1;
-    return 7;
-  },
-  createCallback: (rootId, type) => ({ rootId, type }),
-});
-assert.equal(callbackResult.rootId, 7);
-assert.equal(callbackResult.type, callbackType);
-assert.equal(closureRootTakes, 1);
 const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", defaultPackagePath], {
   encoding: "utf8",
 });
@@ -451,7 +384,7 @@ const objectCounters = withCallLaneCounters(runtime, () => {
   );
 });
 assert.equal(objectCounters.objectCalls, 36);
-assert.equal(objectCounters.codecFallbackCalls, 0);
+assert.equal(objectCounters.bytePayloadCalls, 0);
 
 const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
   assert.match(
@@ -468,7 +401,7 @@ const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
   );
 });
 assert.equal(prettyCounters.objectCalls, 3);
-assert.equal(prettyCounters.codecFallbackCalls, 0);
+assert.equal(prettyCounters.bytePayloadCalls, 0);
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
@@ -547,7 +480,7 @@ assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", { kind: "
   kind: "bvar",
   index: "5",
 });
-const exprCodecCounters = withCallLaneCounters(leanRuntime, () => {
+const exprObjectCounters = withCallLaneCounters(leanRuntime, () => {
   assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.constNatExpr"), {
     kind: "const",
     name: "Nat",
@@ -558,8 +491,8 @@ const exprCodecCounters = withCallLaneCounters(leanRuntime, () => {
     "5",
   );
 });
-assert.equal(exprCodecCounters.objectCalls, 0);
-assert.equal(exprCodecCounters.codecFallbackCalls, 2);
+assert.equal(exprObjectCounters.objectCalls, 2);
+assert.equal(exprObjectCounters.bytePayloadCalls, 0);
 assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 0), {
   kind: "inl",
   value: "10",
@@ -877,4 +810,4 @@ runtime.dispose();
 prettyRuntime.dispose();
 leanRuntime.dispose();
 
-console.log("vir runtime value codec smoke ok");
+console.log("vir runtime object ABI smoke ok");

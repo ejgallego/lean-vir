@@ -11,9 +11,6 @@ import {
 } from "./interface-effects.js";
 import { WIRE } from "./wire-tags.js";
 
-const textEncoder = new TextEncoder();
-const textDecoder = new TextDecoder();
-
 export function asBytes(bytes, label) {
   if (bytes instanceof Uint8Array) {
     return bytes;
@@ -46,34 +43,6 @@ export class BinaryWriter {
     );
   }
 
-  rawBytes(bytes) {
-    for (const byte of bytes) {
-      this.u8(byte);
-    }
-  }
-
-  f64(value) {
-    const buffer = new ArrayBuffer(8);
-    new DataView(buffer).setFloat64(0, value, true);
-    this.rawBytes(new Uint8Array(buffer));
-  }
-
-  f32(value) {
-    const buffer = new ArrayBuffer(4);
-    new DataView(buffer).setFloat32(0, value, true);
-    this.rawBytes(new Uint8Array(buffer));
-  }
-
-  bytesValue(bytes) {
-    const view = asBytes(bytes, "bytes");
-    this.u32(view.byteLength);
-    this.rawBytes(view);
-  }
-
-  string(value) {
-    this.bytesValue(textEncoder.encode(value));
-  }
-
   take() {
     return Uint8Array.from(this.bytes);
   }
@@ -87,7 +56,7 @@ export class BinaryReader {
 
   u8() {
     if (this.offset >= this.bytes.byteLength) {
-      throw new Error("unexpected end of result payload");
+      throw new Error("unexpected end of type descriptor payload");
     }
     return this.bytes[this.offset++];
   }
@@ -100,39 +69,9 @@ export class BinaryReader {
     return (b0 | (b1 << 8) | (b2 << 16) | (b3 << 24)) >>> 0;
   }
 
-  rawBytes(len) {
-    if (len > this.bytes.byteLength - this.offset) {
-      throw new Error("result byte length exceeds payload");
-    }
-    const out = this.bytes.slice(this.offset, this.offset + len);
-    this.offset += len;
-    return out;
-  }
-
-  f64() {
-    const buffer = new ArrayBuffer(8);
-    new Uint8Array(buffer).set(this.rawBytes(8));
-    return new DataView(buffer).getFloat64(0, true);
-  }
-
-  f32() {
-    const buffer = new ArrayBuffer(4);
-    new Uint8Array(buffer).set(this.rawBytes(4));
-    return new DataView(buffer).getFloat32(0, true);
-  }
-
-  bytesValue() {
-    const len = this.u32();
-    return this.rawBytes(len);
-  }
-
-  string() {
-    return textDecoder.decode(this.bytesValue());
-  }
-
   requireEnd() {
     if (this.offset !== this.bytes.byteLength) {
-      throw new Error("trailing bytes after result payload");
+      throw new Error("trailing bytes after type descriptor payload");
     }
   }
 }

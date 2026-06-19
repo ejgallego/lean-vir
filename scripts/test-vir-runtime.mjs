@@ -15,7 +15,7 @@ const tests = [
   { id: "manifest", file: "scripts/runtime-tests/manifest-smoke.mjs", group: "pure" },
   { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", group: "pure" },
   { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },
-  { id: "value-codec", file: "scripts/runtime-tests/value-codec-smoke.mjs", group: "pure" },
+  { id: "object-abi", file: "scripts/runtime-tests/object-abi-smoke.mjs", group: "pure" },
   { id: "package-generation", file: "scripts/runtime-tests/package-generation-smoke.mjs", group: "lean" },
   { id: "sdk-import", file: "scripts/runtime-tests/sdk-import-smoke.mjs", group: "lean" },
 ];

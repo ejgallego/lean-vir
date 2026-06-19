@@ -113,7 +113,8 @@ The embedded manifest currently supports:
 - non-indexed custom inductives with zero or more runtime payload fields per
   constructor, including direct recursive references through supported
   container shapes;
-- `Lean.Expr`, represented as structural JavaScript objects;
+- direct `Lean.Expr`, represented at the JavaScript boundary as structural
+  expression objects;
 - `Lean.Vir.React.Html`, represented through the same recursive custom
   inductive surface and rendered by the React host bindings.
 
@@ -183,16 +184,20 @@ types such as `Lean.Vir.Browser.Element` are rejected at package generation.
 
 The recursive type tree is embedded in the JSON manifest and, for package
 format 7 and newer, also in a compact package-owned export signature table.
-Normal `vir_call_resolved` payloads carry only values; the WASM shim looks up
-the argument/result descriptors from the loaded package. The descriptor-bearing
-named call format has been removed; this is intentionally still an internal
-package ABI, not a committed component-model boundary.
+Normal `vir_call_resolved_objects` calls carry only owned Lean object pointers;
+the WASM shim looks up the argument/result descriptors from the loaded package
+to validate argument count, effects, and boxed wasm32 boundary requirements.
+The descriptor-bearing named call format and the resolved value-byte lane have
+been removed; this is intentionally still an internal package ABI, not a
+committed component-model boundary.
 Lean-to-JavaScript host imports use the same package-owned signature idea in
-format 7: the shim and `VirHostState` exchange value-only request and result
-payloads for package-declared host imports.
-Function-valued imports are rooted with their package-owned function signature.
-Calls back into Lean therefore send only value payloads; the shim decodes
-arguments and encodes the result from the rooted signature metadata.
+format 7: the shim and `VirHostState` exchange borrowed/owned Lean object
+arguments and results for package-declared host imports through
+`env.vir_js_call_objects`.
+Function-valued imports are rooted with only their arity and effect bit in the
+shim. JavaScript keeps the full function descriptor on the `VirCallback` wrapper,
+so calls back into Lean lower arguments to owned objects and lift the owned object
+result using JavaScript-side manifest metadata.
 
 Package loading validates every exported argument/result type before exposing
 the manifest to the UI or JS caller. The validator rejects unsupported wire
@@ -207,10 +212,10 @@ enters WASM.
 The manifest and package payload are trusted in this prototype. The JavaScript
 runtime validates the embedded manifest before exposing entries. For format 7
 packages, the WASM shim uses the package-owned compact export signature table
-to decode arguments, construct Lean runtime objects, and encode compact result
-payloads for `vir_call_resolved`. It also uses package-owned host-import and
-closure signatures to frame compact `env.vir_js_call` requests/responses and
-Lean callback invocations.
+to validate object calls for `vir_call_resolved_objects`. Host-import dispatch
+uses package-owned arity/effect metadata, while JavaScript uses the manifest
+descriptors for argument/result conversion. Closure roots likewise store only
+arity/effect metadata; JavaScript keeps the full callback descriptor.
 
 This is acceptable for the current generated demo packages and local developer
 packages. It is not a hardened boundary for arbitrary remote `.irpkg` files.

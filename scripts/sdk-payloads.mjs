@@ -12,8 +12,6 @@ export const SDK_PAYLOADS = [
   ["js/vir-react-host-bindings.js", "web/src/vir-react-host-bindings.js"],
   ["js/host-resource.js", "web/src/host-resource.js"],
   ["js/runtime/vir-codec.js", "web/src/runtime/vir-codec.js"],
-  ["js/runtime/vir-lean-codec.js", "web/src/runtime/vir-lean-codec.js"],
-  ["js/runtime/vir-value-codec.js", "web/src/runtime/vir-value-codec.js"],
   ["js/runtime/vir-value-normalizers.js", "web/src/runtime/vir-value-normalizers.js"],
   ["js/runtime/interface-effects.js", "web/src/runtime/interface-effects.js"],
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],

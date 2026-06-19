@@ -113,13 +113,13 @@ dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
 The manifest includes package metadata plus one entry per export with its Lean
 declaration name, JavaScript name, argument types, result type, and recursive
 type tree. It also includes `hostImports` for Lean declarations marked with
-`@[vir_js "..."]`. JavaScript validates inputs against that manifest and sends a
-compact byte payload through the resolved `vir_call_resolved` WASM export. WASM
-constructs Lean runtime objects, calls the upstream IR interpreter, and encodes
-the result bytes for JavaScript. When interpreted Lean code reaches a host
-import, the shim calls the runtime's `env.vir_js_call` import and decodes the
-synchronous result back into Lean. Package format 7 uses package-owned
-signatures for compact value-only payloads on both boundaries.
+`@[vir_js "..."]`. JavaScript validates inputs against that manifest, lowers
+values to owned Lean objects with `vir_obj_*` helpers, and calls
+`vir_call_resolved_objects`. When interpreted Lean code reaches a host import,
+the shim calls the runtime's `env.vir_js_call_objects` import with borrowed Lean
+object arguments, and JavaScript returns an owned Lean object result. Package
+format 7 keeps package-owned signatures for object-call validation and callback
+rooting.
 
 Supported v1 types:
 

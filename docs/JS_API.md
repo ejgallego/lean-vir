@@ -57,9 +57,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `vir-runtime.js` | Public runtime, WASM/package loading, exported Lean calls, callback lifecycle. |
 | `vir-runtime-node.js` | Node wrapper that installs virtual browser and React host bindings for tests/tools. |
 | `runtime/vir-codec.js` | Binary reader/writer and interface type descriptor codec. |
-| `runtime/vir-value-codec.js` | JavaScript value encode/decode for Lean call arguments, results, and host imports. |
-| `runtime/vir-value-normalizers.js` | Input normalization helpers used by the value codec. |
-| `runtime/vir-lean-codec.js` | Structural `Lean.Expr` and level encode/decode helpers. |
+| `runtime/vir-value-normalizers.js` | Input normalization helpers used by object ABI lowering. |
 | `vir-host-bindings.js` | Public common/browser host binding factories and stable re-exports. |
 | `host-resource.js` | Opaque host-resource objects and externref root tables. |
 | `host/vir-host-resources.js` | Host-resource store, liveness, teardown, timers, callbacks, and shared binding helpers. |
@@ -70,9 +68,8 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/wire-tags.js` | Shared wire tag constants and JSON-input tag set. |
 
 Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
-`lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. The narrower codec
-modules are packaged so the runtime's internal imports resolve consistently in
-the SDK artifact. React browser bindings are intentionally exported only from
+`lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. React browser
+bindings are intentionally exported only from
 `lean-vir/react-host-bindings`, keeping `lean-vir/host-bindings` free of React
 and `react-dom/client` dependencies.
 
@@ -244,12 +241,14 @@ arguments/results. These shapes can be nested, for example `Option (Array Nat)`,
 `List (Nat × String)`, `Except String (Option (Sum Nat Nat))`, a structure
 containing another structure, and `Array Lean.Expr`.
 
-`Lean.Expr` values use structural JavaScript objects such as
+Lean declarations use the real `Lean.Expr` type directly. At the JavaScript
+boundary, `Lean.Expr` values use structural objects such as
 `{ kind: "const", name: "Nat", levels: [] }`,
 `{ kind: "app", fn, arg }`, or `{ kind: "bvar", index: 0 }`. Level values use
 the same shape with `kind` values `zero`, `succ`, `max`, `imax`, `param`, and
-`mvar`. Metadata expression inputs are accepted by decoding their inner
-expression; metadata results preserve a structural `mdata` wrapper.
+`mvar`. Resolved calls lower these values through the object ABI into real Lean
+expression objects. Metadata expression inputs are accepted by lowering their
+inner expression; metadata results preserve a structural `mdata` wrapper.
 
 Package loading validates the embedded interface manifest before any generated
 entry is exposed. Malformed type trees, invalid structure layouts, unsupported
@@ -301,7 +300,7 @@ matching the Lean result type. Host imports are synchronous in v1; returning a
 overrides on top of the generated import table. If you provide a custom
 `imports` function to `createVirRuntimeFactory`, call
 `createVirImports(module, overrides, hostState)` or otherwise install
-`env.vir_js_call` and `env.vir_js_call_result_size`.
+`env.vir_js_call_objects` plus the `env.vir_resource_*` root-table imports.
 
 ## Closure Lifetime
 

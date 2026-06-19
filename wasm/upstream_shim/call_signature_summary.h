@@ -12,14 +12,17 @@ Author: Emilio J. Gallego Arias
 
 namespace lean {
 
-struct package_call_signature {
+struct vir_call_signature_payload {
     bool ok = false;
     std::string error;
     uint32_t arg_count = 0;
-    bool is_io = false;
     bool needs_boxed_wasm32_boundary = false;
 };
 
-package_call_signature const * cached_package_call_signature(uint32_t slot);
+vir_call_signature_payload decode_call_signature_payload(
+    char const * data,
+    uint32_t size,
+    char const * missing_message,
+    char const * trailing_message);
 
 }

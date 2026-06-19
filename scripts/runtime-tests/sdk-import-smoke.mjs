@@ -42,8 +42,6 @@ try {
   const nodeRuntime = modules["vir-runtime-node.js"];
   const hostBindings = modules["vir-host-bindings.js"];
   const codec = modules["runtime/vir-codec.js"];
-  const leanCodec = modules["runtime/vir-lean-codec.js"];
-  const valueCodec = modules["runtime/vir-value-codec.js"];
   const reactHtml = modules["react/vir-react-html.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
   const wireTags = modules["runtime/wire-tags.js"];
@@ -53,8 +51,6 @@ try {
   assert.equal(typeof nodeRuntime.createVirRuntime, "function");
   assert.equal(typeof hostBindings.createHostResourceState, "function");
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
-  assert.equal(typeof leanCodec.decodeExpr, "function");
-  assert.equal(typeof valueCodec.decodeResolvedCallResult, "function");
   assert.equal(typeof reactHtml.virtualReactTextContent, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
   assert.equal(wireTags.WIRE.NAT, 0);

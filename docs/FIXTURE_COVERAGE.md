@@ -5,7 +5,7 @@ Each fixture is Lean source under `fixtures/`, elaborated by Lean 4.31.0 into
 real `Lean.IR.Decl` values by the compiled `vir_irpkg` package generator, and
 then compared against Lean's host IR interpreter with
 `interpreter.prefer_native=false`. The package generator is built from
-`Vir/GeneratePackage.lean`.
+`tools/GeneratePackage.lean` and the `Vir/GeneratePackage/` library modules.
 The runner schedules fixtures in parallel using half of Node's reported
 `availableParallelism()` by default; set `VIR_FIXTURE_JOBS=1` for serial
 debugging or another positive value to pin the worker count.

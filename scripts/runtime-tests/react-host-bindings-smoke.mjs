@@ -67,7 +67,6 @@ ensureVirtualElements(reactDocumentState, [
   "#react-change",
   "#react-checkbox",
   "#react-attributes",
-  "#react-callback-tree",
   "#react-pet",
   "#react-unmount",
   "#react-stale-root",
@@ -76,12 +75,6 @@ ensureVirtualElements(reactDocumentState, [
 ]);
 assert.equal(reactRuntime.call("ReactCounter.renderStatic", "#react-static"), true);
 assert.equal(reactDocumentState.elements.get("#react-static").textContent, "react:static");
-assert.equal(reactRuntime.liveCallbacks.size, 0);
-assert.equal(reactRuntime.call("ReactCounter.renderCallbackTreeLoop", "#react-callback-tree", "4", "1"), "1");
-assert.equal(
-  reactDocumentState.elements.get("#react-callback-tree").textContent,
-  "callback:0callback:1callback:2callback:3",
-);
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 const missingSelectorDocumentState = createVirtualDocumentState();
 const missingSelectorRuntime = await createVirRuntime({
