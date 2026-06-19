@@ -138,10 +138,14 @@ they avoid both byte payloads and object allocation.
 The automatic object-lane selection in `VirRuntime.call` covers pure unary calls
 whose argument can be lowered from the current object subset and whose result
 can be lifted from it. Arguments and results currently support base values,
-`Array`, `List`, `Option`, and `Prod`; sequence and product fields are lowered
-or lifted recursively. Decimal scalar calls lower through the corresponding
-`vir_obj_*` constructor, call `vir_call_resolved_objects`, lift the result with
-the matching decimal inspection helper plus
+`Array`, `List`, `Option`, `Prod`, object-field-only structures, object-field-
+only tagged unions, and object-field-only custom inductive constructors;
+sequence, product, record, and constructor fields are lowered or lifted
+recursively. Structures and constructors with scalar or `USize` runtime fields
+still fall back to the byte codec, as do recursive-self descriptors for now.
+Decimal scalar calls lower through the corresponding `vir_obj_*` constructor,
+call `vir_call_resolved_objects`, lift the result with the matching decimal
+inspection helper plus
 `vir_obj_decimal_size`, and release the owned result with `vir_obj_dec`.
 Byte-array calls use `vir_obj_byte_array` and lift the result with
 `vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each

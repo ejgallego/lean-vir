@@ -382,6 +382,63 @@ try {
     fst: "7",
     snd: "ok!",
   });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.profileScore", {
+    nickname: "lean",
+    points: 4,
+    tags: ["ir", "wasm"],
+  }), "14");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileBump", {
+    nickname: "lean",
+    points: 4,
+    tags: ["ir", "wasm"],
+  }), {
+    nickname: "lean!",
+    points: "6",
+    tags: ["ir", "wasm"],
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.profileSummary", {
+    nickname: "lean",
+    points: 4,
+    tags: ["ir", "wasm"],
+  }), {
+    label: "lean:2",
+    total: "14",
+    bonus: "14",
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxNatBump", { value: 41 }), {
+    value: "42",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.taggedArrayScore", {
+    label: "ab",
+    payload: ["x", "yz"],
+  }), "5");
+  assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.taggedProfileBump", {
+    label: "profile",
+    payload: {
+      nickname: "lean",
+      points: 4,
+      tags: ["ir", "wasm"],
+    },
+  }), {
+    label: "profile!",
+    payload: {
+      nickname: "lean!",
+      points: "6",
+      tags: ["ir", "wasm"],
+    },
+  });
+  assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 0), {
+    kind: "inl",
+    value: "10",
+  });
+  assert.equal(runtime.call("Vir.Fixtures.ListOption.sumScore", { kind: "inr", value: 7 }), "70");
+  assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifyExcept", 5), {
+    kind: "ok",
+    value: {
+      kind: "inr",
+      value: "5",
+    },
+  });
   assert.deepEqual(
     runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [65, 66, 67]),
     Uint8Array.from([65, 66, 67]),
@@ -389,7 +446,7 @@ try {
 } finally {
   runtime.exports = objectCallExports;
 }
-assert.equal(objectCalls, 17);
+assert.equal(objectCalls, 26);
 assert.equal(codecFallbackCalls, 0);
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
