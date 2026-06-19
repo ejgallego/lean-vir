@@ -245,12 +245,6 @@ static void encode_variant_runtime_counts(vir_writer & w, vir_variant const & va
     w.u32(variant.scalar_bytes);
 }
 
-static bool same_variant_runtime_counts(vir_variant const & lhs, vir_variant const & rhs) {
-    return lhs.object_fields == rhs.object_fields &&
-        lhs.usize_fields == rhs.usize_fields &&
-        lhs.scalar_bytes == rhs.scalar_bytes;
-}
-
 static void decode_field_descriptors(
     vir_reader & r,
     uint32_t field_count,
@@ -924,12 +918,6 @@ vir_arg decode_argument_payload(vir_reader & r, vir_type const & type, bool has_
     return { decode_value(r, type), true };
 }
 
-vir_arg decode_argument(vir_reader & r, bool has_boxed_decl) {
-    vir_type type = decode_type(r);
-    if (!r.ok) return { lean_box(0), true };
-    return decode_argument_payload(r, type, has_boxed_decl);
-}
-
 static std::string int_to_decimal(object * value) {
     if (lean_is_scalar(value)) {
         return std::to_string(lean_scalar_to_int(value));
@@ -1266,52 +1254,9 @@ void encode_result_payload(vir_writer & w, vir_type const & type, object * value
     }
 }
 
-void encode_result(vir_writer & w, vir_type const & type, object * value, bool has_boxed_decl) {
-    encode_type(w, type);
-    encode_result_payload(w, type, value, has_boxed_decl);
-}
-
 bool call_result_is_owned(vir_type const & type, bool has_boxed_decl) {
     vir_type const * unboxed_type = nullptr;
     return has_boxed_decl || !is_unboxed_call_boundary_type(type, &unboxed_type);
-}
-
-bool same_wire_type(vir_type const & lhs, vir_type const & rhs) {
-    if (lhs.tag != rhs.tag || lhs.args.size() != rhs.args.size()) {
-        return false;
-    }
-    if (lhs.tag == vir_wire_type::RecursiveSelf) {
-        return true;
-    }
-    if (lhs.tag == vir_wire_type::Function && lhs.is_io != rhs.is_io) {
-        return false;
-    }
-    if (lhs.tag == vir_wire_type::TaggedUnion || lhs.tag == vir_wire_type::CustomInductive) {
-        if (lhs.variants.size() != rhs.variants.size()) {
-            return false;
-        }
-        for (size_t i = 0; i < lhs.variants.size(); i++) {
-            vir_variant const & lhs_variant = lhs.variants[i];
-            vir_variant const & rhs_variant = rhs.variants[i];
-            if (
-                !same_variant_runtime_counts(lhs_variant, rhs_variant) ||
-                lhs_variant.fields.size() != rhs_variant.fields.size()) {
-                return false;
-            }
-            for (size_t j = 0; j < lhs_variant.fields.size(); j++) {
-                if (!same_wire_type(lhs_variant.fields[j], rhs_variant.fields[j])) {
-                    return false;
-                }
-            }
-        }
-        return true;
-    }
-    for (size_t i = 0; i < lhs.args.size(); i++) {
-        if (!same_wire_type(lhs.args[i], rhs.args[i])) {
-            return false;
-        }
-    }
-    return true;
 }
 
 name name_from_dotted(char const * text, size_t len) {

@@ -11,7 +11,7 @@ objects while a call is running.
 | --- | --- | --- |
 | Lean API | `Vir/*.lean`, `examples/*.lean` | Public combinators, effect types, examples, and `@[vir_js]` declarations. |
 | Package generation | `Vir/GeneratePackage.lean` | Export closure selection, manifest type descriptors, host import metadata, and native extern registration. |
-| WASI boundary | `wasm/upstream_shim/` | `vir_call`, host-import trampolines, package decoding, native externs, closure roots, and WASI/runtime stubs. |
+| WASI boundary | `wasm/upstream_shim/` | Resolved package calls, host-import trampolines, package decoding, native externs, closure roots, and WASI/runtime stubs. |
 | JavaScript runtime | `web/src/vir-runtime.js`, `web/src/runtime/vir-value-codec.js` | Runtime construction, manifest validation, call payload encoding, result decoding, host import dispatch, and callback wrappers. |
 | Host resources | `web/src/host-resource.js`, `web/src/host/vir-host-resources.js` | JavaScript-owned object handles, externref roots, disposable host objects, DOM/timer/frame/React resource cleanup. |
 | React host | `web/src/react/`, `web/src/vir-react-host-bindings.js` | React element construction, root lifetime, function-component bridge, hooks, and callback retention. |
@@ -69,7 +69,7 @@ sequenceDiagram
     JS->>RT: vir.call("entry", ...args)
     RT->>RT: lookup manifest entry
     RT->>Wasm: vir_resolve_call(name) on first use
-    RT->>Codec: encode args with manifest descriptor
+    RT->>Codec: encode value-only args with manifest descriptor
     Codec-->>RT: byte payload
     RT->>Wasm: vir_call_resolved(slot, payload, resultTag)
     Wasm->>Cpp: decode payload into Lean objects
@@ -81,8 +81,8 @@ sequenceDiagram
     RT-->>JS: JavaScript value
 ```
 
-`vir_call(name, ...)` remains available for diagnostics and benchmark
-comparison, but the runtime's hot path is `vir_call_resolved(slot, ...)`.
+The runtime's byte fallback path is `vir_call_resolved(slot, ...)`; the older
+descriptor-bearing named call ABI has been removed.
 
 ## Lean-To-JavaScript Host Import Flow
 

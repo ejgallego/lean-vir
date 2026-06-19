@@ -8,14 +8,11 @@ import {
   BinaryReader,
   BinaryWriter,
   customInductiveConstructorAt,
-  decodeTypeDescriptor,
-  encodeTypeDescriptor,
   normalizeUint32,
   requireFunctionArgs,
   requireStructureFields,
   requireTypeField,
   requireWireTag,
-  sameWireType,
   taggedUnionConstructorAt,
 } from "./vir-codec.js";
 import { decodeExpr, encodeExpr } from "./vir-lean-codec.js";
@@ -35,19 +32,7 @@ import {
   normalizeStructure,
   normalizeTaggedUnion,
 } from "./vir-value-normalizers.js";
-import { interfaceEffectRuntimeTag } from "./interface-effects.js";
 import { WIRE } from "./wire-tags.js";
-
-export function encodeCallPayload(entry, args, options = {}) {
-  const writer = new BinaryWriter();
-  writer.u32(args.length);
-  entry.args.forEach((arg, index) => {
-    encodeValue(writer, arg.type, args[index], `${entry.entry} argument ${arg.name}`, options);
-  });
-  encodeTypeDescriptor(writer, entry.result, `${entry.entry} result`);
-  writer.u8(interfaceEffectRuntimeTag(entry.effect));
-  return writer.take();
-}
 
 export function encodeResolvedCallPayload(entry, args, options = {}) {
   const writer = new BinaryWriter();
@@ -71,17 +56,6 @@ export function encodeClosureCallPayload(type, args, options = {}) {
   return writer.take();
 }
 
-export function decodeCallResult(type, bytes, options = {}) {
-  const reader = new BinaryReader(bytes);
-  const actualType = decodeTypeDescriptor(reader);
-  if (!sameWireType(type, actualType)) {
-    throw new Error(`result wire type mismatch: expected ${type.type ?? requireWireTag(type, "result")}, got tag ${actualType.wireTag}`);
-  }
-  const value = decodeValuePayload(reader, type, options);
-  reader.requireEnd();
-  return value;
-}
-
 export function decodeResolvedCallResult(type, bytes, options = {}) {
   const reader = new BinaryReader(bytes);
   const value = decodeValuePayload(reader, type, options);
@@ -89,43 +63,23 @@ export function decodeResolvedCallResult(type, bytes, options = {}) {
   return value;
 }
 
-export function decodeHostCallRequest(bytes, entry, options = {}, { compactPayload = false } = {}) {
+export function decodeHostCallRequest(bytes, entry, options = {}) {
   const reader = new BinaryReader(bytes);
   const argc = reader.u32();
   if (argc !== entry.args.length) {
     throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argc}`);
   }
-  const args = entry.args.map((arg, index) => {
-    if (!compactPayload) {
-      const actualType = decodeTypeDescriptor(reader);
-      if (!sameWireType(arg.type, actualType)) {
-        throw new Error(`Vir host import ${entry.target} argument ${arg.name ?? index} type mismatch`);
-      }
-    }
+  const args = entry.args.map((arg) => {
     return decodeValuePayload(reader, arg.type, options);
   });
-  if (!compactPayload) {
-    const actualResult = decodeTypeDescriptor(reader);
-    if (!sameWireType(entry.result, actualResult)) {
-      throw new Error(`Vir host import ${entry.target} result type mismatch`);
-    }
-  }
   reader.requireEnd();
   return { args, resultType: entry.result };
 }
 
-export function encodeHostCallResult(type, value, entry, options = {}, { compactPayload = false } = {}) {
+export function encodeHostCallResult(type, value, entry, options = {}) {
   const writer = new BinaryWriter();
-  if (!compactPayload) {
-    encodeTypeDescriptor(writer, type, `${entry.target} result`);
-  }
   encodeValuePayload(writer, type, value, `${entry.target} result`, options);
   return writer.take();
-}
-
-function encodeValue(writer, type, value, label, options) {
-  encodeTypeDescriptor(writer, type, label);
-  encodeValuePayload(writer, type, value, label, options);
 }
 
 function encodeValuePayload(writer, type, value, label, options = {}, selfType = null) {

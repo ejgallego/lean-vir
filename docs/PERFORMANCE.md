@@ -27,8 +27,8 @@ npm run bench:compare -- build/perf/before.json build/perf/after.json
 The comparison checks common benchmark rows for sample names, iteration counts,
 and checksums before printing per-call deltas. Rows present in only one report
 are listed separately with their per-call medians. The default benchmark
-includes the `branchAndSub` top-level dispatch row with both named and resolved
-package call samples, pure-runtime controls (`fib` and `sort`), JavaScript
+includes the `branchAndSub` top-level dispatch row with both resolve-each-call
+and cached-slot samples, pure-runtime controls (`fib` and `sort`), JavaScript
 codec-only rows, base boundary rows for `Unit`, `Bool`, `Nat`, `Int`,
 `String`, fixed-width unsigned integers, `USize`, `Float`, `Float32`,
 `ByteArray`, and shallow array inputs, plus end-to-end top-level value
@@ -63,7 +63,7 @@ without primarily measuring a deep recursive Lean `DomM` loop.
 The machine-readable report schema is `lean-vir.bench.v1`. Benchmark rows are
 objects under the top-level `benchmarks` array. Every timed sample uses the same
 shape, regardless of whether it is named `codec`, `wasm`, `native`, `host`,
-`named`, `resolved`, or `js`:
+`resolveEachCall`, `cachedSlot`, or `js`:
 
 ```json
 {
@@ -95,13 +95,13 @@ The `base-*` conversion rows use this stable row shape:
 }
 ```
 
-The `branchAndSub` row calls a tiny exported fixture through both descriptor-
-bearing `vir_call` and compact `vir_call_resolved`, so it is the focused check
-for package-owned ABI and call-slot dispatch changes. Compact host-import
-framing is more visible in the host/resource and React rows because those paths
-cross from Lean back into JavaScript. The broader `fib` and `sort` rows spend
-more time in Lean execution and should show smaller movement from boundary-only
-work.
+The `branchAndSub` row calls a tiny exported fixture through
+`vir_call_resolved`, comparing repeated name resolution with a cached package
+slot. It is the focused check for package-owned ABI and call-slot dispatch
+changes. Compact host-import framing is more visible in the host/resource and
+React rows because those paths cross from Lean back into JavaScript. The broader
+`fib` and `sort` rows spend more time in Lean execution and should show smaller
+movement from boundary-only work.
 `npm run bench:engines` remains a WASI command-module comparison across
 available engines for the broader `fib` and `sort` rows.
 
