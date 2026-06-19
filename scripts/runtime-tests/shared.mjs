@@ -38,8 +38,16 @@ export async function readRuntimeArtifacts() {
   };
 }
 
-function readPublicArtifact(file) {
-  return readFile(new URL(`../../${publicArtifactPath(file)}`, import.meta.url));
+async function readPublicArtifact(file) {
+  const artifactPath = publicArtifactPath(file);
+  try {
+    return await readFile(new URL(`../../${artifactPath}`, import.meta.url));
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`missing runtime artifact ${artifactPath}; run npm run build:demo first`);
+    }
+    throw error;
+  }
 }
 
 export function createCallbackHostBindings(records = []) {

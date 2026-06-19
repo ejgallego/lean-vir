@@ -33,15 +33,22 @@ Targets have one of three modes:
   `DeclIndex` construction, and declaration-name collision diagnostics.
 - `Vir.GeneratePackage.Closure`: root resolution and transitive IR closure
   collection from typed `Lean.IR.Decl` values.
-- `Vir.GeneratePackage.Interface`: interface type classification, export and
-  host-import signature extraction, host effect recognition, boxed-boundary
-  checks, and export discovery.
+- `Vir.GeneratePackage.Interface`: compatibility import shim for the split
+  interface modules.
 - `Vir.GeneratePackage.Interface.Encode`: interface labels, wire tags, and
   descriptor JSON encoders.
+- `Vir.GeneratePackage.Interface.Classify`: interface type classification,
+  host effect recognition, callback signatures, abbrev-head unfolding, runtime
+  layout classification for structures and inductives, and boxed-boundary
+  checks.
+- `Vir.GeneratePackage.Interface.Collect`: export discovery, export signature
+  extraction, duplicate-avoidance helpers, boxed-boundary diagnostics, and
+  host-import collection for `@[vir_js "..."]` declarations.
 - `Vir.GeneratePackage.Json`: small JSON string, array, object, and primitive
   encoders shared by interface and manifest serialization.
 - `Vir.GeneratePackage.Manifest`: package metadata, interface manifest
-  collection, duplicate export diagnostics, and manifest JSON encoding.
+  collection, and duplicate export diagnostics.
+- `Vir.GeneratePackage.Manifest.Encode`: interface manifest JSON encoders.
 - `Vir.GeneratePackage.Emit`: binary `.irpkg` encoding.
 - `Vir.GeneratePackage.Report`: human-readable generation report.
 - `Vir.GeneratePackage.Run`: top-level orchestration, filesystem writes, and
@@ -72,6 +79,27 @@ Targets have one of three modes:
 8. `Emit.emitPackage` writes the binary package only when the closure and
    manifest have no diagnostics that would make the package ambiguous or
    unsupported.
+
+## Ownership Checklist
+
+Use the smallest focused check that covers the edited boundary, then rely on CI
+for the full matrix.
+
+- Interface descriptor JSON or wire tags:
+  `npm run check:package-abi`, `lake build vir_irpkg`, and
+  `npm run test:runtime -- package-generation`.
+- Interface type classification, abbrev unfolding, structures, inductives,
+  resources, effects, or boxed-boundary checks: `lake build vir_irpkg` and
+  `npm run generate:irpkg -- examples/Fib.lean /tmp/vir-fib.irpkg fib`. Add a
+  targeted fixture when the supported boundary surface changes.
+- Export discovery or host-import collection: `lake build vir_irpkg`,
+  `npm run check:boundary-registry`, and
+  `npm run test:runtime -- package-generation`.
+- Manifest metadata, diagnostics, duplicate export checks, or report output:
+  `lake build vir_irpkg`, `npm run generate:irpkg -- examples/Fib.lean
+  /tmp/vir-fib.irpkg fib`, and inspect the generated report when diagnostics
+  change.
+- Lean library packaging or import layout: `bash scripts/build-lean-lib.sh`.
 
 ## Source And Target Rules
 

@@ -27,6 +27,7 @@ abbrev RecursiveSeen := Array (Name × String)
 
 inductive InterfaceEffect where
   | pure
+  | runtime
   | io
   | dom
   | react
@@ -34,6 +35,7 @@ inductive InterfaceEffect where
 
 def InterfaceEffect.label : InterfaceEffect → String
   | .pure => "pure"
+  | .runtime => "runtime"
   | .io => "io"
   | .dom => "dom"
   | .react => "react"
@@ -44,11 +46,12 @@ def InterfaceEffect.isEffectful : InterfaceEffect → Bool
 
 def InterfaceEffect.display : InterfaceEffect → String
   | .pure => ""
+  | .runtime => "RuntimeM"
   | .io => "IO"
   | .dom => "DomM"
   | .react => "ReactM"
 
-def maxHostImportSlots : Nat := 32
+def maxHostImportSlots : Nat := 64
 
 def maxHostImportArity : Nat := 6
 
