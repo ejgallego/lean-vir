@@ -62,6 +62,13 @@ export function hostResourceExternref(resource) {
   return isHostResource(resource) && hostResourceValue(resource) !== null ? resource : null;
 }
 
+export function normalizeHostResource(resource, label = "host resource") {
+  if (hostResourceExternref(resource) === null) {
+    throw new Error(`${label} must be a live host resource`);
+  }
+  return resource;
+}
+
 export function releaseHostResource(resource) {
   const state = hostResourceState.get(resource);
   if (state !== undefined) {

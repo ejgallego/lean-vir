@@ -1,13 +1,12 @@
 # Lean Object ABI
 
-This note records the direction for replacing the C++ byte value codec with
-JavaScript-driven construction and inspection of Lean runtime objects.
+This note records the JavaScript-driven construction and inspection path for
+Lean runtime objects.
 
-The compact manifest-driven byte path remains the general boundary. The object
-ABI is an internal experimental surface that lets the JavaScript runtime
-lower common JS values into Lean objects, call the interpreter with object
-arguments, and lift the returned Lean object back to JS without descriptor bytes
-on every call.
+The object ABI is now the JavaScript runtime call surface for package
+entrypoints, host imports, callbacks, and resources. The compact binary codec
+that remains in this area encodes type descriptors and callback signatures, not
+runtime values.
 
 ## Boundary Policy
 
@@ -24,11 +23,10 @@ There are two distinct lanes:
   inductives over supported fields. They are copied/lowered/lifted values, not
   JavaScript identity handles.
 
-The object ABI does not change the public Lean signature policy. It is a lower
-runtime implementation path for the plain-value lane: JavaScript may eventually
-construct Lean objects directly for common manifest value types instead of
-sending descriptor-guided byte payloads. `Lean.Vir.Js α` remains the explicit
-resource lane for host-owned objects.
+The object ABI does not change the public Lean signature policy. It is the
+runtime implementation path for the plain-value lane: JavaScript constructs
+Lean objects directly for supported manifest value types. `Lean.Vir.Js α`
+remains the explicit resource lane for host-owned objects.
 
 ## Shape
 
@@ -140,19 +138,22 @@ sequenceDiagram
   JS->>ABI: release result
 ```
 
-The compact byte payload path remains the complete path while this lands. It
-handles structured values, resources, callbacks, and host imports. Primitive
-lane helpers are still useful for the hottest exact scalar signatures because
-they avoid both byte payloads and object allocation.
-The automatic object-lane selection in `VirRuntime.call` covers pure calls
-whose arguments can be lowered from the current object subset and whose result
-can be lifted from it. Arguments and results currently support base values,
+The runtime value path now uses owned Lean objects. Primitive lane helpers are
+still useful for the hottest exact scalar signatures because they avoid object
+allocation, but the JavaScript-facing runtime no longer has a value byte
+fallback.
+`VirRuntime.call` covers calls whose arguments can be lowered from the current
+object subset and whose result can be lifted from it. Arguments and results
+currently support base values,
 `Array`, `List`, `Option`, `Prod`, and manifest-described structures, tagged
 unions, and custom inductive constructors whose fields recursively stay in this
 subset. Nontrivial constructors may mix object fields, raw `USize` slots, and
 packed scalar fields, including direct recursive references through supported
-fields. Resources, callbacks, effectful calls, and `Lean.Expr` values still fall
-back to the byte codec for now. Decimal
+fields. Direct `Lean.Expr` arguments and results are also covered through
+constructor-backed `vir_obj_expr_*` and `vir_obj_level_*`
+helpers; the public Lean type remains `Lean.Expr`, but the helpers call Lean's
+real constructors so cached expression data is preserved. Resources, callbacks,
+host imports, and effectful calls also use object arguments/results. Decimal
 scalar calls lower through the corresponding `vir_obj_*` constructor, call
 `vir_call_resolved_objects`, lift the result with the matching decimal
 inspection helper plus
@@ -161,6 +162,11 @@ Byte-array calls use `vir_obj_byte_array` and lift the result with
 `vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each
 supported element to an owned object and pack those objects with `vir_obj_array`
 or `vir_obj_list`.
+The JavaScript runtime caches package-owned object call support and validated
+layout plans per manifest owner. Each lowered value still gets fresh owned Lean
+objects and fresh constructor buffers, but repeated records and inductive
+constructors no longer rediscover field indexes, scalar offsets, and packed
+runtime counts on every visit.
 
 ## Phases
 
@@ -175,10 +181,14 @@ or `vir_obj_list`.
 4. Generated layout support: structures and inductives lowered by package
    metadata instead of ad hoc descriptors, including object, `USize`, and scalar
    runtime fields.
-5. Host import integration: rooted object handles for Lean-to-JS calls where JS
-   wants to inspect or retain Lean objects directly.
-6. Codec retirement: remove the C++ descriptor/value codec once JS-driven
-   lowering covers the manifest surface we need.
+5. Direct `Lean.Expr` object calls: keep `Lean.Expr` as the user-facing type,
+   but lower/lift it through constructor-backed helpers because generic
+   constructor allocation cannot safely fabricate kernel expression metadata.
+6. Host import and callback integration: rooted resource and closure helpers
+   let Lean-to-JS calls and retained callbacks exchange objects directly.
+7. Value codec retirement: the JavaScript value codec and C++ runtime value
+   codec have been removed; `interface_codec.cpp` now only owns compact type
+   descriptor/signature encoding.
 
 ## Risks
 

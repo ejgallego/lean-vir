@@ -12,10 +12,10 @@ repositories.
 
 The runtime still targets a portable core `wasm32-wasip1` artifact:
 
-- JavaScript calls Lean through the resolved `vir_call_resolved`
-  byte-payload export after resolving a package-local entry slot.
+- JavaScript calls Lean through `vir_call_resolved_objects` after resolving a
+  package-local entry slot.
 - Lean calls JavaScript through package-scoped `@[vir_js]` host imports routed
-  to `env.vir_js_call`.
+  to `env.vir_js_call_objects`.
 - Opaque browser and React resources cross the JS/Wasm boundary through
   `externref` side-channel imports. Lean stores them as GC-finalized external
   objects that root JavaScript `HostResource` objects in the host runtime.
@@ -76,13 +76,12 @@ The JavaScript API treats resources as opaque runtime objects and does not
 accept raw numeric resource tokens or expose a supported numeric `.handle`
 field.
 
-`externref` replaces opaque resource transport, not the entire call ABI. Plain
-scalars and structured Lean values still use the manifest-described byte
-payload because they must be reconstructed as Lean heap objects inside the
-interpreter. Replacing `vir_js_call(slot, payload)` for those values would
-require generated per-package Wasm imports with typed lowering rules, or a
-component-model/WIT-style resource and value ABI. The current prototype keeps
-that larger ABI change separate from the React resource path.
+`externref` remains the transport for JavaScript-owned resources. Plain scalars
+and structured Lean values now use the object ABI: JavaScript lowers them to
+Lean heap objects before entering the interpreter, and host imports lift
+borrowed Lean objects before calling JavaScript bindings. A future
+component-model/WIT-style ABI could still replace this internal object ABI, but
+the current prototype no longer uses a runtime value byte payload fallback.
 
 `externref` does not replace callback rooting. Lean callbacks are still Lean
 heap objects owned by the interpreter runtime. JavaScript may retain a callback
@@ -147,7 +146,7 @@ The intended alignment is:
 The benchmark suite includes rows that should be sensitive to future WIT
 binding choices:
 
-- JavaScript codec-only encoding for scalar records/enums,
+- JavaScript object-lowering work for scalar records/enums,
   nested records/lists/options, and recursive custom inductives;
 - end-to-end scalar record plus enum conversion;
 - end-to-end nested record/list/option conversion;

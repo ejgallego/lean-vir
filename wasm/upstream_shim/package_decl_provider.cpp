@@ -73,6 +73,10 @@ static bool g_package_loaded = false;
 static uint32_t g_package_generation = 1;
 static uint32_t g_package_format_version = 0;
 
+static bool supported_package_version(uint32_t version) {
+    return 1 <= version && version <= 7;
+}
+
 static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
     object * obj = lean_alloc_ctor(tag, fields.size(), scalar_size);
     unsigned idx = 0;
@@ -709,6 +713,16 @@ public:
         }
     }
 
+    std::string signature_bytes() {
+        size_t signature_start = pos();
+        uint32_t argc = u32();
+        for (uint32_t i = 0; i < argc; i++) {
+            interface_type();
+        }
+        interface_type();
+        return bytes_from(signature_start, pos());
+    }
+
     host_import_entry host_import() {
         object * n = name();
         std::string target = string();
@@ -716,27 +730,13 @@ public:
         uint32_t arity = u32();
         uint32_t erased_prefix_args = m_version >= 6 ? u32() : 0;
         bool is_io = boolean();
-        size_t signature_start = pos();
-        uint32_t argc = u32();
-        for (uint32_t i = 0; i < argc; i++) {
-            interface_type();
-        }
-        interface_type();
-        size_t signature_end = pos();
-        return { n, target, symbol, arity, erased_prefix_args, is_io, bytes_from(signature_start, signature_end) };
+        return { n, target, symbol, arity, erased_prefix_args, is_io, signature_bytes() };
     }
 
     export_signature_entry export_signature() {
         object * n = name();
         bool is_io = boolean();
-        size_t signature_start = pos();
-        uint32_t argc = u32();
-        for (uint32_t i = 0; i < argc; i++) {
-            interface_type();
-        }
-        interface_type();
-        size_t signature_end = pos();
-        return { n, is_io, bytes_from(signature_start, signature_end) };
+        return { n, is_io, signature_bytes() };
     }
 
 private:
@@ -807,7 +807,7 @@ static bool load_package(uint8_t const * data, size_t size) {
         g_last_error = "invalid IR package magic `" + magic + "`";
         return false;
     }
-    if (version != 1 && version != 2 && version != 3 && version != 4 && version != 5 && version != 6 && version != 7) {
+    if (!supported_package_version(version)) {
         g_last_error = "unsupported IR package version " + std::to_string(version);
         return false;
     }

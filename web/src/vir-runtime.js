@@ -7,27 +7,26 @@ Author: Emilio J. Gallego Arias
 import { validateInterfaceManifest } from "./runtime/interface-manifest.js";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
 import {
+  BinaryWriter,
   asBytes,
   customInductiveConstructorAt,
+  encodeTypeDescriptor,
   normalizeUint32,
+  requireFunctionArgs,
+  requireFunctionResult,
   requireCustomInductiveConstructors,
   requireStructureFields,
   requireTaggedUnionConstructors,
   requireTypeField,
   taggedUnionConstructorAt,
 } from "./runtime/vir-codec.js";
+import { interfaceEffectRuntimeTag } from "./runtime/interface-effects.js";
 import { WIRE } from "./runtime/wire-tags.js";
 import {
   ExternrefResourceRoots,
   isHostResource,
+  normalizeHostResource,
 } from "./host-resource.js";
-import {
-  decodeResolvedCallResult,
-  decodeHostCallRequest,
-  encodeClosureCallPayload,
-  encodeHostCallResult,
-  encodeResolvedCallPayload,
-} from "./runtime/vir-value-codec.js";
 import {
   asByteArrayBytes,
   enumValue,
@@ -55,6 +54,7 @@ const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 const virCallbackStates = new WeakMap();
+const objectLayoutPlanCache = new WeakMap();
 const FAST_CALL_UNAVAILABLE = Symbol("fast-call-unavailable");
 const OBJECT_VALUE_EXPORTS = [
   "vir_obj_array",
@@ -67,7 +67,20 @@ const OBJECT_VALUE_EXPORTS = [
   "vir_obj_ctor_layout",
   "vir_obj_ctor_scalar_data",
   "vir_obj_ctor_usize_decimal",
+  "vir_obj_closure_root",
   "vir_obj_decimal_size",
+  "vir_obj_expr_app",
+  "vir_obj_expr_bvar",
+  "vir_obj_expr_const",
+  "vir_obj_expr_forall",
+  "vir_obj_expr_fvar",
+  "vir_obj_expr_lambda",
+  "vir_obj_expr_let",
+  "vir_obj_expr_lit",
+  "vir_obj_expr_mvar",
+  "vir_obj_expr_proj",
+  "vir_obj_expr_scalar_u8",
+  "vir_obj_expr_sort",
   "vir_obj_field",
   "vir_obj_float",
   "vir_obj_float_value",
@@ -75,10 +88,22 @@ const OBJECT_VALUE_EXPORTS = [
   "vir_obj_float32_value",
   "vir_obj_int",
   "vir_obj_int_decimal",
+  "vir_obj_level_imax",
+  "vir_obj_level_max",
+  "vir_obj_level_mvar",
+  "vir_obj_level_param",
+  "vir_obj_level_succ",
+  "vir_obj_level_zero",
   "vir_obj_list",
   "vir_obj_list_head",
   "vir_obj_list_is_nil",
   "vir_obj_list_tail",
+  "vir_obj_literal_nat",
+  "vir_obj_literal_string",
+  "vir_obj_name_string",
+  "vir_obj_name_string_size",
+  "vir_obj_resource",
+  "vir_obj_resource_externref",
   "vir_obj_nat",
   "vir_obj_nat_decimal",
   "vir_obj_is_scalar",
@@ -119,7 +144,7 @@ export function createVirImports(module, overrides = {}, hostState = null) {
         if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
           throw new Error(`WASI proc_exit(${args[0]})`);
         }
-        if (spec.module === "env" && spec.name === "vir_js_call") {
+        if (spec.module === "env" && spec.name === "vir_js_call_objects") {
           throw new Error("Vir JavaScript host import called without an attached host state");
         }
         return 0;
@@ -136,15 +161,11 @@ export function createVirImports(module, overrides = {}, hostState = null) {
 
   if (hostState !== null) {
     imports.env ??= {};
-    imports.env.vir_js_call = (slot, requestPtr, requestLen) =>
-      hostState.call(slot, requestPtr, requestLen);
-    imports.env.vir_js_call_result_size = () => hostState.resultSize();
-    imports.env.vir_resource_take = () => hostState.takeIncomingResource();
-    imports.env.vir_resource_push = (value) => hostState.pushOutgoingResource(value);
+    imports.env.vir_js_call_objects = (slot, argvPtr, argc) =>
+      hostState.callObjects(slot, argvPtr, argc);
     imports.env.vir_resource_root = (value) => hostState.rootResource(value);
     imports.env.vir_resource_get = (rootId) => hostState.getRootedResource(rootId);
     imports.env.vir_resource_release = (rootId) => hostState.releaseRootedResource(rootId);
-    imports.env.vir_closure_push = (rootId) => hostState.pushOutgoingClosureRootId(rootId);
   }
 
   return imports;
@@ -230,12 +251,8 @@ class VirHostState {
     this.manifest = null;
     this.hostImports = [];
     this.userBindings = hostBindings;
-    this.lastResultSize = 0;
     this.defaultBindings = defaultHostBindings;
     this.runtime = null;
-    this.incomingResources = [];
-    this.outgoingResources = [];
-    this.outgoingClosureRootIds = [];
     this.resourceRoots = new ExternrefResourceRoots();
   }
 
@@ -252,66 +269,7 @@ class VirHostState {
     this.hostImports = manifest?.hostImports ?? [];
   }
 
-  resultSize() {
-    return this.lastResultSize;
-  }
-
-  pushIncomingResource(value) {
-    this.incomingResources.push(value);
-  }
-
-  takeIncomingResource() {
-    return this.incomingResources.shift() ?? null;
-  }
-
-  clearIncomingResources() {
-    this.incomingResources.length = 0;
-  }
-
-  pushOutgoingResource(value) {
-    this.outgoingResources.push(value);
-  }
-
-  takeOutgoingResource(label) {
-    const value = this.outgoingResources.shift() ?? null;
-    if (!isHostResource(value)) {
-      throw new Error(`${label} did not receive an externref resource`);
-    }
-    return value;
-  }
-
-  clearOutgoingResources() {
-    this.outgoingResources.length = 0;
-  }
-
-  pushOutgoingClosureRootId(rootId) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId > 0xffffffff) {
-      throw new Error("Lean VIR closure root id must be a positive 32-bit integer");
-    }
-    this.outgoingClosureRootIds.push(rootId);
-    return undefined;
-  }
-
-  takeOutgoingClosureRootId(label) {
-    const rootId = this.outgoingClosureRootIds.shift() ?? 0;
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId > 0xffffffff) {
-      throw new Error(`${label} did not receive a live closure root id`);
-    }
-    return rootId;
-  }
-
-  clearOutgoingClosureRootIds() {
-    const rootIds = this.outgoingClosureRootIds.splice(0);
-    for (const rootId of rootIds) {
-      this.exports?.vir_closure_release?.(rootId);
-    }
-  }
-
-  clearTransientQueues() {
-    this.clearIncomingResources();
-    this.clearOutgoingResources();
-    this.clearOutgoingClosureRootIds();
-  }
+  clearTransientQueues() {}
 
   rootResource(value) {
     return this.resourceRoots.root(value);
@@ -329,9 +287,12 @@ class VirHostState {
     this.resourceRoots.clear();
   }
 
-  call(slot, requestPtr, requestLen) {
+  callObjects(slot, argvPtr, argc) {
     if (this.exports === null) {
       throw new Error("Vir host import called before WASM exports were attached");
+    }
+    if (this.runtime === null) {
+      throw new Error("Vir host import called before runtime was attached");
     }
     const entry = this.hostImports[slot] ?? null;
     if (entry === null) {
@@ -342,33 +303,44 @@ class VirHostState {
       throw new Error(`Vir host import binding not found: ${entry.target}`);
     }
 
-    const request = this.readWasmBytes(requestPtr, requestLen);
-    const codecOptions = this.runtime?.codecOptions ?? {};
-    let args;
-    let resultType;
+    const args = [];
+    const liftedCallbacks = [];
     try {
-      ({ args, resultType } = decodeHostCallRequest(request, entry, codecOptions));
-      this.clearOutgoingClosureRootIds();
+      const argObjects = this.readObjectArgv(argvPtr, argc);
+      if (argObjects.length !== entry.args.length) {
+        throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
+      }
+      entry.args.forEach((arg, index) => {
+        const value = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        if (isVirCallback(value)) {
+          liftedCallbacks.push(value);
+        }
+        args.push(value);
+      });
     } catch (error) {
-      this.clearOutgoingClosureRootIds();
+      releaseCallbacks(liftedCallbacks);
       throw error;
     }
-    const value = binding(...args);
+    let value;
+    try {
+      value = binding(...args);
+    } catch (error) {
+      releaseCallbacks(liftedCallbacks);
+      throw error;
+    }
     if (isPromiseLike(value)) {
+      releaseCallbacks(liftedCallbacks);
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
-    const result = encodeHostCallResult(resultType, value, entry, codecOptions);
-    const ptr = this.exports.vir_alloc_bytes(result.byteLength);
-    new Uint8Array(this.exports.memory.buffer, ptr, result.byteLength).set(result);
-    this.lastResultSize = result.byteLength;
-    return ptr;
+    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
   }
 
-  readWasmBytes(ptr, len) {
-    if (ptr === 0 && len !== 0) {
-      throw new Error("Vir host import request pointer is null");
+  readObjectArgv(argvPtr, argc) {
+    if (argvPtr === 0 && argc !== 0) {
+      throw new Error("Vir host import object argv pointer is null");
     }
-    return new Uint8Array(this.exports.memory.buffer, ptr, len).slice();
+    const view = new DataView(this.exports.memory.buffer, argvPtr, argc * 4);
+    return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
   }
 
   dispose() {
@@ -391,7 +363,6 @@ export class VirRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
-    this.codecOptions = valueCodecOptions(this);
     this.disposed = false;
     this.liveCallbacks = new Set();
     this.hostState?.attachRuntime(this);
@@ -521,60 +492,26 @@ export class VirRuntime {
   callEntry(entry, args) {
     this.requireLiveRuntime();
     this.requireFunction("vir_resolve_call");
-    this.requireFunction("vir_call_resolved");
-    this.requireFunction("vir_call_result_size");
     if (args.length !== entry.args.length) {
       throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
     }
 
     const cache = this.callCacheFor(entry);
     this.hostState?.clearTransientQueues();
-    const objectResult = this.tryObjectResolvedCall(entry, args, cache);
-    if (objectResult !== FAST_CALL_UNAVAILABLE) {
-      return objectResult;
-    }
-    let payload;
     try {
-      payload = encodeResolvedCallPayload(entry, args, this.codecOptions);
-    } catch (error) {
-      this.hostState?.clearTransientQueues();
-      throw error;
-    }
-    const payloadPtr = this.allocBytes(payload);
-    try {
-      const callSlot = this.resolveCallSlot(entry, cache);
-      const resultPtr = this.exports.vir_call_resolved(
-        callSlot,
-        payloadPtr,
-        payload.byteLength,
-      );
-      if (resultPtr === 0) {
-        throw new Error(this.lastCallError() || `call failed: ${entry.entry}`);
+      const objectResult = this.tryObjectResolvedCall(entry, args, cache);
+      if (objectResult !== FAST_CALL_UNAVAILABLE) {
+        return objectResult;
       }
-      const resultLen = this.exports.vir_call_result_size();
-      const resultBytes = this.readWasmBytes(resultPtr, resultLen);
-      return decodeResolvedCallResult(entry.result, resultBytes, this.codecOptions);
+      throw new Error(`object ABI does not support interface entry ${entry.entry}`);
     } finally {
-      this.freeBytes(payloadPtr);
       this.hostState?.clearTransientQueues();
     }
   }
 
   tryObjectResolvedCall(entry, args, cache) {
-    if (entry.effect !== "pure") {
-      return FAST_CALL_UNAVAILABLE;
-    }
-    const resultType = entry.result;
-    if (!objectResultSupported(resultType) ||
-        !entry.args.every((arg) => objectArgumentSupported(arg.type))) {
-      return FAST_CALL_UNAVAILABLE;
-    }
-    const hasBoxedDecl = this.boxedCallEntryNames.has(entry.entry);
-    if (
-      !hasBoxedDecl &&
-      (objectTypeNeedsBoxedBoundary(resultType) ||
-        entry.args.some((arg) => objectTypeNeedsBoxedBoundary(arg.type)))
-    ) {
+    const plan = this.objectCallPlanFor(entry, cache);
+    if (plan === null) {
       return FAST_CALL_UNAVAILABLE;
     }
     if (!this.hasObjectValueExports()) {
@@ -582,14 +519,41 @@ export class VirRuntime {
     }
     const argObjs = [];
     try {
-      entry.args.forEach((arg, index) => {
+      for (let index = 0; index < plan.args.length; index++) {
+        const arg = plan.args[index];
         argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
-      });
+      }
       return this.callResolvedObjects(entry, cache, argObjs, (resultObj) =>
-        this.liftObjectValue(resultType, resultObj, `${entry.entry} result`));
+        this.liftObjectValue(plan.resultType, resultObj, `${entry.entry} result`));
     } finally {
       this.releaseOwnedObjects(argObjs);
     }
+  }
+
+  objectCallPlanFor(entry, cache) {
+    if (cache.objectCallPlan !== undefined) {
+      return cache.objectCallPlan;
+    }
+    const resultType = entry.result;
+    if (!objectResultSupported(resultType) ||
+        !entry.args.every((arg) => objectArgumentSupported(arg.type))) {
+      cache.objectCallPlan = null;
+      return null;
+    }
+    const hasBoxedDecl = this.boxedCallEntryNames.has(entry.entry);
+    if (
+      !hasBoxedDecl &&
+      (objectTypeNeedsBoxedBoundary(resultType) ||
+        entry.args.some((arg) => objectTypeNeedsBoxedBoundary(arg.type)))
+    ) {
+      cache.objectCallPlan = null;
+      return null;
+    }
+    cache.objectCallPlan = {
+      args: entry.args,
+      resultType,
+    };
+    return cache.objectCallPlan;
   }
 
   hasObjectValueExports() {
@@ -607,6 +571,10 @@ export class VirRuntime {
       case WIRE.UNIT:
         if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
         return this.makeObjectScalar(0, label);
+      case WIRE.RESOURCE:
+        return this.makeObjectResource(value, label);
+      case WIRE.FUNCTION:
+        throw new Error(`${label} cannot be a JavaScript function in v1`);
       case WIRE.BOOL:
         if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
         return this.makeObjectScalar(value ? 1 : 0, label);
@@ -642,6 +610,8 @@ export class VirRuntime {
         return this.makeObjectFloat(value, label);
       case WIRE.FLOAT32:
         return this.makeObjectFloat32(value, label);
+      case WIRE.EXPR:
+        return this.makeObjectExpr(value, label);
       case WIRE.ARRAY:
       case WIRE.LIST:
         return this.makeObjectSequenceValue(type, value, label, selfType);
@@ -677,9 +647,9 @@ export class VirRuntime {
     const elementType = requireTypeField(sequenceType, "element", label);
     const elementObjs = [];
     try {
-      values.forEach((value, index) => {
-        elementObjs.push(this.makeObjectValue(elementType, value, `${label}[${index}]`, selfType));
-      });
+      for (let index = 0; index < values.length; index++) {
+        elementObjs.push(this.makeObjectValue(elementType, values[index], `${label}[${index}]`, selfType));
+      }
       return this.makeObjectSequenceFromOwnedElements(builderName, elementObjs, label);
     } finally {
       this.releaseOwnedObjects(elementObjs);
@@ -738,10 +708,12 @@ export class VirRuntime {
   }
 
   makeObjectCtorFromLayout(tag, owner, fields, values, label, selfType) {
-    const layout = objectLayoutSlots(owner, fields, label);
+    const plan = objectLayoutPlan(owner, fields, label);
+    const layout = objectLayoutSlotsFromPlan(plan);
     try {
-      for (const field of fields) {
-        this.writeObjectLayoutField(layout, owner, field, values[field.name], `${label}.${field.name}`, selfType);
+      for (const fieldPlan of plan.fields) {
+        const field = fieldPlan.field;
+        this.writeObjectLayoutField(layout, fieldPlan, values[field.name], `${label}.${field.name}`, selfType);
       }
       return this.makeObjectCtorFromOwnedLayout(tag, layout, label);
     } finally {
@@ -749,17 +721,18 @@ export class VirRuntime {
     }
   }
 
-  writeObjectLayoutField(layout, owner, field, value, label, selfType) {
-    switch (field.layout.kind) {
+  writeObjectLayoutField(layout, fieldPlan, value, label, selfType) {
+    const field = fieldPlan.field;
+    switch (fieldPlan.kind) {
       case "object":
-        layout.objectFields[field.layout.index] = this.makeObjectValue(field.type, value, label, selfType);
+        layout.objectFields[fieldPlan.index] = this.makeObjectValue(field.type, value, label, selfType);
         return;
       case "usize":
-        layout.usizeFields[usizeLayoutIndex(owner, field.layout, label)] =
+        layout.usizeFields[fieldPlan.index] =
           normalizeBoundedUnsignedBigInt(value, label, this.usizeMaxValue(), "USize");
         return;
       case "scalar":
-        writeObjectScalarField(layout.scalarBytes, field.type, field.layout, value, label);
+        writeObjectScalarField(layout.scalarBytes, field.type, field.layout, value, label, fieldPlan.offset);
         return;
       default:
         throw new Error(`${label} has unsupported object ABI layout`);
@@ -803,17 +776,30 @@ export class VirRuntime {
   }
 
   makeObjectString(value, label) {
-    if (typeof value !== "string") {
-      throw new Error(`${label} must be a string`);
-    }
-    const bytes = textEncoder.encode(value);
-    const inputPtr = this.allocBytes(bytes);
-    try {
-      const argObj = this.exports.vir_obj_string(inputPtr, bytes.byteLength);
+    return this.withWasmString(value, label, (inputPtr, inputLen) => {
+      const argObj = this.exports.vir_obj_string(inputPtr, inputLen);
       if (argObj === 0) {
         throw new Error(`${label} could not be lowered to a Lean string object`);
       }
       return argObj;
+    });
+  }
+
+  makeObjectStringConstructor(constructorName, value, stringLabel, objectLabel) {
+    return this.withWasmString(requireString(value, stringLabel), stringLabel, (inputPtr, inputLen) => {
+      const obj = this.exports[constructorName](inputPtr, inputLen);
+      if (obj === 0) {
+        throw new Error(`${objectLabel} could not be lowered to a Lean object`);
+      }
+      return obj;
+    });
+  }
+
+  withWasmString(value, label, callback) {
+    const bytes = textEncoder.encode(requireString(value, label));
+    const inputPtr = this.allocBytes(bytes);
+    try {
+      return callback(inputPtr, bytes.byteLength);
     } finally {
       this.freeBytes(inputPtr);
     }
@@ -843,13 +829,282 @@ export class VirRuntime {
     return argObj;
   }
 
+  makeObjectResource(value, label) {
+    const resource = normalizeHostResource(value, label);
+    const argObj = this.exports.vir_obj_resource(resource);
+    if (argObj === 0) {
+      throw new Error(`${label} could not be lowered to a Lean host resource object`);
+    }
+    return argObj;
+  }
+
+  makeObjectExpr(value, label) {
+    const expr = typeof value === "string"
+      ? { kind: "const", name: value, levels: [] }
+      : value;
+    switch (expr?.kind) {
+      case "bvar":
+        return this.makeObjectDecimal(
+          "vir_obj_expr_bvar",
+          normalizeDecimal(expr.index ?? expr.deBruijnIndex, `${label}.index`, { signed: false }),
+          label,
+        );
+      case "fvar":
+        return this.makeObjectStringConstructor("vir_obj_expr_fvar", expr.name, `${label}.name`, label);
+      case "mvar":
+        return this.makeObjectStringConstructor("vir_obj_expr_mvar", expr.name, `${label}.name`, label);
+      case "sort": {
+        let level = this.makeObjectLevel(expr.level ?? expr.u, `${label}.level`);
+        try {
+          const obj = this.exports.vir_obj_expr_sort(level);
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr sort object`);
+          level = 0;
+          return obj;
+        } finally {
+          this.releaseOwnedObjects([level]);
+        }
+      }
+      case "const": {
+        let levels = this.makeObjectLevelList(expr.levels ?? [], `${label}.levels`);
+        try {
+          return this.withWasmString(requireString(expr.name, `${label}.name`), `${label}.name`, (namePtr, nameLen) => {
+            const obj = this.exports.vir_obj_expr_const(namePtr, nameLen, levels);
+            if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr const object`);
+            levels = 0;
+            return obj;
+          });
+        } finally {
+          this.releaseOwnedObjects([levels]);
+        }
+      }
+      case "app":
+        return this.makeObjectExprBinary("vir_obj_expr_app", expr.fn, `${label}.fn`, expr.arg, `${label}.arg`, label);
+      case "lam":
+      case "lambda":
+        return this.makeObjectExprBinding(
+          "vir_obj_expr_lambda",
+          expr.name ?? expr.binderName,
+          expr.type ?? expr.binderType,
+          expr.body,
+          normalizeBinderInfo(expr.binderInfo ?? "default", `${label}.binderInfo`),
+          label,
+        );
+      case "forall":
+      case "forallE":
+        return this.makeObjectExprBinding(
+          "vir_obj_expr_forall",
+          expr.name ?? expr.binderName,
+          expr.type ?? expr.binderType,
+          expr.body,
+          normalizeBinderInfo(expr.binderInfo ?? "default", `${label}.binderInfo`),
+          label,
+        );
+      case "let":
+      case "letE":
+        return this.makeObjectExprLet(expr, label);
+      case "lit": {
+        let literal = this.makeObjectLiteral(expr.literal ?? expr.value, `${label}.literal`);
+        try {
+          const obj = this.exports.vir_obj_expr_lit(literal);
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr literal object`);
+          literal = 0;
+          return obj;
+        } finally {
+          this.releaseOwnedObjects([literal]);
+        }
+      }
+      case "mdata":
+        return this.makeObjectExpr(expr.expr, `${label}.expr`);
+      case "proj":
+        return this.makeObjectExprProj(expr, label);
+      default:
+        throw new Error(`${label} has unsupported Lean.Expr kind ${expr?.kind}`);
+    }
+  }
+
+  makeObjectLevel(value, label) {
+    const level = typeof value === "string" ? { kind: value } : value ?? { kind: "zero" };
+    switch (level.kind) {
+      case "zero": {
+        const obj = this.exports.vir_obj_level_zero();
+        if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Level zero object`);
+        return obj;
+      }
+      case "succ": {
+        let child = this.makeObjectLevel(level.of ?? level.level, `${label}.of`);
+        try {
+          const obj = this.exports.vir_obj_level_succ(child);
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Level succ object`);
+          child = 0;
+          return obj;
+        } finally {
+          this.releaseOwnedObjects([child]);
+        }
+      }
+      case "max":
+        return this.makeObjectLevelBinary(
+          "vir_obj_level_max",
+          level.left ?? level.lhs,
+          `${label}.left`,
+          level.right ?? level.rhs,
+          `${label}.right`,
+          label,
+        );
+      case "imax":
+        return this.makeObjectLevelBinary(
+          "vir_obj_level_imax",
+          level.left ?? level.lhs,
+          `${label}.left`,
+          level.right ?? level.rhs,
+          `${label}.right`,
+          label,
+        );
+      case "param":
+        return this.makeObjectStringConstructor("vir_obj_level_param", level.name, `${label}.name`, label);
+      case "mvar":
+        return this.makeObjectStringConstructor("vir_obj_level_mvar", level.name, `${label}.name`, label);
+      default:
+        throw new Error(`${label} has unsupported Lean.Level kind ${level.kind}`);
+    }
+  }
+
+  makeObjectLevelList(levels, label) {
+    const values = levels == null ? [] : normalizeArray(levels, label);
+    const levelObjs = [];
+    try {
+      values.forEach((level, index) => {
+        levelObjs.push(this.makeObjectLevel(level, `${label}[${index}]`));
+      });
+      return this.makeObjectSequenceFromOwnedElements("vir_obj_list", levelObjs, label);
+    } finally {
+      this.releaseOwnedObjects(levelObjs);
+    }
+  }
+
+  makeObjectLiteral(value, label) {
+    const literal =
+      typeof value === "string" || typeof value === "number" || typeof value === "bigint"
+        ? { kind: typeof value === "string" ? "string" : "nat", value }
+        : value;
+    switch (literal?.kind) {
+      case "nat":
+        return this.makeObjectDecimal(
+          "vir_obj_literal_nat",
+          normalizeDecimal(literal.value, `${label}.value`, { signed: false }),
+          label,
+        );
+      case "string":
+        return this.makeObjectStringConstructor("vir_obj_literal_string", literal.value, `${label}.value`, label);
+      default:
+        throw new Error(`${label} has unsupported Lean.Literal kind ${literal?.kind}`);
+    }
+  }
+
+  makeObjectLevelBinary(constructorName, leftValue, leftLabel, rightValue, rightLabel, label) {
+    let left = this.makeObjectLevel(leftValue, leftLabel);
+    let right = 0;
+    try {
+      right = this.makeObjectLevel(rightValue, rightLabel);
+      const obj = this.exports[constructorName](left, right);
+      if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Level object`);
+      left = 0;
+      right = 0;
+      return obj;
+    } finally {
+      this.releaseOwnedObjects([left, right]);
+    }
+  }
+
+  makeObjectExprBinary(constructorName, leftValue, leftLabel, rightValue, rightLabel, label) {
+    let left = this.makeObjectExpr(leftValue, leftLabel);
+    let right = 0;
+    try {
+      right = this.makeObjectExpr(rightValue, rightLabel);
+      const obj = this.exports[constructorName](left, right);
+      if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr object`);
+      left = 0;
+      right = 0;
+      return obj;
+    } finally {
+      this.releaseOwnedObjects([left, right]);
+    }
+  }
+
+  makeObjectExprBinding(constructorName, name, typeValue, bodyValue, binderInfo, label) {
+    let type = this.makeObjectExpr(typeValue, `${label}.type`);
+    let body = 0;
+    try {
+      body = this.makeObjectExpr(bodyValue, `${label}.body`);
+      return this.withWasmString(requireString(name, `${label}.name`), `${label}.name`, (namePtr, nameLen) => {
+        const obj = this.exports[constructorName](namePtr, nameLen, type, body, binderInfo);
+        if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr binding object`);
+        type = 0;
+        body = 0;
+        return obj;
+      });
+    } finally {
+      this.releaseOwnedObjects([type, body]);
+    }
+  }
+
+  makeObjectExprLet(expr, label) {
+    let type = this.makeObjectExpr(expr.type, `${label}.type`);
+    let value = 0;
+    let body = 0;
+    try {
+      value = this.makeObjectExpr(expr.value, `${label}.value`);
+      body = this.makeObjectExpr(expr.body, `${label}.body`);
+      return this.withWasmString(
+        requireString(expr.name ?? expr.declName, `${label}.name`),
+        `${label}.name`,
+        (namePtr, nameLen) => {
+          const obj = this.exports.vir_obj_expr_let(
+            namePtr,
+            nameLen,
+            type,
+            value,
+            body,
+            expr.nondep ? 1 : 0,
+          );
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr let object`);
+          type = 0;
+          value = 0;
+          body = 0;
+          return obj;
+        },
+      );
+    } finally {
+      this.releaseOwnedObjects([type, value, body]);
+    }
+  }
+
+  makeObjectExprProj(expr, label) {
+    let structure = this.makeObjectExpr(expr.struct ?? expr.expr, `${label}.struct`);
+    try {
+      return this.withWasmString(requireString(expr.typeName, `${label}.typeName`), `${label}.typeName`, (
+        typeNamePtr,
+        typeNameLen,
+      ) => this.withWasmString(
+        normalizeDecimal(expr.index ?? expr.idx, `${label}.index`, { signed: false }),
+        `${label}.index`,
+        (indexPtr, indexLen) => {
+          const obj = this.exports.vir_obj_expr_proj(typeNamePtr, typeNameLen, indexPtr, indexLen, structure);
+          if (obj === 0) throw new Error(`${label} could not be lowered to a Lean.Expr proj object`);
+          structure = 0;
+          return obj;
+        },
+      ));
+    } finally {
+      this.releaseOwnedObjects([structure]);
+    }
+  }
+
   makeObjectSequenceFromOwnedElements(builderName, elementObjs, label) {
     let valuesPtr = 0;
     try {
       if (elementObjs.length !== 0) {
-        valuesPtr = this.allocBytes(new Uint8Array(elementObjs.length * 4));
-        const view = new DataView(this.exports.memory.buffer, valuesPtr, elementObjs.length * 4);
-        elementObjs.forEach((obj, index) => view.setUint32(index * 4, obj, true));
+        valuesPtr = this.allocByteLength(elementObjs.length * 4, `${label} pointer array`);
+        this.writePointerArray(valuesPtr, elementObjs);
       }
       const sequenceObj = this.exports[builderName](valuesPtr, elementObjs.length);
       if (sequenceObj === 0) {
@@ -868,9 +1123,8 @@ export class VirRuntime {
     let fieldsPtr = 0;
     try {
       if (fields.length !== 0) {
-        fieldsPtr = this.allocBytes(new Uint8Array(fields.length * 4));
-        const view = new DataView(this.exports.memory.buffer, fieldsPtr, fields.length * 4);
-        fields.forEach((obj, index) => view.setUint32(index * 4, obj, true));
+        fieldsPtr = this.allocByteLength(fields.length * 4, `${label} field pointer array`);
+        this.writePointerArray(fieldsPtr, fields);
       }
       const obj = this.exports.vir_obj_ctor(tag, fieldsPtr, fields.length);
       if (obj === 0) {
@@ -891,21 +1145,24 @@ export class VirRuntime {
     let scalarFieldsPtr = 0;
     try {
       if (layout.objectFields.length !== 0) {
-        objectFieldsPtr = this.allocBytes(new Uint8Array(layout.objectFields.length * 4));
-        const view = new DataView(this.exports.memory.buffer, objectFieldsPtr, layout.objectFields.length * 4);
-        layout.objectFields.forEach((obj, index) => view.setUint32(index * 4, obj, true));
+        objectFieldsPtr = this.allocByteLength(layout.objectFields.length * 4, `${label} object field pointer array`);
+        this.writePointerArray(objectFieldsPtr, layout.objectFields);
       }
       if (layout.usizeFields.length !== 0) {
         const pointerBytes = this.targetPointerBytes();
-        usizeFieldsPtr = this.allocBytes(new Uint8Array(layout.usizeFields.length * pointerBytes));
+        usizeFieldsPtr = this.allocByteLength(
+          layout.usizeFields.length * pointerBytes,
+          `${label} usize field array`,
+        );
         const view = new DataView(this.exports.memory.buffer, usizeFieldsPtr, layout.usizeFields.length * pointerBytes);
-        layout.usizeFields.forEach((value, index) => {
+        for (let index = 0; index < layout.usizeFields.length; index++) {
+          const value = layout.usizeFields[index];
           if (pointerBytes === 4) {
             view.setUint32(index * pointerBytes, Number(value), true);
           } else {
             view.setBigUint64(index * pointerBytes, value, true);
           }
-        });
+        }
       }
       if (layout.scalarBytes.byteLength !== 0) {
         scalarFieldsPtr = this.allocBytes(layout.scalarBytes);
@@ -952,9 +1209,8 @@ export class VirRuntime {
     let resultObj = 0;
     try {
       if (argObjs.length !== 0) {
-        argvPtr = this.allocBytes(new Uint8Array(argObjs.length * 4));
-        const view = new DataView(this.exports.memory.buffer, argvPtr, argObjs.length * 4);
-        argObjs.forEach((argObj, index) => view.setUint32(index * 4, argObj, true));
+        argvPtr = this.allocByteLength(argObjs.length * 4, `${entry.entry} argv pointer array`);
+        this.writePointerArray(argvPtr, argObjs);
       }
       resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
       argObjs.length = 0;
@@ -1004,6 +1260,12 @@ export class VirRuntime {
     return this.readWasmString(data, len);
   }
 
+  readObjectName(obj) {
+    const data = this.exports.vir_obj_name_string(obj);
+    const len = this.exports.vir_obj_name_string_size();
+    return this.readWasmString(data, len);
+  }
+
   readObjectScalar(obj, label) {
     if (this.exports.vir_obj_is_scalar(obj) === 0) {
       throw new Error(`${label} is not a Lean scalar object`);
@@ -1019,6 +1281,209 @@ export class VirRuntime {
     return field;
   }
 
+  withOwnedObjectField(obj, index, label, callback) {
+    const field = this.ownedObjectField(obj, index, label);
+    try {
+      return callback(field);
+    } finally {
+      this.exports.vir_obj_dec(field);
+    }
+  }
+
+  withOwnedObjectFields(obj, indexes, label, callback) {
+    const fields = [];
+    try {
+      for (const index of indexes) {
+        fields.push(this.ownedObjectField(obj, index, label));
+      }
+      return callback(fields);
+    } finally {
+      this.releaseOwnedObjects(fields);
+    }
+  }
+
+  liftObjectExpr(obj, label) {
+    const kind = this.exports.vir_obj_tag(obj);
+    switch (kind) {
+      case 0:
+        return this.withOwnedObjectField(obj, 0, label, (index) => ({
+          kind: "bvar",
+          index: this.readObjectDecimal(index, "vir_obj_nat_decimal"),
+        }));
+      case 1:
+        return this.withOwnedObjectField(obj, 0, label, (name) => ({
+          kind: "fvar",
+          name: this.readObjectName(name),
+        }));
+      case 2:
+        return this.withOwnedObjectField(obj, 0, label, (name) => ({
+          kind: "mvar",
+          name: this.readObjectName(name),
+        }));
+      case 3:
+        return this.withOwnedObjectField(obj, 0, label, (level) => ({
+          kind: "sort",
+          level: this.liftObjectLevel(level, `${label}.level`),
+        }));
+      case 4:
+        return this.withOwnedObjectFields(obj, [0, 1], label, ([name, levels]) => ({
+          kind: "const",
+          name: this.readObjectName(name),
+          levels: this.liftObjectLevelList(levels, `${label}.levels`),
+        }));
+      case 5:
+        return this.withOwnedObjectFields(obj, [0, 1], label, ([fn, arg]) => ({
+          kind: "app",
+          fn: this.liftObjectExpr(fn, `${label}.fn`),
+          arg: this.liftObjectExpr(arg, `${label}.arg`),
+        }));
+      case 6:
+        return this.withOwnedObjectFields(obj, [0, 1, 2], label, ([name, type, body]) => ({
+          kind: "lam",
+          name: this.readObjectName(name),
+          type: this.liftObjectExpr(type, `${label}.type`),
+          body: this.liftObjectExpr(body, `${label}.body`),
+          binderInfo: decodeBinderInfo(this.exports.vir_obj_expr_scalar_u8(obj, 3)),
+        }));
+      case 7:
+        return this.withOwnedObjectFields(obj, [0, 1, 2], label, ([name, type, body]) => ({
+          kind: "forall",
+          name: this.readObjectName(name),
+          type: this.liftObjectExpr(type, `${label}.type`),
+          body: this.liftObjectExpr(body, `${label}.body`),
+          binderInfo: decodeBinderInfo(this.exports.vir_obj_expr_scalar_u8(obj, 3)),
+        }));
+      case 8:
+        return this.withOwnedObjectFields(obj, [0, 1, 2, 3], label, ([name, type, value, body]) => ({
+          kind: "let",
+          name: this.readObjectName(name),
+          type: this.liftObjectExpr(type, `${label}.type`),
+          value: this.liftObjectExpr(value, `${label}.value`),
+          body: this.liftObjectExpr(body, `${label}.body`),
+          nondep: this.exports.vir_obj_expr_scalar_u8(obj, 4) !== 0,
+        }));
+      case 9:
+        return this.withOwnedObjectField(obj, 0, label, (literal) => ({
+          kind: "lit",
+          literal: this.liftObjectLiteral(literal, `${label}.literal`),
+        }));
+      case 10:
+        return this.withOwnedObjectField(obj, 1, label, (expr) => ({
+          kind: "mdata",
+          expr: this.liftObjectExpr(expr, `${label}.expr`),
+        }));
+      case 11:
+        return this.withOwnedObjectFields(obj, [0, 1, 2], label, ([typeName, index, structure]) => ({
+          kind: "proj",
+          typeName: this.readObjectName(typeName),
+          index: this.readObjectDecimal(index, "vir_obj_nat_decimal"),
+          struct: this.liftObjectExpr(structure, `${label}.struct`),
+        }));
+      default:
+        throw new Error(`${label} has unsupported Lean.Expr result kind ${kind}`);
+    }
+  }
+
+  liftObjectLevel(obj, label) {
+    if (this.exports.vir_obj_is_scalar(obj) !== 0) {
+      return { kind: "zero" };
+    }
+    const kind = this.exports.vir_obj_tag(obj);
+    switch (kind) {
+      case 0:
+        return { kind: "zero" };
+      case 1:
+        return this.withOwnedObjectField(obj, 0, label, (child) => ({
+          kind: "succ",
+          of: this.liftObjectLevel(child, `${label}.of`),
+        }));
+      case 2:
+        return this.withOwnedObjectFields(obj, [0, 1], label, ([left, right]) => ({
+          kind: "max",
+          left: this.liftObjectLevel(left, `${label}.left`),
+          right: this.liftObjectLevel(right, `${label}.right`),
+        }));
+      case 3:
+        return this.withOwnedObjectFields(obj, [0, 1], label, ([left, right]) => ({
+          kind: "imax",
+          left: this.liftObjectLevel(left, `${label}.left`),
+          right: this.liftObjectLevel(right, `${label}.right`),
+        }));
+      case 4:
+        return this.withOwnedObjectField(obj, 0, label, (name) => ({
+          kind: "param",
+          name: this.readObjectName(name),
+        }));
+      case 5:
+        return this.withOwnedObjectField(obj, 0, label, (name) => ({
+          kind: "mvar",
+          name: this.readObjectName(name),
+        }));
+      default:
+        throw new Error(`${label} has unsupported Lean.Level result kind ${kind}`);
+    }
+  }
+
+  liftObjectLevelList(obj, label) {
+    const values = [];
+    let cursor = obj;
+    let ownsCursor = false;
+    try {
+      while (this.exports.vir_obj_list_is_nil(cursor) === 0) {
+        const index = values.length;
+        const head = this.exports.vir_obj_list_head(cursor);
+        if (head === 0) {
+          throw new Error(`${label}[${index}] is unavailable`);
+        }
+        try {
+          values.push(this.liftObjectLevel(head, `${label}[${index}]`));
+        } finally {
+          this.exports.vir_obj_dec(head);
+        }
+
+        let tail = this.exports.vir_obj_list_tail(cursor);
+        try {
+          if (tail === 0) {
+            throw new Error(`${label} tail after index ${index} is unavailable`);
+          }
+          if (ownsCursor) {
+            this.exports.vir_obj_dec(cursor);
+          }
+          cursor = tail;
+          ownsCursor = true;
+          tail = 0;
+        } finally {
+          if (tail !== 0) {
+            this.exports.vir_obj_dec(tail);
+          }
+        }
+      }
+      return values;
+    } finally {
+      if (ownsCursor) {
+        this.exports.vir_obj_dec(cursor);
+      }
+    }
+  }
+
+  liftObjectLiteral(obj, label) {
+    const kind = this.exports.vir_obj_tag(obj);
+    switch (kind) {
+      case 0:
+        return this.withOwnedObjectField(obj, 0, label, (value) => ({
+          kind: "nat",
+          value: this.readObjectDecimal(value, "vir_obj_nat_decimal"),
+        }));
+      case 1:
+        return this.withOwnedObjectField(obj, 0, label, (value) => ({
+          kind: "string",
+          value: this.readObjectString(value),
+        }));
+      default:
+        throw new Error(`${label} has unsupported Lean.Literal result kind ${kind}`);
+    }
+  }
+
   liftObjectValue(type, obj, label, selfType = null) {
     const tag = type?.wireTag;
     switch (tag) {
@@ -1029,6 +1494,10 @@ export class VirRuntime {
         return this.liftObjectValue(selfType, obj, label, selfType);
       case WIRE.UNIT:
         return undefined;
+      case WIRE.RESOURCE:
+        return this.liftObjectResource(obj, label);
+      case WIRE.FUNCTION:
+        return this.liftObjectFunction(type, obj, label);
       case WIRE.BOOL:
         return this.readObjectScalar(obj, label) !== 0;
       case WIRE.UINT8:
@@ -1055,6 +1524,8 @@ export class VirRuntime {
         return this.exports.vir_obj_float_value(obj);
       case WIRE.FLOAT32:
         return Math.fround(this.exports.vir_obj_float32_value(obj));
+      case WIRE.EXPR:
+        return this.liftObjectExpr(obj, label);
       case WIRE.ARRAY:
         return this.liftObjectArrayValue(type, obj, label, selfType);
       case WIRE.LIST:
@@ -1080,6 +1551,49 @@ export class VirRuntime {
       throw new Error(`${label} scalar value ${value} exceeds ${max}`);
     }
     return value;
+  }
+
+  liftObjectResource(obj, label) {
+    const resource = this.exports.vir_obj_resource_externref(obj);
+    if (isHostResource(resource)) {
+      return resource;
+    }
+    // Some effect callback paths can expose one IO.ok wrapper around a Js result
+    // at the JS lift boundary. Keep this resource-only; ordinary Lean tag-0
+    // constructors must continue through their declared value decoders.
+    if (this.exports.vir_obj_is_scalar(obj) === 0 && this.exports.vir_obj_tag(obj) === 0) {
+      const field = this.exports.vir_obj_field(obj, 0);
+      if (field !== 0) {
+        try {
+          const nested = this.exports.vir_obj_resource_externref(field);
+          if (isHostResource(nested)) {
+            return nested;
+          }
+        } finally {
+          this.exports.vir_obj_dec(field);
+        }
+      }
+    }
+    throw new Error(`${label} did not lift to a live host resource`);
+  }
+
+  liftObjectFunction(type, obj, label) {
+    const signature = functionSignatureBytes(type, label);
+    const signaturePtr = this.allocBytes(signature);
+    try {
+      const rootId = this.exports.vir_obj_closure_root(
+        obj,
+        signaturePtr,
+        signature.byteLength,
+        interfaceEffectRuntimeTag(type.effect),
+      );
+      if (rootId === 0) {
+        throw new Error(`${label} could not be rooted as a Lean callback`);
+      }
+      return createVirCallback(this, rootId, type);
+    } finally {
+      this.freeBytes(signaturePtr);
+    }
   }
 
   liftObjectArrayValue(type, obj, label, selfType) {
@@ -1182,9 +1696,11 @@ export class VirRuntime {
     if (trivial !== null) {
       return { [trivial.name]: this.liftObjectValue(trivial.type, obj, `${label}.${trivial.name}`, type) };
     }
+    const plan = objectLayoutPlan(type, fields, label);
     const values = {};
-    for (const field of fields) {
-      values[field.name] = this.liftObjectLayoutField(type, obj, field, `${label}.${field.name}`);
+    for (const fieldPlan of plan.fields) {
+      const field = fieldPlan.field;
+      values[field.name] = this.liftObjectLayoutField(type, obj, fieldPlan, `${label}.${field.name}`);
     }
     return flattenStructureSubobjects(type, values);
   }
@@ -1193,9 +1709,10 @@ export class VirRuntime {
     const tag = this.exports.vir_obj_tag(obj);
     const ctor = taggedUnionConstructorAt(type, tag, label);
     const field = taggedUnionField(ctor);
+    const plan = objectLayoutPlan(ctor, [field], label);
     return {
       kind: ctor.jsName,
-      value: this.liftObjectLayoutField(ctor, obj, field, `${label}.${ctor.jsName}`, type),
+      value: this.liftObjectLayoutField(ctor, obj, plan.fields[0], `${label}.${ctor.jsName}`, type),
     };
   }
 
@@ -1205,13 +1722,14 @@ export class VirRuntime {
     if (ctor.fields.length === 0) {
       return { kind: ctor.jsName };
     }
-    objectLayoutSlots(ctor, ctor.fields, `${label}.${ctor.jsName}`);
+    const plan = objectLayoutPlan(ctor, ctor.fields, `${label}.${ctor.jsName}`);
     const values = {};
-    for (const field of ctor.fields) {
+    for (const fieldPlan of plan.fields) {
+      const field = fieldPlan.field;
       values[field.name] = this.liftObjectLayoutField(
         ctor,
         obj,
-        field,
+        fieldPlan,
         `${label}.${ctor.jsName}.${field.name}`,
         type,
       );
@@ -1225,10 +1743,11 @@ export class VirRuntime {
     };
   }
 
-  liftObjectLayoutField(owner, obj, field, label, selfType = owner) {
-    switch (field.layout.kind) {
+  liftObjectLayoutField(owner, obj, fieldPlan, label, selfType = owner) {
+    const field = fieldPlan.field;
+    switch (fieldPlan.kind) {
       case "object": {
-        const fieldObj = this.ownedObjectField(obj, field.layout.index, label);
+        const fieldObj = this.ownedObjectField(obj, fieldPlan.index, label);
         try {
           return this.liftObjectValue(field.type, fieldObj, label, selfType);
         } finally {
@@ -1236,10 +1755,9 @@ export class VirRuntime {
         }
       }
       case "usize":
-        usizeLayoutIndex(owner, field.layout, label);
         return this.readObjectUSizeField(obj, field.layout.index, label);
       case "scalar":
-        return this.readObjectScalarField(owner, obj, field.type, field.layout, label);
+        return this.readObjectScalarField(owner, obj, field.type, field.layout, label, fieldPlan.offset);
       default:
         throw new Error(`${label} has unsupported object ABI layout`);
     }
@@ -1253,7 +1771,7 @@ export class VirRuntime {
     return this.readWasmString(data, this.exports.vir_obj_decimal_size());
   }
 
-  readObjectScalarField(owner, obj, type, layout, label) {
+  readObjectScalarField(owner, obj, type, layout, label, offset = null) {
     const data = this.exports.vir_obj_ctor_scalar_data(obj, owner.usizeFieldCount);
     if (data === 0) {
       throw new Error(`${label} scalar data is unavailable`);
@@ -1263,6 +1781,7 @@ export class VirRuntime {
       type,
       layout,
       label,
+      offset,
     );
   }
 
@@ -1302,12 +1821,29 @@ export class VirRuntime {
   }
 
   allocBytes(bytes) {
-    this.requireFunction("vir_alloc_bytes");
-
     const view = asBytes(bytes, "bytes");
-    const ptr = this.exports.vir_alloc_bytes(view.byteLength);
+    const ptr = this.allocByteLength(view.byteLength, "bytes");
     new Uint8Array(this.exports.memory.buffer, ptr, view.byteLength).set(view);
     return ptr;
+  }
+
+  allocByteLength(byteLength, label) {
+    this.requireFunction("vir_alloc_bytes");
+    if (!Number.isInteger(byteLength) || byteLength < 0) {
+      throw new Error(`${label} byte length must be a non-negative integer`);
+    }
+    const ptr = this.exports.vir_alloc_bytes(byteLength);
+    if (ptr === 0 && byteLength !== 0) {
+      throw new Error(`${label} allocation failed`);
+    }
+    return ptr;
+  }
+
+  writePointerArray(ptr, values) {
+    const view = new DataView(this.exports.memory.buffer, ptr, values.length * 4);
+    for (let index = 0; index < values.length; index++) {
+      view.setUint32(index * 4, values[index], true);
+    }
   }
 
   freeBytes(ptr) {
@@ -1344,27 +1880,45 @@ export class VirRuntime {
 
   callClosure(rootId, type, args) {
     this.requireLiveRuntime();
-    this.requireFunction("vir_closure_call");
-    this.requireFunction("vir_closure_call_result_size");
+    this.requireFunction("vir_closure_call_objects");
     this.hostState?.clearTransientQueues();
-    let payload;
-    try {
-      payload = encodeClosureCallPayload(type, args, this.codecOptions);
-    } catch (error) {
-      this.hostState?.clearTransientQueues();
-      throw error;
+    const fnArgs = requireFunctionArgs(type, "callback");
+    if (args.length !== fnArgs.length) {
+      throw new Error(`callback expects ${fnArgs.length} arguments, got ${args.length}`);
     }
-    const payloadPtr = this.allocBytes(payload);
+    const argObjs = [];
     try {
-      const resultPtr = this.exports.vir_closure_call(rootId, payloadPtr, payload.byteLength);
-      if (resultPtr === 0) {
+      fnArgs.forEach((arg, index) => {
+        argObjs.push(this.makeObjectValue(arg.type, args[index], `callback argument ${arg.name}`));
+      });
+      return this.callClosureObjects(rootId, type, argObjs);
+    } finally {
+      this.releaseOwnedObjects(argObjs);
+      this.hostState?.clearTransientQueues();
+    }
+  }
+
+  callClosureObjects(rootId, type, argObjs) {
+    let argvPtr = 0;
+    let resultObj = 0;
+    try {
+      if (argObjs.length !== 0) {
+        argvPtr = this.allocByteLength(argObjs.length * 4, "callback argv pointer array");
+        this.writePointerArray(argvPtr, argObjs);
+      }
+      resultObj = this.exports.vir_closure_call_objects(rootId, argvPtr, argObjs.length);
+      argObjs.length = 0;
+      if (resultObj === 0) {
         throw new Error(this.lastClosureCallError() || "closure call failed");
       }
-      const resultLen = this.exports.vir_closure_call_result_size();
-      return decodeResolvedCallResult(type.result, this.readWasmBytes(resultPtr, resultLen), this.codecOptions);
+      return this.liftObjectValue(requireFunctionResult(type, "callback"), resultObj, "callback result");
     } finally {
-      this.freeBytes(payloadPtr);
-      this.hostState?.clearTransientQueues();
+      if (argvPtr !== 0) {
+        this.freeBytes(argvPtr);
+      }
+      if (resultObj !== 0) {
+        this.exports.vir_obj_dec(resultObj);
+      }
     }
   }
 
@@ -1452,22 +2006,6 @@ function requireVirCallbackState(callback) {
   return state;
 }
 
-function valueCodecOptions(runtime) {
-  return runtime === null ? {} : {
-    createCallback: (rootId, type) => createVirCallback(runtime, rootId, type),
-    pushIncomingResource: (value) => requireVirHostState(runtime).pushIncomingResource(value),
-    takeOutgoingResource: (label) => requireVirHostState(runtime).takeOutgoingResource(label),
-    takeOutgoingClosureRootId: (label) => requireVirHostState(runtime).takeOutgoingClosureRootId(label),
-  };
-}
-
-function requireVirHostState(runtime) {
-  if (runtime.hostState === null) {
-    throw new Error("VirRuntime is missing an attached host state");
-  }
-  return runtime.hostState;
-}
-
 function registerManifestEntryKey(map, key, entry) {
   if (typeof key === "string" && key !== "" && map[key] === undefined) {
     map[key] = entry;
@@ -1492,6 +2030,7 @@ function objectArgumentSupported(type, selfType = null) {
     case WIRE.RECURSIVE_SELF:
       return selfType !== null;
     case WIRE.UNIT:
+    case WIRE.RESOURCE:
     case WIRE.BOOL:
     case WIRE.NAT:
     case WIRE.INT:
@@ -1504,6 +2043,7 @@ function objectArgumentSupported(type, selfType = null) {
     case WIRE.BYTE_ARRAY:
     case WIRE.FLOAT:
     case WIRE.FLOAT32:
+    case WIRE.EXPR:
     case WIRE.SIMPLE_ENUM:
       return true;
     case WIRE.ARRAY:
@@ -1530,6 +2070,8 @@ function objectResultSupported(type, selfType = null) {
     case WIRE.RECURSIVE_SELF:
       return selfType !== null;
     case WIRE.UNIT:
+    case WIRE.RESOURCE:
+    case WIRE.FUNCTION:
     case WIRE.BOOL:
     case WIRE.NAT:
     case WIRE.INT:
@@ -1542,6 +2084,7 @@ function objectResultSupported(type, selfType = null) {
     case WIRE.BYTE_ARRAY:
     case WIRE.FLOAT:
     case WIRE.FLOAT32:
+    case WIRE.EXPR:
     case WIRE.SIMPLE_ENUM:
       return true;
     case WIRE.ARRAY:
@@ -1603,22 +2146,22 @@ function objectCustomInductiveSupported(type, fieldSupported) {
 }
 
 function objectLayoutSupported(owner, fields, fieldSupported, selfType) {
+  let plan;
   try {
-    objectLayoutSlots(owner, fields, "object layout");
+    plan = objectLayoutPlan(owner, fields, "object layout");
   } catch {
     return false;
   }
-  return fields.every((field) => objectFieldLayoutSupported(owner, field, fieldSupported, selfType));
+  return plan.fields.every((fieldPlan) => objectFieldPlanSupported(fieldPlan, fieldSupported, selfType));
 }
 
-function objectFieldLayoutSupported(owner, field, fieldSupported, selfType) {
-  switch (field.layout.kind) {
+function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
+  const field = fieldPlan.field;
+  switch (fieldPlan.kind) {
     case "object":
-      return objectLayoutIndex(owner, field.layout, field.name ?? "field") !== null &&
-        fieldSupported(field.type, selfType);
+      return fieldSupported(field.type, selfType);
     case "usize":
-      return field.type?.wireTag === WIRE.USIZE &&
-        usizeLayoutIndex(owner, field.layout, field.name ?? "field") !== null;
+      return field.type?.wireTag === WIRE.USIZE;
     case "scalar":
       return objectScalarFieldSupported(field.type, field.layout);
     default:
@@ -1646,10 +2189,33 @@ function taggedUnionField(ctor) {
 }
 
 function objectLayoutSlots(owner, fields, label) {
+  return objectLayoutSlotsFromPlan(objectLayoutPlan(owner, fields, label));
+}
+
+function objectLayoutSlotsFromPlan(plan) {
+  return {
+    objectFields: Array(plan.objectFieldCount).fill(0),
+    usizeFields: Array(plan.usizeFieldCount).fill(0n),
+    scalarBytes: new Uint8Array(plan.scalarByteSize),
+  };
+}
+
+function objectLayoutPlan(owner, fields, label) {
+  const cacheable = owner !== null && (typeof owner === "object" || typeof owner === "function");
+  let cachedPlans;
+  if (cacheable) {
+    cachedPlans = objectLayoutPlanCache.get(owner);
+    if (cachedPlans !== undefined) {
+      for (const plan of cachedPlans) {
+        if (objectLayoutPlanMatches(plan, fields)) {
+          return plan;
+        }
+      }
+    }
+  }
+
   const counts = objectRuntimeCounts(owner, label);
-  const objectFields = Array(counts.objectFieldCount).fill(0);
-  const usizeFields = Array(counts.usizeFieldCount).fill(0n);
-  const scalarBytes = new Uint8Array(counts.scalarByteSize);
+  const fieldPlans = [];
   const seenObjects = new Set();
   const seenUSize = new Set();
   const seenScalarBytes = new Set();
@@ -1665,6 +2231,7 @@ function objectLayoutSlots(owner, fields, label) {
           throw new Error(`${fieldLabel} duplicates object field index ${index}`);
         }
         seenObjects.add(index);
+        fieldPlans.push({ field, kind: "object", index });
         break;
       }
       case "usize": {
@@ -1676,22 +2243,68 @@ function objectLayoutSlots(owner, fields, label) {
           throw new Error(`${fieldLabel} duplicates USize field index ${field.layout.index}`);
         }
         seenUSize.add(index);
+        fieldPlans.push({ field, kind: "usize", index });
         break;
       }
-      case "scalar":
-        scalarLayoutOffset(field.layout, counts.scalarByteSize, fieldLabel);
+      case "scalar": {
+        const offset = scalarLayoutOffset(field.layout, counts.scalarByteSize, fieldLabel);
         for (let index = field.layout.offset; index < field.layout.offset + field.layout.size; index++) {
           if (seenScalarBytes.has(index)) {
             throw new Error(`${fieldLabel} overlaps scalar byte ${index}`);
           }
           seenScalarBytes.add(index);
         }
+        fieldPlans.push({ field, kind: "scalar", offset });
         break;
+      }
       default:
         throw new Error(`${fieldLabel} has unsupported object ABI layout`);
     }
   }
-  return { objectFields, usizeFields, scalarBytes };
+  const plan = {
+    objectFieldCount: counts.objectFieldCount,
+    usizeFieldCount: counts.usizeFieldCount,
+    scalarByteSize: counts.scalarByteSize,
+    fields: fieldPlans,
+  };
+  if (!cacheable) {
+    return plan;
+  }
+  if (cachedPlans === undefined) {
+    objectLayoutPlanCache.set(owner, [plan]);
+  } else {
+    cachedPlans.push(plan);
+  }
+  return plan;
+}
+
+function objectLayoutPlanMatches(plan, fields) {
+  if (plan.fields.length !== fields.length) {
+    return false;
+  }
+  for (let index = 0; index < fields.length; index++) {
+    if (!sameLayoutField(plan.fields[index].field, fields[index])) {
+      return false;
+    }
+  }
+  return true;
+}
+
+function sameLayoutField(lhs, rhs) {
+  return lhs === rhs || (
+    lhs?.name === rhs?.name &&
+    lhs?.type === rhs?.type &&
+    sameLayout(lhs?.layout, rhs?.layout)
+  );
+}
+
+function sameLayout(lhs, rhs) {
+  return lhs === rhs || (
+    lhs?.kind === rhs?.kind &&
+    lhs?.index === rhs?.index &&
+    lhs?.offset === rhs?.offset &&
+    lhs?.size === rhs?.size
+  );
 }
 
 function objectRuntimeCounts(owner, label) {
@@ -1762,8 +2375,8 @@ function objectScalarFieldSupported(type, layout) {
   }
 }
 
-function writeObjectScalarField(bytes, type, layout, value, label) {
-  const offset = scalarLayoutOffset(layout, bytes.byteLength, label);
+function writeObjectScalarField(bytes, type, layout, value, label, offset = null) {
+  offset ??= scalarLayoutOffset(layout, bytes.byteLength, label);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   switch (type?.wireTag) {
     case WIRE.BOOL:
@@ -1804,8 +2417,8 @@ function writeObjectScalarField(bytes, type, layout, value, label) {
   }
 }
 
-function readObjectScalarField(view, type, layout, label) {
-  const offset = scalarLayoutOffset(layout, view.byteLength, label);
+function readObjectScalarField(view, type, layout, label, offset = null) {
+  offset ??= scalarLayoutOffset(layout, view.byteLength, label);
   switch (type?.wireTag) {
     case WIRE.BOOL:
       return readScalarUnsigned(view, offset, layout.size, label) !== 0n;
@@ -1910,6 +2523,53 @@ function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {
 
 function normalizeBoundedUnsignedBigInt(value, label, max, typeName) {
   return BigInt(normalizeBoundedUnsignedDecimal(value, label, max, typeName));
+}
+
+function normalizeBinderInfo(value, label) {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 3) return value;
+  switch (value) {
+    case "default":
+      return 0;
+    case "implicit":
+      return 1;
+    case "strictImplicit":
+      return 2;
+    case "instImplicit":
+      return 3;
+    default:
+      throw new Error(`${label} must be default, implicit, strictImplicit, or instImplicit`);
+  }
+}
+
+function decodeBinderInfo(value) {
+  return ["default", "implicit", "strictImplicit", "instImplicit"][value] ?? String(value);
+}
+
+function requireString(value, label) {
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string`);
+  }
+  return value;
+}
+
+function functionSignatureBytes(type, label) {
+  const args = requireFunctionArgs(type, label);
+  const writer = new BinaryWriter();
+  writer.u32(args.length);
+  args.forEach((arg, index) => encodeTypeDescriptor(writer, arg.type, `${label}.args[${index}]`));
+  encodeTypeDescriptor(writer, requireFunctionResult(type, label), `${label}.result`);
+  return writer.take();
+}
+
+function isVirCallback(value) {
+  return typeof value === "function" && virCallbackStates.has(value);
+}
+
+function releaseCallbacks(callbacks) {
+  for (const callback of callbacks) {
+    callback.release();
+  }
+  callbacks.length = 0;
 }
 
 function lookupHostBinding(target, userBindings, defaultBindings) {

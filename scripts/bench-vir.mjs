@@ -27,10 +27,6 @@ import {
 } from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
 import {
-  decodeResolvedCallResult,
-  encodeResolvedCallPayload,
-} from "../web/src/runtime/vir-value-codec.js";
-import {
   createVirRuntime as createNodeVirRuntime,
   createVirtualDocumentState,
   ensureVirtualElementState,
@@ -54,10 +50,10 @@ const recursiveValueIterations = 2000;
 const baseScalarIterations = 10000;
 const baseBlobIterations = 3000;
 const baseArrayIterations = 3000;
-const baseCodecIterations = 20000;
-const codecScalarRecordIterations = 20000;
-const codecNestedRecordIterations = 20000;
-const codecRecursiveValueIterations = 20000;
+const baseLowerIterations = 20000;
+const lowerScalarRecordIterations = 20000;
+const lowerNestedRecordIterations = 20000;
+const lowerRecursiveValueIterations = 20000;
 const reactTextRenderIterations = 300;
 const reactTextRenderWidth = 40;
 const reactCallbackRenderIterations = 200;
@@ -262,17 +258,17 @@ function printDispatchRow(name, resolveEachCall, cachedSlot) {
 function printJsRow(name, sample) {
   const perCall = sample.medianMs / sample.iterations;
   console.log(`${name}`);
-  console.log(`  js codec:  ${formatMs(sample.medianMs)} total, ${formatMs(perCall)} / call`);
+  console.log(`  js lower:  ${formatMs(sample.medianMs)} total, ${formatMs(perCall)} / call`);
   console.log(`  checksum:  ${sample.checksum}`);
 }
 
-function printConversionRow(name, codec, wasm) {
-  const codecPerCall = codec.medianMs / codec.iterations;
+function printConversionRow(name, lower, wasm) {
+  const lowerPerCall = lower.medianMs / lower.iterations;
   const wasmPerCall = wasm.medianMs / wasm.iterations;
   console.log(`${name}`);
-  console.log(`  js encode:  ${formatMs(codec.medianMs)} total, ${formatMs(codecPerCall)} / call`);
+  console.log(`  js lower:  ${formatMs(lower.medianMs)} total, ${formatMs(lowerPerCall)} / call`);
   console.log(`  wasm call:  ${formatMs(wasm.medianMs)} total, ${formatMs(wasmPerCall)} / call`);
-  console.log(`  checksums: codec=${codec.checksum} wasm=${wasm.checksum}`);
+  console.log(`  checksums: lower=${lower.checksum} wasm=${wasm.checksum}`);
 }
 
 function benchmarkDispatchReportRow(name, title, resolveEachCall, cachedSlot) {
@@ -304,11 +300,11 @@ function benchmarkJsReportRow(name, title, js) {
   };
 }
 
-function benchmarkConversionReportRow(name, title, codec, wasm) {
+function benchmarkConversionReportRow(name, title, lower, wasm) {
   return {
     name,
     title,
-    codec: benchmarkSampleReport(codec),
+    lower: benchmarkSampleReport(lower),
     wasm: benchmarkSampleReport(wasm),
   };
 }
@@ -368,11 +364,20 @@ function manifestEntry(name) {
   return entry;
 }
 
-function benchEncodeCallPayload(label, iterations, entry, args) {
+function benchLowerCallObjects(label, iterations, entry, args) {
   return benchJsRepeated(label, iterations, () => {
     let acc = 0;
     for (let i = 0; i < iterations; i++) {
-      acc += encodeResolvedCallPayload(entry, args, runtime.codecOptions).byteLength;
+      const objects = [];
+      try {
+        entry.args.forEach((arg, index) => {
+          const obj = runtime.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`);
+          objects.push(obj);
+          acc += obj === 0 ? 0 : 1;
+        });
+      } finally {
+        runtime.releaseOwnedObjects(objects);
+      }
     }
     return acc;
   });
@@ -380,7 +385,7 @@ function benchEncodeCallPayload(label, iterations, entry, args) {
 
 function benchBoundaryConversionCase(testCase) {
   const entry = manifestEntry(testCase.entry);
-  const codec = benchEncodeCallPayload(`codec-${testCase.name}`, testCase.codecIterations ?? baseCodecIterations, entry, testCase.args);
+  const lower = benchLowerCallObjects(`lower-${testCase.name}`, testCase.lowerIterations ?? baseLowerIterations, entry, testCase.args);
   const wasm = benchWasmRepeated(testCase.name, testCase.iterations, () => {
     let acc = 0;
     for (let i = 0; i < testCase.iterations; i++) {
@@ -388,7 +393,7 @@ function benchBoundaryConversionCase(testCase) {
     }
     return acc;
   });
-  return { ...testCase, codec, wasm };
+  return { ...testCase, lower, wasm };
 }
 
 function checksumNumber(value) {
@@ -430,40 +435,40 @@ function resolveRawCallSlotPtr(entry, namePtr, nameLen) {
   return callSlot;
 }
 
-function callRawResolved(entry, callSlot, payloadPtr, payloadLen) {
-  const resultPtr = runtime.exports.vir_call_resolved(callSlot, payloadPtr, payloadLen);
-  if (resultPtr === 0) {
+function callRawResolvedObjects(entry, callSlot) {
+  const resultObj = runtime.exports.vir_call_resolved_objects(callSlot, 0, 0);
+  if (resultObj === 0) {
     throw new Error(runtime.lastCallError() || `resolved call failed: ${entry.entry}`);
   }
-  const resultLen = runtime.exports.vir_call_result_size();
-  return decodeResolvedCallResult(entry.result, runtime.readWasmBytes(resultPtr, resultLen), runtime.codecOptions);
+  try {
+    return runtime.liftObjectValue(entry.result, resultObj, `${entry.entry} result`);
+  } finally {
+    runtime.exports.vir_obj_dec(resultObj);
+  }
 }
 
 function benchTopLevelDispatch(entry) {
   const nameBytes = textEncoder.encode(entry.entry);
-  const resolvedPayload = encodeResolvedCallPayload(entry, [], runtime.codecOptions);
   const callSlot = resolveRawCallSlot(entry, nameBytes);
   const namePtr = runtime.allocBytes(nameBytes);
-  const resolvedPayloadPtr = runtime.allocBytes(resolvedPayload);
   try {
     const resolveEachCall = benchWasmRepeated("resolve-each-call", dispatchIterations, () => {
       let acc = 0;
       for (let i = 0; i < dispatchIterations; i++) {
         const resolvedSlot = resolveRawCallSlotPtr(entry, namePtr, nameBytes.byteLength);
-        acc += Number(callRawResolved(entry, resolvedSlot, resolvedPayloadPtr, resolvedPayload.byteLength));
+        acc += Number(callRawResolvedObjects(entry, resolvedSlot));
       }
       return acc;
     });
     const cachedSlot = benchWasmRepeated("cached-slot", dispatchIterations, () => {
       let acc = 0;
       for (let i = 0; i < dispatchIterations; i++) {
-        acc += Number(callRawResolved(entry, callSlot, resolvedPayloadPtr, resolvedPayload.byteLength));
+        acc += Number(callRawResolvedObjects(entry, callSlot));
       }
       return acc;
     });
     return { resolveEachCall, cachedSlot };
   } finally {
-    runtime.freeBytes(resolvedPayloadPtr);
     runtime.freeBytes(namePtr);
   }
 }
@@ -616,23 +621,23 @@ const wasmSort = benchWasmRepeated("sort", sortIterations, () => {
 });
 const hostSort = benchHostIr("sort", sortIterations, ["sort", String(sortIterations), sortInput.join(",")]);
 
-const jsCodecScalarRecord = benchEncodeCallPayload(
-  "codec-scalar-record",
-  codecScalarRecordIterations,
+const jsLowerScalarRecord = benchLowerCallObjects(
+  "lower-scalar-record",
+  lowerScalarRecordIterations,
   scalarRecordEntry,
   [profileStatsInput],
 );
 
-const jsCodecNestedRecord = benchEncodeCallPayload(
-  "codec-nested-record",
-  codecNestedRecordIterations,
+const jsLowerNestedRecord = benchLowerCallObjects(
+  "lower-nested-record",
+  lowerNestedRecordIterations,
   nestedRecordEntry,
   [profileEnvelopeInput],
 );
 
-const jsCodecRecursiveValue = benchEncodeCallPayload(
-  "codec-recursive-value",
-  codecRecursiveValueIterations,
+const jsLowerRecursiveValue = benchLowerCallObjects(
+  "lower-recursive-value",
+  lowerRecursiveValueIterations,
   recursiveValueEntry,
   [recursiveJsonInput],
 );
@@ -723,14 +728,14 @@ console.log();
 console.log("Base value conversion paths");
 console.log();
 for (const testCase of baseConversionBenchmarks) {
-  printConversionRow(testCase.title, testCase.codec, testCase.wasm);
+  printConversionRow(testCase.title, testCase.lower, testCase.wasm);
   console.log();
 }
-printJsRow(`JS codec scalar record/enums encode x ${codecScalarRecordIterations}`, jsCodecScalarRecord);
+printJsRow(`JS object scalar record/enums lower x ${lowerScalarRecordIterations}`, jsLowerScalarRecord);
 console.log();
-printJsRow(`JS codec nested record/list/option encode x ${codecNestedRecordIterations}`, jsCodecNestedRecord);
+printJsRow(`JS object nested record/list/option lower x ${lowerNestedRecordIterations}`, jsLowerNestedRecord);
 console.log();
-printJsRow(`JS codec recursive custom-inductive encode x ${codecRecursiveValueIterations}`, jsCodecRecursiveValue);
+printJsRow(`JS object recursive custom-inductive lower x ${lowerRecursiveValueIterations}`, jsLowerRecursiveValue);
 console.log();
 printWasmRow(`scalar record/enums x ${scalarRecordIterations}`, wasmScalarRecord);
 console.log();
@@ -771,21 +776,21 @@ if (args.jsonPath !== null) {
     benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib),
     benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
     ...baseConversionBenchmarks.map((testCase) =>
-      benchmarkConversionReportRow(testCase.name, testCase.title, testCase.codec, testCase.wasm)),
+      benchmarkConversionReportRow(testCase.name, testCase.title, testCase.lower, testCase.wasm)),
     benchmarkJsReportRow(
-      "codec-scalar-record",
-      `JS codec scalar record/enums encode x ${codecScalarRecordIterations}`,
-      jsCodecScalarRecord,
+      "lower-scalar-record",
+      `JS object scalar record/enums lower x ${lowerScalarRecordIterations}`,
+      jsLowerScalarRecord,
     ),
     benchmarkJsReportRow(
-      "codec-nested-record",
-      `JS codec nested record/list/option encode x ${codecNestedRecordIterations}`,
-      jsCodecNestedRecord,
+      "lower-nested-record",
+      `JS object nested record/list/option lower x ${lowerNestedRecordIterations}`,
+      jsLowerNestedRecord,
     ),
     benchmarkJsReportRow(
-      "codec-recursive-value",
-      `JS codec recursive custom-inductive encode x ${codecRecursiveValueIterations}`,
-      jsCodecRecursiveValue,
+      "lower-recursive-value",
+      `JS object recursive custom-inductive lower x ${lowerRecursiveValueIterations}`,
+      jsLowerRecursiveValue,
     ),
     benchmarkReportRow(
       "scalar-record",

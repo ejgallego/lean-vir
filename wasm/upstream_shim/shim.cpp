@@ -25,8 +25,7 @@ Author: Emilio J. Gallego Arias
 
 extern "C" {
 extern lean_object * l_ByteArray_empty;
-char const * vir_js_call(uint32_t slot, uint8_t const * request, uint32_t request_len);
-uint32_t vir_js_call_result_size(void);
+lean::object * vir_js_call_objects(uint32_t slot, lean::object ** argv, uint32_t argc);
 }
 
 namespace lean {
@@ -57,55 +56,34 @@ static void ensure_ir_interpreter_initialized() {
     }
 }
 
-static object * decode_host_result(vir_type const & expected, char const * bytes, uint32_t size) {
-    vir_reader reader(reinterpret_cast<uint8_t const *>(bytes), size);
-    object * value = decode_value(reader, expected);
-    if (!reader.ok || !reader.at_end()) {
-        lean_dec(value);
-        return lean_box(0);
+static void cleanup_object_args(uint32_t argc, object ** args) {
+    if (args == nullptr) {
+        return;
     }
-    return value;
+    for (uint32_t i = 0; i < argc; i++) {
+        lean_dec(args[i]);
+    }
 }
 
 static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
     host_signature const * signature = cached_host_signature(slot);
     uint32_t erased_prefix_args = vir::host_import_erased_prefix_args(slot);
     if (!signature->ok) {
-        for (uint32_t i = 0; i < argc; i++) {
-            lean_dec(args[i]);
-        }
+        cleanup_object_args(argc, args);
         return vir::host_import_is_io(slot) ? lean_io_result_mk_ok(lean_box(0)) : lean_box(0);
     }
     if (argc < erased_prefix_args || signature->args.size() > argc - erased_prefix_args) {
-        for (uint32_t i = 0; i < argc; i++) {
-            lean_dec(args[i]);
-        }
+        cleanup_object_args(argc, args);
         return vir::host_import_is_io(slot) ? lean_io_result_mk_ok(lean_box(0)) : lean_box(0);
     }
-    vir_writer request;
-    request.u32(static_cast<uint32_t>(signature->args.size()));
-    for (size_t i = 0; i < signature->args.size(); i++) {
-        encode_value_payload(request, signature->args[i], args[erased_prefix_args + i]);
-    }
-    if (!request.ok) {
-        for (uint32_t i = 0; i < argc; i++) {
-            lean_dec(args[i]);
-        }
-        return vir::host_import_is_io(slot) ? lean_io_result_mk_ok(lean_box(0)) : lean_box(0);
-    }
-    std::string request_bytes = request.take();
-    char const * result_bytes = vir_js_call(
+    object * value = vir_js_call_objects(
         slot,
-        reinterpret_cast<uint8_t const *>(request_bytes.data()),
-        static_cast<uint32_t>(request_bytes.size()));
-    uint32_t result_size = vir_js_call_result_size();
-    object * value = decode_host_result(signature->result, result_bytes, result_size);
-    if (result_bytes != nullptr) {
-        vir_free_bytes(const_cast<char *>(result_bytes));
+        args == nullptr ? nullptr : args + erased_prefix_args,
+        static_cast<uint32_t>(signature->args.size()));
+    if (value == nullptr) {
+        value = lean_box(0);
     }
-    for (uint32_t i = 0; i < argc; i++) {
-        lean_dec(args[i]);
-    }
+    cleanup_object_args(argc, args);
     if (signature->is_io) {
         return lean_io_result_mk_ok(value);
     }
@@ -293,7 +271,6 @@ static void * host_import_trampoline_for(uint32_t slot, uint32_t arity) {
 #undef VIR_JS_TRAMPOLINE_CASES_FOR_SLOT
 #undef VIR_JS_TRAMPOLINE_CASE
 
-static std::string g_call_result;
 static std::string g_call_error;
 struct closure_root {
     object * value = nullptr;
@@ -302,7 +279,6 @@ struct closure_root {
 
 static std::vector<closure_root> g_closure_roots;
 static std::vector<uint32_t> g_free_closure_root_ids;
-static std::string g_closure_call_result;
 static std::string g_closure_call_error;
 
 static closure_root * closure_root_for_id(uint32_t root_id) {
@@ -353,56 +329,38 @@ extern "C" uint32_t vir_closure_release(uint32_t root_id) {
     return 1;
 }
 
-static void cleanup_closure_call_args(std::vector<object *> const & args) {
-    for (object * arg : args) {
-        lean_dec(arg);
-    }
-}
-
-extern "C" char const * vir_closure_call(uint32_t root_id, uint8_t const * request, uint32_t request_len) {
-    g_closure_call_result.clear();
+extern "C" object * vir_closure_call_objects(uint32_t root_id, object ** argv, uint32_t argc) {
     g_closure_call_error.clear();
-    if (request == nullptr && request_len != 0) {
-        g_closure_call_error = "closure call payload pointer is null";
+    if (argv == nullptr && argc != 0) {
+        g_closure_call_error = "closure object argv pointer is null";
         return nullptr;
     }
     closure_root * root = closure_root_for_id(root_id);
     if (root == nullptr) {
+        cleanup_object_args(argc, argv);
         g_closure_call_error = "closure root id is not live";
         return nullptr;
     }
     object * fn = root->value;
-    host_signature signature = root->signature;
-
-    vir_reader reader(request, request_len);
-    uint32_t argc = reader.u32();
+    host_signature const & signature = root->signature;
     if (argc != signature.args.size()) {
+        cleanup_object_args(argc, argv);
         g_closure_call_error =
             "closure argument count mismatch: signature expects " +
             std::to_string(signature.args.size()) +
             ", got " + std::to_string(argc);
         return nullptr;
     }
-    std::vector<object *> args;
-    args.reserve(argc + 1);
-    for (uint32_t i = 0; i < argc; i++) {
-        args.push_back(decode_value(reader, signature.args[i]));
-    }
-    if (!reader.ok) {
-        cleanup_closure_call_args(args);
-        g_closure_call_error = reader.error();
-        return nullptr;
-    }
-    if (!reader.at_end()) {
-        cleanup_closure_call_args(args);
-        g_closure_call_error = "trailing bytes after closure call payload";
-        return nullptr;
-    }
 
-    lean_inc(fn);
+    std::vector<object *> args;
+    args.reserve(argc + (signature.is_io ? 1 : 0));
+    for (uint32_t i = 0; i < argc; i++) {
+        args.push_back(argv[i]);
+    }
     if (signature.is_io) {
         args.push_back(lean_io_mk_world());
     }
+    lean_inc(fn);
     object * result = apply_n(fn, static_cast<unsigned>(args.size()), args.data());
     if (signature.is_io) {
         if (!lean_io_result_is_ok(result)) {
@@ -412,20 +370,7 @@ extern "C" char const * vir_closure_call(uint32_t root_id, uint8_t const * reque
         }
         result = lean_io_result_take_value(result);
     }
-    vir_writer writer;
-    encode_result_payload(writer, signature.result, result, true);
-    if (!writer.ok) {
-        lean_dec(result);
-        g_closure_call_error = writer.error();
-        return nullptr;
-    }
-    lean_dec(result);
-    g_closure_call_result = writer.take();
-    return g_closure_call_result.data();
-}
-
-extern "C" uint32_t vir_closure_call_result_size(void) {
-    return static_cast<uint32_t>(g_closure_call_result.size());
+    return result;
 }
 
 extern "C" char const * vir_closure_call_error(void) {
@@ -479,12 +424,6 @@ extern "C" uint32_t vir_upstream_target_pointer_bytes(void) {
     return sizeof(void *);
 }
 
-static void cleanup_call_args(std::vector<lean::vir_arg> const & args) {
-    for (lean::vir_arg const & arg : args) {
-        if (arg.owned) lean_dec(arg.value);
-    }
-}
-
 static lean::object * run_package_function(
     lean::name const & fn,
     size_t argc,
@@ -501,90 +440,6 @@ static lean::object * run_package_function(
     lean::object ** args) {
     lean::name fn(fn_obj, true);
     return run_package_function(fn, argc, args);
-}
-
-static char const * run_decoded_call(
-    lean::name const & fn,
-    bool has_boxed_decl,
-    lean::vir_type const & result_type,
-    uint8_t effect,
-    std::vector<lean::object *> & args) {
-    if (effect == 1) {
-        args.push_back(lean_io_mk_world());
-    }
-    lean::object * result = run_package_function(fn, args.size(), args.data());
-    if (effect == 1) {
-        if (!lean_io_result_is_ok(result)) {
-            lean_dec(result);
-            lean::g_call_error = "IO action failed";
-            return nullptr;
-        }
-        result = lean_io_result_take_value(result);
-    }
-    lean::vir_writer writer;
-    lean::encode_result_payload(writer, result_type, result, has_boxed_decl);
-    if (!writer.ok) {
-        if (lean::call_result_is_owned(result_type, has_boxed_decl)) {
-            lean_dec(result);
-        }
-        lean::g_call_error = writer.error();
-        return nullptr;
-    }
-    if (lean::call_result_is_owned(result_type, has_boxed_decl)) {
-        lean_dec(result);
-    }
-    lean::g_call_result = writer.take();
-    return lean::g_call_result.data();
-}
-
-static char const * vir_call_resolved_core(
-    lean::name const & fn,
-    bool has_boxed_decl,
-    uint8_t const * request,
-    uint32_t request_len,
-    lean::host_signature const & signature) {
-    if (!signature.ok) {
-        lean::g_call_error = signature.error;
-        return nullptr;
-    }
-    lean::vir_reader reader(request, request_len);
-    uint32_t argc = reader.u32();
-    if (argc != signature.args.size()) {
-        lean::g_call_error =
-            "call argument count mismatch: package signature expects " +
-            std::to_string(signature.args.size()) +
-            ", got " + std::to_string(argc);
-        return nullptr;
-    }
-    std::vector<lean::vir_arg> decoded_args;
-    std::vector<lean::object *> args;
-    decoded_args.reserve(argc);
-    args.reserve(argc);
-    for (uint32_t i = 0; i < argc; i++) {
-        decoded_args.push_back(lean::decode_argument_payload(reader, signature.args[i], has_boxed_decl));
-        args.push_back(decoded_args.back().value);
-    }
-    if (!reader.ok) {
-        lean::g_call_error = reader.error();
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-    if (!has_boxed_decl && lean::needs_boxed_wasm32_call_boundary_type(signature.result)) {
-        lean::g_call_error = "top-level Float, Float32, UInt64, and trivial wrappers over them require a boxed declaration at the wasm32 interpreter boundary";
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-    if (!reader.at_end()) {
-        lean::g_call_error = "trailing bytes after call payload";
-        cleanup_call_args(decoded_args);
-        return nullptr;
-    }
-    return run_decoded_call(
-        fn,
-        has_boxed_decl,
-        signature.result,
-        signature.is_io ? 1 : 0,
-        args);
 }
 
 extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len) {
@@ -604,36 +459,6 @@ extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len) 
         lean::g_call_error = "call entry not found";
     }
     return slot;
-}
-
-extern "C" char const * vir_call_resolved(
-    uint32_t call_slot,
-    uint8_t const * request,
-    uint32_t request_len) {
-    lean::g_call_result.clear();
-    lean::g_call_error.clear();
-    if (request == nullptr && request_len != 0) {
-        lean::g_call_error = "call payload pointer is null";
-        return nullptr;
-    }
-    if (!lean::vir::package_loaded()) {
-        lean::g_call_error = "no IR package has been loaded";
-        return nullptr;
-    }
-
-    lean::object * fn_obj = lean::vir::package_call_slot_name(call_slot);
-    if (fn_obj == nullptr) {
-        lean::g_call_error = "call slot is not registered";
-        return nullptr;
-    }
-    lean::name fn(fn_obj, true);
-    bool has_boxed_decl = lean::vir::package_call_slot_has_boxed_decl(call_slot);
-    lean::host_signature const * signature = lean::cached_package_call_signature(call_slot);
-    if (signature == nullptr) {
-        lean::g_call_error = "resolved call requires a package-owned call signature";
-        return nullptr;
-    }
-    return vir_call_resolved_core(fn, has_boxed_decl, request, request_len, *signature);
 }
 
 static void cleanup_object_call_args(uint32_t argc, lean::object ** args) {
@@ -661,7 +486,6 @@ extern "C" lean::object * vir_call_resolved_objects(
     uint32_t call_slot,
     lean::object ** argv,
     uint32_t argc) {
-    lean::g_call_result.clear();
     lean::g_call_error.clear();
     if (argv == nullptr && argc != 0) {
         lean::g_call_error = "object call argv pointer is null";
@@ -723,10 +547,6 @@ extern "C" lean::object * vir_call_resolved_objects(
         result = lean_io_result_take_value(result);
     }
     return result;
-}
-
-extern "C" uint32_t vir_call_result_size(void) {
-    return static_cast<uint32_t>(lean::g_call_result.size());
 }
 
 extern "C" char const * vir_call_error(void) {

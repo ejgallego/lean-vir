@@ -23,11 +23,8 @@ unrelated responsibilities.
 
 - `runtime/vir-codec.js`: binary reader/writer and interface type descriptor
   codec.
-- `runtime/vir-value-codec.js`: Lean-call argument/result and host-call value
-  encode/decode.
 - `runtime/vir-value-normalizers.js`: JavaScript input normalization for the
-  value codec.
-- `runtime/vir-lean-codec.js`: structural `Lean.Expr` and level encode/decode.
+  object ABI lowering path.
 - `runtime/interface-manifest.js`: interface manifest validation, diagnostics,
   and type formatting helpers.
 - `runtime/wire-tags.js`: shared wire tag constants.

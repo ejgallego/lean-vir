@@ -12,7 +12,7 @@ objects while a call is running.
 | Lean API | `Vir/*.lean`, `examples/*.lean` | Public combinators, effect types, examples, and `@[vir_js]` declarations. |
 | Package generation | `Vir/GeneratePackage.lean` | Export closure selection, manifest type descriptors, host import metadata, and native extern registration. |
 | WASI boundary | `wasm/upstream_shim/` | Resolved package calls, host-import trampolines, package decoding, native externs, closure roots, and WASI/runtime stubs. |
-| JavaScript runtime | `web/src/vir-runtime.js`, `web/src/runtime/vir-value-codec.js` | Runtime construction, manifest validation, call payload encoding, result decoding, host import dispatch, and callback wrappers. |
+| JavaScript runtime | `web/src/vir-runtime.js`, `web/src/runtime/vir-value-normalizers.js` | Runtime construction, manifest validation, object lowering/lifting, host import dispatch, and callback wrappers. |
 | Host resources | `web/src/host-resource.js`, `web/src/host/vir-host-resources.js` | JavaScript-owned object handles, externref roots, disposable host objects, DOM/timer/frame/React resource cleanup. |
 | React host | `web/src/react/`, `web/src/vir-react-host-bindings.js` | React element construction, root lifetime, function-component bridge, hooks, and callback retention. |
 | Browser demos | `web/src/`, `examples/`, `fixtures/` | Local demo entry points, smoke fixtures, and generated `.irpkg` inputs. |
@@ -24,7 +24,7 @@ For package/interface work, read:
 
 1. `docs/INTERFACE_PIPELINE.md`
 2. `Vir/GeneratePackage.lean`
-3. `web/src/runtime/vir-value-codec.js`
+3. `web/src/vir-runtime.js`
 4. `wasm/upstream_shim/interface_codec.cpp`
 
 For browser or React host work, read:
@@ -49,7 +49,7 @@ For benchmark work, read:
 1. `docs/PERFORMANCE.md`
 2. `scripts/bench-vir.mjs`
 3. `scripts/bench-utils.mjs`
-4. `scripts/runtime-tests/value-codec-smoke.mjs`
+4. `scripts/runtime-tests/object-abi-smoke.mjs`
 
 ## Top-Level Call Flow
 
@@ -61,28 +61,26 @@ sequenceDiagram
     autonumber
     participant JS as JavaScript caller
     participant RT as VirRuntime
-    participant Codec as vir-value-codec.js
-    participant Wasm as vir_call_resolved
-    participant Cpp as interface_codec.cpp
+    participant ABI as vir_obj_* helpers
+    participant Wasm as vir_call_resolved_objects
+    participant Shim as shim.cpp
     participant IR as upstream ir_interpreter.cpp
 
     JS->>RT: vir.call("entry", ...args)
     RT->>RT: lookup manifest entry
     RT->>Wasm: vir_resolve_call(name) on first use
-    RT->>Codec: encode value-only args with manifest descriptor
-    Codec-->>RT: byte payload
-    RT->>Wasm: vir_call_resolved(slot, payload)
-    Wasm->>Cpp: decode payload into Lean objects
-    Cpp->>IR: evaluate packaged Lean declaration
-    IR-->>Cpp: Lean result object
-    Cpp-->>Wasm: encode result bytes
-    Wasm-->>RT: result pointer and vir_call_result_size()
-    RT->>Codec: decode result bytes
+    RT->>ABI: lower args to owned Lean objects
+    RT->>Wasm: vir_call_resolved_objects(slot, argv, argc)
+    Wasm->>Shim: consume owned args
+    Shim->>IR: evaluate packaged Lean declaration
+    IR-->>Shim: owned Lean result object
+    Wasm-->>RT: owned result object
+    RT->>ABI: lift result and release it
     RT-->>JS: JavaScript value
 ```
 
-The runtime's byte fallback path is `vir_call_resolved(slot, ...)`; the older
-descriptor-bearing named call ABI has been removed.
+The runtime no longer has a value byte fallback for exported calls. The compact
+type descriptor codec remains for package signatures and callback root metadata.
 
 ## Lean-To-JavaScript Host Import Flow
 
@@ -102,23 +100,23 @@ sequenceDiagram
 
     Lean->>IR: call opaque @[vir_js] declaration
     IR->>Shim: generated native trampoline
-    Shim->>Shim: encode arguments
+    Shim->>Host: env.vir_js_call_objects(slot, argv, argc)
+    Host->>Host: lift borrowed Lean object args
     alt argument is a Lean closure
-        Shim->>Shim: vir_closure_root(closure)
-        Shim->>Host: env.vir_closure_push(rootId)
+        Host->>Shim: vir_obj_closure_root(closure, signature)
         Host->>Callback: create callable VirCallback
     end
-    Shim->>Host: env.vir_js_call(slot, request)
-    Host->>JS: binding(...decodedArgs)
+    Host->>JS: binding(...liftedArgs)
     opt host calls retained callback
         JS->>Callback: callback(...args)
-        Callback->>Shim: vir_closure_call(rootId, payload)
+        Callback->>Shim: vir_closure_call_objects(rootId, argv, argc)
         Shim->>IR: evaluate closure
         IR-->>Shim: closure result
-        Shim-->>Callback: decoded result
+        Shim-->>Callback: owned result object
+        Callback->>Callback: lift result and release it
     end
     JS-->>Host: return value
-    Host-->>Shim: encoded result bytes
+    Host->>Shim: lower return value to owned Lean object
     Shim-->>IR: Lean result object
     JS->>Callback: callback.release() when done
     Callback->>Shim: vir_closure_release(rootId)
@@ -197,7 +195,7 @@ flowchart TD
     ClosureRoot -->|"root id side channel"| Callback
     Callback --> Owner
     Owner -->|"invoke"| Callback
-    Callback -->|"vir_closure_call(rootId)"| ClosureRoot
+    Callback -->|"vir_closure_call_objects(rootId, argv)"| ClosureRoot
     Owner -->|"release / dispose"| Callback
     Callback -->|"vir_closure_release(rootId)"| ClosureRoot
 ```

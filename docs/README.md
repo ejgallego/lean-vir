@@ -11,7 +11,7 @@ resources, React bridge, and benchmark code, and includes call-flow and
 ownership diagrams.
 
 - Package/interface work: read [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md),
-  `Vir/GeneratePackage.lean`, `web/src/runtime/vir-value-codec.js`, and
+  `Vir/GeneratePackage.lean`, `web/src/vir-runtime.js`, and
   `wasm/upstream_shim/interface_codec.cpp`.
 - Browser or React host work: read
   [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md),

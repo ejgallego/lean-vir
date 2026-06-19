@@ -55,8 +55,6 @@ uint64_t lean_expr_mk_data(
     uint8_t has_level_mvar,
     uint8_t has_level_param);
 uint64_t lean_expr_mk_app_data(uint64_t f_data, uint64_t a_data);
-char const * vir_js_call(uint32_t slot, uint8_t const * request, uint32_t request_len);
-uint32_t vir_js_call_result_size(void);
 }
 
 static uint8_t g_vir_io_initializing = 0;
