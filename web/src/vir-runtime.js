@@ -18,11 +18,6 @@ import {
 } from "./runtime/vir-codec.js";
 import { WIRE } from "./runtime/wire-tags.js";
 import {
-  PRIMITIVE_LANE,
-  primitiveLaneForTag,
-  readPrimitiveResult,
-} from "./runtime/primitive-lanes.js";
-import {
   ExternrefResourceRoots,
   isHostResource,
 } from "./host-resource.js";
@@ -534,10 +529,6 @@ export class VirRuntime {
 
     const cache = this.callCacheFor(entry);
     this.hostState?.clearTransientQueues();
-    const primitiveResult = this.tryPrimitiveResolvedCall(entry, args, cache);
-    if (primitiveResult !== FAST_CALL_UNAVAILABLE) {
-      return primitiveResult;
-    }
     const objectResult = this.tryObjectResolvedCall(entry, args, cache);
     if (objectResult !== FAST_CALL_UNAVAILABLE) {
       return objectResult;
@@ -568,78 +559,6 @@ export class VirRuntime {
       this.freeBytes(payloadPtr);
       this.hostState?.clearTransientQueues();
     }
-  }
-
-  tryPrimitiveResolvedCall(entry, args, cache) {
-    if (entry.effect !== "pure" || entry.args.length !== 1) {
-      return FAST_CALL_UNAVAILABLE;
-    }
-    const argType = entry.args[0].type;
-    const resultType = entry.result;
-    const argTag = argType?.wireTag;
-    const resultTag = resultType?.wireTag;
-    const argLane = primitiveLaneForTag(argTag);
-    const resultLane = primitiveLaneForTag(resultTag);
-    if (argLane === null || resultLane === null || resultTag !== argTag) {
-      return FAST_CALL_UNAVAILABLE;
-    }
-    if (typeof this.exports.vir_call_resolved_primitive !== "function") {
-      return FAST_CALL_UNAVAILABLE;
-    }
-    const callSlot = this.resolveCallSlot(entry, cache);
-    const label = `${entry.entry} argument ${entry.args[0].name}`;
-    const finish = () => {
-      if (this.exports.vir_call_resolved_primitive(callSlot, argLane, resultLane) === 0) {
-        throw new Error(this.lastCallError() || `primitive call failed: ${entry.entry}`);
-      }
-      return this.readPrimitiveResult(resultLane, resultTag);
-    };
-
-    if (argLane === PRIMITIVE_LANE.UNIT) {
-      if (args[0] !== undefined && args[0] !== null) {
-        throw new Error(`${label} must be undefined or null`);
-      }
-      return finish();
-    }
-
-    if (argLane === PRIMITIVE_LANE.U32) {
-      if (typeof this.exports.vir_call_primitive_set_u32 !== "function") {
-        return FAST_CALL_UNAVAILABLE;
-      }
-      this.exports.vir_call_primitive_set_u32(normalizeDirectU32(args[0], argTag, label));
-      return finish();
-    }
-
-    if (argLane === PRIMITIVE_LANE.F64) {
-      if (typeof this.exports.vir_call_primitive_set_f64 !== "function") {
-        return FAST_CALL_UNAVAILABLE;
-      }
-      this.exports.vir_call_primitive_set_f64(normalizeFloat(args[0], label));
-      return finish();
-    }
-
-    if (argLane === PRIMITIVE_LANE.STRING) {
-      if (
-        typeof this.exports.vir_call_primitive_set_string !== "function" ||
-        typeof this.exports.vir_call_primitive_string_result !== "function") {
-        return FAST_CALL_UNAVAILABLE;
-      }
-      if (typeof args[0] !== "string") {
-        throw new Error(`${label} must be a string`);
-      }
-      const bytes = textEncoder.encode(args[0]);
-      const ptr = this.allocBytes(bytes);
-      try {
-        if (this.exports.vir_call_primitive_set_string(ptr, bytes.byteLength) === 0) {
-          throw new Error(this.lastCallError() || `primitive string argument failed: ${entry.entry}`);
-        }
-        return finish();
-      } finally {
-        this.freeBytes(ptr);
-      }
-    }
-
-    return FAST_CALL_UNAVAILABLE;
   }
 
   tryObjectResolvedCall(entry, args, cache) {
@@ -1064,10 +983,6 @@ export class VirRuntime {
       typeof this.exports.vir_obj_dec === "function" &&
       names.every((name) => typeof this.exports[name] === "function")
     );
-  }
-
-  readPrimitiveResult(lane, tag) {
-    return readPrimitiveResult(this, lane, tag);
   }
 
   readObjectByteArray(obj) {
@@ -1983,28 +1898,6 @@ function disposeHostBindings(bindings) {
 
 function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
-}
-
-function normalizeDirectU32(value, tag, label) {
-  if (tag === WIRE.BOOL) {
-    if (typeof value !== "boolean") {
-      throw new Error(`${label} must be a boolean`);
-    }
-    return value ? 1 : 0;
-  }
-  if (tag === WIRE.UINT8) {
-    if (!Number.isInteger(value) || value < 0 || value > 0xff) {
-      throw new Error(`${label} must be an integer in 0..255`);
-    }
-    return value;
-  }
-  if (tag === WIRE.UINT16) {
-    if (!Number.isInteger(value) || value < 0 || value > 0xffff) {
-      throw new Error(`${label} must be an integer in 0..65535`);
-    }
-    return value;
-  }
-  return normalizeUint32(value, label);
 }
 
 function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {

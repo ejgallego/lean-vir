@@ -33,10 +33,6 @@ import {
   encodeResolvedCallPayload,
 } from "../web/src/runtime/vir-value-codec.js";
 import {
-  PRIMITIVE_LANE,
-  readPrimitiveResult,
-} from "../web/src/runtime/primitive-lanes.js";
-import {
   createVirRuntime as createNodeVirRuntime,
   createVirtualDocumentState,
   ensureVirtualElementState,
@@ -272,18 +268,13 @@ function printJsRow(name, sample) {
   console.log(`  checksum:  ${sample.checksum}`);
 }
 
-function printConversionRow(name, codec, wasm, direct = null) {
+function printConversionRow(name, codec, wasm) {
   const codecPerCall = codec.medianMs / codec.iterations;
   const wasmPerCall = wasm.medianMs / wasm.iterations;
   console.log(`${name}`);
   console.log(`  js encode:  ${formatMs(codec.medianMs)} total, ${formatMs(codecPerCall)} / call`);
   console.log(`  wasm call:  ${formatMs(wasm.medianMs)} total, ${formatMs(wasmPerCall)} / call`);
-  if (direct !== null) {
-    const directPerCall = direct.medianMs / direct.iterations;
-    console.log(`  primitive api: ${formatMs(direct.medianMs)} total, ${formatMs(directPerCall)} / call`);
-  }
-  const directChecksum = direct === null ? "" : ` primitive=${direct.checksum}`;
-  console.log(`  checksums: codec=${codec.checksum} wasm=${wasm.checksum}${directChecksum}`);
+  console.log(`  checksums: codec=${codec.checksum} wasm=${wasm.checksum}`);
 }
 
 function benchmarkDispatchReportRow(name, title, named, resolved) {
@@ -315,13 +306,12 @@ function benchmarkJsReportRow(name, title, js) {
   };
 }
 
-function benchmarkConversionReportRow(name, title, codec, wasm, direct = null) {
+function benchmarkConversionReportRow(name, title, codec, wasm) {
   return {
     name,
     title,
     codec: benchmarkSampleReport(codec),
     wasm: benchmarkSampleReport(wasm),
-    ...(direct === null ? {} : { direct: benchmarkSampleReport(direct) }),
   };
 }
 
@@ -400,52 +390,7 @@ function benchBoundaryConversionCase(testCase) {
     }
     return acc;
   });
-  const direct = typeof testCase.direct === "function" ? testCase.direct(testCase, entry) : null;
-  return { ...testCase, codec, wasm, direct };
-}
-
-function benchDirectPrimitiveCall(testCase, entry, lane) {
-  const callSlot = resolveRawCallSlot(entry, textEncoder.encode(entry.entry));
-  const stringBytes = lane === PRIMITIVE_LANE.STRING ? textEncoder.encode(testCase.args[0]) : null;
-  const stringPtr = stringBytes === null ? 0 : runtime.allocBytes(stringBytes);
-  try {
-    return benchWasmRepeated(`direct-${testCase.name}`, testCase.iterations, () => {
-      let acc = 0;
-      for (let i = 0; i < testCase.iterations; i++) {
-        setPrimitiveArg(lane, testCase.args[0], stringPtr, stringBytes?.byteLength ?? 0);
-        if (runtime.exports.vir_call_resolved_primitive(callSlot, lane, lane) === 0) {
-          throw new Error(runtime.lastCallError() || `primitive call failed: ${entry.entry}`);
-        }
-        acc += testCase.checksum(readPrimitiveResult(runtime, lane, entry.result.wireTag));
-      }
-      return acc;
-    });
-  } finally {
-    if (stringPtr !== 0) {
-      runtime.freeBytes(stringPtr);
-    }
-  }
-}
-
-function setPrimitiveArg(lane, value, stringPtr, stringLen) {
-  if (lane === PRIMITIVE_LANE.UNIT) {
-    return;
-  }
-  if (lane === PRIMITIVE_LANE.U32) {
-    runtime.exports.vir_call_primitive_set_u32(typeof value === "boolean" ? (value ? 1 : 0) : value);
-    return;
-  }
-  if (lane === PRIMITIVE_LANE.F64) {
-    runtime.exports.vir_call_primitive_set_f64(value);
-    return;
-  }
-  if (lane === PRIMITIVE_LANE.STRING) {
-    if (runtime.exports.vir_call_primitive_set_string(stringPtr, stringLen) === 0) {
-      throw new Error(runtime.lastCallError() || "primitive string argument failed");
-    }
-    return;
-  }
-  throw new Error(`unsupported primitive lane ${lane}`);
+  return { ...testCase, codec, wasm };
 }
 
 function checksumNumber(value) {
@@ -544,7 +489,6 @@ const baseConversionCases = [
     args: [undefined],
     iterations: baseScalarIterations,
     checksum: (value) => value === undefined ? 1 : 0,
-    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.UNIT),
   },
   {
     name: "base-bool",
@@ -553,7 +497,6 @@ const baseConversionCases = [
     args: [true],
     iterations: baseScalarIterations,
     checksum: checksumBool,
-    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.U32),
   },
   {
     name: "base-nat",
@@ -578,7 +521,6 @@ const baseConversionCases = [
     args: [baseStringInput],
     iterations: baseBlobIterations,
     checksum: checksumString,
-    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.STRING),
   },
   {
     name: "base-uint8",
@@ -587,7 +529,6 @@ const baseConversionCases = [
     args: [41],
     iterations: baseScalarIterations,
     checksum: checksumNumber,
-    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.U32),
   },
   {
     name: "base-uint16",
@@ -596,7 +537,6 @@ const baseConversionCases = [
     args: [41],
     iterations: baseScalarIterations,
     checksum: checksumNumber,
-    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.U32),
   },
   {
     name: "base-uint32",
@@ -605,7 +545,6 @@ const baseConversionCases = [
     args: [41],
     iterations: baseScalarIterations,
     checksum: checksumNumber,
-    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.U32),
   },
   {
     name: "base-uint64",
@@ -630,7 +569,6 @@ const baseConversionCases = [
     args: [1.5],
     iterations: baseScalarIterations,
     checksum: checksumNumber,
-    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.F64),
   },
   {
     name: "base-float32",
@@ -639,7 +577,6 @@ const baseConversionCases = [
     args: [1.25],
     iterations: baseScalarIterations,
     checksum: checksumNumber,
-    direct: (testCase, entry) => benchDirectPrimitiveCall(testCase, entry, PRIMITIVE_LANE.F64),
   },
   {
     name: "base-byte-array",
@@ -795,7 +732,7 @@ console.log();
 console.log("Base value conversion paths");
 console.log();
 for (const testCase of baseConversionBenchmarks) {
-  printConversionRow(testCase.title, testCase.codec, testCase.wasm, testCase.direct);
+  printConversionRow(testCase.title, testCase.codec, testCase.wasm);
   console.log();
 }
 printJsRow(`JS codec scalar record/enums encode x ${codecScalarRecordIterations}`, jsCodecScalarRecord);
@@ -843,7 +780,7 @@ if (args.jsonPath !== null) {
     benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib),
     benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
     ...baseConversionBenchmarks.map((testCase) =>
-      benchmarkConversionReportRow(testCase.name, testCase.title, testCase.codec, testCase.wasm, testCase.direct)),
+      benchmarkConversionReportRow(testCase.name, testCase.title, testCase.codec, testCase.wasm)),
     benchmarkJsReportRow(
       "codec-scalar-record",
       `JS codec scalar record/enums encode x ${codecScalarRecordIterations}`,
