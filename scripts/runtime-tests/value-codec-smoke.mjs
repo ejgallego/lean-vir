@@ -91,6 +91,28 @@ function callResolvedObjects(runtime, name, args) {
   }
 }
 
+function withCallLaneCounters(runtime, body) {
+  const originalExports = runtime.exports;
+  const counters = { objectCalls: 0, codecFallbackCalls: 0 };
+  runtime.exports = Object.fromEntries(
+    Reflect.ownKeys(originalExports).map((key) => [key, originalExports[key]]),
+  );
+  runtime.exports.vir_call_resolved_objects = (...args) => {
+    counters.objectCalls++;
+    return originalExports.vir_call_resolved_objects(...args);
+  };
+  runtime.exports.vir_call_resolved = (...args) => {
+    counters.codecFallbackCalls++;
+    return originalExports.vir_call_resolved(...args);
+  };
+  try {
+    body(counters);
+    return counters;
+  } finally {
+    runtime.exports = originalExports;
+  }
+}
+
 const natType = { type: "Nat", wireTag: WIRE.NAT };
 const boolType = { type: "Bool", wireTag: WIRE.BOOL };
 const unitType = { type: "Unit", wireTag: WIRE.UNIT };
@@ -242,21 +264,7 @@ withObjectByteArray(runtime, [0, 65, 255, 17], (obj) => {
   const data = runtime.exports.vir_obj_byte_array_data(obj);
   assert.deepEqual([...runtime.readWasmBytes(data, len)], [0, 65, 255, 17]);
 });
-const objectCallExports = runtime.exports;
-let objectCalls = 0;
-let codecFallbackCalls = 0;
-runtime.exports = Object.fromEntries(
-  Reflect.ownKeys(objectCallExports).map((key) => [key, objectCallExports[key]]),
-);
-runtime.exports.vir_call_resolved_objects = (...args) => {
-  objectCalls++;
-  return objectCallExports.vir_call_resolved_objects(...args);
-};
-runtime.exports.vir_call_resolved = (...args) => {
-  codecFallbackCalls++;
-  return objectCallExports.vir_call_resolved(...args);
-};
-try {
+const objectCounters = withCallLaneCounters(runtime, () => {
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseNatBump", 41), "42");
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseIntNegate", -41), "41");
   assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.uint64Bump", "18446744073709551615"), "0");
@@ -441,27 +449,11 @@ try {
     runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [65, 66, 67]),
     Uint8Array.from([65, 66, 67]),
   );
-} finally {
-  runtime.exports = objectCallExports;
-}
-assert.equal(objectCalls, 36);
-assert.equal(codecFallbackCalls, 0);
+});
+assert.equal(objectCounters.objectCalls, 36);
+assert.equal(objectCounters.codecFallbackCalls, 0);
 
-const prettyObjectCallExports = prettyRuntime.exports;
-let prettyObjectCalls = 0;
-let prettyCodecFallbackCalls = 0;
-prettyRuntime.exports = Object.fromEntries(
-  Reflect.ownKeys(prettyObjectCallExports).map((key) => [key, prettyObjectCallExports[key]]),
-);
-prettyRuntime.exports.vir_call_resolved_objects = (...args) => {
-  prettyObjectCalls++;
-  return prettyObjectCallExports.vir_call_resolved_objects(...args);
-};
-prettyRuntime.exports.vir_call_resolved = (...args) => {
-  prettyCodecFallbackCalls++;
-  return prettyObjectCallExports.vir_call_resolved(...args);
-};
-try {
+const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
   assert.match(
     prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyPreview"),
     /^wide group:\nhello world/,
@@ -474,11 +466,9 @@ try {
     prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12),
     "[alpha,\n beta,\n gamma]",
   );
-} finally {
-  prettyRuntime.exports = prettyObjectCallExports;
-}
-assert.equal(prettyObjectCalls, 3);
-assert.equal(prettyCodecFallbackCalls, 0);
+});
+assert.equal(prettyCounters.objectCalls, 3);
+assert.equal(prettyCounters.codecFallbackCalls, 0);
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
@@ -557,6 +547,19 @@ assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.bumpBVar", { kind: "
   kind: "bvar",
   index: "5",
 });
+const exprCodecCounters = withCallLaneCounters(leanRuntime, () => {
+  assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.constNatExpr"), {
+    kind: "const",
+    name: "Nat",
+    levels: [],
+  });
+  assert.equal(
+    leanRuntime.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar", index: 4 }),
+    "5",
+  );
+});
+assert.equal(exprCodecCounters.objectCalls, 0);
+assert.equal(exprCodecCounters.codecFallbackCalls, 2);
 assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 0), {
   kind: "inl",
   value: "10",
