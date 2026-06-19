@@ -69,6 +69,17 @@ def expectAuthoringPackage (package? : Option Lean.Vir.Infoview.IRPackage) : IO 
       expect "authoring package roots" <|
         package.roots == #["SmokeInfoviewLean.mount", "SmokeInfoviewLean.unmount"]
 
+def smokeVar : Lean.IR.VarId :=
+  { idx := 0 }
+
+def smokeDecl (value : String) : Lean.IR.Decl :=
+  .fdecl `SmokeInfoviewLean.helper #[] .object
+    (.vdecl smokeVar .object (.lit (.str value)) (.ret (.var smokeVar)))
+    {}
+
+def smokeClosure (value : String) : Vir.GeneratePackage.Closure :=
+  { decls := #[{ source := "imported by smoke", decl := smokeDecl value }] }
+
 #eval do
   expect "base64 vir" (Lean.Vir.Infoview.base64Encode "vir".toUTF8 == "dmly")
   expect "base64 Lean" (Lean.Vir.Infoview.base64Encode "Lean".toUTF8 == "TGVhbg==")
@@ -101,5 +112,11 @@ def expectAuthoringPackage (package? : Option Lean.Vir.Infoview.IRPackage) : IO 
   expect "authoring widget reload interval" (widgetProps.autoReloadMs == 1000)
   expect "authoring widget wasm path" (widgetProps.wasmPath == Lean.Vir.Infoview.ReactWidget.defaultWasmPath)
   expectAuthoringPackage widgetProps.irPackage
+  expect "IR decl hash tracks body literals" <|
+    Lean.Vir.Infoview.irDeclHash (smokeDecl "before") !=
+      Lean.Vir.Infoview.irDeclHash (smokeDecl "after")
+  expect "closure IR hash tracks imported helper bodies" <|
+    Lean.Vir.Infoview.closureIRHash (smokeClosure "before") !=
+      Lean.Vir.Infoview.closureIRHash (smokeClosure "after")
 
 end SmokeInfoviewLean

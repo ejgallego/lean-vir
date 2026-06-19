@@ -151,13 +151,14 @@ A realistic path has three layers:
    `Lean.Vir.Infoview.buildIRPackage`, so the local demo no longer requires the
    repository Vite dev server or a package watcher.
    `statIRPackage` provides a package-root revision token for cache lookup and
-   later refreshes. The token is derived from the source ranges of local
-   declarations in the package closure, with a document-version fallback only
-   when range metadata is unavailable. Cursor movement is not part of the
-   runtime cache key, and ordinary proof edits outside the widget closure should
-   not rebuild the package. With `autoReloadMs` set, the demo detects widget-code
-   edits with a stat-only poll and emits fresh package bytes again only when
-   that token changes. It compiles each WASM asset revision to a cached
+   later refreshes. The token is derived from the compiled IR declaration
+   closure plus source ranges for local declarations, so imported helper-module
+   changes are detected once they are present in the active Lean snapshot.
+   Cursor movement is not part of the runtime cache key, and ordinary proof
+   edits outside the widget closure should not rebuild the package. With
+   `autoReloadMs` set, the demo detects widget-code edits with a stat-only poll
+   and emits fresh package bytes again only when that token changes. It compiles
+   each WASM asset revision to a cached
    `WebAssembly.Module`, which avoids recompiling the Lean IR interpreter module
    on ordinary infoview refreshes. For stable widget configuration it also keeps
    a module-level VIR runtime service alive across React component remounts and
