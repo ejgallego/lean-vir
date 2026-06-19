@@ -236,7 +236,7 @@ required shape:
 For a fuller API showcase, see `examples/ReactProofWidget.lean`.
 -/
 
-show_panel_widgets [local Lean.Vir.Infoview.widget with ReactProofWidgetHello.infoviewDemoProps]
+show_panel_widgets [local Lean.Vir.Infoview.widget with ReactProofWidgetHello.widgetProps]
 
 section Playground
 

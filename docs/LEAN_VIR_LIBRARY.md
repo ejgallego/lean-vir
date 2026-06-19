@@ -305,9 +305,9 @@ submit, textarea/select, attribute-conformance, and checkbox callbacks. `example
 keeps both demos: `Tamagotchi` is the non-React DOM-hosted version, and
 `ReactTamagotchi` reuses the same model with a keyed React tree, controlled
 text input, checkbox state, form submit handling, and action callbacks.
-`examples/ReactProofWidget.lean` is a minimal proof-widget-shaped React
-example that compiles into `demo-host.irpkg`, displays on `react.html`, and
-keeps any extra tag/ARIA conveniences local to the example file.
+`examples/ReactProofWidget.lean` is the fuller proof-widget-shaped React
+example. It compiles into `demo-host.irpkg`, displays on `react.html`, and can
+also be loaded as a live infoview widget through `show_panel_widgets`.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
@@ -315,6 +315,9 @@ Future ProofWidgets compatibility work is tracked separately in
 
 The `Vir.Infoview` module provides the first infoview-facing shell:
 
+- `Lean.Vir.Infoview.Assets`
+- `Lean.Vir.Infoview.Package`
+- `Lean.Vir.Infoview.Widget`
 - `Lean.Vir.Infoview.Surface`
 - `Lean.Vir.Infoview.IRPackage`
 - `Lean.Vir.Infoview.WidgetProps`
@@ -334,11 +337,11 @@ service only when the widget IR package revision changes.
 
 `vir_proof_widget` is the narrow authoring helper for Lean-authored React proof
 widgets: users provide a `React.Component Surface`, and the command declares the
-standard selector-owned mount/unmount entries, `IRPackage`, and `WidgetProps` in
-the current namespace. `ReactWidget` is the lower-level expansion target when a
-caller needs to assemble those pieces manually. `examples/ReactProofWidgetHello.lean`
-is the minimal live example and `examples/ReactProofWidget.lean` is the fuller
-API showcase.
+standard selector-owned `mount`/`unmount` entries, `irPackage`, and
+`widgetProps` in the current namespace. `ReactWidget` is the lower-level
+expansion target when a caller needs to assemble those pieces manually.
+`examples/ReactProofWidgetHello.lean` is the minimal live example and
+`examples/ReactProofWidget.lean` is the fuller API showcase.
 `node scripts/smoke-infoview-widget.mjs` checks that the shell module loads and
 that the proof-widget entries have the required signatures.
 

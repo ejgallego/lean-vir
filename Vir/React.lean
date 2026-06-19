@@ -633,6 +633,44 @@ nodeChildElement h5 keyedH5 h5With keyedH5With "h5"
 nodeChildElement h6 keyedH6 h6With keyedH6With "h6"
 nodeButtonElement button keyedButton buttonWith keyedButtonWith
 
+/-- Element builder shape used by text-child convenience helpers. -/
+abbrev TextBuilder :=
+  Array Property → Array EventHandler → Array (Lean.Vir.Js Node) → ReactM (Lean.Vir.Js Node)
+
+/-- Builds one text node and passes it as the only child to `build`. -/
+def textWith
+    (build : TextBuilder)
+    (props : Array Property)
+    (handlers : Array EventHandler)
+    (value : String) : ReactM (Lean.Vir.Js Node) := do
+  let textNode ← text value
+  build props handlers #[textNode]
+
+def codeText (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => codeWith props handlers children) props #[] value
+
+def spanText (value : String) : ReactM (Lean.Vir.Js Node) := do
+  let textNode ← text value
+  span #[textNode]
+
+def spanTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => spanWith props handlers children) props #[] value
+
+def pTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => pWith props handlers children) props #[] value
+
+def h3TextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => h3With props handlers children) props #[] value
+
+def strongTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => strongWith props handlers children) props #[] value
+
+def buttonTextWith
+    (props : Array Property)
+    (handlers : Array EventHandler)
+    (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => buttonWith props handlers children) props handlers value
+
 end Node
 
 namespace Root

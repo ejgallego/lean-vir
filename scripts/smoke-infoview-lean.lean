@@ -51,6 +51,24 @@ def expectRootsError (roots : Array String) : IO Unit := do
       throw <| IO.userError s!"infoview smoke failed: roots {roots} unexpectedly accepted as {got}"
   | .error _ => pure ()
 
+def AuthoringComponent : Lean.Vir.React.Component Lean.Vir.Infoview.Surface := fun _surface =>
+  Lean.Vir.React.Node.text "authoring smoke"
+
+vir_proof_widget AuthoringComponent with mountId := "vir-smoke-widget"
+
+example : String → Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Bool :=
+  mount
+
+example : String → Lean.Vir.Browser.DomM Bool :=
+  unmount
+
+def expectAuthoringPackage (package? : Option Lean.Vir.Infoview.IRPackage) : IO Unit := do
+  match package? with
+  | none => throw <| IO.userError "infoview smoke failed: authoring package missing"
+  | some package =>
+      expect "authoring package roots" <|
+        package.roots == #["SmokeInfoviewLean.mount", "SmokeInfoviewLean.unmount"]
+
 #eval do
   expect "base64 vir" (Lean.Vir.Infoview.base64Encode "vir".toUTF8 == "dmly")
   expect "base64 Lean" (Lean.Vir.Infoview.base64Encode "Lean".toUTF8 == "TGVhbg==")
@@ -77,5 +95,11 @@ def expectRootsError (roots : Array String) : IO Unit := do
   ]
   expectRootsError #[]
   expectRootsError #["ReactProofWidget."]
+  expect "authoring widget entry" (widgetProps.entry == "SmokeInfoviewLean.mount")
+  expect "authoring widget unmount entry" (widgetProps.unmountEntry == "SmokeInfoviewLean.unmount")
+  expect "authoring widget mount id" (widgetProps.mountId == "vir-smoke-widget")
+  expect "authoring widget reload interval" (widgetProps.autoReloadMs == 1000)
+  expect "authoring widget wasm path" (widgetProps.wasmPath == Lean.Vir.Infoview.ReactWidget.defaultWasmPath)
+  expectAuthoringPackage widgetProps.irPackage
 
 end SmokeInfoviewLean

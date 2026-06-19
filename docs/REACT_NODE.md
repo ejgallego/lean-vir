@@ -316,9 +316,9 @@ helpers check `currentTarget` first, then fall back to `target`.
 8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger stateful
    example that shares the non-React Tamagotchi model, renders a keyed React
    tree, and handles controlled input, checkbox, submit, and action callbacks.
-9. Added `examples/ReactProofWidget.lean` as a minimal proof-widget-shaped
+9. Added `examples/ReactProofWidget.lean` as a fuller proof-widget-shaped
    example that compiles into `demo-host.irpkg`, displays on `react.html`, and
-   keeps any extra tag/ARIA conveniences local to the example file.
+   can also be loaded as a live infoview widget through `show_panel_widgets`.
 10. Added runtime tests for nested callbacks inside `ReactNode`, hook-backed
    component rerenders, root rerender cleanup, unmount cleanup, package reload
    cleanup, runtime dispose, malformed Node construction, depth limits, missing
