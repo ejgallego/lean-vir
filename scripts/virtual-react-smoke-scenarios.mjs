@@ -11,6 +11,10 @@ import {
   createVirtualEventState,
   virtualReactElementById,
 } from "../web/src/vir-runtime-node.js";
+import {
+  createMovedProofSurfaceFixture,
+  createProofSurfaceFixture,
+} from "../web/src/proof-surface-fixtures.js";
 import { virtualReactTextContent } from "./virtual-fixtures.mjs";
 
 export function smokeVirtualReactCounter(runtime, documentState, selector) {
@@ -374,20 +378,7 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
     virtualReactTextContent(reactElementById(element, "react-proof-action-status")),
     "Context copied",
   );
-  const movedProofSurfaceFixture = {
-    ...proofSurfaceFixture,
-    position: "ReactProofWidget.lean:87:3",
-    cursor: {
-      ...proofSurfaceFixture.cursor,
-      line: 86,
-      character: 2,
-      label: "ReactProofWidget.lean:87:3",
-    },
-    selectedLocations: ["step"],
-    selections: [
-      { id: "location-step-0", kind: "location", label: "step" },
-    ],
-  };
+  const movedProofSurfaceFixture = createMovedProofSurfaceFixture(proofSurfaceFixture);
   assert.equal(runtime.call("ReactProofWidget.mount", selector, movedProofSurfaceFixture), true);
   assert.equal(element.reactRoot, root);
   assertLiveCallbacks(runtime, 9);
@@ -463,65 +454,4 @@ function assertLiveCallbacks(runtime, expected) {
 function assertUnmountCleanup(runtime, element) {
   assertLiveCallbacks(runtime, 0);
   assert.equal(element.reactRoot, undefined);
-}
-
-function createProofSurfaceFixture() {
-  return {
-    position: "ReactProofWidget.lean:42:7",
-    cursor: {
-      uri: "file:///workspace/ReactProofWidget.lean",
-      fileName: "ReactProofWidget.lean",
-      line: 41,
-      character: 6,
-      label: "ReactProofWidget.lean:42:7",
-    },
-    goals: [
-      {
-        id: "main",
-        kind: "goal",
-        index: 0,
-        title: "Main goal",
-        userName: "main",
-        mvarId: "main",
-        status: "active",
-        target: "xs.reverse.reverse = xs",
-        hypotheses: [
-          { id: "main-xs", names: ["xs"], fvarIds: ["xs"], type: "List Nat", value: null },
-          { id: "main-hxs", names: ["hxs"], fvarIds: ["hxs"], type: "xs.length > 0", value: null },
-        ],
-      },
-      {
-        id: "step",
-        kind: "goal",
-        index: 1,
-        title: "Induction step",
-        userName: "step",
-        mvarId: "step",
-        status: "pending",
-        target: "(x :: xs).reverse.reverse = x :: xs",
-        hypotheses: [
-          { id: "step-x", names: ["x"], fvarIds: ["x"], type: "Nat", value: null },
-          { id: "step-xs", names: ["xs"], fvarIds: ["xs"], type: "List Nat", value: null },
-          { id: "step-ih", names: ["ih"], fvarIds: ["ih"], type: "xs.reverse.reverse = xs", value: null },
-        ],
-      },
-      {
-        id: "side",
-        kind: "goal",
-        index: 2,
-        title: "Side condition",
-        userName: "side",
-        mvarId: "side",
-        status: "pending",
-        target: "([] : List Nat).reverse = []",
-        hypotheses: [
-          { id: "side-inst", names: ["inst"], fvarIds: ["inst"], type: "DecidableEq Nat", value: null },
-        ],
-      },
-    ],
-    selectedLocations: ["main"],
-    selections: [
-      { id: "location-main-0", kind: "location", label: "main" },
-    ],
-  };
 }

@@ -10,7 +10,6 @@ import Vir.React
 namespace ReactProofWidgetHello
 
 open Lean.Vir.React
-open Lean.Vir.Browser (DomM)
 open Lean.Vir.Infoview (Goal Hypothesis Surface)
 
 namespace Style
@@ -222,27 +221,7 @@ def view (surface : Surface) : ReactM (Lean.Vir.Js Node) :=
 def render (surface : Surface) : ReactM (Lean.Vir.Js Node) :=
   view surface
 
-def mount (selector : String) (surface : Surface) : DomM Bool := do
-  Root.renderComponentIntoSelector selector View surface
-
-def unmount (selector : String) : DomM Bool :=
-  Root.unmountSelector selector
-
-def irPackage : Lean.Vir.Infoview.IRPackage where
-  roots := #[
-    "ReactProofWidgetHello.mount",
-    "ReactProofWidgetHello.unmount"
-  ]
-
-def infoviewDemoProps : Lean.Vir.Infoview.WidgetProps where
-  wasmPath := "web/public/vir-upstream.wasm"
-  irPackage := some irPackage
-  entry := "ReactProofWidgetHello.mount"
-  unmountEntry := "ReactProofWidgetHello.unmount"
-  mountId := "vir-react-proof-widget-hello"
-  autoReloadMs := 1000
-  setupHint :=
-    "Run `npm run build:demo` to refresh the embedded infoview shell and web/public/vir-upstream.wasm. If this file was already open in VS Code, restart the Lean server or reopen the file."
+vir_proof_widget View with mountId := "vir-react-proof-widget-hello"
 
 end ReactProofWidgetHello
 
@@ -250,9 +229,8 @@ end ReactProofWidgetHello
 This is the smallest live VIR proof-widget example. It demonstrates the
 required shape:
 
-- a `String -> Surface -> DomM Bool` mount entry;
-- a matching `String -> DomM Bool` unmount entry;
-- a file-local `IRPackage` that names those entries;
+- a `Component Surface`;
+- a `vir_proof_widget` declaration that derives the standard entries and props;
 - a `show_panel_widgets` command that loads the package in the infoview.
 
 For a fuller API showcase, see `examples/ReactProofWidget.lean`.

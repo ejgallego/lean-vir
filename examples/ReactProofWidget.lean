@@ -15,9 +15,41 @@ open Lean.Vir.Browser (DomM)
 open Lean.Vir.Infoview (Hypothesis Goal SelectedLocation Surface)
 
 -- Keep this example independent from any future ProofWidgets compatibility DSL.
-def codeText (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) := do
+abbrev NodeBuilder :=
+  Array Property → Array EventHandler → Array (Lean.Vir.Js Node) → ReactM (Lean.Vir.Js Node)
+
+def textWith
+    (build : NodeBuilder)
+    (props : Array Property)
+    (handlers : Array EventHandler)
+    (value : String) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text value
-  Node.codeWith props #[] #[text]
+  build props handlers #[text]
+
+def codeText (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) := do
+  textWith (fun props handlers children => Node.codeWith props handlers children) props #[] value
+
+def spanText (value : String) : ReactM (Lean.Vir.Js Node) := do
+  let text ← Node.text value
+  Node.span #[text]
+
+def spanTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => Node.spanWith props handlers children) props #[] value
+
+def pTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => Node.pWith props handlers children) props #[] value
+
+def h3TextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => Node.h3With props handlers children) props #[] value
+
+def strongTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => Node.strongWith props handlers children) props #[] value
+
+def buttonTextWith
+    (props : Array Property)
+    (handlers : Array EventHandler)
+    (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => Node.buttonWith props handlers children) props handlers value
 
 namespace UiStyle
 
@@ -571,8 +603,7 @@ def selectedLocationIdsLabel (surface : Surface) : String :=
 
 def apiChip (accent label value : String) : ReactM (Lean.Vir.Js Node) := do
   let name ← codeText #[Property.classList #["react-proof-api-name"], apiNameStyle] label
-  let valueText ← Node.text value
-  let valueNode ← Node.spanWith #[Property.classList #["react-proof-api-value"], apiValueStyle] #[] #[valueText]
+  let valueNode ← spanTextWith #[Property.classList #["react-proof-api-value"], apiValueStyle] value
   Node.spanWith
     #[Property.classList #["react-proof-api-chip"], apiChipStyle accent]
     #[]
@@ -701,13 +732,11 @@ def hypothesisChildren (hypothesis : Hypothesis) : ReactM (Array (Lean.Vir.Js No
     match hypothesis.value with
     | none => pure #[]
     | some value => do
-        let sepText ← Node.text " := "
-        let sep ← Node.span #[sepText]
+        let sep ← spanText " := "
         let valueNode ← codeText #[Property.classList #["react-proof-hypothesis-value"], codeStyle] value
         pure #[sep, valueNode]
   let name ← codeText #[Property.classList #["react-proof-hypothesis-name"], codeStyle] (hypothesisLabel hypothesis)
-  let colonText ← Node.text " : "
-  let colon ← Node.span #[colonText]
+  let colon ← spanText " : "
   let typeNode ← codeText #[Property.classList #["react-proof-hypothesis-type"], codeStyle] hypothesis.type
   let line ← Node.spanWith #[Property.classList #["react-proof-hypothesis-line"], hypothesisLineStyle] #[] <|
       #[
@@ -715,8 +744,7 @@ def hypothesisChildren (hypothesis : Hypothesis) : ReactM (Array (Lean.Vir.Js No
         colon,
         typeNode
       ] ++ valueSuffix
-  let fvarText ← Node.text "fvarIds"
-  let fvarLabel ← Node.span #[fvarText]
+  let fvarLabel ← spanText "fvarIds"
   let fvars ← tokenListView hypothesis.fvarIds "none"
   let metaNode ← Node.spanWith #[Property.classList #["react-proof-hypothesis-meta"], hypothesisMetaStyle] #[] <|
     #[fvarLabel] ++ fvars
@@ -731,15 +759,13 @@ def hypothesisView (hypothesis : Hypothesis) : ReactM (Lean.Vir.Js Node) := do
 
 def hypothesesView (goal : Goal) : ReactM (Lean.Vir.Js Node) := do
   if goal.hypotheses.isEmpty then
-    let text ← Node.text "No local hypotheses."
-    Node.pWith
+    pTextWith
       #[
         Property.id "react-proof-hypotheses",
         Property.classList #["react-proof-hypotheses", "is-empty"],
         emptyStateStyle
       ]
-      #[]
-      #[text]
+      "No local hypotheses."
   else
     let hypotheses ← goal.hypotheses.mapM hypothesisView
     Node.ulWith
@@ -764,30 +790,22 @@ def goalButton
     (selectedId : String)
     (goal : Goal) : ReactM (Lean.Vir.Js Node) := do
   let selected := goal.id == selectedId
-  let titleText ← Node.text goal.title
-  let title ← Node.spanWith
+  let title ← spanTextWith
     #[Property.classList #["react-proof-goal-title"]]
-    #[]
-    #[titleText]
-  let statusText ← Node.text goal.status
-  let status ← Node.spanWith
+    goal.title
+  let status ← spanTextWith
     #[Property.classList #["react-proof-goal-status"], badgeStyle]
-    #[]
-    #[statusText]
+    goal.status
   let top ← Node.spanWith #[Property.classList #["react-proof-goal-top"], goalButtonTopStyle] #[] #[
     title,
     status
   ]
-  let metaText ← Node.text (goalKindLabel goal ++ " · " ++ goalIdentity goal ++ " · " ++ s!"{goal.hypotheses.size} local")
-  let metaNode ← Node.spanWith
+  let metaNode ← spanTextWith
     #[Property.classList #["react-proof-goal-meta"], goalMetaStyle]
-    #[]
-    #[metaText]
-  let targetText ← Node.text goal.target
-  let target ← Node.spanWith
+    (goalKindLabel goal ++ " · " ++ goalIdentity goal ++ " · " ++ s!"{goal.hypotheses.size} local")
+  let target ← spanTextWith
     #[Property.classList #["react-proof-goal-target"], goalTargetPreviewStyle]
-    #[]
-    #[targetText]
+    goal.target
   let button ← Node.buttonWith
     #[
       Property.id ("react-proof-goal-" ++ goal.id),
@@ -825,10 +843,8 @@ def summaryText (surface : Surface) (goal : Goal) : String :=
   s!"{goal.title}; {hypCount} local {plural hypCount "hypothesis" "hypotheses"}; {goalCount} {plural goalCount "goal" "goals"} / {totalHypCount} {plural totalHypCount "hypothesis" "hypotheses"} at {cursorLabel surface}"
 
 def metricView (label value : String) : ReactM (Lean.Vir.Js Node) := do
-  let labelText ← Node.text label
-  let labelNode ← Node.spanWith #[Property.classList #["react-proof-metric-label"], metricLabelStyle] #[] #[labelText]
-  let valueText ← Node.text value
-  let valueNode ← Node.strongWith #[Property.classList #["react-proof-metric-value"], metricValueStyle] #[] #[valueText]
+  let labelNode ← spanTextWith #[Property.classList #["react-proof-metric-label"], metricLabelStyle] label
+  let valueNode ← strongTextWith #[Property.classList #["react-proof-metric-value"], metricValueStyle] value
   Node.divWith #[Property.classList #["react-proof-metric"], metricStyle] #[] #[
     labelNode,
     valueNode
@@ -853,10 +869,8 @@ def metricGrid (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js N
   ]
 
 def surfaceCell (label value : String) : ReactM (Lean.Vir.Js Node) := do
-  let labelText ← Node.text label
-  let labelNode ← Node.spanWith #[Property.classList #["react-proof-surface-label"], surfaceCellLabelStyle] #[] #[labelText]
-  let valueText ← Node.text value
-  let valueNode ← Node.spanWith #[Property.classList #["react-proof-surface-value"], surfaceCellValueStyle] #[] #[valueText]
+  let labelNode ← spanTextWith #[Property.classList #["react-proof-surface-label"], surfaceCellLabelStyle] label
+  let valueNode ← spanTextWith #[Property.classList #["react-proof-surface-value"], surfaceCellValueStyle] value
   Node.divWith #[Property.classList #["react-proof-surface-cell"], surfaceCellStyle] #[] #[
     labelNode,
     valueNode
@@ -892,34 +906,26 @@ def headerSummary (surface : Surface) (goal? : Option Goal) : String :=
   | some goal => summaryText surface goal
 
 def surfaceHeader (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js Node) := do
-  let eyebrowText ← Node.text "Live Lean infoview"
-  let eyebrow ← Node.pWith #[Property.classList #["react-proof-eyebrow"], eyebrowStyle] #[] #[eyebrowText]
-  let titleText ← Node.text "Live ProofWidget"
-  let title ← Node.h3With #[headingStyle] #[] #[titleText]
-  let moduleText ← Node.text "VIR"
-  let moduleBadge ← Node.spanWith #[Property.classList #["react-proof-module"], badgeStyle] #[] #[moduleText]
-  let runtimeText ← Node.text "React"
-  let runtimeBadge ← Node.spanWith #[Property.classList #["react-proof-runtime"], badgeStyle] #[] #[runtimeText]
-  let liveText ← Node.text "live"
-  let liveBadge ← Node.spanWith #[Property.classList #["react-proof-live"], badgeStyle] #[] #[liveText]
-  let rangeText ← Node.text (cursorLabel surface)
-  let rangeBadge ← Node.spanWith #[Property.classList #["react-proof-range"], badgeStyle] #[] #[rangeText]
+  let eyebrow ← pTextWith #[Property.classList #["react-proof-eyebrow"], eyebrowStyle] "Live Lean infoview"
+  let title ← h3TextWith #[headingStyle] "Live ProofWidget"
+  let moduleBadge ← spanTextWith #[Property.classList #["react-proof-module"], badgeStyle] "VIR"
+  let runtimeBadge ← spanTextWith #[Property.classList #["react-proof-runtime"], badgeStyle] "React"
+  let liveBadge ← spanTextWith #[Property.classList #["react-proof-live"], badgeStyle] "live"
+  let rangeBadge ← spanTextWith #[Property.classList #["react-proof-range"], badgeStyle] (cursorLabel surface)
   let source ← Node.pWith #[Property.classList #["react-proof-source"], sourceStyle] #[] #[
     moduleBadge,
     runtimeBadge,
     liveBadge,
     rangeBadge
   ]
-  let summary ← Node.text (headerSummary surface goal?)
-  let summaryNode ← Node.pWith
+  let summaryNode ← pTextWith
     #[
       Property.id "react-proof-summary",
       Property.classList #["react-proof-summary"],
       Property.ariaLive "polite",
       summaryStyle
     ]
-    #[]
-    #[summary]
+    (headerSummary surface goal?)
   let heading ← Node.divWith #[Property.classList #["react-proof-heading"]] #[] #[
     eyebrow,
     title,
@@ -934,8 +940,7 @@ def surfaceHeader (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.J
   ]
 
 def actionButton (id label : String) (onClick : DomM Unit) : ReactM (Lean.Vir.Js Node) := do
-  let text ← Node.text label
-  Node.buttonWith
+  buttonTextWith
     #[
       Property.id id,
       Property.classList #["react-proof-action"],
@@ -943,7 +948,7 @@ def actionButton (id label : String) (onClick : DomM Unit) : ReactM (Lean.Vir.Js
       actionButtonStyle
     ]
     #[EventHandler.onClick onClick]
-    #[text]
+    label
 
 def actionBar
     (goal : Goal)
@@ -958,16 +963,14 @@ def actionBar
   let selection ← actionButton "react-proof-copy-selection" "Copy selection" copySelection
   let target ← actionButton "react-proof-copy-target" "Copy target" (copyTarget goal)
   let context ← actionButton "react-proof-copy-context" "Copy context" (copyContext goal)
-  let statusText ← Node.text actionStatus
-  let status ← Node.spanWith
+  let status ← spanTextWith
     #[
       Property.id "react-proof-action-status",
       Property.classList #["react-proof-action-status"],
       Property.ariaLive "polite",
       actionStatusStyle
     ]
-    #[]
-    #[statusText]
+    actionStatus
   Node.divWith
     #[
       Property.classList #["react-proof-actions"],
@@ -986,10 +989,8 @@ def actionBar
 def emptyView (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
   let header ← surfaceHeader surface none
   let apis ← apiStrip surface none
-  let emptyText ← Node.text "The current infoview snapshot has no goals."
-  let empty ← Node.pWith #[Property.classList #["react-proof-empty"], emptyStateStyle] #[] #[
-    emptyText
-  ]
+  let empty ← pTextWith #[Property.classList #["react-proof-empty"], emptyStateStyle]
+    "The current infoview snapshot has no goals."
   Node.sectionWith
     #[
       Property.id "react-proof-widget",
@@ -1014,25 +1015,19 @@ def detailView
     (copyTarget : Goal → DomM Unit)
     (copyContext : Goal → DomM Unit)
     (actionStatus : String) : ReactM (Lean.Vir.Js Node) := do
-  let titleText ← Node.text goal.title
-  let title ← Node.h3With #[Property.id "react-proof-selected-title", headingStyle] #[] #[titleText]
-  let statusText ← Node.text goal.status
-  let status ← Node.spanWith #[Property.id "react-proof-selected-status", badgeStyle] #[] #[statusText]
-  let kindText ← Node.text (" " ++ goalKindLabel goal ++ " · " ++ selectionSummary surface)
-  let kind ← Node.spanWith #[Property.classList #["react-proof-selected-kind"], goalMetaStyle] #[] #[
-    kindText
-  ]
+  let title ← h3TextWith #[Property.id "react-proof-selected-title", headingStyle] goal.title
+  let status ← spanTextWith #[Property.id "react-proof-selected-status", badgeStyle] goal.status
+  let kind ← spanTextWith #[Property.classList #["react-proof-selected-kind"], goalMetaStyle]
+    (" " ++ goalKindLabel goal ++ " · " ++ selectionSummary surface)
   let statusLine ← Node.pWith #[Property.classList #["react-proof-status-line"]] #[] #[status, kind]
   let surfacePanelNode ← surfacePanel surface goal
   let actions ← actionBar goal revealCursor copyCursor copySelection copyTarget copyContext actionStatus
-  let targetLabelText ← Node.text "Target"
-  let targetLabel ← Node.pWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] #[] #[targetLabelText]
+  let targetLabel ← pTextWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] "Target"
   let targetCode ← codeText #[Property.id "react-proof-target-code", codeStyle] goal.target
   let target ← Node.preWith #[Property.id "react-proof-target", Property.classList #["react-proof-target"], targetStyle] #[] #[
     targetCode
   ]
-  let contextLabelText ← Node.text "Local context"
-  let contextLabel ← Node.pWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] #[] #[contextLabelText]
+  let contextLabel ← pTextWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] "Local context"
   let hypotheses ← hypothesesView goal
   Node.articleWith
     #[
@@ -1069,8 +1064,7 @@ def View : Component ViewProps := fun props => do
   | some goal =>
       let header ← surfaceHeader props.surface (some goal)
       let apis ← apiStrip props.surface (some goal)
-      let goalsText ← Node.text "Goals"
-      let goalsLabel ← Node.pWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] #[] #[goalsText]
+      let goalsLabel ← pTextWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] "Goals"
       let goals ← goalList props.surface props.selectGoal props.state.selectedGoalId
       let sidebar ← Node.divWith #[Property.classList #["react-proof-sidebar"], sidebarStyle] #[] #[
         goalsLabel,
@@ -1161,27 +1155,7 @@ def App : Component Surface := fun surface => do
 def app (surface : Surface) : ReactM (Lean.Vir.Js Node) :=
   Node.component App surface
 
-def mount (selector : String) (surface : Surface) : DomM Bool := do
-  Root.renderComponentIntoSelector selector App surface
-
-def unmount (selector : String) : DomM Bool :=
-  Root.unmountSelector selector
-
-def irPackage : Lean.Vir.Infoview.IRPackage where
-  roots := #[
-    "ReactProofWidget.mount",
-    "ReactProofWidget.unmount"
-  ]
-
-def infoviewDemoProps : Lean.Vir.Infoview.WidgetProps where
-  wasmPath := "web/public/vir-upstream.wasm"
-  irPackage := some irPackage
-  entry := "ReactProofWidget.mount"
-  unmountEntry := "ReactProofWidget.unmount"
-  mountId := "vir-react-proof-widget"
-  autoReloadMs := 1000
-  setupHint :=
-    "Run `npm run build:demo` to refresh the embedded infoview shell and web/public/vir-upstream.wasm. If this file was already open in VS Code, restart the Lean server or reopen the file."
+vir_proof_widget App with mountId := "vir-react-proof-widget"
 
 end ReactProofWidget
 
@@ -1196,15 +1170,15 @@ npm run test:infoview
 The demo path above is the repo-local `web/public/vir-upstream.wasm` binary.
 `npm run build:demo` refreshes the embedded infoview shell, rebuilds `Vir`, and
 creates that WASM. `Vir.Infoview` transports it through the infoview RPC
-session, so no local dev server is required. `ReactProofWidget.irPackage` is the
-explicit widget activation package declaration. Its `.irpkg` payload is built
-from the active Lean server snapshot and sent over the RPC channel when the
-runtime service is first needed. `autoReloadMs` only performs a cheap package
-stat after that; the stat token is derived from source ranges in the local
-package closure, so ordinary proof edits outside the widget code do not rebuild
-the package. Cursor navigation updates the proof surface without rebuilding the
-package. The JavaScript shell passes the real infoview panel goals to
-`ReactProofWidget.mount`.
+session, so no local dev server is required. `vir_proof_widget App` declares the
+standard mount/unmount entries, `ReactProofWidget.irPackage`, and
+`ReactProofWidget.infoviewDemoProps`. The `.irpkg` payload is built from the
+active Lean server snapshot and sent over the RPC channel when the runtime
+service is first needed. `autoReloadMs` only performs a cheap package stat after
+that; the stat token is derived from source ranges in the local package closure,
+so ordinary proof edits outside the widget code do not rebuild the package.
+Cursor navigation updates the proof surface without rebuilding the package. The
+JavaScript shell passes the real infoview panel goals to `ReactProofWidget.mount`.
 -/
 
 show_panel_widgets [local Lean.Vir.Infoview.widget with ReactProofWidget.infoviewDemoProps]

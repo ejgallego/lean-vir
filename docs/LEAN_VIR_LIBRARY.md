@@ -315,17 +315,32 @@ Future ProofWidgets compatibility work is tracked separately in
 
 The `Vir.Infoview` module provides the first infoview-facing shell:
 
+- `Lean.Vir.Infoview.Surface`
+- `Lean.Vir.Infoview.IRPackage`
 - `Lean.Vir.Infoview.WidgetProps`
+- `Lean.Vir.Infoview.ReactWidget`
+- `vir_proof_widget`
 - `Lean.Vir.Infoview.widget`
-- `Lean.Vir.Infoview.localProofWidget`
 
-`WidgetProps` points the infoview widget at a VIR runtime module URL, the
-`vir-upstream.wasm` URL, an `.irpkg` URL, and an entry name. The entry must have
-signature `String -> DomM Bool`; the shell creates a nested mount element, passes
-its selector to the entry, and disposes the VIR runtime when the infoview widget
-unmounts. `examples/InfoviewVirWidget.lean` is the local smoke example for this
-path. `node scripts/smoke-infoview-widget.mjs` checks that the shell module
-loads and that `ReactProofWidget.mount` has the required widget signature.
+`WidgetProps` points the infoview widget at a VIR runtime module URL or bundled
+runtime, the `vir-upstream.wasm` asset, a package source, and an entry name.
+For live Lean widgets, the package source is normally an `IRPackage` declaration
+whose roots are built from the active Lean server snapshot. The mount entry must
+have signature `String -> Surface -> DomM Bool`; the optional unmount entry must
+have signature `String -> DomM Bool`. The shell creates a nested mount element,
+passes its selector plus the current infoview `Surface`, and rerenders the React
+component with fresh surface props on cursor movement. It reloads the runtime
+service only when the widget IR package revision changes.
+
+`vir_proof_widget` is the narrow authoring helper for Lean-authored React proof
+widgets: users provide a `React.Component Surface`, and the command declares the
+standard selector-owned mount/unmount entries, `IRPackage`, and `WidgetProps` in
+the current namespace. `ReactWidget` is the lower-level expansion target when a
+caller needs to assemble those pieces manually. `examples/ReactProofWidgetHello.lean`
+is the minimal live example and `examples/ReactProofWidget.lean` is the fuller
+API showcase.
+`node scripts/smoke-infoview-widget.mjs` checks that the shell module loads and
+that the proof-widget entries have the required signatures.
 
 The JavaScript runtime binding map, Node virtual-host behavior, cleanup hooks,
 and external browser/React API references are documented in

@@ -8,6 +8,7 @@ import "./style.css";
 import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
 import { hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
 import { errorMessage, setReadyState } from "./pages/page-utils.js";
+import { createProofSurfaceFixture } from "./proof-surface-fixtures.js";
 import { fetchBytes } from "./vir-runtime.js";
 
 const packageFile = hostPackageFile;
@@ -20,62 +21,7 @@ const exportsEl = document.querySelector("#react-review-exports");
 const ptrEl = document.querySelector("#react-review-ptr");
 const reloadButton = document.querySelector("#react-review-reload");
 
-const proofSurfaceFixture = {
-  position: "ReactProofWidget.lean:42:7",
-  cursor: {
-    uri: "file:///workspace/ReactProofWidget.lean",
-    fileName: "ReactProofWidget.lean",
-    line: 41,
-    character: 6,
-    label: "ReactProofWidget.lean:42:7",
-  },
-  goals: [
-    {
-      id: "main",
-      kind: "goal",
-      index: 0,
-      title: "Main goal",
-      userName: "main",
-      mvarId: "main",
-      status: "active",
-      target: "xs.reverse.reverse = xs",
-      hypotheses: [
-        { id: "main-xs", names: ["xs"], fvarIds: ["xs"], type: "List Nat", value: null },
-        { id: "main-hxs", names: ["hxs"], fvarIds: ["hxs"], type: "xs.length > 0", value: null },
-      ],
-    },
-    {
-      id: "step",
-      kind: "goal",
-      index: 1,
-      title: "Induction step",
-      userName: "step",
-      mvarId: "step",
-      status: "pending",
-      target: "(x :: xs).reverse.reverse = x :: xs",
-      hypotheses: [
-        { id: "step-x", names: ["x"], fvarIds: ["x"], type: "Nat", value: null },
-        { id: "step-xs", names: ["xs"], fvarIds: ["xs"], type: "List Nat", value: null },
-        { id: "step-ih", names: ["ih"], fvarIds: ["ih"], type: "xs.reverse.reverse = xs", value: null },
-      ],
-    },
-    {
-      id: "side",
-      kind: "goal",
-      index: 2,
-      title: "Side condition",
-      userName: "side",
-      mvarId: "side",
-      status: "pending",
-      target: "([] : List Nat).reverse = []",
-      hypotheses: [
-        { id: "side-inst", names: ["inst"], fvarIds: ["inst"], type: "DecidableEq Nat", value: null },
-      ],
-    },
-  ],
-  selectedLocations: ["main"],
-  selections: [{ id: "location-main-0", kind: "location", label: "main" }],
-};
+const proofSurfaceFixture = createProofSurfaceFixture();
 
 const examples = [
   {

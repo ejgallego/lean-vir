@@ -138,17 +138,18 @@ A realistic path has three layers:
    selected target or a text snapshot of the selected goal context, plus
    `Lean.Vir.Infoview.Command.revealCursor`, which dispatches through upstream
    `EditorConnection.revealPosition` in the bundled infoview shell. The file also
-   includes a file-local
-   `show_panel_widgets` command that mounts that `.irpkg` entry through a real
-   Lean `@[widget_module]` shell in the infoview, then leaves the widget active
-   for the proof playground below it.
+   includes a file-local `vir_proof_widget` declaration and `show_panel_widgets`
+   command that mount the component through a real Lean `@[widget_module]` shell
+   in the infoview, then leave the widget active for the proof playground below
+   it.
    That shell embeds an esbuild bundle of the VIR JavaScript runtime graph,
    keeps React/ReactDOM/infoview imports external so they resolve to the Lean
    infoview dependencies, loads the WASM through `Lean.Vir.Infoview.readAsset`,
-   and requires an explicit `Lean.Vir.Infoview.IRPackage` declaration for the
-   widget activation path. The package bytes are still built from the active
-   Lean server snapshot through `Lean.Vir.Infoview.buildIRPackage`, so the local
-   demo no longer requires the repository Vite dev server or a package watcher.
+   and derives the standard mount/unmount, `IRPackage`, and `WidgetProps`
+   declarations from the supplied component. The package bytes are still built
+   from the active Lean server snapshot through
+   `Lean.Vir.Infoview.buildIRPackage`, so the local demo no longer requires the
+   repository Vite dev server or a package watcher.
    `statIRPackage` provides a package-root revision token for cache lookup and
    later refreshes. The token is derived from the source ranges of local
    declarations in the package closure, with a document-version fallback only
