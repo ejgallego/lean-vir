@@ -64,7 +64,8 @@ decimal scalars, `ByteArray`, `Array Nat -> Nat`, `Array String -> Nat`,
 `Option` arguments/results, `Prod` arguments/results, a nested
 `List (Nat × String)` argument, `Profile` records, `ProfileStats` mixed scalar
 records, trivial scalar wrappers, `Tagged Profile`, `Metered`, extended records,
-`Sum`/`Except` tagged unions, and nullary/unary/binary pretty-printer calls.
+recursive structures/custom inductives, `Sum`/`Except` tagged unions, and
+nullary/unary/binary pretty-printer calls.
 JavaScript lowers inputs with the matching `vir_obj_*` constructor,
 `vir_obj_array`, `vir_obj_list`, `vir_obj_ctor`, or `vir_obj_ctor_layout`, calls
 `vir_call_resolved_objects`, and lifts the owned result with the matching

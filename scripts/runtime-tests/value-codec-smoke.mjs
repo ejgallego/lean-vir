@@ -498,6 +498,33 @@ try {
     score: "8",
     tags: ["ir", "extended"],
   });
+  assert.equal(runtime.call("Vir.Fixtures.RecursiveTypes.treeRootScore", {
+    kind: "branch",
+    fields: {
+      left: { kind: "leaf", value: 4 },
+      right: {
+        kind: "branch",
+        fields: {
+          left: { kind: "leaf", value: 5 },
+          right: { kind: "leaf", value: 6 },
+        },
+      },
+    },
+  }), "515");
+  assert.equal(runtime.call("Vir.Fixtures.RecursiveTypes.chainRootScore", {
+    label: "browser",
+    next: {
+      label: "leaf",
+      next: null,
+    },
+  }), "211");
+  assert.equal(runtime.call("Vir.Fixtures.RecursiveTypes.jsonRootScore", {
+    kind: "object",
+    value: [
+      { fst: "flag", snd: { kind: "bool", value: true } },
+      { fst: "empty", snd: { kind: "null" } },
+    ],
+  }), "22");
   assert.deepEqual(runtime.call("Vir.Fixtures.ListOption.classifySum", 0), {
     kind: "inl",
     value: "10",
@@ -517,7 +544,7 @@ try {
 } finally {
   runtime.exports = objectCallExports;
 }
-assert.equal(objectCalls, 33);
+assert.equal(objectCalls, 36);
 assert.equal(codecFallbackCalls, 0);
 
 const prettyObjectCallExports = prettyRuntime.exports;

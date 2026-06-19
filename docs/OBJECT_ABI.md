@@ -150,8 +150,9 @@ can be lifted from it. Arguments and results currently support base values,
 `Array`, `List`, `Option`, `Prod`, and manifest-described structures, tagged
 unions, and custom inductive constructors whose fields recursively stay in this
 subset. Nontrivial constructors may mix object fields, raw `USize` slots, and
-packed scalar fields. Recursive-self descriptors still fall back to the byte
-codec for now, as do resources, callbacks, and `Lean.Expr` values. Decimal
+packed scalar fields, including direct recursive references through supported
+fields. Resources, callbacks, effectful calls, and `Lean.Expr` values still fall
+back to the byte codec for now. Decimal
 scalar calls lower through the corresponding `vir_obj_*` constructor, call
 `vir_call_resolved_objects`, lift the result with the matching decimal
 inspection helper plus
