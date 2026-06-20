@@ -45,10 +45,15 @@ React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
 `Root.renderComponent root component props` API in a real React function
 component. The hook bindings `react.useState`, `react.useRef`,
-`react.useEffect`, and `react.useEffectWithDeps` are render-time `ReactM`
-operations. `useRef` returns a host-owned React ref object; `react.ref.get` and
-`react.ref.set` are `RuntimeM` operations over its `current` field and do not
-schedule renders. `useEffect` currently has a resource shape: setup returns a
+`react.useReducer`, `react.useEffect`, and `react.useEffectWithDeps` are
+render-time `ReactM` operations. `useRef` returns a host-owned React ref object;
+`react.ref.get` and `react.ref.set` are `RuntimeM` operations over its
+`current` field and do not schedule renders. `useReducer` is exposed through
+concrete `ReducerBinding state action` instances because the current host
+import ABI does not support fully polymorphic callback argument types. Reducer
+callbacks are retained per hook slot, replaced after committed renders, and
+released on failed render, unmount, package reload, or runtime dispose.
+`useEffect` currently has a resource shape: setup returns a
 host resource, and cleanup receives the same resource at React's cleanup point.
 The no-deps binding reruns after committed renders. `useEffectWithDeps` maps to
 React's dependency-array form and compares the Lean-provided string dependency
@@ -187,6 +192,10 @@ need a focused pass once the API and examples are more mature:
   from a retained handle. Examples that call `JsValue.ofString`, `ofNat`, or
   `ofBool` immediately before `State.set` may retain those scalar wrappers
   longer than necessary.
+- `react.useReducer` avoids scalar wrapper state for structured reducer values,
+  but each concrete reducer state/action pair still needs concrete low-level
+  `@[vir_js]` declarations behind its `ReducerBinding` instance until the host
+  import ABI supports polymorphic callback arguments directly.
 - A future cleanup should decide whether render-time state values and
   direct-set scalar values need a scoped borrowed/owned API, debug resource
   counters, or a small retain/release discipline instead of relying on runtime
@@ -234,5 +243,6 @@ manifest.
 - [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame)
 - [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot)
 - [React `useState`](https://react.dev/reference/react/useState)
+- [React `useReducer`](https://react.dev/reference/react/useReducer)
 - [React `useEffect`](https://react.dev/reference/react/useEffect)
 - [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount)

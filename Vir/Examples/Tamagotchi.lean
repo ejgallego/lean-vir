@@ -370,26 +370,11 @@ def actions : Array Tamagotchi.Action :=
 def displayName (state : Tamagotchi.PetState) : String :=
   Tamagotchi.normalizeNameForArtwork state.artwork state.name
 
-def summaryLabel (state : Tamagotchi.PetState) (actionLabel : String) : String :=
-  s!"{displayName state} is {state.mood.label}; last {actionLabel}; " ++
-    s!"care {state.care}/{Tamagotchi.maxCare}; turn {state.turns}"
-
-def stateKey (state : Tamagotchi.PetState) (actionLabel : String) : String :=
-  "|".intercalate #[
-    state.name,
-    state.mood.label,
-    Tamagotchi.traceAttr state.trace,
-    state.artwork,
-    toString state.turns,
-    toString state.care,
-    actionLabel
-  ].toList
-
-def liveTickLabel : String :=
-  "tick"
+def liveTickSeconds : Nat :=
+  50
 
 def liveTickMs : UInt32 :=
-  50000
+  1000
 
 def style (entries : Array (String × String)) : Property :=
   Property.stylePairs entries
@@ -406,15 +391,6 @@ def widgetStyle : Property := style #[
   ("color", "var(--vscode-editor-foreground, #24292f)"),
   ("colorScheme", "light dark"),
   ("fontFamily", "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif")
-]
-
-def headingStyle : Property := style #[
-  ("display", "flex"),
-  ("flexWrap", "wrap"),
-  ("gap", "6px"),
-  ("alignItems", "center"),
-  ("justifyContent", "space-between"),
-  ("minWidth", "0")
 ]
 
 def bodyStyle : Property := style #[
@@ -501,68 +477,83 @@ def screenStyle (state : Tamagotchi.PetState) : Property :=
     ("textAlign", "center")
   ]
 
-def statGridStyle : Property := style #[
-  ("display", "flex"),
-  ("flexWrap", "wrap"),
-  ("gap", "4px"),
-  ("minWidth", "0")
-]
-
-def statStyle : Property := style #[
-  ("display", "inline-grid"),
-  ("gap", "1px"),
-  ("minWidth", "58px"),
-  ("padding", "4px 6px"),
-  ("border", "1px solid var(--vscode-editorWidget-border, #d0d7de)"),
-  ("borderRadius", "5px"),
-  ("background", "var(--vscode-editor-background, #ffffff)"),
-  ("fontSize", "0.72rem"),
-  ("lineHeight", "1.15")
-]
-
 def actionGridStyle : Property := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "repeat(5, minmax(0, 1fr))"),
-  ("gap", "4px")
+  ("gap", "5px")
 ]
 
 def buttonStyle : Property := style #[
-  ("minHeight", "28px"),
-  ("padding", "0 5px"),
-  ("border", "1px solid var(--vscode-button-border, #8ba58c)"),
-  ("borderRadius", "5px"),
-  ("background", "var(--vscode-button-background, #ffffff)"),
+  ("minHeight", "31px"),
+  ("padding", "0 8px"),
+  ("border", "1px solid rgba(49, 79, 120, 0.28)"),
+  ("borderRadius", "8px"),
+  ("background",
+    "linear-gradient(180deg, var(--vscode-button-background, #f7fbf6), var(--vscode-editorWidget-background, #edf5ea))"),
   ("color", "var(--vscode-button-foreground, #17201a)"),
+  ("boxShadow", "inset 0 -2px 0 rgba(49, 79, 120, 0.14), 0 1px 2px rgba(31, 45, 36, 0.12)"),
   ("fontSize", "0.72rem"),
   ("fontWeight", "800"),
+  ("textTransform", "capitalize"),
+  ("transition", "transform 120ms ease, filter 120ms ease, box-shadow 120ms ease"),
   ("cursor", "pointer")
 ]
 
-def summaryStyle : Property := style #[
-  ("margin", "0"),
-  ("padding", "6px 7px"),
+def resetButtonStyle : Property := style #[
+  ("minHeight", "26px"),
+  ("padding", "0 9px"),
   ("border", "1px solid var(--vscode-editorWidget-border, #d0d7de)"),
-  ("borderRadius", "6px"),
-  ("background", "var(--vscode-textCodeBlock-background, #f6f8fa)"),
-  ("fontSize", "0.76rem"),
-  ("lineHeight", "1.25"),
-  ("overflowWrap", "anywhere")
+  ("borderRadius", "8px"),
+  ("background", "var(--vscode-editor-background, #ffffff)"),
+  ("color", "var(--vscode-descriptionForeground, #53645a)"),
+  ("fontSize", "0.7rem"),
+  ("fontWeight", "800"),
+  ("transition", "transform 120ms ease, filter 120ms ease"),
+  ("cursor", "pointer")
+]
+
+def progressWrapStyle : Property := style #[
+  ("display", "grid"),
+  ("gridTemplateColumns", "minmax(0, 1fr) auto"),
+  ("alignItems", "center"),
+  ("gap", "6px"),
+  ("width", "100%"),
+  ("maxWidth", "138px")
 ]
 
 def progressStyle : Property := style #[
-  ("height", "6px"),
+  ("height", "8px"),
+  ("minWidth", "0"),
   ("overflow", "hidden"),
   ("borderRadius", "999px"),
+  ("border", "1px solid rgba(38, 61, 44, 0.18)"),
   ("background", "var(--vscode-editorWidget-border, #d0d7de)")
 ]
 
-def progressFillStyle : Property := style #[
-  ("width", "100%"),
+def progressPercent (secondsLeft : Nat) : Nat :=
+  let secondsLeft := if secondsLeft > liveTickSeconds then liveTickSeconds else secondsLeft
+  (secondsLeft * 100) / liveTickSeconds
+
+def progressLabel (secondsLeft : Nat) : String :=
+  s!"{secondsLeft}s"
+
+def progressFillStyle (secondsLeft : Nat) : Property := style #[
+  ("width", toString (progressPercent secondsLeft) ++ "%"),
   ("height", "100%"),
   ("borderRadius", "inherit"),
   ("background", "linear-gradient(90deg, #5f9e6f, #d68f3b, #bd3c38)"),
   ("transformOrigin", "left center"),
-  ("animation", "virPetCountdown 50s linear forwards")
+  ("transition", "width 260ms linear")
+]
+
+def progressCounterStyle : Property := style #[
+  ("minWidth", "28px"),
+  ("textAlign", "right"),
+  ("fontSize", "0.7rem"),
+  ("fontWeight", "900"),
+  ("lineHeight", "1"),
+  ("fontVariantNumeric", "tabular-nums"),
+  ("color", "var(--vscode-descriptionForeground, #53645a)")
 ]
 
 def widgetCss : String :=
@@ -572,15 +563,14 @@ def widgetCss : String :=
   "50%{transform:translateY(1px) rotate(0deg);}" ++
   "75%{transform:translateY(-2px) rotate(2deg);}" ++
   "}" ++
-  "@keyframes virPetCountdown {" ++
-  "from{transform:scaleX(1);}" ++
-  "to{transform:scaleX(0);}" ++
-  "}" ++
   ".react-pet-widget .vir-pet-dance{animation:virPetDance 2.8s ease-in-out infinite;}" ++
-  ".react-pet-widget .react-pet-stat span:first-child{text-transform:uppercase;color:var(--vscode-descriptionForeground,#5f6f64);font-weight:800;}" ++
-  ".react-pet-widget .react-pet-stat span:last-child{font-weight:800;color:var(--vscode-editor-foreground,#17201a);}" ++
+  ".react-pet-widget .react-pet-action-button:not(:disabled):hover,.react-pet-widget .react-pet-reset-button:hover{filter:brightness(1.05);transform:translateY(-1px);}" ++
+  ".react-pet-widget .react-pet-action-button:not(:disabled):active,.react-pet-widget .react-pet-reset-button:active{filter:brightness(0.98);transform:translateY(0);}" ++
+  ".react-pet-widget .react-pet-action-button:disabled{cursor:not-allowed;opacity:.48;filter:saturate(.45);}" ++
   "@media (prefers-reduced-motion: reduce){" ++
-  ".react-pet-widget .vir-pet-dance,.react-pet-widget .react-pet-progress-fill{animation:none!important;}" ++
+  ".react-pet-widget .vir-pet-dance{animation:none!important;}" ++
+  ".react-pet-widget .react-pet-action-button,.react-pet-widget .react-pet-reset-button{transition:none!important;}" ++
+  ".react-pet-widget .react-pet-progress-fill{transition:none!important;}" ++
   "}"
 
 def emptySpanWith (classes : Array String) (props : Array Property) : ReactM (Lean.Vir.Js Node) :=
@@ -821,232 +811,169 @@ def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
     #[]
     #[screen, leftButton, centerButton, rightButton]
 
-def stat (key label value : String) : ReactM (Lean.Vir.Js Node) := do
-  let labelText ← Node.text label
-  let labelNode ← Node.spanWith #[] #[] #[labelText]
-  let valueText ← Node.text value
-  let valueNode ← Node.spanWith #[] #[] #[valueText]
-  Node.keyedDivWith key
-    #[Property.classList #["react-pet-stat"], statStyle]
-    #[]
-    #[labelNode, valueNode]
-
-partial def traceNodesAux (index : Nat) : List Tamagotchi.Mood → ReactM (Array (Lean.Vir.Js Node))
-  | [] => pure #[]
-  | mood :: rest => do
-      let text ← Node.text mood.label
-      let node ←
-        Node.keyedSpanWith
-          (toString index)
-          #[
-            Property.classList #["react-pet-trace-token", "react-pet-trace-" ++ mood.label],
-            Property.role "listitem"
-          ]
-          #[]
-          #[text]
-      let restNodes ← traceNodesAux (index + 1) rest
-      pure (#[node] ++ restNodes)
-
-def traceNodes (trace : List Tamagotchi.Mood) : ReactM (Array (Lean.Vir.Js Node)) :=
-  traceNodesAux 0 trace
-
-def traceAriaLabel (trace : List Tamagotchi.Mood) : String :=
-  "Mood trace: " ++ Tamagotchi.traceLabel trace
-
 def normalizeViewState (state : Tamagotchi.PetState) : Tamagotchi.PetState :=
   let artwork := Tamagotchi.normalizeArtwork state.artwork
   { state with artwork := artwork, care := Tamagotchi.clampCare state.care }
 
 structure ViewState where
   state : Tamagotchi.PetState
-  actionLabel : String
+  secondsLeft : Nat
 
-structure ViewStateHook where
-  name : State (Lean.Vir.Js String)
-  mood : State (Lean.Vir.Js String)
-  trace : State (Lean.Vir.Js String)
-  artwork : State (Lean.Vir.Js String)
-  turns : State (Lean.Vir.Js Nat)
-  care : State (Lean.Vir.Js Nat)
-  actionLabel : State (Lean.Vir.Js String)
-  value : ViewState
+inductive ViewAction where
+  | care (action : Tamagotchi.Action)
+  | artwork (checked : Bool)
+  | reset
+  | tick
+
+namespace ViewReducerBinding
+
+@[vir_js "react.useReducer"]
+opaque useReducer
+    (reducer : ViewState → ViewAction → Lean.Vir.RuntimeM ViewState)
+    (initial : @& ViewState) :
+    ReactM (ReducerState ViewState ViewAction)
+
+@[vir_js "react.reducer.dispatch"]
+opaque dispatch
+    (dispatch : @& Lean.Vir.Js (ReducerDispatch ViewState ViewAction))
+    (action : @& ViewAction) :
+    Lean.Vir.RuntimeM Unit
+
+end ViewReducerBinding
+
+instance : ReducerBinding ViewState ViewAction where
+  useReducer := ViewReducerBinding.useReducer
+  dispatch := ViewReducerBinding.dispatch
 
 def initialViewState : ViewState :=
   {
     state := Tamagotchi.initialState Tamagotchi.defaultOctopusName "octopus"
-    actionLabel := "..."
+    secondsLeft := liveTickSeconds
   }
 
-def viewStateFromValues
-    (name moodLabel traceValue artwork : String)
-    (turns care : Nat)
-    (actionLabel : String) : ViewState :=
-  let mood := Tamagotchi.Mood.fromString? moodLabel |>.getD .happy
-  let trace := Tamagotchi.traceFromAttr traceValue
-  let trace := if trace.isEmpty then [mood] else trace
+def normalizeView (view : ViewState) : ViewState :=
   {
-    state := {
-      name := Tamagotchi.normalizeNameForArtwork artwork name
-      mood := mood
-      trace := trace
-      artwork := Tamagotchi.normalizeArtwork artwork
-      turns := turns
-      care := Tamagotchi.clampCare care
-    }
-    actionLabel
+    view with
+    state := normalizeViewState view.state
+    secondsLeft := if view.secondsLeft > liveTickSeconds then liveTickSeconds else view.secondsLeft
   }
 
-def useViewState (initial : ViewState := initialViewState) : ReactM ViewStateHook := do
-  let state := normalizeViewState initial.state
-  let initialName ← Lean.Vir.JsValue.ofString state.name
-  let name ← Hooks.useState initialName
-  let initialMood ← Lean.Vir.JsValue.ofString state.mood.label
-  let mood ← Hooks.useState initialMood
-  let initialTrace ← Lean.Vir.JsValue.ofString (Tamagotchi.traceAttr state.trace)
-  let trace ← Hooks.useState initialTrace
-  let initialArtwork ← Lean.Vir.JsValue.ofString state.artwork
-  let artwork ← Hooks.useState initialArtwork
-  let initialTurns ← Lean.Vir.JsValue.ofNat state.turns
-  let turns ← Hooks.useState initialTurns
-  let initialCare ← Lean.Vir.JsValue.ofNat state.care
-  let care ← Hooks.useState initialCare
-  let initialAction ← Lean.Vir.JsValue.ofString initial.actionLabel
-  let actionLabel ← Hooks.useState initialAction
-  let nameValue ← Lean.Vir.JsValue.toString name.value
-  let moodValue ← Lean.Vir.JsValue.toString mood.value
-  let traceValue ← Lean.Vir.JsValue.toString trace.value
-  let artworkValue ← Lean.Vir.JsValue.toString artwork.value
-  let turnsValue ← Lean.Vir.JsValue.toNat turns.value
-  let careValue ← Lean.Vir.JsValue.toNat care.value
-  let actionValue ← Lean.Vir.JsValue.toString actionLabel.value
-  let value := viewStateFromValues
-    nameValue
-    moodValue
-    traceValue
-    artworkValue
-    turnsValue
-    careValue
-    actionValue
-  pure { name, mood, trace, artwork, turns, care, actionLabel, value }
+def reduceViewState (view : ViewState) : ViewAction → Lean.Vir.RuntimeM ViewState
+  | .care action =>
+      let state := normalizeViewState view.state
+      pure {
+        state := Tamagotchi.nextState state action
+        secondsLeft := liveTickSeconds
+      }
+  | .artwork checked =>
+      let state := normalizeViewState view.state
+      let artwork := Tamagotchi.artworkFromChecked checked
+      let name := Tamagotchi.nameForArtworkChange state.artwork artwork state.name
+      pure {
+        view with
+        state := { state with artwork := artwork, name := name }
+      }
+  | .reset =>
+      let state := normalizeViewState view.state
+      pure {
+        state := Tamagotchi.initialState state.name state.artwork
+        secondsLeft := liveTickSeconds
+      }
+  | .tick =>
+      let view := normalizeView view
+      let state := view.state
+      if state.mood == .dead then
+        pure { view with secondsLeft := 0 }
+      else if view.secondsLeft <= 1 then
+        pure {
+          state := Tamagotchi.nextState state .ignore
+          secondsLeft := liveTickSeconds
+        }
+      else
+        pure {
+          view with
+          secondsLeft := view.secondsLeft - 1
+        }
 
-def setStringState (state : State (Lean.Vir.Js String)) (value : String) : DomM Unit := do
-  let next ← Lean.Vir.JsValue.ofString value
-  State.set state next
+def useViewState (initial : ViewState := initialViewState) : ReactM (ReducerState ViewState ViewAction) :=
+  Hooks.useReducer reduceViewState (normalizeView initial)
 
-def setNatState (state : State (Lean.Vir.Js Nat)) (value : Nat) : DomM Unit := do
-  let next ← Lean.Vir.JsValue.ofNat value
-  State.set state next
+def dispatchViewAction (hook : ReducerState ViewState ViewAction) (action : ViewAction) : DomM Unit :=
+  ReducerDispatch.dispatch hook.dispatch action
 
-def commit (hook : ViewStateHook) (next : ViewState) : DomM Unit := do
-  let state := normalizeViewState next.state
-  setStringState hook.name state.name
-  setStringState hook.mood state.mood.label
-  setStringState hook.trace (Tamagotchi.traceAttr state.trace)
-  setStringState hook.artwork state.artwork
-  setNatState hook.turns state.turns
-  setNatState hook.care state.care
-  setStringState hook.actionLabel next.actionLabel
+def tick (hook : ReducerState ViewState ViewAction) : DomM Unit :=
+  dispatchViewAction hook .tick
 
-def tick (hook : ViewStateHook) (state : Tamagotchi.PetState) : DomM Unit := do
-  if state.mood == .dead then
-    pure ()
-  else
-    commit hook {
-      state := Tamagotchi.nextState state .ignore
-      actionLabel := liveTickLabel
-    }
-
-def useLiveTick (hook : ViewStateHook) (state : Tamagotchi.PetState) : ReactM Unit := do
-  Hooks.useEffectWithDeps #[stateKey state hook.value.actionLabel]
-    (Lean.Vir.Browser.Timer.setInterval liveTickMs (tick hook state))
+def useLiveTick (hook : ReducerState ViewState ViewAction) : ReactM Unit := do
+  Hooks.useEffectWithDeps #[]
+    (Lean.Vir.Browser.Timer.setInterval liveTickMs (tick hook))
     (fun interval => Lean.Vir.Browser.Timer.clearInterval interval)
 
 def widgetStyleNode : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text widgetCss
   Node.elementWith "style" #[] #[] #[text]
 
-def progressBar (key : String) : ReactM (Lean.Vir.Js Node) := do
+def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
   let fill ←
-    Node.keyedDivWith key
+    Node.divWith
       #[
         Property.id "react-pet-progress-fill",
         Property.classList #["react-pet-progress-fill"],
-        progressFillStyle
+        progressFillStyle secondsLeft
       ]
       #[]
       #[]
+  let bar ←
+    Node.divWith
+      #[
+        Property.id "react-pet-progress",
+        Property.classList #["react-pet-progress"],
+        Property.role "progressbar",
+        Property.ariaLabel "Time until next mood change",
+        Property.title s!"Next mood change in {progressLabel secondsLeft}",
+        Property.int "aria-valuemin" 0,
+        Property.int "aria-valuemax" (Int.ofNat liveTickSeconds),
+        Property.int "aria-valuenow" (Int.ofNat secondsLeft),
+        progressStyle
+      ]
+      #[]
+      #[fill]
+  let counterText ← Node.text (progressLabel secondsLeft)
+  let counter ←
+    Node.spanWith
+      #[
+        Property.id "react-pet-progress-counter",
+        Property.classList #["react-pet-progress-counter"],
+        Property.ariaHidden true,
+        progressCounterStyle
+      ]
+      #[]
+      #[counterText]
   Node.divWith
     #[
-      Property.id "react-pet-progress",
-      Property.classList #["react-pet-progress"],
-      Property.role "progressbar",
-      Property.ariaLabel "Time until next mood change",
-      progressStyle
+      Property.classList #["react-pet-progress-wrap"],
+      progressWrapStyle
     ]
     #[]
-    #[fill]
+    #[bar, counter]
 
 def View : Component Unit := fun _ => do
   let hook ← useViewState
   let state := normalizeViewState hook.value.state
-  let key := stateKey state hook.value.actionLabel
-  useLiveTick hook state
-  let shownName := displayName state
+  useLiveTick hook
   let actionButton := fun action => do
     let text ← Node.text action.label
     Node.keyedButtonWith
       action.label
       #[
         Property.id ("react-pet-action-" ++ action.label),
+        Property.classList #["react-pet-action-button"],
         Property.disabled (state.mood == .dead),
         Property.ariaLabel ("Tamagotchi action " ++ action.label),
         buttonStyle
       ]
-      #[EventHandler.onClick (commit hook {
-        state := Tamagotchi.nextState state action
-        actionLabel := action.label
-      })]
+      #[EventHandler.onClick (dispatchViewAction hook (.care action))]
       #[text]
-  let nameText ← Node.text "Name"
-  let nameLabel ← Node.labelWith #[Property.htmlFor "react-pet-name-input"] #[] #[nameText]
-  let nameInput ←
-    Node.input
-      #[
-        Property.id "react-pet-name-input",
-        Property.inputName "react-pet-name",
-        Property.type "text",
-        Property.inputValue state.name,
-        Property.placeholder shownName,
-        Property.maxLength 18,
-        Property.autoComplete "off",
-        style #[
-          ("width", "112px"),
-          ("minHeight", "26px"),
-          ("padding", "2px 6px"),
-          ("fontSize", "0.76rem"),
-          ("fontWeight", "700")
-        ]
-      ]
-      #[EventHandler.onChange fun event => do
-        match ← Lean.Vir.Browser.Event.inputValue? event with
-        | none => pure ()
-        | some name => commit hook { state := { state with name := name }, actionLabel := "rename" }]
-  let nameForm ←
-    Node.formWith
-      #[
-        Property.id "react-pet-name-form",
-        style #[
-          ("display", "flex"),
-          ("alignItems", "center"),
-          ("gap", "5px"),
-          ("minWidth", "0")
-        ]
-      ]
-      #[EventHandler.onSubmitWith fun event => do
-        Lean.Vir.Browser.Event.preventDefault event
-        Lean.Vir.Browser.Event.stopPropagation event
-        commit hook { state := { state with name := shownName }, actionLabel := "rename" }]
-      #[nameLabel, nameInput]
   let artInput ←
     Node.input
       #[
@@ -1057,10 +984,7 @@ def View : Component Unit := fun _ => do
       #[EventHandler.onChange fun event => do
         match ← Lean.Vir.Browser.Event.inputChecked? event with
         | none => pure ()
-        | some checked =>
-            let artwork := Tamagotchi.artworkFromChecked checked
-            let name := Tamagotchi.nameForArtworkChange state.artwork artwork state.name
-            commit hook { state := { state with artwork := artwork, name := name }, actionLabel := "artwork" }]
+        | some checked => dispatchViewAction hook (.artwork checked)]
   let artText ← Node.text "Octopus"
   let artSpan ← Node.spanWith #[] #[] #[artText]
   let artLabel ←
@@ -1073,16 +997,12 @@ def View : Component Unit := fun _ => do
           ("alignItems", "center"),
           ("gap", "5px"),
           ("fontSize", "0.72rem"),
-          ("fontWeight", "800")
+          ("fontWeight", "800"),
+          ("color", "var(--vscode-descriptionForeground, #53645a)")
         ]
       ]
       #[]
       #[artInput, artSpan]
-  let heading ←
-    Node.divWith
-      #[Property.classList #["react-pet-heading"], headingStyle]
-      #[]
-      #[nameForm, artLabel]
   let deviceNode ← device state
   let moodText ← Node.text state.mood.label
   let moodValueNode ←
@@ -1098,58 +1018,42 @@ def View : Component Unit := fun _ => do
       ]
       #[]
       #[moodText]
-  let progress ← progressBar key
+  let progress ← progressBar hook.value.secondsLeft
   let petState ←
     Node.divWith
       #[Property.classList #["pet-state"], petStageStyle]
       #[]
       #[deviceNode, moodValueNode, progress]
-  let careStat ← stat "care" "care" s!"{state.care}/{Tamagotchi.maxCare}"
-  let turnStat ← stat "turn" "turn" (toString state.turns)
-  let lastStat ← stat "last" "last" hook.value.actionLabel
-  let stats ←
-    Node.divWith
-      #[Property.classList #["react-pet-stats"], statGridStyle]
-      #[]
-      #[careStat, turnStat, lastStat]
   let actionButtons ← actions.mapM actionButton
   let actionsNode ←
     Node.divWith
       #[Property.classList #["action-grid", "react-pet-actions"], actionGridStyle]
       #[]
       actionButtons
-  let traceNodeList ← traceNodes state.trace
-  let trace ←
-    Node.divWith
-      #[
-        Property.classList #["react-pet-trace"],
-        Property.id "react-pet-trace",
-        Property.role "list",
-        Property.ariaLabel (traceAriaLabel state.trace),
-        summaryStyle
-      ]
-      #[]
-      traceNodeList
-  let summaryText ← Node.text (summaryLabel state hook.value.actionLabel)
-  let summary ←
-    Node.divWith
-      #[Property.classList #["react-pet-summary"], Property.id "react-pet-summary", summaryStyle]
-      #[]
-      #[summaryText]
   let resetText ← Node.text "Reset"
   let reset ←
     Node.buttonWith
-      #[Property.id "react-pet-reset", buttonStyle]
-      #[EventHandler.onClick (commit hook {
-        state := Tamagotchi.initialState state.name state.artwork
-        actionLabel := "..."
-      })]
+      #[Property.id "react-pet-reset", Property.classList #["react-pet-reset-button"], resetButtonStyle]
+      #[EventHandler.onClick (dispatchViewAction hook .reset)]
       #[resetText]
+  let controls ←
+    Node.divWith
+      #[
+        Property.classList #["react-pet-controls"],
+        style #[
+          ("display", "flex"),
+          ("alignItems", "center"),
+          ("justifyContent", "space-between"),
+          ("gap", "8px")
+        ]
+      ]
+      #[]
+      #[artLabel, reset]
   let body ←
     Node.divWith
       #[Property.classList #["react-pet-body"], bodyStyle]
       #[]
-      #[petState, stats, actionsNode, summary, trace, reset]
+      #[petState, actionsNode, controls]
   let css ← widgetStyleNode
   Node.divWith
     #[
@@ -1159,7 +1063,7 @@ def View : Component Unit := fun _ => do
       widgetStyle
     ]
     #[]
-    #[css, heading, body]
+    #[css, body]
 
 def mount (selector : String) : DomM Bool :=
   Root.renderComponentIntoSelector selector View ()

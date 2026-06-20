@@ -80,6 +80,14 @@ state setter helpers in this module.
 opaque StateSetter (α : Type) : Type
 
 /--
+React reducer dispatch function returned by `useReducer`.
+
+The JavaScript host owns the underlying dispatch function. Lean callbacks can
+retain the typed handle and pass actions back through `ReducerDispatch.dispatch`.
+-/
+opaque ReducerDispatch (state action : Type) : Type
+
+/--
 React ref object returned by `useRef`.
 
 The JavaScript host owns the underlying `{ current }` object. Reading and
@@ -125,6 +133,29 @@ structure EventHandler where
 structure State (α : Type) where
   value : α
   setter : Lean.Vir.Js (StateSetter α)
+
+/-- React reducer value and dispatch function returned by `useReducer`. -/
+structure ReducerState (state action : Type) where
+  value : state
+  dispatch : Lean.Vir.Js (ReducerDispatch state action)
+
+/--
+Concrete host binding for a reducer state/action pair.
+
+The current host import ABI does not carry arbitrary type parameters across a
+JavaScript import, so concrete reducer pairs provide the low-level
+`react.useReducer` / `react.reducer.dispatch` imports through this class. User
+code still calls `Hooks.useReducer` and `ReducerDispatch.dispatch`.
+-/
+class ReducerBinding (state action : Type) where
+  useReducer :
+    (state → action → Lean.Vir.RuntimeM state) →
+      state →
+      ReactM (ReducerState state action)
+  dispatch :
+    Lean.Vir.Js (ReducerDispatch state action) →
+      action →
+      Lean.Vir.RuntimeM Unit
 
 /--
 React node object class created by the JavaScript host through React's public
@@ -424,10 +455,24 @@ opaque modify {α : Type}
 
 end StateSetter
 
+namespace ReducerDispatch
+
+def dispatch {state action : Type} [binding : ReducerBinding state action]
+    (dispatch : Lean.Vir.Js (ReducerDispatch state action))
+    (action : action) : Lean.Vir.RuntimeM Unit :=
+  binding.dispatch dispatch action
+
+end ReducerDispatch
+
 namespace Hooks
 
 @[vir_js "react.useState"]
 opaque useState {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
+
+def useReducer {state action : Type} [binding : ReducerBinding state action]
+    (reducer : state → action → Lean.Vir.RuntimeM state)
+    (initial : state) : ReactM (ReducerState state action) :=
+  binding.useReducer reducer initial
 
 @[vir_js "react.useRef"]
 opaque useRef {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (Lean.Vir.Js (Ref (Lean.Vir.Js α)))

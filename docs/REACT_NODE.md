@@ -265,6 +265,11 @@ The browser React host binding is exposed from
   cursor changes.
 - `react.useState` calls `React.useState` while rendering a component. Its ABI
   is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
+- `react.useReducer` calls `React.useReducer` while rendering a component. The
+  public Lean surface is `Hooks.useReducer`, backed by a concrete
+  `ReducerBinding state action` instance for each reducer state/action pair.
+  This keeps reducer state as ordinary structured Lean values while avoiding a
+  polymorphic host import shape the current ABI cannot package.
 - `react.useRef` calls `React.useRef` while rendering a component and returns a
   host-owned ref object. `react.ref.get` and `react.ref.set` read/write
   `.current`; they do not schedule a render.
@@ -328,13 +333,15 @@ helpers check `currentTarget` first, then fall back to `target`.
    before rendering.
 5. Added browser and virtual Node host bindings for React roots, components,
    and hooks.
-6. Added `examples/ReactCounter.lean` that renders a hook-backed function
-   component with `Hooks.useState` and a functional setter.
+6. Added `examples/ReactCounter.lean` that renders hook-backed function
+   components with `Hooks.useState`, `Hooks.useReducer`, functional state
+   setters, fragments, and refs.
 7. Added `examples/ReactInput.lean` with hook-backed controlled text, change,
    submit, checkbox, attribute-conformance, label, and form examples.
-8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger stateful
-   example that shares the non-React Tamagotchi model, renders a keyed React
-   tree, and handles controlled input, checkbox, submit, and action callbacks.
+8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger reducer
+   state example that shares the non-React Tamagotchi model, renders a keyed
+   React tree, and handles controlled input, checkbox, submit, timer, and
+   action callbacks.
 9. Added `examples/ReactProofWidget.lean` as a fuller proof-widget-shaped
    example that compiles into `demo-host.irpkg`, displays on `react.html`, and
    can also be loaded as a live infoview widget through `show_panel_widgets`.

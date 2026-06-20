@@ -18,6 +18,7 @@ import {
   smokeVirtualReactChangeInput,
   smokeVirtualReactCheckbox,
   smokeVirtualReactCounter,
+  smokeVirtualReactReducer,
   smokeVirtualReactInput,
   smokeVirtualReactTamagotchi,
 } from "../virtual-react-smoke-scenarios.mjs";
@@ -43,6 +44,7 @@ export async function smokeVirtualHostRuntime(context) {
 
   ensureVirtualElements(hostDocumentState, [
     "#react-smoke",
+    "#react-reducer-smoke",
     "#react-input-smoke",
     "#react-change-smoke",
     "#react-checkbox-smoke",
@@ -50,6 +52,7 @@ export async function smokeVirtualHostRuntime(context) {
     "#react-pet-smoke",
   ]);
   smokeVirtualReactCounter(hostRuntime, hostDocumentState, "#react-smoke");
+  smokeVirtualReactReducer(hostRuntime, hostDocumentState, "#react-reducer-smoke");
   await smokeMissingReactSelector(context);
   smokeVirtualReactInput(hostRuntime, hostDocumentState, "#react-input-smoke");
   smokeVirtualReactChangeInput(hostRuntime, hostDocumentState, "#react-change-smoke");

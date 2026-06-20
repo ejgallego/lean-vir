@@ -136,6 +136,20 @@ assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
 assert.equal(reactUseStateImports[0]?.result?.fields?.find((field) => field.name === "value")?.type?.type, "Js");
+const reactUseReducerImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useReducer");
+assert.equal(reactUseReducerImports.length, 2);
+for (const entry of reactUseReducerImports) {
+  assert.equal(entry.effect, "react");
+  assert.equal(entry.args[0]?.type?.kind, "function");
+  assert.equal(entry.args[0]?.type?.effect, "runtime");
+  assert.equal(entry.result?.fields?.find((field) => field.name === "dispatch")?.type?.kind, "resource");
+}
+const reactReducerDispatchImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.reducer.dispatch");
+assert.equal(reactReducerDispatchImports.length, 2);
+for (const entry of reactReducerDispatchImports) {
+  assert.equal(entry.effect, "runtime");
+  assert.equal(entry.args[0]?.type?.kind, "resource");
+}
 const reactUseRefImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useRef");
 assert.equal(reactUseRefImports.length, 1);
 assert.equal(reactUseRefImports[0]?.effect, "react");

@@ -57,6 +57,21 @@ export function smokeVirtualReactRefFragment(runtime, documentState, selector) {
   assertUnmountCleanup(runtime, element);
 }
 
+export function smokeVirtualReactReducer(runtime, documentState, selector) {
+  assert.equal(runtime.call("ReactCounter.mountReducer", selector), true);
+  const element = documentState.elements.get(selector);
+  assert.equal(element.textContent, "react:reducer:0:init");
+  assertLiveCallbacks(runtime, 3);
+  reactElementById(element, "react-reducer-button").handlers.onClick({});
+  assert.equal(element.textContent, "react:reducer:2:add");
+  assertLiveCallbacks(runtime, 3);
+  reactElementById(element, "react-reducer-button").handlers.onClick({});
+  assert.equal(element.textContent, "react:reducer:4:add");
+  assertLiveCallbacks(runtime, 3);
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
 export function smokeVirtualReactInput(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactInput.mountInput", selector), true);
   const element = documentState.elements.get(selector);
@@ -320,9 +335,9 @@ export async function smokeVirtualReactTamagotchi(runtime, documentState, select
   await withCapturedIntervals(async (intervals) => {
     assert.equal(runtime.call("ReactTamagotchi.mount", selector), true);
     const element = documentState.elements.get(selector);
-    assertLiveCallbacks(runtime, 13);
+    assertLiveCallbacks(runtime, 12);
     assert.equal(intervals.size, 1);
-    assert.equal(onlyInterval(intervals).delayMs, 50000);
+    assert.equal(onlyInterval(intervals).delayMs, 1000);
     const widget = reactElementById(element, "react-pet-widget");
     assert.equal(widget.props["data-mood"], "happy");
     if (extended) {
@@ -333,84 +348,51 @@ export async function smokeVirtualReactTamagotchi(runtime, documentState, select
       assert.match(device.props["aria-label"], /Octopus Octi mood happy/);
       assert.match(String(device.props.style?.background ?? ""), /linear-gradient/);
       assert.equal(reactElementById(element, "react-pet-progress").props.role, "progressbar");
-      assert.equal(
-        reactElementById(element, "react-pet-progress-fill").props.style?.animation,
-        "virPetCountdown 50s linear forwards",
-      );
-      const nameInput = reactElementById(element, "react-pet-name-input");
-      assert.equal(nameInput.props.maxLength, 18);
-      assert.equal(nameInput.props.autoComplete, "off");
-      assert.equal(
-        virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-        "Octi is happy; last ...; care 3/5; turn 0",
-      );
+      assert.equal(reactElementById(element, "react-pet-progress").props["aria-valuenow"], 50);
+      assert.equal(reactElementById(element, "react-pet-progress-fill").props.style?.width, "100%");
+      assert.equal(virtualReactTextContent(reactElementById(element, "react-pet-progress-counter")), "50s");
     }
 
     reactElementById(element, "react-pet-action-ignore").handlers.onClick({});
-    assertLiveCallbacks(runtime, 13);
+    assertLiveCallbacks(runtime, 12);
     assert.equal(intervals.size, 1);
     assert.equal(reactElementById(element, "react-pet-widget").props["data-mood"], "hungry");
-    assert.equal(
-      virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-      "Octi is hungry; last ignore; care 2/5; turn 1",
-    );
-    assert.equal(
-      virtualReactTextContent(reactElementById(element, "react-pet-trace")),
-      "happyhungry",
-    );
-    const trace = reactElementById(element, "react-pet-trace");
-    assert.equal(trace.props.role, "list");
-    assert.equal(trace.props["aria-label"], "Mood trace: happy -> hungry");
-    assert.equal(trace.children[0].props.role, "listitem");
-    assert.equal(trace.children[1].props.role, "listitem");
-
-    reactElementById(element, "react-pet-name-input").handlers.onChange(createVirtualEventState({
-      currentTarget: createVirtualElementState({ value: "Ada" }),
-    }));
-    assertLiveCallbacks(runtime, 13);
-    assert.equal(intervals.size, 1);
-    assert.equal(
-      virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-      "Ada is hungry; last rename; care 2/5; turn 1",
-    );
+    assert.equal(reactElementById(element, "react-pet-device").props["data-mood"], "hungry");
+    assert.equal(reactElementById(element, "react-pet-progress").props["aria-valuenow"], 50);
     assert.equal(runtime.call("ReactTamagotchi.mount", selector), true);
     await flushMicrotasks();
-    assertLiveCallbacks(runtime, 13);
+    assertLiveCallbacks(runtime, 12);
     assert.equal(intervals.size, 1);
-    assert.equal(
-      virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-      "Ada is hungry; last rename; care 2/5; turn 1",
-    );
+    assert.equal(reactElementById(element, "react-pet-widget").props["data-mood"], "hungry");
 
     if (extended) {
-      const submitEvent = createVirtualEventState();
-      reactElementById(element, "react-pet-name-form").handlers.onSubmit(submitEvent);
-      assert.equal(submitEvent.defaultPrevented, true);
-      assert.equal(submitEvent.propagationStopped, true);
-      assertLiveCallbacks(runtime, 13);
-      assert.equal(intervals.size, 1);
       reactElementById(element, "react-pet-art-toggle").handlers.onChange(createVirtualEventState({
         currentTarget: createVirtualElementState({ checked: false }),
       }));
-      assertLiveCallbacks(runtime, 13);
+      assertLiveCallbacks(runtime, 12);
       assert.equal(intervals.size, 1);
       assert.equal(reactElementById(element, "react-pet-device").props["data-art"], "pet");
       assert.equal(reactElementById(element, "react-pet-art-toggle").props.checked, false);
       reactElementById(element, "react-pet-reset").handlers.onClick({});
-      assertLiveCallbacks(runtime, 13);
+      assertLiveCallbacks(runtime, 12);
       assert.equal(intervals.size, 1);
-      assert.equal(
-        virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-        "Ada is happy; last ...; care 3/5; turn 0",
-      );
+      assert.equal(reactElementById(element, "react-pet-widget").props["data-mood"], "happy");
+      assert.equal(reactElementById(element, "react-pet-progress").props["aria-valuenow"], 50);
       onlyInterval(intervals).run();
       await flushMicrotasks();
-      assertLiveCallbacks(runtime, 13);
+      assertLiveCallbacks(runtime, 12);
       assert.equal(intervals.size, 1);
-      assert.equal(
-        virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-        "Ada is hungry; last tick; care 2/5; turn 1",
-      );
+      assert.equal(reactElementById(element, "react-pet-progress").props["aria-valuenow"], 49);
+      assert.equal(virtualReactTextContent(reactElementById(element, "react-pet-progress-counter")), "49s");
+      assert.equal(reactElementById(element, "react-pet-widget").props["data-mood"], "happy");
+      for (let index = 0; index < 49; index += 1) {
+        onlyInterval(intervals).run();
+        await flushMicrotasks();
+      }
+      assertLiveCallbacks(runtime, 12);
+      assert.equal(intervals.size, 1);
+      assert.equal(reactElementById(element, "react-pet-progress").props["aria-valuenow"], 50);
+      assert.equal(virtualReactTextContent(reactElementById(element, "react-pet-progress-counter")), "50s");
       assert.equal(reactElementById(element, "react-pet-widget").props["data-mood"], "hungry");
     }
 

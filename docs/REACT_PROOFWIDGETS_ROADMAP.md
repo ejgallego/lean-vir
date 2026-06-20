@@ -120,8 +120,10 @@ Current RF status:
 
 - Function components render through stable JavaScript component identities, so
   hook state is preserved across prop-only rerenders.
-- `useState` and resource-shaped `useEffect` are delegated to React's hook
-  runtime.
+- `useState`, `useReducer`, and resource-shaped `useEffect` are delegated to
+  React's hook runtime. `useReducer` currently needs concrete
+  `ReducerBinding state action` instances because package-level host imports
+  cannot yet expose a fully polymorphic reducer callback.
 - `useEffectWithDeps` exposes React's dependency-array shape for string
   dependencies, with callback release handled by the host layer when
   dependencies are unchanged.
@@ -130,8 +132,8 @@ Current RF status:
 
 Remaining RF gaps to close in order:
 
-1. Add common hook bindings that existing React/ProofWidgets code naturally
-   expects: `useReducer`, `useMemo`, `useCallback`, and later `useContext`.
+1. Add the next common hook bindings that existing React/ProofWidgets code
+   naturally expects: `useMemo`, `useCallback`, and later `useContext`.
 2. Broaden dependency values from strings to JavaScript resource values once
    the `Js α` array/object story is strong enough for external library APIs.
 3. Add the remaining common DOM attributes/events needed by real ProofWidgets

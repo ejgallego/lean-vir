@@ -92,6 +92,7 @@
             "ReactCounter.renderStatic",
             "ReactCounter.mountEffect",
             "ReactCounter.mountRefFragment",
+            "ReactCounter.mountReducer",
             "ReactCounter.renderWideTextLoop",
             "ReactCounter.renderCallbackTreeLoop",
             "ReactCounter.mountAndUnmount",

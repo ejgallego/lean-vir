@@ -247,6 +247,8 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.PropValue`
 - `Lean.Vir.React.EventHandler`
 - `Lean.Vir.React.State α`
+- `Lean.Vir.React.ReducerState state action`
+- `Lean.Vir.React.ReducerBinding state action`
 - `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.createElement : @& String -> Option String -> Array Lean.Vir.React.Property -> Array Lean.Vir.React.EventHandler -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
@@ -257,6 +259,8 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
+- `Lean.Vir.React.Hooks.useReducer : [Lean.Vir.React.ReducerBinding state action] -> (state -> action -> Lean.Vir.RuntimeM state) -> state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
+- `Lean.Vir.React.ReducerDispatch.dispatch : [Lean.Vir.React.ReducerBinding state action] -> Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> action -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.RuntimeM (Lean.Vir.Js α)) -> Lean.Vir.RuntimeM Unit`
 
@@ -279,6 +283,13 @@ resource-typed: `useState`, `State.set`, and `State.modify` accept
 are runtime-side calls to React setter resources, not DOM mutations. They are
 typed JavaScript resources and must cross public signatures as `Lean.Vir.Js
 (Lean.Vir.React.StateSetter α)`.
+
+`Hooks.useReducer` keeps reducer state and actions as ordinary Lean types, but
+the current host import ABI cannot package a single fully polymorphic reducer
+host import. Each concrete state/action pair therefore provides a low-level
+`@[vir_js "react.useReducer"]` / `@[vir_js "react.reducer.dispatch"]` pair
+behind a `ReducerBinding state action` instance; callers still use
+`Hooks.useReducer` and `ReducerDispatch.dispatch`.
 
 ```lean
 Lean.Vir.React.State.modify count fun previous => do
