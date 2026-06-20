@@ -4845,12 +4845,20 @@ var statusStyle = {
   fontFamily: "ui-monospace, SFMono-Regular, Menlo, Consolas, monospace",
   fontSize: "0.82rem"
 };
+var rpcRefStatusStyle = {
+  ...statusStyle,
+  padding: "0.45rem 0.55rem",
+  border: "1px solid var(--vscode-editorWidget-border, #d0d7de)",
+  borderRadius: "6px",
+  background: "var(--vscode-textCodeBlock-background, #f6f8fa)"
+};
 function VirInfoviewWidget(props) {
   const rpcSession = useRpcSession();
   const editorConnection = React2.useContext(EditorContext);
   const rpcSessionRef = React2.useRef(rpcSession);
   const editorConnectionRef = React2.useRef(editorConnection);
   const [status, setStatus] = React2.useState({ kind: "loading", message: "Loading VIR widget..." });
+  const [rpcRefInfo, setRpcRefInfo] = React2.useState(null);
   const [mountId] = React2.useState(() => freshMountId(props.mountId));
   const loadedRef = React2.useRef(null);
   const [reloadToken, setReloadToken] = React2.useState(0);
@@ -5020,6 +5028,18 @@ function VirInfoviewWidget(props) {
       setStatus({ kind: "error", message: errorMessage(error, loaded.setupHint) });
     }
   }, [runtimeToken, surfaceKey, mountId]);
+  React2.useEffect(() => {
+    const loaded = loadedRef.current;
+    if (loaded === null) {
+      return void 0;
+    }
+    setRpcRefInfo(null);
+    const listener = (info) => setRpcRefInfo(info);
+    loaded.service.proofWidgetsRpcRefListeners.add(listener);
+    return () => {
+      loaded.service.proofWidgetsRpcRefListeners.delete(listener);
+    };
+  }, [runtimeToken]);
   return e(
     "section",
     {
@@ -5036,7 +5056,12 @@ function VirInfoviewWidget(props) {
       className: "vir-infoview-widget-mount",
       style: mountStyle
     }),
-    status.kind === "ready" ? null : e("pre", { className: "vir-infoview-widget-status", style: statusStyle }, status.message)
+    status.kind === "ready" ? null : e("pre", { className: "vir-infoview-widget-status", style: statusStyle }, status.message),
+    rpcRefInfo === null ? null : e(
+      "pre",
+      { className: "vir-infoview-widget-rpc-status", style: rpcRefStatusStyle },
+      formatProofWidgetsRpcRefInfo(rpcRefInfo)
+    )
   );
 }
 function stopInfoviewEvent(event) {
@@ -5276,6 +5301,12 @@ function optionalString(value, label) {
   }
   return value;
 }
+function requiredBoolean(value, label) {
+  if (typeof value !== "boolean") {
+    throw new Error(`VIR widget ${label} must be a boolean`);
+  }
+  return value;
+}
 function widgetRuntimeConfigFromProps(props) {
   const irPackage = optionalIRPackage(props.irPackage, "irPackage");
   return {
@@ -5342,7 +5373,11 @@ function runtimeBaseKey(config) {
     irPackage: config.irPackage
   });
 }
-async function loadRuntimeService({ rpcSession, editorConnectionRef = null, config }) {
+async function loadRuntimeService({
+  rpcSession,
+  editorConnectionRef = null,
+  config
+}) {
   return loadRuntimeServiceWithHost({ rpcSession, editorConnectionRef, config });
 }
 async function loadRuntimeServiceWithHost({ rpcSession, editorConnectionRef, config }) {
@@ -5351,7 +5386,14 @@ async function loadRuntimeServiceWithHost({ rpcSession, editorConnectionRef, con
   const key = runtimeServiceKey(baseKey, sources);
   let cached = runtimeServiceCache.get(key);
   if (cached === void 0) {
-    cached = createRuntimeService({ rpcSession, editorConnectionRef, config, baseKey, key, sources });
+    cached = createRuntimeService({
+      rpcSession,
+      editorConnectionRef,
+      config,
+      baseKey,
+      key,
+      sources
+    });
     runtimeServiceCache.set(key, cached);
     cached.then(() => {
       retireRuntimeServicesForBaseKey(baseKey, key);
@@ -5373,16 +5415,30 @@ function runtimeServiceKey(baseKey, sources) {
     packageRevision: sources.packageSource.revision ?? ""
   });
 }
-async function createRuntimeService({ rpcSession, editorConnectionRef, config, baseKey, key, sources }) {
+async function createRuntimeService({
+  rpcSession,
+  editorConnectionRef,
+  config,
+  baseKey,
+  key,
+  sources
+}) {
   const runtimeModule = config.runtimeUrl.length === 0 ? { createVirRuntime } : await import(config.runtimeUrl);
   const createVirRuntime2 = runtimeModule.createVirRuntime;
   if (typeof createVirRuntime2 !== "function") {
     throw new Error("VIR runtime module does not export createVirRuntime");
   }
   const runtimeOptions = await loadRuntimeOptionsFromSources({ rpcSession, sources });
+  const proofWidgetsRpcRefListeners = /* @__PURE__ */ new Set();
   runtimeOptions.defaultHostBindings = (runtimeRef) => createBrowserHostBindings({
     runtimeRef,
-    infoviewCommandDispatcher: createInfoviewCommandDispatcher(editorConnectionRef),
+    infoviewCommandDispatcher: createInfoviewCommandDispatcher({
+      editorConnectionRef,
+      rpcSession,
+      position: config.position,
+      packageRevision: sources.packageSource.revision ?? "",
+      onProofWidgetsRpcRefInfo: (info) => notifyProofWidgetsRpcRefListeners(proofWidgetsRpcRefListeners, info)
+    }),
     reactHostBindings: createBrowserReactHostBindings
   });
   return {
@@ -5392,28 +5448,55 @@ async function createRuntimeService({ rpcSession, editorConnectionRef, config, b
     packageRevision: sources.packageSource.revision ?? "",
     idleTimer: null,
     lastUsed: Date.now(),
+    proofWidgetsRpcRefListeners,
     stale: false,
     disposed: false,
     runtime: await createVirRuntime2(runtimeOptions)
   };
 }
-function createInfoviewCommandDispatcher(editorConnectionRef) {
+function createInfoviewCommandDispatcher({
+  editorConnectionRef,
+  rpcSession = null,
+  position = null,
+  packageRevision = "",
+  onProofWidgetsRpcRefInfo = null
+}) {
   return {
-    revealPosition(position) {
+    revealPosition(position2) {
       const editorConnection = editorConnectionRef?.current ?? null;
       if (editorConnection === null || typeof editorConnection !== "object" || typeof editorConnection.revealPosition !== "function") {
         return false;
       }
-      editorConnection.revealPosition(position).catch((error) => {
+      editorConnection.revealPosition(position2).catch((error) => {
         console.error(error);
       });
       return true;
     },
     proofwidgetsRpcInspectRef(ref) {
-      console.info("VIR ProofWidgets RPC reference", ref);
+      if (rpcSession === null || typeof rpcSession.call !== "function" || position === null) {
+        return false;
+      }
+      resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision).then((info) => {
+        if (typeof onProofWidgetsRpcRefInfo === "function") {
+          onProofWidgetsRpcRefInfo(info);
+        } else {
+          console.info("VIR ProofWidgets RPC reference", info);
+        }
+      }).catch((error) => {
+        console.error(error);
+      });
       return true;
     }
   };
+}
+function notifyProofWidgetsRpcRefListeners(listeners, info) {
+  for (const listener of Array.from(listeners)) {
+    try {
+      listener(info);
+    } catch (error) {
+      console.error(error);
+    }
+  }
 }
 function retainRuntimeService(service) {
   clearRuntimeServiceIdleTimer(service);
@@ -5642,6 +5725,18 @@ async function buildIRPackage(rpcSession, irPackage, position) {
   });
   return irPackageInfo(response, irPackage.roots);
 }
+async function resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision = "") {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null) {
+    throw new Error("VIR ProofWidgets RPC ref must have a non-empty id");
+  }
+  const response = await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsRpcRef", {
+    ref: normalized,
+    pos: requiredPosition(position, "proofwidgets rpc position"),
+    packageRevision
+  });
+  return proofWidgetsRpcRefInfo(response, normalized);
+}
 async function statAsset(rpcSession, path) {
   const response = await rpcSession.call("Lean.Vir.Infoview.statAsset", { path });
   return assetInfo(response, path);
@@ -5671,6 +5766,32 @@ function irPackageInfo(response, roots) {
     dataBase64: requiredString(response?.dataBase64, "IR package dataBase64"),
     report: optionalString(response?.report, "IR package report")
   };
+}
+function proofWidgetsRpcRefInfo(response, ref) {
+  const id = requiredString(response?.id, "proofwidgets rpc ref id");
+  if (id !== ref.id) {
+    throw new Error(`VIR ProofWidgets RPC ref id mismatch: expected ${ref.id}, got ${id}`);
+  }
+  return {
+    id,
+    label: optionalString(response?.label, "proofwidgets rpc ref label"),
+    typeName: optionalString(response?.typeName, "proofwidgets rpc ref typeName"),
+    summary: optionalString(response?.summary, "proofwidgets rpc ref summary"),
+    source: requiredString(response?.source, "proofwidgets rpc ref source"),
+    position: requiredString(response?.position, "proofwidgets rpc ref position"),
+    packageRevision: optionalString(response?.packageRevision, "proofwidgets rpc ref packageRevision"),
+    knownConstant: requiredBoolean(response?.knownConstant, "proofwidgets rpc ref knownConstant")
+  };
+}
+function formatProofWidgetsRpcRefInfo(info) {
+  const title = info.label.length === 0 ? info.id : info.label;
+  return [
+    `ProofWidgets RPC: ${title}`,
+    `type: ${info.typeName || "(unknown)"}`,
+    `source: ${info.position}`,
+    `known constant: ${info.knownConstant ? "yes" : "no"}`,
+    `revision: ${info.packageRevision || "(none)"}`
+  ].join("\n");
 }
 function irPackageStatInfo(response, roots) {
   const responseRoots = requiredStringArray(response?.roots, "IR package roots");
@@ -5720,6 +5841,7 @@ export {
   loadRuntimeOptions,
   loadRuntimeService,
   loadWasmModule,
+  resolveProofWidgetsRpcRef,
   shouldReloadIRPackage,
   statAsset,
   statIRPackage,

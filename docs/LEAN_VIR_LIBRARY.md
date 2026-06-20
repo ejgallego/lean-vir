@@ -318,7 +318,9 @@ attributes, style attributes, child spread, and a `MarkdownDisplay`-shaped
 component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
 `RpcRef`, `WithRpcRef α`, and `Rpc.inspectRef` are enough for the JSX-subset
 fixture to include an `InteractiveExpr`-shaped component whose click handler
-dispatches a host-inspectable reference descriptor.
+dispatches a host-inspectable reference descriptor. In live infoview widgets,
+`Vir.Infoview.ProofWidgetsRpc` resolves that descriptor through the active Lean
+server snapshot and the shell displays the resolved source/revision metadata.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
@@ -328,6 +330,7 @@ The `Vir.Infoview` module provides the first infoview-facing shell:
 
 - `Lean.Vir.Infoview.Assets`
 - `Lean.Vir.Infoview.Package`
+- `Lean.Vir.Infoview.ProofWidgetsRpc`
 - `Lean.Vir.Infoview.Widget`
 - `Lean.Vir.Infoview.Surface`
 - `Lean.Vir.Infoview.IRPackage`

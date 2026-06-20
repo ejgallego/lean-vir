@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import * as React from "react";
 import { EditorContext, useRpcSession } from "@leanprover/infoview";
-import { createBrowserHostBindings } from "./vir-host-bindings.js";
+import { createBrowserHostBindings, normalizeProofWidgetsRpcRef } from "./vir-host-bindings.js";
 import { createBrowserReactHostBindings } from "./vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "./vir-runtime.js";
 import { isEffectfulInterfaceEffect } from "./runtime/interface-effects.js";
@@ -35,12 +35,21 @@ const statusStyle = {
   fontSize: "0.82rem",
 };
 
+const rpcRefStatusStyle = {
+  ...statusStyle,
+  padding: "0.45rem 0.55rem",
+  border: "1px solid var(--vscode-editorWidget-border, #d0d7de)",
+  borderRadius: "6px",
+  background: "var(--vscode-textCodeBlock-background, #f6f8fa)",
+};
+
 export default function VirInfoviewWidget(props) {
   const rpcSession = useRpcSession();
   const editorConnection = React.useContext(EditorContext);
   const rpcSessionRef = React.useRef(rpcSession);
   const editorConnectionRef = React.useRef(editorConnection);
   const [status, setStatus] = React.useState({ kind: "loading", message: "Loading VIR widget..." });
+  const [rpcRefInfo, setRpcRefInfo] = React.useState(null);
   const [mountId] = React.useState(() => freshMountId(props.mountId));
   const loadedRef = React.useRef(null);
   const [reloadToken, setReloadToken] = React.useState(0);
@@ -223,6 +232,19 @@ export default function VirInfoviewWidget(props) {
     }
   }, [runtimeToken, surfaceKey, mountId]);
 
+  React.useEffect(() => {
+    const loaded = loadedRef.current;
+    if (loaded === null) {
+      return undefined;
+    }
+    setRpcRefInfo(null);
+    const listener = (info) => setRpcRefInfo(info);
+    loaded.service.proofWidgetsRpcRefListeners.add(listener);
+    return () => {
+      loaded.service.proofWidgetsRpcRefListeners.delete(listener);
+    };
+  }, [runtimeToken]);
+
   return e(
     "section",
     {
@@ -242,6 +264,13 @@ export default function VirInfoviewWidget(props) {
     status.kind === "ready"
       ? null
       : e("pre", { className: "vir-infoview-widget-status", style: statusStyle }, status.message),
+    rpcRefInfo === null
+      ? null
+      : e(
+          "pre",
+          { className: "vir-infoview-widget-rpc-status", style: rpcRefStatusStyle },
+          formatProofWidgetsRpcRefInfo(rpcRefInfo),
+        ),
   );
 }
 
@@ -546,6 +575,13 @@ function optionalString(value, label) {
   return value;
 }
 
+function requiredBoolean(value, label) {
+  if (typeof value !== "boolean") {
+    throw new Error(`VIR widget ${label} must be a boolean`);
+  }
+  return value;
+}
+
 function widgetRuntimeConfigFromProps(props) {
   const irPackage = optionalIRPackage(props.irPackage, "irPackage");
   return {
@@ -624,7 +660,11 @@ function runtimeBaseKey(config) {
   });
 }
 
-export async function loadRuntimeService({ rpcSession, editorConnectionRef = null, config }) {
+export async function loadRuntimeService({
+  rpcSession,
+  editorConnectionRef = null,
+  config,
+}) {
   return loadRuntimeServiceWithHost({ rpcSession, editorConnectionRef, config });
 }
 
@@ -634,7 +674,14 @@ async function loadRuntimeServiceWithHost({ rpcSession, editorConnectionRef, con
   const key = runtimeServiceKey(baseKey, sources);
   let cached = runtimeServiceCache.get(key);
   if (cached === undefined) {
-    cached = createRuntimeService({ rpcSession, editorConnectionRef, config, baseKey, key, sources });
+    cached = createRuntimeService({
+      rpcSession,
+      editorConnectionRef,
+      config,
+      baseKey,
+      key,
+      sources,
+    });
     runtimeServiceCache.set(key, cached);
     cached.then(() => {
       retireRuntimeServicesForBaseKey(baseKey, key);
@@ -658,7 +705,14 @@ function runtimeServiceKey(baseKey, sources) {
   });
 }
 
-async function createRuntimeService({ rpcSession, editorConnectionRef, config, baseKey, key, sources }) {
+async function createRuntimeService({
+  rpcSession,
+  editorConnectionRef,
+  config,
+  baseKey,
+  key,
+  sources,
+}) {
   const runtimeModule = config.runtimeUrl.length === 0
     ? { createVirRuntime: createBundledVirRuntime }
     : await import(config.runtimeUrl);
@@ -667,9 +721,16 @@ async function createRuntimeService({ rpcSession, editorConnectionRef, config, b
     throw new Error("VIR runtime module does not export createVirRuntime");
   }
   const runtimeOptions = await loadRuntimeOptionsFromSources({ rpcSession, sources });
+  const proofWidgetsRpcRefListeners = new Set();
   runtimeOptions.defaultHostBindings = (runtimeRef) => createBrowserHostBindings({
     runtimeRef,
-    infoviewCommandDispatcher: createInfoviewCommandDispatcher(editorConnectionRef),
+    infoviewCommandDispatcher: createInfoviewCommandDispatcher({
+      editorConnectionRef,
+      rpcSession,
+      position: config.position,
+      packageRevision: sources.packageSource.revision ?? "",
+      onProofWidgetsRpcRefInfo: (info) => notifyProofWidgetsRpcRefListeners(proofWidgetsRpcRefListeners, info),
+    }),
     reactHostBindings: createBrowserReactHostBindings,
   });
   return {
@@ -679,13 +740,20 @@ async function createRuntimeService({ rpcSession, editorConnectionRef, config, b
     packageRevision: sources.packageSource.revision ?? "",
     idleTimer: null,
     lastUsed: Date.now(),
+    proofWidgetsRpcRefListeners,
     stale: false,
     disposed: false,
     runtime: await createVirRuntime(runtimeOptions),
   };
 }
 
-function createInfoviewCommandDispatcher(editorConnectionRef) {
+function createInfoviewCommandDispatcher({
+  editorConnectionRef,
+  rpcSession = null,
+  position = null,
+  packageRevision = "",
+  onProofWidgetsRpcRefInfo = null,
+}) {
   return {
     revealPosition(position) {
       const editorConnection = editorConnectionRef?.current ?? null;
@@ -702,10 +770,33 @@ function createInfoviewCommandDispatcher(editorConnectionRef) {
       return true;
     },
     proofwidgetsRpcInspectRef(ref) {
-      console.info("VIR ProofWidgets RPC reference", ref);
+      if (rpcSession === null || typeof rpcSession.call !== "function" || position === null) {
+        return false;
+      }
+      resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision)
+        .then((info) => {
+          if (typeof onProofWidgetsRpcRefInfo === "function") {
+            onProofWidgetsRpcRefInfo(info);
+          } else {
+            console.info("VIR ProofWidgets RPC reference", info);
+          }
+        })
+        .catch((error) => {
+          console.error(error);
+        });
       return true;
     },
   };
+}
+
+function notifyProofWidgetsRpcRefListeners(listeners, info) {
+  for (const listener of Array.from(listeners)) {
+    try {
+      listener(info);
+    } catch (error) {
+      console.error(error);
+    }
+  }
 }
 
 function retainRuntimeService(service) {
@@ -970,6 +1061,19 @@ export async function buildIRPackage(rpcSession, irPackage, position) {
   return irPackageInfo(response, irPackage.roots);
 }
 
+export async function resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision = "") {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null) {
+    throw new Error("VIR ProofWidgets RPC ref must have a non-empty id");
+  }
+  const response = await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsRpcRef", {
+    ref: normalized,
+    pos: requiredPosition(position, "proofwidgets rpc position"),
+    packageRevision,
+  });
+  return proofWidgetsRpcRefInfo(response, normalized);
+}
+
 export async function statAsset(rpcSession, path) {
   const response = await rpcSession.call("Lean.Vir.Infoview.statAsset", { path });
   return assetInfo(response, path);
@@ -1002,6 +1106,34 @@ function irPackageInfo(response, roots) {
     dataBase64: requiredString(response?.dataBase64, "IR package dataBase64"),
     report: optionalString(response?.report, "IR package report"),
   };
+}
+
+function proofWidgetsRpcRefInfo(response, ref) {
+  const id = requiredString(response?.id, "proofwidgets rpc ref id");
+  if (id !== ref.id) {
+    throw new Error(`VIR ProofWidgets RPC ref id mismatch: expected ${ref.id}, got ${id}`);
+  }
+  return {
+    id,
+    label: optionalString(response?.label, "proofwidgets rpc ref label"),
+    typeName: optionalString(response?.typeName, "proofwidgets rpc ref typeName"),
+    summary: optionalString(response?.summary, "proofwidgets rpc ref summary"),
+    source: requiredString(response?.source, "proofwidgets rpc ref source"),
+    position: requiredString(response?.position, "proofwidgets rpc ref position"),
+    packageRevision: optionalString(response?.packageRevision, "proofwidgets rpc ref packageRevision"),
+    knownConstant: requiredBoolean(response?.knownConstant, "proofwidgets rpc ref knownConstant"),
+  };
+}
+
+function formatProofWidgetsRpcRefInfo(info) {
+  const title = info.label.length === 0 ? info.id : info.label;
+  return [
+    `ProofWidgets RPC: ${title}`,
+    `type: ${info.typeName || "(unknown)"}`,
+    `source: ${info.position}`,
+    `known constant: ${info.knownConstant ? "yes" : "no"}`,
+    `revision: ${info.packageRevision || "(none)"}`,
+  ].join("\n");
 }
 
 function irPackageStatInfo(response, roots) {

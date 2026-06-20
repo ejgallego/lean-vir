@@ -178,7 +178,10 @@ A realistic path has three layers:
    bag to Lean. The first reference slice is intentionally smaller than this
    final target: `Vir.ProofWidgets.Rpc` provides `RpcRef`, `WithRpcRef α`, and
    a host-dispatched `inspectRef` action so `InteractiveExpr`-shaped component
-   props can cross the Lean/JS boundary before a real server resolver exists.
+   props can cross the Lean/JS boundary. `Vir.Infoview.ProofWidgetsRpc` now
+   resolves those descriptors through the active Lean server snapshot and
+   returns source/revision metadata, while real `ExprWithCtx` storage and edit
+   commands remain future work.
 
 ## Porting Targets
 

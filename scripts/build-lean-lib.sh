@@ -90,6 +90,7 @@ build_module Vir/GeneratePackage.lean
 build_module Vir/Infoview/Assets.lean
 build_module Vir/Infoview/Surface.lean
 build_module Vir/Infoview/Package.lean
+build_module Vir/Infoview/ProofWidgetsRpc.lean
 build_module Vir/Infoview/Widget.lean
 build_module Vir/Infoview.lean
 build_module Vir.lean

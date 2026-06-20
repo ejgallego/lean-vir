@@ -43,6 +43,7 @@ const {
   loadRuntimeOptions,
   loadRuntimeService,
   loadWasmModule,
+  resolveProofWidgetsRpcRef,
   shouldReloadIRPackage,
   statIRPackage,
   statAsset,
@@ -62,6 +63,7 @@ let assetStatCount = 0;
 let irPackageBuildCount = 0;
 let irPackageStatCount = 0;
 let irPackageRevision = "ir-package-v1";
+const resolvedRpcRefRequests = [];
 const assetRevisions = new Map([
   ["web/public/vir-upstream.wasm", "wasm-v1"],
   ["web/public/demo-host.irpkg", "package-v1"],
@@ -85,6 +87,16 @@ const rpcSession = {
         revision: irPackageRevision,
         dataBase64: packageBytes.toString("base64"),
         report: "IR package report",
+      };
+    }
+    if (method === "Lean.Vir.Infoview.resolveProofWidgetsRpcRef") {
+      resolvedRpcRefRequests.push(params);
+      return {
+        ...params.ref,
+        source: "examples/ReactProofWidget.lean",
+        position: `ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
+        packageRevision: params.packageRevision,
+        knownConstant: params.ref.id === "ReactProofWidget.mount",
       };
     }
     const bytes = await readFile(new URL(params.path, repoRoot));
@@ -231,6 +243,29 @@ assert.equal(
   )).revision,
   "ir-package-v1",
 );
+assert.deepEqual(
+  await resolveProofWidgetsRpcRef(
+    rpcSession,
+    {
+      id: "ReactProofWidget.mount",
+      label: "mount",
+      typeName: "Const",
+      summary: "resolve smoke",
+    },
+    { line: 4, character: 2 },
+    "package-smoke",
+  ),
+  {
+    id: "ReactProofWidget.mount",
+    label: "mount",
+    typeName: "Const",
+    summary: "resolve smoke",
+    source: "examples/ReactProofWidget.lean",
+    position: "ReactProofWidget.lean:5:3",
+    packageRevision: "package-smoke",
+    knownConstant: true,
+  },
+);
 await assert.rejects(
   () => loadAssetBytes({
     async call() {
@@ -344,6 +379,42 @@ const irPackageServiceConfig = {
   setupHint: "",
 };
 const irPackageFirstService = await loadRuntimeService({ rpcSession, config: irPackageServiceConfig });
+let resolvedRpcRefInfo = null;
+irPackageFirstService.proofWidgetsRpcRefListeners.add((info) => {
+  resolvedRpcRefInfo = info;
+});
+const resolvedBeforeHostInspect = resolvedRpcRefRequests.length;
+assert.equal(
+  irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.inspectRef"]({
+    id: "ReactProofWidget.mount",
+    label: "mount",
+    typeName: "Const",
+    summary: "host binding smoke",
+  }),
+  true,
+);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(resolvedRpcRefRequests.length, resolvedBeforeHostInspect + 1);
+assert.deepEqual(resolvedRpcRefRequests.at(-1), {
+  ref: {
+    id: "ReactProofWidget.mount",
+    label: "mount",
+    typeName: "Const",
+    summary: "host binding smoke",
+  },
+  pos: { line: 0, character: 0 },
+  packageRevision: "ir-package-v1",
+});
+assert.deepEqual(resolvedRpcRefInfo, {
+  id: "ReactProofWidget.mount",
+  label: "mount",
+  typeName: "Const",
+  summary: "host binding smoke",
+  source: "examples/ReactProofWidget.lean",
+  position: "ReactProofWidget.lean:1:1",
+  packageRevision: "ir-package-v1",
+  knownConstant: true,
+});
 const firstIRPackageBuildCount = irPackageBuildCount;
 const firstIRPackageStatCount = irPackageStatCount;
 const irPackageSecondService = await loadRuntimeService({ rpcSession, config: irPackageServiceConfig });

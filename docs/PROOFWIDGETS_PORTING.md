@@ -53,10 +53,13 @@ reference-shaped interactive case:
 
 The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
 `WithRpcRef α`, and `Rpc.inspectRef`, and the browser/virtual hosts normalize
-the reference descriptor behind `proofwidgets.rpc.inspectRef`. This proves the
-typed prop and host-dispatch path needed by an `InteractiveExpr`-style port,
-but it is not yet server-side reference resolution, proof-script editing, or
-the full ProofWidgets RPC request model.
+the reference descriptor behind `proofwidgets.rpc.inspectRef`. In the infoview,
+that host action calls `Lean.Vir.Infoview.resolveProofWidgetsRpcRef`, which is
+a snapshot-backed server RPC returning the active source position, package
+revision, and a simple known-constant check for the reference id. This proves
+the typed prop, host-dispatch, and infoview RPC round trip needed by an
+`InteractiveExpr`-style port, but it is not yet `ExprWithCtx.save`, proof-script
+editing, or the full ProofWidgets RPC request model.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 
@@ -71,8 +74,8 @@ Known first-slice limits:
 - Attribute values are `Lean.Vir.React.Property`, not arbitrary JSON props.
 - JSX syntax is intentionally deferred; `ProofWidgetsJsxSubset.lean` keeps the
   porting shape as explicit combinators for now.
-- The upstream `InteractiveExpr` example still needs real server-side reference
-  resolution before it can be considered faithfully ported.
+- The upstream `InteractiveExpr` example still needs real `ExprWithCtx` storage
+  and rendering before it can be considered faithfully ported.
 
 ## External JavaScript Libraries
 

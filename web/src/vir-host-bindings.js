@@ -38,6 +38,7 @@ export {
   findVirtualReactElementById,
   createVirtualEventState,
   createVirtualEventHostBindings,
+  normalizeProofWidgetsRpcRef,
   virtualReactElementById,
 } from "./host/vir-virtual-host-bindings.js";
 

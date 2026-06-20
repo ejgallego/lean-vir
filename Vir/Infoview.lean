@@ -6,5 +6,6 @@ Author: Emilio J. Gallego Arias
 
 import Vir.Infoview.Assets
 import Vir.Infoview.Package
+import Vir.Infoview.ProofWidgetsRpc
 import Vir.Infoview.Surface
 import Vir.Infoview.Widget
