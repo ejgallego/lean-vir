@@ -301,10 +301,14 @@ contract.
 The React browser fixtures are split by intent: `examples/ReactCounter.lean`
 contains the hook-backed counter, static render, lifecycle, and stress cases, while
 `examples/ReactInput.lean` contains hook-backed controlled text, change,
-submit, textarea/select, attribute-conformance, and checkbox callbacks. `examples/Tamagotchi.lean`
-keeps both demos: `Tamagotchi` is the non-React DOM-hosted version, and
-`ReactTamagotchi` reuses the same model with a keyed React tree, controlled
-text input, checkbox state, form submit handling, and action callbacks.
+submit, textarea/select, attribute-conformance, and checkbox callbacks.
+`Vir.Examples.Tamagotchi` keeps the shared Tamagotchi implementation:
+`Tamagotchi` is the non-React DOM-hosted version, and `ReactTamagotchi` reuses
+the same model with a hook-backed keyed React tree, controlled text input,
+checkbox state, form submit handling, and action callbacks.
+`examples/Tamagotchi.lean` is the browser-demo wrapper, while
+`examples/ReactTamagotchiWidget.lean` mounts the same `ReactTamagotchi.View`
+component through the live infoview shell.
 `examples/ReactProofWidget.lean` is the fuller proof-widget-shaped React
 example. It compiles into `demo-host.irpkg`, displays on `react.html`, and can
 also be loaded as a live infoview widget through `show_panel_widgets`.

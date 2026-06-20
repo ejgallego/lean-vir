@@ -71,7 +71,7 @@ props, events, keyed labels, forms, inputs, buttons, style objects, class
 lists, and text containers, with examples covering button clicks in
 `ReactCounter`, controlled input rerendering, DOM attribute conformance in
 `ReactInput`, a proof-state-shaped `ReactProofWidget`, and a React Tamagotchi
-that shares the DOM demo's model while keeping view state in Lean closures
+that shares the DOM demo's model while keeping view state in React hooks
 instead of reading it back from DOM attributes.
 Controlled text handlers use `Event.inputValue?` and checkbox handlers use
 `Event.inputChecked?`; both check `Event.currentTarget` before `target`.

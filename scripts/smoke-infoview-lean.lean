@@ -125,6 +125,10 @@ def expectImportedDecl
     `ReactProofWidgetHello.mount,
     `ReactProofWidgetHello.unmount
   ]
+  expectRootsOk #["ReactTamagotchiWidget.mount", "ReactTamagotchiWidget.unmount"] #[
+    `ReactTamagotchiWidget.mount,
+    `ReactTamagotchiWidget.unmount
+  ]
   expectRootsOk #["ReactProofWidget.mount", "ReactProofWidget.mount"] #[
     `ReactProofWidget.mount
   ]

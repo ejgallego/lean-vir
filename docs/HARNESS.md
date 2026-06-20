@@ -169,6 +169,9 @@ fixture suite. It is the default pre-merge signal for code changes.
   from the active Lean server snapshot. If the file was already open before the
   build, restart the Lean server or reopen the file so the editor sees the
   rebuilt `Vir.Infoview` widget module.
+- Shared Tamagotchi widget demo iteration after `npm run build:demo`:
+  open `examples/ReactTamagotchiWidget.lean` in VS Code. The widget reuses the
+  same hook-backed `ReactTamagotchi.View` component as the browser React demo.
 - Lean fixture behavior or package generation coverage:
   `npm run test:fixtures`
 - A single fixture or fixture family:

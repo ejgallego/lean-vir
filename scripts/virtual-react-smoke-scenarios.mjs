@@ -294,7 +294,7 @@ export function smokeVirtualReactTamagotchi(runtime, documentState, selector, {
 } = {}) {
   assert.equal(runtime.call("ReactTamagotchi.mount", selector), true);
   const element = documentState.elements.get(selector);
-  assertLiveCallbacks(runtime, 9);
+  assertLiveCallbacks(runtime, 10);
   const widget = reactElementById(element, "react-pet-widget");
   assert.equal(widget.props["data-mood"], "happy");
   if (extended) {
@@ -313,7 +313,7 @@ export function smokeVirtualReactTamagotchi(runtime, documentState, selector, {
   }
 
   reactElementById(element, "react-pet-action-ignore").handlers.onClick({});
-  assertLiveCallbacks(runtime, 9);
+  assertLiveCallbacks(runtime, 10);
   assert.equal(reactElementById(element, "react-pet-widget").props["data-mood"], "hungry");
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-pet-summary")),
@@ -332,7 +332,7 @@ export function smokeVirtualReactTamagotchi(runtime, documentState, selector, {
   reactElementById(element, "react-pet-name-input").handlers.onChange(createVirtualEventState({
     currentTarget: createVirtualElementState({ value: "Ada" }),
   }));
-  assertLiveCallbacks(runtime, 9);
+  assertLiveCallbacks(runtime, 10);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-pet-summary")),
     "Ada is hungry; last rename; care 2/5; turn 1",
@@ -343,15 +343,15 @@ export function smokeVirtualReactTamagotchi(runtime, documentState, selector, {
     reactElementById(element, "react-pet-name-form").handlers.onSubmit(submitEvent);
     assert.equal(submitEvent.defaultPrevented, true);
     assert.equal(submitEvent.propagationStopped, true);
-    assertLiveCallbacks(runtime, 9);
+    assertLiveCallbacks(runtime, 10);
     reactElementById(element, "react-pet-art-toggle").handlers.onChange(createVirtualEventState({
       currentTarget: createVirtualElementState({ checked: false }),
     }));
-    assertLiveCallbacks(runtime, 9);
+    assertLiveCallbacks(runtime, 10);
     assert.equal(reactElementById(element, "react-pet-device").props["data-art"], "pet");
     assert.equal(reactElementById(element, "react-pet-art-toggle").props.checked, false);
     reactElementById(element, "react-pet-reset").handlers.onClick({});
-    assertLiveCallbacks(runtime, 9);
+    assertLiveCallbacks(runtime, 10);
     assert.equal(
       virtualReactTextContent(reactElementById(element, "react-pet-summary")),
       "Ada is happy; last ...; care 3/5; turn 0",

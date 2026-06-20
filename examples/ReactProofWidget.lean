@@ -442,6 +442,17 @@ def emptyStateStyle : Property := style #[
   ("fontSize", "0.9rem")
 ]
 
+def exprResultStyle : Property := style #[
+  ("display", "grid"),
+  ("gap", "6px"),
+  ("minWidth", "0"),
+  ("padding", "10px"),
+  ("border", border borderColor),
+  ("borderRadius", "6px"),
+  ("background", codeBg),
+  ("color", fg)
+]
+
 end UiStyle
 
 open UiStyle
@@ -449,10 +460,12 @@ open UiStyle
 structure WidgetState where
   selectedGoalId : String
   actionStatus : String
+  exprResult : String
 
 structure WidgetStateHook where
   selectedGoalId : State (Lean.Vir.Js String)
   actionStatus : State (Lean.Vir.Js String)
+  exprResult : State (Lean.Vir.Js String)
   value : WidgetState
 
 def selectedLocationGoalId? (surface : Surface) : Option String :=
@@ -468,7 +481,11 @@ def initialSelectedGoalId (surface : Surface) : String :=
       | none => ""
 
 def initialState (surface : Surface) : WidgetState :=
-  { selectedGoalId := initialSelectedGoalId surface, actionStatus := "Ready" }
+  {
+    selectedGoalId := initialSelectedGoalId surface
+    actionStatus := "Ready"
+    exprResult := "Resolve ExprWithCtx to inspect the current goal target."
+  }
 
 def selectedGoal? (surface : Surface) (selectedId : String) : Option Goal :=
   match surface.goals.find? (fun goal => goal.id == selectedId) with
@@ -482,7 +499,7 @@ def reconcileState (surface : Surface) (state : WidgetState) : WidgetState :=
   if hasGoalId surface state.selectedGoalId then
     state
   else
-    { selectedGoalId := initialSelectedGoalId surface, actionStatus := "Ready" }
+    { state with selectedGoalId := initialSelectedGoalId surface, actionStatus := "Ready" }
 
 def useWidgetState (surface : Surface) : ReactM WidgetStateHook := do
   let initial := initialState surface
@@ -490,13 +507,17 @@ def useWidgetState (surface : Surface) : ReactM WidgetStateHook := do
   let selectedGoalId ← Hooks.useState initialGoalId
   let initialStatus ← JsValue.ofString initial.actionStatus
   let actionStatus ← Hooks.useState initialStatus
+  let initialExprResult ← JsValue.ofString initial.exprResult
+  let exprResult ← Hooks.useState initialExprResult
   let selectedGoalValue ← JsValue.toString selectedGoalId.value
   let actionStatusValue ← JsValue.toString actionStatus.value
+  let exprResultValue ← JsValue.toString exprResult.value
   let value := reconcileState surface {
     selectedGoalId := selectedGoalValue,
-    actionStatus := actionStatusValue
+    actionStatus := actionStatusValue,
+    exprResult := exprResultValue
   }
-  pure { selectedGoalId, actionStatus, value }
+  pure { selectedGoalId, actionStatus, exprResult, value }
 
 def setStringState (state : State (Lean.Vir.Js String)) (value : String) : DomM Unit := do
   let next ← JsValue.ofString value
@@ -512,6 +533,10 @@ def commit
     pure ()
   if next.actionStatus != state.value.actionStatus then
     setStringState state.actionStatus next.actionStatus
+  else
+    pure ()
+  if next.exprResult != state.value.exprResult then
+    setStringState state.exprResult next.exprResult
   else
     pure ()
 
@@ -959,6 +984,35 @@ def actionBar
       status
     ]
 
+def resolvedExprText (info : Lean.Vir.ProofWidgets.ResolvedRef) : String :=
+  let expression := if info.expression == "" then info.label else info.expression
+  let typeText := if info.typeText == "" then "(unavailable)" else info.typeText
+  let context := if info.context == "" then "(empty context)" else info.context
+  "source: " ++ info.source ++ "\n" ++
+  "position: " ++ info.position ++ "\n" ++
+  "expression: " ++ expression ++ "\n" ++
+  "type: " ++ typeText ++ "\n" ++
+  "context:\n" ++ context
+
+def exprResultView (result : String) : ReactM (Lean.Vir.Js Node) := do
+  let label ← Node.pTextWith
+    #[Property.classList #["react-proof-panel-label"], panelLabelStyle]
+    "Resolved ExprWithCtx"
+  let code ← Node.codeText #[Property.id "react-proof-expr-result-code", codeStyle] result
+  let panel ←
+    Node.preWith
+      #[
+        Property.id "react-proof-expr-result",
+        Property.classList #["react-proof-expr-result"],
+        exprResultStyle
+      ]
+      #[]
+      #[code]
+  Node.divWith #[Property.classList #["react-proof-expr-result-panel"]] #[] #[
+    label,
+    panel
+  ]
+
 def emptyView (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
   let header ← surfaceHeader surface none
   let apis ← apiStrip surface none
@@ -988,7 +1042,8 @@ def detailView
     (copyTarget : Goal → DomM Unit)
     (copyContext : Goal → DomM Unit)
     (resolveExpr : DomM Unit)
-    (actionStatus : String) : ReactM (Lean.Vir.Js Node) := do
+    (actionStatus : String)
+    (exprResult : String) : ReactM (Lean.Vir.Js Node) := do
   let title ← Node.h3TextWith #[Property.id "react-proof-selected-title", headingStyle] goal.title
   let status ← Node.spanTextWith #[Property.id "react-proof-selected-status", badgeStyle] goal.status
   let kind ← Node.spanTextWith #[Property.classList #["react-proof-selected-kind"], goalMetaStyle]
@@ -996,6 +1051,7 @@ def detailView
   let statusLine ← Node.pWith #[Property.classList #["react-proof-status-line"]] #[] #[status, kind]
   let surfacePanelNode ← surfacePanel surface goal
   let actions ← actionBar goal revealCursor copyCursor copySelection copyTarget copyContext resolveExpr actionStatus
+  let exprResultNode ← exprResultView exprResult
   let targetLabel ← Node.pTextWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] "Target"
   let targetCode ← Node.codeText #[Property.id "react-proof-target-code", codeStyle] goal.target
   let target ← Node.preWith #[Property.id "react-proof-target", Property.classList #["react-proof-target"], targetStyle] #[] #[
@@ -1016,6 +1072,7 @@ def detailView
       statusLine,
       surfacePanelNode,
       actions,
+      exprResultNode,
       targetLabel,
       target,
       contextLabel,
@@ -1055,6 +1112,7 @@ def View : Component ViewProps := fun props => do
         props.copyContext
         props.resolveExpr
         props.state.actionStatus
+        props.state.exprResult
       let main ← Node.divWith #[Property.classList #["react-proof-main"], mainStyle] #[] #[detail]
       let layout ← Node.divWith #[Property.classList #["react-proof-layout"], layoutStyle] #[] #[
         sidebar,
@@ -1119,16 +1177,35 @@ def renderView (surface : Surface) (stateHook : WidgetStateHook) : ReactM (Lean.
   let resolveExpr : DomM Unit := do
     match surface.proofWidgetsExpr with
     | none =>
-        commit surface stateHook fun state => { state with actionStatus := "ExprWithCtx ref pending" }
+        commit surface stateHook fun state =>
+          {
+            state with
+            actionStatus := "ExprWithCtx ref pending",
+            exprResult := "No ExprWithCtx ref is available at this cursor. Move into a tactic proof and wait for the API chip to leave pending."
+          }
     | some expr =>
-        commit surface stateHook fun state => { state with actionStatus := "Resolving ExprWithCtx" }
+        commit surface stateHook fun state =>
+          {
+            state with
+            actionStatus := "Resolving ExprWithCtx",
+            exprResult := "Resolving server-owned ExprWithCtx..."
+          }
         let ok ← Lean.Vir.ProofWidgets.Rpc.resolve expr fun info => do
           commit surface stateHook fun state =>
-            { state with actionStatus := Lean.Vir.ProofWidgets.ResolvedRef.statusText info }
+            {
+              state with
+              actionStatus := Lean.Vir.ProofWidgets.ResolvedRef.statusText info,
+              exprResult := resolvedExprText info
+            }
         if ok then
           pure ()
         else
-          commit surface stateHook fun state => { state with actionStatus := "ExprWithCtx resolve unavailable" }
+          commit surface stateHook fun state =>
+            {
+              state with
+              actionStatus := "ExprWithCtx resolve unavailable",
+              exprResult := "The host did not accept the ExprWithCtx resolve request."
+            }
   view
     surface
     selectGoal

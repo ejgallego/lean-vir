@@ -65,6 +65,7 @@ build_module Vir/Js.lean
 build_module Vir/Common.lean
 build_module Vir/Browser.lean
 build_module Vir/React.lean
+build_module Vir/Examples/Tamagotchi.lean
 build_module Vir/GeneratePackage/Basic.lean
 build_module Vir/GeneratePackage/PackageFormat.lean
 build_module Vir/GeneratePackage/NativeExterns.lean
