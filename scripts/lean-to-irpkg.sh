@@ -64,8 +64,10 @@ echo "package: $package"
 echo "report:  $report"
 echo "mode:    $mode"
 
-scripts/build-lean-lib.sh
-lake build vir_irpkg
+if [ "${VIR_SKIP_IRPKG_BUILD:-0}" != "1" ]; then
+  scripts/build-lean-lib.sh
+  lake build vir_irpkg
+fi
 
 lean_prefix="$(lean --print-prefix)"
 generator_lean_path="build/lean-lib:.lake/build/lib/lean:$lean_prefix/lib/lean"

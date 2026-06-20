@@ -16,15 +16,14 @@ import {
   readFile,
   runVirIrpkg,
   spawnSync,
-  writeFile,
+  writeRuntimeFixture,
 } from "./shared.mjs";
 
 export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   const factory = createVirRuntimeFactory({ wasmBytes });
   const freshSource = join(freshDir, "FreshUser.lean");
   const freshPackage = join(freshDir, "fresh.irpkg");
-  const freshFixture = new URL("../../fixtures/runtime-tests/FreshUser.lean", import.meta.url);
-  await writeFile(freshSource, await readFile(freshFixture, "utf8"));
+  await writeRuntimeFixture(freshSource, "FreshUser.lean");
 
   const generated = generateIrPackage(freshSource, freshPackage);
   assert.match(generated.stdout, /mode:\s+auto-discover public definitions/);
@@ -87,22 +86,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   const aliasSource = join(freshDir, "AliasEdges.lean");
   const aliasPackage = join(freshDir, "alias-edges.irpkg");
   const aliasReport = join(freshDir, "alias-edges.report.md");
-  await writeFile(aliasSource, [
-    "abbrev AliasUserId := Nat",
-    "abbrev AliasNatArray := Array AliasUserId",
-    "abbrev AliasCallback := AliasUserId -> AliasUserId",
-    "abbrev AliasIO (α : Type) := IO α",
-    "",
-    "def aliasArraySum (xs : AliasNatArray) : AliasUserId :=",
-    "  xs.foldl (fun acc n => acc + n) 0",
-    "",
-    "def aliasCallbackApply (callback : AliasCallback) (n : AliasUserId) : AliasUserId :=",
-    "  callback n",
-    "",
-    "def aliasIoBump (n : AliasUserId) : AliasIO AliasUserId :=",
-    "  pure (n + 1)",
-    "",
-  ].join("\n"));
+  await writeRuntimeFixture(aliasSource, "AliasEdges.lean");
   const aliasGenerated = runVirIrpkg([aliasPackage, aliasReport, "--target-all", aliasSource]);
   assert.equal(aliasGenerated.status, 0, aliasGenerated.stderr || aliasGenerated.stdout);
   const aliasInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", aliasPackage], {

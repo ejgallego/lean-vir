@@ -147,19 +147,24 @@ export function wait(ms) {
 }
 
 export function generateIrPackage(source, packagePath) {
+  ensureVirIrpkgBuilt();
   const generated = spawnSync(
     "bash",
     ["scripts/lean-to-irpkg.sh", source, packagePath],
-    { encoding: "utf8" },
+    { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
   );
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
   return generated;
 }
 
+let cachedVirIrpkgEnv = null;
+let virIrpkgBuilt = false;
+
 export function virIrpkgEnv() {
+  if (cachedVirIrpkgEnv !== null) return cachedVirIrpkgEnv;
   const leanPrefix = spawnSync("lean", ["--print-prefix"], { encoding: "utf8" });
   assert.equal(leanPrefix.status, 0, leanPrefix.stderr || leanPrefix.stdout);
-  return {
+  cachedVirIrpkgEnv = {
     ...process.env,
     LEAN_PATH: [
       "build/lean-lib",
@@ -168,17 +173,36 @@ export function virIrpkgEnv() {
       process.env.LEAN_PATH,
     ].filter(Boolean).join(":"),
   };
+  return cachedVirIrpkgEnv;
 }
 
-export function runVirIrpkg(args) {
+function skipVirIrpkgBuildEnv() {
+  return {
+    ...process.env,
+    VIR_SKIP_IRPKG_BUILD: "1",
+  };
+}
+
+export function ensureVirIrpkgBuilt() {
+  if (virIrpkgBuilt) return;
   const builtLeanLib = spawnSync("bash", ["scripts/build-lean-lib.sh"], { encoding: "utf8" });
   assert.equal(builtLeanLib.status, 0, builtLeanLib.stderr || builtLeanLib.stdout);
   const builtGenerator = spawnSync("lake", ["build", "vir_irpkg"], { encoding: "utf8" });
   assert.equal(builtGenerator.status, 0, builtGenerator.stderr || builtGenerator.stdout);
+  virIrpkgBuilt = true;
+}
+
+export function runVirIrpkg(args) {
+  ensureVirIrpkgBuilt();
   return spawnSync(".lake/build/bin/vir_irpkg", args, {
     encoding: "utf8",
     env: virIrpkgEnv(),
   });
+}
+
+export async function writeRuntimeFixture(target, fixtureName) {
+  const fixture = new URL(`../../fixtures/runtime-tests/${fixtureName}`, import.meta.url);
+  await writeFile(target, await readFile(fixture, "utf8"));
 }
 
 export async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns, roots = null) {
@@ -186,14 +210,28 @@ export async function assertUnsupportedInterfaceSource(dir, stem, lines, pattern
   const packagePath = join(dir, `${stem}.irpkg`);
   const reportPath = join(dir, `${stem}.report.md`);
   await writeFile(source, lines.join("\n"));
+  await assertUnsupportedInterfaceFile(source, packagePath, reportPath, patterns, roots);
+}
+
+export async function assertUnsupportedInterfaceFixture(dir, fixtureName, patterns, roots = null) {
+  const stem = fixtureName.replace(/\.lean$/, "");
+  const source = join(dir, fixtureName);
+  const packagePath = join(dir, `${stem}.irpkg`);
+  const reportPath = join(dir, `${stem}.report.md`);
+  await writeRuntimeFixture(source, fixtureName);
+  await assertUnsupportedInterfaceFile(source, packagePath, reportPath, patterns, roots);
+}
+
+async function assertUnsupportedInterfaceFile(source, packagePath, reportPath, patterns, roots) {
+  ensureVirIrpkgBuilt();
   const generated = spawnSync(
     "bash",
     roots === null
       ? ["scripts/lean-to-irpkg.sh", source, packagePath]
       : ["scripts/lean-to-irpkg.sh", source, packagePath, ...roots],
-    { encoding: "utf8" },
+    { encoding: "utf8", env: skipVirIrpkgBuildEnv() },
   );
-  assert.notEqual(generated.status, 0, `${stem} unexpectedly generated successfully`);
+  assert.notEqual(generated.status, 0, `${source} unexpectedly generated successfully`);
   assert.match(generated.stderr, /package diagnostics/);
   const report = await readFile(reportPath, "utf8");
   for (const pattern of patterns) {

@@ -26,7 +26,9 @@ map lives in `docs/HARNESS.md`.
   Run all JavaScript runtime, host binding, callback lifecycle, manifest,
   package-generation, and SDK import smoke tests. Use
   `npm run test:runtime -- <substring>` or
-  `VIR_RUNTIME_TEST_FILTER=<substring>` to narrow it.
+  `VIR_RUNTIME_TEST_FILTER=<substring>` to narrow it. Pure runtime smokes run
+  in parallel; Lean-dependent package-generation smokes are serialized because
+  they share Lean build outputs.
 - `npm run test:runtime:pure`
   Run the runtime smoke group that only needs Node plus existing demo artifacts.
 - `npm run test:runtime:lean`
@@ -68,6 +70,12 @@ tracked artifact-policy change:
 
 Useful diagnostic reports include `build/upstream-probe/boundary.md`,
 `build/generated/*.report.md`, and `build/fixtures/summary.json`.
+
+Commands ending in `:no-build` and the runtime smoke tests expect
+`web/public/vir-upstream.wasm` and browser `.irpkg` files from a previous
+`npm run build:demo`. If one of those commands reports a missing
+`web/public/...` artifact, rebuild the demo artifacts rather than committing a
+generated output.
 
 ## Internal Helpers
 
