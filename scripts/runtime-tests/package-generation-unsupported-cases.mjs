@@ -6,29 +6,15 @@ Author: Emilio J. Gallego Arias
 
 import {
   assert,
-  assertUnsupportedInterfaceSource,
+  assertUnsupportedInterfaceFixture,
   join,
   readFile,
   runVirIrpkg,
-  writeFile,
+  writeRuntimeFixture,
 } from "./shared.mjs";
 
 export async function runUnsupportedInterfaceSmoke(freshDir) {
-  await assertUnsupportedInterfaceSource(freshDir, "UnsupportedInterfaces", [
-    "import Vir.React",
-    "",
-    "inductive IndexedPair : Nat → Type where",
-    "  | mk (left : Nat) (right : Nat) : IndexedPair 0",
-    "",
-    "def indexedPairIdentity (box : IndexedPair 0) : IndexedPair 0 := box",
-    "def implicitBump {offset : Nat} (n : Nat) : Nat := n + offset",
-    "def polymorphicJsIdentity {α : Type} (value : Lean.Vir.Js α) : Lean.Vir.Js α := value",
-    "def nakedElementIdentity (element : Lean.Vir.Browser.Element) : Lean.Vir.Browser.Element := element",
-    "def nakedReactRootIdentity (root : Lean.Vir.React.Root) : Lean.Vir.React.Root := root",
-    "def nakedStateSetterIdentity (setter : Lean.Vir.React.StateSetter Nat) : Lean.Vir.React.StateSetter Nat := setter",
-    "def nakedPropsIdentity (props : Lean.Vir.React.Props) : Lean.Vir.React.Props := props",
-    "",
-  ], [
+  await assertUnsupportedInterfaceFixture(freshDir, "UnsupportedInterfaces.lean", [
     /indexedPairIdentity/,
     /indexed inductive `IndexedPair` is not supported/,
     /implicitBump/,
@@ -53,29 +39,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "nakedPropsIdentity",
   ]);
 
-  await assertUnsupportedInterfaceSource(freshDir, "UnsupportedRecursiveInductives", [
-    "structure RecursiveBase where",
-    "  label : String",
-    "",
-    "structure RecursiveChild extends RecursiveBase where",
-    "  next : Option RecursiveChild",
-    "",
-    "mutual",
-    "inductive MutualLeft where",
-    "  | leaf (value : Nat)",
-    "  | step (right : MutualRight)",
-    "inductive MutualRight where",
-    "  | step (left : MutualLeft)",
-    "end",
-    "",
-    "inductive ProofPayload where",
-    "  | mk (value : Nat) (proof : value = value)",
-    "",
-    "def recursiveChildIdentity (box : RecursiveChild) : RecursiveChild := box",
-    "def mutualLeftIdentity (value : MutualLeft) : MutualLeft := value",
-    "def proofPayloadIdentity (value : ProofPayload) : ProofPayload := value",
-    "",
-  ], [
+  await assertUnsupportedInterfaceFixture(freshDir, "UnsupportedRecursiveInductives.lean", [
     /recursiveChildIdentity/,
     /recursive inherited structure `RecursiveChild` is not supported/,
     /mutualLeftIdentity/,
@@ -84,14 +48,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /field `proof` of constructor `ProofPayload\.mk` has erased or void runtime layout/,
   ], ["recursiveChildIdentity", "mutualLeftIdentity", "proofPayloadIdentity"]);
 
-  await assertUnsupportedInterfaceSource(freshDir, "DuplicateExportNames", [
-    "namespace Duplicate",
-    "def entry (n : Nat) : Nat := n + 1",
-    "end Duplicate",
-    "",
-    "def Duplicate_entry (n : Nat) : Nat := n + 2",
-    "",
-  ], [
+  await assertUnsupportedInterfaceFixture(freshDir, "DuplicateExportNames.lean", [
     /Duplicate\.entry/,
     /Duplicate_entry/,
     /interface export id `Duplicate_entry` duplicates/,
@@ -101,8 +58,8 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   const rightSource = join(freshDir, "CollisionRight.lean");
   const packagePath = join(freshDir, "CollisionTargets.irpkg");
   const reportPath = join(freshDir, "CollisionTargets.report.md");
-  await writeFile(leftSource, "def collisionBump (n : Nat) : Nat := n + 1\n");
-  await writeFile(rightSource, "def collisionBump (n : Nat) : Nat := n + 2\n");
+  await writeRuntimeFixture(leftSource, "CollisionLeft.lean");
+  await writeRuntimeFixture(rightSource, "CollisionRight.lean");
   const generated = runVirIrpkg([
     packagePath,
     reportPath,

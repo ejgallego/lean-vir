@@ -113,11 +113,7 @@ function testMatchesGroup(test, group) {
   return group === null || test.group === group;
 }
 
-function runtimeJobCount(selectedTests) {
-  const total = selectedTests.length;
-  if (selectedTests.some((test) => serialRuntimeGroups.has(test.group))) {
-    return 1;
-  }
+function runtimeJobCount(total) {
   const configured = Number.parseInt(process.env.VIR_RUNTIME_JOBS ?? "", 10);
   if (Number.isInteger(configured) && configured > 0) {
     return Math.min(configured, total);
@@ -136,6 +132,28 @@ async function runRuntimeTest(test) {
     test,
     seconds: elapsedSeconds(start),
   };
+}
+
+async function runSelectedRuntimeTests(selectedTests, parallelJobs) {
+  const results = [];
+  let parallelBatch = [];
+
+  async function flushParallelBatch() {
+    if (parallelBatch.length === 0) return;
+    results.push(...await mapWithLimit(parallelBatch, parallelJobs, runRuntimeTest));
+    parallelBatch = [];
+  }
+
+  for (const test of selectedTests) {
+    if (serialRuntimeGroups.has(test.group)) {
+      await flushParallelBatch();
+      results.push(await runRuntimeTest(test));
+    } else {
+      parallelBatch.push(test);
+    }
+  }
+  await flushParallelBatch();
+  return results;
 }
 
 function printCapturedOutput(result) {
@@ -169,17 +187,18 @@ if (selected.length === 0) {
   throw new Error(`no runtime tests matched ${clauses.join(" and ") || "the current selection"}`);
 }
 
-const jobs = runtimeJobCount(selected);
+const parallelTestCount = selected.filter((test) => !serialRuntimeGroups.has(test.group)).length;
+const jobs = runtimeJobCount(Math.max(1, parallelTestCount));
 if (group !== null) {
   console.log(`runtime group: ${group} (${selected.length}/${tests.length})`);
 }
 if (filters.length !== 0) {
   console.log(`runtime filter: ${filters.join(", ")} (${selected.length}/${tests.length})`);
 }
-console.log(`runtime jobs: ${jobs}`);
+console.log(`runtime jobs: ${jobs}${selected.some((test) => serialRuntimeGroups.has(test.group)) ? " (lean serial)" : ""}`);
 
 const runStart = timerStart();
-const results = await mapWithLimit(selected, jobs, runRuntimeTest);
+const results = await runSelectedRuntimeTests(selected, jobs);
 let failed = 0;
 for (const result of results) {
   if (result.ok) {

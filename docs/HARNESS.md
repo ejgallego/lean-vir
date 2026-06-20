@@ -75,6 +75,13 @@ Reference these reports in local notes or final summaries when they explain a
 failure, but keep them out of Git unless the maintainer asks for a tracked
 fixture/report change.
 
+Commands that reuse generated runtime artifacts expect
+`web/public/vir-upstream.wasm` and the generated browser `.irpkg` files to
+exist. Run `npm run build:demo` first when `npm run test:runtime`,
+`npm run test:runtime:pure`, `npm run test:runtime:lean`,
+`npm run test:upstream:no-build`, or `npm run test:fixtures:no-build` reports a
+missing `web/public/...` artifact.
+
 ## Command Map
 
 Toolchain and build:
@@ -171,6 +178,20 @@ available runtime smoke ids and groups are printed by:
 ```bash
 node scripts/test-vir-runtime.mjs --list
 ```
+
+Runtime smoke tests are split into two groups:
+
+- `pure`: Node-only runtime, host binding, manifest, object ABI, and callback
+  tests that reuse existing demo artifacts.
+- `lean`: package-generator and SDK-import tests that require Lean and write
+  shared `build/lean-lib` / `.lake` outputs.
+
+The runtime runner executes pure tests in parallel, but serializes Lean-group
+tests to avoid concurrent writes to shared Lean build outputs on cold CI
+checkouts. The Lean-group helpers build `build/lean-lib` and `vir_irpkg` once
+per test process. Internal helper calls may set `VIR_SKIP_IRPKG_BUILD=1` only
+after that setup has completed; routine manual use should keep using the npm
+commands above.
 
 `test:fixtures:no-build` is a local iteration shortcut. It requires
 `web/public/vir-upstream.wasm` from a previous `npm run build:demo`.

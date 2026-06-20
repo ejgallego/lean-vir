@@ -15,6 +15,7 @@ import {
   runVirIrpkg,
   spawnSync,
   writeFile,
+  writeRuntimeFixture,
 } from "./shared.mjs";
 
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-generator-"));
@@ -22,16 +23,7 @@ try {
   const runtimeSource = join(freshDir, "RuntimeEffect.lean");
   const runtimePackage = join(freshDir, "runtime-effect.irpkg");
   const runtimeReport = join(freshDir, "runtime-effect.report.md");
-  await writeFile(runtimeSource, [
-    "import Vir.Js",
-    "",
-    "@[vir_js \"test.runtime.value\"]",
-    "private opaque runtimeValueHost : Lean.Vir.RuntimeM Nat",
-    "",
-    "def runtimeValue : Lean.Vir.RuntimeM Nat :=",
-    "  runtimeValueHost",
-    "",
-  ].join("\n"));
+  await writeRuntimeFixture(runtimeSource, "RuntimeEffect.lean");
 
   const generated = runVirIrpkg([runtimePackage, runtimeReport, "--target-all", runtimeSource]);
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);

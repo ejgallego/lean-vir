@@ -16,14 +16,13 @@ import {
   generateIrPackage,
   join,
   readFile,
-  writeFile,
+  writeRuntimeFixture,
 } from "./shared.mjs";
 
 export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const hostSource = join(freshDir, "FreshHost.lean");
   const hostPackage = join(freshDir, "host.irpkg");
-  const hostFixture = new URL("../../fixtures/runtime-tests/FreshHost.lean", import.meta.url);
-  await writeFile(hostSource, await readFile(hostFixture, "utf8"));
+  await writeRuntimeFixture(hostSource, "FreshHost.lean");
 
   generateIrPackage(hostSource, hostPackage);
   const freshHostDocumentState = createVirtualDocumentState();
@@ -60,8 +59,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
 
   const customHostSource = join(freshDir, "FreshCustomHost.lean");
   const customHostPackage = join(freshDir, "custom-host.irpkg");
-  const customHostFixture = new URL("../../fixtures/runtime-tests/FreshCustomHost.lean", import.meta.url);
-  await writeFile(customHostSource, await readFile(customHostFixture, "utf8"));
+  await writeRuntimeFixture(customHostSource, "FreshCustomHost.lean");
   generateIrPackage(customHostSource, customHostPackage);
   const customFactory = createVirRuntimeFactory({
     wasmBytes,
@@ -103,8 +101,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
 
   const jsObjectSource = join(freshDir, "FreshJsObject.lean");
   const jsObjectPackage = join(freshDir, "js-object.irpkg");
-  const jsObjectFixture = new URL("../../fixtures/runtime-tests/FreshJsObject.lean", import.meta.url);
-  await writeFile(jsObjectSource, await readFile(jsObjectFixture, "utf8"));
+  await writeRuntimeFixture(jsObjectSource, "FreshJsObject.lean");
   generateIrPackage(jsObjectSource, jsObjectPackage);
   const jsObjectRuntime = await createVirRuntimeFactory({
     wasmBytes,
