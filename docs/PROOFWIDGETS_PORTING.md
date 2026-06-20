@@ -52,14 +52,17 @@ reference-shaped interactive case:
   `ProofWidgets.Rpc.inspect`.
 
 The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
-`WithRpcRef α`, and `Rpc.inspectRef`, and the browser/virtual hosts normalize
-the reference descriptor behind `proofwidgets.rpc.inspectRef`. In the infoview,
-that host action calls `Lean.Vir.Infoview.resolveProofWidgetsRpcRef`, which is
-a snapshot-backed server RPC returning the active source position, package
-revision, and a simple known-constant check for the reference id. This proves
-the typed prop, host-dispatch, and infoview RPC round trip needed by an
-`InteractiveExpr`-style port, but it is not yet `ExprWithCtx.save`, proof-script
-editing, or the full ProofWidgets RPC request model.
+`WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and `Rpc.resolveRef`. The
+browser/virtual hosts normalize the reference descriptor behind
+`proofwidgets.rpc.resolveRef`; in the infoview, that host action calls
+`Lean.Vir.Infoview.resolveProofWidgetsRpcRef`, which is a snapshot-backed server
+RPC returning the active source position, package revision, and a simple
+known-constant check for the reference id. The `InteractiveExpr`-shaped demo
+uses ordinary React state to render the async result from the callback, keeping
+the component behavior close to a JavaScript React component. This proves the
+typed prop, host-dispatch, component-state, and infoview RPC round trip needed
+by an `InteractiveExpr`-style port, but it is not yet real `ExprWithCtx.save`,
+proof-script editing, or the full ProofWidgets RPC request model.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 

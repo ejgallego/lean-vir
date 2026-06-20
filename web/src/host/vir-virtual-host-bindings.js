@@ -180,6 +180,18 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       state.infoviewCommands.push({ kind: "proofwidgetsRpcInspectRef", ref: normalized });
       return true;
     },
+    "proofwidgets.rpc.resolveRef": (ref, callback) => {
+      const normalized = normalizeProofWidgetsRpcRef(ref);
+      if (normalized === null || typeof callback !== "function") {
+        releaseCallback(callback);
+        return false;
+      }
+      const result = virtualProofWidgetsRpcRefInfo(normalized);
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "proofwidgetsRpcResolveRef", ref: normalized, result });
+      callAndReleaseCallback(callback, result);
+      return true;
+    },
     [VIR_HOST_DISPOSE]: () => state.resources.dispose(),
   };
 }
@@ -294,6 +306,32 @@ export function normalizeProofWidgetsRpcRef(ref) {
 
 function stringField(value) {
   return typeof value === "string" ? value : "";
+}
+
+function virtualProofWidgetsRpcRefInfo(ref) {
+  return {
+    ...ref,
+    source: "virtual",
+    position: "virtual",
+    packageRevision: "virtual",
+    knownConstant: false,
+  };
+}
+
+function callAndReleaseCallback(callback, value) {
+  try {
+    callback(value);
+  } catch (error) {
+    console.error(error);
+  } finally {
+    releaseCallback(callback);
+  }
+}
+
+function releaseCallback(callback) {
+  if (callback !== null && typeof callback === "function" && typeof callback.release === "function") {
+    callback.release();
+  }
 }
 
 function nonNegativeInteger(value) {

@@ -1405,7 +1405,8 @@ function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
   return {
     "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
     "infoview.command.revealPosition": (position) => revealInfoviewPosition(commandDispatcher, position),
-    "proofwidgets.rpc.inspectRef": (ref) => inspectProofWidgetsRpcRef(commandDispatcher, ref)
+    "proofwidgets.rpc.inspectRef": (ref) => inspectProofWidgetsRpcRef(commandDispatcher, ref),
+    "proofwidgets.rpc.resolveRef": (ref, callback) => resolveProofWidgetsRpcRef(commandDispatcher, ref, callback)
   };
 }
 function createBrowserHostBindings({
@@ -1481,6 +1482,41 @@ function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
   }
   return dispatchInfoviewCommand(commandDispatcher, "proofwidgetsRpcInspectRef", normalized);
 }
+function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null || typeof callback !== "function") {
+    releaseCallback(callback);
+    return false;
+  }
+  const handler = infoviewCommandHandler(commandDispatcher, "proofwidgetsRpcResolveRef");
+  if (handler === null) {
+    releaseCallback(callback);
+    return false;
+  }
+  let result;
+  try {
+    result = handler(normalized);
+  } catch (error) {
+    reportEventHandlerError(error);
+    releaseCallback(callback);
+    return false;
+  }
+  if (result === false) {
+    releaseCallback(callback);
+    return false;
+  }
+  if (result !== null && typeof result === "object" && typeof result.then === "function") {
+    result.then((info) => {
+      callAndReleaseCallback(callback, info);
+    }).catch((error) => {
+      reportEventHandlerError(error);
+      releaseCallback(callback);
+    });
+  } else {
+    callAndReleaseCallback(callback, result);
+  }
+  return true;
+}
 function normalizeInfoviewDocumentPosition(position) {
   if (position === null || typeof position !== "object") {
     return null;
@@ -1510,13 +1546,7 @@ function nonNegativeInteger(value) {
   return null;
 }
 function dispatchInfoviewCommand(commandDispatcher, name, payload) {
-  const dispatcher = commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
-  let handler = null;
-  if (typeof dispatcher === "function") {
-    handler = (value) => dispatcher(name, value);
-  } else if (dispatcher !== null && typeof dispatcher === "object" && typeof dispatcher[name] === "function") {
-    handler = (value) => dispatcher[name](value);
-  }
+  const handler = infoviewCommandHandler(commandDispatcher, name);
   if (handler === null) {
     return false;
   }
@@ -1532,6 +1562,30 @@ function dispatchInfoviewCommand(commandDispatcher, name, payload) {
   } catch (error) {
     reportEventHandlerError(error);
     return false;
+  }
+}
+function infoviewCommandHandler(commandDispatcher, name) {
+  const dispatcher = commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
+  if (typeof dispatcher === "function") {
+    return (value) => dispatcher(name, value);
+  }
+  if (dispatcher !== null && typeof dispatcher === "object" && typeof dispatcher[name] === "function") {
+    return (value) => dispatcher[name](value);
+  }
+  return null;
+}
+function callAndReleaseCallback(callback, value) {
+  try {
+    callback(value);
+  } catch (error) {
+    reportEventHandlerError(error);
+  } finally {
+    releaseCallback(callback);
+  }
+}
+function releaseCallback(callback) {
+  if (callback !== null && typeof callback === "function" && typeof callback.release === "function") {
+    callback.release();
   }
 }
 function copyTextWithExecCommand(text) {
@@ -5461,6 +5515,19 @@ function createInfoviewCommandDispatcher({
   packageRevision = "",
   onProofWidgetsRpcRefInfo = null
 }) {
+  const resolveRef = (ref) => {
+    if (rpcSession === null || typeof rpcSession.call !== "function" || position === null) {
+      return false;
+    }
+    return resolveProofWidgetsRpcRef2(rpcSession, ref, position, packageRevision).then((info) => {
+      if (typeof onProofWidgetsRpcRefInfo === "function") {
+        onProofWidgetsRpcRefInfo(info);
+      } else {
+        console.info("VIR ProofWidgets RPC reference", info);
+      }
+      return info;
+    });
+  };
   return {
     revealPosition(position2) {
       const editorConnection = editorConnectionRef?.current ?? null;
@@ -5473,20 +5540,16 @@ function createInfoviewCommandDispatcher({
       return true;
     },
     proofwidgetsRpcInspectRef(ref) {
-      if (rpcSession === null || typeof rpcSession.call !== "function" || position === null) {
+      const result = resolveRef(ref);
+      if (result === false) {
         return false;
       }
-      resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision).then((info) => {
-        if (typeof onProofWidgetsRpcRefInfo === "function") {
-          onProofWidgetsRpcRefInfo(info);
-        } else {
-          console.info("VIR ProofWidgets RPC reference", info);
-        }
-      }).catch((error) => {
+      result.catch((error) => {
         console.error(error);
       });
       return true;
-    }
+    },
+    proofwidgetsRpcResolveRef: resolveRef
   };
 }
 function notifyProofWidgetsRpcRefListeners(listeners, info) {
@@ -5725,7 +5788,7 @@ async function buildIRPackage(rpcSession, irPackage, position) {
   });
   return irPackageInfo(response, irPackage.roots);
 }
-async function resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision = "") {
+async function resolveProofWidgetsRpcRef2(rpcSession, ref, position, packageRevision = "") {
   const normalized = normalizeProofWidgetsRpcRef(ref);
   if (normalized === null) {
     throw new Error("VIR ProofWidgets RPC ref must have a non-empty id");
@@ -5841,7 +5904,7 @@ export {
   loadRuntimeOptions,
   loadRuntimeService,
   loadWasmModule,
-  resolveProofWidgetsRpcRef,
+  resolveProofWidgetsRpcRef2 as resolveProofWidgetsRpcRef,
   shouldReloadIRPackage,
   statAsset,
   statIRPackage,

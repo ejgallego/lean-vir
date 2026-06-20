@@ -754,6 +754,20 @@ function createInfoviewCommandDispatcher({
   packageRevision = "",
   onProofWidgetsRpcRefInfo = null,
 }) {
+  const resolveRef = (ref) => {
+    if (rpcSession === null || typeof rpcSession.call !== "function" || position === null) {
+      return false;
+    }
+    return resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision)
+      .then((info) => {
+        if (typeof onProofWidgetsRpcRefInfo === "function") {
+          onProofWidgetsRpcRefInfo(info);
+        } else {
+          console.info("VIR ProofWidgets RPC reference", info);
+        }
+        return info;
+      });
+  };
   return {
     revealPosition(position) {
       const editorConnection = editorConnectionRef?.current ?? null;
@@ -770,22 +784,16 @@ function createInfoviewCommandDispatcher({
       return true;
     },
     proofwidgetsRpcInspectRef(ref) {
-      if (rpcSession === null || typeof rpcSession.call !== "function" || position === null) {
+      const result = resolveRef(ref);
+      if (result === false) {
         return false;
       }
-      resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision)
-        .then((info) => {
-          if (typeof onProofWidgetsRpcRefInfo === "function") {
-            onProofWidgetsRpcRefInfo(info);
-          } else {
-            console.info("VIR ProofWidgets RPC reference", info);
-          }
-        })
-        .catch((error) => {
-          console.error(error);
-        });
+      result.catch((error) => {
+        console.error(error);
+      });
       return true;
     },
+    proofwidgetsRpcResolveRef: resolveRef,
   };
 }
 

@@ -415,6 +415,48 @@ assert.deepEqual(resolvedRpcRefInfo, {
   packageRevision: "ir-package-v1",
   knownConstant: true,
 });
+let resolvedCallbackInfo = null;
+let resolvedCallbackReleased = false;
+const resolvedCallback = Object.assign((info) => {
+  resolvedCallbackInfo = info;
+}, {
+  release() {
+    resolvedCallbackReleased = true;
+  },
+});
+const resolvedBeforeHostResolve = resolvedRpcRefRequests.length;
+assert.equal(
+  irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.resolveRef"]({
+    id: "ReactProofWidget.mount",
+    label: "mount",
+    typeName: "Const",
+    summary: "host resolve smoke",
+  }, resolvedCallback),
+  true,
+);
+await new Promise((resolve) => setTimeout(resolve, 0));
+assert.equal(resolvedRpcRefRequests.length, resolvedBeforeHostResolve + 1);
+assert.deepEqual(resolvedRpcRefRequests.at(-1), {
+  ref: {
+    id: "ReactProofWidget.mount",
+    label: "mount",
+    typeName: "Const",
+    summary: "host resolve smoke",
+  },
+  pos: { line: 0, character: 0 },
+  packageRevision: "ir-package-v1",
+});
+assert.deepEqual(resolvedCallbackInfo, {
+  id: "ReactProofWidget.mount",
+  label: "mount",
+  typeName: "Const",
+  summary: "host resolve smoke",
+  source: "examples/ReactProofWidget.lean",
+  position: "ReactProofWidget.lean:1:1",
+  packageRevision: "ir-package-v1",
+  knownConstant: true,
+});
+assert.equal(resolvedCallbackReleased, true);
 const firstIRPackageBuildCount = irPackageBuildCount;
 const firstIRPackageStatCount = irPackageStatCount;
 const irPackageSecondService = await loadRuntimeService({ rpcSession, config: irPackageServiceConfig });

@@ -35,7 +35,7 @@ export const demoHostImportTargets = [
   "js.nat.value",
   "js.string",
   "js.string.value",
-  "proofwidgets.rpc.inspectRef",
+  "proofwidgets.rpc.resolveRef",
   "react.node.createElement",
   "react.node.text",
   "react.root.create",

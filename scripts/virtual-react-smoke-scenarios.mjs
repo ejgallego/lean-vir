@@ -238,17 +238,31 @@ export function smokeVirtualProofWidgetsJsxSubset(runtime, documentState, select
   assert.equal(interactive.props["data-component"], "InteractiveExpr");
   assert.equal(interactive.props["data-rpc-ref"], "jsx-demo.expr.successor");
   assert.equal(interactive.props["data-type"], "Nat -> Nat");
-  assert.equal(virtualReactTextContent(interactive), "InteractiveExpr fun x => x + 1");
+  assert.equal(virtualReactTextContent(interactive), "InteractiveExpr fun x => x + 1 ready");
   assertLiveCallbacks(runtime, 3);
   interactive.handlers.onClick({});
+  assert.equal(
+    virtualReactTextContent(reactElementById(element, "proofwidgets-jsx-interactive-status")),
+    " resolved reference at virtual",
+  );
   assert.deepEqual(documentState.infoviewCommands, [
     {
-      kind: "proofwidgetsRpcInspectRef",
+      kind: "proofwidgetsRpcResolveRef",
       ref: {
         id: "jsx-demo.expr.successor",
         label: "fun x => x + 1",
         typeName: "ExprWithCtx",
         summary: "A sample expression reference from the JSX subset demo.",
+      },
+      result: {
+        id: "jsx-demo.expr.successor",
+        label: "fun x => x + 1",
+        typeName: "ExprWithCtx",
+        summary: "A sample expression reference from the JSX subset demo.",
+        source: "virtual",
+        position: "virtual",
+        packageRevision: "virtual",
+        knownConstant: false,
       },
     },
   ]);

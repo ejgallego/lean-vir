@@ -8,6 +8,7 @@ import Vir.ProofWidgets
 
 namespace ProofWidgetsJsxSubset
 
+open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.ProofWidgets
 
@@ -110,25 +111,20 @@ def Badge : Component BadgeProps := fun ctx =>
     ]
     (#[Html.text ctx.props.label] ++ ctx.children)
 
-structure ExprPreview where
-  code : String
-  type : String
-
-def sampleExpr : WithRpcRef ExprPreview :=
-  {
-    value := { code := "fun x => x + 1", type := "Nat -> Nat" },
-    ref := {
-      id := "jsx-demo.expr.successor",
-      label := "fun x => x + 1",
-      typeName := "ExprWithCtx",
-      summary := "A sample expression reference from the JSX subset demo."
-    }
-  }
+def sampleExpr : WithRpcRef ExprWithCtx :=
+  ExprWithCtx.save
+    "jsx-demo.expr.successor"
+    "fun x => x + 1"
+    "Nat -> Nat"
+    "A sample expression reference from the JSX subset demo."
 
 structure InteractiveExprProps where
-  expr : WithRpcRef ExprPreview
+  expr : WithRpcRef ExprWithCtx
 
-def InteractiveExpr : Component InteractiveExprProps := fun ctx =>
+def InteractiveExpr : Component InteractiveExprProps := fun ctx => do
+  let initialStatus ← JsValue.ofString "ready"
+  let status ← Lean.Vir.React.Hooks.useState initialStatus
+  let statusText ← JsValue.toString status.value
   Html.buttonWith
     #[
       Attr.id "proofwidgets-jsx-interactive-expr",
@@ -136,17 +132,29 @@ def InteractiveExpr : Component InteractiveExprProps := fun ctx =>
       Attr.title ctx.props.expr.ref.summary,
       Attr.data "component" "InteractiveExpr",
       Attr.data "rpc-ref" ctx.props.expr.ref.id,
-      Attr.data "type" ctx.props.expr.value.type
+      Attr.data "type" ctx.props.expr.value.typeText
     ]
     #[Handler.onClick do
-      discard <| Rpc.inspect ctx.props.expr]
+      let loading ← JsValue.ofString "resolving..."
+      Lean.Vir.React.State.set status loading
+      let ok ← Rpc.resolve ctx.props.expr fun info => do
+        let resolved ← JsValue.ofString info.statusText
+        Lean.Vir.React.State.set status resolved
+      if !ok then
+        let failed ← JsValue.ofString "RPC unavailable"
+        Lean.Vir.React.State.set status failed]
     #[
       Html.spanWith #[Attr.className "pw-jsx-interactive-label"] #[
         Html.text "InteractiveExpr "
       ],
       Html.element "code" #[Attr.className "pw-jsx-interactive-code"] #[
         Html.text ctx.props.expr.value.code
-      ]
+      ],
+      Html.spanWith
+        #[Attr.id "proofwidgets-jsx-interactive-status", Attr.className "pw-jsx-interactive-status"]
+        #[
+          Html.text (" " ++ statusText)
+        ]
     ]
 
 def row (key label value : String) : Html :=

@@ -176,12 +176,13 @@ A realistic path has three layers:
    This is the layer needed for tactic UIs and proof-script editing, and it
    should stay narrow and typed instead of exposing an arbitrary JavaScript RPC
    bag to Lean. The first reference slice is intentionally smaller than this
-   final target: `Vir.ProofWidgets.Rpc` provides `RpcRef`, `WithRpcRef α`, and
-   a host-dispatched `inspectRef` action so `InteractiveExpr`-shaped component
-   props can cross the Lean/JS boundary. `Vir.Infoview.ProofWidgetsRpc` now
-   resolves those descriptors through the active Lean server snapshot and
-   returns source/revision metadata, while real `ExprWithCtx` storage and edit
-   commands remain future work.
+   final target: `Vir.ProofWidgets.Rpc` provides `RpcRef`, `WithRpcRef α`,
+   `ExprWithCtx.save`, and a host-dispatched `resolveRef` action so
+   `InteractiveExpr`-shaped component props can cross the Lean/JS boundary and
+   update component-owned React state from an async callback.
+   `Vir.Infoview.ProofWidgetsRpc` resolves those descriptors through the active
+   Lean server snapshot and returns source/revision metadata, while real
+   `ExprWithCtx` storage and edit commands remain future work.
 
 ## Porting Targets
 

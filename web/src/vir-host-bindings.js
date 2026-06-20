@@ -129,6 +129,8 @@ export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
     "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
     "infoview.command.revealPosition": (position) => revealInfoviewPosition(commandDispatcher, position),
     "proofwidgets.rpc.inspectRef": (ref) => inspectProofWidgetsRpcRef(commandDispatcher, ref),
+    "proofwidgets.rpc.resolveRef": (ref, callback) =>
+      resolveProofWidgetsRpcRef(commandDispatcher, ref, callback),
   };
 }
 
@@ -223,6 +225,42 @@ function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
   return dispatchInfoviewCommand(commandDispatcher, "proofwidgetsRpcInspectRef", normalized);
 }
 
+function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null || typeof callback !== "function") {
+    releaseCallback(callback);
+    return false;
+  }
+  const handler = infoviewCommandHandler(commandDispatcher, "proofwidgetsRpcResolveRef");
+  if (handler === null) {
+    releaseCallback(callback);
+    return false;
+  }
+  let result;
+  try {
+    result = handler(normalized);
+  } catch (error) {
+    reportEventHandlerError(error);
+    releaseCallback(callback);
+    return false;
+  }
+  if (result === false) {
+    releaseCallback(callback);
+    return false;
+  }
+  if (result !== null && typeof result === "object" && typeof result.then === "function") {
+    result.then((info) => {
+      callAndReleaseCallback(callback, info);
+    }).catch((error) => {
+      reportEventHandlerError(error);
+      releaseCallback(callback);
+    });
+  } else {
+    callAndReleaseCallback(callback, result);
+  }
+  return true;
+}
+
 export function normalizeInfoviewDocumentPosition(position) {
   if (position === null || typeof position !== "object") {
     return null;
@@ -254,13 +292,7 @@ function nonNegativeInteger(value) {
 }
 
 function dispatchInfoviewCommand(commandDispatcher, name, payload) {
-  const dispatcher = commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
-  let handler = null;
-  if (typeof dispatcher === "function") {
-    handler = (value) => dispatcher(name, value);
-  } else if (dispatcher !== null && typeof dispatcher === "object" && typeof dispatcher[name] === "function") {
-    handler = (value) => dispatcher[name](value);
-  }
+  const handler = infoviewCommandHandler(commandDispatcher, name);
   if (handler === null) {
     return false;
   }
@@ -276,6 +308,33 @@ function dispatchInfoviewCommand(commandDispatcher, name, payload) {
   } catch (error) {
     reportEventHandlerError(error);
     return false;
+  }
+}
+
+function infoviewCommandHandler(commandDispatcher, name) {
+  const dispatcher = commandDispatcher ?? globalThis.leanVirInfoviewCommands ?? null;
+  if (typeof dispatcher === "function") {
+    return (value) => dispatcher(name, value);
+  }
+  if (dispatcher !== null && typeof dispatcher === "object" && typeof dispatcher[name] === "function") {
+    return (value) => dispatcher[name](value);
+  }
+  return null;
+}
+
+function callAndReleaseCallback(callback, value) {
+  try {
+    callback(value);
+  } catch (error) {
+    reportEventHandlerError(error);
+  } finally {
+    releaseCallback(callback);
+  }
+}
+
+function releaseCallback(callback) {
+  if (callback !== null && typeof callback === "function" && typeof callback.release === "function") {
+    callback.release();
   }
 }
 
