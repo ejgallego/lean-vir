@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.Infoview
+import Vir.ProofWidgets.Rpc
 import Vir.React
 
 namespace ReactProofWidget
@@ -592,6 +593,10 @@ def apiStrip (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js Nod
   let clicks ← apiChip linkFg "React.onClick" "goal tabs"
   let clipboard ← apiChip blueFg "Clipboard.writeText" "copy actions"
   let reveal ← apiChip greenFg "Command.revealPosition" "cursor"
+  let exprRef ← apiChip purpleFg "WithRpcRef ExprWithCtx" <|
+    match surface.proofWidgetsExpr with
+    | none => "pending"
+    | some expr => expr.ref.label
   Node.navWith
     #[
       Property.id "react-proof-api-strip",
@@ -607,7 +612,8 @@ def apiStrip (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js Nod
       fvars,
       clicks,
       clipboard,
-      reveal
+      reveal,
+      exprRef
     ]
 
 def hypothesisLabel (hypothesis : Hypothesis) : String :=
@@ -921,12 +927,14 @@ def actionBar
     (copySelection : DomM Unit)
     (copyTarget : Goal → DomM Unit)
     (copyContext : Goal → DomM Unit)
+    (resolveExpr : DomM Unit)
     (actionStatus : String) : ReactM (Lean.Vir.Js Node) := do
   let reveal ← actionButton "react-proof-reveal-cursor" "Reveal cursor" revealCursor
   let cursor ← actionButton "react-proof-copy-cursor" "Copy cursor" copyCursor
   let selection ← actionButton "react-proof-copy-selection" "Copy selection" copySelection
   let target ← actionButton "react-proof-copy-target" "Copy target" (copyTarget goal)
   let context ← actionButton "react-proof-copy-context" "Copy context" (copyContext goal)
+  let expr ← actionButton "react-proof-resolve-expr" "Resolve ExprWithCtx" resolveExpr
   let status ← Node.spanTextWith
     #[
       Property.id "react-proof-action-status",
@@ -947,6 +955,7 @@ def actionBar
       selection,
       target,
       context,
+      expr,
       status
     ]
 
@@ -978,6 +987,7 @@ def detailView
     (copySelection : DomM Unit)
     (copyTarget : Goal → DomM Unit)
     (copyContext : Goal → DomM Unit)
+    (resolveExpr : DomM Unit)
     (actionStatus : String) : ReactM (Lean.Vir.Js Node) := do
   let title ← Node.h3TextWith #[Property.id "react-proof-selected-title", headingStyle] goal.title
   let status ← Node.spanTextWith #[Property.id "react-proof-selected-status", badgeStyle] goal.status
@@ -985,7 +995,7 @@ def detailView
     (" " ++ goalKindLabel goal ++ " · " ++ selectionSummary surface)
   let statusLine ← Node.pWith #[Property.classList #["react-proof-status-line"]] #[] #[status, kind]
   let surfacePanelNode ← surfacePanel surface goal
-  let actions ← actionBar goal revealCursor copyCursor copySelection copyTarget copyContext actionStatus
+  let actions ← actionBar goal revealCursor copyCursor copySelection copyTarget copyContext resolveExpr actionStatus
   let targetLabel ← Node.pTextWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] "Target"
   let targetCode ← Node.codeText #[Property.id "react-proof-target-code", codeStyle] goal.target
   let target ← Node.preWith #[Property.id "react-proof-target", Property.classList #["react-proof-target"], targetStyle] #[] #[
@@ -1020,6 +1030,7 @@ structure ViewProps where
   copySelection : DomM Unit
   copyTarget : Goal → DomM Unit
   copyContext : Goal → DomM Unit
+  resolveExpr : DomM Unit
   state : WidgetState
 
 def View : Component ViewProps := fun props => do
@@ -1042,6 +1053,7 @@ def View : Component ViewProps := fun props => do
         props.copySelection
         props.copyTarget
         props.copyContext
+        props.resolveExpr
         props.state.actionStatus
       let main ← Node.divWith #[Property.classList #["react-proof-main"], mainStyle] #[] #[detail]
       let layout ← Node.divWith #[Property.classList #["react-proof-layout"], layoutStyle] #[] #[
@@ -1071,6 +1083,7 @@ def view
     (copySelection : DomM Unit)
     (copyTarget : Goal → DomM Unit)
     (copyContext : Goal → DomM Unit)
+    (resolveExpr : DomM Unit)
     (state : WidgetState) : ReactM (Lean.Vir.Js Node) :=
   Node.component View {
     surface,
@@ -1080,6 +1093,7 @@ def view
     copySelection,
     copyTarget,
     copyContext,
+    resolveExpr,
     state
   }
 
@@ -1102,6 +1116,19 @@ def renderView (surface : Surface) (stateHook : WidgetStateHook) : ReactM (Lean.
   let copyContext (goal : Goal) : DomM Unit := do
     let ok ← Lean.Vir.Infoview.Clipboard.writeText (goalClipboardText surface goal)
     commit surface stateHook fun state => { state with actionStatus := copyStatus "Context" ok }
+  let resolveExpr : DomM Unit := do
+    match surface.proofWidgetsExpr with
+    | none =>
+        commit surface stateHook fun state => { state with actionStatus := "ExprWithCtx ref pending" }
+    | some expr =>
+        commit surface stateHook fun state => { state with actionStatus := "Resolving ExprWithCtx" }
+        let ok ← Lean.Vir.ProofWidgets.Rpc.resolve expr fun info => do
+          commit surface stateHook fun state =>
+            { state with actionStatus := Lean.Vir.ProofWidgets.ResolvedRef.statusText info }
+        if ok then
+          pure ()
+        else
+          commit surface stateHook fun state => { state with actionStatus := "ExprWithCtx resolve unavailable" }
   view
     surface
     selectGoal
@@ -1110,6 +1137,7 @@ def renderView (surface : Surface) (stateHook : WidgetStateHook) : ReactM (Lean.
     copySelection
     copyTarget
     copyContext
+    resolveExpr
     state
 
 def App : Component Surface := fun surface => do

@@ -8,12 +8,15 @@ import Vir.Browser
 
 namespace Lean.Vir.ProofWidgets
 
+/-- Opaque marker for a server-owned ProofWidgets RPC reference object. -/
+opaque ServerRef : Type
+
 /--
 Host-inspectable descriptor for a ProofWidgets-style RPC reference.
 
 This is the first narrow slice of the RPC surface. It intentionally carries a
 small concrete descriptor across the host boundary; richer server-side
-resolution can replace the descriptor payload without changing the typed
+resolution can attach a typed JavaScript object handle without changing the
 `WithRpcRef` shape used by component props.
 -/
 structure RpcRef where
@@ -24,8 +27,7 @@ structure RpcRef where
   expression : String
   typeText : String
   context : String
-  serverRefJson : String := ""
-  deriving Repr
+  serverRef : Option (Lean.Vir.Js ServerRef) := none
 
 /--
 Resolved metadata for a ProofWidgets-style RPC reference.
@@ -66,7 +68,6 @@ typed values with an RPC-visible reference.
 structure WithRpcRef (α : Type) where
   value : α
   ref : RpcRef
-  deriving Repr
 
 /--
 Expression-with-context preview value used by the narrow `InteractiveExpr`
@@ -95,7 +96,7 @@ def save (id code typeText summary : String) (context : String := "") : WithRpcR
       expression := code
       typeText
       context
-      serverRefJson := ""
+      serverRef := none
     }
   }
 

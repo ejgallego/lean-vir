@@ -1325,7 +1325,6 @@ function normalizeProofWidgetsRpcRef(ref) {
   if (id.length === 0) {
     return null;
   }
-  const serverRefJson = stringField(ref.serverRefJson);
   const normalized = {
     id,
     label: stringField(ref.label),
@@ -1335,9 +1334,6 @@ function normalizeProofWidgetsRpcRef(ref) {
     typeText: stringField(ref.typeText),
     context: stringField(ref.context)
   };
-  if (serverRefJson.length > 0) {
-    normalized.serverRefJson = serverRefJson;
-  }
   const serverRef = proofWidgetsServerRpcRef(ref);
   if (serverRef !== null) {
     normalized.serverRef = serverRef;
@@ -1351,16 +1347,11 @@ function proofWidgetsServerRpcRef(ref) {
   if (isRpcRefObject(ref.serverRef)) {
     return ref.serverRef;
   }
-  const serverRefJson = stringField(ref.serverRefJson).trim();
-  if (serverRefJson.length === 0) {
-    return null;
+  if (isHostResource(ref.serverRef)) {
+    const value = hostResourceValue(ref.serverRef);
+    return isRpcRefObject(value) ? value : null;
   }
-  try {
-    const parsed = JSON.parse(serverRefJson);
-    return isRpcRefObject(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 function isRpcRefObject(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value) && (typeof value.__rpcref === "number" || typeof value.p === "number");
@@ -4939,8 +4930,11 @@ function VirInfoviewWidget(props) {
   const loadedRef = React2.useRef(null);
   const [reloadToken, setReloadToken] = React2.useState(0);
   const [runtimeToken, setRuntimeToken] = React2.useState(0);
+  const [proofWidgetsExpr, setProofWidgetsExpr] = React2.useState(null);
   const irPackageRevisionRef = React2.useRef("");
-  const surface = surfaceFromInfoviewProps(props);
+  const baseSurface = surfaceFromInfoviewProps(props);
+  const baseSurfaceKey = surfaceCacheKey(baseSurface);
+  const surface = surfaceFromInfoviewProps(props, proofWidgetsExpr);
   const surfaceKey = surfaceCacheKey(surface);
   const irPackageKey = props.irPackage === null || props.irPackage === void 0 ? "" : JSON.stringify(props.irPackage);
   React2.useEffect(() => {
@@ -4974,6 +4968,7 @@ function VirInfoviewWidget(props) {
         releaseLoadedWidget(current, mountId);
       }
       loadedRef.current = { service, entry, unmountEntry, setupHint };
+      setProofWidgetsExpr(null);
       setRuntimeToken((token) => token + 1);
     } catch (error) {
       if (!isDisposed()) {
@@ -4992,6 +4987,7 @@ function VirInfoviewWidget(props) {
         if (loadedRef.current === loaded) {
           loadedRef.current = null;
         }
+        setProofWidgetsExpr(null);
       }
     };
   }, [
@@ -5084,6 +5080,60 @@ function VirInfoviewWidget(props) {
     props.setupHint
   ]);
   React2.useEffect(() => {
+    let disposed = false;
+    async function refreshProofWidgetsExpr() {
+      const loaded = loadedRef.current;
+      if (loaded === null || rpcSessionRef.current === null || typeof rpcSessionRef.current?.call !== "function") {
+        if (!disposed) {
+          setProofWidgetsExpr(null);
+        }
+        return;
+      }
+      let config;
+      try {
+        config = widgetRuntimeConfigFromProps(props);
+      } catch {
+        if (!disposed) {
+          setProofWidgetsExpr(null);
+        }
+        return;
+      }
+      if (config.position === null) {
+        if (!disposed) {
+          setProofWidgetsExpr(null);
+        }
+        return;
+      }
+      const descriptor = proofWidgetsExprDescriptorFromSurface(baseSurface);
+      if (descriptor === null) {
+        if (!disposed) {
+          setProofWidgetsExpr(null);
+        }
+        return;
+      }
+      try {
+        const saved = await createProofWidgetsExprWithCtxRef(
+          rpcSessionRef.current,
+          descriptor,
+          config.position,
+          loaded.service.packageRevision
+        );
+        if (!disposed && loadedRef.current === loaded) {
+          setProofWidgetsExpr(proofWidgetsExprFromSavedRef(saved, loaded.service.resources));
+        }
+      } catch (error) {
+        if (!disposed) {
+          console.error(error);
+          setProofWidgetsExpr(null);
+        }
+      }
+    }
+    refreshProofWidgetsExpr();
+    return () => {
+      disposed = true;
+    };
+  }, [runtimeToken, baseSurfaceKey, irPackageKey]);
+  React2.useEffect(() => {
     const loaded = loadedRef.current;
     if (loaded === null) {
       return;
@@ -5167,7 +5217,7 @@ function releaseLoadedWidget(loaded, mountId) {
   unmountWidgetSelector(loaded, mountId);
   releaseRuntimeService(loaded.service);
 }
-function surfaceFromInfoviewProps(props) {
+function surfaceFromInfoviewProps(props, proofWidgetsExpr = null) {
   const goals = arrayOrEmpty(props?.goals).map((goal, index) => goalFromInteractiveGoal(goal, index, "goal"));
   const termGoal = props?.termGoal === null || props?.termGoal === void 0 ? [] : [goalFromInteractiveGoal(props.termGoal, goals.length, "term")];
   const cursor = documentPositionFromInfoviewPosition(props?.pos);
@@ -5177,11 +5227,72 @@ function surfaceFromInfoviewProps(props) {
     cursor,
     goals: [...goals, ...termGoal],
     selectedLocations: selections.map((selection) => selection.label),
-    selections
+    selections,
+    proofWidgetsExpr
   };
 }
 function surfaceCacheKey(surface) {
   return JSON.stringify(surface);
+}
+function proofWidgetsExprDescriptorFromSurface(surface) {
+  const goal = activeGoalFromSurface(surface);
+  if (goal === null) {
+    return null;
+  }
+  const expression = nonEmptyText(goal.target, "(unavailable target)");
+  const id = nonEmptyText(goal.mvarId ?? goal.id, `goal-${goal.index}`);
+  return {
+    id,
+    label: nonEmptyText(goal.title, id),
+    typeName: "ExprWithCtx",
+    summary: `${goalKindLabel(goal)} target at ${surface?.position ?? "unknown position"}`,
+    expression,
+    typeText: "Prop",
+    context: goalContextText(goal)
+  };
+}
+function proofWidgetsExprFromSavedRef(saved, resources) {
+  if (resources === null || typeof resources !== "object" || typeof resources.resourceForValue !== "function") {
+    throw new Error("VIR widget ProofWidgets server ref requires a host resource state");
+  }
+  const info = saved?.info;
+  const ref = requiredRpcRefObject(saved?.ref, "proofwidgets stored expr ref");
+  return {
+    value: {
+      code: optionalString(info?.expression, "proofwidgets expr expression"),
+      typeText: optionalString(info?.typeText, "proofwidgets expr typeText"),
+      context: optionalString(info?.context, "proofwidgets expr context")
+    },
+    ref: {
+      id: requiredString(info?.id, "proofwidgets expr id"),
+      label: optionalString(info?.label, "proofwidgets expr label"),
+      typeName: optionalString(info?.typeName, "proofwidgets expr typeName"),
+      summary: optionalString(info?.summary, "proofwidgets expr summary"),
+      expression: optionalString(info?.expression, "proofwidgets expr expression"),
+      typeText: optionalString(info?.typeText, "proofwidgets expr typeText"),
+      context: optionalString(info?.context, "proofwidgets expr context"),
+      serverRef: resources.resourceForValue(ref)
+    }
+  };
+}
+function activeGoalFromSurface(surface) {
+  const goals = arrayOrEmpty(surface?.goals);
+  return goals.find((goal) => goal?.status === "active") ?? goals[0] ?? null;
+}
+function goalKindLabel(goal) {
+  return goal?.kind === "term" ? "term goal" : `goal ${(goal?.index ?? 0) + 1}`;
+}
+function goalContextText(goal) {
+  const hypotheses = arrayOrEmpty(goal?.hypotheses);
+  if (hypotheses.length === 0) {
+    return "";
+  }
+  return hypotheses.map((hypothesis) => {
+    const names = arrayOrEmpty(hypothesis?.names).join(" ") || optionalStringValue(hypothesis?.id);
+    const value = optionalStringValue(hypothesis?.value);
+    const suffix = value.length === 0 ? "" : ` := ${value}`;
+    return `${names} : ${optionalStringValue(hypothesis?.type)}${suffix}`;
+  }).join("\n");
 }
 function goalFromInteractiveGoal(goal, index, kind) {
   const userName = optionalStringValue(readOption(goal?.userName ?? goal?.["userName?"]));
@@ -5487,8 +5598,10 @@ async function createRuntimeService({
   if (typeof createVirRuntime2 !== "function") {
     throw new Error("VIR runtime module does not export createVirRuntime");
   }
+  const resources = createHostResourceState();
   const runtimeOptions = await loadRuntimeOptionsFromSources({ rpcSession, sources });
   runtimeOptions.defaultHostBindings = (runtimeRef) => createBrowserHostBindings({
+    resources,
     runtimeRef,
     infoviewCommandDispatcher: createInfoviewCommandDispatcher({
       editorConnectionRef,
@@ -5507,6 +5620,7 @@ async function createRuntimeService({
     lastUsed: Date.now(),
     stale: false,
     disposed: false,
+    resources,
     runtime: await createVirRuntime2(runtimeOptions)
   };
 }
@@ -5865,8 +5979,7 @@ function proofWidgetsRpcRefRequest(ref) {
     summary: ref.summary,
     expression: ref.expression,
     typeText: ref.typeText,
-    context: ref.context,
-    serverRefJson: ref.serverRefJson ?? ""
+    context: ref.context
   };
 }
 function requiredRpcRefObject(value, label) {
@@ -5924,6 +6037,8 @@ export {
   loadRuntimeOptions,
   loadRuntimeService,
   loadWasmModule,
+  proofWidgetsExprDescriptorFromSurface,
+  proofWidgetsExprFromSavedRef,
   resolveProofWidgetsRpcRef2 as resolveProofWidgetsRpcRef,
   shouldReloadIRPackage,
   statAsset,

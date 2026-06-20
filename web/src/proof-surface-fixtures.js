@@ -62,6 +62,7 @@ export function createProofSurfaceFixture() {
     selections: [
       { id: "location-main-0", kind: "location", label: "main" },
     ],
+    proofWidgetsExpr: null,
   };
 }
 

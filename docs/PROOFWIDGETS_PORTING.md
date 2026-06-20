@@ -54,17 +54,19 @@ reference-shaped interactive case:
 The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
 `WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and `Rpc.resolveRef`. The
 browser/virtual hosts normalize refs behind `proofwidgets.rpc.resolveRef`. In
-the infoview, refs can now resolve either through the descriptor fallback
-`Lean.Vir.Infoview.resolveProofWidgetsRpcRef` or through the preferred
-server-owned `Lean.Server.WithRpcRef` path,
-`Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef`. The latter uses Lean's
-standard RPC object store and refcount/lifetime model for the heavy server
-object; the browser only carries the opaque RPC handle. The
-`InteractiveExpr`-shaped demo uses ordinary React state to render the async
-result from the callback, keeping the component behavior close to a JavaScript
-React component. This proves the typed prop, host-dispatch, component-state,
-and infoview RPC round trip needed by an `InteractiveExpr`-style port. It is
-not yet proof-script editing or the full ProofWidgets RPC request model.
+the infoview, `Surface.proofWidgetsExpr` now carries a live
+`WithRpcRef ExprWithCtx` prop backed by the preferred server-owned
+`Lean.Server.WithRpcRef` path,
+`Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef`. The browser stores the
+opaque RPC handle as a typed `Js ServerRef` host resource, so the callback path
+does not serialize or parse RPC refs through a string field. Descriptor refs
+still resolve through `Lean.Vir.Infoview.resolveProofWidgetsRpcRef` as a
+fallback for tests and static examples. The `InteractiveExpr`-shaped demos use
+ordinary React state to render the async result from the callback, keeping the
+component behavior close to a JavaScript React component. This proves the
+typed prop, host-dispatch, component-state, and infoview RPC round trip needed
+by an `InteractiveExpr`-style port. It is not yet proof-script editing or the
+full ProofWidgets RPC request model.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 

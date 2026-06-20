@@ -80,6 +80,7 @@ export async function smokeReactReview(cdp, origin) {
     state.proofApi?.includes("Hypothesis.fvarIds3 fvars") &&
     state.proofApi?.includes("Clipboard.writeTextcopy actions") &&
     state.proofApi?.includes("Command.revealPositioncursor") &&
+    state.proofApi?.includes("WithRpcRef ExprWithCtxpending") &&
     state.proofSurface?.includes("mvarIdstep")
   `), {
     timeoutMessage: "React Tamagotchi toggle did not update",
@@ -102,7 +103,7 @@ export async function smokeReactReview(cdp, origin) {
     petArt: "pet",
     petToggleChecked: false,
     proofTitle: "Induction step",
-    proofApi: "Surface.goals3Surface.selections1 selectionGoal.targetInduction stepHypothesis.fvarIds3 fvarsReact.onClickgoal tabsClipboard.writeTextcopy actionsCommand.revealPositioncursor",
+    proofApi: "Surface.goals3Surface.selections1 selectionGoal.targetInduction stepHypothesis.fvarIds3 fvarsReact.onClickgoal tabsClipboard.writeTextcopy actionsCommand.revealPositioncursorWithRpcRef ExprWithCtxpending",
     proofSurface: "SelectedmainselectedLocationsmainmvarIdstepuserNamestepkindgoalfvarIds3",
   });
 }

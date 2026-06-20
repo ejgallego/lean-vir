@@ -367,7 +367,7 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactProofWidget.mount", selector, proofSurfaceFixture), true);
   const element = documentState.elements.get(selector);
   const root = element.reactRoot;
-  assertLiveCallbacks(runtime, 9);
+  assertLiveCallbacks(runtime, 10);
   const widget = reactElementById(element, "react-proof-widget");
   assert.match(String(widget.props.style?.background ?? ""), /--vscode-editorWidget-background/);
   assert.equal(widget.props.style?.colorScheme, "light dark");
@@ -388,11 +388,12 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
   assert.equal(reactElementById(element, "react-proof-detail").props["aria-live"], "polite");
   assert.equal(reactElementById(element, "react-proof-metrics").children.length, 4);
   const apiStrip = reactElementById(element, "react-proof-api-strip");
-  assert.equal(apiStrip.children.length, 7);
+  assert.equal(apiStrip.children.length, 8);
   assert.match(virtualReactTextContent(apiStrip), /Surface\.goals3/);
   assert.match(virtualReactTextContent(apiStrip), /Hypothesis\.fvarIds2 fvars/);
   assert.match(virtualReactTextContent(apiStrip), /Clipboard\.writeTextcopy actions/);
   assert.match(virtualReactTextContent(apiStrip), /Command\.revealPositioncursor/);
+  assert.match(virtualReactTextContent(apiStrip), /WithRpcRef ExprWithCtxpending/);
   const surfacePanel = reactElementById(element, "react-proof-surface-panel");
   assert.equal(surfacePanel.children.length, 6);
   assert.match(virtualReactTextContent(surfacePanel), /selectedLocationsmain/);
@@ -459,7 +460,7 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
     "Target copied",
   );
   reactElementById(element, "react-proof-goal-step").handlers.onClick({});
-  assertLiveCallbacks(runtime, 9);
+  assertLiveCallbacks(runtime, 10);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-selected-title")),
     "Induction step",
@@ -495,7 +496,7 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
   const movedProofSurfaceFixture = createMovedProofSurfaceFixture(proofSurfaceFixture);
   assert.equal(runtime.call("ReactProofWidget.mount", selector, movedProofSurfaceFixture), true);
   assert.equal(element.reactRoot, root);
-  assertLiveCallbacks(runtime, 9);
+  assertLiveCallbacks(runtime, 10);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-summary")),
     "Induction step; 3 local hypotheses; 3 goals / 6 hypotheses at ReactProofWidget.lean:87:3",

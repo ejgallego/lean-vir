@@ -19,7 +19,6 @@ structure ProofWidgetsRpcRef where
   expression : String
   typeText : String
   context : String
-  serverRefJson : String := ""
   deriving Server.RpcEncodable
 
 structure ProofWidgetsRpcRefRequest where

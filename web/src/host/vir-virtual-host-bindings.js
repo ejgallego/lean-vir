@@ -14,7 +14,7 @@ import {
   createReactStateHostBindings,
   createVirtualReactHookRuntime,
 } from "../react/vir-react-hooks.js";
-import { isHostResource } from "../host-resource.js";
+import { hostResourceValue, isHostResource } from "../host-resource.js";
 import {
   callLeanEventCallback,
   createAnimationResourceHostBindings,
@@ -296,7 +296,6 @@ export function normalizeProofWidgetsRpcRef(ref) {
   if (id.length === 0) {
     return null;
   }
-  const serverRefJson = stringField(ref.serverRefJson);
   const normalized = {
     id,
     label: stringField(ref.label),
@@ -306,9 +305,6 @@ export function normalizeProofWidgetsRpcRef(ref) {
     typeText: stringField(ref.typeText),
     context: stringField(ref.context),
   };
-  if (serverRefJson.length > 0) {
-    normalized.serverRefJson = serverRefJson;
-  }
   const serverRef = proofWidgetsServerRpcRef(ref);
   if (serverRef !== null) {
     normalized.serverRef = serverRef;
@@ -324,16 +320,11 @@ function proofWidgetsServerRpcRef(ref) {
   if (isRpcRefObject(ref.serverRef)) {
     return ref.serverRef;
   }
-  const serverRefJson = stringField(ref.serverRefJson).trim();
-  if (serverRefJson.length === 0) {
-    return null;
+  if (isHostResource(ref.serverRef)) {
+    const value = hostResourceValue(ref.serverRef);
+    return isRpcRefObject(value) ? value : null;
   }
-  try {
-    const parsed = JSON.parse(serverRefJson);
-    return isRpcRefObject(parsed) ? parsed : null;
-  } catch {
-    return null;
-  }
+  return null;
 }
 
 function isRpcRefObject(value) {

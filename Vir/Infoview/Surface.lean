@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.Browser
+import Vir.ProofWidgets.Rpc
 
 namespace Lean.Vir.Infoview
 
@@ -57,6 +58,7 @@ structure Surface where
   goals : Array Goal
   selectedLocations : Array String
   selections : Array SelectedLocation
+  proofWidgetsExpr : Option (Lean.Vir.ProofWidgets.WithRpcRef Lean.Vir.ProofWidgets.ExprWithCtx)
 
 namespace Clipboard
 
