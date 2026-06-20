@@ -44,13 +44,11 @@ test-visible virtual React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
 `Root.renderComponent root component props` API in a real React function
 component. The hook bindings `react.useState`, `react.useEffect`, and
-`react.useEffectKey` are
-render-time `ReactM` operations. `useEffect` currently has a resource shape:
-setup returns a host resource, and cleanup receives the same resource at
-React's cleanup point. It does not expose the dependency array yet, so it uses
-React's no-deps behavior and reruns after committed renders. `useEffectKey`
-uses a single Lean-computed string key as a narrow dependency array for effects
-whose lifetime should not reset on prop-only rerenders.
+`react.useEffectWithDeps` are render-time `ReactM` operations. `useEffect`
+currently has a resource shape: setup returns a host resource, and cleanup
+receives the same resource at React's cleanup point. The no-deps binding reruns
+after committed renders. `useEffectWithDeps` maps to React's dependency-array
+form and compares the Lean-provided string dependency list with `Object.is`.
 `react.state.set`, `react.state.modify`, and small
 `js.string`, `js.nat`, and `js.bool` scalar helpers are `RuntimeM` operations
 over `Lean.Vir.Js α` resources and share the same browser and virtual host

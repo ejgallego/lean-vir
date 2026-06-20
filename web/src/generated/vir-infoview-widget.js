@@ -1267,23 +1267,24 @@ function createBrowserReactHookRuntime(resources, React3) {
       }
       return void 0;
     },
-    useEffectKey(key, setup, cleanup) {
+    useEffectWithDeps(deps, setup, cleanup) {
       if (typeof React3?.useEffect !== "function" || typeof React3?.useRef !== "function") {
         releaseEffectCallbacks(setup, cleanup);
-        throw new Error("React.useEffectKey requires React.useEffect and React.useRef");
+        throw new Error("React.useEffectWithDeps requires React.useEffect and React.useRef");
       }
-      const ref = React3.useRef({ initialized: false, key: void 0 });
-      const changed = !ref.current.initialized || !Object.is(ref.current.key, key);
+      const dependencyList = normalizeDependencyListOrRelease(deps, setup, cleanup);
+      const ref = React3.useRef({ initialized: false, deps: null });
+      const changed = !ref.current.initialized || !dependencyListsEqual(ref.current.deps, dependencyList);
       const effect = changed ? createBrowserEffect(setup, cleanup) : () => void 0;
       if (changed) {
         ref.current.initialized = true;
-        ref.current.key = key;
+        ref.current.deps = dependencyList.slice();
       } else {
         releaseEffectCallbacks(setup, cleanup);
       }
       let registered = false;
       try {
-        React3.useEffect(effect, [key]);
+        React3.useEffect(effect, dependencyList);
         registered = true;
       } finally {
         if (!registered && changed) {
@@ -1298,7 +1299,7 @@ function createReactStateHostBindings(resources, hookRuntime) {
   return {
     "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
-    "react.useEffectKey": (key, setup, cleanup) => hookRuntime.useEffectKey(String(key), setup, cleanup),
+    "react.useEffectWithDeps": (deps, setup, cleanup) => hookRuntime.useEffectWithDeps(deps, setup, cleanup),
     "react.state.set": (setter, value) => setStateValue(resources, setter, value),
     "react.state.modify": (setter, update) => modifyStateValue(resources, setter, update)
   };
@@ -1320,6 +1321,31 @@ function stateSetterFor(setters, setState) {
     setters.set(setState, setter);
   }
   return setter;
+}
+function normalizeDependencyList(deps) {
+  if (!Array.isArray(deps)) {
+    throw new Error("React dependency list must be an array");
+  }
+  return deps.map((dep) => String(dep));
+}
+function normalizeDependencyListOrRelease(deps, setup, cleanup) {
+  try {
+    return normalizeDependencyList(deps);
+  } catch (error) {
+    releaseEffectCallbacks(setup, cleanup);
+    throw error;
+  }
+}
+function dependencyListsEqual(left, right) {
+  if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
+    return false;
+  }
+  for (let index = 0; index < left.length; index += 1) {
+    if (!Object.is(left[index], right[index])) {
+      return false;
+    }
+  }
+  return true;
 }
 function createBrowserEffect(setup, cleanup) {
   return () => {

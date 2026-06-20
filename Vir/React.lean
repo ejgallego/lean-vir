@@ -435,16 +435,16 @@ opaque useEffect {α : Type}
     ReactM Unit
 
 /--
-Runs a resource-shaped React effect when `key` changes.
+Runs a resource-shaped React effect with a dependency list.
 
-This is a narrow dependency-array binding for effects whose lifetime should
-track one stable Lean-computed key. React calls `setup` after the initial
-committed render and after later commits where `key` changes, and calls
-`cleanup` with the returned resource before replacement or unmount.
+This is the dependency-array form of `useEffect`: React calls `setup` after the
+initial committed render and after later commits where any dependency changes
+according to `Object.is`, and calls `cleanup` with the returned resource before
+replacement or unmount. Use `#[]` for React's empty dependency array behavior.
 -/
-@[vir_js "react.useEffectKey"]
-opaque useEffectKey {α : Type}
-    (key : @& String)
+@[vir_js "react.useEffectWithDeps"]
+opaque useEffectWithDeps {α : Type}
+    (deps : @& Array String)
     (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
     (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
     ReactM Unit

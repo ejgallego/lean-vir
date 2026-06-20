@@ -106,6 +106,40 @@ host-resource and callback-lifetime model first. Resource values now cross the
 C++/Wasm ABI through an `externref` side channel, while ProofWidgets RPC
 compatibility remains a later layer.
 
+## React Faithfulness Plan
+
+The React layer should stay a shallow embedding of React's own programming
+model. Lean code should author real React function components, create real
+React elements, call React-owned hooks during render, and accept the usual
+React pitfalls around hook order, render purity, stale closures, and effect
+dependencies. Safer Lean abstractions can come later, but the compatibility
+surface should first be familiar enough that ProofWidgets4 examples can be
+ported without redesigning their component model.
+
+Current RF status:
+
+- Function components render through stable JavaScript component identities, so
+  hook state is preserved across prop-only rerenders.
+- `useState` and resource-shaped `useEffect` are delegated to React's hook
+  runtime.
+- `useEffectWithDeps` exposes React's dependency-array shape for string
+  dependencies, with callback release handled by the host layer when
+  dependencies are unchanged.
+
+Remaining RF gaps to close in order:
+
+1. Add common hook bindings that existing React/ProofWidgets code naturally
+   expects: `useRef`, `useMemo`, `useCallback`, `useReducer`, and later
+   `useContext`.
+2. Broaden dependency values from strings to JavaScript resource values once
+   the `Js α` array/object story is strong enough for external library APIs.
+3. Add fragments and the remaining common DOM attributes/events needed by
+   real ProofWidgets examples.
+4. Add lightweight Lean-side linting for hook order and obvious render-time IO
+   footguns, without changing the shallow React-compatible API.
+5. Keep StrictMode/concurrent-render callback-root behavior documented and
+   audited; do not invent non-React lifetime semantics to hide it.
+
 ## ProofWidgets Compatibility Layers
 
 A realistic path has three layers:

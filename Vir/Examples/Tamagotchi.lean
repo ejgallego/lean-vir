@@ -957,7 +957,7 @@ def tick (hook : ViewStateHook) (state : Tamagotchi.PetState) : DomM Unit := do
     }
 
 def useLiveTick (hook : ViewStateHook) (state : Tamagotchi.PetState) : ReactM Unit := do
-  Hooks.useEffectKey (stateKey state hook.value.actionLabel)
+  Hooks.useEffectWithDeps #[stateKey state hook.value.actionLabel]
     (Lean.Vir.Browser.Timer.setInterval liveTickMs (tick hook state))
     (fun interval => Lean.Vir.Browser.Timer.clearInterval interval)
 
