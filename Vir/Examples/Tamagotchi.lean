@@ -374,6 +374,12 @@ def summaryLabel (state : Tamagotchi.PetState) (actionLabel : String) : String :
   s!"{displayName state} is {state.mood.label}; last {actionLabel}; " ++
     s!"care {state.care}/{Tamagotchi.maxCare}; turn {state.turns}"
 
+def liveTickLabel : String :=
+  "tick"
+
+def liveTickMs : UInt32 :=
+  1000
+
 def style (entries : Array (String × String)) : Property :=
   Property.stylePairs entries
 
@@ -645,9 +651,24 @@ def commit (hook : ViewStateHook) (next : ViewState) : DomM Unit := do
   setNatState hook.care state.care
   setStringState hook.actionLabel next.actionLabel
 
+def tick (hook : ViewStateHook) (state : Tamagotchi.PetState) : DomM Unit := do
+  if state.mood == .dead then
+    pure ()
+  else
+    commit hook {
+      state := Tamagotchi.nextState state .ignore
+      actionLabel := liveTickLabel
+    }
+
+def useLiveTick (hook : ViewStateHook) (state : Tamagotchi.PetState) : ReactM Unit := do
+  Hooks.useEffect
+    (Lean.Vir.Browser.Timer.setInterval liveTickMs (tick hook state))
+    (fun interval => Lean.Vir.Browser.Timer.clearInterval interval)
+
 def View : Component Unit := fun _ => do
   let hook ← useViewState
   let state := normalizeViewState hook.value.state
+  useLiveTick hook state
   let shownName := displayName state
   let actionButton := fun action => do
     let text ← Node.text action.label

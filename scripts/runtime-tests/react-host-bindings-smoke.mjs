@@ -197,7 +197,7 @@ smokeVirtualProofWidgetsHtml(reactRuntime, reactDocumentState, "#proofwidgets-ht
 smokeVirtualProofWidgetsJsxSubset(reactRuntime, reactDocumentState, "#proofwidgets-jsx-subset");
 smokeVirtualReactProofWidgetHello(reactRuntime, reactDocumentState, "#react-proof-hello");
 smokeVirtualReactProofWidget(reactRuntime, reactDocumentState, "#react-proof");
-smokeVirtualReactTamagotchi(reactRuntime, reactDocumentState, "#react-pet", { extended: true });
+await smokeVirtualReactTamagotchi(reactRuntime, reactDocumentState, "#react-pet", { extended: true });
 assert.equal(reactRuntime.call("ReactCounter.mountAndUnmount", "#react-unmount"), true);
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactDocumentState.elements.get("#react-unmount").reactRoot, undefined);

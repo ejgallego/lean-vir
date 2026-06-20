@@ -99,6 +99,14 @@ until the timer fires, is cleared, or the runtime is disposed.
 opaque Timeout : Type
 
 /--
+Browser interval object class returned by `setInterval`.
+
+The JavaScript host owns the timer registration and the retained Lean callback
+until the interval is cleared or the runtime is disposed.
+-/
+opaque Interval : Type
+
+/--
 Browser animation-frame object class returned by `requestAnimationFrame`.
 
 The JavaScript host owns the frame registration and the retained Lean callback
@@ -409,6 +417,25 @@ Reference: [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API
 -/
 @[vir_js "browser.timer.clearTimeout"]
 opaque clearTimeout (timeout : @& Lean.Vir.Js Timeout) : DomM Unit
+
+/--
+Runs `callback` every `delayMs` milliseconds until cleared.
+
+The host retains the callback until `clearInterval` is called or the runtime is
+disposed.
+
+Reference: [MDN `setInterval`](https://developer.mozilla.org/en-US/docs/Web/API/setInterval).
+-/
+@[vir_js "browser.timer.setInterval"]
+opaque setInterval (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Interval)
+
+/--
+Cancels a pending interval and releases its retained callback.
+
+Reference: [MDN `clearInterval`](https://developer.mozilla.org/en-US/docs/Web/API/clearInterval).
+-/
+@[vir_js "browser.timer.clearInterval"]
+opaque clearInterval (interval : @& Lean.Vir.Js Interval) : DomM Unit
 
 end Timer
 

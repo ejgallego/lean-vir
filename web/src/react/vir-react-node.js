@@ -445,8 +445,10 @@ function createReactComponentResource(
           const next = renderNode(node);
           disposePreviousNode(currentNode);
           currentNode = node;
+          hookRuntime.commitComponentRender?.(componentState);
           return next;
         } catch (error) {
+          hookRuntime.cancelComponentRender?.(componentState);
           disposeReactNode(resources, node);
           throw error;
         }

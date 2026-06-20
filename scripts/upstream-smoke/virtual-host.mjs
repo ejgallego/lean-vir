@@ -55,7 +55,7 @@ export async function smokeVirtualHostRuntime(context) {
   smokeVirtualReactChangeInput(hostRuntime, hostDocumentState, "#react-change-smoke");
   smokeVirtualReactCheckbox(hostRuntime, hostDocumentState, "#react-checkbox-smoke");
   smokeVirtualReactAttributes(hostRuntime, hostDocumentState, "#react-attributes-smoke");
-  smokeVirtualReactTamagotchi(hostRuntime, hostDocumentState, "#react-pet-smoke");
+  await smokeVirtualReactTamagotchi(hostRuntime, hostDocumentState, "#react-pet-smoke");
   smokeTamagotchiDom(hostRuntime, hostDocumentState);
 }
 

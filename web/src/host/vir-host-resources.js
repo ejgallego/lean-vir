@@ -383,6 +383,14 @@ export function createTimerResourceHostBindings(resources) {
       resources.releaseResource(timeout);
       return undefined;
     },
+    "browser.timer.setInterval": (delayMs, callback) =>
+      resources.resourceForValue(createIntervalResource(resources, delayMs, callback)),
+    "browser.timer.clearInterval": (interval) => {
+      const value = resources.resolveResource(interval, "Interval");
+      value.clear();
+      resources.releaseResource(interval);
+      return undefined;
+    },
   };
 }
 
@@ -406,6 +414,46 @@ export function createTimeoutResource(resources, delayMs, callback) {
     cancel: globalThis.clearTimeout.bind(globalThis),
     invoke: (leanCallback) => leanCallback(),
   });
+}
+
+export function createIntervalResource(resources, delayMs, callback) {
+  let token = null;
+  let running = 0;
+  let cleared = false;
+  const release = () => {
+    callback.release();
+    resources.removeDisposable(value);
+  };
+  const value = {
+    clear() {
+      if (cleared) return undefined;
+      cleared = true;
+      if (token !== null) {
+        globalThis.clearInterval(token);
+        token = null;
+      }
+      if (running === 0) {
+        release();
+      }
+      return undefined;
+    },
+  };
+  token = globalThis.setInterval(() => {
+    if (cleared) return undefined;
+    running++;
+    try {
+      callback();
+    } catch (error) {
+      reportEventHandlerError(error);
+    } finally {
+      running--;
+      if (cleared && running === 0) {
+        release();
+      }
+    }
+  }, delayMs);
+  resources.addDisposable(value);
+  return value;
 }
 
 export function createAnimationFrameResource(resources, callback, requestFrame, cancelFrame) {

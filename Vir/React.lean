@@ -420,6 +420,20 @@ namespace Hooks
 @[vir_js "react.useState"]
 opaque useState {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
 
+/--
+Runs a React effect whose setup returns a host resource cleaned up by React.
+
+This is the v0 resource-shaped `useEffect` binding with React's no-dependency
+behavior: React calls `setup` after each committed render and calls `cleanup`
+with the returned resource before the effect is replaced, before unmount, or
+when the runtime is disposed.
+-/
+@[vir_js "react.useEffect"]
+opaque useEffect {α : Type}
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit
+
 end Hooks
 
 namespace State

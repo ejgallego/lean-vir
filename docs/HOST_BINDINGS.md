@@ -43,12 +43,16 @@ the browser binding uses `React.createElement`, while the virtual binding builds
 test-visible virtual React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
 `Root.renderComponent root component props` API in a real React function
-component. The hook binding `react.useState` is a render-time `ReactM`
-operation. `react.state.set`, `react.state.modify`, and small `js.string`,
-`js.nat`, and `js.bool` scalar helpers are `RuntimeM` operations over
-`Lean.Vir.Js α` resources and share the same browser and virtual host resource
-store as React roots. The scalar helpers let examples use primitive React state
-without giving `react.useState` a scalar ABI.
+component. The hook bindings `react.useState` and `react.useEffect` are
+render-time `ReactM` operations. `useEffect` currently has a resource shape:
+setup returns a host resource, and cleanup receives the same resource at
+React's cleanup point. It does not expose the dependency array yet, so it uses
+React's no-deps behavior and reruns after committed renders.
+`react.state.set`, `react.state.modify`, and small
+`js.string`, `js.nat`, and `js.bool` scalar helpers are `RuntimeM` operations
+over `Lean.Vir.Js α` resources and share the same browser and virtual host
+resource store as React roots. The scalar helpers let examples use primitive
+React state without giving `react.useState` a scalar ABI.
 `Root.render` accepts a `ReactM (Lean.Vir.Js Node)` tree. The
 `react.root.render` host binding receives that render action as a releasable
 callback, invokes it to obtain the concrete `Js Node` resource, renders the
@@ -219,8 +223,11 @@ manifest.
 - [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value)
 - [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout)
 - [MDN `clearTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/clearTimeout)
+- [MDN `setInterval`](https://developer.mozilla.org/en-US/docs/Web/API/setInterval)
+- [MDN `clearInterval`](https://developer.mozilla.org/en-US/docs/Web/API/clearInterval)
 - [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame)
 - [MDN `cancelAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/cancelAnimationFrame)
 - [React `createRoot`](https://react.dev/reference/react-dom/client/createRoot)
 - [React `useState`](https://react.dev/reference/react/useState)
+- [React `useEffect`](https://react.dev/reference/react/useEffect)
 - [React `root.unmount`](https://react.dev/reference/react-dom/client/createRoot#root-unmount)

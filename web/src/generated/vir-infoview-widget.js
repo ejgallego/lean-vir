@@ -441,8 +441,10 @@ function createReactComponentResource(resources, renderCallback, hookRuntime, re
           const next = renderNode(node);
           disposePreviousNode(currentNode);
           currentNode = node;
+          hookRuntime.commitComponentRender?.(componentState);
           return next;
         } catch (error) {
+          hookRuntime.cancelComponentRender?.(componentState);
           disposeReactNode(resources, node);
           throw error;
         }
@@ -908,7 +910,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     root.unmount();
     resources.releaseValueResource(root);
   }
-  function releaseLeanCallback(callback) {
+  function releaseLeanCallback2(callback) {
     if (typeof callback?.release === "function") {
       callback.release();
     }
@@ -964,7 +966,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
       return true;
     },
     "react.root.renderComponentIntoSelector": (selector, component) => {
-      const root = selectorRoot(selector, () => releaseLeanCallback(component));
+      const root = selectorRoot(selector, () => releaseLeanCallback2(component));
       if (root === null) {
         return false;
       }
@@ -1013,6 +1015,13 @@ function createTimerResourceHostBindings(resources) {
       value.clear();
       resources.releaseResource(timeout);
       return void 0;
+    },
+    "browser.timer.setInterval": (delayMs, callback) => resources.resourceForValue(createIntervalResource(resources, delayMs, callback)),
+    "browser.timer.clearInterval": (interval) => {
+      const value = resources.resolveResource(interval, "Interval");
+      value.clear();
+      resources.releaseResource(interval);
+      return void 0;
     }
   };
 }
@@ -1034,6 +1043,45 @@ function createTimeoutResource(resources, delayMs, callback) {
     cancel: globalThis.clearTimeout.bind(globalThis),
     invoke: (leanCallback) => leanCallback()
   });
+}
+function createIntervalResource(resources, delayMs, callback) {
+  let token = null;
+  let running = 0;
+  let cleared = false;
+  const release = () => {
+    callback.release();
+    resources.removeDisposable(value);
+  };
+  const value = {
+    clear() {
+      if (cleared) return void 0;
+      cleared = true;
+      if (token !== null) {
+        globalThis.clearInterval(token);
+        token = null;
+      }
+      if (running === 0) {
+        release();
+      }
+      return void 0;
+    }
+  };
+  token = globalThis.setInterval(() => {
+    if (cleared) return void 0;
+    running++;
+    try {
+      callback();
+    } catch (error) {
+      reportEventHandlerError(error);
+    } finally {
+      running--;
+      if (cleared && running === 0) {
+        release();
+      }
+    }
+  }, delayMs);
+  resources.addDisposable(value);
+  return value;
 }
 function createAnimationFrameResource(resources, callback, requestFrame, cancelFrame) {
   return createScheduledCallbackResource(resources, callback, {
@@ -1185,12 +1233,29 @@ function createBrowserReactHookRuntime(resources, React3) {
       const setter = stateSetterFor(setters, setState);
       currentComponent?.setters?.add(setter);
       return stateResult(resources, value, setter);
+    },
+    useEffect(setup, cleanup) {
+      if (typeof React3?.useEffect !== "function") {
+        releaseEffectCallbacks(setup, cleanup);
+        throw new Error("React.useEffect is not available");
+      }
+      let registered = false;
+      try {
+        React3.useEffect(createBrowserEffect(setup, cleanup));
+        registered = true;
+      } finally {
+        if (!registered) {
+          releaseEffectCallbacks(setup, cleanup);
+        }
+      }
+      return void 0;
     }
   };
 }
 function createReactStateHostBindings(resources, hookRuntime) {
   return {
     "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
+    "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
     "react.state.set": (setter, value) => setStateValue(resources, setter, value),
     "react.state.modify": (setter, update) => modifyStateValue(resources, setter, update)
   };
@@ -1212,6 +1277,39 @@ function stateSetterFor(setters, setState) {
     setters.set(setState, setter);
   }
   return setter;
+}
+function createBrowserEffect(setup, cleanup) {
+  return () => {
+    let resource = null;
+    let ready = false;
+    try {
+      resource = setup();
+      ready = true;
+    } finally {
+      if (!ready) {
+        releaseEffectCallbacks(setup, cleanup);
+      }
+    }
+    let disposed = false;
+    return () => {
+      if (disposed) return void 0;
+      disposed = true;
+      try {
+        return cleanup(resource);
+      } finally {
+        releaseEffectCallbacks(setup, cleanup);
+      }
+    };
+  };
+}
+function releaseEffectCallbacks(setup, cleanup) {
+  releaseLeanCallback(setup);
+  releaseLeanCallback(cleanup);
+}
+function releaseLeanCallback(callback) {
+  if (typeof callback?.release === "function") {
+    callback.release();
+  }
 }
 function stateResult(resources, value, setter) {
   return {

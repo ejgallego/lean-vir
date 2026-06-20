@@ -136,6 +136,13 @@ assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
 assert.equal(reactUseStateImports[0]?.result?.fields?.find((field) => field.name === "value")?.type?.type, "Js");
+const reactUseEffectImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useEffect");
+assert.equal(reactUseEffectImports.length, 1);
+assert.equal(reactUseEffectImports[0]?.effect, "react");
+assert.equal(reactUseEffectImports[0]?.args[0]?.type?.kind, "function");
+assert.equal(reactUseEffectImports[0]?.args[0]?.type?.effect, "dom");
+assert.equal(reactUseEffectImports[0]?.args[1]?.type?.kind, "function");
+assert.equal(reactUseEffectImports[0]?.args[1]?.type?.effect, "dom");
 for (const target of [
   "js.string",
   "js.string.value",

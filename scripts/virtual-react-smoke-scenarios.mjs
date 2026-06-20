@@ -289,77 +289,97 @@ export function smokeVirtualProofWidgetsJsxSubset(runtime, documentState, select
   assertUnmountCleanup(runtime, element);
 }
 
-export function smokeVirtualReactTamagotchi(runtime, documentState, selector, {
+export async function smokeVirtualReactTamagotchi(runtime, documentState, selector, {
   extended = false,
 } = {}) {
-  assert.equal(runtime.call("ReactTamagotchi.mount", selector), true);
-  const element = documentState.elements.get(selector);
-  assertLiveCallbacks(runtime, 10);
-  const widget = reactElementById(element, "react-pet-widget");
-  assert.equal(widget.props["data-mood"], "happy");
-  if (extended) {
-    const device = reactElementById(element, "react-pet-device");
-    assert.equal(device.props.role, "img");
-    assert.equal(device.props["data-art"], "octopus");
-    assert.equal(device.props["data-mood"], "happy");
-    assert.match(device.props["aria-label"], /Octopus Octi mood happy/);
-    const nameInput = reactElementById(element, "react-pet-name-input");
-    assert.equal(nameInput.props.maxLength, 18);
-    assert.equal(nameInput.props.autoComplete, "off");
+  await withCapturedIntervals(async (intervals) => {
+    assert.equal(runtime.call("ReactTamagotchi.mount", selector), true);
+    const element = documentState.elements.get(selector);
+    assertLiveCallbacks(runtime, 13);
+    assert.equal(intervals.size, 1);
+    assert.equal(onlyInterval(intervals).delayMs, 1000);
+    const widget = reactElementById(element, "react-pet-widget");
+    assert.equal(widget.props["data-mood"], "happy");
+    if (extended) {
+      const device = reactElementById(element, "react-pet-device");
+      assert.equal(device.props.role, "img");
+      assert.equal(device.props["data-art"], "octopus");
+      assert.equal(device.props["data-mood"], "happy");
+      assert.match(device.props["aria-label"], /Octopus Octi mood happy/);
+      const nameInput = reactElementById(element, "react-pet-name-input");
+      assert.equal(nameInput.props.maxLength, 18);
+      assert.equal(nameInput.props.autoComplete, "off");
+      assert.equal(
+        virtualReactTextContent(reactElementById(element, "react-pet-summary")),
+        "Octi is happy; last ...; care 3/5; turn 0",
+      );
+    }
+
+    reactElementById(element, "react-pet-action-ignore").handlers.onClick({});
+    assertLiveCallbacks(runtime, 13);
+    assert.equal(intervals.size, 1);
+    assert.equal(reactElementById(element, "react-pet-widget").props["data-mood"], "hungry");
     assert.equal(
       virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-      "Octi is happy; last ...; care 3/5; turn 0",
+      "Octi is hungry; last ignore; care 2/5; turn 1",
     );
-  }
+    assert.equal(
+      virtualReactTextContent(reactElementById(element, "react-pet-trace")),
+      "happyhungry",
+    );
+    const trace = reactElementById(element, "react-pet-trace");
+    assert.equal(trace.props.role, "list");
+    assert.equal(trace.props["aria-label"], "Mood trace: happy -> hungry");
+    assert.equal(trace.children[0].props.role, "listitem");
+    assert.equal(trace.children[1].props.role, "listitem");
 
-  reactElementById(element, "react-pet-action-ignore").handlers.onClick({});
-  assertLiveCallbacks(runtime, 10);
-  assert.equal(reactElementById(element, "react-pet-widget").props["data-mood"], "hungry");
-  assert.equal(
-    virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-    "Octi is hungry; last ignore; care 2/5; turn 1",
-  );
-  assert.equal(
-    virtualReactTextContent(reactElementById(element, "react-pet-trace")),
-    "happyhungry",
-  );
-  const trace = reactElementById(element, "react-pet-trace");
-  assert.equal(trace.props.role, "list");
-  assert.equal(trace.props["aria-label"], "Mood trace: happy -> hungry");
-  assert.equal(trace.children[0].props.role, "listitem");
-  assert.equal(trace.children[1].props.role, "listitem");
-
-  reactElementById(element, "react-pet-name-input").handlers.onChange(createVirtualEventState({
-    currentTarget: createVirtualElementState({ value: "Ada" }),
-  }));
-  assertLiveCallbacks(runtime, 10);
-  assert.equal(
-    virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-    "Ada is hungry; last rename; care 2/5; turn 1",
-  );
-
-  if (extended) {
-    const submitEvent = createVirtualEventState();
-    reactElementById(element, "react-pet-name-form").handlers.onSubmit(submitEvent);
-    assert.equal(submitEvent.defaultPrevented, true);
-    assert.equal(submitEvent.propagationStopped, true);
-    assertLiveCallbacks(runtime, 10);
-    reactElementById(element, "react-pet-art-toggle").handlers.onChange(createVirtualEventState({
-      currentTarget: createVirtualElementState({ checked: false }),
+    reactElementById(element, "react-pet-name-input").handlers.onChange(createVirtualEventState({
+      currentTarget: createVirtualElementState({ value: "Ada" }),
     }));
-    assertLiveCallbacks(runtime, 10);
-    assert.equal(reactElementById(element, "react-pet-device").props["data-art"], "pet");
-    assert.equal(reactElementById(element, "react-pet-art-toggle").props.checked, false);
-    reactElementById(element, "react-pet-reset").handlers.onClick({});
-    assertLiveCallbacks(runtime, 10);
+    assertLiveCallbacks(runtime, 13);
+    assert.equal(intervals.size, 1);
     assert.equal(
       virtualReactTextContent(reactElementById(element, "react-pet-summary")),
-      "Ada is happy; last ...; care 3/5; turn 0",
+      "Ada is hungry; last rename; care 2/5; turn 1",
     );
-  }
 
-  element.reactRoot.unmount();
-  assertUnmountCleanup(runtime, element);
+    if (extended) {
+      const submitEvent = createVirtualEventState();
+      reactElementById(element, "react-pet-name-form").handlers.onSubmit(submitEvent);
+      assert.equal(submitEvent.defaultPrevented, true);
+      assert.equal(submitEvent.propagationStopped, true);
+      assertLiveCallbacks(runtime, 13);
+      assert.equal(intervals.size, 1);
+      reactElementById(element, "react-pet-art-toggle").handlers.onChange(createVirtualEventState({
+        currentTarget: createVirtualElementState({ checked: false }),
+      }));
+      assertLiveCallbacks(runtime, 13);
+      assert.equal(intervals.size, 1);
+      assert.equal(reactElementById(element, "react-pet-device").props["data-art"], "pet");
+      assert.equal(reactElementById(element, "react-pet-art-toggle").props.checked, false);
+      reactElementById(element, "react-pet-reset").handlers.onClick({});
+      assertLiveCallbacks(runtime, 13);
+      assert.equal(intervals.size, 1);
+      assert.equal(
+        virtualReactTextContent(reactElementById(element, "react-pet-summary")),
+        "Ada is happy; last ...; care 3/5; turn 0",
+      );
+      onlyInterval(intervals).run();
+      await flushMicrotasks();
+      assertLiveCallbacks(runtime, 13);
+      assert.equal(intervals.size, 1);
+      assert.equal(
+        virtualReactTextContent(reactElementById(element, "react-pet-summary")),
+        "Ada is hungry; last tick; care 2/5; turn 1",
+      );
+      assert.equal(reactElementById(element, "react-pet-widget").props["data-mood"], "hungry");
+    }
+
+    element.reactRoot.unmount();
+    await flushMicrotasks();
+    assert.equal(intervals.size, 0);
+    assertUnmountCleanup(runtime, element);
+  });
 }
 
 export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
@@ -572,4 +592,38 @@ function assertLiveCallbacks(runtime, expected) {
 function assertUnmountCleanup(runtime, element) {
   assertLiveCallbacks(runtime, 0);
   assert.equal(element.reactRoot, undefined);
+}
+
+async function withCapturedIntervals(run) {
+  const originalSetInterval = globalThis.setInterval;
+  const originalClearInterval = globalThis.clearInterval;
+  const intervals = new Map();
+  let nextId = 1;
+  globalThis.setInterval = (callback, delayMs) => {
+    const token = { id: nextId++ };
+    intervals.set(token, {
+      callback,
+      delayMs,
+      run: () => callback(),
+    });
+    return token;
+  };
+  globalThis.clearInterval = (token) => {
+    intervals.delete(token);
+  };
+  try {
+    return await run(intervals);
+  } finally {
+    globalThis.setInterval = originalSetInterval;
+    globalThis.clearInterval = originalClearInterval;
+  }
+}
+
+function onlyInterval(intervals) {
+  assert.equal(intervals.size, 1);
+  return Array.from(intervals.values())[0];
+}
+
+function flushMicrotasks() {
+  return Promise.resolve();
 }
