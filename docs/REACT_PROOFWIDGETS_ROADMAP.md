@@ -182,8 +182,9 @@ A realistic path has three layers:
    update component-owned React state from an async callback.
    `Vir.Infoview.Surface` now carries a live server-owned
    `WithRpcRef ExprWithCtx` prop backed by a typed `Js ServerRef` host
-   resource. `Vir.Infoview.ProofWidgetsRpc` still resolves descriptor
-   fallbacks through the active Lean server snapshot, while elaborator-backed
+   resource. `Vir.Infoview.ProofWidgetsRpc` builds that prop from Lean's
+   current interactive goal at the cursor and still resolves descriptor
+   fallbacks through the active Lean server snapshot. Broader ExprWithCtx
    construction and edit commands remain future work.
 
 ## Porting Targets

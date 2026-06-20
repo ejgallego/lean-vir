@@ -39,12 +39,12 @@ const {
   exactlyOneAssetSource,
   exactlyOnePackageSource,
   clearRuntimeServiceCacheForTests,
+  createProofWidgetsExprWithCtxAtPos,
   createProofWidgetsExprWithCtxRef,
   loadAssetBytes,
   loadRuntimeOptions,
   loadRuntimeService,
   loadWasmModule,
-  proofWidgetsExprDescriptorFromSurface,
   proofWidgetsExprFromSavedRef,
   resolveProofWidgetsRpcRef,
   shouldReloadIRPackage,
@@ -68,6 +68,7 @@ let irPackageStatCount = 0;
 let irPackageRevision = "ir-package-v1";
 const resolvedRpcRefRequests = [];
 const createdExprWithCtxRefRequests = [];
+const createdExprWithCtxAtPosRequests = [];
 const resolvedExprWithCtxRefRequests = [];
 const assetRevisions = new Map([
   ["web/public/vir-upstream.wasm", "wasm-v1"],
@@ -116,6 +117,29 @@ const rpcSession = {
           packageRevision: params.packageRevision,
           storeKey: `${params.packageRevision}:${params.ref.id}`,
           knownConstant: params.ref.id === "ReactProofWidget.mount",
+        },
+      };
+    }
+    if (method === "Lean.Vir.Infoview.createProofWidgetsExprWithCtxAtPos") {
+      createdExprWithCtxAtPosRequests.push(params);
+      if (params.pos.line === 99) {
+        return null;
+      }
+      return {
+        ref: { __rpcref: 19 },
+        info: {
+          id: "m.1",
+          label: "case main",
+          typeName: "ExprWithCtx",
+          summary: `goal 1 target at ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
+          expression: "xs.reverse.reverse = xs",
+          typeText: "Prop",
+          context: "xs : List Nat",
+          source: "examples/ReactProofWidget.lean",
+          position: `ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
+          packageRevision: params.packageRevision,
+          storeKey: `${params.packageRevision}:m.1`,
+          knownConstant: false,
         },
       };
     }
@@ -231,15 +255,7 @@ assert.deepEqual(surfaceFromInfoviewProps(infoviewPropsFixture), {
   ],
   proofWidgetsExpr: null,
 });
-assert.deepEqual(proofWidgetsExprDescriptorFromSurface(surfaceFromInfoviewProps(infoviewPropsFixture)), {
-  id: "m.1",
-  label: "case main",
-  typeName: "ExprWithCtx",
-  summary: "goal 1 target at Example.lean:7:3",
-  expression: "xs.reverse.reverse = xs",
-  typeText: "Prop",
-  context: "xs : List Nat",
-});
+assert.equal(surfaceFromInfoviewProps(infoviewPropsFixture).goals[0].target, "xs.reverse.reverse = xs");
 assert.equal(
   surfaceCacheKey(surfaceFromInfoviewProps(infoviewPropsFixture)),
   surfaceCacheKey(surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture))),
@@ -336,6 +352,42 @@ assert.deepEqual(createdExprWithCtxRefRequests.at(-1), {
   pos: { line: 2, character: 4 },
   packageRevision: "server-package-v1",
 });
+assert.deepEqual(
+  await createProofWidgetsExprWithCtxAtPos(
+    rpcSession,
+    { line: 6, character: 2 },
+    "server-package-v2",
+  ),
+  {
+    ref: { __rpcref: 19 },
+    info: {
+      id: "m.1",
+      label: "case main",
+      typeName: "ExprWithCtx",
+      summary: "goal 1 target at ReactProofWidget.lean:7:3",
+      expression: "xs.reverse.reverse = xs",
+      typeText: "Prop",
+      context: "xs : List Nat",
+      source: "examples/ReactProofWidget.lean",
+      position: "ReactProofWidget.lean:7:3",
+      packageRevision: "server-package-v2",
+      storeKey: "server-package-v2:m.1",
+      knownConstant: false,
+    },
+  },
+);
+assert.deepEqual(createdExprWithCtxAtPosRequests.at(-1), {
+  pos: { line: 6, character: 2 },
+  packageRevision: "server-package-v2",
+});
+assert.equal(
+  await createProofWidgetsExprWithCtxAtPos(
+    rpcSession,
+    { line: 99, character: 0 },
+    "server-package-v2",
+  ),
+  null,
+);
 assert.deepEqual(
   await resolveProofWidgetsRpcRef(
     rpcSession,

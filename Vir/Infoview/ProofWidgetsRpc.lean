@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Lean.Widget
+import Lean.Server.FileWorker.RequestHandling
 import Vir.Infoview.Package
 
 namespace Lean.Vir.Infoview
@@ -23,6 +24,11 @@ structure ProofWidgetsRpcRef where
 
 structure ProofWidgetsRpcRefRequest where
   ref : ProofWidgetsRpcRef
+  pos : Lsp.Position
+  packageRevision : String
+  deriving Server.RpcEncodable
+
+structure ProofWidgetsExprWithCtxAtPosRequest where
   pos : Lsp.Position
   packageRevision : String
   deriving Server.RpcEncodable
@@ -134,6 +140,49 @@ def lspPositionLabel (source : String) (pos : Lsp.Position) : String :=
   let fileName := (System.FilePath.mk source).fileName.getD source
   s!"{fileName}:{pos.line + 1}:{pos.character + 1}"
 
+def interactiveHypothesesContext (hyps : Array Widget.InteractiveHypothesisBundle) : String :=
+  String.intercalate "\n" <| hyps.toList.map fun hyp =>
+    let names := String.intercalate " " hyp.names.toList
+    let names := if names.isEmpty then "_" else names
+    let valueSuffix :=
+      match hyp.val? with
+      | none => ""
+      | some value => s!" := {value.stripTags}"
+    s!"{names} : {hyp.type.stripTags}{valueSuffix}"
+
+def interactiveGoalLabel (goal : Widget.InteractiveGoal) (index : Nat) : String :=
+  match goal.userName? with
+  | some userName => s!"case {userName}"
+  | none => s!"Goal {index + 1}"
+
+def interactiveGoalStoredExprWithCtx
+    (goal : Widget.InteractiveGoal)
+    (source position packageRevision : String)
+    (index : Nat) :
+    StoredExprWithCtx :=
+  let id := toString goal.mvarId.name
+  let label := interactiveGoalLabel goal index
+  let expression := goal.type.stripTags
+  {
+    storeKey := proofWidgetsRpcRefStoreKey packageRevision id
+    id
+    label
+    typeName := "ExprWithCtx"
+    summary := s!"goal {index + 1} target at {position}"
+    expression
+    typeText := "Prop"
+    context := interactiveHypothesesContext goal.hyps
+    source
+    position
+    packageRevision
+    knownConstant := false
+  }
+
+def saveStoredExprWithCtx (stored : StoredExprWithCtx) : RequestM SavedExprWithCtxRef := do
+  rememberStoredExprWithCtx stored
+  let ref ← Server.WithRpcRef.mk stored
+  return { ref, info := stored.toInfo }
+
 def rpcRefName? (ref : ProofWidgetsRpcRef) : Option Name :=
   match nameFromDotted ref.id with
   | .ok name => some name
@@ -181,6 +230,29 @@ def createProofWidgetsExprWithCtxRef
     rememberStoredExprWithCtx stored
     let ref ← Server.WithRpcRef.mk stored
     return { ref, info := stored.toInfo }
+
+@[server_rpc_method]
+def createProofWidgetsExprWithCtxAtPos
+    (params : ProofWidgetsExprWithCtxAtPosRequest) :
+    RequestM (RequestTask (Option SavedExprWithCtxRef)) := do
+  let doc ← RequestM.readDoc
+  let source := documentSourceName doc
+  let position := lspPositionLabel source params.pos
+  let goalsTask ← Server.FileWorker.getInteractiveGoals {
+    textDocument := { uri := doc.meta.uri }
+    position := params.pos
+  }
+  RequestM.mapRequestTaskCostly goalsTask fun goals? => do
+    match goals?.bind (fun goals => goals.goals[0]?) with
+    | none => return none
+    | some goal =>
+      let stored := interactiveGoalStoredExprWithCtx
+        goal
+        source
+        position
+        params.packageRevision
+        0
+      return some (← saveStoredExprWithCtx stored)
 
 @[server_rpc_method]
 def resolveProofWidgetsExprWithCtxRef

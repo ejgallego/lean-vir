@@ -56,7 +56,9 @@ The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
 browser/virtual hosts normalize refs behind `proofwidgets.rpc.resolveRef`. In
 the infoview, `Surface.proofWidgetsExpr` now carries a live
 `WithRpcRef ExprWithCtx` prop backed by the preferred server-owned
-`Lean.Server.WithRpcRef` path,
+`Lean.Server.WithRpcRef` path. The infoview shell asks
+`Lean.Vir.Infoview.createProofWidgetsExprWithCtxAtPos` to build that prop from
+Lean's current interactive goal at the cursor, then resolves it through
 `Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef`. The browser stores the
 opaque RPC handle as a typed `Js ServerRef` host resource, so the callback path
 does not serialize or parse RPC refs through a string field. Descriptor refs
@@ -64,9 +66,9 @@ still resolve through `Lean.Vir.Infoview.resolveProofWidgetsRpcRef` as a
 fallback for tests and static examples. The `InteractiveExpr`-shaped demos use
 ordinary React state to render the async result from the callback, keeping the
 component behavior close to a JavaScript React component. This proves the
-typed prop, host-dispatch, component-state, and infoview RPC round trip needed
-by an `InteractiveExpr`-style port. It is not yet proof-script editing or the
-full ProofWidgets RPC request model.
+typed prop, host-dispatch, component-state, current-goal construction, and
+infoview RPC round trip needed by an `InteractiveExpr`-style port. It is not
+yet proof-script editing or the full ProofWidgets RPC request model.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 

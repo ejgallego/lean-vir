@@ -5106,22 +5106,14 @@ function VirInfoviewWidget(props) {
         }
         return;
       }
-      const descriptor = proofWidgetsExprDescriptorFromSurface(baseSurface);
-      if (descriptor === null) {
-        if (!disposed) {
-          setProofWidgetsExpr(null);
-        }
-        return;
-      }
       try {
-        const saved = await createProofWidgetsExprWithCtxRef(
+        const saved = await createProofWidgetsExprWithCtxAtPos(
           rpcSessionRef.current,
-          descriptor,
           config.position,
           loaded.service.packageRevision
         );
         if (!disposed && loadedRef.current === loaded) {
-          setProofWidgetsExpr(proofWidgetsExprFromSavedRef(saved, loaded.service.resources));
+          setProofWidgetsExpr(saved === null ? null : proofWidgetsExprFromSavedRef(saved, loaded.service.resources));
         }
       } catch (error) {
         if (!disposed) {
@@ -5236,23 +5228,6 @@ function surfaceFromInfoviewProps(props, proofWidgetsExpr = null) {
 function surfaceCacheKey(surface) {
   return JSON.stringify(surface);
 }
-function proofWidgetsExprDescriptorFromSurface(surface) {
-  const goal = activeGoalFromSurface(surface);
-  if (goal === null) {
-    return null;
-  }
-  const expression = nonEmptyText(goal.target, "(unavailable target)");
-  const id = nonEmptyText(goal.mvarId ?? goal.id, `goal-${goal.index}`);
-  return {
-    id,
-    label: nonEmptyText(goal.title, id),
-    typeName: "ExprWithCtx",
-    summary: `${goalKindLabel(goal)} target at ${surface?.position ?? "unknown position"}`,
-    expression,
-    typeText: "Prop",
-    context: goalContextText(goal)
-  };
-}
 function proofWidgetsExprFromSavedRef(saved, resources) {
   if (resources === null || typeof resources !== "object" || typeof resources.resourceForValue !== "function") {
     throw new Error("VIR widget ProofWidgets server ref requires a host resource state");
@@ -5276,25 +5251,6 @@ function proofWidgetsExprFromSavedRef(saved, resources) {
       serverRef: resources.resourceForValue(ref)
     }
   };
-}
-function activeGoalFromSurface(surface) {
-  const goals = arrayOrEmpty(surface?.goals);
-  return goals.find((goal) => goal?.status === "active") ?? goals[0] ?? null;
-}
-function goalKindLabel(goal) {
-  return goal?.kind === "term" ? "term goal" : `goal ${(goal?.index ?? 0) + 1}`;
-}
-function goalContextText(goal) {
-  const hypotheses = arrayOrEmpty(goal?.hypotheses);
-  if (hypotheses.length === 0) {
-    return "";
-  }
-  return hypotheses.map((hypothesis) => {
-    const names = arrayOrEmpty(hypothesis?.names).join(" ") || optionalStringValue(hypothesis?.id);
-    const value = optionalStringValue(hypothesis?.value);
-    const suffix = value.length === 0 ? "" : ` := ${value}`;
-    return `${names} : ${optionalStringValue(hypothesis?.type)}${suffix}`;
-  }).join("\n");
 }
 function goalFromInteractiveGoal(goal, index, kind) {
   const userName = optionalStringValue(readOption(goal?.userName ?? goal?.["userName?"]));
@@ -5923,6 +5879,21 @@ async function createProofWidgetsExprWithCtxRef(rpcSession, ref, position, packa
     info: proofWidgetsRpcRefInfo(response?.info, normalized)
   };
 }
+async function createProofWidgetsExprWithCtxAtPos(rpcSession, position, packageRevision = "") {
+  const response = await rpcSession.call("Lean.Vir.Infoview.createProofWidgetsExprWithCtxAtPos", {
+    pos: requiredPosition(position, "proofwidgets expr position"),
+    packageRevision
+  });
+  const saved = readOption(response);
+  if (saved === null) {
+    return null;
+  }
+  const id = requiredString(saved?.info?.id, "proofwidgets expr id");
+  return {
+    ref: requiredRpcRefObject(saved?.ref, "proofwidgets stored expr ref"),
+    info: proofWidgetsRpcRefInfo(saved?.info, { id })
+  };
+}
 async function statAsset(rpcSession, path) {
   const response = await rpcSession.call("Lean.Vir.Infoview.statAsset", { path });
   return assetInfo(response, path);
@@ -6030,6 +6001,7 @@ ${hint}`;
 export {
   buildIRPackage,
   clearRuntimeServiceCacheForTests,
+  createProofWidgetsExprWithCtxAtPos,
   createProofWidgetsExprWithCtxRef,
   decodeBase64Bytes,
   VirInfoviewWidget as default,
@@ -6039,7 +6011,6 @@ export {
   loadRuntimeOptions,
   loadRuntimeService,
   loadWasmModule,
-  proofWidgetsExprDescriptorFromSurface,
   proofWidgetsExprFromSavedRef,
   resolveProofWidgetsRpcRef2 as resolveProofWidgetsRpcRef,
   shouldReloadIRPackage,

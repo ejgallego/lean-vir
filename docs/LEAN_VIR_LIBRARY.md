@@ -321,12 +321,13 @@ component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
 `InteractiveExpr`-shaped component whose click handler dispatches a
 host-inspectable reference descriptor and updates component-owned React state
 from the callback. In live infoview widgets, `Vir.Infoview.ProofWidgetsRpc`
-resolves that expression-shaped descriptor through the active Lean server
-snapshot and can also resolve a standard `Lean.Server.WithRpcRef` handle for a
-server-owned expression-with-context object. `Vir.Infoview.Surface` carries the
-live `proofWidgetsExpr : Option (WithRpcRef ExprWithCtx)` prop, and the
-infoview shell stores the server RPC handle as a typed `Js ServerRef` host
-resource instead of serializing the handle through a string field.
+can resolve that expression-shaped descriptor as a fallback, and the live
+infoview shell asks the Lean server to create a standard
+`Lean.Server.WithRpcRef` handle for the current interactive goal at the cursor.
+`Vir.Infoview.Surface` carries the live
+`proofWidgetsExpr : Option (WithRpcRef ExprWithCtx)` prop, and the infoview
+shell stores the server RPC handle as a typed `Js ServerRef` host resource
+instead of serializing the handle through a string field.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
