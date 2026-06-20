@@ -78,6 +78,19 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
     index := { index with sourceDecls := index.sourceDecls.push (target.source.toString, names) }
   return index
 
+def declIndexFromEnvironment (source : String) (env : Environment) : DeclIndex := Id.run do
+  let mut names : Array Name := #[]
+  let mut index : DeclIndex := {
+    envs := #[(source, env)]
+  }
+  for decl in getDecls env do
+    names := names.push decl.name
+    index := {
+      index with
+      localDecls := index.localDecls.insert decl.name { source, decl }
+    }
+  return { index with sourceDecls := #[(source, names)] }
+
 def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
   match index.localDecls.find? name with
   | some decl => some decl
