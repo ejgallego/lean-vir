@@ -16,8 +16,8 @@ with per-fixture status, imported IR declarations, native externs, and
 missing-boundary diagnostics for CI and boundary debugging.
 
 The Lean-dependent runtime smoke also generates temporary packages with
-intentionally unsupported interface exports and asserts that package generation
-fails loudly.
+intentionally unsupported or ambiguous interface exports and asserts that
+package generation fails loudly with package diagnostics.
 Those negative cases cover recursive inherited structures, indexed inductive
 families, mutual recursion, erased proof fields, and implicit arguments.
 

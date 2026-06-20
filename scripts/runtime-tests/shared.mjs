@@ -38,8 +38,16 @@ export async function readRuntimeArtifacts() {
   };
 }
 
-function readPublicArtifact(file) {
-  return readFile(new URL(`../../${publicArtifactPath(file)}`, import.meta.url));
+async function readPublicArtifact(file) {
+  const artifactPath = publicArtifactPath(file);
+  try {
+    return await readFile(new URL(`../../${artifactPath}`, import.meta.url));
+  } catch (error) {
+    if (error?.code === "ENOENT") {
+      throw new Error(`missing runtime artifact ${artifactPath}; run npm run build:demo first`);
+    }
+    throw error;
+  }
 }
 
 export function createCallbackHostBindings(records = []) {
@@ -148,6 +156,31 @@ export function generateIrPackage(source, packagePath) {
   return generated;
 }
 
+export function virIrpkgEnv() {
+  const leanPrefix = spawnSync("lean", ["--print-prefix"], { encoding: "utf8" });
+  assert.equal(leanPrefix.status, 0, leanPrefix.stderr || leanPrefix.stdout);
+  return {
+    ...process.env,
+    LEAN_PATH: [
+      "build/lean-lib",
+      ".lake/build/lib/lean",
+      `${leanPrefix.stdout.trim()}/lib/lean`,
+      process.env.LEAN_PATH,
+    ].filter(Boolean).join(":"),
+  };
+}
+
+export function runVirIrpkg(args) {
+  const builtLeanLib = spawnSync("bash", ["scripts/build-lean-lib.sh"], { encoding: "utf8" });
+  assert.equal(builtLeanLib.status, 0, builtLeanLib.stderr || builtLeanLib.stdout);
+  const builtGenerator = spawnSync("lake", ["build", "vir_irpkg"], { encoding: "utf8" });
+  assert.equal(builtGenerator.status, 0, builtGenerator.stderr || builtGenerator.stdout);
+  return spawnSync(".lake/build/bin/vir_irpkg", args, {
+    encoding: "utf8",
+    env: virIrpkgEnv(),
+  });
+}
+
 export async function assertUnsupportedInterfaceSource(dir, stem, lines, patterns, roots = null) {
   const source = join(dir, `${stem}.lean`);
   const packagePath = join(dir, `${stem}.irpkg`);
@@ -161,7 +194,7 @@ export async function assertUnsupportedInterfaceSource(dir, stem, lines, pattern
     { encoding: "utf8" },
   );
   assert.notEqual(generated.status, 0, `${stem} unexpectedly generated successfully`);
-  assert.match(generated.stderr, /unsupported interface exports/);
+  assert.match(generated.stderr, /package diagnostics/);
   const report = await readFile(reportPath, "utf8");
   for (const pattern of patterns) {
     assert.match(generated.stderr, pattern);

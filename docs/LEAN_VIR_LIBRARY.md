@@ -419,7 +419,7 @@ package to call explicitly declared JavaScript bindings.
 If package generation fails, inspect the generated report:
 
 - `JavaScript Host Imports` should list the imported declarations and targets.
-- `Interface Diagnostics` points out unsupported argument or result types.
+- `Package Diagnostics` points out unsupported argument or result types.
 - `Missing Native Extern Registrations` is unrelated to `@[vir_js]`; it means
   the normal Lean IR closure reached an unsupported native runtime primitive.
 

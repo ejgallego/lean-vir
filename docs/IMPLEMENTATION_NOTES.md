@@ -2,7 +2,8 @@
 
 This document owns architecture and implementation status. Command maps and CI
 shape live in `docs/HARNESS.md`; package config and manifest semantics live in
-`docs/INTERFACE_PIPELINE.md`.
+`docs/INTERFACE_PIPELINE.md`; package generator internals live in
+`docs/GENERATE_PACKAGE.md`.
 
 The scoped POC deliberately keeps one active execution path:
 

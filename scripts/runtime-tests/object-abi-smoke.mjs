@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { createVirRuntime, createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
 import { defaultPackageFile, publicArtifactPath } from "../browser-package-config.mjs";
+import { PACKAGE_FORMAT_VERSION } from "../package-versions.mjs";
 import {
   createHostResource,
   ExternrefResourceRoots,
@@ -167,7 +168,7 @@ const inspectedJson = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", 
 });
 assert.equal(inspectedJson.status, 0, inspectedJson.stderr || inspectedJson.stdout);
 const inspectedInfo = JSON.parse(inspectedJson.stdout);
-assert.equal(inspectedInfo.package.version, 7);
+assert.equal(inspectedInfo.package.version, PACKAGE_FORMAT_VERSION);
 assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
 assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
 assert.equal(inspectedInfo.manifest.hostImports.length, 0);
@@ -533,11 +534,11 @@ assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScore", 3.25), "4")
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.float32Roundtrip", 1.25), 1.25);
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [65, 66, 67]), Uint8Array.from([65, 66, 67]));
 const floatScaleEntry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.floatScale");
-assert.equal(floatScaleEntry.args[0].type.wireTag, 10);
-assert.equal(floatScaleEntry.result.wireTag, 10);
+assert.equal(floatScaleEntry.args[0].type.wireTag, WIRE.FLOAT);
+assert.equal(floatScaleEntry.result.wireTag, WIRE.FLOAT);
 const float32Entry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.float32Roundtrip");
-assert.equal(float32Entry.args[0].type.wireTag, 11);
-assert.equal(float32Entry.result.wireTag, 11);
+assert.equal(float32Entry.args[0].type.wireTag, WIRE.FLOAT32);
+assert.equal(float32Entry.result.wireTag, WIRE.FLOAT32);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", null), "0");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { kind: "some", value: 41 }), "42");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null), "empty");
@@ -648,7 +649,7 @@ assert.equal(boxNatEntry.args[0].type.trivialFieldIndex, 0);
 const boxUInt32Entry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.boxUInt32Bump");
 assert.equal(boxUInt32Entry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box UInt32");
 assert.equal(boxUInt32Entry.args[0].type.trivialFieldIndex, 0);
-assert.equal(boxUInt32Entry.args[0].type.fields[0].type.wireTag, 6);
+assert.equal(boxUInt32Entry.args[0].type.fields[0].type.wireTag, WIRE.UINT32);
 assert.equal(boxUInt32Entry.args[0].type.fields[0].layout.kind, "object");
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
   value: 41,
@@ -658,7 +659,7 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
 const boxUInt64Entry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.boxUInt64Bump");
 assert.equal(boxUInt64Entry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box UInt64");
 assert.equal(boxUInt64Entry.args[0].type.trivialFieldIndex, 0);
-assert.equal(boxUInt64Entry.args[0].type.fields[0].type.wireTag, 7);
+assert.equal(boxUInt64Entry.args[0].type.fields[0].type.wireTag, WIRE.UINT64);
 assert.equal(boxUInt64Entry.args[0].type.fields[0].layout.kind, "object");
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt64Bump", {
   value: "18446744073709551615",
@@ -668,7 +669,7 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt64Bump", {
 const uint32BoxEntry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.uint32BoxBump");
 assert.equal(uint32BoxEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.UInt32Box");
 assert.equal(uint32BoxEntry.args[0].type.trivialFieldIndex, 0);
-assert.equal(uint32BoxEntry.args[0].type.fields[0].type.wireTag, 6);
+assert.equal(uint32BoxEntry.args[0].type.fields[0].type.wireTag, WIRE.UINT32);
 assert.equal(uint32BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
   value: 41,
@@ -678,7 +679,7 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
 const uint64BoxEntry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.uint64BoxBump");
 assert.equal(uint64BoxEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.UInt64Box");
 assert.equal(uint64BoxEntry.args[0].type.trivialFieldIndex, 0);
-assert.equal(uint64BoxEntry.args[0].type.fields[0].type.wireTag, 7);
+assert.equal(uint64BoxEntry.args[0].type.fields[0].type.wireTag, WIRE.UINT64);
 assert.equal(uint64BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint64BoxBump", {
   value: "18446744073709551615",

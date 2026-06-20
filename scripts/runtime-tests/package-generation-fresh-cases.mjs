@@ -5,6 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 import { createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { WIRE } from "../../web/src/runtime/wire-tags.js";
+import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../package-versions.mjs";
 import {
   assert,
   assertManifestTypeDescriptorsRoundTrip,
@@ -12,6 +14,7 @@ import {
   join,
   manifestEntry,
   readFile,
+  runVirIrpkg,
   spawnSync,
   writeFile,
 } from "./shared.mjs";
@@ -29,19 +32,21 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const freshRuntime = await factory.createRuntime({ irPackageBytes: await readFile(freshPackage) });
   const freshManifest = freshRuntime.interfaceManifest;
-  assert.equal(freshManifest.metadata.packageFormatVersion, 7);
-  assert.equal(freshManifest.metadata.manifestVersion, 1);
+  assert.equal(freshManifest.metadata.packageFormatVersion, PACKAGE_FORMAT_VERSION);
+  assert.equal(freshManifest.metadata.manifestVersion, INTERFACE_MANIFEST_VERSION);
   assert.match(freshManifest.metadata.leanToolchain, /leanprover\/lean4/);
   assert.ok(freshManifest.metadata.generatedAt.length > 0);
   assert.equal(freshManifest.metadata.targets.length, 1);
   assert.equal(freshManifest.metadata.targets[0].source, freshSource);
   assert.equal(freshManifest.metadata.targets[0].mode, "all");
   assert.deepEqual(freshManifest.metadata.targets[0].roots, []);
+  assert.equal(freshManifest.metadata.targets[0].dropEvalCommands, true);
   assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"));
   assertManifestTypeDescriptorsRoundTrip(freshManifest);
 
   const freshEntries = freshManifest.exports.map((entry) => entry.entry).sort();
   assert.deepEqual(freshEntries, [
+    "freshAliasBump",
     "freshBoxBump",
     "freshBump",
     "freshChainDepth",
@@ -79,6 +84,48 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(freshInfo.manifest.metadata.targets[0].source, freshSource);
   assert.deepEqual(freshInfo.manifest.exports.map((entry) => entry.entry).sort(), freshEntries);
 
+  const aliasSource = join(freshDir, "AliasEdges.lean");
+  const aliasPackage = join(freshDir, "alias-edges.irpkg");
+  const aliasReport = join(freshDir, "alias-edges.report.md");
+  await writeFile(aliasSource, [
+    "abbrev AliasUserId := Nat",
+    "abbrev AliasNatArray := Array AliasUserId",
+    "abbrev AliasCallback := AliasUserId -> AliasUserId",
+    "abbrev AliasIO (α : Type) := IO α",
+    "",
+    "def aliasArraySum (xs : AliasNatArray) : AliasUserId :=",
+    "  xs.foldl (fun acc n => acc + n) 0",
+    "",
+    "def aliasCallbackApply (callback : AliasCallback) (n : AliasUserId) : AliasUserId :=",
+    "  callback n",
+    "",
+    "def aliasIoBump (n : AliasUserId) : AliasIO AliasUserId :=",
+    "  pure (n + 1)",
+    "",
+  ].join("\n"));
+  const aliasGenerated = runVirIrpkg([aliasPackage, aliasReport, "--target-all", aliasSource]);
+  assert.equal(aliasGenerated.status, 0, aliasGenerated.stderr || aliasGenerated.stdout);
+  const aliasInspect = spawnSync("node", ["scripts/inspect-irpkg.mjs", "--json", aliasPackage], {
+    encoding: "utf8",
+  });
+  assert.equal(aliasInspect.status, 0, aliasInspect.stderr || aliasInspect.stdout);
+  const aliasManifest = JSON.parse(aliasInspect.stdout).manifest;
+  const aliasArrayEntry = manifestEntry(aliasManifest, "aliasArraySum");
+  assert.equal(aliasArrayEntry.args[0].type.kind, "array");
+  assert.equal(aliasArrayEntry.args[0].type.element.type, "Nat");
+  assert.equal(aliasArrayEntry.result.type, "Nat");
+  const aliasCallbackEntry = manifestEntry(aliasManifest, "aliasCallbackApply");
+  assert.equal(aliasCallbackEntry.args[0].type.kind, "function");
+  assert.equal(aliasCallbackEntry.args[0].type.args[0].type.type, "Nat");
+  assert.equal(aliasCallbackEntry.args[0].type.result.type, "Nat");
+  const aliasIoEntry = manifestEntry(aliasManifest, "aliasIoBump");
+  assert.equal(aliasIoEntry.effect, "io");
+  assert.equal(aliasIoEntry.result.type, "Nat");
+
+  const freshAliasEntry = manifestEntry(freshManifest, "freshAliasBump");
+  assert.equal(freshAliasEntry.args[0].type.type, "Nat");
+  assert.equal(freshAliasEntry.result.type, "Nat");
+  assert.equal(freshRuntime.call("freshAliasBump", 3), "12");
   assert.equal(freshRuntime.call("freshBump", 35), "42");
   assert.equal(freshRuntime.exportsByName.freshBump(1), "8");
   assert.equal(freshRuntime.call("freshSum", [4, 5, 6]), "15");
@@ -121,7 +168,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const freshWrapUInt32Entry = manifestEntry(freshManifest, "freshWrapUInt32Bump");
   assert.equal(freshWrapUInt32Entry.args[0].type.type, "FreshWrap UInt32");
-  assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].type.wireTag, 6);
+  assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].type.wireTag, WIRE.UINT32);
   assert.equal(freshWrapUInt32Entry.args[0].type.fields[1].layout.kind, "object");
   assert.deepEqual(freshRuntime.call("freshWrapUInt32Bump", {
     label: "u",
@@ -142,7 +189,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
 
   const freshUInt64BoxEntry = manifestEntry(freshManifest, "freshUInt64BoxBump");
   assert.equal(freshUInt64BoxEntry.args[0].type.trivialFieldIndex, 0);
-  assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].type.wireTag, 7);
+  assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].type.wireTag, WIRE.UINT64);
   assert.equal(freshUInt64BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
   assert.deepEqual(freshRuntime.call("freshUInt64BoxBump", {
     value: "18446744073709551615",
@@ -186,9 +233,9 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     next: freshChain,
   });
   const freshChainEntry = manifestEntry(freshManifest, "freshChainIdentity");
-  assert.equal(freshChainEntry.args[0].type.wireTag, 20);
-  assert.equal(freshChainEntry.args[0].type.fields[1].type.wireTag, 18);
-  assert.equal(freshChainEntry.args[0].type.fields[1].type.element.wireTag, 26);
+  assert.equal(freshChainEntry.args[0].type.wireTag, WIRE.STRUCTURE);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.wireTag, WIRE.OPTION);
+  assert.equal(freshChainEntry.args[0].type.fields[1].type.element.wireTag, WIRE.RECURSIVE_SELF);
   assert.equal(freshChainEntry.args[0].type.fields[1].type.element.kind, "recursiveSelf");
 
   const freshTree = {
@@ -219,8 +266,8 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   });
   assert.equal(freshRuntime.call("freshTreeRootScore", freshTree), "12");
   const freshTreeEntry = manifestEntry(freshManifest, "freshTreeIdentity");
-  assert.equal(freshTreeEntry.args[0].type.wireTag, 25);
-  assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.wireTag, 26);
+  assert.equal(freshTreeEntry.args[0].type.wireTag, WIRE.CUSTOM_INDUCTIVE);
+  assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.wireTag, WIRE.RECURSIVE_SELF);
   assert.equal(freshTreeEntry.args[0].type.constructors[1].fields[0].type.element.kind, "recursiveSelf");
 
   const term = {
@@ -284,10 +331,10 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
     ],
   });
   const freshJsonEntry = manifestEntry(freshManifest, "freshJsonWeight");
-  assert.equal(freshJsonEntry.args[0].type.wireTag, 25);
+  assert.equal(freshJsonEntry.args[0].type.wireTag, WIRE.CUSTOM_INDUCTIVE);
   assert.equal(freshJsonEntry.args[0].type.constructors[0].fields.length, 0);
-  assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.wireTag, 26);
+  assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.wireTag, WIRE.RECURSIVE_SELF);
   assert.equal(freshJsonEntry.args[0].type.constructors[3].fields[0].type.element.kind, "recursiveSelf");
-  assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.wireTag, 26);
+  assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.wireTag, WIRE.RECURSIVE_SELF);
   assert.equal(freshJsonEntry.args[0].type.constructors[4].fields[0].type.element.snd.kind, "recursiveSelf");
 }

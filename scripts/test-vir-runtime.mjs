@@ -16,10 +16,12 @@ const tests = [
   { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", group: "pure" },
   { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },
   { id: "object-abi", file: "scripts/runtime-tests/object-abi-smoke.mjs", group: "pure" },
+  { id: "package-generator", file: "scripts/runtime-tests/package-generator-smoke.mjs", group: "lean" },
   { id: "package-generation", file: "scripts/runtime-tests/package-generation-smoke.mjs", group: "lean" },
   { id: "sdk-import", file: "scripts/runtime-tests/sdk-import-smoke.mjs", group: "lean" },
 ];
 const runtimeGroupNames = [...new Set(tests.map((test) => test.group))].sort();
+const serialRuntimeGroups = new Set(["lean"]);
 
 const cli = parseRuntimeArgs(process.argv.slice(2));
 
@@ -111,7 +113,11 @@ function testMatchesGroup(test, group) {
   return group === null || test.group === group;
 }
 
-function runtimeJobCount(total) {
+function runtimeJobCount(selectedTests) {
+  const total = selectedTests.length;
+  if (selectedTests.some((test) => serialRuntimeGroups.has(test.group))) {
+    return 1;
+  }
   const configured = Number.parseInt(process.env.VIR_RUNTIME_JOBS ?? "", 10);
   if (Number.isInteger(configured) && configured > 0) {
     return Math.min(configured, total);
@@ -163,7 +169,7 @@ if (selected.length === 0) {
   throw new Error(`no runtime tests matched ${clauses.join(" and ") || "the current selection"}`);
 }
 
-const jobs = runtimeJobCount(selected.length);
+const jobs = runtimeJobCount(selected);
 if (group !== null) {
   console.log(`runtime group: ${group} (${selected.length}/${tests.length})`);
 }

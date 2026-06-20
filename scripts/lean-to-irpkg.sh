@@ -79,7 +79,7 @@ if [ "$status" -ne 0 ]; then
   echo "source:  $source" >&2
   echo "package: $package" >&2
   echo "report:  $report" >&2
-  echo "the report contains the exact missing declarations or unsupported interface exports" >&2
+  echo "the report contains the exact missing declarations or package diagnostics" >&2
   exit "$status"
 fi
 

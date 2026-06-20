@@ -2,7 +2,8 @@
 
 This document owns package config shape, generated manifest semantics, and the
 current interface surface. Command selection and CI shape live in
-`docs/HARNESS.md`; architecture status lives in `docs/IMPLEMENTATION_NOTES.md`.
+`docs/HARNESS.md`; architecture status lives in `docs/IMPLEMENTATION_NOTES.md`;
+the split package generator internals live in `docs/GENERATE_PACKAGE.md`.
 
 The developer path is package-driven:
 
@@ -21,7 +22,8 @@ That command:
 The generated `.irpkg` is the only browser artifact needed by `/dev.html`.
 After the package is loaded, the runner reads the embedded manifest and creates
 the UI entries automatically. The manifest metadata records the package format,
-Lean toolchain, generation time, source targets, and resolved roots.
+Lean toolchain, generation time, source targets, resolved roots, and whether the
+target dropped top-level `#eval` command lines before elaboration.
 
 `web/public/*.irpkg` files are generated local assets and are ignored by git.
 Pass multiple config files to reuse the same prepared `vir_irpkg` generator:
@@ -118,6 +120,39 @@ The embedded manifest currently supports:
 - `Lean.Vir.React.Node`, represented as an opaque `Lean.Vir.Js` resource whose
   native React node is constructed by the React host bindings.
 
+The numeric `wireTag` table is part of the package ABI. Lean assigns tags in
+`Vir.GeneratePackage.Interface.Encode`; JavaScript validates and dispatches
+them in `web/src/runtime/wire-tags.js`. Run `npm run check:package-abi` after
+editing either side.
+
+| Tag | JavaScript name | Lean interface type | Descriptor payload |
+| --- | --- | --- | --- |
+| 0 | `WIRE.NAT` | `Nat` | Primitive. |
+| 1 | `WIRE.INT` | `Int` | Primitive. |
+| 2 | `WIRE.BOOL` | `Bool` | Primitive. |
+| 3 | `WIRE.STRING` | `String` | Primitive. |
+| 4 | `WIRE.UINT8` | `UInt8` | Primitive. |
+| 5 | `WIRE.UINT16` | `UInt16` | Primitive. |
+| 6 | `WIRE.UINT32` | `UInt32` | Primitive. |
+| 7 | `WIRE.UINT64` | `UInt64` | Primitive. |
+| 8 | `WIRE.USIZE` | `USize` | Primitive. |
+| 9 | `WIRE.BYTE_ARRAY` | `ByteArray` | Primitive byte data. |
+| 10 | `WIRE.FLOAT` | `Float` | Primitive. |
+| 11 | `WIRE.FLOAT32` | `Float32` | Primitive. |
+| 14 | `WIRE.SIMPLE_ENUM` | Nullary inductive enum | Constructor names and tags. |
+| 15 | `WIRE.EXPR` | `Lean.Expr` | Structural expression object. |
+| 16 | `WIRE.ARRAY` | `Array α` | Element descriptor. |
+| 17 | `WIRE.LIST` | `List α` | Element descriptor. |
+| 18 | `WIRE.OPTION` | `Option α` | Element descriptor. |
+| 19 | `WIRE.PROD` | `α × β` | `fst` and `snd` descriptors. |
+| 20 | `WIRE.STRUCTURE` | Structure | Name, runtime layout counts, fields, optional trivial field. |
+| 21 | `WIRE.TAGGED_UNION` | `Sum` / `Except` | Constructor descriptors with payload layout. |
+| 22 | `WIRE.UNIT` | `Unit` | Primitive. |
+| 23 | `WIRE.RESOURCE` | `@[vir_js]` resource marker | Resource name. |
+| 24 | `WIRE.FUNCTION` | Callback function type | Argument descriptors, result descriptor, effect label. |
+| 25 | `WIRE.CUSTOM_INDUCTIVE` | Non-indexed custom inductive | Constructor descriptors and field layouts. |
+| 26 | `WIRE.RECURSIVE_SELF` | Recursive reference | Referenced owner name. |
+
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
 Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them require
@@ -205,6 +240,12 @@ structure field layouts, bad `trivialFieldIndex` values, and duplicate export
 names. Runtime tests also round-trip every generated export type through the
 compact descriptor encoder/decoder so descriptor drift fails before a call
 enters WASM.
+
+The package generator also rejects ambiguous source-time names before writing a
+package. Different source targets in the same generator run must not define the
+same Lean declaration name, and exported entries must not produce the same
+manifest `id` or JavaScript name. Reducible type aliases are allowed at package
+boundaries when they reduce to a supported interface type.
 
 ## Current Trust Boundary
 

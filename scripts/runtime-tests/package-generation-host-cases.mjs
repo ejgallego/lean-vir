@@ -22,48 +22,8 @@ import {
 export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const hostSource = join(freshDir, "FreshHost.lean");
   const hostPackage = join(freshDir, "host.irpkg");
-  await writeFile(hostSource, [
-    "import Vir.Browser",
-    "import Vir.React",
-    "",
-    "def freshEchoBang (s : String) : String :=",
-    "  Lean.Vir.Common.echoString (s ++ \"!\")",
-    "",
-    "def freshTitleRoundtrip (s : String) : Lean.Vir.Browser.DomM String := do",
-    "  Lean.Vir.Browser.Document.setTitle s",
-    "  Lean.Vir.Browser.Document.getTitle",
-    "",
-    "def freshElementRoundtrip (s : String) : Lean.Vir.Browser.DomM (String × Option String) := do",
-    "  match ← Lean.Vir.Browser.Document.querySelector \"#fresh\" with",
-    "  | none => pure (\"\", none)",
-    "  | some fresh =>",
-    "      Lean.Vir.Browser.Element.setTextContent fresh s",
-    "      Lean.Vir.Browser.Element.setAttribute fresh \"data-fresh\" (s ++ \"!\")",
-    "      let text ← Lean.Vir.Browser.Element.getTextContent fresh",
-    "      let attr ← Lean.Vir.Browser.Element.getAttribute fresh \"data-fresh\"",
-    "      pure (text, attr)",
-    "",
-    "@[vir_js \"test.react.value\"]",
-    "opaque freshReactValueHost : Lean.Vir.React.ReactM Nat",
-    "",
-    "def freshReactValue : Lean.Vir.React.ReactM Nat :=",
-    "  freshReactValueHost",
-    "",
-    "@[vir_js \"test.runtime.value\"]",
-    "opaque freshRuntimeValueHost : Lean.Vir.RuntimeM Nat",
-    "",
-    "def freshRuntimeValue : Lean.Vir.RuntimeM Nat :=",
-    "  freshRuntimeValueHost",
-    "",
-    "def freshRuntimeInDom : Lean.Vir.Browser.DomM Nat := do",
-    "  let value ← freshRuntimeValueHost",
-    "  pure (value + 1)",
-    "",
-    "def freshRuntimeInReact : Lean.Vir.React.ReactM Nat := do",
-    "  let value ← freshRuntimeValueHost",
-    "  pure (value + 2)",
-    "",
-  ].join("\n"));
+  const hostFixture = new URL("../../fixtures/runtime-tests/FreshHost.lean", import.meta.url);
+  await writeFile(hostSource, await readFile(hostFixture, "utf8"));
 
   generateIrPackage(hostSource, hostPackage);
   const freshHostDocumentState = createVirtualDocumentState();
@@ -100,28 +60,8 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
 
   const customHostSource = join(freshDir, "FreshCustomHost.lean");
   const customHostPackage = join(freshDir, "custom-host.irpkg");
-  await writeFile(customHostSource, [
-    "import Vir.Host",
-    "",
-    "structure HostCounter where",
-    "  label : String",
-    "  value : Nat",
-    "  enabled : Bool",
-    "deriving Inhabited",
-    "",
-    "@[vir_js \"test.bumpNat\"]",
-    "opaque jsBumpNat (n : Nat) : Nat",
-    "",
-    "@[vir_js \"test.bumpCounter\"]",
-    "opaque jsBumpCounter (counter : HostCounter) : HostCounter",
-    "",
-    "def freshCustomBump (n : Nat) : Nat :=",
-    "  jsBumpNat n",
-    "",
-    "def freshCustomCounter (counter : HostCounter) : HostCounter :=",
-    "  jsBumpCounter counter",
-    "",
-  ].join("\n"));
+  const customHostFixture = new URL("../../fixtures/runtime-tests/FreshCustomHost.lean", import.meta.url);
+  await writeFile(customHostSource, await readFile(customHostFixture, "utf8"));
   generateIrPackage(customHostSource, customHostPackage);
   const customFactory = createVirRuntimeFactory({
     wasmBytes,
@@ -163,23 +103,8 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
 
   const jsObjectSource = join(freshDir, "FreshJsObject.lean");
   const jsObjectPackage = join(freshDir, "js-object.irpkg");
-  await writeFile(jsObjectSource, [
-    "import Vir.Browser",
-    "import Vir.Js",
-    "",
-    "@[vir_js \"test.js.id\"]",
-    "private opaque jsId {α : Type} (value : @& Lean.Vir.Js α) : Lean.Vir.RuntimeM (Lean.Vir.Js α)",
-    "",
-    "@[vir_js \"test.js.length\"]",
-    "private opaque jsLength {α : Type} (value : @& Lean.Vir.Js (Array α)) : Lean.Vir.RuntimeM Nat",
-    "",
-    "def freshJsIdNat (value : Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat) :=",
-    "  jsId value",
-    "",
-    "def freshJsLengthNatArray (value : Lean.Vir.Js (Array Nat)) : Lean.Vir.RuntimeM Nat :=",
-    "  jsLength value",
-    "",
-  ].join("\n"));
+  const jsObjectFixture = new URL("../../fixtures/runtime-tests/FreshJsObject.lean", import.meta.url);
+  await writeFile(jsObjectSource, await readFile(jsObjectFixture, "utf8"));
   generateIrPackage(jsObjectSource, jsObjectPackage);
   const jsObjectRuntime = await createVirRuntimeFactory({
     wasmBytes,

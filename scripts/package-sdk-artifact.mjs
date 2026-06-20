@@ -17,6 +17,7 @@ import {
   writeAndPublishArtifactArchive,
 } from "./file-utils.mjs";
 import { runSync } from "./process-utils.mjs";
+import { PACKAGE_VERSIONS } from "./package-versions.mjs";
 import { SDK_PAYLOADS } from "./sdk-payloads.mjs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
@@ -56,9 +57,7 @@ const artifactManifest = {
   gitDirty: gitStatus.length !== 0,
   leanToolchain,
   leanVersion,
-  packageFormatVersion: 7,
-  manifestVersion: 1,
-  runtimeAbiVersion: 1,
+  ...PACKAGE_VERSIONS,
   generatedAt: new Date().toISOString(),
   files,
 };
