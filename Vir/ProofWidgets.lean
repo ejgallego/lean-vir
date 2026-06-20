@@ -5,3 +5,4 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.ProofWidgets.Html
+import Vir.ProofWidgets.Rpc

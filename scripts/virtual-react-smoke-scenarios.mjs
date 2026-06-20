@@ -201,7 +201,7 @@ export function smokeVirtualProofWidgetsHtml(runtime, documentState, selector) {
 export function smokeVirtualProofWidgetsJsxSubset(runtime, documentState, selector) {
   assert.equal(runtime.call("ProofWidgetsJsxSubset.mount", selector), true);
   const element = documentState.elements.get(selector);
-  assertLiveCallbacks(runtime, 2);
+  assertLiveCallbacks(runtime, 3);
   const widget = reactElementById(element, "proofwidgets-jsx-subset");
   assert.equal(widget.tag, "section");
   assert.equal(widget.props.role, "region");
@@ -233,10 +233,29 @@ export function smokeVirtualProofWidgetsJsxSubset(runtime, documentState, select
   const badge = reactElementById(element, "proofwidgets-jsx-badge-info");
   assert.equal(badge.props["data-tone"], "info");
   assert.equal(virtualReactTextContent(badge), "component children");
-  assertLiveCallbacks(runtime, 2);
+  const interactive = reactElementById(element, "proofwidgets-jsx-interactive-expr");
+  assert.equal(interactive.tag, "button");
+  assert.equal(interactive.props["data-component"], "InteractiveExpr");
+  assert.equal(interactive.props["data-rpc-ref"], "jsx-demo.expr.successor");
+  assert.equal(interactive.props["data-type"], "Nat -> Nat");
+  assert.equal(virtualReactTextContent(interactive), "InteractiveExpr fun x => x + 1");
+  assertLiveCallbacks(runtime, 3);
+  interactive.handlers.onClick({});
+  assert.deepEqual(documentState.infoviewCommands, [
+    {
+      kind: "proofwidgetsRpcInspectRef",
+      ref: {
+        id: "jsx-demo.expr.successor",
+        label: "fun x => x + 1",
+        typeName: "ExprWithCtx",
+        summary: "A sample expression reference from the JSX subset demo.",
+      },
+    },
+  ]);
+  assertLiveCallbacks(runtime, 3);
   reactElementById(element, "proofwidgets-jsx-action").handlers.onClick({});
   assert.equal(documentState.title, "ProofWidgets JSX subset clicked");
-  assertLiveCallbacks(runtime, 2);
+  assertLiveCallbacks(runtime, 3);
   const rows = reactElementById(element, "proofwidgets-jsx-rows");
   assert.equal(rows.tag, "ul");
   assert.equal(rows.children.length, 3);
@@ -245,6 +264,7 @@ export function smokeVirtualProofWidgetsJsxSubset(runtime, documentState, select
   assert.equal(rows.children[2].key, "interpolation");
   assert.match(virtualReactTextContent(rows), /3 rendered rows/);
   element.reactRoot.unmount();
+  documentState.infoviewCommands.length = 0;
   assertUnmountCleanup(runtime, element);
 }
 

@@ -315,7 +315,10 @@ aliases and is included in the host package as a compatibility regression.
 `examples/ProofWidgetsJsxSubset.lean` ports a tiny upstream JSX-shaped pattern
 with explicit combinators, including child-bearing `Html.ofComponent`, image
 attributes, style attributes, child spread, and a `MarkdownDisplay`-shaped
-component.
+component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
+`RpcRef`, `WithRpcRef α`, and `Rpc.inspectRef` are enough for the JSX-subset
+fixture to include an `InteractiveExpr`-shaped component whose click handler
+dispatches a host-inspectable reference descriptor.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in

@@ -1316,6 +1316,26 @@ function jsBoolPayload(value) {
   return value;
 }
 
+// web/src/host/vir-virtual-host-bindings.js
+function normalizeProofWidgetsRpcRef(ref) {
+  if (ref === null || typeof ref !== "object") {
+    return null;
+  }
+  const id = stringField(ref.id);
+  if (id.length === 0) {
+    return null;
+  }
+  return {
+    id,
+    label: stringField(ref.label),
+    typeName: stringField(ref.typeName),
+    summary: stringField(ref.summary)
+  };
+}
+function stringField(value) {
+  return typeof value === "string" ? value : "";
+}
+
 // web/src/vir-host-bindings.js
 var VIR_HOST_DISPOSE = /* @__PURE__ */ Symbol.for("lean-vir.hostDispose");
 function createCommonHostBindings() {
@@ -1384,7 +1404,8 @@ function createBrowserAnimationHostBindings(state = createHostResourceState()) {
 function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
   return {
     "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
-    "infoview.command.revealPosition": (position) => revealInfoviewPosition(commandDispatcher, position)
+    "infoview.command.revealPosition": (position) => revealInfoviewPosition(commandDispatcher, position),
+    "proofwidgets.rpc.inspectRef": (ref) => inspectProofWidgetsRpcRef(commandDispatcher, ref)
   };
 }
 function createBrowserHostBindings({
@@ -1452,6 +1473,13 @@ function revealInfoviewPosition(commandDispatcher, position) {
     return false;
   }
   return dispatchInfoviewCommand(commandDispatcher, "revealPosition", normalized);
+}
+function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null) {
+    return false;
+  }
+  return dispatchInfoviewCommand(commandDispatcher, "proofwidgetsRpcInspectRef", normalized);
 }
 function normalizeInfoviewDocumentPosition(position) {
   if (position === null || typeof position !== "object") {
@@ -5379,6 +5407,10 @@ function createInfoviewCommandDispatcher(editorConnectionRef) {
       editorConnection.revealPosition(position).catch((error) => {
         console.error(error);
       });
+      return true;
+    },
+    proofwidgetsRpcInspectRef(ref) {
+      console.info("VIR ProofWidgets RPC reference", ref);
       return true;
     }
   };

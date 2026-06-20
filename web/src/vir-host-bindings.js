@@ -20,6 +20,7 @@ import {
 import {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
+  normalizeProofWidgetsRpcRef,
 } from "./host/vir-virtual-host-bindings.js";
 
 export {
@@ -126,6 +127,7 @@ export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
   return {
     "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
     "infoview.command.revealPosition": (position) => revealInfoviewPosition(commandDispatcher, position),
+    "proofwidgets.rpc.inspectRef": (ref) => inspectProofWidgetsRpcRef(commandDispatcher, ref),
   };
 }
 
@@ -210,6 +212,14 @@ function revealInfoviewPosition(commandDispatcher, position) {
     return false;
   }
   return dispatchInfoviewCommand(commandDispatcher, "revealPosition", normalized);
+}
+
+function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null) {
+    return false;
+  }
+  return dispatchInfoviewCommand(commandDispatcher, "proofwidgetsRpcInspectRef", normalized);
 }
 
 export function normalizeInfoviewDocumentPosition(position) {

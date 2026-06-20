@@ -84,6 +84,7 @@ build_module Vir/GeneratePackage/Emit.lean
 build_module Vir/GeneratePackage/Report.lean
 build_module Vir/GeneratePackage/Run.lean
 build_module Vir/ProofWidgets/Html.lean
+build_module Vir/ProofWidgets/Rpc.lean
 build_module Vir/ProofWidgets.lean
 build_module Vir/GeneratePackage.lean
 build_module Vir/Infoview/Assets.lean

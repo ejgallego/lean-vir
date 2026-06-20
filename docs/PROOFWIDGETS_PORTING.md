@@ -39,13 +39,24 @@ demos use `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, and
 `demo-host.irpkg` runtime smoke package.
 
 `ProofWidgetsJsxSubset.lean` now ports the static surface of upstream
-`ProofWidgets/Demos/Jsx.lean` with explicit combinators:
+`ProofWidgets/Demos/Jsx.lean` with explicit combinators plus the first narrow
+reference-shaped interactive case:
 
 - lowercase HTML tags such as `b`, `img`, `span`, and `hr`;
 - string and interpolated attributes such as `src`, `alt`, and `style`;
 - child array spread and string interpolation;
 - an uppercase `MarkdownDisplay`-shaped component with props;
-- a small callback to keep handler coverage in the same fixture.
+- a small callback to keep handler coverage in the same fixture;
+- an `InteractiveExpr`-shaped component whose props carry
+  `WithRpcRef ExprPreview` and whose click handler calls
+  `ProofWidgets.Rpc.inspect`.
+
+The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
+`WithRpcRef α`, and `Rpc.inspectRef`, and the browser/virtual hosts normalize
+the reference descriptor behind `proofwidgets.rpc.inspectRef`. This proves the
+typed prop and host-dispatch path needed by an `InteractiveExpr`-style port,
+but it is not yet server-side reference resolution, proof-script editing, or
+the full ProofWidgets RPC request model.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 
@@ -60,8 +71,8 @@ Known first-slice limits:
 - Attribute values are `Lean.Vir.React.Property`, not arbitrary JSON props.
 - JSX syntax is intentionally deferred; `ProofWidgetsJsxSubset.lean` keeps the
   porting shape as explicit combinators for now.
-- The upstream `InteractiveExpr` example depends on RPC references and remains
-  blocked on the `proofwidgets.rpc` slice.
+- The upstream `InteractiveExpr` example still needs real server-side reference
+  resolution before it can be considered faithfully ported.
 
 ## External JavaScript Libraries
 

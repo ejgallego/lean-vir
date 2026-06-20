@@ -175,7 +175,10 @@ A realistic path has three layers:
    surface with snapshot-aware RPC, server-side references, and edit commands.
    This is the layer needed for tactic UIs and proof-script editing, and it
    should stay narrow and typed instead of exposing an arbitrary JavaScript RPC
-   bag to Lean.
+   bag to Lean. The first reference slice is intentionally smaller than this
+   final target: `Vir.ProofWidgets.Rpc` provides `RpcRef`, `WithRpcRef α`, and
+   a host-dispatched `inspectRef` action so `InteractiveExpr`-shaped component
+   props can cross the Lean/JS boundary before a real server resolver exists.
 
 ## Porting Targets
 
@@ -185,7 +188,8 @@ enough to prevent us from designing an API in a vacuum:
 
 1. `ProofWidgets/Demos/Jsx.lean`: verifies JSX-like Lean syntax, lowercase HTML
    tags, string/JSON attributes, children interpolation, and uppercase component
-   embedding.
+   embedding. The current combinator-only fixture also includes the first
+   `InteractiveExpr`-shaped `WithRpcRef`/`inspectRef` case.
 2. `ProofWidgets/Component/HtmlDisplay.lean` and
    `ProofWidgets/Data/Html.lean`: verify the core `Html` and component-node
    encoding.

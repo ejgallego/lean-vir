@@ -701,6 +701,10 @@ function createInfoviewCommandDispatcher(editorConnectionRef) {
       });
       return true;
     },
+    proofwidgetsRpcInspectRef(ref) {
+      console.info("VIR ProofWidgets RPC reference", ref);
+      return true;
+    },
   };
 }
 

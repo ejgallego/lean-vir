@@ -171,6 +171,15 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       state.infoviewCommands.push({ kind: "revealPosition", position: normalized });
       return true;
     },
+    "proofwidgets.rpc.inspectRef": (ref) => {
+      const normalized = normalizeProofWidgetsRpcRef(ref);
+      if (normalized === null) {
+        return false;
+      }
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "proofwidgetsRpcInspectRef", ref: normalized });
+      return true;
+    },
     [VIR_HOST_DISPOSE]: () => state.resources.dispose(),
   };
 }
@@ -265,6 +274,26 @@ function normalizeInfoviewDocumentPosition(position) {
     return null;
   }
   return { uri, line, character };
+}
+
+export function normalizeProofWidgetsRpcRef(ref) {
+  if (ref === null || typeof ref !== "object") {
+    return null;
+  }
+  const id = stringField(ref.id);
+  if (id.length === 0) {
+    return null;
+  }
+  return {
+    id,
+    label: stringField(ref.label),
+    typeName: stringField(ref.typeName),
+    summary: stringField(ref.summary),
+  };
+}
+
+function stringField(value) {
+  return typeof value === "string" ? value : "";
 }
 
 function nonNegativeInteger(value) {

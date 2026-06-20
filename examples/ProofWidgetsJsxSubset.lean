@@ -110,6 +110,45 @@ def Badge : Component BadgeProps := fun ctx =>
     ]
     (#[Html.text ctx.props.label] ++ ctx.children)
 
+structure ExprPreview where
+  code : String
+  type : String
+
+def sampleExpr : WithRpcRef ExprPreview :=
+  {
+    value := { code := "fun x => x + 1", type := "Nat -> Nat" },
+    ref := {
+      id := "jsx-demo.expr.successor",
+      label := "fun x => x + 1",
+      typeName := "ExprWithCtx",
+      summary := "A sample expression reference from the JSX subset demo."
+    }
+  }
+
+structure InteractiveExprProps where
+  expr : WithRpcRef ExprPreview
+
+def InteractiveExpr : Component InteractiveExprProps := fun ctx =>
+  Html.buttonWith
+    #[
+      Attr.id "proofwidgets-jsx-interactive-expr",
+      Attr.className "pw-jsx-interactive-expr",
+      Attr.title ctx.props.expr.ref.summary,
+      Attr.data "component" "InteractiveExpr",
+      Attr.data "rpc-ref" ctx.props.expr.ref.id,
+      Attr.data "type" ctx.props.expr.value.type
+    ]
+    #[Handler.onClick do
+      discard <| Rpc.inspect ctx.props.expr]
+    #[
+      Html.spanWith #[Attr.className "pw-jsx-interactive-label"] #[
+        Html.text "InteractiveExpr "
+      ],
+      Html.element "code" #[Attr.className "pw-jsx-interactive-code"] #[
+        Html.text ctx.props.expr.value.code
+      ]
+    ]
+
 def row (key label value : String) : Html :=
   Html.keyedElement "li" key #[Attr.className "pw-jsx-row"] #[
     Html.strongWith #[Attr.className "pw-jsx-row-label"] #[Html.text label],
@@ -134,6 +173,7 @@ def View : Component Unit := fun _ => do
         Html.ofComponent Badge { tone := "info", label := "component" } #[
           Html.text " children"
         ],
+        Html.ofComponent InteractiveExpr { expr := sampleExpr },
         Html.buttonWith
           #[Attr.id "proofwidgets-jsx-action", Attr.className "pw-jsx-action"]
           #[Handler.onClick do
@@ -141,7 +181,7 @@ def View : Component Unit := fun _ => do
           #[Html.text "mark"],
         Html.ulWith #[Attr.id "proofwidgets-jsx-rows", Attr.className "pw-jsx-rows"] #[
           row "tags" "lowercase tags" "b, img, span, hr",
-          row "components" "uppercase components" "Card, MarkdownDisplay, Badge",
+          row "components" "uppercase components" "Card, MarkdownDisplay, Badge, InteractiveExpr",
           row "interpolation" "interpolation" s!"{renderedRows} rendered rows"
         ]
       ]
