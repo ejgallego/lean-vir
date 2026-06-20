@@ -1325,7 +1325,8 @@ function normalizeProofWidgetsRpcRef(ref) {
   if (id.length === 0) {
     return null;
   }
-  return {
+  const serverRefJson = stringField(ref.serverRefJson);
+  const normalized = {
     id,
     label: stringField(ref.label),
     typeName: stringField(ref.typeName),
@@ -1334,9 +1335,35 @@ function normalizeProofWidgetsRpcRef(ref) {
     typeText: stringField(ref.typeText),
     context: stringField(ref.context)
   };
+  if (serverRefJson.length > 0) {
+    normalized.serverRefJson = serverRefJson;
+  }
+  const serverRef = proofWidgetsServerRpcRef(ref);
+  if (serverRef !== null) {
+    normalized.serverRef = serverRef;
+  }
+  return normalized;
 }
 function stringField(value) {
   return typeof value === "string" ? value : "";
+}
+function proofWidgetsServerRpcRef(ref) {
+  if (isRpcRefObject(ref.serverRef)) {
+    return ref.serverRef;
+  }
+  const serverRefJson = stringField(ref.serverRefJson).trim();
+  if (serverRefJson.length === 0) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(serverRefJson);
+    return isRpcRefObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+function isRpcRefObject(value) {
+  return value !== null && typeof value === "object" && !Array.isArray(value) && (typeof value.__rpcref === "number" || typeof value.p === "number");
 }
 
 // web/src/vir-host-bindings.js
@@ -5753,12 +5780,32 @@ async function resolveProofWidgetsRpcRef2(rpcSession, ref, position, packageRevi
   if (normalized === null) {
     throw new Error("VIR ProofWidgets RPC ref must have a non-empty id");
   }
-  const response = await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsRpcRef", {
-    ref: normalized,
-    pos: requiredPosition(position, "proofwidgets rpc position"),
+  const pos = requiredPosition(position, "proofwidgets rpc position");
+  const response = normalized.serverRef === void 0 ? await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsRpcRef", {
+    ref: proofWidgetsRpcRefRequest(normalized),
+    pos,
+    packageRevision
+  }) : await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef", {
+    ref: normalized.serverRef,
+    pos,
     packageRevision
   });
   return proofWidgetsRpcRefInfo(response, normalized);
+}
+async function createProofWidgetsExprWithCtxRef(rpcSession, ref, position, packageRevision = "") {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null) {
+    throw new Error("VIR ProofWidgets RPC ref must have a non-empty id");
+  }
+  const response = await rpcSession.call("Lean.Vir.Infoview.createProofWidgetsExprWithCtxRef", {
+    ref: proofWidgetsRpcRefRequest(normalized),
+    pos: requiredPosition(position, "proofwidgets rpc position"),
+    packageRevision
+  });
+  return {
+    ref: requiredRpcRefObject(response?.ref, "proofwidgets stored expr ref"),
+    info: proofWidgetsRpcRefInfo(response?.info, normalized)
+  };
 }
 async function statAsset(rpcSession, path) {
   const response = await rpcSession.call("Lean.Vir.Infoview.statAsset", { path });
@@ -5810,6 +5857,24 @@ function proofWidgetsRpcRefInfo(response, ref) {
     knownConstant: requiredBoolean(response?.knownConstant, "proofwidgets rpc ref knownConstant")
   };
 }
+function proofWidgetsRpcRefRequest(ref) {
+  return {
+    id: ref.id,
+    label: ref.label,
+    typeName: ref.typeName,
+    summary: ref.summary,
+    expression: ref.expression,
+    typeText: ref.typeText,
+    context: ref.context,
+    serverRefJson: ref.serverRefJson ?? ""
+  };
+}
+function requiredRpcRefObject(value, label) {
+  if (value !== null && typeof value === "object" && !Array.isArray(value) && (typeof value.__rpcref === "number" || typeof value.p === "number")) {
+    return value;
+  }
+  throw new Error(`VIR widget ${label} must be an RPC ref object`);
+}
 function irPackageStatInfo(response, roots) {
   const responseRoots = requiredStringArray(response?.roots, "IR package roots");
   if (JSON.stringify(responseRoots) !== JSON.stringify(roots)) {
@@ -5850,6 +5915,7 @@ ${hint}`;
 export {
   buildIRPackage,
   clearRuntimeServiceCacheForTests,
+  createProofWidgetsExprWithCtxRef,
   decodeBase64Bytes,
   VirInfoviewWidget as default,
   exactlyOneAssetSource,

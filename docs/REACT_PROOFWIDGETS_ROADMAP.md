@@ -180,10 +180,10 @@ A realistic path has three layers:
    `ExprWithCtx.save`, and a host-dispatched `resolveRef` action so
    `InteractiveExpr`-shaped component props can cross the Lean/JS boundary and
    update component-owned React state from an async callback.
-   `Vir.Infoview.ProofWidgetsRpc` resolves those descriptors through the active
-   Lean server snapshot and stores expression/type/context metadata under a
-   package-revision-scoped key, while elaborator-backed `ExprWithCtx` objects
-   and edit commands remain future work.
+   `Vir.Infoview.ProofWidgetsRpc` resolves descriptor fallbacks through the
+   active Lean server snapshot and now has a standard `Lean.Server.WithRpcRef`
+   route for server-owned expression-with-context objects, while
+   elaborator-backed construction and edit commands remain future work.
 
 ## Porting Targets
 

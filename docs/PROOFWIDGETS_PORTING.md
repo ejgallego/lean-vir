@@ -53,17 +53,18 @@ reference-shaped interactive case:
 
 The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
 `WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and `Rpc.resolveRef`. The
-browser/virtual hosts normalize the reference descriptor behind
-`proofwidgets.rpc.resolveRef`; in the infoview, that host action calls
-`Lean.Vir.Infoview.resolveProofWidgetsRpcRef`, which is a snapshot-backed server
-RPC returning expression/type/context text, the active source position, package
-revision, a revision-scoped store key, and a simple known-constant check for
-the reference id. The `InteractiveExpr`-shaped demo uses ordinary React state
-to render the async result from the callback, keeping the component behavior
-close to a JavaScript React component. This proves the typed prop,
-host-dispatch, component-state, and infoview RPC round trip needed by an
-`InteractiveExpr`-style port. The current store is still descriptor-seeded; it
-is not yet proof-script editing or the full ProofWidgets RPC request model.
+browser/virtual hosts normalize refs behind `proofwidgets.rpc.resolveRef`. In
+the infoview, refs can now resolve either through the descriptor fallback
+`Lean.Vir.Infoview.resolveProofWidgetsRpcRef` or through the preferred
+server-owned `Lean.Server.WithRpcRef` path,
+`Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef`. The latter uses Lean's
+standard RPC object store and refcount/lifetime model for the heavy server
+object; the browser only carries the opaque RPC handle. The
+`InteractiveExpr`-shaped demo uses ordinary React state to render the async
+result from the callback, keeping the component behavior close to a JavaScript
+React component. This proves the typed prop, host-dispatch, component-state,
+and infoview RPC round trip needed by an `InteractiveExpr`-style port. It is
+not yet proof-script editing or the full ProofWidgets RPC request model.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 

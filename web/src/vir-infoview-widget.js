@@ -1025,12 +1025,35 @@ export async function resolveProofWidgetsRpcRef(rpcSession, ref, position, packa
   if (normalized === null) {
     throw new Error("VIR ProofWidgets RPC ref must have a non-empty id");
   }
-  const response = await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsRpcRef", {
-    ref: normalized,
+  const pos = requiredPosition(position, "proofwidgets rpc position");
+  const response = normalized.serverRef === undefined
+    ? await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsRpcRef", {
+        ref: proofWidgetsRpcRefRequest(normalized),
+        pos,
+        packageRevision,
+      })
+    : await rpcSession.call("Lean.Vir.Infoview.resolveProofWidgetsExprWithCtxRef", {
+        ref: normalized.serverRef,
+        pos,
+        packageRevision,
+      });
+  return proofWidgetsRpcRefInfo(response, normalized);
+}
+
+export async function createProofWidgetsExprWithCtxRef(rpcSession, ref, position, packageRevision = "") {
+  const normalized = normalizeProofWidgetsRpcRef(ref);
+  if (normalized === null) {
+    throw new Error("VIR ProofWidgets RPC ref must have a non-empty id");
+  }
+  const response = await rpcSession.call("Lean.Vir.Infoview.createProofWidgetsExprWithCtxRef", {
+    ref: proofWidgetsRpcRefRequest(normalized),
     pos: requiredPosition(position, "proofwidgets rpc position"),
     packageRevision,
   });
-  return proofWidgetsRpcRefInfo(response, normalized);
+  return {
+    ref: requiredRpcRefObject(response?.ref, "proofwidgets stored expr ref"),
+    info: proofWidgetsRpcRefInfo(response?.info, normalized),
+  };
 }
 
 export async function statAsset(rpcSession, path) {
@@ -1086,6 +1109,31 @@ function proofWidgetsRpcRefInfo(response, ref) {
     storeKey: optionalString(response?.storeKey, "proofwidgets rpc ref storeKey"),
     knownConstant: requiredBoolean(response?.knownConstant, "proofwidgets rpc ref knownConstant"),
   };
+}
+
+function proofWidgetsRpcRefRequest(ref) {
+  return {
+    id: ref.id,
+    label: ref.label,
+    typeName: ref.typeName,
+    summary: ref.summary,
+    expression: ref.expression,
+    typeText: ref.typeText,
+    context: ref.context,
+    serverRefJson: ref.serverRefJson ?? "",
+  };
+}
+
+function requiredRpcRefObject(value, label) {
+  if (
+    value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (typeof value.__rpcref === "number" || typeof value.p === "number")
+  ) {
+    return value;
+  }
+  throw new Error(`VIR widget ${label} must be an RPC ref object`);
 }
 
 function irPackageStatInfo(response, roots) {

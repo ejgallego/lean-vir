@@ -296,7 +296,8 @@ export function normalizeProofWidgetsRpcRef(ref) {
   if (id.length === 0) {
     return null;
   }
-  return {
+  const serverRefJson = stringField(ref.serverRefJson);
+  const normalized = {
     id,
     label: stringField(ref.label),
     typeName: stringField(ref.typeName),
@@ -305,10 +306,41 @@ export function normalizeProofWidgetsRpcRef(ref) {
     typeText: stringField(ref.typeText),
     context: stringField(ref.context),
   };
+  if (serverRefJson.length > 0) {
+    normalized.serverRefJson = serverRefJson;
+  }
+  const serverRef = proofWidgetsServerRpcRef(ref);
+  if (serverRef !== null) {
+    normalized.serverRef = serverRef;
+  }
+  return normalized;
 }
 
 function stringField(value) {
   return typeof value === "string" ? value : "";
+}
+
+function proofWidgetsServerRpcRef(ref) {
+  if (isRpcRefObject(ref.serverRef)) {
+    return ref.serverRef;
+  }
+  const serverRefJson = stringField(ref.serverRefJson).trim();
+  if (serverRefJson.length === 0) {
+    return null;
+  }
+  try {
+    const parsed = JSON.parse(serverRefJson);
+    return isRpcRefObject(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function isRpcRefObject(value) {
+  return value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (typeof value.__rpcref === "number" || typeof value.p === "number");
 }
 
 function virtualProofWidgetsRpcRefInfo(ref) {

@@ -24,6 +24,7 @@ structure RpcRef where
   expression : String
   typeText : String
   context : String
+  serverRefJson : String := ""
   deriving Repr
 
 /--
@@ -94,6 +95,7 @@ def save (id code typeText summary : String) (context : String := "") : WithRpcR
       expression := code
       typeText
       context
+      serverRefJson := ""
     }
   }
 
