@@ -508,6 +508,9 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
 
 export function smokeVirtualReactProofWidgetHello(runtime, documentState, selector) {
   const proofSurfaceFixture = createProofSurfaceFixture();
+  const legacyProofSurfaceFixture = { ...proofSurfaceFixture };
+  delete legacyProofSurfaceFixture.proofWidgetsExpr;
+  assert.equal(runtime.call("ReactProofWidgetHello.mount", selector, legacyProofSurfaceFixture), true);
   assert.equal(runtime.call("ReactProofWidgetHello.mount", selector, proofSurfaceFixture), true);
   const element = documentState.elements.get(selector);
   assert.equal(

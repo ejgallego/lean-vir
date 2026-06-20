@@ -2422,6 +2422,8 @@ function normalizeStructure(value, fields, label) {
         requireStructureFields(field.type, `${label}.${field.name}`),
         `${label}.${field.name}`
       );
+    } else if (field.type?.wireTag === WIRE.OPTION) {
+      normalized[field.name] = null;
     } else {
       throw new Error(`${label} is missing field ${field.name}`);
     }
