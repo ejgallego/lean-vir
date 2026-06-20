@@ -38,6 +38,15 @@ demos use `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, and
 `Handler` aliases in an upstream-recognizable shape and are included in the
 `demo-host.irpkg` runtime smoke package.
 
+`ProofWidgetsJsxSubset.lean` now ports the static surface of upstream
+`ProofWidgets/Demos/Jsx.lean` with explicit combinators:
+
+- lowercase HTML tags such as `b`, `img`, `span`, and `hr`;
+- string and interpolated attributes such as `src`, `alt`, and `style`;
+- child array spread and string interpolation;
+- an uppercase `MarkdownDisplay`-shaped component with props;
+- a small callback to keep handler coverage in the same fixture.
+
 Before attempting a port, keep the authoring model shallow and familiar:
 
 - Lean users provide a React component and widget props are derived around it.
@@ -51,6 +60,8 @@ Known first-slice limits:
 - Attribute values are `Lean.Vir.React.Property`, not arbitrary JSON props.
 - JSX syntax is intentionally deferred; `ProofWidgetsJsxSubset.lean` keeps the
   porting shape as explicit combinators for now.
+- The upstream `InteractiveExpr` example depends on RPC references and remains
+  blocked on the `proofwidgets.rpc` slice.
 
 ## External JavaScript Libraries
 

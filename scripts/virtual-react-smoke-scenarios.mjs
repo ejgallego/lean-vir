@@ -214,6 +214,22 @@ export function smokeVirtualProofWidgetsJsxSubset(runtime, documentState, select
     virtualReactTextContent(card.children[0]),
     "JSX-shaped combinators",
   );
+  const headline = reactElementById(element, "proofwidgets-jsx-headline");
+  assert.equal(headline.tag, "b");
+  assert.equal(virtualReactTextContent(headline), "What, HTML in Lean?!");
+  const parrot = reactElementById(element, "proofwidgets-jsx-parrot");
+  assert.equal(parrot.tag, "img");
+  assert.match(parrot.props.src, /Parrot_montage\.jpg$/);
+  assert.equal(parrot.props.alt, "Six photos of parrots arranged in a grid.");
+  assert.equal(reactElementById(element, "proofwidgets-jsx-letter-h").props.style.color, "red");
+  assert.equal(reactElementById(element, "proofwidgets-jsx-letter-t").props.style.color, "yellow");
+  const spread = reactElementById(element, "proofwidgets-jsx-spread");
+  assert.equal(virtualReactTextContent(spread), "You can use HTML in Lean 4! ");
+  assert.equal(reactElementById(element, "proofwidgets-jsx-divider").tag, "hr");
+  const markdown = reactElementById(element, "proofwidgets-jsx-markdown");
+  assert.equal(markdown.props["data-component"], "MarkdownDisplay");
+  assert.match(virtualReactTextContent(markdown), /Hello, Markdown/);
+  assert.match(virtualReactTextContent(markdown), /3\*19/);
   const badge = reactElementById(element, "proofwidgets-jsx-badge-info");
   assert.equal(badge.props["data-tone"], "info");
   assert.equal(virtualReactTextContent(badge), "component children");

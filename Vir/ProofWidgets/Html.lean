@@ -88,6 +88,12 @@ def tabIndex (value : Int) : Attr :=
 def stylePairs (entries : Array (String × String)) : Attr :=
   Lean.Vir.React.Property.stylePairs entries
 
+def src (value : String) : Attr :=
+  Lean.Vir.React.Property.src value
+
+def alt (value : String) : Attr :=
+  Lean.Vir.React.Property.alt value
+
 def href (value : String) : Attr :=
   Lean.Vir.React.Property.href value
 
@@ -211,6 +217,12 @@ def p (children : Array Html) : Html :=
 def pWith (attrs : Array Attr) (children : Array Html) : Html :=
   element "p" attrs children
 
+def b (children : Array Html) : Html :=
+  element "b" #[] children
+
+def bWith (attrs : Array Attr) (children : Array Html) : Html :=
+  element "b" attrs children
+
 def sectionWith (attrs : Array Attr) (children : Array Html) : Html :=
   element "section" attrs children
 
@@ -228,6 +240,15 @@ def strong (children : Array Html) : Html :=
 
 def strongWith (attrs : Array Attr) (children : Array Html) : Html :=
   element "strong" attrs children
+
+def img (attrs : Array Attr := #[]) : Html :=
+  elementWith "img" attrs #[]
+
+def hr (attrs : Array Attr := #[]) : Html :=
+  elementWith "hr" attrs #[]
+
+def br (attrs : Array Attr := #[]) : Html :=
+  elementWith "br" attrs #[]
 
 def buttonWith
     (attrs : Array Attr)

@@ -313,7 +313,9 @@ facade over the same native React node ABI. `examples/ProofWidgetsHtml.lean`
 uses `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, and `Handler`
 aliases and is included in the host package as a compatibility regression.
 `examples/ProofWidgetsJsxSubset.lean` ports a tiny upstream JSX-shaped pattern
-with explicit combinators, including child-bearing `Html.ofComponent`.
+with explicit combinators, including child-bearing `Html.ofComponent`, image
+attributes, style attributes, child spread, and a `MarkdownDisplay`-shaped
+component.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
