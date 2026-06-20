@@ -10,9 +10,9 @@ objects while a call is running.
 | Work area | Primary files | What changes here |
 | --- | --- | --- |
 | Lean API | `Vir/*.lean`, `examples/*.lean` | Public combinators, effect types, examples, and `@[vir_js]` declarations. |
-| Package generation | `Vir/GeneratePackage.lean` | Export closure selection, manifest type descriptors, host import metadata, and native extern registration. |
+| Package generation | `Vir/GeneratePackage.lean`, `Vir/GeneratePackage/Interface/` | Export closure selection, manifest type descriptors, host import metadata, and native extern registration. |
 | WASI boundary | `wasm/upstream_shim/` | `vir_call`, host-import trampolines, package decoding, native externs, closure roots, and WASI/runtime stubs. |
-| JavaScript runtime | `web/src/vir-runtime.js`, `web/src/value-codec.js` | Runtime construction, manifest validation, call payload encoding, result decoding, host import dispatch, and callback wrappers. |
+| JavaScript runtime | `web/src/vir-runtime.js`, `web/src/runtime/` | Runtime construction, manifest validation, object ABI lowering/lifting, host import dispatch, and callback wrappers. |
 | Host resources | `web/src/host-resource.js`, `web/src/host/vir-host-resources.js` | JavaScript-owned object handles, externref roots, disposable host objects, DOM/timer/frame/React resource cleanup. |
 | React host | `web/src/react/`, `web/src/vir-react-host-bindings.js` | React element construction, root lifetime, function-component bridge, hooks, and callback retention. |
 | Browser demos | `web/src/`, `examples/`, `fixtures/` | Local demo entry points, smoke fixtures, and generated `.irpkg` inputs. |
@@ -23,9 +23,12 @@ objects while a call is running.
 For package/interface work, read:
 
 1. `docs/INTERFACE_PIPELINE.md`
-2. `Vir/GeneratePackage.lean`
-3. `web/src/value-codec.js`
-4. `wasm/upstream_shim/interface_codec.cpp`
+2. `docs/GENERATE_PACKAGE.md`
+3. `Vir/GeneratePackage/Interface/Classify/Core.lean`
+4. `Vir/GeneratePackage/Interface/Encode.lean`
+5. `web/src/runtime/interface-manifest.js`
+6. `web/src/runtime/vir-codec.js`
+7. `web/src/runtime/vir-value-normalizers.js`
 
 For browser or React host work, read:
 
@@ -49,7 +52,7 @@ For benchmark work, read:
 1. `docs/PERFORMANCE.md`
 2. `scripts/bench-vir.mjs`
 3. `scripts/bench-utils.mjs`
-4. `scripts/runtime-tests/value-codec-smoke.mjs`
+4. `scripts/runtime-tests/object-abi-smoke.mjs`
 
 ## Top-Level Call Flow
 
@@ -61,28 +64,27 @@ sequenceDiagram
     autonumber
     participant JS as JavaScript caller
     participant RT as VirRuntime
-    participant Codec as value-codec.js
-    participant Wasm as vir_call_resolved
-    participant Cpp as interface_codec.cpp
+    participant Codec as runtime codec/normalizers
+    participant Obj as object ABI exports
+    participant Wasm as vir_call_resolved_objects
     participant IR as upstream ir_interpreter.cpp
 
     JS->>RT: vir.call("entry", ...args)
     RT->>RT: lookup manifest entry
     RT->>Wasm: vir_resolve_call(name) on first use
-    RT->>Codec: encode args with manifest descriptor
-    Codec-->>RT: byte payload
-    RT->>Wasm: vir_call_resolved(slot, payload, resultTag)
-    Wasm->>Cpp: decode payload into Lean objects
-    Cpp->>IR: evaluate packaged Lean declaration
-    IR-->>Cpp: Lean result object
-    Cpp-->>Wasm: encode result bytes
-    Wasm-->>RT: result pointer and vir_call_result_size()
-    RT->>Codec: decode result bytes
+    RT->>Codec: normalize args with manifest descriptors
+    RT->>Obj: lower args to Lean objects with vir_obj_* exports
+    RT->>Wasm: vir_call_resolved_objects(slot, argv, argc)
+    Wasm->>IR: evaluate packaged Lean declaration
+    IR-->>Wasm: Lean result object
+    Wasm-->>RT: result object
+    RT->>Obj: inspect result object with vir_obj_* exports
+    RT->>Codec: lift result using manifest descriptor
     RT-->>JS: JavaScript value
 ```
 
-`vir_call(name, ...)` remains available for diagnostics and benchmark
-comparison, but the runtime's hot path is `vir_call_resolved(slot, ...)`.
+The runtime uses the object ABI for manifest calls; it resolves each entry once
+and then calls `vir_call_resolved_objects(slot, ...)`.
 
 ## Lean-To-JavaScript Host Import Flow
 
@@ -102,23 +104,23 @@ sequenceDiagram
 
     Lean->>IR: call opaque @[vir_js] declaration
     IR->>Shim: generated native trampoline
-    Shim->>Shim: encode arguments
+    Shim->>Shim: pass Lean object arguments
     alt argument is a Lean closure
         Shim->>Shim: vir_closure_root(closure)
         Shim->>Host: env.vir_closure_push(rootId)
         Host->>Callback: create callable VirCallback
     end
-    Shim->>Host: env.vir_js_call(slot, request)
-    Host->>JS: binding(...decodedArgs)
+    Shim->>Host: env.vir_js_call_objects(slot, argv, argc)
+    Host->>JS: binding(...liftedArgs)
     opt host calls retained callback
         JS->>Callback: callback(...args)
         Callback->>Shim: vir_closure_call(rootId, payload)
         Shim->>IR: evaluate closure
         IR-->>Shim: closure result
-        Shim-->>Callback: decoded result
+        Shim-->>Callback: Lean result object
     end
     JS-->>Host: return value
-    Host-->>Shim: encoded result bytes
+    Host-->>Shim: lowered Lean result object
     Shim-->>IR: Lean result object
     JS->>Callback: callback.release() when done
     Callback->>Shim: vir_closure_release(rootId)
@@ -257,8 +259,10 @@ Use this checklist when adding a new host-backed primitive:
    operation: pure, `RuntimeM`, `IO`, `DomM`, or `ReactM`.
 2. Make JavaScript-owned objects appear as `Lean.Vir.Js α`, not as naked marker
    types.
-3. Run or update package-generation tests so `Vir/GeneratePackage.lean`
-   validates the argument and result types.
+3. Run or update package-generation tests so
+   `Vir/GeneratePackage/Interface/Classify/Core.lean` and
+   `Vir/GeneratePackage/Interface/Classify/Signature.lean` validate the
+   argument and result types.
 4. Add the JavaScript binding in the relevant host module.
 5. If the binding retains a callback or host object, wire its cleanup into
    `HostResourceState` or an equivalent disposer.

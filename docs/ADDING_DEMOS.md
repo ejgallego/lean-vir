@@ -82,9 +82,10 @@ the package-backed imported closure or the explicit native boundary.
 
 Prefer the manifest-driven `vir.call(name, ...args)` API in
 `web/src/vir-runtime.js`. If a demo needs another browser-supplied input or
-result shape, extend the manifest type classifier in `Vir/GeneratePackage/Interface.lean`,
-the JavaScript object lowering/lifting code in `web/src/runtime/`, and the
-signature descriptor support in `wasm/upstream_shim/call_signature_summary.cpp`. Keep
+result shape, extend the manifest type classifier in
+`Vir/GeneratePackage/Interface/Classify/Core.lean`, descriptor JSON support in
+`Vir/GeneratePackage/Interface/Encode.lean`, and the JavaScript object
+lowering/lifting code in `web/src/runtime/` and `web/src/vir-runtime.js`. Keep
 the Lean declaration itself in `examples/` and include it as an exported root.
 Do not add per-function or per-shape WASM exports for manifest-supported
 declarations; unsupported entries should fail during package generation until

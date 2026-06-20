@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.GeneratePackage.Closure
-import Vir.GeneratePackage.Interface.Classify
+import Vir.GeneratePackage.Interface.Classify.Signature
 
 open Lean
 

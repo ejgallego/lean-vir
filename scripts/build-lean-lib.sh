@@ -72,6 +72,9 @@ build_module Vir/GeneratePackage/Frontend.lean
 build_module Vir/GeneratePackage/Closure.lean
 build_module Vir/GeneratePackage/Json.lean
 build_module Vir/GeneratePackage/Interface/Encode.lean
+build_module Vir/GeneratePackage/Interface/Classify/Basic.lean
+build_module Vir/GeneratePackage/Interface/Classify/Core.lean
+build_module Vir/GeneratePackage/Interface/Classify/Signature.lean
 build_module Vir/GeneratePackage/Interface/Classify.lean
 build_module Vir/GeneratePackage/Interface/Collect.lean
 build_module Vir/GeneratePackage/Interface.lean

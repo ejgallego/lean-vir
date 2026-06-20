@@ -37,10 +37,16 @@ Targets have one of three modes:
   interface modules.
 - `Vir.GeneratePackage.Interface.Encode`: interface labels, wire tags, and
   descriptor JSON encoders.
-- `Vir.GeneratePackage.Interface.Classify`: interface type classification,
-  host effect recognition, callback signatures, abbrev-head unfolding, runtime
-  layout classification for structures and inductives, and boxed-boundary
-  checks.
+- `Vir.GeneratePackage.Interface.Classify`: compatibility import shim for the
+  classifier modules.
+- `Vir.GeneratePackage.Interface.Classify.Basic`: shared classifier helpers,
+  host effect recognition, abbrev-head unfolding, primitive/resource labels,
+  layout helper utilities, and boxed-boundary checks.
+- `Vir.GeneratePackage.Interface.Classify.Core`: interface type classification,
+  callback type classification, and runtime layout classification for structures
+  and inductives.
+- `Vir.GeneratePackage.Interface.Classify.Signature`: top-level export and host
+  import signature classification.
 - `Vir.GeneratePackage.Interface.Collect`: export discovery, export signature
   extraction, duplicate-avoidance helpers, boxed-boundary diagnostics, and
   host-import collection for `@[vir_js "..."]` declarations.
