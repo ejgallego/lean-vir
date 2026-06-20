@@ -136,6 +136,12 @@ assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
 assert.equal(reactUseStateImports[0]?.result?.fields?.find((field) => field.name === "value")?.type?.type, "Js");
+const reactUseRefImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useRef");
+assert.equal(reactUseRefImports.length, 1);
+assert.equal(reactUseRefImports[0]?.effect, "react");
+assert.equal(reactUseRefImports[0]?.args[0]?.type?.kind, "resource");
+assert.equal(reactUseRefImports[0]?.result?.type, "Js");
+assert.equal(reactUseRefImports[0]?.result?.name, "Lean.Vir.Js");
 const reactUseEffectImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useEffect");
 assert.equal(reactUseEffectImports.length, 1);
 assert.equal(reactUseEffectImports[0]?.effect, "react");
@@ -152,6 +158,16 @@ assert.equal(reactUseEffectWithDepsImports[0]?.args[1]?.type?.kind, "function");
 assert.equal(reactUseEffectWithDepsImports[0]?.args[1]?.type?.effect, "dom");
 assert.equal(reactUseEffectWithDepsImports[0]?.args[2]?.type?.kind, "function");
 assert.equal(reactUseEffectWithDepsImports[0]?.args[2]?.type?.effect, "dom");
+const reactRefGetImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.ref.get");
+assert.equal(reactRefGetImports.length, 1);
+assert.equal(reactRefGetImports[0]?.effect, "runtime");
+assert.equal(reactRefGetImports[0]?.args[0]?.type?.kind, "resource");
+assert.equal(reactRefGetImports[0]?.result?.type, "Js");
+const reactRefSetImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.ref.set");
+assert.equal(reactRefSetImports.length, 1);
+assert.equal(reactRefSetImports[0]?.effect, "runtime");
+assert.equal(reactRefSetImports[0]?.args[0]?.type?.kind, "resource");
+assert.equal(reactRefSetImports[0]?.args[1]?.type?.type, "Js");
 for (const target of [
   "js.string",
   "js.string.value",
@@ -189,6 +205,11 @@ assert.equal(
 );
 const reactNodeType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.createElement")
   ?.args[2]?.type;
+const reactFragmentImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.fragment");
+assert.equal(reactFragmentImport?.effect, "react");
+assert.equal(reactFragmentImport?.args[0]?.type?.type, "Option String");
+assert.equal(reactFragmentImport?.args[1]?.type?.kind, "array");
+assert.equal(reactFragmentImport?.args[1]?.type?.element?.type, "Js");
 const reactPropValueType = findTypeDescriptor(
   reactNodeType,
   (type) => type.kind === "customInductive" && typeof type.name === "string" && type.name.endsWith(".PropValue"),

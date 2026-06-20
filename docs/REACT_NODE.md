@@ -249,6 +249,9 @@ The browser React host binding is exposed from
 - `react.node.createElement` validates props/handlers/children, calls
   `React.createElement(tag, props, ...children)`, and returns a `ReactNode`
   resource.
+- `react.node.fragment` calls
+  `React.createElement(React.Fragment, props, ...children)` in the browser host
+  and returns a virtual fragment node in tests.
 - `react.root.render` invokes the received Lean `ReactM` render action, renders
   the retained native React node held by the resulting `ReactNode` resource,
   and releases the render callback.
@@ -262,6 +265,9 @@ The browser React host binding is exposed from
   cursor changes.
 - `react.useState` calls `React.useState` while rendering a component. Its ABI
   is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
+- `react.useRef` calls `React.useRef` while rendering a component and returns a
+  host-owned ref object. `react.ref.get` and `react.ref.set` read/write
+  `.current`; they do not schedule a render.
 - `react.useEffect` calls `React.useEffect` while rendering a component. The
   current ABI is resource-shaped: setup returns a host resource and cleanup
   receives that resource when React cleans the effect up. The base binding

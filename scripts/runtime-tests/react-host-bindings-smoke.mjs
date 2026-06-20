@@ -33,6 +33,7 @@ import {
   smokeVirtualReactCheckbox,
   smokeVirtualReactCounter,
   smokeVirtualReactEffect,
+  smokeVirtualReactRefFragment,
   smokeVirtualReactInput,
   smokeVirtualProofWidgetsHtml,
   smokeVirtualProofWidgetsJsxSubset,
@@ -162,6 +163,7 @@ ensureVirtualElements(reactDocumentState, [
   "#react-static",
   "#react-counter",
   "#react-effect",
+  "#react-ref-fragment",
   "#react-input",
   "#react-change",
   "#react-select-textarea",
@@ -191,6 +193,7 @@ assert.equal(missingSelectorRuntime.liveCallbacks.size, 0);
 missingSelectorRuntime.dispose();
 smokeVirtualReactCounter(reactRuntime, reactDocumentState, "#react-counter");
 smokeVirtualReactEffect(reactRuntime, reactDocumentState, "#react-effect");
+smokeVirtualReactRefFragment(reactRuntime, reactDocumentState, "#react-ref-fragment");
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
 smokeVirtualReactChangeInput(reactRuntime, reactDocumentState, "#react-change");
 smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select-textarea");

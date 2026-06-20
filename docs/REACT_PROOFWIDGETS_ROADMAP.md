@@ -125,16 +125,17 @@ Current RF status:
 - `useEffectWithDeps` exposes React's dependency-array shape for string
   dependencies, with callback release handled by the host layer when
   dependencies are unchanged.
+- `useRef` exposes React-owned ref objects, and `Node.fragment` maps to
+  `React.Fragment`.
 
 Remaining RF gaps to close in order:
 
 1. Add common hook bindings that existing React/ProofWidgets code naturally
-   expects: `useRef`, `useMemo`, `useCallback`, `useReducer`, and later
-   `useContext`.
+   expects: `useReducer`, `useMemo`, `useCallback`, and later `useContext`.
 2. Broaden dependency values from strings to JavaScript resource values once
    the `Js α` array/object story is strong enough for external library APIs.
-3. Add fragments and the remaining common DOM attributes/events needed by
-   real ProofWidgets examples.
+3. Add the remaining common DOM attributes/events needed by real ProofWidgets
+   examples.
 4. Add lightweight Lean-side linting for hook order and obvious render-time IO
    footguns, without changing the shallow React-compatible API.
 5. Keep StrictMode/concurrent-render callback-root behavior documented and

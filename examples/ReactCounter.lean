@@ -62,6 +62,32 @@ def effectProbe : Component Unit :=
 def mountEffect (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root effectProbe ()
 
+def refFragmentProbe : Component Unit :=
+  fun _ => do
+    let initial ← JsValue.ofNat 0
+    let count ← Hooks.useState initial
+    let lastClick ← Hooks.useRef initial
+    let countValue ← JsValue.toNat count.value
+    let lastValueResource ← Ref.get lastClick
+    let lastValue ← JsValue.toNat lastValueResource
+    let labelText ← Node.text s!"react:ref:{countValue}:{lastValue}"
+    let button ←
+      Node.buttonWith
+        #[Property.id "react-ref-button"]
+        #[EventHandler.onClick do
+          State.modify count fun previous => do
+            let value ← JsValue.toNat previous
+            let next ← JsValue.ofNat (value + 1)
+            Ref.set lastClick next
+            pure next]
+        #[labelText]
+    let markerText ← Node.text "fragment child"
+    let marker ← Node.spanWith #[Property.id "react-fragment-marker"] #[] #[markerText]
+    Node.fragment #[button, marker]
+
+def mountRefFragment (selector : String) : DomM Bool :=
+  Root.mountFromSelector selector fun root => Root.renderComponent root refFragmentProbe ()
+
 def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text ("item:" ++ toString index)
   Node.spanWith

@@ -42,6 +42,21 @@ export function smokeVirtualReactEffect(runtime, documentState, selector) {
   assertUnmountCleanup(runtime, element);
 }
 
+export function smokeVirtualReactRefFragment(runtime, documentState, selector) {
+  assert.equal(runtime.call("ReactCounter.mountRefFragment", selector), true);
+  const element = documentState.elements.get(selector);
+  assert.equal(element.reactRoot.current.kind, "fragment");
+  assert.equal(element.textContent, "react:ref:0:0fragment child");
+  assertLiveCallbacks(runtime, 2);
+  assert.equal(reactElementById(element, "react-fragment-marker").tag, "span");
+  reactElementById(element, "react-ref-button").handlers.onClick({});
+  assert.equal(element.reactRoot.current.kind, "fragment");
+  assert.equal(element.textContent, "react:ref:1:1fragment child");
+  assertLiveCallbacks(runtime, 2);
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
 export function smokeVirtualReactInput(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactInput.mountInput", selector), true);
   const element = documentState.elements.get(selector);

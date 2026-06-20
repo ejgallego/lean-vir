@@ -38,17 +38,21 @@ non-browser environments.
 Browser `react.root.*` targets are provided by
 `lean-vir/react-host-bindings`. With that entry installed, React roots map to
 `ReactDOMClient.createRoot`, `root.render`, and `root.unmount`.
-`react.node.text` and `react.node.createElement` construct `ReactNode` resources;
-the browser binding uses `React.createElement`, while the virtual binding builds
-test-visible virtual React nodes.
+`react.node.text`, `react.node.createElement`, and `react.node.fragment`
+construct `ReactNode` resources; the browser binding uses `React.createElement`
+and `React.Fragment`, while the virtual binding builds test-visible virtual
+React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
 `Root.renderComponent root component props` API in a real React function
-component. The hook bindings `react.useState`, `react.useEffect`, and
-`react.useEffectWithDeps` are render-time `ReactM` operations. `useEffect`
-currently has a resource shape: setup returns a host resource, and cleanup
-receives the same resource at React's cleanup point. The no-deps binding reruns
-after committed renders. `useEffectWithDeps` maps to React's dependency-array
-form and compares the Lean-provided string dependency list with `Object.is`.
+component. The hook bindings `react.useState`, `react.useRef`,
+`react.useEffect`, and `react.useEffectWithDeps` are render-time `ReactM`
+operations. `useRef` returns a host-owned React ref object; `react.ref.get` and
+`react.ref.set` are `RuntimeM` operations over its `current` field and do not
+schedule renders. `useEffect` currently has a resource shape: setup returns a
+host resource, and cleanup receives the same resource at React's cleanup point.
+The no-deps binding reruns after committed renders. `useEffectWithDeps` maps to
+React's dependency-array form and compares the Lean-provided string dependency
+list with `Object.is`.
 `react.state.set`, `react.state.modify`, and small
 `js.string`, `js.nat`, and `js.bool` scalar helpers are `RuntimeM` operations
 over `Lean.Vir.Js α` resources and share the same browser and virtual host

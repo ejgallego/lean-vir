@@ -169,6 +169,18 @@ export function createBrowserReactNodeElementResource(resources, createElement, 
   });
 }
 
+export function createBrowserReactNodeFragmentResource(resources, createElement, Fragment, key, children) {
+  if (typeof createElement !== "function") {
+    throw new Error("createBrowserReactNodeFragmentResource requires a React.createElement-compatible function");
+  }
+  if (Fragment === null || Fragment === undefined) {
+    throw new Error("createBrowserReactNodeFragmentResource requires React.Fragment");
+  }
+  return createReactNodeFragmentResource(resources, key, children, (fields, childEntries) => ({
+    node: createElement(Fragment, reactFragmentProps(fields), ...childEntries.map((child) => child.value.node)),
+  }));
+}
+
 export function createVirtualReactNodeTextResource(resources, value) {
   return createReactNodeResource(resources, {
     node: { kind: "text", value: reactNodeTextValue(value) },
@@ -194,6 +206,16 @@ export function createVirtualReactNodeElementResource(resources, hooks, tag, key
   });
 }
 
+export function createVirtualReactNodeFragmentResource(resources, key, children) {
+  return createReactNodeFragmentResource(resources, key, children, (fields, childEntries) => ({
+    node: {
+      kind: "fragment",
+      key: fields.key,
+      children: childEntries.map((child) => child.value.node),
+    },
+  }));
+}
+
 export function createReactNodeElementResource(resources, tag, key, props, handlers, children, createNode) {
   const childEntries = resolveReactNodeChildren(resources, children);
   const stats = reactNodeSubtreeStats(childEntries);
@@ -217,6 +239,20 @@ export function createReactNodeElementResource(resources, tag, key, props, handl
     releaseReactCallbacks(callbacks);
     throw error;
   }
+}
+
+export function createReactNodeFragmentResource(resources, key, children, createNode) {
+  const childEntries = resolveReactNodeChildren(resources, children);
+  const stats = reactNodeSubtreeStats(childEntries);
+  const fields = {
+    key: reactNodeKey(key),
+  };
+  const created = createNode(fields, childEntries);
+  return createReactNodeResource(resources, {
+    node: created.node,
+    childEntries,
+    ...stats,
+  });
 }
 
 export function createReactNodeResource(resources, { node, childEntries = [], callbacks = [], nodeCount = 1, maxDepth = 0 }) {
@@ -330,7 +366,9 @@ export function validateReactNodeResourceLimits(node) {
 export function virtualReactTextContent(node) {
   if (node === null || node === undefined) return "";
   if (node.kind === "text") return node.value;
-  if (node.kind === "element") return node.children.map(virtualReactTextContent).join("");
+  if (node.kind === "element" || node.kind === "fragment") {
+    return node.children.map(virtualReactTextContent).join("");
+  }
   return "";
 }
 
@@ -515,6 +553,14 @@ function reactPropsFromNode(state, fields, callLeanEventCallback, hooks) {
     });
   }
   return { props, callbacks };
+}
+
+function reactFragmentProps(fields) {
+  const props = {};
+  if (fields.key !== null && fields.key !== undefined) {
+    props.key = fields.key;
+  }
+  return props;
 }
 
 function virtualReactPropsFromNode(fields) {

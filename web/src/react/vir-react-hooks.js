@@ -11,7 +11,7 @@ export function createBrowserReactHookRuntime(resources, React) {
   let currentComponent = null;
   return {
     createComponentState() {
-      return { setters: new Set() };
+      return { refs: new Set(), setters: new Set() };
     },
     withComponentRender(componentState, render) {
       const previous = currentComponent;
@@ -23,9 +23,13 @@ export function createBrowserReactHookRuntime(resources, React) {
       }
     },
     disposeComponent(componentState) {
+      for (const ref of componentState?.refs ?? []) {
+        resources.releaseValueResource(ref);
+      }
       for (const setter of componentState?.setters ?? []) {
         resources.releaseValueResource(setter);
       }
+      componentState?.refs?.clear();
       componentState?.setters?.clear();
     },
     useState(initial) {
@@ -36,6 +40,14 @@ export function createBrowserReactHookRuntime(resources, React) {
       const setter = stateSetterFor(setters, setState);
       currentComponent?.setters?.add(setter);
       return stateResult(resources, value, setter);
+    },
+    useRef(initial) {
+      if (typeof React?.useRef !== "function") {
+        throw new Error("React.useRef is not available");
+      }
+      const ref = React.useRef(initial);
+      currentComponent?.refs?.add(ref);
+      return resources.resourceForValue(ref);
     },
     useEffect(setup, cleanup) {
       if (typeof React?.useEffect !== "function") {
@@ -107,6 +119,8 @@ export function createVirtualReactHookRuntime(resources) {
       for (const hook of componentState?.hooks ?? []) {
         if (hook?.kind === "state") {
           resources.releaseValueResource(hook.setter);
+        } else if (hook?.kind === "ref") {
+          resources.releaseValueResource(hook.ref);
         } else if (hook?.kind === "effect") {
           disposeVirtualEffectHook(hook);
         }
@@ -152,6 +166,20 @@ export function createVirtualReactHookRuntime(resources) {
         throw new Error("React hook order changed: expected useState");
       }
       return stateResult(resources, hook.value, hook.setter);
+    },
+    useRef(initial) {
+      if (currentComponent === null) {
+        throw new Error("React.useRef can only be called while rendering a component");
+      }
+      const index = currentComponent.hookIndex++;
+      let hook = currentComponent.hooks[index];
+      if (hook === undefined) {
+        hook = createVirtualRefHook(initial);
+        currentComponent.hooks[index] = hook;
+      } else if (hook.kind !== "ref") {
+        throw new Error("React hook order changed: expected useRef");
+      }
+      return resources.resourceForValue(hook.ref);
     },
     useEffect(setup, cleanup) {
       if (currentComponent === null) {
@@ -205,8 +233,14 @@ export function createVirtualReactHookRuntime(resources) {
 export function createReactStateHostBindings(resources, hookRuntime) {
   return {
     "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
+    "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
     "react.useEffectWithDeps": (deps, setup, cleanup) => hookRuntime.useEffectWithDeps(deps, setup, cleanup),
+    "react.ref.get": (ref) => resources.resourceForValue(resources.resolveResource(ref, "ReactRef").current),
+    "react.ref.set": (ref, value) => {
+      resources.resolveResource(ref, "ReactRef").current = reactStatePayload(resources, value);
+      return undefined;
+    },
     "react.state.set": (setter, value) => setStateValue(resources, setter, value),
     "react.state.modify": (setter, update) => modifyStateValue(resources, setter, update),
   };
@@ -273,6 +307,13 @@ function createVirtualStateHook(initial, scheduleRender) {
     },
   };
   return hook;
+}
+
+function createVirtualRefHook(initial) {
+  return {
+    kind: "ref",
+    ref: { current: initial },
+  };
 }
 
 function createBrowserEffect(setup, cleanup) {

@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import {
   createVirtualReactNodeElementResource,
+  createVirtualReactNodeFragmentResource,
   createVirtualReactNodeTextResource,
   createVirtualReactRootResource as createVirtualReactRootResourceFromNode,
 } from "../react/vir-react-node.js";
@@ -152,6 +153,8 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
         createNodeTextResource: (value) => createVirtualReactNodeTextResource(state.resources, value),
         createNodeElementResource: (tag, key, props, handlers, children) =>
           createVirtualReactNodeElementResource(state.resources, reactHooks, tag, key, props, handlers, children),
+        createNodeFragmentResource: (key, children) =>
+          createVirtualReactNodeFragmentResource(state.resources, key, children),
       }),
     ...createReactJsValueHostBindings(state.resources),
     ...createReactStateHostBindings(state.resources, reactHookRuntime),
@@ -234,8 +237,8 @@ function normalizeVirtualElementState(element) {
 }
 
 function findVirtualReactElementNodeById(node, id) {
-  if (node?.kind !== "element") return null;
-  if (node.props?.id === id) return node;
+  if (node?.kind !== "element" && node?.kind !== "fragment") return null;
+  if (node.kind === "element" && node.props?.id === id) return node;
   for (const child of node.children ?? []) {
     const found = findVirtualReactElementNodeById(child, id);
     if (found !== null) return found;

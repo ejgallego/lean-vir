@@ -219,6 +219,7 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
   querySelector = null,
   createNodeTextResource = null,
   createNodeElementResource = null,
+  createNodeFragmentResource = null,
 } = {}) {
   const rootsByContainer = new WeakMap();
   const rootsBySelector = new Map();
@@ -299,6 +300,8 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       resources.resourceForValue(
         requireReactNodeElementResourceFactory(createNodeElementResource)(tag, key, props, handlers, children)
       ),
+    "react.node.fragment": (key, children) =>
+      resources.resourceForValue(requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(key, children)),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
       return resources.resourceForValue(rootForContainer(target));
@@ -369,6 +372,13 @@ function requireReactNodeTextResourceFactory(factory) {
 function requireReactNodeElementResourceFactory(factory) {
   if (typeof factory !== "function") {
     throw new Error("react.node.createElement host binding requires a React Node element resource factory");
+  }
+  return factory;
+}
+
+function requireReactNodeFragmentResourceFactory(factory) {
+  if (typeof factory !== "function") {
+    throw new Error("react.node.fragment host binding requires a React Node fragment resource factory");
   }
   return factory;
 }

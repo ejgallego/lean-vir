@@ -233,6 +233,17 @@ function createBrowserReactNodeElementResource(resources, createElement3, hooks,
     };
   });
 }
+function createBrowserReactNodeFragmentResource(resources, createElement3, Fragment2, key, children) {
+  if (typeof createElement3 !== "function") {
+    throw new Error("createBrowserReactNodeFragmentResource requires a React.createElement-compatible function");
+  }
+  if (Fragment2 === null || Fragment2 === void 0) {
+    throw new Error("createBrowserReactNodeFragmentResource requires React.Fragment");
+  }
+  return createReactNodeFragmentResource(resources, key, children, (fields, childEntries) => ({
+    node: createElement3(Fragment2, reactFragmentProps(fields), ...childEntries.map((child) => child.value.node))
+  }));
+}
 function createReactNodeElementResource(resources, tag, key, props, handlers, children, createNode) {
   const childEntries = resolveReactNodeChildren(resources, children);
   const stats = reactNodeSubtreeStats(childEntries);
@@ -256,6 +267,19 @@ function createReactNodeElementResource(resources, tag, key, props, handlers, ch
     releaseReactCallbacks(callbacks);
     throw error;
   }
+}
+function createReactNodeFragmentResource(resources, key, children, createNode) {
+  const childEntries = resolveReactNodeChildren(resources, children);
+  const stats = reactNodeSubtreeStats(childEntries);
+  const fields = {
+    key: reactNodeKey(key)
+  };
+  const created = createNode(fields, childEntries);
+  return createReactNodeResource(resources, {
+    node: created.node,
+    childEntries,
+    ...stats
+  });
 }
 function createReactNodeResource(resources, { node, childEntries = [], callbacks = [], nodeCount = 1, maxDepth = 0 }) {
   const children = childEntries.map((child) => child.value);
@@ -505,6 +529,13 @@ function reactPropsFromNode(state, fields, callLeanEventCallback2, hooks) {
     });
   }
   return { props, callbacks };
+}
+function reactFragmentProps(fields) {
+  const props = {};
+  if (fields.key !== null && fields.key !== void 0) {
+    props.key = fields.key;
+  }
+  return props;
 }
 function reactNodeKey(key) {
   if (key !== null && key !== void 0 && typeof key !== "string") {
@@ -883,7 +914,8 @@ function createHtmlInputElementResourceHostBindings(resources, { fromElement }) 
 function createReactRootResourceHostBindings(resources, createRootResource, {
   querySelector = null,
   createNodeTextResource = null,
-  createNodeElementResource = null
+  createNodeElementResource = null,
+  createNodeFragmentResource = null
 } = {}) {
   const rootsByContainer = /* @__PURE__ */ new WeakMap();
   const rootsBySelector = /* @__PURE__ */ new Map();
@@ -954,6 +986,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     "react.node.createElement": (tag, key, props, handlers, children) => resources.resourceForValue(
       requireReactNodeElementResourceFactory(createNodeElementResource)(tag, key, props, handlers, children)
     ),
+    "react.node.fragment": (key, children) => resources.resourceForValue(requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(key, children)),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
       return resources.resourceForValue(rootForContainer(target));
@@ -1021,6 +1054,12 @@ function requireReactNodeTextResourceFactory(factory) {
 function requireReactNodeElementResourceFactory(factory) {
   if (typeof factory !== "function") {
     throw new Error("react.node.createElement host binding requires a React Node element resource factory");
+  }
+  return factory;
+}
+function requireReactNodeFragmentResourceFactory(factory) {
+  if (typeof factory !== "function") {
+    throw new Error("react.node.fragment host binding requires a React Node fragment resource factory");
   }
   return factory;
 }
@@ -1225,7 +1264,7 @@ function createBrowserReactHookRuntime(resources, React3) {
   let currentComponent = null;
   return {
     createComponentState() {
-      return { setters: /* @__PURE__ */ new Set() };
+      return { refs: /* @__PURE__ */ new Set(), setters: /* @__PURE__ */ new Set() };
     },
     withComponentRender(componentState, render) {
       const previous = currentComponent;
@@ -1237,9 +1276,13 @@ function createBrowserReactHookRuntime(resources, React3) {
       }
     },
     disposeComponent(componentState) {
+      for (const ref of componentState?.refs ?? []) {
+        resources.releaseValueResource(ref);
+      }
       for (const setter of componentState?.setters ?? []) {
         resources.releaseValueResource(setter);
       }
+      componentState?.refs?.clear();
       componentState?.setters?.clear();
     },
     useState(initial) {
@@ -1250,6 +1293,14 @@ function createBrowserReactHookRuntime(resources, React3) {
       const setter = stateSetterFor(setters, setState);
       currentComponent?.setters?.add(setter);
       return stateResult(resources, value, setter);
+    },
+    useRef(initial) {
+      if (typeof React3?.useRef !== "function") {
+        throw new Error("React.useRef is not available");
+      }
+      const ref = React3.useRef(initial);
+      currentComponent?.refs?.add(ref);
+      return resources.resourceForValue(ref);
     },
     useEffect(setup, cleanup) {
       if (typeof React3?.useEffect !== "function") {
@@ -1298,8 +1349,14 @@ function createBrowserReactHookRuntime(resources, React3) {
 function createReactStateHostBindings(resources, hookRuntime) {
   return {
     "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
+    "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
     "react.useEffectWithDeps": (deps, setup, cleanup) => hookRuntime.useEffectWithDeps(deps, setup, cleanup),
+    "react.ref.get": (ref) => resources.resourceForValue(resources.resolveResource(ref, "ReactRef").current),
+    "react.ref.set": (ref, value) => {
+      resources.resolveResource(ref, "ReactRef").current = reactStatePayload(resources, value);
+      return void 0;
+    },
     "react.state.set": (setter, value) => setStateValue(resources, setter, value),
     "react.state.modify": (setter, update) => modifyStateValue(resources, setter, update)
   };
@@ -1861,7 +1918,8 @@ function createBrowserReactHostBindings(state = createHostResourceState(), {
     ...createReactRootResourceHostBindings(state, (target) => createBrowserReactRootResource2(state, createRoot(target), React, hooks), {
       querySelector,
       createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
-      createNodeElementResource: (tag, key, props, handlers, children) => createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, key, props, handlers, children)
+      createNodeElementResource: (tag, key, props, handlers, children) => createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
+      createNodeFragmentResource: (key, children) => createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, key, children)
     }),
     ...createReactJsValueHostBindings(state),
     ...createReactStateHostBindings(state, hookRuntime)

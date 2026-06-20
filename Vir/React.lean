@@ -80,6 +80,15 @@ state setter helpers in this module.
 opaque StateSetter (α : Type) : Type
 
 /--
+React ref object returned by `useRef`.
+
+The JavaScript host owns the underlying `{ current }` object. Reading and
+writing `current` does not schedule a React render, matching React's ref
+lifetime semantics.
+-/
+opaque Ref (α : Type) : Type
+
+/--
 Default React props object marker.
 
 `Root.renderComponent` accepts Lean-side props directly. This marker names the
@@ -420,6 +429,9 @@ namespace Hooks
 @[vir_js "react.useState"]
 opaque useState {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
 
+@[vir_js "react.useRef"]
+opaque useRef {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (Lean.Vir.Js (Ref (Lean.Vir.Js α)))
+
 /--
 Runs a React effect whose setup returns a host resource cleaned up by React.
 
@@ -451,6 +463,19 @@ opaque useEffectWithDeps {α : Type}
 
 end Hooks
 
+namespace Ref
+
+@[vir_js "react.ref.get"]
+opaque get {α : Type} (ref : @& Lean.Vir.Js (Ref (Lean.Vir.Js α))) : Lean.Vir.RuntimeM (Lean.Vir.Js α)
+
+@[vir_js "react.ref.set"]
+opaque set {α : Type}
+    (ref : @& Lean.Vir.Js (Ref (Lean.Vir.Js α)))
+    (value : @& Lean.Vir.Js α) :
+    Lean.Vir.RuntimeM Unit
+
+end Ref
+
 namespace State
 
 def set (state : State (Lean.Vir.Js α)) (value : Lean.Vir.Js α) : Lean.Vir.RuntimeM Unit :=
@@ -477,6 +502,16 @@ opaque createElement
     (handlers : Array EventHandler)
     (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node)
+
+@[vir_js "react.node.fragment"]
+opaque fragmentWithKey (key? : Option String) (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node)
+
+def fragment (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
+  fragmentWithKey none children
+
+def keyedFragment (key : String) (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
+  fragmentWithKey (some key) children
 
 /-- Renders a Lean function component with typed props. -/
 def component (component : Component props) (props : props) : ReactM (Lean.Vir.Js Node) :=

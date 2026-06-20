@@ -13,6 +13,7 @@ import {
 } from "./react/vir-react-hooks.js";
 import {
   createBrowserReactNodeElementResource,
+  createBrowserReactNodeFragmentResource,
   createBrowserReactNodeTextResource,
   createBrowserReactRootResource as createBrowserReactRootResourceFromNode,
 } from "./react/vir-react-node.js";
@@ -37,6 +38,8 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
         createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
         createNodeElementResource: (tag, key, props, handlers, children) =>
           createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
+        createNodeFragmentResource: (key, children) =>
+          createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, key, children),
       }),
     ...createReactJsValueHostBindings(state),
     ...createReactStateHostBindings(state, hookRuntime),
