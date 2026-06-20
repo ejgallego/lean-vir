@@ -378,7 +378,7 @@ def liveTickLabel : String :=
   "tick"
 
 def liveTickMs : UInt32 :=
-  1000
+  50000
 
 def style (entries : Array (String × String)) : Property :=
   Property.stylePairs entries
@@ -411,29 +411,75 @@ def bodyStyle : Property := style #[
   ("minWidth", "0")
 ]
 
-def deviceStyle : Property := style #[
-  ("display", "grid"),
-  ("placeItems", "center"),
-  ("minHeight", "118px"),
-  ("border", "1px solid #8ba58c"),
-  ("borderRadius", "18px"),
-  ("background", "#bfd9bd"),
-  ("padding", "14px")
-]
+def petShell : Tamagotchi.Mood → String
+  | .hungry => "#d68f3b"
+  | .sleepy => "#6083b8"
+  | .asleep => "#6083b8"
+  | .angry => "#bd3c38"
+  | .dead => "#70736f"
+  | _ => "#d8505d"
 
-def screenStyle : Property := style #[
-  ("display", "grid"),
-  ("placeItems", "center"),
-  ("gap", "6px"),
-  ("minWidth", "150px"),
-  ("minHeight", "76px"),
-  ("border", "2px solid #425747"),
-  ("borderRadius", "10px"),
-  ("background", "#d9edc7"),
-  ("color", "#17201a"),
-  ("fontWeight", "800"),
-  ("textAlign", "center")
-]
+def petShellDark : Tamagotchi.Mood → String
+  | .hungry => "#946026"
+  | .sleepy => "#354f79"
+  | .asleep => "#354f79"
+  | .angry => "#782523"
+  | .dead => "#444946"
+  | _ => "#9f303b"
+
+def petScreen : Tamagotchi.Mood → String
+  | .hungry => "#f1e2b6"
+  | .sleepy => "#d8e4f4"
+  | .asleep => "#d8e4f4"
+  | .angry => "#f1d3bf"
+  | .dead => "#d8ded2"
+  | _ => "#d9edc7"
+
+def petInk (artwork : String) : String :=
+  if Tamagotchi.normalizeArtwork artwork == "octopus" then "#314f78" else "#1e3328"
+
+def deviceStyle (state : Tamagotchi.PetState) : Property :=
+  let shell := petShell state.mood
+  let shellDark := petShellDark state.mood
+  style #[
+    ("position", "relative"),
+    ("width", "126px"),
+    ("height", "154px"),
+    ("margin", "0 auto"),
+    ("border", "3px solid #6d2b34"),
+    ("borderRadius", "52% 52% 44% 44% / 58% 58% 42% 42%"),
+    ("background",
+      "radial-gradient(circle at 32% 18%, rgba(255, 255, 255, 0.46) 0 12%, transparent 13%), " ++
+      "linear-gradient(145deg, #f06b73 0%, " ++ shell ++ " 58%, " ++ shellDark ++ " 100%)"),
+    ("boxShadow", "inset 0 -10px 0 rgba(0, 0, 0, 0.08), 0 12px 18px rgba(52, 64, 54, 0.14)"),
+    ("filter", if state.mood == .dead then "saturate(0.35)" else "none"),
+    ("padding", "0")
+  ]
+
+def screenStyle (state : Tamagotchi.PetState) : Property :=
+  let screen := petScreen state.mood
+  style #[
+    ("position", "absolute"),
+    ("top", "32px"),
+    ("left", "21px"),
+    ("right", "21px"),
+    ("height", "72px"),
+    ("display", "grid"),
+    ("placeItems", "center"),
+    ("gap", "2px"),
+    ("overflow", "hidden"),
+    ("border", "3px solid #263d2c"),
+    ("borderRadius", "10px"),
+    ("background",
+      "linear-gradient(rgba(38, 61, 44, 0.07) 1px, transparent 1px), " ++
+      "linear-gradient(90deg, rgba(38, 61, 44, 0.07) 1px, transparent 1px), " ++ screen),
+    ("backgroundSize", "10px 10px"),
+    ("boxShadow", "inset 0 0 0 2px rgba(255, 255, 255, 0.34)"),
+    ("color", "#17201a"),
+    ("fontWeight", "800"),
+    ("fontSize", "0.68rem"),
+    ("textAlign", "center")
+  ]
 
 def statGridStyle : Property := style #[
   ("display", "grid"),
@@ -477,41 +523,231 @@ def summaryStyle : Property := style #[
   ("overflowWrap", "anywhere")
 ]
 
-def emptySpan (classes : Array String) : ReactM (Lean.Vir.Js Node) :=
+def emptySpanWith (classes : Array String) (props : Array Property) : ReactM (Lean.Vir.Js Node) :=
   Node.spanWith
-    #[Property.classList classes, Property.ariaHidden true]
+    (#[Property.classList classes, Property.ariaHidden true] ++ props)
     #[]
     #[]
 
-def pixelPet : ReactM (Lean.Vir.Js Node) := do
-  let earLeft ← emptySpan #["pet-ear", "pet-ear-left"]
-  let earRight ← emptySpan #["pet-ear", "pet-ear-right"]
-  let body ← emptySpan #["pet-body"]
-  let tentacle1 ← emptySpan #["pet-tentacle", "pet-tentacle-1"]
-  let tentacle2 ← emptySpan #["pet-tentacle", "pet-tentacle-2"]
-  let tentacle3 ← emptySpan #["pet-tentacle", "pet-tentacle-3"]
-  let tentacle4 ← emptySpan #["pet-tentacle", "pet-tentacle-4"]
-  let tentacle5 ← emptySpan #["pet-tentacle", "pet-tentacle-5"]
-  let eyeLeft ← emptySpan #["pet-eye", "pet-eye-left"]
-  let eyeRight ← emptySpan #["pet-eye", "pet-eye-right"]
-  let mouth ← emptySpan #["pet-mouth"]
-  let signal ← emptySpan #["pet-signal"]
+def emptySpan (classes : Array String) : ReactM (Lean.Vir.Js Node) :=
+  emptySpanWith classes #[]
+
+def pixelPart (classes : Array String) (entries : Array (String × String)) : ReactM (Lean.Vir.Js Node) :=
+  emptySpanWith classes #[style entries]
+
+def petPixelStyle : Property := style #[
+  ("position", "relative"),
+  ("width", "60px"),
+  ("height", "54px"),
+  ("margin", "0 auto")
+]
+
+def bodyStyleFor (state : Tamagotchi.PetState) (ink : String) : Array (String × String) :=
+  if Tamagotchi.normalizeArtwork state.artwork == "octopus" then
+    #[
+      ("position", "absolute"),
+      ("left", "14px"),
+      ("top", "9px"),
+      ("width", "32px"),
+      ("height", "30px"),
+      ("borderRadius", "48% 48% 42% 42%"),
+      ("background", ink)
+    ]
+  else
+    #[
+      ("position", "absolute"),
+      ("left", "11px"),
+      ("top", "15px"),
+      ("width", "38px"),
+      ("height", "31px"),
+      ("borderRadius", "9px 9px 12px 12px"),
+      ("background", ink)
+    ]
+
+def eyeStyleFor (state : Tamagotchi.PetState) (screen : String) (left : Bool) : Array (String × String) :=
+  let artwork := Tamagotchi.normalizeArtwork state.artwork
+  let baseLeft := if artwork == "octopus" then "23px" else "22px"
+  let baseRight := if artwork == "octopus" then "23px" else "22px"
+  let baseTop := if artwork == "octopus" then "20px" else "25px"
+  let moodShape :=
+    match state.mood with
+    | .angry => #[("width", "8px"), ("height", "3px"), ("transform", if left then "rotate(18deg)" else "rotate(-18deg)")]
+    | .dead => #[("width", "9px"), ("height", "2px"), ("transform", "rotate(45deg)")]
+    | _ => #[("width", "5px"), ("height", "5px")]
+  #[
+    ("position", "absolute"),
+    ("top", baseTop),
+    (if left then ("left", baseLeft) else ("right", baseRight)),
+    ("background", screen),
+    ("borderRadius", "1px")
+  ] ++ moodShape
+
+def mouthStyleFor (state : Tamagotchi.PetState) (screen : String) : Array (String × String) :=
+  let artwork := Tamagotchi.normalizeArtwork state.artwork
+  let baseLeft := if artwork == "octopus" then "26px" else "25px"
+  let baseTop := if artwork == "octopus" then "29px" else "34px"
+  let sleepyLeft := "27px"
+  match state.mood with
+  | .sleepy | .asleep =>
+      #[
+        ("position", "absolute"),
+        ("left", sleepyLeft),
+        ("top", baseTop),
+        ("width", "7px"),
+        ("height", "7px"),
+        ("border", "2px solid " ++ screen),
+        ("borderRadius", "50%")
+      ]
+  | .angry =>
+      #[
+        ("position", "absolute"),
+        ("left", baseLeft),
+        ("top", if artwork == "octopus" then "31px" else "36px"),
+        ("width", "11px"),
+        ("height", "0"),
+        ("borderBottom", "2px solid " ++ screen),
+        ("borderRadius", "0")
+      ]
+  | .dead =>
+      #[
+        ("position", "absolute"),
+        ("left", baseLeft),
+        ("top", if artwork == "octopus" then "32px" else "38px"),
+        ("width", "11px"),
+        ("height", "0"),
+        ("borderBottom", "2px solid " ++ screen),
+        ("borderRadius", "0")
+      ]
+  | _ =>
+      #[
+        ("position", "absolute"),
+        ("left", baseLeft),
+        ("top", baseTop),
+        ("width", "11px"),
+        ("height", "6px"),
+        ("borderBottom", "2px solid " ++ screen),
+        ("borderRadius", "0 0 8px 8px")
+      ]
+
+def signalText : Tamagotchi.Mood → String
+  | .hungry => "!"
+  | .sleepy => "zz"
+  | .asleep => "zz"
+  | .angry => "!!"
+  | _ => ""
+
+def tentacle (index left transform : String) (ink : String) : ReactM (Lean.Vir.Js Node) :=
+  pixelPart #["pet-tentacle", "pet-tentacle-" ++ index] #[
+    ("position", "absolute"),
+    ("top", "34px"),
+    ("left", left),
+    ("width", "7px"),
+    ("height", "14px"),
+    ("background", ink),
+    ("borderRadius", "0 0 7px 7px"),
+    ("transform", transform)
+  ]
+
+def foot (left : String) (ink : String) : ReactM (Lean.Vir.Js Node) :=
+  pixelPart #["pet-foot"] #[
+    ("position", "absolute"),
+    ("left", left),
+    ("top", "43px"),
+    ("width", "10px"),
+    ("height", "7px"),
+    ("background", ink),
+    ("borderRadius", "0 0 5px 5px")
+  ]
+
+def pixelPet (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
+  let artwork := Tamagotchi.normalizeArtwork state.artwork
+  let ink := petInk artwork
+  let screen := petScreen state.mood
+  let body ← pixelPart #["pet-body"] (bodyStyleFor state ink)
+  let eyeLeft ← pixelPart #["pet-eye", "pet-eye-left"] (eyeStyleFor state screen true)
+  let eyeRight ← pixelPart #["pet-eye", "pet-eye-right"] (eyeStyleFor state screen false)
+  let mouth ← pixelPart #["pet-mouth"] (mouthStyleFor state screen)
+  let signalText ← Node.text (signalText state.mood)
+  let signal ←
+    Node.spanWith
+      #[
+        Property.classList #["pet-signal"],
+        Property.ariaHidden true,
+        style #[
+          ("position", "absolute"),
+          ("top", "0"),
+          ("right", "2px"),
+          ("color", ink),
+          ("fontFamily", "SFMono-Regular, Consolas, Liberation Mono, monospace"),
+          ("fontSize", "0.82rem"),
+          ("fontWeight", "900"),
+          ("lineHeight", "1")
+        ]
+      ]
+      #[]
+      #[signalText]
+  let children ←
+    if artwork == "octopus" then do
+      let tentacle1 ← tentacle "1" "13px" "rotate(12deg)" ink
+      let tentacle2 ← tentacle "2" "21px" "none" ink
+      let tentacle3 ← tentacle "3" "29px" "none" ink
+      let tentacle4 ← tentacle "4" "37px" "none" ink
+      let tentacle5 ← tentacle "5" "45px" "rotate(-12deg)" ink
+      pure #[body, tentacle1, tentacle2, tentacle3, tentacle4, tentacle5, eyeLeft, eyeRight, mouth, signal]
+    else do
+      let earLeft ← pixelPart #["pet-ear", "pet-ear-left"] #[
+        ("position", "absolute"),
+        ("top", "7px"),
+        ("left", "14px"),
+        ("width", "12px"),
+        ("height", "12px"),
+        ("background", ink),
+        ("transform", "rotate(45deg)")
+      ]
+      let earRight ← pixelPart #["pet-ear", "pet-ear-right"] #[
+        ("position", "absolute"),
+        ("top", "7px"),
+        ("right", "14px"),
+        ("width", "12px"),
+        ("height", "12px"),
+        ("background", ink),
+        ("transform", "rotate(45deg)")
+      ]
+      let footLeft ← foot "17px" ink
+      let footRight ← foot "33px" ink
+      pure #[earLeft, earRight, body, footLeft, footRight, eyeLeft, eyeRight, mouth, signal]
   Node.divWith
-    #[Property.classList #["pet-pixel-pet"], Property.ariaHidden true]
+    #[Property.classList #["pet-pixel-pet"], Property.ariaHidden true, petPixelStyle]
     #[]
-    #[earLeft, earRight, body, tentacle1, tentacle2, tentacle3, tentacle4,
-      tentacle5, eyeLeft, eyeRight, mouth, signal]
+    children
+
+def deviceButtonStyle (left right : Option String) : Property :=
+  let horizontal :=
+    match left, right with
+    | some value, _ => #[("left", value)]
+    | none, some value => #[("right", value)]
+    | none, none => #[]
+  style <| #[
+    ("position", "absolute"),
+    ("bottom", "18px"),
+    ("width", "16px"),
+    ("height", "16px"),
+    ("border", "2px solid #6d2b34"),
+    ("borderRadius", "50%"),
+    ("background", "#ffe6c9"),
+    ("boxShadow", "inset 0 -3px 0 rgba(109, 43, 52, 0.16)")
+  ] ++ horizontal
 
 def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
   let artwork := Tamagotchi.normalizeArtwork state.artwork
   let moodLabel := state.mood.label
-  let pet ← pixelPet
+  let pet ← pixelPet state
   let screenLabelText ← Node.text (displayName state ++ " / " ++ moodLabel)
   let screenLabel ← Node.spanWith #[] #[] #[screenLabelText]
-  let screen ← Node.divWith #[Property.classList #["pet-screen"], screenStyle] #[] #[pet, screenLabel]
-  let leftButton ← emptySpan #["pet-device-button", "pet-device-button-left"]
-  let centerButton ← emptySpan #["pet-device-button", "pet-device-button-center"]
-  let rightButton ← emptySpan #["pet-device-button", "pet-device-button-right"]
+  let screen ← Node.divWith #[Property.classList #["pet-screen"], screenStyle state] #[] #[pet, screenLabel]
+  let leftButton ← emptySpanWith #["pet-device-button", "pet-device-button-left"] #[deviceButtonStyle (some "30px") none]
+  let centerButton ← emptySpanWith #["pet-device-button", "pet-device-button-center"] #[deviceButtonStyle (some "55px") none]
+  let rightButton ← emptySpanWith #["pet-device-button", "pet-device-button-right"] #[deviceButtonStyle none (some "30px")]
   Node.divWith
     #[
       Property.id "react-pet-device",
@@ -520,7 +756,7 @@ def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
       Property.ariaLabel s!"{Tamagotchi.artLabel artwork} {displayName state} mood {moodLabel}",
       Property.data "art" artwork,
       Property.data "mood" moodLabel,
-      deviceStyle
+      deviceStyle state
     ]
     #[]
     #[screen, leftButton, centerButton, rightButton]

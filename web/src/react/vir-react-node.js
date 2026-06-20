@@ -79,22 +79,26 @@ function createReactRootResource(resources, hooks, adapter) {
       currentComponent = null;
     },
     renderComponent(renderCallback) {
-      const component = adapter.createComponent(
-        resources,
-        hooks,
-        renderCallback,
-        (node) => resolveRenderedReactNodeValue(resources, node),
-        (node) => queueReactNodeRelease(resources, node, hooks),
-        value);
+      const component =
+        currentComponent === null
+          ? adapter.createComponent(
+              resources,
+              hooks,
+              renderCallback,
+              (node) => resolveRenderedReactNodeValue(resources, node),
+              (node) => queueReactNodeRelease(resources, node, hooks),
+              value)
+          : currentComponent.updateRenderCallback(renderCallback);
       try {
         adapter.commitComponent(value, component);
       } catch (error) {
-        component.dispose();
+        if (component !== currentComponent) {
+          component.dispose();
+        }
         throw error;
       }
       queueReactNodeRelease(resources, currentNode, hooks);
       currentNode = null;
-      disposeReactComponent(currentComponent);
       currentComponent = component;
     },
     unmount: once(() => {
@@ -454,6 +458,17 @@ function createReactComponentResource(
         }
       });
     },
+    updateRenderCallback(nextRenderCallback) {
+      if (disposed) {
+        releaseReactRenderCallback(nextRenderCallback);
+        throw new Error("React component has been disposed");
+      }
+      requireReactComponentRenderCallback(nextRenderCallback);
+      const previousRenderCallback = renderCallback;
+      renderCallback = nextRenderCallback;
+      previousRenderCallback.release();
+      return component;
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -464,6 +479,12 @@ function createReactComponentResource(
     },
   };
   return component;
+}
+
+function releaseReactRenderCallback(renderCallback) {
+  if (typeof renderCallback?.release === "function") {
+    renderCallback.release();
+  }
 }
 
 function disposeReactComponent(component) {

@@ -155,23 +155,24 @@ function createReactRootResource(resources, hooks, adapter) {
       currentComponent = null;
     },
     renderComponent(renderCallback) {
-      const component = adapter.createComponent(
+      const component = currentComponent === null ? adapter.createComponent(
         resources,
         hooks,
         renderCallback,
         (node) => resolveRenderedReactNodeValue(resources, node),
         (node) => queueReactNodeRelease(resources, node, hooks),
         value
-      );
+      ) : currentComponent.updateRenderCallback(renderCallback);
       try {
         adapter.commitComponent(value, component);
       } catch (error) {
-        component.dispose();
+        if (component !== currentComponent) {
+          component.dispose();
+        }
         throw error;
       }
       queueReactNodeRelease(resources, currentNode, hooks);
       currentNode = null;
-      disposeReactComponent(currentComponent);
       currentComponent = component;
     },
     unmount: once2(() => {
@@ -450,6 +451,17 @@ function createReactComponentResource(resources, renderCallback, hookRuntime, re
         }
       });
     },
+    updateRenderCallback(nextRenderCallback) {
+      if (disposed) {
+        releaseReactRenderCallback(nextRenderCallback);
+        throw new Error("React component has been disposed");
+      }
+      requireReactComponentRenderCallback(nextRenderCallback);
+      const previousRenderCallback = renderCallback;
+      renderCallback = nextRenderCallback;
+      previousRenderCallback.release();
+      return component;
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -460,6 +472,11 @@ function createReactComponentResource(resources, renderCallback, hookRuntime, re
     }
   };
   return component;
+}
+function releaseReactRenderCallback(renderCallback) {
+  if (typeof renderCallback?.release === "function") {
+    renderCallback.release();
+  }
 }
 function disposeReactComponent(component) {
   if (component !== null && component !== void 0) {

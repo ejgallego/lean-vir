@@ -255,6 +255,11 @@ The browser React host binding is exposed from
 - `react.root.renderComponent` wraps a Lean thunk produced from
   `Component props` plus concrete props in a JavaScript React function
   component and invokes `root.render(...)` with that component.
+- Repeated `react.root.renderComponent` or
+  `react.root.renderComponentIntoSelector` calls on the same root update the
+  Lean render callback while keeping the same JavaScript component identity, so
+  React hook state is preserved across prop-only rerenders such as infoview
+  cursor changes.
 - `react.useState` calls `React.useState` while rendering a component. Its ABI
   is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
 - `react.useEffect` calls `React.useEffect` while rendering a component. The

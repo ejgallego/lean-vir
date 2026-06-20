@@ -297,7 +297,7 @@ export async function smokeVirtualReactTamagotchi(runtime, documentState, select
     const element = documentState.elements.get(selector);
     assertLiveCallbacks(runtime, 13);
     assert.equal(intervals.size, 1);
-    assert.equal(onlyInterval(intervals).delayMs, 1000);
+    assert.equal(onlyInterval(intervals).delayMs, 50000);
     const widget = reactElementById(element, "react-pet-widget");
     assert.equal(widget.props["data-mood"], "happy");
     if (extended) {
@@ -336,6 +336,14 @@ export async function smokeVirtualReactTamagotchi(runtime, documentState, select
     reactElementById(element, "react-pet-name-input").handlers.onChange(createVirtualEventState({
       currentTarget: createVirtualElementState({ value: "Ada" }),
     }));
+    assertLiveCallbacks(runtime, 13);
+    assert.equal(intervals.size, 1);
+    assert.equal(
+      virtualReactTextContent(reactElementById(element, "react-pet-summary")),
+      "Ada is hungry; last rename; care 2/5; turn 1",
+    );
+    assert.equal(runtime.call("ReactTamagotchi.mount", selector), true);
+    await flushMicrotasks();
     assertLiveCallbacks(runtime, 13);
     assert.equal(intervals.size, 1);
     assert.equal(
@@ -382,7 +390,7 @@ export async function smokeVirtualReactTamagotchi(runtime, documentState, select
   });
 }
 
-export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
+export async function smokeVirtualReactProofWidget(runtime, documentState, selector) {
   const proofSurfaceFixture = createProofSurfaceFixture();
   assert.equal(runtime.call("ReactProofWidget.mount", selector, proofSurfaceFixture), true);
   const element = documentState.elements.get(selector);
@@ -516,6 +524,7 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
   const movedProofSurfaceFixture = createMovedProofSurfaceFixture(proofSurfaceFixture);
   assert.equal(runtime.call("ReactProofWidget.mount", selector, movedProofSurfaceFixture), true);
   assert.equal(element.reactRoot, root);
+  await flushMicrotasks();
   assertLiveCallbacks(runtime, 10);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-summary")),
@@ -526,12 +535,13 @@ export function smokeVirtualReactProofWidget(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactProofWidget.unmount", selector), false);
 }
 
-export function smokeVirtualReactProofWidgetHello(runtime, documentState, selector) {
+export async function smokeVirtualReactProofWidgetHello(runtime, documentState, selector) {
   const proofSurfaceFixture = createProofSurfaceFixture();
   const legacyProofSurfaceFixture = { ...proofSurfaceFixture };
   delete legacyProofSurfaceFixture.proofWidgetsExpr;
   assert.equal(runtime.call("ReactProofWidgetHello.mount", selector, legacyProofSurfaceFixture), true);
   assert.equal(runtime.call("ReactProofWidgetHello.mount", selector, proofSurfaceFixture), true);
+  await flushMicrotasks();
   const element = documentState.elements.get(selector);
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-hello-title")),
@@ -568,6 +578,7 @@ export function smokeVirtualReactProofWidgetHello(runtime, documentState, select
     ],
   };
   assert.equal(runtime.call("ReactProofWidgetHello.mount", selector, movedProofSurfaceFixture), true);
+  await flushMicrotasks();
   assert.equal(
     virtualReactTextContent(reactElementById(element, "react-proof-hello-summary")),
     "case main - active",
