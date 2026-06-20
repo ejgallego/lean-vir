@@ -48,21 +48,22 @@ reference-shaped interactive case:
 - an uppercase `MarkdownDisplay`-shaped component with props;
 - a small callback to keep handler coverage in the same fixture;
 - an `InteractiveExpr`-shaped component whose props carry
-  `WithRpcRef ExprPreview` and whose click handler calls
-  `ProofWidgets.Rpc.inspect`.
+  `WithRpcRef ExprWithCtx` and whose click handler calls
+  `ProofWidgets.Rpc.resolve`.
 
 The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
 `WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and `Rpc.resolveRef`. The
 browser/virtual hosts normalize the reference descriptor behind
 `proofwidgets.rpc.resolveRef`; in the infoview, that host action calls
 `Lean.Vir.Infoview.resolveProofWidgetsRpcRef`, which is a snapshot-backed server
-RPC returning the active source position, package revision, and a simple
-known-constant check for the reference id. The `InteractiveExpr`-shaped demo
-uses ordinary React state to render the async result from the callback, keeping
-the component behavior close to a JavaScript React component. This proves the
-typed prop, host-dispatch, component-state, and infoview RPC round trip needed
-by an `InteractiveExpr`-style port, but it is not yet real `ExprWithCtx.save`,
-proof-script editing, or the full ProofWidgets RPC request model.
+RPC returning expression/type/context text, the active source position, package
+revision, a revision-scoped store key, and a simple known-constant check for
+the reference id. The `InteractiveExpr`-shaped demo uses ordinary React state
+to render the async result from the callback, keeping the component behavior
+close to a JavaScript React component. This proves the typed prop,
+host-dispatch, component-state, and infoview RPC round trip needed by an
+`InteractiveExpr`-style port. The current store is still descriptor-seeded; it
+is not yet proof-script editing or the full ProofWidgets RPC request model.
 
 Before attempting a port, keep the authoring model shallow and familiar:
 
@@ -77,8 +78,9 @@ Known first-slice limits:
 - Attribute values are `Lean.Vir.React.Property`, not arbitrary JSON props.
 - JSX syntax is intentionally deferred; `ProofWidgetsJsxSubset.lean` keeps the
   porting shape as explicit combinators for now.
-- The upstream `InteractiveExpr` example still needs real `ExprWithCtx` storage
-  and rendering before it can be considered faithfully ported.
+- The upstream `InteractiveExpr` example still needs elaborator-backed
+  `ExprWithCtx` objects and rendering before it can be considered faithfully
+  ported.
 
 ## External JavaScript Libraries
 

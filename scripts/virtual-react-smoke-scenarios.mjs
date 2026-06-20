@@ -243,7 +243,7 @@ export function smokeVirtualProofWidgetsJsxSubset(runtime, documentState, select
   interactive.handlers.onClick({});
   assert.equal(
     virtualReactTextContent(reactElementById(element, "proofwidgets-jsx-interactive-status")),
-    " resolved reference at virtual",
+    " resolved fun x => x + 1 : Nat -> Nat at virtual",
   );
   assert.deepEqual(documentState.infoviewCommands, [
     {
@@ -253,15 +253,22 @@ export function smokeVirtualProofWidgetsJsxSubset(runtime, documentState, select
         label: "fun x => x + 1",
         typeName: "ExprWithCtx",
         summary: "A sample expression reference from the JSX subset demo.",
+        expression: "fun x => x + 1",
+        typeText: "Nat -> Nat",
+        context: "",
       },
       result: {
         id: "jsx-demo.expr.successor",
         label: "fun x => x + 1",
         typeName: "ExprWithCtx",
         summary: "A sample expression reference from the JSX subset demo.",
+        expression: "fun x => x + 1",
+        typeText: "Nat -> Nat",
+        context: "",
         source: "virtual",
         position: "virtual",
         packageRevision: "virtual",
+        storeKey: "virtual:jsx-demo.expr.successor",
         knownConstant: false,
       },
     },

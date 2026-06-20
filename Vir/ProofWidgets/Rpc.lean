@@ -21,6 +21,9 @@ structure RpcRef where
   label : String
   typeName : String
   summary : String
+  expression : String
+  typeText : String
+  context : String
   deriving Repr
 
 /--
@@ -35,17 +38,22 @@ structure ResolvedRef where
   label : String
   typeName : String
   summary : String
+  expression : String
+  typeText : String
+  context : String
   source : String
   position : String
   packageRevision : String
+  storeKey : String
   knownConstant : Bool
   deriving Repr
 
 namespace ResolvedRef
 
 def statusText (info : ResolvedRef) : String :=
-  let kind := if info.knownConstant then "known constant" else "reference"
-  "resolved " ++ kind ++ " at " ++ info.position
+  let expression := if info.expression == "" then info.label else info.expression
+  let typeText := if info.typeText == "" then "" else " : " ++ info.typeText
+  "resolved " ++ expression ++ typeText ++ " at " ++ info.position
 
 end ResolvedRef
 
@@ -70,18 +78,22 @@ layer grows real expression storage.
 structure ExprWithCtx where
   code : String
   typeText : String
+  context : String
   deriving Repr
 
 namespace ExprWithCtx
 
-def save (id code typeText summary : String) : WithRpcRef ExprWithCtx :=
+def save (id code typeText summary : String) (context : String := "") : WithRpcRef ExprWithCtx :=
   {
-    value := { code, typeText },
+    value := { code, typeText, context },
     ref := {
       id
       label := code
       typeName := "ExprWithCtx"
       summary
+      expression := code
+      typeText
+      context
     }
   }
 

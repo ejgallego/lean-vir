@@ -301,6 +301,9 @@ export function normalizeProofWidgetsRpcRef(ref) {
     label: stringField(ref.label),
     typeName: stringField(ref.typeName),
     summary: stringField(ref.summary),
+    expression: stringField(ref.expression),
+    typeText: stringField(ref.typeText),
+    context: stringField(ref.context),
   };
 }
 
@@ -314,6 +317,7 @@ function virtualProofWidgetsRpcRefInfo(ref) {
     source: "virtual",
     position: "virtual",
     packageRevision: "virtual",
+    storeKey: `virtual:${ref.id}`,
     knownConstant: false,
   };
 }

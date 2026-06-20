@@ -35,21 +35,12 @@ const statusStyle = {
   fontSize: "0.82rem",
 };
 
-const rpcRefStatusStyle = {
-  ...statusStyle,
-  padding: "0.45rem 0.55rem",
-  border: "1px solid var(--vscode-editorWidget-border, #d0d7de)",
-  borderRadius: "6px",
-  background: "var(--vscode-textCodeBlock-background, #f6f8fa)",
-};
-
 export default function VirInfoviewWidget(props) {
   const rpcSession = useRpcSession();
   const editorConnection = React.useContext(EditorContext);
   const rpcSessionRef = React.useRef(rpcSession);
   const editorConnectionRef = React.useRef(editorConnection);
   const [status, setStatus] = React.useState({ kind: "loading", message: "Loading VIR widget..." });
-  const [rpcRefInfo, setRpcRefInfo] = React.useState(null);
   const [mountId] = React.useState(() => freshMountId(props.mountId));
   const loadedRef = React.useRef(null);
   const [reloadToken, setReloadToken] = React.useState(0);
@@ -232,19 +223,6 @@ export default function VirInfoviewWidget(props) {
     }
   }, [runtimeToken, surfaceKey, mountId]);
 
-  React.useEffect(() => {
-    const loaded = loadedRef.current;
-    if (loaded === null) {
-      return undefined;
-    }
-    setRpcRefInfo(null);
-    const listener = (info) => setRpcRefInfo(info);
-    loaded.service.proofWidgetsRpcRefListeners.add(listener);
-    return () => {
-      loaded.service.proofWidgetsRpcRefListeners.delete(listener);
-    };
-  }, [runtimeToken]);
-
   return e(
     "section",
     {
@@ -264,13 +242,6 @@ export default function VirInfoviewWidget(props) {
     status.kind === "ready"
       ? null
       : e("pre", { className: "vir-infoview-widget-status", style: statusStyle }, status.message),
-    rpcRefInfo === null
-      ? null
-      : e(
-          "pre",
-          { className: "vir-infoview-widget-rpc-status", style: rpcRefStatusStyle },
-          formatProofWidgetsRpcRefInfo(rpcRefInfo),
-        ),
   );
 }
 
@@ -721,7 +692,6 @@ async function createRuntimeService({
     throw new Error("VIR runtime module does not export createVirRuntime");
   }
   const runtimeOptions = await loadRuntimeOptionsFromSources({ rpcSession, sources });
-  const proofWidgetsRpcRefListeners = new Set();
   runtimeOptions.defaultHostBindings = (runtimeRef) => createBrowserHostBindings({
     runtimeRef,
     infoviewCommandDispatcher: createInfoviewCommandDispatcher({
@@ -729,7 +699,6 @@ async function createRuntimeService({
       rpcSession,
       position: config.position,
       packageRevision: sources.packageSource.revision ?? "",
-      onProofWidgetsRpcRefInfo: (info) => notifyProofWidgetsRpcRefListeners(proofWidgetsRpcRefListeners, info),
     }),
     reactHostBindings: createBrowserReactHostBindings,
   });
@@ -740,7 +709,6 @@ async function createRuntimeService({
     packageRevision: sources.packageSource.revision ?? "",
     idleTimer: null,
     lastUsed: Date.now(),
-    proofWidgetsRpcRefListeners,
     stale: false,
     disposed: false,
     runtime: await createVirRuntime(runtimeOptions),
@@ -752,21 +720,12 @@ function createInfoviewCommandDispatcher({
   rpcSession = null,
   position = null,
   packageRevision = "",
-  onProofWidgetsRpcRefInfo = null,
 }) {
   const resolveRef = (ref) => {
     if (rpcSession === null || typeof rpcSession.call !== "function" || position === null) {
       return false;
     }
-    return resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision)
-      .then((info) => {
-        if (typeof onProofWidgetsRpcRefInfo === "function") {
-          onProofWidgetsRpcRefInfo(info);
-        } else {
-          console.info("VIR ProofWidgets RPC reference", info);
-        }
-        return info;
-      });
+    return resolveProofWidgetsRpcRef(rpcSession, ref, position, packageRevision);
   };
   return {
     revealPosition(position) {
@@ -788,23 +747,15 @@ function createInfoviewCommandDispatcher({
       if (result === false) {
         return false;
       }
-      result.catch((error) => {
+      result.then((info) => {
+        console.info("VIR ProofWidgets RPC reference", info);
+      }).catch((error) => {
         console.error(error);
       });
       return true;
     },
     proofwidgetsRpcResolveRef: resolveRef,
   };
-}
-
-function notifyProofWidgetsRpcRefListeners(listeners, info) {
-  for (const listener of Array.from(listeners)) {
-    try {
-      listener(info);
-    } catch (error) {
-      console.error(error);
-    }
-  }
 }
 
 function retainRuntimeService(service) {
@@ -1126,22 +1077,15 @@ function proofWidgetsRpcRefInfo(response, ref) {
     label: optionalString(response?.label, "proofwidgets rpc ref label"),
     typeName: optionalString(response?.typeName, "proofwidgets rpc ref typeName"),
     summary: optionalString(response?.summary, "proofwidgets rpc ref summary"),
+    expression: optionalString(response?.expression, "proofwidgets rpc ref expression"),
+    typeText: optionalString(response?.typeText, "proofwidgets rpc ref typeText"),
+    context: optionalString(response?.context, "proofwidgets rpc ref context"),
     source: requiredString(response?.source, "proofwidgets rpc ref source"),
     position: requiredString(response?.position, "proofwidgets rpc ref position"),
     packageRevision: optionalString(response?.packageRevision, "proofwidgets rpc ref packageRevision"),
+    storeKey: optionalString(response?.storeKey, "proofwidgets rpc ref storeKey"),
     knownConstant: requiredBoolean(response?.knownConstant, "proofwidgets rpc ref knownConstant"),
   };
-}
-
-function formatProofWidgetsRpcRefInfo(info) {
-  const title = info.label.length === 0 ? info.id : info.label;
-  return [
-    `ProofWidgets RPC: ${title}`,
-    `type: ${info.typeName || "(unknown)"}`,
-    `source: ${info.position}`,
-    `known constant: ${info.knownConstant ? "yes" : "no"}`,
-    `revision: ${info.packageRevision || "(none)"}`,
-  ].join("\n");
 }
 
 function irPackageStatInfo(response, roots) {

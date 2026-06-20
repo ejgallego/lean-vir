@@ -181,8 +181,9 @@ A realistic path has three layers:
    `InteractiveExpr`-shaped component props can cross the Lean/JS boundary and
    update component-owned React state from an async callback.
    `Vir.Infoview.ProofWidgetsRpc` resolves those descriptors through the active
-   Lean server snapshot and returns source/revision metadata, while real
-   `ExprWithCtx` storage and edit commands remain future work.
+   Lean server snapshot and stores expression/type/context metadata under a
+   package-revision-scoped key, while elaborator-backed `ExprWithCtx` objects
+   and edit commands remain future work.
 
 ## Porting Targets
 
@@ -193,7 +194,7 @@ enough to prevent us from designing an API in a vacuum:
 1. `ProofWidgets/Demos/Jsx.lean`: verifies JSX-like Lean syntax, lowercase HTML
    tags, string/JSON attributes, children interpolation, and uppercase component
    embedding. The current combinator-only fixture also includes the first
-   `InteractiveExpr`-shaped `WithRpcRef`/`inspectRef` case.
+   `InteractiveExpr`-shaped `WithRpcRef`/`resolveRef` case.
 2. `ProofWidgets/Component/HtmlDisplay.lean` and
    `ProofWidgets/Data/Html.lean`: verify the core `Html` and component-node
    encoding.

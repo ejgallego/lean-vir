@@ -96,6 +96,7 @@ const rpcSession = {
         source: "examples/ReactProofWidget.lean",
         position: `ReactProofWidget.lean:${params.pos.line + 1}:${params.pos.character + 1}`,
         packageRevision: params.packageRevision,
+        storeKey: `${params.packageRevision}:${params.ref.id}`,
         knownConstant: params.ref.id === "ReactProofWidget.mount",
       };
     }
@@ -251,6 +252,9 @@ assert.deepEqual(
       label: "mount",
       typeName: "Const",
       summary: "resolve smoke",
+      expression: "ReactProofWidget.mount",
+      typeText: "String -> Surface -> DomM Bool",
+      context: "",
     },
     { line: 4, character: 2 },
     "package-smoke",
@@ -260,9 +264,13 @@ assert.deepEqual(
     label: "mount",
     typeName: "Const",
     summary: "resolve smoke",
+    expression: "ReactProofWidget.mount",
+    typeText: "String -> Surface -> DomM Bool",
+    context: "",
     source: "examples/ReactProofWidget.lean",
     position: "ReactProofWidget.lean:5:3",
     packageRevision: "package-smoke",
+    storeKey: "package-smoke:ReactProofWidget.mount",
     knownConstant: true,
   },
 );
@@ -379,10 +387,6 @@ const irPackageServiceConfig = {
   setupHint: "",
 };
 const irPackageFirstService = await loadRuntimeService({ rpcSession, config: irPackageServiceConfig });
-let resolvedRpcRefInfo = null;
-irPackageFirstService.proofWidgetsRpcRefListeners.add((info) => {
-  resolvedRpcRefInfo = info;
-});
 const resolvedBeforeHostInspect = resolvedRpcRefRequests.length;
 assert.equal(
   irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.inspectRef"]({
@@ -390,6 +394,9 @@ assert.equal(
     label: "mount",
     typeName: "Const",
     summary: "host binding smoke",
+    expression: "ReactProofWidget.mount",
+    typeText: "String -> Surface -> DomM Bool",
+    context: "",
   }),
   true,
 );
@@ -401,19 +408,12 @@ assert.deepEqual(resolvedRpcRefRequests.at(-1), {
     label: "mount",
     typeName: "Const",
     summary: "host binding smoke",
+    expression: "ReactProofWidget.mount",
+    typeText: "String -> Surface -> DomM Bool",
+    context: "",
   },
   pos: { line: 0, character: 0 },
   packageRevision: "ir-package-v1",
-});
-assert.deepEqual(resolvedRpcRefInfo, {
-  id: "ReactProofWidget.mount",
-  label: "mount",
-  typeName: "Const",
-  summary: "host binding smoke",
-  source: "examples/ReactProofWidget.lean",
-  position: "ReactProofWidget.lean:1:1",
-  packageRevision: "ir-package-v1",
-  knownConstant: true,
 });
 let resolvedCallbackInfo = null;
 let resolvedCallbackReleased = false;
@@ -431,6 +431,9 @@ assert.equal(
     label: "mount",
     typeName: "Const",
     summary: "host resolve smoke",
+    expression: "ReactProofWidget.mount",
+    typeText: "String -> Surface -> DomM Bool",
+    context: "",
   }, resolvedCallback),
   true,
 );
@@ -442,6 +445,9 @@ assert.deepEqual(resolvedRpcRefRequests.at(-1), {
     label: "mount",
     typeName: "Const",
     summary: "host resolve smoke",
+    expression: "ReactProofWidget.mount",
+    typeText: "String -> Surface -> DomM Bool",
+    context: "",
   },
   pos: { line: 0, character: 0 },
   packageRevision: "ir-package-v1",
@@ -451,9 +457,13 @@ assert.deepEqual(resolvedCallbackInfo, {
   label: "mount",
   typeName: "Const",
   summary: "host resolve smoke",
+  expression: "ReactProofWidget.mount",
+  typeText: "String -> Surface -> DomM Bool",
+  context: "",
   source: "examples/ReactProofWidget.lean",
   position: "ReactProofWidget.lean:1:1",
   packageRevision: "ir-package-v1",
+  storeKey: "ir-package-v1:ReactProofWidget.mount",
   knownConstant: true,
 });
 assert.equal(resolvedCallbackReleased, true);
