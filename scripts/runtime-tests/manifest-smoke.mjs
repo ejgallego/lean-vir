@@ -143,6 +143,14 @@ assert.equal(reactUseEffectImports[0]?.args[0]?.type?.kind, "function");
 assert.equal(reactUseEffectImports[0]?.args[0]?.type?.effect, "dom");
 assert.equal(reactUseEffectImports[0]?.args[1]?.type?.kind, "function");
 assert.equal(reactUseEffectImports[0]?.args[1]?.type?.effect, "dom");
+const reactUseEffectKeyImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useEffectKey");
+assert.equal(reactUseEffectKeyImports.length, 1);
+assert.equal(reactUseEffectKeyImports[0]?.effect, "react");
+assert.equal(reactUseEffectKeyImports[0]?.args[0]?.type?.type, "String");
+assert.equal(reactUseEffectKeyImports[0]?.args[1]?.type?.kind, "function");
+assert.equal(reactUseEffectKeyImports[0]?.args[1]?.type?.effect, "dom");
+assert.equal(reactUseEffectKeyImports[0]?.args[2]?.type?.kind, "function");
+assert.equal(reactUseEffectKeyImports[0]?.args[2]?.type?.effect, "dom");
 for (const target of [
   "js.string",
   "js.string.value",

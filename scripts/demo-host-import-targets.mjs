@@ -49,6 +49,7 @@ export const demoHostImportTargets = [
   "react.state.modify",
   "react.state.set",
   "react.useEffect",
+  "react.useEffectKey",
   "react.useState",
   "test.callNatCallback",
   "test.recordNat",

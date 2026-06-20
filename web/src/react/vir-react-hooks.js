@@ -53,6 +53,31 @@ export function createBrowserReactHookRuntime(resources, React) {
       }
       return undefined;
     },
+    useEffectKey(key, setup, cleanup) {
+      if (typeof React?.useEffect !== "function" || typeof React?.useRef !== "function") {
+        releaseEffectCallbacks(setup, cleanup);
+        throw new Error("React.useEffectKey requires React.useEffect and React.useRef");
+      }
+      const ref = React.useRef({ initialized: false, key: undefined });
+      const changed = !ref.current.initialized || !Object.is(ref.current.key, key);
+      const effect = changed ? createBrowserEffect(setup, cleanup) : () => undefined;
+      if (changed) {
+        ref.current.initialized = true;
+        ref.current.key = key;
+      } else {
+        releaseEffectCallbacks(setup, cleanup);
+      }
+      let registered = false;
+      try {
+        React.useEffect(effect, [key]);
+        registered = true;
+      } finally {
+        if (!registered && changed) {
+          releaseEffectCallbacks(setup, cleanup);
+        }
+      }
+      return undefined;
+    },
   };
 }
 
@@ -147,6 +172,31 @@ export function createVirtualReactHookRuntime(resources) {
       currentComponent.pendingEffects.push(hook);
       return undefined;
     },
+    useEffectKey(key, setup, cleanup) {
+      if (currentComponent === null) {
+        releaseEffectCallbacks(setup, cleanup);
+        throw new Error("React.useEffectKey can only be called while rendering a component");
+      }
+      const index = currentComponent.hookIndex++;
+      let hook = currentComponent.hooks[index];
+      if (hook === undefined) {
+        hook = createVirtualEffectHook();
+        currentComponent.hooks[index] = hook;
+      } else if (hook.kind !== "effect") {
+        releaseEffectCallbacks(setup, cleanup);
+        throw new Error("React hook order changed: expected useEffectKey");
+      }
+      if (hook.dependencyKey !== null && Object.is(hook.dependencyKey, key)) {
+        releaseEffectCallbacks(setup, cleanup);
+        return undefined;
+      }
+      releasePendingEffectCallbacks(hook);
+      hook.nextDependencyKey = key;
+      hook.nextSetup = setup;
+      hook.nextCleanup = cleanup;
+      currentComponent.pendingEffects.push(hook);
+      return undefined;
+    },
   };
 }
 
@@ -154,6 +204,7 @@ export function createReactStateHostBindings(resources, hookRuntime) {
   return {
     "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
+    "react.useEffectKey": (key, setup, cleanup) => hookRuntime.useEffectKey(String(key), setup, cleanup),
     "react.state.set": (setter, value) => setStateValue(resources, setter, value),
     "react.state.modify": (setter, update) => modifyStateValue(resources, setter, update),
   };
@@ -225,6 +276,8 @@ function createVirtualEffectHook() {
     setup: null,
     cleanup: null,
     resource: null,
+    dependencyKey: null,
+    nextDependencyKey: null,
     nextSetup: null,
     nextCleanup: null,
   };
@@ -233,8 +286,10 @@ function createVirtualEffectHook() {
 function runVirtualEffectHook(hook) {
   const setup = hook.nextSetup;
   const cleanup = hook.nextCleanup;
+  const dependencyKey = hook.nextDependencyKey;
   hook.nextSetup = null;
   hook.nextCleanup = null;
+  hook.nextDependencyKey = null;
   if (typeof setup !== "function" || typeof cleanup !== "function") {
     releaseEffectCallbacks(setup, cleanup);
     return undefined;
@@ -247,6 +302,7 @@ function runVirtualEffectHook(hook) {
   }
   hook.setup = setup;
   hook.cleanup = cleanup;
+  hook.dependencyKey = dependencyKey;
   let ready = false;
   try {
     hook.resource = setup();
@@ -257,6 +313,7 @@ function runVirtualEffectHook(hook) {
       hook.setup = null;
       hook.cleanup = null;
       hook.resource = null;
+      hook.dependencyKey = null;
     }
   }
   return undefined;
@@ -274,6 +331,7 @@ function cleanupVirtualEffectInstance(hook) {
   hook.setup = null;
   hook.cleanup = null;
   hook.resource = null;
+  hook.dependencyKey = null;
   if (typeof setup !== "function" || typeof cleanup !== "function") {
     releaseEffectCallbacks(setup, cleanup);
     return undefined;
@@ -291,6 +349,7 @@ function releasePendingEffectCallbacks(hook) {
   if (hook !== null && hook !== undefined) {
     hook.nextSetup = null;
     hook.nextCleanup = null;
+    hook.nextDependencyKey = null;
   }
   releaseEffectCallbacks(setup, cleanup);
 }

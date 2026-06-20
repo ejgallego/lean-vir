@@ -32,6 +32,16 @@ export function smokeVirtualReactCounter(runtime, documentState, selector) {
   assertUnmountCleanup(runtime, element);
 }
 
+export function smokeVirtualReactEffect(runtime, documentState, selector) {
+  assert.equal(runtime.call("ReactCounter.mountEffect", selector), true);
+  const element = documentState.elements.get(selector);
+  assert.equal(element.textContent, "react:effect");
+  assertLiveCallbacks(runtime, 3);
+  assert.equal(reactElementById(element, "react-effect-label").tag, "span");
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
 export function smokeVirtualReactInput(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactInput.mountInput", selector), true);
   const element = documentState.elements.get(selector);
@@ -306,6 +316,12 @@ export async function smokeVirtualReactTamagotchi(runtime, documentState, select
       assert.equal(device.props["data-art"], "octopus");
       assert.equal(device.props["data-mood"], "happy");
       assert.match(device.props["aria-label"], /Octopus Octi mood happy/);
+      assert.match(String(device.props.style?.background ?? ""), /linear-gradient/);
+      assert.equal(reactElementById(element, "react-pet-progress").props.role, "progressbar");
+      assert.equal(
+        reactElementById(element, "react-pet-progress-fill").props.style?.animation,
+        "virPetCountdown 50s linear forwards",
+      );
       const nameInput = reactElementById(element, "react-pet-name-input");
       assert.equal(nameInput.props.maxLength, 18);
       assert.equal(nameInput.props.autoComplete, "off");

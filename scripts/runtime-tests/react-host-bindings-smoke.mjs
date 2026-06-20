@@ -32,6 +32,7 @@ import {
   smokeVirtualReactChangeInput,
   smokeVirtualReactCheckbox,
   smokeVirtualReactCounter,
+  smokeVirtualReactEffect,
   smokeVirtualReactInput,
   smokeVirtualProofWidgetsHtml,
   smokeVirtualProofWidgetsJsxSubset,
@@ -160,6 +161,7 @@ const reactRuntime = await createVirRuntime({
 ensureVirtualElements(reactDocumentState, [
   "#react-static",
   "#react-counter",
+  "#react-effect",
   "#react-input",
   "#react-change",
   "#react-select-textarea",
@@ -188,6 +190,7 @@ assert.equal(missingSelectorRuntime.call("ReactCounter.mount", "#missing-react-r
 assert.equal(missingSelectorRuntime.liveCallbacks.size, 0);
 missingSelectorRuntime.dispose();
 smokeVirtualReactCounter(reactRuntime, reactDocumentState, "#react-counter");
+smokeVirtualReactEffect(reactRuntime, reactDocumentState, "#react-effect");
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
 smokeVirtualReactChangeInput(reactRuntime, reactDocumentState, "#react-change");
 smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select-textarea");

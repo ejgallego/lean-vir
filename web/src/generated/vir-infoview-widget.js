@@ -1266,6 +1266,31 @@ function createBrowserReactHookRuntime(resources, React3) {
         }
       }
       return void 0;
+    },
+    useEffectKey(key, setup, cleanup) {
+      if (typeof React3?.useEffect !== "function" || typeof React3?.useRef !== "function") {
+        releaseEffectCallbacks(setup, cleanup);
+        throw new Error("React.useEffectKey requires React.useEffect and React.useRef");
+      }
+      const ref = React3.useRef({ initialized: false, key: void 0 });
+      const changed = !ref.current.initialized || !Object.is(ref.current.key, key);
+      const effect = changed ? createBrowserEffect(setup, cleanup) : () => void 0;
+      if (changed) {
+        ref.current.initialized = true;
+        ref.current.key = key;
+      } else {
+        releaseEffectCallbacks(setup, cleanup);
+      }
+      let registered = false;
+      try {
+        React3.useEffect(effect, [key]);
+        registered = true;
+      } finally {
+        if (!registered && changed) {
+          releaseEffectCallbacks(setup, cleanup);
+        }
+      }
+      return void 0;
     }
   };
 }
@@ -1273,6 +1298,7 @@ function createReactStateHostBindings(resources, hookRuntime) {
   return {
     "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
+    "react.useEffectKey": (key, setup, cleanup) => hookRuntime.useEffectKey(String(key), setup, cleanup),
     "react.state.set": (setter, value) => setStateValue(resources, setter, value),
     "react.state.modify": (setter, update) => modifyStateValue(resources, setter, update)
   };

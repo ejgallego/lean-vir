@@ -266,6 +266,8 @@ The browser React host binding is exposed from
   current ABI is resource-shaped: setup returns a host resource and cleanup
   receives that resource when React cleans the effect up. It currently exposes
   React's no-dependency behavior; dependency arrays are not modeled yet.
+- `react.useEffectKey` is the same resource-shaped effect with one
+  Lean-computed string key used as a narrow dependency array.
 - `js.string`, `js.nat`, and `js.bool` convert Lean scalar values into explicit
   `Lean.Vir.Js α` values through `RuntimeM` for examples that need primitive
   React state.

@@ -434,6 +434,21 @@ opaque useEffect {α : Type}
     (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
     ReactM Unit
 
+/--
+Runs a resource-shaped React effect when `key` changes.
+
+This is a narrow dependency-array binding for effects whose lifetime should
+track one stable Lean-computed key. React calls `setup` after the initial
+committed render and after later commits where `key` changes, and calls
+`cleanup` with the returned resource before replacement or unmount.
+-/
+@[vir_js "react.useEffectKey"]
+opaque useEffectKey {α : Type}
+    (key : @& String)
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit
+
 end Hooks
 
 namespace State

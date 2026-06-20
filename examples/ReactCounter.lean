@@ -51,6 +51,17 @@ def renderStatic (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => do
     Root.render root staticTree
 
+def effectProbe : Component Unit :=
+  fun _ => do
+    Hooks.useEffect
+      (JsValue.ofNat 0)
+      (fun _ => pure ())
+    let text ← Node.text "react:effect"
+    Node.spanWith #[Property.id "react-effect-label"] #[] #[text]
+
+def mountEffect (selector : String) : DomM Bool :=
+  Root.mountFromSelector selector fun root => Root.renderComponent root effectProbe ()
+
 def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text ("item:" ++ toString index)
   Node.spanWith
