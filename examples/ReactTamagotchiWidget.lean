@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.Infoview
+import Vir.Examples.Style
 import Vir.Examples.Tamagotchi
 
 namespace ReactTamagotchiWidget
@@ -12,8 +13,7 @@ namespace ReactTamagotchiWidget
 open Lean.Vir.React
 open Lean.Vir.Infoview (Surface)
 
-def style (entries : Array (String × String)) : Property :=
-  Property.stylePairs entries
+abbrev style := Lean.Vir.Examples.Style.style
 
 def shellStyle : Property := style #[
   ("display", "grid"),

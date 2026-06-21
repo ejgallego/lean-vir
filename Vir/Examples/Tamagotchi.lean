@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.Browser
+import Vir.Examples.Style
 import Vir.React
 
 namespace Tamagotchi
@@ -376,8 +377,7 @@ def liveTickSeconds : Nat :=
 def liveTickMs : UInt32 :=
   1000
 
-def style (entries : Array (String × String)) : Property :=
-  Property.stylePairs entries
+abbrev style := Lean.Vir.Examples.Style.style
 
 def widgetStyle : Property := style #[
   ("display", "grid"),

@@ -34,7 +34,6 @@ import {
   smokeVirtualReactCounter,
   smokeVirtualReactEffect,
   smokeVirtualReactRefFragment,
-  smokeVirtualReactReducer,
   smokeVirtualReactInput,
   smokeVirtualProofWidgetsHtml,
   smokeVirtualProofWidgetsJsxSubset,
@@ -165,7 +164,6 @@ ensureVirtualElements(reactDocumentState, [
   "#react-counter",
   "#react-effect",
   "#react-ref-fragment",
-  "#react-reducer",
   "#react-input",
   "#react-change",
   "#react-select-textarea",
@@ -196,7 +194,6 @@ missingSelectorRuntime.dispose();
 smokeVirtualReactCounter(reactRuntime, reactDocumentState, "#react-counter");
 smokeVirtualReactEffect(reactRuntime, reactDocumentState, "#react-effect");
 smokeVirtualReactRefFragment(reactRuntime, reactDocumentState, "#react-ref-fragment");
-smokeVirtualReactReducer(reactRuntime, reactDocumentState, "#react-reducer");
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
 smokeVirtualReactChangeInput(reactRuntime, reactDocumentState, "#react-change");
 smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select-textarea");

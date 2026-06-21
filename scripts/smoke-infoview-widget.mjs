@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
+import { WIRE } from "../web/src/runtime/wire-tags.js";
 import { createVirRuntime } from "../web/src/vir-runtime-node.js";
 
 const buildDir = new URL("../build/infoview-smoke/", import.meta.url);
@@ -36,8 +37,6 @@ await writeFile(new URL("vir-infoview-widget-smoke.mjs", buildDir), smokeWidgetS
 const {
   default: infoviewWidgetComponent,
   decodeBase64Bytes,
-  exactlyOneAssetSource,
-  exactlyOnePackageSource,
   clearRuntimeServiceCacheForTests,
   createProofWidgetsExprWithCtxAtPos,
   createProofWidgetsExprWithCtxRef,
@@ -190,6 +189,22 @@ assert.throws(
   /String -> Surface -> DomM Bool/,
 );
 assert.throws(
+  () => validateWidgetEntry({
+    interfaceManifest: {
+      exports: [{
+        entry: "WrongSurface.mount",
+        effect: "dom",
+        args: [
+          { type: { wireTag: WIRE.STRING } },
+          { type: { wireTag: WIRE.STRUCTURE, name: "Wrong.Surface" } },
+        ],
+        result: { wireTag: WIRE.BOOL },
+      }],
+    },
+  }, "WrongSurface.mount"),
+  /String -> Surface -> DomM Bool/,
+);
+assert.throws(
   () => validateWidgetUnmountEntry(runtime, "ReactProofWidget.mount"),
   /String -> DomM Bool/,
 );
@@ -259,42 +274,6 @@ assert.equal(surfaceFromInfoviewProps(infoviewPropsFixture).goals[0].target, "xs
 assert.equal(
   surfaceCacheKey(surfaceFromInfoviewProps(infoviewPropsFixture)),
   surfaceCacheKey(surfaceFromInfoviewProps(structuredClone(infoviewPropsFixture))),
-);
-assert.deepEqual(exactlyOneAssetSource("wasm", "vir-upstream.wasm", ""), {
-  kind: "url",
-  value: "vir-upstream.wasm",
-});
-assert.deepEqual(exactlyOneAssetSource("wasm", "", "web/public/vir-upstream.wasm"), {
-  kind: "path",
-  value: "web/public/vir-upstream.wasm",
-});
-assert.throws(
-  () => exactlyOneAssetSource("wasm", "vir-upstream.wasm", "web/public/vir-upstream.wasm"),
-  /exactly one/,
-);
-assert.deepEqual(exactlyOnePackageSource({
-  packageUrl: "",
-  packagePath: "",
-  irPackage: { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
-  entry: "ReactProofWidget.mount",
-  unmountEntry: "ReactProofWidget.unmount",
-  position: { line: 0, character: 0 },
-}), {
-  kind: "irPackage",
-  package: { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
-  roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"],
-  position: { line: 0, character: 0 },
-});
-assert.throws(
-  () => exactlyOnePackageSource({
-    packageUrl: "demo-host.irpkg",
-    packagePath: "",
-    irPackage: { roots: ["ReactProofWidget.mount"] },
-    entry: "ReactProofWidget.mount",
-    unmountEntry: "",
-    position: { line: 0, character: 0 },
-  }),
-  /exactly one/,
 );
 assert.equal(decodeBase64Bytes(Buffer.from("vir").toString("base64"))[2], "r".charCodeAt(0));
 assert.equal((await statAsset(rpcSession, "web/public/vir-upstream.wasm")).revision, "wasm-v1");
@@ -468,26 +447,12 @@ await assert.rejects(
 );
 const runtimeOptions = await loadRuntimeOptions({
   rpcSession,
-  wasmUrl: "",
-  packageUrl: "",
   wasmPath: "web/public/vir-upstream.wasm",
-  packagePath: "web/public/demo-host.irpkg",
+  irPackage: { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
+  position: { line: 0, character: 0 },
 });
 assert.ok(runtimeOptions.wasmModule instanceof WebAssembly.Module);
 assert.equal(runtimeOptions.irPackageBytes.length, packageBytes.length);
-const irPackageRuntimeOptions = await loadRuntimeOptions({
-  rpcSession,
-  wasmUrl: "",
-  packageUrl: "",
-  wasmPath: "web/public/vir-upstream.wasm",
-  packagePath: "",
-  irPackage: { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
-  entry: "ReactProofWidget.mount",
-  unmountEntry: "ReactProofWidget.unmount",
-  position: { line: 0, character: 0 },
-});
-assert.ok(irPackageRuntimeOptions.wasmModule instanceof WebAssembly.Module);
-assert.equal(irPackageRuntimeOptions.irPackageBytes.length, packageBytes.length);
 assert.equal(
   await loadWasmModule(rpcSession, {
     kind: "path",
@@ -525,41 +490,8 @@ assert.equal(
 assert.equal(irPackageBuildCount, reloadBuildCount);
 assert.ok(irPackageStatCount > changedReloadStatCount);
 irPackageRevision = "ir-package-v1";
-const serviceConfig = {
-  runtimeUrl: "",
-  wasmUrl: "",
-  packageUrl: "",
-  wasmPath: "web/public/vir-upstream.wasm",
-  packagePath: "web/public/demo-host.irpkg",
-  entry: "ReactProofWidget.mount",
-  unmountEntry: "ReactProofWidget.unmount",
-  setupHint: "",
-};
-const firstService = await loadRuntimeService({ rpcSession, config: serviceConfig });
-assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.root.create"], "function");
-assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.node.text"], "function");
-assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.node.createElement"], "function");
-assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.root.renderIntoSelector"], "function");
-assert.equal(typeof firstService.runtime.hostState.defaultBindings["react.root.unmountSelector"], "function");
-const firstServiceAssetReadCount = assetReadCount;
-const firstServiceAssetStatCount = assetStatCount;
-const secondService = await loadRuntimeService({ rpcSession, config: serviceConfig });
-assert.equal(secondService, firstService);
-assert.equal(assetReadCount, firstServiceAssetReadCount);
-assert.ok(assetStatCount > firstServiceAssetStatCount);
-assert.equal(firstService.runtime.call("ReactProofWidget.unmount", "#missing-proof-widget"), false);
-assetRevisions.set("web/public/demo-host.irpkg", "package-v2");
-const thirdService = await loadRuntimeService({ rpcSession, config: serviceConfig });
-assert.notEqual(thirdService, firstService);
-assert.ok(assetReadCount > firstServiceAssetReadCount);
-await clearRuntimeServiceCacheForTests();
-
 const irPackageServiceConfig = {
-  runtimeUrl: "",
-  wasmUrl: "",
-  packageUrl: "",
   wasmPath: "web/public/vir-upstream.wasm",
-  packagePath: "",
   irPackage: { roots: ["ReactProofWidget.mount", "ReactProofWidget.unmount"] },
   entry: "ReactProofWidget.mount",
   unmountEntry: "ReactProofWidget.unmount",
@@ -568,6 +500,11 @@ const irPackageServiceConfig = {
 };
 const irPackageFirstService = await loadRuntimeService({ rpcSession, config: irPackageServiceConfig });
 assert.equal(typeof irPackageFirstService.resources.resourceForValue, "function");
+assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.root.create"], "function");
+assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.node.text"], "function");
+assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.node.createElement"], "function");
+assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.root.renderIntoSelector"], "function");
+assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.root.unmountSelector"], "function");
 const serverOwnedExpr = proofWidgetsExprFromSavedRef({
   ref: { __rpcref: 18 },
   info: {

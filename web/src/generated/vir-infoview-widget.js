@@ -5380,11 +5380,7 @@ function VirInfoviewWidget(props) {
       }
     };
   }, [
-    props.runtimeUrl,
-    props.wasmUrl,
-    props.packageUrl,
     props.wasmPath,
-    props.packagePath,
     irPackageKey,
     props.entry,
     props.unmountEntry,
@@ -5401,11 +5397,7 @@ function VirInfoviewWidget(props) {
       disposed = true;
     };
   }, [
-    props.runtimeUrl,
-    props.wasmUrl,
-    props.packageUrl,
     props.wasmPath,
-    props.packagePath,
     irPackageKey,
     props.entry,
     props.unmountEntry,
@@ -5419,7 +5411,7 @@ function VirInfoviewWidget(props) {
     let inFlight = false;
     try {
       const config = widgetRuntimeConfigFromProps(props);
-      if (config.autoReloadMs > 0 && config.irPackage !== null) {
+      if (config.autoReloadMs > 0) {
         intervalId = setInterval(() => {
           if (inFlight) {
             return;
@@ -5442,10 +5434,6 @@ function VirInfoviewWidget(props) {
             inFlight = false;
           });
         }, config.autoReloadMs);
-      } else if (config.autoReloadMs > 0 && usesPathAssets(config)) {
-        intervalId = setInterval(() => {
-          setReloadToken((token) => token + 1);
-        }, config.autoReloadMs);
       }
     } catch {
       return void 0;
@@ -5457,11 +5445,7 @@ function VirInfoviewWidget(props) {
       }
     };
   }, [
-    props.runtimeUrl,
-    props.wasmUrl,
-    props.packageUrl,
     props.wasmPath,
-    props.packagePath,
     irPackageKey,
     props.entry,
     props.unmountEntry,
@@ -5562,7 +5546,7 @@ function validateWidgetEntry(runtime, entryName) {
   if (entry === null || entry === void 0) {
     throw new Error(`VIR widget entry not found: ${entryName}`);
   }
-  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 2 || entry.args[0]?.type?.wireTag !== WIRE.STRING || entry.args[1]?.type?.wireTag !== WIRE.STRUCTURE || entry.result?.wireTag !== WIRE.BOOL) {
+  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 2 || entry.args[0]?.type?.wireTag !== WIRE.STRING || entry.args[1]?.type?.wireTag !== WIRE.STRUCTURE || entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" || entry.result?.wireTag !== WIRE.BOOL) {
     throw new Error(
       `VIR widget entry ${entryName} must be an effectful String -> Surface -> Bool entry (Lean: String -> Surface -> DomM Bool)`
     );
@@ -5732,7 +5716,7 @@ function documentPositionFromInfoviewPosition(pos) {
   const character = hasPosition && Number.isInteger(pos.character) && pos.character >= 0 ? pos.character : 0;
   const uri = hasPosition && typeof pos.uri === "string" ? pos.uri : "";
   const fileName = fileNameFromUri(uri);
-  const label = hasPosition ? formatDocumentPositionParts(fileName, line, character) : "unknown position";
+  const label = hasPosition ? formatDocumentPositionLabel(fileName, line, character) : "unknown position";
   return {
     uri,
     fileName,
@@ -5741,7 +5725,7 @@ function documentPositionFromInfoviewPosition(pos) {
     label
   };
 }
-function formatDocumentPositionParts(fileName, line, character) {
+function formatDocumentPositionLabel(fileName, line, character) {
   const label = `line ${line + 1}:${character + 1}`;
   return fileName.length === 0 ? label : `${fileName}:${line + 1}:${character + 1}`;
 }
@@ -5823,26 +5807,19 @@ function requiredBoolean(value, label) {
   return value;
 }
 function widgetRuntimeConfigFromProps(props) {
-  const irPackage = optionalIRPackage(props.irPackage, "irPackage");
+  const irPackage = requiredIRPackage(props.irPackage, "irPackage");
   return {
-    runtimeUrl: optionalString(props.runtimeUrl, "runtimeUrl"),
-    wasmUrl: optionalString(props.wasmUrl, "wasmUrl"),
-    packageUrl: optionalString(props.packageUrl, "packageUrl"),
-    wasmPath: optionalString(props.wasmPath, "wasmPath"),
-    packagePath: optionalString(props.packagePath, "packagePath"),
+    wasmPath: requiredString(props.wasmPath, "wasmPath"),
     irPackage,
     entry: requiredString(props.entry, "entry"),
     unmountEntry: optionalString(props.unmountEntry, "unmountEntry"),
-    position: irPackage !== null ? requiredPosition(props.pos, "pos") : null,
+    position: requiredPosition(props.pos, "pos"),
     autoReloadMs: optionalNonNegativeInteger(props.autoReloadMs, "autoReloadMs"),
     setupHint: optionalString(props.setupHint, "setupHint")
   };
 }
-function optionalIRPackage(value, label) {
-  if (value === void 0 || value === null) {
-    return null;
-  }
-  if (typeof value !== "object" || Array.isArray(value)) {
+function requiredIRPackage(value, label) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`VIR widget ${label} must be an object`);
   }
   const roots = requiredStringArray(value.roots, `${label}.roots`);
@@ -5872,19 +5849,12 @@ function optionalNonNegativeInteger(value, label) {
   }
   return value;
 }
-function usesPathAssets(config) {
-  return config.wasmPath.length !== 0 || config.packagePath.length !== 0;
-}
 function sameLoadedWidget(loaded, service, entry, unmountEntry, setupHint) {
   return loaded !== null && loaded.service === service && loaded.entry.entry === entry.entry && (loaded.unmountEntry?.entry ?? "") === (unmountEntry?.entry ?? "") && loaded.setupHint === setupHint;
 }
 function runtimeBaseKey(config) {
   return JSON.stringify({
-    runtimeUrl: config.runtimeUrl,
-    wasmUrl: config.wasmUrl,
     wasmPath: config.wasmPath,
-    packageUrl: config.packageUrl,
-    packagePath: config.packagePath,
     irPackage: config.irPackage
   });
 }
@@ -5938,11 +5908,6 @@ async function createRuntimeService({
   key,
   sources
 }) {
-  const runtimeModule = config.runtimeUrl.length === 0 ? { createVirRuntime } : await import(config.runtimeUrl);
-  const createVirRuntime2 = runtimeModule.createVirRuntime;
-  if (typeof createVirRuntime2 !== "function") {
-    throw new Error("VIR runtime module does not export createVirRuntime");
-  }
   const resources = createHostResourceState();
   const runtimeOptions = await loadRuntimeOptionsFromSources({ rpcSession, sources });
   runtimeOptions.defaultHostBindings = (runtimeRef) => createBrowserHostBindings({
@@ -5966,7 +5931,7 @@ async function createRuntimeService({
     stale: false,
     disposed: false,
     resources,
-    runtime: await createVirRuntime2(runtimeOptions)
+    runtime: await createVirRuntime(runtimeOptions)
   };
 }
 function createInfoviewCommandDispatcher({
@@ -6095,39 +6060,26 @@ async function shouldReloadIRPackage({ rpcSession, irPackage, position, currentR
 }
 async function loadRuntimeOptions({
   rpcSession,
-  wasmUrl = "",
-  packageUrl = "",
-  wasmPath = "",
-  packagePath = "",
-  irPackage = null,
-  entry = "",
-  unmountEntry = "",
-  position = null
+  wasmPath,
+  irPackage,
+  position
 }) {
   const sources = await resolveRuntimeSources(rpcSession, {
-    wasmUrl,
-    packageUrl,
     wasmPath,
-    packagePath,
     irPackage,
-    entry,
-    unmountEntry,
     position
   });
   return loadRuntimeOptionsFromSources({ rpcSession, sources });
 }
 async function resolveRuntimeSources(rpcSession, config) {
-  const wasmSource = exactlyOneAssetSource("wasm", config.wasmUrl, config.wasmPath);
-  const packageSource = exactlyOnePackageSource(config);
+  const wasmSource = wasmAssetSource(config);
+  const packageSource = irPackageSource(config);
   return {
     wasmSource: await resolveAssetSource(rpcSession, wasmSource),
     packageSource: await resolveAssetSource(rpcSession, packageSource)
   };
 }
 async function resolveAssetSource(rpcSession, source) {
-  if (source.kind === "url") {
-    return source;
-  }
   if (source.kind === "irPackage") {
     const info2 = await statIRPackage(rpcSession, source.package, source.position);
     return { ...source, revision: info2.revision, source: info2.source };
@@ -6139,17 +6091,11 @@ async function loadRuntimeOptionsFromSources({ rpcSession, sources }) {
   const { wasmSource, packageSource } = sources;
   const options = {};
   options.wasmModule = await loadWasmModule(rpcSession, wasmSource);
-  if (packageSource.kind === "url") {
-    options.irPackageUrl = packageSource.value;
-  } else if (packageSource.kind === "irPackage") {
-    const irPackage = await buildIRPackage(rpcSession, packageSource.package, packageSource.position);
-    if ((packageSource.revision ?? "") !== "" && irPackage.revision !== packageSource.revision) {
-      throw new Error("VIR IR package changed while loading; retrying with the latest Lean snapshot");
-    }
-    options.irPackageBytes = decodeBase64Bytes(irPackage.dataBase64);
-  } else {
-    options.irPackageBytes = await loadAssetBytes(rpcSession, packageSource.value);
+  const irPackage = await buildIRPackage(rpcSession, packageSource.package, packageSource.position);
+  if ((packageSource.revision ?? "") !== "" && irPackage.revision !== packageSource.revision) {
+    throw new Error("VIR IR package changed while loading; retrying with the latest Lean snapshot");
   }
+  options.irPackageBytes = decodeBase64Bytes(irPackage.dataBase64);
   return options;
 }
 async function loadWasmModule(rpcSession, source) {
@@ -6167,44 +6113,24 @@ async function loadWasmModule(rpcSession, source) {
   return cached;
 }
 async function compileWasmModule(rpcSession, source) {
-  const bytes = source.kind === "url" ? await loadUrlBytes(source.value) : await loadAssetBytes(rpcSession, source.value);
+  const bytes = await loadAssetBytes(rpcSession, source.value);
   return WebAssembly.compile(bytes);
-}
-async function loadUrlBytes(url) {
-  const response = await fetch(url, { cache: "no-store" });
-  if (!response.ok) {
-    throw new Error(`failed to load ${url}`);
-  }
-  return new Uint8Array(await response.arrayBuffer());
 }
 function assetSourceCacheKey(source) {
   const revision = source.revision ?? "";
   return revision.length === 0 ? `${source.kind}:${source.value}` : `${source.kind}:${source.value}:${revision}`;
 }
-function exactlyOneAssetSource(label, url, path) {
-  const hasUrl = url.length !== 0;
-  const hasPath = path.length !== 0;
-  if (hasUrl === hasPath) {
-    throw new Error(`VIR widget ${label} asset must set exactly one of ${label}Url or ${label}Path`);
+function wasmAssetSource(config) {
+  const wasmPath = config.wasmPath ?? "";
+  if (wasmPath.length === 0) {
+    throw new Error("VIR widget wasmPath must be a non-empty string");
   }
-  return hasUrl ? { kind: "url", value: url } : { kind: "path", value: path };
+  return { kind: "path", value: wasmPath };
 }
-function exactlyOnePackageSource(config) {
-  const packageUrl = config.packageUrl ?? "";
-  const packagePath = config.packagePath ?? "";
-  const hasUrl = packageUrl.length !== 0;
-  const hasPath = packagePath.length !== 0;
+function irPackageSource(config) {
   const irPackage = config.irPackage ?? null;
-  const hasIRPackage = irPackage !== null;
-  const sourceCount = Number(hasUrl) + Number(hasPath) + Number(hasIRPackage);
-  if (sourceCount !== 1) {
-    throw new Error("VIR widget package asset must set exactly one of packageUrl, packagePath, or irPackage");
-  }
-  if (hasUrl) {
-    return { kind: "url", value: packageUrl };
-  }
-  if (hasPath) {
-    return { kind: "path", value: packagePath };
+  if (irPackage === null) {
+    throw new Error("VIR widget irPackage must be set");
   }
   if (config.position === null || config.position === void 0) {
     throw new Error("VIR widget irPackage requires an infoview position");
@@ -6392,8 +6318,6 @@ export {
   createProofWidgetsExprWithCtxRef,
   decodeBase64Bytes,
   VirInfoviewWidget as default,
-  exactlyOneAssetSource,
-  exactlyOnePackageSource,
   loadAssetBytes,
   loadRuntimeOptions,
   loadRuntimeService,

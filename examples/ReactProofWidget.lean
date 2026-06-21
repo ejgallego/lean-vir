@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.Infoview
+import Vir.Examples.Style
 import Vir.ProofWidgets.Rpc
 import Vir.React
 
@@ -18,11 +19,9 @@ open Lean.Vir.Infoview (Hypothesis Goal SelectedLocation Surface)
 -- Keep this example independent from any future ProofWidgets compatibility DSL.
 namespace UiStyle
 
-def style (entries : Array (String × String)) : Property :=
-  Property.stylePairs entries
-
-def vscodeColor (name fallback : String) : String :=
-  "var(--vscode-" ++ name ++ ", " ++ fallback ++ ")"
+abbrev style := Lean.Vir.Examples.Style.style
+abbrev vscodeColor := Lean.Vir.Examples.Style.vscodeColor
+abbrev border := Lean.Vir.Examples.Style.border
 
 def fg : String := vscodeColor "editor-foreground" "#24292f"
 def mutedFg : String := vscodeColor "descriptionForeground" "#57606a"
@@ -42,9 +41,6 @@ def blueFg : String := vscodeColor "charts-blue" "#0969da"
 def greenFg : String := vscodeColor "charts-green" "#1a7f37"
 def purpleFg : String := vscodeColor "charts-purple" "#8250df"
 def orangeFg : String := vscodeColor "charts-orange" "#bc4c00"
-
-def border (color : String) : String :=
-  "1px solid " ++ color
 
 def widgetStyle : Property := style #[
   ("display", "grid"),

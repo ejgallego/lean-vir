@@ -57,21 +57,6 @@ export function smokeVirtualReactRefFragment(runtime, documentState, selector) {
   assertUnmountCleanup(runtime, element);
 }
 
-export function smokeVirtualReactReducer(runtime, documentState, selector) {
-  assert.equal(runtime.call("ReactCounter.mountReducer", selector), true);
-  const element = documentState.elements.get(selector);
-  assert.equal(element.textContent, "react:reducer:0:init");
-  assertLiveCallbacks(runtime, 3);
-  reactElementById(element, "react-reducer-button").handlers.onClick({});
-  assert.equal(element.textContent, "react:reducer:2:add");
-  assertLiveCallbacks(runtime, 3);
-  reactElementById(element, "react-reducer-button").handlers.onClick({});
-  assert.equal(element.textContent, "react:reducer:4:add");
-  assertLiveCallbacks(runtime, 3);
-  element.reactRoot.unmount();
-  assertUnmountCleanup(runtime, element);
-}
-
 export function smokeVirtualReactInput(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactInput.mountInput", selector), true);
   const element = documentState.elements.get(selector);

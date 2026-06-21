@@ -22,12 +22,8 @@ called when the shell unmounts its nested element while keeping the runtime
 service alive for later remounts.
 -/
 structure WidgetProps where
-  runtimeUrl : String := ""
-  wasmUrl : String := ""
-  packageUrl : String := ""
   wasmPath : String := ""
-  packagePath : String := ""
-  irPackage : Option IRPackage := none
+  irPackage : IRPackage
   entry : String
   unmountEntry : String := ""
   mountId : String := "vir-infoview-widget"
@@ -88,7 +84,7 @@ def irPackage (widget : ReactWidget) : IRPackage :=
 /-- `show_panel_widgets` props for a repo-local live React widget. -/
 def props (widget : ReactWidget) : WidgetProps where
   wasmPath := widget.wasmPath
-  irPackage := some (irPackage widget)
+  irPackage := irPackage widget
   entry := widget.mountName
   unmountEntry := widget.unmountName
   mountId := widget.mountId

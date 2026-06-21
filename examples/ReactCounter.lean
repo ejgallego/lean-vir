@@ -88,50 +88,6 @@ def refFragmentProbe : Component Unit :=
 def mountRefFragment (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root refFragmentProbe ()
 
-structure CounterReducerModel where
-  count : Nat
-  last : String
-
-inductive CounterAction where
-  | increment
-  | add (amount : Nat)
-
-def counterReducer (model : CounterReducerModel) : CounterAction → RuntimeM CounterReducerModel
-  | .increment => pure { count := model.count + 1, last := "increment" }
-  | .add amount => pure { count := model.count + amount, last := "add" }
-
-namespace CounterReducerBinding
-
-@[vir_js "react.useReducer"]
-opaque useReducer
-    (reducer : CounterReducerModel → CounterAction → RuntimeM CounterReducerModel)
-    (initial : @& CounterReducerModel) :
-    ReactM (ReducerState CounterReducerModel CounterAction)
-
-@[vir_js "react.reducer.dispatch"]
-opaque dispatch
-    (dispatch : @& Lean.Vir.Js (ReducerDispatch CounterReducerModel CounterAction))
-    (action : @& CounterAction) :
-    RuntimeM Unit
-
-end CounterReducerBinding
-
-instance : ReducerBinding CounterReducerModel CounterAction where
-  useReducer := CounterReducerBinding.useReducer
-  dispatch := CounterReducerBinding.dispatch
-
-def reducerProbe : Component Unit :=
-  fun _ => do
-    let model ← Hooks.useReducer counterReducer { count := 0, last := "init" }
-    let labelText ← Node.text s!"react:reducer:{model.value.count}:{model.value.last}"
-    Node.buttonWith
-      #[Property.id "react-reducer-button"]
-      #[EventHandler.onClick (ReducerDispatch.dispatch model.dispatch (.add 2))]
-      #[labelText]
-
-def mountReducer (selector : String) : DomM Bool :=
-  Root.mountFromSelector selector fun root => Root.renderComponent root reducerProbe ()
-
 def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text ("item:" ++ toString index)
   Node.spanWith

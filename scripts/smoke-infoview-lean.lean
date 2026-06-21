@@ -62,12 +62,9 @@ example : String → Lean.Vir.Infoview.Surface → Lean.Vir.Browser.DomM Bool :=
 example : String → Lean.Vir.Browser.DomM Bool :=
   unmount
 
-def expectAuthoringPackage (package? : Option Lean.Vir.Infoview.IRPackage) : IO Unit := do
-  match package? with
-  | none => throw <| IO.userError "infoview smoke failed: authoring package missing"
-  | some package =>
-      expect "authoring package roots" <|
-        package.roots == #["SmokeInfoviewLean.mount", "SmokeInfoviewLean.unmount"]
+def expectAuthoringPackage (package : Lean.Vir.Infoview.IRPackage) : IO Unit := do
+  expect "authoring package roots" <|
+    package.roots == #["SmokeInfoviewLean.mount", "SmokeInfoviewLean.unmount"]
 
 def smokeVar : Lean.IR.VarId :=
   { idx := 0 }

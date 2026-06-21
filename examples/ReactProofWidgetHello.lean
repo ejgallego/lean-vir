@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.Infoview
+import Vir.Examples.Style
 import Vir.React
 
 namespace ReactProofWidgetHello
@@ -14,11 +15,8 @@ open Lean.Vir.Infoview (Goal Hypothesis Surface)
 
 namespace Style
 
-def style (entries : Array (String × String)) : Property :=
-  Property.stylePairs entries
-
-def vscodeColor (name fallback : String) : String :=
-  "var(--vscode-" ++ name ++ ", " ++ fallback ++ ")"
+abbrev style := Lean.Vir.Examples.Style.style
+abbrev vscodeColor := Lean.Vir.Examples.Style.vscodeColor
 
 def fg : String := vscodeColor "editor-foreground" "#24292f"
 def mutedFg : String := vscodeColor "descriptionForeground" "#57606a"
@@ -28,7 +26,7 @@ def codeBg : String := vscodeColor "textCodeBlock-background" "#f6f8fa"
 def borderColor : String := vscodeColor "editorWidget-border" "#d0d7de"
 
 def border : String :=
-  "1px solid " ++ borderColor
+  Lean.Vir.Examples.Style.border borderColor
 
 def shell : Property := style #[
   ("display", "grid"),

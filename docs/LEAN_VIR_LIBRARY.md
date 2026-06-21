@@ -361,17 +361,17 @@ The `Vir.Infoview` module provides the first infoview-facing shell:
 - `vir_proof_widget`
 - `Lean.Vir.Infoview.widget`
 
-`WidgetProps` points the infoview widget at a VIR runtime module URL or bundled
-runtime, the `vir-upstream.wasm` asset, a package source, and an entry name.
-For live Lean widgets, the package source is normally an `IRPackage` declaration
-whose roots are built from the active Lean server snapshot. The mount entry must
-have signature `String -> Surface -> DomM Bool`; the optional unmount entry must
-have signature `String -> DomM Bool`. The shell creates a nested mount element,
-passes its selector plus the current infoview `Surface`, and rerenders the React
-component with fresh surface props on cursor movement. It reloads the runtime
-service only when the widget IR package revision changes. That revision token
-hashes the compiled IR closure and local source ranges, so imported helper
-changes are detected once the active Lean snapshot contains them.
+`WidgetProps` deliberately keeps one blessed activation path: the bundled
+infoview runtime shell, a repo-local `wasmPath`, an `IRPackage` declaration, and
+entry names. The package roots are built from the active Lean server snapshot.
+The mount entry must have signature `String -> Surface -> DomM Bool`; the
+optional unmount entry must have signature `String -> DomM Bool`. The shell
+creates a nested mount element, passes its selector plus the current infoview
+`Surface`, and rerenders the React component with fresh surface props on cursor
+movement. It reloads the runtime service only when the widget IR package
+revision changes. That revision token hashes the compiled IR closure and local
+source ranges, so imported helper changes are detected once the active Lean
+snapshot contains them.
 
 `vir_proof_widget` is the narrow authoring helper for Lean-authored React proof
 widgets: users provide a `React.Component Surface`, and the command declares the
