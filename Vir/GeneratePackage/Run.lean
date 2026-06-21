@@ -56,6 +56,40 @@ def namesSummary (names : Array Name) : String :=
   else
     ", ".intercalate (names.map (fun n => n.toString)).toList
 
+structure GeneratedPackage where
+  closure : Closure
+  manifest : InterfaceManifest
+  report : String
+  bytes : ByteArray
+
+def hasBlockingDiagnostics (closure : Closure) (manifest : InterfaceManifest) : Bool :=
+  !closure.missingDecls.isEmpty ||
+  !closure.missingExterns.isEmpty ||
+  !closure.unsupportedInitGlobals.isEmpty ||
+  !manifest.diagnostics.isEmpty
+
+def buildPackageFromIndex
+    (generatedAt : String)
+    (targets : Array Target)
+    (index : DeclIndex) : IO (Except String GeneratedPackage) := do
+  let closure := collectClosure targets index
+  let (hostImports, hostDiagnostics) ← collectHostImports index closure
+  let metadata := collectPackageMetadata generatedAt targets index
+  let manifest ← collectInterfaceManifest metadata targets index hostImports hostDiagnostics
+  let report := reportFor targets closure manifest
+  if hasBlockingDiagnostics closure manifest then
+    return .error report
+  match emitPackage closure manifest with
+  | .ok bytes =>
+      return .ok {
+        closure
+        manifest
+        report
+        bytes
+      }
+  | .error err =>
+      return .error err
+
 unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath) : IO UInt32 := do
   let index <- loadDeclIndex targets
   let closure := collectClosure targets index

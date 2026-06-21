@@ -32,7 +32,14 @@ import {
   smokeVirtualReactChangeInput,
   smokeVirtualReactCheckbox,
   smokeVirtualReactCounter,
+  smokeVirtualReactEffect,
+  smokeVirtualReactRefFragment,
   smokeVirtualReactInput,
+  smokeVirtualProofWidgetsHtml,
+  smokeVirtualProofWidgetsJsxSubset,
+  smokeVirtualReactProofWidget,
+  smokeVirtualReactProofWidgetHello,
+  smokeVirtualReactSelectTextarea,
   smokeVirtualReactTamagotchi,
 } from "../virtual-react-smoke-scenarios.mjs";
 
@@ -155,10 +162,17 @@ const reactRuntime = await createVirRuntime({
 ensureVirtualElements(reactDocumentState, [
   "#react-static",
   "#react-counter",
+  "#react-effect",
+  "#react-ref-fragment",
   "#react-input",
   "#react-change",
+  "#react-select-textarea",
   "#react-checkbox",
   "#react-attributes",
+  "#proofwidgets-html",
+  "#proofwidgets-jsx-subset",
+  "#react-proof-hello",
+  "#react-proof",
   "#react-pet",
   "#react-unmount",
   "#react-stale-root",
@@ -178,11 +192,18 @@ assert.equal(missingSelectorRuntime.call("ReactCounter.mount", "#missing-react-r
 assert.equal(missingSelectorRuntime.liveCallbacks.size, 0);
 missingSelectorRuntime.dispose();
 smokeVirtualReactCounter(reactRuntime, reactDocumentState, "#react-counter");
+smokeVirtualReactEffect(reactRuntime, reactDocumentState, "#react-effect");
+smokeVirtualReactRefFragment(reactRuntime, reactDocumentState, "#react-ref-fragment");
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
 smokeVirtualReactChangeInput(reactRuntime, reactDocumentState, "#react-change");
+smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select-textarea");
 smokeVirtualReactCheckbox(reactRuntime, reactDocumentState, "#react-checkbox");
 smokeVirtualReactAttributes(reactRuntime, reactDocumentState, "#react-attributes", { assertKeys: true });
-smokeVirtualReactTamagotchi(reactRuntime, reactDocumentState, "#react-pet", { extended: true });
+smokeVirtualProofWidgetsHtml(reactRuntime, reactDocumentState, "#proofwidgets-html");
+smokeVirtualProofWidgetsJsxSubset(reactRuntime, reactDocumentState, "#proofwidgets-jsx-subset");
+await smokeVirtualReactProofWidgetHello(reactRuntime, reactDocumentState, "#react-proof-hello");
+await smokeVirtualReactProofWidget(reactRuntime, reactDocumentState, "#react-proof");
+await smokeVirtualReactTamagotchi(reactRuntime, reactDocumentState, "#react-pet", { extended: true });
 assert.equal(reactRuntime.call("ReactCounter.mountAndUnmount", "#react-unmount"), true);
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactDocumentState.elements.get("#react-unmount").reactRoot, undefined);

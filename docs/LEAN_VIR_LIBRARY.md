@@ -247,6 +247,8 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.PropValue`
 - `Lean.Vir.React.EventHandler`
 - `Lean.Vir.React.State α`
+- `Lean.Vir.React.ReducerState state action`
+- `Lean.Vir.React.ReducerBinding state action`
 - `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.createElement : @& String -> Option String -> Array Lean.Vir.React.Property -> Array Lean.Vir.React.EventHandler -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
@@ -257,6 +259,8 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
+- `Lean.Vir.React.Hooks.useReducer : [Lean.Vir.React.ReducerBinding state action] -> (state -> action -> Lean.Vir.RuntimeM state) -> state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
+- `Lean.Vir.React.ReducerDispatch.dispatch : [Lean.Vir.React.ReducerBinding state action] -> Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> action -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.RuntimeM (Lean.Vir.Js α)) -> Lean.Vir.RuntimeM Unit`
 
@@ -280,6 +284,13 @@ are runtime-side calls to React setter resources, not DOM mutations. They are
 typed JavaScript resources and must cross public signatures as `Lean.Vir.Js
 (Lean.Vir.React.StateSetter α)`.
 
+`Hooks.useReducer` keeps reducer state and actions as ordinary Lean types, but
+the current host import ABI cannot package a single fully polymorphic reducer
+host import. Each concrete state/action pair therefore provides a low-level
+`@[vir_js "react.useReducer"]` / `@[vir_js "react.reducer.dispatch"]` pair
+behind a `ReducerBinding state action` instance; callers still use
+`Hooks.useReducer` and `ReducerDispatch.dispatch`.
+
 ```lean
 Lean.Vir.React.State.modify count fun previous => do
   let value ← Lean.Vir.JsValue.toNat previous
@@ -301,14 +312,76 @@ contract.
 The React browser fixtures are split by intent: `examples/ReactCounter.lean`
 contains the hook-backed counter, static render, lifecycle, and stress cases, while
 `examples/ReactInput.lean` contains hook-backed controlled text, change,
-submit, attribute-conformance, and checkbox callbacks. `examples/Tamagotchi.lean`
-keeps both demos: `Tamagotchi` is the non-React DOM-hosted version, and
-`ReactTamagotchi` reuses the same model with a keyed React tree, controlled
-text input, checkbox state, form submit handling, and action callbacks.
+submit, textarea/select, attribute-conformance, and checkbox callbacks.
+`Vir.Examples.Tamagotchi` keeps the shared Tamagotchi implementation:
+`Tamagotchi` is the non-React DOM-hosted version, and `ReactTamagotchi` reuses
+the same model with a hook-backed keyed React tree, controlled text input,
+checkbox state, form submit handling, and action callbacks.
+`examples/Tamagotchi.lean` is the browser-demo wrapper, while
+`examples/ReactTamagotchiWidget.lean` mounts the same `ReactTamagotchi.View`
+component through the live infoview shell.
+`examples/ReactProofWidget.lean` is the fuller proof-widget-shaped React
+example. It compiles into `demo-host.irpkg`, displays on `react.html`, and can
+also be loaded as a live infoview widget through `show_panel_widgets`.
+`Vir.ProofWidgets.Html` adds the first shallow ProofWidgets-style authoring
+facade over the same native React node ABI. `examples/ProofWidgetsHtml.lean`
+uses `Html.text`, `Html.element`, `Html.ofComponent`, `Attr`, and `Handler`
+aliases and is included in the host package as a compatibility regression.
+`examples/ProofWidgetsJsxSubset.lean` ports a tiny upstream JSX-shaped pattern
+with explicit combinators, including child-bearing `Html.ofComponent`, image
+attributes, style attributes, child spread, and a `MarkdownDisplay`-shaped
+component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
+`RpcRef`, `WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and
+`Rpc.resolveRef` are enough for the JSX-subset fixture to include an
+`InteractiveExpr`-shaped component whose click handler dispatches a
+host-inspectable reference descriptor and updates component-owned React state
+from the callback. In live infoview widgets, `Vir.Infoview.ProofWidgetsRpc`
+can resolve that expression-shaped descriptor as a fallback, and the live
+infoview shell asks the Lean server to create a standard
+`Lean.Server.WithRpcRef` handle for the current interactive goal at the cursor.
+`Vir.Infoview.Surface` carries the live
+`proofWidgetsExpr : Option (WithRpcRef ExprWithCtx)` prop, and the infoview
+shell stores the server RPC handle as a typed `Js ServerRef` host resource
+instead of serializing the handle through a string field.
 
 The standalone React Node renderer status is tracked in `docs/REACT_NODE.md`.
 Future ProofWidgets compatibility work is tracked separately in
-`docs/REACT_PROOFWIDGETS_ROADMAP.md`.
+`docs/REACT_PROOFWIDGETS_ROADMAP.md` and `docs/PROOFWIDGETS_PORTING.md`.
+
+The `Vir.Infoview` module provides the first infoview-facing shell:
+
+- `Lean.Vir.Infoview.Assets`
+- `Lean.Vir.Infoview.Package`
+- `Lean.Vir.Infoview.ProofWidgetsRpc`
+- `Lean.Vir.Infoview.Widget`
+- `Lean.Vir.Infoview.Surface`
+- `Lean.Vir.Infoview.IRPackage`
+- `Lean.Vir.Infoview.WidgetProps`
+- `Lean.Vir.Infoview.ReactWidget`
+- `vir_proof_widget`
+- `Lean.Vir.Infoview.widget`
+
+`WidgetProps` deliberately keeps one blessed activation path: the bundled
+infoview runtime shell, a repo-local `wasmPath`, an `IRPackage` declaration, and
+entry names. The package roots are built from the active Lean server snapshot.
+The mount entry must have signature `String -> Surface -> DomM Bool`; the
+optional unmount entry must have signature `String -> DomM Bool`. The shell
+creates a nested mount element, passes its selector plus the current infoview
+`Surface`, and rerenders the React component with fresh surface props on cursor
+movement. It reloads the runtime service only when the widget IR package
+revision changes. That revision token hashes the compiled IR closure and local
+source ranges, so imported helper changes are detected once the active Lean
+snapshot contains them.
+
+`vir_proof_widget` is the narrow authoring helper for Lean-authored React proof
+widgets: users provide a `React.Component Surface`, and the command declares the
+standard selector-owned `mount`/`unmount` entries, `irPackage`, and
+`widgetProps` in the current namespace. `ReactWidget` is the lower-level
+expansion target when a caller needs to assemble those pieces manually.
+`examples/ReactProofWidgetHello.lean` is the minimal live example and
+`examples/ReactProofWidget.lean` is the fuller API showcase.
+`node scripts/smoke-infoview-widget.mjs` checks that the shell module loads and
+that the proof-widget entries have the required signatures.
 
 The JavaScript runtime binding map, Node virtual-host behavior, cleanup hooks,
 and external browser/React API references are documented in

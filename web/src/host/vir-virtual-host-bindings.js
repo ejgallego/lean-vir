@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import {
   createVirtualReactNodeElementResource,
+  createVirtualReactNodeFragmentResource,
   createVirtualReactNodeTextResource,
   createVirtualReactRootResource as createVirtualReactRootResourceFromNode,
 } from "../react/vir-react-node.js";
@@ -14,7 +15,7 @@ import {
   createReactStateHostBindings,
   createVirtualReactHookRuntime,
 } from "../react/vir-react-hooks.js";
-import { isHostResource } from "../host-resource.js";
+import { hostResourceValue, isHostResource } from "../host-resource.js";
 import {
   callLeanEventCallback,
   createAnimationResourceHostBindings,
@@ -31,11 +32,19 @@ import {
 
 const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 
-export function createVirtualDocumentState({ title = "", elements = new Map(), resources = createHostResourceState() } = {}) {
+export function createVirtualDocumentState({
+  title = "",
+  elements = new Map(),
+  resources = createHostResourceState(),
+  clipboardText = "",
+  clipboardWrites = [],
+  revealedPosition = null,
+  infoviewCommands = [],
+} = {}) {
   if (!(elements instanceof Map)) {
     throw new Error("virtual document elements must be a Map");
   }
-  return { title, elements, resources };
+  return { title, elements, resources, clipboardText, clipboardWrites, revealedPosition, infoviewCommands };
 }
 
 export function createVirtualElementState({
@@ -97,6 +106,8 @@ export function createVirtualEventHostBindings(state = createVirtualDocumentStat
       stopPropagationOnEvent(state.resources.resolveResource(event, "Event"));
       return undefined;
     },
+    "browser.event.formValue": (event) =>
+      formControlEventValue(state.resources.resolveResource(event, "Event")),
   };
 }
 
@@ -138,12 +149,52 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
     }),
     ...createReactRootResourceHostBindings(state.resources, (target) =>
       createVirtualReactRootResource(state.resources, target, reactHooks), {
+        querySelector: (selector) => queryVirtualElementState(state, selector),
         createNodeTextResource: (value) => createVirtualReactNodeTextResource(state.resources, value),
         createNodeElementResource: (tag, key, props, handlers, children) =>
           createVirtualReactNodeElementResource(state.resources, reactHooks, tag, key, props, handlers, children),
+        createNodeFragmentResource: (key, children) =>
+          createVirtualReactNodeFragmentResource(state.resources, key, children),
       }),
     ...createReactJsValueHostBindings(state.resources),
     ...createReactStateHostBindings(state.resources, reactHookRuntime),
+    "infoview.clipboard.writeText": (text) => {
+      state.clipboardText = text;
+      state.clipboardWrites ??= [];
+      state.clipboardWrites.push(text);
+      return true;
+    },
+    "infoview.command.revealPosition": (position) => {
+      const normalized = normalizeInfoviewDocumentPosition(position);
+      if (normalized === null) {
+        return false;
+      }
+      state.revealedPosition = normalized;
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "revealPosition", position: normalized });
+      return true;
+    },
+    "proofwidgets.rpc.inspectRef": (ref) => {
+      const normalized = normalizeProofWidgetsRpcRef(ref);
+      if (normalized === null) {
+        return false;
+      }
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "proofwidgetsRpcInspectRef", ref: normalized });
+      return true;
+    },
+    "proofwidgets.rpc.resolveRef": (ref, callback) => {
+      const normalized = normalizeProofWidgetsRpcRef(ref);
+      if (normalized === null || typeof callback !== "function") {
+        releaseCallback(callback);
+        return false;
+      }
+      const result = virtualProofWidgetsRpcRefInfo(normalized);
+      state.infoviewCommands ??= [];
+      state.infoviewCommands.push({ kind: "proofwidgetsRpcResolveRef", ref: normalized, result });
+      callAndReleaseCallback(callback, result);
+      return true;
+    },
     [VIR_HOST_DISPOSE]: () => state.resources.dispose(),
   };
 }
@@ -186,8 +237,8 @@ function normalizeVirtualElementState(element) {
 }
 
 function findVirtualReactElementNodeById(node, id) {
-  if (node?.kind !== "element") return null;
-  if (node.props?.id === id) return node;
+  if (node?.kind !== "element" && node?.kind !== "fragment") return null;
+  if (node.kind === "element" && node.props?.id === id) return node;
   for (const child of node.children ?? []) {
     const found = findVirtualReactElementNodeById(child, id);
     if (found !== null) return found;
@@ -207,6 +258,122 @@ function virtualEventElementResource(state, event, field) {
   }
   if (typeof value === "object") {
     return state.resources.resourceForValue(value);
+  }
+  return null;
+}
+
+function formControlEventValue(event) {
+  const currentValue = formControlValue(event?.currentTarget);
+  if (currentValue !== null) return currentValue;
+  return formControlValue(event?.target);
+}
+
+function formControlValue(value) {
+  if (value === null || typeof value !== "object" || !("value" in value)) {
+    return null;
+  }
+  return String(value.value ?? "");
+}
+
+function normalizeInfoviewDocumentPosition(position) {
+  if (position === null || typeof position !== "object") {
+    return null;
+  }
+  const uri = typeof position.uri === "string" ? position.uri : "";
+  if (uri.length === 0) {
+    return null;
+  }
+  const line = nonNegativeInteger(position.line);
+  const character = nonNegativeInteger(position.character);
+  if (line === null || character === null) {
+    return null;
+  }
+  return { uri, line, character };
+}
+
+export function normalizeProofWidgetsRpcRef(ref) {
+  if (ref === null || typeof ref !== "object") {
+    return null;
+  }
+  const id = stringField(ref.id);
+  if (id.length === 0) {
+    return null;
+  }
+  const normalized = {
+    id,
+    label: stringField(ref.label),
+    typeName: stringField(ref.typeName),
+    summary: stringField(ref.summary),
+    expression: stringField(ref.expression),
+    typeText: stringField(ref.typeText),
+    context: stringField(ref.context),
+  };
+  const serverRef = proofWidgetsServerRpcRef(ref);
+  if (serverRef !== null) {
+    normalized.serverRef = serverRef;
+  }
+  return normalized;
+}
+
+function stringField(value) {
+  return typeof value === "string" ? value : "";
+}
+
+function proofWidgetsServerRpcRef(ref) {
+  if (isRpcRefObject(ref.serverRef)) {
+    return ref.serverRef;
+  }
+  if (isHostResource(ref.serverRef)) {
+    const value = hostResourceValue(ref.serverRef);
+    return isRpcRefObject(value) ? value : null;
+  }
+  return null;
+}
+
+function isRpcRefObject(value) {
+  return value !== null &&
+    typeof value === "object" &&
+    !Array.isArray(value) &&
+    (typeof value.__rpcref === "number" || typeof value.p === "number");
+}
+
+function virtualProofWidgetsRpcRefInfo(ref) {
+  return {
+    ...ref,
+    source: "virtual",
+    position: "virtual",
+    packageRevision: "virtual",
+    storeKey: `virtual:${ref.id}`,
+    knownConstant: false,
+  };
+}
+
+function callAndReleaseCallback(callback, value) {
+  try {
+    callback(value);
+  } catch (error) {
+    console.error(error);
+  } finally {
+    releaseCallback(callback);
+  }
+}
+
+function releaseCallback(callback) {
+  if (callback !== null && typeof callback === "function" && typeof callback.release === "function") {
+    callback.release();
+  }
+}
+
+function nonNegativeInteger(value) {
+  if (typeof value === "bigint") {
+    return value >= 0n && value <= BigInt(Number.MAX_SAFE_INTEGER) ? Number(value) : null;
+  }
+  if (typeof value === "number") {
+    return Number.isSafeInteger(value) && value >= 0 ? value : null;
+  }
+  if (typeof value === "string" && /^[0-9]+$/.test(value)) {
+    const parsed = Number(value);
+    return Number.isSafeInteger(parsed) ? parsed : null;
   }
   return null;
 }

@@ -10,3 +10,4 @@ import Vir.Js
 import Vir.Common
 import Vir.Browser
 import Vir.React
+import Vir.ProofWidgets

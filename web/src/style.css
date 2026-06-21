@@ -1374,12 +1374,24 @@ h2 {
   margin-right: 8px;
 }
 
-.react-mount input {
+.react-mount input,
+.react-mount textarea,
+.react-mount select {
   min-height: 34px;
   border: 1px solid #bdc8bb;
   background: #ffffff;
   color: #17201a;
   padding: 5px 8px;
+}
+
+.react-mount textarea,
+.react-mount select {
+  margin-right: 8px;
+  vertical-align: middle;
+}
+
+.react-mount textarea {
+  resize: vertical;
 }
 
 .react-mount input[type="checkbox"] {
@@ -1402,7 +1414,9 @@ h2 {
 }
 
 .react-mount button:hover,
-.react-mount input:focus-visible {
+.react-mount input:focus-visible,
+.react-mount textarea:focus-visible,
+.react-mount select:focus-visible {
   border-color: #516f88;
 }
 
@@ -1412,8 +1426,195 @@ h2 {
   padding: 12px;
 }
 
+.react-proof-widget {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+  color: #17201a;
+}
+
+.react-proof-widget span {
+  margin-right: 0;
+}
+
+.react-proof-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  min-width: 0;
+}
+
+.react-proof-header h3,
+.react-proof-detail h3 {
+  margin: 0;
+  color: #17201a;
+  font-size: 1rem;
+  line-height: 1.2;
+}
+
+.react-proof-heading {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.react-proof-source {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  color: #5f6f64;
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.react-proof-module,
+.react-proof-range {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.react-proof-range::before {
+  color: #8a9b90;
+  content: "/";
+  margin-right: 6px;
+}
+
+.react-proof-summary {
+  max-width: 360px;
+  margin: 0;
+  color: #5f6f64;
+  font-size: 0.84rem;
+  font-weight: 700;
+  line-height: 1.35;
+  text-align: right;
+  overflow-wrap: anywhere;
+}
+
+.react-proof-layout {
+  display: grid;
+  grid-template-columns: minmax(180px, 0.72fr) minmax(0, 1.28fr);
+  gap: 12px;
+  min-width: 0;
+}
+
+.react-proof-sidebar,
+.react-proof-detail {
+  min-width: 0;
+}
+
+.react-proof-sidebar,
+.react-proof-main {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+  min-width: 0;
+}
+
+.react-proof-panel-label {
+  margin: 0 0 8px;
+  color: #5f6f64;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.react-proof-goal-list,
+.react-proof-hypotheses {
+  display: grid;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.react-proof-goal {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 46px;
+  text-align: left;
+}
+
+.react-proof-goal[aria-pressed="true"] {
+  border-color: #516f88;
+  background: #edf5f9;
+  color: #20384a;
+}
+
+.react-proof-goal-title,
+.react-proof-goal-status {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.react-proof-goal-title {
+  font-weight: 800;
+}
+
+.react-proof-goal-status {
+  color: #5f6f64;
+  font-size: 0.72rem;
+  text-align: right;
+  text-transform: uppercase;
+}
+
+.react-proof-detail {
+  display: grid;
+  gap: 10px;
+}
+
+.react-proof-status-line {
+  margin: 0;
+  color: #33415c;
+  font-size: 0.88rem;
+  overflow-wrap: anywhere;
+}
+
+.react-proof-target {
+  min-height: 72px;
+  margin: 0;
+  padding: 12px;
+  overflow: auto;
+  border: 1px solid #263d2c;
+  background: #17201a;
+  color: #f8faf6;
+}
+
+.react-proof-target code,
+.react-proof-hypothesis code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+  white-space: pre-wrap;
+}
+
+.react-proof-hypothesis {
+  min-width: 0;
+  padding: 8px 10px;
+  border-left: 3px solid #516f88;
+  background: #ffffff;
+  color: #33415c;
+  font-size: 0.86rem;
+  overflow-wrap: anywhere;
+}
+
+.react-proof-hypothesis-name {
+  color: #17201a;
+  font-weight: 800;
+}
+
+.react-proof-hypothesis-type {
+  color: #20384a;
+}
+
 .react-pet-mount {
   min-height: 430px;
+}
+
+.react-proof-review-mount {
+  min-height: 560px;
 }
 
 .react-pet-widget {
@@ -1821,6 +2022,10 @@ h2 {
     grid-template-columns: 1fr;
   }
 
+  .react-proof-layout {
+    grid-template-columns: 1fr;
+  }
+
   .react-pet-body {
     grid-template-columns: 1fr;
   }
@@ -1945,9 +2150,23 @@ h2 {
   }
 
   .react-pet-heading,
+  .react-proof-header,
   #react-pet-name-form {
     align-items: flex-start;
     flex-direction: column;
+  }
+
+  .react-proof-summary {
+    max-width: none;
+    text-align: left;
+  }
+
+  .react-proof-goal {
+    grid-template-columns: 1fr;
+  }
+
+  .react-proof-goal-status {
+    text-align: left;
   }
 
   #react-pet-name-form input,

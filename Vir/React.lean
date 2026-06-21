@@ -51,6 +51,9 @@ instance : MonadLift Lean.Vir.RuntimeM ReactM where
       unfold ReactM
       exact action
 
+instance : MonadLift ReactM Lean.Vir.Browser.DomM where
+  monadLift := ReactM.run
+
 instance : Nonempty (ReactM α) :=
   by
     unfold ReactM
@@ -75,6 +78,23 @@ the typed `Js (StateSetter α)` handle in callbacks and pass it back to the
 state setter helpers in this module.
 -/
 opaque StateSetter (α : Type) : Type
+
+/--
+React reducer dispatch function returned by `useReducer`.
+
+The JavaScript host owns the underlying dispatch function. Lean callbacks can
+retain the typed handle and pass actions back through `ReducerDispatch.dispatch`.
+-/
+opaque ReducerDispatch (state action : Type) : Type
+
+/--
+React ref object returned by `useRef`.
+
+The JavaScript host owns the underlying `{ current }` object. Reading and
+writing `current` does not schedule a React render, matching React's ref
+lifetime semantics.
+-/
+opaque Ref (α : Type) : Type
 
 /--
 Default React props object marker.
@@ -113,6 +133,29 @@ structure EventHandler where
 structure State (α : Type) where
   value : α
   setter : Lean.Vir.Js (StateSetter α)
+
+/-- React reducer value and dispatch function returned by `useReducer`. -/
+structure ReducerState (state action : Type) where
+  value : state
+  dispatch : Lean.Vir.Js (ReducerDispatch state action)
+
+/--
+Concrete host binding for a reducer state/action pair.
+
+The current host import ABI does not carry arbitrary type parameters across a
+JavaScript import, so concrete reducer pairs provide the low-level
+`react.useReducer` / `react.reducer.dispatch` imports through this class. User
+code still calls `Hooks.useReducer` and `ReducerDispatch.dispatch`.
+-/
+class ReducerBinding (state action : Type) where
+  useReducer :
+    (state → action → Lean.Vir.RuntimeM state) →
+      state →
+      ReactM (ReducerState state action)
+  dispatch :
+    Lean.Vir.Js (ReducerDispatch state action) →
+      action →
+      Lean.Vir.RuntimeM Unit
 
 /--
 React node object class created by the JavaScript host through React's public
@@ -412,12 +455,71 @@ opaque modify {α : Type}
 
 end StateSetter
 
+namespace ReducerDispatch
+
+def dispatch {state action : Type} [binding : ReducerBinding state action]
+    (dispatch : Lean.Vir.Js (ReducerDispatch state action))
+    (action : action) : Lean.Vir.RuntimeM Unit :=
+  binding.dispatch dispatch action
+
+end ReducerDispatch
+
 namespace Hooks
 
 @[vir_js "react.useState"]
 opaque useState {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
 
+def useReducer {state action : Type} [binding : ReducerBinding state action]
+    (reducer : state → action → Lean.Vir.RuntimeM state)
+    (initial : state) : ReactM (ReducerState state action) :=
+  binding.useReducer reducer initial
+
+@[vir_js "react.useRef"]
+opaque useRef {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (Lean.Vir.Js (Ref (Lean.Vir.Js α)))
+
+/--
+Runs a React effect whose setup returns a host resource cleaned up by React.
+
+This is the v0 resource-shaped `useEffect` binding with React's no-dependency
+behavior: React calls `setup` after each committed render and calls `cleanup`
+with the returned resource before the effect is replaced, before unmount, or
+when the runtime is disposed.
+-/
+@[vir_js "react.useEffect"]
+opaque useEffect {α : Type}
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit
+
+/--
+Runs a resource-shaped React effect with a dependency list.
+
+This is the dependency-array form of `useEffect`: React calls `setup` after the
+initial committed render and after later commits where any dependency changes
+according to `Object.is`, and calls `cleanup` with the returned resource before
+replacement or unmount. Use `#[]` for React's empty dependency array behavior.
+-/
+@[vir_js "react.useEffectWithDeps"]
+opaque useEffectWithDeps {α : Type}
+    (deps : @& Array String)
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit
+
 end Hooks
+
+namespace Ref
+
+@[vir_js "react.ref.get"]
+opaque get {α : Type} (ref : @& Lean.Vir.Js (Ref (Lean.Vir.Js α))) : Lean.Vir.RuntimeM (Lean.Vir.Js α)
+
+@[vir_js "react.ref.set"]
+opaque set {α : Type}
+    (ref : @& Lean.Vir.Js (Ref (Lean.Vir.Js α)))
+    (value : @& Lean.Vir.Js α) :
+    Lean.Vir.RuntimeM Unit
+
+end Ref
 
 namespace State
 
@@ -445,6 +547,16 @@ opaque createElement
     (handlers : Array EventHandler)
     (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node)
+
+@[vir_js "react.node.fragment"]
+opaque fragmentWithKey (key? : Option String) (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node)
+
+def fragment (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
+  fragmentWithKey none children
+
+def keyedFragment (key : String) (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
+  fragmentWithKey (some key) children
 
 /-- Renders a Lean function component with typed props. -/
 def component (component : Component props) (props : props) : ReactM (Lean.Vir.Js Node) :=
@@ -630,6 +742,44 @@ nodeChildElement h5 keyedH5 h5With keyedH5With "h5"
 nodeChildElement h6 keyedH6 h6With keyedH6With "h6"
 nodeButtonElement button keyedButton buttonWith keyedButtonWith
 
+/-- Element builder shape used by text-child convenience helpers. -/
+abbrev TextBuilder :=
+  Array Property → Array EventHandler → Array (Lean.Vir.Js Node) → ReactM (Lean.Vir.Js Node)
+
+/-- Builds one text node and passes it as the only child to `build`. -/
+def textWith
+    (build : TextBuilder)
+    (props : Array Property)
+    (handlers : Array EventHandler)
+    (value : String) : ReactM (Lean.Vir.Js Node) := do
+  let textNode ← text value
+  build props handlers #[textNode]
+
+def codeText (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => codeWith props handlers children) props #[] value
+
+def spanText (value : String) : ReactM (Lean.Vir.Js Node) := do
+  let textNode ← text value
+  span #[textNode]
+
+def spanTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => spanWith props handlers children) props #[] value
+
+def pTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => pWith props handlers children) props #[] value
+
+def h3TextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => h3With props handlers children) props #[] value
+
+def strongTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => strongWith props handlers children) props #[] value
+
+def buttonTextWith
+    (props : Array Property)
+    (handlers : Array EventHandler)
+    (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props handlers children => buttonWith props handlers children) props handlers value
+
 end Node
 
 namespace Root
@@ -697,6 +847,25 @@ def renderComponent
     Lean.Vir.Browser.DomM Unit :=
   renderComponentThunk root fun _ => component props
 
+@[vir_js "react.root.renderIntoSelector"]
+opaque renderIntoSelector
+    (selector : @& String)
+    (node : @& Lean.Vir.Js Node) :
+    Lean.Vir.Browser.DomM Bool
+
+@[vir_js "react.root.renderComponentIntoSelector"]
+opaque renderComponentIntoSelectorThunk
+    (selector : @& String)
+    (component : Unit → ReactM (Lean.Vir.Js Node)) :
+    Lean.Vir.Browser.DomM Bool
+
+def renderComponentIntoSelector
+    (selector : @& String)
+    (component : Component props)
+    (props : props) :
+    Lean.Vir.Browser.DomM Bool :=
+  renderComponentIntoSelectorThunk selector fun _ => component props
+
 /--
 Unmounts a React root and releases callbacks retained by its current render.
 
@@ -704,6 +873,9 @@ Reference: [React `root.unmount`](https://react.dev/reference/react-dom/client/c
 -/
 @[vir_js "react.root.unmount"]
 opaque unmount (root : @& Lean.Vir.Js Root) : Lean.Vir.Browser.DomM Unit
+
+@[vir_js "react.root.unmountSelector"]
+opaque unmountSelector (selector : @& String) : Lean.Vir.Browser.DomM Bool
 
 end Root
 

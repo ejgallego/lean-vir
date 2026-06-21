@@ -90,6 +90,8 @@
             "ReactCounter.mount",
             "ReactCounter.mountDefault",
             "ReactCounter.renderStatic",
+            "ReactCounter.mountEffect",
+            "ReactCounter.mountRefFragment",
             "ReactCounter.renderWideTextLoop",
             "ReactCounter.renderCallbackTreeLoop",
             "ReactCounter.mountAndUnmount",
@@ -103,8 +105,37 @@
           "roots": [
             "ReactInput.mountInput",
             "ReactInput.mountChangeInput",
+            "ReactInput.mountSelectTextarea",
             "ReactInput.mountCheckbox",
             "ReactInput.mountAttributes"
+          ]
+        },
+        {
+          "source": "examples/ProofWidgetsHtml.lean",
+          "roots": [
+            "ProofWidgetsHtml.mount",
+            "ProofWidgetsHtml.mountDefault"
+          ]
+        },
+        {
+          "source": "examples/ProofWidgetsJsxSubset.lean",
+          "roots": [
+            "ProofWidgetsJsxSubset.mount",
+            "ProofWidgetsJsxSubset.mountDefault"
+          ]
+        },
+        {
+          "source": "examples/ReactProofWidgetHello.lean",
+          "roots": [
+            "ReactProofWidgetHello.mount",
+            "ReactProofWidgetHello.unmount"
+          ]
+        },
+        {
+          "source": "examples/ReactProofWidget.lean",
+          "roots": [
+            "ReactProofWidget.mount",
+            "ReactProofWidget.unmount"
           ]
         }
       ],

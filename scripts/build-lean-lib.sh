@@ -65,6 +65,8 @@ build_module Vir/Js.lean
 build_module Vir/Common.lean
 build_module Vir/Browser.lean
 build_module Vir/React.lean
+build_module Vir/Examples/Style.lean
+build_module Vir/Examples/Tamagotchi.lean
 build_module Vir/GeneratePackage/Basic.lean
 build_module Vir/GeneratePackage/PackageFormat.lean
 build_module Vir/GeneratePackage/NativeExterns.lean
@@ -83,7 +85,16 @@ build_module Vir/GeneratePackage/Manifest/Encode.lean
 build_module Vir/GeneratePackage/Emit.lean
 build_module Vir/GeneratePackage/Report.lean
 build_module Vir/GeneratePackage/Run.lean
+build_module Vir/ProofWidgets/Html.lean
+build_module Vir/ProofWidgets/Rpc.lean
+build_module Vir/ProofWidgets.lean
 build_module Vir/GeneratePackage.lean
+build_module Vir/Infoview/Assets.lean
+build_module Vir/Infoview/Surface.lean
+build_module Vir/Infoview/Package.lean
+build_module Vir/Infoview/ProofWidgetsRpc.lean
+build_module Vir/Infoview/Widget.lean
+build_module Vir/Infoview.lean
 build_module Vir.lean
 
 for stale in "${stale_layouts[@]}"; do

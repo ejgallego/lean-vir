@@ -398,8 +398,7 @@ else
   : > "$wasi_imports"
 fi
 
-rg -o "undefined symbol: .+" "$strict_log" \
-  | sed 's/^undefined symbol: //' \
+sed -n 's/.*undefined symbol: //p' "$strict_log" \
   | sort -u > "$unresolved" || true
 
 object_bytes=0

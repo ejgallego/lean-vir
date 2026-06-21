@@ -12,6 +12,7 @@ import {
   releaseHostResource,
   requireExternrefTableSupport,
 } from "../host-resource.js";
+import { disposeReactNode } from "../react/vir-react-node.js";
 
 export class HostResourceState {
   constructor() {
@@ -215,9 +216,83 @@ export function createHtmlInputElementResourceHostBindings(resources, { fromElem
 }
 
 export function createReactRootResourceHostBindings(resources, createRootResource, {
+  querySelector = null,
   createNodeTextResource = null,
   createNodeElementResource = null,
+  createNodeFragmentResource = null,
 } = {}) {
+  const rootsByContainer = new WeakMap();
+  const rootsBySelector = new Map();
+
+  function forgetRoot(container, root) {
+    if (rootsByContainer.get(container) === root) {
+      rootsByContainer.delete(container);
+    }
+    for (const [selector, mounted] of rootsBySelector) {
+      if (mounted.root === root) {
+        rootsBySelector.delete(selector);
+      }
+    }
+  }
+
+  function rootForContainer(container) {
+    let root = rootsByContainer.get(container);
+    if (root !== undefined) {
+      return root;
+    }
+    root = createRootResource(container);
+    if (typeof root?.unmount !== "function") {
+      throw new Error("React root resource must provide an unmount function");
+    }
+    const unmount = root.unmount;
+    root.unmount = (...args) => {
+      try {
+        return unmount.apply(root, args);
+      } finally {
+        forgetRoot(container, root);
+      }
+    };
+    rootsByContainer.set(container, root);
+    return root;
+  }
+
+  function queryReactRootSelector(selector) {
+    if (typeof querySelector !== "function") {
+      throw new Error("react.root selector host bindings require a querySelector function");
+    }
+    return querySelector(selector);
+  }
+
+  function releaseRootResource(root) {
+    root.unmount();
+    resources.releaseValueResource(root);
+  }
+
+  function releaseLeanCallback(callback) {
+    if (typeof callback?.release === "function") {
+      callback.release();
+    }
+  }
+
+  function disposeUnrenderedReactNode(node) {
+    disposeReactNode(resources, node);
+  }
+
+  function selectorRoot(selector, onMissing) {
+    const target = queryReactRootSelector(selector);
+    if (target === null || target === undefined) {
+      onMissing();
+      return null;
+    }
+    const existing = rootsBySelector.get(selector);
+    if (existing !== undefined && existing.container !== target) {
+      releaseRootResource(existing.root);
+    }
+    const root = rootForContainer(target);
+    rootsBySelector.set(selector, { container: target, root });
+    return root;
+  }
+
   return {
     "react.node.text": (value) =>
       resources.resourceForValue(requireReactNodeTextResourceFactory(createNodeTextResource)(value)),
@@ -225,9 +300,11 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       resources.resourceForValue(
         requireReactNodeElementResourceFactory(createNodeElementResource)(tag, key, props, handlers, children)
       ),
+    "react.node.fragment": (key, children) =>
+      resources.resourceForValue(requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(key, children)),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
-      return resources.resourceForValue(createRootResource(target));
+      return resources.resourceForValue(rootForContainer(target));
     },
     "react.root.render": (root, renderTree) => {
       const render = requireReactRenderCallback(renderTree);
@@ -245,11 +322,35 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       value.renderComponent(component);
       return undefined;
     },
+    "react.root.renderIntoSelector": (selector, node) => {
+      const root = selectorRoot(selector, () => disposeUnrenderedReactNode(node));
+      if (root === null) {
+        return false;
+      }
+      root.render(node);
+      return true;
+    },
+    "react.root.renderComponentIntoSelector": (selector, component) => {
+      const root = selectorRoot(selector, () => releaseLeanCallback(component));
+      if (root === null) {
+        return false;
+      }
+      root.renderComponent(component);
+      return true;
+    },
     "react.root.unmount": (root) => {
       const value = resources.resolveResource(root, "ReactRoot");
       value.unmount();
       resources.releaseResource(root);
       return undefined;
+    },
+    "react.root.unmountSelector": (selector) => {
+      const mounted = rootsBySelector.get(selector);
+      if (mounted === undefined) {
+        return false;
+      }
+      releaseRootResource(mounted.root);
+      return true;
     },
   };
 }
@@ -275,6 +376,13 @@ function requireReactNodeElementResourceFactory(factory) {
   return factory;
 }
 
+function requireReactNodeFragmentResourceFactory(factory) {
+  if (typeof factory !== "function") {
+    throw new Error("react.node.fragment host binding requires a React Node fragment resource factory");
+  }
+  return factory;
+}
+
 export function createTimerResourceHostBindings(resources) {
   return {
     "browser.timer.setTimeout": (delayMs, callback) =>
@@ -283,6 +391,14 @@ export function createTimerResourceHostBindings(resources) {
       const value = resources.resolveResource(timeout, "Timeout");
       value.clear();
       resources.releaseResource(timeout);
+      return undefined;
+    },
+    "browser.timer.setInterval": (delayMs, callback) =>
+      resources.resourceForValue(createIntervalResource(resources, delayMs, callback)),
+    "browser.timer.clearInterval": (interval) => {
+      const value = resources.resolveResource(interval, "Interval");
+      value.clear();
+      resources.releaseResource(interval);
       return undefined;
     },
   };
@@ -308,6 +424,46 @@ export function createTimeoutResource(resources, delayMs, callback) {
     cancel: globalThis.clearTimeout.bind(globalThis),
     invoke: (leanCallback) => leanCallback(),
   });
+}
+
+export function createIntervalResource(resources, delayMs, callback) {
+  let token = null;
+  let running = 0;
+  let cleared = false;
+  const release = () => {
+    callback.release();
+    resources.removeDisposable(value);
+  };
+  const value = {
+    clear() {
+      if (cleared) return undefined;
+      cleared = true;
+      if (token !== null) {
+        globalThis.clearInterval(token);
+        token = null;
+      }
+      if (running === 0) {
+        release();
+      }
+      return undefined;
+    },
+  };
+  token = globalThis.setInterval(() => {
+    if (cleared) return undefined;
+    running++;
+    try {
+      callback();
+    } catch (error) {
+      reportEventHandlerError(error);
+    } finally {
+      running--;
+      if (cleared && running === 0) {
+        release();
+      }
+    }
+  }, delayMs);
+  resources.addDisposable(value);
+  return value;
 }
 
 export function createAnimationFrameResource(resources, callback, requestFrame, cancelFrame) {

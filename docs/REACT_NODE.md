@@ -139,8 +139,19 @@ def renderComponent
     (props : props) :
     Lean.Vir.Browser.DomM Unit
 
+def renderIntoSelector (selector : String) (node : @& Lean.Vir.Js Node) :
+  Lean.Vir.Browser.DomM Bool
+
+def renderComponentIntoSelector
+    (selector : String)
+    (component : Component props)
+    (props : props) :
+    Lean.Vir.Browser.DomM Bool
+
 @[vir_js "react.root.unmount"]
 opaque unmount (root : @& Lean.Vir.Js Root) : Lean.Vir.Browser.DomM Unit
+
+def unmountSelector (selector : String) : Lean.Vir.Browser.DomM Bool
 
 end Root
 end Lean.Vir.React
@@ -238,17 +249,45 @@ The browser React host binding is exposed from
 - `react.node.createElement` validates props/handlers/children, calls
   `React.createElement(tag, props, ...children)`, and returns a `ReactNode`
   resource.
+- `react.node.fragment` calls
+  `React.createElement(React.Fragment, props, ...children)` in the browser host
+  and returns a virtual fragment node in tests.
 - `react.root.render` invokes the received Lean `ReactM` render action, renders
   the retained native React node held by the resulting `ReactNode` resource,
   and releases the render callback.
 - `react.root.renderComponent` wraps a Lean thunk produced from
   `Component props` plus concrete props in a JavaScript React function
   component and invokes `root.render(...)` with that component.
+- Repeated `react.root.renderComponent` or
+  `react.root.renderComponentIntoSelector` calls on the same root update the
+  Lean render callback while keeping the same JavaScript component identity, so
+  React hook state is preserved across prop-only rerenders such as infoview
+  cursor changes.
 - `react.useState` calls `React.useState` while rendering a component. Its ABI
   is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
+- `react.useReducer` calls `React.useReducer` while rendering a component. The
+  public Lean surface is `Hooks.useReducer`, backed by a concrete
+  `ReducerBinding state action` instance for each reducer state/action pair.
+  This keeps reducer state as ordinary structured Lean values while avoiding a
+  polymorphic host import shape the current ABI cannot package.
+- `react.useRef` calls `React.useRef` while rendering a component and returns a
+  host-owned ref object. `react.ref.get` and `react.ref.set` read/write
+  `.current`; they do not schedule a render.
+- `react.useEffect` calls `React.useEffect` while rendering a component. The
+  current ABI is resource-shaped: setup returns a host resource and cleanup
+  receives that resource when React cleans the effect up. The base binding
+  exposes React's no-dependency behavior.
+- `react.useEffectWithDeps` is the same resource-shaped effect with a
+  Lean-provided string dependency list. The browser binding passes that list as
+  React's dependency array and uses `Object.is` comparison to release newly
+  created Lean callbacks when the effect does not need to restart.
 - `js.string`, `js.nat`, and `js.bool` convert Lean scalar values into explicit
   `Lean.Vir.Js α` values through `RuntimeM` for examples that need primitive
   React state.
+- `react.root.renderIntoSelector` and
+  `react.root.renderComponentIntoSelector` create or reuse a host-owned React
+  root for a selector. This is the infoview/proof-widget path where the shell
+  owns the DOM mount element and Lean supplies the current tree or component.
 - `react.state.set` and `react.state.modify` call the retained React setter;
   both are `RuntimeM`, and `modify` retains the Lean updater callback until
   React invokes it or the runtime is disposed.
@@ -257,6 +296,7 @@ The browser React host binding is exposed from
   [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 - `react.root.unmount` calls `root.unmount()` and releases callbacks retained
   by the current render.
+- `react.root.unmountSelector` unmounts and forgets a selector-owned root.
 - Rendering a new tree into the same browser root queues callbacks retained by
   the previous tree for microtask release after React has been given the
   replacement tree. Event-triggered rerenders defer stale callback release
@@ -293,23 +333,29 @@ helpers check `currentTarget` first, then fall back to `target`.
    before rendering.
 5. Added browser and virtual Node host bindings for React roots, components,
    and hooks.
-6. Added `examples/ReactCounter.lean` that renders a hook-backed function
-   component with `Hooks.useState` and a functional setter.
+6. Added `examples/ReactCounter.lean` that renders hook-backed function
+   components with `Hooks.useState`, `Hooks.useReducer`, functional state
+   setters, fragments, and refs.
 7. Added `examples/ReactInput.lean` with hook-backed controlled text, change,
    submit, checkbox, attribute-conformance, label, and form examples.
-8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger stateful
-   example that shares the non-React Tamagotchi model, renders a keyed React
-   tree, and handles controlled input, checkbox, submit, and action callbacks.
-9. Added runtime tests for nested callbacks inside `ReactNode`, hook-backed
+8. Added `ReactTamagotchi` in `examples/Tamagotchi.lean` as a larger reducer
+   state example that shares the non-React Tamagotchi model, renders a keyed
+   React tree, and handles controlled input, checkbox, submit, timer, and
+   action callbacks.
+9. Added `examples/ReactProofWidget.lean` as a fuller proof-widget-shaped
+   example that compiles into `demo-host.irpkg`, displays on `react.html`, and
+   can also be loaded as a live infoview widget through `show_panel_widgets`.
+10. Added runtime tests for nested callbacks inside `ReactNode`, hook-backed
    component rerenders, root rerender cleanup, unmount cleanup, package reload
-   cleanup, runtime dispose, malformed Node construction, depth limits, missing selectors, and input-event
+   cleanup, runtime dispose, malformed Node construction, depth limits, missing
+   selectors, and input-event
    target fallback. Virtual `Document.querySelector` follows DOM semantics, so
    tests pre-seed expected fixtures with `ensureVirtualElementState`. Virtual
    React callback tests find nodes by DOM-like `id` props instead of child
    indexes.
-10. Added browser smoke coverage proving real React click, input, change,
+11. Added browser smoke coverage proving real React click, input, change,
     submit/checkbox, and React Tamagotchi handlers call back into Lean,
-    including rapid rerender cleanup.
+    including rapid rerender cleanup, plus proof-state goal selection.
 
 ## Future Notes
 

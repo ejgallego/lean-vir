@@ -8,6 +8,7 @@ import "./style.css";
 import { createBrowserReactRuntimeFactory } from "./browser-react-runtime.js";
 import { hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
 import { errorMessage, setReadyState } from "./pages/page-utils.js";
+import { createProofSurfaceFixture } from "./proof-surface-fixtures.js";
 import { fetchBytes } from "./vir-runtime.js";
 
 const packageFile = hostPackageFile;
@@ -19,6 +20,8 @@ const declsEl = document.querySelector("#react-review-decls");
 const exportsEl = document.querySelector("#react-review-exports");
 const ptrEl = document.querySelector("#react-review-ptr");
 const reloadButton = document.querySelector("#react-review-reload");
+
+const proofSurfaceFixture = createProofSurfaceFixture();
 
 const examples = [
   {
@@ -37,6 +40,11 @@ const examples = [
     result: document.querySelector("#react-change-result"),
   },
   {
+    entry: "ReactInput.mountSelectTextarea",
+    selector: "#react-select-textarea-root",
+    result: document.querySelector("#react-select-textarea-result"),
+  },
+  {
     entry: "ReactInput.mountCheckbox",
     selector: "#react-checkbox-root",
     result: document.querySelector("#react-checkbox-result"),
@@ -50,6 +58,12 @@ const examples = [
     entry: "ReactTamagotchi.mount",
     selector: "#react-pet-root",
     result: document.querySelector("#react-pet-result"),
+  },
+  {
+    entry: "ReactProofWidget.mount",
+    selector: "#react-proof-review-root",
+    args: [proofSurfaceFixture],
+    result: document.querySelector("#react-proof-review-result"),
   },
 ];
 
@@ -89,7 +103,7 @@ async function mountExamples() {
     runtime = await runtimeFactory.createRuntime({ irPackageBytes });
     renderRuntimeSummary();
     for (const example of examples) {
-      const mounted = runtime.call(example.entry, example.selector);
+      const mounted = runtime.call(example.entry, example.selector, ...(example.args ?? []));
       setExampleResult(example, mounted === true ? "mounted" : "missing", mounted !== true);
     }
     setReadyState(statusEl, "Ready", true);
