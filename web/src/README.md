@@ -7,8 +7,8 @@ unrelated responsibilities.
 
 ## Public Runtime Entry Points
 
-- `vir-runtime.js`: generic runtime API, WASM/package loading, exported Lean
-  calls, host import dispatch, and callback lifecycle.
+- `vir-runtime.js`: public runtime facade, WASM instantiation, package loading
+  convenience helpers, and host import wiring.
 - `vir-runtime-node.js`: Node/test wrapper that installs virtual browser and
   React host bindings.
 - `vir-host-bindings.js`: public common/browser host-binding factories and
@@ -28,10 +28,14 @@ unrelated responsibilities.
   codec.
 - `runtime/callbacks.js`: JavaScript callable Lean closure wrappers,
   callback state tracking, release, and disposal helpers.
+- `runtime/core.js`: package loading, manifest export tables, call resolution,
+  memory helpers, and runtime/callback lifecycle.
+- `runtime/object-values.js`: object ABI lowering and lifting between
+  JavaScript values and owned Lean objects.
 - `runtime/host-state.js`: host import dispatch state, externref resource
   roots, host-binding lookup, and host-binding disposal.
 - `runtime/object-abi.js`: object ABI support checks, layout planning, scalar
-  field packing, and unpacking helpers used by `vir-runtime.js`.
+  field packing, and unpacking helpers used by the object-value runtime.
 - `runtime/vir-value-normalizers.js`: JavaScript input normalization for the
   object ABI lowering path.
 - `runtime/interface-manifest.js`: interface manifest validation, diagnostics,

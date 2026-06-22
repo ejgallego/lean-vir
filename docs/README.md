@@ -14,6 +14,8 @@ ownership diagrams.
   [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md),
   `Vir/GeneratePackage/Interface/Classify/Core.lean`,
   `Vir/GeneratePackage/Interface/Encode.lean`,
+  `web/src/runtime/core.js`,
+  `web/src/runtime/object-values.js`,
   `web/src/runtime/vir-codec.js`,
   `web/src/runtime/object-abi.js`, and
   `web/src/runtime/vir-value-normalizers.js`.

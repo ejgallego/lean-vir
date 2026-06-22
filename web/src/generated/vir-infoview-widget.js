@@ -2778,134 +2778,6 @@ function normalizeUint32(value, label) {
   return value >>> 0;
 }
 
-// web/src/runtime/host-state.js
-var VirHostState = class {
-  constructor({
-    hostBindings = null,
-    defaultHostBindings = createBrowserHostBindings()
-  } = {}) {
-    this.exports = null;
-    this.manifest = null;
-    this.hostImports = [];
-    this.userBindings = hostBindings;
-    this.defaultBindings = defaultHostBindings;
-    this.runtime = null;
-    this.resourceRoots = new ExternrefResourceRoots();
-    this.callError = null;
-  }
-  attach(exports) {
-    this.exports = exports;
-  }
-  attachRuntime(runtime) {
-    this.runtime = runtime;
-  }
-  setManifest(manifest) {
-    this.manifest = manifest;
-    this.hostImports = manifest?.hostImports ?? [];
-  }
-  clearCallError() {
-    this.callError = null;
-  }
-  recordCallError(error) {
-    this.callError = error instanceof Error ? error : new Error(String(error));
-  }
-  takeCallError() {
-    const error = this.callError;
-    this.callError = null;
-    return error;
-  }
-  rootResource(value) {
-    return this.resourceRoots.root(value);
-  }
-  getRootedResource(rootId) {
-    return this.resourceRoots.get(rootId);
-  }
-  releaseRootedResource(rootId) {
-    return this.resourceRoots.release(rootId);
-  }
-  clearResourceRoots() {
-    this.resourceRoots.clear();
-  }
-  callObjects(slot, argvPtr, argc) {
-    if (this.exports === null) {
-      throw new Error("Vir host import called before WASM exports were attached");
-    }
-    if (this.runtime === null) {
-      throw new Error("Vir host import called before runtime was attached");
-    }
-    const entry = this.hostImports[slot] ?? null;
-    if (entry === null) {
-      throw new Error(`Vir host import slot ${slot} is not registered`);
-    }
-    const binding = lookupHostBinding(entry.target, this.userBindings, this.defaultBindings);
-    if (typeof binding !== "function") {
-      throw new Error(`Vir host import binding not found: ${entry.target}`);
-    }
-    const args = [];
-    const liftedCallbacks = [];
-    try {
-      const argObjects = this.readObjectArgv(argvPtr, argc);
-      if (argObjects.length !== entry.args.length) {
-        throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
-      }
-      entry.args.forEach((arg, index) => {
-        const value2 = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
-        if (isVirCallback(value2)) {
-          liftedCallbacks.push(value2);
-        }
-        args.push(value2);
-      });
-    } catch (error) {
-      releaseCallbacks(liftedCallbacks);
-      throw error;
-    }
-    let value;
-    try {
-      value = binding(...args);
-    } catch (error) {
-      releaseCallbacks(liftedCallbacks);
-      throw error;
-    }
-    if (isPromiseLike(value)) {
-      releaseCallbacks(liftedCallbacks);
-      throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
-    }
-    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
-  }
-  readObjectArgv(argvPtr, argc) {
-    if (argvPtr === 0 && argc !== 0) {
-      throw new Error("Vir host import object argv pointer is null");
-    }
-    const view = new DataView(this.exports.memory.buffer, argvPtr, argc * 4);
-    return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
-  }
-  dispose() {
-    this.clearCallError();
-    this.clearResourceRoots();
-    disposeHostBindings(this.userBindings);
-    disposeHostBindings(this.defaultBindings);
-  }
-};
-function disposeHostBindings(bindings) {
-  if (bindings === null || bindings === void 0) return;
-  const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;
-  if (typeof disposer === "function") {
-    disposer.call(bindings);
-  }
-}
-function lookupHostBinding(target, userBindings, defaultBindings) {
-  if (userBindings instanceof Map && userBindings.has(target)) {
-    return userBindings.get(target);
-  }
-  if (userBindings !== null && typeof userBindings === "object" && Object.hasOwn(userBindings, target)) {
-    return userBindings[target];
-  }
-  return defaultBindings[target];
-}
-function isPromiseLike(value) {
-  return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
-}
-
 // web/src/runtime/vir-value-normalizers.js
 function normalizeDecimal(value, label, { signed }) {
   if (typeof value === "bigint") {
@@ -3668,312 +3540,10 @@ function readScalarUnsigned(view, offset, size, label) {
   }
 }
 
-// web/src/vir-runtime.js
+// web/src/runtime/object-values.js
 var textEncoder = new TextEncoder();
-var textDecoder = new TextDecoder();
-var MAX_UINT322 = 0xffffffffn;
 var MAX_UINT642 = 0xffffffffffffffffn;
-var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
-var VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
-async function fetchBytes(path, init = { cache: "no-store" }) {
-  const response = await fetch(path, init);
-  if (!response.ok) {
-    throw new Error(`failed to load ${path}`);
-  }
-  return new Uint8Array(await response.arrayBuffer());
-}
-function debugWasmUrlFor(wasmUrl = VIR_WASM_RELEASE_FILE) {
-  const value = wasmUrl instanceof URL ? wasmUrl.href : String(wasmUrl);
-  const match = /(\.wasm)([?#].*)?$/.exec(value);
-  if (match === null) {
-    throw new Error("debugWasm requires a .wasm wasmUrl or an explicit wasmDebugUrl");
-  }
-  return `${value.slice(0, match.index)}.dev.wasm${match[2] ?? ""}`;
-}
-function createVirImports(module, overrides = {}, hostState = null) {
-  const imports = {};
-  for (const spec of WebAssembly.Module.imports(module)) {
-    imports[spec.module] ??= {};
-    if (spec.kind === "function") {
-      imports[spec.module][spec.name] = (...args) => {
-        if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
-          throw new Error(`WASI proc_exit(${args[0]})`);
-        }
-        if (spec.module === "env" && spec.name === "vir_js_call_objects") {
-          throw new Error("Vir JavaScript host import called without an attached host state");
-        }
-        return 0;
-      };
-    }
-  }
-  for (const [moduleName, moduleImports] of Object.entries(overrides)) {
-    imports[moduleName] = {
-      ...imports[moduleName] ?? {},
-      ...moduleImports
-    };
-  }
-  if (hostState !== null) {
-    imports.env ??= {};
-    imports.env.vir_js_call_objects = (slot, argvPtr, argc) => {
-      try {
-        return hostState.callObjects(slot, argvPtr, argc);
-      } catch (error) {
-        hostState.recordCallError(error);
-        return 0;
-      }
-    };
-    imports.env.vir_resource_root = (value) => hostState.rootResource(value);
-    imports.env.vir_resource_get = (rootId) => hostState.getRootedResource(rootId);
-    imports.env.vir_resource_release = (rootId) => hostState.releaseRootedResource(rootId);
-  }
-  return imports;
-}
-function createVirRuntimeFactory(options = {}) {
-  return new VirRuntimeFactory(options);
-}
-async function createVirRuntime(options = {}) {
-  const { irPackageBytes, irPackageUrl, ...factoryOptions } = options;
-  const factory = createVirRuntimeFactory(factoryOptions);
-  return factory.createRuntime({ irPackageBytes, irPackageUrl });
-}
-var VirRuntimeFactory = class {
-  constructor({
-    wasmBytes = null,
-    wasmModule = null,
-    wasmUrl = null,
-    wasmDebugUrl = null,
-    debugWasm = false,
-    fetchBytes: loadBytes = fetchBytes,
-    imports = null,
-    hostBindings = null,
-    defaultHostBindings = null
-  } = {}) {
-    this.wasmBytes = wasmBytes;
-    this.wasmModule = wasmModule;
-    this.debugWasm = debugWasm;
-    this.wasmUrl = selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm });
-    this.fetchBytes = loadBytes;
-    this.imports = imports;
-    this.hostBindings = hostBindings;
-    this.defaultHostBindings = defaultHostBindings;
-  }
-  async module() {
-    if (this.wasmModule !== null) {
-      return this.wasmModule;
-    }
-    if (this.wasmBytes === null) {
-      if (this.wasmUrl === null) {
-        throw new Error("wasmUrl, wasmBytes, or wasmModule is required");
-      }
-      this.wasmBytes = await this.fetchBytes(this.wasmUrl);
-    }
-    this.wasmModule = new WebAssembly.Module(asBytes(this.wasmBytes, "wasmBytes"));
-    return this.wasmModule;
-  }
-  async instantiate() {
-    const module = await this.module();
-    const defaultHostBindings = typeof this.defaultHostBindings === "function" ? this.defaultHostBindings() : this.defaultHostBindings ?? createBrowserHostBindings();
-    const hostState = new VirHostState({
-      hostBindings: this.hostBindings,
-      defaultHostBindings
-    });
-    const imports = typeof this.imports === "function" ? this.imports(module, hostState) : createVirImports(module, this.imports ?? {}, hostState);
-    const instance = await WebAssembly.instantiate(module, imports);
-    hostState.attach(instance.exports);
-    instance.exports.__wasm_call_ctors?.();
-    const runtime = new VirRuntime(instance.exports, { module, hostState });
-    return runtime;
-  }
-  async createRuntime({ irPackageBytes = null, irPackageUrl = null } = {}) {
-    const runtime = await this.instantiate();
-    if (irPackageBytes !== null || irPackageUrl !== null) {
-      const bytes = irPackageBytes ?? await this.fetchBytes(irPackageUrl);
-      await runtime.loadIrPackageBytes(bytes);
-    }
-    return runtime;
-  }
-};
-function selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm }) {
-  if (debugWasm) {
-    return wasmDebugUrl ?? debugWasmUrlFor(wasmUrl ?? VIR_WASM_RELEASE_FILE);
-  }
-  return wasmUrl ?? VIR_WASM_RELEASE_FILE;
-}
-var VirRuntime = class {
-  constructor(exports, { module = null, packageInfo = null, hostState = null } = {}) {
-    this.exports = exports;
-    this.module = module;
-    this.hostState = hostState;
-    this.packageInfo = packageInfo;
-    this.interfaceManifest = null;
-    this.packageMetadata = null;
-    this.boxedCallEntryNames = /* @__PURE__ */ new Set();
-    this.exportsByName = /* @__PURE__ */ Object.create(null);
-    this.entriesByName = /* @__PURE__ */ Object.create(null);
-    this.entryCallCache = /* @__PURE__ */ new WeakMap();
-    this.disposed = false;
-    this.liveCallbacks = /* @__PURE__ */ new Set();
-    this.hostState?.attachRuntime(this);
-    if (!this.exports.memory) {
-      throw new Error("WASM memory export is missing");
-    }
-    if (typeof this.exports.vir_package_interface_manifest_size === "function" && this.exports.vir_package_interface_manifest_size() !== 0) {
-      this.interfaceManifest = this.readPackageManifest();
-      this.hostState?.setManifest(this.interfaceManifest);
-      this.packageMetadata = this.interfaceManifest.metadata;
-      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
-      this.rebuildManifestExports();
-    }
-  }
-  targetPointerBytes() {
-    return this.exports.vir_upstream_target_pointer_bytes?.() ?? null;
-  }
-  packageDeclCount() {
-    return this.exports.vir_package_decl_count?.() ?? null;
-  }
-  lastPackageError() {
-    const len = this.exports.vir_last_package_error_size?.() ?? 0;
-    return len === 0 ? "" : this.readWasmString(this.exports.vir_last_package_error(), len);
-  }
-  loadIrPackageBytes(bytes) {
-    this.requireLiveRuntime();
-    this.requireFunction("vir_alloc_bytes");
-    this.requireFunction("vir_load_ir_package");
-    const packageBytes = asBytes(bytes, "IR package bytes");
-    if (this.hasPackageState() || this.liveCallbacks.size !== 0) {
-      this.teardownPackageResources();
-    }
-    this.clearPackageMetadata();
-    const ptr = this.allocBytes(packageBytes);
-    try {
-      const count = this.exports.vir_load_ir_package(ptr, packageBytes.byteLength);
-      if (count === 0) {
-        const detail = this.lastPackageError();
-        throw new Error(`IR package load failed${detail ? `: ${detail}` : ""}`);
-      }
-      const providerCount = this.packageDeclCount();
-      if (providerCount !== null && providerCount !== count) {
-        throw new Error(`IR package declaration count mismatch: load returned ${count}, provider has ${providerCount}`);
-      }
-      this.interfaceManifest = this.readPackageManifest();
-      this.hostState?.setManifest(this.interfaceManifest);
-      this.packageMetadata = this.interfaceManifest.metadata;
-      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
-      this.rebuildManifestExports();
-      this.packageInfo = {
-        count: providerCount ?? count,
-        byteLength: packageBytes.byteLength,
-        interfaceExports: this.interfaceManifest.exports.length,
-        hostImports: this.interfaceManifest.hostImports?.length ?? 0,
-        metadata: this.packageMetadata
-      };
-      return this.packageInfo;
-    } finally {
-      this.freeBytes(ptr);
-    }
-  }
-  clearPackageMetadata() {
-    this.packageInfo = null;
-    this.interfaceManifest = null;
-    this.hostState?.setManifest(null);
-    this.packageMetadata = null;
-    this.boxedCallEntryNames = /* @__PURE__ */ new Set();
-    this.exportsByName = /* @__PURE__ */ Object.create(null);
-    this.entriesByName = /* @__PURE__ */ Object.create(null);
-    this.entryCallCache = /* @__PURE__ */ new WeakMap();
-  }
-  hasPackageState() {
-    return this.packageInfo !== null || this.interfaceManifest !== null || this.packageMetadata !== null;
-  }
-  readPackageManifest() {
-    this.requireFunction("vir_package_interface_manifest");
-    this.requireFunction("vir_package_interface_manifest_size");
-    const len = this.exports.vir_package_interface_manifest_size();
-    if (len === 0) {
-      throw new Error("IR package does not contain an embedded interface manifest");
-    }
-    const text = this.readWasmString(this.exports.vir_package_interface_manifest(), len);
-    const manifest = JSON.parse(text);
-    return validateInterfaceManifest(manifest);
-  }
-  rebuildManifestExports() {
-    this.exportsByName = /* @__PURE__ */ Object.create(null);
-    this.entriesByName = /* @__PURE__ */ Object.create(null);
-    this.entryCallCache = /* @__PURE__ */ new WeakMap();
-    for (const entry of this.interfaceManifest?.exports ?? []) {
-      registerManifestEntryKey(this.entriesByName, entry.entry, entry);
-      registerManifestEntryKey(this.entriesByName, entry.id, entry);
-      registerManifestEntryKey(this.entriesByName, entry.jsName, entry);
-      this.entryCallCache.set(entry, {
-        nameBytes: textEncoder.encode(entry.entry)
-      });
-      if (entry.jsName && isIdentifier(entry.jsName)) {
-        this.exportsByName[entry.jsName] = (...args) => this.callEntry(entry, args);
-      }
-    }
-  }
-  findManifestEntry(name) {
-    return typeof name === "string" ? this.entriesByName[name] ?? null : null;
-  }
-  call(name, ...args) {
-    const entry = this.findManifestEntry(name);
-    if (entry === null) {
-      throw new Error(`interface entry not found: ${name}`);
-    }
-    return this.callEntry(entry, args);
-  }
-  callEntry(entry, args) {
-    this.requireLiveRuntime();
-    this.requireFunction("vir_resolve_call");
-    if (args.length !== entry.args.length) {
-      throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
-    }
-    const cache = this.callCacheFor(entry);
-    const objectResult = this.tryObjectResolvedCall(entry, args, cache);
-    if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
-      return objectResult;
-    }
-    throw new Error(`object ABI does not support interface entry ${entry.entry}`);
-  }
-  tryObjectResolvedCall(entry, args, cache) {
-    const plan = this.objectCallPlanFor(entry, cache);
-    if (plan === null) {
-      return OBJECT_CALL_UNAVAILABLE;
-    }
-    if (!this.hasObjectValueExports()) {
-      return OBJECT_CALL_UNAVAILABLE;
-    }
-    const argObjs = [];
-    try {
-      for (let index = 0; index < plan.args.length; index++) {
-        const arg = plan.args[index];
-        argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
-      }
-      return this.callResolvedObjects(entry, cache, argObjs, (resultObj) => this.liftObjectValue(plan.resultType, resultObj, `${entry.entry} result`));
-    } finally {
-      this.releaseOwnedObjects(argObjs);
-    }
-  }
-  objectCallPlanFor(entry, cache) {
-    if (cache.objectCallPlan !== void 0) {
-      return cache.objectCallPlan;
-    }
-    const resultType = entry.result;
-    if (!objectResultSupported(resultType) || !entry.args.every((arg) => objectArgumentSupported(arg.type))) {
-      cache.objectCallPlan = null;
-      return null;
-    }
-    const hasBoxedDecl = this.boxedCallEntryNames.has(entry.entry);
-    if (!hasBoxedDecl && (objectTypeNeedsBoxedBoundary(resultType) || entry.args.some((arg) => objectTypeNeedsBoxedBoundary(arg.type)))) {
-      cache.objectCallPlan = null;
-      return null;
-    }
-    cache.objectCallPlan = {
-      args: entry.args,
-      resultType
-    };
-    return cache.objectCallPlan;
-  }
+var ObjectValueRuntime = class {
   hasObjectValueExports() {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
   }
@@ -5120,13 +4690,221 @@ var VirRuntime = class {
       offset
     );
   }
+};
+function normalizeBinderInfo(value, label) {
+  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 3) return value;
+  switch (value) {
+    case "default":
+      return 0;
+    case "implicit":
+      return 1;
+    case "strictImplicit":
+      return 2;
+    case "instImplicit":
+      return 3;
+    default:
+      throw new Error(`${label} must be default, implicit, strictImplicit, or instImplicit`);
+  }
+}
+function decodeBinderInfo(value) {
+  return ["default", "implicit", "strictImplicit", "instImplicit"][value] ?? String(value);
+}
+function requireString2(value, label) {
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a string`);
+  }
+  return value;
+}
+
+// web/src/runtime/core.js
+var textEncoder2 = new TextEncoder();
+var textDecoder = new TextDecoder();
+var MAX_UINT322 = 0xffffffffn;
+var MAX_UINT643 = 0xffffffffffffffffn;
+var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
+var VirRuntime = class extends ObjectValueRuntime {
+  constructor(exports, { module = null, packageInfo = null, hostState = null } = {}) {
+    super();
+    this.exports = exports;
+    this.module = module;
+    this.hostState = hostState;
+    this.packageInfo = packageInfo;
+    this.interfaceManifest = null;
+    this.packageMetadata = null;
+    this.boxedCallEntryNames = /* @__PURE__ */ new Set();
+    this.exportsByName = /* @__PURE__ */ Object.create(null);
+    this.entriesByName = /* @__PURE__ */ Object.create(null);
+    this.entryCallCache = /* @__PURE__ */ new WeakMap();
+    this.disposed = false;
+    this.liveCallbacks = /* @__PURE__ */ new Set();
+    this.hostState?.attachRuntime(this);
+    if (!this.exports.memory) {
+      throw new Error("WASM memory export is missing");
+    }
+    if (typeof this.exports.vir_package_interface_manifest_size === "function" && this.exports.vir_package_interface_manifest_size() !== 0) {
+      this.interfaceManifest = this.readPackageManifest();
+      this.hostState?.setManifest(this.interfaceManifest);
+      this.packageMetadata = this.interfaceManifest.metadata;
+      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
+      this.rebuildManifestExports();
+    }
+  }
+  targetPointerBytes() {
+    return this.exports.vir_upstream_target_pointer_bytes?.() ?? null;
+  }
+  packageDeclCount() {
+    return this.exports.vir_package_decl_count?.() ?? null;
+  }
+  lastPackageError() {
+    const len = this.exports.vir_last_package_error_size?.() ?? 0;
+    return len === 0 ? "" : this.readWasmString(this.exports.vir_last_package_error(), len);
+  }
+  loadIrPackageBytes(bytes) {
+    this.requireLiveRuntime();
+    this.requireFunction("vir_alloc_bytes");
+    this.requireFunction("vir_load_ir_package");
+    const packageBytes = asBytes(bytes, "IR package bytes");
+    if (this.hasPackageState() || this.liveCallbacks.size !== 0) {
+      this.teardownPackageResources();
+    }
+    this.clearPackageMetadata();
+    const ptr = this.allocBytes(packageBytes);
+    try {
+      const count = this.exports.vir_load_ir_package(ptr, packageBytes.byteLength);
+      if (count === 0) {
+        const detail = this.lastPackageError();
+        throw new Error(`IR package load failed${detail ? `: ${detail}` : ""}`);
+      }
+      const providerCount = this.packageDeclCount();
+      if (providerCount !== null && providerCount !== count) {
+        throw new Error(`IR package declaration count mismatch: load returned ${count}, provider has ${providerCount}`);
+      }
+      this.interfaceManifest = this.readPackageManifest();
+      this.hostState?.setManifest(this.interfaceManifest);
+      this.packageMetadata = this.interfaceManifest.metadata;
+      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
+      this.rebuildManifestExports();
+      this.packageInfo = {
+        count: providerCount ?? count,
+        byteLength: packageBytes.byteLength,
+        interfaceExports: this.interfaceManifest.exports.length,
+        hostImports: this.interfaceManifest.hostImports?.length ?? 0,
+        metadata: this.packageMetadata
+      };
+      return this.packageInfo;
+    } finally {
+      this.freeBytes(ptr);
+    }
+  }
+  clearPackageMetadata() {
+    this.packageInfo = null;
+    this.interfaceManifest = null;
+    this.hostState?.setManifest(null);
+    this.packageMetadata = null;
+    this.boxedCallEntryNames = /* @__PURE__ */ new Set();
+    this.exportsByName = /* @__PURE__ */ Object.create(null);
+    this.entriesByName = /* @__PURE__ */ Object.create(null);
+    this.entryCallCache = /* @__PURE__ */ new WeakMap();
+  }
+  hasPackageState() {
+    return this.packageInfo !== null || this.interfaceManifest !== null || this.packageMetadata !== null;
+  }
+  readPackageManifest() {
+    this.requireFunction("vir_package_interface_manifest");
+    this.requireFunction("vir_package_interface_manifest_size");
+    const len = this.exports.vir_package_interface_manifest_size();
+    if (len === 0) {
+      throw new Error("IR package does not contain an embedded interface manifest");
+    }
+    const text = this.readWasmString(this.exports.vir_package_interface_manifest(), len);
+    const manifest = JSON.parse(text);
+    return validateInterfaceManifest(manifest);
+  }
+  rebuildManifestExports() {
+    this.exportsByName = /* @__PURE__ */ Object.create(null);
+    this.entriesByName = /* @__PURE__ */ Object.create(null);
+    this.entryCallCache = /* @__PURE__ */ new WeakMap();
+    for (const entry of this.interfaceManifest?.exports ?? []) {
+      registerManifestEntryKey(this.entriesByName, entry.entry, entry);
+      registerManifestEntryKey(this.entriesByName, entry.id, entry);
+      registerManifestEntryKey(this.entriesByName, entry.jsName, entry);
+      this.entryCallCache.set(entry, {
+        nameBytes: textEncoder2.encode(entry.entry)
+      });
+      if (entry.jsName && isIdentifier(entry.jsName)) {
+        this.exportsByName[entry.jsName] = (...args) => this.callEntry(entry, args);
+      }
+    }
+  }
+  findManifestEntry(name) {
+    return typeof name === "string" ? this.entriesByName[name] ?? null : null;
+  }
+  call(name, ...args) {
+    const entry = this.findManifestEntry(name);
+    if (entry === null) {
+      throw new Error(`interface entry not found: ${name}`);
+    }
+    return this.callEntry(entry, args);
+  }
+  callEntry(entry, args) {
+    this.requireLiveRuntime();
+    this.requireFunction("vir_resolve_call");
+    if (args.length !== entry.args.length) {
+      throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
+    }
+    const cache = this.callCacheFor(entry);
+    const objectResult = this.tryObjectResolvedCall(entry, args, cache);
+    if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
+      return objectResult;
+    }
+    throw new Error(`object ABI does not support interface entry ${entry.entry}`);
+  }
+  tryObjectResolvedCall(entry, args, cache) {
+    const plan = this.objectCallPlanFor(entry, cache);
+    if (plan === null) {
+      return OBJECT_CALL_UNAVAILABLE;
+    }
+    if (!this.hasObjectValueExports()) {
+      return OBJECT_CALL_UNAVAILABLE;
+    }
+    const argObjs = [];
+    try {
+      for (let index = 0; index < plan.args.length; index++) {
+        const arg = plan.args[index];
+        argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
+      }
+      return this.callResolvedObjects(entry, cache, argObjs, (resultObj) => this.liftObjectValue(plan.resultType, resultObj, `${entry.entry} result`));
+    } finally {
+      this.releaseOwnedObjects(argObjs);
+    }
+  }
+  objectCallPlanFor(entry, cache) {
+    if (cache.objectCallPlan !== void 0) {
+      return cache.objectCallPlan;
+    }
+    const resultType = entry.result;
+    if (!objectResultSupported(resultType) || !entry.args.every((arg) => objectArgumentSupported(arg.type))) {
+      cache.objectCallPlan = null;
+      return null;
+    }
+    const hasBoxedDecl = this.boxedCallEntryNames.has(entry.entry);
+    if (!hasBoxedDecl && (objectTypeNeedsBoxedBoundary(resultType) || entry.args.some((arg) => objectTypeNeedsBoxedBoundary(arg.type)))) {
+      cache.objectCallPlan = null;
+      return null;
+    }
+    cache.objectCallPlan = {
+      args: entry.args,
+      resultType
+    };
+    return cache.objectCallPlan;
+  }
   usizeMaxValue() {
-    return this.targetPointerBytes() === 4 ? MAX_UINT322 : MAX_UINT642;
+    return this.targetPointerBytes() === 4 ? MAX_UINT322 : MAX_UINT643;
   }
   callCacheFor(entry) {
     let cache = this.entryCallCache.get(entry);
     if (cache === void 0) {
-      cache = { nameBytes: textEncoder.encode(entry.entry) };
+      cache = { nameBytes: textEncoder2.encode(entry.entry) };
       this.entryCallCache.set(entry, cache);
     }
     return cache;
@@ -5282,29 +5060,260 @@ function boxedCallEntryNames(manifest) {
 function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
 }
-function normalizeBinderInfo(value, label) {
-  if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 3) return value;
-  switch (value) {
-    case "default":
-      return 0;
-    case "implicit":
-      return 1;
-    case "strictImplicit":
-      return 2;
-    case "instImplicit":
-      return 3;
-    default:
-      throw new Error(`${label} must be default, implicit, strictImplicit, or instImplicit`);
+
+// web/src/runtime/host-state.js
+var VirHostState = class {
+  constructor({
+    hostBindings = null,
+    defaultHostBindings = createBrowserHostBindings()
+  } = {}) {
+    this.exports = null;
+    this.manifest = null;
+    this.hostImports = [];
+    this.userBindings = hostBindings;
+    this.defaultBindings = defaultHostBindings;
+    this.runtime = null;
+    this.resourceRoots = new ExternrefResourceRoots();
+    this.callError = null;
+  }
+  attach(exports) {
+    this.exports = exports;
+  }
+  attachRuntime(runtime) {
+    this.runtime = runtime;
+  }
+  setManifest(manifest) {
+    this.manifest = manifest;
+    this.hostImports = manifest?.hostImports ?? [];
+  }
+  clearCallError() {
+    this.callError = null;
+  }
+  recordCallError(error) {
+    this.callError = error instanceof Error ? error : new Error(String(error));
+  }
+  takeCallError() {
+    const error = this.callError;
+    this.callError = null;
+    return error;
+  }
+  rootResource(value) {
+    return this.resourceRoots.root(value);
+  }
+  getRootedResource(rootId) {
+    return this.resourceRoots.get(rootId);
+  }
+  releaseRootedResource(rootId) {
+    return this.resourceRoots.release(rootId);
+  }
+  clearResourceRoots() {
+    this.resourceRoots.clear();
+  }
+  callObjects(slot, argvPtr, argc) {
+    if (this.exports === null) {
+      throw new Error("Vir host import called before WASM exports were attached");
+    }
+    if (this.runtime === null) {
+      throw new Error("Vir host import called before runtime was attached");
+    }
+    const entry = this.hostImports[slot] ?? null;
+    if (entry === null) {
+      throw new Error(`Vir host import slot ${slot} is not registered`);
+    }
+    const binding = lookupHostBinding(entry.target, this.userBindings, this.defaultBindings);
+    if (typeof binding !== "function") {
+      throw new Error(`Vir host import binding not found: ${entry.target}`);
+    }
+    const args = [];
+    const liftedCallbacks = [];
+    try {
+      const argObjects = this.readObjectArgv(argvPtr, argc);
+      if (argObjects.length !== entry.args.length) {
+        throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
+      }
+      entry.args.forEach((arg, index) => {
+        const value2 = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        if (isVirCallback(value2)) {
+          liftedCallbacks.push(value2);
+        }
+        args.push(value2);
+      });
+    } catch (error) {
+      releaseCallbacks(liftedCallbacks);
+      throw error;
+    }
+    let value;
+    try {
+      value = binding(...args);
+    } catch (error) {
+      releaseCallbacks(liftedCallbacks);
+      throw error;
+    }
+    if (isPromiseLike(value)) {
+      releaseCallbacks(liftedCallbacks);
+      throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
+    }
+    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
+  }
+  readObjectArgv(argvPtr, argc) {
+    if (argvPtr === 0 && argc !== 0) {
+      throw new Error("Vir host import object argv pointer is null");
+    }
+    const view = new DataView(this.exports.memory.buffer, argvPtr, argc * 4);
+    return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
+  }
+  dispose() {
+    this.clearCallError();
+    this.clearResourceRoots();
+    disposeHostBindings(this.userBindings);
+    disposeHostBindings(this.defaultBindings);
+  }
+};
+function disposeHostBindings(bindings) {
+  if (bindings === null || bindings === void 0) return;
+  const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;
+  if (typeof disposer === "function") {
+    disposer.call(bindings);
   }
 }
-function decodeBinderInfo(value) {
-  return ["default", "implicit", "strictImplicit", "instImplicit"][value] ?? String(value);
-}
-function requireString2(value, label) {
-  if (typeof value !== "string") {
-    throw new Error(`${label} must be a string`);
+function lookupHostBinding(target, userBindings, defaultBindings) {
+  if (userBindings instanceof Map && userBindings.has(target)) {
+    return userBindings.get(target);
   }
-  return value;
+  if (userBindings !== null && typeof userBindings === "object" && Object.hasOwn(userBindings, target)) {
+    return userBindings[target];
+  }
+  return defaultBindings[target];
+}
+function isPromiseLike(value) {
+  return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
+}
+
+// web/src/vir-runtime.js
+var VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
+async function fetchBytes(path, init = { cache: "no-store" }) {
+  const response = await fetch(path, init);
+  if (!response.ok) {
+    throw new Error(`failed to load ${path}`);
+  }
+  return new Uint8Array(await response.arrayBuffer());
+}
+function debugWasmUrlFor(wasmUrl = VIR_WASM_RELEASE_FILE) {
+  const value = wasmUrl instanceof URL ? wasmUrl.href : String(wasmUrl);
+  const match = /(\.wasm)([?#].*)?$/.exec(value);
+  if (match === null) {
+    throw new Error("debugWasm requires a .wasm wasmUrl or an explicit wasmDebugUrl");
+  }
+  return `${value.slice(0, match.index)}.dev.wasm${match[2] ?? ""}`;
+}
+function createVirImports(module, overrides = {}, hostState = null) {
+  const imports = {};
+  for (const spec of WebAssembly.Module.imports(module)) {
+    imports[spec.module] ??= {};
+    if (spec.kind === "function") {
+      imports[spec.module][spec.name] = (...args) => {
+        if (spec.module === "wasi_snapshot_preview1" && spec.name === "proc_exit") {
+          throw new Error(`WASI proc_exit(${args[0]})`);
+        }
+        if (spec.module === "env" && spec.name === "vir_js_call_objects") {
+          throw new Error("Vir JavaScript host import called without an attached host state");
+        }
+        return 0;
+      };
+    }
+  }
+  for (const [moduleName, moduleImports] of Object.entries(overrides)) {
+    imports[moduleName] = {
+      ...imports[moduleName] ?? {},
+      ...moduleImports
+    };
+  }
+  if (hostState !== null) {
+    imports.env ??= {};
+    imports.env.vir_js_call_objects = (slot, argvPtr, argc) => {
+      try {
+        return hostState.callObjects(slot, argvPtr, argc);
+      } catch (error) {
+        hostState.recordCallError(error);
+        return 0;
+      }
+    };
+    imports.env.vir_resource_root = (value) => hostState.rootResource(value);
+    imports.env.vir_resource_get = (rootId) => hostState.getRootedResource(rootId);
+    imports.env.vir_resource_release = (rootId) => hostState.releaseRootedResource(rootId);
+  }
+  return imports;
+}
+function createVirRuntimeFactory(options = {}) {
+  return new VirRuntimeFactory(options);
+}
+async function createVirRuntime(options = {}) {
+  const { irPackageBytes, irPackageUrl, ...factoryOptions } = options;
+  const factory = createVirRuntimeFactory(factoryOptions);
+  return factory.createRuntime({ irPackageBytes, irPackageUrl });
+}
+var VirRuntimeFactory = class {
+  constructor({
+    wasmBytes = null,
+    wasmModule = null,
+    wasmUrl = null,
+    wasmDebugUrl = null,
+    debugWasm = false,
+    fetchBytes: loadBytes = fetchBytes,
+    imports = null,
+    hostBindings = null,
+    defaultHostBindings = null
+  } = {}) {
+    this.wasmBytes = wasmBytes;
+    this.wasmModule = wasmModule;
+    this.debugWasm = debugWasm;
+    this.wasmUrl = selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm });
+    this.fetchBytes = loadBytes;
+    this.imports = imports;
+    this.hostBindings = hostBindings;
+    this.defaultHostBindings = defaultHostBindings;
+  }
+  async module() {
+    if (this.wasmModule !== null) {
+      return this.wasmModule;
+    }
+    if (this.wasmBytes === null) {
+      if (this.wasmUrl === null) {
+        throw new Error("wasmUrl, wasmBytes, or wasmModule is required");
+      }
+      this.wasmBytes = await this.fetchBytes(this.wasmUrl);
+    }
+    this.wasmModule = new WebAssembly.Module(asBytes(this.wasmBytes, "wasmBytes"));
+    return this.wasmModule;
+  }
+  async instantiate() {
+    const module = await this.module();
+    const defaultHostBindings = typeof this.defaultHostBindings === "function" ? this.defaultHostBindings() : this.defaultHostBindings ?? createBrowserHostBindings();
+    const hostState = new VirHostState({
+      hostBindings: this.hostBindings,
+      defaultHostBindings
+    });
+    const imports = typeof this.imports === "function" ? this.imports(module, hostState) : createVirImports(module, this.imports ?? {}, hostState);
+    const instance = await WebAssembly.instantiate(module, imports);
+    hostState.attach(instance.exports);
+    instance.exports.__wasm_call_ctors?.();
+    const runtime = new VirRuntime(instance.exports, { module, hostState });
+    return runtime;
+  }
+  async createRuntime({ irPackageBytes = null, irPackageUrl = null } = {}) {
+    const runtime = await this.instantiate();
+    if (irPackageBytes !== null || irPackageUrl !== null) {
+      const bytes = irPackageBytes ?? await this.fetchBytes(irPackageUrl);
+      await runtime.loadIrPackageBytes(bytes);
+    }
+    return runtime;
+  }
+};
+function selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm }) {
+  if (debugWasm) {
+    return wasmDebugUrl ?? debugWasmUrlFor(wasmUrl ?? VIR_WASM_RELEASE_FILE);
+  }
+  return wasmUrl ?? VIR_WASM_RELEASE_FILE;
 }
 
 // web/src/vir-infoview-widget.js
