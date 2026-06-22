@@ -26,6 +26,10 @@ unrelated responsibilities.
 
 - `runtime/vir-codec.js`: binary reader/writer and interface type descriptor
   codec.
+- `runtime/callbacks.js`: JavaScript callable Lean closure wrappers,
+  callback state tracking, release, and disposal helpers.
+- `runtime/host-state.js`: host import dispatch state, externref resource
+  roots, host-binding lookup, and host-binding disposal.
 - `runtime/object-abi.js`: object ABI support checks, layout planning, scalar
   field packing, and unpacking helpers used by `vir-runtime.js`.
 - `runtime/vir-value-normalizers.js`: JavaScript input normalization for the

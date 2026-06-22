@@ -2556,6 +2556,66 @@ function requireUniqueStructureField(seen, value, label) {
   seen.add(value);
 }
 
+// web/src/runtime/callbacks.js
+var virCallbackStates = /* @__PURE__ */ new WeakMap();
+var VirCallback = class {
+  call(...args) {
+    const state = requireVirCallbackState(this);
+    if (state.released) {
+      throw new Error("Vir callback has been released");
+    }
+    return state.runtime.callClosure(state.rootId, state.type, args);
+  }
+  release() {
+    const state = requireVirCallbackState(this);
+    if (state.released) return false;
+    state.released = true;
+    state.runtime.releaseClosure(state.rootId);
+    state.runtime.untrackCallback(this);
+    return true;
+  }
+  dispose() {
+    return this.release();
+  }
+  get released() {
+    return requireVirCallbackState(this).released;
+  }
+};
+Object.setPrototypeOf(VirCallback.prototype, Function.prototype);
+function createVirCallback(runtime, rootId, type) {
+  if (!Number.isInteger(rootId) || rootId <= 0 || rootId > 4294967295) {
+    throw new Error("callback root id must be a positive 32-bit integer");
+  }
+  const callback = function virCallback(...args) {
+    return callback.call(...args);
+  };
+  Object.setPrototypeOf(callback, VirCallback.prototype);
+  virCallbackStates.set(callback, {
+    runtime,
+    rootId,
+    type,
+    released: false
+  });
+  runtime.trackCallback(callback);
+  return callback;
+}
+function isVirCallback(value) {
+  return typeof value === "function" && virCallbackStates.has(value);
+}
+function releaseCallbacks(callbacks) {
+  for (const callback of callbacks) {
+    callback.release();
+  }
+  callbacks.length = 0;
+}
+function requireVirCallbackState(callback) {
+  const state = virCallbackStates.get(callback);
+  if (state === void 0) {
+    throw new Error("Vir callback state is missing");
+  }
+  return state;
+}
+
 // web/src/runtime/vir-codec.js
 function asBytes(bytes, label) {
   if (bytes instanceof Uint8Array) {
@@ -2716,6 +2776,134 @@ function normalizeUint32(value, label) {
     throw new Error(`${label} must be an integer in 0..4294967295`);
   }
   return value >>> 0;
+}
+
+// web/src/runtime/host-state.js
+var VirHostState = class {
+  constructor({
+    hostBindings = null,
+    defaultHostBindings = createBrowserHostBindings()
+  } = {}) {
+    this.exports = null;
+    this.manifest = null;
+    this.hostImports = [];
+    this.userBindings = hostBindings;
+    this.defaultBindings = defaultHostBindings;
+    this.runtime = null;
+    this.resourceRoots = new ExternrefResourceRoots();
+    this.callError = null;
+  }
+  attach(exports) {
+    this.exports = exports;
+  }
+  attachRuntime(runtime) {
+    this.runtime = runtime;
+  }
+  setManifest(manifest) {
+    this.manifest = manifest;
+    this.hostImports = manifest?.hostImports ?? [];
+  }
+  clearCallError() {
+    this.callError = null;
+  }
+  recordCallError(error) {
+    this.callError = error instanceof Error ? error : new Error(String(error));
+  }
+  takeCallError() {
+    const error = this.callError;
+    this.callError = null;
+    return error;
+  }
+  rootResource(value) {
+    return this.resourceRoots.root(value);
+  }
+  getRootedResource(rootId) {
+    return this.resourceRoots.get(rootId);
+  }
+  releaseRootedResource(rootId) {
+    return this.resourceRoots.release(rootId);
+  }
+  clearResourceRoots() {
+    this.resourceRoots.clear();
+  }
+  callObjects(slot, argvPtr, argc) {
+    if (this.exports === null) {
+      throw new Error("Vir host import called before WASM exports were attached");
+    }
+    if (this.runtime === null) {
+      throw new Error("Vir host import called before runtime was attached");
+    }
+    const entry = this.hostImports[slot] ?? null;
+    if (entry === null) {
+      throw new Error(`Vir host import slot ${slot} is not registered`);
+    }
+    const binding = lookupHostBinding(entry.target, this.userBindings, this.defaultBindings);
+    if (typeof binding !== "function") {
+      throw new Error(`Vir host import binding not found: ${entry.target}`);
+    }
+    const args = [];
+    const liftedCallbacks = [];
+    try {
+      const argObjects = this.readObjectArgv(argvPtr, argc);
+      if (argObjects.length !== entry.args.length) {
+        throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
+      }
+      entry.args.forEach((arg, index) => {
+        const value2 = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        if (isVirCallback(value2)) {
+          liftedCallbacks.push(value2);
+        }
+        args.push(value2);
+      });
+    } catch (error) {
+      releaseCallbacks(liftedCallbacks);
+      throw error;
+    }
+    let value;
+    try {
+      value = binding(...args);
+    } catch (error) {
+      releaseCallbacks(liftedCallbacks);
+      throw error;
+    }
+    if (isPromiseLike(value)) {
+      releaseCallbacks(liftedCallbacks);
+      throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
+    }
+    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
+  }
+  readObjectArgv(argvPtr, argc) {
+    if (argvPtr === 0 && argc !== 0) {
+      throw new Error("Vir host import object argv pointer is null");
+    }
+    const view = new DataView(this.exports.memory.buffer, argvPtr, argc * 4);
+    return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
+  }
+  dispose() {
+    this.clearCallError();
+    this.clearResourceRoots();
+    disposeHostBindings(this.userBindings);
+    disposeHostBindings(this.defaultBindings);
+  }
+};
+function disposeHostBindings(bindings) {
+  if (bindings === null || bindings === void 0) return;
+  const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;
+  if (typeof disposer === "function") {
+    disposer.call(bindings);
+  }
+}
+function lookupHostBinding(target, userBindings, defaultBindings) {
+  if (userBindings instanceof Map && userBindings.has(target)) {
+    return userBindings.get(target);
+  }
+  if (userBindings !== null && typeof userBindings === "object" && Object.hasOwn(userBindings, target)) {
+    return userBindings[target];
+  }
+  return defaultBindings[target];
+}
+function isPromiseLike(value) {
+  return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
 }
 
 // web/src/runtime/vir-value-normalizers.js
@@ -3485,7 +3673,6 @@ var textEncoder = new TextEncoder();
 var textDecoder = new TextDecoder();
 var MAX_UINT322 = 0xffffffffn;
 var MAX_UINT642 = 0xffffffffffffffffn;
-var virCallbackStates = /* @__PURE__ */ new WeakMap();
 var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
 async function fetchBytes(path, init = { cache: "no-store" }) {
   const response = await fetch(path, init);
@@ -3592,110 +3779,6 @@ var VirRuntimeFactory = class {
       await runtime.loadIrPackageBytes(bytes);
     }
     return runtime;
-  }
-};
-var VirHostState = class {
-  constructor({ hostBindings = null, defaultHostBindings = createBrowserHostBindings() } = {}) {
-    this.exports = null;
-    this.manifest = null;
-    this.hostImports = [];
-    this.userBindings = hostBindings;
-    this.defaultBindings = defaultHostBindings;
-    this.runtime = null;
-    this.resourceRoots = new ExternrefResourceRoots();
-    this.callError = null;
-  }
-  attach(exports) {
-    this.exports = exports;
-  }
-  attachRuntime(runtime) {
-    this.runtime = runtime;
-  }
-  setManifest(manifest) {
-    this.manifest = manifest;
-    this.hostImports = manifest?.hostImports ?? [];
-  }
-  clearCallError() {
-    this.callError = null;
-  }
-  recordCallError(error) {
-    this.callError = error instanceof Error ? error : new Error(String(error));
-  }
-  takeCallError() {
-    const error = this.callError;
-    this.callError = null;
-    return error;
-  }
-  rootResource(value) {
-    return this.resourceRoots.root(value);
-  }
-  getRootedResource(rootId) {
-    return this.resourceRoots.get(rootId);
-  }
-  releaseRootedResource(rootId) {
-    return this.resourceRoots.release(rootId);
-  }
-  clearResourceRoots() {
-    this.resourceRoots.clear();
-  }
-  callObjects(slot, argvPtr, argc) {
-    if (this.exports === null) {
-      throw new Error("Vir host import called before WASM exports were attached");
-    }
-    if (this.runtime === null) {
-      throw new Error("Vir host import called before runtime was attached");
-    }
-    const entry = this.hostImports[slot] ?? null;
-    if (entry === null) {
-      throw new Error(`Vir host import slot ${slot} is not registered`);
-    }
-    const binding = lookupHostBinding(entry.target, this.userBindings, this.defaultBindings);
-    if (typeof binding !== "function") {
-      throw new Error(`Vir host import binding not found: ${entry.target}`);
-    }
-    const args = [];
-    const liftedCallbacks = [];
-    try {
-      const argObjects = this.readObjectArgv(argvPtr, argc);
-      if (argObjects.length !== entry.args.length) {
-        throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
-      }
-      entry.args.forEach((arg, index) => {
-        const value2 = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
-        if (isVirCallback(value2)) {
-          liftedCallbacks.push(value2);
-        }
-        args.push(value2);
-      });
-    } catch (error) {
-      releaseCallbacks(liftedCallbacks);
-      throw error;
-    }
-    let value;
-    try {
-      value = binding(...args);
-    } catch (error) {
-      releaseCallbacks(liftedCallbacks);
-      throw error;
-    }
-    if (isPromiseLike(value)) {
-      releaseCallbacks(liftedCallbacks);
-      throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
-    }
-    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
-  }
-  readObjectArgv(argvPtr, argc) {
-    if (argvPtr === 0 && argc !== 0) {
-      throw new Error("Vir host import object argv pointer is null");
-    }
-    const view = new DataView(this.exports.memory.buffer, argvPtr, argc * 4);
-    return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
-  }
-  dispose() {
-    this.clearCallError();
-    this.clearResourceRoots();
-    disposeHostBindings(this.userBindings);
-    disposeHostBindings(this.defaultBindings);
   }
 };
 var VirRuntime = class {
@@ -5162,54 +5245,6 @@ var VirRuntime = class {
     }
   }
 };
-var VirCallback = class {
-  call(...args) {
-    const state = requireVirCallbackState(this);
-    if (state.released) {
-      throw new Error("Vir callback has been released");
-    }
-    return state.runtime.callClosure(state.rootId, state.type, args);
-  }
-  release() {
-    const state = requireVirCallbackState(this);
-    if (state.released) return false;
-    state.released = true;
-    state.runtime.releaseClosure(state.rootId);
-    state.runtime.untrackCallback(this);
-    return true;
-  }
-  dispose() {
-    return this.release();
-  }
-  get released() {
-    return requireVirCallbackState(this).released;
-  }
-};
-Object.setPrototypeOf(VirCallback.prototype, Function.prototype);
-function createVirCallback(runtime, rootId, type) {
-  if (!Number.isInteger(rootId) || rootId <= 0 || rootId > 4294967295) {
-    throw new Error("callback root id must be a positive 32-bit integer");
-  }
-  const callback = function virCallback(...args) {
-    return callback.call(...args);
-  };
-  Object.setPrototypeOf(callback, VirCallback.prototype);
-  virCallbackStates.set(callback, {
-    runtime,
-    rootId,
-    type,
-    released: false
-  });
-  runtime.trackCallback(callback);
-  return callback;
-}
-function requireVirCallbackState(callback) {
-  const state = virCallbackStates.get(callback);
-  if (state === void 0) {
-    throw new Error("Vir callback state is missing");
-  }
-  return state;
-}
 function registerManifestEntryKey(map, key, entry) {
   if (typeof key === "string" && key !== "" && map[key] === void 0) {
     map[key] = entry;
@@ -5225,13 +5260,6 @@ function boxedCallEntryNames(manifest) {
     }
   }
   return names;
-}
-function disposeHostBindings(bindings) {
-  if (bindings === null || bindings === void 0) return;
-  const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;
-  if (typeof disposer === "function") {
-    disposer.call(bindings);
-  }
 }
 function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
@@ -5259,27 +5287,6 @@ function requireString2(value, label) {
     throw new Error(`${label} must be a string`);
   }
   return value;
-}
-function isVirCallback(value) {
-  return typeof value === "function" && virCallbackStates.has(value);
-}
-function releaseCallbacks(callbacks) {
-  for (const callback of callbacks) {
-    callback.release();
-  }
-  callbacks.length = 0;
-}
-function lookupHostBinding(target, userBindings, defaultBindings) {
-  if (userBindings instanceof Map && userBindings.has(target)) {
-    return userBindings.get(target);
-  }
-  if (userBindings !== null && typeof userBindings === "object" && Object.hasOwn(userBindings, target)) {
-    return userBindings[target];
-  }
-  return defaultBindings[target];
-}
-function isPromiseLike(value) {
-  return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
 }
 
 // web/src/vir-infoview-widget.js

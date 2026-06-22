@@ -56,7 +56,9 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | --- | --- |
 | `vir-runtime.js` | Public runtime, WASM/package loading, exported Lean calls, callback lifecycle. |
 | `vir-runtime-node.js` | Node wrapper that installs virtual browser and React host bindings for tests/tools. |
+| `runtime/callbacks.js` | JavaScript callable Lean closure wrappers, callback state tracking, release, and disposal helpers. |
 | `runtime/vir-codec.js` | Binary reader/writer and interface type descriptor codec. |
+| `runtime/host-state.js` | Host import dispatch state, externref roots, host-binding lookup, and disposal. |
 | `runtime/object-abi.js` | Object ABI support checks, layout planning, scalar packing, and unpacking helpers. |
 | `runtime/vir-value-normalizers.js` | Input normalization helpers used by object ABI lowering. |
 | `vir-host-bindings.js` | Public common/browser host binding factories and stable re-exports. |
