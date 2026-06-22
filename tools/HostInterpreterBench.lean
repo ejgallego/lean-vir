@@ -55,17 +55,24 @@ def repeatSort : Nat -> Array Nat -> Nat
   | 0, _ => 0
   | n + 1, input => sortChecksum input + repeatSort n input
 
-def parseNat! (text : String) : Nat :=
+def parseNat (text : String) : Except String Nat :=
   match text.toNat? with
-  | some n => n
-  | none => panic! s!"expected Nat, got `{text}`"
+  | some n => .ok n
+  | none => .error s!"expected Nat, got `{text}`"
 
-def parseArray (text : String) : Array Nat :=
-  text.splitOn ","
-    |>.filterMap (fun part =>
+partial def parseArrayParts : List String → Array Nat → Except String (Array Nat)
+  | [], values => .ok values
+  | part :: rest, values =>
       let trimmed := part.trimAscii.toString
-      if trimmed.isEmpty then none else some (parseNat! trimmed))
-    |>.toArray
+      if trimmed.isEmpty then
+        parseArrayParts rest values
+      else
+        match parseNat trimmed with
+        | .ok n => parseArrayParts rest (values.push n)
+        | .error err => .error err
+
+def parseArray (text : String) : Except String (Array Nat) :=
+  parseArrayParts (text.splitOn ",") #[]
 
 def measure (label : String) (iterations : Nat) (run : Unit -> Nat) : IO Unit := do
   let sink ← IO.mkRef 0
@@ -78,16 +85,32 @@ def measure (label : String) (iterations : Nat) (run : Unit -> Nat) : IO Unit :=
 
 def main (args : List String) : IO UInt32 := do
   match args with
-  | ["fib", iterations, input] =>
-      let iterations := parseNat! iterations
-      let input := parseNat! input
-      measure "fib" iterations fun _ => repeatFib iterations input
-      return 0
-  | ["sort", iterations, input] =>
-      let iterations := parseNat! iterations
-      let input := parseArray input
-      measure "sort" iterations fun _ => repeatSort iterations input
-      return 0
+  | ["fib", iterationsText, inputText] =>
+      match parseNat iterationsText with
+      | .error err =>
+          IO.eprintln err
+          return 2
+      | .ok iterations =>
+          match parseNat inputText with
+          | .error err =>
+              IO.eprintln err
+              return 2
+          | .ok input =>
+              measure "fib" iterations fun _ => repeatFib iterations input
+              return 0
+  | ["sort", iterationsText, inputText] =>
+      match parseNat iterationsText with
+      | .error err =>
+          IO.eprintln err
+          return 2
+      | .ok iterations =>
+          match parseArray inputText with
+          | .error err =>
+              IO.eprintln err
+              return 2
+          | .ok input =>
+              measure "sort" iterations fun _ => repeatSort iterations input
+              return 0
   | _ =>
       IO.eprintln "usage: host-interpreter-bench <fib|sort> <iterations> <input>"
       return 2

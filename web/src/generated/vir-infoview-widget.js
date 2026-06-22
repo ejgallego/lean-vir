@@ -12,6 +12,7 @@ import { EditorContext, useRpcSession } from "@leanprover/infoview";
 
 // web/src/host-resource.js
 var EXTERNREF_TABLE_INITIAL_LENGTH = 1;
+var VIR_HOST_DISPOSE = /* @__PURE__ */ Symbol.for("lean-vir.hostDispose");
 var hostResourceState = /* @__PURE__ */ new WeakMap();
 var externrefTableSupport = null;
 function hasExternrefTableSupport() {
@@ -1744,7 +1745,6 @@ function isRpcRefObject(value) {
 }
 
 // web/src/vir-host-bindings.js
-var VIR_HOST_DISPOSE = /* @__PURE__ */ Symbol.for("lean-vir.hostDispose");
 function createCommonHostBindings() {
   return {
     "common.echoString": (value) => value,
@@ -2982,7 +2982,6 @@ var textEncoder = new TextEncoder();
 var textDecoder = new TextDecoder();
 var MAX_UINT32 = 0xffffffffn;
 var MAX_UINT64 = 0xffffffffffffffffn;
-var VIR_HOST_DISPOSE2 = /* @__PURE__ */ Symbol.for("lean-vir.hostDispose");
 var virCallbackStates = /* @__PURE__ */ new WeakMap();
 var objectLayoutPlanCache = /* @__PURE__ */ new WeakMap();
 var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
@@ -3178,8 +3177,6 @@ var VirHostState = class {
     this.manifest = manifest;
     this.hostImports = manifest?.hostImports ?? [];
   }
-  clearTransientQueues() {
-  }
   clearCallError() {
     this.callError = null;
   }
@@ -3257,7 +3254,6 @@ var VirHostState = class {
     return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
   }
   dispose() {
-    this.clearTransientQueues();
     this.clearCallError();
     this.clearResourceRoots();
     disposeHostBindings(this.userBindings);
@@ -3394,16 +3390,11 @@ var VirRuntime = class {
       throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
     }
     const cache = this.callCacheFor(entry);
-    this.hostState?.clearTransientQueues();
-    try {
-      const objectResult = this.tryObjectResolvedCall(entry, args, cache);
-      if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
-        return objectResult;
-      }
-      throw new Error(`object ABI does not support interface entry ${entry.entry}`);
-    } finally {
-      this.hostState?.clearTransientQueues();
+    const objectResult = this.tryObjectResolvedCall(entry, args, cache);
+    if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
+      return objectResult;
     }
+    throw new Error(`object ABI does not support interface entry ${entry.entry}`);
   }
   tryObjectResolvedCall(entry, args, cache) {
     const plan = this.objectCallPlanFor(entry, cache);
@@ -4672,7 +4663,6 @@ var VirRuntime = class {
   callClosure(rootId, type, args) {
     this.requireLiveRuntime();
     this.requireFunction("vir_closure_call_objects");
-    this.hostState?.clearTransientQueues();
     const fnArgs = requireFunctionArgs(type, "callback");
     if (args.length !== fnArgs.length) {
       throw new Error(`callback expects ${fnArgs.length} arguments, got ${args.length}`);
@@ -4685,7 +4675,6 @@ var VirRuntime = class {
       return this.callClosureObjects(rootId, type, argObjs);
     } finally {
       this.releaseOwnedObjects(argObjs);
-      this.hostState?.clearTransientQueues();
     }
   }
   callClosureObjects(rootId, type, argObjs) {
@@ -5224,7 +5213,7 @@ function readScalarUnsigned(view, offset, size, label) {
 }
 function disposeHostBindings(bindings) {
   if (bindings === null || bindings === void 0) return;
-  const disposer = bindings[VIR_HOST_DISPOSE2] ?? bindings.dispose;
+  const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;
   if (typeof disposer === "function") {
     disposer.call(bindings);
   }
