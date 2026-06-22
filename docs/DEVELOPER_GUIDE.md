@@ -28,7 +28,8 @@ For package/interface work, read:
 4. `Vir/GeneratePackage/Interface/Encode.lean`
 5. `web/src/runtime/interface-manifest.js`
 6. `web/src/runtime/vir-codec.js`
-7. `web/src/runtime/vir-value-normalizers.js`
+7. `web/src/runtime/object-abi.js`
+8. `web/src/runtime/vir-value-normalizers.js`
 
 For browser or React host work, read:
 

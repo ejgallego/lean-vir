@@ -2736,6 +2736,17 @@ function normalizeDecimal(value, label, { signed }) {
   }
   throw new Error(`${label} must be an integer, BigInt, or decimal string`);
 }
+function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {
+  const decimal = normalizeDecimal(value, label, { signed: false });
+  const normalized = BigInt(decimal);
+  if (normalized > max) {
+    throw new Error(`${label} is out of range for ${typeName}`);
+  }
+  return decimal;
+}
+function normalizeBoundedUnsignedBigInt(value, label, max, typeName) {
+  return BigInt(normalizeBoundedUnsignedDecimal(value, label, max, typeName));
+}
 function normalizeFloat(value, label) {
   if (typeof value === "number") {
     return value;
@@ -2977,14 +2988,10 @@ function hasOwn(value, key) {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-// web/src/vir-runtime.js
-var textEncoder = new TextEncoder();
-var textDecoder = new TextDecoder();
+// web/src/runtime/object-abi.js
 var MAX_UINT32 = 0xffffffffn;
 var MAX_UINT64 = 0xffffffffffffffffn;
-var virCallbackStates = /* @__PURE__ */ new WeakMap();
 var objectLayoutPlanCache = /* @__PURE__ */ new WeakMap();
-var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
 var OBJECT_VALUE_EXPORTS = [
   "vir_obj_array",
   "vir_obj_array_get",
@@ -3049,6 +3056,437 @@ var OBJECT_VALUE_EXPORTS = [
   "vir_obj_usize",
   "vir_obj_usize_decimal"
 ];
+function objectArgumentSupported(type, selfType = null) {
+  const tag = type?.wireTag;
+  switch (tag) {
+    case WIRE.RECURSIVE_SELF:
+      return selfType !== null;
+    case WIRE.UNIT:
+    case WIRE.RESOURCE:
+    case WIRE.BOOL:
+    case WIRE.NAT:
+    case WIRE.INT:
+    case WIRE.STRING:
+    case WIRE.UINT8:
+    case WIRE.UINT16:
+    case WIRE.UINT32:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
+    case WIRE.BYTE_ARRAY:
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
+    case WIRE.EXPR:
+    case WIRE.SIMPLE_ENUM:
+      return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      return objectArgumentSupported(requireTypeField(type, "element", "object argument"), selfType);
+    case WIRE.PROD:
+      return objectArgumentSupported(requireTypeField(type, "fst", "object argument"), selfType) && objectArgumentSupported(requireTypeField(type, "snd", "object argument"), selfType);
+    case WIRE.STRUCTURE:
+      return objectStructureSupported(type, objectArgumentSupported);
+    case WIRE.TAGGED_UNION:
+      return objectTaggedUnionSupported(type, objectArgumentSupported);
+    case WIRE.CUSTOM_INDUCTIVE:
+      return objectCustomInductiveSupported(type, objectArgumentSupported);
+    default:
+      return false;
+  }
+}
+function objectResultSupported(type, selfType = null) {
+  const tag = type?.wireTag;
+  switch (tag) {
+    case WIRE.RECURSIVE_SELF:
+      return selfType !== null;
+    case WIRE.UNIT:
+    case WIRE.RESOURCE:
+    case WIRE.FUNCTION:
+    case WIRE.BOOL:
+    case WIRE.NAT:
+    case WIRE.INT:
+    case WIRE.STRING:
+    case WIRE.UINT8:
+    case WIRE.UINT16:
+    case WIRE.UINT32:
+    case WIRE.UINT64:
+    case WIRE.USIZE:
+    case WIRE.BYTE_ARRAY:
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
+    case WIRE.EXPR:
+    case WIRE.SIMPLE_ENUM:
+      return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      return objectResultSupported(requireTypeField(type, "element", "object result"), selfType);
+    case WIRE.PROD:
+      return objectResultSupported(requireTypeField(type, "fst", "object result"), selfType) && objectResultSupported(requireTypeField(type, "snd", "object result"), selfType);
+    case WIRE.STRUCTURE:
+      return objectStructureSupported(type, objectResultSupported);
+    case WIRE.TAGGED_UNION:
+      return objectTaggedUnionSupported(type, objectResultSupported);
+    case WIRE.CUSTOM_INDUCTIVE:
+      return objectCustomInductiveSupported(type, objectResultSupported);
+    default:
+      return false;
+  }
+}
+function objectTypeNeedsBoxedBoundary(type) {
+  switch (type?.wireTag) {
+    case WIRE.FLOAT:
+    case WIRE.FLOAT32:
+    case WIRE.UINT64:
+      return true;
+    case WIRE.STRUCTURE: {
+      const fields = requireStructureFields(type, "object boundary");
+      const trivial = trivialStructureField(type, fields);
+      return trivial !== null && objectTypeNeedsBoxedBoundary(trivial.type);
+    }
+    default:
+      return false;
+  }
+}
+function objectStructureSupported(type, fieldSupported) {
+  const fields = requireStructureFields(type, "object structure");
+  const trivial = trivialStructureField(type, fields);
+  if (trivial !== null) {
+    return fieldSupported(trivial.type, type);
+  }
+  return objectLayoutSupported(type, fields, fieldSupported, type);
+}
+function objectTaggedUnionSupported(type, fieldSupported) {
+  return requireTaggedUnionConstructors(type, "object tagged union").every((ctor) => objectLayoutSupported(ctor, [taggedUnionField(ctor)], fieldSupported, type));
+}
+function objectCustomInductiveSupported(type, fieldSupported) {
+  return requireCustomInductiveConstructors(type, "object custom inductive").every((ctor) => {
+    if (ctor.fields.length === 0) {
+      const counts = objectRuntimeCounts(ctor, "object custom inductive");
+      return counts.objectFieldCount === 0 && counts.usizeFieldCount === 0 && counts.scalarByteSize === 0;
+    }
+    return objectLayoutSupported(ctor, ctor.fields, fieldSupported, type);
+  });
+}
+function objectLayoutSupported(owner, fields, fieldSupported, selfType) {
+  let plan;
+  try {
+    plan = objectLayoutPlan(owner, fields, "object layout");
+  } catch {
+    return false;
+  }
+  return plan.fields.every((fieldPlan) => objectFieldPlanSupported(fieldPlan, fieldSupported, selfType));
+}
+function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
+  const field = fieldPlan.field;
+  switch (fieldPlan.kind) {
+    case "object":
+      return fieldSupported(field.type, selfType);
+    case "usize":
+      return field.type?.wireTag === WIRE.USIZE;
+    case "scalar":
+      return objectScalarFieldSupported(field.type, field.layout);
+    default:
+      return false;
+  }
+}
+function trivialStructureField(type, fields) {
+  const index = type?.trivialFieldIndex;
+  if (!Number.isInteger(index)) {
+    return null;
+  }
+  if (index < 0 || index >= fields.length) {
+    throw new Error(`${type?.type ?? "structure"} has invalid trivial field index`);
+  }
+  return fields[index];
+}
+function taggedUnionField(ctor) {
+  return {
+    name: ctor.jsName,
+    type: ctor.type,
+    layout: ctor.layout
+  };
+}
+function objectLayoutSlotsFromPlan(plan) {
+  return {
+    objectFields: Array(plan.objectFieldCount).fill(0),
+    usizeFields: Array(plan.usizeFieldCount).fill(0n),
+    scalarBytes: new Uint8Array(plan.scalarByteSize)
+  };
+}
+function objectLayoutPlan(owner, fields, label) {
+  const cacheable = owner !== null && (typeof owner === "object" || typeof owner === "function");
+  let cachedPlans;
+  if (cacheable) {
+    cachedPlans = objectLayoutPlanCache.get(owner);
+    if (cachedPlans !== void 0) {
+      for (const plan2 of cachedPlans) {
+        if (objectLayoutPlanMatches(plan2, fields)) {
+          return plan2;
+        }
+      }
+    }
+  }
+  const counts = objectRuntimeCounts(owner, label);
+  const fieldPlans = [];
+  const seenObjects = /* @__PURE__ */ new Set();
+  const seenUSize = /* @__PURE__ */ new Set();
+  const seenScalarBytes = /* @__PURE__ */ new Set();
+  for (const field of fields) {
+    const fieldLabel = `${label}.${field.name ?? "field"}`;
+    switch (field.layout.kind) {
+      case "object": {
+        const index = objectLayoutIndex(owner, field.layout, fieldLabel);
+        if (index === null) {
+          throw new Error(`${fieldLabel} has unsupported object ABI layout`);
+        }
+        if (seenObjects.has(index)) {
+          throw new Error(`${fieldLabel} duplicates object field index ${index}`);
+        }
+        seenObjects.add(index);
+        fieldPlans.push({ field, kind: "object", index });
+        break;
+      }
+      case "usize": {
+        const index = usizeLayoutIndex(owner, field.layout, fieldLabel);
+        if (index === null) {
+          throw new Error(`${fieldLabel} has unsupported object ABI layout`);
+        }
+        if (seenUSize.has(index)) {
+          throw new Error(`${fieldLabel} duplicates USize field index ${field.layout.index}`);
+        }
+        seenUSize.add(index);
+        fieldPlans.push({ field, kind: "usize", index });
+        break;
+      }
+      case "scalar": {
+        const offset = scalarLayoutOffset(field.layout, counts.scalarByteSize, fieldLabel);
+        for (let index = field.layout.offset; index < field.layout.offset + field.layout.size; index++) {
+          if (seenScalarBytes.has(index)) {
+            throw new Error(`${fieldLabel} overlaps scalar byte ${index}`);
+          }
+          seenScalarBytes.add(index);
+        }
+        fieldPlans.push({ field, kind: "scalar", offset });
+        break;
+      }
+      default:
+        throw new Error(`${fieldLabel} has unsupported object ABI layout`);
+    }
+  }
+  const plan = {
+    objectFieldCount: counts.objectFieldCount,
+    usizeFieldCount: counts.usizeFieldCount,
+    scalarByteSize: counts.scalarByteSize,
+    fields: fieldPlans
+  };
+  if (!cacheable) {
+    return plan;
+  }
+  if (cachedPlans === void 0) {
+    objectLayoutPlanCache.set(owner, [plan]);
+  } else {
+    cachedPlans.push(plan);
+  }
+  return plan;
+}
+function objectLayoutPlanMatches(plan, fields) {
+  if (plan.fields.length !== fields.length) {
+    return false;
+  }
+  for (let index = 0; index < fields.length; index++) {
+    if (!sameLayoutField(plan.fields[index].field, fields[index])) {
+      return false;
+    }
+  }
+  return true;
+}
+function sameLayoutField(lhs, rhs) {
+  return lhs === rhs || lhs?.name === rhs?.name && lhs?.type === rhs?.type && sameLayout(lhs?.layout, rhs?.layout);
+}
+function sameLayout(lhs, rhs) {
+  return lhs === rhs || lhs?.kind === rhs?.kind && lhs?.index === rhs?.index && lhs?.offset === rhs?.offset && lhs?.size === rhs?.size;
+}
+function objectRuntimeCounts(owner, label) {
+  const objectFieldCount = owner?.objectFieldCount;
+  const usizeFieldCount = owner?.usizeFieldCount;
+  const scalarByteSize = owner?.scalarByteSize;
+  if (!Number.isInteger(objectFieldCount) || objectFieldCount < 0 || !Number.isInteger(usizeFieldCount) || usizeFieldCount < 0 || !Number.isInteger(scalarByteSize) || scalarByteSize < 0) {
+    throw new Error(`${label} has unsupported object ABI runtime counts`);
+  }
+  return { objectFieldCount, usizeFieldCount, scalarByteSize };
+}
+function objectLayoutIndex(owner, layout, label) {
+  if (layout?.kind !== "object" || !Number.isInteger(layout.index)) {
+    return null;
+  }
+  const { objectFieldCount } = objectRuntimeCounts(owner, label);
+  return layout.index >= 0 && layout.index < objectFieldCount ? layout.index : null;
+}
+function usizeLayoutIndex(owner, layout, label) {
+  if (layout?.kind !== "usize" || !Number.isInteger(layout.index)) {
+    return null;
+  }
+  const { objectFieldCount, usizeFieldCount } = objectRuntimeCounts(owner, label);
+  const index = layout.index - objectFieldCount;
+  return index >= 0 && index < usizeFieldCount ? index : null;
+}
+function scalarLayoutOffset(layout, scalarByteSize, label) {
+  if (layout?.kind !== "scalar" || !Number.isInteger(layout.offset) || !Number.isInteger(layout.size) || layout.offset < 0 || layout.size <= 0 || layout.offset + layout.size > scalarByteSize) {
+    throw new Error(`${label} has unsupported object ABI scalar layout`);
+  }
+  return layout.offset;
+}
+function objectScalarFieldSupported(type, layout) {
+  if (layout?.kind !== "scalar") {
+    return false;
+  }
+  switch (type?.wireTag) {
+    case WIRE.BOOL:
+    case WIRE.SIMPLE_ENUM:
+      return [1, 2, 4, 8].includes(layout.size);
+    case WIRE.UINT8:
+      return layout.size === 1;
+    case WIRE.UINT16:
+      return layout.size === 2;
+    case WIRE.UINT32:
+    case WIRE.FLOAT32:
+      return layout.size === 4;
+    case WIRE.UINT64:
+    case WIRE.FLOAT:
+      return layout.size === 8;
+    default:
+      return false;
+  }
+}
+function writeObjectScalarField(bytes, type, layout, value, label, offset = null) {
+  offset ??= scalarLayoutOffset(layout, bytes.byteLength, label);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  switch (type?.wireTag) {
+    case WIRE.BOOL:
+      if (typeof value !== "boolean") {
+        throw new Error(`${label} must be a boolean`);
+      }
+      writeScalarUnsigned(view, offset, layout.size, value ? 1n : 0n, label);
+      return;
+    case WIRE.UINT8:
+      requireScalarSize(layout, 1, label);
+      view.setUint8(offset, normalizeInteger(value, label, 0, 255));
+      return;
+    case WIRE.UINT16:
+      requireScalarSize(layout, 2, label);
+      view.setUint16(offset, normalizeInteger(value, label, 0, 65535), true);
+      return;
+    case WIRE.UINT32:
+      requireScalarSize(layout, 4, label);
+      view.setUint32(offset, normalizeUint32(value, label), true);
+      return;
+    case WIRE.UINT64:
+      requireScalarSize(layout, 8, label);
+      view.setBigUint64(offset, normalizeBoundedUnsignedBigInt(value, label, MAX_UINT64, "UInt64"), true);
+      return;
+    case WIRE.FLOAT:
+      requireScalarSize(layout, 8, label);
+      view.setFloat64(offset, normalizeFloat(value, label), true);
+      return;
+    case WIRE.FLOAT32:
+      requireScalarSize(layout, 4, label);
+      view.setFloat32(offset, Math.fround(normalizeFloat(value, label)), true);
+      return;
+    case WIRE.SIMPLE_ENUM:
+      writeScalarUnsigned(view, offset, layout.size, BigInt(normalizeEnum(value, type, label)), label);
+      return;
+    default:
+      throw new Error(`${label} has unsupported object ABI scalar type`);
+  }
+}
+function readObjectScalarField(view, type, layout, label, offset = null) {
+  offset ??= scalarLayoutOffset(layout, view.byteLength, label);
+  switch (type?.wireTag) {
+    case WIRE.BOOL:
+      return readScalarUnsigned(view, offset, layout.size, label) !== 0n;
+    case WIRE.UINT8:
+      requireScalarSize(layout, 1, label);
+      return view.getUint8(offset);
+    case WIRE.UINT16:
+      requireScalarSize(layout, 2, label);
+      return view.getUint16(offset, true);
+    case WIRE.UINT32:
+      requireScalarSize(layout, 4, label);
+      return view.getUint32(offset, true);
+    case WIRE.UINT64:
+      requireScalarSize(layout, 8, label);
+      return view.getBigUint64(offset, true).toString();
+    case WIRE.FLOAT:
+      requireScalarSize(layout, 8, label);
+      return view.getFloat64(offset, true);
+    case WIRE.FLOAT32:
+      requireScalarSize(layout, 4, label);
+      return Math.fround(view.getFloat32(offset, true));
+    case WIRE.SIMPLE_ENUM: {
+      const tag = readScalarUnsigned(view, offset, layout.size, label);
+      if (tag > BigInt(Number.MAX_SAFE_INTEGER)) {
+        throw new Error(`${label} enum tag is too large for JavaScript`);
+      }
+      return enumValue(type, Number(tag));
+    }
+    default:
+      throw new Error(`${label} has unsupported object ABI scalar type`);
+  }
+}
+function requireScalarSize(layout, expected, label) {
+  if (layout.size !== expected) {
+    throw new Error(`${label} has scalar size ${layout.size}, expected ${expected}`);
+  }
+}
+function writeScalarUnsigned(view, offset, size, value, label) {
+  const normalized = typeof value === "bigint" ? value : BigInt(value);
+  if (normalized < 0n) {
+    throw new Error(`${label} must be non-negative`);
+  }
+  switch (size) {
+    case 1:
+      if (normalized > 0xffn) throw new Error(`${label} exceeds UInt8 scalar field size`);
+      view.setUint8(offset, Number(normalized));
+      return;
+    case 2:
+      if (normalized > 0xffffn) throw new Error(`${label} exceeds UInt16 scalar field size`);
+      view.setUint16(offset, Number(normalized), true);
+      return;
+    case 4:
+      if (normalized > MAX_UINT32) throw new Error(`${label} exceeds UInt32 scalar field size`);
+      view.setUint32(offset, Number(normalized), true);
+      return;
+    case 8:
+      if (normalized > MAX_UINT64) throw new Error(`${label} exceeds UInt64 scalar field size`);
+      view.setBigUint64(offset, normalized, true);
+      return;
+    default:
+      throw new Error(`${label} has unsupported scalar field size ${size}`);
+  }
+}
+function readScalarUnsigned(view, offset, size, label) {
+  switch (size) {
+    case 1:
+      return BigInt(view.getUint8(offset));
+    case 2:
+      return BigInt(view.getUint16(offset, true));
+    case 4:
+      return BigInt(view.getUint32(offset, true));
+    case 8:
+      return view.getBigUint64(offset, true);
+    default:
+      throw new Error(`${label} has unsupported scalar field size ${size}`);
+  }
+}
+
+// web/src/vir-runtime.js
+var textEncoder = new TextEncoder();
+var textDecoder = new TextDecoder();
+var MAX_UINT322 = 0xffffffffn;
+var MAX_UINT642 = 0xffffffffffffffffn;
+var virCallbackStates = /* @__PURE__ */ new WeakMap();
+var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
 async function fetchBytes(path, init = { cache: "no-store" }) {
   const response = await fetch(path, init);
   if (!response.ok) {
@@ -3473,7 +3911,7 @@ var VirRuntime = class {
       case WIRE.UINT64:
         return this.makeObjectDecimal(
           "vir_obj_uint64",
-          normalizeBoundedUnsignedDecimal(value, label, MAX_UINT64, "UInt64"),
+          normalizeBoundedUnsignedDecimal(value, label, MAX_UINT642, "UInt64"),
           label
         );
       case WIRE.USIZE:
@@ -4582,7 +5020,7 @@ var VirRuntime = class {
     );
   }
   usizeMaxValue() {
-    return this.targetPointerBytes() === 4 ? MAX_UINT32 : MAX_UINT64;
+    return this.targetPointerBytes() === 4 ? MAX_UINT322 : MAX_UINT642;
   }
   callCacheFor(entry) {
     let cache = this.entryCallCache.get(entry);
@@ -4788,429 +5226,6 @@ function boxedCallEntryNames(manifest) {
   }
   return names;
 }
-function objectArgumentSupported(type, selfType = null) {
-  const tag = type?.wireTag;
-  switch (tag) {
-    case WIRE.RECURSIVE_SELF:
-      return selfType !== null;
-    case WIRE.UNIT:
-    case WIRE.RESOURCE:
-    case WIRE.BOOL:
-    case WIRE.NAT:
-    case WIRE.INT:
-    case WIRE.STRING:
-    case WIRE.UINT8:
-    case WIRE.UINT16:
-    case WIRE.UINT32:
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-    case WIRE.BYTE_ARRAY:
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-    case WIRE.EXPR:
-    case WIRE.SIMPLE_ENUM:
-      return true;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
-      return objectArgumentSupported(requireTypeField(type, "element", "object argument"), selfType);
-    case WIRE.PROD:
-      return objectArgumentSupported(requireTypeField(type, "fst", "object argument"), selfType) && objectArgumentSupported(requireTypeField(type, "snd", "object argument"), selfType);
-    case WIRE.STRUCTURE:
-      return objectStructureSupported(type, objectArgumentSupported);
-    case WIRE.TAGGED_UNION:
-      return objectTaggedUnionSupported(type, objectArgumentSupported);
-    case WIRE.CUSTOM_INDUCTIVE:
-      return objectCustomInductiveSupported(type, objectArgumentSupported);
-    default:
-      return false;
-  }
-}
-function objectResultSupported(type, selfType = null) {
-  const tag = type?.wireTag;
-  switch (tag) {
-    case WIRE.RECURSIVE_SELF:
-      return selfType !== null;
-    case WIRE.UNIT:
-    case WIRE.RESOURCE:
-    case WIRE.FUNCTION:
-    case WIRE.BOOL:
-    case WIRE.NAT:
-    case WIRE.INT:
-    case WIRE.STRING:
-    case WIRE.UINT8:
-    case WIRE.UINT16:
-    case WIRE.UINT32:
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-    case WIRE.BYTE_ARRAY:
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-    case WIRE.EXPR:
-    case WIRE.SIMPLE_ENUM:
-      return true;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
-      return objectResultSupported(requireTypeField(type, "element", "object result"), selfType);
-    case WIRE.PROD:
-      return objectResultSupported(requireTypeField(type, "fst", "object result"), selfType) && objectResultSupported(requireTypeField(type, "snd", "object result"), selfType);
-    case WIRE.STRUCTURE:
-      return objectStructureSupported(type, objectResultSupported);
-    case WIRE.TAGGED_UNION:
-      return objectTaggedUnionSupported(type, objectResultSupported);
-    case WIRE.CUSTOM_INDUCTIVE:
-      return objectCustomInductiveSupported(type, objectResultSupported);
-    default:
-      return false;
-  }
-}
-function objectTypeNeedsBoxedBoundary(type) {
-  switch (type?.wireTag) {
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-    case WIRE.UINT64:
-      return true;
-    case WIRE.STRUCTURE: {
-      const fields = requireStructureFields(type, "object boundary");
-      const trivial = trivialStructureField(type, fields);
-      return trivial !== null && objectTypeNeedsBoxedBoundary(trivial.type);
-    }
-    default:
-      return false;
-  }
-}
-function objectStructureSupported(type, fieldSupported) {
-  const fields = requireStructureFields(type, "object structure");
-  const trivial = trivialStructureField(type, fields);
-  if (trivial !== null) {
-    return fieldSupported(trivial.type, type);
-  }
-  return objectLayoutSupported(type, fields, fieldSupported, type);
-}
-function objectTaggedUnionSupported(type, fieldSupported) {
-  return requireTaggedUnionConstructors(type, "object tagged union").every((ctor) => objectLayoutSupported(ctor, [taggedUnionField(ctor)], fieldSupported, type));
-}
-function objectCustomInductiveSupported(type, fieldSupported) {
-  return requireCustomInductiveConstructors(type, "object custom inductive").every((ctor) => {
-    if (ctor.fields.length === 0) {
-      const counts = objectRuntimeCounts(ctor, "object custom inductive");
-      return counts.objectFieldCount === 0 && counts.usizeFieldCount === 0 && counts.scalarByteSize === 0;
-    }
-    return objectLayoutSupported(ctor, ctor.fields, fieldSupported, type);
-  });
-}
-function objectLayoutSupported(owner, fields, fieldSupported, selfType) {
-  let plan;
-  try {
-    plan = objectLayoutPlan(owner, fields, "object layout");
-  } catch {
-    return false;
-  }
-  return plan.fields.every((fieldPlan) => objectFieldPlanSupported(fieldPlan, fieldSupported, selfType));
-}
-function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
-  const field = fieldPlan.field;
-  switch (fieldPlan.kind) {
-    case "object":
-      return fieldSupported(field.type, selfType);
-    case "usize":
-      return field.type?.wireTag === WIRE.USIZE;
-    case "scalar":
-      return objectScalarFieldSupported(field.type, field.layout);
-    default:
-      return false;
-  }
-}
-function trivialStructureField(type, fields) {
-  const index = type?.trivialFieldIndex;
-  if (!Number.isInteger(index)) {
-    return null;
-  }
-  if (index < 0 || index >= fields.length) {
-    throw new Error(`${type?.type ?? "structure"} has invalid trivial field index`);
-  }
-  return fields[index];
-}
-function taggedUnionField(ctor) {
-  return {
-    name: ctor.jsName,
-    type: ctor.type,
-    layout: ctor.layout
-  };
-}
-function objectLayoutSlotsFromPlan(plan) {
-  return {
-    objectFields: Array(plan.objectFieldCount).fill(0),
-    usizeFields: Array(plan.usizeFieldCount).fill(0n),
-    scalarBytes: new Uint8Array(plan.scalarByteSize)
-  };
-}
-function objectLayoutPlan(owner, fields, label) {
-  const cacheable = owner !== null && (typeof owner === "object" || typeof owner === "function");
-  let cachedPlans;
-  if (cacheable) {
-    cachedPlans = objectLayoutPlanCache.get(owner);
-    if (cachedPlans !== void 0) {
-      for (const plan2 of cachedPlans) {
-        if (objectLayoutPlanMatches(plan2, fields)) {
-          return plan2;
-        }
-      }
-    }
-  }
-  const counts = objectRuntimeCounts(owner, label);
-  const fieldPlans = [];
-  const seenObjects = /* @__PURE__ */ new Set();
-  const seenUSize = /* @__PURE__ */ new Set();
-  const seenScalarBytes = /* @__PURE__ */ new Set();
-  for (const field of fields) {
-    const fieldLabel = `${label}.${field.name ?? "field"}`;
-    switch (field.layout.kind) {
-      case "object": {
-        const index = objectLayoutIndex(owner, field.layout, fieldLabel);
-        if (index === null) {
-          throw new Error(`${fieldLabel} has unsupported object ABI layout`);
-        }
-        if (seenObjects.has(index)) {
-          throw new Error(`${fieldLabel} duplicates object field index ${index}`);
-        }
-        seenObjects.add(index);
-        fieldPlans.push({ field, kind: "object", index });
-        break;
-      }
-      case "usize": {
-        const index = usizeLayoutIndex(owner, field.layout, fieldLabel);
-        if (index === null) {
-          throw new Error(`${fieldLabel} has unsupported object ABI layout`);
-        }
-        if (seenUSize.has(index)) {
-          throw new Error(`${fieldLabel} duplicates USize field index ${field.layout.index}`);
-        }
-        seenUSize.add(index);
-        fieldPlans.push({ field, kind: "usize", index });
-        break;
-      }
-      case "scalar": {
-        const offset = scalarLayoutOffset(field.layout, counts.scalarByteSize, fieldLabel);
-        for (let index = field.layout.offset; index < field.layout.offset + field.layout.size; index++) {
-          if (seenScalarBytes.has(index)) {
-            throw new Error(`${fieldLabel} overlaps scalar byte ${index}`);
-          }
-          seenScalarBytes.add(index);
-        }
-        fieldPlans.push({ field, kind: "scalar", offset });
-        break;
-      }
-      default:
-        throw new Error(`${fieldLabel} has unsupported object ABI layout`);
-    }
-  }
-  const plan = {
-    objectFieldCount: counts.objectFieldCount,
-    usizeFieldCount: counts.usizeFieldCount,
-    scalarByteSize: counts.scalarByteSize,
-    fields: fieldPlans
-  };
-  if (!cacheable) {
-    return plan;
-  }
-  if (cachedPlans === void 0) {
-    objectLayoutPlanCache.set(owner, [plan]);
-  } else {
-    cachedPlans.push(plan);
-  }
-  return plan;
-}
-function objectLayoutPlanMatches(plan, fields) {
-  if (plan.fields.length !== fields.length) {
-    return false;
-  }
-  for (let index = 0; index < fields.length; index++) {
-    if (!sameLayoutField(plan.fields[index].field, fields[index])) {
-      return false;
-    }
-  }
-  return true;
-}
-function sameLayoutField(lhs, rhs) {
-  return lhs === rhs || lhs?.name === rhs?.name && lhs?.type === rhs?.type && sameLayout(lhs?.layout, rhs?.layout);
-}
-function sameLayout(lhs, rhs) {
-  return lhs === rhs || lhs?.kind === rhs?.kind && lhs?.index === rhs?.index && lhs?.offset === rhs?.offset && lhs?.size === rhs?.size;
-}
-function objectRuntimeCounts(owner, label) {
-  const objectFieldCount = owner?.objectFieldCount;
-  const usizeFieldCount = owner?.usizeFieldCount;
-  const scalarByteSize = owner?.scalarByteSize;
-  if (!Number.isInteger(objectFieldCount) || objectFieldCount < 0 || !Number.isInteger(usizeFieldCount) || usizeFieldCount < 0 || !Number.isInteger(scalarByteSize) || scalarByteSize < 0) {
-    throw new Error(`${label} has unsupported object ABI runtime counts`);
-  }
-  return { objectFieldCount, usizeFieldCount, scalarByteSize };
-}
-function objectLayoutIndex(owner, layout, label) {
-  if (layout?.kind !== "object" || !Number.isInteger(layout.index)) {
-    return null;
-  }
-  const { objectFieldCount } = objectRuntimeCounts(owner, label);
-  return layout.index >= 0 && layout.index < objectFieldCount ? layout.index : null;
-}
-function usizeLayoutIndex(owner, layout, label) {
-  if (layout?.kind !== "usize" || !Number.isInteger(layout.index)) {
-    return null;
-  }
-  const { objectFieldCount, usizeFieldCount } = objectRuntimeCounts(owner, label);
-  const index = layout.index - objectFieldCount;
-  return index >= 0 && index < usizeFieldCount ? index : null;
-}
-function scalarLayoutOffset(layout, scalarByteSize, label) {
-  if (layout?.kind !== "scalar" || !Number.isInteger(layout.offset) || !Number.isInteger(layout.size) || layout.offset < 0 || layout.size <= 0 || layout.offset + layout.size > scalarByteSize) {
-    throw new Error(`${label} has unsupported object ABI scalar layout`);
-  }
-  return layout.offset;
-}
-function objectScalarFieldSupported(type, layout) {
-  if (layout?.kind !== "scalar") {
-    return false;
-  }
-  switch (type?.wireTag) {
-    case WIRE.BOOL:
-    case WIRE.SIMPLE_ENUM:
-      return [1, 2, 4, 8].includes(layout.size);
-    case WIRE.UINT8:
-      return layout.size === 1;
-    case WIRE.UINT16:
-      return layout.size === 2;
-    case WIRE.UINT32:
-    case WIRE.FLOAT32:
-      return layout.size === 4;
-    case WIRE.UINT64:
-    case WIRE.FLOAT:
-      return layout.size === 8;
-    default:
-      return false;
-  }
-}
-function writeObjectScalarField(bytes, type, layout, value, label, offset = null) {
-  offset ??= scalarLayoutOffset(layout, bytes.byteLength, label);
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  switch (type?.wireTag) {
-    case WIRE.BOOL:
-      if (typeof value !== "boolean") {
-        throw new Error(`${label} must be a boolean`);
-      }
-      writeScalarUnsigned(view, offset, layout.size, value ? 1n : 0n, label);
-      return;
-    case WIRE.UINT8:
-      requireScalarSize(layout, 1, label);
-      view.setUint8(offset, normalizeInteger(value, label, 0, 255));
-      return;
-    case WIRE.UINT16:
-      requireScalarSize(layout, 2, label);
-      view.setUint16(offset, normalizeInteger(value, label, 0, 65535), true);
-      return;
-    case WIRE.UINT32:
-      requireScalarSize(layout, 4, label);
-      view.setUint32(offset, normalizeUint32(value, label), true);
-      return;
-    case WIRE.UINT64:
-      requireScalarSize(layout, 8, label);
-      view.setBigUint64(offset, normalizeBoundedUnsignedBigInt(value, label, MAX_UINT64, "UInt64"), true);
-      return;
-    case WIRE.FLOAT:
-      requireScalarSize(layout, 8, label);
-      view.setFloat64(offset, normalizeFloat(value, label), true);
-      return;
-    case WIRE.FLOAT32:
-      requireScalarSize(layout, 4, label);
-      view.setFloat32(offset, Math.fround(normalizeFloat(value, label)), true);
-      return;
-    case WIRE.SIMPLE_ENUM:
-      writeScalarUnsigned(view, offset, layout.size, BigInt(normalizeEnum(value, type, label)), label);
-      return;
-    default:
-      throw new Error(`${label} has unsupported object ABI scalar type`);
-  }
-}
-function readObjectScalarField(view, type, layout, label, offset = null) {
-  offset ??= scalarLayoutOffset(layout, view.byteLength, label);
-  switch (type?.wireTag) {
-    case WIRE.BOOL:
-      return readScalarUnsigned(view, offset, layout.size, label) !== 0n;
-    case WIRE.UINT8:
-      requireScalarSize(layout, 1, label);
-      return view.getUint8(offset);
-    case WIRE.UINT16:
-      requireScalarSize(layout, 2, label);
-      return view.getUint16(offset, true);
-    case WIRE.UINT32:
-      requireScalarSize(layout, 4, label);
-      return view.getUint32(offset, true);
-    case WIRE.UINT64:
-      requireScalarSize(layout, 8, label);
-      return view.getBigUint64(offset, true).toString();
-    case WIRE.FLOAT:
-      requireScalarSize(layout, 8, label);
-      return view.getFloat64(offset, true);
-    case WIRE.FLOAT32:
-      requireScalarSize(layout, 4, label);
-      return Math.fround(view.getFloat32(offset, true));
-    case WIRE.SIMPLE_ENUM: {
-      const tag = readScalarUnsigned(view, offset, layout.size, label);
-      if (tag > BigInt(Number.MAX_SAFE_INTEGER)) {
-        throw new Error(`${label} enum tag is too large for JavaScript`);
-      }
-      return enumValue(type, Number(tag));
-    }
-    default:
-      throw new Error(`${label} has unsupported object ABI scalar type`);
-  }
-}
-function requireScalarSize(layout, expected, label) {
-  if (layout.size !== expected) {
-    throw new Error(`${label} has scalar size ${layout.size}, expected ${expected}`);
-  }
-}
-function writeScalarUnsigned(view, offset, size, value, label) {
-  const normalized = typeof value === "bigint" ? value : BigInt(value);
-  if (normalized < 0n) {
-    throw new Error(`${label} must be non-negative`);
-  }
-  switch (size) {
-    case 1:
-      if (normalized > 0xffn) throw new Error(`${label} exceeds UInt8 scalar field size`);
-      view.setUint8(offset, Number(normalized));
-      return;
-    case 2:
-      if (normalized > 0xffffn) throw new Error(`${label} exceeds UInt16 scalar field size`);
-      view.setUint16(offset, Number(normalized), true);
-      return;
-    case 4:
-      if (normalized > MAX_UINT32) throw new Error(`${label} exceeds UInt32 scalar field size`);
-      view.setUint32(offset, Number(normalized), true);
-      return;
-    case 8:
-      if (normalized > MAX_UINT64) throw new Error(`${label} exceeds UInt64 scalar field size`);
-      view.setBigUint64(offset, normalized, true);
-      return;
-    default:
-      throw new Error(`${label} has unsupported scalar field size ${size}`);
-  }
-}
-function readScalarUnsigned(view, offset, size, label) {
-  switch (size) {
-    case 1:
-      return BigInt(view.getUint8(offset));
-    case 2:
-      return BigInt(view.getUint16(offset, true));
-    case 4:
-      return BigInt(view.getUint32(offset, true));
-    case 8:
-      return view.getBigUint64(offset, true);
-    default:
-      throw new Error(`${label} has unsupported scalar field size ${size}`);
-  }
-}
 function disposeHostBindings(bindings) {
   if (bindings === null || bindings === void 0) return;
   const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;
@@ -5220,17 +5235,6 @@ function disposeHostBindings(bindings) {
 }
 function isIdentifier(text) {
   return /^[A-Za-z_$][A-Za-z0-9_$]*$/.test(text);
-}
-function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {
-  const decimal = normalizeDecimal(value, label, { signed: false });
-  const normalized = BigInt(decimal);
-  if (normalized > max) {
-    throw new Error(`${label} is out of range for ${typeName}`);
-  }
-  return decimal;
-}
-function normalizeBoundedUnsignedBigInt(value, label, max, typeName) {
-  return BigInt(normalizeBoundedUnsignedDecimal(value, label, max, typeName));
 }
 function normalizeBinderInfo(value, label) {
   if (typeof value === "number" && Number.isInteger(value) && value >= 0 && value <= 3) return value;
