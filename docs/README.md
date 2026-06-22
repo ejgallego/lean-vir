@@ -14,7 +14,8 @@ ownership diagrams.
   [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md),
   `Vir/GeneratePackage/Interface/Classify/Core.lean`,
   `Vir/GeneratePackage/Interface/Encode.lean`,
-  `web/src/runtime/vir-codec.js`, and
+  `web/src/runtime/vir-codec.js`,
+  `web/src/runtime/object-abi.js`, and
   `web/src/runtime/vir-value-normalizers.js`.
 - Browser or React host work: read
   [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md),

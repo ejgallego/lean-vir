@@ -13,6 +13,7 @@ export const SDK_PAYLOADS = [
   ["js/vir-react-dom-client.js", "web/src/vir-react-dom-client.js"],
   ["js/host-resource.js", "web/src/host-resource.js"],
   ["js/runtime/vir-codec.js", "web/src/runtime/vir-codec.js"],
+  ["js/runtime/object-abi.js", "web/src/runtime/object-abi.js"],
   ["js/runtime/vir-value-normalizers.js", "web/src/runtime/vir-value-normalizers.js"],
   ["js/runtime/interface-effects.js", "web/src/runtime/interface-effects.js"],
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],

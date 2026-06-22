@@ -35,6 +35,19 @@ export function normalizeDecimal(value, label, { signed }) {
   throw new Error(`${label} must be an integer, BigInt, or decimal string`);
 }
 
+export function normalizeBoundedUnsignedDecimal(value, label, max, typeName) {
+  const decimal = normalizeDecimal(value, label, { signed: false });
+  const normalized = BigInt(decimal);
+  if (normalized > max) {
+    throw new Error(`${label} is out of range for ${typeName}`);
+  }
+  return decimal;
+}
+
+export function normalizeBoundedUnsignedBigInt(value, label, max, typeName) {
+  return BigInt(normalizeBoundedUnsignedDecimal(value, label, max, typeName));
+}
+
 export function normalizeFloat(value, label) {
   if (typeof value === "number") {
     return value;

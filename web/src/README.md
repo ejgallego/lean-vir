@@ -26,6 +26,8 @@ unrelated responsibilities.
 
 - `runtime/vir-codec.js`: binary reader/writer and interface type descriptor
   codec.
+- `runtime/object-abi.js`: object ABI support checks, layout planning, scalar
+  field packing, and unpacking helpers used by `vir-runtime.js`.
 - `runtime/vir-value-normalizers.js`: JavaScript input normalization for the
   object ABI lowering path.
 - `runtime/interface-manifest.js`: interface manifest validation, diagnostics,

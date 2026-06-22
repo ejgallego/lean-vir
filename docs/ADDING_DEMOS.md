@@ -85,7 +85,8 @@ Prefer the manifest-driven `vir.call(name, ...args)` API in
 result shape, extend the manifest type classifier in
 `Vir/GeneratePackage/Interface/Classify/Core.lean`, descriptor JSON support in
 `Vir/GeneratePackage/Interface/Encode.lean`, and the JavaScript object
-lowering/lifting code in `web/src/runtime/` and `web/src/vir-runtime.js`. Keep
+ABI helpers in `web/src/runtime/object-abi.js`, `web/src/runtime/`, and
+`web/src/vir-runtime.js`. Keep
 the Lean declaration itself in `examples/` and include it as an exported root.
 Do not add per-function or per-shape WASM exports for manifest-supported
 declarations; unsupported entries should fail during package generation until
