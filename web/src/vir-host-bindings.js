@@ -22,6 +22,7 @@ import {
   createVirtualDocumentState,
   normalizeProofWidgetsRpcRef,
 } from "./host/vir-virtual-host-bindings.js";
+import { VIR_HOST_DISPOSE } from "./host-resource.js";
 
 export {
   hasExternrefTableSupport,
@@ -41,8 +42,6 @@ export {
   normalizeProofWidgetsRpcRef,
   virtualReactElementById,
 } from "./host/vir-virtual-host-bindings.js";
-
-const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 
 export function createCommonHostBindings() {
   return {

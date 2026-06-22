@@ -15,7 +15,7 @@ import {
   createReactStateHostBindings,
   createVirtualReactHookRuntime,
 } from "../react/vir-react-hooks.js";
-import { hostResourceValue, isHostResource } from "../host-resource.js";
+import { VIR_HOST_DISPOSE, hostResourceValue, isHostResource } from "../host-resource.js";
 import {
   callLeanEventCallback,
   createAnimationResourceHostBindings,
@@ -29,8 +29,6 @@ import {
   preventDefaultOnEvent,
   stopPropagationOnEvent,
 } from "./vir-host-resources.js";
-
-const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 
 export function createVirtualDocumentState({
   title = "",

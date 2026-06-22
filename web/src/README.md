@@ -18,6 +18,9 @@ unrelated responsibilities.
   dependencies out of the generic runtime and host-binding entry points.
 - `browser-react-runtime.js`: browser convenience factory that composes generic
   browser bindings with React bindings.
+- `vir-infoview-widget.js`: live infoview widget shell that loads WASM,
+  requests fresh `.irpkg` packages from Lean, and mounts Lean-authored React
+  widgets.
 
 ## Runtime Internals
 
@@ -38,6 +41,8 @@ unrelated responsibilities.
   callback release.
 - `react/vir-react-hooks.js`: shared React component hook runtime and typed
   state setter host bindings for browser and virtual React roots.
+- `generated/vir-infoview-widget.js`: checked-in bundle generated from
+  `vir-infoview-widget.js` for `Vir.Infoview`'s `include_str` path.
 
 ## Demo And Page Modules
 
@@ -62,6 +67,9 @@ unrelated responsibilities.
   under `js/` so internal imports resolve without wrapper files.
 - Keep React imports isolated to `vir-react-host-bindings.js` and modules that
   intentionally compose it.
+- Regenerate `generated/vir-infoview-widget.js` with
+  `npm run build:infoview` after editing the infoview widget shell or any
+  runtime modules it bundles.
 - Prefer adding focused helpers beside the relevant runtime area instead of
   growing page entry files or `vir-runtime.js`.
 - Generated `web/dist/` output and generated `web/public/*.wasm`, `.irpkg`,

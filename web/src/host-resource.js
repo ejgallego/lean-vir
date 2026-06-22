@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
+export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 const hostResourceState = new WeakMap();
 let externrefTableSupport = null;
 

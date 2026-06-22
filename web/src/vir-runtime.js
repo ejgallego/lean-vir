@@ -22,6 +22,7 @@ import { interfaceEffectRuntimeTag } from "./runtime/interface-effects.js";
 import { WIRE } from "./runtime/wire-tags.js";
 import {
   ExternrefResourceRoots,
+  VIR_HOST_DISPOSE,
   isHostResource,
   normalizeHostResource,
 } from "./host-resource.js";
@@ -45,12 +46,14 @@ export {
   hasExternrefTableSupport,
   requireExternrefTableSupport,
 } from "./vir-host-bindings.js";
+export {
+  VIR_HOST_DISPOSE,
+} from "./host-resource.js";
 
 const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
-export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 const virCallbackStates = new WeakMap();
 const objectLayoutPlanCache = new WeakMap();
 const OBJECT_CALL_UNAVAILABLE = Symbol("object-call-unavailable");
@@ -274,8 +277,6 @@ class VirHostState {
     this.hostImports = manifest?.hostImports ?? [];
   }
 
-  clearTransientQueues() {}
-
   clearCallError() {
     this.callError = null;
   }
@@ -363,7 +364,6 @@ class VirHostState {
   }
 
   dispose() {
-    this.clearTransientQueues();
     this.clearCallError();
     this.clearResourceRoots();
     disposeHostBindings(this.userBindings);
@@ -517,16 +517,11 @@ export class VirRuntime {
     }
 
     const cache = this.callCacheFor(entry);
-    this.hostState?.clearTransientQueues();
-    try {
-      const objectResult = this.tryObjectResolvedCall(entry, args, cache);
-      if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
-        return objectResult;
-      }
-      throw new Error(`object ABI does not support interface entry ${entry.entry}`);
-    } finally {
-      this.hostState?.clearTransientQueues();
+    const objectResult = this.tryObjectResolvedCall(entry, args, cache);
+    if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
+      return objectResult;
     }
+    throw new Error(`object ABI does not support interface entry ${entry.entry}`);
   }
 
   tryObjectResolvedCall(entry, args, cache) {
@@ -1901,7 +1896,6 @@ export class VirRuntime {
   callClosure(rootId, type, args) {
     this.requireLiveRuntime();
     this.requireFunction("vir_closure_call_objects");
-    this.hostState?.clearTransientQueues();
     const fnArgs = requireFunctionArgs(type, "callback");
     if (args.length !== fnArgs.length) {
       throw new Error(`callback expects ${fnArgs.length} arguments, got ${args.length}`);
@@ -1914,7 +1908,6 @@ export class VirRuntime {
       return this.callClosureObjects(rootId, type, argObjs);
     } finally {
       this.releaseOwnedObjects(argObjs);
-      this.hostState?.clearTransientQueues();
     }
   }
 
@@ -2206,10 +2199,6 @@ function taggedUnionField(ctor) {
     type: ctor.type,
     layout: ctor.layout,
   };
-}
-
-function objectLayoutSlots(owner, fields, label) {
-  return objectLayoutSlotsFromPlan(objectLayoutPlan(owner, fields, label));
 }
 
 function objectLayoutSlotsFromPlan(plan) {
