@@ -14,9 +14,16 @@ import { createVirRuntime as createExportedNodeVirRuntime } from "lean-vir/vir-r
 import {
   createVirImports,
   createVirRuntime as createBrowserVirRuntime,
+  createVirRuntimeFactory as createBrowserVirRuntimeFactory,
+  debugWasmUrlFor,
+  VIR_WASM_DEV_FILE,
+  VIR_WASM_RELEASE_FILE,
 } from "../../web/src/vir-runtime.js";
 import {
   createVirRuntime,
+  debugWasmUrlFor as debugNodeWasmUrlFor,
+  VIR_WASM_DEV_FILE as NODE_VIR_WASM_DEV_FILE,
+  VIR_WASM_RELEASE_FILE as NODE_VIR_WASM_RELEASE_FILE,
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
   createVirtualEventState,
@@ -67,6 +74,28 @@ const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPack
 assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
 assert.equal(createExportedNodeVirRuntime, createVirRuntime);
 assert.equal(typeof createExportedHostResourceState, "function");
+assert.equal(VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
+assert.equal(VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
+assert.equal(NODE_VIR_WASM_RELEASE_FILE, VIR_WASM_RELEASE_FILE);
+assert.equal(NODE_VIR_WASM_DEV_FILE, VIR_WASM_DEV_FILE);
+assert.equal(debugNodeWasmUrlFor, debugWasmUrlFor);
+assert.equal(debugWasmUrlFor("vir-upstream.wasm"), "vir-upstream.dev.wasm");
+assert.equal(debugWasmUrlFor("./wasm/vir-upstream.wasm?rev=1#test"), "./wasm/vir-upstream.dev.wasm?rev=1#test");
+assert.equal(createBrowserVirRuntimeFactory().wasmUrl, VIR_WASM_RELEASE_FILE);
+assert.equal(createBrowserVirRuntimeFactory({ debugWasm: true }).wasmUrl, VIR_WASM_DEV_FILE);
+assert.equal(
+  createBrowserVirRuntimeFactory({ wasmUrl: "./wasm/custom.wasm", debugWasm: true }).wasmUrl,
+  "./wasm/custom.dev.wasm",
+);
+assert.equal(
+  createBrowserVirRuntimeFactory({
+    wasmUrl: "./wasm/custom.wasm",
+    wasmDebugUrl: "./wasm/custom-debug.wasm",
+    debugWasm: true,
+  }).wasmUrl,
+  "./wasm/custom-debug.wasm",
+);
+assert.throws(() => debugWasmUrlFor("module.bin"), /debugWasm requires a \.wasm wasmUrl/);
 {
   const previousDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   const element = { textContent: "shared element" };

@@ -3674,12 +3674,21 @@ var textDecoder = new TextDecoder();
 var MAX_UINT322 = 0xffffffffn;
 var MAX_UINT642 = 0xffffffffffffffffn;
 var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
+var VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
 async function fetchBytes(path, init = { cache: "no-store" }) {
   const response = await fetch(path, init);
   if (!response.ok) {
     throw new Error(`failed to load ${path}`);
   }
   return new Uint8Array(await response.arrayBuffer());
+}
+function debugWasmUrlFor(wasmUrl = VIR_WASM_RELEASE_FILE) {
+  const value = wasmUrl instanceof URL ? wasmUrl.href : String(wasmUrl);
+  const match = /(\.wasm)([?#].*)?$/.exec(value);
+  if (match === null) {
+    throw new Error("debugWasm requires a .wasm wasmUrl or an explicit wasmDebugUrl");
+  }
+  return `${value.slice(0, match.index)}.dev.wasm${match[2] ?? ""}`;
 }
 function createVirImports(module, overrides = {}, hostState = null) {
   const imports = {};
@@ -3732,6 +3741,8 @@ var VirRuntimeFactory = class {
     wasmBytes = null,
     wasmModule = null,
     wasmUrl = null,
+    wasmDebugUrl = null,
+    debugWasm = false,
     fetchBytes: loadBytes = fetchBytes,
     imports = null,
     hostBindings = null,
@@ -3739,7 +3750,8 @@ var VirRuntimeFactory = class {
   } = {}) {
     this.wasmBytes = wasmBytes;
     this.wasmModule = wasmModule;
-    this.wasmUrl = wasmUrl;
+    this.debugWasm = debugWasm;
+    this.wasmUrl = selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm });
     this.fetchBytes = loadBytes;
     this.imports = imports;
     this.hostBindings = hostBindings;
@@ -3781,6 +3793,12 @@ var VirRuntimeFactory = class {
     return runtime;
   }
 };
+function selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm }) {
+  if (debugWasm) {
+    return wasmDebugUrl ?? debugWasmUrlFor(wasmUrl ?? VIR_WASM_RELEASE_FILE);
+  }
+  return wasmUrl ?? VIR_WASM_RELEASE_FILE;
+}
 var VirRuntime = class {
   constructor(exports, { module = null, packageInfo = null, hostState = null } = {}) {
     this.exports = exports;

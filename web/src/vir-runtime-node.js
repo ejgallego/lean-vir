@@ -14,12 +14,15 @@ import {
 
 export {
   createVirImports,
+  debugWasmUrlFor,
   fetchBytes,
   roundTripInterfaceTypeDescriptor,
   sameInterfaceWireType,
   VIR_HOST_DISPOSE,
   VirCallback,
   VirRuntime,
+  VIR_WASM_DEV_FILE,
+  VIR_WASM_RELEASE_FILE,
 } from "./vir-runtime.js";
 export {
   createNodeHostBindings,

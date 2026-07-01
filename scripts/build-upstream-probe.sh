@@ -36,6 +36,7 @@ fi
 lean_prefix="${LEAN_PREFIX:-$(lean --print-prefix)}"
 target="${WASI_TARGET:-wasm32-wasip1}"
 wasm_opt_level="${VIR_WASM_OPT_LEVEL:--O3}"
+wasm_profile="${VIR_WASM_PROFILE:-dev}"
 wasm_initial_memory="${VIR_WASM_INITIAL_MEMORY:-4194304}"
 wasm_stack_size="${VIR_WASM_STACK_SIZE:-1048576}"
 upstream="$src/src/library/ir_interpreter.cpp"
@@ -44,6 +45,9 @@ obj_dir="$out/obj"
 wasm="$out/ir_interpreter.allow-undefined.wasm"
 strict_wasm="$out/ir_interpreter.strict.wasm"
 demo_wasm="web/public/vir-upstream.wasm"
+demo_dev_wasm="web/public/vir-upstream.dev.wasm"
+demo_wasm_stamp="$out/demo-wasm-profile.stamp"
+demo_dev_wasm_stamp="$out/demo-wasm-dev.stamp"
 strict_log="$out/strict-link.log"
 import_section="$out/import-section.txt"
 env_imports="$out/env-imports.txt"
@@ -54,6 +58,31 @@ report="$out/boundary.md"
 mapfile -t browser_packages < <(
   node -e 'const cfg = require("./fixtures/browser-packages.json"); for (const pkg of cfg.packages ?? []) console.log(pkg.file)'
 )
+
+case "$wasm_profile" in
+  dev)
+    wasm_output_profile=dev
+    ;;
+  dist | production | release)
+    wasm_output_profile=dist
+    ;;
+  *)
+    echo "error: unsupported VIR_WASM_PROFILE '$wasm_profile'; expected dev, dist, release, or production" >&2
+    exit 1
+    ;;
+esac
+
+llvm_objcopy=
+if [ "$wasm_output_profile" = "dist" ]; then
+  if command -v llvm-objcopy >/dev/null 2>&1; then
+    llvm_objcopy="$(command -v llvm-objcopy)"
+  elif [ -x "$local_wasi_sdk/bin/llvm-objcopy" ]; then
+    llvm_objcopy="$local_wasi_sdk/bin/llvm-objcopy"
+  else
+    echo "error: llvm-objcopy is required for VIR_WASM_PROFILE=$wasm_profile" >&2
+    exit 1
+  fi
+fi
 
 mkdir -p "$out"
 mkdir -p "$obj_dir"
@@ -373,9 +402,53 @@ else
 fi
 
 copied_demo_wasm=0
-if [ "$strict_status" = "0" ] && { [ ! -f "$demo_wasm" ] || [ "$strict_wasm" -nt "$demo_wasm" ]; }; then
-  cp "$strict_wasm" "$demo_wasm"
-  copied_demo_wasm=1
+copied_demo_dev_wasm=0
+if [ "$strict_status" = "0" ]; then
+  demo_wasm_stamp_tmp="$demo_wasm_stamp.tmp"
+  {
+    printf 'profile=%s\n' "$wasm_output_profile"
+    printf 'source=%s\n' "$strict_wasm"
+    if [ "$wasm_output_profile" = "dist" ]; then
+      printf 'strip_tool=%s\n' "$llvm_objcopy"
+      printf 'strip_flag=--strip-all\n'
+    fi
+  } > "$demo_wasm_stamp_tmp"
+
+  needs_demo_wasm=0
+  if [ ! -f "$demo_wasm" ] || [ "$strict_wasm" -nt "$demo_wasm" ] || [ ! -f "$demo_wasm_stamp" ] || ! cmp -s "$demo_wasm_stamp_tmp" "$demo_wasm_stamp"; then
+    needs_demo_wasm=1
+  fi
+
+  if [ "$needs_demo_wasm" = "1" ]; then
+    if [ "$wasm_output_profile" = "dist" ]; then
+      "$llvm_objcopy" --strip-all "$strict_wasm" "$demo_wasm"
+    else
+      cp "$strict_wasm" "$demo_wasm"
+    fi
+    mv "$demo_wasm_stamp_tmp" "$demo_wasm_stamp"
+    copied_demo_wasm=1
+  else
+    rm "$demo_wasm_stamp_tmp"
+  fi
+
+  demo_dev_wasm_stamp_tmp="$demo_dev_wasm_stamp.tmp"
+  {
+    printf 'profile=dev\n'
+    printf 'source=%s\n' "$strict_wasm"
+  } > "$demo_dev_wasm_stamp_tmp"
+
+  needs_demo_dev_wasm=0
+  if [ ! -f "$demo_dev_wasm" ] || [ "$strict_wasm" -nt "$demo_dev_wasm" ] || [ ! -f "$demo_dev_wasm_stamp" ] || ! cmp -s "$demo_dev_wasm_stamp_tmp" "$demo_dev_wasm_stamp"; then
+    needs_demo_dev_wasm=1
+  fi
+
+  if [ "$needs_demo_dev_wasm" = "1" ]; then
+    cp "$strict_wasm" "$demo_dev_wasm"
+    mv "$demo_dev_wasm_stamp_tmp" "$demo_dev_wasm_stamp"
+    copied_demo_dev_wasm=1
+  else
+    rm "$demo_dev_wasm_stamp_tmp"
+  fi
 fi
 
 if command -v wasm-objdump >/dev/null 2>&1; then
@@ -429,6 +502,8 @@ report_start=$SECONDS
   echo "- Upstream file: \`$upstream\`"
   echo "- WASI target: \`$target\`"
   echo "- WASM optimization level: \`$wasm_opt_level\`"
+  echo "- Requested WASM profile: \`$wasm_profile\`"
+  echo "- Browser WASM output profile: \`$wasm_output_profile\`"
   echo "- Compiler: \`$cxx\`"
   echo "- Initial wasm memory: $wasm_initial_memory bytes"
   echo "- Wasm stack size: $wasm_stack_size bytes"
@@ -460,7 +535,8 @@ report_start=$SECONDS
   echo "- Link reused cached wasm: $([ "$needs_link" = "0" ] && echo "yes" || echo "no")"
   echo "- Allow-undefined wasm with runtime: \`$wasm\` (${wasm_bytes} bytes)"
   if [ "$strict_status" = "0" ]; then
-    echo "- Browser demo wasm: \`$demo_wasm\`"
+    echo "- Browser release wasm: \`$demo_wasm\` ($([ "$wasm_output_profile" = "dist" ] && echo "stripped" || echo "unstripped"))"
+    echo "- Browser dev wasm: \`$demo_dev_wasm\` (unstripped)"
   fi
   echo "- Strict link log: \`$strict_log\`"
   echo "- Strict link status: \`$strict_status\`"
@@ -563,7 +639,10 @@ report_seconds=$((SECONDS - report_start))
 
 echo "wrote $report"
 if [ "$copied_demo_wasm" = "1" ]; then
-  echo "wrote $demo_wasm"
+  echo "wrote $demo_wasm ($wasm_output_profile)"
+fi
+if [ "$copied_demo_dev_wasm" = "1" ]; then
+  echo "wrote $demo_dev_wasm (dev)"
 fi
 echo "strict unresolved symbols: $unresolved_count"
 echo "upstream probe timing: packages=${package_seconds}s compile=${compile_seconds}s link=${link_seconds}s report=${report_seconds}s total=$((SECONDS - script_start))s compiled_objects=$compiled_count link_reused=$([ "$needs_link" = "0" ] && echo "yes" || echo "no")"
