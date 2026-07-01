@@ -12,7 +12,7 @@ objects while a call is running.
 | Lean API | `Vir/*.lean`, `examples/*.lean` | Public combinators, effect types, examples, and `@[vir_js]` declarations. |
 | Package generation | `Vir/GeneratePackage.lean`, `Vir/GeneratePackage/Interface/` | Export closure selection, manifest type descriptors, host import metadata, and native extern registration. |
 | WASI boundary | `wasm/upstream_shim/` | `vir_call`, host-import trampolines, package decoding, native externs, closure roots, and WASI/runtime stubs. |
-| JavaScript runtime | `web/src/vir-runtime.js`, `web/src/runtime/` | Runtime construction, manifest validation, object ABI lowering/lifting, host import dispatch, and callback wrappers. |
+| JavaScript runtime | `web/src/vir-runtime.js`, `web/src/runtime/` | Runtime construction, manifest validation, package call resolution, object ABI lowering/lifting, host import dispatch, and callback wrappers. |
 | Host resources | `web/src/host-resource.js`, `web/src/host/vir-host-resources.js` | JavaScript-owned object handles, externref roots, disposable host objects, DOM/timer/frame/React resource cleanup. |
 | React host | `web/src/react/`, `web/src/vir-react-host-bindings.js` | React element construction, root lifetime, function-component bridge, hooks, and callback retention. |
 | Browser demos | `web/src/`, `examples/`, `fixtures/` | Local demo entry points, smoke fixtures, and generated `.irpkg` inputs. |
@@ -27,9 +27,11 @@ For package/interface work, read:
 3. `Vir/GeneratePackage/Interface/Classify/Core.lean`
 4. `Vir/GeneratePackage/Interface/Encode.lean`
 5. `web/src/runtime/interface-manifest.js`
-6. `web/src/runtime/vir-codec.js`
-7. `web/src/runtime/object-abi.js`
-8. `web/src/runtime/vir-value-normalizers.js`
+6. `web/src/runtime/core.js`
+7. `web/src/runtime/object-values.js`
+8. `web/src/runtime/vir-codec.js`
+9. `web/src/runtime/object-abi.js`
+10. `web/src/runtime/vir-value-normalizers.js`
 
 For browser or React host work, read:
 

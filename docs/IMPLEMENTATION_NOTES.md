@@ -39,9 +39,9 @@ point loads a served or uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls
 go through `vir_call_resolved_objects`; the local
 `wasm/upstream_shim/call_signature_summary.cpp` parser now computes package-call
-signature summaries, while `web/src/vir-runtime.js` lowers JavaScript values to
-owned Lean objects before calling the upstream interpreter through a package-local
-slot.
+signature summaries, while `web/src/runtime/object-values.js` lowers JavaScript
+values to owned Lean objects before the core runtime calls the upstream
+interpreter through a package-local slot.
 
 The browser keeps a Lean-rendered DOM Tamagotchi as the top-level interactive
 demo over the same upstream interpreter artifact. Lean registers the pet
