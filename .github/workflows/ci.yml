@@ -41,7 +41,7 @@ jobs:
       - run: npm run fetch:lean
       - run: npm run install:wasi
       - run: npm run check:boundary-registry
-      - run: npm run build:demo
+      - run: npm run build:demo:dist
       - run: npm run test:upstream:no-build
       - name: Upload demo artifacts
         uses: actions/upload-artifact@v4

@@ -233,6 +233,8 @@ when comparing CI runs:
 
 - `npm run build:demo` prints browser package, compile, link, and total probe
   timing.
+- `npm run build:demo:dist` uses the same optimized build, then strips
+  `web/public/vir-upstream.wasm` for distribution bundles.
 - `npm run prepare:irpkg` prints Lean library, generator, package, and total
   timing; when passed multiple configs, it prepares the generator once.
 - `npm run test:runtime` prints selected groups/filters plus per-test timings
@@ -243,13 +245,13 @@ when comparing CI runs:
 ## CI Shape
 
 The CI workflow keeps one job responsible for fetching the pinned Lean source,
-installing the WASI SDK, building `web/public/vir-upstream.wasm`, generating
-browser `.irpkg` files, and running upstream smoke. That job uploads the demo
-artifacts. The pure runtime job downloads those artifacts and runs without
-installing Lean. The Lean-dependent runtime job installs Lean only for package
-generation and SDK metadata smoke tests. The fixture job also downloads the
-demo artifacts and runs in parallel without re-fetching Lean source or
-reinstalling the WASI SDK.
+installing the WASI SDK, building the dist-profile
+`web/public/vir-upstream.wasm`, generating browser `.irpkg` files, and running
+upstream smoke. That job uploads the demo artifacts. The pure runtime job
+downloads those artifacts and runs without installing Lean. The Lean-dependent
+runtime job installs Lean only for package generation and SDK metadata smoke
+tests. The fixture job also downloads the demo artifacts and runs in parallel
+without re-fetching Lean source or reinstalling the WASI SDK.
 
 ## Browser Smoke
 

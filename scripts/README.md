@@ -15,6 +15,9 @@ map lives in `docs/HARNESS.md`.
 - `npm run build:demo`
   Build the upstream IR interpreter WASM and generated browser packages. The
   browser package step uses the compiled `vir_irpkg` generator executable.
+- `npm run build:demo:dist`
+  Build the same optimized demo WASM and packages, then strip the public WASM
+  artifact for distribution.
 - `npm run generate:irpkg`
   Build the local Lean library and `vir_irpkg` generator executable, then
   generate one manifest-bearing `.irpkg`.
