@@ -49,6 +49,7 @@ demo_dev_wasm="web/public/vir-upstream.dev.wasm"
 demo_wasm_stamp="$out/demo-wasm-profile.stamp"
 demo_dev_wasm_stamp="$out/demo-wasm-dev.stamp"
 strict_log="$out/strict-link.log"
+link_map="$out/link.map"
 import_section="$out/import-section.txt"
 env_imports="$out/env-imports.txt"
 wasi_imports="$out/wasi-imports.txt"
@@ -64,7 +65,7 @@ case "$wasm_profile" in
     wasm_output_profile=dev
     ;;
   dist | production | release)
-    wasm_output_profile=dist
+    wasm_output_profile=release
     ;;
   *)
     echo "error: unsupported VIR_WASM_PROFILE '$wasm_profile'; expected dev, dist, release, or production" >&2
@@ -73,7 +74,7 @@ case "$wasm_profile" in
 esac
 
 llvm_objcopy=
-if [ "$wasm_output_profile" = "dist" ]; then
+if [ "$wasm_output_profile" = "release" ]; then
   if command -v llvm-objcopy >/dev/null 2>&1; then
     llvm_objcopy="$(command -v llvm-objcopy)"
   elif [ -x "$local_wasi_sdk/bin/llvm-objcopy" ]; then
@@ -367,7 +368,7 @@ else
 fi
 
 needs_link=0
-if [ ! -f "$wasm" ] || [ ! -f "$strict_wasm" ] || [ "$link_stamp" -nt "$strict_wasm" ]; then
+if [ ! -f "$wasm" ] || [ ! -f "$strict_wasm" ] || [ ! -f "$link_map" ] || [ "$link_stamp" -nt "$strict_wasm" ]; then
   needs_link=1
 else
   for object in "${link_objects[@]}"; do
@@ -394,6 +395,7 @@ if [ "$needs_link" = "1" ]; then
     "${link_flags[@]}" \
     "-Wl,--allow-undefined-file=$allowed_undefined" \
     -Wl,--error-limit=0 \
+    "-Wl,--Map=$link_map" \
     "${exports[@]}" \
     -o "$strict_wasm" > "$strict_log" 2>&1 || strict_status=$?
   link_seconds=$((SECONDS - link_start))
@@ -401,53 +403,54 @@ else
   strict_status=0
 fi
 
-copied_demo_wasm=0
-copied_demo_dev_wasm=0
-if [ "$strict_status" = "0" ]; then
-  demo_wasm_stamp_tmp="$demo_wasm_stamp.tmp"
+copy_profile_wasm_if_needed() {
+  local profile="$1"
+  local source="$2"
+  local dest="$3"
+  local stamp="$4"
+  local strip_mode="$5"
+  local stamp_tmp="$stamp.tmp"
   {
-    printf 'profile=%s\n' "$wasm_output_profile"
-    printf 'source=%s\n' "$strict_wasm"
-    if [ "$wasm_output_profile" = "dist" ]; then
+    printf 'profile=%s\n' "$profile"
+    printf 'source=%s\n' "$source"
+    if [ "$strip_mode" = "strip" ]; then
       printf 'strip_tool=%s\n' "$llvm_objcopy"
       printf 'strip_flag=--strip-all\n'
     fi
-  } > "$demo_wasm_stamp_tmp"
+  } > "$stamp_tmp"
 
-  needs_demo_wasm=0
-  if [ ! -f "$demo_wasm" ] || [ "$strict_wasm" -nt "$demo_wasm" ] || [ ! -f "$demo_wasm_stamp" ] || ! cmp -s "$demo_wasm_stamp_tmp" "$demo_wasm_stamp"; then
-    needs_demo_wasm=1
+  local needs_copy=0
+  if [ ! -f "$dest" ] || [ "$source" -nt "$dest" ] || [ ! -f "$stamp" ] || ! cmp -s "$stamp_tmp" "$stamp"; then
+    needs_copy=1
   fi
 
-  if [ "$needs_demo_wasm" = "1" ]; then
-    if [ "$wasm_output_profile" = "dist" ]; then
-      "$llvm_objcopy" --strip-all "$strict_wasm" "$demo_wasm"
+  if [ "$needs_copy" = "1" ]; then
+    if [ "$strip_mode" = "strip" ]; then
+      "$llvm_objcopy" --strip-all "$source" "$dest"
     else
-      cp "$strict_wasm" "$demo_wasm"
+      cp "$source" "$dest"
     fi
-    mv "$demo_wasm_stamp_tmp" "$demo_wasm_stamp"
+    mv "$stamp_tmp" "$stamp"
+    return 0
+  else
+    rm "$stamp_tmp"
+    return 1
+  fi
+}
+
+copied_demo_wasm=0
+copied_demo_dev_wasm=0
+if [ "$strict_status" = "0" ]; then
+  demo_strip_mode=copy
+  if [ "$wasm_output_profile" = "release" ]; then
+    demo_strip_mode=strip
+  fi
+
+  if copy_profile_wasm_if_needed "$wasm_output_profile" "$strict_wasm" "$demo_wasm" "$demo_wasm_stamp" "$demo_strip_mode"; then
     copied_demo_wasm=1
-  else
-    rm "$demo_wasm_stamp_tmp"
   fi
-
-  demo_dev_wasm_stamp_tmp="$demo_dev_wasm_stamp.tmp"
-  {
-    printf 'profile=dev\n'
-    printf 'source=%s\n' "$strict_wasm"
-  } > "$demo_dev_wasm_stamp_tmp"
-
-  needs_demo_dev_wasm=0
-  if [ ! -f "$demo_dev_wasm" ] || [ "$strict_wasm" -nt "$demo_dev_wasm" ] || [ ! -f "$demo_dev_wasm_stamp" ] || ! cmp -s "$demo_dev_wasm_stamp_tmp" "$demo_dev_wasm_stamp"; then
-    needs_demo_dev_wasm=1
-  fi
-
-  if [ "$needs_demo_dev_wasm" = "1" ]; then
-    cp "$strict_wasm" "$demo_dev_wasm"
-    mv "$demo_dev_wasm_stamp_tmp" "$demo_dev_wasm_stamp"
+  if copy_profile_wasm_if_needed "dev" "$strict_wasm" "$demo_dev_wasm" "$demo_dev_wasm_stamp" "copy"; then
     copied_demo_dev_wasm=1
-  else
-    rm "$demo_dev_wasm_stamp_tmp"
   fi
 fi
 
@@ -535,10 +538,11 @@ report_start=$SECONDS
   echo "- Link reused cached wasm: $([ "$needs_link" = "0" ] && echo "yes" || echo "no")"
   echo "- Allow-undefined wasm with runtime: \`$wasm\` (${wasm_bytes} bytes)"
   if [ "$strict_status" = "0" ]; then
-    echo "- Browser release wasm: \`$demo_wasm\` ($([ "$wasm_output_profile" = "dist" ] && echo "stripped" || echo "unstripped"))"
-    echo "- Browser dev wasm: \`$demo_dev_wasm\` (unstripped)"
+    echo "- Browser default wasm: \`$demo_wasm\` ($([ "$wasm_output_profile" = "release" ] && echo "stripped release" || echo "unstripped dev"))"
+    echo "- Browser debug wasm: \`$demo_dev_wasm\` (optimized, unstripped)"
   fi
   echo "- Strict link log: \`$strict_log\`"
+  echo "- Strict link map: \`$link_map\`"
   echo "- Strict link status: \`$strict_status\`"
   echo
   echo "## Linked Real Runtime Sources"
@@ -639,10 +643,10 @@ report_seconds=$((SECONDS - report_start))
 
 echo "wrote $report"
 if [ "$copied_demo_wasm" = "1" ]; then
-  echo "wrote $demo_wasm ($wasm_output_profile)"
+  echo "wrote $demo_wasm (default, $wasm_output_profile)"
 fi
 if [ "$copied_demo_dev_wasm" = "1" ]; then
-  echo "wrote $demo_dev_wasm (dev)"
+  echo "wrote $demo_dev_wasm (debug, optimized unstripped)"
 fi
 echo "strict unresolved symbols: $unresolved_count"
 echo "upstream probe timing: packages=${package_seconds}s compile=${compile_seconds}s link=${link_seconds}s report=${report_seconds}s total=$((SECONDS - script_start))s compiled_objects=$compiled_count link_reused=$([ "$needs_link" = "0" ] && echo "yes" || echo "no")"

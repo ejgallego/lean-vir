@@ -53,7 +53,8 @@ by one group are live in the others.
 Distribution builds ship two interpreter artifacts:
 
 - `vir-upstream.wasm`: stripped release artifact, used by default.
-- `vir-upstream.dev.wasm`: unstripped companion artifact for debugging.
+- `vir-upstream.dev.wasm`: optimized, unstripped companion artifact for
+  debugging. It is not an `-O0` build.
 
 Applications that serve both files beside each other can opt into the debug
 artifact by setting `debugWasm: true`:

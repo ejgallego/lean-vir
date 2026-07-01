@@ -75,6 +75,7 @@ stale shell embedded in `Vir.Infoview`.
 The most useful generated diagnostics are:
 
 - `build/upstream-probe/boundary.md`
+- `build/upstream-probe/link.map`
 - `build/generated/*.report.md`
 - `build/fixtures/summary.json`
 - `build/fixtures/*.report.md`
@@ -84,9 +85,10 @@ failure, but keep them out of Git unless the maintainer asks for a tracked
 fixture/report change.
 
 Commands that reuse generated runtime artifacts expect
-`web/public/vir-upstream.wasm`, `web/public/vir-upstream.dev.wasm`, and the
-generated browser `.irpkg` files to exist. Run `npm run build:demo` first when
-`npm run test:runtime`,
+`web/public/vir-upstream.wasm` and the generated browser `.irpkg` files to
+exist. SDK/local artifact packaging and SDK import smokes also expect the
+optimized debug companion `web/public/vir-upstream.dev.wasm`. Run
+`npm run build:demo` first when `npm run test:runtime`,
 `npm run test:runtime:pure`, `npm run test:runtime:lean`,
 `npm run test:upstream:no-build`, or `npm run test:fixtures:no-build` reports a
 missing `web/public/...` artifact.
@@ -101,6 +103,7 @@ npm run install:wasi
 npm run build:infoview
 npm run check:infoview-bundle
 npm run build:demo
+npm run build:demo:release
 npm run build:demo-package
 npm run build:site
 npm run check:api-coverage
@@ -114,6 +117,7 @@ npm run prepare:irpkg -- examples/quickstart.virpkg.json
 npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
 npm run inspect:irpkg -- web/public/local-quickstart.irpkg
 npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
+npm run size:wasm
 node scripts/run-fixtures.mjs --help
 ```
 
@@ -151,6 +155,9 @@ fixture suite. It is the default pre-merge signal for code changes.
 - Upstream smoke after `npm run build:demo` has already refreshed the WASM and
   browser packages:
   `npm run test:upstream:no-build`
+- WASM section size and linker-map attribution after `npm run build:demo` or
+  `npm run build:demo:release`:
+  `npm run size:wasm`
 - JavaScript runtime, host bindings, manifest decoding, or callback lifecycle
   without Lean-dependent package generation:
   `npm run test:runtime:pure`
@@ -234,9 +241,10 @@ when comparing CI runs:
 
 - `npm run build:demo` prints browser package, compile, link, and total probe
   timing.
-- `npm run build:demo:dist` uses the same optimized build, then strips
+- `npm run build:demo:release` uses the same optimized build, then strips
   `web/public/vir-upstream.wasm` for distribution bundles while keeping
-  `web/public/vir-upstream.dev.wasm` unstripped for debugging.
+  `web/public/vir-upstream.dev.wasm` optimized but unstripped for debugging.
+  `npm run build:demo:dist` remains a compatibility alias.
 - `npm run prepare:irpkg` prints Lean library, generator, package, and total
   timing; when passed multiple configs, it prepares the generator once.
 - `npm run test:runtime` prints selected groups/filters plus per-test timings
@@ -247,8 +255,8 @@ when comparing CI runs:
 ## CI Shape
 
 The CI workflow keeps one job responsible for fetching the pinned Lean source,
-installing the WASI SDK, building the dist-profile
-`web/public/vir-upstream.wasm` plus the unstripped
+installing the WASI SDK, building the release-profile
+`web/public/vir-upstream.wasm` plus the optimized, unstripped
 `web/public/vir-upstream.dev.wasm`, generating browser `.irpkg` files, and
 running upstream smoke. That job uploads the demo artifacts. The pure runtime
 job downloads those artifacts and runs without installing Lean. The

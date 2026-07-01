@@ -82,7 +82,8 @@ Use the matching Lean package generator to create .irpkg files, then serve:
   your generated .irpkg
 
 wasm/vir-upstream.wasm is the stripped release artifact and is selected by
-default. wasm/vir-upstream.dev.wasm is an unstripped debugging companion.
+default. wasm/vir-upstream.dev.wasm is an optimized, unstripped debugging
+companion.
 
 Minimal browser usage:
 

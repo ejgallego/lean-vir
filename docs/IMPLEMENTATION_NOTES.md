@@ -123,8 +123,8 @@ instances. That avoids retaining interpreter caches across a long run while
 keeping the top-level interactive demo on its long-lived page instance.
 
 Generated artifacts live under `build/`, `web/dist/`,
-`web/public/vir-upstream.wasm`, the generated `web/public/*.irpkg` packages,
-and generated `web/public/*.report.md` reports. They should not be committed.
+`web/public/*.wasm`, the generated `web/public/*.irpkg` packages, and generated
+`web/public/*.report.md` reports. They should not be committed.
 
 Stable WASI object files are cached under `build/upstream-probe/obj`. Example
 iteration updates the relevant `web/public/*.irpkg`; it does not rebuild or
