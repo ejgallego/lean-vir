@@ -97,6 +97,32 @@ assert.equal(
 );
 assert.throws(() => debugWasmUrlFor("module.bin"), /debugWasm requires a \.wasm wasmUrl/);
 {
+  let fetchedWasmUrl = null;
+  const debugFactory = createBrowserVirRuntimeFactory({
+    debugWasm: true,
+    fetchBytes: async (path) => {
+      fetchedWasmUrl = path;
+      return wasmBytes;
+    },
+  });
+  assert.ok((await debugFactory.module()) instanceof WebAssembly.Module);
+  assert.equal(fetchedWasmUrl, VIR_WASM_DEV_FILE);
+}
+{
+  let fetchedWasmUrl = null;
+  const debugFactory = createBrowserVirRuntimeFactory({
+    wasmUrl: "./wasm/custom.wasm",
+    wasmDebugUrl: "./wasm/custom-debug.wasm",
+    debugWasm: true,
+    fetchBytes: async (path) => {
+      fetchedWasmUrl = path;
+      return wasmBytes;
+    },
+  });
+  assert.ok((await debugFactory.module()) instanceof WebAssembly.Module);
+  assert.equal(fetchedWasmUrl, "./wasm/custom-debug.wasm");
+}
+{
   const previousDocument = Object.getOwnPropertyDescriptor(globalThis, "document");
   const element = { textContent: "shared element" };
   Object.defineProperty(globalThis, "document", {

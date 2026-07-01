@@ -115,8 +115,9 @@ server, and open the server URL.
 To build the same archive locally, run `npm run build:local-artifact`.
 
 The latest developer SDK artifact contains the stable JavaScript runtime files,
-the release `vir-upstream.wasm`, the debug `vir-upstream.dev.wasm`, and a
-machine-readable `lean-vir-artifact.json` manifest:
+the release `vir-upstream.wasm`, the optimized debug companion
+`vir-upstream.dev.wasm`, and a machine-readable `lean-vir-artifact.json`
+manifest:
 
 [lean-vir-sdk.tar.gz](https://ejgallego.github.io/lean-vir/downloads/lean-vir-sdk.tar.gz)
 

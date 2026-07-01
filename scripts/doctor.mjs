@@ -9,7 +9,7 @@ import { constants as fsConstants } from "node:fs";
 import { readFile } from "node:fs/promises";
 import { resolve } from "node:path";
 
-import { defaultPackageFile, publicArtifactPath, wasmPublicFile } from "./browser-package-config.mjs";
+import { defaultPackageFile, publicArtifactPath, wasmDevPublicFile, wasmPublicFile } from "./browser-package-config.mjs";
 import { findChromiumExecutable, pathExists } from "./file-utils.mjs";
 
 const checks = [];
@@ -111,7 +111,8 @@ await checkPath(
   fsConstants.X_OK,
 );
 
-await checkPath("upstream WASM", publicArtifactPath(wasmPublicFile), "run npm run build:demo");
+await checkPath("release upstream WASM", publicArtifactPath(wasmPublicFile), "run npm run build:demo");
+await checkPath("dev upstream WASM", publicArtifactPath(wasmDevPublicFile), "run npm run build:demo");
 await checkPath("browser package", publicArtifactPath(defaultPackageFile), "run npm run build:demo");
 
 const chromium = await findChromiumExecutable();

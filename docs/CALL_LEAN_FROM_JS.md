@@ -51,10 +51,10 @@ Build the browser WASM artifact once:
 npm run build:demo
 ```
 
-The build also produces `vir-upstream.dev.wasm`, an unstripped debugging
-companion to `vir-upstream.wasm`. In distribution builds, `vir-upstream.wasm` is
-stripped for release use. Serve both files when you want app code to switch
-between them with `debugWasm: true`.
+The build also produces `vir-upstream.dev.wasm`, an optimized, unstripped
+debugging companion to `vir-upstream.wasm`. It is not an `-O0` build. In
+distribution builds, `vir-upstream.wasm` is stripped for release use. Serve both
+files when you want app code to switch between them with `debugWasm: true`.
 
 Then generate a package. Put it under `web/public/` if you want Vite to serve it
 by URL:
@@ -108,8 +108,8 @@ console.log(validated);  // { kind: "ok", value: "Hello, Lean" }
 `vir.call(name, ...args)` accepts the Lean declaration name, manifest `id`, or
 generated JavaScript name.
 
-The release WASM is selected by default. To load the unstripped companion
-artifact while debugging, serve `vir-upstream.dev.wasm` next to
+The release WASM is selected by default. To load the optimized, unstripped
+companion artifact while debugging, serve `vir-upstream.dev.wasm` next to
 `vir-upstream.wasm` and set `debugWasm: true` in the same options object.
 
 You can also call generated methods by JavaScript name:

@@ -13,6 +13,7 @@ const configUrl = new URL("../fixtures/browser-packages.json", import.meta.url);
 export const browserPackageConfig = JSON.parse(await readFile(configUrl, "utf8"));
 export const {
   wasmPublicFile,
+  wasmDevPublicFile,
   packageSpecs,
   packageFiles,
   localPackageFiles,
