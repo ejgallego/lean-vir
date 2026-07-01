@@ -48,6 +48,28 @@ When composing low-level browser binding groups, pass the same
 `createHostResourceState()` result to each group so opaque resources returned
 by one group are live in the others.
 
+## WASM Artifact Selection
+
+Distribution builds ship two interpreter artifacts:
+
+- `vir-upstream.wasm`: stripped release artifact, used by default.
+- `vir-upstream.dev.wasm`: unstripped companion artifact for debugging.
+
+Applications that serve both files beside each other can opt into the debug
+artifact by setting `debugWasm: true`:
+
+```js
+const vir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  debugWasm: true,
+  irPackageUrl: "fixtures-basic.irpkg",
+});
+```
+
+When `debugWasm` is true, the runtime derives `*.dev.wasm` from `wasmUrl`.
+Pass `wasmDebugUrl` when the debug artifact lives at a different URL. If no
+`wasmUrl` is supplied, the factory defaults to `vir-upstream.wasm`.
+
 ## Runtime Module Map
 
 The browser app, Node wrapper, and SDK artifact share these JavaScript modules:

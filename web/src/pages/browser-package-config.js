@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 export function deriveBrowserPackageConfig(browserPackageConfig) {
   const wasmPublicFile = "vir-upstream.wasm";
+  const wasmDevPublicFile = "vir-upstream.dev.wasm";
   const packageSpecs = browserPackageConfig.packages ?? [];
   const localPackagePresets = browserPackageConfig.localPackages ?? [];
   const packageFileById = new Map(packageSpecs.map((spec) => [spec.id, spec.file]));
@@ -36,6 +37,7 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
   const benchmarkPublicFiles = [wasmPublicFile, defaultPackageFile, hostPackageFile];
   const generatedPublicFiles = [
     wasmPublicFile,
+    wasmDevPublicFile,
     ...packageFiles,
     ...localPackageFiles,
   ];
@@ -51,6 +53,7 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
   return {
     browserPackageConfig,
     wasmPublicFile,
+    wasmDevPublicFile,
     packageSpecs,
     packageFiles,
     localPackageFiles,

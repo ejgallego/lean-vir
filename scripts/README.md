@@ -14,10 +14,12 @@ map lives in `docs/HARNESS.md`.
   artifacts, WASI SDK, and optional Chromium browser.
 - `npm run build:demo`
   Build the upstream IR interpreter WASM and generated browser packages. The
-  browser package step uses the compiled `vir_irpkg` generator executable.
+  browser package step uses the compiled `vir_irpkg` generator executable. The
+  build writes `web/public/vir-upstream.wasm` and the debug companion
+  `web/public/vir-upstream.dev.wasm`.
 - `npm run build:demo:dist`
   Build the same optimized demo WASM and packages, then strip the public WASM
-  artifact for distribution.
+  artifact for distribution. The debug companion remains unstripped.
 - `npm run generate:irpkg`
   Build the local Lean library and `vir_irpkg` generator executable, then
   generate one manifest-bearing `.irpkg`.
@@ -75,10 +77,10 @@ Useful diagnostic reports include `build/upstream-probe/boundary.md`,
 `build/generated/*.report.md`, and `build/fixtures/summary.json`.
 
 Commands ending in `:no-build` and the runtime smoke tests expect
-`web/public/vir-upstream.wasm` and browser `.irpkg` files from a previous
-`npm run build:demo`. If one of those commands reports a missing
-`web/public/...` artifact, rebuild the demo artifacts rather than committing a
-generated output.
+`web/public/vir-upstream.wasm`, `web/public/vir-upstream.dev.wasm`, and browser
+`.irpkg` files from a previous `npm run build:demo`. If one of those commands
+reports a missing `web/public/...` artifact, rebuild the demo artifacts rather
+than committing a generated output.
 
 ## Internal Helpers
 

@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 export const SDK_PAYLOADS = [
   ["wasm/vir-upstream.wasm", "web/public/vir-upstream.wasm"],
+  ["wasm/vir-upstream.dev.wasm", "web/public/vir-upstream.dev.wasm"],
   ["js/vir-runtime.js", "web/src/vir-runtime.js"],
   ["js/vir-runtime-node.js", "web/src/vir-runtime-node.js"],
   ["js/vir-host-bindings.js", "web/src/vir-host-bindings.js"],

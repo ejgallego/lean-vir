@@ -77,8 +77,12 @@ react-dom/client and should only be used by browser React integrations.
 Use the matching Lean package generator to create .irpkg files, then serve:
 
   wasm/vir-upstream.wasm
+  wasm/vir-upstream.dev.wasm
   js/vir-runtime.js
   your generated .irpkg
+
+wasm/vir-upstream.wasm is the stripped release artifact and is selected by
+default. wasm/vir-upstream.dev.wasm is an unstripped debugging companion.
 
 Minimal browser usage:
 
@@ -86,6 +90,14 @@ Minimal browser usage:
 
   const vir = await createVirRuntime({
     wasmUrl: "./wasm/vir-upstream.wasm",
+    irPackageUrl: "./my-app.irpkg",
+  });
+
+Set debugWasm: true to load ./wasm/vir-upstream.dev.wasm instead:
+
+  const debugVir = await createVirRuntime({
+    wasmUrl: "./wasm/vir-upstream.wasm",
+    debugWasm: true,
     irPackageUrl: "./my-app.irpkg",
   });
 

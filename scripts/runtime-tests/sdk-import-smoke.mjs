@@ -49,6 +49,10 @@ try {
 
   assert.equal(typeof runtime.createVirRuntime, "function");
   assert.equal(typeof runtime.roundTripInterfaceTypeDescriptor, "function");
+  assert.equal(runtime.VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
+  assert.equal(runtime.VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
+  assert.equal(runtime.debugWasmUrlFor("./wasm/vir-upstream.wasm"), "./wasm/vir-upstream.dev.wasm");
+  assert.equal(nodeRuntime.debugWasmUrlFor, runtime.debugWasmUrlFor);
   assert.equal(typeof nodeRuntime.createVirRuntime, "function");
   assert.equal(typeof hostBindings.createHostResourceState, "function");
   assert.equal(typeof codec.decodeTypeDescriptor, "function");

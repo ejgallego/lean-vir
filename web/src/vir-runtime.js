@@ -67,6 +67,8 @@ const textDecoder = new TextDecoder();
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
 const OBJECT_CALL_UNAVAILABLE = Symbol("object-call-unavailable");
+export const VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
+export const VIR_WASM_DEV_FILE = "vir-upstream.dev.wasm";
 
 export {
   VirCallback,
@@ -82,6 +84,15 @@ export async function fetchBytes(path, init = { cache: "no-store" }) {
     throw new Error(`failed to load ${path}`);
   }
   return new Uint8Array(await response.arrayBuffer());
+}
+
+export function debugWasmUrlFor(wasmUrl = VIR_WASM_RELEASE_FILE) {
+  const value = wasmUrl instanceof URL ? wasmUrl.href : String(wasmUrl);
+  const match = /(\.wasm)([?#].*)?$/.exec(value);
+  if (match === null) {
+    throw new Error("debugWasm requires a .wasm wasmUrl or an explicit wasmDebugUrl");
+  }
+  return `${value.slice(0, match.index)}.dev.wasm${match[2] ?? ""}`;
 }
 
 export function createVirImports(module, overrides = {}, hostState = null) {
@@ -142,6 +153,8 @@ export class VirRuntimeFactory {
     wasmBytes = null,
     wasmModule = null,
     wasmUrl = null,
+    wasmDebugUrl = null,
+    debugWasm = false,
     fetchBytes: loadBytes = fetchBytes,
     imports = null,
     hostBindings = null,
@@ -149,7 +162,8 @@ export class VirRuntimeFactory {
   } = {}) {
     this.wasmBytes = wasmBytes;
     this.wasmModule = wasmModule;
-    this.wasmUrl = wasmUrl;
+    this.debugWasm = debugWasm;
+    this.wasmUrl = selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm });
     this.fetchBytes = loadBytes;
     this.imports = imports;
     this.hostBindings = hostBindings;
@@ -199,6 +213,13 @@ export class VirRuntimeFactory {
     }
     return runtime;
   }
+}
+
+function selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm }) {
+  if (debugWasm) {
+    return wasmDebugUrl ?? debugWasmUrlFor(wasmUrl ?? VIR_WASM_RELEASE_FILE);
+  }
+  return wasmUrl ?? VIR_WASM_RELEASE_FILE;
 }
 
 export class VirRuntime {

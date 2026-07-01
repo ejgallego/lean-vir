@@ -49,6 +49,7 @@ jobs:
           name: vir-demo-artifacts
           path: |
             web/public/vir-upstream.wasm
+            web/public/vir-upstream.dev.wasm
             web/public/*.irpkg
           if-no-files-found: error
 

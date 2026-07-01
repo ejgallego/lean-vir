@@ -84,8 +84,9 @@ failure, but keep them out of Git unless the maintainer asks for a tracked
 fixture/report change.
 
 Commands that reuse generated runtime artifacts expect
-`web/public/vir-upstream.wasm` and the generated browser `.irpkg` files to
-exist. Run `npm run build:demo` first when `npm run test:runtime`,
+`web/public/vir-upstream.wasm`, `web/public/vir-upstream.dev.wasm`, and the
+generated browser `.irpkg` files to exist. Run `npm run build:demo` first when
+`npm run test:runtime`,
 `npm run test:runtime:pure`, `npm run test:runtime:lean`,
 `npm run test:upstream:no-build`, or `npm run test:fixtures:no-build` reports a
 missing `web/public/...` artifact.
@@ -234,7 +235,8 @@ when comparing CI runs:
 - `npm run build:demo` prints browser package, compile, link, and total probe
   timing.
 - `npm run build:demo:dist` uses the same optimized build, then strips
-  `web/public/vir-upstream.wasm` for distribution bundles.
+  `web/public/vir-upstream.wasm` for distribution bundles while keeping
+  `web/public/vir-upstream.dev.wasm` unstripped for debugging.
 - `npm run prepare:irpkg` prints Lean library, generator, package, and total
   timing; when passed multiple configs, it prepares the generator once.
 - `npm run test:runtime` prints selected groups/filters plus per-test timings
@@ -246,12 +248,13 @@ when comparing CI runs:
 
 The CI workflow keeps one job responsible for fetching the pinned Lean source,
 installing the WASI SDK, building the dist-profile
-`web/public/vir-upstream.wasm`, generating browser `.irpkg` files, and running
-upstream smoke. That job uploads the demo artifacts. The pure runtime job
-downloads those artifacts and runs without installing Lean. The Lean-dependent
-runtime job installs Lean only for package generation and SDK metadata smoke
-tests. The fixture job also downloads the demo artifacts and runs in parallel
-without re-fetching Lean source or reinstalling the WASI SDK.
+`web/public/vir-upstream.wasm` plus the unstripped
+`web/public/vir-upstream.dev.wasm`, generating browser `.irpkg` files, and
+running upstream smoke. That job uploads the demo artifacts. The pure runtime
+job downloads those artifacts and runs without installing Lean. The
+Lean-dependent runtime job installs Lean only for package generation and SDK
+metadata smoke tests. The fixture job also downloads the demo artifacts and runs
+in parallel without re-fetching Lean source or reinstalling the WASI SDK.
 
 ## Browser Smoke
 
