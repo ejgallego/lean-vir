@@ -15,7 +15,6 @@ import {
   taggedUnionConstructorAt,
 } from "./vir-codec.js";
 import { WIRE } from "./wire-tags.js";
-import { hostResourceExternref } from "../host-resource.js";
 
 export function normalizeDecimal(value, label, { signed }) {
   if (typeof value === "bigint") {
@@ -74,14 +73,6 @@ export function normalizeInteger(value, label, min, max) {
     throw new Error(`${label} must be an integer in ${min}..${max}`);
   }
   return value;
-}
-
-export function normalizeHostResource(value, label) {
-  const ref = hostResourceExternref(value);
-  if (ref === null) {
-    throw new Error(`${label} must be a live host resource`);
-  }
-  return ref;
 }
 
 export function normalizeArray(value, label) {
