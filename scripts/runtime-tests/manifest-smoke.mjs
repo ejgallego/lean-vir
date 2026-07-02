@@ -186,9 +186,11 @@ for (const { name, mutate, pattern } of invalidManifestCases) {
   }
 }
 assert.deepEqual(hostRuntime.interfaceManifest.hostImports.map((entry) => entry.target).sort(), demoHostImportTargets);
+const hostImportTarget = (target) => hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === target);
 const reactUseStateImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useState");
 assert.equal(reactUseStateImports.length, 1);
 assert.equal(reactUseStateImports[0]?.effect, "react");
+assert.equal(reactUseStateImports[0]?.boundary, "wire");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
@@ -275,15 +277,21 @@ for (const target of [
   "js.value.tamagotchi.viewAction.value",
   "js.value.tamagotchi.viewState",
   "js.value.tamagotchi.viewState.value",
+]) {
+  const entry = hostImportTarget(target);
+  assert.equal(entry?.effect, "runtime");
+  assert.equal(entry?.boundary, "conversion");
+}
+for (const target of [
   "react.state.modify",
   "react.state.set",
 ]) {
-  assert.equal(
-    hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === target)?.effect,
-    "runtime",
-  );
+  const entry = hostImportTarget(target);
+  assert.equal(entry?.effect, "runtime");
+  assert.equal(entry?.boundary, "wire");
 }
 const documentSetTitleImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "browser.document.setTitle");
+assert.equal(documentSetTitleImport?.boundary, "wire");
 assert.equal(documentSetTitleImport?.args[0]?.type?.type, "Js");
 const documentGetTitleImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "browser.document.getTitle");
 assert.equal(documentGetTitleImport?.result?.type, "Js");

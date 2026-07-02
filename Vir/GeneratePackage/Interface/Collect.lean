@@ -177,16 +177,18 @@ def hostImportResultBoundaryDiagnostic? (result : InterfaceType) : Option String
   else
     some s!"unsupported JavaScript import result: {hostBoundaryTypeDiagnostic result}"
 
-def hostImportBoundaryDiagnostic?
+def hostImportBoundary
     (target : String)
     (args : Array InterfaceArg)
     (result : InterfaceType)
-    (effect : InterfaceEffect) : Option String :=
+    (effect : InterfaceEffect) : Except String HostImportBoundary :=
   if isJsValueConversionSignature target args result effect then
-    none
+    .ok .conversion
   else
-    args.findSome? (hostImportArgBoundaryDiagnostic? target) <|>
-      hostImportResultBoundaryDiagnostic? result
+    match args.findSome? (hostImportArgBoundaryDiagnostic? target) <|>
+        hostImportResultBoundaryDiagnostic? result with
+    | some reason => .error reason
+    | none => .ok .wire
 
 def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except PackageDiagnostic InterfaceExport) := do
@@ -252,24 +254,27 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
         source := loaded.source,
         reason := s!"JavaScript import IR arity mismatch: expected {expectedArity}, got {arity}"
       }
-    if let some reason := hostImportBoundaryDiagnostic? target args result effect then
-      return .error {
-        name := loaded.decl.name,
-        source := loaded.source,
-        reason
-      }
-    return .ok {
-      slot,
-      name := loaded.decl.name,
-      source := loaded.source,
-      target,
-      symbol := hostImportSymbol slot arity,
-      arity,
-      erasedPrefixArgs := erasedArgCount,
-      args,
-      result,
-      effect
-    }
+    match hostImportBoundary target args result effect with
+    | .error reason =>
+        return .error {
+          name := loaded.decl.name,
+          source := loaded.source,
+          reason
+        }
+    | .ok boundary =>
+        return .ok {
+          slot,
+          name := loaded.decl.name,
+          source := loaded.source,
+          target,
+          boundary,
+          symbol := hostImportSymbol slot arity,
+          arity,
+          erasedPrefixArgs := erasedArgCount,
+          args,
+          result,
+          effect
+        }
 
 def runCoreForSource (source : String) (env : Environment) (x : CoreM α) : IO α :=
   x.toIO'

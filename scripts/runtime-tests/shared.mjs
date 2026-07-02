@@ -126,7 +126,7 @@ export function manifestEntry(manifest, name) {
 
 const validManifestShape = {
   artifact: INTERFACE_MANIFEST_ARTIFACT,
-  version: 1,
+  version: 2,
   metadata: {},
   exports: [
     {

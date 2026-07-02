@@ -2325,7 +2325,12 @@ var JSON_INPUT_WIRE_TAGS = /* @__PURE__ */ new Set([
 
 // web/src/runtime/interface-manifest.js
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 1, metadata: {...}, exports: [...] }";
+var INTERFACE_MANIFEST_VERSION = 2;
+var HOST_IMPORT_BOUNDARY = Object.freeze({
+  WIRE: "wire",
+  CONVERSION: "conversion"
+});
+var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 2, metadata: {...}, exports: [...] }";
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -2345,7 +2350,7 @@ function requireNonNegativeInteger(value, label) {
   }
 }
 function validateInterfaceManifest(manifest) {
-  if (!isRecord(manifest) || manifest.version !== 1 || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
+  if (!isRecord(manifest) || manifest.version !== INTERFACE_MANIFEST_VERSION || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
     throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
   }
   if (manifest.artifact !== void 0 && manifest.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
@@ -2399,7 +2404,13 @@ function validateManifestHostImports(hostImports) {
       throw new Error(`${label} must be an object`);
     }
     requireInterfaceEffect(entry.effect, `${label}.effect`);
+    requireHostImportBoundary(entry.boundary, `${label}.boundary`);
   });
+}
+function requireHostImportBoundary(value, label) {
+  if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
+    throw new Error(`${label} must be wire or conversion`);
+  }
 }
 function requireUnique(seen, value, label, owner = "interface export") {
   if (seen.has(value)) {
@@ -5337,7 +5348,7 @@ var VirHostState = class {
     }
     const args = [];
     const liftedCallbacks = [];
-    const explicitConversionTarget = isExplicitHostConversionTarget(entry.target);
+    const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.CONVERSION;
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
       if (argObjects.length !== entry.args.length) {
@@ -5410,20 +5421,6 @@ function lookupHostBindingIn(target, bindings) {
     return resolver.call(bindings, target);
   }
   return void 0;
-}
-var explicitHostConversionTargets = /* @__PURE__ */ new Set([
-  "js.string",
-  "js.string.value",
-  "js.nat",
-  "js.nat.value",
-  "js.bool",
-  "js.bool.value",
-  "js.float",
-  "js.float.value"
-]);
-var explicitJsValuePrefix2 = "js.value.";
-function isExplicitHostConversionTarget(target) {
-  return explicitHostConversionTargets.has(target) || target.startsWith(explicitJsValuePrefix2) && target !== "js.value.value";
 }
 function isPromiseLike(value) {
   return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";

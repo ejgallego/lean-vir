@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 export const PACKAGE_FORMAT_VERSION = 7;
-export const INTERFACE_MANIFEST_VERSION = 1;
+export const INTERFACE_MANIFEST_VERSION = 2;
 export const RUNTIME_ABI_VERSION = 1;
 
 export const PACKAGE_VERSIONS = {

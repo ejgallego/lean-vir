@@ -504,8 +504,8 @@ boundary is synchronous; returning a JavaScript `Promise` is an error. The
 current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.
-The JSON manifest records effect labels as `pure`, `runtime`, `io`, `dom`, or
-`react`.
+The JSON manifest also records each host import boundary as `wire` or
+`conversion`, plus effect labels as `pure`, `runtime`, `io`, `dom`, or `react`.
 
 ## Runtime Behavior
 

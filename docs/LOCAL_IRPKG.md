@@ -113,8 +113,9 @@ dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
 The manifest includes package metadata plus one entry per export with its Lean
 declaration name, JavaScript name, argument types, result type, and recursive
 type tree. It also includes `hostImports` for Lean declarations marked with
-`@[vir_js "..."]`. JavaScript validates inputs against that manifest, lowers
-values to owned Lean objects with `vir_obj_*` helpers, and calls
+`@[vir_js "..."]`, including their `wire` or `conversion` host boundary.
+JavaScript validates inputs against that manifest, lowers values to owned Lean
+objects with `vir_obj_*` helpers, and calls
 `vir_call_resolved_objects`. When interpreted Lean code reaches a host import,
 the shim calls the runtime's `env.vir_js_call_objects` import with borrowed Lean
 object arguments, and JavaScript returns an owned Lean object result. Package

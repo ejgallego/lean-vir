@@ -47,9 +47,12 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.react.value")?.effect, "react");
   assert.equal(hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.runtime.value")?.effect, "runtime");
   assert.equal(hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.react.value")?.result?.type, "Js");
+  assert.equal(hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.react.value")?.boundary, "wire");
   assert.equal(hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.runtime.value")?.result?.type, "Js");
+  assert.equal(hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.runtime.value")?.boundary, "wire");
   const commonEchoImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "common.echoString");
   assert.equal(commonEchoImport?.effect, "runtime");
+  assert.equal(commonEchoImport?.boundary, "wire");
   assert.equal(commonEchoImport?.args[0]?.type?.type, "Js");
   assert.equal(commonEchoImport?.result?.type, "Js");
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
@@ -80,12 +83,14 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(jsIdImport?.effect, "runtime");
   assert.equal(jsIdImport?.arity, 3);
   assert.equal(jsIdImport?.erasedPrefixArgs, 1);
+  assert.equal(jsIdImport?.boundary, "wire");
   assert.equal(jsIdImport?.args.length, 1);
   assert.equal(jsIdImport?.args[0]?.type?.type, "Js");
   const jsLengthImport = jsObjectRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.js.length");
   assert.equal(jsLengthImport?.effect, "runtime");
   assert.equal(jsLengthImport?.arity, 3);
   assert.equal(jsLengthImport?.erasedPrefixArgs, 1);
+  assert.equal(jsLengthImport?.boundary, "wire");
   assert.equal(jsLengthImport?.args.length, 1);
   assert.equal(jsLengthImport?.args[0]?.type?.name, "Lean.Vir.Js");
   assert.equal(jsLengthImport?.result?.type, "Js");

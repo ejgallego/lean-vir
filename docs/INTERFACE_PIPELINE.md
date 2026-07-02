@@ -204,9 +204,9 @@ component construction uses `Lean.Vir.React.ReactM α`. For Lean-to-JavaScript
 calls, import `Vir.Host` and mark an opaque declaration with
 `@[vir_js "target.name"]`, or use the starter declarations in `Vir.Common` and
 `Vir.Browser`. The manifest records each host import under `hostImports` with
-its slot, Lean name, JavaScript target, generated WASM symbol, low-level IR
-arity, leading erased argument count, JavaScript-visible arguments, result
-type, and effect.
+its slot, Lean name, JavaScript target, host boundary mode (`wire` or
+`conversion`), generated WASM symbol, low-level IR arity, leading erased
+argument count, JavaScript-visible arguments, result type, and effect.
 The JSON manifest keeps the source-level effect classification for review and
 tooling: `pure`, `runtime`, `io`, `dom`, or `react`. The compact wasm call
 descriptor still lowers that to the runtime distinction the shim needs today:

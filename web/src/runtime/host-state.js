@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING } from "../host-resource.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import { isVirCallback, releaseCallbacks } from "./callbacks.js";
+import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
 
 export class VirHostState {
   constructor({
@@ -86,7 +87,7 @@ export class VirHostState {
 
     const args = [];
     const liftedCallbacks = [];
-    const explicitConversionTarget = isExplicitHostConversionTarget(entry.target);
+    const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.CONVERSION;
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
       if (argObjects.length !== entry.args.length) {
@@ -168,23 +169,6 @@ function lookupHostBindingIn(target, bindings) {
     return resolver.call(bindings, target);
   }
   return undefined;
-}
-
-const explicitHostConversionTargets = new Set([
-  "js.string",
-  "js.string.value",
-  "js.nat",
-  "js.nat.value",
-  "js.bool",
-  "js.bool.value",
-  "js.float",
-  "js.float.value",
-]);
-const explicitJsValuePrefix = "js.value.";
-
-function isExplicitHostConversionTarget(target) {
-  return explicitHostConversionTargets.has(target) ||
-    (target.startsWith(explicitJsValuePrefix) && target !== "js.value.value");
 }
 
 function isPromiseLike(value) {

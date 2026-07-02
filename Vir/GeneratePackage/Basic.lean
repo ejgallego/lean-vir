@@ -148,11 +148,21 @@ structure InterfaceExport where
   result : InterfaceType
   effect : InterfaceEffect := .pure
 
+inductive HostImportBoundary where
+  | wire
+  | conversion
+  deriving BEq, Inhabited
+
+def HostImportBoundary.label : HostImportBoundary → String
+  | .wire => "wire"
+  | .conversion => "conversion"
+
 structure HostImport where
   slot : Nat
   name : Name
   source : String
   target : String
+  boundary : HostImportBoundary
   symbol : String
   arity : Nat
   erasedPrefixArgs : Nat := 0
