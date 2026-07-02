@@ -95,7 +95,7 @@ export class VirHostState {
       }
       entry.args.forEach((arg, index) => {
         const value = explicitConversionTarget
-          ? this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`)
+          ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`)
           : this.runtime.liftHostWireObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
         if (isVirCallback(value)) {
           liftedCallbacks.push(value);
@@ -118,7 +118,7 @@ export class VirHostState {
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
     return explicitConversionTarget
-      ? this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`)
+      ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`)
       : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
   }
 

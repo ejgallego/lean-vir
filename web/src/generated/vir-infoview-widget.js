@@ -1474,7 +1474,7 @@ function createBrowserReactHookRuntime(resources, React3) {
       const [value, setState] = React3.useState(initial);
       const setter = stateSetterFor(setters, setState);
       currentComponent?.setters?.add(setter);
-      return stateResult(resources, value, setter);
+      return stateResult(value, setter);
     },
     useReducer(reducer, initial) {
       if (typeof React3?.useReducer !== "function") {
@@ -1494,7 +1494,7 @@ function createBrowserReactHookRuntime(resources, React3) {
         const [value, dispatch] = React3.useReducer(hook.reducerProxy, initial);
         hook.dispatchTarget = dispatch;
         rendered = true;
-        return reducerStateResult(resources, value, hook.dispatcher);
+        return reducerStateResult(value, hook.dispatcher);
       } finally {
         if (!rendered) {
           releasePendingReducerHook(hook);
@@ -1756,13 +1756,13 @@ function releaseLeanCallback(callback) {
     callback.release();
   }
 }
-function stateResult(resources, value, setter) {
+function stateResult(value, setter) {
   return {
     value,
     setter
   };
 }
-function reducerStateResult(resources, value, dispatcher) {
+function reducerStateResult(value, dispatcher) {
   return {
     value,
     dispatch: dispatcher
@@ -3761,6 +3761,9 @@ var ObjectValueRuntime = class {
     }
     return this.makeObjectValue(type, value, label);
   }
+  makeExplicitConversionObjectValue(type, value, label) {
+    return this.makeObjectValue(type, value, label);
+  }
   makeObjectValue(type, value, label, selfType = null) {
     const tag = type?.wireTag;
     switch (tag) {
@@ -4692,6 +4695,9 @@ var ObjectValueRuntime = class {
     }
     return this.liftObjectValue(type, obj, label);
   }
+  liftExplicitConversionObjectValue(type, obj, label) {
+    return this.liftObjectValue(type, obj, label);
+  }
   readBoundedObjectScalar(obj, label, max) {
     const value = this.readObjectScalar(obj, label);
     if (value > max) {
@@ -5355,7 +5361,7 @@ var VirHostState = class {
         throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
       }
       entry.args.forEach((arg, index) => {
-        const value2 = explicitConversionTarget ? this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostWireObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        const value2 = explicitConversionTarget ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostWireObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
         if (isVirCallback(value2)) {
           liftedCallbacks.push(value2);
         }
@@ -5376,7 +5382,7 @@ var VirHostState = class {
       releaseCallbacks(liftedCallbacks);
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
-    return explicitConversionTarget ? this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
+    return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
   }
   readObjectArgv(argvPtr, argc) {
     if (argvPtr === 0 && argc !== 0) {

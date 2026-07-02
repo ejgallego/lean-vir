@@ -165,7 +165,7 @@ def isJsValueConversionSignature
 def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
   s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Lean.Vir.Js ...` resources and explicit conversion calls"
 
-def hostImportArgBoundaryDiagnostic? (_target : String) (arg : InterfaceArg) : Option String :=
+def hostImportArgBoundaryDiagnostic? (arg : InterfaceArg) : Option String :=
   if arg.type.isHostWireArgType then
     none
   else
@@ -185,7 +185,7 @@ def hostImportBoundary
   if isJsValueConversionSignature target args result effect then
     .ok .conversion
   else
-    match args.findSome? (hostImportArgBoundaryDiagnostic? target) <|>
+    match args.findSome? hostImportArgBoundaryDiagnostic? <|>
         hostImportResultBoundaryDiagnostic? result with
     | some reason => .error reason
     | none => .ok .wire

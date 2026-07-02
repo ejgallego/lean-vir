@@ -60,7 +60,7 @@ export function createBrowserReactHookRuntime(resources, React) {
       const [value, setState] = React.useState(initial);
       const setter = stateSetterFor(setters, setState);
       currentComponent?.setters?.add(setter);
-      return stateResult(resources, value, setter);
+      return stateResult(value, setter);
     },
     useReducer(reducer, initial) {
       if (typeof React?.useReducer !== "function") {
@@ -80,7 +80,7 @@ export function createBrowserReactHookRuntime(resources, React) {
         const [value, dispatch] = React.useReducer(hook.reducerProxy, initial);
         hook.dispatchTarget = dispatch;
         rendered = true;
-        return reducerStateResult(resources, value, hook.dispatcher);
+        return reducerStateResult(value, hook.dispatcher);
       } finally {
         if (!rendered) {
           releasePendingReducerHook(hook);
@@ -233,7 +233,7 @@ export function createVirtualReactHookRuntime(resources) {
       } else if (hook.kind !== "state") {
         throw new Error("React hook order changed: expected useState");
       }
-      return stateResult(resources, hook.value, hook.setter);
+      return stateResult(hook.value, hook.setter);
     },
     useReducer(reducer, initial) {
       if (currentComponent === null) {
@@ -250,7 +250,7 @@ export function createVirtualReactHookRuntime(resources) {
         throw new Error("React hook order changed: expected useReducer");
       }
       stagePendingReducerCallback(currentComponent, hook, reducer);
-      return reducerStateResult(resources, hook.value, hook.dispatcher);
+      return reducerStateResult(hook.value, hook.dispatcher);
     },
     useRef(initial) {
       if (currentComponent === null) {
@@ -653,14 +653,14 @@ function releaseLeanCallback(callback) {
   }
 }
 
-function stateResult(resources, value, setter) {
+function stateResult(value, setter) {
   return {
     value,
     setter,
   };
 }
 
-function reducerStateResult(resources, value, dispatcher) {
+function reducerStateResult(value, dispatcher) {
   return {
     value,
     dispatch: dispatcher,

@@ -83,7 +83,7 @@ function printText(info) {
       .join(", ");
     const effect = formatInterfaceEffectSuffix(entry.effect);
     const erased = entry.erasedPrefixArgs ? ` erasedPrefixArgs=${entry.erasedPrefixArgs}` : "";
-    const boundary = entry.boundary ?? "unknown";
+    const boundary = entry.boundary;
     console.log(`  - #${entry.slot} ${entry.name} boundary=${boundary} arity=${entry.arity ?? "?"}${erased} (${args}) ->${effect} ${formatInterfaceType(entry.result)} [${entry.target}]`);
     printDescriptorDetails(entry.args ?? [], entry.result);
   }

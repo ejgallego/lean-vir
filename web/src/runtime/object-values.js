@@ -64,6 +64,10 @@ export class ObjectValueRuntime {
     return this.makeObjectValue(type, value, label);
   }
 
+  makeExplicitConversionObjectValue(type, value, label) {
+    return this.makeObjectValue(type, value, label);
+  }
+
   makeObjectValue(type, value, label, selfType = null) {
     const tag = type?.wireTag;
     switch (tag) {
@@ -1058,6 +1062,10 @@ export class ObjectValueRuntime {
     if (!hostWireArgumentSupported(type)) {
       throw new Error(`${label} has unsupported JavaScript host wire argument type`);
     }
+    return this.liftObjectValue(type, obj, label);
+  }
+
+  liftExplicitConversionObjectValue(type, obj, label) {
     return this.liftObjectValue(type, obj, label);
   }
 
