@@ -86,13 +86,16 @@ export class VirHostState {
 
     const args = [];
     const liftedCallbacks = [];
+    const explicitConversionTarget = isExplicitHostConversionTarget(entry.target);
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
       if (argObjects.length !== entry.args.length) {
         throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
       }
       entry.args.forEach((arg, index) => {
-        const value = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        const value = explicitConversionTarget
+          ? this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`)
+          : this.runtime.liftHostWireObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
         if (isVirCallback(value)) {
           liftedCallbacks.push(value);
         }
@@ -113,7 +116,9 @@ export class VirHostState {
       releaseCallbacks(liftedCallbacks);
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
-    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
+    return explicitConversionTarget
+      ? this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`)
+      : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
   }
 
   readObjectArgv(argvPtr, argc) {
@@ -163,6 +168,23 @@ function lookupHostBindingIn(target, bindings) {
     return resolver.call(bindings, target);
   }
   return undefined;
+}
+
+const explicitHostConversionTargets = new Set([
+  "js.string",
+  "js.string.value",
+  "js.nat",
+  "js.nat.value",
+  "js.bool",
+  "js.bool.value",
+  "js.float",
+  "js.float.value",
+]);
+const explicitJsValuePrefix = "js.value.";
+
+function isExplicitHostConversionTarget(target) {
+  return explicitHostConversionTargets.has(target) ||
+    (target.startsWith(explicitJsValuePrefix) && target !== "js.value.value");
 }
 
 function isPromiseLike(value) {

@@ -160,7 +160,7 @@ Host imports are a JavaScript-resource boundary by default: use `Lean.Vir.Js α`
 resources, `Option`/`Array` containers of resources, and callback types whose
 arguments/results follow the same rule. Raw Lean scalars and structures are
 rejected unless they are part of an explicit conversion target such as
-`js.nat.value` or a documented React wire binding. `Unit` returns use
+`js.nat.value` or `js.value.react.property`. `Unit` returns use
 `undefined` or `null`. Function-valued Lean arguments are decoded as callable
 `VirCallback` objects. A host binding that stores a callback must eventually
 call `callback.release()` or rely on `VirRuntime.dispose()` to release any

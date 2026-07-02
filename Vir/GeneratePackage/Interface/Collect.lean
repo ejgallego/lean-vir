@@ -113,16 +113,29 @@ def InterfaceType.hostBoundaryKind : InterfaceType → String
   | .resource .. => "resource"
   | .function .. => "callback"
 
-partial def InterfaceType.isHostWireType : InterfaceType → Bool
+mutual
+
+partial def InterfaceType.isHostWireArgType : InterfaceType → Bool
   | .unit => true
   | .resource .. => true
-  | .array element => element.isHostWireType
-  | .list element => element.isHostWireType
-  | .option element => element.isHostWireType
-  | .prod fst snd => fst.isHostWireType && snd.isHostWireType
+  | .array element => element.isHostWireArgType
+  | .list element => element.isHostWireArgType
+  | .option element => element.isHostWireArgType
+  | .prod fst snd => fst.isHostWireArgType && snd.isHostWireArgType
   | .function args result _ =>
-      args.all (fun (_, ty) => ty.isHostWireType) && result.isHostWireType
+      args.all (fun (_, ty) => ty.isHostWireArgType) && result.isHostWireResultType
   | _ => false
+
+partial def InterfaceType.isHostWireResultType : InterfaceType → Bool
+  | .unit => true
+  | .resource .. => true
+  | .array element => element.isHostWireResultType
+  | .list element => element.isHostWireResultType
+  | .option element => element.isHostWireResultType
+  | .prod fst snd => fst.isHostWireResultType && snd.isHostWireResultType
+  | _ => false
+
+end
 
 def isJsValueConversionSignature
     (target : String)
@@ -153,13 +166,13 @@ def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
   s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Lean.Vir.Js ...` resources and explicit conversion calls"
 
 def hostImportArgBoundaryDiagnostic? (_target : String) (arg : InterfaceArg) : Option String :=
-  if arg.type.isHostWireType then
+  if arg.type.isHostWireArgType then
     none
   else
     some s!"unsupported JavaScript import argument `{arg.name}`: {hostBoundaryTypeDiagnostic arg.type}"
 
 def hostImportResultBoundaryDiagnostic? (result : InterfaceType) : Option String :=
-  if result.isHostWireType then
+  if result.isHostWireResultType then
     none
   else
     some s!"unsupported JavaScript import result: {hostBoundaryTypeDiagnostic result}"

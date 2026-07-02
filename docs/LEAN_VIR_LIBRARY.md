@@ -455,7 +455,7 @@ Host imports use an explicit JavaScript-resource boundary by default. Use
 `Lean.Vir.Js α` resources, containers of resources, or callbacks whose
 arguments/results are resource-shaped. Raw Lean scalars and structures are
 rejected unless the target is an explicit conversion primitive such as
-`js.nat.value` or a documented React wire binding. `Unit` results should return
+`js.nat.value` or `js.value.react.property`. `Unit` results should return
 `undefined` or `null`.
 
 Lean function values in host-import arguments are supported as callbacks from

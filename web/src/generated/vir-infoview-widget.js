@@ -3361,6 +3361,35 @@ function objectResultSupported(type, selfType = null) {
       return false;
   }
 }
+function hostWireArgumentSupported(type) {
+  return hostWireTypeSupported(type, { allowFunction: true });
+}
+function hostWireResultSupported(type) {
+  return hostWireTypeSupported(type, { allowFunction: false });
+}
+function hostWireTypeSupported(type, { allowFunction }) {
+  const tag = type?.wireTag;
+  switch (tag) {
+    case WIRE.UNIT:
+    case WIRE.RESOURCE:
+      return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      return hostWireTypeSupported(requireTypeField(type, "element", "host wire type"), { allowFunction });
+    case WIRE.PROD:
+      return hostWireTypeSupported(requireTypeField(type, "fst", "host wire type"), { allowFunction }) && hostWireTypeSupported(requireTypeField(type, "snd", "host wire type"), { allowFunction });
+    case WIRE.FUNCTION: {
+      if (!allowFunction) {
+        return false;
+      }
+      const args = requireFunctionArgs(type, "host wire callback");
+      return args.every((arg) => hostWireArgumentSupported(arg.type)) && hostWireResultSupported(requireFunctionResult(type, "host wire callback"));
+    }
+    default:
+      return false;
+  }
+}
 function objectTypeNeedsBoxedBoundary(type) {
   switch (type?.wireTag) {
     case WIRE.FLOAT:
@@ -3714,6 +3743,12 @@ var MAX_UINT642 = 0xffffffffffffffffn;
 var ObjectValueRuntime = class {
   hasObjectValueExports() {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
+  }
+  makeHostWireObjectValue(type, value, label) {
+    if (!hostWireResultSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host wire result type`);
+    }
+    return this.makeObjectValue(type, value, label);
   }
   makeObjectValue(type, value, label, selfType = null) {
     const tag = type?.wireTag;
@@ -4640,6 +4675,12 @@ var ObjectValueRuntime = class {
         throw new Error(`${label} has unsupported object ABI result type`);
     }
   }
+  liftHostWireObjectValue(type, obj, label) {
+    if (!hostWireArgumentSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host wire argument type`);
+    }
+    return this.liftObjectValue(type, obj, label);
+  }
   readBoundedObjectScalar(obj, label, max) {
     const value = this.readObjectScalar(obj, label);
     if (value > max) {
@@ -5296,13 +5337,14 @@ var VirHostState = class {
     }
     const args = [];
     const liftedCallbacks = [];
+    const explicitConversionTarget = isExplicitHostConversionTarget(entry.target);
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
       if (argObjects.length !== entry.args.length) {
         throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
       }
       entry.args.forEach((arg, index) => {
-        const value2 = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        const value2 = explicitConversionTarget ? this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostWireObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
         if (isVirCallback(value2)) {
           liftedCallbacks.push(value2);
         }
@@ -5323,7 +5365,7 @@ var VirHostState = class {
       releaseCallbacks(liftedCallbacks);
       throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
     }
-    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
+    return explicitConversionTarget ? this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
   }
   readObjectArgv(argvPtr, argc) {
     if (argvPtr === 0 && argc !== 0) {
@@ -5368,6 +5410,20 @@ function lookupHostBindingIn(target, bindings) {
     return resolver.call(bindings, target);
   }
   return void 0;
+}
+var explicitHostConversionTargets = /* @__PURE__ */ new Set([
+  "js.string",
+  "js.string.value",
+  "js.nat",
+  "js.nat.value",
+  "js.bool",
+  "js.bool.value",
+  "js.float",
+  "js.float.value"
+]);
+var explicitJsValuePrefix2 = "js.value.";
+function isExplicitHostConversionTarget(target) {
+  return explicitHostConversionTargets.has(target) || target.startsWith(explicitJsValuePrefix2) && target !== "js.value.value";
 }
 function isPromiseLike(value) {
   return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";

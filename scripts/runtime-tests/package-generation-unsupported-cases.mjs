@@ -55,7 +55,10 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /jsBumpCounter/,
     /unsupported JavaScript import argument `counter`/,
     /structure `HostCounter` is not a JavaScript boundary type/,
-  ], ["freshCustomBump", "freshCustomCounter"]);
+    /jsCallbackResult/,
+    /unsupported JavaScript import result/,
+    /callback `Function` is not a JavaScript boundary type/,
+  ], ["freshCustomBump", "freshCustomCounter", "freshCustomCallbackResult"]);
 
   await assertUnsupportedInterfaceFixture(freshDir, "DuplicateExportNames.lean", [
     /Duplicate\.entry/,

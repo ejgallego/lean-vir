@@ -22,6 +22,8 @@ import {
 } from "../host-resource.js";
 import {
   OBJECT_VALUE_EXPORTS,
+  hostWireArgumentSupported,
+  hostWireResultSupported,
   objectLayoutPlan,
   objectLayoutSlotsFromPlan,
   readObjectScalarField as readObjectScalarFieldValue,
@@ -53,6 +55,13 @@ const MAX_UINT64 = 0xffffffffffffffffn;
 export class ObjectValueRuntime {
   hasObjectValueExports() {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
+  }
+
+  makeHostWireObjectValue(type, value, label) {
+    if (!hostWireResultSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host wire result type`);
+    }
+    return this.makeObjectValue(type, value, label);
   }
 
   makeObjectValue(type, value, label, selfType = null) {
@@ -1043,6 +1052,13 @@ export class ObjectValueRuntime {
       default:
         throw new Error(`${label} has unsupported object ABI result type`);
     }
+  }
+
+  liftHostWireObjectValue(type, obj, label) {
+    if (!hostWireArgumentSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host wire argument type`);
+    }
+    return this.liftObjectValue(type, obj, label);
   }
 
   readBoundedObjectScalar(obj, label, max) {

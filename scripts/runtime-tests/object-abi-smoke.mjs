@@ -107,6 +107,8 @@ function withCallLaneCounters(runtime, body) {
 }
 
 const resourceType = { type: "Resource", wireTag: WIRE.RESOURCE };
+const unitType = { type: "Unit", wireTag: WIRE.UNIT };
+const stringType = { type: "String", wireTag: WIRE.STRING };
 assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
 assert.equal(typeof runtime.exports.vir_call_result_size, "undefined");
 const resourceValue = { name: "resource" };
@@ -123,6 +125,53 @@ try {
   runtime.exports.vir_obj_dec(resourceObj);
   resourceObj = 0;
 }
+let hostWireResourceObj = runtime.makeHostWireObjectValue(resourceType, resourceArg, "resource host result");
+try {
+  assert.equal(runtime.liftHostWireObjectValue(resourceType, hostWireResourceObj, "resource host argument"), resourceArg);
+} finally {
+  runtime.exports.vir_obj_dec(hostWireResourceObj);
+  hostWireResourceObj = 0;
+}
+const optionResourceType = { type: "Option", wireTag: WIRE.OPTION, element: resourceType };
+let emptyOptionResourceObj = runtime.makeHostWireObjectValue(optionResourceType, null, "optional resource host result");
+try {
+  assert.equal(runtime.liftHostWireObjectValue(optionResourceType, emptyOptionResourceObj, "optional resource host argument"), null);
+} finally {
+  runtime.exports.vir_obj_dec(emptyOptionResourceObj);
+  emptyOptionResourceObj = 0;
+}
+assert.throws(
+  () => runtime.makeHostWireObjectValue(stringType, "raw", "raw string host result"),
+  /unsupported JavaScript host wire result type/,
+);
+withObjectString(runtime, "raw", (obj) => {
+  assert.throws(
+    () => runtime.liftHostWireObjectValue(stringType, obj, "raw string host argument"),
+    /unsupported JavaScript host wire argument type/,
+  );
+});
+const callbackWithRawStringType = {
+  type: "Function",
+  wireTag: WIRE.FUNCTION,
+  effect: "io",
+  args: [{ name: "value", type: stringType }],
+  result: unitType,
+};
+assert.throws(
+  () => runtime.liftHostWireObjectValue(callbackWithRawStringType, 0, "raw callback host argument"),
+  /unsupported JavaScript host wire argument type/,
+);
+const callbackWithResourceType = {
+  type: "Function",
+  wireTag: WIRE.FUNCTION,
+  effect: "io",
+  args: [{ name: "value", type: resourceType }],
+  result: unitType,
+};
+assert.throws(
+  () => runtime.makeHostWireObjectValue(callbackWithResourceType, () => undefined, "callback host result"),
+  /unsupported JavaScript host wire result type/,
+);
 assert.throws(() => runtime.makeObjectValue(resourceType, { handle: 1 }, "resource argument"), /resource argument must be a live host resource/);
 releaseHostResource(resourceArg);
 assert.throws(() => runtime.makeObjectValue(resourceType, resourceArg, "resource argument"), /resource argument must be a live host resource/);
