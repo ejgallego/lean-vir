@@ -300,23 +300,27 @@ when creating the runtime.
 Lean:
 
 ```lean
-import Vir.Host
+import Vir.Js
 
 @[vir_js "demo.bumpNat"]
-opaque jsBumpNat (n : Nat) : Nat
+opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
-def bumpViaJavaScript (n : Nat) : Nat :=
-  jsBumpNat n
+def bumpViaJavaScript (n : Nat) : Lean.Vir.RuntimeM Nat := do
+  let input ← Lean.Vir.JsValue.ofNat n
+  let output ← jsBumpNat input
+  Lean.Vir.JsValue.toNat output
 ```
 
 JavaScript:
 
 ```js
+const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "/assets/vir-upstream.wasm",
   irPackageUrl: "/assets/my-app.irpkg",
+  defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
+    "demo.bumpNat": (n) => resources.resourceForValue(hostResourceValue(n) + 1n),
   },
 });
 

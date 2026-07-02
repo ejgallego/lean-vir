@@ -44,7 +44,7 @@ try {
   assert.equal(runtimeImport.effect, "runtime");
   assert.equal(runtimeImport.arity, 1);
   assert.equal(runtimeImport.erasedPrefixArgs, 0);
-  assert.equal(runtimeImport.result.type, "Nat");
+  assert.equal(runtimeImport.result.type, "Js");
 
   const report = await readFile(runtimeReport, "utf8");
   assert.match(report, /runtimeValue/);
@@ -56,16 +56,16 @@ try {
   const hostSlotNames = Array.from({ length: 64 }, (_, slot) => `hostSlot${slot}`);
   const hostSlotLines = hostSlotNames.flatMap((name, slot) => [
     `@[vir_js "test.slot.${slot}"]`,
-    `private opaque ${name} : Nat`,
+    `private opaque ${name} : Lean.Vir.RuntimeM (Lean.Vir.Js Unit)`,
     "",
   ]);
   await writeFile(hostSlotSource, [
-    "import Vir.Host",
+    "import Vir.Js",
     "",
     ...hostSlotLines,
-    "def hostSlotTotal : Nat :=",
-    ...hostSlotNames.map((name, index) =>
-      `  ${name}${index + 1 === hostSlotNames.length ? "" : " +"}`),
+    "def hostSlotTotal : Lean.Vir.RuntimeM (Lean.Vir.Js Unit) := do",
+    ...hostSlotNames.slice(0, -1).map((name) => `  let _ ← ${name}`),
+    `  ${hostSlotNames.at(-1)}`,
     "",
   ].join("\n"));
 
@@ -84,8 +84,8 @@ try {
     Array.from({ length: 64 }, (_, slot) => slot),
   );
   const lastHostSlot = hostSlotManifest.hostImports.find((entry) => entry.slot === 63);
-  assert.equal(lastHostSlot?.symbol, "vir_js_import_63_0");
-  assert.equal(lastHostSlot?.arity, 0);
+  assert.equal(lastHostSlot?.symbol, "vir_js_import_63_1");
+  assert.equal(lastHostSlot?.arity, 1);
 } finally {
   await rm(freshDir, { recursive: true, force: true });
 }

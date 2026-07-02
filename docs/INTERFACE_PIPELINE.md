@@ -188,15 +188,21 @@ is done with it.
 
 `Lean.Vir.React.Node` is a JavaScript-owned resource marker. The recursive
 structure of the rendered tree lives in the host resource graph created by
-`react.node.text` and `react.node.createElement`; the manifest still describes the
-ordinary `Property`, `PropValue`, and `EventHandler` payloads that those host
-imports receive.
+`react.node.text` and `react.node.createElement`. Their scalar text/tag/key
+inputs are explicit `Lean.Vir.Js String` resources; the manifest still
+describes the ordinary `Property`, `PropValue`, and `EventHandler` payloads
+that those host imports receive.
 
 Entry points and host imports can be pure functions or synchronous effect
-actions. JavaScript resource/runtime APIs use `Lean.Vir.RuntimeM α`; raw custom
-host imports can use `IO α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
-component construction uses `Lean.Vir.React.ReactM α`. For
-Lean-to-JavaScript calls, import `Vir.Host` and mark an opaque declaration with
+actions. Host imports are deliberately narrower than exports: low-level
+JavaScript imports should expose `Lean.Vir.Js α` resources, resource-shaped
+containers/callbacks, or explicit conversion targets such as `js.string.value`.
+Raw Lean scalar and structure host imports are rejected, apart from documented
+React wire records used by `react.node.createElement` and concrete
+`ReducerBinding` imports. JavaScript resource/runtime APIs use
+`Lean.Vir.RuntimeM α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
+component construction uses `Lean.Vir.React.ReactM α`. For Lean-to-JavaScript
+calls, import `Vir.Host` and mark an opaque declaration with
 `@[vir_js "target.name"]`, or use the starter declarations in `Vir.Common` and
 `Vir.Browser`. The manifest records each host import under `hostImports` with
 its slot, Lean name, JavaScript target, generated WASM symbol, low-level IR

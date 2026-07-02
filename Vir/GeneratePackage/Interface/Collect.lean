@@ -76,6 +76,140 @@ def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : Interf
 def boxedBoundaryDiagnostic (name : Name) : String :=
   s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
 
+def InterfaceType.isHostResourceWire : InterfaceType → Bool
+  | .resource .. => true
+  | _ => false
+
+def InterfaceType.hostBoundaryKind : InterfaceType → String
+  | .unit
+  | .nat
+  | .int
+  | .bool
+  | .string
+  | .float
+  | .float32
+  | .uint8
+  | .uint16
+  | .uint32
+  | .uint64
+  | .usize
+  | .byteArray
+  | .expr => "raw Lean type"
+  | .simpleEnum .. => "enum"
+  | .taggedUnion .. => "tagged union"
+  | .customInductive .. => "inductive"
+  | .structure .. => "structure"
+  | .recursiveSelf .. => "recursive type"
+  | .array .. => "array"
+  | .list .. => "list"
+  | .option .. => "option"
+  | .prod .. => "product"
+  | .resource .. => "resource"
+  | .function .. => "callback"
+
+def isHostWireStructureName : Name → Bool
+  | `Lean.Vir.React.State => true
+  | _ => false
+
+partial def InterfaceType.isHostWireType : InterfaceType → Bool
+  | .unit => true
+  | .resource .. => true
+  | .array element => element.isHostWireType
+  | .list element => element.isHostWireType
+  | .option element => element.isHostWireType
+  | .prod fst snd => fst.isHostWireType && snd.isHostWireType
+  | .function args result _ =>
+      args.all (fun (_, ty) => ty.isHostWireType) && result.isHostWireType
+  | .structure name _ _ _ _ _ fields =>
+      isHostWireStructureName name &&
+        fields.all (fun (_, fieldType, _, _) => fieldType.isHostWireType)
+  | _ => false
+
+def isJsValueConversionSignature
+    (target : String)
+    (args : Array InterfaceArg)
+    (result : InterfaceType)
+    (effect : InterfaceEffect) : Bool :=
+  if effect != .runtime then
+    false
+  else
+    match target, args[0]? with
+    | "js.string", some arg => args.size == 1 && arg.type == .string && result.isHostResourceWire
+    | "js.string.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .string
+    | "js.nat", some arg => args.size == 1 && arg.type == .nat && result.isHostResourceWire
+    | "js.nat.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .nat
+    | "js.bool", some arg => args.size == 1 && arg.type == .bool && result.isHostResourceWire
+    | "js.bool.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .bool
+    | "js.float", some arg => args.size == 1 && arg.type == .float && result.isHostResourceWire
+    | "js.float.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .float
+    | _, _ => false
+
+def InterfaceType.isReactNodeCreateElementWireArg : InterfaceType → Bool
+  | .array (.structure `Lean.Vir.React.Property ..) => true
+  | .array (.structure `Lean.Vir.React.EventHandler ..) => true
+  | _ => false
+
+def isReactReducerSignature
+    (target : String)
+    (args : Array InterfaceArg)
+    (result : InterfaceType)
+    (effect : InterfaceEffect) : Bool :=
+  match target, args[0]?, args[1]? with
+  | "react.useReducer", some reducer, some _ =>
+      args.size == 2 &&
+        effect == .react &&
+        (match reducer.type with | .function .. => true | _ => false) &&
+        (match result with | .structure `Lean.Vir.React.ReducerState .. => true | _ => false)
+  | "react.reducer.dispatch", some dispatch, some _ =>
+      args.size == 2 &&
+        effect == .runtime &&
+        dispatch.type.isHostWireType &&
+        result == .unit
+  | _, _, _ => false
+
+def isProofWidgetsConversionSignature
+    (target : String)
+    (args : Array InterfaceArg)
+    (result : InterfaceType)
+    (effect : InterfaceEffect) : Bool :=
+  match target, args[0]? with
+  | "proofwidgets.rpc.resolvedRef.value", some ref =>
+      args.size == 1 &&
+        effect == .dom &&
+        ref.type.isHostWireType &&
+        (match result with | .structure `Lean.Vir.ProofWidgets.ResolvedRef .. => true | _ => false)
+  | _, _ => false
+
+def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
+  s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Lean.Vir.Js ...` resources and explicit conversion calls"
+
+def hostImportArgBoundaryDiagnostic? (target : String) (arg : InterfaceArg) : Option String :=
+  if target == "react.node.createElement" && arg.type.isReactNodeCreateElementWireArg then
+    none
+  else if arg.type.isHostWireType then
+    none
+  else
+    some s!"unsupported JavaScript import argument `{arg.name}`: {hostBoundaryTypeDiagnostic arg.type}"
+
+def hostImportResultBoundaryDiagnostic? (result : InterfaceType) : Option String :=
+  if result.isHostWireType then
+    none
+  else
+    some s!"unsupported JavaScript import result: {hostBoundaryTypeDiagnostic result}"
+
+def hostImportBoundaryDiagnostic?
+    (target : String)
+    (args : Array InterfaceArg)
+    (result : InterfaceType)
+    (effect : InterfaceEffect) : Option String :=
+  if isJsValueConversionSignature target args result effect ||
+      isReactReducerSignature target args result effect ||
+      isProofWidgetsConversionSignature target args result effect then
+    none
+  else
+    args.findSome? (hostImportArgBoundaryDiagnostic? target) <|>
+      hostImportResultBoundaryDiagnostic? result
+
 def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except PackageDiagnostic InterfaceExport) := do
   if isPrivateName name then
@@ -139,6 +273,12 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
         name := loaded.decl.name,
         source := loaded.source,
         reason := s!"JavaScript import IR arity mismatch: expected {expectedArity}, got {arity}"
+      }
+    if let some reason := hostImportBoundaryDiagnostic? target args result effect then
+      return .error {
+        name := loaded.decl.name,
+        source := loaded.source,
+        reason
       }
     return .ok {
       slot,

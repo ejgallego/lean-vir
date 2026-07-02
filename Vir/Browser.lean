@@ -169,7 +169,12 @@ synchronous and returns `Unit`.
 Reference: [MDN `console.log`](https://developer.mozilla.org/en-US/docs/Web/API/console/log_static).
 -/
 @[vir_js "browser.console.log"]
-opaque log (message : @& String) : IO Unit
+private opaque logJs (message : @& Lean.Vir.Js String) : Lean.Vir.RuntimeM Unit
+
+def log (message : @& String) : IO Unit :=
+  Lean.Vir.RuntimeM.run do
+    let jsMessage ← Lean.Vir.JsValue.ofString message
+    logJs jsMessage
 
 end Console
 
@@ -184,7 +189,11 @@ In a browser this returns `document.title`. In Node tests, use the
 Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title).
 -/
 @[vir_js "browser.document.getTitle"]
-opaque getTitle : DomM String
+private opaque getTitleJs : DomM (Lean.Vir.Js String)
+
+def getTitle : DomM String := do
+  let title ← getTitleJs
+  Lean.Vir.JsValue.toString title
 
 /--
 Sets the current document title through the JavaScript host.
@@ -195,7 +204,11 @@ In a browser this writes `document.title`. In Node tests, use the
 Reference: [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title).
 -/
 @[vir_js "browser.document.setTitle"]
-opaque setTitle (title : @& String) : DomM Unit
+private opaque setTitleJs (title : @& Lean.Vir.Js String) : DomM Unit
+
+def setTitle (title : @& String) : DomM Unit := do
+  let jsTitle ← Lean.Vir.JsValue.ofString title
+  setTitleJs jsTitle
 
 /--
 Returns the first element matching a CSS selector.
@@ -209,7 +222,11 @@ that need an element fixture should pre-seed it from JavaScript with
 Reference: [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector).
 -/
 @[vir_js "browser.document.querySelector"]
-opaque querySelector (selector : @& String) : DomM (Option (Lean.Vir.Js Element))
+private opaque querySelectorJs (selector : @& Lean.Vir.Js String) : DomM (Option (Lean.Vir.Js Element))
+
+def querySelector (selector : @& String) : DomM (Option (Lean.Vir.Js Element)) := do
+  let jsSelector ← Lean.Vir.JsValue.ofString selector
+  querySelectorJs jsSelector
 
 end Document
 
@@ -225,7 +242,11 @@ wrapper for virtual document state.
 Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
 -/
 @[vir_js "browser.element.getTextContent"]
-opaque getTextContent (element : @& Lean.Vir.Js Element) : DomM String
+private opaque getTextContentJs (element : @& Lean.Vir.Js Element) : DomM (Lean.Vir.Js String)
+
+def getTextContent (element : @& Lean.Vir.Js Element) : DomM String := do
+  let text ← getTextContentJs element
+  Lean.Vir.JsValue.toString text
 
 /--
 Sets an element's text content through the JavaScript host.
@@ -236,7 +257,14 @@ In a browser this writes `element.textContent`. In Node tests, use the
 Reference: [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent).
 -/
 @[vir_js "browser.element.setTextContent"]
-opaque setTextContent (element : @& Lean.Vir.Js Element) (text : @& String) : DomM Unit
+private opaque setTextContentJs
+    (element : @& Lean.Vir.Js Element)
+    (text : @& Lean.Vir.Js String) :
+    DomM Unit
+
+def setTextContent (element : @& Lean.Vir.Js Element) (text : @& String) : DomM Unit := do
+  let jsText ← Lean.Vir.JsValue.ofString text
+  setTextContentJs element jsText
 
 /--
 Reads an element attribute through the JavaScript host.
@@ -248,7 +276,18 @@ wrapper for virtual document state.
 Reference: [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute).
 -/
 @[vir_js "browser.element.getAttribute"]
-opaque getAttribute (element : @& Lean.Vir.Js Element) (name : @& String) : DomM (Option String)
+private opaque getAttributeJs
+    (element : @& Lean.Vir.Js Element)
+    (name : @& Lean.Vir.Js String) :
+    DomM (Option (Lean.Vir.Js String))
+
+def getAttribute (element : @& Lean.Vir.Js Element) (name : @& String) : DomM (Option String) := do
+  let jsName ← Lean.Vir.JsValue.ofString name
+  match ← getAttributeJs element jsName with
+  | none => pure none
+  | some value =>
+      let text ← Lean.Vir.JsValue.toString value
+      pure (some text)
 
 /--
 Sets an element attribute through the JavaScript host.
@@ -259,7 +298,15 @@ the `lean-vir/vir-runtime-node` wrapper for virtual document state.
 Reference: [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute).
 -/
 @[vir_js "browser.element.setAttribute"]
-opaque setAttribute (element : @& Lean.Vir.Js Element) (name value : @& String) : DomM Unit
+private opaque setAttributeJs
+    (element : @& Lean.Vir.Js Element)
+    (name value : @& Lean.Vir.Js String) :
+    DomM Unit
+
+def setAttribute (element : @& Lean.Vir.Js Element) (name value : @& String) : DomM Unit := do
+  let jsName ← Lean.Vir.JsValue.ofString name
+  let jsValue ← Lean.Vir.JsValue.ofString value
+  setAttributeJs element jsName jsValue
 
 /--
 Registers a browser event listener backed by a Lean callback closure.
@@ -271,11 +318,19 @@ that is valid only during that event dispatch.
 Reference: [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener).
 -/
 @[vir_js "browser.element.addEventListener"]
-opaque addEventListener
+private opaque addEventListenerJs
+    (element : @& Lean.Vir.Js Element)
+    (event : @& Lean.Vir.Js String)
+    (callback : Lean.Vir.Js Event → DomM Unit) :
+    DomM (Lean.Vir.Js EventListener)
+
+def addEventListener
     (element : @& Lean.Vir.Js Element)
     (event : @& String)
     (callback : Lean.Vir.Js Event → DomM Unit) :
-    DomM (Lean.Vir.Js EventListener)
+    DomM (Lean.Vir.Js EventListener) := do
+  let jsEvent ← Lean.Vir.JsValue.ofString event
+  addEventListenerJs element jsEvent callback
 
 /--
 Removes a listener previously registered by `Element.addEventListener`.
@@ -310,7 +365,11 @@ In a browser this reads `input.checked`. In Node tests, use the
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
 @[vir_js "browser.htmlInputElement.getChecked"]
-opaque getChecked (input : @& Lean.Vir.Js HTMLInputElement) : DomM Bool
+private opaque getCheckedJs (input : @& Lean.Vir.Js HTMLInputElement) : DomM (Lean.Vir.Js Bool)
+
+def getChecked (input : @& Lean.Vir.Js HTMLInputElement) : DomM Bool := do
+  let checked ← getCheckedJs input
+  Lean.Vir.JsValue.toBool checked
 
 /--
 Sets the `checked` property of a checkbox or radio input.
@@ -321,7 +380,14 @@ In a browser this writes `input.checked`. In Node tests, use the
 Reference: [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked).
 -/
 @[vir_js "browser.htmlInputElement.setChecked"]
-opaque setChecked (input : @& Lean.Vir.Js HTMLInputElement) (checked : Bool) : DomM Unit
+private opaque setCheckedJs
+    (input : @& Lean.Vir.Js HTMLInputElement)
+    (checked : @& Lean.Vir.Js Bool) :
+    DomM Unit
+
+def setChecked (input : @& Lean.Vir.Js HTMLInputElement) (checked : Bool) : DomM Unit := do
+  let jsChecked ← Lean.Vir.JsValue.ofBool checked
+  setCheckedJs input jsChecked
 
 /--
 Reads the `value` property of an input element.
@@ -332,7 +398,11 @@ In a browser this reads `input.value`. In Node tests, use the
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/
 @[vir_js "browser.htmlInputElement.getValue"]
-opaque getValue (input : @& Lean.Vir.Js HTMLInputElement) : DomM String
+private opaque getValueJs (input : @& Lean.Vir.Js HTMLInputElement) : DomM (Lean.Vir.Js String)
+
+def getValue (input : @& Lean.Vir.Js HTMLInputElement) : DomM String := do
+  let value ← getValueJs input
+  Lean.Vir.JsValue.toString value
 
 /--
 Sets the `value` property of an input element.
@@ -343,7 +413,14 @@ In a browser this writes `input.value`. In Node tests, use the
 Reference: [MDN `HTMLInputElement.value`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/value).
 -/
 @[vir_js "browser.htmlInputElement.setValue"]
-opaque setValue (input : @& Lean.Vir.Js HTMLInputElement) (value : @& String) : DomM Unit
+private opaque setValueJs
+    (input : @& Lean.Vir.Js HTMLInputElement)
+    (value : @& Lean.Vir.Js String) :
+    DomM Unit
+
+def setValue (input : @& Lean.Vir.Js HTMLInputElement) (value : @& String) : DomM Unit := do
+  let jsValue ← Lean.Vir.JsValue.ofString value
+  setValueJs input jsValue
 
 end HTMLInputElement
 
@@ -382,7 +459,14 @@ returns `some value` for `HTMLInputElement`, `HTMLTextAreaElement`, and
 `HTMLSelectElement` targets, and `none` for other elements.
 -/
 @[vir_js "browser.event.formValue"]
-opaque formValue? (event : @& Lean.Vir.Js Event) : DomM (Option String)
+private opaque formValueJs? (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js String))
+
+def formValue? (event : @& Lean.Vir.Js Event) : DomM (Option String) := do
+  match ← formValueJs? event with
+  | none => pure none
+  | some value =>
+      let text ← Lean.Vir.JsValue.toString value
+      pure (some text)
 
 /--
 Returns the current checked state for an input-like event.
@@ -408,7 +492,14 @@ cleared.
 Reference: [MDN `setTimeout`](https://developer.mozilla.org/en-US/docs/Web/API/setTimeout).
 -/
 @[vir_js "browser.timer.setTimeout"]
-opaque setTimeout (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Timeout)
+private opaque setTimeoutJs
+    (delayMs : @& Lean.Vir.Js Nat)
+    (callback : DomM Unit) :
+    DomM (Lean.Vir.Js Timeout)
+
+def setTimeout (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Timeout) := do
+  let jsDelay ← Lean.Vir.JsValue.ofNat delayMs.toNat
+  setTimeoutJs jsDelay callback
 
 /--
 Cancels a pending timeout and releases its retained callback.
@@ -427,7 +518,14 @@ disposed.
 Reference: [MDN `setInterval`](https://developer.mozilla.org/en-US/docs/Web/API/setInterval).
 -/
 @[vir_js "browser.timer.setInterval"]
-opaque setInterval (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Interval)
+private opaque setIntervalJs
+    (delayMs : @& Lean.Vir.Js Nat)
+    (callback : DomM Unit) :
+    DomM (Lean.Vir.Js Interval)
+
+def setInterval (delayMs : UInt32) (callback : DomM Unit) : DomM (Lean.Vir.Js Interval) := do
+  let jsDelay ← Lean.Vir.JsValue.ofNat delayMs.toNat
+  setIntervalJs jsDelay callback
 
 /--
 Cancels a pending interval and releases its retained callback.
@@ -450,7 +548,14 @@ retained callback after it fires or when the frame is cancelled.
 Reference: [MDN `requestAnimationFrame`](https://developer.mozilla.org/en-US/docs/Web/API/window/requestAnimationFrame).
 -/
 @[vir_js "browser.animation.requestAnimationFrame"]
-opaque requestAnimationFrame (callback : Float → DomM Unit) : DomM (Lean.Vir.Js AnimationFrame)
+private opaque requestAnimationFrameJs
+    (callback : Lean.Vir.Js Float → DomM Unit) :
+    DomM (Lean.Vir.Js AnimationFrame)
+
+def requestAnimationFrame (callback : Float → DomM Unit) : DomM (Lean.Vir.Js AnimationFrame) :=
+  requestAnimationFrameJs fun timestamp => do
+    let value ← Lean.Vir.JsValue.toFloat timestamp
+    callback value
 
 /--
 Cancels a pending animation frame and releases its retained callback.

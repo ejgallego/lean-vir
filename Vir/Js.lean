@@ -40,6 +40,12 @@ opaque ofBool (value : Bool) : RuntimeM (Js Bool)
 @[vir_js "js.bool.value"]
 opaque toBool (value : @& Js Bool) : RuntimeM Bool
 
+@[vir_js "js.float"]
+opaque ofFloat (value : Float) : RuntimeM (Js Float)
+
+@[vir_js "js.float.value"]
+opaque toFloat (value : @& Js Float) : RuntimeM Float
+
 end JsValue
 
 end Lean.Vir

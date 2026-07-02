@@ -1,7 +1,7 @@
 import Vir.Browser
 import Vir.React
 
-def freshEchoBang (s : String) : String :=
+def freshEchoBang (s : String) : Lean.Vir.RuntimeM String := do
   Lean.Vir.Common.echoString (s ++ "!")
 
 def freshTitleRoundtrip (s : String) : Lean.Vir.Browser.DomM String := do
@@ -19,21 +19,23 @@ def freshElementRoundtrip (s : String) : Lean.Vir.Browser.DomM (String × Option
       pure (text, attr)
 
 @[vir_js "test.react.value"]
-opaque freshReactValueHost : Lean.Vir.React.ReactM Nat
+opaque freshReactValueHost : Lean.Vir.React.ReactM (Lean.Vir.Js Nat)
 
-def freshReactValue : Lean.Vir.React.ReactM Nat :=
-  freshReactValueHost
+def freshReactValue : Lean.Vir.React.ReactM Nat := do
+  let value ← freshReactValueHost
+  Lean.Vir.JsValue.toNat value
 
 @[vir_js "test.runtime.value"]
-opaque freshRuntimeValueHost : Lean.Vir.RuntimeM Nat
+opaque freshRuntimeValueHost : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
-def freshRuntimeValue : Lean.Vir.RuntimeM Nat :=
-  freshRuntimeValueHost
+def freshRuntimeValue : Lean.Vir.RuntimeM Nat := do
+  let value ← freshRuntimeValueHost
+  Lean.Vir.JsValue.toNat value
 
 def freshRuntimeInDom : Lean.Vir.Browser.DomM Nat := do
-  let value ← freshRuntimeValueHost
+  let value ← freshRuntimeValue
   pure (value + 1)
 
 def freshRuntimeInReact : Lean.Vir.React.ReactM Nat := do
-  let value ← freshRuntimeValueHost
+  let value ← freshRuntimeValue
   pure (value + 2)

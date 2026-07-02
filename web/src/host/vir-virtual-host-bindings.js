@@ -105,7 +105,7 @@ export function createVirtualEventHostBindings(state = createVirtualDocumentStat
       return undefined;
     },
     "browser.event.formValue": (event) =>
-      formControlEventValue(state.resources.resolveResource(event, "Event")),
+      state.resources.resourceForValue(formControlEventValue(state.resources.resolveResource(event, "Event"))),
   };
 }
 
@@ -120,12 +120,16 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
     hookRuntime: reactHookRuntime,
   };
   return {
-    "browser.document.getTitle": () => state.title,
+    "browser.document.getTitle": () => state.resources.resourceForValue(state.title),
     "browser.document.setTitle": (title) => {
-      state.title = title;
+      state.title = state.resources.resolveResource(title, "JsString");
       return undefined;
     },
-    "browser.document.querySelector": (selector) => state.resources.resourceForValue(queryVirtualElementState(state, selector)),
+    "browser.document.querySelector": (selector) =>
+      state.resources.resourceForValue(queryVirtualElementState(
+        state,
+        state.resources.resolveResource(selector, "JsString"),
+      )),
     ...createVirtualEventHostBindings(state),
     ...createElementResourceHostBindings(state.resources, {
       getTextContent: (target) => target.textContent,
@@ -156,42 +160,72 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       }),
     ...createReactJsValueHostBindings(state.resources),
     ...createReactStateHostBindings(state.resources, reactHookRuntime),
+    "infoview.documentPosition": (uri, fileName, line, character, label) =>
+      state.resources.resourceForValue({
+        uri: state.resources.resolveResource(uri, "JsString"),
+        fileName: state.resources.resolveResource(fileName, "JsString"),
+        line: state.resources.resolveResource(line, "JsNat"),
+        character: state.resources.resolveResource(character, "JsNat"),
+        label: state.resources.resolveResource(label, "JsString"),
+      }),
     "infoview.clipboard.writeText": (text) => {
-      state.clipboardText = text;
+      const value = state.resources.resolveResource(text, "JsString");
+      state.clipboardText = value;
       state.clipboardWrites ??= [];
-      state.clipboardWrites.push(text);
-      return true;
+      state.clipboardWrites.push(value);
+      return state.resources.resourceForValue(true);
     },
     "infoview.command.revealPosition": (position) => {
-      const normalized = normalizeInfoviewDocumentPosition(position);
+      const normalized = normalizeInfoviewDocumentPosition(
+        state.resources.resolveResource(position, "DocumentPosition"),
+      );
       if (normalized === null) {
-        return false;
+        return state.resources.resourceForValue(false);
       }
       state.revealedPosition = normalized;
       state.infoviewCommands ??= [];
       state.infoviewCommands.push({ kind: "revealPosition", position: normalized });
-      return true;
+      return state.resources.resourceForValue(true);
     },
+    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) =>
+      state.resources.resourceForValue({
+        id: state.resources.resolveResource(id, "JsString"),
+        label: state.resources.resolveResource(label, "JsString"),
+        typeName: state.resources.resolveResource(typeName, "JsString"),
+        summary: state.resources.resolveResource(summary, "JsString"),
+        expression: state.resources.resolveResource(expression, "JsString"),
+        typeText: "",
+        context: "",
+      }),
+    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) =>
+      state.resources.resourceForValue({
+        ...state.resources.resolveResource(ref, "RpcRef"),
+        typeText: state.resources.resolveResource(typeText, "JsString"),
+        context: state.resources.resolveResource(context, "JsString"),
+        ...(serverRef === null || serverRef === undefined ? {} : { serverRef }),
+      }),
+    "proofwidgets.rpc.resolvedRef.value": (ref) =>
+      normalizeProofWidgetsResolvedRef(state.resources.resolveResource(ref, "ResolvedRef")),
     "proofwidgets.rpc.inspectRef": (ref) => {
-      const normalized = normalizeProofWidgetsRpcRef(ref);
+      const normalized = normalizeProofWidgetsRpcRef(state.resources.resolveResource(ref, "RpcRef"));
       if (normalized === null) {
-        return false;
+        return state.resources.resourceForValue(false);
       }
       state.infoviewCommands ??= [];
       state.infoviewCommands.push({ kind: "proofwidgetsRpcInspectRef", ref: normalized });
-      return true;
+      return state.resources.resourceForValue(true);
     },
     "proofwidgets.rpc.resolveRef": (ref, callback) => {
-      const normalized = normalizeProofWidgetsRpcRef(ref);
+      const normalized = normalizeProofWidgetsRpcRef(state.resources.resolveResource(ref, "RpcRef"));
       if (normalized === null || typeof callback !== "function") {
         releaseCallback(callback);
-        return false;
+        return state.resources.resourceForValue(false);
       }
       const result = virtualProofWidgetsRpcRefInfo(normalized);
       state.infoviewCommands ??= [];
       state.infoviewCommands.push({ kind: "proofwidgetsRpcResolveRef", ref: normalized, result });
-      callAndReleaseCallback(callback, result);
-      return true;
+      callAndReleaseCallback(callback, state.resources.resourceForValue(result));
+      return state.resources.resourceForValue(true);
     },
     [VIR_HOST_DISPOSE]: () => state.resources.dispose(),
   };
@@ -311,6 +345,24 @@ export function normalizeProofWidgetsRpcRef(ref) {
     normalized.serverRef = serverRef;
   }
   return normalized;
+}
+
+export function normalizeProofWidgetsResolvedRef(ref) {
+  const value = ref !== null && typeof ref === "object" ? ref : {};
+  return {
+    id: stringField(value.id),
+    label: stringField(value.label),
+    typeName: stringField(value.typeName),
+    summary: stringField(value.summary),
+    expression: stringField(value.expression),
+    typeText: stringField(value.typeText),
+    context: stringField(value.context),
+    source: stringField(value.source),
+    position: stringField(value.position),
+    packageRevision: stringField(value.packageRevision),
+    storeKey: stringField(value.storeKey),
+    knownConstant: value.knownConstant === true,
+  };
 }
 
 function stringField(value) {

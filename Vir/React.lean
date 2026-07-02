@@ -178,6 +178,10 @@ React hooks exposed by this module run under React's normal hook dispatcher.
 abbrev Component (props : Type := Unit) : Type :=
   props → ReactM (Lean.Vir.Js Node)
 
+private def stringToJs (value : String) : ReactM (Lean.Vir.Js String) := do
+  let jsValue ← Lean.Vir.JsValue.ofString value
+  pure jsValue
+
 namespace Property
 
 /-- Raw string-valued prop escape hatch. Prefer named helpers in the v0 surface. -/
@@ -500,11 +504,19 @@ according to `Object.is`, and calls `cleanup` with the returned resource before
 replacement or unmount. Use `#[]` for React's empty dependency array behavior.
 -/
 @[vir_js "react.useEffectWithDeps"]
-opaque useEffectWithDeps {α : Type}
-    (deps : @& Array String)
+private opaque useEffectWithDepsJs {α : Type}
+    (deps : @& Array (Lean.Vir.Js String))
     (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
     (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
     ReactM Unit
+
+def useEffectWithDeps {α : Type}
+    (deps : @& Array String)
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit := do
+  let jsDeps ← deps.mapM stringToJs
+  useEffectWithDepsJs jsDeps setup cleanup
 
 end Hooks
 
@@ -537,20 +549,44 @@ end State
 namespace Node
 
 @[vir_js "react.node.text"]
-opaque text (value : @& String) : ReactM (Lean.Vir.Js Node)
+private opaque textJs (value : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js Node)
 
 @[vir_js "react.node.createElement"]
-opaque createElement
-    (tag : @& String)
-    (key? : Option String)
+private opaque createElementJs
+    (tag : @& Lean.Vir.Js String)
+    (key? : Option (Lean.Vir.Js String))
     (props : Array Property)
     (handlers : Array EventHandler)
     (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node)
 
 @[vir_js "react.node.fragment"]
-opaque fragmentWithKey (key? : Option String) (children : Array (Lean.Vir.Js Node)) :
+private opaque fragmentWithKeyJs (key? : Option (Lean.Vir.Js String)) (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node)
+
+private def optionStringToJs : Option String → ReactM (Option (Lean.Vir.Js String))
+  | none => pure none
+  | some value => some <$> Lean.Vir.JsValue.ofString value
+
+def text (value : @& String) : ReactM (Lean.Vir.Js Node) := do
+  let jsValue ← Lean.Vir.JsValue.ofString value
+  textJs jsValue
+
+def createElement
+    (tag : @& String)
+    (key? : Option String)
+    (props : Array Property)
+    (handlers : Array EventHandler)
+    (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node) := do
+  let jsTag ← Lean.Vir.JsValue.ofString tag
+  let jsKey ← optionStringToJs key?
+  createElementJs jsTag jsKey props handlers children
+
+def fragmentWithKey (key? : Option String) (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node) := do
+  let jsKey ← optionStringToJs key?
+  fragmentWithKeyJs jsKey children
 
 def fragment (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
   fragmentWithKey none children
@@ -848,16 +884,32 @@ def renderComponent
   renderComponentThunk root fun _ => component props
 
 @[vir_js "react.root.renderIntoSelector"]
-opaque renderIntoSelector
-    (selector : @& String)
+private opaque renderIntoSelectorJs
+    (selector : @& Lean.Vir.Js String)
     (node : @& Lean.Vir.Js Node) :
-    Lean.Vir.Browser.DomM Bool
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
 
 @[vir_js "react.root.renderComponentIntoSelector"]
-opaque renderComponentIntoSelectorThunk
+private opaque renderComponentIntoSelectorThunkJs
+    (selector : @& Lean.Vir.Js String)
+    (component : Unit → ReactM (Lean.Vir.Js Node)) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
+
+def renderIntoSelector
+    (selector : @& String)
+    (node : @& Lean.Vir.Js Node) :
+    Lean.Vir.Browser.DomM Bool := do
+  let jsSelector ← Lean.Vir.JsValue.ofString selector
+  let rendered ← renderIntoSelectorJs jsSelector node
+  Lean.Vir.JsValue.toBool rendered
+
+private def renderComponentIntoSelectorThunk
     (selector : @& String)
     (component : Unit → ReactM (Lean.Vir.Js Node)) :
-    Lean.Vir.Browser.DomM Bool
+    Lean.Vir.Browser.DomM Bool := do
+  let jsSelector ← Lean.Vir.JsValue.ofString selector
+  let rendered ← renderComponentIntoSelectorThunkJs jsSelector component
+  Lean.Vir.JsValue.toBool rendered
 
 def renderComponentIntoSelector
     (selector : @& String)
@@ -875,7 +927,13 @@ Reference: [React `root.unmount`](https://react.dev/reference/react-dom/client/c
 opaque unmount (root : @& Lean.Vir.Js Root) : Lean.Vir.Browser.DomM Unit
 
 @[vir_js "react.root.unmountSelector"]
-opaque unmountSelector (selector : @& String) : Lean.Vir.Browser.DomM Bool
+private opaque unmountSelectorJs (selector : @& Lean.Vir.Js String) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
+
+def unmountSelector (selector : @& String) : Lean.Vir.Browser.DomM Bool := do
+  let jsSelector ← Lean.Vir.JsValue.ofString selector
+  let unmounted ← unmountSelectorJs jsSelector
+  Lean.Vir.JsValue.toBool unmounted
 
 end Root
 

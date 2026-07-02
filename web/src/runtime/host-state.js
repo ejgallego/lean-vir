@@ -41,7 +41,9 @@ export class VirHostState {
   }
 
   recordCallError(error) {
-    this.callError = error instanceof Error ? error : new Error(String(error));
+    if (this.callError === null) {
+      this.callError = error instanceof Error ? error : new Error(String(error));
+    }
   }
 
   takeCallError() {

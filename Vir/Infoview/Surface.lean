@@ -22,6 +22,24 @@ structure DocumentPosition where
   character : Nat
   label : String
 
+@[vir_js "infoview.documentPosition"]
+private opaque documentPositionJs
+    (uri : @& Lean.Vir.Js String)
+    (fileName : @& Lean.Vir.Js String)
+    (line : @& Lean.Vir.Js Nat)
+    (character : @& Lean.Vir.Js Nat)
+    (label : @& Lean.Vir.Js String) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js DocumentPosition)
+
+private def DocumentPosition.toJs (position : @& DocumentPosition) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js DocumentPosition) := do
+  let uri ← Lean.Vir.JsValue.ofString position.uri
+  let fileName ← Lean.Vir.JsValue.ofString position.fileName
+  let line ← Lean.Vir.JsValue.ofNat position.line
+  let character ← Lean.Vir.JsValue.ofNat position.character
+  let label ← Lean.Vir.JsValue.ofString position.label
+  documentPositionJs uri fileName line character label
+
 /-- A selected infoview location, normalized from the JavaScript widget props. -/
 structure SelectedLocation where
   id : String
@@ -70,7 +88,13 @@ The JavaScript host returns `false` instead of trapping when no clipboard API is
 available or when the write is rejected by the host.
 -/
 @[vir_js "infoview.clipboard.writeText"]
-opaque writeText (text : @& String) : Lean.Vir.Browser.DomM Bool
+private opaque writeTextJs (text : @& Lean.Vir.Js String) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
+
+def writeText (text : @& String) : Lean.Vir.Browser.DomM Bool := do
+  let jsText ← Lean.Vir.JsValue.ofString text
+  let written ← writeTextJs jsText
+  Lean.Vir.JsValue.toBool written
 
 end Clipboard
 
@@ -84,7 +108,13 @@ available. The bundled infoview shell wires this command to
 `EditorConnection.revealPosition`.
 -/
 @[vir_js "infoview.command.revealPosition"]
-opaque revealPosition (position : @& DocumentPosition) : Lean.Vir.Browser.DomM Bool
+private opaque revealPositionJs (position : @& Lean.Vir.Js DocumentPosition) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
+
+def revealPosition (position : @& DocumentPosition) : Lean.Vir.Browser.DomM Bool := do
+  let jsPosition ← DocumentPosition.toJs position
+  let revealed ← revealPositionJs jsPosition
+  Lean.Vir.JsValue.toBool revealed
 
 /-- Reveals the cursor position carried by the current infoview surface. -/
 def revealCursor (surface : @& Surface) : Lean.Vir.Browser.DomM Bool :=

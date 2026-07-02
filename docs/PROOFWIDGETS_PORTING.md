@@ -53,8 +53,12 @@ reference-shaped interactive case:
 
 The RPC slice is deliberately small. `Vir.ProofWidgets.Rpc` defines `RpcRef`,
 `WithRpcRef α`, `ResolvedRef`, `ExprWithCtx.save`, and `Rpc.resolveRef`. The
-browser/virtual hosts normalize refs behind `proofwidgets.rpc.resolveRef`. In
-the infoview, `Surface.proofWidgetsExpr` now carries a live
+public Lean helpers convert `RpcRef` to a `Js RpcRef` resource through
+`proofwidgets.rpc.ref` before calling `proofwidgets.rpc.resolveRef`; the
+browser/virtual hosts normalize that resource behind the low-level target.
+Resolve callbacks receive a `Js ResolvedRef` resource, and the public Lean
+wrapper calls `proofwidgets.rpc.resolvedRef.value` before invoking the user
+callback. In the infoview, `Surface.proofWidgetsExpr` now carries a live
 `WithRpcRef ExprWithCtx` prop backed by the preferred server-owned
 `Lean.Server.WithRpcRef` path. The infoview shell asks
 `Lean.Vir.Infoview.createProofWidgetsExprWithCtxAtPos` to build that prop from

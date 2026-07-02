@@ -153,12 +153,15 @@ explicit wasm32 boundary diagnostic.
 
 Pure functions and recognized synchronous effects are supported on both
 exported entrypoints and host imports. JavaScript resource/runtime APIs use
-`Lean.Vir.RuntimeM α`; raw custom host imports can use `IO α`; browser APIs use
-`Lean.Vir.Browser.DomM α`; React render-construction APIs use
-`Lean.Vir.React.ReactM α`. Host imports are currently synchronous, with at most
-64 imported declarations and IR arity at most 6. Leading erased type parameters
-on host imports are recorded in package format 6 and newer and skipped before
-JavaScript-visible arguments.
+`Lean.Vir.RuntimeM α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
+render-construction APIs use `Lean.Vir.React.ReactM α`. Host imports are
+narrower than exports: low-level JavaScript imports should expose
+`Lean.Vir.Js α` resources, resource-shaped containers/callbacks, or explicit
+conversion targets. Raw Lean scalar and structure host imports are rejected.
+Host imports are currently synchronous, with at most 64 imported declarations
+and IR arity at most 6. Leading erased type parameters on host imports are
+recorded in package format 6 and newer and skipped before JavaScript-visible
+arguments.
 The embedded JSON manifest preserves the effect labels as `pure`, `runtime`,
 `io`, `dom`, or `react`; the binary call path currently consumes only pure
 versus effectful.

@@ -48,6 +48,15 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /field `proof` of constructor `ProofPayload\.mk` has erased or void runtime layout/,
   ], ["recursiveChildIdentity", "mutualLeftIdentity", "proofPayloadIdentity"]);
 
+  await assertUnsupportedInterfaceFixture(freshDir, "FreshCustomHost.lean", [
+    /jsBumpNat/,
+    /unsupported JavaScript import argument `n`/,
+    /raw Lean type `Nat` is not a JavaScript boundary type/,
+    /jsBumpCounter/,
+    /unsupported JavaScript import argument `counter`/,
+    /structure `HostCounter` is not a JavaScript boundary type/,
+  ], ["freshCustomBump", "freshCustomCounter"]);
+
   await assertUnsupportedInterfaceFixture(freshDir, "DuplicateExportNames.lean", [
     /Duplicate\.entry/,
     /Duplicate_entry/,

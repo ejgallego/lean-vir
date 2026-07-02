@@ -69,7 +69,8 @@ callback from the current callback.
 
 `scripts/test-vir-runtime.mjs` covers the current callback surface:
 
-- pure callback round-trip through a custom `test.callNatCallback` host import;
+- resource-shaped `RuntimeM` callback round-trip through a custom
+  `test.callNatCallback` host import using explicit `Js Nat` values;
 - double release, call-after-release, and stale closure root failure;
 - nested callback argument errors while Lean is inside a host import;
 - callback-backed event listener dispatch, listener removal, and runtime

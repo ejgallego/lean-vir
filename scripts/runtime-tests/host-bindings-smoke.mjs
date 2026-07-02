@@ -41,7 +41,9 @@ const retainedCallbackRuntime = await createVirRuntime({
 });
 assert.equal(retainedCallbackRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
 assert.equal(retainedCallbackRuntime.liveCallbacks.size, 1);
-assert.equal(retainedCallback(4), "11");
+const retainedJsNat = (value) => retainedCallbackRuntime.hostState.defaultBindings["js.nat"](BigInt(value));
+const retainedJsNatValue = (value) => retainedCallbackRuntime.hostState.defaultBindings["js.nat.value"](value);
+assert.equal(retainedJsNatValue(retainedCallback(retainedJsNat(4))), 11n);
 assert.deepEqual(Object.keys(retainedCallback), []);
 assert.equal(Object.hasOwn(retainedCallback, "handle"), false);
 assert.equal("handle" in retainedCallback, false);
@@ -57,7 +59,7 @@ assert.equal(retainedCallback.released, true);
 assert.equal(retainedCallbackRuntime.liveCallbacks.size, 0);
 assert.throws(() => retainedCallback(4), /released/);
 assert.throws(
-  () => retainedCallbackRuntime.callClosure(staleCallbackRootId, staleCallbackType, [4]),
+  () => retainedCallbackRuntime.callClosure(staleCallbackRootId, staleCallbackType, [retainedJsNat(4)]),
   /closure root id is not live/,
 );
 retainedCallbackRuntime.dispose();

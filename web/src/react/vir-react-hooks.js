@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { isHostResource } from "../host-resource.js";
+import { createJsValueHostBindings } from "../host/vir-js-value-bindings.js";
 
 export function createBrowserReactHookRuntime(resources, React) {
   const setters = new WeakMap();
@@ -128,7 +129,7 @@ export function createBrowserReactHookRuntime(resources, React) {
         releaseEffectCallbacks(setup, cleanup);
         throw error;
       }
-      const dependencyList = normalizeDependencyListOrRelease(deps, setup, cleanup);
+      const dependencyList = normalizeDependencyListOrRelease(resources, deps, setup, cleanup);
       const ref = React.useRef({ initialized: false, deps: null });
       const changed = !ref.current.initialized || !dependencyListsEqual(ref.current.deps, dependencyList);
       const effect = changed ? createBrowserEffect(setup, cleanup) : () => undefined;
@@ -290,7 +291,7 @@ export function createVirtualReactHookRuntime(resources) {
         releaseEffectCallbacks(setup, cleanup);
         throw new Error("React.useEffectWithDeps can only be called while rendering a component");
       }
-      const dependencyList = normalizeDependencyListOrRelease(deps, setup, cleanup);
+      const dependencyList = normalizeDependencyListOrRelease(resources, deps, setup, cleanup);
       const index = currentComponent.hookIndex++;
       let hook = currentComponent.hooks[index];
       if (hook === undefined) {
@@ -333,12 +334,7 @@ export function createReactStateHostBindings(resources, hookRuntime) {
 }
 
 export function createReactJsValueHostBindings(resources) {
-  const bindings = {};
-  for (const [target, codec] of Object.entries(jsValueCodecs)) {
-    bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
-    bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
-  }
-  return bindings;
+  return createJsValueHostBindings(resources);
 }
 
 function stateSetterFor(setters, setState) {
@@ -390,16 +386,22 @@ function createBrowserReducerHook() {
   return hook;
 }
 
-function normalizeDependencyList(deps) {
+function normalizeDependencyList(resources, deps) {
   if (!Array.isArray(deps)) {
     throw new Error("React dependency list must be an array");
   }
-  return deps.map((dep) => String(dep));
+  return deps.map((dep, index) => {
+    const value = resources.resolveResource(dep, `React dependency[${index}]`);
+    if (typeof value !== "string") {
+      throw new Error(`React dependency[${index}] must be a Js String`);
+    }
+    return value;
+  });
 }
 
-function normalizeDependencyListOrRelease(deps, setup, cleanup) {
+function normalizeDependencyListOrRelease(resources, deps, setup, cleanup) {
   try {
-    return normalizeDependencyList(deps);
+    return normalizeDependencyList(resources, deps);
   } catch (error) {
     releaseEffectCallbacks(setup, cleanup);
     throw error;
@@ -706,65 +708,4 @@ function withStateUpdaterResourceScope(resources, run) {
 
 function reactStatePayload(resources, value) {
   return isHostResource(value) ? resources.resolveResource(value, "Js") : value;
-}
-
-const jsValueCodecs = {
-  "js.string": {
-    toJs: jsStringValue,
-    fromJs: jsStringPayload,
-  },
-  "js.nat": {
-    toJs: jsNatValue,
-    fromJs: jsNatPayload,
-  },
-  "js.bool": {
-    toJs: jsBoolValue,
-    fromJs: jsBoolPayload,
-  },
-};
-
-function jsStringValue(value) {
-  if (typeof value !== "string") {
-    throw new Error("js.string expects a string");
-  }
-  return value;
-}
-
-function jsStringPayload(value) {
-  if (typeof value !== "string") {
-    throw new Error("js.string.value expects a JS string");
-  }
-  return value;
-}
-
-function jsNatValue(value) {
-  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
-    throw new Error("js.nat expects a natural number");
-  }
-  const text = String(value);
-  if (!/^(0|[1-9][0-9]*)$/.test(text)) {
-    throw new Error("js.nat expects a natural number");
-  }
-  return BigInt(text);
-}
-
-function jsNatPayload(value) {
-  if (typeof value !== "bigint" || value < 0n) {
-    throw new Error("js.nat.value expects a JS natural number");
-  }
-  return value;
-}
-
-function jsBoolValue(value) {
-  if (typeof value !== "boolean") {
-    throw new Error("js.bool expects a boolean");
-  }
-  return value;
-}
-
-function jsBoolPayload(value) {
-  if (typeof value !== "boolean") {
-    throw new Error("js.bool.value expects a JS boolean");
-  }
-  return value;
 }

@@ -115,13 +115,15 @@ For custom JavaScript functions, declare the host import in Lean and bind the
 same target string in JavaScript.
 
 ```lean
-import Vir.Host
+import Vir.Js
 
 @[vir_js "demo.bumpNat"]
-opaque jsBumpNat (n : Nat) : Nat
+opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
-def bumpViaJs (n : Nat) : Nat :=
-  jsBumpNat n
+def bumpViaJs (n : Nat) : Lean.Vir.RuntimeM Nat := do
+  let input ← Lean.Vir.JsValue.ofNat n
+  let output ← jsBumpNat input
+  Lean.Vir.JsValue.toNat output
 ```
 
 Generate a package with `bumpViaJs` as a root:
@@ -133,11 +135,13 @@ npm run generate:irpkg -- MyCustom.lean web/public/custom.irpkg bumpViaJs
 Then provide the matching JavaScript binding when creating the runtime:
 
 ```js
+const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
   irPackageUrl: "custom.irpkg",
+  defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
+    "demo.bumpNat": (n) => resources.resourceForValue(hostResourceValue(n) + 1n),
   },
 });
 
@@ -156,10 +160,10 @@ LEAN_PATH="build/lean-lib${LEAN_PATH:+:$LEAN_PATH}" lean MyDemo.lean
 `Vir.Host` provides the low-level `@[vir_js "..."]` host-import attribute.
 
 ```lean
-import Vir.Host
+import Vir.Js
 
 @[vir_js "demo.bumpNat"]
-opaque jsBumpNat (n : Nat) : Nat
+opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 ```
 
 `Vir.Runtime` provides `Lean.Vir.RuntimeM`, the effect for
@@ -182,6 +186,8 @@ helpers for JavaScript state/resource values:
 - `Lean.Vir.JsValue.toNat : @& Lean.Vir.Js Nat -> Lean.Vir.RuntimeM Nat`
 - `Lean.Vir.JsValue.ofBool : Bool -> Lean.Vir.RuntimeM (Lean.Vir.Js Bool)`
 - `Lean.Vir.JsValue.toBool : @& Lean.Vir.Js Bool -> Lean.Vir.RuntimeM Bool`
+- `Lean.Vir.JsValue.ofFloat : Float -> Lean.Vir.RuntimeM (Lean.Vir.Js Float)`
+- `Lean.Vir.JsValue.toFloat : @& Lean.Vir.Js Float -> Lean.Vir.RuntimeM Float`
 
 Top-level erased type parameters are allowed before runtime arguments in
 host-import signatures. The package records how many leading erased parameters
@@ -194,8 +200,8 @@ concrete wrapper instead.
 `Vir.Common` provides small host imports that are useful in browser and
 Node-like environments:
 
-- `Lean.Vir.Common.echoString : @& String -> String`
-- `Lean.Vir.Common.addNat : Nat -> Nat -> Nat`
+- `Lean.Vir.Common.echoString : @& String -> Lean.Vir.RuntimeM String`
+- `Lean.Vir.Common.addNat : Nat -> Nat -> Lean.Vir.RuntimeM Nat`
 
 `Vir.Browser` provides the first browser-specific imports. DOM object names
 such as `Lean.Vir.Browser.Element` and `Lean.Vir.Browser.Event` are object-class
@@ -264,12 +270,13 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.RuntimeM (Lean.Vir.Js α)) -> Lean.Vir.RuntimeM Unit`
 
-`Node` is an opaque JavaScript-owned renderable marker. Lean constructs values with
-`Node.text` and `Node.createElement`, which call `react.node.text` and
-`react.node.createElement`; browser hosts construct native React nodes with
-`React.createElement` at that point. Rendering retains any Lean event callbacks
-embedded in the resource graph until the root is rerendered, unmounted, the
-package is reloaded, or the runtime is disposed.
+`Node` is an opaque JavaScript-owned renderable marker. Lean constructs values
+with `Node.text` and `Node.createElement`; those public helpers explicitly
+convert text, tag, and key strings through `JsValue` before calling the
+low-level `react.node.*` host targets. Browser hosts construct native React
+nodes with `React.createElement` at that point. Rendering retains any Lean event
+callbacks embedded in the resource graph until the root is rerendered,
+unmounted, the package is reloaded, or the runtime is disposed.
 
 `Root.render` is the host boundary for rendering a `ReactM` tree into an
 existing root. The JavaScript host invokes the received render action to obtain
@@ -335,7 +342,13 @@ component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
 `Rpc.resolveRef` are enough for the JSX-subset fixture to include an
 `InteractiveExpr`-shaped component whose click handler dispatches a
 host-inspectable reference descriptor and updates component-owned React state
-from the callback. In live infoview widgets, `Vir.Infoview.ProofWidgetsRpc`
+from the callback. The public RPC helpers keep accepting `RpcRef`, but their
+low-level host targets receive `Js RpcRef` resources built by the
+`proofwidgets.rpc.ref` conversion targets. Resolve callbacks receive
+`Js ResolvedRef` resources and decode them through
+`proofwidgets.rpc.resolvedRef.value` before running user callbacks. In live
+infoview widgets,
+`Vir.Infoview.ProofWidgetsRpc`
 can resolve that expression-shaped descriptor as a fallback, and the live
 infoview shell asks the Lean server to create a standard
 `Lean.Server.WithRpcRef` handle for the current interactive goal at the cursor.
@@ -360,6 +373,16 @@ The `Vir.Infoview` module provides the first infoview-facing shell:
 - `Lean.Vir.Infoview.ReactWidget`
 - `vir_proof_widget`
 - `Lean.Vir.Infoview.widget`
+
+`Lean.Vir.Infoview.Clipboard.writeText` remains a public `String -> DomM Bool`
+helper, but its low-level host target receives an explicit
+`Lean.Vir.Js String` resource via `JsValue.ofString` and returns an explicit
+`Lean.Vir.Js Bool` resource. The infoview command and proof-widget RPC command
+helpers follow the same `Js Bool` result convention at the low-level host
+boundary. `Lean.Vir.Infoview.Command.revealPosition` keeps its public
+`DocumentPosition -> DomM Bool` shape, but first builds a `Js DocumentPosition`
+with the `infoview.documentPosition` conversion target from explicit
+`Js String` and `Js Nat` fields.
 
 `WidgetProps` deliberately keeps one blessed activation path: the bundled
 infoview runtime shell, a repo-local `wasmPath`, an `IRPackage` declaration, and
@@ -418,17 +441,23 @@ the embedded manifest `hostImports` array.
 The JavaScript runtime binds targets through `hostBindings`:
 
 ```js
+const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
   irPackageUrl: "custom.irpkg",
+  defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
+    "demo.bumpNat": (n) => resources.resourceForValue(hostResourceValue(n) + 1n),
   },
 });
 ```
 
-Bindings receive decoded JavaScript values and return a value matching the Lean
-result type. `Unit` results should return `undefined` or `null`.
+Host imports use an explicit JavaScript-resource boundary by default. Use
+`Lean.Vir.Js α` resources, containers of resources, or callbacks whose
+arguments/results are resource-shaped. Raw Lean scalars and structures are
+rejected unless the target is an explicit conversion primitive such as
+`js.nat.value` or a documented React wire binding. `Unit` results should return
+`undefined` or `null`.
 
 Lean function values in host-import arguments are supported as callbacks from
 JavaScript into Lean. The JavaScript runtime roots the closure in the WASM shim,
@@ -448,8 +477,7 @@ follow-up work.
 
 ## Current Surface
 
-Supported host import signatures use the same v1 interface types as exported
-entrypoints:
+Exported entrypoints support the v1 interface types:
 
 - `Unit`
 - `Nat`, `Int`, `Bool`, `String`
@@ -467,14 +495,16 @@ entrypoints:
 - `Lean.Vir.React.Node` as an opaque JavaScript-owned resource under
   `Lean.Vir.Js`
 
-Imports may be pure functions or synchronous effect actions. JavaScript
-resource/runtime APIs use `Lean.Vir.RuntimeM α`; raw custom host imports can use
-`IO α`; DOM and React-root APIs use `Lean.Vir.Browser.DomM α`; render
-construction APIs use `ReactM α`. The v1 host boundary is synchronous; returning
-a JavaScript `Promise` is an error. The current package format supports up to
-64 host imports with IR arity at most 6. Host-import metadata records both the
-low-level IR arity and the number of leading erased type parameters skipped
-before JavaScript-visible arguments.
+Imports may be pure functions or synchronous effect actions, but host imports
+are narrower than exports: low-level host declarations should expose
+`Lean.Vir.Js α` resources and perform scalar conversion through
+`Lean.Vir.JsValue` or another explicit conversion target. JavaScript
+resource/runtime APIs use `Lean.Vir.RuntimeM α`; DOM and React-root APIs use
+`Lean.Vir.Browser.DomM α`; render construction APIs use `ReactM α`. The v1 host
+boundary is synchronous; returning a JavaScript `Promise` is an error. The
+current package format supports up to 64 host imports with IR arity at most 6.
+Host-import metadata records both the low-level IR arity and the number of
+leading erased type parameters skipped before JavaScript-visible arguments.
 The JSON manifest records effect labels as `pure`, `runtime`, `io`, `dom`, or
 `react`.
 

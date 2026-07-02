@@ -208,12 +208,15 @@ object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
 and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary. Host imports may additionally receive Lean function values as
 callbacks, including event handlers retained by `Lean.Vir.React.Node` resources
-created through `react.node.createElement`. Exported Lean entrypoints and host
-imports may be pure or use a recognized synchronous effect. JavaScript
-resource/runtime APIs use `Lean.Vir.RuntimeM α`; raw custom host imports can
-use `IO α`; DOM and React-root imports use `Lean.Vir.Browser.DomM α`; React
-render-construction imports use `Lean.Vir.React.ReactM α`. Effect failures
-currently surface as call failures.
+created through `react.node.createElement`. Host imports are narrower than
+exports: low-level JavaScript imports use `Lean.Vir.Js α` resources,
+resource-shaped containers/callbacks, or explicit conversion targets such as
+`js.nat.value`; raw Lean scalar and structure imports are rejected by package
+generation. Exported Lean entrypoints and host imports may be pure or use a
+recognized synchronous effect. JavaScript resource/runtime APIs use
+`Lean.Vir.RuntimeM α`; DOM and React-root imports use
+`Lean.Vir.Browser.DomM α`; React render-construction imports use
+`Lean.Vir.React.ReactM α`. Effect failures currently surface as call failures.
 The JSON manifest records those as `effect: "pure"`, `"runtime"`, `"io"`,
 `"dom"`, or `"react"` for tooling and documentation. The wasm call payload
 still lowers them to pure versus effectful execution.
@@ -337,13 +340,15 @@ overrides on top of the generated import table. If you provide a custom
 Custom imports can be declared directly:
 
 ```lean
-import Vir.Host
+import Vir.Js
 
 @[vir_js "demo.bumpNat"]
-opaque jsBumpNat (n : Nat) : Nat
+opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
-def bumpFromJs (n : Nat) : Nat :=
-  jsBumpNat n
+def bumpFromJs (n : Nat) : Lean.Vir.RuntimeM Nat := do
+  let input ← Lean.Vir.JsValue.ofNat n
+  let output ← jsBumpNat input
+  Lean.Vir.JsValue.toNat output
 ```
 
 Bind custom targets when constructing the runtime. User bindings override the
@@ -351,11 +356,13 @@ default `common.*`, `browser.*`, and `react.*` bindings, including selector
 helpers such as `react.root.renderComponentIntoSelector`:
 
 ```js
+const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
   irPackageUrl: "custom.irpkg",
+  defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
+    "demo.bumpNat": (n) => resources.resourceForValue(hostResourceValue(n) + 1n),
   },
 });
 
@@ -363,15 +370,17 @@ console.log(vir.call("bumpFromJs", 41)); // "42"
 ```
 
 Bindings receive decoded JavaScript values and return a value matching the Lean
-result type. `Unit` returns use `undefined` or `null`. Function-valued Lean
-arguments are decoded as callable `VirCallback` objects. A host binding that
-stores a callback must eventually call `callback.release()` or rely on
+result type. Resource-shaped custom bindings that interoperate with built-in
+`JsValue.to*` conversions should share the same `HostResourceState` as the
+default bindings. `Unit` returns use `undefined` or `null`. Function-valued
+Lean arguments are decoded as callable `VirCallback` objects. A host binding
+that stores a callback must eventually call `callback.release()` or rely on
 `VirRuntime.dispose()` to release any still-live callback roots. Host imports
 are synchronous in v1; returning a `Promise` is an error. Object-style
 `imports` factory options are treated as overrides on top of the generated
 import table. If you provide a custom `imports` function to
 `createVirRuntimeFactory`, call `createVirImports(module, overrides, hostState)`
-or otherwise install `env.vir_js_call` and `env.vir_js_call_result_size`.
+or otherwise install `env.vir_js_call_objects` plus the resource-root imports.
 
 ## Closure And Resource Lifetime
 
