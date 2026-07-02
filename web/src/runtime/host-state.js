@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { ExternrefResourceRoots, VIR_HOST_DISPOSE } from "../host-resource.js";
+import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING } from "../host-resource.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import { isVirCallback, releaseCallbacks } from "./callbacks.js";
 
@@ -141,13 +141,28 @@ function disposeHostBindings(bindings) {
 }
 
 function lookupHostBinding(target, userBindings, defaultBindings) {
-  if (userBindings instanceof Map && userBindings.has(target)) {
-    return userBindings.get(target);
+  const userBinding = lookupHostBindingIn(target, userBindings);
+  if (typeof userBinding === "function") {
+    return userBinding;
   }
-  if (userBindings !== null && typeof userBindings === "object" && Object.hasOwn(userBindings, target)) {
-    return userBindings[target];
+  return lookupHostBindingIn(target, defaultBindings);
+}
+
+function lookupHostBindingIn(target, bindings) {
+  if (bindings === null || bindings === undefined) {
+    return undefined;
   }
-  return defaultBindings[target];
+  if (bindings instanceof Map && bindings.has(target)) {
+    return bindings.get(target);
+  }
+  if (typeof bindings === "object" && Object.hasOwn(bindings, target)) {
+    return bindings[target];
+  }
+  const resolver = bindings[VIR_HOST_RESOLVE_BINDING];
+  if (typeof resolver === "function") {
+    return resolver.call(bindings, target);
+  }
+  return undefined;
 }
 
 function isPromiseLike(value) {

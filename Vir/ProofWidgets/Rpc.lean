@@ -132,9 +132,9 @@ end ExprWithCtx
 
 namespace Rpc
 
-@[vir_js "proofwidgets.rpc.resolvedRef.value"]
+@[vir_js "js.value.proofwidgets.resolvedRef.value"]
 private opaque resolvedRefValueJs (ref : @& Lean.Vir.Js ResolvedRef) :
-    Lean.Vir.Browser.DomM ResolvedRef
+    Lean.Vir.RuntimeM ResolvedRef
 
 @[vir_js "proofwidgets.rpc.inspectRef"]
 private opaque inspectRefJs (ref : @& Lean.Vir.Js RpcRef) :

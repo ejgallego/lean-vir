@@ -291,12 +291,11 @@ are runtime-side calls to React setter resources, not DOM mutations. They are
 typed JavaScript resources and must cross public signatures as `Lean.Vir.Js
 (Lean.Vir.React.StateSetter α)`.
 
-`Hooks.useReducer` keeps reducer state and actions as ordinary Lean types, but
-the current host import ABI cannot package a single fully polymorphic reducer
-host import. Each concrete state/action pair therefore provides a low-level
-`@[vir_js "react.useReducer"]` / `@[vir_js "react.reducer.dispatch"]` pair
-behind a `ReducerBinding state action` instance; callers still use
-`Hooks.useReducer` and `ReducerDispatch.dispatch`.
+`Hooks.useReducer` keeps reducer state and actions as ordinary Lean types. The
+low-level React imports move only `Lean.Vir.Js` resources; each concrete
+state/action pair provides explicit `js.value.*` converters through a
+`ReducerBinding state action` instance. Callers still use `Hooks.useReducer`
+and `ReducerDispatch.dispatch`.
 
 ```lean
 Lean.Vir.React.State.modify count fun previous => do
@@ -346,7 +345,7 @@ from the callback. The public RPC helpers keep accepting `RpcRef`, but their
 low-level host targets receive `Js RpcRef` resources built by the
 `proofwidgets.rpc.ref` conversion targets. Resolve callbacks receive
 `Js ResolvedRef` resources and decode them through
-`proofwidgets.rpc.resolvedRef.value` before running user callbacks. In live
+`js.value.proofwidgets.resolvedRef.value` before running user callbacks. In live
 infoview widgets,
 `Vir.Infoview.ProofWidgetsRpc`
 can resolve that expression-shaped descriptor as a fallback, and the live
@@ -502,7 +501,7 @@ are narrower than exports: low-level host declarations should expose
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; DOM and React-root APIs use
 `Lean.Vir.Browser.DomM α`; render construction APIs use `ReactM α`. The v1 host
 boundary is synchronous; returning a JavaScript `Promise` is an error. The
-current package format supports up to 64 host imports with IR arity at most 6.
+current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.
 The JSON manifest records effect labels as `pure`, `runtime`, `io`, `dom`, or

@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 import { WIRE } from "../web/src/runtime/wire-tags.js";
-import { createVirRuntime } from "../web/src/vir-runtime-node.js";
+import { createVirRuntime, VIR_HOST_RESOLVE_BINDING } from "../web/src/vir-runtime-node.js";
 
 const buildDir = new URL("../build/infoview-smoke/", import.meta.url);
 await mkdir(buildDir, { recursive: true });
@@ -557,7 +557,9 @@ let resolvedCallbackInfo = null;
 let resolvedCallbackReleased = false;
 const resolvedCallback = Object.assign((info) => {
   resolvedCallbackInfo =
-    irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.resolvedRef.value"](info);
+    irPackageFirstService.runtime.hostState.defaultBindings[VIR_HOST_RESOLVE_BINDING](
+      "js.value.proofwidgets.resolvedRef.value",
+    )(info);
 }, {
   release() {
     resolvedCallbackReleased = true;
@@ -611,7 +613,9 @@ let serverOwnedCallbackInfo = null;
 let serverOwnedCallbackReleased = false;
 const serverOwnedCallback = Object.assign((info) => {
   serverOwnedCallbackInfo =
-    irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.resolvedRef.value"](info);
+    irPackageFirstService.runtime.hostState.defaultBindings[VIR_HOST_RESOLVE_BINDING](
+      "js.value.proofwidgets.resolvedRef.value",
+    )(info);
 }, {
   release() {
     serverOwnedCallbackReleased = true;

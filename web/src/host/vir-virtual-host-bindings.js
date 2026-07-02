@@ -204,7 +204,7 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
         context: state.resources.resolveResource(context, "JsString"),
         ...(serverRef === null || serverRef === undefined ? {} : { serverRef }),
       }),
-    "proofwidgets.rpc.resolvedRef.value": (ref) =>
+    "js.value.proofwidgets.resolvedRef.value": (ref) =>
       normalizeProofWidgetsResolvedRef(state.resources.resolveResource(ref, "ResolvedRef")),
     "proofwidgets.rpc.inspectRef": (ref) => {
       const normalized = normalizeProofWidgetsRpcRef(state.resources.resolveResource(ref, "RpcRef"));

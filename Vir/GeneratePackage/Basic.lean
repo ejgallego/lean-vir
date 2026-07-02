@@ -51,7 +51,7 @@ def InterfaceEffect.display : InterfaceEffect → String
   | .dom => "DomM"
   | .react => "ReactM"
 
-def maxHostImportSlots : Nat := 64
+def maxHostImportSlots : Nat := 128
 
 def maxHostImportArity : Nat := 6
 

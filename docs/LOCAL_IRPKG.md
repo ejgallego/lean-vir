@@ -158,7 +158,7 @@ render-construction APIs use `Lean.Vir.React.ReactM α`. Host imports are
 narrower than exports: low-level JavaScript imports should expose
 `Lean.Vir.Js α` resources, resource-shaped containers/callbacks, or explicit
 conversion targets. Raw Lean scalar and structure host imports are rejected.
-Host imports are currently synchronous, with at most 64 imported declarations
+Host imports are currently synchronous, with at most 128 imported declarations
 and IR arity at most 6. Leading erased type parameters on host imports are
 recorded in package format 6 and newer and skipped before JavaScript-visible
 arguments.

@@ -319,8 +319,8 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
         requireReactNodeElementResourceFactory(createNodeElementResource)(
           jsStringValue(resources, tag, "React Node element tag"),
           optionalJsStringValue(resources, key, "React Node element key"),
-          props,
-          handlers,
+          reactNodeWireResources(resources, props, "React Node property"),
+          reactNodeWireResources(resources, handlers, "React Node event handler"),
           children,
         )
       ),
@@ -416,6 +416,13 @@ function requireReactNodeFragmentResourceFactory(factory) {
     throw new Error("react.node.fragment host binding requires a React Node fragment resource factory");
   }
   return factory;
+}
+
+function reactNodeWireResources(resources, values, label) {
+  if (!Array.isArray(values)) {
+    throw new Error(`${label}s must be an array`);
+  }
+  return values.map((value, index) => resources.resolveResource(value, `${label}[${index}]`));
 }
 
 export function createTimerResourceHostBindings(resources) {

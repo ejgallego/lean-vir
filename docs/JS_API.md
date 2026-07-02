@@ -478,5 +478,5 @@ The runtime uses the single-file declaration package path. It does not load
 exports fail during package generation instead of being omitted silently, and a
 failed package load clears the runtime's package metadata instead of leaving
 stale declarations callable. JavaScript host imports are sync-only and limited
-to 64 imported declarations with IR arity at most 6; async host calls will need
+to 128 imported declarations with IR arity at most 6; async host calls will need
 a later Promise/JSPI-shaped boundary.

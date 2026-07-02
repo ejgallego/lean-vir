@@ -164,7 +164,7 @@ export function createInfoviewHostBindings({ resources = createHostResourceState
         context: resources.resolveResource(context, "JsString"),
         ...(serverRef === null || serverRef === undefined ? {} : { serverRef }),
       }),
-    "proofwidgets.rpc.resolvedRef.value": (ref) =>
+    "js.value.proofwidgets.resolvedRef.value": (ref) =>
       normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
     "proofwidgets.rpc.inspectRef": (ref) =>
       resources.resourceForValue(inspectProofWidgetsRpcRef(

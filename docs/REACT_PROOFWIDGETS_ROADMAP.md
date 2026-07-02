@@ -121,9 +121,9 @@ Current RF status:
 - Function components render through stable JavaScript component identities, so
   hook state is preserved across prop-only rerenders.
 - `useState`, `useReducer`, and resource-shaped `useEffect` are delegated to
-  React's hook runtime. `useReducer` currently needs concrete
-  `ReducerBinding state action` instances because package-level host imports
-  cannot yet expose a fully polymorphic reducer callback.
+  React's hook runtime. `useReducer` uses concrete `ReducerBinding state action`
+  instances to supply explicit `js.value.*` conversions for structured state
+  and action values.
 - `useEffectWithDeps` exposes React's dependency-array shape for string
   dependencies, with callback release handled by the host layer when
   dependencies are unchanged.

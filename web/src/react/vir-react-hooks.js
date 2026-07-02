@@ -69,7 +69,7 @@ export function createBrowserReactHookRuntime(resources, React) {
       }
       let hook;
       try {
-        hook = nextBrowserHook(currentComponent, "reducer", "useReducer", createBrowserReducerHook);
+        hook = nextBrowserHook(currentComponent, "reducer", "useReducer", () => createBrowserReducerHook(resources));
         stagePendingReducerCallback(currentComponent, hook, reducer);
       } catch (error) {
         releaseLeanCallback(reducer);
@@ -243,7 +243,7 @@ export function createVirtualReactHookRuntime(resources) {
       const index = currentComponent.hookIndex++;
       let hook = currentComponent.hooks[index];
       if (hook === undefined) {
-        hook = createVirtualReducerHook(initial, currentComponent.scheduleRender);
+        hook = createVirtualReducerHook(resources, initial, currentComponent.scheduleRender);
         currentComponent.hooks[index] = hook;
       } else if (hook.kind !== "reducer") {
         releaseLeanCallback(reducer);
@@ -317,8 +317,17 @@ export function createVirtualReactHookRuntime(resources) {
 
 export function createReactStateHostBindings(resources, hookRuntime) {
   return {
-    "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
-    "react.useReducer": (reducer, initial) => hookRuntime.useReducer(reducer, initial),
+    "react.useState": (initial) => resources.resourceForValue(hookRuntime.useState(reactStatePayload(resources, initial))),
+    "react.state.value": (state) =>
+      resources.resourceForValue(resources.resolveResource(state, "ReactState").value),
+    "react.state.setter": (state) =>
+      resources.resourceForValue(resources.resolveResource(state, "ReactState").setter),
+    "react.useReducer": (reducer, initial) =>
+      resources.resourceForValue(hookRuntime.useReducer(reducer, reactStatePayload(resources, initial))),
+    "react.reducerState.value": (state) =>
+      resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").value),
+    "react.reducerState.dispatch": (state) =>
+      resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").dispatch),
     "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
     "react.useEffectWithDeps": (deps, setup, cleanup) => hookRuntime.useEffectWithDeps(deps, setup, cleanup),
@@ -363,7 +372,7 @@ function nextBrowserHook(componentState, expectedKind, hookName, createHook = nu
   return hook;
 }
 
-function createBrowserReducerHook() {
+function createBrowserReducerHook(resources) {
   const hook = {
     kind: "reducer",
     reducer: null,
@@ -373,7 +382,7 @@ function createBrowserReducerHook() {
     dispatcher: null,
     dispatchTarget: null,
   };
-  hook.reducerProxy = (state, action) => callReducerHook(hook, state, action);
+  hook.reducerProxy = (state, action) => callReducerHook(resources, hook, state, action);
   hook.dispatcher = {
     dispatch(action) {
       if (typeof hook.dispatchTarget !== "function") {
@@ -435,7 +444,7 @@ function createVirtualStateHook(initial, scheduleRender) {
   return hook;
 }
 
-function createVirtualReducerHook(initial, scheduleRender) {
+function createVirtualReducerHook(resources, initial, scheduleRender) {
   const hook = {
     kind: "reducer",
     value: initial,
@@ -446,7 +455,7 @@ function createVirtualReducerHook(initial, scheduleRender) {
   };
   hook.dispatcher = {
     dispatch(action) {
-      hook.value = callReducerHook(hook, hook.value, action);
+      hook.value = callReducerHook(resources, hook, hook.value, action);
       scheduleRender?.();
       return undefined;
     },
@@ -626,12 +635,16 @@ function disposeReducerHook(resources, hook) {
   }
 }
 
-function callReducerHook(hook, state, action) {
+function callReducerHook(resources, hook, state, action) {
   const reducer = hook?.nextReducer ?? hook?.reducer;
   if (typeof reducer !== "function") {
     throw new Error("React reducer callback is not available");
   }
-  return reducer(state, action);
+  return withStateUpdaterResourceScope(resources, () => {
+    const stateResource = resources.temporaryResourceForValue(state);
+    const actionResource = resources.temporaryResourceForValue(action);
+    return reactStatePayload(resources, reducer(stateResource, actionResource));
+  });
 }
 
 function releaseLeanCallback(callback) {
@@ -642,15 +655,15 @@ function releaseLeanCallback(callback) {
 
 function stateResult(resources, value, setter) {
   return {
-    value: resources.resourceForValue(value),
-    setter: resources.resourceForValue(setter),
+    value,
+    setter,
   };
 }
 
 function reducerStateResult(resources, value, dispatcher) {
   return {
     value,
-    dispatch: resources.resourceForValue(dispatcher),
+    dispatch: dispatcher,
   };
 }
 
@@ -694,7 +707,7 @@ function dispatchReducerAction(resources, dispatch, action) {
   if (typeof dispatcher?.dispatch !== "function") {
     throw new Error("ReactReducerDispatch resource has invalid value");
   }
-  dispatcher.dispatch(action);
+  dispatcher.dispatch(reactStatePayload(resources, action));
   return undefined;
 }
 

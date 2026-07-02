@@ -17,6 +17,9 @@ import {
   createBrowserHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import {
+  VIR_HOST_RESOLVE_BINDING,
+} from "../../web/src/host-resource.js";
+import {
   createReactJsValueHostBindings,
   createReactStateHostBindings,
 } from "../../web/src/react/vir-react-hooks.js";
@@ -260,6 +263,8 @@ const renderMalformedReactNode = (node) => {
   assert.equal(released, true);
 }
 const reactNodeText = (value) => malformedReactHost["react.node.text"](malformedReactJsString(value));
+const reactNodeProperty = (value) => malformedReactHost[VIR_HOST_RESOLVE_BINDING]("js.value.react.property")(value);
+const reactNodeEventHandler = (value) => malformedReactHost[VIR_HOST_RESOLVE_BINDING]("js.value.react.eventHandler")(value);
 const reactNodeElement = ({
   tag = "div",
   key = null,
@@ -269,8 +274,8 @@ const reactNodeElement = ({
 } = {}) => malformedReactHost["react.node.createElement"](
   typeof tag === "string" ? malformedReactJsString(tag) : tag,
   typeof key === "string" ? malformedReactJsString(key) : key,
-  props,
-  handlers,
+  props.map(reactNodeProperty),
+  handlers.map(reactNodeEventHandler),
   children,
 );
 const renderReactNodeElement = (fields) => renderMalformedReactNode(reactNodeElement(fields));

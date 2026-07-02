@@ -48,7 +48,8 @@ ProofWidgets RPC refs follow the same shape: public Lean code keeps the
 `RpcRef` record, `proofwidgets.rpc.ref` builds a host `Js RpcRef` resource from
 explicit scalar fields, and `proofwidgets.rpc.resolveRef` receives that
 resource. Resolve callbacks receive a `Js ResolvedRef` resource and the public
-Lean wrapper calls `proofwidgets.rpc.resolvedRef.value` to decode it explicitly.
+Lean wrapper calls `js.value.proofwidgets.resolvedRef.value` to decode it
+explicitly.
 
 Browser `react.root.*` targets are provided by
 `lean-vir/react-host-bindings`. With that entry installed, React roots map to
@@ -65,11 +66,12 @@ component. The hook bindings `react.useState`, `react.useRef`,
 `react.useReducer`, `react.useEffect`, and `react.useEffectWithDeps` are
 render-time `ReactM` operations. `useRef` returns a host-owned React ref object;
 `react.ref.get` and `react.ref.set` are `RuntimeM` operations over its
-`current` field and do not schedule renders. `useReducer` is exposed through
-concrete `ReducerBinding state action` instances because the current host
-import ABI does not support fully polymorphic callback argument types. Reducer
-callbacks are retained per hook slot, replaced after committed renders, and
-released on failed render, unmount, package reload, or runtime dispose.
+`current` field and do not schedule renders. `useReducer` keeps the low-level
+React boundary in `Js` resources; concrete `ReducerBinding state action`
+instances provide explicit `js.value.*` conversions for each reducer
+state/action pair. Reducer callbacks are retained per hook slot, replaced after
+committed renders, and released on failed render, unmount, package reload, or
+runtime dispose.
 `useEffect` currently has a resource shape: setup returns a
 host resource, and cleanup receives the same resource at React's cleanup point.
 The no-deps binding reruns after committed renders. `useEffectWithDeps` maps to

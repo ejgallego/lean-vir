@@ -13,6 +13,7 @@ import { EditorContext, useRpcSession } from "@leanprover/infoview";
 // web/src/host-resource.js
 var EXTERNREF_TABLE_INITIAL_LENGTH = 1;
 var VIR_HOST_DISPOSE = /* @__PURE__ */ Symbol.for("lean-vir.hostDispose");
+var VIR_HOST_RESOLVE_BINDING = /* @__PURE__ */ Symbol.for("lean-vir.hostResolveBinding");
 var hostResourceState = /* @__PURE__ */ new WeakMap();
 var externrefTableSupport = null;
 function hasExternrefTableSupport() {
@@ -1004,8 +1005,8 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
       requireReactNodeElementResourceFactory(createNodeElementResource)(
         jsStringValue(resources, tag, "React Node element tag"),
         optionalJsStringValue(resources, key, "React Node element key"),
-        props,
-        handlers,
+        reactNodeWireResources(resources, props, "React Node property"),
+        reactNodeWireResources(resources, handlers, "React Node event handler"),
         children
       )
     ),
@@ -1096,6 +1097,12 @@ function requireReactNodeFragmentResourceFactory(factory) {
     throw new Error("react.node.fragment host binding requires a React Node fragment resource factory");
   }
   return factory;
+}
+function reactNodeWireResources(resources, values, label) {
+  if (!Array.isArray(values)) {
+    throw new Error(`${label}s must be an array`);
+  }
+  return values.map((value, index) => resources.resolveResource(value, `${label}[${index}]`));
 }
 function createTimerResourceHostBindings(resources) {
   return {
@@ -1323,12 +1330,24 @@ function createReactHostHooks() {
 
 // web/src/host/vir-js-value-bindings.js
 function createJsValueHostBindings(resources) {
-  const bindings = {};
+  const bindings = {
+    [VIR_HOST_RESOLVE_BINDING]: (target) => jsValueConversionBinding(resources, target)
+  };
   for (const [target, codec] of Object.entries(jsValueCodecs)) {
     bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
     bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
   }
   return bindings;
+}
+var explicitJsValuePrefix = "js.value.";
+function jsValueConversionBinding(resources, target) {
+  if (!target.startsWith(explicitJsValuePrefix) || target === "js.value.value") {
+    return void 0;
+  }
+  if (target.endsWith(".value")) {
+    return (value) => resources.resolveResource(value, "Js");
+  }
+  return (value) => resources.resourceForValue(value);
 }
 var jsValueCodecs = {
   "js.string": {
@@ -1464,7 +1483,7 @@ function createBrowserReactHookRuntime(resources, React3) {
       }
       let hook;
       try {
-        hook = nextBrowserHook(currentComponent, "reducer", "useReducer", createBrowserReducerHook);
+        hook = nextBrowserHook(currentComponent, "reducer", "useReducer", () => createBrowserReducerHook(resources));
         stagePendingReducerCallback(currentComponent, hook, reducer);
       } catch (error) {
         releaseLeanCallback(reducer);
@@ -1549,8 +1568,12 @@ function createBrowserReactHookRuntime(resources, React3) {
 }
 function createReactStateHostBindings(resources, hookRuntime) {
   return {
-    "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
-    "react.useReducer": (reducer, initial) => hookRuntime.useReducer(reducer, initial),
+    "react.useState": (initial) => resources.resourceForValue(hookRuntime.useState(reactStatePayload(resources, initial))),
+    "react.state.value": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactState").value),
+    "react.state.setter": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactState").setter),
+    "react.useReducer": (reducer, initial) => resources.resourceForValue(hookRuntime.useReducer(reducer, reactStatePayload(resources, initial))),
+    "react.reducerState.value": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").value),
+    "react.reducerState.dispatch": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").dispatch),
     "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
     "react.useEffectWithDeps": (deps, setup, cleanup) => hookRuntime.useEffectWithDeps(deps, setup, cleanup),
@@ -1591,7 +1614,7 @@ function nextBrowserHook(componentState, expectedKind, hookName, createHook = nu
   }
   return hook;
 }
-function createBrowserReducerHook() {
+function createBrowserReducerHook(resources) {
   const hook = {
     kind: "reducer",
     reducer: null,
@@ -1601,7 +1624,7 @@ function createBrowserReducerHook() {
     dispatcher: null,
     dispatchTarget: null
   };
-  hook.reducerProxy = (state, action) => callReducerHook(hook, state, action);
+  hook.reducerProxy = (state, action) => callReducerHook(resources, hook, state, action);
   hook.dispatcher = {
     dispatch(action) {
       if (typeof hook.dispatchTarget !== "function") {
@@ -1717,12 +1740,16 @@ function disposeReducerHook(resources, hook) {
     resources.releaseValueResource(hook.dispatcher);
   }
 }
-function callReducerHook(hook, state, action) {
+function callReducerHook(resources, hook, state, action) {
   const reducer = hook?.nextReducer ?? hook?.reducer;
   if (typeof reducer !== "function") {
     throw new Error("React reducer callback is not available");
   }
-  return reducer(state, action);
+  return withStateUpdaterResourceScope(resources, () => {
+    const stateResource = resources.temporaryResourceForValue(state);
+    const actionResource = resources.temporaryResourceForValue(action);
+    return reactStatePayload(resources, reducer(stateResource, actionResource));
+  });
 }
 function releaseLeanCallback(callback) {
   if (typeof callback?.release === "function") {
@@ -1731,14 +1758,14 @@ function releaseLeanCallback(callback) {
 }
 function stateResult(resources, value, setter) {
   return {
-    value: resources.resourceForValue(value),
-    setter: resources.resourceForValue(setter)
+    value,
+    setter
   };
 }
 function reducerStateResult(resources, value, dispatcher) {
   return {
     value,
-    dispatch: resources.resourceForValue(dispatcher)
+    dispatch: dispatcher
   };
 }
 function setStateValue(resources, setter, value) {
@@ -1779,7 +1806,7 @@ function dispatchReducerAction(resources, dispatch, action) {
   if (typeof dispatcher?.dispatch !== "function") {
     throw new Error("ReactReducerDispatch resource has invalid value");
   }
-  dispatcher.dispatch(action);
+  dispatcher.dispatch(reactStatePayload(resources, action));
   return void 0;
 }
 function withStateUpdaterResourceScope(resources, run) {
@@ -1944,7 +1971,7 @@ function createInfoviewHostBindings({ resources = createHostResourceState(), com
       context: resources.resolveResource(context, "JsString"),
       ...serverRef === null || serverRef === void 0 ? {} : { serverRef }
     }),
-    "proofwidgets.rpc.resolvedRef.value": (ref) => normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
+    "js.value.proofwidgets.resolvedRef.value": (ref) => normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
     "proofwidgets.rpc.inspectRef": (ref) => resources.resourceForValue(inspectProofWidgetsRpcRef(
       commandDispatcher,
       resources.resolveResource(ref, "RpcRef")
@@ -5320,13 +5347,27 @@ function disposeHostBindings(bindings) {
   }
 }
 function lookupHostBinding(target, userBindings, defaultBindings) {
-  if (userBindings instanceof Map && userBindings.has(target)) {
-    return userBindings.get(target);
+  const userBinding = lookupHostBindingIn(target, userBindings);
+  if (typeof userBinding === "function") {
+    return userBinding;
   }
-  if (userBindings !== null && typeof userBindings === "object" && Object.hasOwn(userBindings, target)) {
-    return userBindings[target];
+  return lookupHostBindingIn(target, defaultBindings);
+}
+function lookupHostBindingIn(target, bindings) {
+  if (bindings === null || bindings === void 0) {
+    return void 0;
   }
-  return defaultBindings[target];
+  if (bindings instanceof Map && bindings.has(target)) {
+    return bindings.get(target);
+  }
+  if (typeof bindings === "object" && Object.hasOwn(bindings, target)) {
+    return bindings[target];
+  }
+  const resolver = bindings[VIR_HOST_RESOLVE_BINDING];
+  if (typeof resolver === "function") {
+    return resolver.call(bindings, target);
+  }
+  return void 0;
 }
 function isPromiseLike(value) {
   return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";

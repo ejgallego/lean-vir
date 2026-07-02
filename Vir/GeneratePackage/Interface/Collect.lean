@@ -80,6 +80,12 @@ def InterfaceType.isHostResourceWire : InterfaceType → Bool
   | .resource .. => true
   | _ => false
 
+def isExplicitJsValueConversionTarget (target : String) : Bool :=
+  target.startsWith "js.value." && target != "js.value.value"
+
+def isExplicitJsValueUnwrapTarget (target : String) : Bool :=
+  isExplicitJsValueConversionTarget target && target.endsWith ".value"
+
 def InterfaceType.hostBoundaryKind : InterfaceType → String
   | .unit
   | .nat
@@ -107,10 +113,6 @@ def InterfaceType.hostBoundaryKind : InterfaceType → String
   | .resource .. => "resource"
   | .function .. => "callback"
 
-def isHostWireStructureName : Name → Bool
-  | `Lean.Vir.React.State => true
-  | _ => false
-
 partial def InterfaceType.isHostWireType : InterfaceType → Bool
   | .unit => true
   | .resource .. => true
@@ -120,9 +122,6 @@ partial def InterfaceType.isHostWireType : InterfaceType → Bool
   | .prod fst snd => fst.isHostWireType && snd.isHostWireType
   | .function args result _ =>
       args.all (fun (_, ty) => ty.isHostWireType) && result.isHostWireType
-  | .structure name _ _ _ _ _ fields =>
-      isHostWireStructureName name &&
-        fields.all (fun (_, fieldType, _, _) => fieldType.isHostWireType)
   | _ => false
 
 def isJsValueConversionSignature
@@ -132,6 +131,12 @@ def isJsValueConversionSignature
     (effect : InterfaceEffect) : Bool :=
   if effect != .runtime then
     false
+  else if isExplicitJsValueUnwrapTarget target then
+    match args[0]? with
+    | some arg => args.size == 1 && arg.type.isHostResourceWire
+    | none => false
+  else if isExplicitJsValueConversionTarget target then
+    args.size == 1 && result.isHostResourceWire
   else
     match target, args[0]? with
     | "js.string", some arg => args.size == 1 && arg.type == .string && result.isHostResourceWire
@@ -144,49 +149,11 @@ def isJsValueConversionSignature
     | "js.float.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .float
     | _, _ => false
 
-def InterfaceType.isReactNodeCreateElementWireArg : InterfaceType → Bool
-  | .array (.structure `Lean.Vir.React.Property ..) => true
-  | .array (.structure `Lean.Vir.React.EventHandler ..) => true
-  | _ => false
-
-def isReactReducerSignature
-    (target : String)
-    (args : Array InterfaceArg)
-    (result : InterfaceType)
-    (effect : InterfaceEffect) : Bool :=
-  match target, args[0]?, args[1]? with
-  | "react.useReducer", some reducer, some _ =>
-      args.size == 2 &&
-        effect == .react &&
-        (match reducer.type with | .function .. => true | _ => false) &&
-        (match result with | .structure `Lean.Vir.React.ReducerState .. => true | _ => false)
-  | "react.reducer.dispatch", some dispatch, some _ =>
-      args.size == 2 &&
-        effect == .runtime &&
-        dispatch.type.isHostWireType &&
-        result == .unit
-  | _, _, _ => false
-
-def isProofWidgetsConversionSignature
-    (target : String)
-    (args : Array InterfaceArg)
-    (result : InterfaceType)
-    (effect : InterfaceEffect) : Bool :=
-  match target, args[0]? with
-  | "proofwidgets.rpc.resolvedRef.value", some ref =>
-      args.size == 1 &&
-        effect == .dom &&
-        ref.type.isHostWireType &&
-        (match result with | .structure `Lean.Vir.ProofWidgets.ResolvedRef .. => true | _ => false)
-  | _, _ => false
-
 def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
   s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Lean.Vir.Js ...` resources and explicit conversion calls"
 
-def hostImportArgBoundaryDiagnostic? (target : String) (arg : InterfaceArg) : Option String :=
-  if target == "react.node.createElement" && arg.type.isReactNodeCreateElementWireArg then
-    none
-  else if arg.type.isHostWireType then
+def hostImportArgBoundaryDiagnostic? (_target : String) (arg : InterfaceArg) : Option String :=
+  if arg.type.isHostWireType then
     none
   else
     some s!"unsupported JavaScript import argument `{arg.name}`: {hostBoundaryTypeDiagnostic arg.type}"
@@ -202,9 +169,7 @@ def hostImportBoundaryDiagnostic?
     (args : Array InterfaceArg)
     (result : InterfaceType)
     (effect : InterfaceEffect) : Option String :=
-  if isJsValueConversionSignature target args result effect ||
-      isReactReducerSignature target args result effect ||
-      isProofWidgetsConversionSignature target args result effect then
+  if isJsValueConversionSignature target args result effect then
     none
   else
     args.findSome? (hostImportArgBoundaryDiagnostic? target) <|>

@@ -192,21 +192,41 @@ assert.equal(reactUseStateImports[0]?.effect, "react");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
-assert.equal(reactUseStateImports[0]?.result?.fields?.find((field) => field.name === "value")?.type?.type, "Js");
+assert.equal(reactUseStateImports[0]?.result?.type, "Js");
+const reactStateValueImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.state.value");
+assert.equal(reactStateValueImport?.args[0]?.type?.type, "Js");
+assert.equal(reactStateValueImport?.result?.type, "Js");
+const reactStateSetterImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.state.setter");
+assert.equal(reactStateSetterImport?.args[0]?.type?.type, "Js");
+assert.equal(reactStateSetterImport?.result?.type, "Js");
 const reactUseReducerImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useReducer");
 assert.equal(reactUseReducerImports.length, 1);
 for (const entry of reactUseReducerImports) {
   assert.equal(entry.effect, "react");
   assert.equal(entry.args[0]?.type?.kind, "function");
   assert.equal(entry.args[0]?.type?.effect, "runtime");
-  assert.equal(entry.result?.fields?.find((field) => field.name === "dispatch")?.type?.kind, "resource");
+  assert.equal(entry.args[0]?.type?.args[0]?.type?.type, "Js");
+  assert.equal(entry.args[0]?.type?.args[1]?.type?.type, "Js");
+  assert.equal(entry.args[0]?.type?.result?.type, "Js");
+  assert.equal(entry.args[1]?.type?.type, "Js");
+  assert.equal(entry.result?.type, "Js");
 }
 const reactReducerDispatchImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.reducer.dispatch");
 assert.equal(reactReducerDispatchImports.length, 1);
 for (const entry of reactReducerDispatchImports) {
   assert.equal(entry.effect, "runtime");
   assert.equal(entry.args[0]?.type?.kind, "resource");
+  assert.equal(entry.args[1]?.type?.type, "Js");
+  assert.equal(entry.result?.type, "Unit");
 }
+const reactReducerStateValueImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.reducerState.value");
+assert.equal(reactReducerStateValueImport?.effect, "runtime");
+assert.equal(reactReducerStateValueImport?.args[0]?.type?.type, "Js");
+assert.equal(reactReducerStateValueImport?.result?.type, "Js");
+const reactReducerStateDispatchImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.reducerState.dispatch");
+assert.equal(reactReducerStateDispatchImport?.effect, "runtime");
+assert.equal(reactReducerStateDispatchImport?.args[0]?.type?.type, "Js");
+assert.equal(reactReducerStateDispatchImport?.result?.type, "Js");
 const reactUseRefImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useRef");
 assert.equal(reactUseRefImports.length, 1);
 assert.equal(reactUseRefImports[0]?.effect, "react");
@@ -248,6 +268,13 @@ for (const target of [
   "js.bool",
   "js.bool.value",
   "js.float.value",
+  "js.value.proofwidgets.resolvedRef.value",
+  "js.value.react.eventHandler",
+  "js.value.react.property",
+  "js.value.tamagotchi.viewAction",
+  "js.value.tamagotchi.viewAction.value",
+  "js.value.tamagotchi.viewState",
+  "js.value.tamagotchi.viewState.value",
   "react.state.modify",
   "react.state.set",
 ]) {
@@ -288,9 +315,9 @@ assert.equal(proofwidgetsResolveRefImport?.args[1]?.type?.kind, "function");
 assert.equal(proofwidgetsResolveRefImport?.args[1]?.type?.args[0]?.type?.type, "Js");
 assert.equal(proofwidgetsResolveRefImport?.result?.type, "Js");
 const proofwidgetsResolvedRefValueImport = hostRuntime.interfaceManifest.hostImports.find(
-  (entry) => entry.target === "proofwidgets.rpc.resolvedRef.value"
+  (entry) => entry.target === "js.value.proofwidgets.resolvedRef.value"
 );
-assert.equal(proofwidgetsResolvedRefValueImport?.effect, "dom");
+assert.equal(proofwidgetsResolvedRefValueImport?.effect, "runtime");
 assert.equal(proofwidgetsResolvedRefValueImport?.args[0]?.type?.type, "Js");
 assert.equal(proofwidgetsResolvedRefValueImport?.result?.name, "Lean.Vir.ProofWidgets.ResolvedRef");
 const proofwidgetsRpcRefImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "proofwidgets.rpc.ref");
@@ -356,8 +383,14 @@ const reactUnmountSelectorImport = hostRuntime.interfaceManifest.hostImports.fin
 );
 assert.equal(reactUnmountSelectorImport?.args[0]?.type?.type, "Js");
 assert.equal(reactUnmountSelectorImport?.result?.type, "Js");
-const reactNodeType = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.createElement")
-  ?.args[2]?.type;
+const reactPropertyImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "js.value.react.property");
+assert.equal(reactPropertyImport?.effect, "runtime");
+assert.equal(reactPropertyImport?.args[0]?.type?.name, "Lean.Vir.React.Property");
+assert.equal(reactPropertyImport?.result?.type, "Js");
+const reactEventHandlerImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "js.value.react.eventHandler");
+assert.equal(reactEventHandlerImport?.effect, "runtime");
+assert.equal(reactEventHandlerImport?.args[0]?.type?.name, "Lean.Vir.React.EventHandler");
+assert.equal(reactEventHandlerImport?.result?.type, "Js");
 const reactTextImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.text");
 assert.equal(reactTextImport?.args[0]?.type?.type, "Js");
 const reactCreateElementImport = hostRuntime.interfaceManifest.hostImports.find(
@@ -366,6 +399,10 @@ const reactCreateElementImport = hostRuntime.interfaceManifest.hostImports.find(
 assert.equal(reactCreateElementImport?.args[0]?.type?.type, "Js");
 assert.equal(reactCreateElementImport?.args[1]?.type?.kind, "option");
 assert.equal(reactCreateElementImport?.args[1]?.type?.element?.type, "Js");
+assert.equal(reactCreateElementImport?.args[2]?.type?.kind, "array");
+assert.equal(reactCreateElementImport?.args[2]?.type?.element?.type, "Js");
+assert.equal(reactCreateElementImport?.args[3]?.type?.kind, "array");
+assert.equal(reactCreateElementImport?.args[3]?.type?.element?.type, "Js");
 const reactFragmentImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.fragment");
 assert.equal(reactFragmentImport?.effect, "react");
 assert.equal(reactFragmentImport?.args[0]?.type?.kind, "option");
@@ -373,7 +410,7 @@ assert.equal(reactFragmentImport?.args[0]?.type?.element?.type, "Js");
 assert.equal(reactFragmentImport?.args[1]?.type?.kind, "array");
 assert.equal(reactFragmentImport?.args[1]?.type?.element?.type, "Js");
 const reactPropValueType = findTypeDescriptor(
-  reactNodeType,
+  reactPropertyImport?.args[0]?.type,
   (type) => type.kind === "customInductive" && typeof type.name === "string" && type.name.endsWith(".PropValue"),
 );
 assert.deepEqual(
