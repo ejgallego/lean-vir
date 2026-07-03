@@ -87,5 +87,8 @@ ownership diagrams.
   infoview and ProofWidgets alignment.
 - [REACT_WASM_BINDINGS.md](REACT_WASM_BINDINGS.md): `externref`, JSPI, and
   related Wasm interop plan.
+- [PACKAGE_ADAPTER_ROADMAP.md](PACKAGE_ADAPTER_ROADMAP.md): optional generated
+  JavaScript adapters, exact ABI requirements, and Wasm export profile
+  direction.
 - [OBJECT_ABI.md](OBJECT_ABI.md): staged plan for JS-driven Lean object
   lowering/lifting.

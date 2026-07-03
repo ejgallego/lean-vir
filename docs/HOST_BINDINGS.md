@@ -9,6 +9,22 @@ with `@[vir_js "..."]`. Built-in `common.*` and `browser.*` targets are
 installed by the browser runtime. Node tests and tools can use
 `lean-vir/vir-runtime-node`, which installs virtual browser and React bindings.
 
+## Boundary Rule
+
+`@[vir_js]` is a JavaScript host boundary, not the same surface as an exported
+Lean declaration called from JavaScript. Host imports should expose
+`Lean.Vir.Js α` resources, resource-shaped containers, and callbacks whose
+arguments/results follow that same rule. Public Lean wrappers can convert to or
+from ordinary Lean values with `Lean.Vir.JsValue`.
+
+Raw Lean scalar and structure types are rejected in ordinary host imports. The
+only scalar-shaped host imports are explicit conversion targets such as
+`js.string`, `js.string.value`, `js.nat`, `js.nat.value`, `js.bool`,
+`js.bool.value`, `js.float`, and `js.float.value`, plus structured
+`js.value.*` converters used by React, infoview, ProofWidgets, and examples.
+The package manifest records each host import boundary as `wire` or
+`conversion`, and the runtime dispatches them through the corresponding path.
+
 ## Built-In Targets
 
 `Lean.Vir.Common.echoString` and `Lean.Vir.Common.addNat` map to `common.*`

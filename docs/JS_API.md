@@ -292,7 +292,13 @@ reported as package-load errors.
 
 Lean sources can call synchronous JavaScript functions through declarations
 marked with `@[vir_js "..."]`. See `docs/LEAN_VIR_LIBRARY.md` for the
-Lean-side API reference. Import one of the provided modules:
+Lean-side API reference. The host-import boundary is deliberately narrower than
+the exported-call boundary: custom `@[vir_js]` declarations should use
+`Lean.Vir.Js α` resources, resource-shaped containers, and callbacks over those
+types. Raw Lean scalars and structures are rejected unless the declaration is an
+explicit conversion target such as `js.string.value` or `js.nat.value`.
+
+Import one of the provided modules:
 
 ```lean
 import Vir.Browser
@@ -330,7 +336,9 @@ event, ReactNode, and React state for tests/tools.
 
 Custom target bindings are passed through `hostBindings`; user bindings
 override defaults. Bindings receive decoded JavaScript values and return a value
-matching the Lean result type. Host imports are synchronous in v1; returning a
+matching the manifest host boundary mode. Ordinary host imports receive
+resource values; explicit conversion imports receive or return decoded scalar
+values for that converter. Host imports are synchronous in v1; returning a
 `Promise` is an error. Object-style `imports` factory options are treated as
 overrides on top of the generated import table. If you provide a custom
 `imports` function to `createVirRuntimeFactory`, call
