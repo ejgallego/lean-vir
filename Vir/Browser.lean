@@ -62,7 +62,7 @@ opaque Element : Type
 /--
 Browser event object class.
 
-The v1 listener API passes event values to exported Lean entrypoints as private
+Listener callbacks receive event values as private
 resources. The event resource is only valid for the duration of that listener
 callback.
 

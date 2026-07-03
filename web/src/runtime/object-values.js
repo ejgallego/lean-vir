@@ -82,7 +82,7 @@ export class ObjectValueRuntime {
       case WIRE.RESOURCE:
         return this.makeObjectResource(value, label);
       case WIRE.FUNCTION:
-        throw new Error(`${label} cannot be a JavaScript function in v1`);
+        throw new Error(`${label} cannot be a JavaScript function at this boundary`);
       case WIRE.BOOL:
         if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
         return this.makeObjectScalar(value ? 1 : 0, label);

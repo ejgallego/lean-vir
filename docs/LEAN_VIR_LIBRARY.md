@@ -476,7 +476,7 @@ follow-up work.
 
 ## Current Surface
 
-Exported entrypoints support the v1 interface types:
+Exported entrypoints support the current interface types:
 
 - `Unit`
 - `Nat`, `Int`, `Bool`, `String`
@@ -499,8 +499,8 @@ are narrower than exports: low-level host declarations should expose
 `Lean.Vir.Js α` resources and perform scalar conversion through
 `Lean.Vir.JsValue` or another explicit conversion target. JavaScript
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; DOM and React-root APIs use
-`Lean.Vir.Browser.DomM α`; render construction APIs use `ReactM α`. The v1 host
-boundary is synchronous; returning a JavaScript `Promise` is an error. The
+`Lean.Vir.Browser.DomM α`; render construction APIs use `ReactM α`. The current
+host boundary is synchronous; returning a JavaScript `Promise` is an error. The
 current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.
@@ -526,5 +526,5 @@ If package generation fails, inspect the generated report:
   the normal Lean IR closure reached an unsupported native runtime primitive.
 
 If a host import is missing at runtime, check that the manifest target string
-matches the key in `hostBindings`. If a binding returns a `Promise`, the v1
+matches the key in `hostBindings`. If a binding returns a `Promise`, the
 runtime rejects the call because host imports are synchronous.

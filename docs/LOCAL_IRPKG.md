@@ -122,7 +122,7 @@ object arguments, and JavaScript returns an owned Lean object result. Package
 format 7 keeps package-owned signatures for object-call validation and callback
 rooting.
 
-Supported v1 types:
+Supported interface types:
 
 - `Unit`;
 - `Nat`, `Int`, `Bool`, `String`;

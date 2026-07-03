@@ -115,7 +115,7 @@ export class VirHostState {
     }
     if (isPromiseLike(value)) {
       releaseCallbacks(liftedCallbacks);
-      throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
+      throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
     }
     return explicitConversionTarget
       ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`)

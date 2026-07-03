@@ -3778,7 +3778,7 @@ var ObjectValueRuntime = class {
       case WIRE.RESOURCE:
         return this.makeObjectResource(value, label);
       case WIRE.FUNCTION:
-        throw new Error(`${label} cannot be a JavaScript function in v1`);
+        throw new Error(`${label} cannot be a JavaScript function at this boundary`);
       case WIRE.BOOL:
         if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
         return this.makeObjectScalar(value ? 1 : 0, label);
@@ -5380,7 +5380,7 @@ var VirHostState = class {
     }
     if (isPromiseLike(value)) {
       releaseCallbacks(liftedCallbacks);
-      throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
+      throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
     }
     return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
   }

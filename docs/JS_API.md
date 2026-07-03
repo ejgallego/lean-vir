@@ -196,7 +196,7 @@ const second = await factory.createRuntime({ irPackageBytes });
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
 - `vir.packageInfo.hostImports` reports the number of JavaScript host imports.
 
-Supported v1 types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
+Supported interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
 recursive `Array α`, `List α`, `Option α`, `α × β`, `Sum α β`, and `Except ε α`
 shapes over supported types, non-indexed user-defined structures including
@@ -338,7 +338,7 @@ Custom target bindings are passed through `hostBindings`; user bindings
 override defaults. Bindings receive decoded JavaScript values and return a value
 matching the manifest host boundary mode. Ordinary host imports receive
 resource values; explicit conversion imports receive or return decoded scalar
-values for that converter. Host imports are synchronous in v1; returning a
+values for that converter. Host imports are synchronous; returning a
 `Promise` is an error. Object-style `imports` factory options are treated as
 overrides on top of the generated import table. If you provide a custom
 `imports` function to `createVirRuntimeFactory`, call
@@ -384,7 +384,7 @@ default bindings. `Unit` returns use `undefined` or `null`. Function-valued
 Lean arguments are decoded as callable `VirCallback` objects. A host binding
 that stores a callback must eventually call `callback.release()` or rely on
 `VirRuntime.dispose()` to release any still-live callback roots. Host imports
-are synchronous in v1; returning a `Promise` is an error. Object-style
+are synchronous; returning a `Promise` is an error. Object-style
 `imports` factory options are treated as overrides on top of the generated
 import table. If you provide a custom `imports` function to
 `createVirRuntimeFactory`, call `createVirImports(module, overrides, hostState)`

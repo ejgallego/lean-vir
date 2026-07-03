@@ -41,7 +41,7 @@ flowchart LR
   ResultObj --> Release["vir_obj_dec"]
 ```
 
-The initial exported object helper surface is deliberately small:
+The exported object helper surface includes:
 
 - `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
 - `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
@@ -53,6 +53,11 @@ The initial exported object helper surface is deliberately small:
   `vir_obj_ctor_scalar_data`
 - `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
 - `vir_obj_tag` / `vir_obj_field`
+- `vir_obj_expr_*`, `vir_obj_level_*`, and `vir_obj_literal_*` for direct
+  `Lean.Expr` values
+- `vir_obj_name_string` / `vir_obj_name_string_size`
+- `vir_obj_resource` / `vir_obj_resource_externref`
+- `vir_obj_closure_root` for Lean function values crossing to JavaScript
 - `vir_obj_nat` / `vir_obj_nat_decimal`
 - `vir_obj_int` / `vir_obj_int_decimal`
 - `vir_obj_uint32` / `vir_obj_uint32_value`

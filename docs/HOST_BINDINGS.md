@@ -180,7 +180,7 @@ rejected unless they are part of an explicit conversion target such as
 `undefined` or `null`. Function-valued Lean arguments are decoded as callable
 `VirCallback` objects. A host binding that stores a callback must eventually
 call `callback.release()` or rely on `VirRuntime.dispose()` to release any
-still-live callback roots. Host imports are synchronous in v1; returning a
+still-live callback roots. Host imports are synchronous; returning a
 `Promise` is an error.
 
 ## Resource Lifetime

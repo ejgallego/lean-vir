@@ -202,11 +202,14 @@ The shim also exposes the first experimental Lean object ABI helpers:
 - `vir_obj_list` / `vir_obj_list_is_nil` / `vir_obj_list_head` /
   `vir_obj_list_tail`
 - `vir_obj_ctor`
+- `vir_obj_ctor_layout` / `vir_obj_ctor_usize_decimal` /
+  `vir_obj_ctor_scalar_data`
 - `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
 - `vir_obj_tag` / `vir_obj_field`
 - `vir_obj_nat` / `vir_obj_nat_decimal`
 - `vir_obj_expr_*`, `vir_obj_level_*`, and `vir_obj_literal_*` for direct
   `Lean.Expr` values
+- `vir_obj_name_string` / `vir_obj_name_string_size`
 - `vir_obj_resource` / `vir_obj_resource_externref`
 - `vir_obj_closure_root` for Lean function values crossing to JavaScript
 - `vir_obj_int` / `vir_obj_int_decimal`

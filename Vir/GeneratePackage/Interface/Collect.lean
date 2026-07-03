@@ -236,10 +236,10 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
   let some target := virJsTargetFromDecl? loaded.decl
     | return .error { name := loaded.decl.name, source := loaded.source, reason := "declaration is not a Vir JavaScript import" }
   if slot >= maxHostImportSlots then
-    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"too many JavaScript imports; v1 supports at most {maxHostImportSlots}" }
+    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"too many JavaScript imports; current package format supports at most {maxHostImportSlots}" }
   let arity := declParamCount loaded.decl
   if arity > maxHostImportArity then
-    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"JavaScript import arity {arity} exceeds v1 limit {maxHostImportArity}" }
+    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"JavaScript import arity {arity} exceeds current limit {maxHostImportArity}" }
   let env ← getEnv
   let some info := env.find? loaded.decl.name
     | return .error { name := loaded.decl.name, source := loaded.source, reason := "missing elaborated Lean declaration for JavaScript import" }
