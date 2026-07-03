@@ -29,6 +29,34 @@ structure RpcRef where
   context : String
   serverRef : Option (Lean.Vir.Js ServerRef) := none
 
+@[vir_js "proofwidgets.rpc.ref"]
+private opaque rpcRefBaseJs
+    (id : @& Lean.Vir.Js String)
+    (label : @& Lean.Vir.Js String)
+    (typeName : @& Lean.Vir.Js String)
+    (summary : @& Lean.Vir.Js String)
+    (expression : @& Lean.Vir.Js String) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js RpcRef)
+
+@[vir_js "proofwidgets.rpc.ref.finish"]
+private opaque rpcRefFinishJs
+    (ref : @& Lean.Vir.Js RpcRef)
+    (typeText : @& Lean.Vir.Js String)
+    (context : @& Lean.Vir.Js String)
+    (serverRef : Option (Lean.Vir.Js ServerRef)) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js RpcRef)
+
+private def RpcRef.toJs (ref : @& RpcRef) : Lean.Vir.RuntimeM (Lean.Vir.Js RpcRef) := do
+  let id ← Lean.Vir.JsValue.ofString ref.id
+  let label ← Lean.Vir.JsValue.ofString ref.label
+  let typeName ← Lean.Vir.JsValue.ofString ref.typeName
+  let summary ← Lean.Vir.JsValue.ofString ref.summary
+  let expression ← Lean.Vir.JsValue.ofString ref.expression
+  let typeText ← Lean.Vir.JsValue.ofString ref.typeText
+  let context ← Lean.Vir.JsValue.ofString ref.context
+  let base ← rpcRefBaseJs id label typeName summary expression
+  rpcRefFinishJs base typeText context ref.serverRef
+
 /--
 Resolved metadata for a ProofWidgets-style RPC reference.
 
@@ -104,14 +132,39 @@ end ExprWithCtx
 
 namespace Rpc
 
+@[vir_js "js.value.proofwidgets.resolvedRef.value"]
+private opaque resolvedRefValueJs (ref : @& Lean.Vir.Js ResolvedRef) :
+    Lean.Vir.RuntimeM ResolvedRef
+
 @[vir_js "proofwidgets.rpc.inspectRef"]
-opaque inspectRef (ref : @& RpcRef) : Lean.Vir.Browser.DomM Bool
+private opaque inspectRefJs (ref : @& Lean.Vir.Js RpcRef) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
 
 @[vir_js "proofwidgets.rpc.resolveRef"]
-opaque resolveRef
+private opaque resolveRefJs
+    (ref : @& Lean.Vir.Js RpcRef)
+    (callback : Lean.Vir.Js ResolvedRef → Lean.Vir.Browser.DomM Unit) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Bool)
+
+private def resolvedRefCallback
+    (callback : ResolvedRef → Lean.Vir.Browser.DomM Unit)
+    (ref : Lean.Vir.Js ResolvedRef) :
+    Lean.Vir.Browser.DomM Unit := do
+  let value ← resolvedRefValueJs ref
+  callback value
+
+def inspectRef (ref : @& RpcRef) : Lean.Vir.Browser.DomM Bool := do
+  let jsRef ← RpcRef.toJs ref
+  let inspected ← inspectRefJs jsRef
+  Lean.Vir.JsValue.toBool inspected
+
+def resolveRef
     (ref : @& RpcRef)
     (callback : ResolvedRef → Lean.Vir.Browser.DomM Unit) :
-    Lean.Vir.Browser.DomM Bool
+    Lean.Vir.Browser.DomM Bool := do
+  let jsRef ← RpcRef.toJs ref
+  let resolved ← resolveRefJs jsRef (resolvedRefCallback callback)
+  Lean.Vir.JsValue.toBool resolved
 
 def inspect (value : @& WithRpcRef α) : Lean.Vir.Browser.DomM Bool :=
   inspectRef value.ref

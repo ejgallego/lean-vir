@@ -25,6 +25,7 @@ import {
   INTERFACE_MANIFEST_ARTIFACT,
   validateInterfaceManifest,
 } from "../../web/src/runtime/interface-manifest.js";
+import { hostResourceValue } from "../../web/src/host-resource.js";
 
 export { assert, readFile, writeFile, spawnSync, join, validateInterfaceManifest };
 
@@ -60,10 +61,18 @@ export function createCallbackHostBindings(records = []) {
       }
     },
     "test.recordNat": (value) => {
-      records.push(Number(value));
+      records.push(Number(jsNatResourceValue(value)));
       return undefined;
     },
   };
+}
+
+export function jsNatResourceValue(value) {
+  const nat = hostResourceValue(value);
+  if (typeof nat !== "bigint") {
+    throw new Error("expected JsNat host resource");
+  }
+  return nat;
 }
 
 export function assertManifestTypeDescriptorsRoundTrip(manifest) {
@@ -117,7 +126,7 @@ export function manifestEntry(manifest, name) {
 
 const validManifestShape = {
   artifact: INTERFACE_MANIFEST_ARTIFACT,
-  version: 1,
+  version: 2,
   metadata: {},
   exports: [
     {

@@ -19,6 +19,7 @@ export {
   roundTripInterfaceTypeDescriptor,
   sameInterfaceWireType,
   VIR_HOST_DISPOSE,
+  VIR_HOST_RESOLVE_BINDING,
   VirCallback,
   VirRuntime,
   VIR_WASM_DEV_FILE,

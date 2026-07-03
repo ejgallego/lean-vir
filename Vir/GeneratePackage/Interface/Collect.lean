@@ -76,6 +76,120 @@ def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : Interf
 def boxedBoundaryDiagnostic (name : Name) : String :=
   s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
 
+def InterfaceType.isHostResourceWire : InterfaceType → Bool
+  | .resource .. => true
+  | _ => false
+
+def isExplicitJsValueConversionTarget (target : String) : Bool :=
+  target.startsWith "js.value." && target != "js.value.value"
+
+def isExplicitJsValueUnwrapTarget (target : String) : Bool :=
+  isExplicitJsValueConversionTarget target && target.endsWith ".value"
+
+def InterfaceType.hostBoundaryKind : InterfaceType → String
+  | .unit
+  | .nat
+  | .int
+  | .bool
+  | .string
+  | .float
+  | .float32
+  | .uint8
+  | .uint16
+  | .uint32
+  | .uint64
+  | .usize
+  | .byteArray
+  | .expr => "raw Lean type"
+  | .simpleEnum .. => "enum"
+  | .taggedUnion .. => "tagged union"
+  | .customInductive .. => "inductive"
+  | .structure .. => "structure"
+  | .recursiveSelf .. => "recursive type"
+  | .array .. => "array"
+  | .list .. => "list"
+  | .option .. => "option"
+  | .prod .. => "product"
+  | .resource .. => "resource"
+  | .function .. => "callback"
+
+mutual
+
+partial def InterfaceType.isHostWireArgType : InterfaceType → Bool
+  | .unit => true
+  | .resource .. => true
+  | .array element => element.isHostWireArgType
+  | .list element => element.isHostWireArgType
+  | .option element => element.isHostWireArgType
+  | .prod fst snd => fst.isHostWireArgType && snd.isHostWireArgType
+  | .function args result _ =>
+      args.all (fun (_, ty) => ty.isHostWireArgType) && result.isHostWireResultType
+  | _ => false
+
+partial def InterfaceType.isHostWireResultType : InterfaceType → Bool
+  | .unit => true
+  | .resource .. => true
+  | .array element => element.isHostWireResultType
+  | .list element => element.isHostWireResultType
+  | .option element => element.isHostWireResultType
+  | .prod fst snd => fst.isHostWireResultType && snd.isHostWireResultType
+  | _ => false
+
+end
+
+def isJsValueConversionSignature
+    (target : String)
+    (args : Array InterfaceArg)
+    (result : InterfaceType)
+    (effect : InterfaceEffect) : Bool :=
+  if effect != .runtime then
+    false
+  else if isExplicitJsValueUnwrapTarget target then
+    match args[0]? with
+    | some arg => args.size == 1 && arg.type.isHostResourceWire
+    | none => false
+  else if isExplicitJsValueConversionTarget target then
+    args.size == 1 && result.isHostResourceWire
+  else
+    match target, args[0]? with
+    | "js.string", some arg => args.size == 1 && arg.type == .string && result.isHostResourceWire
+    | "js.string.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .string
+    | "js.nat", some arg => args.size == 1 && arg.type == .nat && result.isHostResourceWire
+    | "js.nat.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .nat
+    | "js.bool", some arg => args.size == 1 && arg.type == .bool && result.isHostResourceWire
+    | "js.bool.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .bool
+    | "js.float", some arg => args.size == 1 && arg.type == .float && result.isHostResourceWire
+    | "js.float.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .float
+    | _, _ => false
+
+def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
+  s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Lean.Vir.Js ...` resources and explicit conversion calls"
+
+def hostImportArgBoundaryDiagnostic? (arg : InterfaceArg) : Option String :=
+  if arg.type.isHostWireArgType then
+    none
+  else
+    some s!"unsupported JavaScript import argument `{arg.name}`: {hostBoundaryTypeDiagnostic arg.type}"
+
+def hostImportResultBoundaryDiagnostic? (result : InterfaceType) : Option String :=
+  if result.isHostWireResultType then
+    none
+  else
+    some s!"unsupported JavaScript import result: {hostBoundaryTypeDiagnostic result}"
+
+def hostImportBoundary
+    (target : String)
+    (args : Array InterfaceArg)
+    (result : InterfaceType)
+    (effect : InterfaceEffect) : Except String HostImportBoundary :=
+  if isJsValueConversionSignature target args result effect then
+    .ok .conversion
+  else
+    match args.findSome? hostImportArgBoundaryDiagnostic? <|>
+        hostImportResultBoundaryDiagnostic? result with
+    | some reason => .error reason
+    | none => .ok .wire
+
 def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except PackageDiagnostic InterfaceExport) := do
   if isPrivateName name then
@@ -122,10 +236,10 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
   let some target := virJsTargetFromDecl? loaded.decl
     | return .error { name := loaded.decl.name, source := loaded.source, reason := "declaration is not a Vir JavaScript import" }
   if slot >= maxHostImportSlots then
-    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"too many JavaScript imports; v1 supports at most {maxHostImportSlots}" }
+    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"too many JavaScript imports; current package format supports at most {maxHostImportSlots}" }
   let arity := declParamCount loaded.decl
   if arity > maxHostImportArity then
-    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"JavaScript import arity {arity} exceeds v1 limit {maxHostImportArity}" }
+    return .error { name := loaded.decl.name, source := loaded.source, reason := s!"JavaScript import arity {arity} exceeds current limit {maxHostImportArity}" }
   let env ← getEnv
   let some info := env.find? loaded.decl.name
     | return .error { name := loaded.decl.name, source := loaded.source, reason := "missing elaborated Lean declaration for JavaScript import" }
@@ -140,18 +254,27 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
         source := loaded.source,
         reason := s!"JavaScript import IR arity mismatch: expected {expectedArity}, got {arity}"
       }
-    return .ok {
-      slot,
-      name := loaded.decl.name,
-      source := loaded.source,
-      target,
-      symbol := hostImportSymbol slot arity,
-      arity,
-      erasedPrefixArgs := erasedArgCount,
-      args,
-      result,
-      effect
-    }
+    match hostImportBoundary target args result effect with
+    | .error reason =>
+        return .error {
+          name := loaded.decl.name,
+          source := loaded.source,
+          reason
+        }
+    | .ok boundary =>
+        return .ok {
+          slot,
+          name := loaded.decl.name,
+          source := loaded.source,
+          target,
+          boundary,
+          symbol := hostImportSymbol slot arity,
+          arity,
+          erasedPrefixArgs := erasedArgCount,
+          args,
+          result,
+          effect
+        }
 
 def runCoreForSource (source : String) (env : Environment) (x : CoreM α) : IO α :=
   x.toIO'

@@ -42,9 +42,10 @@ try {
   const runtimeImport = manifest.hostImports.find((entry) => entry.target === "test.runtime.value");
   assert.ok(runtimeImport, "runtime host import missing");
   assert.equal(runtimeImport.effect, "runtime");
+  assert.equal(runtimeImport.boundary, "wire");
   assert.equal(runtimeImport.arity, 1);
   assert.equal(runtimeImport.erasedPrefixArgs, 0);
-  assert.equal(runtimeImport.result.type, "Nat");
+  assert.equal(runtimeImport.result.type, "Js");
 
   const report = await readFile(runtimeReport, "utf8");
   assert.match(report, /runtimeValue/);
@@ -53,19 +54,20 @@ try {
   const hostSlotSource = join(freshDir, "HostImportSlots.lean");
   const hostSlotPackage = join(freshDir, "host-import-slots.irpkg");
   const hostSlotReport = join(freshDir, "host-import-slots.report.md");
-  const hostSlotNames = Array.from({ length: 64 }, (_, slot) => `hostSlot${slot}`);
+  const hostSlotNames = Array.from({ length: 128 }, (_, slot) => `hostSlot${slot}`);
   const hostSlotLines = hostSlotNames.flatMap((name, slot) => [
     `@[vir_js "test.slot.${slot}"]`,
-    `private opaque ${name} : Nat`,
+    `private opaque ${name} : Lean.Vir.RuntimeM (Lean.Vir.Js Unit)`,
     "",
   ]);
   await writeFile(hostSlotSource, [
-    "import Vir.Host",
+    "import Vir.Js",
+    "set_option maxRecDepth 1024",
     "",
     ...hostSlotLines,
-    "def hostSlotTotal : Nat :=",
-    ...hostSlotNames.map((name, index) =>
-      `  ${name}${index + 1 === hostSlotNames.length ? "" : " +"}`),
+    "def hostSlotTotal : Lean.Vir.RuntimeM (Lean.Vir.Js Unit) := do",
+    ...hostSlotNames.slice(0, -1).map((name) => `  let _ ← ${name}`),
+    `  ${hostSlotNames.at(-1)}`,
     "",
   ].join("\n"));
 
@@ -78,14 +80,15 @@ try {
   assert.equal(inspectedHostSlots.status, 0, inspectedHostSlots.stderr || inspectedHostSlots.stdout);
   const hostSlotManifest = JSON.parse(inspectedHostSlots.stdout).manifest;
   assert.deepEqual(hostSlotManifest.diagnostics, []);
-  assert.equal(hostSlotManifest.hostImports.length, 64);
+  assert.equal(hostSlotManifest.hostImports.length, 128);
   assert.deepEqual(
     hostSlotManifest.hostImports.map((entry) => entry.slot).sort((a, b) => a - b),
-    Array.from({ length: 64 }, (_, slot) => slot),
+    Array.from({ length: 128 }, (_, slot) => slot),
   );
-  const lastHostSlot = hostSlotManifest.hostImports.find((entry) => entry.slot === 63);
-  assert.equal(lastHostSlot?.symbol, "vir_js_import_63_0");
-  assert.equal(lastHostSlot?.arity, 0);
+  const lastHostSlot = hostSlotManifest.hostImports.find((entry) => entry.slot === 127);
+  assert.equal(lastHostSlot?.symbol, "vir_js_import_127_1");
+  assert.equal(lastHostSlot?.boundary, "wire");
+  assert.equal(lastHostSlot?.arity, 1);
 } finally {
   await rm(freshDir, { recursive: true, force: true });
 }

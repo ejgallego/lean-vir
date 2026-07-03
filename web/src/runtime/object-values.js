@@ -22,6 +22,8 @@ import {
 } from "../host-resource.js";
 import {
   OBJECT_VALUE_EXPORTS,
+  hostWireArgumentSupported,
+  hostWireResultSupported,
   objectLayoutPlan,
   objectLayoutSlotsFromPlan,
   readObjectScalarField as readObjectScalarFieldValue,
@@ -55,6 +57,17 @@ export class ObjectValueRuntime {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
   }
 
+  makeHostWireObjectValue(type, value, label) {
+    if (!hostWireResultSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host wire result type`);
+    }
+    return this.makeObjectValue(type, value, label);
+  }
+
+  makeExplicitConversionObjectValue(type, value, label) {
+    return this.makeObjectValue(type, value, label);
+  }
+
   makeObjectValue(type, value, label, selfType = null) {
     const tag = type?.wireTag;
     switch (tag) {
@@ -69,7 +82,7 @@ export class ObjectValueRuntime {
       case WIRE.RESOURCE:
         return this.makeObjectResource(value, label);
       case WIRE.FUNCTION:
-        throw new Error(`${label} cannot be a JavaScript function in v1`);
+        throw new Error(`${label} cannot be a JavaScript function at this boundary`);
       case WIRE.BOOL:
         if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
         return this.makeObjectScalar(value ? 1 : 0, label);
@@ -1043,6 +1056,17 @@ export class ObjectValueRuntime {
       default:
         throw new Error(`${label} has unsupported object ABI result type`);
     }
+  }
+
+  liftHostWireObjectValue(type, obj, label) {
+    if (!hostWireArgumentSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host wire argument type`);
+    }
+    return this.liftObjectValue(type, obj, label);
+  }
+
+  liftExplicitConversionObjectValue(type, obj, label) {
+    return this.liftObjectValue(type, obj, label);
   }
 
   readBoundedObjectScalar(obj, label, max) {

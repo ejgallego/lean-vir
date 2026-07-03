@@ -69,7 +69,8 @@ callback from the current callback.
 
 `scripts/test-vir-runtime.mjs` covers the current callback surface:
 
-- pure callback round-trip through a custom `test.callNatCallback` host import;
+- resource-shaped `RuntimeM` callback round-trip through a custom
+  `test.callNatCallback` host import using explicit `Js Nat` values;
 - double release, call-after-release, and stale closure root failure;
 - nested callback argument errors while Lean is inside a host import;
 - callback-backed event listener dispatch, listener removal, and runtime
@@ -91,12 +92,12 @@ callback from the current callback.
 ## Remaining Work
 
 1. Add more focused helpers for common events while keeping `Event` opaque.
-2. Keep the v1 closure-root table simple. If release overhead becomes visible,
+2. Keep the closure-root table simple. If release overhead becomes visible,
    optimize root-id allocation/release in a second phase, after leak tests make
    the ownership contract hard to regress.
-3. Keep async host imports out of v1. Promise-returning host bindings need a
-   later JSPI or task-queue design that can report rejection without leaving the
-   interpreter state ambiguous.
+3. Keep async host imports out of the current synchronous boundary.
+   Promise-returning host bindings need a later JSPI or task-queue design that
+   can report rejection without leaving the interpreter state ambiguous.
 
 ## Wasm Extension Direction
 

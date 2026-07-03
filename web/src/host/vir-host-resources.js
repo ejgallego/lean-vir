@@ -170,20 +170,34 @@ export function createHostResourceState() {
 export function createElementResourceHostBindings(resources, operations) {
   return {
     "browser.element.getTextContent": (element) =>
-      operations.getTextContent(resources.resolveResource(element, "Element")),
+      resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
     "browser.element.setTextContent": (element, text) => {
-      operations.setTextContent(resources.resolveResource(element, "Element"), text);
+      operations.setTextContent(
+        resources.resolveResource(element, "Element"),
+        resources.resolveResource(text, "JsString"),
+      );
       return undefined;
     },
     "browser.element.getAttribute": (element, name) =>
-      operations.getAttribute(resources.resolveResource(element, "Element"), name),
+      resources.resourceForValue(operations.getAttribute(
+        resources.resolveResource(element, "Element"),
+        resources.resolveResource(name, "JsString"),
+      )),
     "browser.element.setAttribute": (element, name, value) => {
-      operations.setAttribute(resources.resolveResource(element, "Element"), name, value);
+      operations.setAttribute(
+        resources.resolveResource(element, "Element"),
+        resources.resolveResource(name, "JsString"),
+        resources.resolveResource(value, "JsString"),
+      );
       return undefined;
     },
     "browser.element.addEventListener": (element, eventName, callback) => {
       const target = resources.resolveResource(element, "Element");
-      const listener = operations.createEventListener(target, eventName, callback);
+      const listener = operations.createEventListener(
+        target,
+        resources.resolveResource(eventName, "JsString"),
+        callback,
+      );
       resources.addDisposable(listener);
       return resources.resourceForValue(listener);
     },
@@ -201,15 +215,17 @@ export function createHtmlInputElementResourceHostBindings(resources, { fromElem
     "browser.htmlInputElement.fromElement": (element) =>
       fromElement(resources.resolveResource(element, "Element")),
     "browser.htmlInputElement.getChecked": (input) =>
-      resources.resolveResource(input, "HTMLInputElement").checked === true,
+      resources.resourceForValue(resources.resolveResource(input, "HTMLInputElement").checked === true),
     "browser.htmlInputElement.setChecked": (input, checked) => {
-      resources.resolveResource(input, "HTMLInputElement").checked = checked;
+      resources.resolveResource(input, "HTMLInputElement").checked =
+        resources.resolveResource(checked, "JsBool");
       return undefined;
     },
     "browser.htmlInputElement.getValue": (input) =>
-      resources.resolveResource(input, "HTMLInputElement").value ?? "",
+      resources.resourceForValue(resources.resolveResource(input, "HTMLInputElement").value ?? ""),
     "browser.htmlInputElement.setValue": (input, value) => {
-      resources.resolveResource(input, "HTMLInputElement").value = value;
+      resources.resolveResource(input, "HTMLInputElement").value =
+        resources.resolveResource(value, "JsString");
       return undefined;
     },
   };
@@ -295,13 +311,26 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
 
   return {
     "react.node.text": (value) =>
-      resources.resourceForValue(requireReactNodeTextResourceFactory(createNodeTextResource)(value)),
+      resources.resourceForValue(
+        requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue(resources, value, "React Node text value"))
+      ),
     "react.node.createElement": (tag, key, props, handlers, children) =>
       resources.resourceForValue(
-        requireReactNodeElementResourceFactory(createNodeElementResource)(tag, key, props, handlers, children)
+        requireReactNodeElementResourceFactory(createNodeElementResource)(
+          jsStringValue(resources, tag, "React Node element tag"),
+          optionalJsStringValue(resources, key, "React Node element key"),
+          reactNodeWireResources(resources, props, "React Node property"),
+          reactNodeWireResources(resources, handlers, "React Node event handler"),
+          children,
+        )
       ),
     "react.node.fragment": (key, children) =>
-      resources.resourceForValue(requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(key, children)),
+      resources.resourceForValue(
+        requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(
+          optionalJsStringValue(resources, key, "React Node fragment key"),
+          children,
+        )
+      ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
       return resources.resourceForValue(rootForContainer(target));
@@ -323,20 +352,26 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       return undefined;
     },
     "react.root.renderIntoSelector": (selector, node) => {
-      const root = selectorRoot(selector, () => disposeUnrenderedReactNode(node));
+      const root = selectorRoot(
+        jsStringValue(resources, selector, "React root selector"),
+        () => disposeUnrenderedReactNode(node),
+      );
       if (root === null) {
-        return false;
+        return resources.resourceForValue(false);
       }
       root.render(node);
-      return true;
+      return resources.resourceForValue(true);
     },
     "react.root.renderComponentIntoSelector": (selector, component) => {
-      const root = selectorRoot(selector, () => releaseLeanCallback(component));
+      const root = selectorRoot(
+        jsStringValue(resources, selector, "React root selector"),
+        () => releaseLeanCallback(component),
+      );
       if (root === null) {
-        return false;
+        return resources.resourceForValue(false);
       }
       root.renderComponent(component);
-      return true;
+      return resources.resourceForValue(true);
     },
     "react.root.unmount": (root) => {
       const value = resources.resolveResource(root, "ReactRoot");
@@ -345,12 +380,12 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       return undefined;
     },
     "react.root.unmountSelector": (selector) => {
-      const mounted = rootsBySelector.get(selector);
+      const mounted = rootsBySelector.get(jsStringValue(resources, selector, "React root selector"));
       if (mounted === undefined) {
-        return false;
+        return resources.resourceForValue(false);
       }
       releaseRootResource(mounted.root);
-      return true;
+      return resources.resourceForValue(true);
     },
   };
 }
@@ -383,10 +418,17 @@ function requireReactNodeFragmentResourceFactory(factory) {
   return factory;
 }
 
+function reactNodeWireResources(resources, values, label) {
+  if (!Array.isArray(values)) {
+    throw new Error(`${label}s must be an array`);
+  }
+  return values.map((value, index) => resources.resolveResource(value, `${label}[${index}]`));
+}
+
 export function createTimerResourceHostBindings(resources) {
   return {
     "browser.timer.setTimeout": (delayMs, callback) =>
-      resources.resourceForValue(createTimeoutResource(resources, delayMs, callback)),
+      resources.resourceForValue(createTimeoutResource(resources, jsNatAsDelay(resources, delayMs), callback)),
     "browser.timer.clearTimeout": (timeout) => {
       const value = resources.resolveResource(timeout, "Timeout");
       value.clear();
@@ -394,7 +436,7 @@ export function createTimerResourceHostBindings(resources) {
       return undefined;
     },
     "browser.timer.setInterval": (delayMs, callback) =>
-      resources.resourceForValue(createIntervalResource(resources, delayMs, callback)),
+      resources.resourceForValue(createIntervalResource(resources, jsNatAsDelay(resources, delayMs), callback)),
     "browser.timer.clearInterval": (interval) => {
       const value = resources.resolveResource(interval, "Interval");
       value.clear();
@@ -415,6 +457,29 @@ export function createAnimationResourceHostBindings(resources, { requestFrame, c
       return undefined;
     },
   };
+}
+
+function jsNatAsDelay(resources, value) {
+  const delay = resources.resolveResource(value, "JsNat");
+  if (typeof delay !== "bigint" || delay < 0n || delay > 0xffffffffn) {
+    throw new Error("timer delay must be a Js Nat in the UInt32 range");
+  }
+  return Number(delay);
+}
+
+function jsStringValue(resources, value, label) {
+  const text = resources.resolveResource(value, label);
+  if (typeof text !== "string") {
+    throw new Error(`${label} must be a Js String`);
+  }
+  return text;
+}
+
+function optionalJsStringValue(resources, value, label) {
+  if (value === null || value === undefined) {
+    return null;
+  }
+  return jsStringValue(resources, value, label);
 }
 
 export function createTimeoutResource(resources, delayMs, callback) {
@@ -471,7 +536,16 @@ export function createAnimationFrameResource(resources, callback, requestFrame, 
     disposeMethod: "cancel",
     schedule: requestFrame,
     cancel: cancelFrame,
-    invoke: (leanCallback, timestamp) => leanCallback(Number(timestamp)),
+    invoke: (leanCallback, timestamp) => {
+      const timestampResource = resources.temporaryResourceForValue(Number(timestamp));
+      try {
+        leanCallback(timestampResource);
+      } finally {
+        if (timestampResource !== null) {
+          resources.releaseResource(timestampResource);
+        }
+      }
+    },
   });
 }
 

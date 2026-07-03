@@ -20,8 +20,10 @@ import {
 import {
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
+  normalizeProofWidgetsResolvedRef,
   normalizeProofWidgetsRpcRef,
 } from "./host/vir-virtual-host-bindings.js";
+import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
 import { VIR_HOST_DISPOSE } from "./host-resource.js";
 
 export {
@@ -39,21 +41,24 @@ export {
   findVirtualReactElementById,
   createVirtualEventState,
   createVirtualEventHostBindings,
+  normalizeProofWidgetsResolvedRef,
   normalizeProofWidgetsRpcRef,
   virtualReactElementById,
 } from "./host/vir-virtual-host-bindings.js";
 
-export function createCommonHostBindings() {
+export function createCommonHostBindings(state = createHostResourceState()) {
   return {
-    "common.echoString": (value) => value,
-    "common.addNat": (lhs, rhs) => (BigInt(lhs) + BigInt(rhs)).toString(),
+    ...createJsValueHostBindings(state),
+    "common.echoString": (value) => state.resourceForValue(state.resolveResource(value, "JsString")),
+    "common.addNat": (lhs, rhs) =>
+      state.resourceForValue(state.resolveResource(lhs, "JsNat") + state.resolveResource(rhs, "JsNat")),
   };
 }
 
-export function createConsoleHostBindings() {
+export function createConsoleHostBindings(state = createHostResourceState()) {
   return {
     "browser.console.log": (message) => {
-      console.log(message);
+      console.log(state.resolveResource(message, "JsString"));
       return undefined;
     },
   };
@@ -61,12 +66,13 @@ export function createConsoleHostBindings() {
 
 export function createBrowserDocumentHostBindings(state = createHostResourceState()) {
   return {
-    "browser.document.getTitle": () => browserDocument().title,
+    "browser.document.getTitle": () => state.resourceForValue(browserDocument().title),
     "browser.document.setTitle": (title) => {
-      browserDocument().title = title;
+      browserDocument().title = state.resolveResource(title, "JsString");
       return undefined;
     },
-    "browser.document.querySelector": (selector) => state.resourceForValue(queryDocumentElement(selector)),
+    "browser.document.querySelector": (selector) =>
+      state.resourceForValue(queryDocumentElement(state.resolveResource(selector, "JsString"))),
   };
 }
 
@@ -84,7 +90,8 @@ export function createBrowserEventHostBindings(state = createHostResourceState()
       stopPropagationOnEvent(state.resolveResource(event, "Event"));
       return undefined;
     },
-    "browser.event.formValue": (event) => formControlEventValue(state.resolveResource(event, "Event")),
+    "browser.event.formValue": (event) =>
+      state.resourceForValue(formControlEventValue(state.resolveResource(event, "Event"))),
   };
 }
 
@@ -123,13 +130,54 @@ export function createBrowserAnimationHostBindings(state = createHostResourceSta
   return createAnimationResourceHostBindings(state, { requestFrame, cancelFrame });
 }
 
-export function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
+export function createInfoviewHostBindings({ resources = createHostResourceState(), commandDispatcher = null } = {}) {
   return {
-    "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
-    "infoview.command.revealPosition": (position) => revealInfoviewPosition(commandDispatcher, position),
-    "proofwidgets.rpc.inspectRef": (ref) => inspectProofWidgetsRpcRef(commandDispatcher, ref),
+    "infoview.documentPosition": (uri, fileName, line, character, label) =>
+      resources.resourceForValue({
+        uri: resources.resolveResource(uri, "JsString"),
+        fileName: resources.resolveResource(fileName, "JsString"),
+        line: resources.resolveResource(line, "JsNat"),
+        character: resources.resolveResource(character, "JsNat"),
+        label: resources.resolveResource(label, "JsString"),
+      }),
+    "infoview.clipboard.writeText": (text) =>
+      resources.resourceForValue(writeTextToHostClipboard(resources.resolveResource(text, "JsString"))),
+    "infoview.command.revealPosition": (position) =>
+      resources.resourceForValue(revealInfoviewPosition(
+        commandDispatcher,
+        resources.resolveResource(position, "DocumentPosition"),
+      )),
+    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) =>
+      resources.resourceForValue({
+        id: resources.resolveResource(id, "JsString"),
+        label: resources.resolveResource(label, "JsString"),
+        typeName: resources.resolveResource(typeName, "JsString"),
+        summary: resources.resolveResource(summary, "JsString"),
+        expression: resources.resolveResource(expression, "JsString"),
+        typeText: "",
+        context: "",
+      }),
+    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) =>
+      resources.resourceForValue({
+        ...resources.resolveResource(ref, "RpcRef"),
+        typeText: resources.resolveResource(typeText, "JsString"),
+        context: resources.resolveResource(context, "JsString"),
+        ...(serverRef === null || serverRef === undefined ? {} : { serverRef }),
+      }),
+    "js.value.proofwidgets.resolvedRef.value": (ref) =>
+      normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
+    "proofwidgets.rpc.inspectRef": (ref) =>
+      resources.resourceForValue(inspectProofWidgetsRpcRef(
+        commandDispatcher,
+        resources.resolveResource(ref, "RpcRef"),
+      )),
     "proofwidgets.rpc.resolveRef": (ref, callback) =>
-      resolveProofWidgetsRpcRef(commandDispatcher, ref, callback),
+      resources.resourceForValue(resolveProofWidgetsRpcRef(
+        resources,
+        commandDispatcher,
+        resources.resolveResource(ref, "RpcRef"),
+        callback,
+      )),
   };
 }
 
@@ -145,24 +193,25 @@ export function createBrowserHostBindings({
       : reactHostBindings;
   const reactBindings = normalizeOptionalHostBindingMap(reactBindingsSource, "reactHostBindings");
   return {
-    ...createCommonHostBindings(),
-    ...createConsoleHostBindings(),
+    ...createCommonHostBindings(state),
+    ...createConsoleHostBindings(state),
     ...createBrowserDocumentHostBindings(state),
     ...createBrowserEventHostBindings(state),
     ...createBrowserElementHostBindings(state),
     ...createBrowserHtmlInputElementHostBindings(state),
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
-    ...createInfoviewHostBindings({ commandDispatcher: infoviewCommandDispatcher }),
+    ...createInfoviewHostBindings({ resources: state, commandDispatcher: infoviewCommandDispatcher }),
     ...reactBindings,
     [VIR_HOST_DISPOSE]: () => state.dispose(),
   };
 }
 
 export function createNodeHostBindings(state = createVirtualDocumentState()) {
+  state.resources ??= createHostResourceState();
   return {
-    ...createCommonHostBindings(),
-    ...createConsoleHostBindings(),
+    ...createCommonHostBindings(state.resources),
+    ...createConsoleHostBindings(state.resources),
     ...createVirtualDocumentHostBindings(state),
   };
 }
@@ -224,7 +273,7 @@ function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
   return dispatchInfoviewCommand(commandDispatcher, "proofwidgetsRpcInspectRef", normalized);
 }
 
-function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
+function resolveProofWidgetsRpcRef(resources, commandDispatcher, ref, callback) {
   const normalized = normalizeProofWidgetsRpcRef(ref);
   if (normalized === null || typeof callback !== "function") {
     releaseCallback(callback);
@@ -249,13 +298,13 @@ function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
   }
   if (result !== null && typeof result === "object" && typeof result.then === "function") {
     result.then((info) => {
-      callAndReleaseCallback(callback, info);
+      callAndReleaseCallback(callback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(info)));
     }).catch((error) => {
       reportEventHandlerError(error);
       releaseCallback(callback);
     });
   } else {
-    callAndReleaseCallback(callback, result);
+    callAndReleaseCallback(callback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(result)));
   }
   return true;
 }

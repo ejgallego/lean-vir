@@ -13,6 +13,7 @@ import { EditorContext, useRpcSession } from "@leanprover/infoview";
 // web/src/host-resource.js
 var EXTERNREF_TABLE_INITIAL_LENGTH = 1;
 var VIR_HOST_DISPOSE = /* @__PURE__ */ Symbol.for("lean-vir.hostDispose");
+var VIR_HOST_RESOLVE_BINDING = /* @__PURE__ */ Symbol.for("lean-vir.hostResolveBinding");
 var hostResourceState = /* @__PURE__ */ new WeakMap();
 var externrefTableSupport = null;
 function hasExternrefTableSupport() {
@@ -873,19 +874,33 @@ function createHostResourceState() {
 }
 function createElementResourceHostBindings(resources, operations) {
   return {
-    "browser.element.getTextContent": (element) => operations.getTextContent(resources.resolveResource(element, "Element")),
+    "browser.element.getTextContent": (element) => resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
     "browser.element.setTextContent": (element, text) => {
-      operations.setTextContent(resources.resolveResource(element, "Element"), text);
+      operations.setTextContent(
+        resources.resolveResource(element, "Element"),
+        resources.resolveResource(text, "JsString")
+      );
       return void 0;
     },
-    "browser.element.getAttribute": (element, name) => operations.getAttribute(resources.resolveResource(element, "Element"), name),
+    "browser.element.getAttribute": (element, name) => resources.resourceForValue(operations.getAttribute(
+      resources.resolveResource(element, "Element"),
+      resources.resolveResource(name, "JsString")
+    )),
     "browser.element.setAttribute": (element, name, value) => {
-      operations.setAttribute(resources.resolveResource(element, "Element"), name, value);
+      operations.setAttribute(
+        resources.resolveResource(element, "Element"),
+        resources.resolveResource(name, "JsString"),
+        resources.resolveResource(value, "JsString")
+      );
       return void 0;
     },
     "browser.element.addEventListener": (element, eventName, callback) => {
       const target = resources.resolveResource(element, "Element");
-      const listener = operations.createEventListener(target, eventName, callback);
+      const listener = operations.createEventListener(
+        target,
+        resources.resolveResource(eventName, "JsString"),
+        callback
+      );
       resources.addDisposable(listener);
       return resources.resourceForValue(listener);
     },
@@ -900,14 +915,14 @@ function createElementResourceHostBindings(resources, operations) {
 function createHtmlInputElementResourceHostBindings(resources, { fromElement }) {
   return {
     "browser.htmlInputElement.fromElement": (element) => fromElement(resources.resolveResource(element, "Element")),
-    "browser.htmlInputElement.getChecked": (input) => resources.resolveResource(input, "HTMLInputElement").checked === true,
+    "browser.htmlInputElement.getChecked": (input) => resources.resourceForValue(resources.resolveResource(input, "HTMLInputElement").checked === true),
     "browser.htmlInputElement.setChecked": (input, checked) => {
-      resources.resolveResource(input, "HTMLInputElement").checked = checked;
+      resources.resolveResource(input, "HTMLInputElement").checked = resources.resolveResource(checked, "JsBool");
       return void 0;
     },
-    "browser.htmlInputElement.getValue": (input) => resources.resolveResource(input, "HTMLInputElement").value ?? "",
+    "browser.htmlInputElement.getValue": (input) => resources.resourceForValue(resources.resolveResource(input, "HTMLInputElement").value ?? ""),
     "browser.htmlInputElement.setValue": (input, value) => {
-      resources.resolveResource(input, "HTMLInputElement").value = value;
+      resources.resolveResource(input, "HTMLInputElement").value = resources.resolveResource(value, "JsString");
       return void 0;
     }
   };
@@ -983,11 +998,24 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     return root;
   }
   return {
-    "react.node.text": (value) => resources.resourceForValue(requireReactNodeTextResourceFactory(createNodeTextResource)(value)),
-    "react.node.createElement": (tag, key, props, handlers, children) => resources.resourceForValue(
-      requireReactNodeElementResourceFactory(createNodeElementResource)(tag, key, props, handlers, children)
+    "react.node.text": (value) => resources.resourceForValue(
+      requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue(resources, value, "React Node text value"))
     ),
-    "react.node.fragment": (key, children) => resources.resourceForValue(requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(key, children)),
+    "react.node.createElement": (tag, key, props, handlers, children) => resources.resourceForValue(
+      requireReactNodeElementResourceFactory(createNodeElementResource)(
+        jsStringValue(resources, tag, "React Node element tag"),
+        optionalJsStringValue(resources, key, "React Node element key"),
+        reactNodeWireResources(resources, props, "React Node property"),
+        reactNodeWireResources(resources, handlers, "React Node event handler"),
+        children
+      )
+    ),
+    "react.node.fragment": (key, children) => resources.resourceForValue(
+      requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(
+        optionalJsStringValue(resources, key, "React Node fragment key"),
+        children
+      )
+    ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
       return resources.resourceForValue(rootForContainer(target));
@@ -1009,20 +1037,26 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
       return void 0;
     },
     "react.root.renderIntoSelector": (selector, node) => {
-      const root = selectorRoot(selector, () => disposeUnrenderedReactNode(node));
+      const root = selectorRoot(
+        jsStringValue(resources, selector, "React root selector"),
+        () => disposeUnrenderedReactNode(node)
+      );
       if (root === null) {
-        return false;
+        return resources.resourceForValue(false);
       }
       root.render(node);
-      return true;
+      return resources.resourceForValue(true);
     },
     "react.root.renderComponentIntoSelector": (selector, component) => {
-      const root = selectorRoot(selector, () => releaseLeanCallback2(component));
+      const root = selectorRoot(
+        jsStringValue(resources, selector, "React root selector"),
+        () => releaseLeanCallback2(component)
+      );
       if (root === null) {
-        return false;
+        return resources.resourceForValue(false);
       }
       root.renderComponent(component);
-      return true;
+      return resources.resourceForValue(true);
     },
     "react.root.unmount": (root) => {
       const value = resources.resolveResource(root, "ReactRoot");
@@ -1031,12 +1065,12 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
       return void 0;
     },
     "react.root.unmountSelector": (selector) => {
-      const mounted = rootsBySelector.get(selector);
+      const mounted = rootsBySelector.get(jsStringValue(resources, selector, "React root selector"));
       if (mounted === void 0) {
-        return false;
+        return resources.resourceForValue(false);
       }
       releaseRootResource(mounted.root);
-      return true;
+      return resources.resourceForValue(true);
     }
   };
 }
@@ -1064,16 +1098,22 @@ function requireReactNodeFragmentResourceFactory(factory) {
   }
   return factory;
 }
+function reactNodeWireResources(resources, values, label) {
+  if (!Array.isArray(values)) {
+    throw new Error(`${label}s must be an array`);
+  }
+  return values.map((value, index) => resources.resolveResource(value, `${label}[${index}]`));
+}
 function createTimerResourceHostBindings(resources) {
   return {
-    "browser.timer.setTimeout": (delayMs, callback) => resources.resourceForValue(createTimeoutResource(resources, delayMs, callback)),
+    "browser.timer.setTimeout": (delayMs, callback) => resources.resourceForValue(createTimeoutResource(resources, jsNatAsDelay(resources, delayMs), callback)),
     "browser.timer.clearTimeout": (timeout) => {
       const value = resources.resolveResource(timeout, "Timeout");
       value.clear();
       resources.releaseResource(timeout);
       return void 0;
     },
-    "browser.timer.setInterval": (delayMs, callback) => resources.resourceForValue(createIntervalResource(resources, delayMs, callback)),
+    "browser.timer.setInterval": (delayMs, callback) => resources.resourceForValue(createIntervalResource(resources, jsNatAsDelay(resources, delayMs), callback)),
     "browser.timer.clearInterval": (interval) => {
       const value = resources.resolveResource(interval, "Interval");
       value.clear();
@@ -1092,6 +1132,26 @@ function createAnimationResourceHostBindings(resources, { requestFrame, cancelFr
       return void 0;
     }
   };
+}
+function jsNatAsDelay(resources, value) {
+  const delay = resources.resolveResource(value, "JsNat");
+  if (typeof delay !== "bigint" || delay < 0n || delay > 0xffffffffn) {
+    throw new Error("timer delay must be a Js Nat in the UInt32 range");
+  }
+  return Number(delay);
+}
+function jsStringValue(resources, value, label) {
+  const text = resources.resolveResource(value, label);
+  if (typeof text !== "string") {
+    throw new Error(`${label} must be a Js String`);
+  }
+  return text;
+}
+function optionalJsStringValue(resources, value, label) {
+  if (value === null || value === void 0) {
+    return null;
+  }
+  return jsStringValue(resources, value, label);
 }
 function createTimeoutResource(resources, delayMs, callback) {
   return createScheduledCallbackResource(resources, callback, {
@@ -1145,7 +1205,16 @@ function createAnimationFrameResource(resources, callback, requestFrame, cancelF
     disposeMethod: "cancel",
     schedule: requestFrame,
     cancel: cancelFrame,
-    invoke: (leanCallback, timestamp) => leanCallback(Number(timestamp))
+    invoke: (leanCallback, timestamp) => {
+      const timestampResource = resources.temporaryResourceForValue(Number(timestamp));
+      try {
+        leanCallback(timestampResource);
+      } finally {
+        if (timestampResource !== null) {
+          resources.releaseResource(timestampResource);
+        }
+      }
+    }
   });
 }
 function createScheduledCallbackResource(resources, callback, { disposeMethod, schedule, cancel, invoke }) {
@@ -1259,6 +1328,98 @@ function createReactHostHooks() {
   };
 }
 
+// web/src/host/vir-js-value-bindings.js
+function createJsValueHostBindings(resources) {
+  const bindings = {
+    [VIR_HOST_RESOLVE_BINDING]: (target) => jsValueConversionBinding(resources, target)
+  };
+  for (const [target, codec] of Object.entries(jsValueCodecs)) {
+    bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
+    bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
+  }
+  return bindings;
+}
+var explicitJsValuePrefix = "js.value.";
+function jsValueConversionBinding(resources, target) {
+  if (!target.startsWith(explicitJsValuePrefix) || target === "js.value.value") {
+    return void 0;
+  }
+  if (target.endsWith(".value")) {
+    return (value) => resources.resolveResource(value, "Js");
+  }
+  return (value) => resources.resourceForValue(value);
+}
+var jsValueCodecs = {
+  "js.string": {
+    toJs: jsStringValue2,
+    fromJs: jsStringPayload
+  },
+  "js.nat": {
+    toJs: jsNatValue,
+    fromJs: jsNatPayload
+  },
+  "js.bool": {
+    toJs: jsBoolValue,
+    fromJs: jsBoolPayload
+  },
+  "js.float": {
+    toJs: jsFloatValue,
+    fromJs: jsFloatPayload
+  }
+};
+function jsStringValue2(value) {
+  if (typeof value !== "string") {
+    throw new Error("js.string expects a string");
+  }
+  return value;
+}
+function jsStringPayload(value) {
+  if (typeof value !== "string") {
+    throw new Error("js.string.value expects a JS string");
+  }
+  return value;
+}
+function jsNatValue(value) {
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
+    throw new Error("js.nat expects a natural number");
+  }
+  const text = String(value);
+  if (!/^(0|[1-9][0-9]*)$/.test(text)) {
+    throw new Error("js.nat expects a natural number");
+  }
+  return BigInt(text);
+}
+function jsNatPayload(value) {
+  if (typeof value !== "bigint" || value < 0n) {
+    throw new Error("js.nat.value expects a JS natural number");
+  }
+  return value;
+}
+function jsBoolValue(value) {
+  if (typeof value !== "boolean") {
+    throw new Error("js.bool expects a boolean");
+  }
+  return value;
+}
+function jsBoolPayload(value) {
+  if (typeof value !== "boolean") {
+    throw new Error("js.bool.value expects a JS boolean");
+  }
+  return value;
+}
+function jsFloatValue(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("js.float expects a finite number");
+  }
+  return value;
+}
+function jsFloatPayload(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("js.float.value expects a finite JS number");
+  }
+  return value;
+}
+
 // web/src/react/vir-react-hooks.js
 function createBrowserReactHookRuntime(resources, React3) {
   const setters = /* @__PURE__ */ new WeakMap();
@@ -1313,7 +1474,7 @@ function createBrowserReactHookRuntime(resources, React3) {
       const [value, setState] = React3.useState(initial);
       const setter = stateSetterFor(setters, setState);
       currentComponent?.setters?.add(setter);
-      return stateResult(resources, value, setter);
+      return stateResult(value, setter);
     },
     useReducer(reducer, initial) {
       if (typeof React3?.useReducer !== "function") {
@@ -1322,7 +1483,7 @@ function createBrowserReactHookRuntime(resources, React3) {
       }
       let hook;
       try {
-        hook = nextBrowserHook(currentComponent, "reducer", "useReducer", createBrowserReducerHook);
+        hook = nextBrowserHook(currentComponent, "reducer", "useReducer", () => createBrowserReducerHook(resources));
         stagePendingReducerCallback(currentComponent, hook, reducer);
       } catch (error) {
         releaseLeanCallback(reducer);
@@ -1333,7 +1494,7 @@ function createBrowserReactHookRuntime(resources, React3) {
         const [value, dispatch] = React3.useReducer(hook.reducerProxy, initial);
         hook.dispatchTarget = dispatch;
         rendered = true;
-        return reducerStateResult(resources, value, hook.dispatcher);
+        return reducerStateResult(value, hook.dispatcher);
       } finally {
         if (!rendered) {
           releasePendingReducerHook(hook);
@@ -1382,7 +1543,7 @@ function createBrowserReactHookRuntime(resources, React3) {
         releaseEffectCallbacks(setup, cleanup);
         throw error;
       }
-      const dependencyList = normalizeDependencyListOrRelease(deps, setup, cleanup);
+      const dependencyList = normalizeDependencyListOrRelease(resources, deps, setup, cleanup);
       const ref = React3.useRef({ initialized: false, deps: null });
       const changed = !ref.current.initialized || !dependencyListsEqual(ref.current.deps, dependencyList);
       const effect = changed ? createBrowserEffect(setup, cleanup) : () => void 0;
@@ -1407,8 +1568,12 @@ function createBrowserReactHookRuntime(resources, React3) {
 }
 function createReactStateHostBindings(resources, hookRuntime) {
   return {
-    "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
-    "react.useReducer": (reducer, initial) => hookRuntime.useReducer(reducer, initial),
+    "react.useState": (initial) => resources.resourceForValue(hookRuntime.useState(reactStatePayload(resources, initial))),
+    "react.state.value": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactState").value),
+    "react.state.setter": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactState").setter),
+    "react.useReducer": (reducer, initial) => resources.resourceForValue(hookRuntime.useReducer(reducer, reactStatePayload(resources, initial))),
+    "react.reducerState.value": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").value),
+    "react.reducerState.dispatch": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").dispatch),
     "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
     "react.useEffectWithDeps": (deps, setup, cleanup) => hookRuntime.useEffectWithDeps(deps, setup, cleanup),
@@ -1423,12 +1588,7 @@ function createReactStateHostBindings(resources, hookRuntime) {
   };
 }
 function createReactJsValueHostBindings(resources) {
-  const bindings = {};
-  for (const [target, codec] of Object.entries(jsValueCodecs)) {
-    bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
-    bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
-  }
-  return bindings;
+  return createJsValueHostBindings(resources);
 }
 function stateSetterFor(setters, setState) {
   let setter = setters.get(setState);
@@ -1454,7 +1614,7 @@ function nextBrowserHook(componentState, expectedKind, hookName, createHook = nu
   }
   return hook;
 }
-function createBrowserReducerHook() {
+function createBrowserReducerHook(resources) {
   const hook = {
     kind: "reducer",
     reducer: null,
@@ -1464,7 +1624,7 @@ function createBrowserReducerHook() {
     dispatcher: null,
     dispatchTarget: null
   };
-  hook.reducerProxy = (state, action) => callReducerHook(hook, state, action);
+  hook.reducerProxy = (state, action) => callReducerHook(resources, hook, state, action);
   hook.dispatcher = {
     dispatch(action) {
       if (typeof hook.dispatchTarget !== "function") {
@@ -1476,15 +1636,21 @@ function createBrowserReducerHook() {
   };
   return hook;
 }
-function normalizeDependencyList(deps) {
+function normalizeDependencyList(resources, deps) {
   if (!Array.isArray(deps)) {
     throw new Error("React dependency list must be an array");
   }
-  return deps.map((dep) => String(dep));
+  return deps.map((dep, index) => {
+    const value = resources.resolveResource(dep, `React dependency[${index}]`);
+    if (typeof value !== "string") {
+      throw new Error(`React dependency[${index}] must be a Js String`);
+    }
+    return value;
+  });
 }
-function normalizeDependencyListOrRelease(deps, setup, cleanup) {
+function normalizeDependencyListOrRelease(resources, deps, setup, cleanup) {
   try {
-    return normalizeDependencyList(deps);
+    return normalizeDependencyList(resources, deps);
   } catch (error) {
     releaseEffectCallbacks(setup, cleanup);
     throw error;
@@ -1574,28 +1740,32 @@ function disposeReducerHook(resources, hook) {
     resources.releaseValueResource(hook.dispatcher);
   }
 }
-function callReducerHook(hook, state, action) {
+function callReducerHook(resources, hook, state, action) {
   const reducer = hook?.nextReducer ?? hook?.reducer;
   if (typeof reducer !== "function") {
     throw new Error("React reducer callback is not available");
   }
-  return reducer(state, action);
+  return withStateUpdaterResourceScope(resources, () => {
+    const stateResource = resources.temporaryResourceForValue(state);
+    const actionResource = resources.temporaryResourceForValue(action);
+    return reactStatePayload(resources, reducer(stateResource, actionResource));
+  });
 }
 function releaseLeanCallback(callback) {
   if (typeof callback?.release === "function") {
     callback.release();
   }
 }
-function stateResult(resources, value, setter) {
-  return {
-    value: resources.resourceForValue(value),
-    setter: resources.resourceForValue(setter)
-  };
-}
-function reducerStateResult(resources, value, dispatcher) {
+function stateResult(value, setter) {
   return {
     value,
-    dispatch: resources.resourceForValue(dispatcher)
+    setter
+  };
+}
+function reducerStateResult(value, dispatcher) {
+  return {
+    value,
+    dispatch: dispatcher
   };
 }
 function setStateValue(resources, setter, value) {
@@ -1636,7 +1806,7 @@ function dispatchReducerAction(resources, dispatch, action) {
   if (typeof dispatcher?.dispatch !== "function") {
     throw new Error("ReactReducerDispatch resource has invalid value");
   }
-  dispatcher.dispatch(action);
+  dispatcher.dispatch(reactStatePayload(resources, action));
   return void 0;
 }
 function withStateUpdaterResourceScope(resources, run) {
@@ -1647,60 +1817,6 @@ function withStateUpdaterResourceScope(resources, run) {
 }
 function reactStatePayload(resources, value) {
   return isHostResource(value) ? resources.resolveResource(value, "Js") : value;
-}
-var jsValueCodecs = {
-  "js.string": {
-    toJs: jsStringValue,
-    fromJs: jsStringPayload
-  },
-  "js.nat": {
-    toJs: jsNatValue,
-    fromJs: jsNatPayload
-  },
-  "js.bool": {
-    toJs: jsBoolValue,
-    fromJs: jsBoolPayload
-  }
-};
-function jsStringValue(value) {
-  if (typeof value !== "string") {
-    throw new Error("js.string expects a string");
-  }
-  return value;
-}
-function jsStringPayload(value) {
-  if (typeof value !== "string") {
-    throw new Error("js.string.value expects a JS string");
-  }
-  return value;
-}
-function jsNatValue(value) {
-  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
-    throw new Error("js.nat expects a natural number");
-  }
-  const text = String(value);
-  if (!/^(0|[1-9][0-9]*)$/.test(text)) {
-    throw new Error("js.nat expects a natural number");
-  }
-  return BigInt(text);
-}
-function jsNatPayload(value) {
-  if (typeof value !== "bigint" || value < 0n) {
-    throw new Error("js.nat.value expects a JS natural number");
-  }
-  return value;
-}
-function jsBoolValue(value) {
-  if (typeof value !== "boolean") {
-    throw new Error("js.bool expects a boolean");
-  }
-  return value;
-}
-function jsBoolPayload(value) {
-  if (typeof value !== "boolean") {
-    throw new Error("js.bool.value expects a JS boolean");
-  }
-  return value;
 }
 
 // web/src/host/vir-virtual-host-bindings.js
@@ -1727,6 +1843,23 @@ function normalizeProofWidgetsRpcRef(ref) {
   }
   return normalized;
 }
+function normalizeProofWidgetsResolvedRef(ref) {
+  const value = ref !== null && typeof ref === "object" ? ref : {};
+  return {
+    id: stringField(value.id),
+    label: stringField(value.label),
+    typeName: stringField(value.typeName),
+    summary: stringField(value.summary),
+    expression: stringField(value.expression),
+    typeText: stringField(value.typeText),
+    context: stringField(value.context),
+    source: stringField(value.source),
+    position: stringField(value.position),
+    packageRevision: stringField(value.packageRevision),
+    storeKey: stringField(value.storeKey),
+    knownConstant: value.knownConstant === true
+  };
+}
 function stringField(value) {
   return typeof value === "string" ? value : "";
 }
@@ -1745,28 +1878,29 @@ function isRpcRefObject(value) {
 }
 
 // web/src/vir-host-bindings.js
-function createCommonHostBindings() {
+function createCommonHostBindings(state = createHostResourceState()) {
   return {
-    "common.echoString": (value) => value,
-    "common.addNat": (lhs, rhs) => (BigInt(lhs) + BigInt(rhs)).toString()
+    ...createJsValueHostBindings(state),
+    "common.echoString": (value) => state.resourceForValue(state.resolveResource(value, "JsString")),
+    "common.addNat": (lhs, rhs) => state.resourceForValue(state.resolveResource(lhs, "JsNat") + state.resolveResource(rhs, "JsNat"))
   };
 }
-function createConsoleHostBindings() {
+function createConsoleHostBindings(state = createHostResourceState()) {
   return {
     "browser.console.log": (message) => {
-      console.log(message);
+      console.log(state.resolveResource(message, "JsString"));
       return void 0;
     }
   };
 }
 function createBrowserDocumentHostBindings(state = createHostResourceState()) {
   return {
-    "browser.document.getTitle": () => browserDocument().title,
+    "browser.document.getTitle": () => state.resourceForValue(browserDocument().title),
     "browser.document.setTitle": (title) => {
-      browserDocument().title = title;
+      browserDocument().title = state.resolveResource(title, "JsString");
       return void 0;
     },
-    "browser.document.querySelector": (selector) => state.resourceForValue(queryDocumentElement(selector))
+    "browser.document.querySelector": (selector) => state.resourceForValue(queryDocumentElement(state.resolveResource(selector, "JsString")))
   };
 }
 function createBrowserEventHostBindings(state = createHostResourceState()) {
@@ -1781,7 +1915,7 @@ function createBrowserEventHostBindings(state = createHostResourceState()) {
       stopPropagationOnEvent(state.resolveResource(event, "Event"));
       return void 0;
     },
-    "browser.event.formValue": (event) => formControlEventValue(state.resolveResource(event, "Event"))
+    "browser.event.formValue": (event) => state.resourceForValue(formControlEventValue(state.resolveResource(event, "Event")))
   };
 }
 function createBrowserElementHostBindings(state = createHostResourceState()) {
@@ -1808,12 +1942,46 @@ function createBrowserAnimationHostBindings(state = createHostResourceState()) {
   const cancelFrame = typeof globalThis.cancelAnimationFrame === "function" ? globalThis.cancelAnimationFrame.bind(globalThis) : globalThis.clearTimeout.bind(globalThis);
   return createAnimationResourceHostBindings(state, { requestFrame, cancelFrame });
 }
-function createInfoviewHostBindings({ commandDispatcher = null } = {}) {
+function createInfoviewHostBindings({ resources = createHostResourceState(), commandDispatcher = null } = {}) {
   return {
-    "infoview.clipboard.writeText": (text) => writeTextToHostClipboard(text),
-    "infoview.command.revealPosition": (position) => revealInfoviewPosition(commandDispatcher, position),
-    "proofwidgets.rpc.inspectRef": (ref) => inspectProofWidgetsRpcRef(commandDispatcher, ref),
-    "proofwidgets.rpc.resolveRef": (ref, callback) => resolveProofWidgetsRpcRef(commandDispatcher, ref, callback)
+    "infoview.documentPosition": (uri, fileName, line, character, label) => resources.resourceForValue({
+      uri: resources.resolveResource(uri, "JsString"),
+      fileName: resources.resolveResource(fileName, "JsString"),
+      line: resources.resolveResource(line, "JsNat"),
+      character: resources.resolveResource(character, "JsNat"),
+      label: resources.resolveResource(label, "JsString")
+    }),
+    "infoview.clipboard.writeText": (text) => resources.resourceForValue(writeTextToHostClipboard(resources.resolveResource(text, "JsString"))),
+    "infoview.command.revealPosition": (position) => resources.resourceForValue(revealInfoviewPosition(
+      commandDispatcher,
+      resources.resolveResource(position, "DocumentPosition")
+    )),
+    "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) => resources.resourceForValue({
+      id: resources.resolveResource(id, "JsString"),
+      label: resources.resolveResource(label, "JsString"),
+      typeName: resources.resolveResource(typeName, "JsString"),
+      summary: resources.resolveResource(summary, "JsString"),
+      expression: resources.resolveResource(expression, "JsString"),
+      typeText: "",
+      context: ""
+    }),
+    "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) => resources.resourceForValue({
+      ...resources.resolveResource(ref, "RpcRef"),
+      typeText: resources.resolveResource(typeText, "JsString"),
+      context: resources.resolveResource(context, "JsString"),
+      ...serverRef === null || serverRef === void 0 ? {} : { serverRef }
+    }),
+    "js.value.proofwidgets.resolvedRef.value": (ref) => normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
+    "proofwidgets.rpc.inspectRef": (ref) => resources.resourceForValue(inspectProofWidgetsRpcRef(
+      commandDispatcher,
+      resources.resolveResource(ref, "RpcRef")
+    )),
+    "proofwidgets.rpc.resolveRef": (ref, callback) => resources.resourceForValue(resolveProofWidgetsRpcRef(
+      resources,
+      commandDispatcher,
+      resources.resolveResource(ref, "RpcRef"),
+      callback
+    ))
   };
 }
 function createBrowserHostBindings({
@@ -1825,15 +1993,15 @@ function createBrowserHostBindings({
   const reactBindingsSource = typeof reactHostBindings === "function" ? reactHostBindings(state, { querySelector: queryDocumentElement }) : reactHostBindings;
   const reactBindings = normalizeOptionalHostBindingMap(reactBindingsSource, "reactHostBindings");
   return {
-    ...createCommonHostBindings(),
-    ...createConsoleHostBindings(),
+    ...createCommonHostBindings(state),
+    ...createConsoleHostBindings(state),
     ...createBrowserDocumentHostBindings(state),
     ...createBrowserEventHostBindings(state),
     ...createBrowserElementHostBindings(state),
     ...createBrowserHtmlInputElementHostBindings(state),
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
-    ...createInfoviewHostBindings({ commandDispatcher: infoviewCommandDispatcher }),
+    ...createInfoviewHostBindings({ resources: state, commandDispatcher: infoviewCommandDispatcher }),
     ...reactBindings,
     [VIR_HOST_DISPOSE]: () => state.dispose()
   };
@@ -1889,7 +2057,7 @@ function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
   }
   return dispatchInfoviewCommand(commandDispatcher, "proofwidgetsRpcInspectRef", normalized);
 }
-function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
+function resolveProofWidgetsRpcRef(resources, commandDispatcher, ref, callback) {
   const normalized = normalizeProofWidgetsRpcRef(ref);
   if (normalized === null || typeof callback !== "function") {
     releaseCallback(callback);
@@ -1914,13 +2082,13 @@ function resolveProofWidgetsRpcRef(commandDispatcher, ref, callback) {
   }
   if (result !== null && typeof result === "object" && typeof result.then === "function") {
     result.then((info) => {
-      callAndReleaseCallback(callback, info);
+      callAndReleaseCallback(callback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(info)));
     }).catch((error) => {
       reportEventHandlerError(error);
       releaseCallback(callback);
     });
   } else {
-    callAndReleaseCallback(callback, result);
+    callAndReleaseCallback(callback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(result)));
   }
   return true;
 }
@@ -2157,7 +2325,12 @@ var JSON_INPUT_WIRE_TAGS = /* @__PURE__ */ new Set([
 
 // web/src/runtime/interface-manifest.js
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 1, metadata: {...}, exports: [...] }";
+var INTERFACE_MANIFEST_VERSION = 2;
+var HOST_IMPORT_BOUNDARY = Object.freeze({
+  WIRE: "wire",
+  CONVERSION: "conversion"
+});
+var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 2, metadata: {...}, exports: [...] }";
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -2177,7 +2350,7 @@ function requireNonNegativeInteger(value, label) {
   }
 }
 function validateInterfaceManifest(manifest) {
-  if (!isRecord(manifest) || manifest.version !== 1 || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
+  if (!isRecord(manifest) || manifest.version !== INTERFACE_MANIFEST_VERSION || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
     throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
   }
   if (manifest.artifact !== void 0 && manifest.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
@@ -2231,7 +2404,13 @@ function validateManifestHostImports(hostImports) {
       throw new Error(`${label} must be an object`);
     }
     requireInterfaceEffect(entry.effect, `${label}.effect`);
+    requireHostImportBoundary(entry.boundary, `${label}.boundary`);
   });
+}
+function requireHostImportBoundary(value, label) {
+  if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
+    throw new Error(`${label} must be wire or conversion`);
+  }
 }
 function requireUnique(seen, value, label, owner = "interface export") {
   if (seen.has(value)) {
@@ -3193,6 +3372,35 @@ function objectResultSupported(type, selfType = null) {
       return false;
   }
 }
+function hostWireArgumentSupported(type) {
+  return hostWireTypeSupported(type, { allowFunction: true });
+}
+function hostWireResultSupported(type) {
+  return hostWireTypeSupported(type, { allowFunction: false });
+}
+function hostWireTypeSupported(type, { allowFunction }) {
+  const tag = type?.wireTag;
+  switch (tag) {
+    case WIRE.UNIT:
+    case WIRE.RESOURCE:
+      return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      return hostWireTypeSupported(requireTypeField(type, "element", "host wire type"), { allowFunction });
+    case WIRE.PROD:
+      return hostWireTypeSupported(requireTypeField(type, "fst", "host wire type"), { allowFunction }) && hostWireTypeSupported(requireTypeField(type, "snd", "host wire type"), { allowFunction });
+    case WIRE.FUNCTION: {
+      if (!allowFunction) {
+        return false;
+      }
+      const args = requireFunctionArgs(type, "host wire callback");
+      return args.every((arg) => hostWireArgumentSupported(arg.type)) && hostWireResultSupported(requireFunctionResult(type, "host wire callback"));
+    }
+    default:
+      return false;
+  }
+}
 function objectTypeNeedsBoxedBoundary(type) {
   switch (type?.wireTag) {
     case WIRE.FLOAT:
@@ -3547,6 +3755,15 @@ var ObjectValueRuntime = class {
   hasObjectValueExports() {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
   }
+  makeHostWireObjectValue(type, value, label) {
+    if (!hostWireResultSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host wire result type`);
+    }
+    return this.makeObjectValue(type, value, label);
+  }
+  makeExplicitConversionObjectValue(type, value, label) {
+    return this.makeObjectValue(type, value, label);
+  }
   makeObjectValue(type, value, label, selfType = null) {
     const tag = type?.wireTag;
     switch (tag) {
@@ -3561,7 +3778,7 @@ var ObjectValueRuntime = class {
       case WIRE.RESOURCE:
         return this.makeObjectResource(value, label);
       case WIRE.FUNCTION:
-        throw new Error(`${label} cannot be a JavaScript function in v1`);
+        throw new Error(`${label} cannot be a JavaScript function at this boundary`);
       case WIRE.BOOL:
         if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
         return this.makeObjectScalar(value ? 1 : 0, label);
@@ -4472,6 +4689,15 @@ var ObjectValueRuntime = class {
         throw new Error(`${label} has unsupported object ABI result type`);
     }
   }
+  liftHostWireObjectValue(type, obj, label) {
+    if (!hostWireArgumentSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host wire argument type`);
+    }
+    return this.liftObjectValue(type, obj, label);
+  }
+  liftExplicitConversionObjectValue(type, obj, label) {
+    return this.liftObjectValue(type, obj, label);
+  }
   readBoundedObjectScalar(obj, label, max) {
     const value = this.readObjectScalar(obj, label);
     if (value > max) {
@@ -5090,7 +5316,9 @@ var VirHostState = class {
     this.callError = null;
   }
   recordCallError(error) {
-    this.callError = error instanceof Error ? error : new Error(String(error));
+    if (this.callError === null) {
+      this.callError = error instanceof Error ? error : new Error(String(error));
+    }
   }
   takeCallError() {
     const error = this.callError;
@@ -5126,13 +5354,14 @@ var VirHostState = class {
     }
     const args = [];
     const liftedCallbacks = [];
+    const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.CONVERSION;
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
       if (argObjects.length !== entry.args.length) {
         throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
       }
       entry.args.forEach((arg, index) => {
-        const value2 = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        const value2 = explicitConversionTarget ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostWireObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
         if (isVirCallback(value2)) {
           liftedCallbacks.push(value2);
         }
@@ -5151,9 +5380,9 @@ var VirHostState = class {
     }
     if (isPromiseLike(value)) {
       releaseCallbacks(liftedCallbacks);
-      throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
+      throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
     }
-    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
+    return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
   }
   readObjectArgv(argvPtr, argc) {
     if (argvPtr === 0 && argc !== 0) {
@@ -5177,13 +5406,27 @@ function disposeHostBindings(bindings) {
   }
 }
 function lookupHostBinding(target, userBindings, defaultBindings) {
-  if (userBindings instanceof Map && userBindings.has(target)) {
-    return userBindings.get(target);
+  const userBinding = lookupHostBindingIn(target, userBindings);
+  if (typeof userBinding === "function") {
+    return userBinding;
   }
-  if (userBindings !== null && typeof userBindings === "object" && Object.hasOwn(userBindings, target)) {
-    return userBindings[target];
+  return lookupHostBindingIn(target, defaultBindings);
+}
+function lookupHostBindingIn(target, bindings) {
+  if (bindings === null || bindings === void 0) {
+    return void 0;
   }
-  return defaultBindings[target];
+  if (bindings instanceof Map && bindings.has(target)) {
+    return bindings.get(target);
+  }
+  if (typeof bindings === "object" && Object.hasOwn(bindings, target)) {
+    return bindings[target];
+  }
+  const resolver = bindings[VIR_HOST_RESOLVE_BINDING];
+  if (typeof resolver === "function") {
+    return resolver.call(bindings, target);
+  }
+  return void 0;
 }
 function isPromiseLike(value) {
   return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";

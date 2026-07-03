@@ -17,6 +17,9 @@ import {
   createBrowserHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import {
+  VIR_HOST_RESOLVE_BINDING,
+} from "../../web/src/host-resource.js";
+import {
   createReactJsValueHostBindings,
   createReactStateHostBindings,
 } from "../../web/src/react/vir-react-hooks.js";
@@ -221,8 +224,11 @@ assert.equal(reactRuntime.liveCallbacks.size, 0);
 const malformedReactDocumentState = createVirtualDocumentState();
 ensureVirtualElementState(malformedReactDocumentState, "#react-malformed");
 const malformedReactHost = createVirtualDocumentHostBindings(malformedReactDocumentState);
-const malformedReactContainer = malformedReactHost["browser.document.querySelector"]("#react-malformed");
+const malformedReactContainer = malformedReactHost["browser.document.querySelector"](
+  malformedReactDocumentState.resources.resourceForValue("#react-malformed"),
+);
 const malformedReactRoot = malformedReactHost["react.root.create"](malformedReactContainer);
+const malformedReactJsString = (value) => malformedReactDocumentState.resources.resourceForValue(value);
 const renderMalformedReactNode = (node) => {
   let released = false;
   const render = Object.assign(() => node, {
@@ -256,14 +262,22 @@ const renderMalformedReactNode = (node) => {
   assert.equal(called, false);
   assert.equal(released, true);
 }
-const reactNodeText = (value) => malformedReactHost["react.node.text"](value);
+const reactNodeText = (value) => malformedReactHost["react.node.text"](malformedReactJsString(value));
+const reactNodeProperty = (value) => malformedReactHost[VIR_HOST_RESOLVE_BINDING]("js.value.react.property")(value);
+const reactNodeEventHandler = (value) => malformedReactHost[VIR_HOST_RESOLVE_BINDING]("js.value.react.eventHandler")(value);
 const reactNodeElement = ({
   tag = "div",
   key = null,
   props = [],
   handlers = [],
   children = [],
-} = {}) => malformedReactHost["react.node.createElement"](tag, key, props, handlers, children);
+} = {}) => malformedReactHost["react.node.createElement"](
+  typeof tag === "string" ? malformedReactJsString(tag) : tag,
+  typeof key === "string" ? malformedReactJsString(key) : key,
+  props.map(reactNodeProperty),
+  handlers.map(reactNodeEventHandler),
+  children,
+);
 const renderReactNodeElement = (fields) => renderMalformedReactNode(reactNodeElement(fields));
 renderReactNodeElement({
   props: [
@@ -279,10 +293,10 @@ assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactR
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.style.marginTop, "1px");
 assert.throws(
   () => reactNodeText(1),
-  /React Node text value must be a string/,
+  /React Node text value must be a Js String/,
 );
 assert.throws(
-  () => malformedReactHost["react.node.createElement"]("div", null, [], [], "children"),
+  () => malformedReactHost["react.node.createElement"](malformedReactJsString("div"), null, [], [], "children"),
   /React Node children must be an array/,
 );
 assert.throws(
@@ -294,8 +308,8 @@ assert.throws(
   /React Node element tag must be a non-empty string/,
 );
 assert.throws(
-  () => renderReactNodeElement({ key: 7 }),
-  /React Node element key must be a string or null/,
+  () => renderReactNodeElement({ key: malformedReactDocumentState.resources.resourceForValue(7) }),
+  /React Node element key must be a Js String/,
 );
 assert.throws(
   () => renderReactNodeElement({

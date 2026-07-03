@@ -36,6 +36,7 @@ def HostImport.toJson (entry : HostImport) : String :=
     ("name", jsonName entry.name),
     ("source", jsonString entry.source),
     ("target", jsonString entry.target),
+    ("boundary", jsonString entry.boundary.label),
     ("symbol", jsonString entry.symbol),
     ("arity", jsonNat entry.arity),
     ("erasedPrefixArgs", jsonNat entry.erasedPrefixArgs),
@@ -75,7 +76,7 @@ def PackageMetadata.toJson (metadata : PackageMetadata) : String :=
 
 def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
   jsonObject #[
-    ("version", jsonNat 1),
+    ("version", jsonNat currentInterfaceManifestVersion),
     ("artifact", jsonString "lean-vir-ir-package"),
     ("metadata", manifest.metadata.toJson),
     ("exports", jsonArray (manifest.exports.map InterfaceExport.toJson)),

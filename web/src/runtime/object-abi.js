@@ -7,6 +7,8 @@ Author: Emilio J. Gallego Arias
 import {
   normalizeUint32,
   requireCustomInductiveConstructors,
+  requireFunctionArgs,
+  requireFunctionResult,
   requireStructureFields,
   requireTaggedUnionConstructors,
   requireTypeField,
@@ -165,6 +167,40 @@ export function objectResultSupported(type, selfType = null) {
       return objectTaggedUnionSupported(type, objectResultSupported);
     case WIRE.CUSTOM_INDUCTIVE:
       return objectCustomInductiveSupported(type, objectResultSupported);
+    default:
+      return false;
+  }
+}
+
+export function hostWireArgumentSupported(type) {
+  return hostWireTypeSupported(type, { allowFunction: true });
+}
+
+export function hostWireResultSupported(type) {
+  return hostWireTypeSupported(type, { allowFunction: false });
+}
+
+function hostWireTypeSupported(type, { allowFunction }) {
+  const tag = type?.wireTag;
+  switch (tag) {
+    case WIRE.UNIT:
+    case WIRE.RESOURCE:
+      return true;
+    case WIRE.ARRAY:
+    case WIRE.LIST:
+    case WIRE.OPTION:
+      return hostWireTypeSupported(requireTypeField(type, "element", "host wire type"), { allowFunction });
+    case WIRE.PROD:
+      return hostWireTypeSupported(requireTypeField(type, "fst", "host wire type"), { allowFunction }) &&
+        hostWireTypeSupported(requireTypeField(type, "snd", "host wire type"), { allowFunction });
+    case WIRE.FUNCTION: {
+      if (!allowFunction) {
+        return false;
+      }
+      const args = requireFunctionArgs(type, "host wire callback");
+      return args.every((arg) => hostWireArgumentSupported(arg.type)) &&
+        hostWireResultSupported(requireFunctionResult(type, "host wire callback"));
+    }
     default:
       return false;
   }

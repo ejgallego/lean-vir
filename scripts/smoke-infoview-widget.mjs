@@ -8,7 +8,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
 import { WIRE } from "../web/src/runtime/wire-tags.js";
-import { createVirRuntime } from "../web/src/vir-runtime-node.js";
+import { createVirRuntime, VIR_HOST_RESOLVE_BINDING } from "../web/src/vir-runtime-node.js";
 
 const buildDir = new URL("../build/infoview-smoke/", import.meta.url);
 await mkdir(buildDir, { recursive: true });
@@ -499,6 +499,8 @@ const irPackageServiceConfig = {
   setupHint: "",
 };
 const irPackageFirstService = await loadRuntimeService({ rpcSession, config: irPackageServiceConfig });
+const jsBoolValue = (service, value) => service.resources.resolveResource(value, "JsBool");
+const rpcRefResource = (service, ref) => service.resources.resourceForValue(ref);
 assert.equal(typeof irPackageFirstService.resources.resourceForValue, "function");
 assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.root.create"], "function");
 assert.equal(typeof irPackageFirstService.runtime.hostState.defaultBindings["react.node.text"], "function");
@@ -524,7 +526,8 @@ assert.deepEqual(surfaceFromInfoviewProps(infoviewPropsFixture, serverOwnedExpr)
 });
 const resolvedBeforeHostInspect = resolvedRpcRefRequests.length;
 assert.equal(
-  irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.inspectRef"]({
+  jsBoolValue(irPackageFirstService, irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.inspectRef"](
+    rpcRefResource(irPackageFirstService, {
     id: "ReactProofWidget.mount",
     label: "mount",
     typeName: "Const",
@@ -532,7 +535,7 @@ assert.equal(
     expression: "ReactProofWidget.mount",
     typeText: "String -> Surface -> DomM Bool",
     context: "",
-  }),
+  }))),
   true,
 );
 await new Promise((resolve) => setTimeout(resolve, 0));
@@ -553,7 +556,10 @@ assert.deepEqual(resolvedRpcRefRequests.at(-1), {
 let resolvedCallbackInfo = null;
 let resolvedCallbackReleased = false;
 const resolvedCallback = Object.assign((info) => {
-  resolvedCallbackInfo = info;
+  resolvedCallbackInfo =
+    irPackageFirstService.runtime.hostState.defaultBindings[VIR_HOST_RESOLVE_BINDING](
+      "js.value.proofwidgets.resolvedRef.value",
+    )(info);
 }, {
   release() {
     resolvedCallbackReleased = true;
@@ -561,7 +567,8 @@ const resolvedCallback = Object.assign((info) => {
 });
 const resolvedBeforeHostResolve = resolvedRpcRefRequests.length;
 assert.equal(
-  irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.resolveRef"]({
+  jsBoolValue(irPackageFirstService, irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.resolveRef"](
+    rpcRefResource(irPackageFirstService, {
     id: "ReactProofWidget.mount",
     label: "mount",
     typeName: "Const",
@@ -569,7 +576,7 @@ assert.equal(
     expression: "ReactProofWidget.mount",
     typeText: "String -> Surface -> DomM Bool",
     context: "",
-  }, resolvedCallback),
+  }), resolvedCallback)),
   true,
 );
 await new Promise((resolve) => setTimeout(resolve, 0));
@@ -605,7 +612,10 @@ assert.equal(resolvedCallbackReleased, true);
 let serverOwnedCallbackInfo = null;
 let serverOwnedCallbackReleased = false;
 const serverOwnedCallback = Object.assign((info) => {
-  serverOwnedCallbackInfo = info;
+  serverOwnedCallbackInfo =
+    irPackageFirstService.runtime.hostState.defaultBindings[VIR_HOST_RESOLVE_BINDING](
+      "js.value.proofwidgets.resolvedRef.value",
+    )(info);
 }, {
   release() {
     serverOwnedCallbackReleased = true;
@@ -613,10 +623,10 @@ const serverOwnedCallback = Object.assign((info) => {
 });
 const serverOwnedBeforeHostResolve = resolvedExprWithCtxRefRequests.length;
 assert.equal(
-  irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.resolveRef"](
-    serverOwnedExpr.ref,
+  jsBoolValue(irPackageFirstService, irPackageFirstService.runtime.hostState.defaultBindings["proofwidgets.rpc.resolveRef"](
+    rpcRefResource(irPackageFirstService, serverOwnedExpr.ref),
     serverOwnedCallback,
-  ),
+  )),
   true,
 );
 await new Promise((resolve) => setTimeout(resolve, 0));

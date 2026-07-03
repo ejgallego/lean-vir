@@ -361,4 +361,31 @@ export const invalidManifestCases = [
     },
     pattern: /fields\[1\]\.name duplicates another flattened structure field/,
   },
+  {
+    name: "host import missing boundary",
+    mutate: (manifest) => {
+      manifest.hostImports = [
+        {
+          name: "jsHost",
+          target: "test.host",
+          effect: "runtime",
+        },
+      ];
+    },
+    pattern: /hostImports\[0\]\.boundary must be wire or conversion/,
+  },
+  {
+    name: "host import unsupported boundary",
+    mutate: (manifest) => {
+      manifest.hostImports = [
+        {
+          name: "jsHost",
+          target: "test.host",
+          boundary: "implicit",
+          effect: "runtime",
+        },
+      ];
+    },
+    pattern: /hostImports\[0\]\.boundary must be wire or conversion/,
+  },
 ];

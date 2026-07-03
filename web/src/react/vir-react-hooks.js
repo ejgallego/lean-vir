@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { isHostResource } from "../host-resource.js";
+import { createJsValueHostBindings } from "../host/vir-js-value-bindings.js";
 
 export function createBrowserReactHookRuntime(resources, React) {
   const setters = new WeakMap();
@@ -59,7 +60,7 @@ export function createBrowserReactHookRuntime(resources, React) {
       const [value, setState] = React.useState(initial);
       const setter = stateSetterFor(setters, setState);
       currentComponent?.setters?.add(setter);
-      return stateResult(resources, value, setter);
+      return stateResult(value, setter);
     },
     useReducer(reducer, initial) {
       if (typeof React?.useReducer !== "function") {
@@ -68,7 +69,7 @@ export function createBrowserReactHookRuntime(resources, React) {
       }
       let hook;
       try {
-        hook = nextBrowserHook(currentComponent, "reducer", "useReducer", createBrowserReducerHook);
+        hook = nextBrowserHook(currentComponent, "reducer", "useReducer", () => createBrowserReducerHook(resources));
         stagePendingReducerCallback(currentComponent, hook, reducer);
       } catch (error) {
         releaseLeanCallback(reducer);
@@ -79,7 +80,7 @@ export function createBrowserReactHookRuntime(resources, React) {
         const [value, dispatch] = React.useReducer(hook.reducerProxy, initial);
         hook.dispatchTarget = dispatch;
         rendered = true;
-        return reducerStateResult(resources, value, hook.dispatcher);
+        return reducerStateResult(value, hook.dispatcher);
       } finally {
         if (!rendered) {
           releasePendingReducerHook(hook);
@@ -128,7 +129,7 @@ export function createBrowserReactHookRuntime(resources, React) {
         releaseEffectCallbacks(setup, cleanup);
         throw error;
       }
-      const dependencyList = normalizeDependencyListOrRelease(deps, setup, cleanup);
+      const dependencyList = normalizeDependencyListOrRelease(resources, deps, setup, cleanup);
       const ref = React.useRef({ initialized: false, deps: null });
       const changed = !ref.current.initialized || !dependencyListsEqual(ref.current.deps, dependencyList);
       const effect = changed ? createBrowserEffect(setup, cleanup) : () => undefined;
@@ -232,7 +233,7 @@ export function createVirtualReactHookRuntime(resources) {
       } else if (hook.kind !== "state") {
         throw new Error("React hook order changed: expected useState");
       }
-      return stateResult(resources, hook.value, hook.setter);
+      return stateResult(hook.value, hook.setter);
     },
     useReducer(reducer, initial) {
       if (currentComponent === null) {
@@ -242,14 +243,14 @@ export function createVirtualReactHookRuntime(resources) {
       const index = currentComponent.hookIndex++;
       let hook = currentComponent.hooks[index];
       if (hook === undefined) {
-        hook = createVirtualReducerHook(initial, currentComponent.scheduleRender);
+        hook = createVirtualReducerHook(resources, initial, currentComponent.scheduleRender);
         currentComponent.hooks[index] = hook;
       } else if (hook.kind !== "reducer") {
         releaseLeanCallback(reducer);
         throw new Error("React hook order changed: expected useReducer");
       }
       stagePendingReducerCallback(currentComponent, hook, reducer);
-      return reducerStateResult(resources, hook.value, hook.dispatcher);
+      return reducerStateResult(hook.value, hook.dispatcher);
     },
     useRef(initial) {
       if (currentComponent === null) {
@@ -290,7 +291,7 @@ export function createVirtualReactHookRuntime(resources) {
         releaseEffectCallbacks(setup, cleanup);
         throw new Error("React.useEffectWithDeps can only be called while rendering a component");
       }
-      const dependencyList = normalizeDependencyListOrRelease(deps, setup, cleanup);
+      const dependencyList = normalizeDependencyListOrRelease(resources, deps, setup, cleanup);
       const index = currentComponent.hookIndex++;
       let hook = currentComponent.hooks[index];
       if (hook === undefined) {
@@ -316,8 +317,17 @@ export function createVirtualReactHookRuntime(resources) {
 
 export function createReactStateHostBindings(resources, hookRuntime) {
   return {
-    "react.useState": (initial) => hookRuntime.useState(reactStatePayload(resources, initial)),
-    "react.useReducer": (reducer, initial) => hookRuntime.useReducer(reducer, initial),
+    "react.useState": (initial) => resources.resourceForValue(hookRuntime.useState(reactStatePayload(resources, initial))),
+    "react.state.value": (state) =>
+      resources.resourceForValue(resources.resolveResource(state, "ReactState").value),
+    "react.state.setter": (state) =>
+      resources.resourceForValue(resources.resolveResource(state, "ReactState").setter),
+    "react.useReducer": (reducer, initial) =>
+      resources.resourceForValue(hookRuntime.useReducer(reducer, reactStatePayload(resources, initial))),
+    "react.reducerState.value": (state) =>
+      resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").value),
+    "react.reducerState.dispatch": (state) =>
+      resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").dispatch),
     "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
     "react.useEffectWithDeps": (deps, setup, cleanup) => hookRuntime.useEffectWithDeps(deps, setup, cleanup),
@@ -333,12 +343,7 @@ export function createReactStateHostBindings(resources, hookRuntime) {
 }
 
 export function createReactJsValueHostBindings(resources) {
-  const bindings = {};
-  for (const [target, codec] of Object.entries(jsValueCodecs)) {
-    bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
-    bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
-  }
-  return bindings;
+  return createJsValueHostBindings(resources);
 }
 
 function stateSetterFor(setters, setState) {
@@ -367,7 +372,7 @@ function nextBrowserHook(componentState, expectedKind, hookName, createHook = nu
   return hook;
 }
 
-function createBrowserReducerHook() {
+function createBrowserReducerHook(resources) {
   const hook = {
     kind: "reducer",
     reducer: null,
@@ -377,7 +382,7 @@ function createBrowserReducerHook() {
     dispatcher: null,
     dispatchTarget: null,
   };
-  hook.reducerProxy = (state, action) => callReducerHook(hook, state, action);
+  hook.reducerProxy = (state, action) => callReducerHook(resources, hook, state, action);
   hook.dispatcher = {
     dispatch(action) {
       if (typeof hook.dispatchTarget !== "function") {
@@ -390,16 +395,22 @@ function createBrowserReducerHook() {
   return hook;
 }
 
-function normalizeDependencyList(deps) {
+function normalizeDependencyList(resources, deps) {
   if (!Array.isArray(deps)) {
     throw new Error("React dependency list must be an array");
   }
-  return deps.map((dep) => String(dep));
+  return deps.map((dep, index) => {
+    const value = resources.resolveResource(dep, `React dependency[${index}]`);
+    if (typeof value !== "string") {
+      throw new Error(`React dependency[${index}] must be a Js String`);
+    }
+    return value;
+  });
 }
 
-function normalizeDependencyListOrRelease(deps, setup, cleanup) {
+function normalizeDependencyListOrRelease(resources, deps, setup, cleanup) {
   try {
-    return normalizeDependencyList(deps);
+    return normalizeDependencyList(resources, deps);
   } catch (error) {
     releaseEffectCallbacks(setup, cleanup);
     throw error;
@@ -433,7 +444,7 @@ function createVirtualStateHook(initial, scheduleRender) {
   return hook;
 }
 
-function createVirtualReducerHook(initial, scheduleRender) {
+function createVirtualReducerHook(resources, initial, scheduleRender) {
   const hook = {
     kind: "reducer",
     value: initial,
@@ -444,7 +455,7 @@ function createVirtualReducerHook(initial, scheduleRender) {
   };
   hook.dispatcher = {
     dispatch(action) {
-      hook.value = callReducerHook(hook, hook.value, action);
+      hook.value = callReducerHook(resources, hook, hook.value, action);
       scheduleRender?.();
       return undefined;
     },
@@ -624,12 +635,16 @@ function disposeReducerHook(resources, hook) {
   }
 }
 
-function callReducerHook(hook, state, action) {
+function callReducerHook(resources, hook, state, action) {
   const reducer = hook?.nextReducer ?? hook?.reducer;
   if (typeof reducer !== "function") {
     throw new Error("React reducer callback is not available");
   }
-  return reducer(state, action);
+  return withStateUpdaterResourceScope(resources, () => {
+    const stateResource = resources.temporaryResourceForValue(state);
+    const actionResource = resources.temporaryResourceForValue(action);
+    return reactStatePayload(resources, reducer(stateResource, actionResource));
+  });
 }
 
 function releaseLeanCallback(callback) {
@@ -638,17 +653,17 @@ function releaseLeanCallback(callback) {
   }
 }
 
-function stateResult(resources, value, setter) {
+function stateResult(value, setter) {
   return {
-    value: resources.resourceForValue(value),
-    setter: resources.resourceForValue(setter),
+    value,
+    setter,
   };
 }
 
-function reducerStateResult(resources, value, dispatcher) {
+function reducerStateResult(value, dispatcher) {
   return {
     value,
-    dispatch: resources.resourceForValue(dispatcher),
+    dispatch: dispatcher,
   };
 }
 
@@ -692,7 +707,7 @@ function dispatchReducerAction(resources, dispatch, action) {
   if (typeof dispatcher?.dispatch !== "function") {
     throw new Error("ReactReducerDispatch resource has invalid value");
   }
-  dispatcher.dispatch(action);
+  dispatcher.dispatch(reactStatePayload(resources, action));
   return undefined;
 }
 
@@ -706,65 +721,4 @@ function withStateUpdaterResourceScope(resources, run) {
 
 function reactStatePayload(resources, value) {
   return isHostResource(value) ? resources.resolveResource(value, "Js") : value;
-}
-
-const jsValueCodecs = {
-  "js.string": {
-    toJs: jsStringValue,
-    fromJs: jsStringPayload,
-  },
-  "js.nat": {
-    toJs: jsNatValue,
-    fromJs: jsNatPayload,
-  },
-  "js.bool": {
-    toJs: jsBoolValue,
-    fromJs: jsBoolPayload,
-  },
-};
-
-function jsStringValue(value) {
-  if (typeof value !== "string") {
-    throw new Error("js.string expects a string");
-  }
-  return value;
-}
-
-function jsStringPayload(value) {
-  if (typeof value !== "string") {
-    throw new Error("js.string.value expects a JS string");
-  }
-  return value;
-}
-
-function jsNatValue(value) {
-  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
-    throw new Error("js.nat expects a natural number");
-  }
-  const text = String(value);
-  if (!/^(0|[1-9][0-9]*)$/.test(text)) {
-    throw new Error("js.nat expects a natural number");
-  }
-  return BigInt(text);
-}
-
-function jsNatPayload(value) {
-  if (typeof value !== "bigint" || value < 0n) {
-    throw new Error("js.nat.value expects a JS natural number");
-  }
-  return value;
-}
-
-function jsBoolValue(value) {
-  if (typeof value !== "boolean") {
-    throw new Error("js.bool expects a boolean");
-  }
-  return value;
-}
-
-function jsBoolPayload(value) {
-  if (typeof value !== "boolean") {
-    throw new Error("js.bool.value expects a JS boolean");
-  }
-  return value;
 }

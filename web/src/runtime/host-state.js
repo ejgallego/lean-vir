@@ -4,9 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { ExternrefResourceRoots, VIR_HOST_DISPOSE } from "../host-resource.js";
+import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING } from "../host-resource.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import { isVirCallback, releaseCallbacks } from "./callbacks.js";
+import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
 
 export class VirHostState {
   constructor({
@@ -41,7 +42,9 @@ export class VirHostState {
   }
 
   recordCallError(error) {
-    this.callError = error instanceof Error ? error : new Error(String(error));
+    if (this.callError === null) {
+      this.callError = error instanceof Error ? error : new Error(String(error));
+    }
   }
 
   takeCallError() {
@@ -84,13 +87,16 @@ export class VirHostState {
 
     const args = [];
     const liftedCallbacks = [];
+    const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.CONVERSION;
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
       if (argObjects.length !== entry.args.length) {
         throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
       }
       entry.args.forEach((arg, index) => {
-        const value = this.runtime.liftObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        const value = explicitConversionTarget
+          ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`)
+          : this.runtime.liftHostWireObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
         if (isVirCallback(value)) {
           liftedCallbacks.push(value);
         }
@@ -109,9 +115,11 @@ export class VirHostState {
     }
     if (isPromiseLike(value)) {
       releaseCallbacks(liftedCallbacks);
-      throw new Error(`Vir host import ${entry.target} returned a Promise; v1 host imports must be synchronous`);
+      throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
     }
-    return this.runtime.makeObjectValue(entry.result, value, `${entry.target} result`);
+    return explicitConversionTarget
+      ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`)
+      : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
   }
 
   readObjectArgv(argvPtr, argc) {
@@ -139,13 +147,28 @@ function disposeHostBindings(bindings) {
 }
 
 function lookupHostBinding(target, userBindings, defaultBindings) {
-  if (userBindings instanceof Map && userBindings.has(target)) {
-    return userBindings.get(target);
+  const userBinding = lookupHostBindingIn(target, userBindings);
+  if (typeof userBinding === "function") {
+    return userBinding;
   }
-  if (userBindings !== null && typeof userBindings === "object" && Object.hasOwn(userBindings, target)) {
-    return userBindings[target];
+  return lookupHostBindingIn(target, defaultBindings);
+}
+
+function lookupHostBindingIn(target, bindings) {
+  if (bindings === null || bindings === undefined) {
+    return undefined;
   }
-  return defaultBindings[target];
+  if (bindings instanceof Map && bindings.has(target)) {
+    return bindings.get(target);
+  }
+  if (typeof bindings === "object" && Object.hasOwn(bindings, target)) {
+    return bindings[target];
+  }
+  const resolver = bindings[VIR_HOST_RESOLVE_BINDING];
+  if (typeof resolver === "function") {
+    return resolver.call(bindings, target);
+  }
+  return undefined;
 }
 
 function isPromiseLike(value) {

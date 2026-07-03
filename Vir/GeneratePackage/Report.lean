@@ -42,7 +42,7 @@ def reportFor (_targets : Array Target) (closure : Closure) (manifest : Interfac
       let erased :=
         if entry.erasedPrefixArgs == 0 then ""
         else s!" erasedPrefixArgs={entry.erasedPrefixArgs}"
-      s!"- slot {entry.slot}: `{entry.name}` -> `{entry.target}` via `{entry.symbol}` arity={entry.arity}{erased} : ({", ".intercalate args.toList}) -> {effect}{entry.result.label}"
+      s!"- slot {entry.slot}: `{entry.name}` -> `{entry.target}` via `{entry.symbol}` boundary={entry.boundary.label} arity={entry.arity}{erased} : ({", ".intercalate args.toList}) -> {effect}{entry.result.label}"
   let packageDiagnosticLines :=
     if manifest.diagnostics.isEmpty then #["None."] else manifest.diagnostics.map fun diagnostic =>
       s!"- `{diagnostic.name}` from `{diagnostic.source}`: {diagnostic.reason}"

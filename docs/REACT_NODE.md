@@ -75,6 +75,8 @@ def ofNat (value : Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 def toNat (value : Lean.Vir.Js Nat) : Lean.Vir.RuntimeM Nat
 def ofBool (value : Bool) : Lean.Vir.RuntimeM (Lean.Vir.Js Bool)
 def toBool (value : Lean.Vir.Js Bool) : Lean.Vir.RuntimeM Bool
+def ofFloat (value : Float) : Lean.Vir.RuntimeM (Lean.Vir.Js Float)
+def toFloat (value : Lean.Vir.Js Float) : Lean.Vir.RuntimeM Float
 
 end Lean.Vir.JsValue
 
@@ -83,6 +85,11 @@ namespace Lean.Vir.React
 namespace Hooks
 
 def useState (initial : Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
+def useEffectWithDeps
+    (deps : Array String)
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit
 
 end Hooks
 
@@ -101,12 +108,10 @@ end State
 
 namespace Node
 
-@[vir_js "react.node.text"]
-opaque text (value : @& String) : ReactM (Lean.Vir.Js Node)
+def text (value : String) : ReactM (Lean.Vir.Js Node)
 
-@[vir_js "react.node.createElement"]
-opaque createElement
-    (tag : @& String)
+def createElement
+    (tag : String)
     (key? : Option String)
     (props : Array Property)
     (handlers : Array EventHandler)
@@ -159,10 +164,13 @@ end Lean.Vir.React
 
 `Lean.Vir.React.Node` is an opaque JavaScript-owned object marker and crosses
 the host boundary as `Lean.Vir.Js Node`. Lean builds nodes through
-`react.node.text` and `react.node.createElement`; the browser host constructs native
-React nodes immediately with `React.createElement`, while the virtual test host
-constructs equivalent virtual nodes. The package generator still represents the
-known `Property`, `PropValue`, and `EventHandler` payload shapes directly; the
+`Node.text` and `Node.createElement`. Those public helpers convert text, tag,
+and key strings through `Lean.Vir.JsValue` before calling the private
+`react.node.*` host imports, so the low-level host boundary receives explicit
+`Lean.Vir.Js String` resources. The browser host constructs native React nodes
+immediately with `React.createElement`, while the virtual test host constructs
+equivalent virtual nodes. The package generator still represents the known
+`Property`, `PropValue`, and `EventHandler` payload shapes directly; the
 React-specific boundary is the native React node resource and callback
 ownership policy, not a private recursive wire codec.
 
@@ -245,13 +253,16 @@ The browser React host binding is exposed from
 `lean-vir/react-host-bindings`. It owns a React root resource:
 
 - `react.root.create` calls `ReactDOM.createRoot(container)`.
-- `react.node.text` creates a `ReactNode` resource for a string node.
-- `react.node.createElement` validates props/handlers/children, calls
+- `react.node.text` creates a `ReactNode` resource for an explicit `Js String`
+  text node.
+- `react.node.createElement` unwraps explicit `Js String` tag/key values,
+  validates props/handlers/children, calls
   `React.createElement(tag, props, ...children)`, and returns a `ReactNode`
   resource.
 - `react.node.fragment` calls
-  `React.createElement(React.Fragment, props, ...children)` in the browser host
-  and returns a virtual fragment node in tests.
+  `React.createElement(React.Fragment, props, ...children)` in the browser host,
+  unwrapping an optional explicit `Js String` key, and returns a virtual
+  fragment node in tests.
 - `react.root.render` invokes the received Lean `ReactM` render action, renders
   the retained native React node held by the resulting `ReactNode` resource,
   and releases the render callback.
@@ -268,8 +279,8 @@ The browser React host binding is exposed from
 - `react.useReducer` calls `React.useReducer` while rendering a component. The
   public Lean surface is `Hooks.useReducer`, backed by a concrete
   `ReducerBinding state action` instance for each reducer state/action pair.
-  This keeps reducer state as ordinary structured Lean values while avoiding a
-  polymorphic host import shape the current ABI cannot package.
+  The low-level host imports move `Js` resources only; the binding supplies
+  explicit `js.value.*` converters for structured state and actions.
 - `react.useRef` calls `React.useRef` while rendering a component and returns a
   host-owned ref object. `react.ref.get` and `react.ref.set` read/write
   `.current`; they do not schedule a render.
@@ -278,16 +289,20 @@ The browser React host binding is exposed from
   receives that resource when React cleans the effect up. The base binding
   exposes React's no-dependency behavior.
 - `react.useEffectWithDeps` is the same resource-shaped effect with a
-  Lean-provided string dependency list. The browser binding passes that list as
-  React's dependency array and uses `Object.is` comparison to release newly
-  created Lean callbacks when the effect does not need to restart.
-- `js.string`, `js.nat`, and `js.bool` convert Lean scalar values into explicit
+  Lean-provided string dependency list. The public helper converts each
+  dependency through `JsValue`, and the browser binding passes the unwrapped
+  strings as React's dependency array. It uses `Object.is` comparison to release
+  newly created Lean callbacks when the effect does not need to restart.
+- `js.string`, `js.nat`, `js.bool`, and `js.float` convert Lean scalar values into explicit
   `Lean.Vir.Js α` values through `RuntimeM` for examples that need primitive
   React state.
 - `react.root.renderIntoSelector` and
   `react.root.renderComponentIntoSelector` create or reuse a host-owned React
-  root for a selector. This is the infoview/proof-widget path where the shell
-  owns the DOM mount element and Lean supplies the current tree or component.
+  root for a selector. Public helpers accept ordinary strings and convert them
+  to explicit `Js String` selector resources before the low-level host call,
+  then convert the returned `Js Bool` success value back to `Bool`. This is the
+  infoview/proof-widget path where the shell owns the DOM mount element and
+  Lean supplies the current tree or component.
 - `react.state.set` and `react.state.modify` call the retained React setter;
   both are `RuntimeM`, and `modify` retains the Lean updater callback until
   React invokes it or the runtime is disposed.
@@ -296,7 +311,9 @@ The browser React host binding is exposed from
   [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 - `react.root.unmount` calls `root.unmount()` and releases callbacks retained
   by the current render.
-- `react.root.unmountSelector` unmounts and forgets a selector-owned root.
+- `react.root.unmountSelector` unwraps an explicit `Js String` selector,
+  unmounts, forgets a selector-owned root, and returns an explicit `Js Bool`
+  success value.
 - Rendering a new tree into the same browser root queues callbacks retained by
   the previous tree for microtask release after React has been given the
   replacement tree. Event-triggered rerenders defer stale callback release

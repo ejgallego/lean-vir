@@ -291,6 +291,24 @@ Common Lean values map to JavaScript values like this:
 See `docs/JS_API.md` for the complete type surface, including `Sum`, `Except`,
 `Lean.Expr`, nested structures, and host imports.
 
+## Export Types Vs Host Import Types
+
+The JavaScript-to-Lean export surface and the Lean-to-JavaScript host-import
+surface are intentionally different.
+
+Exported Lean declarations can use the ordinary value types listed above. The
+runtime lowers JavaScript values into Lean objects and lifts Lean results back
+to JavaScript values.
+
+Declarations marked with `@[vir_js "..."]` are lower-level host imports. They
+must expose JavaScript wire/resource types such as `Lean.Vir.Js α`, resource
+containers, or callbacks whose arguments and results are resource-shaped. Raw
+Lean scalars and structures are rejected at package generation unless the
+target is one of the explicit conversion primitives, for example
+`js.string`, `js.string.value`, `js.nat`, or `js.nat.value`. Public Lean APIs
+should wrap those low-level imports with explicit `Lean.Vir.JsValue`
+conversions when they want to expose ordinary Lean values.
+
 ## Lean Calling JavaScript
 
 If the Lean function needs to call back into JavaScript, mark an opaque Lean
@@ -300,23 +318,27 @@ when creating the runtime.
 Lean:
 
 ```lean
-import Vir.Host
+import Vir.Js
 
 @[vir_js "demo.bumpNat"]
-opaque jsBumpNat (n : Nat) : Nat
+opaque jsBumpNat (n : @& Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
-def bumpViaJavaScript (n : Nat) : Nat :=
-  jsBumpNat n
+def bumpViaJavaScript (n : Nat) : Lean.Vir.RuntimeM Nat := do
+  let input ← Lean.Vir.JsValue.ofNat n
+  let output ← jsBumpNat input
+  Lean.Vir.JsValue.toNat output
 ```
 
 JavaScript:
 
 ```js
+const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "/assets/vir-upstream.wasm",
   irPackageUrl: "/assets/my-app.irpkg",
+  defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => (BigInt(n) + 1n).toString(),
+    "demo.bumpNat": (n) => resources.resourceForValue(hostResourceValue(n) + 1n),
   },
 });
 

@@ -16,6 +16,7 @@ export {
 } from "./vir-host-bindings.js";
 export {
   VIR_HOST_DISPOSE,
+  VIR_HOST_RESOLVE_BINDING,
 } from "./host-resource.js";
 export {
   VirCallback,

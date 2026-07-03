@@ -11,10 +11,24 @@ namespace HostInterop
 open Lean.Vir.Browser (DomM)
 
 @[vir_js "test.callNatCallback"]
-opaque callNatCallback (input : Nat) (callback : Nat → Nat) : Nat
+private opaque callNatCallbackJs
+    (input : @& Lean.Vir.Js Nat)
+    (callback : Lean.Vir.Js Nat → Lean.Vir.RuntimeM (Lean.Vir.Js Nat)) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
 @[vir_js "test.recordNat"]
-opaque recordNat (value : Nat) : DomM Unit
+private opaque recordNatJs (value : @& Lean.Vir.Js Nat) : DomM Unit
+
+def callNatCallback (input : Nat) (callback : Nat → Nat) : Lean.Vir.RuntimeM Nat := do
+  let jsInput ← Lean.Vir.JsValue.ofNat input
+  let jsResult ← callNatCallbackJs jsInput fun jsValue => do
+    let value ← Lean.Vir.JsValue.toNat jsValue
+    Lean.Vir.JsValue.ofNat (callback value)
+  Lean.Vir.JsValue.toNat jsResult
+
+def recordNat (value : Nat) : DomM Unit := do
+  let jsValue ← Lean.Vir.JsValue.ofNat value
+  recordNatJs jsValue
 
 def titleHandshake (label : String) : DomM String := do
   let title := "Lean VIR host: " ++ label
@@ -31,14 +45,16 @@ partial def titleHandshakeLoopAux (remaining acc : Nat) : DomM Nat := do
 def titleHandshakeLoop (count : Nat) : DomM Nat :=
   titleHandshakeLoopAux count 0
 
-def callbackRoundTrip (n : Nat) : Nat :=
+def callbackRoundTrip (n : Nat) : Lean.Vir.RuntimeM Nat :=
   callNatCallback n fun value => value + 7
 
-partial def callbackRoundTripLoopAux : Nat → Nat → Nat
-  | 0, acc => acc
-  | n + 1, acc => callbackRoundTripLoopAux n (acc + callbackRoundTrip (n % 256))
+partial def callbackRoundTripLoopAux : Nat → Nat → Lean.Vir.RuntimeM Nat
+  | 0, acc => pure acc
+  | n + 1, acc => do
+      let value ← callbackRoundTrip (n % 256)
+      callbackRoundTripLoopAux n (acc + value)
 
-def callbackRoundTripLoop (count : Nat) : Nat :=
+def callbackRoundTripLoop (count : Nat) : Lean.Vir.RuntimeM Nat :=
   callbackRoundTripLoopAux count 0
 
 def mountCallbackEvent (selector : String) : DomM Nat := do
