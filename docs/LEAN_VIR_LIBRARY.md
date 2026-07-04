@@ -184,8 +184,8 @@ lane for Lean-owned values that JavaScript should store or route without
 decoding. They are backed by the intrinsic `js.leanRef` and
 `js.leanRef.value` object-handle imports; the JavaScript host retains the Lean
 object pointer behind a `Js α` resource and returns a fresh owned Lean pointer
-when the value is unwrapped. This avoids the generic `js.value.*` object
-conversion path for state/action values that are only coordinated through
+when the value is unwrapped. This avoids named structured `js.value.*`
+conversion targets for state/action values that are only coordinated through
 JavaScript.
 
 `Vir.Js` also provides explicit scalar conversion helpers for JavaScript
@@ -356,7 +356,7 @@ component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
 host-inspectable reference descriptor and updates component-owned React state
 from the callback. The public RPC helpers keep accepting `RpcRef`, but their
 low-level host targets receive `Js RpcRef` resources built by the
-`proofwidgets.rpc.ref` conversion targets. Resolve callbacks receive
+`proofwidgets.rpc.ref` host targets. Resolve callbacks receive
 `Js ResolvedRef` resources and decode them through
 `js.value.proofwidgets.resolvedRef.value` before running user callbacks. In live
 infoview widgets,
@@ -467,7 +467,7 @@ const vir = await createVirRuntime({
 Host imports use an explicit JavaScript-resource boundary by default. Use
 `Lean.Vir.Js α` resources, containers of resources, or callbacks whose
 arguments/results are resource-shaped. Raw Lean scalars and structures are
-rejected unless the target is an explicit conversion primitive such as
+rejected unless the target is a built-in conversion primitive such as
 `js.nat.value` or `js.value.react.property`. `Unit` results should return
 `undefined` or `null`.
 

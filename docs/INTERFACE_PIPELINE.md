@@ -191,14 +191,15 @@ structure of the rendered tree lives in the host resource graph created by
 `react.node.text` and `react.node.createElement`. Their scalar text/tag/key
 inputs are explicit `Lean.Vir.Js String` resources. Ordinary `Property`,
 `PropValue`, and `EventHandler` payloads cross only through explicit
-`js.value.react.*` conversion targets.
+`js.value.react.property` and `js.value.react.eventHandler` conversion
+targets.
 
 Entry points and host imports can be pure functions or synchronous effect
 actions. Host imports are deliberately narrower than exports: low-level
 JavaScript imports should expose `Lean.Vir.Js α` resources, resource-shaped
 containers/callbacks, or explicit conversion targets such as `js.string.value`.
 Raw Lean scalar and structure host imports are rejected, except at explicit
-conversion targets or the `js.leanRef` object-handle boundary. JavaScript
+named conversion targets or the `js.leanRef` object-handle boundary. JavaScript
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; browser APIs use
 `Lean.Vir.Browser.DomM α`; React component construction uses
 `Lean.Vir.React.ReactM α`. For Lean-to-JavaScript calls, import `Vir.Host` and

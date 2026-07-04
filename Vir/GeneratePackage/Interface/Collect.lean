@@ -88,11 +88,12 @@ def InterfaceType.isLeanObjectWire : InterfaceType → Bool
   | .leanObject => true
   | _ => false
 
-def isExplicitJsValueConversionTarget (target : String) : Bool :=
-  target.startsWith "js.value." && target != "js.value.value"
-
-def isExplicitJsValueUnwrapTarget (target : String) : Bool :=
-  isExplicitJsValueConversionTarget target && target.endsWith ".value"
+def InterfaceType.hasTypeName (expected : Name) : InterfaceType → Bool
+  | .simpleEnum name ..
+  | .taggedUnion name ..
+  | .customInductive name ..
+  | .structure name .. => name == expected
+  | _ => false
 
 def InterfaceType.hostBoundaryKind : InterfaceType → String
   | .unit
@@ -153,22 +154,22 @@ def isJsValueConversionSignature
     (effect : InterfaceEffect) : Bool :=
   if effect != .runtime then
     false
-  else if isExplicitJsValueUnwrapTarget target then
-    match args[0]? with
-    | some arg => args.size == 1 && arg.type.isHostResourceWire
-    | none => false
-  else if isExplicitJsValueConversionTarget target then
-    args.size == 1 && result.isHostResourceWire
   else
     match target, args[0]? with
-    | "js.string", some arg => args.size == 1 && arg.type == .string && result.isHostResourceWire
-    | "js.string.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .string
-    | "js.nat", some arg => args.size == 1 && arg.type == .nat && result.isHostResourceWire
-    | "js.nat.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .nat
-    | "js.bool", some arg => args.size == 1 && arg.type == .bool && result.isHostResourceWire
-    | "js.bool.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .bool
-    | "js.float", some arg => args.size == 1 && arg.type == .float && result.isHostResourceWire
-    | "js.float.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .float
+    | "js.string", some arg => args.size == 1 && arg.type == .string && result.isGenericJsResourceWire
+    | "js.string.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .string
+    | "js.nat", some arg => args.size == 1 && arg.type == .nat && result.isGenericJsResourceWire
+    | "js.nat.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .nat
+    | "js.bool", some arg => args.size == 1 && arg.type == .bool && result.isGenericJsResourceWire
+    | "js.bool.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .bool
+    | "js.float", some arg => args.size == 1 && arg.type == .float && result.isGenericJsResourceWire
+    | "js.float.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .float
+    | "js.value.react.property", some arg =>
+        args.size == 1 && arg.type.hasTypeName `Lean.Vir.React.Property && result.isGenericJsResourceWire
+    | "js.value.react.eventHandler", some arg =>
+        args.size == 1 && arg.type.hasTypeName `Lean.Vir.React.EventHandler && result.isGenericJsResourceWire
+    | "js.value.proofwidgets.resolvedRef.value", some arg =>
+        args.size == 1 && arg.type.isGenericJsResourceWire && result.hasTypeName `Lean.Vir.ProofWidgets.ResolvedRef
     | _, _ => false
 
 def isLeanObjectHandleSignature

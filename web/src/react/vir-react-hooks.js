@@ -343,7 +343,11 @@ export function createReactStateHostBindings(resources, hookRuntime) {
 }
 
 export function createReactJsValueHostBindings(resources) {
-  return createJsValueHostBindings(resources);
+  return {
+    ...createJsValueHostBindings(resources),
+    "js.value.react.property": (value) => resources.resourceForValue(value),
+    "js.value.react.eventHandler": (value) => resources.resourceForValue(value),
+  };
 }
 
 function stateSetterFor(setters, setState) {

@@ -21,11 +21,13 @@ Raw Lean scalar and structure types are rejected in ordinary host imports. The
 only scalar-shaped host imports are explicit conversion targets such as
 `js.string`, `js.string.value`, `js.nat`, `js.nat.value`, `js.bool`,
 `js.bool.value`, `js.float`, and `js.float.value`. Structured values that
-JavaScript must inspect still use explicit `js.value.*` conversion targets,
-while Lean-owned values that JavaScript only stores or routes can use the
-`js.leanRef` object-handle boundary. The package manifest records each host
-import boundary as `wire`, `conversion`, or `objectHandle`, and the runtime
-dispatches them through the corresponding path.
+JavaScript must inspect use named conversion targets such as
+`js.value.react.property`, `js.value.react.eventHandler`, and
+`js.value.proofwidgets.resolvedRef.value`; `js.value.*` is not a wildcard
+extension lane. Lean-owned values that JavaScript only stores or routes can use
+the `js.leanRef` object-handle boundary. The package manifest records each
+host import boundary as `wire`, `conversion`, or `objectHandle`, and the
+runtime dispatches them through the corresponding path.
 
 ## Built-In Targets
 
@@ -179,7 +181,7 @@ console.log(vir.call("bumpFromJs", 41)); // "42"
 Host imports are a JavaScript-resource boundary by default: use `Lean.Vir.Js α`
 resources, `Option`/`Array` containers of resources, and callback types whose
 arguments/results follow the same rule. Raw Lean scalars and structures are
-rejected unless they are part of an explicit conversion target such as
+rejected unless they are part of a built-in conversion target such as
 `js.nat.value` or `js.value.react.property`. `Unit` returns use
 `undefined` or `null`. Function-valued Lean arguments are decoded as callable
 `VirCallback` objects. A host binding that stores a callback must eventually

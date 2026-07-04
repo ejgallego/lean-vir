@@ -4,29 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { VIR_HOST_RESOLVE_BINDING } from "../host-resource.js";
-
 export function createJsValueHostBindings(resources) {
-  const bindings = {
-    [VIR_HOST_RESOLVE_BINDING]: (target) => jsValueConversionBinding(resources, target),
-  };
+  const bindings = {};
   for (const [target, codec] of Object.entries(jsValueCodecs)) {
     bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
     bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
   }
   return bindings;
-}
-
-const explicitJsValuePrefix = "js.value.";
-
-function jsValueConversionBinding(resources, target) {
-  if (!target.startsWith(explicitJsValuePrefix) || target === "js.value.value") {
-    return undefined;
-  }
-  if (target.endsWith(".value")) {
-    return (value) => resources.resolveResource(value, "Js");
-  }
-  return (value) => resources.resourceForValue(value);
 }
 
 const jsValueCodecs = {

@@ -1336,24 +1336,12 @@ function createReactHostHooks() {
 
 // web/src/host/vir-js-value-bindings.js
 function createJsValueHostBindings(resources) {
-  const bindings = {
-    [VIR_HOST_RESOLVE_BINDING]: (target) => jsValueConversionBinding(resources, target)
-  };
+  const bindings = {};
   for (const [target, codec] of Object.entries(jsValueCodecs)) {
     bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
     bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
   }
   return bindings;
-}
-var explicitJsValuePrefix = "js.value.";
-function jsValueConversionBinding(resources, target) {
-  if (!target.startsWith(explicitJsValuePrefix) || target === "js.value.value") {
-    return void 0;
-  }
-  if (target.endsWith(".value")) {
-    return (value) => resources.resolveResource(value, "Js");
-  }
-  return (value) => resources.resourceForValue(value);
 }
 var jsValueCodecs = {
   "js.string": {
@@ -1594,7 +1582,11 @@ function createReactStateHostBindings(resources, hookRuntime) {
   };
 }
 function createReactJsValueHostBindings(resources) {
-  return createJsValueHostBindings(resources);
+  return {
+    ...createJsValueHostBindings(resources),
+    "js.value.react.property": (value) => resources.resourceForValue(value),
+    "js.value.react.eventHandler": (value) => resources.resourceForValue(value)
+  };
 }
 function stateSetterFor(setters, setState) {
   let setter = setters.get(setState);
