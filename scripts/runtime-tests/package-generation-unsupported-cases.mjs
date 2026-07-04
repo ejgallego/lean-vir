@@ -78,6 +78,14 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
 
   const badJslStringSource = join(freshDir, "BadJSLString.lean");
   await writeRuntimeFixture(badJslStringSource, "BadJSLString.lean");
+  const builtVirJs = spawnSync("lake", ["build", "Vir.Js"], {
+    encoding: "utf8",
+  });
+  assert.equal(
+    builtVirJs.status,
+    0,
+    `failed to build Vir.Js before BadJSLString typecheck:\n${builtVirJs.stderr}${builtVirJs.stdout}`,
+  );
   const checkedBadJslString = spawnSync("lake", ["env", "lean", badJslStringSource], {
     encoding: "utf8",
   });
