@@ -113,14 +113,15 @@ dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
 The manifest includes package metadata plus one entry per export with its Lean
 declaration name, JavaScript name, argument types, result type, and recursive
 type tree. It also includes `hostImports` for Lean declarations marked with
-`@[vir_js "..."]`, including their `wire` or `conversion` host boundary.
+`@[vir_js "..."]`, including their `wire`, `conversion`, or `objectHandle`
+host boundary.
 JavaScript validates inputs against that manifest, lowers values to owned Lean
 objects with `vir_obj_*` helpers, and calls
 `vir_call_resolved_objects`. When interpreted Lean code reaches a host import,
 the shim calls the runtime's `env.vir_js_call_objects` import with borrowed Lean
 object arguments, and JavaScript returns an owned Lean object result. Package
-format 7 keeps package-owned signatures for object-call validation and callback
-rooting.
+format 7 and newer keep package-owned signatures for object-call validation and
+callback rooting.
 
 Supported interface types:
 
@@ -141,6 +142,8 @@ Supported interface types:
 - opaque host resources;
 - `Lean.Vir.Js α`, an opaque `Js` resource for JavaScript-owned objects whose
   `α` parameter is a Lean-side phantom shape;
+- `Lean.Vir.LeanRef.toJs` / `fromJs`, which move Lean-owned objects through an
+  opaque `Js α` handle without decoding the Lean value in JavaScript;
 - Lean function values used as host callbacks;
 - `Lean.Expr`;
 - `Lean.Vir.React.Node` as an opaque JavaScript-owned resource under

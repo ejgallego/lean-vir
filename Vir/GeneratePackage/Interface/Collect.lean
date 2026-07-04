@@ -80,6 +80,14 @@ def InterfaceType.isHostResourceWire : InterfaceType → Bool
   | .resource .. => true
   | _ => false
 
+def InterfaceType.isGenericJsResourceWire : InterfaceType → Bool
+  | .resource name label => name == `Lean.Vir.Js && label == "Js"
+  | _ => false
+
+def InterfaceType.isLeanObjectWire : InterfaceType → Bool
+  | .leanObject => true
+  | _ => false
+
 def isExplicitJsValueConversionTarget (target : String) : Bool :=
   target.startsWith "js.value." && target != "js.value.value"
 
@@ -112,6 +120,7 @@ def InterfaceType.hostBoundaryKind : InterfaceType → String
   | .prod .. => "product"
   | .resource .. => "resource"
   | .function .. => "callback"
+  | .leanObject => "opaque Lean object"
 
 mutual
 
@@ -162,6 +171,19 @@ def isJsValueConversionSignature
     | "js.float.value", some arg => args.size == 1 && arg.type.isHostResourceWire && result == .float
     | _, _ => false
 
+def isLeanObjectHandleSignature
+    (target : String)
+    (args : Array InterfaceArg)
+    (result : InterfaceType)
+    (effect : InterfaceEffect) : Bool :=
+  if effect != .runtime then
+    false
+  else
+    match target, args[0]? with
+    | "js.leanRef", some arg => args.size == 1 && arg.type.isLeanObjectWire && result.isGenericJsResourceWire
+    | "js.leanRef.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result.isLeanObjectWire
+    | _, _ => false
+
 def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
   s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Lean.Vir.Js ...` resources and explicit conversion calls"
 
@@ -184,6 +206,8 @@ def hostImportBoundary
     (effect : InterfaceEffect) : Except String HostImportBoundary :=
   if isJsValueConversionSignature target args result effect then
     .ok .conversion
+  else if isLeanObjectHandleSignature target args result effect then
+    .ok .objectHandle
   else
     match args.findSome? hostImportArgBoundaryDiagnostic? <|>
         hostImportResultBoundaryDiagnostic? result with

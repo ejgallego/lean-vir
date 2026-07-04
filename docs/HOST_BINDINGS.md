@@ -20,10 +20,12 @@ from ordinary Lean values with `Lean.Vir.JsValue`.
 Raw Lean scalar and structure types are rejected in ordinary host imports. The
 only scalar-shaped host imports are explicit conversion targets such as
 `js.string`, `js.string.value`, `js.nat`, `js.nat.value`, `js.bool`,
-`js.bool.value`, `js.float`, and `js.float.value`, plus structured
-`js.value.*` converters used by React, infoview, ProofWidgets, and examples.
-The package manifest records each host import boundary as `wire` or
-`conversion`, and the runtime dispatches them through the corresponding path.
+`js.bool.value`, `js.float`, and `js.float.value`. Structured values that
+JavaScript must inspect still use explicit `js.value.*` conversion targets,
+while Lean-owned values that JavaScript only stores or routes can use the
+`js.leanRef` object-handle boundary. The package manifest records each host
+import boundary as `wire`, `conversion`, or `objectHandle`, and the runtime
+dispatches them through the corresponding path.
 
 ## Built-In Targets
 
@@ -84,10 +86,12 @@ render-time `ReactM` operations. `useRef` returns a host-owned React ref object;
 `react.ref.get` and `react.ref.set` are `RuntimeM` operations over its
 `current` field and do not schedule renders. `useReducer` keeps the low-level
 React boundary in `Js` resources; concrete `ReducerBinding state action`
-instances provide explicit `js.value.*` conversions for each reducer
-state/action pair. Reducer callbacks are retained per hook slot, replaced after
-committed renders, and released on failed render, unmount, package reload, or
-runtime dispose.
+instances provide explicit transport for each reducer state/action pair. For
+structured Lean-owned values, the default reducer binding uses
+`Lean.Vir.LeanRef.toJs`/`fromJs` instead of `js.value.*` conversion targets.
+Reducer callbacks are retained per hook slot,
+replaced after committed renders, and released on failed render, unmount,
+package reload, or runtime dispose.
 `useEffect` currently has a resource shape: setup returns a
 host resource, and cleanup receives the same resource at React's cleanup point.
 The no-deps binding reruns after committed renders. `useEffectWithDeps` maps to
@@ -208,6 +212,10 @@ setters, React node resources, event listeners, timers, and animation frames.
 Their API cleanup is owned by the binding that created them: listener removal,
 timer/frame cancellation, React root unmounting, React node callback release,
 and final runtime/package teardown all go through the shared resource store.
+Lean-owned object handles created by `js.leanRef` use the same `Js` resource
+transport, but their payload is a retained Lean object pointer. The runtime
+increments the object when creating the resource and decrements it when the
+resource is released during package/runtime teardown.
 
 Some resources are callback-local rather than retained:
 

@@ -153,6 +153,13 @@ class ReducerBinding (state action : Type) where
   actionToJs : @& action → Lean.Vir.RuntimeM (Lean.Vir.Js action)
   actionFromJs : @& Lean.Vir.Js action → Lean.Vir.RuntimeM action
 
+instance (priority := 100) leanRefReducerBinding {state action : Type} :
+    ReducerBinding state action where
+  stateToJs := Lean.Vir.LeanRef.toJs
+  stateFromJs := Lean.Vir.LeanRef.fromJs
+  actionToJs := Lean.Vir.LeanRef.toJs
+  actionFromJs := Lean.Vir.LeanRef.fromJs
+
 /--
 React node object class created by the JavaScript host through React's public
 APIs.

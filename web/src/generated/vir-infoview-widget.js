@@ -39,16 +39,16 @@ function requireExternrefTableSupport() {
   }
 }
 var HostResource = class {
-  constructor(value, label) {
-    hostResourceState.set(this, { value, label });
+  constructor(value, label, { dispose = null } = {}) {
+    hostResourceState.set(this, { value, label, dispose });
     Object.freeze(this);
   }
 };
-function createHostResource(value, label = null) {
+function createHostResource(value, label = null, options = {}) {
   if (value === null || value === void 0) {
     throw new Error("host resource value must not be null");
   }
-  return new HostResource(value, label);
+  return new HostResource(value, label, options);
 }
 function isHostResource(resource) {
   return hostResourceState.has(resource);
@@ -71,7 +71,13 @@ function normalizeHostResource(resource, label = "host resource") {
 function releaseHostResource(resource) {
   const state = hostResourceState.get(resource);
   if (state !== void 0) {
+    const value = state.value;
     state.value = null;
+    const dispose = state.dispose;
+    state.dispose = null;
+    if (value !== null && value !== void 0 && typeof dispose === "function") {
+      dispose(value);
+    }
   }
 }
 var ExternrefResourceRoots = class {
@@ -1816,7 +1822,16 @@ function withStateUpdaterResourceScope(resources, run) {
   return resources.withTemporaryResourceScope(run);
 }
 function reactStatePayload(resources, value) {
-  return isHostResource(value) ? resources.resolveResource(value, "Js") : value;
+  if (!isHostResource(value)) return value;
+  try {
+    return resources.resolveResource(value, "Js");
+  } catch (error) {
+    const payload = hostResourceValue(value);
+    if (payload !== null && payload !== void 0) {
+      return payload;
+    }
+    throw error;
+  }
 }
 
 // web/src/host/vir-virtual-host-bindings.js
@@ -2309,7 +2324,8 @@ var WIRE = Object.freeze({
   RESOURCE: 23,
   FUNCTION: 24,
   CUSTOM_INDUCTIVE: 25,
-  RECURSIVE_SELF: 26
+  RECURSIVE_SELF: 26,
+  LEAN_OBJECT: 27
 });
 var SUPPORTED_WIRE_TAGS = new Set(Object.values(WIRE));
 var JSON_INPUT_WIRE_TAGS = /* @__PURE__ */ new Set([
@@ -2325,12 +2341,13 @@ var JSON_INPUT_WIRE_TAGS = /* @__PURE__ */ new Set([
 
 // web/src/runtime/interface-manifest.js
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_VERSION = 2;
+var INTERFACE_MANIFEST_VERSION = 4;
 var HOST_IMPORT_BOUNDARY = Object.freeze({
   WIRE: "wire",
-  CONVERSION: "conversion"
+  CONVERSION: "conversion",
+  OBJECT_HANDLE: "objectHandle"
 });
-var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 2, metadata: {...}, exports: [...] }";
+var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 4, metadata: {...}, exports: [...] }";
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -2409,7 +2426,7 @@ function validateManifestHostImports(hostImports) {
 }
 function requireHostImportBoundary(value, label) {
   if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be wire or conversion`);
+    throw new Error(`${label} must be wire, conversion, or objectHandle`);
   }
 }
 function requireUnique(seen, value, label, owner = "interface export") {
@@ -2456,6 +2473,9 @@ function validateInterfaceType(type, label = "interface type") {
       break;
     case WIRE.FUNCTION:
       validateFunctionType(type, label);
+      break;
+    case WIRE.LEAN_OBJECT:
+      validateLeanObjectType(type, label);
       break;
     default:
       break;
@@ -2685,6 +2705,11 @@ function validateResourceType(type, label) {
     throw new Error(`${label}.kind must be resource`);
   }
   requireString(type.name, `${label}.name`);
+}
+function validateLeanObjectType(type, label) {
+  if (type.kind !== "leanObject") {
+    throw new Error(`${label}.kind must be leanObject`);
+  }
 }
 function validateFunctionType(type, label) {
   if (type.kind !== "function") {
@@ -3261,6 +3286,7 @@ var OBJECT_VALUE_EXPORTS = [
   "vir_obj_float_value",
   "vir_obj_float32",
   "vir_obj_float32_value",
+  "vir_obj_inc",
   "vir_obj_int",
   "vir_obj_int_decimal",
   "vir_obj_level_imax",
@@ -3751,6 +3777,13 @@ function readScalarUnsigned(view, offset, size, label) {
 // web/src/runtime/object-values.js
 var textEncoder = new TextEncoder();
 var MAX_UINT642 = 0xffffffffffffffffn;
+var LEAN_OBJECT_HANDLE = /* @__PURE__ */ Symbol("lean-vir.leanObjectHandle");
+function normalizeObjectPointer(value, label) {
+  if (!Number.isInteger(value) || value <= 0 || value > 4294967295) {
+    throw new Error(`${label} must be a live Lean object pointer`);
+  }
+  return value >>> 0;
+}
 var ObjectValueRuntime = class {
   hasObjectValueExports() {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
@@ -4017,6 +4050,24 @@ var ObjectValueRuntime = class {
       throw new Error(`${label} could not be lowered to a Lean host resource object`);
     }
     return argObj;
+  }
+  makeLeanObjectHandleResource(obj, label) {
+    const object = normalizeObjectPointer(obj, label);
+    this.exports.vir_obj_inc(object);
+    let live = true;
+    const handle = Object.freeze({
+      [LEAN_OBJECT_HANDLE]: true,
+      runtime: this,
+      object
+    });
+    return createHostResource(handle, label, {
+      dispose: () => {
+        if (!live) return void 0;
+        live = false;
+        this.exports.vir_obj_dec(object);
+        return void 0;
+      }
+    });
   }
   makeObjectExpr(value, label) {
     const expr = typeof value === "string" ? { kind: "const", name: value, levels: [] } : value;
@@ -4725,6 +4776,15 @@ var ObjectValueRuntime = class {
     }
     throw new Error(`${label} did not lift to a live host resource`);
   }
+  retainLeanObjectHandleValue(resource, label) {
+    const handle = hostResourceValue(resource);
+    if (handle?.[LEAN_OBJECT_HANDLE] !== true || handle.runtime !== this) {
+      throw new Error(`${label} must be a live Lean object handle resource`);
+    }
+    const object = normalizeObjectPointer(handle.object, label);
+    this.exports.vir_obj_inc(object);
+    return object;
+  }
   liftObjectFunction(type, obj, label) {
     const args = requireFunctionArgs(type, label);
     requireFunctionResult(type, label);
@@ -5300,6 +5360,7 @@ var VirHostState = class {
     this.defaultBindings = defaultHostBindings;
     this.runtime = null;
     this.resourceRoots = new ExternrefResourceRoots();
+    this.leanObjectResources = /* @__PURE__ */ new Set();
     this.callError = null;
   }
   attach(exports) {
@@ -5348,6 +5409,9 @@ var VirHostState = class {
     if (entry === null) {
       throw new Error(`Vir host import slot ${slot} is not registered`);
     }
+    if (entry.boundary === HOST_IMPORT_BOUNDARY.OBJECT_HANDLE) {
+      return this.callObjectHandle(entry, argvPtr, argc);
+    }
     const binding = lookupHostBinding(entry.target, this.userBindings, this.defaultBindings);
     if (typeof binding !== "function") {
       throw new Error(`Vir host import binding not found: ${entry.target}`);
@@ -5384,6 +5448,26 @@ var VirHostState = class {
     }
     return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
   }
+  callObjectHandle(entry, argvPtr, argc) {
+    const argObjects = this.readObjectArgv(argvPtr, argc);
+    if (argObjects.length !== entry.args.length) {
+      throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
+    }
+    if (entry.target === "js.leanRef" && entry.args.length === 1 && isLeanObjectDescriptor(entry.args[0]?.type) && isGenericJsResourceDescriptor(entry.result)) {
+      const resource = this.runtime.makeLeanObjectHandleResource(argObjects[0], `${entry.target} argument ${entry.args[0].name}`);
+      this.leanObjectResources.add(resource);
+      return this.runtime.makeHostWireObjectValue(entry.result, resource, `${entry.target} result`);
+    }
+    if (entry.target === "js.leanRef.value" && entry.args.length === 1 && isGenericJsResourceDescriptor(entry.args[0]?.type) && isLeanObjectDescriptor(entry.result)) {
+      const resource = this.runtime.liftHostWireObjectValue(
+        entry.args[0].type,
+        argObjects[0],
+        `${entry.target} argument ${entry.args[0].name}`
+      );
+      return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} result`);
+    }
+    throw new Error(`Vir host import ${entry.target} has unsupported objectHandle signature`);
+  }
   readObjectArgv(argvPtr, argc) {
     if (argvPtr === 0 && argc !== 0) {
       throw new Error("Vir host import object argv pointer is null");
@@ -5394,10 +5478,26 @@ var VirHostState = class {
   dispose() {
     this.clearCallError();
     this.clearResourceRoots();
-    disposeHostBindings(this.userBindings);
-    disposeHostBindings(this.defaultBindings);
+    try {
+      disposeHostBindings(this.userBindings);
+      disposeHostBindings(this.defaultBindings);
+    } finally {
+      this.releaseLeanObjectResources();
+    }
+  }
+  releaseLeanObjectResources() {
+    for (const resource of Array.from(this.leanObjectResources)) {
+      releaseHostResource(resource);
+    }
+    this.leanObjectResources.clear();
   }
 };
+function isLeanObjectDescriptor(type) {
+  return type?.wireTag === WIRE.LEAN_OBJECT && type?.kind === "leanObject";
+}
+function isGenericJsResourceDescriptor(type) {
+  return type?.wireTag === WIRE.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";
+}
 function disposeHostBindings(bindings) {
   if (bindings === null || bindings === void 0) return;
   const disposer = bindings[VIR_HOST_DISPOSE] ?? bindings.dispose;

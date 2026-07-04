@@ -150,6 +150,22 @@ withObjectString(runtime, "raw", (obj) => {
     /unsupported JavaScript host wire argument type/,
   );
 });
+let leanHandleObj = makeObjectString(runtime, "lean-ref");
+const leanHandleResource = runtime.makeLeanObjectHandleResource(leanHandleObj, "lean object handle");
+runtime.exports.vir_obj_dec(leanHandleObj);
+leanHandleObj = 0;
+let retainedLeanHandleObj = runtime.retainLeanObjectHandleValue(leanHandleResource, "lean object handle value");
+try {
+  assert.equal(runtime.readObjectString(retainedLeanHandleObj), "lean-ref");
+} finally {
+  runtime.exports.vir_obj_dec(retainedLeanHandleObj);
+  retainedLeanHandleObj = 0;
+}
+releaseHostResource(leanHandleResource);
+assert.throws(
+  () => runtime.retainLeanObjectHandleValue(leanHandleResource, "released lean object handle"),
+  /released lean object handle must be a live Lean object handle resource/,
+);
 const callbackWithRawStringType = {
   type: "Function",
   wireTag: WIRE.FUNCTION,

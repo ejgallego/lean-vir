@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { isHostResource } from "../host-resource.js";
+import { hostResourceValue, isHostResource } from "../host-resource.js";
 import { createJsValueHostBindings } from "../host/vir-js-value-bindings.js";
 
 export function createBrowserReactHookRuntime(resources, React) {
@@ -720,5 +720,15 @@ function withStateUpdaterResourceScope(resources, run) {
 }
 
 function reactStatePayload(resources, value) {
-  return isHostResource(value) ? resources.resolveResource(value, "Js") : value;
+  if (!isHostResource(value)) return value;
+  try {
+    return resources.resolveResource(value, "Js");
+  } catch (error) {
+    // Runtime-owned LeanRef handles are live HostResources outside this store.
+    const payload = hostResourceValue(value);
+    if (payload !== null && payload !== undefined) {
+      return payload;
+    }
+    throw error;
+  }
 }

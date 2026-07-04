@@ -35,17 +35,17 @@ export function requireExternrefTableSupport() {
 }
 
 class HostResource {
-  constructor(value, label) {
-    hostResourceState.set(this, { value, label });
+  constructor(value, label, { dispose = null } = {}) {
+    hostResourceState.set(this, { value, label, dispose });
     Object.freeze(this);
   }
 }
 
-export function createHostResource(value, label = null) {
+export function createHostResource(value, label = null, options = {}) {
   if (value === null || value === undefined) {
     throw new Error("host resource value must not be null");
   }
-  return new HostResource(value, label);
+  return new HostResource(value, label, options);
 }
 
 export function isHostResource(resource) {
@@ -74,7 +74,13 @@ export function normalizeHostResource(resource, label = "host resource") {
 export function releaseHostResource(resource) {
   const state = hostResourceState.get(resource);
   if (state !== undefined) {
+    const value = state.value;
     state.value = null;
+    const dispose = state.dispose;
+    state.dispose = null;
+    if (value !== null && value !== undefined && typeof dispose === "function") {
+      dispose(value);
+    }
   }
 }
 

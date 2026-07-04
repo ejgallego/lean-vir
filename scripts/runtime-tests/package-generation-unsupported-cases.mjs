@@ -60,6 +60,15 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /callback `Function` is not a JavaScript boundary type/,
   ], ["freshCustomBump", "freshCustomCounter", "freshCustomCallbackResult"]);
 
+  await assertUnsupportedInterfaceFixture(freshDir, "BadLeanRef.lean", [
+    /actionToJs/,
+    /unsupported JavaScript import argument `action`/,
+    /inductive `Vir\.Fixtures\.BadLeanRef\.Action` is not a JavaScript boundary type/,
+    /actionFromJs/,
+    /unsupported JavaScript import result/,
+    /inductive `Vir\.Fixtures\.BadLeanRef\.Action` is not a JavaScript boundary type/,
+  ], ["Vir.Fixtures.BadLeanRef.roundtripFeed"]);
+
   await assertUnsupportedInterfaceFixture(freshDir, "DuplicateExportNames.lean", [
     /Duplicate\.entry/,
     /Duplicate_entry/,

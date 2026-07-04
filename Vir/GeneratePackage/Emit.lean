@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.GeneratePackage.Manifest.Encode
+import Vir.GeneratePackage.PackageFormat
 
 open Lean
 
@@ -263,7 +264,7 @@ def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
 
 def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit := do
   emitString "lean-vir-ir-package"
-  emitU32 7
+  emitU32 currentPackageFormatVersion
   emitU32 (closure.decls.size + closure.externs.size)
   closure.decls.forM emitDeclEntry
   closure.externs.forM emitExternEntry

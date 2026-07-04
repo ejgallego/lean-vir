@@ -372,7 +372,7 @@ export const invalidManifestCases = [
         },
       ];
     },
-    pattern: /hostImports\[0\]\.boundary must be wire or conversion/,
+    pattern: /hostImports\[0\]\.boundary must be wire, conversion, or objectHandle/,
   },
   {
     name: "host import unsupported boundary",
@@ -386,6 +386,6 @@ export const invalidManifestCases = [
         },
       ];
     },
-    pattern: /hostImports\[0\]\.boundary must be wire or conversion/,
+    pattern: /hostImports\[0\]\.boundary must be wire, conversion, or objectHandle/,
   },
 ];

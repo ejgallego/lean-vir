@@ -17,6 +17,8 @@ import {
 import { interfaceEffectRuntimeTag } from "./interface-effects.js";
 import { WIRE } from "./wire-tags.js";
 import {
+  createHostResource,
+  hostResourceValue,
   isHostResource,
   normalizeHostResource,
 } from "../host-resource.js";
@@ -51,6 +53,14 @@ import {
 
 const textEncoder = new TextEncoder();
 const MAX_UINT64 = 0xffffffffffffffffn;
+const LEAN_OBJECT_HANDLE = Symbol("lean-vir.leanObjectHandle");
+
+function normalizeObjectPointer(value, label) {
+  if (!Number.isInteger(value) || value <= 0 || value > 0xffffffff) {
+    throw new Error(`${label} must be a live Lean object pointer`);
+  }
+  return value >>> 0;
+}
 
 export class ObjectValueRuntime {
   hasObjectValueExports() {
@@ -344,6 +354,25 @@ export class ObjectValueRuntime {
       throw new Error(`${label} could not be lowered to a Lean host resource object`);
     }
     return argObj;
+  }
+
+  makeLeanObjectHandleResource(obj, label) {
+    const object = normalizeObjectPointer(obj, label);
+    this.exports.vir_obj_inc(object);
+    let live = true;
+    const handle = Object.freeze({
+      [LEAN_OBJECT_HANDLE]: true,
+      runtime: this,
+      object,
+    });
+    return createHostResource(handle, label, {
+      dispose: () => {
+        if (!live) return undefined;
+        live = false;
+        this.exports.vir_obj_dec(object);
+        return undefined;
+      },
+    });
   }
 
   makeObjectExpr(value, label) {
@@ -1099,6 +1128,16 @@ export class ObjectValueRuntime {
       }
     }
     throw new Error(`${label} did not lift to a live host resource`);
+  }
+
+  retainLeanObjectHandleValue(resource, label) {
+    const handle = hostResourceValue(resource);
+    if (handle?.[LEAN_OBJECT_HANDLE] !== true || handle.runtime !== this) {
+      throw new Error(`${label} must be a live Lean object handle resource`);
+    }
+    const object = normalizeObjectPointer(handle.object, label);
+    this.exports.vir_obj_inc(object);
+    return object;
   }
 
   liftObjectFunction(type, obj, label) {

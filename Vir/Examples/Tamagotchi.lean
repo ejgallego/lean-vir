@@ -825,32 +825,6 @@ inductive ViewAction where
   | reset
   | tick
 
-namespace ViewState
-
-@[vir_js "js.value.tamagotchi.viewState"]
-opaque toJs (state : @& ViewState) : Lean.Vir.RuntimeM (Lean.Vir.Js ViewState)
-
-@[vir_js "js.value.tamagotchi.viewState.value"]
-opaque fromJs (state : @& Lean.Vir.Js ViewState) : Lean.Vir.RuntimeM ViewState
-
-end ViewState
-
-namespace ViewAction
-
-@[vir_js "js.value.tamagotchi.viewAction"]
-opaque toJs (action : @& ViewAction) : Lean.Vir.RuntimeM (Lean.Vir.Js ViewAction)
-
-@[vir_js "js.value.tamagotchi.viewAction.value"]
-opaque fromJs (action : @& Lean.Vir.Js ViewAction) : Lean.Vir.RuntimeM ViewAction
-
-end ViewAction
-
-instance : ReducerBinding ViewState ViewAction where
-  stateToJs := ViewState.toJs
-  stateFromJs := ViewState.fromJs
-  actionToJs := ViewAction.toJs
-  actionFromJs := ViewAction.fromJs
-
 def initialViewState : ViewState :=
   {
     state := Tamagotchi.initialState Tamagotchi.defaultOctopusName "octopus"

@@ -144,6 +144,8 @@ function descriptorLabel(type) {
       return `customInductive ${type.name ?? type.type ?? "?"}`;
     case WIRE.STRUCTURE:
       return `structure ${type.name ?? type.type ?? "?"}`;
+    case WIRE.LEAN_OBJECT:
+      return type.type ?? "LeanObject";
     default:
       return formatInterfaceType(type);
   }

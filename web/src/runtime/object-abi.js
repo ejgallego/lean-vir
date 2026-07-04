@@ -56,6 +56,7 @@ export const OBJECT_VALUE_EXPORTS = [
   "vir_obj_float_value",
   "vir_obj_float32",
   "vir_obj_float32_value",
+  "vir_obj_inc",
   "vir_obj_int",
   "vir_obj_int_decimal",
   "vir_obj_level_imax",

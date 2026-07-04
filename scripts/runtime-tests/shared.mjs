@@ -23,6 +23,7 @@ import {
 } from "../../web/src/vir-runtime.js";
 import {
   INTERFACE_MANIFEST_ARTIFACT,
+  INTERFACE_MANIFEST_VERSION,
   validateInterfaceManifest,
 } from "../../web/src/runtime/interface-manifest.js";
 import { hostResourceValue } from "../../web/src/host-resource.js";
@@ -126,7 +127,7 @@ export function manifestEntry(manifest, name) {
 
 const validManifestShape = {
   artifact: INTERFACE_MANIFEST_ARTIFACT,
-  version: 2,
+  version: INTERFACE_MANIFEST_VERSION,
   metadata: {},
   exports: [
     {

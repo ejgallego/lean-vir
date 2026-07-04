@@ -8,14 +8,15 @@ import { formatInterfaceEffectPrefix, requireInterfaceEffect } from "./interface
 import { SUPPORTED_WIRE_TAGS, WIRE } from "./wire-tags.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 2;
+export const INTERFACE_MANIFEST_VERSION = 4;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   WIRE: "wire",
   CONVERSION: "conversion",
+  OBJECT_HANDLE: "objectHandle",
 });
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
-  "embedded interface manifest must be { version: 2, metadata: {...}, exports: [...] }";
+  "embedded interface manifest must be { version: 4, metadata: {...}, exports: [...] }";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -105,7 +106,7 @@ function validateManifestHostImports(hostImports) {
 
 function requireHostImportBoundary(value, label) {
   if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be wire or conversion`);
+    throw new Error(`${label} must be wire, conversion, or objectHandle`);
   }
 }
 
@@ -154,6 +155,9 @@ export function validateInterfaceType(type, label = "interface type") {
       break;
     case WIRE.FUNCTION:
       validateFunctionType(type, label);
+      break;
+    case WIRE.LEAN_OBJECT:
+      validateLeanObjectType(type, label);
       break;
     default:
       break;
@@ -406,6 +410,12 @@ function validateResourceType(type, label) {
   requireString(type.name, `${label}.name`);
 }
 
+function validateLeanObjectType(type, label) {
+  if (type.kind !== "leanObject") {
+    throw new Error(`${label}.kind must be leanObject`);
+  }
+}
+
 function validateFunctionType(type, label) {
   if (type.kind !== "function") {
     throw new Error(`${label}.kind must be function`);
@@ -485,6 +495,8 @@ export function formatInterfaceType(type) {
       return type.type ?? type.name ?? "Recursive";
     case WIRE.RESOURCE:
       return type.type ?? type.name ?? "Resource";
+    case WIRE.LEAN_OBJECT:
+      return type.type ?? "LeanObject";
     case WIRE.FUNCTION:
       return `(${(type.args ?? []).map((arg) => formatInterfaceType(arg.type)).join(", ")}) -> ${formatInterfaceEffectPrefix(type.effect)}${formatInterfaceType(type.result)}`;
     default:

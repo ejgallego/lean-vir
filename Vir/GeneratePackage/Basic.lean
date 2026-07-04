@@ -133,6 +133,7 @@ inductive InterfaceType where
   | resource (name : Name) (label : String)
   | function (args : Array (String × InterfaceType)) (result : InterfaceType) (effect : InterfaceEffect)
   | expr
+  | leanObject
   deriving BEq, Repr
 
 structure InterfaceArg where
@@ -151,11 +152,13 @@ structure InterfaceExport where
 inductive HostImportBoundary where
   | wire
   | conversion
+  | objectHandle
   deriving BEq, Inhabited
 
 def HostImportBoundary.label : HostImportBoundary → String
   | .wire => "wire"
   | .conversion => "conversion"
+  | .objectHandle => "objectHandle"
 
 structure HostImport where
   slot : Nat

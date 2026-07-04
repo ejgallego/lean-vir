@@ -98,4 +98,21 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   const jsArray = jsResources.resourceForValue([10, 20, 30]);
   assert.equal(jsObjectRuntime.call("freshJsIdNat", jsArray), jsArray);
   assert.equal(jsObjectRuntime.call("freshJsLengthNatArray", jsArray), "3");
+
+  const leanRefSource = join(freshDir, "FreshLeanRef.lean");
+  const leanRefPackage = join(freshDir, "lean-ref.irpkg");
+  await writeRuntimeFixture(leanRefSource, "FreshLeanRef.lean");
+  generateIrPackage(leanRefSource, leanRefPackage);
+  const leanRefRuntime = await createVirRuntimeFactory({ wasmBytes })
+    .createRuntime({ irPackageBytes: await readFile(leanRefPackage) });
+  const leanRefToJsImport = leanRefRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "js.leanRef");
+  assert.equal(leanRefToJsImport?.boundary, "objectHandle");
+  assert.equal(leanRefToJsImport?.args[0]?.type?.kind, "leanObject");
+  assert.equal(leanRefToJsImport?.result?.type, "Js");
+  const leanRefFromJsImport = leanRefRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "js.leanRef.value");
+  assert.equal(leanRefFromJsImport?.boundary, "objectHandle");
+  assert.equal(leanRefFromJsImport?.args[0]?.type?.type, "Js");
+  assert.equal(leanRefFromJsImport?.result?.kind, "leanObject");
+  assert.equal(leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.roundtripName", "Mochi"), "Mochi");
+  assert.equal(leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.roundtripFeed"), "feed");
 }

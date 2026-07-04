@@ -192,6 +192,7 @@ partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : C
   let e := stripMData e
   match e with
   | .forallE .. => functionType e
+  | .bvar _ => return .ok .leanObject
   | _ =>
       let env ← getEnv
       match simpleInterfaceType? e <|> resourceInterfaceType? e with

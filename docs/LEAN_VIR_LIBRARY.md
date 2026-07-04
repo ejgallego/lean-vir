@@ -177,8 +177,19 @@ JavaScript-owned objects. The `α` parameter is a Lean-side phantom marker: whil
 the value remains inside `Js`, the runtime transports it as one host resource
 and does not decode the underlying `α`. This is the intended lane for
 polymorphic JavaScript object APIs that move objects around without inspecting
-their Lean representation. `Vir.Js` also provides explicit scalar conversion
-helpers for JavaScript state/resource values:
+their Lean representation.
+
+`Lean.Vir.LeanRef.toJs` and `Lean.Vir.LeanRef.fromJs` are the generic handle
+lane for Lean-owned values that JavaScript should store or route without
+decoding. They are backed by the intrinsic `js.leanRef` and
+`js.leanRef.value` object-handle imports; the JavaScript host retains the Lean
+object pointer behind a `Js α` resource and returns a fresh owned Lean pointer
+when the value is unwrapped. This avoids the generic `js.value.*` object
+conversion path for state/action values that are only coordinated through
+JavaScript.
+
+`Vir.Js` also provides explicit scalar conversion helpers for JavaScript
+state/resource values:
 
 - `Lean.Vir.JsValue.ofString : @& String -> Lean.Vir.RuntimeM (Lean.Vir.Js String)`
 - `Lean.Vir.JsValue.toString : @& Lean.Vir.Js String -> Lean.Vir.RuntimeM String`
@@ -293,9 +304,11 @@ typed JavaScript resources and must cross public signatures as `Lean.Vir.Js
 
 `Hooks.useReducer` keeps reducer state and actions as ordinary Lean types. The
 low-level React imports move only `Lean.Vir.Js` resources; each concrete
-state/action pair provides explicit `js.value.*` converters through a
-`ReducerBinding state action` instance. Callers still use `Hooks.useReducer`
-and `ReducerDispatch.dispatch`.
+state/action pair provides explicit transport through a
+`ReducerBinding state action` instance. Structured Lean-owned reducer values
+use the default LeanRef-backed binding so React stores opaque handles instead of
+JavaScript-shaped copies. Callers still use `Hooks.useReducer` and
+`ReducerDispatch.dispatch`.
 
 ```lean
 Lean.Vir.React.State.modify count fun previous => do

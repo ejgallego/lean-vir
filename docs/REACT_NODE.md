@@ -280,7 +280,9 @@ The browser React host binding is exposed from
   public Lean surface is `Hooks.useReducer`, backed by a concrete
   `ReducerBinding state action` instance for each reducer state/action pair.
   The low-level host imports move `Js` resources only; the binding supplies
-  explicit `js.value.*` converters for structured state and actions.
+  explicit transport. By default, structured Lean-owned state and actions use
+  `LeanRef.toJs`/`fromJs` so React stores opaque handles instead of decoding
+  them.
 - `react.useRef` calls `React.useRef` while rendering a component and returns a
   host-owned ref object. `react.ref.get` and `react.ref.set` read/write
   `.current`; they do not schedule a render.
