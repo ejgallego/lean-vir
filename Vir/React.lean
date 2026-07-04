@@ -148,10 +148,12 @@ state/action pair is wrapped before crossing that boundary and unwrapped when a
 reducer callback runs.
 -/
 class ReducerBinding (state action : Type) where
-  stateToJs : @& state → Lean.Vir.RuntimeM (Lean.Vir.Js state)
-  stateFromJs : @& Lean.Vir.Js state → Lean.Vir.RuntimeM state
-  actionToJs : @& action → Lean.Vir.RuntimeM (Lean.Vir.Js action)
-  actionFromJs : @& Lean.Vir.Js action → Lean.Vir.RuntimeM action
+  jsState : Type := Lean.Vir.LeanRef.Handle state
+  jsAction : Type := Lean.Vir.LeanRef.Handle action
+  stateToJs : @& state → Lean.Vir.RuntimeM (Lean.Vir.Js jsState)
+  stateFromJs : @& Lean.Vir.Js jsState → Lean.Vir.RuntimeM state
+  actionToJs : @& action → Lean.Vir.RuntimeM (Lean.Vir.Js jsAction)
+  actionFromJs : @& Lean.Vir.Js jsAction → Lean.Vir.RuntimeM action
 
 instance (priority := 100) leanRefReducerBinding {state action : Type} :
     ReducerBinding state action where
@@ -472,8 +474,9 @@ namespace ReducerDispatch
 
 @[vir_js "react.reducer.dispatch"]
 private opaque dispatchJs {state action : Type}
+    {jsAction : Type}
     (dispatch : @& Lean.Vir.Js (ReducerDispatch state action))
-    (action : @& Lean.Vir.Js action) :
+    (action : @& Lean.Vir.Js jsAction) :
     Lean.Vir.RuntimeM Unit
 
 def dispatch {state action : Type} [binding : ReducerBinding state action]
@@ -488,14 +491,16 @@ namespace Hooks
 
 @[vir_js "react.useReducer"]
 private opaque useReducerJs {state action : Type}
-    (reducer : Lean.Vir.Js state → Lean.Vir.Js action → Lean.Vir.RuntimeM (Lean.Vir.Js state))
-    (initial : @& Lean.Vir.Js state) :
+    {jsState jsAction : Type}
+    (reducer : Lean.Vir.Js jsState → Lean.Vir.Js jsAction → Lean.Vir.RuntimeM (Lean.Vir.Js jsState))
+    (initial : @& Lean.Vir.Js jsState) :
     ReactM (Lean.Vir.Js (ReducerState state action))
 
 @[vir_js "react.reducerState.value"]
 private opaque reducerStateValueJs {state action : Type}
+    {jsState : Type}
     (reducerState : @& Lean.Vir.Js (ReducerState state action)) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js state)
+    Lean.Vir.RuntimeM (Lean.Vir.Js jsState)
 
 @[vir_js "react.reducerState.dispatch"]
 private opaque reducerStateDispatchJs {state action : Type}
@@ -504,9 +509,9 @@ private opaque reducerStateDispatchJs {state action : Type}
 
 private def reducerCallback {state action : Type} [binding : ReducerBinding state action]
     (reducer : state → action → Lean.Vir.RuntimeM state)
-    (stateJs : Lean.Vir.Js state)
-    (actionJs : Lean.Vir.Js action) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js state) := do
+    (stateJs : Lean.Vir.Js binding.jsState)
+    (actionJs : Lean.Vir.Js binding.jsAction) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js binding.jsState) := do
   let state ← binding.stateFromJs stateJs
   let action ← binding.actionFromJs actionJs
   let next ← reducer state action

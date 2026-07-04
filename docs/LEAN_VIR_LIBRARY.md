@@ -183,10 +183,11 @@ their Lean representation.
 lane for Lean-owned values that JavaScript should store or route without
 decoding. They are backed by the intrinsic `js.leanRef` and
 `js.leanRef.value` object-handle imports; the JavaScript host retains the Lean
-object pointer behind a `Js α` resource and returns a fresh owned Lean pointer
-when the value is unwrapped. This avoids named structured `js.value.*`
-conversion targets for state/action values that are only coordinated through
-JavaScript.
+object pointer behind a `Lean.Vir.JSL α` resource and returns a fresh owned
+Lean pointer when the value is unwrapped. `JSL α` is an alias for
+`Js (LeanRef.Handle α)`, so `JSL String` is distinct from a true JavaScript
+`Js String`. This avoids named structured `js.value.*` conversion targets for
+state/action values that are only coordinated through JavaScript.
 
 `Vir.Js` also provides explicit scalar conversion helpers for JavaScript
 state/resource values:
@@ -306,9 +307,9 @@ typed JavaScript resources and must cross public signatures as `Lean.Vir.Js
 low-level React imports move only `Lean.Vir.Js` resources; each concrete
 state/action pair provides explicit transport through a
 `ReducerBinding state action` instance. Structured Lean-owned reducer values
-use the default LeanRef-backed binding so React stores opaque handles instead of
-JavaScript-shaped copies. Callers still use `Hooks.useReducer` and
-`ReducerDispatch.dispatch`.
+use the default LeanRef-backed binding, whose storage type is `Lean.Vir.JSL`,
+so React stores opaque retained-Lean handles instead of JavaScript-shaped
+copies. Callers still use `Hooks.useReducer` and `ReducerDispatch.dispatch`.
 
 ```lean
 Lean.Vir.React.State.modify count fun previous => do

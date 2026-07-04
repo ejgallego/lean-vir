@@ -10,6 +10,7 @@ import {
   join,
   readFile,
   runVirIrpkg,
+  spawnSync,
   writeRuntimeFixture,
 } from "./shared.mjs";
 
@@ -74,6 +75,17 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /unsupported JavaScript import argument `action`/,
     /inductive `Vir\.Fixtures\.BadJsValue\.Action` is not a JavaScript boundary type/,
   ], ["Vir.Fixtures.BadJsValue.roundtripFeed"]);
+
+  const badJslStringSource = join(freshDir, "BadJSLString.lean");
+  await writeRuntimeFixture(badJslStringSource, "BadJSLString.lean");
+  const checkedBadJslString = spawnSync("lake", ["env", "lean", badJslStringSource], {
+    encoding: "utf8",
+  });
+  assert.notEqual(checkedBadJslString.status, 0, "LeanRef-wrapped String unexpectedly typechecked as Js String");
+  const badJslStringOutput = `${checkedBadJslString.stderr}${checkedBadJslString.stdout}`;
+  assert.match(badJslStringOutput, /Application type mismatch/);
+  assert.match(badJslStringOutput, /Lean\.Vir\.JSL String/);
+  assert.match(badJslStringOutput, /Lean\.Vir\.Js String/);
 
   await assertUnsupportedInterfaceFixture(freshDir, "DuplicateExportNames.lean", [
     /Duplicate\.entry/,

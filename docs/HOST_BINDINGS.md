@@ -91,6 +91,8 @@ React boundary in `Js` resources; concrete `ReducerBinding state action`
 instances provide explicit transport for each reducer state/action pair. For
 structured Lean-owned values, the default reducer binding uses
 `Lean.Vir.LeanRef.toJs`/`fromJs` instead of `js.value.*` conversion targets.
+Those helpers store `Lean.Vir.JSL state` and `Lean.Vir.JSL action` values, so
+a retained Lean string does not typecheck as a JavaScript-shaped `Js String`.
 Reducer callbacks are retained per hook slot,
 replaced after committed renders, and released on failed render, unmount,
 package reload, or runtime dispose.

@@ -123,8 +123,8 @@ Current RF status:
 - `useState`, `useReducer`, and resource-shaped `useEffect` are delegated to
   React's hook runtime. `useReducer` uses concrete `ReducerBinding state action`
   instances to supply explicit transport for state and action values. Lean-owned
-  structured values use the default LeanRef transport so React stores opaque
-  handles.
+  structured values use the default LeanRef transport so React stores
+  `Lean.Vir.JSL` handles, distinct from JavaScript-shaped `Js` values.
 - `useEffectWithDeps` exposes React's dependency-array shape for string
   dependencies, with callback release handled by the host layer when
   dependencies are unchanged.

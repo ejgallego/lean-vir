@@ -236,7 +236,9 @@ Lean-to-JavaScript host imports use the same package-owned signature idea in
 format 7: the shim and `VirHostState` exchange borrowed/owned Lean object
 arguments and results for package-declared host imports through
 `env.vir_js_call_objects`. Format 8 adds the `leanObject` descriptor used by
-generic `Lean.Vir.LeanRef.toJs` / `fromJs` object handles.
+generic `Lean.Vir.LeanRef.toJs` / `fromJs` object handles. On the Lean side
+those handles are surfaced as `Lean.Vir.JSL α`, an alias that remains distinct
+from JavaScript-shaped `Js α` resources.
 Function-valued imports are rooted with only their arity and effect bit in the
 shim. JavaScript keeps the full function descriptor on the `VirCallback` wrapper,
 so calls back into Lean lower arguments to owned objects and lift the owned object
