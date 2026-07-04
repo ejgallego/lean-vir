@@ -8,6 +8,6 @@ namespace Vir.GeneratePackage
 
 def currentPackageFormatVersion : Nat := 8
 
-def currentInterfaceManifestVersion : Nat := 4
+def currentInterfaceManifestVersion : Nat := 5
 
 end Vir.GeneratePackage

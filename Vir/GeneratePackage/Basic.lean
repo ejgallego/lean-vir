@@ -151,13 +151,13 @@ structure InterfaceExport where
 
 inductive HostImportBoundary where
   | wire
-  | conversion
+  | explicitConversion
   | objectHandle
   deriving BEq, Inhabited
 
 def HostImportBoundary.label : HostImportBoundary → String
   | .wire => "wire"
-  | .conversion => "conversion"
+  | .explicitConversion => "explicitConversion"
   | .objectHandle => "objectHandle"
 
 structure HostImport where

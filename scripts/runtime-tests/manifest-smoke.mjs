@@ -276,7 +276,7 @@ for (const target of [
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
-  assert.equal(entry?.boundary, "conversion");
+  assert.equal(entry?.boundary, "explicitConversion");
 }
 const leanRefImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "js.leanRef");
 assert.equal(leanRefImports.length, 1);

@@ -2333,13 +2333,13 @@ var JSON_INPUT_WIRE_TAGS = /* @__PURE__ */ new Set([
 
 // web/src/runtime/interface-manifest.js
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_VERSION = 4;
+var INTERFACE_MANIFEST_VERSION = 5;
 var HOST_IMPORT_BOUNDARY = Object.freeze({
   WIRE: "wire",
-  CONVERSION: "conversion",
+  EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle"
 });
-var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 4, metadata: {...}, exports: [...] }";
+var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 5, metadata: {...}, exports: [...] }";
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -2418,7 +2418,7 @@ function validateManifestHostImports(hostImports) {
 }
 function requireHostImportBoundary(value, label) {
   if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be wire, conversion, or objectHandle`);
+    throw new Error(`${label} must be wire, explicitConversion, or objectHandle`);
   }
 }
 function requireUnique(seen, value, label, owner = "interface export") {
@@ -5410,7 +5410,7 @@ var VirHostState = class {
     }
     const args = [];
     const liftedCallbacks = [];
-    const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.CONVERSION;
+    const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION;
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
       if (argObjects.length !== entry.args.length) {
