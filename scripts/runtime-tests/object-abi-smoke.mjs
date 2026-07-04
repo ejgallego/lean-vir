@@ -84,6 +84,17 @@ function callResolvedObjects(runtime, name, args) {
   }
 }
 
+function callHostImportObjects(runtime, slot, args) {
+  const argvPtr = runtime.allocBytes(new Uint8Array(args.length * 4));
+  try {
+    const view = new DataView(runtime.exports.memory.buffer, argvPtr, args.length * 4);
+    args.forEach((arg, index) => view.setUint32(index * 4, arg, true));
+    return runtime.hostState.callObjects(slot, argvPtr, args.length);
+  } finally {
+    runtime.freeBytes(argvPtr);
+  }
+}
+
 function withCallLaneCounters(runtime, body) {
   const originalExports = runtime.exports;
   const counters = { objectCalls: 0, bytePayloadCalls: 0 };
@@ -107,6 +118,8 @@ function withCallLaneCounters(runtime, body) {
 }
 
 const resourceType = { type: "Resource", wireTag: WIRE.RESOURCE };
+const jsResourceType = { type: "Js", wireTag: WIRE.RESOURCE, kind: "resource", name: "Lean.Vir.Js" };
+const leanObjectType = { type: "LeanObject", wireTag: WIRE.LEAN_OBJECT, kind: "leanObject" };
 const unitType = { type: "Unit", wireTag: WIRE.UNIT };
 const stringType = { type: "String", wireTag: WIRE.STRING };
 assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
@@ -166,6 +179,56 @@ assert.throws(
   () => runtime.retainLeanObjectHandleValue(leanHandleResource, "released lean object handle"),
   /released lean object handle must be a live Lean object handle resource/,
 );
+const leanHandleHostRuntime = await createVirRuntime({ wasmBytes, irPackageBytes });
+try {
+  leanHandleHostRuntime.hostState.setManifest({
+    hostImports: [{
+      target: "js.leanRef",
+      boundary: "objectHandle",
+      args: [{ name: "value", type: leanObjectType }],
+      result: jsResourceType,
+    }],
+  });
+  let hostLeanHandleObj = makeObjectString(leanHandleHostRuntime, "host-state-lean-ref");
+  let hostLeanHandleResultObj = 0;
+  let hostLeanHandleResource = null;
+  try {
+    hostLeanHandleResultObj = callHostImportObjects(leanHandleHostRuntime, 0, [hostLeanHandleObj]);
+    leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleObj);
+    hostLeanHandleObj = 0;
+    hostLeanHandleResource = leanHandleHostRuntime.liftHostWireObjectValue(
+      jsResourceType,
+      hostLeanHandleResultObj,
+      "host-state lean ref result",
+    );
+  } finally {
+    if (hostLeanHandleObj !== 0) {
+      leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleObj);
+    }
+    if (hostLeanHandleResultObj !== 0) {
+      leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleResultObj);
+    }
+  }
+  let retainedHostLeanHandleObj = leanHandleHostRuntime.retainLeanObjectHandleValue(
+    hostLeanHandleResource,
+    "host-state lean ref value",
+  );
+  try {
+    assert.equal(leanHandleHostRuntime.readObjectString(retainedHostLeanHandleObj), "host-state-lean-ref");
+  } finally {
+    leanHandleHostRuntime.exports.vir_obj_dec(retainedHostLeanHandleObj);
+    retainedHostLeanHandleObj = 0;
+  }
+  assert.equal(leanHandleHostRuntime.hostState.leanObjectResources.size, 1);
+  leanHandleHostRuntime.hostState.dispose();
+  assert.equal(leanHandleHostRuntime.hostState.leanObjectResources.size, 0);
+  assert.throws(
+    () => leanHandleHostRuntime.retainLeanObjectHandleValue(hostLeanHandleResource, "disposed host-state lean ref"),
+    /disposed host-state lean ref must be a live Lean object handle resource/,
+  );
+} finally {
+  leanHandleHostRuntime.dispose();
+}
 const callbackWithRawStringType = {
   type: "Function",
   wireTag: WIRE.FUNCTION,
