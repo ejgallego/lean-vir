@@ -36,6 +36,7 @@ def InterfaceType.label : InterfaceType → String
   | .resource _ label => label
   | .function .. => "Function"
   | .expr => "Lean.Expr"
+  | .leanObject => "LeanObject"
 
 def InterfaceType.wireTag : InterfaceType → Nat
   | .unit => 22
@@ -63,6 +64,7 @@ def InterfaceType.wireTag : InterfaceType → Nat
   | .resource .. => 23
   | .function .. => 24
   | .expr => 15
+  | .leanObject => 27
 
 def ctorShortName (inductiveName ctorName : Name) : String :=
   let prefixText := inductiveName.toString ++ "."
@@ -228,6 +230,12 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ("effect", jsonString effect.label),
         ("args", jsonArray argJson),
         ("result", result.toJson)
+      ]
+  | .leanObject =>
+      jsonObject #[
+        ("type", jsonString ty.label),
+        ("wireTag", jsonNat ty.wireTag),
+        ("kind", jsonString "leanObject")
       ]
   | _ =>
       jsonObject #[

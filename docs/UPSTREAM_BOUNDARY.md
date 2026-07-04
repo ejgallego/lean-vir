@@ -163,9 +163,12 @@ Package format 7 also records host-import arity, erased-prefix count, effect,
 and manifest type descriptors for Lean-to-JavaScript calls. The shim uses the
 arity/effect metadata to send borrowed Lean object arguments through
 `env.vir_js_call_objects`, and JavaScript uses the manifest descriptors to lift
-arguments and lower the owned Lean object result. The shim caches export
-signature summaries by package generation and slot, so compact signature bytes
-are streamed once per loaded package rather than on every call.
+arguments and lower the owned Lean object result. Package format 8 adds the
+opaque `leanObject` descriptor for generic LeanRef object handles, surfaced to
+Lean as `Lean.Vir.JSL α` so they do not typecheck as JavaScript-shaped `Js α`
+resources. The shim caches export signature summaries by package generation
+and slot, so compact signature bytes are streamed once per loaded package
+rather than on every call.
 
 `vir_call_resolved_objects(slot, argv, argc)` is the first object ABI call
 helper. It accepts an array of owned `lean_object *` arguments, consumes those

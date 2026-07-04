@@ -113,14 +113,15 @@ dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
 The manifest includes package metadata plus one entry per export with its Lean
 declaration name, JavaScript name, argument types, result type, and recursive
 type tree. It also includes `hostImports` for Lean declarations marked with
-`@[vir_js "..."]`, including their `wire` or `conversion` host boundary.
+`@[vir_js "..."]`, including their `wire`, `conversion`, or `objectHandle`
+host boundary.
 JavaScript validates inputs against that manifest, lowers values to owned Lean
 objects with `vir_obj_*` helpers, and calls
 `vir_call_resolved_objects`. When interpreted Lean code reaches a host import,
 the shim calls the runtime's `env.vir_js_call_objects` import with borrowed Lean
 object arguments, and JavaScript returns an owned Lean object result. Package
-format 7 keeps package-owned signatures for object-call validation and callback
-rooting.
+format 7 and newer keep package-owned signatures for object-call validation and
+callback rooting.
 
 Supported interface types:
 
@@ -141,6 +142,9 @@ Supported interface types:
 - opaque host resources;
 - `Lean.Vir.Js α`, an opaque `Js` resource for JavaScript-owned objects whose
   `α` parameter is a Lean-side phantom shape;
+- `Lean.Vir.LeanRef.toJs` / `fromJs`, which move Lean-owned objects through an
+  opaque `Lean.Vir.JSL α` handle without decoding the Lean value in
+  JavaScript;
 - Lean function values used as host callbacks;
 - `Lean.Expr`;
 - `Lean.Vir.React.Node` as an opaque JavaScript-owned resource under
@@ -157,8 +161,9 @@ exported entrypoints and host imports. JavaScript resource/runtime APIs use
 `Lean.Vir.RuntimeM α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
 render-construction APIs use `Lean.Vir.React.ReactM α`. Host imports are
 narrower than exports: low-level JavaScript imports should expose
-`Lean.Vir.Js α` resources, resource-shaped containers/callbacks, or explicit
-conversion targets. Raw Lean scalar and structure host imports are rejected.
+`Lean.Vir.Js α` resources, resource-shaped containers/callbacks, or built-in
+named conversion targets. Raw Lean scalar and structure host imports are
+rejected.
 Host imports are currently synchronous, with at most 128 imported declarations
 and IR arity at most 6. Leading erased type parameters on host imports are
 recorded in package format 6 and newer and skipped before JavaScript-visible

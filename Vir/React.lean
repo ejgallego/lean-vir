@@ -83,7 +83,8 @@ opaque StateSetter (α : Type) : Type
 React reducer dispatch function returned by `useReducer`.
 
 The JavaScript host owns the underlying dispatch function. Lean callbacks can
-retain the typed handle and pass actions back through `ReducerDispatch.dispatch`.
+retain the typed handle and pass `Js action` values back through
+`ReducerDispatch.dispatch`.
 -/
 opaque ReducerDispatch (state action : Type) : Type
 
@@ -134,24 +135,17 @@ structure State (α : Type) where
   value : α
   setter : Lean.Vir.Js (StateSetter α)
 
-/-- React reducer value and dispatch function returned by `useReducer`. -/
-structure ReducerState (state action : Type) where
-  value : state
-  dispatch : Lean.Vir.Js (ReducerDispatch state action)
-
 /--
-Explicit reducer conversions for a state/action pair.
+React reducer value and dispatch function returned by `useReducer`.
 
-`Hooks.useReducer` and `ReducerDispatch.dispatch` only expose `Lean.Vir.Js`
-resources at the JavaScript boundary. Instances describe how a concrete Lean
-state/action pair is wrapped before crossing that boundary and unwrapped when a
-reducer callback runs.
+Reducer state and actions live in JavaScript-land. Use `Js` resources directly
+for JavaScript-owned state. Use `Lean.Vir.JSL α` when React should store a
+retained Lean-owned value, and call `Lean.Vir.LeanRef.toJs` / `fromJs`
+explicitly at the application boundary.
 -/
-class ReducerBinding (state action : Type) where
-  stateToJs : @& state → Lean.Vir.RuntimeM (Lean.Vir.Js state)
-  stateFromJs : @& Lean.Vir.Js state → Lean.Vir.RuntimeM state
-  actionToJs : @& action → Lean.Vir.RuntimeM (Lean.Vir.Js action)
-  actionFromJs : @& Lean.Vir.Js action → Lean.Vir.RuntimeM action
+structure ReducerState (state action : Type) where
+  value : Lean.Vir.Js state
+  dispatch : Lean.Vir.Js (ReducerDispatch state action)
 
 /--
 React node object class created by the JavaScript host through React's public
@@ -469,11 +463,10 @@ private opaque dispatchJs {state action : Type}
     (action : @& Lean.Vir.Js action) :
     Lean.Vir.RuntimeM Unit
 
-def dispatch {state action : Type} [binding : ReducerBinding state action]
+def dispatch {state action : Type}
     (dispatch : Lean.Vir.Js (ReducerDispatch state action))
-    (action : action) : Lean.Vir.RuntimeM Unit := do
-  let jsAction ← binding.actionToJs action
-  dispatchJs dispatch jsAction
+    (action : Lean.Vir.Js action) : Lean.Vir.RuntimeM Unit :=
+  dispatchJs dispatch action
 
 end ReducerDispatch
 
@@ -494,16 +487,6 @@ private opaque reducerStateValueJs {state action : Type}
 private opaque reducerStateDispatchJs {state action : Type}
     (reducerState : @& Lean.Vir.Js (ReducerState state action)) :
     Lean.Vir.RuntimeM (Lean.Vir.Js (ReducerDispatch state action))
-
-private def reducerCallback {state action : Type} [binding : ReducerBinding state action]
-    (reducer : state → action → Lean.Vir.RuntimeM state)
-    (stateJs : Lean.Vir.Js state)
-    (actionJs : Lean.Vir.Js action) :
-    Lean.Vir.RuntimeM (Lean.Vir.Js state) := do
-  let state ← binding.stateFromJs stateJs
-  let action ← binding.actionFromJs actionJs
-  let next ← reducer state action
-  binding.stateToJs next
 
 @[vir_js "react.useState"]
 private opaque useStateJs {α : Type}
@@ -526,15 +509,13 @@ def useState {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (State (Lean.Vir
   let setter ← stateSetterJs state
   pure { value, setter }
 
-def useReducer {state action : Type} [binding : ReducerBinding state action]
-    (reducer : state → action → Lean.Vir.RuntimeM state)
-    (initial : state) : ReactM (ReducerState state action) := do
-  let initialJs ← binding.stateToJs initial
-  let reducerStateJs ← useReducerJs (reducerCallback reducer) initialJs
+def useReducer {state action : Type}
+    (reducer : Lean.Vir.Js state → Lean.Vir.Js action → Lean.Vir.RuntimeM (Lean.Vir.Js state))
+    (initial : @& Lean.Vir.Js state) : ReactM (ReducerState state action) := do
+  let reducerStateJs ← useReducerJs reducer initial
   let valueJs ← reducerStateValueJs reducerStateJs
-  let value ← binding.stateFromJs valueJs
   let dispatch ← reducerStateDispatchJs reducerStateJs
-  pure { value, dispatch }
+  pure { value := valueJs, dispatch }
 
 @[vir_js "react.useRef"]
 opaque useRef {α : Type} (initial : @& Lean.Vir.Js α) : ReactM (Lean.Vir.Js (Ref (Lean.Vir.Js α)))

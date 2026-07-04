@@ -20,10 +20,14 @@ from ordinary Lean values with `Lean.Vir.JsValue`.
 Raw Lean scalar and structure types are rejected in ordinary host imports. The
 only scalar-shaped host imports are explicit conversion targets such as
 `js.string`, `js.string.value`, `js.nat`, `js.nat.value`, `js.bool`,
-`js.bool.value`, `js.float`, and `js.float.value`, plus structured
-`js.value.*` converters used by React, infoview, ProofWidgets, and examples.
-The package manifest records each host import boundary as `wire` or
-`conversion`, and the runtime dispatches them through the corresponding path.
+`js.bool.value`, `js.float`, and `js.float.value`. Structured values that
+JavaScript must inspect use named conversion targets such as
+`js.value.react.property`, `js.value.react.eventHandler`, and
+`js.value.proofwidgets.resolvedRef.value`; `js.value.*` is not a wildcard
+extension lane. Lean-owned values that JavaScript only stores or routes can use
+the `js.leanRef` object-handle boundary. The package manifest records each
+host import boundary as `wire`, `conversion`, or `objectHandle`, and the
+runtime dispatches them through the corresponding path.
 
 ## Built-In Targets
 
@@ -83,11 +87,15 @@ component. The hook bindings `react.useState`, `react.useRef`,
 render-time `ReactM` operations. `useRef` returns a host-owned React ref object;
 `react.ref.get` and `react.ref.set` are `RuntimeM` operations over its
 `current` field and do not schedule renders. `useReducer` keeps the low-level
-React boundary in `Js` resources; concrete `ReducerBinding state action`
-instances provide explicit `js.value.*` conversions for each reducer
-state/action pair. Reducer callbacks are retained per hook slot, replaced after
-committed renders, and released on failed render, unmount, package reload, or
-runtime dispose.
+React boundary in `Js` resources. Reducer state and actions are typed by their
+JavaScript resource marker, so structured Lean-owned values use
+`Lean.Vir.JSL state` and `Lean.Vir.JSL action` explicitly with
+`Lean.Vir.LeanRef.toJs`/`fromJs` instead of `js.value.*` conversion targets.
+A retained Lean string therefore does not typecheck as a JavaScript-shaped
+`Js String`.
+Reducer callbacks are retained per hook slot,
+replaced after committed renders, and released on failed render, unmount,
+package reload, or runtime dispose.
 `useEffect` currently has a resource shape: setup returns a
 host resource, and cleanup receives the same resource at React's cleanup point.
 The no-deps binding reruns after committed renders. `useEffectWithDeps` maps to
@@ -175,7 +183,7 @@ console.log(vir.call("bumpFromJs", 41)); // "42"
 Host imports are a JavaScript-resource boundary by default: use `Lean.Vir.Js α`
 resources, `Option`/`Array` containers of resources, and callback types whose
 arguments/results follow the same rule. Raw Lean scalars and structures are
-rejected unless they are part of an explicit conversion target such as
+rejected unless they are part of a built-in conversion target such as
 `js.nat.value` or `js.value.react.property`. `Unit` returns use
 `undefined` or `null`. Function-valued Lean arguments are decoded as callable
 `VirCallback` objects. A host binding that stores a callback must eventually
@@ -208,6 +216,10 @@ setters, React node resources, event listeners, timers, and animation frames.
 Their API cleanup is owned by the binding that created them: listener removal,
 timer/frame cancellation, React root unmounting, React node callback release,
 and final runtime/package teardown all go through the shared resource store.
+Lean-owned object handles created by `js.leanRef` use the same `Js` resource
+transport, but their payload is a retained Lean object pointer. The runtime
+increments the object when creating the resource and decrements it when the
+resource is released during package/runtime teardown.
 
 Some resources are callback-local rather than retained:
 
@@ -239,10 +251,9 @@ need a focused pass once the API and examples are more mature:
   from a retained handle. Examples that call `JsValue.ofString`, `ofNat`, or
   `ofBool` immediately before `State.set` may retain those scalar wrappers
   longer than necessary.
-- `react.useReducer` avoids scalar wrapper state for structured reducer values,
-  but each concrete reducer state/action pair still needs concrete low-level
-  `@[vir_js]` declarations behind its `ReducerBinding` instance until the host
-  import ABI supports polymorphic callback arguments directly.
+- `react.useReducer` avoids scalar wrapper state for structured reducer values
+  when callers use `Lean.Vir.JSL` handles, but those handles are retained for
+  the reducer lifetime and should still be covered by resource lifetime tests.
 - A future cleanup should decide whether render-time state values and
   direct-set scalar values need a scoped borrowed/owned API, debug resource
   counters, or a small retain/release discipline instead of relying on runtime

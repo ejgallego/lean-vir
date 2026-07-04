@@ -30,6 +30,7 @@ export const WIRE = Object.freeze({
   FUNCTION: 24,
   CUSTOM_INDUCTIVE: 25,
   RECURSIVE_SELF: 26,
+  LEAN_OBJECT: 27,
 });
 
 export const SUPPORTED_WIRE_TAGS = new Set(Object.values(WIRE));

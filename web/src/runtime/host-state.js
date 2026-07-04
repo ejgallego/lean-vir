@@ -4,10 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING } from "../host-resource.js";
+import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING, releaseHostResource } from "../host-resource.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import { isVirCallback, releaseCallbacks } from "./callbacks.js";
 import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
+import { WIRE } from "./wire-tags.js";
 
 export class VirHostState {
   constructor({
@@ -21,6 +22,7 @@ export class VirHostState {
     this.defaultBindings = defaultHostBindings;
     this.runtime = null;
     this.resourceRoots = new ExternrefResourceRoots();
+    this.leanObjectResources = new Set();
     this.callError = null;
   }
 
@@ -80,6 +82,9 @@ export class VirHostState {
     if (entry === null) {
       throw new Error(`Vir host import slot ${slot} is not registered`);
     }
+    if (entry.boundary === HOST_IMPORT_BOUNDARY.OBJECT_HANDLE) {
+      return this.callObjectHandle(entry, argvPtr, argc);
+    }
     const binding = lookupHostBinding(entry.target, this.userBindings, this.defaultBindings);
     if (typeof binding !== "function") {
       throw new Error(`Vir host import binding not found: ${entry.target}`);
@@ -122,6 +127,29 @@ export class VirHostState {
       : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
   }
 
+  callObjectHandle(entry, argvPtr, argc) {
+    const argObjects = this.readObjectArgv(argvPtr, argc);
+    if (argObjects.length !== entry.args.length) {
+      throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
+    }
+    if (entry.target === "js.leanRef" && entry.args.length === 1 &&
+        isLeanObjectDescriptor(entry.args[0]?.type) && isGenericJsResourceDescriptor(entry.result)) {
+      const resource = this.runtime.makeLeanObjectHandleResource(argObjects[0], `${entry.target} argument ${entry.args[0].name}`);
+      this.leanObjectResources.add(resource);
+      return this.runtime.makeHostWireObjectValue(entry.result, resource, `${entry.target} result`);
+    }
+    if (entry.target === "js.leanRef.value" && entry.args.length === 1 &&
+        isGenericJsResourceDescriptor(entry.args[0]?.type) && isLeanObjectDescriptor(entry.result)) {
+      const resource = this.runtime.liftHostWireObjectValue(
+        entry.args[0].type,
+        argObjects[0],
+        `${entry.target} argument ${entry.args[0].name}`,
+      );
+      return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} result`);
+    }
+    throw new Error(`Vir host import ${entry.target} has unsupported objectHandle signature`);
+  }
+
   readObjectArgv(argvPtr, argc) {
     if (argvPtr === 0 && argc !== 0) {
       throw new Error("Vir host import object argv pointer is null");
@@ -133,9 +161,28 @@ export class VirHostState {
   dispose() {
     this.clearCallError();
     this.clearResourceRoots();
-    disposeHostBindings(this.userBindings);
-    disposeHostBindings(this.defaultBindings);
+    try {
+      disposeHostBindings(this.userBindings);
+      disposeHostBindings(this.defaultBindings);
+    } finally {
+      this.releaseLeanObjectResources();
+    }
   }
+
+  releaseLeanObjectResources() {
+    for (const resource of Array.from(this.leanObjectResources)) {
+      releaseHostResource(resource);
+    }
+    this.leanObjectResources.clear();
+  }
+}
+
+function isLeanObjectDescriptor(type) {
+  return type?.wireTag === WIRE.LEAN_OBJECT && type?.kind === "leanObject";
+}
+
+function isGenericJsResourceDescriptor(type) {
+  return type?.wireTag === WIRE.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";
 }
 
 function disposeHostBindings(bindings) {

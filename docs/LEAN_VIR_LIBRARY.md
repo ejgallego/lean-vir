@@ -177,8 +177,20 @@ JavaScript-owned objects. The `α` parameter is a Lean-side phantom marker: whil
 the value remains inside `Js`, the runtime transports it as one host resource
 and does not decode the underlying `α`. This is the intended lane for
 polymorphic JavaScript object APIs that move objects around without inspecting
-their Lean representation. `Vir.Js` also provides explicit scalar conversion
-helpers for JavaScript state/resource values:
+their Lean representation.
+
+`Lean.Vir.LeanRef.toJs` and `Lean.Vir.LeanRef.fromJs` are the generic handle
+lane for Lean-owned values that JavaScript should store or route without
+decoding. They are backed by the intrinsic `js.leanRef` and
+`js.leanRef.value` object-handle imports; the JavaScript host retains the Lean
+object pointer behind a `Lean.Vir.JSL α` resource and returns a fresh owned
+Lean pointer when the value is unwrapped. `JSL α` is an alias for
+`Js (LeanRef.Handle α)`, so `JSL String` is distinct from a true JavaScript
+`Js String`. This avoids named structured `js.value.*` conversion targets for
+state/action values that are only coordinated through JavaScript.
+
+`Vir.Js` also provides explicit scalar conversion helpers for JavaScript
+state/resource values:
 
 - `Lean.Vir.JsValue.ofString : @& String -> Lean.Vir.RuntimeM (Lean.Vir.Js String)`
 - `Lean.Vir.JsValue.toString : @& Lean.Vir.Js String -> Lean.Vir.RuntimeM String`
@@ -254,7 +266,6 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.EventHandler`
 - `Lean.Vir.React.State α`
 - `Lean.Vir.React.ReducerState state action`
-- `Lean.Vir.React.ReducerBinding state action`
 - `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.createElement : @& String -> Option String -> Array Lean.Vir.React.Property -> Array Lean.Vir.React.EventHandler -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
@@ -265,8 +276,8 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
-- `Lean.Vir.React.Hooks.useReducer : [Lean.Vir.React.ReducerBinding state action] -> (state -> action -> Lean.Vir.RuntimeM state) -> state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
-- `Lean.Vir.React.ReducerDispatch.dispatch : [Lean.Vir.React.ReducerBinding state action] -> Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> action -> Lean.Vir.RuntimeM Unit`
+- `Lean.Vir.React.Hooks.useReducer : (Lean.Vir.Js state -> Lean.Vir.Js action -> Lean.Vir.RuntimeM (Lean.Vir.Js state)) -> @& Lean.Vir.Js state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
+- `Lean.Vir.React.ReducerDispatch.dispatch : Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> Lean.Vir.Js action -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.RuntimeM (Lean.Vir.Js α)) -> Lean.Vir.RuntimeM Unit`
 
@@ -291,11 +302,12 @@ are runtime-side calls to React setter resources, not DOM mutations. They are
 typed JavaScript resources and must cross public signatures as `Lean.Vir.Js
 (Lean.Vir.React.StateSetter α)`.
 
-`Hooks.useReducer` keeps reducer state and actions as ordinary Lean types. The
-low-level React imports move only `Lean.Vir.Js` resources; each concrete
-state/action pair provides explicit `js.value.*` converters through a
-`ReducerBinding state action` instance. Callers still use `Hooks.useReducer`
-and `ReducerDispatch.dispatch`.
+`Hooks.useReducer` keeps reducer state and actions in JavaScript-land. The
+reducer receives `Lean.Vir.Js state` and `Lean.Vir.Js action` values and returns
+the next `Lean.Vir.Js state`. Structured Lean-owned reducer values should use
+`Lean.Vir.JSL` handles and explicit `Lean.Vir.LeanRef.toJs` / `fromJs` calls at
+the application boundary, so React stores retained-Lean handles instead of
+JavaScript-shaped copies.
 
 ```lean
 Lean.Vir.React.State.modify count fun previous => do
@@ -343,7 +355,7 @@ component. `Vir.ProofWidgets.Rpc` adds the first narrow RPC-reference shape:
 host-inspectable reference descriptor and updates component-owned React state
 from the callback. The public RPC helpers keep accepting `RpcRef`, but their
 low-level host targets receive `Js RpcRef` resources built by the
-`proofwidgets.rpc.ref` conversion targets. Resolve callbacks receive
+`proofwidgets.rpc.ref` host targets. Resolve callbacks receive
 `Js ResolvedRef` resources and decode them through
 `js.value.proofwidgets.resolvedRef.value` before running user callbacks. In live
 infoview widgets,
@@ -454,7 +466,7 @@ const vir = await createVirRuntime({
 Host imports use an explicit JavaScript-resource boundary by default. Use
 `Lean.Vir.Js α` resources, containers of resources, or callbacks whose
 arguments/results are resource-shaped. Raw Lean scalars and structures are
-rejected unless the target is an explicit conversion primitive such as
+rejected unless the target is a built-in conversion primitive such as
 `js.nat.value` or `js.value.react.property`. `Unit` results should return
 `undefined` or `null`.
 
@@ -504,8 +516,9 @@ host boundary is synchronous; returning a JavaScript `Promise` is an error. The
 current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.
-The JSON manifest also records each host import boundary as `wire` or
-`conversion`, plus effect labels as `pure`, `runtime`, `io`, `dom`, or `react`.
+The JSON manifest also records each host import boundary as `wire`,
+`conversion`, or `objectHandle`, plus effect labels as `pure`, `runtime`, `io`,
+`dom`, or `react`.
 
 ## Runtime Behavior
 

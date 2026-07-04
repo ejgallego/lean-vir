@@ -191,22 +191,25 @@ structure of the rendered tree lives in the host resource graph created by
 `react.node.text` and `react.node.createElement`. Their scalar text/tag/key
 inputs are explicit `Lean.Vir.Js String` resources. Ordinary `Property`,
 `PropValue`, and `EventHandler` payloads cross only through explicit
-`js.value.react.*` conversion targets.
+`js.value.react.property` and `js.value.react.eventHandler` conversion
+targets.
 
 Entry points and host imports can be pure functions or synchronous effect
 actions. Host imports are deliberately narrower than exports: low-level
 JavaScript imports should expose `Lean.Vir.Js α` resources, resource-shaped
 containers/callbacks, or explicit conversion targets such as `js.string.value`.
 Raw Lean scalar and structure host imports are rejected, except at explicit
-`js.value.*` conversion targets. JavaScript resource/runtime APIs use
-`Lean.Vir.RuntimeM α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
-component construction uses `Lean.Vir.React.ReactM α`. For Lean-to-JavaScript
-calls, import `Vir.Host` and mark an opaque declaration with
+named conversion targets or the `js.leanRef` object-handle boundary. JavaScript
+resource/runtime APIs use `Lean.Vir.RuntimeM α`; browser APIs use
+`Lean.Vir.Browser.DomM α`; React component construction uses
+`Lean.Vir.React.ReactM α`. For Lean-to-JavaScript calls, import `Vir.Host` and
+mark an opaque declaration with
 `@[vir_js "target.name"]`, or use the starter declarations in `Vir.Common` and
 `Vir.Browser`. The manifest records each host import under `hostImports` with
-its slot, Lean name, JavaScript target, host boundary mode (`wire` or
-`conversion`), generated WASM symbol, low-level IR arity, leading erased
-argument count, JavaScript-visible arguments, result type, and effect.
+its slot, Lean name, JavaScript target, host boundary mode (`wire`,
+`conversion`, or `objectHandle`), generated WASM symbol, low-level IR arity,
+leading erased argument count, JavaScript-visible arguments, result type, and
+effect.
 The JSON manifest keeps the source-level effect classification for review and
 tooling: `pure`, `runtime`, `io`, `dom`, or `react`. The compact wasm call
 descriptor still lowers that to the runtime distinction the shim needs today:
@@ -232,7 +235,10 @@ committed component-model boundary.
 Lean-to-JavaScript host imports use the same package-owned signature idea in
 format 7: the shim and `VirHostState` exchange borrowed/owned Lean object
 arguments and results for package-declared host imports through
-`env.vir_js_call_objects`.
+`env.vir_js_call_objects`. Format 8 adds the `leanObject` descriptor used by
+generic `Lean.Vir.LeanRef.toJs` / `fromJs` object handles. On the Lean side
+those handles are surfaced as `Lean.Vir.JSL α`, an alias that remains distinct
+from JavaScript-shaped `Js α` resources.
 Function-valued imports are rooted with only their arity and effect bit in the
 shim. JavaScript keeps the full function descriptor on the `VirCallback` wrapper,
 so calls back into Lean lower arguments to owned objects and lift the owned object
@@ -256,11 +262,12 @@ boundaries when they reduce to a supported interface type.
 
 The manifest and package payload are trusted in this prototype. The JavaScript
 runtime validates the embedded manifest before exposing entries. For format 7
-packages, the WASM shim uses the package-owned compact export signature table
-to validate object calls for `vir_call_resolved_objects`. Host-import dispatch
-uses package-owned arity/effect metadata, while JavaScript uses the manifest
-descriptors for argument/result conversion. Closure roots likewise store only
-arity/effect metadata; JavaScript keeps the full callback descriptor.
+and newer packages, the WASM shim uses the package-owned compact export
+signature table to validate object calls for `vir_call_resolved_objects`.
+Host-import dispatch uses package-owned arity/effect metadata, while
+JavaScript uses the manifest descriptors for argument/result conversion.
+Closure roots likewise store only arity/effect metadata; JavaScript keeps the
+full callback descriptor.
 
 This is acceptable for the current generated demo packages and local developer
 packages. It is not a hardened boundary for arbitrary remote `.irpkg` files.

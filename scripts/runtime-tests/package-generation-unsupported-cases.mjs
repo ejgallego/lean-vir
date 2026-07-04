@@ -10,6 +10,7 @@ import {
   join,
   readFile,
   runVirIrpkg,
+  spawnSync,
   writeRuntimeFixture,
 } from "./shared.mjs";
 
@@ -59,6 +60,40 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /unsupported JavaScript import result/,
     /callback `Function` is not a JavaScript boundary type/,
   ], ["freshCustomBump", "freshCustomCounter", "freshCustomCallbackResult"]);
+
+  await assertUnsupportedInterfaceFixture(freshDir, "BadLeanRef.lean", [
+    /actionToJs/,
+    /unsupported JavaScript import argument `action`/,
+    /inductive `Vir\.Fixtures\.BadLeanRef\.Action` is not a JavaScript boundary type/,
+    /actionFromJs/,
+    /unsupported JavaScript import result/,
+    /inductive `Vir\.Fixtures\.BadLeanRef\.Action` is not a JavaScript boundary type/,
+  ], ["Vir.Fixtures.BadLeanRef.roundtripFeed"]);
+
+  await assertUnsupportedInterfaceFixture(freshDir, "BadJsValue.lean", [
+    /actionToJs/,
+    /unsupported JavaScript import argument `action`/,
+    /inductive `Vir\.Fixtures\.BadJsValue\.Action` is not a JavaScript boundary type/,
+  ], ["Vir.Fixtures.BadJsValue.roundtripFeed"]);
+
+  const badJslStringSource = join(freshDir, "BadJSLString.lean");
+  await writeRuntimeFixture(badJslStringSource, "BadJSLString.lean");
+  const builtVirJs = spawnSync("lake", ["build", "Vir.Js"], {
+    encoding: "utf8",
+  });
+  assert.equal(
+    builtVirJs.status,
+    0,
+    `failed to build Vir.Js before BadJSLString typecheck:\n${builtVirJs.stderr}${builtVirJs.stdout}`,
+  );
+  const checkedBadJslString = spawnSync("lake", ["env", "lean", badJslStringSource], {
+    encoding: "utf8",
+  });
+  assert.notEqual(checkedBadJslString.status, 0, "LeanRef-wrapped String unexpectedly typechecked as Js String");
+  const badJslStringOutput = `${checkedBadJslString.stderr}${checkedBadJslString.stdout}`;
+  assert.match(badJslStringOutput, /Application type mismatch/);
+  assert.match(badJslStringOutput, /Lean\.Vir\.JSL String/);
+  assert.match(badJslStringOutput, /Lean\.Vir\.Js String/);
 
   await assertUnsupportedInterfaceFixture(freshDir, "DuplicateExportNames.lean", [
     /Duplicate\.entry/,

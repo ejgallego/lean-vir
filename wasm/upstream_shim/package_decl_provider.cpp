@@ -73,7 +73,7 @@ static uint32_t g_package_generation = 1;
 static uint32_t g_package_format_version = 0;
 
 static bool supported_package_version(uint32_t version) {
-    return 1 <= version && version <= 7;
+    return 1 <= version && version <= 8;
 }
 
 static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
@@ -705,6 +705,7 @@ public:
         case 22:
         case 23:
         case 26:
+        case 27:
             break;
         default:
             fail("unsupported interface type tag " + std::to_string(tag));

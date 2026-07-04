@@ -273,14 +273,26 @@ for (const target of [
   "js.value.proofwidgets.resolvedRef.value",
   "js.value.react.eventHandler",
   "js.value.react.property",
-  "js.value.tamagotchi.viewAction",
-  "js.value.tamagotchi.viewAction.value",
-  "js.value.tamagotchi.viewState",
-  "js.value.tamagotchi.viewState.value",
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
   assert.equal(entry?.boundary, "conversion");
+}
+const leanRefImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "js.leanRef");
+assert.equal(leanRefImports.length, 1);
+for (const entry of leanRefImports) {
+  assert.equal(entry.effect, "runtime");
+  assert.equal(entry.boundary, "objectHandle");
+  assert.equal(entry.args[0]?.type?.kind, "leanObject");
+  assert.equal(entry.result?.type, "Js");
+}
+const leanRefValueImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "js.leanRef.value");
+assert.equal(leanRefValueImports.length, 1);
+for (const entry of leanRefValueImports) {
+  assert.equal(entry.effect, "runtime");
+  assert.equal(entry.boundary, "objectHandle");
+  assert.equal(entry.args[0]?.type?.type, "Js");
+  assert.equal(entry.result?.kind, "leanObject");
 }
 for (const target of [
   "react.state.modify",

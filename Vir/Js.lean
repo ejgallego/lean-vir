@@ -48,4 +48,46 @@ opaque toFloat (value : @& Js Float) : RuntimeM Float
 
 end JsValue
 
+namespace LeanRef
+
+/--
+Phantom marker for a Lean-owned value retained behind a JavaScript host
+resource.
+-/
+opaque Handle (α : Type) : Type
+
+end LeanRef
+
+/--
+JavaScript host resource containing a retained Lean-owned value.
+
+`JSL α` is definitionally `Js (LeanRef.Handle α)`, not `Js α`. This keeps
+LeanRef handles from being confused with true JavaScript-shaped resources such
+as `Js String`.
+-/
+abbrev JSL (α : Type) : Type :=
+  Js (LeanRef.Handle α)
+
+namespace LeanRef
+
+/--
+Wraps a Lean-owned value in an opaque `Js` resource handle.
+
+JavaScript stores and routes the resulting resource without decoding `α`. The
+runtime retains the underlying Lean object while the handle is live.
+-/
+@[vir_js "js.leanRef"]
+opaque toJs {α : Type} (value : @& α) : RuntimeM (JSL α)
+
+/--
+Returns the Lean-owned value stored behind a `Js` resource handle.
+
+Unwrapping does not consume the JavaScript handle; the runtime returns a fresh
+owned Lean reference to the stored object.
+-/
+@[vir_js "js.leanRef.value"]
+opaque fromJs {α : Type} (value : @& JSL α) : RuntimeM α
+
+end LeanRef
+
 end Lean.Vir
