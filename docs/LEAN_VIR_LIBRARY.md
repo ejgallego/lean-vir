@@ -266,7 +266,6 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.EventHandler`
 - `Lean.Vir.React.State α`
 - `Lean.Vir.React.ReducerState state action`
-- `Lean.Vir.React.ReducerBinding state action`
 - `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.createElement : @& String -> Option String -> Array Lean.Vir.React.Property -> Array Lean.Vir.React.EventHandler -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
@@ -277,8 +276,8 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.renderComponent : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.React.Component props -> props -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
-- `Lean.Vir.React.Hooks.useReducer : [Lean.Vir.React.ReducerBinding state action] -> (state -> action -> Lean.Vir.RuntimeM state) -> state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
-- `Lean.Vir.React.ReducerDispatch.dispatch : [Lean.Vir.React.ReducerBinding state action] -> Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> action -> Lean.Vir.RuntimeM Unit`
+- `Lean.Vir.React.Hooks.useReducer : (Lean.Vir.Js state -> Lean.Vir.Js action -> Lean.Vir.RuntimeM (Lean.Vir.Js state)) -> @& Lean.Vir.Js state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
+- `Lean.Vir.React.ReducerDispatch.dispatch : Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> Lean.Vir.Js action -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.RuntimeM (Lean.Vir.Js α)) -> Lean.Vir.RuntimeM Unit`
 
@@ -303,13 +302,12 @@ are runtime-side calls to React setter resources, not DOM mutations. They are
 typed JavaScript resources and must cross public signatures as `Lean.Vir.Js
 (Lean.Vir.React.StateSetter α)`.
 
-`Hooks.useReducer` keeps reducer state and actions as ordinary Lean types. The
-low-level React imports move only `Lean.Vir.Js` resources; each concrete
-state/action pair provides explicit transport through a
-`ReducerBinding state action` instance. Structured Lean-owned reducer values
-use the default LeanRef-backed binding, whose storage type is `Lean.Vir.JSL`,
-so React stores opaque retained-Lean handles instead of JavaScript-shaped
-copies. Callers still use `Hooks.useReducer` and `ReducerDispatch.dispatch`.
+`Hooks.useReducer` keeps reducer state and actions in JavaScript-land. The
+reducer receives `Lean.Vir.Js state` and `Lean.Vir.Js action` values and returns
+the next `Lean.Vir.Js state`. Structured Lean-owned reducer values should use
+`Lean.Vir.JSL` handles and explicit `Lean.Vir.LeanRef.toJs` / `fromJs` calls at
+the application boundary, so React stores retained-Lean handles instead of
+JavaScript-shaped copies.
 
 ```lean
 Lean.Vir.React.State.modify count fun previous => do
@@ -518,8 +516,9 @@ host boundary is synchronous; returning a JavaScript `Promise` is an error. The
 current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.
-The JSON manifest also records each host import boundary as `wire` or
-`conversion`, plus effect labels as `pure`, `runtime`, `io`, `dom`, or `react`.
+The JSON manifest also records each host import boundary as `wire`,
+`conversion`, or `objectHandle`, plus effect labels as `pure`, `runtime`, `io`,
+`dom`, or `react`.
 
 ## Runtime Behavior
 

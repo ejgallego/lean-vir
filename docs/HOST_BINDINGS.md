@@ -87,12 +87,12 @@ component. The hook bindings `react.useState`, `react.useRef`,
 render-time `ReactM` operations. `useRef` returns a host-owned React ref object;
 `react.ref.get` and `react.ref.set` are `RuntimeM` operations over its
 `current` field and do not schedule renders. `useReducer` keeps the low-level
-React boundary in `Js` resources; concrete `ReducerBinding state action`
-instances provide explicit transport for each reducer state/action pair. For
-structured Lean-owned values, the default reducer binding uses
+React boundary in `Js` resources. Reducer state and actions are typed by their
+JavaScript resource marker, so structured Lean-owned values use
+`Lean.Vir.JSL state` and `Lean.Vir.JSL action` explicitly with
 `Lean.Vir.LeanRef.toJs`/`fromJs` instead of `js.value.*` conversion targets.
-Those helpers store `Lean.Vir.JSL state` and `Lean.Vir.JSL action` values, so
-a retained Lean string does not typecheck as a JavaScript-shaped `Js String`.
+A retained Lean string therefore does not typecheck as a JavaScript-shaped
+`Js String`.
 Reducer callbacks are retained per hook slot,
 replaced after committed renders, and released on failed render, unmount,
 package reload, or runtime dispose.
@@ -251,10 +251,9 @@ need a focused pass once the API and examples are more mature:
   from a retained handle. Examples that call `JsValue.ofString`, `ofNat`, or
   `ofBool` immediately before `State.set` may retain those scalar wrappers
   longer than necessary.
-- `react.useReducer` avoids scalar wrapper state for structured reducer values,
-  but each concrete reducer state/action pair still needs concrete low-level
-  `@[vir_js]` declarations behind its `ReducerBinding` instance until the host
-  import ABI supports polymorphic callback arguments directly.
+- `react.useReducer` avoids scalar wrapper state for structured reducer values
+  when callers use `Lean.Vir.JSL` handles, but those handles are retained for
+  the reducer lifetime and should still be covered by resource lifetime tests.
 - A future cleanup should decide whether render-time state values and
   direct-set scalar values need a scoped borrowed/owned API, debug resource
   counters, or a small retain/release discipline instead of relying on runtime

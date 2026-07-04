@@ -875,16 +875,30 @@ def reduceViewState (view : ViewState) : ViewAction → Lean.Vir.RuntimeM ViewSt
           secondsLeft := view.secondsLeft - 1
         }
 
-def useViewState (initial : ViewState := initialViewState) : ReactM (ReducerState ViewState ViewAction) :=
-  Hooks.useReducer reduceViewState (normalizeView initial)
+abbrev ViewReducerState : Type :=
+  ReducerState (Lean.Vir.LeanRef.Handle ViewState) (Lean.Vir.LeanRef.Handle ViewAction)
 
-def dispatchViewAction (hook : ReducerState ViewState ViewAction) (action : ViewAction) : DomM Unit :=
-  ReducerDispatch.dispatch hook.dispatch action
+def reduceViewStateJs
+    (viewJs : Lean.Vir.JSL ViewState)
+    (actionJs : Lean.Vir.JSL ViewAction) :
+    Lean.Vir.RuntimeM (Lean.Vir.JSL ViewState) := do
+  let view ← Lean.Vir.LeanRef.fromJs viewJs
+  let action ← Lean.Vir.LeanRef.fromJs actionJs
+  let next ← reduceViewState view action
+  Lean.Vir.LeanRef.toJs next
 
-def tick (hook : ReducerState ViewState ViewAction) : DomM Unit :=
+def useViewState (initial : ViewState := initialViewState) : ReactM ViewReducerState := do
+  let initialJs ← Lean.Vir.LeanRef.toJs (normalizeView initial)
+  Hooks.useReducer reduceViewStateJs initialJs
+
+def dispatchViewAction (hook : ViewReducerState) (action : ViewAction) : DomM Unit := do
+  let actionJs ← Lean.Vir.LeanRef.toJs action
+  ReducerDispatch.dispatch hook.dispatch actionJs
+
+def tick (hook : ViewReducerState) : DomM Unit :=
   dispatchViewAction hook .tick
 
-def useLiveTick (hook : ReducerState ViewState ViewAction) : ReactM Unit := do
+def useLiveTick (hook : ViewReducerState) : ReactM Unit := do
   Hooks.useEffectWithDeps #[]
     (Lean.Vir.Browser.Timer.setInterval liveTickMs (tick hook))
     (fun interval => Lean.Vir.Browser.Timer.clearInterval interval)
@@ -939,7 +953,8 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
 
 def View : Component Unit := fun _ => do
   let hook ← useViewState
-  let state := normalizeViewState hook.value.state
+  let view ← Lean.Vir.LeanRef.fromJs hook.value
+  let state := normalizeViewState view.state
   useLiveTick hook
   let actionButton := fun action => do
     let text ← Node.text action.label
@@ -998,7 +1013,7 @@ def View : Component Unit := fun _ => do
       ]
       #[]
       #[moodText]
-  let progress ← progressBar hook.value.secondsLeft
+  let progress ← progressBar view.secondsLeft
   let petState ←
     Node.divWith
       #[Property.classList #["pet-state"], petStageStyle]
