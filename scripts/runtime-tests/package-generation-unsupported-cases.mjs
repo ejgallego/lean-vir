@@ -72,8 +72,9 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
 
   await assertUnsupportedInterfaceFixture(freshDir, "BadJsValue.lean", [
     /actionToJs/,
-    /unsupported JavaScript import argument `action`/,
-    /inductive `Vir\.Fixtures\.BadJsValue\.Action` is not a JavaScript boundary type/,
+    /declaration is marked with `@\[vir_js_explicit_conversion\]`/,
+    /js\.value\.bad\.action/,
+    /not a supported explicit conversion signature/,
   ], ["Vir.Fixtures.BadJsValue.roundtripFeed"]);
 
   const badJslStringSource = join(freshDir, "BadJSLString.lean");

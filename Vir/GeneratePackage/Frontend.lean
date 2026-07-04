@@ -14,14 +14,20 @@ open Lean.IR
 
 def jsExternPrefix : String := "__vir_js:"
 
+def jsExplicitConversionExternPrefix : String := "__vir_js_explicit_conversion:"
+
+def externTargetWithPrefix? (pfx symbol : String) : Option String :=
+  if symbol.startsWith pfx then
+    some (symbol.drop pfx.length).toString
+  else
+    none
+
 def virJsTargetFromExternData? (data : ExternAttrData) : Option String :=
   data.entries.findSome? fun entry =>
     match entry with
     | .standard _ symbol =>
-        if symbol.startsWith jsExternPrefix then
-          some (symbol.drop jsExternPrefix.length).toString
-        else
-          none
+        externTargetWithPrefix? jsExternPrefix symbol <|>
+          externTargetWithPrefix? jsExplicitConversionExternPrefix symbol
     | _ => none
 
 def virJsTargetFromDecl? : Decl → Option String
@@ -30,6 +36,16 @@ def virJsTargetFromDecl? : Decl → Option String
 
 def isVirJsDecl (decl : Decl) : Bool :=
   virJsTargetFromDecl? decl |>.isSome
+
+def virJsExplicitConversionTargetFromExternData? (data : ExternAttrData) : Option String :=
+  data.entries.findSome? fun entry =>
+    match entry with
+    | .standard _ symbol => externTargetWithPrefix? jsExplicitConversionExternPrefix symbol
+    | _ => none
+
+def isVirJsExplicitConversionDecl : Decl → Bool
+  | .extern _ _ _ data => virJsExplicitConversionTargetFromExternData? data |>.isSome
+  | _ => false
 
 def dropEvalCommandLines (input : String) : String :=
   "\n".intercalate <|

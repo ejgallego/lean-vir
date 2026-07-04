@@ -341,7 +341,7 @@ def required (value : Bool) : Property :=
 def selected (value : Bool) : Property :=
   bool "selected" value
 
-@[vir_js "js.value.react.property"]
+@[vir_js_explicit_conversion "js.value.react.property"]
 opaque toJs (value : @& Property) : Lean.Vir.RuntimeM (Lean.Vir.Js Property)
 
 end Property
@@ -434,7 +434,7 @@ def onSubmit (callback : Lean.Vir.Browser.DomM Unit) : EventHandler :=
 def onSubmitWith (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) : EventHandler :=
   on "onSubmit" callback
 
-@[vir_js "js.value.react.eventHandler"]
+@[vir_js_explicit_conversion "js.value.react.eventHandler"]
 opaque toJs (value : @& EventHandler) : Lean.Vir.RuntimeM (Lean.Vir.Js EventHandler)
 
 end EventHandler
