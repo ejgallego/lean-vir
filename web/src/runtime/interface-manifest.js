@@ -8,15 +8,15 @@ import { formatInterfaceEffectPrefix, requireInterfaceEffect } from "./interface
 import { SUPPORTED_WIRE_TAGS, WIRE } from "./wire-tags.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 4;
+export const INTERFACE_MANIFEST_VERSION = 5;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   WIRE: "wire",
-  CONVERSION: "conversion",
+  EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle",
 });
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
-  "embedded interface manifest must be { version: 4, metadata: {...}, exports: [...] }";
+  "embedded interface manifest must be { version: 5, metadata: {...}, exports: [...] }";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -106,7 +106,7 @@ function validateManifestHostImports(hostImports) {
 
 function requireHostImportBoundary(value, label) {
   if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be wire, conversion, or objectHandle`);
+    throw new Error(`${label} must be wire, explicitConversion, or objectHandle`);
   }
 }
 

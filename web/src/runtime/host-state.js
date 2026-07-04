@@ -92,7 +92,7 @@ export class VirHostState {
 
     const args = [];
     const liftedCallbacks = [];
-    const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.CONVERSION;
+    const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION;
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
       if (argObjects.length !== entry.args.length) {

@@ -26,7 +26,7 @@ JavaScript must inspect use named conversion targets such as
 `js.value.proofwidgets.resolvedRef.value`; `js.value.*` is not a wildcard
 extension lane. Lean-owned values that JavaScript only stores or routes can use
 the `js.leanRef` object-handle boundary. The package manifest records each
-host import boundary as `wire`, `conversion`, or `objectHandle`, and the
+host import boundary as `wire`, `explicitConversion`, or `objectHandle`, and the
 runtime dispatches them through the corresponding path.
 
 ## Built-In Targets

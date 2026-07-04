@@ -207,7 +207,7 @@ mark an opaque declaration with
 `@[vir_js "target.name"]`, or use the starter declarations in `Vir.Common` and
 `Vir.Browser`. The manifest records each host import under `hostImports` with
 its slot, Lean name, JavaScript target, host boundary mode (`wire`,
-`conversion`, or `objectHandle`), generated WASM symbol, low-level IR arity,
+`explicitConversion`, or `objectHandle`), generated WASM symbol, low-level IR arity,
 leading erased argument count, JavaScript-visible arguments, result type, and
 effect.
 The JSON manifest keeps the source-level effect classification for review and

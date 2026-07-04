@@ -206,7 +206,7 @@ def hostImportBoundary
     (result : InterfaceType)
     (effect : InterfaceEffect) : Except String HostImportBoundary :=
   if isJsValueConversionSignature target args result effect then
-    .ok .conversion
+    .ok .explicitConversion
   else if isLeanObjectHandleSignature target args result effect then
     .ok .objectHandle
   else
