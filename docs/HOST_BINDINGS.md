@@ -34,6 +34,20 @@ the corresponding path. Explicit conversion declarations use
 generic shape, and the JavaScript runtime still requires a matching host binding
 for the declared target.
 
+For example, a package can define a named conversion for a Lean structure when
+the JavaScript host binding wants to inspect that structure and return a real
+JavaScript resource:
+
+```lean
+structure Payload where
+  name : String
+  count : Nat
+
+@[vir_js_explicit_conversion "test.payload"]
+opaque payloadToJs (payload : @& Payload) :
+  Lean.Vir.RuntimeM (Lean.Vir.Js Payload)
+```
+
 ## Built-In Targets
 
 `Lean.Vir.Common.echoString` and `Lean.Vir.Common.addNat` map to `common.*`

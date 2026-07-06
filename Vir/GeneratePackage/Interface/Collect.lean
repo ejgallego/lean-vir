@@ -76,10 +76,6 @@ def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : Interf
 def boxedBoundaryDiagnostic (name : Name) : String :=
   s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
 
-def InterfaceType.isHostResourceWire : InterfaceType → Bool
-  | .resource .. => true
-  | _ => false
-
 def InterfaceType.isGenericJsResourceWire : InterfaceType → Bool
   | .resource name label => name == `Lean.Vir.Js && label == "Js"
   | _ => false
@@ -93,13 +89,6 @@ def InterfaceType.isExplicitConversionValue : InterfaceType → Bool
   | .function ..
   | .leanObject => false
   | _ => true
-
-def InterfaceType.hasTypeName (expected : Name) : InterfaceType → Bool
-  | .simpleEnum name ..
-  | .taggedUnion name ..
-  | .customInductive name ..
-  | .structure name .. => name == expected
-  | _ => false
 
 def InterfaceType.hostBoundaryKind : InterfaceType → String
   | .unit
