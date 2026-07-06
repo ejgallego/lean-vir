@@ -93,21 +93,3 @@ initialize virJsExplicitConversionAttr : ParametricAttribute Lean.Vir.JsImport â
       | .ok env => setEnv env
       | .error error => throwError error
   }
-
-namespace Lean.Vir
-
-/--
-Returns the JavaScript host import metadata for `declName`, if the declaration
-was marked with `@[vir_js]` in `env`.
--/
-def getJsImport? (env : Environment) (declName : Name) : Option JsImport :=
-  _root_.virJsAttr.getParam? env declName
-
-/--
-Returns the explicit conversion host import metadata for `declName`, if the
-declaration was marked with `@[vir_js_explicit_conversion]` in `env`.
--/
-def getJsExplicitConversionImport? (env : Environment) (declName : Name) : Option JsImport :=
-  _root_.virJsExplicitConversionAttr.getParam? env declName
-
-end Lean.Vir
