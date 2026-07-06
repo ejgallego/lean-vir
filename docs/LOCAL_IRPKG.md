@@ -142,7 +142,7 @@ Supported interface types:
 - opaque host resources;
 - `Lean.Vir.Js α`, an opaque `Js` resource for JavaScript-owned objects whose
   `α` parameter is a Lean-side phantom shape;
-- `Lean.Vir.LeanRef.toJs` / `fromJs`, which move Lean-owned objects through an
+- `Lean.Vir.LeanRef.toJSL` / `fromJSL`, which move Lean-owned objects through an
   opaque `Lean.Vir.JSL α` handle without decoding the Lean value in
   JavaScript;
 - Lean function values used as host callbacks;

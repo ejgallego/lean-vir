@@ -179,8 +179,8 @@ and does not decode the underlying `α`. This is the intended lane for
 polymorphic JavaScript object APIs that move objects around without inspecting
 their Lean representation.
 
-`Lean.Vir.LeanRef.toJs`, `Lean.Vir.LeanRef.fromJs`, and
-`Lean.Vir.LeanRef.release` are the generic handle lane for Lean-owned values
+`Lean.Vir.LeanRef.toJSL`, `Lean.Vir.LeanRef.fromJSL`, and
+`Lean.Vir.LeanRef.releaseJSL` are the generic handle lane for Lean-owned values
 that JavaScript should store or route without decoding. They are backed by the
 intrinsic `js.leanRef`, `js.leanRef.value`, and `js.leanRef.release`
 object-handle imports. The JavaScript host retains the Lean object pointer
@@ -308,7 +308,7 @@ typed JavaScript resources and must cross public signatures as `Lean.Vir.Js
 `Hooks.useReducer` keeps reducer state and actions in JavaScript-land. The
 reducer receives `Lean.Vir.Js state` and `Lean.Vir.Js action` values and returns
 the next `Lean.Vir.Js state`. Structured Lean-owned reducer values should use
-`Lean.Vir.JSL` handles and explicit `Lean.Vir.LeanRef.toJs` / `fromJs` calls at
+`Lean.Vir.JSL` handles and explicit `Lean.Vir.LeanRef.toJSL` / `fromJSL` calls at
 the application boundary, so React stores retained-Lean handles instead of
 JavaScript-shaped copies.
 

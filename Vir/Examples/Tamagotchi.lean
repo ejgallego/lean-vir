@@ -882,17 +882,17 @@ def reduceViewStateJs
     (viewJs : Lean.Vir.JSL ViewState)
     (actionJs : Lean.Vir.JSL ViewAction) :
     Lean.Vir.RuntimeM (Lean.Vir.JSL ViewState) := do
-  let view ← Lean.Vir.LeanRef.fromJs viewJs
-  let action ← Lean.Vir.LeanRef.fromJs actionJs
+  let view ← Lean.Vir.LeanRef.fromJSL viewJs
+  let action ← Lean.Vir.LeanRef.fromJSL actionJs
   let next ← reduceViewState view action
-  Lean.Vir.LeanRef.toJs next
+  Lean.Vir.LeanRef.toJSL next
 
 def useViewState (initial : ViewState := initialViewState) : ReactM ViewReducerState := do
-  let initialJs ← Lean.Vir.LeanRef.toJs (normalizeView initial)
+  let initialJs ← Lean.Vir.LeanRef.toJSL (normalizeView initial)
   Hooks.useReducer reduceViewStateJs initialJs
 
 def dispatchViewAction (hook : ViewReducerState) (action : ViewAction) : DomM Unit := do
-  let actionJs ← Lean.Vir.LeanRef.toJs action
+  let actionJs ← Lean.Vir.LeanRef.toJSL action
   ReducerDispatch.dispatch hook.dispatch actionJs
 
 def tick (hook : ViewReducerState) : DomM Unit :=
@@ -953,7 +953,7 @@ def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
 
 def View : Component Unit := fun _ => do
   let hook ← useViewState
-  let view ← Lean.Vir.LeanRef.fromJs hook.value
+  let view ← Lean.Vir.LeanRef.fromJSL hook.value
   let state := normalizeViewState view.state
   useLiveTick hook
   let actionButton := fun action => do

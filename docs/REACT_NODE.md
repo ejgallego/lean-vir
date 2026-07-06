@@ -279,7 +279,7 @@ The browser React host binding is exposed from
 - `react.useReducer` calls `React.useReducer` while rendering a component. The
   public Lean surface is JS-shaped: reducers receive `Js state` and
   `Js action`, return `Js state`, and dispatch consumes `Js action`. Structured
-  Lean-owned state and actions use explicit `LeanRef.toJs`/`fromJs` calls so
+  Lean-owned state and actions use explicit `LeanRef.toJSL`/`fromJSL` calls so
   React stores `Lean.Vir.JSL` handles instead of decoding them or confusing
   them with JavaScript-shaped `Js` values.
 - `react.useRef` calls `React.useRef` while rendering a component and returns a

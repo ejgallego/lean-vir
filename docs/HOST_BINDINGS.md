@@ -94,7 +94,7 @@ render-time `ReactM` operations. `useRef` returns a host-owned React ref object;
 React boundary in `Js` resources. Reducer state and actions are typed by their
 JavaScript resource marker, so structured Lean-owned values use
 `Lean.Vir.JSL state` and `Lean.Vir.JSL action` explicitly with
-`Lean.Vir.LeanRef.toJs`/`fromJs` instead of `js.value.*` conversion targets.
+`Lean.Vir.LeanRef.toJSL`/`fromJSL` instead of `js.value.*` conversion targets.
 A retained Lean string therefore does not typecheck as a JavaScript-shaped
 `Js String`.
 Reducer callbacks are retained per hook slot,
@@ -223,7 +223,7 @@ and final runtime/package teardown all go through the shared resource store.
 Lean-owned object handles created by `js.leanRef` use the same `Js` resource
 transport, but their payload is a retained Lean object pointer. The runtime
 increments the object when creating the resource and decrements it when the
-handle is released with `Lean.Vir.LeanRef.release` or during package/runtime
+handle is released with `Lean.Vir.LeanRef.releaseJSL` or during package/runtime
 teardown.
 
 Some resources are callback-local rather than retained:

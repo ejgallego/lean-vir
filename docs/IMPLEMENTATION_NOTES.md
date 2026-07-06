@@ -86,7 +86,7 @@ Lean infoview RPC compatibility remains follow-up work tracked in
 
 Open React/JSL ownership research: `Lean.Vir.JSL α` handles are retained
 Lean-owned objects that JavaScript can store without decoding. The current
-primitive gives Lean code deterministic `LeanRef.release` and runtime teardown,
+primitive gives Lean code deterministic `LeanRef.releaseJSL` and runtime teardown,
 but React ownership is more subtle than a single live/dead flag. React state,
 reducers, and refs can rewrap the same JSL payload in different host-resource
 stores, and future automatic cleanup of replaced reducer state/actions must not
