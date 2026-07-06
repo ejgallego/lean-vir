@@ -201,12 +201,16 @@ def hostImportResultBoundaryDiagnostic? (result : InterfaceType) : Option String
     some s!"unsupported JavaScript import result: {hostBoundaryTypeDiagnostic result}"
 
 def hostImportBoundary
+    (isExplicitConversion : Bool)
     (target : String)
     (args : Array InterfaceArg)
     (result : InterfaceType)
     (effect : InterfaceEffect) : Except String HostImportBoundary :=
-  if isJsValueConversionSignature target args result effect then
-    .ok .explicitConversion
+  if isExplicitConversion then
+    if isJsValueConversionSignature target args result effect then
+      .ok .explicitConversion
+    else
+      .error s!"declaration is marked with `@[vir_js_explicit_conversion]`, but `{target}` is not a supported explicit conversion signature"
   else if isLeanObjectHandleSignature target args result effect then
     .ok .objectHandle
   else
@@ -279,7 +283,8 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
         source := loaded.source,
         reason := s!"JavaScript import IR arity mismatch: expected {expectedArity}, got {arity}"
       }
-    match hostImportBoundary target args result effect with
+    let isExplicitConversion := isVirJsExplicitConversionDecl loaded.decl
+    match hostImportBoundary isExplicitConversion target args result effect with
     | .error reason =>
         return .error {
           name := loaded.decl.name,

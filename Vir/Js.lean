@@ -22,28 +22,28 @@ opaque Js (α : Type) : Type
 
 namespace JsValue
 
-@[vir_js "js.string"]
+@[vir_js_explicit_conversion "js.string"]
 opaque ofString (value : @& String) : RuntimeM (Js String)
 
-@[vir_js "js.string.value"]
+@[vir_js_explicit_conversion "js.string.value"]
 opaque toString (value : @& Js String) : RuntimeM String
 
-@[vir_js "js.nat"]
+@[vir_js_explicit_conversion "js.nat"]
 opaque ofNat (value : Nat) : RuntimeM (Js Nat)
 
-@[vir_js "js.nat.value"]
+@[vir_js_explicit_conversion "js.nat.value"]
 opaque toNat (value : @& Js Nat) : RuntimeM Nat
 
-@[vir_js "js.bool"]
+@[vir_js_explicit_conversion "js.bool"]
 opaque ofBool (value : Bool) : RuntimeM (Js Bool)
 
-@[vir_js "js.bool.value"]
+@[vir_js_explicit_conversion "js.bool.value"]
 opaque toBool (value : @& Js Bool) : RuntimeM Bool
 
-@[vir_js "js.float"]
+@[vir_js_explicit_conversion "js.float"]
 opaque ofFloat (value : Float) : RuntimeM (Js Float)
 
-@[vir_js "js.float.value"]
+@[vir_js_explicit_conversion "js.float.value"]
 opaque toFloat (value : @& Js Float) : RuntimeM Float
 
 end JsValue
