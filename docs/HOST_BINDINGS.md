@@ -223,7 +223,8 @@ and final runtime/package teardown all go through the shared resource store.
 Lean-owned object handles created by `js.leanRef` use the same `Js` resource
 transport, but their payload is a retained Lean object pointer. The runtime
 increments the object when creating the resource and decrements it when the
-resource is released during package/runtime teardown.
+handle is released with `Lean.Vir.LeanRef.release` or during package/runtime
+teardown.
 
 Some resources are callback-local rather than retained:
 

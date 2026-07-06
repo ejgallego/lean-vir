@@ -179,15 +179,18 @@ and does not decode the underlying `α`. This is the intended lane for
 polymorphic JavaScript object APIs that move objects around without inspecting
 their Lean representation.
 
-`Lean.Vir.LeanRef.toJs` and `Lean.Vir.LeanRef.fromJs` are the generic handle
-lane for Lean-owned values that JavaScript should store or route without
-decoding. They are backed by the intrinsic `js.leanRef` and
-`js.leanRef.value` object-handle imports; the JavaScript host retains the Lean
-object pointer behind a `Lean.Vir.JSL α` resource and returns a fresh owned
-Lean pointer when the value is unwrapped. `JSL α` is an alias for
-`Js (LeanRef.Handle α)`, so `JSL String` is distinct from a true JavaScript
-`Js String`. This avoids named structured `js.value.*` conversion targets for
-state/action values that are only coordinated through JavaScript.
+`Lean.Vir.LeanRef.toJs`, `Lean.Vir.LeanRef.fromJs`, and
+`Lean.Vir.LeanRef.release` are the generic handle lane for Lean-owned values
+that JavaScript should store or route without decoding. They are backed by the
+intrinsic `js.leanRef`, `js.leanRef.value`, and `js.leanRef.release`
+object-handle imports. The JavaScript host retains the Lean object pointer
+behind a `Lean.Vir.JSL α` resource, returns a fresh owned Lean pointer when the
+value is unwrapped, and releases the retained pointer when the handle is
+explicitly released or torn down with the runtime.
+`JSL α` is an alias for `Js (LeanRef.Handle α)`, so `JSL String` is distinct
+from a true JavaScript `Js String`. This avoids named structured `js.value.*`
+conversion targets for state/action values that are only coordinated through
+JavaScript.
 
 `Vir.Js` also provides explicit scalar conversion helpers for JavaScript
 state/resource values:

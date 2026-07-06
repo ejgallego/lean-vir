@@ -209,7 +209,7 @@ assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.equal(reactDocumentState.elements.get("#react-unmount").reactRoot, undefined);
 assert.throws(
   () => reactRuntime.call("ReactCounter.renderAfterUnmount", "#react-stale-root"),
-  /ReactRoot resource is not live/,
+  /react\.root\.render argument root did not lift to a live host resource/,
 );
 assert.equal(reactRuntime.liveCallbacks.size, 0);
 assert.throws(

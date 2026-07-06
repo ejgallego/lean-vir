@@ -212,8 +212,10 @@ created through `react.node.createElement`. Host imports are narrower than
 exports: low-level JavaScript imports use `Lean.Vir.Js α` resources,
 resource-shaped containers/callbacks, or explicit conversion targets such as
 `js.nat.value`; concrete Lean-owned values can also opt into the
-`js.leanRef`/`js.leanRef.value` object-handle boundary, which stores the Lean
-object behind a `Lean.Vir.JSL α` resource instead of decoding it to JavaScript.
+`js.leanRef`/`js.leanRef.value`/`js.leanRef.release` object-handle boundary,
+which stores the Lean object behind a `Lean.Vir.JSL α` resource instead of
+decoding it to JavaScript. `LeanRef.release` deterministically releases a
+handle.
 Other raw Lean scalar and structure imports are rejected by package generation.
 Exported Lean entrypoints and host imports may be pure or use a
 recognized synchronous effect. JavaScript resource/runtime APIs use

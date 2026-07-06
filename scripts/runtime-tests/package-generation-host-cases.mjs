@@ -113,6 +113,14 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(leanRefFromJsImport?.boundary, "objectHandle");
   assert.equal(leanRefFromJsImport?.args[0]?.type?.type, "Js");
   assert.equal(leanRefFromJsImport?.result?.kind, "leanObject");
+  const leanRefReleaseImport = leanRefRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "js.leanRef.release");
+  assert.equal(leanRefReleaseImport?.boundary, "objectHandle");
+  assert.equal(leanRefReleaseImport?.args[0]?.type?.type, "Js");
+  assert.equal(leanRefReleaseImport?.result?.type, "Unit");
   assert.equal(leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.roundtripName", "Mochi"), "Mochi");
   assert.equal(leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.roundtripFeed"), "feed");
+  assert.throws(
+    () => leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.useReleased"),
+    /js\.leanRef\.value argument value must be a live Lean object handle resource/,
+  );
 }

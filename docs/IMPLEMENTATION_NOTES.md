@@ -84,6 +84,19 @@ Current standalone React Node status is tracked in `docs/REACT_NODE.md`; full
 Lean infoview RPC compatibility remains follow-up work tracked in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
+Open React/JSL ownership research: `Lean.Vir.JSL α` handles are retained
+Lean-owned objects that JavaScript can store without decoding. The current
+primitive gives Lean code deterministic `LeanRef.release` and runtime teardown,
+but React ownership is more subtle than a single live/dead flag. React state,
+reducers, and refs can rewrap the same JSL payload in different host-resource
+stores, and future automatic cleanup of replaced reducer state/actions must not
+invalidate aliases that are still stored elsewhere. The likely direction is an
+internal refcounted LeanRef cell plus React-hook ownership helpers: retain when
+React starts storing a JSL payload, release when that storage is replaced or the
+component unmounts, and release reducer action payloads after the reducer call.
+Keep this out of the public API until the aliasing and ownership boundaries are
+specified and covered by stress tests.
+
 `Lean.Expr` is also part of the current manifest surface. JavaScript sends and
 receives structural objects for the standard expression constructors, while Lean
 code keeps using the real `Lean.Expr` type. Resolved calls lower and lift these
