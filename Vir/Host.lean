@@ -82,7 +82,7 @@ initialize virJsAttr : ParametricAttribute Lean.Vir.JsImport ←
 initialize virJsExplicitConversionAttr : ParametricAttribute Lean.Vir.JsImport ←
   registerParametricAttribute {
     name := `vir_js_explicit_conversion
-    descr := "mark an internal Lean.Vir JavaScript host import as an explicit conversion intrinsic"
+    descr := "mark a Lean.Vir JavaScript host import as an explicit conversion intrinsic"
     getParam := fun _ stx => Lean.Vir.parseVirJsExplicitConversionAttr stx
     afterSet := fun declName data => do
       let env ← getEnv

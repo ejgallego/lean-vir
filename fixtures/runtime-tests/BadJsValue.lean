@@ -7,9 +7,9 @@ inductive Action where
   | rename (name : String)
 
 @[vir_js_explicit_conversion "js.value.bad.action"]
-opaque actionToJs (action : @& Action) : Lean.Vir.RuntimeM (Lean.Vir.Js Action)
+opaque actionToString (action : @& Action) : Lean.Vir.RuntimeM String
 
-def roundtripFeed : Lean.Vir.RuntimeM (Lean.Vir.Js Action) :=
-  actionToJs Action.feed
+def roundtripFeed : Lean.Vir.RuntimeM String :=
+  actionToString Action.feed
 
 end Vir.Fixtures.BadJsValue

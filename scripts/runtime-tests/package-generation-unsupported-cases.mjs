@@ -71,10 +71,10 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   ], ["Vir.Fixtures.BadLeanRef.roundtripFeed"]);
 
   await assertUnsupportedInterfaceFixture(freshDir, "BadJsValue.lean", [
-    /actionToJs/,
+    /actionToString/,
     /declaration is marked with `@\[vir_js_explicit_conversion\]`/,
     /js\.value\.bad\.action/,
-    /not a supported explicit conversion signature/,
+    /does not convert between exactly one `Lean\.Vir\.Js \.\.\.` resource and one Lean value/,
   ], ["Vir.Fixtures.BadJsValue.roundtripFeed"]);
 
   const badJslStringSource = join(freshDir, "BadJSLString.lean");

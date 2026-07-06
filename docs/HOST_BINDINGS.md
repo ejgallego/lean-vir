@@ -18,20 +18,21 @@ arguments/results follow that same rule. Public Lean wrappers can convert to or
 from ordinary Lean values with `Lean.Vir.JsValue`.
 
 Raw Lean scalar and structure types are rejected in ordinary host imports. The
-only scalar-shaped host imports are explicit conversion targets such as
-`js.string`, `js.string.value`, `js.nat`, `js.nat.value`, `js.bool`,
-`js.bool.value`, `js.float`, and `js.float.value`. Structured values that
-JavaScript must inspect use named conversion targets such as
-`js.value.react.property`, `js.value.react.eventHandler`, and
-`js.value.proofwidgets.resolvedRef.value`; `js.value.*` is not a wildcard
-extension lane. Lean-owned values that JavaScript only stores or routes can use
-the `js.leanRef` object-handle boundary. The package manifest records each
-host import boundary as `wire`, `explicitConversion`, or `objectHandle`, and the
-runtime dispatches them through the corresponding path.
-Built-in converter declarations use the internal
-`@[vir_js_explicit_conversion "..."]` marker instead of raw `@[vir_js "..."]`,
-but package generation still validates their exact target and signature. The
-marker is not a user extension point for arbitrary raw Lean values.
+supported boundary lanes are:
+
+| Lean type surface | Owner / shape | Import boundary | Use |
+| --- | --- | --- | --- |
+| `Lean.Vir.Js α` | JavaScript-owned host resource with phantom Lean shape | `wire` | Pass real JavaScript objects without decoding them in Lean. |
+| `Lean.Vir.JSL α` | JavaScript handle to a retained Lean-owned value | `objectHandle` | Let JavaScript store or route Lean values without structural conversion. |
+| Explicit conversion declarations | One side `Lean.Vir.Js ...`, one side an ordinary Lean value | `explicitConversion` | Decode or encode values at named host bindings such as `js.string.value` or `js.value.react.property`. |
+| Wire scalars and containers | JavaScript caller to exported Lean entrypoints | export ABI | Call public Lean functions from JavaScript without a host-import wrapper. |
+
+The package manifest records each host import boundary as `wire`,
+`explicitConversion`, or `objectHandle`, and the runtime dispatches them through
+the corresponding path. Explicit conversion declarations use
+`@[vir_js_explicit_conversion "..."]`; package generation validates their
+generic shape, and the JavaScript runtime still requires a matching host binding
+for the declared target.
 
 ## Built-In Targets
 
