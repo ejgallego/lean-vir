@@ -23,7 +23,7 @@ ownership diagrams.
   [LEAN_VIR_LIBRARY.md](LEAN_VIR_LIBRARY.md),
   [HOST_BINDINGS.md](HOST_BINDINGS.md),
   [REACT_NODE.md](REACT_NODE.md),
-  [REACT_API_ADEQUACY.md](REACT_API_ADEQUACY.md),
+  [REACT_API_FIDELITY.md](REACT_API_FIDELITY.md),
   `web/src/host/vir-host-resources.js`, and `web/src/react/`.
 - WASI/runtime boundary work: read
   [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md),
@@ -82,8 +82,8 @@ ownership diagrams.
 - [EVENT_CALLBACK_ROADMAP.md](EVENT_CALLBACK_ROADMAP.md): callback/resource
   ownership direction.
 - [REACT_NODE.md](REACT_NODE.md): current Lean-authored React Node surface.
-- [REACT_API_ADEQUACY.md](REACT_API_ADEQUACY.md): Lean React API versus
-  TypeScript/React authoring assessment and next API priorities.
+- [REACT_API_FIDELITY.md](REACT_API_FIDELITY.md): Lean React API fidelity
+  audit against React's public API and next binding priorities.
 - [PROOFWIDGETS_PORTING.md](PROOFWIDGETS_PORTING.md): first upstream
   ProofWidgets porting targets and external JS library binding pressure.
 - [REACT_PROOFWIDGETS_ROADMAP.md](REACT_PROOFWIDGETS_ROADMAP.md): future
