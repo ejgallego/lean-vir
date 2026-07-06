@@ -71,32 +71,44 @@ abbrev JSL (α : Type) : Type :=
 namespace LeanRef
 
 /--
-Wraps a Lean-owned value in an opaque `Js` resource handle.
+Wraps a Lean-owned value in an opaque `JSL` resource handle.
 
 JavaScript stores and routes the resulting resource without decoding `α`. The
 runtime retains the underlying Lean object while the handle is live.
 -/
 @[vir_js "js.leanRef"]
-opaque toJs {α : Type} (value : @& α) : RuntimeM (JSL α)
+opaque toJSL {α : Type} (value : @& α) : RuntimeM (JSL α)
 
 /--
-Returns the Lean-owned value stored behind a `Js` resource handle.
+Returns the Lean-owned value stored behind a `JSL` resource handle.
 
 Unwrapping does not consume the JavaScript handle; the runtime returns a fresh
 owned Lean reference to the stored object.
 -/
 @[vir_js "js.leanRef.value"]
-opaque fromJs {α : Type} (value : @& JSL α) : RuntimeM α
+opaque fromJSL {α : Type} (value : @& JSL α) : RuntimeM α
 
 /--
-Releases a JavaScript handle created by `LeanRef.toJs`.
+Releases a JavaScript handle created by `LeanRef.toJSL`.
 
 Releasing the handle does not affect Lean values already returned by
-`LeanRef.fromJs`; those calls receive fresh owned Lean references. Using the
+`LeanRef.fromJSL`; those calls receive fresh owned Lean references. Using the
 released handle again is a runtime error.
 -/
 @[vir_js "js.leanRef.release"]
-opaque release {α : Type} (value : @& JSL α) : RuntimeM Unit
+opaque releaseJSL {α : Type} (value : @& JSL α) : RuntimeM Unit
+
+/-- Compatibility alias for `LeanRef.toJSL`. -/
+abbrev toJs {α : Type} (value : @& α) : RuntimeM (JSL α) :=
+  toJSL value
+
+/-- Compatibility alias for `LeanRef.fromJSL`. -/
+abbrev fromJs {α : Type} (value : @& JSL α) : RuntimeM α :=
+  fromJSL value
+
+/-- Compatibility alias for `LeanRef.releaseJSL`. -/
+abbrev release {α : Type} (value : @& JSL α) : RuntimeM Unit :=
+  releaseJSL value
 
 end LeanRef
 

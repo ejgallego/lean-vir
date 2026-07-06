@@ -7,28 +7,28 @@ inductive Action where
   | rename (name : String)
 
 def roundtripName (name : String) : Lean.Vir.RuntimeM String := do
-  let action ← Lean.Vir.LeanRef.toJs (Action.rename name)
+  let action ← Lean.Vir.LeanRef.toJSL (Action.rename name)
   let result ←
-    match ← Lean.Vir.LeanRef.fromJs action with
+    match ← Lean.Vir.LeanRef.fromJSL action with
     | .rename value => pure value
     | .feed => pure "feed"
-  Lean.Vir.LeanRef.release action
+  Lean.Vir.LeanRef.releaseJSL action
   pure result
 
 def useReleased : Lean.Vir.RuntimeM String := do
-  let action ← Lean.Vir.LeanRef.toJs Action.feed
-  Lean.Vir.LeanRef.release action
-  match ← Lean.Vir.LeanRef.fromJs action with
+  let action ← Lean.Vir.LeanRef.toJSL Action.feed
+  Lean.Vir.LeanRef.releaseJSL action
+  match ← Lean.Vir.LeanRef.fromJSL action with
   | .rename value => pure value
   | .feed => pure "feed"
 
 def roundtripFeed : Lean.Vir.RuntimeM String := do
-  let action ← Lean.Vir.LeanRef.toJs Action.feed
+  let action ← Lean.Vir.LeanRef.toJSL Action.feed
   let result ←
-    match ← Lean.Vir.LeanRef.fromJs action with
+    match ← Lean.Vir.LeanRef.fromJSL action with
     | .rename value => pure value
     | .feed => pure "feed"
-  Lean.Vir.LeanRef.release action
+  Lean.Vir.LeanRef.releaseJSL action
   pure result
 
 end Vir.Fixtures.FreshLeanRef

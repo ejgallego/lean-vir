@@ -140,7 +140,7 @@ React reducer value and dispatch function returned by `useReducer`.
 
 Reducer state and actions live in JavaScript-land. Use `Js` resources directly
 for JavaScript-owned state. Use `Lean.Vir.JSL α` when React should store a
-retained Lean-owned value, and call `Lean.Vir.LeanRef.toJs` / `fromJs`
+retained Lean-owned value, and call `Lean.Vir.LeanRef.toJSL` / `fromJSL`
 explicitly at the application boundary.
 -/
 structure ReducerState (state action : Type) where
