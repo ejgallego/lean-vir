@@ -304,9 +304,9 @@ Declarations marked with `@[vir_js "..."]` are lower-level host imports. They
 must expose JavaScript wire/resource types such as `Lean.Vir.Js α`, resource
 containers, or callbacks whose arguments and results are resource-shaped. Raw
 Lean scalars and structures are rejected at package generation unless the
-target is one of the explicit conversion primitives, for example
-`js.string`, `js.string.value`, `js.nat`, or `js.nat.value`. Public Lean APIs
-should wrap those low-level imports with explicit `Lean.Vir.JsValue`
+declaration is marked with `@[vir_js_explicit_conversion]` and converts between
+exactly one `Lean.Vir.Js ...` resource and one ordinary Lean value. Public Lean
+APIs should wrap those low-level imports with explicit `Lean.Vir.JsValue`
 conversions when they want to expose ordinary Lean values.
 
 ## Lean Calling JavaScript

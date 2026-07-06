@@ -98,18 +98,6 @@ released handle again is a runtime error.
 @[vir_js "js.leanRef.release"]
 opaque releaseJSL {α : Type} (value : @& JSL α) : RuntimeM Unit
 
-/-- Compatibility alias for `LeanRef.toJSL`. -/
-abbrev toJs {α : Type} (value : @& α) : RuntimeM (JSL α) :=
-  toJSL value
-
-/-- Compatibility alias for `LeanRef.fromJSL`. -/
-abbrev fromJs {α : Type} (value : @& JSL α) : RuntimeM α :=
-  fromJSL value
-
-/-- Compatibility alias for `LeanRef.releaseJSL`. -/
-abbrev release {α : Type} (value : @& JSL α) : RuntimeM Unit :=
-  releaseJSL value
-
 end LeanRef
 
 end Lean.Vir

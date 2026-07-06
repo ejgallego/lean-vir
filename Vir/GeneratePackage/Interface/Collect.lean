@@ -88,6 +88,12 @@ def InterfaceType.isLeanObjectWire : InterfaceType → Bool
   | .leanObject => true
   | _ => false
 
+def InterfaceType.isExplicitConversionValue : InterfaceType → Bool
+  | .resource ..
+  | .function ..
+  | .leanObject => false
+  | _ => true
+
 def InterfaceType.hasTypeName (expected : Name) : InterfaceType → Bool
   | .simpleEnum name ..
   | .taggedUnion name ..
@@ -148,29 +154,18 @@ partial def InterfaceType.isHostWireResultType : InterfaceType → Bool
 end
 
 def isJsValueConversionSignature
-    (target : String)
     (args : Array InterfaceArg)
     (result : InterfaceType)
     (effect : InterfaceEffect) : Bool :=
   if effect != .runtime then
     false
   else
-    match target, args[0]? with
-    | "js.string", some arg => args.size == 1 && arg.type == .string && result.isGenericJsResourceWire
-    | "js.string.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .string
-    | "js.nat", some arg => args.size == 1 && arg.type == .nat && result.isGenericJsResourceWire
-    | "js.nat.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .nat
-    | "js.bool", some arg => args.size == 1 && arg.type == .bool && result.isGenericJsResourceWire
-    | "js.bool.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .bool
-    | "js.float", some arg => args.size == 1 && arg.type == .float && result.isGenericJsResourceWire
-    | "js.float.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .float
-    | "js.value.react.property", some arg =>
-        args.size == 1 && arg.type.hasTypeName `Lean.Vir.React.Property && result.isGenericJsResourceWire
-    | "js.value.react.eventHandler", some arg =>
-        args.size == 1 && arg.type.hasTypeName `Lean.Vir.React.EventHandler && result.isGenericJsResourceWire
-    | "js.value.proofwidgets.resolvedRef.value", some arg =>
-        args.size == 1 && arg.type.isGenericJsResourceWire && result.hasTypeName `Lean.Vir.ProofWidgets.ResolvedRef
-    | _, _ => false
+    match args[0]? with
+    | some arg =>
+        args.size == 1 &&
+          ((arg.type.isGenericJsResourceWire && result.isExplicitConversionValue) ||
+            (arg.type.isExplicitConversionValue && result.isGenericJsResourceWire))
+    | none => false
 
 def isLeanObjectHandleSignature
     (target : String)
@@ -208,10 +203,10 @@ def hostImportBoundary
     (result : InterfaceType)
     (effect : InterfaceEffect) : Except String HostImportBoundary :=
   if isExplicitConversion then
-    if isJsValueConversionSignature target args result effect then
+    if isJsValueConversionSignature args result effect then
       .ok .explicitConversion
     else
-      .error s!"declaration is marked with `@[vir_js_explicit_conversion]`, but `{target}` is not a supported explicit conversion signature"
+      .error s!"declaration is marked with `@[vir_js_explicit_conversion]`, but `{target}` does not convert between exactly one `Lean.Vir.Js ...` resource and one Lean value"
   else if isLeanObjectHandleSignature target args result effect then
     .ok .objectHandle
   else

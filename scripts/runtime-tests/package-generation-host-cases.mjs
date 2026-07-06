@@ -123,4 +123,24 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     () => leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.useReleased"),
     /js\.leanRef\.value argument value must be a live Lean object handle resource/,
   );
+
+  const customJsValueSource = join(freshDir, "CustomJsValue.lean");
+  const customJsValuePackage = join(freshDir, "custom-js-value.irpkg");
+  await writeRuntimeFixture(customJsValueSource, "CustomJsValue.lean");
+  generateIrPackage(customJsValueSource, customJsValuePackage);
+  const customJsValueResources = createHostResourceState();
+  const customJsValueRuntime = await createVirRuntimeFactory({
+    wasmBytes,
+    hostBindings: {
+      "test.payload": (payload) => customJsValueResources.resourceForValue({ ...payload, name: `${payload.name}!` }),
+    },
+  }).createRuntime({ irPackageBytes: await readFile(customJsValuePackage) });
+  const customPayloadImport = customJsValueRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.payload");
+  assert.equal(customPayloadImport?.boundary, "explicitConversion");
+  assert.equal(customPayloadImport?.args[0]?.type?.kind, "structure");
+  assert.equal(customPayloadImport?.result?.type, "Js");
+  assert.deepEqual(hostResourceValue(customJsValueRuntime.call("Vir.Fixtures.CustomJsValue.makePayload")), {
+    name: "custom!",
+    count: "3",
+  });
 }
