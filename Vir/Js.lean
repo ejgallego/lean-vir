@@ -88,6 +88,16 @@ owned Lean reference to the stored object.
 @[vir_js "js.leanRef.value"]
 opaque fromJs {α : Type} (value : @& JSL α) : RuntimeM α
 
+/--
+Releases a JavaScript handle created by `LeanRef.toJs`.
+
+Releasing the handle does not affect Lean values already returned by
+`LeanRef.fromJs`; those calls receive fresh owned Lean references. Using the
+released handle again is a runtime error.
+-/
+@[vir_js "js.leanRef.release"]
+opaque release {α : Type} (value : @& JSL α) : RuntimeM Unit
+
 end LeanRef
 
 end Lean.Vir

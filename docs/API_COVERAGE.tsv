@@ -4,6 +4,7 @@ core.interface.containers	core	interface	supported	Vir.GeneratePackage	vir-runti
 core.interface.structures	core	interface	supported	Vir.GeneratePackage	vir-runtime	test:runtime;test:fixtures	Non-indexed structures including inherited fields supported	none
 core.interface.inductives	core	interface	partial	Vir.GeneratePackage	vir-runtime	test:runtime;test:fixtures	Custom inductives and simple recursive inductives supported; mutual non-uniform and inherited recursive structures limited	improve recursive and rectype coverage
 core.interface.resources	core	interface	supported	Vir.Host	vir-runtime;vir-host-bindings	test:runtime	Opaque resource handles cross boundary by host-owned handles	none
+core.interface.lean_ref	core	interface	supported	Vir.Js	vir-runtime	test:runtime	LeanRef toJs fromJs release move Lean-owned values through opaque JSL handles without structural decoding	specify React ownership and aliasing before automatic cleanup
 core.interface.callbacks	core	interface	supported	Vir.Host;Vir.Browser;Vir.React	vir-runtime;vir-host-bindings	test:runtime;test:upstream	Lean closures retained by JS and released on remove cancel rerender unmount package reload or runtime dispose	closure release optimization
 core.interface.expr	core	interface	supported	Vir.GeneratePackage	vir-runtime	test:runtime;test:fixtures	Lean.Expr and Level structural wire representation supported	none
 browser.document.query	browser	dom	supported	Vir.Browser.Document	vir-host-bindings	test:runtime;test:upstream	querySelector getTitle setTitle supported	none

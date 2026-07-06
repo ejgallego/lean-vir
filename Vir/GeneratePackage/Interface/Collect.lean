@@ -183,6 +183,7 @@ def isLeanObjectHandleSignature
     match target, args[0]? with
     | "js.leanRef", some arg => args.size == 1 && arg.type.isLeanObjectWire && result.isGenericJsResourceWire
     | "js.leanRef.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result.isLeanObjectWire
+    | "js.leanRef.release", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .unit
     | _, _ => false
 
 def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=

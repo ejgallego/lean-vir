@@ -62,6 +62,34 @@ function normalizeObjectPointer(value, label) {
   return value >>> 0;
 }
 
+function releaseLeanObjectHandleCell(cell) {
+  const onRelease = cell?.onRelease;
+  if (cell !== null && cell !== undefined) {
+    cell.onRelease = null;
+  }
+  if (cell?.live !== true) {
+    if (typeof onRelease === "function") onRelease();
+    return false;
+  }
+  cell.live = false;
+  cell.runtime.exports.vir_obj_dec(cell.object);
+  if (typeof onRelease === "function") onRelease();
+  return true;
+}
+
+function requireLeanObjectHandleCell(resource, runtime, label) {
+  const handle = hostResourceValue(resource);
+  const cell = handle?.cell;
+  if (handle?.[LEAN_OBJECT_HANDLE] !== true ||
+      handle.runtime !== runtime ||
+      cell?.runtime !== runtime ||
+      cell.live !== true) {
+    throw new Error(`${label} must be a live Lean object handle resource`);
+  }
+  normalizeObjectPointer(cell.object, label);
+  return cell;
+}
+
 export class ObjectValueRuntime {
   hasObjectValueExports() {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
@@ -359,20 +387,33 @@ export class ObjectValueRuntime {
   makeLeanObjectHandleResource(obj, label) {
     const object = normalizeObjectPointer(obj, label);
     this.exports.vir_obj_inc(object);
-    let live = true;
+    const cell = {
+      runtime: this,
+      object,
+      live: true,
+      onRelease: null,
+    };
     const handle = Object.freeze({
       [LEAN_OBJECT_HANDLE]: true,
       runtime: this,
       object,
+      cell,
     });
-    return createHostResource(handle, label, {
+    const resource = createHostResource(handle, label, {
       dispose: () => {
-        if (!live) return undefined;
-        live = false;
-        this.exports.vir_obj_dec(object);
+        releaseLeanObjectHandleCell(cell);
         return undefined;
       },
     });
+    return resource;
+  }
+
+  leanObjectHandleCell(resource, label) {
+    return requireLeanObjectHandleCell(resource, this, label);
+  }
+
+  releaseLeanObjectHandleCell(cell) {
+    return releaseLeanObjectHandleCell(cell);
   }
 
   makeObjectExpr(value, label) {
@@ -1108,7 +1149,7 @@ export class ObjectValueRuntime {
 
   liftObjectResource(obj, label) {
     const resource = this.exports.vir_obj_resource_externref(obj);
-    if (isHostResource(resource)) {
+    if (isHostResource(resource) && hostResourceValue(resource) !== null) {
       return resource;
     }
     // Some effect callback paths can expose one IO.ok wrapper around a Js result
@@ -1119,7 +1160,7 @@ export class ObjectValueRuntime {
       if (field !== 0) {
         try {
           const nested = this.exports.vir_obj_resource_externref(field);
-          if (isHostResource(nested)) {
+          if (isHostResource(nested) && hostResourceValue(nested) !== null) {
             return nested;
           }
         } finally {
@@ -1131,11 +1172,8 @@ export class ObjectValueRuntime {
   }
 
   retainLeanObjectHandleValue(resource, label) {
-    const handle = hostResourceValue(resource);
-    if (handle?.[LEAN_OBJECT_HANDLE] !== true || handle.runtime !== this) {
-      throw new Error(`${label} must be a live Lean object handle resource`);
-    }
-    const object = normalizeObjectPointer(handle.object, label);
+    const cell = requireLeanObjectHandleCell(resource, this, label);
+    const object = normalizeObjectPointer(cell.object, label);
     this.exports.vir_obj_inc(object);
     return object;
   }

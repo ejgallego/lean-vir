@@ -3776,6 +3776,29 @@ function normalizeObjectPointer(value, label) {
   }
   return value >>> 0;
 }
+function releaseLeanObjectHandleCell(cell) {
+  const onRelease = cell?.onRelease;
+  if (cell !== null && cell !== void 0) {
+    cell.onRelease = null;
+  }
+  if (cell?.live !== true) {
+    if (typeof onRelease === "function") onRelease();
+    return false;
+  }
+  cell.live = false;
+  cell.runtime.exports.vir_obj_dec(cell.object);
+  if (typeof onRelease === "function") onRelease();
+  return true;
+}
+function requireLeanObjectHandleCell(resource, runtime, label) {
+  const handle = hostResourceValue(resource);
+  const cell = handle?.cell;
+  if (handle?.[LEAN_OBJECT_HANDLE] !== true || handle.runtime !== runtime || cell?.runtime !== runtime || cell.live !== true) {
+    throw new Error(`${label} must be a live Lean object handle resource`);
+  }
+  normalizeObjectPointer(cell.object, label);
+  return cell;
+}
 var ObjectValueRuntime = class {
   hasObjectValueExports() {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
@@ -4046,20 +4069,31 @@ var ObjectValueRuntime = class {
   makeLeanObjectHandleResource(obj, label) {
     const object = normalizeObjectPointer(obj, label);
     this.exports.vir_obj_inc(object);
-    let live = true;
+    const cell = {
+      runtime: this,
+      object,
+      live: true,
+      onRelease: null
+    };
     const handle = Object.freeze({
       [LEAN_OBJECT_HANDLE]: true,
       runtime: this,
-      object
+      object,
+      cell
     });
-    return createHostResource(handle, label, {
+    const resource = createHostResource(handle, label, {
       dispose: () => {
-        if (!live) return void 0;
-        live = false;
-        this.exports.vir_obj_dec(object);
+        releaseLeanObjectHandleCell(cell);
         return void 0;
       }
     });
+    return resource;
+  }
+  leanObjectHandleCell(resource, label) {
+    return requireLeanObjectHandleCell(resource, this, label);
+  }
+  releaseLeanObjectHandleCell(cell) {
+    return releaseLeanObjectHandleCell(cell);
   }
   makeObjectExpr(value, label) {
     const expr = typeof value === "string" ? { kind: "const", name: value, levels: [] } : value;
@@ -4750,7 +4784,7 @@ var ObjectValueRuntime = class {
   }
   liftObjectResource(obj, label) {
     const resource = this.exports.vir_obj_resource_externref(obj);
-    if (isHostResource(resource)) {
+    if (isHostResource(resource) && hostResourceValue(resource) !== null) {
       return resource;
     }
     if (this.exports.vir_obj_is_scalar(obj) === 0 && this.exports.vir_obj_tag(obj) === 0) {
@@ -4758,7 +4792,7 @@ var ObjectValueRuntime = class {
       if (field !== 0) {
         try {
           const nested = this.exports.vir_obj_resource_externref(field);
-          if (isHostResource(nested)) {
+          if (isHostResource(nested) && hostResourceValue(nested) !== null) {
             return nested;
           }
         } finally {
@@ -4769,11 +4803,8 @@ var ObjectValueRuntime = class {
     throw new Error(`${label} did not lift to a live host resource`);
   }
   retainLeanObjectHandleValue(resource, label) {
-    const handle = hostResourceValue(resource);
-    if (handle?.[LEAN_OBJECT_HANDLE] !== true || handle.runtime !== this) {
-      throw new Error(`${label} must be a live Lean object handle resource`);
-    }
-    const object = normalizeObjectPointer(handle.object, label);
+    const cell = requireLeanObjectHandleCell(resource, this, label);
+    const object = normalizeObjectPointer(cell.object, label);
     this.exports.vir_obj_inc(object);
     return object;
   }
@@ -5352,7 +5383,7 @@ var VirHostState = class {
     this.defaultBindings = defaultHostBindings;
     this.runtime = null;
     this.resourceRoots = new ExternrefResourceRoots();
-    this.leanObjectResources = /* @__PURE__ */ new Set();
+    this.leanObjectHandleCells = /* @__PURE__ */ new Set();
     this.callError = null;
   }
   attach(exports) {
@@ -5447,7 +5478,11 @@ var VirHostState = class {
     }
     if (entry.target === "js.leanRef" && entry.args.length === 1 && isLeanObjectDescriptor(entry.args[0]?.type) && isGenericJsResourceDescriptor(entry.result)) {
       const resource = this.runtime.makeLeanObjectHandleResource(argObjects[0], `${entry.target} argument ${entry.args[0].name}`);
-      this.leanObjectResources.add(resource);
+      const cell = this.runtime.leanObjectHandleCell(resource, `${entry.target} result`);
+      cell.onRelease = () => {
+        this.leanObjectHandleCells.delete(cell);
+      };
+      this.leanObjectHandleCells.add(cell);
       return this.runtime.makeHostWireObjectValue(entry.result, resource, `${entry.target} result`);
     }
     if (entry.target === "js.leanRef.value" && entry.args.length === 1 && isGenericJsResourceDescriptor(entry.args[0]?.type) && isLeanObjectDescriptor(entry.result)) {
@@ -5456,7 +5491,17 @@ var VirHostState = class {
         argObjects[0],
         `${entry.target} argument ${entry.args[0].name}`
       );
-      return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} result`);
+      return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} argument ${entry.args[0].name}`);
+    }
+    if (entry.target === "js.leanRef.release" && entry.args.length === 1 && isGenericJsResourceDescriptor(entry.args[0]?.type) && isUnitDescriptor(entry.result)) {
+      const resource = this.runtime.liftHostWireObjectValue(
+        entry.args[0].type,
+        argObjects[0],
+        `${entry.target} argument ${entry.args[0].name}`
+      );
+      const cell = this.runtime.leanObjectHandleCell(resource, `${entry.target} argument ${entry.args[0].name}`);
+      this.runtime.releaseLeanObjectHandleCell(cell);
+      return this.runtime.makeHostWireObjectValue(entry.result, void 0, `${entry.target} result`);
     }
     throw new Error(`Vir host import ${entry.target} has unsupported objectHandle signature`);
   }
@@ -5474,18 +5519,21 @@ var VirHostState = class {
       disposeHostBindings(this.userBindings);
       disposeHostBindings(this.defaultBindings);
     } finally {
-      this.releaseLeanObjectResources();
+      this.releaseLeanObjectHandleCells();
     }
   }
-  releaseLeanObjectResources() {
-    for (const resource of Array.from(this.leanObjectResources)) {
-      releaseHostResource(resource);
+  releaseLeanObjectHandleCells() {
+    for (const cell of Array.from(this.leanObjectHandleCells)) {
+      this.runtime.releaseLeanObjectHandleCell(cell);
     }
-    this.leanObjectResources.clear();
+    this.leanObjectHandleCells.clear();
   }
 };
 function isLeanObjectDescriptor(type) {
   return type?.wireTag === WIRE.LEAN_OBJECT && type?.kind === "leanObject";
+}
+function isUnitDescriptor(type) {
+  return type?.wireTag === WIRE.UNIT;
 }
 function isGenericJsResourceDescriptor(type) {
   return type?.wireTag === WIRE.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";

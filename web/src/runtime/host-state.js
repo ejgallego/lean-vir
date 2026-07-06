@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING, releaseHostResource } from "../host-resource.js";
+import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING } from "../host-resource.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import { isVirCallback, releaseCallbacks } from "./callbacks.js";
 import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
@@ -22,7 +22,7 @@ export class VirHostState {
     this.defaultBindings = defaultHostBindings;
     this.runtime = null;
     this.resourceRoots = new ExternrefResourceRoots();
-    this.leanObjectResources = new Set();
+    this.leanObjectHandleCells = new Set();
     this.callError = null;
   }
 
@@ -135,7 +135,11 @@ export class VirHostState {
     if (entry.target === "js.leanRef" && entry.args.length === 1 &&
         isLeanObjectDescriptor(entry.args[0]?.type) && isGenericJsResourceDescriptor(entry.result)) {
       const resource = this.runtime.makeLeanObjectHandleResource(argObjects[0], `${entry.target} argument ${entry.args[0].name}`);
-      this.leanObjectResources.add(resource);
+      const cell = this.runtime.leanObjectHandleCell(resource, `${entry.target} result`);
+      cell.onRelease = () => {
+        this.leanObjectHandleCells.delete(cell);
+      };
+      this.leanObjectHandleCells.add(cell);
       return this.runtime.makeHostWireObjectValue(entry.result, resource, `${entry.target} result`);
     }
     if (entry.target === "js.leanRef.value" && entry.args.length === 1 &&
@@ -145,7 +149,18 @@ export class VirHostState {
         argObjects[0],
         `${entry.target} argument ${entry.args[0].name}`,
       );
-      return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} result`);
+      return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} argument ${entry.args[0].name}`);
+    }
+    if (entry.target === "js.leanRef.release" && entry.args.length === 1 &&
+        isGenericJsResourceDescriptor(entry.args[0]?.type) && isUnitDescriptor(entry.result)) {
+      const resource = this.runtime.liftHostWireObjectValue(
+        entry.args[0].type,
+        argObjects[0],
+        `${entry.target} argument ${entry.args[0].name}`,
+      );
+      const cell = this.runtime.leanObjectHandleCell(resource, `${entry.target} argument ${entry.args[0].name}`);
+      this.runtime.releaseLeanObjectHandleCell(cell);
+      return this.runtime.makeHostWireObjectValue(entry.result, undefined, `${entry.target} result`);
     }
     throw new Error(`Vir host import ${entry.target} has unsupported objectHandle signature`);
   }
@@ -165,20 +180,24 @@ export class VirHostState {
       disposeHostBindings(this.userBindings);
       disposeHostBindings(this.defaultBindings);
     } finally {
-      this.releaseLeanObjectResources();
+      this.releaseLeanObjectHandleCells();
     }
   }
 
-  releaseLeanObjectResources() {
-    for (const resource of Array.from(this.leanObjectResources)) {
-      releaseHostResource(resource);
+  releaseLeanObjectHandleCells() {
+    for (const cell of Array.from(this.leanObjectHandleCells)) {
+      this.runtime.releaseLeanObjectHandleCell(cell);
     }
-    this.leanObjectResources.clear();
+    this.leanObjectHandleCells.clear();
   }
 }
 
 function isLeanObjectDescriptor(type) {
   return type?.wireTag === WIRE.LEAN_OBJECT && type?.kind === "leanObject";
+}
+
+function isUnitDescriptor(type) {
+  return type?.wireTag === WIRE.UNIT;
 }
 
 function isGenericJsResourceDescriptor(type) {

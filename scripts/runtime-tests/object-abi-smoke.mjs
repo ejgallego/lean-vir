@@ -10,6 +10,7 @@ import { PACKAGE_FORMAT_VERSION } from "../package-versions.mjs";
 import {
   createHostResource,
   ExternrefResourceRoots,
+  hostResourceValue,
   releaseHostResource,
 } from "../../web/src/host-resource.js";
 import {
@@ -187,6 +188,11 @@ try {
       boundary: "objectHandle",
       args: [{ name: "value", type: leanObjectType }],
       result: jsResourceType,
+    }, {
+      target: "js.leanRef.release",
+      boundary: "objectHandle",
+      args: [{ name: "value", type: jsResourceType }],
+      result: unitType,
     }],
   });
   let hostLeanHandleObj = makeObjectString(leanHandleHostRuntime, "host-state-lean-ref");
@@ -219,12 +225,35 @@ try {
     leanHandleHostRuntime.exports.vir_obj_dec(retainedHostLeanHandleObj);
     retainedHostLeanHandleObj = 0;
   }
-  assert.equal(leanHandleHostRuntime.hostState.leanObjectResources.size, 1);
-  leanHandleHostRuntime.hostState.dispose();
-  assert.equal(leanHandleHostRuntime.hostState.leanObjectResources.size, 0);
+  assert.equal(leanHandleHostRuntime.hostState.leanObjectHandleCells.size, 1);
+  const rewrappedLeanHandleResources = createHostResourceState();
+  const rewrappedHostLeanHandleResource = rewrappedLeanHandleResources.resourceForValue(
+    hostResourceValue(hostLeanHandleResource),
+  );
+  let hostLeanHandleReleaseArgObj = leanHandleHostRuntime.makeHostWireObjectValue(
+    jsResourceType,
+    rewrappedHostLeanHandleResource,
+    "host-state lean ref release argument",
+  );
+  let hostLeanHandleReleaseResultObj = 0;
+  try {
+    hostLeanHandleReleaseResultObj = callHostImportObjects(leanHandleHostRuntime, 1, [hostLeanHandleReleaseArgObj]);
+    assert.equal(leanHandleHostRuntime.hostState.leanObjectHandleCells.size, 0);
+    assert.equal(hostResourceValue(rewrappedHostLeanHandleResource), hostResourceValue(hostLeanHandleResource));
+  } finally {
+    if (hostLeanHandleReleaseArgObj !== 0) {
+      leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleReleaseArgObj);
+      hostLeanHandleReleaseArgObj = 0;
+    }
+    if (hostLeanHandleReleaseResultObj !== 0) {
+      leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleReleaseResultObj);
+      hostLeanHandleReleaseResultObj = 0;
+    }
+    rewrappedLeanHandleResources.dispose();
+  }
   assert.throws(
-    () => leanHandleHostRuntime.retainLeanObjectHandleValue(hostLeanHandleResource, "disposed host-state lean ref"),
-    /disposed host-state lean ref must be a live Lean object handle resource/,
+    () => leanHandleHostRuntime.retainLeanObjectHandleValue(hostLeanHandleResource, "released host-state lean ref"),
+    /released host-state lean ref must be a live Lean object handle resource/,
   );
 } finally {
   leanHandleHostRuntime.dispose();
