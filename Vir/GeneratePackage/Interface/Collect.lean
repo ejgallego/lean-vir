@@ -118,21 +118,18 @@ def InterfaceType.hostBoundaryKind : InterfaceType → String
   | .function .. => "callback"
   | .leanObject => "opaque Lean object"
 
-mutual
-
-partial def InterfaceType.isHostWireArgType : InterfaceType → Bool
+def InterfaceType.isHostWireValueType : InterfaceType → Bool
   | .unit => true
   | .resource .. => true
+  | _ => false
+
+def InterfaceType.isHostWireArgType : InterfaceType → Bool
   | .function args result _ =>
-      args.all (fun (_, ty) => ty.isHostWireArgType) && result.isHostWireResultType
-  | _ => false
+      args.all (fun (_, ty) => ty.isHostWireValueType) && result.isHostWireValueType
+  | ty => ty.isHostWireValueType
 
-partial def InterfaceType.isHostWireResultType : InterfaceType → Bool
-  | .unit => true
-  | .resource .. => true
-  | _ => false
-
-end
+def InterfaceType.isHostWireResultType (ty : InterfaceType) : Bool :=
+  ty.isHostWireValueType
 
 def isJsValueConversionSignature
     (args : Array InterfaceArg)

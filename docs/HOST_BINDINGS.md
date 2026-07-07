@@ -14,8 +14,9 @@ installed by the browser runtime. Node tests and tools can use
 `@[vir_js]` is a JavaScript host boundary, not the same surface as an exported
 Lean declaration called from JavaScript. Host imports should expose
 `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources for JavaScript
-`null`, and callbacks whose arguments/results follow that same rule. Public
-Lean wrappers can convert to or from ordinary Lean values with
+`null`, and callbacks whose own arguments/results are `Unit` or resources.
+Callbacks are accepted only as host-import arguments; nested callback arguments
+are rejected. Public Lean wrappers can convert to or from ordinary Lean values with
 `Lean.Vir.JsValue` and `Lean.Vir.Js.Nullable`.
 
 Raw Lean scalar, structure, array, list, option, and product types are rejected
@@ -208,7 +209,8 @@ console.log(vir.call("bumpFromJs", 41)); // "42"
 
 Host imports are a JavaScript-resource boundary by default: use `Unit`,
 `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` for JavaScript `null`
-semantics, and callback types whose arguments/results follow the same rule.
+semantics, and callback arguments whose own arguments/results are `Unit` or
+resources.
 Raw Lean scalars, structures, arrays, lists, options, and products are rejected
 unless they are part of a built-in conversion target such as `js.nat.value` or
 `js.value.react.property`. `Unit` returns use `undefined` or `null`.

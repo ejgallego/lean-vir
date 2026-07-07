@@ -302,10 +302,11 @@ to JavaScript values.
 
 Declarations marked with `@[vir_js "..."]` are lower-level host imports. They
 must expose `Unit`, JavaScript resource types such as `Lean.Vir.Js α`,
-`Lean.Vir.Js.Nullable α` for JavaScript `null`, or callbacks whose arguments
-and results use those same shapes. Raw Lean scalars, structures, arrays, lists,
-options, and products are rejected at package generation unless the declaration
-is marked with `@[vir_js_explicit_conversion]` and converts between exactly one
+`Lean.Vir.Js.Nullable α` for JavaScript `null`, or callback arguments whose own
+arguments/results are `Unit` or resources. Nested callbacks are rejected. Raw
+Lean scalars, structures, arrays, lists, options, and products are rejected at
+package generation unless the declaration is marked with
+`@[vir_js_explicit_conversion]` and converts between exactly one
 `Lean.Vir.Js ...` resource and one ordinary Lean value. Public Lean APIs should
 wrap those low-level imports with explicit `Lean.Vir.JsValue` or
 `Lean.Vir.Js.Nullable` conversions when they want to expose ordinary Lean

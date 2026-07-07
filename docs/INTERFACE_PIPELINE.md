@@ -184,7 +184,9 @@ result type, and whether applying the callback returns a synchronous effect
 `VirCallback` objects. The `WIRE.FUNCTION` value payload carries no serialized
 numeric token; the runtime receives the internal closure root id through a side
 channel and releases the rooted Lean closure when the host-owned registration
-is done with it.
+is done with it. Functions are accepted only as host-import arguments; callback
+arguments and results must be `Unit` or resource descriptors, so nested
+callbacks are rejected.
 
 `Lean.Vir.React.Node` is a JavaScript-owned resource marker. The recursive
 structure of the rendered tree lives in the host resource graph created by
@@ -198,8 +200,8 @@ and `EventHandler` payloads cross only through explicit
 Entry points and host imports can be pure functions or synchronous effect
 actions. Host imports are deliberately narrower than exports: low-level
 JavaScript imports should expose `Unit`, `Lean.Vir.Js α` resources,
-`Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callbacks whose
-arguments/results use those same shapes, or explicit conversion targets such as
+`Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callbacks whose own
+arguments/results are `Unit` or resources, or explicit conversion targets such as
 `js.string.value`. Raw Lean scalar, structure, array, list, option, and product
 host imports are rejected, except for declarations marked with
 `@[vir_js_explicit_conversion]` that convert between exactly one

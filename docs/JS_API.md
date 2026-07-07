@@ -210,8 +210,8 @@ boundary. Host imports may additionally receive Lean function values as
 callbacks, including event handlers retained by `Lean.Vir.React.Node` resources
 created through `react.node.createElement`. Host imports are narrower than
 exports: low-level JavaScript imports use `Unit`, `Lean.Vir.Js α` resources,
-`Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callbacks whose
-arguments/results use those same shapes, or explicit conversion targets such as
+`Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callback arguments
+whose own arguments/results are `Unit` or resources, or explicit conversion targets such as
 `js.nat.value`; concrete Lean-owned values can also opt into the
 `js.leanRef`/`js.leanRef.value`/`js.leanRef.release` object-handle boundary,
 which stores the Lean object behind a `Lean.Vir.JSL α` resource instead of
@@ -302,7 +302,8 @@ marked with `@[vir_js "..."]`. See `docs/LEAN_VIR_LIBRARY.md` for the
 Lean-side API reference. The host-import boundary is deliberately narrower than
 the exported-call boundary: custom `@[vir_js]` declarations should use
 `Unit`, `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources for
-JavaScript `null`, and callbacks over those types. Raw Lean scalars,
+JavaScript `null`, and callback arguments whose own arguments/results are
+`Unit` or resources. Nested callbacks are rejected. Raw Lean scalars,
 structures, arrays, lists, options, and products are rejected unless the
 declaration is an explicit conversion target such as `js.string.value` or
 `js.nat.value`.

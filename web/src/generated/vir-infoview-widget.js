@@ -3499,24 +3499,23 @@ function objectResultSupported(type, selfType = null) {
   }
 }
 function hostWireArgumentSupported(type) {
-  return hostWireTypeSupported(type, { allowFunction: true });
+  if (hostWireValueSupported(type)) {
+    return true;
+  }
+  if (type?.wireTag !== WIRE.FUNCTION) {
+    return false;
+  }
+  const args = requireFunctionArgs(type, "host wire callback");
+  return args.every((arg) => hostWireValueSupported(arg.type)) && hostWireValueSupported(requireFunctionResult(type, "host wire callback"));
 }
 function hostWireResultSupported(type) {
-  return hostWireTypeSupported(type, { allowFunction: false });
+  return hostWireValueSupported(type);
 }
-function hostWireTypeSupported(type, { allowFunction }) {
-  const tag = type?.wireTag;
-  switch (tag) {
+function hostWireValueSupported(type) {
+  switch (type?.wireTag) {
     case WIRE.UNIT:
     case WIRE.RESOURCE:
       return true;
-    case WIRE.FUNCTION: {
-      if (!allowFunction) {
-        return false;
-      }
-      const args = requireFunctionArgs(type, "host wire callback");
-      return args.every((arg) => hostWireArgumentSupported(arg.type)) && hostWireResultSupported(requireFunctionResult(type, "host wire callback"));
-    }
     default:
       return false;
   }

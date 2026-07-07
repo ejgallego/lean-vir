@@ -304,6 +304,17 @@ const callbackWithResourceType = {
   args: [{ name: "value", type: resourceType }],
   result: unitType,
 };
+const callbackWithNestedCallbackType = {
+  type: "Function",
+  wireTag: WIRE.FUNCTION,
+  effect: "io",
+  args: [{ name: "callback", type: callbackWithResourceType }],
+  result: unitType,
+};
+assert.throws(
+  () => runtime.liftHostWireObjectValue(callbackWithNestedCallbackType, 0, "nested callback host argument"),
+  /unsupported JavaScript host wire argument type/,
+);
 assert.throws(
   () => runtime.makeHostWireObjectValue(callbackWithResourceType, () => undefined, "callback host result"),
   /unsupported JavaScript host wire result type/,
