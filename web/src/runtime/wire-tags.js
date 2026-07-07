@@ -4,7 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-export const WIRE = Object.freeze({
+/*
+The serialized manifest field is still named `wireTag` for package
+compatibility. These numeric tags now describe the interface value codec, not
+the ordinary host-import `wire` boundary.
+*/
+export const INTERFACE_TAG = Object.freeze({
   NAT: 0,
   INT: 1,
   BOOL: 2,
@@ -33,15 +38,24 @@ export const WIRE = Object.freeze({
   LEAN_OBJECT: 27,
 });
 
-export const SUPPORTED_WIRE_TAGS = new Set(Object.values(WIRE));
+// Backward-compatible SDK alias. Prefer INTERFACE_TAG in new runtime code.
+export const WIRE = INTERFACE_TAG;
 
-export const JSON_INPUT_WIRE_TAGS = new Set([
-  WIRE.EXPR,
-  WIRE.ARRAY,
-  WIRE.LIST,
-  WIRE.OPTION,
-  WIRE.PROD,
-  WIRE.STRUCTURE,
-  WIRE.TAGGED_UNION,
-  WIRE.CUSTOM_INDUCTIVE,
+export const SUPPORTED_INTERFACE_TAGS = new Set(Object.values(INTERFACE_TAG));
+
+// Backward-compatible SDK alias.
+export const SUPPORTED_WIRE_TAGS = SUPPORTED_INTERFACE_TAGS;
+
+export const JSON_INPUT_INTERFACE_TAGS = new Set([
+  INTERFACE_TAG.EXPR,
+  INTERFACE_TAG.ARRAY,
+  INTERFACE_TAG.LIST,
+  INTERFACE_TAG.OPTION,
+  INTERFACE_TAG.PROD,
+  INTERFACE_TAG.STRUCTURE,
+  INTERFACE_TAG.TAGGED_UNION,
+  INTERFACE_TAG.CUSTOM_INDUCTIVE,
 ]);
+
+// Backward-compatible SDK alias.
+export const JSON_INPUT_WIRE_TAGS = JSON_INPUT_INTERFACE_TAGS;

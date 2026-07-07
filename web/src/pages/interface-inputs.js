@@ -4,10 +4,10 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { JSON_INPUT_WIRE_TAGS, WIRE } from "../runtime/wire-tags.js";
+import { JSON_INPUT_INTERFACE_TAGS, INTERFACE_TAG } from "../runtime/wire-tags.js";
 
 export function interfaceInputTag(type) {
-  if (type?.wireTag === WIRE.SIMPLE_ENUM) return "SELECT";
+  if (type?.wireTag === INTERFACE_TAG.SIMPLE_ENUM) return "SELECT";
   if (isJsonInputTag(type?.wireTag)) return "TEXTAREA";
   return "INPUT";
 }
@@ -25,48 +25,48 @@ export function parseBoolText(text) {
 }
 
 export function isJsonInputTag(tag) {
-  return JSON_INPUT_WIRE_TAGS.has(tag);
+  return JSON_INPUT_INTERFACE_TAGS.has(tag);
 }
 
 export function defaultValueForType(type, selfType = null, depth = 0) {
   switch (type?.wireTag) {
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType && depth < 2 ? defaultValueForType(selfType, selfType, depth + 1) : null;
-    case WIRE.NAT:
-    case WIRE.INT:
-    case WIRE.UINT8:
-    case WIRE.UINT16:
-    case WIRE.UINT32:
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
+    case INTERFACE_TAG.NAT:
+    case INTERFACE_TAG.INT:
+    case INTERFACE_TAG.UINT8:
+    case INTERFACE_TAG.UINT16:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.USIZE:
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
       return 0;
-    case WIRE.BOOL:
+    case INTERFACE_TAG.BOOL:
       return false;
-    case WIRE.STRING:
+    case INTERFACE_TAG.STRING:
       return "";
-    case WIRE.BYTE_ARRAY:
+    case INTERFACE_TAG.BYTE_ARRAY:
       return [];
-    case WIRE.EXPR:
+    case INTERFACE_TAG.EXPR:
       return { kind: "const", name: "Nat", levels: [] };
-    case WIRE.ARRAY:
-    case WIRE.LIST:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
       return [];
-    case WIRE.OPTION:
+    case INTERFACE_TAG.OPTION:
       return null;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return {
         fst: defaultValueForType(type?.fst, selfType, depth),
         snd: defaultValueForType(type?.snd, selfType, depth),
       };
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       return defaultStructureValue(type, depth);
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       return defaultTaggedUnionValue(type);
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return defaultCustomInductiveValue(type, depth);
-    case WIRE.SIMPLE_ENUM:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       return type?.constructors?.[0]?.jsName ?? "";
     default:
       return "";

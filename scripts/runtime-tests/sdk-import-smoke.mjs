@@ -58,13 +58,17 @@ try {
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof reactNode.virtualReactTextContent, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
+  assert.equal(wireTags.INTERFACE_TAG.NAT, 0);
   assert.equal(wireTags.WIRE.NAT, 0);
+  assert.equal(wireTags.WIRE, wireTags.INTERFACE_TAG);
+  assert.equal(wireTags.SUPPORTED_WIRE_TAGS, wireTags.SUPPORTED_INTERFACE_TAGS);
+  assert.equal(wireTags.JSON_INPUT_WIRE_TAGS, wireTags.JSON_INPUT_INTERFACE_TAGS);
 
   const decoded = runtime.roundTripInterfaceTypeDescriptor({
     type: "Nat",
-    wireTag: wireTags.WIRE.NAT,
+    wireTag: wireTags.INTERFACE_TAG.NAT,
   });
-  assert.deepEqual(decoded, { wireTag: wireTags.WIRE.NAT });
+  assert.deepEqual(decoded, { wireTag: wireTags.INTERFACE_TAG.NAT });
 } finally {
   await rm(isolatedDir, { recursive: true, force: true });
 }

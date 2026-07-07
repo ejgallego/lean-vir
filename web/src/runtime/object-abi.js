@@ -13,7 +13,7 @@ import {
   requireTaggedUnionConstructors,
   requireTypeField,
 } from "./vir-codec.js";
-import { WIRE } from "./wire-tags.js";
+import { INTERFACE_TAG } from "./wire-tags.js";
 import {
   enumValue,
   normalizeBoundedUnsignedBigInt,
@@ -95,37 +95,37 @@ export const OBJECT_VALUE_EXPORTS = [
 export function objectArgumentSupported(type, selfType = null) {
   const tag = type?.wireTag;
   switch (tag) {
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
-    case WIRE.UNIT:
-    case WIRE.RESOURCE:
-    case WIRE.BOOL:
-    case WIRE.NAT:
-    case WIRE.INT:
-    case WIRE.STRING:
-    case WIRE.UINT8:
-    case WIRE.UINT16:
-    case WIRE.UINT32:
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-    case WIRE.BYTE_ARRAY:
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-    case WIRE.EXPR:
-    case WIRE.SIMPLE_ENUM:
+    case INTERFACE_TAG.UNIT:
+    case INTERFACE_TAG.RESOURCE:
+    case INTERFACE_TAG.BOOL:
+    case INTERFACE_TAG.NAT:
+    case INTERFACE_TAG.INT:
+    case INTERFACE_TAG.STRING:
+    case INTERFACE_TAG.UINT8:
+    case INTERFACE_TAG.UINT16:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.USIZE:
+    case INTERFACE_TAG.BYTE_ARRAY:
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
+    case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       return true;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       return objectArgumentSupported(requireTypeField(type, "element", "object argument"), selfType);
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return objectArgumentSupported(requireTypeField(type, "fst", "object argument"), selfType) &&
         objectArgumentSupported(requireTypeField(type, "snd", "object argument"), selfType);
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       return objectStructureSupported(type, objectArgumentSupported);
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       return objectTaggedUnionSupported(type, objectArgumentSupported);
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return objectCustomInductiveSupported(type, objectArgumentSupported);
     default:
       return false;
@@ -135,38 +135,38 @@ export function objectArgumentSupported(type, selfType = null) {
 export function objectResultSupported(type, selfType = null) {
   const tag = type?.wireTag;
   switch (tag) {
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
-    case WIRE.UNIT:
-    case WIRE.RESOURCE:
-    case WIRE.FUNCTION:
-    case WIRE.BOOL:
-    case WIRE.NAT:
-    case WIRE.INT:
-    case WIRE.STRING:
-    case WIRE.UINT8:
-    case WIRE.UINT16:
-    case WIRE.UINT32:
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-    case WIRE.BYTE_ARRAY:
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-    case WIRE.EXPR:
-    case WIRE.SIMPLE_ENUM:
+    case INTERFACE_TAG.UNIT:
+    case INTERFACE_TAG.RESOURCE:
+    case INTERFACE_TAG.FUNCTION:
+    case INTERFACE_TAG.BOOL:
+    case INTERFACE_TAG.NAT:
+    case INTERFACE_TAG.INT:
+    case INTERFACE_TAG.STRING:
+    case INTERFACE_TAG.UINT8:
+    case INTERFACE_TAG.UINT16:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.USIZE:
+    case INTERFACE_TAG.BYTE_ARRAY:
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
+    case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       return true;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       return objectResultSupported(requireTypeField(type, "element", "object result"), selfType);
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return objectResultSupported(requireTypeField(type, "fst", "object result"), selfType) &&
         objectResultSupported(requireTypeField(type, "snd", "object result"), selfType);
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       return objectStructureSupported(type, objectResultSupported);
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       return objectTaggedUnionSupported(type, objectResultSupported);
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return objectCustomInductiveSupported(type, objectResultSupported);
     default:
       return false;
@@ -177,7 +177,7 @@ export function hostWireArgumentSupported(type) {
   if (hostWireValueSupported(type)) {
     return true;
   }
-  if (type?.wireTag !== WIRE.FUNCTION) {
+  if (type?.wireTag !== INTERFACE_TAG.FUNCTION) {
     return false;
   }
   const args = requireFunctionArgs(type, "host wire callback");
@@ -191,8 +191,8 @@ export function hostWireResultSupported(type) {
 
 function hostWireValueSupported(type) {
   switch (type?.wireTag) {
-    case WIRE.UNIT:
-    case WIRE.RESOURCE:
+    case INTERFACE_TAG.UNIT:
+    case INTERFACE_TAG.RESOURCE:
       return true;
     default:
       return false;
@@ -201,11 +201,11 @@ function hostWireValueSupported(type) {
 
 export function objectTypeNeedsBoxedBoundary(type) {
   switch (type?.wireTag) {
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-    case WIRE.UINT64:
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
+    case INTERFACE_TAG.UINT64:
       return true;
-    case WIRE.STRUCTURE: {
+    case INTERFACE_TAG.STRUCTURE: {
       const fields = requireStructureFields(type, "object boundary");
       const trivial = trivialStructureField(type, fields);
       return trivial !== null && objectTypeNeedsBoxedBoundary(trivial.type);
@@ -255,7 +255,7 @@ function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
     case "object":
       return fieldSupported(field.type, selfType);
     case "usize":
-      return field.type?.wireTag === WIRE.USIZE;
+      return field.type?.wireTag === INTERFACE_TAG.USIZE;
     case "scalar":
       return objectScalarFieldSupported(field.type, field.layout);
     default:
@@ -447,18 +447,18 @@ function objectScalarFieldSupported(type, layout) {
     return false;
   }
   switch (type?.wireTag) {
-    case WIRE.BOOL:
-    case WIRE.SIMPLE_ENUM:
+    case INTERFACE_TAG.BOOL:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       return [1, 2, 4, 8].includes(layout.size);
-    case WIRE.UINT8:
+    case INTERFACE_TAG.UINT8:
       return layout.size === 1;
-    case WIRE.UINT16:
+    case INTERFACE_TAG.UINT16:
       return layout.size === 2;
-    case WIRE.UINT32:
-    case WIRE.FLOAT32:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.FLOAT32:
       return layout.size === 4;
-    case WIRE.UINT64:
-    case WIRE.FLOAT:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.FLOAT:
       return layout.size === 8;
     default:
       return false;
@@ -469,37 +469,37 @@ export function writeObjectScalarField(bytes, type, layout, value, label, offset
   offset ??= scalarLayoutOffset(layout, bytes.byteLength, label);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
   switch (type?.wireTag) {
-    case WIRE.BOOL:
+    case INTERFACE_TAG.BOOL:
       if (typeof value !== "boolean") {
         throw new Error(`${label} must be a boolean`);
       }
       writeScalarUnsigned(view, offset, layout.size, value ? 1n : 0n, label);
       return;
-    case WIRE.UINT8:
+    case INTERFACE_TAG.UINT8:
       requireScalarSize(layout, 1, label);
       view.setUint8(offset, normalizeInteger(value, label, 0, 0xff));
       return;
-    case WIRE.UINT16:
+    case INTERFACE_TAG.UINT16:
       requireScalarSize(layout, 2, label);
       view.setUint16(offset, normalizeInteger(value, label, 0, 0xffff), true);
       return;
-    case WIRE.UINT32:
+    case INTERFACE_TAG.UINT32:
       requireScalarSize(layout, 4, label);
       view.setUint32(offset, normalizeUint32(value, label), true);
       return;
-    case WIRE.UINT64:
+    case INTERFACE_TAG.UINT64:
       requireScalarSize(layout, 8, label);
       view.setBigUint64(offset, normalizeBoundedUnsignedBigInt(value, label, MAX_UINT64, "UInt64"), true);
       return;
-    case WIRE.FLOAT:
+    case INTERFACE_TAG.FLOAT:
       requireScalarSize(layout, 8, label);
       view.setFloat64(offset, normalizeFloat(value, label), true);
       return;
-    case WIRE.FLOAT32:
+    case INTERFACE_TAG.FLOAT32:
       requireScalarSize(layout, 4, label);
       view.setFloat32(offset, Math.fround(normalizeFloat(value, label)), true);
       return;
-    case WIRE.SIMPLE_ENUM:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       writeScalarUnsigned(view, offset, layout.size, BigInt(normalizeEnum(value, type, label)), label);
       return;
     default:
@@ -510,27 +510,27 @@ export function writeObjectScalarField(bytes, type, layout, value, label, offset
 export function readObjectScalarField(view, type, layout, label, offset = null) {
   offset ??= scalarLayoutOffset(layout, view.byteLength, label);
   switch (type?.wireTag) {
-    case WIRE.BOOL:
+    case INTERFACE_TAG.BOOL:
       return readScalarUnsigned(view, offset, layout.size, label) !== 0n;
-    case WIRE.UINT8:
+    case INTERFACE_TAG.UINT8:
       requireScalarSize(layout, 1, label);
       return view.getUint8(offset);
-    case WIRE.UINT16:
+    case INTERFACE_TAG.UINT16:
       requireScalarSize(layout, 2, label);
       return view.getUint16(offset, true);
-    case WIRE.UINT32:
+    case INTERFACE_TAG.UINT32:
       requireScalarSize(layout, 4, label);
       return view.getUint32(offset, true);
-    case WIRE.UINT64:
+    case INTERFACE_TAG.UINT64:
       requireScalarSize(layout, 8, label);
       return view.getBigUint64(offset, true).toString();
-    case WIRE.FLOAT:
+    case INTERFACE_TAG.FLOAT:
       requireScalarSize(layout, 8, label);
       return view.getFloat64(offset, true);
-    case WIRE.FLOAT32:
+    case INTERFACE_TAG.FLOAT32:
       requireScalarSize(layout, 4, label);
       return Math.fround(view.getFloat32(offset, true));
-    case WIRE.SIMPLE_ENUM: {
+    case INTERFACE_TAG.SIMPLE_ENUM: {
       const tag = readScalarUnsigned(view, offset, layout.size, label);
       if (tag > BigInt(Number.MAX_SAFE_INTEGER)) {
         throw new Error(`${label} enum tag is too large for JavaScript`);

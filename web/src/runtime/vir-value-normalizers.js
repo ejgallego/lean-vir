@@ -14,7 +14,7 @@ import {
   requireTaggedUnionConstructors,
   taggedUnionConstructorAt,
 } from "./vir-codec.js";
-import { WIRE } from "./wire-tags.js";
+import { INTERFACE_TAG } from "./wire-tags.js";
 
 export function normalizeDecimal(value, label, { signed }) {
   if (typeof value === "bigint") {
@@ -125,7 +125,7 @@ export function normalizeStructure(value, fields, label) {
         requireStructureFields(field.type, `${label}.${field.name}`),
         `${label}.${field.name}`,
       );
-    } else if (field.type?.wireTag === WIRE.OPTION) {
+    } else if (field.type?.wireTag === INTERFACE_TAG.OPTION) {
       normalized[field.name] = null;
     } else {
       throw new Error(`${label} is missing field ${field.name}`);

@@ -131,6 +131,9 @@ interface value codec, not the ordinary host-import `wire` mode. Lean assigns
 tags in `Vir.GeneratePackage.Interface.Encode`; JavaScript validates and
 dispatches them in `web/src/runtime/wire-tags.js`. Run
 `npm run check:package-abi` after editing either side.
+JavaScript runtime code should use the `INTERFACE_TAG.*` constants; `WIRE.*`
+remains exported as a compatibility alias for existing SDK callers and for the
+historical package field name.
 
 | Tag | JavaScript name | Lean interface type | Descriptor payload |
 | --- | --- | --- | --- |

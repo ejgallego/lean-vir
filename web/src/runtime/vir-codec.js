@@ -9,7 +9,7 @@ import {
   requireInterfaceEffect,
   sameRuntimeInterfaceEffect,
 } from "./interface-effects.js";
-import { WIRE } from "./wire-tags.js";
+import { INTERFACE_TAG } from "./wire-tags.js";
 
 export function asBytes(bytes, label) {
   if (bytes instanceof Uint8Array) {
@@ -93,16 +93,16 @@ export function encodeTypeDescriptor(writer, type, label) {
   const tag = requireWireTag(type, label);
   writer.u8(tag);
   switch (tag) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       encodeTypeDescriptor(writer, requireTypeField(type, "element", label), `${label}.element`);
       return;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       encodeTypeDescriptor(writer, requireTypeField(type, "fst", label), `${label}.fst`);
       encodeTypeDescriptor(writer, requireTypeField(type, "snd", label), `${label}.snd`);
       return;
-    case WIRE.STRUCTURE: {
+    case INTERFACE_TAG.STRUCTURE: {
       const fields = requireStructureFields(type, label);
       encodeRuntimeCounts(writer, type, label);
       writer.u32(requireStructureTrivialFieldIndex(type, label));
@@ -110,7 +110,7 @@ export function encodeTypeDescriptor(writer, type, label) {
       fields.forEach((field) => encodeFieldDescriptor(writer, field, `${label}.${field.name}`));
       return;
     }
-    case WIRE.TAGGED_UNION: {
+    case INTERFACE_TAG.TAGGED_UNION: {
       const constructors = requireTaggedUnionConstructors(type, label);
       writer.u32(constructors.length);
       constructors.forEach((ctor) => {
@@ -120,16 +120,16 @@ export function encodeTypeDescriptor(writer, type, label) {
       });
       return;
     }
-    case WIRE.CUSTOM_INDUCTIVE: {
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE: {
       const constructors = requireCustomInductiveConstructors(type, label);
       writer.u32(constructors.length);
       constructors.forEach((ctor) =>
         encodeCustomInductiveConstructorDescriptor(writer, ctor, `${label}.${ctor.jsName}`));
       return;
     }
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return;
-    case WIRE.FUNCTION: {
+    case INTERFACE_TAG.FUNCTION: {
       const args = requireFunctionArgs(type, label);
       writer.u8(interfaceEffectRuntimeTag(type.effect));
       writer.u32(args.length);
@@ -156,13 +156,13 @@ function encodeCustomInductiveConstructorDescriptor(writer, ctor, label) {
 export function decodeTypeDescriptor(reader) {
   const tag = reader.u8();
   switch (tag) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       return { wireTag: tag, element: decodeTypeDescriptor(reader) };
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return { wireTag: tag, fst: decodeTypeDescriptor(reader), snd: decodeTypeDescriptor(reader) };
-    case WIRE.STRUCTURE: {
+    case INTERFACE_TAG.STRUCTURE: {
       const counts = decodeRuntimeCounts(reader);
       const trivialFieldIndex = decodeStructureTrivialFieldIndex(reader.u32());
       const len = reader.u32();
@@ -173,7 +173,7 @@ export function decodeTypeDescriptor(reader) {
         fields: decodeFieldDescriptors(reader, len),
       };
     }
-    case WIRE.TAGGED_UNION: {
+    case INTERFACE_TAG.TAGGED_UNION: {
       const len = reader.u32();
       return {
         wireTag: tag,
@@ -184,7 +184,7 @@ export function decodeTypeDescriptor(reader) {
         })),
       };
     }
-    case WIRE.CUSTOM_INDUCTIVE: {
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE: {
       const len = reader.u32();
       return {
         wireTag: tag,
@@ -198,9 +198,9 @@ export function decodeTypeDescriptor(reader) {
         }),
       };
     }
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return { wireTag: tag };
-    case WIRE.FUNCTION: {
+    case INTERFACE_TAG.FUNCTION: {
       // Compact wasm descriptors only need the execution lane distinction:
       // pure callbacks use direct application, every source-level effect label
       // (`runtime`, `io`, `dom`, `react`) uses the effectful callback lane.
@@ -349,14 +349,14 @@ export function requireStructureFields(type, label) {
 export function sameWireType(expected, actual) {
   if (requireWireTag(expected, "expected result") !== actual?.wireTag) return false;
   switch (expected.wireTag) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       return sameWireType(requireTypeField(expected, "element", "expected result"), actual.element);
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return sameWireType(requireTypeField(expected, "fst", "expected result"), actual.fst) &&
         sameWireType(requireTypeField(expected, "snd", "expected result"), actual.snd);
-    case WIRE.STRUCTURE: {
+    case INTERFACE_TAG.STRUCTURE: {
       const fields = requireStructureFields(expected, "expected result");
       if (!Array.isArray(actual?.fields) || fields.length !== actual.fields.length) return false;
       if (!sameRuntimeCounts(expected, actual, "expected result") ||
@@ -368,7 +368,7 @@ export function sameWireType(expected, actual) {
         sameStructureFieldLayout(field.layout, actual.fields[index]?.layout) &&
         sameWireType(field.type, actual.fields[index]?.type));
     }
-    case WIRE.TAGGED_UNION: {
+    case INTERFACE_TAG.TAGGED_UNION: {
       const constructors = requireTaggedUnionConstructors(expected, "expected result");
       if (!Array.isArray(actual?.constructors) || constructors.length !== actual.constructors.length) return false;
       return constructors.every((ctor, index) => {
@@ -378,7 +378,7 @@ export function sameWireType(expected, actual) {
           sameWireType(ctor.type, actualCtor?.type);
       });
     }
-    case WIRE.CUSTOM_INDUCTIVE: {
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE: {
       const constructors = requireCustomInductiveConstructors(expected, "expected result");
       if (!Array.isArray(actual?.constructors) || constructors.length !== actual.constructors.length) return false;
       return constructors.every((ctor, index) => {
@@ -393,9 +393,9 @@ export function sameWireType(expected, actual) {
           sameWireType(field.type, actualCtor.fields[fieldIndex]?.type));
       });
     }
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return true;
-    case WIRE.FUNCTION: {
+    case INTERFACE_TAG.FUNCTION: {
       const args = requireFunctionArgs(expected, "expected result");
       if (!sameRuntimeInterfaceEffect(expected.effect, actual?.effect) ||
           !Array.isArray(actual?.args) ||

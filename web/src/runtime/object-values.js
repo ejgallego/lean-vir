@@ -15,7 +15,7 @@ import {
   taggedUnionConstructorAt,
 } from "./vir-codec.js";
 import { interfaceEffectRuntimeTag } from "./interface-effects.js";
-import { WIRE } from "./wire-tags.js";
+import { INTERFACE_TAG } from "./wire-tags.js";
 import {
   createHostResource,
   hostResourceValue,
@@ -109,67 +109,67 @@ export class ObjectValueRuntime {
   makeObjectValue(type, value, label, selfType = null) {
     const tag = type?.wireTag;
     switch (tag) {
-      case WIRE.RECURSIVE_SELF:
+      case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
           throw new Error(`${label} has a recursive self reference without an enclosing type`);
         }
         return this.makeObjectValue(selfType, value, label, selfType);
-      case WIRE.UNIT:
+      case INTERFACE_TAG.UNIT:
         if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
         return this.makeObjectScalar(0, label);
-      case WIRE.RESOURCE:
+      case INTERFACE_TAG.RESOURCE:
         return this.makeObjectResource(value, label);
-      case WIRE.FUNCTION:
+      case INTERFACE_TAG.FUNCTION:
         throw new Error(`${label} cannot be a JavaScript function at this boundary`);
-      case WIRE.BOOL:
+      case INTERFACE_TAG.BOOL:
         if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
         return this.makeObjectScalar(value ? 1 : 0, label);
-      case WIRE.UINT8:
+      case INTERFACE_TAG.UINT8:
         return this.makeObjectScalar(normalizeInteger(value, label, 0, 0xff), label);
-      case WIRE.UINT16:
+      case INTERFACE_TAG.UINT16:
         return this.makeObjectScalar(normalizeInteger(value, label, 0, 0xffff), label);
-      case WIRE.SIMPLE_ENUM:
+      case INTERFACE_TAG.SIMPLE_ENUM:
         return this.makeObjectScalar(normalizeEnum(value, type, label), label);
-      case WIRE.NAT:
+      case INTERFACE_TAG.NAT:
         return this.makeObjectDecimal("vir_obj_nat", normalizeDecimal(value, label, { signed: false }), label);
-      case WIRE.INT:
+      case INTERFACE_TAG.INT:
         return this.makeObjectDecimal("vir_obj_int", normalizeDecimal(value, label, { signed: true }), label);
-      case WIRE.STRING:
+      case INTERFACE_TAG.STRING:
         return this.makeObjectString(value, label);
-      case WIRE.UINT32:
+      case INTERFACE_TAG.UINT32:
         return this.makeObjectUint32(value, label);
-      case WIRE.UINT64:
+      case INTERFACE_TAG.UINT64:
         return this.makeObjectDecimal(
           "vir_obj_uint64",
           normalizeBoundedUnsignedDecimal(value, label, MAX_UINT64, "UInt64"),
           label,
         );
-      case WIRE.USIZE:
+      case INTERFACE_TAG.USIZE:
         return this.makeObjectDecimal(
           "vir_obj_usize",
           normalizeBoundedUnsignedDecimal(value, label, this.usizeMaxValue(), "USize"),
           label,
         );
-      case WIRE.BYTE_ARRAY:
+      case INTERFACE_TAG.BYTE_ARRAY:
         return this.makeObjectByteArray(value, label);
-      case WIRE.FLOAT:
+      case INTERFACE_TAG.FLOAT:
         return this.makeObjectFloat(value, label);
-      case WIRE.FLOAT32:
+      case INTERFACE_TAG.FLOAT32:
         return this.makeObjectFloat32(value, label);
-      case WIRE.EXPR:
+      case INTERFACE_TAG.EXPR:
         return this.makeObjectExpr(value, label);
-      case WIRE.ARRAY:
-      case WIRE.LIST:
+      case INTERFACE_TAG.ARRAY:
+      case INTERFACE_TAG.LIST:
         return this.makeObjectSequenceValue(type, value, label, selfType);
-      case WIRE.OPTION:
+      case INTERFACE_TAG.OPTION:
         return this.makeObjectOptionValue(type, value, label, selfType);
-      case WIRE.PROD:
+      case INTERFACE_TAG.PROD:
         return this.makeObjectProdValue(type, value, label, selfType);
-      case WIRE.STRUCTURE:
+      case INTERFACE_TAG.STRUCTURE:
         return this.makeObjectStructureValue(type, value, label);
-      case WIRE.TAGGED_UNION:
+      case INTERFACE_TAG.TAGGED_UNION:
         return this.makeObjectTaggedUnionValue(type, value, label);
-      case WIRE.CUSTOM_INDUCTIVE:
+      case INTERFACE_TAG.CUSTOM_INDUCTIVE:
         return this.makeObjectCustomInductiveValue(type, value, label);
       default:
         throw new Error(`${label} has unsupported object ABI argument type`);
@@ -179,8 +179,8 @@ export class ObjectValueRuntime {
   makeObjectSequenceValue(sequenceType, value, label, selfType) {
     const sequenceTag = sequenceType?.wireTag;
     const builderName =
-      sequenceTag === WIRE.ARRAY ? "vir_obj_array" :
-      sequenceTag === WIRE.LIST ? "vir_obj_list" :
+      sequenceTag === INTERFACE_TAG.ARRAY ? "vir_obj_array" :
+      sequenceTag === INTERFACE_TAG.LIST ? "vir_obj_list" :
       null;
     if (builderName === null) {
       throw new Error(`${label} has unsupported object ABI sequence type`);
@@ -1070,58 +1070,58 @@ export class ObjectValueRuntime {
   liftObjectValue(type, obj, label, selfType = null) {
     const tag = type?.wireTag;
     switch (tag) {
-      case WIRE.RECURSIVE_SELF:
+      case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
           throw new Error(`${label} has a recursive self reference without an enclosing type`);
         }
         return this.liftObjectValue(selfType, obj, label, selfType);
-      case WIRE.UNIT:
+      case INTERFACE_TAG.UNIT:
         return undefined;
-      case WIRE.RESOURCE:
+      case INTERFACE_TAG.RESOURCE:
         return this.liftObjectResource(obj, label);
-      case WIRE.FUNCTION:
+      case INTERFACE_TAG.FUNCTION:
         return this.liftObjectFunction(type, obj, label);
-      case WIRE.BOOL:
+      case INTERFACE_TAG.BOOL:
         return this.readObjectScalar(obj, label) !== 0;
-      case WIRE.UINT8:
+      case INTERFACE_TAG.UINT8:
         return this.readBoundedObjectScalar(obj, label, 0xff);
-      case WIRE.UINT16:
+      case INTERFACE_TAG.UINT16:
         return this.readBoundedObjectScalar(obj, label, 0xffff);
-      case WIRE.SIMPLE_ENUM:
+      case INTERFACE_TAG.SIMPLE_ENUM:
         return enumValue(type, this.readObjectScalar(obj, label));
-      case WIRE.NAT:
+      case INTERFACE_TAG.NAT:
         return this.readObjectDecimal(obj, "vir_obj_nat_decimal");
-      case WIRE.INT:
+      case INTERFACE_TAG.INT:
         return this.readObjectDecimal(obj, "vir_obj_int_decimal");
-      case WIRE.STRING:
+      case INTERFACE_TAG.STRING:
         return this.readObjectString(obj);
-      case WIRE.UINT32:
+      case INTERFACE_TAG.UINT32:
         return this.exports.vir_obj_uint32_value(obj) >>> 0;
-      case WIRE.UINT64:
+      case INTERFACE_TAG.UINT64:
         return this.readObjectDecimal(obj, "vir_obj_uint64_decimal");
-      case WIRE.USIZE:
+      case INTERFACE_TAG.USIZE:
         return this.readObjectDecimal(obj, "vir_obj_usize_decimal");
-      case WIRE.BYTE_ARRAY:
+      case INTERFACE_TAG.BYTE_ARRAY:
         return this.readObjectByteArray(obj);
-      case WIRE.FLOAT:
+      case INTERFACE_TAG.FLOAT:
         return this.exports.vir_obj_float_value(obj);
-      case WIRE.FLOAT32:
+      case INTERFACE_TAG.FLOAT32:
         return Math.fround(this.exports.vir_obj_float32_value(obj));
-      case WIRE.EXPR:
+      case INTERFACE_TAG.EXPR:
         return this.liftObjectExpr(obj, label);
-      case WIRE.ARRAY:
+      case INTERFACE_TAG.ARRAY:
         return this.liftObjectArrayValue(type, obj, label, selfType);
-      case WIRE.LIST:
+      case INTERFACE_TAG.LIST:
         return this.liftObjectListValue(type, obj, label, selfType);
-      case WIRE.OPTION:
+      case INTERFACE_TAG.OPTION:
         return this.liftObjectOptionValue(type, obj, label, selfType);
-      case WIRE.PROD:
+      case INTERFACE_TAG.PROD:
         return this.liftObjectProdValue(type, obj, label, selfType);
-      case WIRE.STRUCTURE:
+      case INTERFACE_TAG.STRUCTURE:
         return this.liftObjectStructureValue(type, obj, label);
-      case WIRE.TAGGED_UNION:
+      case INTERFACE_TAG.TAGGED_UNION:
         return this.liftObjectTaggedUnionValue(type, obj, label);
-      case WIRE.CUSTOM_INDUCTIVE:
+      case INTERFACE_TAG.CUSTOM_INDUCTIVE:
         return this.liftObjectCustomInductiveValue(type, obj, label);
       default:
         throw new Error(`${label} has unsupported object ABI result type`);

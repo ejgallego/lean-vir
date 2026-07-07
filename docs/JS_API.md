@@ -94,7 +94,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `react/vir-react-hooks.js` | Shared React component hook runtime and typed state setter host bindings. |
 | `vir-react-host-bindings.js` | Browser React root/component/hook bindings; imports `react` and `react-dom/client`. |
 | `runtime/interface-manifest.js` | Manifest validation, diagnostics, and type formatting helpers. |
-| `runtime/wire-tags.js` | Shared wire tag constants and JSON-input tag set. |
+| `runtime/wire-tags.js` | Shared interface descriptor tag constants and JSON-input tag set. Existing `WIRE` exports remain compatibility aliases for `INTERFACE_TAG`. |
 
 Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
 `lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. React browser
