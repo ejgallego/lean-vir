@@ -129,6 +129,8 @@ function renderHtmlReport(report) {
     .join("\n");
   const provenance = renderHtmlProvenance(report.typeScriptProvenance);
   const matrix = renderCoverageMatrix(report);
+  const tools = renderHtmlTools(report);
+  const index = renderHtmlIndex(report);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -219,8 +221,111 @@ function renderHtmlReport(report) {
     .coverage td.numeric { text-align: right; white-space: nowrap; }
     .coverage details summary { cursor: pointer; color: var(--fg); }
     .coverage ul { margin: 6px 0 0; padding-left: 18px; }
+    .report-tools {
+      margin: 0 0 18px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .tool-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .tool-head p { color: var(--muted); font-size: 13px; }
+    .filter-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.6fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(220px, 1.4fr);
+      gap: 12px;
+      align-items: end;
+    }
+    .filter {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .filter input[type="search"], .filter select {
+      width: 100%;
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--fg);
+      font: inherit;
+    }
+    .status-filter {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+    .status-options { display: flex; flex-wrap: wrap; gap: 6px; }
+    .status-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 36px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--fg);
+      font-weight: 500;
+    }
+    .report-body {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .anchor-index {
+      position: sticky;
+      top: 16px;
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .anchor-index h2 { margin-bottom: 8px; }
+    .anchor-index details { border-top: 1px solid var(--line); padding: 8px 0; }
+    .anchor-index details:first-of-type { border-top: 0; }
+    .anchor-index summary { cursor: pointer; font-weight: 600; }
+    .index-links { display: grid; gap: 4px; margin-top: 6px; }
+    .index-link {
+      display: grid;
+      grid-template-columns: 8px minmax(0, 1fr);
+      gap: 7px;
+      align-items: center;
+      padding: 4px 0;
+      color: var(--fg);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .index-link:hover { text-decoration: underline; }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+    .empty-state {
+      display: none;
+      padding: 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+    }
+    .empty-state[data-visible="true"] { display: block; }
     .groups { display: grid; gap: 28px; }
     .anchor-group { display: grid; gap: 12px; }
+    .anchor[hidden], .anchor-group[hidden], .index-link[hidden] { display: none; }
     .group-title {
       margin: 0;
       font-size: 20px;
@@ -295,6 +400,9 @@ function renderHtmlReport(report) {
       main { padding: 24px 12px 40px; }
       .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .coverage { overflow-x: auto; }
+      .filter-row { grid-template-columns: 1fr; }
+      .report-body { grid-template-columns: 1fr; }
+      .anchor-index { position: static; max-height: none; }
       .anchor-head { display: grid; }
       .comparison { grid-template-columns: 1fr; }
     }
@@ -313,11 +421,17 @@ ${provenance}
       ${summaryCard("weak", report.summary.weak)}
       ${summaryCard("missing", report.summary.missing)}
     </section>
+${tools}
 ${matrix}
-    <div class="groups" aria-label="Type anchors">
+    <div class="report-body">
+${index}
+      <div class="groups" aria-label="Type anchors">
 ${sections}
+        <p class="empty-state" id="anchor-empty-state">No anchors match the current filters.</p>
+      </div>
     </div>
   </main>
+${renderHtmlFilterScript()}
 </body>
 </html>
 `;
@@ -378,6 +492,53 @@ function renderCoverageRow(row) {
           </tr>`;
 }
 
+function renderHtmlTools(report) {
+  const categories = coverageRows(report).map((row) => row.category);
+  return `    <section class="report-tools" aria-labelledby="type-anchor-browse">
+      <div class="tool-head">
+        <h2 id="type-anchor-browse">Browse</h2>
+        <p id="anchor-result-count">Showing ${report.results.length} anchors</p>
+      </div>
+      <div class="filter-row">
+        <label class="filter">Search
+          <input id="anchor-search" type="search" autocomplete="off" placeholder="TypeScript or Lean symbol">
+        </label>
+        <label class="filter">Category
+          <select id="anchor-category">
+            <option value="">All categories</option>
+${categories.map((category) => `            <option value="${escapeAttr(category)}">${escapeHtml(category)}</option>`).join("\n")}
+          </select>
+        </label>
+        <label class="filter">Relation
+          <select id="anchor-relation">
+            <option value="">All relations</option>
+            <option value="audit">Audit</option>
+            <option value="coverageGap">Coverage gap</option>
+          </select>
+        </label>
+        <fieldset class="filter status-filter">
+          <legend>Status</legend>
+          <div class="status-options">
+${["exact", "compatible", "weak", "missing"].map((status) => `            <label class="status-toggle ${escapeAttr(status)}"><input type="checkbox" value="${escapeAttr(status)}" data-status-filter checked> ${escapeHtml(status)}</label>`).join("\n")}
+          </div>
+        </fieldset>
+      </div>
+    </section>`;
+}
+
+function renderHtmlIndex(report) {
+  const groups = groupResults(report.results);
+  return `      <aside class="anchor-index" aria-labelledby="type-anchor-index">
+        <h2 id="type-anchor-index">Index</h2>
+${groups.map(([category, results]) => `        <details open data-index-group data-category="${escapeAttr(category)}">
+          <summary>${escapeHtml(category)}</summary>
+          <div class="index-links">
+${results.map((result) => `            <a class="index-link ${escapeAttr(result.status)}" href="#${escapeAttr(`type-anchor-${slug(result.id)}`)}" data-index-link ${anchorFilterAttrs(result)}><span class="status-dot" aria-hidden="true"></span><span>${escapeHtml(result.ts)}</span></a>`).join("\n")}
+          </div>
+        </details>`).join("\n")}
+      </aside>`;
+}
+
 function detailsList(summary, items) {
   if (items.length === 0) return escapeHtml(summary);
   return `<details><summary>${escapeHtml(summary)}</summary><ul>${items.map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join("")}</ul></details>`;
@@ -392,7 +553,7 @@ function renderStatusSummary(status) {
 
 function renderHtmlGroup(category, results, provenance) {
   const rows = results.map((result) => renderHtmlAnchor(result, provenance)).join("\n");
-  return `      <section class="anchor-group" aria-labelledby="type-anchor-group-${escapeAttr(slug(category))}">
+  return `      <section class="anchor-group" data-anchor-group data-category="${escapeAttr(category)}" aria-labelledby="type-anchor-group-${escapeAttr(slug(category))}">
         <h2 class="group-title" id="type-anchor-group-${escapeAttr(slug(category))}">${escapeHtml(category)}</h2>
         <div class="anchors">
 ${rows}
@@ -425,7 +586,7 @@ function renderHtmlAnchor(result, provenance) {
     ? escapeHtml(ts.display)
     : escapeHtml(JSON.stringify(result.tsSymbol?.shape ?? {}, null, 2));
   const leanDisplay = escapeHtml(formatLeanDescriptor(result.leanDescriptor));
-  return `      <article class="anchor" id="${escapeAttr(`type-anchor-${slug(result.id)}`)}" data-vir-type-anchor-hover="${escapeAttr(hoverText(result))}">
+  return `      <article class="anchor" id="${escapeAttr(`type-anchor-${slug(result.id)}`)}" data-anchor ${anchorFilterAttrs(result)} data-vir-type-anchor-hover="${escapeAttr(hoverText(result))}">
         <div class="anchor-head">
           <div class="name">
             <h2 class="ts-name"><a href="${escapeAttr(primaryHref)}" title="${escapeAttr(hoverText(result))}">${escapeHtml(result.ts)}</a></h2>
@@ -450,6 +611,22 @@ function renderHtmlAnchor(result, provenance) {
           </section>
         </div>${notes}${note}${hover}
       </article>`;
+}
+
+function anchorFilterAttrs(result) {
+  const search = [
+    result.id,
+    result.ts,
+    result.lean,
+    result.category,
+    result.note,
+  ].filter(Boolean).join(" ").toLowerCase();
+  return [
+    `data-status="${escapeAttr(result.status)}"`,
+    `data-category="${escapeAttr(result.category ?? "Type anchors")}"`,
+    `data-relation="${escapeAttr(result.relation ?? "audit")}"`,
+    `data-search="${escapeAttr(search)}"`,
+  ].join(" ");
 }
 
 function renderAnchor(result) {
@@ -499,6 +676,66 @@ function sourceHref(source, provenance = undefined) {
 function leanSourceHref(source) {
   if (typeof source !== "string" || source.length === 0) return null;
   return source.split("/").pop();
+}
+
+function renderHtmlFilterScript() {
+  return `  <script>
+    (() => {
+      const anchors = [...document.querySelectorAll("[data-anchor]")];
+      const links = [...document.querySelectorAll("[data-index-link]")];
+      const groups = [...document.querySelectorAll("[data-anchor-group]")];
+      const indexGroups = [...document.querySelectorAll("[data-index-group]")];
+      const search = document.getElementById("anchor-search");
+      const category = document.getElementById("anchor-category");
+      const relation = document.getElementById("anchor-relation");
+      const statuses = [...document.querySelectorAll("[data-status-filter]")];
+      const count = document.getElementById("anchor-result-count");
+      const empty = document.getElementById("anchor-empty-state");
+
+      function selectedStatuses() {
+        return new Set(statuses.filter((input) => input.checked).map((input) => input.value));
+      }
+
+      function matches(node, activeStatuses, query) {
+        if (!activeStatuses.has(node.dataset.status)) return false;
+        if (category.value && node.dataset.category !== category.value) return false;
+        if (relation.value && node.dataset.relation !== relation.value) return false;
+        return query === "" || (node.dataset.search ?? "").includes(query);
+      }
+
+      function hasVisibleChild(group, selector) {
+        return [...group.querySelectorAll(selector)].some((node) => !node.hidden);
+      }
+
+      function update() {
+        const activeStatuses = selectedStatuses();
+        const query = search.value.trim().toLowerCase();
+        let shown = 0;
+        for (const anchor of anchors) {
+          const visible = matches(anchor, activeStatuses, query);
+          anchor.hidden = !visible;
+          if (visible) shown += 1;
+        }
+        for (const link of links) {
+          link.hidden = !matches(link, activeStatuses, query);
+        }
+        for (const group of groups) {
+          group.hidden = !hasVisibleChild(group, "[data-anchor]");
+        }
+        for (const group of indexGroups) {
+          group.hidden = !hasVisibleChild(group, "[data-index-link]");
+        }
+        count.textContent = "Showing " + shown + " of " + anchors.length + " anchors";
+        empty.dataset.visible = shown === 0 ? "true" : "false";
+      }
+
+      for (const input of [search, category, relation, ...statuses]) {
+        input.addEventListener("input", update);
+        input.addEventListener("change", update);
+      }
+      update();
+    })();
+  </script>`;
 }
 
 function groupResults(results) {
