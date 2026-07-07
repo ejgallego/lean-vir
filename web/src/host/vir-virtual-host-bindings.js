@@ -122,7 +122,6 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
     ...createReactHostHooks(),
     hookRuntime: reactHookRuntime,
   };
-  const externalBadge = createVirtualExternalBadgeComponent();
   return {
     "browser.document.getTitle": () => state.resources.resourceForValue(state.title),
     "browser.document.setTitle": (title) => {
@@ -166,8 +165,6 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       }),
     ...createReactJsValueHostBindings(state.resources),
     ...createReactStateHostBindings(state.resources, reactHookRuntime),
-    "test.react.externalBadge": () =>
-      state.resources.resourceForValue(externalBadge),
     "infoview.documentPosition": (uri, fileName, line, character, label) =>
       state.resources.resourceForValue({
         uri: state.resources.resolveResource(uri, "JsString"),
@@ -260,12 +257,6 @@ function createVirtualEventListenerResource(resources, target, eventName, callba
 
 function createVirtualReactRootResource(resources, target, hooks) {
   return createVirtualReactRootResourceFromNode(resources, target, hooks);
-}
-
-function createVirtualExternalBadgeComponent() {
-  function VirExternalBadge() {}
-  VirExternalBadge.displayName = "VirExternalBadge";
-  return VirExternalBadge;
 }
 
 function queryVirtualElementState(state, selector) {

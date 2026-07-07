@@ -36,6 +36,7 @@ import {
   smokeVirtualReactEffect,
   smokeVirtualReactExternalComponent,
   smokeVirtualReactMemo,
+  smokeVirtualReactMemoStable,
   smokeVirtualReactRefFragment,
   smokeVirtualReactInput,
   smokeVirtualProofWidgetsHtml,
@@ -161,6 +162,7 @@ function assertNatResourceReleased(jsBindings, resource) {
 }
 
 const reactDocumentState = createVirtualDocumentState();
+const externalBadge = createVirtualExternalBadgeComponent();
 const reactRuntime = await createVirRuntime({
   wasmBytes,
   irPackageBytes: hostPackageBytes,
@@ -174,6 +176,7 @@ const reactRuntime = await createVirRuntime({
       }
     },
     "test.recordNat": () => undefined,
+    "test.react.externalBadge": () => reactDocumentState.resources.resourceForValue(externalBadge),
   },
 });
 ensureVirtualElements(reactDocumentState, [
@@ -181,6 +184,7 @@ ensureVirtualElements(reactDocumentState, [
   "#react-counter",
   "#react-effect",
   "#react-memo",
+  "#react-memo-stable",
   "#react-ref-fragment",
   "#react-external-component",
   "#react-input",
@@ -213,6 +217,7 @@ missingSelectorRuntime.dispose();
 smokeVirtualReactCounter(reactRuntime, reactDocumentState, "#react-counter");
 smokeVirtualReactEffect(reactRuntime, reactDocumentState, "#react-effect");
 smokeVirtualReactMemo(reactRuntime, reactDocumentState, "#react-memo");
+smokeVirtualReactMemoStable(reactRuntime, reactDocumentState, "#react-memo-stable");
 smokeVirtualReactRefFragment(reactRuntime, reactDocumentState, "#react-ref-fragment");
 smokeVirtualReactExternalComponent(reactRuntime, reactDocumentState, "#react-external-component");
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
@@ -559,3 +564,9 @@ assert.equal(reactReloadDocumentState.elements.get("#react-reload").reactRoot, u
 reactReloadRuntime.dispose();
 
 console.log("vir runtime React host bindings smoke ok");
+
+function createVirtualExternalBadgeComponent() {
+  function VirExternalBadge() {}
+  VirExternalBadge.displayName = "VirExternalBadge";
+  return VirExternalBadge;
+}

@@ -27,7 +27,6 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
   querySelector = queryBrowserElement,
 } = {}) {
   const hookRuntime = createBrowserReactHookRuntime(state, React);
-  const externalBadge = createExternalBadgeComponent(React);
   const hooks = {
     ...createReactHostHooks(),
     hookRuntime,
@@ -44,7 +43,6 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
       }),
     ...createReactJsValueHostBindings(state),
     ...createReactStateHostBindings(state, hookRuntime),
-    "test.react.externalBadge": () => state.resourceForValue(externalBadge),
   };
 }
 
@@ -57,27 +55,4 @@ function queryBrowserElement(selector) {
     throw new Error("React selector host bindings require globalThis.document");
   }
   return globalThis.document.querySelector(selector);
-}
-
-function createExternalBadgeComponent(React) {
-  const render = (props = {}, ref = null) => {
-    const { children, ...rest } = props;
-    return React.createElement("span", {
-      ...rest,
-      ref,
-      "data-external-component": "true",
-    }, children);
-  };
-  if (typeof React?.forwardRef === "function") {
-    const component = React.forwardRef(function VirExternalBadge(props, ref) {
-      return render(props, ref);
-    });
-    component.displayName = "VirExternalBadge";
-    return component;
-  }
-  function VirExternalBadge(props) {
-    return render(props, props?.ref ?? null);
-  }
-  VirExternalBadge.displayName = "VirExternalBadge";
-  return VirExternalBadge;
 }

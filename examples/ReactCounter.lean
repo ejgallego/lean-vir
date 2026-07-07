@@ -88,6 +88,28 @@ def memoProbe : Component Unit :=
 def mountMemo (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root memoProbe ()
 
+def memoStableProbe : Component Unit :=
+  fun _ => do
+    let initial ← JsValue.ofNat 0
+    let count ← Hooks.useState initial
+    let deps ← Hooks.DependencyList.empty
+    let memoValue ← Hooks.useMemo (pure count.value) deps
+    let countValue ← JsValue.toNat count.value
+    let cachedValue ← JsValue.toNat memoValue
+    let text ← Node.text s!"react:memo-stable:{countValue}:{cachedValue}"
+    Node.buttonWith
+      #[
+        Props.id "react-memo-stable-button",
+        Props.onClick do
+          State.modify count fun previous => do
+            let value ← JsValue.toNat previous
+            JsValue.ofNat (value + 1)
+      ]
+      #[text]
+
+def mountMemoStable (selector : String) : DomM Bool :=
+  Root.mountFromSelector selector fun root => Root.renderComponent root memoStableProbe ()
+
 def refFragmentProbe : Component Unit :=
   fun _ => do
     let initial ← JsValue.ofNat 0

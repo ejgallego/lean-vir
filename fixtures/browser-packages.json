@@ -92,6 +92,7 @@
             "ReactCounter.renderStatic",
             "ReactCounter.mountEffect",
             "ReactCounter.mountMemo",
+            "ReactCounter.mountMemoStable",
             "ReactCounter.mountRefFragment",
             "ReactCounter.mountExternalComponent",
             "ReactCounter.renderWideTextLoop",

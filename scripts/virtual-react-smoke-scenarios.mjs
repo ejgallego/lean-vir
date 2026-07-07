@@ -67,6 +67,18 @@ export function smokeVirtualReactMemo(runtime, documentState, selector) {
   assertUnmountCleanup(runtime, element);
 }
 
+export function smokeVirtualReactMemoStable(runtime, documentState, selector) {
+  assert.equal(runtime.call("ReactCounter.mountMemoStable", selector), true);
+  const element = documentState.elements.get(selector);
+  assert.equal(element.textContent, "react:memo-stable:0:0");
+  assertLiveCallbacks(runtime, 2);
+  reactElementById(element, "react-memo-stable-button").handlers.onClick({});
+  assert.equal(element.textContent, "react:memo-stable:1:0");
+  assertLiveCallbacks(runtime, 2);
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
 export function smokeVirtualReactExternalComponent(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactCounter.mountExternalComponent", selector), true);
   const element = documentState.elements.get(selector);
