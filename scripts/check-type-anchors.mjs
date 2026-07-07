@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 
 import { readIrPackageFile } from "./irpkg-format.mjs";
 import { validateInterfaceManifest } from "../web/src/runtime/interface-manifest.js";
-import { WIRE } from "../web/src/runtime/wire-tags.js";
+import { INTERFACE_TAG as WIRE } from "../web/src/runtime/interface-tags.js";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -296,7 +296,7 @@ function collectLeanTypes(descriptors, type) {
 }
 
 function leanNamedDescriptor(type) {
-  switch (type.wireTag) {
+  switch (leanInterfaceTag(type)) {
     case WIRE.SIMPLE_ENUM:
     case WIRE.STRUCTURE:
     case WIRE.CUSTOM_INDUCTIVE:
@@ -313,7 +313,7 @@ function leanNamedDescriptor(type) {
 }
 
 function leanChildren(type) {
-  switch (type?.wireTag) {
+  switch (leanInterfaceTag(type)) {
     case WIRE.ARRAY:
     case WIRE.LIST:
     case WIRE.OPTION:
@@ -339,7 +339,7 @@ function addLeanDescriptor(descriptors, key, descriptor) {
 }
 
 function leanShape(type) {
-  switch (type?.wireTag) {
+  switch (leanInterfaceTag(type)) {
     case WIRE.UNIT:
       return { kind: "primitive", name: "Unit" };
     case WIRE.NAT:
@@ -416,8 +416,12 @@ function leanShape(type) {
         result: leanShape(type.result),
       };
     default:
-      return { kind: "opaque", name: type?.type ?? `wireTag ${type?.wireTag ?? "?"}` };
+      return { kind: "opaque", name: type?.type ?? `interfaceTag ${leanInterfaceTag(type) ?? "?"}` };
   }
+}
+
+function leanInterfaceTag(type) {
+  return type?.interfaceTag ?? type?.wireTag;
 }
 
 function compareAnchor(anchor, lean, tsSymbols) {

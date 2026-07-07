@@ -2,7 +2,6 @@
 Lean.Vir.TypeAnchors.reactStylePropertyIdentity
 Lean.Vir.TypeAnchors.reactPropValueIdentity
 Lean.Vir.TypeAnchors.reactPropertyIdentity
-Lean.Vir.TypeAnchors.reactPropsEntryIdentity
 Lean.Vir.TypeAnchors.reactEventHandlerIdentity
 Lean.Vir.TypeAnchors.browserEventIdentity
 Lean.Vir.TypeAnchors.reactNodeIdentity

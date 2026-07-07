@@ -11,6 +11,9 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
+import { INTERFACE_MANIFEST_VERSION } from "../web/src/runtime/interface-manifest.js";
+import { INTERFACE_TAG } from "../web/src/runtime/interface-tags.js";
+
 const root = new URL("..", import.meta.url).pathname;
 const tmp = await mkdtemp(join(tmpdir(), "lean-vir-type-anchors-"));
 
@@ -47,7 +50,7 @@ try {
 
   const boxType = {
     type: "Demo.Box",
-    wireTag: 20,
+    interfaceTag: INTERFACE_TAG.STRUCTURE,
     kind: "structure",
     name: "Demo.Box",
     objectFieldCount: 1,
@@ -56,14 +59,14 @@ try {
     fields: [
       {
         name: "value",
-        type: { type: "String", wireTag: 3 },
+        type: { type: "String", interfaceTag: INTERFACE_TAG.STRING },
         layout: { kind: "object", index: 0 },
       },
     ],
   };
 
   await writeFile(manifest, `${JSON.stringify({
-    version: 5,
+    version: INTERFACE_MANIFEST_VERSION,
     artifact: "lean-vir-ir-package",
     metadata: {},
     exports: [
@@ -74,7 +77,7 @@ try {
         source: "Demo.lean",
         args: [
           { name: "box", type: boxType },
-          { name: "count", type: { type: "Nat", wireTag: 0 } },
+          { name: "count", type: { type: "Nat", interfaceTag: INTERFACE_TAG.NAT } },
         ],
         result: boxType,
         effect: "pure",

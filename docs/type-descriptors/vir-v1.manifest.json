@@ -1,13 +1,13 @@
 {
-  "version": 5,
+  "version": 6,
   "artifact": "lean-vir-ir-package",
   "metadata": {
     "generator": "tools/GeneratePackage.lean",
     "packageFormatVersion": 8,
-    "manifestVersion": 5,
-    "leanVersion": "4.31.0",
-    "leanToolchain": "leanprover/lean4:4.31.0",
-    "leanGithash": "68218e876d2a38b1985b8590fff244a83c321783",
+    "manifestVersion": 6,
+    "leanVersion": "4.32.0-rc1",
+    "leanToolchain": "leanprover/lean4:4.32.0-rc1",
+    "leanGithash": "b4812ae53eea93439ad5dce5a5c26591c31cb697",
     "generatedAt": "normalized",
     "targets": [
       {
@@ -17,7 +17,6 @@
           "Lean.Vir.TypeAnchors.reactStylePropertyIdentity",
           "Lean.Vir.TypeAnchors.reactPropValueIdentity",
           "Lean.Vir.TypeAnchors.reactPropertyIdentity",
-          "Lean.Vir.TypeAnchors.reactPropsEntryIdentity",
           "Lean.Vir.TypeAnchors.reactEventHandlerIdentity",
           "Lean.Vir.TypeAnchors.browserEventIdentity",
           "Lean.Vir.TypeAnchors.reactNodeIdentity",
@@ -39,8 +38,6 @@
           "Lean.Vir.TypeAnchors.reactPropValueIdentity._boxed",
           "Lean.Vir.TypeAnchors.reactPropertyIdentity",
           "Lean.Vir.TypeAnchors.reactPropertyIdentity._boxed",
-          "Lean.Vir.TypeAnchors.reactPropsEntryIdentity",
-          "Lean.Vir.TypeAnchors.reactPropsEntryIdentity._boxed",
           "Lean.Vir.TypeAnchors.reactEventHandlerIdentity",
           "Lean.Vir.TypeAnchors.reactEventHandlerIdentity._boxed",
           "Lean.Vir.TypeAnchors.browserEventIdentity",
@@ -165,7 +162,7 @@
           "name": "value",
           "type": {
             "type": "Lean.Vir.React.StyleProperty",
-            "wireTag": 20,
+            "interfaceTag": 20,
             "kind": "structure",
             "name": "Lean.Vir.React.StyleProperty",
             "objectFieldCount": 2,
@@ -176,7 +173,7 @@
                 "name": "name",
                 "type": {
                   "type": "String",
-                  "wireTag": 3
+                  "interfaceTag": 3
                 },
                 "layout": {
                   "kind": "object",
@@ -187,7 +184,7 @@
                 "name": "value",
                 "type": {
                   "type": "String",
-                  "wireTag": 3
+                  "interfaceTag": 3
                 },
                 "layout": {
                   "kind": "object",
@@ -200,7 +197,7 @@
       ],
       "result": {
         "type": "Lean.Vir.React.StyleProperty",
-        "wireTag": 20,
+        "interfaceTag": 20,
         "kind": "structure",
         "name": "Lean.Vir.React.StyleProperty",
         "objectFieldCount": 2,
@@ -211,7 +208,7 @@
             "name": "name",
             "type": {
               "type": "String",
-              "wireTag": 3
+              "interfaceTag": 3
             },
             "layout": {
               "kind": "object",
@@ -222,7 +219,7 @@
             "name": "value",
             "type": {
               "type": "String",
-              "wireTag": 3
+              "interfaceTag": 3
             },
             "layout": {
               "kind": "object",
@@ -243,7 +240,7 @@
           "name": "value",
           "type": {
             "type": "Lean.Vir.React.PropValue",
-            "wireTag": 25,
+            "interfaceTag": 25,
             "kind": "customInductive",
             "name": "Lean.Vir.React.PropValue",
             "constructors": [
@@ -259,7 +256,7 @@
                     "name": "value",
                     "type": {
                       "type": "String",
-                      "wireTag": 3
+                      "interfaceTag": 3
                     },
                     "layout": {
                       "kind": "object",
@@ -280,7 +277,7 @@
                     "name": "value",
                     "type": {
                       "type": "Bool",
-                      "wireTag": 2
+                      "interfaceTag": 2
                     },
                     "layout": {
                       "kind": "scalar",
@@ -302,7 +299,7 @@
                     "name": "value",
                     "type": {
                       "type": "Int",
-                      "wireTag": 1
+                      "interfaceTag": 1
                     },
                     "layout": {
                       "kind": "object",
@@ -323,7 +320,7 @@
                     "name": "value",
                     "type": {
                       "type": "Float",
-                      "wireTag": 10
+                      "interfaceTag": 10
                     },
                     "layout": {
                       "kind": "scalar",
@@ -345,11 +342,11 @@
                     "name": "entries",
                     "type": {
                       "type": "Array Lean.Vir.React.StyleProperty",
-                      "wireTag": 16,
+                      "interfaceTag": 16,
                       "kind": "array",
                       "element": {
                         "type": "Lean.Vir.React.StyleProperty",
-                        "wireTag": 20,
+                        "interfaceTag": 20,
                         "kind": "structure",
                         "name": "Lean.Vir.React.StyleProperty",
                         "objectFieldCount": 2,
@@ -360,7 +357,7 @@
                             "name": "name",
                             "type": {
                               "type": "String",
-                              "wireTag": 3
+                              "interfaceTag": 3
                             },
                             "layout": {
                               "kind": "object",
@@ -371,7 +368,7 @@
                             "name": "value",
                             "type": {
                               "type": "String",
-                              "wireTag": 3
+                              "interfaceTag": 3
                             },
                             "layout": {
                               "kind": "object",
@@ -400,11 +397,11 @@
                     "name": "classes",
                     "type": {
                       "type": "Array String",
-                      "wireTag": 16,
+                      "interfaceTag": 16,
                       "kind": "array",
                       "element": {
                         "type": "String",
-                        "wireTag": 3
+                        "interfaceTag": 3
                       }
                     },
                     "layout": {
@@ -420,7 +417,7 @@
       ],
       "result": {
         "type": "Lean.Vir.React.PropValue",
-        "wireTag": 25,
+        "interfaceTag": 25,
         "kind": "customInductive",
         "name": "Lean.Vir.React.PropValue",
         "constructors": [
@@ -436,7 +433,7 @@
                 "name": "value",
                 "type": {
                   "type": "String",
-                  "wireTag": 3
+                  "interfaceTag": 3
                 },
                 "layout": {
                   "kind": "object",
@@ -457,7 +454,7 @@
                 "name": "value",
                 "type": {
                   "type": "Bool",
-                  "wireTag": 2
+                  "interfaceTag": 2
                 },
                 "layout": {
                   "kind": "scalar",
@@ -479,7 +476,7 @@
                 "name": "value",
                 "type": {
                   "type": "Int",
-                  "wireTag": 1
+                  "interfaceTag": 1
                 },
                 "layout": {
                   "kind": "object",
@@ -500,7 +497,7 @@
                 "name": "value",
                 "type": {
                   "type": "Float",
-                  "wireTag": 10
+                  "interfaceTag": 10
                 },
                 "layout": {
                   "kind": "scalar",
@@ -522,11 +519,11 @@
                 "name": "entries",
                 "type": {
                   "type": "Array Lean.Vir.React.StyleProperty",
-                  "wireTag": 16,
+                  "interfaceTag": 16,
                   "kind": "array",
                   "element": {
                     "type": "Lean.Vir.React.StyleProperty",
-                    "wireTag": 20,
+                    "interfaceTag": 20,
                     "kind": "structure",
                     "name": "Lean.Vir.React.StyleProperty",
                     "objectFieldCount": 2,
@@ -537,7 +534,7 @@
                         "name": "name",
                         "type": {
                           "type": "String",
-                          "wireTag": 3
+                          "interfaceTag": 3
                         },
                         "layout": {
                           "kind": "object",
@@ -548,7 +545,7 @@
                         "name": "value",
                         "type": {
                           "type": "String",
-                          "wireTag": 3
+                          "interfaceTag": 3
                         },
                         "layout": {
                           "kind": "object",
@@ -577,11 +574,11 @@
                 "name": "classes",
                 "type": {
                   "type": "Array String",
-                  "wireTag": 16,
+                  "interfaceTag": 16,
                   "kind": "array",
                   "element": {
                     "type": "String",
-                    "wireTag": 3
+                    "interfaceTag": 3
                   }
                 },
                 "layout": {
@@ -605,7 +602,7 @@
           "name": "value",
           "type": {
             "type": "Lean.Vir.React.Property",
-            "wireTag": 20,
+            "interfaceTag": 20,
             "kind": "structure",
             "name": "Lean.Vir.React.Property",
             "objectFieldCount": 2,
@@ -616,7 +613,7 @@
                 "name": "name",
                 "type": {
                   "type": "String",
-                  "wireTag": 3
+                  "interfaceTag": 3
                 },
                 "layout": {
                   "kind": "object",
@@ -627,7 +624,7 @@
                 "name": "value",
                 "type": {
                   "type": "Lean.Vir.React.PropValue",
-                  "wireTag": 25,
+                  "interfaceTag": 25,
                   "kind": "customInductive",
                   "name": "Lean.Vir.React.PropValue",
                   "constructors": [
@@ -643,7 +640,7 @@
                           "name": "value",
                           "type": {
                             "type": "String",
-                            "wireTag": 3
+                            "interfaceTag": 3
                           },
                           "layout": {
                             "kind": "object",
@@ -664,7 +661,7 @@
                           "name": "value",
                           "type": {
                             "type": "Bool",
-                            "wireTag": 2
+                            "interfaceTag": 2
                           },
                           "layout": {
                             "kind": "scalar",
@@ -686,7 +683,7 @@
                           "name": "value",
                           "type": {
                             "type": "Int",
-                            "wireTag": 1
+                            "interfaceTag": 1
                           },
                           "layout": {
                             "kind": "object",
@@ -707,7 +704,7 @@
                           "name": "value",
                           "type": {
                             "type": "Float",
-                            "wireTag": 10
+                            "interfaceTag": 10
                           },
                           "layout": {
                             "kind": "scalar",
@@ -729,11 +726,11 @@
                           "name": "entries",
                           "type": {
                             "type": "Array Lean.Vir.React.StyleProperty",
-                            "wireTag": 16,
+                            "interfaceTag": 16,
                             "kind": "array",
                             "element": {
                               "type": "Lean.Vir.React.StyleProperty",
-                              "wireTag": 20,
+                              "interfaceTag": 20,
                               "kind": "structure",
                               "name": "Lean.Vir.React.StyleProperty",
                               "objectFieldCount": 2,
@@ -744,7 +741,7 @@
                                   "name": "name",
                                   "type": {
                                     "type": "String",
-                                    "wireTag": 3
+                                    "interfaceTag": 3
                                   },
                                   "layout": {
                                     "kind": "object",
@@ -755,7 +752,7 @@
                                   "name": "value",
                                   "type": {
                                     "type": "String",
-                                    "wireTag": 3
+                                    "interfaceTag": 3
                                   },
                                   "layout": {
                                     "kind": "object",
@@ -784,11 +781,11 @@
                           "name": "classes",
                           "type": {
                             "type": "Array String",
-                            "wireTag": 16,
+                            "interfaceTag": 16,
                             "kind": "array",
                             "element": {
                               "type": "String",
-                              "wireTag": 3
+                              "interfaceTag": 3
                             }
                           },
                           "layout": {
@@ -811,7 +808,7 @@
       ],
       "result": {
         "type": "Lean.Vir.React.Property",
-        "wireTag": 20,
+        "interfaceTag": 20,
         "kind": "structure",
         "name": "Lean.Vir.React.Property",
         "objectFieldCount": 2,
@@ -822,7 +819,7 @@
             "name": "name",
             "type": {
               "type": "String",
-              "wireTag": 3
+              "interfaceTag": 3
             },
             "layout": {
               "kind": "object",
@@ -833,7 +830,7 @@
             "name": "value",
             "type": {
               "type": "Lean.Vir.React.PropValue",
-              "wireTag": 25,
+              "interfaceTag": 25,
               "kind": "customInductive",
               "name": "Lean.Vir.React.PropValue",
               "constructors": [
@@ -849,7 +846,7 @@
                       "name": "value",
                       "type": {
                         "type": "String",
-                        "wireTag": 3
+                        "interfaceTag": 3
                       },
                       "layout": {
                         "kind": "object",
@@ -870,7 +867,7 @@
                       "name": "value",
                       "type": {
                         "type": "Bool",
-                        "wireTag": 2
+                        "interfaceTag": 2
                       },
                       "layout": {
                         "kind": "scalar",
@@ -892,7 +889,7 @@
                       "name": "value",
                       "type": {
                         "type": "Int",
-                        "wireTag": 1
+                        "interfaceTag": 1
                       },
                       "layout": {
                         "kind": "object",
@@ -913,7 +910,7 @@
                       "name": "value",
                       "type": {
                         "type": "Float",
-                        "wireTag": 10
+                        "interfaceTag": 10
                       },
                       "layout": {
                         "kind": "scalar",
@@ -935,11 +932,11 @@
                       "name": "entries",
                       "type": {
                         "type": "Array Lean.Vir.React.StyleProperty",
-                        "wireTag": 16,
+                        "interfaceTag": 16,
                         "kind": "array",
                         "element": {
                           "type": "Lean.Vir.React.StyleProperty",
-                          "wireTag": 20,
+                          "interfaceTag": 20,
                           "kind": "structure",
                           "name": "Lean.Vir.React.StyleProperty",
                           "objectFieldCount": 2,
@@ -950,7 +947,7 @@
                               "name": "name",
                               "type": {
                                 "type": "String",
-                                "wireTag": 3
+                                "interfaceTag": 3
                               },
                               "layout": {
                                 "kind": "object",
@@ -961,7 +958,7 @@
                               "name": "value",
                               "type": {
                                 "type": "String",
-                                "wireTag": 3
+                                "interfaceTag": 3
                               },
                               "layout": {
                                 "kind": "object",
@@ -990,11 +987,11 @@
                       "name": "classes",
                       "type": {
                         "type": "Array String",
-                        "wireTag": 16,
+                        "interfaceTag": 16,
                         "kind": "array",
                         "element": {
                           "type": "String",
-                          "wireTag": 3
+                          "interfaceTag": 3
                         }
                       },
                       "layout": {
@@ -1016,652 +1013,6 @@
       "effect": "pure"
     },
     {
-      "id": "Lean_Vir_TypeAnchors_reactPropsEntryIdentity",
-      "jsName": "Lean_Vir_TypeAnchors_reactPropsEntryIdentity",
-      "entry": "Lean.Vir.TypeAnchors.reactPropsEntryIdentity",
-      "source": "docs/type-descriptors/vir-v1.fixture.lean",
-      "args": [
-        {
-          "name": "value",
-          "type": {
-            "type": "Lean.Vir.React.Props.Entry",
-            "wireTag": 25,
-            "kind": "customInductive",
-            "name": "Lean.Vir.React.Props.Entry",
-            "constructors": [
-              {
-                "name": "Lean.Vir.React.Props.Entry.key",
-                "jsName": "key",
-                "tag": 0,
-                "objectFieldCount": 1,
-                "usizeFieldCount": 0,
-                "scalarByteSize": 0,
-                "fields": [
-                  {
-                    "name": "value",
-                    "type": {
-                      "type": "String",
-                      "wireTag": 3
-                    },
-                    "layout": {
-                      "kind": "object",
-                      "index": 0
-                    }
-                  }
-                ]
-              },
-              {
-                "name": "Lean.Vir.React.Props.Entry.property",
-                "jsName": "property",
-                "tag": 1,
-                "objectFieldCount": 1,
-                "usizeFieldCount": 0,
-                "scalarByteSize": 0,
-                "fields": [
-                  {
-                    "name": "value",
-                    "type": {
-                      "type": "Lean.Vir.React.Property",
-                      "wireTag": 20,
-                      "kind": "structure",
-                      "name": "Lean.Vir.React.Property",
-                      "objectFieldCount": 2,
-                      "usizeFieldCount": 0,
-                      "scalarByteSize": 0,
-                      "fields": [
-                        {
-                          "name": "name",
-                          "type": {
-                            "type": "String",
-                            "wireTag": 3
-                          },
-                          "layout": {
-                            "kind": "object",
-                            "index": 0
-                          }
-                        },
-                        {
-                          "name": "value",
-                          "type": {
-                            "type": "Lean.Vir.React.PropValue",
-                            "wireTag": 25,
-                            "kind": "customInductive",
-                            "name": "Lean.Vir.React.PropValue",
-                            "constructors": [
-                              {
-                                "name": "Lean.Vir.React.PropValue.string",
-                                "jsName": "string",
-                                "tag": 0,
-                                "objectFieldCount": 1,
-                                "usizeFieldCount": 0,
-                                "scalarByteSize": 0,
-                                "fields": [
-                                  {
-                                    "name": "value",
-                                    "type": {
-                                      "type": "String",
-                                      "wireTag": 3
-                                    },
-                                    "layout": {
-                                      "kind": "object",
-                                      "index": 0
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "name": "Lean.Vir.React.PropValue.bool",
-                                "jsName": "bool",
-                                "tag": 1,
-                                "objectFieldCount": 0,
-                                "usizeFieldCount": 0,
-                                "scalarByteSize": 1,
-                                "fields": [
-                                  {
-                                    "name": "value",
-                                    "type": {
-                                      "type": "Bool",
-                                      "wireTag": 2
-                                    },
-                                    "layout": {
-                                      "kind": "scalar",
-                                      "size": 1,
-                                      "offset": 0
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "name": "Lean.Vir.React.PropValue.int",
-                                "jsName": "int",
-                                "tag": 2,
-                                "objectFieldCount": 1,
-                                "usizeFieldCount": 0,
-                                "scalarByteSize": 0,
-                                "fields": [
-                                  {
-                                    "name": "value",
-                                    "type": {
-                                      "type": "Int",
-                                      "wireTag": 1
-                                    },
-                                    "layout": {
-                                      "kind": "object",
-                                      "index": 0
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "name": "Lean.Vir.React.PropValue.float",
-                                "jsName": "float",
-                                "tag": 3,
-                                "objectFieldCount": 0,
-                                "usizeFieldCount": 0,
-                                "scalarByteSize": 8,
-                                "fields": [
-                                  {
-                                    "name": "value",
-                                    "type": {
-                                      "type": "Float",
-                                      "wireTag": 10
-                                    },
-                                    "layout": {
-                                      "kind": "scalar",
-                                      "size": 8,
-                                      "offset": 0
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "name": "Lean.Vir.React.PropValue.style",
-                                "jsName": "style",
-                                "tag": 4,
-                                "objectFieldCount": 1,
-                                "usizeFieldCount": 0,
-                                "scalarByteSize": 0,
-                                "fields": [
-                                  {
-                                    "name": "entries",
-                                    "type": {
-                                      "type": "Array Lean.Vir.React.StyleProperty",
-                                      "wireTag": 16,
-                                      "kind": "array",
-                                      "element": {
-                                        "type": "Lean.Vir.React.StyleProperty",
-                                        "wireTag": 20,
-                                        "kind": "structure",
-                                        "name": "Lean.Vir.React.StyleProperty",
-                                        "objectFieldCount": 2,
-                                        "usizeFieldCount": 0,
-                                        "scalarByteSize": 0,
-                                        "fields": [
-                                          {
-                                            "name": "name",
-                                            "type": {
-                                              "type": "String",
-                                              "wireTag": 3
-                                            },
-                                            "layout": {
-                                              "kind": "object",
-                                              "index": 0
-                                            }
-                                          },
-                                          {
-                                            "name": "value",
-                                            "type": {
-                                              "type": "String",
-                                              "wireTag": 3
-                                            },
-                                            "layout": {
-                                              "kind": "object",
-                                              "index": 1
-                                            }
-                                          }
-                                        ]
-                                      }
-                                    },
-                                    "layout": {
-                                      "kind": "object",
-                                      "index": 0
-                                    }
-                                  }
-                                ]
-                              },
-                              {
-                                "name": "Lean.Vir.React.PropValue.classList",
-                                "jsName": "classList",
-                                "tag": 5,
-                                "objectFieldCount": 1,
-                                "usizeFieldCount": 0,
-                                "scalarByteSize": 0,
-                                "fields": [
-                                  {
-                                    "name": "classes",
-                                    "type": {
-                                      "type": "Array String",
-                                      "wireTag": 16,
-                                      "kind": "array",
-                                      "element": {
-                                        "type": "String",
-                                        "wireTag": 3
-                                      }
-                                    },
-                                    "layout": {
-                                      "kind": "object",
-                                      "index": 0
-                                    }
-                                  }
-                                ]
-                              }
-                            ]
-                          },
-                          "layout": {
-                            "kind": "object",
-                            "index": 1
-                          }
-                        }
-                      ]
-                    },
-                    "layout": {
-                      "kind": "object",
-                      "index": 0
-                    }
-                  }
-                ]
-              },
-              {
-                "name": "Lean.Vir.React.Props.Entry.eventHandler",
-                "jsName": "eventHandler",
-                "tag": 2,
-                "objectFieldCount": 1,
-                "usizeFieldCount": 0,
-                "scalarByteSize": 0,
-                "fields": [
-                  {
-                    "name": "value",
-                    "type": {
-                      "type": "Lean.Vir.React.EventHandler",
-                      "wireTag": 20,
-                      "kind": "structure",
-                      "name": "Lean.Vir.React.EventHandler",
-                      "objectFieldCount": 2,
-                      "usizeFieldCount": 0,
-                      "scalarByteSize": 0,
-                      "fields": [
-                        {
-                          "name": "name",
-                          "type": {
-                            "type": "String",
-                            "wireTag": 3
-                          },
-                          "layout": {
-                            "kind": "object",
-                            "index": 0
-                          }
-                        },
-                        {
-                          "name": "callback",
-                          "type": {
-                            "type": "Function",
-                            "wireTag": 24,
-                            "kind": "function",
-                            "effect": "dom",
-                            "args": [
-                              {
-                                "name": "arg1",
-                                "type": {
-                                  "type": "Event",
-                                  "wireTag": 23,
-                                  "kind": "resource",
-                                  "name": "Lean.Vir.Browser.Event"
-                                }
-                              }
-                            ],
-                            "result": {
-                              "type": "Unit",
-                              "wireTag": 22
-                            }
-                          },
-                          "layout": {
-                            "kind": "object",
-                            "index": 1
-                          }
-                        }
-                      ]
-                    },
-                    "layout": {
-                      "kind": "object",
-                      "index": 0
-                    }
-                  }
-                ]
-              }
-            ]
-          }
-        }
-      ],
-      "result": {
-        "type": "Lean.Vir.React.Props.Entry",
-        "wireTag": 25,
-        "kind": "customInductive",
-        "name": "Lean.Vir.React.Props.Entry",
-        "constructors": [
-          {
-            "name": "Lean.Vir.React.Props.Entry.key",
-            "jsName": "key",
-            "tag": 0,
-            "objectFieldCount": 1,
-            "usizeFieldCount": 0,
-            "scalarByteSize": 0,
-            "fields": [
-              {
-                "name": "value",
-                "type": {
-                  "type": "String",
-                  "wireTag": 3
-                },
-                "layout": {
-                  "kind": "object",
-                  "index": 0
-                }
-              }
-            ]
-          },
-          {
-            "name": "Lean.Vir.React.Props.Entry.property",
-            "jsName": "property",
-            "tag": 1,
-            "objectFieldCount": 1,
-            "usizeFieldCount": 0,
-            "scalarByteSize": 0,
-            "fields": [
-              {
-                "name": "value",
-                "type": {
-                  "type": "Lean.Vir.React.Property",
-                  "wireTag": 20,
-                  "kind": "structure",
-                  "name": "Lean.Vir.React.Property",
-                  "objectFieldCount": 2,
-                  "usizeFieldCount": 0,
-                  "scalarByteSize": 0,
-                  "fields": [
-                    {
-                      "name": "name",
-                      "type": {
-                        "type": "String",
-                        "wireTag": 3
-                      },
-                      "layout": {
-                        "kind": "object",
-                        "index": 0
-                      }
-                    },
-                    {
-                      "name": "value",
-                      "type": {
-                        "type": "Lean.Vir.React.PropValue",
-                        "wireTag": 25,
-                        "kind": "customInductive",
-                        "name": "Lean.Vir.React.PropValue",
-                        "constructors": [
-                          {
-                            "name": "Lean.Vir.React.PropValue.string",
-                            "jsName": "string",
-                            "tag": 0,
-                            "objectFieldCount": 1,
-                            "usizeFieldCount": 0,
-                            "scalarByteSize": 0,
-                            "fields": [
-                              {
-                                "name": "value",
-                                "type": {
-                                  "type": "String",
-                                  "wireTag": 3
-                                },
-                                "layout": {
-                                  "kind": "object",
-                                  "index": 0
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "name": "Lean.Vir.React.PropValue.bool",
-                            "jsName": "bool",
-                            "tag": 1,
-                            "objectFieldCount": 0,
-                            "usizeFieldCount": 0,
-                            "scalarByteSize": 1,
-                            "fields": [
-                              {
-                                "name": "value",
-                                "type": {
-                                  "type": "Bool",
-                                  "wireTag": 2
-                                },
-                                "layout": {
-                                  "kind": "scalar",
-                                  "size": 1,
-                                  "offset": 0
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "name": "Lean.Vir.React.PropValue.int",
-                            "jsName": "int",
-                            "tag": 2,
-                            "objectFieldCount": 1,
-                            "usizeFieldCount": 0,
-                            "scalarByteSize": 0,
-                            "fields": [
-                              {
-                                "name": "value",
-                                "type": {
-                                  "type": "Int",
-                                  "wireTag": 1
-                                },
-                                "layout": {
-                                  "kind": "object",
-                                  "index": 0
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "name": "Lean.Vir.React.PropValue.float",
-                            "jsName": "float",
-                            "tag": 3,
-                            "objectFieldCount": 0,
-                            "usizeFieldCount": 0,
-                            "scalarByteSize": 8,
-                            "fields": [
-                              {
-                                "name": "value",
-                                "type": {
-                                  "type": "Float",
-                                  "wireTag": 10
-                                },
-                                "layout": {
-                                  "kind": "scalar",
-                                  "size": 8,
-                                  "offset": 0
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "name": "Lean.Vir.React.PropValue.style",
-                            "jsName": "style",
-                            "tag": 4,
-                            "objectFieldCount": 1,
-                            "usizeFieldCount": 0,
-                            "scalarByteSize": 0,
-                            "fields": [
-                              {
-                                "name": "entries",
-                                "type": {
-                                  "type": "Array Lean.Vir.React.StyleProperty",
-                                  "wireTag": 16,
-                                  "kind": "array",
-                                  "element": {
-                                    "type": "Lean.Vir.React.StyleProperty",
-                                    "wireTag": 20,
-                                    "kind": "structure",
-                                    "name": "Lean.Vir.React.StyleProperty",
-                                    "objectFieldCount": 2,
-                                    "usizeFieldCount": 0,
-                                    "scalarByteSize": 0,
-                                    "fields": [
-                                      {
-                                        "name": "name",
-                                        "type": {
-                                          "type": "String",
-                                          "wireTag": 3
-                                        },
-                                        "layout": {
-                                          "kind": "object",
-                                          "index": 0
-                                        }
-                                      },
-                                      {
-                                        "name": "value",
-                                        "type": {
-                                          "type": "String",
-                                          "wireTag": 3
-                                        },
-                                        "layout": {
-                                          "kind": "object",
-                                          "index": 1
-                                        }
-                                      }
-                                    ]
-                                  }
-                                },
-                                "layout": {
-                                  "kind": "object",
-                                  "index": 0
-                                }
-                              }
-                            ]
-                          },
-                          {
-                            "name": "Lean.Vir.React.PropValue.classList",
-                            "jsName": "classList",
-                            "tag": 5,
-                            "objectFieldCount": 1,
-                            "usizeFieldCount": 0,
-                            "scalarByteSize": 0,
-                            "fields": [
-                              {
-                                "name": "classes",
-                                "type": {
-                                  "type": "Array String",
-                                  "wireTag": 16,
-                                  "kind": "array",
-                                  "element": {
-                                    "type": "String",
-                                    "wireTag": 3
-                                  }
-                                },
-                                "layout": {
-                                  "kind": "object",
-                                  "index": 0
-                                }
-                              }
-                            ]
-                          }
-                        ]
-                      },
-                      "layout": {
-                        "kind": "object",
-                        "index": 1
-                      }
-                    }
-                  ]
-                },
-                "layout": {
-                  "kind": "object",
-                  "index": 0
-                }
-              }
-            ]
-          },
-          {
-            "name": "Lean.Vir.React.Props.Entry.eventHandler",
-            "jsName": "eventHandler",
-            "tag": 2,
-            "objectFieldCount": 1,
-            "usizeFieldCount": 0,
-            "scalarByteSize": 0,
-            "fields": [
-              {
-                "name": "value",
-                "type": {
-                  "type": "Lean.Vir.React.EventHandler",
-                  "wireTag": 20,
-                  "kind": "structure",
-                  "name": "Lean.Vir.React.EventHandler",
-                  "objectFieldCount": 2,
-                  "usizeFieldCount": 0,
-                  "scalarByteSize": 0,
-                  "fields": [
-                    {
-                      "name": "name",
-                      "type": {
-                        "type": "String",
-                        "wireTag": 3
-                      },
-                      "layout": {
-                        "kind": "object",
-                        "index": 0
-                      }
-                    },
-                    {
-                      "name": "callback",
-                      "type": {
-                        "type": "Function",
-                        "wireTag": 24,
-                        "kind": "function",
-                        "effect": "dom",
-                        "args": [
-                          {
-                            "name": "arg1",
-                            "type": {
-                              "type": "Event",
-                              "wireTag": 23,
-                              "kind": "resource",
-                              "name": "Lean.Vir.Browser.Event"
-                            }
-                          }
-                        ],
-                        "result": {
-                          "type": "Unit",
-                          "wireTag": 22
-                        }
-                      },
-                      "layout": {
-                        "kind": "object",
-                        "index": 1
-                      }
-                    }
-                  ]
-                },
-                "layout": {
-                  "kind": "object",
-                  "index": 0
-                }
-              }
-            ]
-          }
-        ]
-      },
-      "effect": "pure"
-    },
-    {
       "id": "Lean_Vir_TypeAnchors_reactEventHandlerIdentity",
       "jsName": "Lean_Vir_TypeAnchors_reactEventHandlerIdentity",
       "entry": "Lean.Vir.TypeAnchors.reactEventHandlerIdentity",
@@ -1671,7 +1022,7 @@
           "name": "value",
           "type": {
             "type": "Lean.Vir.React.EventHandler",
-            "wireTag": 20,
+            "interfaceTag": 20,
             "kind": "structure",
             "name": "Lean.Vir.React.EventHandler",
             "objectFieldCount": 2,
@@ -1682,7 +1033,7 @@
                 "name": "name",
                 "type": {
                   "type": "String",
-                  "wireTag": 3
+                  "interfaceTag": 3
                 },
                 "layout": {
                   "kind": "object",
@@ -1693,7 +1044,7 @@
                 "name": "callback",
                 "type": {
                   "type": "Function",
-                  "wireTag": 24,
+                  "interfaceTag": 24,
                   "kind": "function",
                   "effect": "dom",
                   "args": [
@@ -1701,7 +1052,7 @@
                       "name": "arg1",
                       "type": {
                         "type": "Event",
-                        "wireTag": 23,
+                        "interfaceTag": 23,
                         "kind": "resource",
                         "name": "Lean.Vir.Browser.Event"
                       }
@@ -1709,7 +1060,7 @@
                   ],
                   "result": {
                     "type": "Unit",
-                    "wireTag": 22
+                    "interfaceTag": 22
                   }
                 },
                 "layout": {
@@ -1723,7 +1074,7 @@
       ],
       "result": {
         "type": "Lean.Vir.React.EventHandler",
-        "wireTag": 20,
+        "interfaceTag": 20,
         "kind": "structure",
         "name": "Lean.Vir.React.EventHandler",
         "objectFieldCount": 2,
@@ -1734,7 +1085,7 @@
             "name": "name",
             "type": {
               "type": "String",
-              "wireTag": 3
+              "interfaceTag": 3
             },
             "layout": {
               "kind": "object",
@@ -1745,7 +1096,7 @@
             "name": "callback",
             "type": {
               "type": "Function",
-              "wireTag": 24,
+              "interfaceTag": 24,
               "kind": "function",
               "effect": "dom",
               "args": [
@@ -1753,7 +1104,7 @@
                   "name": "arg1",
                   "type": {
                     "type": "Event",
-                    "wireTag": 23,
+                    "interfaceTag": 23,
                     "kind": "resource",
                     "name": "Lean.Vir.Browser.Event"
                   }
@@ -1761,7 +1112,7 @@
               ],
               "result": {
                 "type": "Unit",
-                "wireTag": 22
+                "interfaceTag": 22
               }
             },
             "layout": {
@@ -1783,7 +1134,7 @@
           "name": "value",
           "type": {
             "type": "Event",
-            "wireTag": 23,
+            "interfaceTag": 23,
             "kind": "resource",
             "name": "Lean.Vir.Browser.Event"
           }
@@ -1791,7 +1142,7 @@
       ],
       "result": {
         "type": "Event",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Browser.Event"
       },
@@ -1807,7 +1158,7 @@
           "name": "value",
           "type": {
             "type": "Js",
-            "wireTag": 23,
+            "interfaceTag": 23,
             "kind": "resource",
             "name": "Lean.Vir.Js"
           }
@@ -1815,7 +1166,7 @@
       ],
       "result": {
         "type": "Js",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Js"
       },
@@ -1831,7 +1182,7 @@
           "name": "value",
           "type": {
             "type": "Js",
-            "wireTag": 23,
+            "interfaceTag": 23,
             "kind": "resource",
             "name": "Lean.Vir.Js"
           }
@@ -1839,7 +1190,7 @@
       ],
       "result": {
         "type": "Js",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Js"
       },
@@ -1855,7 +1206,7 @@
           "name": "value",
           "type": {
             "type": "Js",
-            "wireTag": 23,
+            "interfaceTag": 23,
             "kind": "resource",
             "name": "Lean.Vir.Js"
           }
@@ -1863,7 +1214,7 @@
       ],
       "result": {
         "type": "Js",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Js"
       },
@@ -1879,7 +1230,7 @@
           "name": "value",
           "type": {
             "type": "Js",
-            "wireTag": 23,
+            "interfaceTag": 23,
             "kind": "resource",
             "name": "Lean.Vir.Js"
           }
@@ -1887,7 +1238,7 @@
       ],
       "result": {
         "type": "Js",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Js"
       },
@@ -1903,7 +1254,7 @@
           "name": "value",
           "type": {
             "type": "Js",
-            "wireTag": 23,
+            "interfaceTag": 23,
             "kind": "resource",
             "name": "Lean.Vir.Js"
           }
@@ -1911,7 +1262,7 @@
       ],
       "result": {
         "type": "Js",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Js"
       },
@@ -1927,7 +1278,7 @@
           "name": "value",
           "type": {
             "type": "Js",
-            "wireTag": 23,
+            "interfaceTag": 23,
             "kind": "resource",
             "name": "Lean.Vir.Js"
           }
@@ -1935,7 +1286,7 @@
       ],
       "result": {
         "type": "Js",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Js"
       },
@@ -1951,7 +1302,7 @@
           "name": "value",
           "type": {
             "type": "Lean.Vir.React.State (Lean.Vir.Js String)",
-            "wireTag": 20,
+            "interfaceTag": 20,
             "kind": "structure",
             "name": "Lean.Vir.React.State",
             "objectFieldCount": 2,
@@ -1962,7 +1313,7 @@
                 "name": "value",
                 "type": {
                   "type": "Js",
-                  "wireTag": 23,
+                  "interfaceTag": 23,
                   "kind": "resource",
                   "name": "Lean.Vir.Js"
                 },
@@ -1975,7 +1326,7 @@
                 "name": "setter",
                 "type": {
                   "type": "Js",
-                  "wireTag": 23,
+                  "interfaceTag": 23,
                   "kind": "resource",
                   "name": "Lean.Vir.Js"
                 },
@@ -1990,7 +1341,7 @@
       ],
       "result": {
         "type": "Lean.Vir.React.State (Lean.Vir.Js String)",
-        "wireTag": 20,
+        "interfaceTag": 20,
         "kind": "structure",
         "name": "Lean.Vir.React.State",
         "objectFieldCount": 2,
@@ -2001,7 +1352,7 @@
             "name": "value",
             "type": {
               "type": "Js",
-              "wireTag": 23,
+              "interfaceTag": 23,
               "kind": "resource",
               "name": "Lean.Vir.Js"
             },
@@ -2014,7 +1365,7 @@
             "name": "setter",
             "type": {
               "type": "Js",
-              "wireTag": 23,
+              "interfaceTag": 23,
               "kind": "resource",
               "name": "Lean.Vir.Js"
             },
@@ -2037,7 +1388,7 @@
           "name": "value",
           "type": {
             "type": "Js",
-            "wireTag": 23,
+            "interfaceTag": 23,
             "kind": "resource",
             "name": "Lean.Vir.Js"
           }
@@ -2045,7 +1396,7 @@
       ],
       "result": {
         "type": "Js",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Js"
       },
@@ -2061,7 +1412,7 @@
           "name": "value",
           "type": {
             "type": "Lean.Vir.React.ReducerState String String",
-            "wireTag": 20,
+            "interfaceTag": 20,
             "kind": "structure",
             "name": "Lean.Vir.React.ReducerState",
             "objectFieldCount": 2,
@@ -2072,7 +1423,7 @@
                 "name": "value",
                 "type": {
                   "type": "Js",
-                  "wireTag": 23,
+                  "interfaceTag": 23,
                   "kind": "resource",
                   "name": "Lean.Vir.Js"
                 },
@@ -2085,7 +1436,7 @@
                 "name": "dispatch",
                 "type": {
                   "type": "Js",
-                  "wireTag": 23,
+                  "interfaceTag": 23,
                   "kind": "resource",
                   "name": "Lean.Vir.Js"
                 },
@@ -2100,7 +1451,7 @@
       ],
       "result": {
         "type": "Lean.Vir.React.ReducerState String String",
-        "wireTag": 20,
+        "interfaceTag": 20,
         "kind": "structure",
         "name": "Lean.Vir.React.ReducerState",
         "objectFieldCount": 2,
@@ -2111,7 +1462,7 @@
             "name": "value",
             "type": {
               "type": "Js",
-              "wireTag": 23,
+              "interfaceTag": 23,
               "kind": "resource",
               "name": "Lean.Vir.Js"
             },
@@ -2124,7 +1475,7 @@
             "name": "dispatch",
             "type": {
               "type": "Js",
-              "wireTag": 23,
+              "interfaceTag": 23,
               "kind": "resource",
               "name": "Lean.Vir.Js"
             },
@@ -2147,7 +1498,7 @@
           "name": "value",
           "type": {
             "type": "Js",
-            "wireTag": 23,
+            "interfaceTag": 23,
             "kind": "resource",
             "name": "Lean.Vir.Js"
           }
@@ -2155,7 +1506,7 @@
       ],
       "result": {
         "type": "Js",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Js"
       },
@@ -2171,7 +1522,7 @@
           "name": "component",
           "type": {
             "type": "Function",
-            "wireTag": 24,
+            "interfaceTag": 24,
             "kind": "function",
             "effect": "react",
             "args": [
@@ -2179,13 +1530,13 @@
                 "name": "arg1",
                 "type": {
                   "type": "Unit",
-                  "wireTag": 22
+                  "interfaceTag": 22
                 }
               }
             ],
             "result": {
               "type": "Js",
-              "wireTag": 23,
+              "interfaceTag": 23,
               "kind": "resource",
               "name": "Lean.Vir.Js"
             }
@@ -2194,7 +1545,7 @@
       ],
       "result": {
         "type": "Js",
-        "wireTag": 23,
+        "interfaceTag": 23,
         "kind": "resource",
         "name": "Lean.Vir.Js"
       },

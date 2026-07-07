@@ -32,11 +32,6 @@ def reactPropertyIdentity
     Lean.Vir.React.Property :=
   value
 
-def reactPropsEntryIdentity
-    (value : Lean.Vir.React.Props.Entry) :
-    Lean.Vir.React.Props.Entry :=
-  value
-
 def reactEventHandlerIdentity
     (value : Lean.Vir.React.EventHandler) :
     Lean.Vir.React.EventHandler :=
