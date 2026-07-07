@@ -451,10 +451,6 @@ for (const target of [
   assert.equal(entry?.args[1]?.type?.type, "Js");
   assert.equal(entry?.result?.type, "Unit");
 }
-const externalBadgeImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.react.externalBadge");
-assert.equal(externalBadgeImport?.effect, "react");
-assert.equal(externalBadgeImport?.args.length, 0);
-assert.equal(externalBadgeImport?.result?.type, "Js");
 const reactChildrenEmptyImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.children.empty");
 assert.equal(reactChildrenEmptyImport?.effect, "react");
 assert.equal(reactChildrenEmptyImport?.args.length, 0);

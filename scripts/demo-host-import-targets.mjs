@@ -86,6 +86,5 @@ export const demoHostImportTargets = [
   "react.useRef",
   "react.useState",
   "test.callNatCallback",
-  "test.react.externalBadge",
   "test.recordNat",
 ];

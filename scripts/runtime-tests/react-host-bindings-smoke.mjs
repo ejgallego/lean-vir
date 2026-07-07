@@ -34,7 +34,6 @@ import {
   smokeVirtualReactCheckbox,
   smokeVirtualReactCounter,
   smokeVirtualReactEffect,
-  smokeVirtualReactExternalComponent,
   smokeVirtualReactMemo,
   smokeVirtualReactMemoStable,
   smokeVirtualReactRefFragment,
@@ -162,7 +161,6 @@ function assertNatResourceReleased(jsBindings, resource) {
 }
 
 const reactDocumentState = createVirtualDocumentState();
-const externalBadge = createVirtualExternalBadgeComponent();
 const reactRuntime = await createVirRuntime({
   wasmBytes,
   irPackageBytes: hostPackageBytes,
@@ -176,7 +174,6 @@ const reactRuntime = await createVirRuntime({
       }
     },
     "test.recordNat": () => undefined,
-    "test.react.externalBadge": () => reactDocumentState.resources.resourceForValue(externalBadge),
   },
 });
 ensureVirtualElements(reactDocumentState, [
@@ -186,7 +183,6 @@ ensureVirtualElements(reactDocumentState, [
   "#react-memo",
   "#react-memo-stable",
   "#react-ref-fragment",
-  "#react-external-component",
   "#react-input",
   "#react-change",
   "#react-select-textarea",
@@ -219,7 +215,6 @@ smokeVirtualReactEffect(reactRuntime, reactDocumentState, "#react-effect");
 smokeVirtualReactMemo(reactRuntime, reactDocumentState, "#react-memo");
 smokeVirtualReactMemoStable(reactRuntime, reactDocumentState, "#react-memo-stable");
 smokeVirtualReactRefFragment(reactRuntime, reactDocumentState, "#react-ref-fragment");
-smokeVirtualReactExternalComponent(reactRuntime, reactDocumentState, "#react-external-component");
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
 smokeVirtualReactChangeInput(reactRuntime, reactDocumentState, "#react-change");
 smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select-textarea");
@@ -564,9 +559,3 @@ assert.equal(reactReloadDocumentState.elements.get("#react-reload").reactRoot, u
 reactReloadRuntime.dispose();
 
 console.log("vir runtime React host bindings smoke ok");
-
-function createVirtualExternalBadgeComponent() {
-  function VirExternalBadge() {}
-  VirExternalBadge.displayName = "VirExternalBadge";
-  return VirExternalBadge;
-}
