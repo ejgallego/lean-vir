@@ -115,7 +115,8 @@ function renderMarkdownReport(report) {
 }
 
 function renderHtmlReport(report) {
-  const rows = report.results.map(renderHtmlAnchor).join("\n");
+  const rows = report.results.map((result) => renderHtmlAnchor(result, report.typeScriptProvenance)).join("\n");
+  const provenance = renderHtmlProvenance(report.typeScriptProvenance);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -165,6 +166,16 @@ function renderHtmlReport(report) {
       gap: 10px;
       margin: 18px 0 28px;
     }
+    .provenance {
+      margin: -10px 0 24px;
+      padding: 12px 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .provenance ul { margin: 6px 0 0; padding-left: 20px; }
     .summary-card, .anchor {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -251,6 +262,7 @@ function renderHtmlReport(report) {
       <h1>Lean VIR Type Anchors</h1>
       <p>TypeScript declaration documentation enriched with Lean VIR descriptor matches.</p>
     </header>
+${provenance}
     <section class="summary" aria-label="Type anchor summary">
       ${summaryCard("exact", report.summary.exact)}
       ${summaryCard("compatible", report.summary.compatible)}
@@ -266,13 +278,35 @@ ${rows}
 `;
 }
 
+function renderHtmlProvenance(provenance) {
+  if (provenance === undefined) return "";
+  const docs = Array.isArray(provenance.docs) ? provenance.docs : [];
+  const packages = Array.isArray(provenance.packages) ? provenance.packages : [];
+  const note = provenance.note ? `<p>${escapeHtml(provenance.note)}</p>` : "";
+  const items = [
+    ...packages.map((pkg) => escapeHtml(`${pkg.name}@${pkg.version}${pkg.role ? ` (${pkg.role})` : ""}`)),
+    ...docs.map((doc) => `<a href="${escapeAttr(doc.url)}">${escapeHtml(doc.title ?? doc.url)}</a>`),
+  ];
+  if (items.length === 0 && note === "") return "";
+  return `<aside class="provenance" aria-label="TypeScript source provenance">
+      <strong>TypeScript source provenance</strong>
+      ${note}
+      ${items.length === 0 ? "" : `<ul>${items.map((item) => `<li>${item}</li>`).join("")}</ul>`}
+    </aside>`;
+}
+
 function summaryCard(label, count) {
   return `<div class="summary-card ${escapeAttr(label)}"><strong>${count}</strong><span>${escapeHtml(label)}</span></div>`;
 }
 
-function renderHtmlAnchor(result) {
+function renderHtmlAnchor(result, provenance) {
   const ts = result.tsSymbol;
-  const href = ts === undefined ? "#" : sourceHref(ts.source);
+  const href = sourceHref(ts?.source, provenance);
+  const docsHref = documentationHref(provenance, result.ts);
+  const primaryHref = docsHref ?? href;
+  const docsMeta = docsHref === null
+    ? ""
+    : `\n          <span>React docs: <a href="${escapeAttr(docsHref)}">${escapeHtml(result.ts)}</a></span>`;
   const notes = result.notes.length === 0
     ? ""
     : `<p class="notes">${escapeHtml(result.notes.join("; "))}</p>`;
@@ -286,13 +320,13 @@ function renderHtmlAnchor(result) {
   return `      <article class="anchor" id="${escapeAttr(`type-anchor-${slug(result.id)}`)}" data-vir-type-anchor-hover="${escapeAttr(hoverText(result))}">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="${escapeAttr(href)}" title="${escapeAttr(hoverText(result))}">${escapeHtml(result.ts)}</a></h2>
+            <h2 class="ts-name"><a href="${escapeAttr(primaryHref)}" title="${escapeAttr(hoverText(result))}">${escapeHtml(result.ts)}</a></h2>
             <p class="lean-name">Lean: <code>${escapeHtml(result.lean)}</code></p>
           </div>
           <span class="badge ${escapeAttr(result.status)}" title="${escapeAttr(statusTitle(result))}">${escapeHtml(result.status)}</span>
         </div>
         <div class="meta">
-          <span>TypeScript source: <a href="${escapeAttr(href)}">${escapeHtml(sourceLabel(ts?.source))}</a></span>
+          <span>TypeScript source: <a href="${escapeAttr(href)}">${escapeHtml(sourceLabel(ts?.source))}</a></span>${docsMeta}
           <span>Anchor: <code>${escapeHtml(result.id)}</code></span>
         </div>
         <div class="comparison">
@@ -331,13 +365,32 @@ function renderAnchor(result) {
   ].filter((line) => line !== "");
 }
 
-function sourceHref(source) {
+function sourceHref(source, provenance = undefined) {
   if (source === undefined) return "#";
+  const sourceMaps = Array.isArray(provenance?.sourceMaps) ? provenance.sourceMaps : [];
+  for (const sourceMap of sourceMaps) {
+    const pathPrefix = sourceMap.pathPrefix;
+    if (source.path === sourceMap.path ||
+        (typeof pathPrefix === "string" && source.path.startsWith(pathPrefix))) {
+      const line = source.startLine === source.endLine
+        ? `#L${source.startLine}`
+        : `#L${source.startLine}-L${source.endLine}`;
+      return `${sourceMap.url}${line}`;
+    }
+  }
   const file = source.path.split("/").pop();
   const line = source.startLine === source.endLine
     ? `#L${source.startLine}`
     : `#L${source.startLine}-L${source.endLine}`;
   return `${file}${line}`;
+}
+
+function documentationHref(provenance, symbolId) {
+  const symbolDocs = provenance?.symbolDocs;
+  if (symbolId !== undefined && typeof symbolDocs?.[symbolId] === "string") {
+    return symbolDocs[symbolId];
+  }
+  return null;
 }
 
 function hoverText(result) {

@@ -146,6 +146,7 @@ async function buildReport({ descriptors, irpkg, manifest }) {
       descriptors: relative(root, descriptors),
       lean: irpkg === null ? relative(root, manifest) : relative(root, irpkg),
     },
+    ...(tsDescriptors.provenance ? { typeScriptProvenance: tsDescriptors.provenance } : {}),
     summary,
     results,
   };

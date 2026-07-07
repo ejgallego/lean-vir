@@ -20,6 +20,10 @@ Generate Lean VIR TypeScript descriptor JSON from TypeScript declarations.
 
 Options:
   --anchors FILE  Merge explicit Lean-to-TS anchors from JSON.
+  --namespace NS  Treat a declared namespace as an exported descriptor root.
+  --symbol ID     Keep only this TypeScript symbol id. Repeatable.
+  --provenance FILE
+                  Merge descriptor provenance metadata from JSON.
   --out FILE      Write descriptor JSON to FILE. Defaults to stdout.
   --check         Compare generated output with --out instead of writing it.
   -h, --help      Show this help.
@@ -34,8 +38,11 @@ function fail(message) {
 function parseArgs(argv) {
   const files = [];
   let anchors = null;
+  let provenance = null;
   let out = null;
   let check = false;
+  const namespaces = new Set();
+  const symbols = new Set();
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     switch (arg) {
@@ -47,6 +54,15 @@ function parseArgs(argv) {
         anchors = argv[index + 1];
         if (!anchors || anchors.startsWith("--")) fail("--anchors requires a file");
         index += 1;
+        break;
+      case "--namespace":
+        namespaces.add(requiredValue(argv, ++index, "--namespace"));
+        break;
+      case "--symbol":
+        symbols.add(requiredValue(argv, ++index, "--symbol"));
+        break;
+      case "--provenance":
+        provenance = requiredValue(argv, ++index, "--provenance");
         break;
       case "--out":
         out = argv[index + 1];
@@ -67,9 +83,18 @@ function parseArgs(argv) {
   return {
     files: files.map((file) => resolve(root, file)),
     anchors: anchors === null ? null : resolve(root, anchors),
+    provenance: provenance === null ? null : resolve(root, provenance),
     out: out === null ? null : resolve(root, out),
     check,
+    namespaces,
+    symbols,
   };
+}
+
+function requiredValue(argv, index, option) {
+  const value = argv[index];
+  if (!value || value.startsWith("--")) fail(`${option} requires a value`);
+  return value;
 }
 
 const cli = parseArgs(process.argv.slice(2));
@@ -89,7 +114,7 @@ if (cli.out === null) {
   console.log(`wrote ${relative(root, cli.out)} (${descriptor.symbols.length} symbols)`);
 }
 
-async function generateDescriptorFile({ files, anchors }) {
+async function generateDescriptorFile({ files, anchors, provenance, namespaces, symbols: requestedSymbols }) {
   const fileSet = new Set(files.map((file) => resolve(file)));
   const program = ts.createProgram(files, {
     allowJs: false,
@@ -105,34 +130,49 @@ async function generateDescriptorFile({ files, anchors }) {
     .filter((sourceFile) => fileSet.has(resolve(sourceFile.fileName)));
   const symbols = [];
   const symbolIds = new Set();
+  const allowDuplicateIds = namespaces.size !== 0 || requestedSymbols.size !== 0;
   for (const sourceFile of sourceFiles) {
-    collectStatements(sourceFile.statements, sourceFile, [], symbols, symbolIds);
+    collectStatements(sourceFile.statements, sourceFile, [], symbols, symbolIds, namespaces, allowDuplicateIds);
   }
-  symbols.sort((left, right) => left.id.localeCompare(right.id));
-  const anchorData = anchors === null ? { anchors: [] } : JSON.parse(await readFile(anchors, "utf8"));
-  validateAnchors(anchorData, symbolIds);
-  return {
+  let selectedSymbols = symbols;
+  if (requestedSymbols.size !== 0) {
+    selectedSymbols = symbols.filter((symbol) => requestedSymbols.has(symbol.id));
+    const found = new Set(selectedSymbols.map((symbol) => symbol.id));
+    for (const id of requestedSymbols) {
+      if (!found.has(id)) throw new Error(`requested TypeScript symbol was not found: ${id}`);
+    }
+  }
+  selectedSymbols.sort((left, right) => left.id.localeCompare(right.id));
+  const selectedSymbolIds = new Set(selectedSymbols.map((symbol) => symbol.id));
+  const anchorData = anchors === null ? { version: 1, anchors: [] } : JSON.parse(await readFile(anchors, "utf8"));
+  validateAnchors(anchorData, selectedSymbolIds);
+  const provenanceData = provenance === null ? null : JSON.parse(await readFile(provenance, "utf8"));
+  const descriptor = {
     version: 1,
     generator: "scripts/generate-ts-descriptors.mjs",
     sources: sourceFiles.map((sourceFile) => relative(root, sourceFile.fileName)).sort(),
-    symbols,
+    symbols: selectedSymbols,
     anchors: anchorData.anchors ?? [],
   };
+  if (provenanceData !== null) descriptor.provenance = provenanceData;
+  return descriptor;
 }
 
-function collectStatements(statements, sourceFile, prefix, symbols, symbolIds) {
+function collectStatements(statements, sourceFile, prefix, symbols, symbolIds, namespaces, allowDuplicateIds) {
   for (const statement of statements) {
-    if (ts.isModuleDeclaration(statement) && hasExportModifier(statement)) {
+    if (ts.isModuleDeclaration(statement) &&
+        (hasExportModifier(statement) || namespaceIsRequested(statement, prefix, namespaces))) {
       const name = moduleDeclarationName(statement);
       if (name !== null && statement.body && ts.isModuleBlock(statement.body)) {
-        collectStatements(statement.body.statements, sourceFile, [...prefix, name], symbols, symbolIds);
+        collectStatements(statement.body.statements, sourceFile, [...prefix, name], symbols, symbolIds, namespaces, allowDuplicateIds);
       }
       continue;
     }
-    if (!hasExportModifier(statement)) continue;
+    if (!hasExportModifier(statement) && !isInsideRequestedNamespace(prefix, namespaces)) continue;
     const symbol = symbolForStatement(statement, sourceFile, prefix);
     if (symbol === null) continue;
     if (symbolIds.has(symbol.id)) {
+      if (allowDuplicateIds) continue;
       throw new Error(`duplicate TypeScript descriptor id ${symbol.id}`);
     }
     symbolIds.add(symbol.id);
@@ -395,6 +435,16 @@ function hasExportModifier(node) {
 function moduleDeclarationName(node) {
   if (ts.isIdentifier(node.name) || ts.isStringLiteral(node.name)) return node.name.text;
   return null;
+}
+
+function namespaceIsRequested(node, prefix, namespaces) {
+  const name = moduleDeclarationName(node);
+  if (name === null) return false;
+  return namespaces.has([...prefix, name].join("."));
+}
+
+function isInsideRequestedNamespace(prefix, namespaces) {
+  return namespaces.has(prefix.join("."));
 }
 
 function propertyNameText(name) {

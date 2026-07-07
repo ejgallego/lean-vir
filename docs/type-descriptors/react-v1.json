@@ -1,0 +1,700 @@
+{
+  "version": 1,
+  "generator": "scripts/generate-ts-descriptors.mjs",
+  "sources": [
+    "node_modules/@types/react/index.d.ts"
+  ],
+  "symbols": [
+    {
+      "id": "React.CSSProperties",
+      "kind": "interface",
+      "source": {
+        "path": "node_modules/@types/react/index.d.ts",
+        "startLine": 2477,
+        "startColumn": 5,
+        "endLine": 2486,
+        "endColumn": 6
+      },
+      "display": "export interface CSSProperties extends CSS.Properties<string | number> {\n        /**\n         * The index signature was removed to enable closed typing for style\n         * using CSSType. You're able to use type assertion or module augmentation\n         * to add properties or an index signature of your own.\n         *\n         * For examples and more information, visit:\n         * https://github.com/frenic/csstype#what-should-i-do-when-i-get-type-errors\n         */\n    }",
+      "hover": "",
+      "shape": {
+        "kind": "record",
+        "fields": {}
+      }
+    },
+    {
+      "id": "React.EventHandler",
+      "kind": "type",
+      "source": {
+        "path": "node_modules/@types/react/index.d.ts",
+        "startLine": 2222,
+        "startColumn": 5,
+        "endLine": 2222,
+        "endColumn": 109
+      },
+      "display": "type EventHandler<E extends SyntheticEvent<any>> = { bivarianceHack(event: E): void }[\"bivarianceHack\"];",
+      "hover": "",
+      "shape": {
+        "kind": "opaque",
+        "name": "{ bivarianceHack(event: E): void }[\"bivarianceHack\"]"
+      }
+    },
+    {
+      "id": "React.HTMLAttributes",
+      "kind": "interface",
+      "source": {
+        "path": "node_modules/@types/react/index.d.ts",
+        "startLine": 2785,
+        "startColumn": 5,
+        "endLine": 2873,
+        "endColumn": 6
+      },
+      "display": "interface HTMLAttributes<T> extends AriaAttributes, DOMAttributes<T> {\n        // React-specific Attributes\n        defaultChecked?: boolean | undefined;\n        defaultValue?: string | number | readonly string[] | undefined;\n        suppressContentEditableWarning?: boolean | undefined;\n        suppressHydrationWarning?: boolean | undefined;\n\n        // Standard HTML Attributes\n        accessKey?: string | undefined;\n        autoCapitalize?: \"off\" | \"none\" | \"on\" | \"sentences\" | \"words\" | \"characters\" | undefined | (string & {});\n        autoFocus?: boolean | undefined;\n        className?: string | undefined;\n        contentEditable?: Booleanish | \"inherit\" | \"plaintext-only\" | undefined;\n        contextMenu?: string | undefined;\n        dir?: string | undefined;\n        draggable?: Booleanish | undefined;\n        enterKeyHint?: \"enter\" | \"done\" | \"go\" | \"next\" | \"previous\" | \"search\" | \"send\" | undefined;\n        hidden?: boolean | undefined;\n        id?: string | undefined;\n        lang?: string | undefined;\n        nonce?: string | undefined;\n        slot?: string | undefined;\n        spellCheck?: Booleanish | undefined;\n        style?: CSSProperties | undefined;\n        tabIndex?: number | undefined;\n        title?: string | undefined;\n        translate?: \"yes\" | \"no\" | undefined;\n\n        // Unknown\n        radioGroup?: string | undefined; // <command>, <menuitem>\n\n        // WAI-ARIA\n        role?: AriaRole | undefined;\n\n        // RDFa Attributes\n        about?: string | undefined;\n        content?: string | undefined;\n        datatype?: string | undefined;\n        inlist?: any;\n        prefix?: string | undefined;\n        property?: string | undefined;\n        rel?: string | undefined;\n        resource?: string | undefined;\n        rev?: string | undefined;\n        typeof?: string | undefined;\n        vocab?: string | undefined;\n\n        // Non-standard Attributes\n        autoCorrect?: string | undefined;\n        autoSave?: string | undefined;\n        color?: string | undefined;\n        itemProp?: string | undefined;\n        itemScope?: boolean | undefined;\n        itemType?: string | undefined;\n        itemID?: string | undefined;\n        itemRef?: string | undefined;\n        results?: number | undefined;\n        security?: string | undefined;\n        unselectable?: \"on\" | \"off\" | undefined;\n\n        // Popover API\n        popover?: \"\" | \"auto\" | \"manual\" | \"hint\" | undefined;\n        popoverTargetAction?: \"toggle\" | \"show\" | \"hide\" | undefined;\n        popoverTarget?: string | undefined;\n\n        // Living Standard\n        /**\n         * @see {@link https://developer.mozilla.org/en-US/docs/Web/API/HTMLElement/inert}\n         */\n        inert?: boolean | undefined;\n        /**\n         * Hints at the type of data that might be entered by the user while editing the element or its contents\n         * @see {@link https://html.spec.whatwg.org/multipage/interaction.html#input-modalities:-the-inputmode-attribute}\n         */\n        inputMode?: \"none\" | \"text\" | \"tel\" | \"url\" | \"email\" | \"numeric\" | \"decimal\" | \"search\" | undefined;\n        /**\n         * Specify that a standard HTML element should behave like a defined custom built-in element\n         * @see {@link https://html.spec.whatwg.org/multipage/custom-elements.html#attr-is}\n         */\n        is?: string | undefined;\n        /**\n         * @see {@link https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/exportparts}\n         */\n        exportparts?: string | undefined;\n        /**\n         * @see {@link https://developer.mozilla.org/en-US/docs/Web/HTML/Global_attributes/part}\n         */\n        part?: string | undefined;\n    }",
+      "hover": "",
+      "shape": {
+        "kind": "record",
+        "fields": {
+          "defaultChecked": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "boolean"
+            }
+          },
+          "defaultValue": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "primitive",
+                "name": "string"
+              },
+              {
+                "kind": "primitive",
+                "name": "number"
+              },
+              {
+                "kind": "array",
+                "element": {
+                  "kind": "primitive",
+                  "name": "string"
+                }
+              },
+              {
+                "kind": "primitive",
+                "name": "undefined"
+              }
+            ]
+          },
+          "suppressContentEditableWarning": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "boolean"
+            }
+          },
+          "suppressHydrationWarning": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "boolean"
+            }
+          },
+          "accessKey": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "autoCapitalize": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "literal",
+                "value": "off"
+              },
+              {
+                "kind": "literal",
+                "value": "none"
+              },
+              {
+                "kind": "literal",
+                "value": "on"
+              },
+              {
+                "kind": "literal",
+                "value": "sentences"
+              },
+              {
+                "kind": "literal",
+                "value": "words"
+              },
+              {
+                "kind": "literal",
+                "value": "characters"
+              },
+              {
+                "kind": "primitive",
+                "name": "undefined"
+              },
+              {
+                "kind": "opaque",
+                "name": "string & {}"
+              }
+            ]
+          },
+          "autoFocus": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "boolean"
+            }
+          },
+          "className": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "contentEditable": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "ref",
+                "id": "React.Booleanish"
+              },
+              {
+                "kind": "literal",
+                "value": "inherit"
+              },
+              {
+                "kind": "literal",
+                "value": "plaintext-only"
+              },
+              {
+                "kind": "primitive",
+                "name": "undefined"
+              }
+            ]
+          },
+          "contextMenu": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "dir": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "draggable": {
+            "kind": "option",
+            "element": {
+              "kind": "ref",
+              "id": "React.Booleanish"
+            }
+          },
+          "enterKeyHint": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "literal",
+                "value": "enter"
+              },
+              {
+                "kind": "literal",
+                "value": "done"
+              },
+              {
+                "kind": "literal",
+                "value": "go"
+              },
+              {
+                "kind": "literal",
+                "value": "next"
+              },
+              {
+                "kind": "literal",
+                "value": "previous"
+              },
+              {
+                "kind": "literal",
+                "value": "search"
+              },
+              {
+                "kind": "literal",
+                "value": "send"
+              },
+              {
+                "kind": "primitive",
+                "name": "undefined"
+              }
+            ]
+          },
+          "hidden": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "boolean"
+            }
+          },
+          "id": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "lang": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "nonce": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "slot": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "spellCheck": {
+            "kind": "option",
+            "element": {
+              "kind": "ref",
+              "id": "React.Booleanish"
+            }
+          },
+          "style": {
+            "kind": "option",
+            "element": {
+              "kind": "ref",
+              "id": "React.CSSProperties"
+            }
+          },
+          "tabIndex": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "number"
+            }
+          },
+          "title": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "translate": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "literal",
+                "value": "yes"
+              },
+              {
+                "kind": "literal",
+                "value": "no"
+              },
+              {
+                "kind": "primitive",
+                "name": "undefined"
+              }
+            ]
+          },
+          "radioGroup": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "role": {
+            "kind": "option",
+            "element": {
+              "kind": "ref",
+              "id": "React.AriaRole"
+            }
+          },
+          "about": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "content": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "datatype": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "inlist": {
+            "kind": "opaque",
+            "name": "any"
+          },
+          "prefix": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "property": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "rel": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "resource": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "rev": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "typeof": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "vocab": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "autoCorrect": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "autoSave": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "color": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "itemProp": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "itemScope": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "boolean"
+            }
+          },
+          "itemType": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "itemID": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "itemRef": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "results": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "number"
+            }
+          },
+          "security": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "unselectable": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "literal",
+                "value": "on"
+              },
+              {
+                "kind": "literal",
+                "value": "off"
+              },
+              {
+                "kind": "primitive",
+                "name": "undefined"
+              }
+            ]
+          },
+          "popover": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "literal",
+                "value": ""
+              },
+              {
+                "kind": "literal",
+                "value": "auto"
+              },
+              {
+                "kind": "literal",
+                "value": "manual"
+              },
+              {
+                "kind": "literal",
+                "value": "hint"
+              },
+              {
+                "kind": "primitive",
+                "name": "undefined"
+              }
+            ]
+          },
+          "popoverTargetAction": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "literal",
+                "value": "toggle"
+              },
+              {
+                "kind": "literal",
+                "value": "show"
+              },
+              {
+                "kind": "literal",
+                "value": "hide"
+              },
+              {
+                "kind": "primitive",
+                "name": "undefined"
+              }
+            ]
+          },
+          "popoverTarget": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "inert": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "boolean"
+            }
+          },
+          "inputMode": {
+            "kind": "union",
+            "options": [
+              {
+                "kind": "literal",
+                "value": "none"
+              },
+              {
+                "kind": "literal",
+                "value": "text"
+              },
+              {
+                "kind": "literal",
+                "value": "tel"
+              },
+              {
+                "kind": "literal",
+                "value": "url"
+              },
+              {
+                "kind": "literal",
+                "value": "email"
+              },
+              {
+                "kind": "literal",
+                "value": "numeric"
+              },
+              {
+                "kind": "literal",
+                "value": "decimal"
+              },
+              {
+                "kind": "literal",
+                "value": "search"
+              },
+              {
+                "kind": "primitive",
+                "name": "undefined"
+              }
+            ]
+          },
+          "is": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "exportparts": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          },
+          "part": {
+            "kind": "option",
+            "element": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "React.SyntheticEvent",
+      "kind": "interface",
+      "source": {
+        "path": "node_modules/@types/react/index.d.ts",
+        "startLine": 2045,
+        "startColumn": 5,
+        "endLine": 2045,
+        "endColumn": 116
+      },
+      "display": "interface SyntheticEvent<T = Element, E = Event> extends BaseSyntheticEvent<E, EventTarget & T, EventTarget> {}",
+      "hover": "currentTarget - a reference to the element on which the event listener is registered.\n\ntarget - a reference to the element from which the event was originally dispatched.\nThis might be a child element to the element on which the event listener is registered.\nIf you thought this should be `EventTarget & T`, see https://github.com/DefinitelyTyped/DefinitelyTyped/issues/11508#issuecomment-256045682",
+      "shape": {
+        "kind": "record",
+        "fields": {}
+      }
+    }
+  ],
+  "anchors": [
+    {
+      "id": "react.official.html_attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.HTMLAttributes",
+      "note": "Audit anchor from VIR's key/value property representation to React's full HTML attribute surface."
+    },
+    {
+      "id": "react.official.css_properties",
+      "lean": "Lean.Vir.React.PropValue",
+      "ts": "React.CSSProperties",
+      "note": "Audit anchor for the style branch of VIR PropValue."
+    },
+    {
+      "id": "react.official.event_handler",
+      "lean": "Lean.Vir.React.EventHandler",
+      "ts": "React.EventHandler",
+      "note": "Audit anchor from VIR retained callbacks to React's event handler type."
+    },
+    {
+      "id": "react.official.synthetic_event",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "React.SyntheticEvent",
+      "note": "Audit anchor from VIR event resources to React's synthetic event surface."
+    }
+  ],
+  "provenance": {
+    "note": "React 19.2.7 does not ship bundled TypeScript declaration files. React's official TypeScript guide directs users to @types/react and @types/react-dom; this report uses that declaration source and links back to the official React documentation.",
+    "packages": [
+      {
+        "name": "react",
+        "version": "19.2.7",
+        "role": "runtime package"
+      },
+      {
+        "name": "@types/react",
+        "version": "19.2.17",
+        "role": "React-recommended TypeScript declarations"
+      }
+    ],
+    "docs": [
+      {
+        "title": "React: Using TypeScript",
+        "url": "https://react.dev/learn/typescript"
+      },
+      {
+        "title": "React DOM common components",
+        "url": "https://react.dev/reference/react-dom/components/common"
+      }
+    ],
+    "sourceMaps": [
+      {
+        "path": "node_modules/@types/react/index.d.ts",
+        "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts"
+      }
+    ],
+    "symbolDocs": {
+      "React.HTMLAttributes": "https://react.dev/reference/react-dom/components/common",
+      "React.CSSProperties": "https://react.dev/learn/typescript#style-props",
+      "React.EventHandler": "https://react.dev/learn/typescript#dom-events",
+      "React.SyntheticEvent": "https://react.dev/learn/typescript#dom-events"
+    }
+  }
+}
