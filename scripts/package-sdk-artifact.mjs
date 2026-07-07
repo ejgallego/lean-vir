@@ -74,6 +74,17 @@ The JavaScript files are ES modules. The generic runtime and host-binding
 modules do not import React; js/vir-react-host-bindings.js imports react and
 react-dom/client and should only be used by browser React integrations.
 
+Application code should import the entry modules directly under js/:
+
+  js/vir-runtime.js
+  js/vir-runtime-node.js
+  js/vir-host-bindings.js
+  js/vir-react-host-bindings.js
+
+Nested js/runtime/, js/host/, and js/react/ modules are shipped so those entry
+modules can resolve relative imports. They remain internal implementation
+modules and may change with the matching lean_vir revision.
+
 Use the matching Lean package generator to create .irpkg files, then serve:
 
   wasm/vir-upstream.wasm
