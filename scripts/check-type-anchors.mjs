@@ -139,6 +139,7 @@ async function buildReport({ descriptors, irpkg, manifest }) {
   const results = tsDescriptors.anchors.map((anchor) => compareAnchor(anchor, lean, tsSymbols));
   const summary = { exact: 0, compatible: 0, weak: 0, missing: 0 };
   for (const result of results) summary[result.status] += 1;
+  const coverage = buildCoverage(results);
   return {
     version: 1,
     generatedBy: "scripts/check-type-anchors.mjs",
@@ -148,6 +149,7 @@ async function buildReport({ descriptors, irpkg, manifest }) {
     },
     ...(tsDescriptors.provenance ? { typeScriptProvenance: tsDescriptors.provenance } : {}),
     summary,
+    coverage,
     results,
   };
 }
@@ -356,6 +358,7 @@ function anchorResult(anchor, status, notes, leanDescriptor, tsSymbol) {
     ts: anchor.ts,
     status,
     notes,
+    relation: anchor.relation ?? inferredAnchorRelation(anchor),
     ...(anchor.category ? { category: anchor.category } : {}),
     ...(anchor.note ? { note: anchor.note } : {}),
     ...(leanDescriptor ? { leanDescriptor } : {}),
@@ -365,6 +368,71 @@ function anchorResult(anchor, status, notes, leanDescriptor, tsSymbol) {
 
 function anchorId(anchor) {
   return anchor.lean.replace(/[^A-Za-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
+}
+
+function inferredAnchorRelation(anchor) {
+  return typeof anchor.note === "string" && anchor.note.startsWith("Coverage gap:")
+    ? "coverageGap"
+    : "audit";
+}
+
+function buildCoverage(results) {
+  const categories = new Map();
+  for (const result of results) {
+    const category = result.category ?? "Type anchors";
+    if (!categories.has(category)) categories.set(category, coverageCategory(category));
+    const row = categories.get(category);
+    row.anchors += 1;
+    row.status[result.status] += 1;
+    if (result.relation === "coverageGap") row.relations.coverageGap += 1;
+    else row.relations.audit += 1;
+    row.typeScriptSymbols.add(result.ts);
+    row.leanTargets.add(result.lean);
+    if (result.leanDescriptor !== undefined) row.leanDescriptors.add(result.lean);
+    else row.missingLeanTargets.add(result.lean);
+  }
+  return {
+    categories: [...categories.values()].map((row) => ({
+      category: row.category,
+      anchors: row.anchors,
+      relations: row.relations,
+      status: row.status,
+      typeScriptSymbols: [...row.typeScriptSymbols],
+      leanTargets: [...row.leanTargets],
+      leanDescriptors: [...row.leanDescriptors],
+      missingLeanTargets: [...row.missingLeanTargets],
+      interpretation: coverageInterpretation(row),
+    })),
+  };
+}
+
+function coverageCategory(category) {
+  return {
+    category,
+    anchors: 0,
+    relations: { audit: 0, coverageGap: 0 },
+    status: { exact: 0, compatible: 0, weak: 0, missing: 0 },
+    typeScriptSymbols: new Set(),
+    leanTargets: new Set(),
+    leanDescriptors: new Set(),
+    missingLeanTargets: new Set(),
+  };
+}
+
+function coverageInterpretation(row) {
+  if (row.relations.coverageGap !== 0 && row.status.missing === row.anchors) {
+    return "Coverage gap: these React surfaces have no Lean VIR descriptor yet.";
+  }
+  if (row.status.missing !== 0) {
+    return "Mixed coverage: some anchors point to existing Lean descriptors, and some are gaps.";
+  }
+  if (row.status.weak !== 0) {
+    return "Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different.";
+  }
+  if (row.status.compatible !== 0) {
+    return "Compatible coverage under known representation conventions.";
+  }
+  return "Exact coverage in this descriptor model.";
 }
 
 function compareShapes(lean, tsShape, tsSymbols, seen) {

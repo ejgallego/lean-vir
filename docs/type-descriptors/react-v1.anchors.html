@@ -65,6 +65,29 @@
     .summary-card { padding: 12px; }
     .summary-card strong { display: block; font-size: 22px; }
     .summary-card span { color: var(--muted); }
+    .coverage {
+      margin: 0 0 28px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .coverage h2 { margin: 0 0 10px; }
+    .coverage table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .coverage th, .coverage td {
+      padding: 8px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    .coverage th { color: var(--muted); font-weight: 600; }
+    .coverage td.numeric { text-align: right; white-space: nowrap; }
+    .coverage details summary { cursor: pointer; color: var(--fg); }
+    .coverage ul { margin: 6px 0 0; padding-left: 18px; }
     .groups { display: grid; gap: 28px; }
     .anchor-group { display: grid; gap: 12px; }
     .group-title {
@@ -140,6 +163,7 @@
     @media (max-width: 720px) {
       main { padding: 24px 12px 40px; }
       .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .coverage { overflow-x: auto; }
       .anchor-head { display: grid; }
       .comparison { grid-template-columns: 1fr; }
     }
@@ -162,6 +186,63 @@
       <div class="summary-card weak"><strong>22</strong><span>weak</span></div>
       <div class="summary-card missing"><strong>11</strong><span>missing</span></div>
     </section>
+    <section class="coverage" aria-labelledby="type-anchor-coverage">
+      <h2 id="type-anchor-coverage">Coverage Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>TypeScript symbols</th>
+            <th>Lean VIR targets</th>
+            <th>Relation</th>
+            <th>Status</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Props and attributes</strong></td>
+            <td class="numeric"><details><summary>8 symbols</summary><ul><li><code>React.Attributes</code></li><li><code>React.HTMLAttributes</code></li><li><code>React.DOMAttributes</code></li><li><code>React.AriaAttributes</code></li><li><code>React.ButtonHTMLAttributes</code></li><li><code>React.InputHTMLAttributes</code></li><li><code>React.JSX.IntrinsicAttributes</code></li><li><code>React.JSX.IntrinsicElements</code></li></ul></details></td>
+            <td class="numeric"><details><summary>1 targets</summary><ul><li><code>Lean.Vir.React.Property</code></li></ul></details></td>
+            <td>8 audit</td>
+            <td><span class="weak">8 weak</span></td>
+            <td>Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different.</td>
+          </tr>
+          <tr>
+            <td><strong>Style and prop values</strong></td>
+            <td class="numeric"><details><summary>2 symbols</summary><ul><li><code>React.CSSProperties</code></li><li><code>React.Key</code></li></ul></details></td>
+            <td class="numeric"><details><summary>2 targets</summary><ul><li><code>Lean.Vir.React.PropValue</code></li><li><code>Lean.Vir.React.StyleProperty</code></li></ul></details></td>
+            <td>3 audit</td>
+            <td><span class="weak">3 weak</span></td>
+            <td>Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different.</td>
+          </tr>
+          <tr>
+            <td><strong>Events</strong></td>
+            <td class="numeric"><details><summary>11 symbols</summary><ul><li><code>React.EventHandler</code></li><li><code>React.ChangeEventHandler</code></li><li><code>React.MouseEventHandler</code></li><li><code>React.DOMAttributes</code></li><li><code>React.SyntheticEvent</code></li><li><code>React.ChangeEvent</code></li><li><code>React.FocusEvent</code></li><li><code>React.KeyboardEvent</code></li><li><code>React.MouseEvent</code></li><li><code>React.PointerEvent</code></li><li><code>React.UIEvent</code></li></ul></details></td>
+            <td class="numeric"><details><summary>2 targets</summary><ul><li><code>Lean.Vir.React.EventHandler</code></li><li><code>Lean.Vir.Browser.Event</code></li></ul></details></td>
+            <td>11 audit</td>
+            <td><span class="weak">11 weak</span></td>
+            <td>Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different.</td>
+          </tr>
+          <tr>
+            <td><strong>Rendered values and elements</strong></td>
+            <td class="numeric"><details><summary>4 symbols</summary><ul><li><code>React.ReactNode</code></li><li><code>React.ReactElement</code></li><li><code>React.JSX.Element</code></li><li><code>React.JSX.ElementType</code></li></ul></details></td>
+            <td class="numeric"><details><summary>4 targets</summary><ul><li><code>Lean.Vir.React.Node</code></li><li><code>Lean.Vir.React.Element</code></li><li><code>Lean.Vir.React.JSX.Element</code></li><li><code>Lean.Vir.React.JSX.ElementType</code></li></ul></details></td>
+            <td>4 gap</td>
+            <td><span class="missing">4 missing</span></td>
+            <td>Coverage gap: these React surfaces have no Lean VIR descriptor yet.</td>
+          </tr>
+          <tr>
+            <td><strong>Components and refs</strong></td>
+            <td class="numeric"><details><summary>7 symbols</summary><ul><li><code>React.ElementType</code></li><li><code>React.ComponentType</code></li><li><code>React.JSXElementConstructor</code></li><li><code>React.FunctionComponent</code></li><li><code>React.FC</code></li><li><code>React.Ref</code></li><li><code>React.RefObject</code></li></ul></details></td>
+            <td class="numeric"><details><summary>6 targets</summary><ul><li><code>Lean.Vir.React.ElementType</code></li><li><code>Lean.Vir.React.ComponentType</code></li><li><code>Lean.Vir.React.JSXElementConstructor</code></li><li><code>Lean.Vir.React.FunctionComponent</code></li><li><code>Lean.Vir.React.Ref</code></li><li><code>Lean.Vir.React.RefObject</code></li></ul></details></td>
+            <td>7 gap</td>
+            <td><span class="missing">7 missing</span></td>
+            <td>Coverage gap: these React surfaces have no Lean VIR descriptor yet.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
     <div class="groups" aria-label="Type anchors">
       <section class="anchor-group" aria-labelledby="type-anchor-group-props_and_attributes">
         <h2 class="group-title" id="type-anchor-group-props_and_attributes">Props and attributes</h2>
@@ -181,6 +262,7 @@ missing TypeScript fields: name, value; extra TypeScript fields: key">React.Attr
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L258-L260">node_modules/@types/react/index.d.ts:258</a></span>
           <span>React docs: <a href="https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key">React.Attributes</a></span>
+          <span>Relation: audit</span>
           <span>Category: Props and attributes</span>
           <span>Anchor: <code>react.props.attributes</code></span>
         </div>
@@ -225,6 +307,7 @@ missing TypeScript fields: name, value; extra TypeScript fields: about, accessKe
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2785-L2873">node_modules/@types/react/index.d.ts:2785</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.HTMLAttributes</a></span>
+          <span>Relation: audit</span>
           <span>Category: Props and attributes</span>
           <span>Anchor: <code>react.props.html_attributes</code></span>
         </div>
@@ -355,6 +438,7 @@ missing TypeScript fields: name, value; extra TypeScript fields: children, dange
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2266-L2475">node_modules/@types/react/index.d.ts:2266</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.DOMAttributes</a></span>
+          <span>Relation: audit</span>
           <span>Category: Props and attributes</span>
           <span>Anchor: <code>react.props.dom_attributes</code></span>
         </div>
@@ -606,6 +690,7 @@ missing TypeScript fields: name, value; extra TypeScript fields: aria-activedesc
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2489-L2710">node_modules/@types/react/index.d.ts:2489</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.AriaAttributes</a></span>
+          <span>Relation: audit</span>
           <span>Category: Props and attributes</span>
           <span>Anchor: <code>react.props.aria_attributes</code></span>
         </div>
@@ -869,6 +954,7 @@ extra TypeScript fields: disabled, form, formAction, formEncType, formMethod, fo
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L3052-L3069">node_modules/@types/react/index.d.ts:3052</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.ButtonHTMLAttributes</a></span>
+          <span>Relation: audit</span>
           <span>Category: Props and attributes</span>
           <span>Anchor: <code>react.props.button_attributes</code></span>
         </div>
@@ -928,6 +1014,7 @@ extra TypeScript fields: accept, alt, autoComplete, capture, checked, disabled, 
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L3277-L3318">node_modules/@types/react/index.d.ts:3277</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/input">React.InputHTMLAttributes</a></span>
+          <span>Relation: audit</span>
           <span>Category: Props and attributes</span>
           <span>Anchor: <code>react.props.input_attributes</code></span>
         </div>
@@ -1011,6 +1098,7 @@ missing TypeScript fields: name, value">React.JSX.IntrinsicAttributes</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L4165">node_modules/@types/react/index.d.ts:4165</a></span>
           <span>React docs: <a href="https://react.dev/learn/writing-markup-with-jsx">React.JSX.IntrinsicAttributes</a></span>
+          <span>Relation: audit</span>
           <span>Category: Props and attributes</span>
           <span>Anchor: <code>react.props.jsx_intrinsic_attributes</code></span>
         </div>
@@ -1053,6 +1141,7 @@ missing TypeScript fields: name, value; extra TypeScript fields: a, abbr, addres
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L4168-L4351">node_modules/@types/react/index.d.ts:4168</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.JSX.IntrinsicElements</a></span>
+          <span>Relation: audit</span>
           <span>Category: Props and attributes</span>
           <span>Anchor: <code>react.props.jsx_intrinsic_elements</code></span>
         </div>
@@ -1283,6 +1372,7 @@ kind differs: Lean variant vs TypeScript record">React.CSSProperties</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2477-L2486">node_modules/@types/react/index.d.ts:2477</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#style-props">React.CSSProperties</a></span>
+          <span>Relation: audit</span>
           <span>Category: Style and prop values</span>
           <span>Anchor: <code>react.style.css_properties_prop_value</code></span>
         </div>
@@ -1330,6 +1420,7 @@ missing TypeScript fields: name, value">React.CSSProperties</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2477-L2486">node_modules/@types/react/index.d.ts:2477</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#style-props">React.CSSProperties</a></span>
+          <span>Relation: audit</span>
           <span>Category: Style and prop values</span>
           <span>Anchor: <code>react.style.css_properties_style_property</code></span>
         </div>
@@ -1378,6 +1469,7 @@ kind differs: Lean variant vs TypeScript union">React.Key</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L236-L242">node_modules/@types/react/index.d.ts:236</a></span>
           <span>React docs: <a href="https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key">React.Key</a></span>
+          <span>Relation: audit</span>
           <span>Category: Style and prop values</span>
           <span>Anchor: <code>react.style.key_scalar</code></span>
         </div>
@@ -1428,6 +1520,7 @@ kind differs: Lean record vs TypeScript opaque">React.EventHandler</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2222">node_modules/@types/react/index.d.ts:2222</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#dom-events">React.EventHandler</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.event_handler</code></span>
         </div>
@@ -1463,6 +1556,7 @@ kind differs: Lean record vs TypeScript opaque">React.ChangeEventHandler</a></h2
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2236-L2238">node_modules/@types/react/index.d.ts:2236</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#dom-events">React.ChangeEventHandler</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.change_event_handler</code></span>
         </div>
@@ -1500,6 +1594,7 @@ kind differs: Lean record vs TypeScript opaque">React.MouseEventHandler</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2241">node_modules/@types/react/index.d.ts:2241</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#dom-events">React.MouseEventHandler</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.mouse_event_handler</code></span>
         </div>
@@ -1535,6 +1630,7 @@ missing TypeScript fields: callback, name; extra TypeScript fields: children, da
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2266-L2475">node_modules/@types/react/index.d.ts:2266</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.DOMAttributes</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.dom_attributes</code></span>
         </div>
@@ -1791,6 +1887,7 @@ kind differs: Lean resource vs TypeScript record">React.SyntheticEvent</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2045">node_modules/@types/react/index.d.ts:2045</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#dom-events">React.SyntheticEvent</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.synthetic_event</code></span>
         </div>
@@ -1828,6 +1925,7 @@ kind differs: Lean resource vs TypeScript record">React.ChangeEvent</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2095-L2099">node_modules/@types/react/index.d.ts:2095</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#dom-events">React.ChangeEvent</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.change_event</code></span>
         </div>
@@ -1864,6 +1962,7 @@ kind differs: Lean resource vs TypeScript record">React.FocusEvent</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2072-L2075">node_modules/@types/react/index.d.ts:2072</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.FocusEvent</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.focus_event</code></span>
         </div>
@@ -1899,6 +1998,7 @@ kind differs: Lean resource vs TypeScript record">React.KeyboardEvent</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2121-L2144">node_modules/@types/react/index.d.ts:2121</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.KeyboardEvent</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.keyboard_event</code></span>
         </div>
@@ -1954,6 +2054,7 @@ kind differs: Lean resource vs TypeScript record">React.MouseEvent</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2146-L2166">node_modules/@types/react/index.d.ts:2146</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.MouseEvent</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.mouse_event</code></span>
         </div>
@@ -2006,6 +2107,7 @@ kind differs: Lean resource vs TypeScript record">React.PointerEvent</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2059-L2070">node_modules/@types/react/index.d.ts:2059</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.PointerEvent</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.pointer_event</code></span>
         </div>
@@ -2049,6 +2151,7 @@ kind differs: Lean resource vs TypeScript record">React.UIEvent</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L2189-L2192">node_modules/@types/react/index.d.ts:2189</a></span>
           <span>React docs: <a href="https://react.dev/reference/react-dom/components/common">React.UIEvent</a></span>
+          <span>Relation: audit</span>
           <span>Category: Events</span>
           <span>Anchor: <code>react.events.ui_event</code></span>
         </div>
@@ -2089,6 +2192,7 @@ missing Lean descriptor Lean.Vir.React.Node">React.ReactNode</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L436-L449">node_modules/@types/react/index.d.ts:436</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#children">React.ReactNode</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Rendered values and elements</span>
           <span>Anchor: <code>react.render.react_node</code></span>
         </div>
@@ -2133,6 +2237,7 @@ missing Lean descriptor Lean.Vir.React.Element">React.ReactElement</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L325-L332">node_modules/@types/react/index.d.ts:325</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#children">React.ReactElement</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Rendered values and elements</span>
           <span>Anchor: <code>react.render.react_element</code></span>
         </div>
@@ -2171,6 +2276,7 @@ missing Lean descriptor Lean.Vir.React.JSX.Element">React.JSX.Element</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L4145">node_modules/@types/react/index.d.ts:4145</a></span>
           <span>React docs: <a href="https://react.dev/learn/writing-markup-with-jsx">React.JSX.Element</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Rendered values and elements</span>
           <span>Anchor: <code>react.render.jsx_element</code></span>
         </div>
@@ -2202,6 +2308,7 @@ missing Lean descriptor Lean.Vir.React.JSX.ElementType">React.JSX.ElementType</a
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L4144">node_modules/@types/react/index.d.ts:4144</a></span>
           <span>React docs: <a href="https://react.dev/learn/writing-markup-with-jsx">React.JSX.ElementType</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Rendered values and elements</span>
           <span>Anchor: <code>react.render.jsx_element_type</code></span>
         </div>
@@ -2238,6 +2345,7 @@ missing Lean descriptor Lean.Vir.React.ElementType">React.ElementType</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L109-L111">node_modules/@types/react/index.d.ts:109</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.ElementType</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.element_type</code></span>
         </div>
@@ -2271,6 +2379,7 @@ missing Lean descriptor Lean.Vir.React.ComponentType">React.ComponentType</a></h
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L124">node_modules/@types/react/index.d.ts:124</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.ComponentType</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.component_type</code></span>
         </div>
@@ -2302,6 +2411,7 @@ missing Lean descriptor Lean.Vir.React.JSXElementConstructor">React.JSXElementCo
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L134-L139">node_modules/@types/react/index.d.ts:134</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.JSXElementConstructor</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.jsx_element_constructor</code></span>
         </div>
@@ -2346,6 +2456,7 @@ missing Lean descriptor Lean.Vir.React.FunctionComponent">React.FunctionComponen
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L1060-L1086">node_modules/@types/react/index.d.ts:1060</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.FunctionComponent</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.function_component</code></span>
         </div>
@@ -2414,6 +2525,7 @@ missing Lean descriptor Lean.Vir.React.FunctionComponent">React.FC</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L1030">node_modules/@types/react/index.d.ts:1030</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.FC</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.fc</code></span>
         </div>
@@ -2452,6 +2564,7 @@ missing Lean descriptor Lean.Vir.React.Ref">React.Ref</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L194">node_modules/@types/react/index.d.ts:194</a></span>
           <span>React docs: <a href="https://react.dev/learn/referencing-values-with-refs">React.Ref</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.refs.ref</code></span>
         </div>
@@ -2484,6 +2597,7 @@ missing Lean descriptor Lean.Vir.React.RefObject">React.RefObject</a></h2>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L154-L159">node_modules/@types/react/index.d.ts:154</a></span>
           <span>React docs: <a href="https://react.dev/learn/referencing-values-with-refs">React.RefObject</a></span>
+          <span>Relation: coverage gap</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.refs.ref_object</code></span>
         </div>

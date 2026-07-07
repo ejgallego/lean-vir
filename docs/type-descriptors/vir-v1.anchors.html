@@ -65,6 +65,29 @@
     .summary-card { padding: 12px; }
     .summary-card strong { display: block; font-size: 22px; }
     .summary-card span { color: var(--muted); }
+    .coverage {
+      margin: 0 0 28px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .coverage h2 { margin: 0 0 10px; }
+    .coverage table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .coverage th, .coverage td {
+      padding: 8px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    .coverage th { color: var(--muted); font-weight: 600; }
+    .coverage td.numeric { text-align: right; white-space: nowrap; }
+    .coverage details summary { cursor: pointer; color: var(--fg); }
+    .coverage ul { margin: 6px 0 0; padding-left: 18px; }
     .groups { display: grid; gap: 28px; }
     .anchor-group { display: grid; gap: 12px; }
     .group-title {
@@ -140,6 +163,7 @@
     @media (max-width: 720px) {
       main { padding: 24px 12px 40px; }
       .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .coverage { overflow-x: auto; }
       .anchor-head { display: grid; }
       .comparison { grid-template-columns: 1fr; }
     }
@@ -157,6 +181,31 @@
       <div class="summary-card compatible"><strong>4</strong><span>compatible</span></div>
       <div class="summary-card weak"><strong>0</strong><span>weak</span></div>
       <div class="summary-card missing"><strong>0</strong><span>missing</span></div>
+    </section>
+    <section class="coverage" aria-labelledby="type-anchor-coverage">
+      <h2 id="type-anchor-coverage">Coverage Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>TypeScript symbols</th>
+            <th>Lean VIR targets</th>
+            <th>Relation</th>
+            <th>Status</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>Type anchors</strong></td>
+            <td class="numeric"><details><summary>6 symbols</summary><ul><li><code>LeanVir.React.StyleProperty</code></li><li><code>LeanVir.React.PropValue</code></li><li><code>LeanVir.React.Property</code></li><li><code>LeanVir.React.EventHandler</code></li><li><code>LeanVir.Browser.Event</code></li><li><code>LeanVir.React.PropertyIdentity</code></li></ul></details></td>
+            <td class="numeric"><details><summary>6 targets</summary><ul><li><code>Lean.Vir.React.StyleProperty</code></li><li><code>Lean.Vir.React.PropValue</code></li><li><code>Lean.Vir.React.Property</code></li><li><code>Lean.Vir.React.EventHandler</code></li><li><code>Lean.Vir.Browser.Event</code></li><li><code>Lean.Vir.TypeAnchors.reactPropertyIdentity</code></li></ul></details></td>
+            <td>6 audit</td>
+            <td><span class="exact">2 exact</span><br><span class="compatible">4 compatible</span></td>
+            <td>Compatible coverage under known representation conventions.</td>
+          </tr>
+        </tbody>
+      </table>
     </section>
     <div class="groups" aria-label="Type anchors">
       <section class="anchor-group" aria-labelledby="type-anchor-group-type_anchors">
@@ -176,6 +225,7 @@ A single React style object entry.">LeanVir.React.StyleProperty</a></h2>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L30-L33">docs/type-descriptors/vir-v1.types.d.ts:30</a></span>
+          <span>Relation: audit</span>
           <span>Category: Type anchors</span>
           <span>Anchor: <code>react.style_property</code></span>
         </div>
@@ -216,6 +266,7 @@ Lean Int accepts one TypeScript union arm compatibly">LeanVir.React.PropValue</a
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L36-L42">docs/type-descriptors/vir-v1.types.d.ts:36</a></span>
+          <span>Relation: audit</span>
           <span>Category: Type anchors</span>
           <span>Anchor: <code>react.prop_value</code></span>
         </div>
@@ -263,6 +314,7 @@ Lean Int accepts one TypeScript union arm compatibly">LeanVir.React.Property</a>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L45-L48">docs/type-descriptors/vir-v1.types.d.ts:45</a></span>
+          <span>Relation: audit</span>
           <span>Category: Type anchors</span>
           <span>Anchor: <code>react.property</code></span>
         </div>
@@ -311,6 +363,7 @@ Lean Unit uses TypeScript void representation">LeanVir.React.EventHandler</a></h
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L51-L54">docs/type-descriptors/vir-v1.types.d.ts:51</a></span>
+          <span>Relation: audit</span>
           <span>Category: Type anchors</span>
           <span>Anchor: <code>react.event_handler</code></span>
         </div>
@@ -348,6 +401,7 @@ Browser event resource marker.">LeanVir.Browser.Event</a></h2>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L23-L25">docs/type-descriptors/vir-v1.types.d.ts:23</a></span>
+          <span>Relation: audit</span>
           <span>Category: Type anchors</span>
           <span>Anchor: <code>browser.event</code></span>
         </div>
@@ -385,6 +439,7 @@ Lean Int accepts one TypeScript union arm compatibly">LeanVir.React.PropertyIden
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L57-L58">docs/type-descriptors/vir-v1.types.d.ts:57</a></span>
+          <span>Relation: audit</span>
           <span>Category: Type anchors</span>
           <span>Anchor: <code>react.property_identity</code></span>
         </div>

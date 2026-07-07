@@ -82,6 +82,14 @@ component types, refs, and JSX element types. In this corpus, `weak` means
 "useful audit/documentation pointer", while `missing` means "important React
 surface with no corresponding Lean VIR descriptor yet".
 
+The rendered report starts with a coverage matrix. The matrix groups anchors by
+category and separates two relation kinds:
+
+- `audit`: a React TypeScript surface is related to an existing Lean VIR
+  descriptor, but may still be structurally weaker or richer than VIR.
+- `coverage gap`: a React TypeScript surface is intentionally listed even
+  though the current Lean VIR manifest has no descriptor for it.
+
 ## Output Contract
 
 The pipeline has three public outputs.
@@ -102,9 +110,11 @@ The pipeline has three public outputs.
 - `results[]`, one entry per explicit anchor;
 - `results[].lean` and `results[].ts`, the compared names;
 - `results[].status`, one of `exact`, `compatible`, `weak`, or `missing`;
+- `results[].relation`, one of `audit` or `coverageGap`;
 - `results[].notes`, short explanations for non-exact matches;
 - `results[].category`, when provided by the anchor file, for grouped reports;
 - `results[].leanDescriptor` and `results[].tsSymbol`, when found;
+- `coverage.categories[]`, the matrix used by the human-readable reports;
 - `typeScriptProvenance`, when present in the descriptor JSON, with package and
   documentation sources used to build an enriched report.
 

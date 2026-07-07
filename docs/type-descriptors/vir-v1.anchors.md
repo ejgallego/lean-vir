@@ -11,11 +11,18 @@ weak	0
 missing	0
 ```
 
+## Coverage Matrix
+
+| Category | TypeScript symbols | Lean targets | Relation | Status | Interpretation |
+| --- | ---: | ---: | --- | --- | --- |
+| Type anchors | 6 | 6 | 6 audit | 2 exact, 4 compatible | Compatible coverage under known representation conventions. |
+
 :::definition "vir_type_anchor_react_style_property" (lean := "Lean.Vir.React.StyleProperty")
 <div class="vir-type-anchor vir-type-anchor-exact" id="vir_type_anchor_react_style_property" data-vir-type-anchor-hover="exact: Lean.Vir.React.StyleProperty -&gt; LeanVir.React.StyleProperty
 
 A single React style object entry.">
 <p><strong>Lean.Vir.React.StyleProperty</strong> <span class="vir-type-anchor-status" title="exact">exact</span></p>
+<p>Relation: audit</p>
 <p>TypeScript: <a href="vir-v1.types.d.ts#L30-L33" title="exact: Lean.Vir.React.StyleProperty -&gt; LeanVir.React.StyleProperty
 
 A single React style object entry."><code>LeanVir.React.StyleProperty</code></a></p>
@@ -33,6 +40,7 @@ Conservative v1 set of React property values.
 
 Lean Int accepts one TypeScript union arm compatibly">
 <p><strong>Lean.Vir.React.PropValue</strong> <span class="vir-type-anchor-status" title="compatible: Lean Int accepts one TypeScript union arm compatibly">compatible</span></p>
+<p>Relation: audit</p>
 <p>TypeScript: <a href="vir-v1.types.d.ts#L36-L42" title="compatible: Lean.Vir.React.PropValue -&gt; LeanVir.React.PropValue
 
 Conservative v1 set of React property values.
@@ -56,6 +64,7 @@ A React property transported through the VIR manifest object ABI.
 
 Lean Int accepts one TypeScript union arm compatibly">
 <p><strong>Lean.Vir.React.Property</strong> <span class="vir-type-anchor-status" title="compatible: Lean Int accepts one TypeScript union arm compatibly">compatible</span></p>
+<p>Relation: audit</p>
 <p>TypeScript: <a href="vir-v1.types.d.ts#L45-L48" title="compatible: Lean.Vir.React.Property -&gt; LeanVir.React.Property
 
 A React property transported through the VIR manifest object ABI.
@@ -76,6 +85,7 @@ DOM-like React event handler backed by a retained Lean closure.
 
 Lean Unit uses TypeScript void representation">
 <p><strong>Lean.Vir.React.EventHandler</strong> <span class="vir-type-anchor-status" title="compatible: Lean Unit uses TypeScript void representation">compatible</span></p>
+<p>Relation: audit</p>
 <p>TypeScript: <a href="vir-v1.types.d.ts#L51-L54" title="compatible: Lean.Vir.React.EventHandler -&gt; LeanVir.React.EventHandler
 
 DOM-like React event handler backed by a retained Lean closure.
@@ -94,6 +104,7 @@ Lean Unit uses TypeScript void representation"><code>LeanVir.React.EventHandler<
 
 Browser event resource marker.">
 <p><strong>Lean.Vir.Browser.Event</strong> <span class="vir-type-anchor-status" title="exact">exact</span></p>
+<p>Relation: audit</p>
 <p>TypeScript: <a href="vir-v1.types.d.ts#L23-L25" title="exact: Lean.Vir.Browser.Event -&gt; LeanVir.Browser.Event
 
 Browser event resource marker."><code>LeanVir.Browser.Event</code></a></p>
@@ -110,6 +121,7 @@ Sample callable shape used by the descriptor anchor fixture.
 
 Lean Int accepts one TypeScript union arm compatibly">
 <p><strong>Lean.Vir.TypeAnchors.reactPropertyIdentity</strong> <span class="vir-type-anchor-status" title="compatible: Lean Int accepts one TypeScript union arm compatibly">compatible</span></p>
+<p>Relation: audit</p>
 <p>TypeScript: <a href="vir-v1.types.d.ts#L57-L58" title="compatible: Lean.Vir.TypeAnchors.reactPropertyIdentity -&gt; LeanVir.React.PropertyIdentity
 
 Sample callable shape used by the descriptor anchor fixture.

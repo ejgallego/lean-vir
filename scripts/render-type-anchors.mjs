@@ -107,6 +107,12 @@ function renderMarkdownReport(report) {
     `missing\t${report.summary.missing}`,
     "```",
     "",
+    "## Coverage Matrix",
+    "",
+    "| Category | TypeScript symbols | Lean targets | Relation | Status | Interpretation |",
+    "| --- | ---: | ---: | --- | --- | --- |",
+    ...coverageRows(report).map((row) => `| ${escapeMarkdownTable(row.category)} | ${row.typeScriptSymbols.length} | ${row.leanTargets.length} | ${relationSummary(row)} | ${statusSummary(row.status)} | ${escapeMarkdownTable(row.interpretation)} |`),
+    "",
   ];
   for (const [category, results] of groupResults(report.results)) {
     if (category !== "Type anchors") lines.push(`## ${category}`, "");
@@ -122,6 +128,7 @@ function renderHtmlReport(report) {
     .map(([category, results]) => renderHtmlGroup(category, results, report.typeScriptProvenance))
     .join("\n");
   const provenance = renderHtmlProvenance(report.typeScriptProvenance);
+  const matrix = renderCoverageMatrix(report);
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -189,6 +196,29 @@ function renderHtmlReport(report) {
     .summary-card { padding: 12px; }
     .summary-card strong { display: block; font-size: 22px; }
     .summary-card span { color: var(--muted); }
+    .coverage {
+      margin: 0 0 28px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .coverage h2 { margin: 0 0 10px; }
+    .coverage table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .coverage th, .coverage td {
+      padding: 8px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    .coverage th { color: var(--muted); font-weight: 600; }
+    .coverage td.numeric { text-align: right; white-space: nowrap; }
+    .coverage details summary { cursor: pointer; color: var(--fg); }
+    .coverage ul { margin: 6px 0 0; padding-left: 18px; }
     .groups { display: grid; gap: 28px; }
     .anchor-group { display: grid; gap: 12px; }
     .group-title {
@@ -264,6 +294,7 @@ function renderHtmlReport(report) {
     @media (max-width: 720px) {
       main { padding: 24px 12px 40px; }
       .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .coverage { overflow-x: auto; }
       .anchor-head { display: grid; }
       .comparison { grid-template-columns: 1fr; }
     }
@@ -282,6 +313,7 @@ ${provenance}
       ${summaryCard("weak", report.summary.weak)}
       ${summaryCard("missing", report.summary.missing)}
     </section>
+${matrix}
     <div class="groups" aria-label="Type anchors">
 ${sections}
     </div>
@@ -310,6 +342,52 @@ function renderHtmlProvenance(provenance) {
 
 function summaryCard(label, count) {
   return `<div class="summary-card ${escapeAttr(label)}"><strong>${count}</strong><span>${escapeHtml(label)}</span></div>`;
+}
+
+function renderCoverageMatrix(report) {
+  const rows = coverageRows(report);
+  if (rows.length === 0) return "";
+  return `    <section class="coverage" aria-labelledby="type-anchor-coverage">
+      <h2 id="type-anchor-coverage">Coverage Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>TypeScript symbols</th>
+            <th>Lean VIR targets</th>
+            <th>Relation</th>
+            <th>Status</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+${rows.map(renderCoverageRow).join("\n")}
+        </tbody>
+      </table>
+    </section>`;
+}
+
+function renderCoverageRow(row) {
+  return `          <tr>
+            <td><strong>${escapeHtml(row.category)}</strong></td>
+            <td class="numeric">${detailsList(`${row.typeScriptSymbols.length} symbols`, row.typeScriptSymbols)}</td>
+            <td class="numeric">${detailsList(`${row.leanTargets.length} targets`, row.leanTargets)}</td>
+            <td>${escapeHtml(relationSummary(row))}</td>
+            <td>${renderStatusSummary(row.status)}</td>
+            <td>${escapeHtml(row.interpretation)}</td>
+          </tr>`;
+}
+
+function detailsList(summary, items) {
+  if (items.length === 0) return escapeHtml(summary);
+  return `<details><summary>${escapeHtml(summary)}</summary><ul>${items.map((item) => `<li><code>${escapeHtml(item)}</code></li>`).join("")}</ul></details>`;
+}
+
+function renderStatusSummary(status) {
+  return ["exact", "compatible", "weak", "missing"]
+    .filter((name) => status[name] !== 0)
+    .map((name) => `<span class="${escapeAttr(name)}">${status[name]} ${escapeHtml(name)}</span>`)
+    .join("<br>") || "0";
 }
 
 function renderHtmlGroup(category, results, provenance) {
@@ -353,6 +431,7 @@ function renderHtmlAnchor(result, provenance) {
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="${escapeAttr(href)}">${escapeHtml(sourceLabel(ts?.source))}</a></span>${docsMeta}
+          <span>Relation: ${escapeHtml(relationLabel(result.relation))}</span>
           <span>Category: ${escapeHtml(result.category ?? "Type anchors")}</span>
           <span>Anchor: <code>${escapeHtml(result.id)}</code></span>
         </div>
@@ -382,6 +461,7 @@ function renderAnchor(result) {
     `:::definition "${label}"${lean}`,
     `<div class="vir-type-anchor vir-type-anchor-${escapeAttr(result.status)}" id="${escapeAttr(label)}" data-vir-type-anchor-hover="${escapeAttr(hover)}">`,
     `<p><strong>${escapeHtml(result.lean)}</strong> <span class="vir-type-anchor-status" title="${escapeAttr(statusTitle)}">${escapeHtml(result.status)}</span></p>`,
+    `<p>Relation: ${escapeHtml(relationLabel(result.relation))}</p>`,
     `<p>TypeScript: <a href="${escapeAttr(href)}" title="${escapeAttr(hover)}"><code>${escapeHtml(result.ts)}</code></a></p>`,
     ts?.display ? `<pre><code>${escapeHtml(ts.display)}</code></pre>` : "",
     result.notes.length === 0 ? "" : `<p>${escapeHtml(result.notes.join("; "))}</p>`,
@@ -418,6 +498,72 @@ function groupResults(results) {
     groups.get(category).push(result);
   }
   return [...groups.entries()];
+}
+
+function coverageRows(report) {
+  if (Array.isArray(report.coverage?.categories)) return report.coverage.categories;
+  return groupResults(report.results).map(([category, results]) => {
+    const status = { exact: 0, compatible: 0, weak: 0, missing: 0 };
+    const relations = { audit: 0, coverageGap: 0 };
+    const typeScriptSymbols = new Set();
+    const leanTargets = new Set();
+    const missingLeanTargets = new Set();
+    const leanDescriptors = new Set();
+    for (const result of results) {
+      status[result.status] += 1;
+      if (result.relation === "coverageGap") relations.coverageGap += 1;
+      else relations.audit += 1;
+      typeScriptSymbols.add(result.ts);
+      leanTargets.add(result.lean);
+      if (result.leanDescriptor === undefined) missingLeanTargets.add(result.lean);
+      else leanDescriptors.add(result.lean);
+    }
+    const row = {
+      category,
+      anchors: results.length,
+      relations,
+      status,
+      typeScriptSymbols: [...typeScriptSymbols],
+      leanTargets: [...leanTargets],
+      leanDescriptors: [...leanDescriptors],
+      missingLeanTargets: [...missingLeanTargets],
+    };
+    return { ...row, interpretation: coverageInterpretation(row) };
+  });
+}
+
+function coverageInterpretation(row) {
+  if (row.relations.coverageGap !== 0 && row.status.missing === row.anchors) {
+    return "Coverage gap: these React surfaces have no Lean VIR descriptor yet.";
+  }
+  if (row.status.missing !== 0) {
+    return "Mixed coverage: some anchors point to existing Lean descriptors, and some are gaps.";
+  }
+  if (row.status.weak !== 0) {
+    return "Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different.";
+  }
+  if (row.status.compatible !== 0) {
+    return "Compatible coverage under known representation conventions.";
+  }
+  return "Exact coverage in this descriptor model.";
+}
+
+function relationSummary(row) {
+  const parts = [];
+  if (row.relations.audit !== 0) parts.push(`${row.relations.audit} audit`);
+  if (row.relations.coverageGap !== 0) parts.push(`${row.relations.coverageGap} gap`);
+  return parts.join(", ") || "0";
+}
+
+function relationLabel(relation) {
+  return relation === "coverageGap" ? "coverage gap" : "audit";
+}
+
+function statusSummary(status) {
+  return ["exact", "compatible", "weak", "missing"]
+    .filter((name) => status[name] !== 0)
+    .map((name) => `${status[name]} ${name}`)
+    .join(", ") || "0";
 }
 
 function documentationHref(provenance, symbolId) {
@@ -560,4 +706,8 @@ function escapeHtml(text) {
 
 function escapeAttr(text) {
   return escapeHtml(text).replaceAll("\"", "&quot;");
+}
+
+function escapeMarkdownTable(text) {
+  return String(text).replaceAll("|", "\\|").replace(/\s+/g, " ").trim();
 }

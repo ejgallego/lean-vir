@@ -89,6 +89,182 @@
     "weak": 22,
     "missing": 11
   },
+  "coverage": {
+    "categories": [
+      {
+        "category": "Props and attributes",
+        "anchors": 8,
+        "relations": {
+          "audit": 8,
+          "coverageGap": 0
+        },
+        "status": {
+          "exact": 0,
+          "compatible": 0,
+          "weak": 8,
+          "missing": 0
+        },
+        "typeScriptSymbols": [
+          "React.Attributes",
+          "React.HTMLAttributes",
+          "React.DOMAttributes",
+          "React.AriaAttributes",
+          "React.ButtonHTMLAttributes",
+          "React.InputHTMLAttributes",
+          "React.JSX.IntrinsicAttributes",
+          "React.JSX.IntrinsicElements"
+        ],
+        "leanTargets": [
+          "Lean.Vir.React.Property"
+        ],
+        "leanDescriptors": [
+          "Lean.Vir.React.Property"
+        ],
+        "missingLeanTargets": [],
+        "interpretation": "Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different."
+      },
+      {
+        "category": "Style and prop values",
+        "anchors": 3,
+        "relations": {
+          "audit": 3,
+          "coverageGap": 0
+        },
+        "status": {
+          "exact": 0,
+          "compatible": 0,
+          "weak": 3,
+          "missing": 0
+        },
+        "typeScriptSymbols": [
+          "React.CSSProperties",
+          "React.Key"
+        ],
+        "leanTargets": [
+          "Lean.Vir.React.PropValue",
+          "Lean.Vir.React.StyleProperty"
+        ],
+        "leanDescriptors": [
+          "Lean.Vir.React.PropValue",
+          "Lean.Vir.React.StyleProperty"
+        ],
+        "missingLeanTargets": [],
+        "interpretation": "Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different."
+      },
+      {
+        "category": "Events",
+        "anchors": 11,
+        "relations": {
+          "audit": 11,
+          "coverageGap": 0
+        },
+        "status": {
+          "exact": 0,
+          "compatible": 0,
+          "weak": 11,
+          "missing": 0
+        },
+        "typeScriptSymbols": [
+          "React.EventHandler",
+          "React.ChangeEventHandler",
+          "React.MouseEventHandler",
+          "React.DOMAttributes",
+          "React.SyntheticEvent",
+          "React.ChangeEvent",
+          "React.FocusEvent",
+          "React.KeyboardEvent",
+          "React.MouseEvent",
+          "React.PointerEvent",
+          "React.UIEvent"
+        ],
+        "leanTargets": [
+          "Lean.Vir.React.EventHandler",
+          "Lean.Vir.Browser.Event"
+        ],
+        "leanDescriptors": [
+          "Lean.Vir.React.EventHandler",
+          "Lean.Vir.Browser.Event"
+        ],
+        "missingLeanTargets": [],
+        "interpretation": "Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different."
+      },
+      {
+        "category": "Rendered values and elements",
+        "anchors": 4,
+        "relations": {
+          "audit": 0,
+          "coverageGap": 4
+        },
+        "status": {
+          "exact": 0,
+          "compatible": 0,
+          "weak": 0,
+          "missing": 4
+        },
+        "typeScriptSymbols": [
+          "React.ReactNode",
+          "React.ReactElement",
+          "React.JSX.Element",
+          "React.JSX.ElementType"
+        ],
+        "leanTargets": [
+          "Lean.Vir.React.Node",
+          "Lean.Vir.React.Element",
+          "Lean.Vir.React.JSX.Element",
+          "Lean.Vir.React.JSX.ElementType"
+        ],
+        "leanDescriptors": [],
+        "missingLeanTargets": [
+          "Lean.Vir.React.Node",
+          "Lean.Vir.React.Element",
+          "Lean.Vir.React.JSX.Element",
+          "Lean.Vir.React.JSX.ElementType"
+        ],
+        "interpretation": "Coverage gap: these React surfaces have no Lean VIR descriptor yet."
+      },
+      {
+        "category": "Components and refs",
+        "anchors": 7,
+        "relations": {
+          "audit": 0,
+          "coverageGap": 7
+        },
+        "status": {
+          "exact": 0,
+          "compatible": 0,
+          "weak": 0,
+          "missing": 7
+        },
+        "typeScriptSymbols": [
+          "React.ElementType",
+          "React.ComponentType",
+          "React.JSXElementConstructor",
+          "React.FunctionComponent",
+          "React.FC",
+          "React.Ref",
+          "React.RefObject"
+        ],
+        "leanTargets": [
+          "Lean.Vir.React.ElementType",
+          "Lean.Vir.React.ComponentType",
+          "Lean.Vir.React.JSXElementConstructor",
+          "Lean.Vir.React.FunctionComponent",
+          "Lean.Vir.React.Ref",
+          "Lean.Vir.React.RefObject"
+        ],
+        "leanDescriptors": [],
+        "missingLeanTargets": [
+          "Lean.Vir.React.ElementType",
+          "Lean.Vir.React.ComponentType",
+          "Lean.Vir.React.JSXElementConstructor",
+          "Lean.Vir.React.FunctionComponent",
+          "Lean.Vir.React.Ref",
+          "Lean.Vir.React.RefObject"
+        ],
+        "interpretation": "Coverage gap: these React surfaces have no Lean VIR descriptor yet."
+      }
+    ]
+  },
   "results": [
     {
       "id": "react.props.attributes",
@@ -99,6 +275,7 @@
         "missing TypeScript fields: name, value",
         "extra TypeScript fields: key"
       ],
+      "relation": "audit",
       "category": "Props and attributes",
       "note": "Audit anchor from VIR's generic key/value property representation to React's reserved component attributes.",
       "leanDescriptor": {
@@ -221,6 +398,7 @@
         "missing TypeScript fields: name, value",
         "extra TypeScript fields: about, accessKey, autoCapitalize, autoCorrect, autoFocus, autoSave, className, color, content, contentEditable, contextMenu, datatype, defaultChecked, defaultValue, dir, draggable, enterKeyHint, exportparts, hidden, id, inert, inlist, inputMode, is, itemID, itemProp, itemRef, itemScope, itemType, lang, nonce, part, popover, popoverTarget, popoverTargetAction, prefix, property, radioGroup, rel, resource, results, rev, role, security, slot, spellCheck, style, suppressContentEditableWarning, suppressHydrationWarning, tabIndex, title, translate, typeof, unselectable, vocab"
       ],
+      "relation": "audit",
       "category": "Props and attributes",
       "note": "Audit anchor from VIR's key/value property representation to React's full HTML attribute surface.",
       "leanDescriptor": {
@@ -895,6 +1073,7 @@
         "missing TypeScript fields: name, value",
         "extra TypeScript fields: children, dangerouslySetInnerHTML, onAbort, onAbortCapture, onAnimationEnd, onAnimationEndCapture, onAnimationIteration, onAnimationIterationCapture, onAnimationStart, onAnimationStartCapture, onAuxClick, onAuxClickCapture, onBeforeInput, onBeforeInputCapture, onBeforeToggle, onBlur, onBlurCapture, onCanPlay, onCanPlayCapture, onCanPlayThrough, onCanPlayThroughCapture, onChange, onChangeCapture, onClick, onClickCapture, onCompositionEnd, onCompositionEndCapture, onCompositionStart, onCompositionStartCapture, onCompositionUpdate, onCompositionUpdateCapture, onContextMenu, onContextMenuCapture, onCopy, onCopyCapture, onCut, onCutCapture, onDoubleClick, onDoubleClickCapture, onDrag, onDragCapture, onDragEnd, onDragEndCapture, onDragEnter, onDragEnterCapture, onDragExit, onDragExitCapture, onDragLeave, onDragLeaveCapture, onDragOver, onDragOverCapture, onDragStart, onDragStartCapture, onDrop, onDropCapture, onDurationChange, onDurationChangeCapture, onEmptied, onEmptiedCapture, onEncrypted, onEncryptedCapture, onEnded, onEndedCapture, onError, onErrorCapture, onFocus, onFocusCapture, onGotPointerCapture, onGotPointerCaptureCapture, onInput, onInputCapture, onInvalid, onInvalidCapture, onKeyDown, onKeyDownCapture, onKeyPress, onKeyPressCapture, onKeyUp, onKeyUpCapture, onLoad, onLoadCapture, onLoadStart, onLoadStartCapture, onLoadedData, onLoadedDataCapture, onLoadedMetadata, onLoadedMetadataCapture, onLostPointerCapture, onLostPointerCaptureCapture, onMouseDown, onMouseDownCapture, onMouseEnter, onMouseLeave, onMouseMove, onMouseMoveCapture, onMouseOut, onMouseOutCapture, onMouseOver, onMouseOverCapture, onMouseUp, onMouseUpCapture, onPaste, onPasteCapture, onPause, onPauseCapture, onPlay, onPlayCapture, onPlaying, onPlayingCapture, onPointerCancel, onPointerCancelCapture, onPointerDown, onPointerDownCapture, onPointerEnter, onPointerLeave, onPointerMove, onPointerMoveCapture, onPointerOut, onPointerOutCapture, onPointerOver, onPointerOverCapture, onPointerUp, onPointerUpCapture, onProgress, onProgressCapture, onRateChange, onRateChangeCapture, onReset, onResetCapture, onScroll, onScrollCapture, onScrollEnd, onScrollEndCapture, onSeeked, onSeekedCapture, onSeeking, onSeekingCapture, onSelect, onSelectCapture, onStalled, onStalledCapture, onSubmit, onSubmitCapture, onSuspend, onSuspendCapture, onTimeUpdate, onTimeUpdateCapture, onToggle, onTouchCancel, onTouchCancelCapture, onTouchEnd, onTouchEndCapture, onTouchMove, onTouchMoveCapture, onTouchStart, onTouchStartCapture, onTransitionCancel, onTransitionCancelCapture, onTransitionEnd, onTransitionEndCapture, onTransitionRun, onTransitionRunCapture, onTransitionStart, onTransitionStartCapture, onVolumeChange, onVolumeChangeCapture, onWaiting, onWaitingCapture, onWheel, onWheelCapture"
       ],
+      "relation": "audit",
       "category": "Props and attributes",
       "note": "Audit anchor from VIR properties to React's event-bearing DOM attribute bag.",
       "leanDescriptor": {
@@ -3222,6 +3401,7 @@
         "missing TypeScript fields: name, value",
         "extra TypeScript fields: aria-activedescendant, aria-atomic, aria-autocomplete, aria-braillelabel, aria-brailleroledescription, aria-busy, aria-checked, aria-colcount, aria-colindex, aria-colindextext, aria-colspan, aria-controls, aria-current, aria-describedby, aria-description, aria-details, aria-disabled, aria-dropeffect, aria-errormessage, aria-expanded, aria-flowto, aria-grabbed, aria-haspopup, aria-hidden, aria-invalid, aria-keyshortcuts, aria-label, aria-labelledby, aria-level, aria-live, aria-modal, aria-multiline, aria-multiselectable, aria-orientation, aria-owns, aria-placeholder, aria-posinset, aria-pressed, aria-readonly, aria-relevant, aria-required, aria-roledescription, aria-rowcount, aria-rowindex, aria-rowindextext, aria-rowspan, aria-selected, aria-setsize, aria-sort, aria-valuemax, aria-valuemin, aria-valuenow, aria-valuetext"
       ],
+      "relation": "audit",
       "category": "Props and attributes",
       "note": "Audit anchor for accessibility attributes represented today as ordinary VIR properties.",
       "leanDescriptor": {
@@ -3963,6 +4143,7 @@
         "kind differs: Lean primitive vs TypeScript option",
         "kind differs: Lean variant vs TypeScript union"
       ],
+      "relation": "audit",
       "category": "Props and attributes",
       "note": "Audit anchor for one concrete element-specific attribute family.",
       "leanDescriptor": {
@@ -4222,6 +4403,7 @@
         "kind differs: Lean primitive vs TypeScript option",
         "kind differs: Lean variant vs TypeScript union"
       ],
+      "relation": "audit",
       "category": "Props and attributes",
       "note": "Audit anchor for form input attributes, including value and change-handler surfaces.",
       "leanDescriptor": {
@@ -4686,6 +4868,7 @@
       "notes": [
         "missing TypeScript fields: name, value"
       ],
+      "relation": "audit",
       "category": "Props and attributes",
       "note": "Audit anchor from generic properties to JSX's always-available intrinsic attributes.",
       "leanDescriptor": {
@@ -4800,6 +4983,7 @@
         "missing TypeScript fields: name, value",
         "extra TypeScript fields: a, abbr, address, animate, animateMotion, animateTransform, area, article, aside, audio, b, base, bdi, bdo, big, blockquote, body, br, button, canvas, caption, center, circle, cite, clipPath, code, col, colgroup, data, datalist, dd, defs, del, desc, details, dfn, dialog, div, dl, dt, ellipse, em, embed, feBlend, feColorMatrix, feComponentTransfer, feComposite, feConvolveMatrix, feDiffuseLighting, feDisplacementMap, feDistantLight, feDropShadow, feFlood, feFuncA, feFuncB, feFuncG, feFuncR, feGaussianBlur, feImage, feMerge, feMergeNode, feMorphology, feOffset, fePointLight, feSpecularLighting, feSpotLight, feTile, feTurbulence, fieldset, figcaption, figure, filter, footer, foreignObject, form, g, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, image, img, input, ins, kbd, keygen, label, legend, li, line, linearGradient, link, main, map, mark, marker, mask, menu, menuitem, meta, metadata, meter, mpath, nav, noindex, noscript, object, ol, optgroup, option, output, p, param, path, pattern, picture, polygon, polyline, pre, progress, q, radialGradient, rect, rp, rt, ruby, s, samp, script, search, section, select, set, slot, small, source, span, stop, strong, style, sub, summary, sup, svg, switch, symbol, table, tbody, td, template, text, textPath, textarea, tfoot, th, thead, time, title, tr, track, tspan, u, ul, use, var, video, view, wbr, webview"
       ],
+      "relation": "audit",
       "category": "Props and attributes",
       "note": "Audit anchor for the full built-in JSX element table; this is intentionally broad.",
       "leanDescriptor": {
@@ -7884,6 +8068,7 @@
       "notes": [
         "kind differs: Lean variant vs TypeScript record"
       ],
+      "relation": "audit",
       "category": "Style and prop values",
       "note": "Audit anchor for the style branch of VIR PropValue.",
       "leanDescriptor": {
@@ -7987,6 +8172,7 @@
       "notes": [
         "missing TypeScript fields: name, value"
       ],
+      "relation": "audit",
       "category": "Style and prop values",
       "note": "Audit anchor from VIR's individual style-property entries to React's typed CSS property object.",
       "leanDescriptor": {
@@ -8034,6 +8220,7 @@
       "notes": [
         "kind differs: Lean variant vs TypeScript union"
       ],
+      "relation": "audit",
       "category": "Style and prop values",
       "note": "Loose scalar audit anchor: React keys are not regular props, but they exercise the same string/number value boundary.",
       "leanDescriptor": {
@@ -8154,6 +8341,7 @@
       "notes": [
         "kind differs: Lean record vs TypeScript opaque"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor from VIR retained callbacks to React's generic event handler type.",
       "leanDescriptor": {
@@ -8214,6 +8402,7 @@
       "notes": [
         "kind differs: Lean record vs TypeScript opaque"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor for one common form event callback specialization.",
       "leanDescriptor": {
@@ -8290,6 +8479,7 @@
       "notes": [
         "kind differs: Lean record vs TypeScript opaque"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor for one common pointer callback specialization.",
       "leanDescriptor": {
@@ -8363,6 +8553,7 @@
         "missing TypeScript fields: callback, name",
         "extra TypeScript fields: children, dangerouslySetInnerHTML, onAbort, onAbortCapture, onAnimationEnd, onAnimationEndCapture, onAnimationIteration, onAnimationIterationCapture, onAnimationStart, onAnimationStartCapture, onAuxClick, onAuxClickCapture, onBeforeInput, onBeforeInputCapture, onBeforeToggle, onBlur, onBlurCapture, onCanPlay, onCanPlayCapture, onCanPlayThrough, onCanPlayThroughCapture, onChange, onChangeCapture, onClick, onClickCapture, onCompositionEnd, onCompositionEndCapture, onCompositionStart, onCompositionStartCapture, onCompositionUpdate, onCompositionUpdateCapture, onContextMenu, onContextMenuCapture, onCopy, onCopyCapture, onCut, onCutCapture, onDoubleClick, onDoubleClickCapture, onDrag, onDragCapture, onDragEnd, onDragEndCapture, onDragEnter, onDragEnterCapture, onDragExit, onDragExitCapture, onDragLeave, onDragLeaveCapture, onDragOver, onDragOverCapture, onDragStart, onDragStartCapture, onDrop, onDropCapture, onDurationChange, onDurationChangeCapture, onEmptied, onEmptiedCapture, onEncrypted, onEncryptedCapture, onEnded, onEndedCapture, onError, onErrorCapture, onFocus, onFocusCapture, onGotPointerCapture, onGotPointerCaptureCapture, onInput, onInputCapture, onInvalid, onInvalidCapture, onKeyDown, onKeyDownCapture, onKeyPress, onKeyPressCapture, onKeyUp, onKeyUpCapture, onLoad, onLoadCapture, onLoadStart, onLoadStartCapture, onLoadedData, onLoadedDataCapture, onLoadedMetadata, onLoadedMetadataCapture, onLostPointerCapture, onLostPointerCaptureCapture, onMouseDown, onMouseDownCapture, onMouseEnter, onMouseLeave, onMouseMove, onMouseMoveCapture, onMouseOut, onMouseOutCapture, onMouseOver, onMouseOverCapture, onMouseUp, onMouseUpCapture, onPaste, onPasteCapture, onPause, onPauseCapture, onPlay, onPlayCapture, onPlaying, onPlayingCapture, onPointerCancel, onPointerCancelCapture, onPointerDown, onPointerDownCapture, onPointerEnter, onPointerLeave, onPointerMove, onPointerMoveCapture, onPointerOut, onPointerOutCapture, onPointerOver, onPointerOverCapture, onPointerUp, onPointerUpCapture, onProgress, onProgressCapture, onRateChange, onRateChangeCapture, onReset, onResetCapture, onScroll, onScrollCapture, onScrollEnd, onScrollEndCapture, onSeeked, onSeekedCapture, onSeeking, onSeekingCapture, onSelect, onSelectCapture, onStalled, onStalledCapture, onSubmit, onSubmitCapture, onSuspend, onSuspendCapture, onTimeUpdate, onTimeUpdateCapture, onToggle, onTouchCancel, onTouchCancelCapture, onTouchEnd, onTouchEndCapture, onTouchMove, onTouchMoveCapture, onTouchStart, onTouchStartCapture, onTransitionCancel, onTransitionCancelCapture, onTransitionEnd, onTransitionEndCapture, onTransitionRun, onTransitionRunCapture, onTransitionStart, onTransitionStartCapture, onVolumeChange, onVolumeChangeCapture, onWaiting, onWaitingCapture, onWheel, onWheelCapture"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor from VIR's named event handlers to React's DOM event prop bag.",
       "leanDescriptor": {
@@ -10636,6 +10827,7 @@
       "notes": [
         "kind differs: Lean resource vs TypeScript record"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor from VIR event resources to React's synthetic event base surface.",
       "leanDescriptor": {
@@ -10673,6 +10865,7 @@
       "notes": [
         "kind differs: Lean resource vs TypeScript record"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor for a form event resource specialization.",
       "leanDescriptor": {
@@ -10715,6 +10908,7 @@
       "notes": [
         "kind differs: Lean resource vs TypeScript record"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor for focus event resource specialization.",
       "leanDescriptor": {
@@ -10764,6 +10958,7 @@
       "notes": [
         "kind differs: Lean resource vs TypeScript record"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor for keyboard event resource specialization.",
       "leanDescriptor": {
@@ -10850,6 +11045,7 @@
       "notes": [
         "kind differs: Lean resource vs TypeScript record"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor for mouse event resource specialization.",
       "leanDescriptor": {
@@ -10951,6 +11147,7 @@
       "notes": [
         "kind differs: Lean resource vs TypeScript record"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor for pointer event resource specialization.",
       "leanDescriptor": {
@@ -11033,6 +11230,7 @@
       "notes": [
         "kind differs: Lean resource vs TypeScript record"
       ],
+      "relation": "audit",
       "category": "Events",
       "note": "Audit anchor for UI event resource specialization.",
       "leanDescriptor": {
@@ -11079,6 +11277,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.Node"
       ],
+      "relation": "coverageGap",
       "category": "Rendered values and elements",
       "note": "Coverage gap: VIR does not yet expose a Lean descriptor for the full set of renderable React children.",
       "tsSymbol": {
@@ -11164,6 +11363,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.Element"
       ],
+      "relation": "coverageGap",
       "category": "Rendered values and elements",
       "note": "Coverage gap: VIR does not yet expose a Lean descriptor for JSX element values.",
       "tsSymbol": {
@@ -11208,6 +11408,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.JSX.Element"
       ],
+      "relation": "coverageGap",
       "category": "Rendered values and elements",
       "note": "Coverage gap: JSX's element interface has no corresponding VIR descriptor today.",
       "tsSymbol": {
@@ -11236,6 +11437,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.JSX.ElementType"
       ],
+      "relation": "coverageGap",
       "category": "Rendered values and elements",
       "note": "Coverage gap: JSX element-type selection has no corresponding VIR descriptor today.",
       "tsSymbol": {
@@ -11279,6 +11481,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.ElementType"
       ],
+      "relation": "coverageGap",
       "category": "Components and refs",
       "note": "Coverage gap: VIR does not yet describe component-or-tag values.",
       "tsSymbol": {
@@ -11322,6 +11525,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.ComponentType"
       ],
+      "relation": "coverageGap",
       "category": "Components and refs",
       "note": "Coverage gap: user-defined component types are outside the current VIR manifest.",
       "tsSymbol": {
@@ -11371,6 +11575,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.JSXElementConstructor"
       ],
+      "relation": "coverageGap",
       "category": "Components and refs",
       "note": "Coverage gap: JSX component constructors are not represented by the current VIR manifest.",
       "tsSymbol": {
@@ -11436,6 +11641,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.FunctionComponent"
       ],
+      "relation": "coverageGap",
       "category": "Components and refs",
       "note": "Coverage gap: function component call signatures are not represented by the current VIR manifest.",
       "tsSymbol": {
@@ -11476,6 +11682,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.FunctionComponent"
       ],
+      "relation": "coverageGap",
       "category": "Components and refs",
       "note": "Coverage gap: React.FC is included as a common alias for function components.",
       "tsSymbol": {
@@ -11510,6 +11717,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.Ref"
       ],
+      "relation": "coverageGap",
       "category": "Components and refs",
       "note": "Coverage gap: refs are not represented in the current VIR React descriptor surface.",
       "tsSymbol": {
@@ -11566,6 +11774,7 @@
       "notes": [
         "missing Lean descriptor Lean.Vir.React.RefObject"
       ],
+      "relation": "coverageGap",
       "category": "Components and refs",
       "note": "Coverage gap: ref objects are not represented in the current VIR React descriptor surface.",
       "tsSymbol": {
