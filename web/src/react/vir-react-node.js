@@ -155,28 +155,35 @@ export function createBrowserReactNodeTextResource(resources, value) {
   });
 }
 
-export function createBrowserReactNodeElementResource(resources, createElement, hooks, tag, key, props, handlers, children) {
+export function createReactElementTypeTagResource(value) {
+  return {
+    kind: "ReactElementType",
+    value: reactNodeName(value, "element type tag"),
+  };
+}
+
+export function createBrowserReactNodeElementResource(resources, createElement, hooks, elementType, props, children) {
   if (typeof createElement !== "function") {
     throw new Error("createBrowserReactNodeElementResource requires a React.createElement-compatible function");
   }
   const { callLeanEventCallback } = requireReactHostHooks(hooks);
-  return createReactNodeElementResource(resources, tag, key, props, handlers, children, (fields, childEntries) => {
+  return createReactNodeElementResource(resources, elementType, props, children, (fields, childEntries) => {
     const { props: reactProps, callbacks } = reactPropsFromNode(resources, fields, callLeanEventCallback, hooks);
     return {
-      node: createElement(fields.tag, reactProps, ...childEntries.map((child) => child.value.node)),
+      node: createElement(fields.elementType, reactProps, ...childEntries.map((child) => child.value.node)),
       callbacks,
     };
   });
 }
 
-export function createBrowserReactNodeFragmentResource(resources, createElement, Fragment, key, children) {
+export function createBrowserReactNodeFragmentResource(resources, createElement, Fragment, props, children) {
   if (typeof createElement !== "function") {
     throw new Error("createBrowserReactNodeFragmentResource requires a React.createElement-compatible function");
   }
   if (Fragment === null || Fragment === undefined) {
     throw new Error("createBrowserReactNodeFragmentResource requires React.Fragment");
   }
-  return createReactNodeFragmentResource(resources, key, children, (fields, childEntries) => ({
+  return createReactNodeFragmentResource(resources, props, children, (fields, childEntries) => ({
     node: createElement(Fragment, reactFragmentProps(fields), ...childEntries.map((child) => child.value.node)),
   }));
 }
@@ -187,16 +194,16 @@ export function createVirtualReactNodeTextResource(resources, value) {
   });
 }
 
-export function createVirtualReactNodeElementResource(resources, hooks, tag, key, props, handlers, children) {
+export function createVirtualReactNodeElementResource(resources, hooks, elementType, props, children) {
   const { callLeanEventCallback } = requireReactHostHooks(hooks);
-  return createReactNodeElementResource(resources, tag, key, props, handlers, children, (fields, childEntries) => {
+  return createReactNodeElementResource(resources, elementType, props, children, (fields, childEntries) => {
     const { handlers: virtualHandlers, callbacks } =
       virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, hooks);
     return {
       node: {
         kind: "element",
-        tag: fields.tag,
-        key: fields.key,
+        tag: virtualReactElementTypeLabel(fields.elementType),
+        key: fields.props.key,
         props: virtualReactPropsFromNode(fields),
         handlers: virtualHandlers,
         children: childEntries.map((child) => child.value.node),
@@ -206,24 +213,60 @@ export function createVirtualReactNodeElementResource(resources, hooks, tag, key
   });
 }
 
-export function createVirtualReactNodeFragmentResource(resources, key, children) {
-  return createReactNodeFragmentResource(resources, key, children, (fields, childEntries) => ({
+export function createVirtualReactNodeFragmentResource(resources, props, children) {
+  return createReactNodeFragmentResource(resources, props, children, (fields, childEntries) => ({
     node: {
       kind: "fragment",
-      key: fields.key,
+      key: fields.props.key,
       children: childEntries.map((child) => child.value.node),
     },
   }));
 }
 
-export function createReactNodeElementResource(resources, tag, key, props, handlers, children, createNode) {
+export function createReactPropsResource() {
+  return { kind: "ReactProps", key: null, ref: null, properties: [], handlers: [] };
+}
+
+export function setReactPropsKey(resources, propsResource, keyResource) {
+  const props = resolveReactPropsResource(resources, propsResource);
+  props.key = jsStringValue(resources, keyResource, "React Node element key");
+  return undefined;
+}
+
+export function setReactPropsRef(resources, propsResource, refResource) {
+  const props = resolveReactPropsResource(resources, propsResource);
+  props.ref = resources.resolveResource(refResource, "ReactRef");
+  return undefined;
+}
+
+export function setReactPropsProperty(resources, propsResource, propertyResource) {
+  const props = resolveReactPropsResource(resources, propsResource);
+  props.properties.push(resources.resolveResource(propertyResource, `React Node property[${props.properties.length}]`));
+  return undefined;
+}
+
+export function setReactPropsEventHandler(resources, propsResource, handlerResource) {
+  const props = resolveReactPropsResource(resources, propsResource);
+  props.handlers.push(resources.resolveResource(handlerResource, `React Node event handler[${props.handlers.length}]`));
+  return undefined;
+}
+
+export function createReactNodeChildrenResource() {
+  return { kind: "ReactNodeChildren", children: [] };
+}
+
+export function pushReactNodeChild(resources, childrenResource, childResource) {
+  const children = resolveReactNodeChildrenBuilder(resources, childrenResource);
+  children.children.push(childResource);
+  return undefined;
+}
+
+export function createReactNodeElementResource(resources, elementType, props, children, createNode) {
   const childEntries = resolveReactNodeChildren(resources, children);
   const stats = reactNodeSubtreeStats(childEntries);
   const fields = {
-    tag: reactNodeName(tag, "element tag"),
-    key: reactNodeKey(key),
-    props: reactNodeArray(props, "props"),
-    handlers: reactNodeArray(handlers, "handlers"),
+    elementType: normalizeReactElementType(resources, elementType),
+    props: normalizeReactProps(resources, props),
   };
   let callbacks = [];
   try {
@@ -241,12 +284,13 @@ export function createReactNodeElementResource(resources, tag, key, props, handl
   }
 }
 
-export function createReactNodeFragmentResource(resources, key, children, createNode) {
+export function createReactNodeFragmentResource(resources, props, children, createNode) {
   const childEntries = resolveReactNodeChildren(resources, children);
   const stats = reactNodeSubtreeStats(childEntries);
   const fields = {
-    key: reactNodeKey(key),
+    props: normalizeReactProps(resources, props),
   };
+  validateReactFragmentProps(fields.props);
   const created = createNode(fields, childEntries);
   return createReactNodeResource(resources, {
     node: created.node,
@@ -443,8 +487,17 @@ function finalizeReactNodeValue(resources, value) {
   resources.removeDisposable(value);
 }
 
+function resolveReactNodeChildrenBuilder(resources, children) {
+  const value = resources.resolveResource(children, "ReactNodeChildren");
+  if (value?.kind !== "ReactNodeChildren") {
+    throw new Error("ReactNodeChildren resource has invalid value");
+  }
+  reactNodeArray(value.children, "children");
+  return value;
+}
+
 function resolveReactNodeChildren(resources, children) {
-  return reactNodeArray(children, "children").map((resource, index) => ({
+  return resolveReactNodeChildrenBuilder(resources, children).children.map((resource, index) => ({
     resource,
     value: resolveReactNodeResource(resources, resource, `React Node child[${index}]`),
   }));
@@ -534,13 +587,16 @@ function disposeReactComponent(component) {
 function reactPropsFromNode(state, fields, callLeanEventCallback, hooks) {
   const props = {};
   const callbacks = [];
-  if (fields.key !== null && fields.key !== undefined) {
-    props.key = fields.key;
+  if (fields.props.key !== null && fields.props.key !== undefined) {
+    props.key = fields.props.key;
   }
-  for (const [name, value] of reactNodePropertyEntries(fields.props)) {
+  if (fields.props.ref !== null && fields.props.ref !== undefined) {
+    props.ref = fields.props.ref;
+  }
+  for (const [name, value] of reactNodePropertyEntries(fields.props.properties)) {
     setReactObjectProperty(props, name, value);
   }
-  for (const [name, callback] of reactNodeEventHandlerEntries(fields.handlers)) {
+  for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
     callbacks.push(callback);
     setReactObjectProperty(props, name, (event) => {
       beginReactNodeEventCallback(hooks);
@@ -557,15 +613,24 @@ function reactPropsFromNode(state, fields, callLeanEventCallback, hooks) {
 
 function reactFragmentProps(fields) {
   const props = {};
-  if (fields.key !== null && fields.key !== undefined) {
-    props.key = fields.key;
+  if (fields.props.key !== null && fields.props.key !== undefined) {
+    props.key = fields.props.key;
   }
   return props;
 }
 
+function validateReactFragmentProps(props) {
+  if (props.ref !== null || props.properties.length !== 0 || props.handlers.length !== 0) {
+    throw new Error("React Fragment props only support key");
+  }
+}
+
 function virtualReactPropsFromNode(fields) {
   const props = {};
-  for (const [name, value] of reactNodePropertyEntries(fields.props)) {
+  if (fields.props.ref !== null && fields.props.ref !== undefined) {
+    setReactObjectProperty(props, "ref", fields.props.ref);
+  }
+  for (const [name, value] of reactNodePropertyEntries(fields.props.properties)) {
     setReactObjectProperty(props, name, value);
   }
   return props;
@@ -574,7 +639,7 @@ function virtualReactPropsFromNode(fields) {
 function virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, hooks) {
   const handlers = {};
   const callbacks = [];
-  for (const [name, callback] of reactNodeEventHandlerEntries(fields.handlers)) {
+  for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
     callbacks.push(callback);
     setReactObjectProperty(handlers, name, (event = {}) => {
       beginReactNodeEventCallback(hooks);
@@ -589,11 +654,70 @@ function virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, 
   return { handlers, callbacks };
 }
 
+function normalizeReactElementType(resources, elementType) {
+  const value = resources.resolveResource(elementType, "ReactElementType");
+  if (value?.kind === "ReactElementType") {
+    return reactNodeName(value.value, "element type tag");
+  }
+  return reactElementTypeValue(value, "React Node element type");
+}
+
+function reactElementTypeValue(value, label) {
+  if (typeof value === "string") {
+    throw new Error(`${label} must be wrapped with react.elementType.tag`);
+  }
+  if (typeof value === "function" || typeof value === "symbol") {
+    return value;
+  }
+  if (value !== null && typeof value === "object" && typeof value.$$typeof === "symbol") {
+    return value;
+  }
+  throw new Error(`${label} must be a React element type`);
+}
+
+function virtualReactElementTypeLabel(elementType) {
+  if (typeof elementType === "string") {
+    return elementType;
+  }
+  if (typeof elementType === "function") {
+    return elementType.displayName ?? elementType.name ?? "component";
+  }
+  if (typeof elementType === "symbol") {
+    return elementType.description ?? String(elementType);
+  }
+  return elementType?.displayName ?? elementType?.name ?? "component";
+}
+
+function normalizeReactProps(resources, props) {
+  const value = resolveReactPropsResource(resources, props);
+  return {
+    key: reactNodeKey(value.key),
+    ref: reactNodeRef(value.ref),
+    properties: reactNodeArray(value.properties, "props"),
+    handlers: reactNodeArray(value.handlers, "handlers"),
+  };
+}
+
+function resolveReactPropsResource(resources, props) {
+  const value = resources.resolveResource(props, "ReactProps");
+  if (value?.kind !== "ReactProps") {
+    throw new Error("ReactProps resource has invalid value");
+  }
+  return value;
+}
+
 function reactNodeKey(key) {
   if (key !== null && key !== undefined && typeof key !== "string") {
     throw new Error("React Node element key must be a string or null");
   }
   return key;
+}
+
+function reactNodeRef(ref) {
+  if (ref !== null && ref !== undefined && (typeof ref !== "object" || Array.isArray(ref))) {
+    throw new Error("React Node element ref must be a React ref object or null");
+  }
+  return ref ?? null;
 }
 
 function reactNodeArray(value, label) {
@@ -743,6 +867,14 @@ function reactClassListPropValue(classes) {
 function reactClassToken(value, index) {
   if (typeof value !== "string" || value.length === 0 || /\s/.test(value)) {
     throw new Error(`React PropValue.classList[${index}] must be a non-empty token without whitespace`);
+  }
+  return value;
+}
+
+function jsStringValue(resources, resource, label) {
+  const value = resources.resolveResource(resource, label);
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a Js String`);
   }
   return value;
 }

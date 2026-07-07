@@ -8,6 +8,7 @@ import {
   createVirRuntimeFactory,
   createVirtualDocumentState,
   ensureVirtualElementState,
+  virtualReactElementById,
 } from "../../web/src/vir-runtime-node.js";
 import { hostResourceValue } from "../../web/src/host-resource.js";
 import { createHostResourceState } from "../../web/src/host/vir-host-resources.js";
@@ -36,7 +37,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     },
   });
   const hostRuntime = await hostFactory.createRuntime({ irPackageBytes: await readFile(hostPackage) });
-  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 13);
+  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 16);
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshEchoBang")?.effect, "runtime");
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshTitleRoundtrip")?.effect, "dom");
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshReactValue")?.effect, "react");
@@ -143,4 +144,49 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     name: "custom!",
     count: "3",
   });
+
+  const reactExternalSource = join(freshDir, "ReactExternalComponent.lean");
+  const reactExternalPackage = join(freshDir, "react-external-component.irpkg");
+  await writeRuntimeFixture(reactExternalSource, "ReactExternalComponent.lean");
+  generateIrPackage(reactExternalSource, reactExternalPackage);
+  const reactExternalDocumentState = createVirtualDocumentState();
+  ensureVirtualElementState(reactExternalDocumentState, "#react-external-component");
+  const externalBadge = createVirtualExternalBadgeComponent();
+  const reactExternalRuntime = await createVirRuntimeFactory({
+    wasmBytes,
+    virtualDocumentState: reactExternalDocumentState,
+    hostBindings: {
+      "test.react.externalBadge": () => reactExternalDocumentState.resources.resourceForValue(externalBadge),
+    },
+  }).createRuntime({ irPackageBytes: await readFile(reactExternalPackage) });
+  const externalBadgeImport = reactExternalRuntime.interfaceManifest.hostImports.find(
+    (entry) => entry.target === "test.react.externalBadge",
+  );
+  assert.equal(externalBadgeImport?.effect, "react");
+  assert.equal(externalBadgeImport?.args.length, 0);
+  assert.equal(externalBadgeImport?.result?.type, "Js");
+  assert.equal(
+    reactExternalRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.createElement")?.effect,
+    "react",
+  );
+  assert.equal(
+    reactExternalRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.props.setRef")?.effect,
+    "react",
+  );
+  assert.equal(reactExternalRuntime.call("Vir.Fixtures.ReactExternalComponent.mount", "#react-external-component"), true);
+  const mounted = reactExternalDocumentState.elements.get("#react-external-component");
+  assert.equal(mounted.textContent, "external child");
+  assert.equal(reactExternalRuntime.liveCallbacks.size, 1);
+  const badge = virtualReactElementById(mounted.reactRoot, "react-external-badge");
+  assert.equal(badge.tag, "VirExternalBadge");
+  assert.equal(badge.props.ref.current, "unset");
+  mounted.reactRoot.unmount();
+  assert.equal(reactExternalRuntime.liveCallbacks.size, 0);
+  reactExternalRuntime.dispose();
+}
+
+function createVirtualExternalBadgeComponent() {
+  function VirExternalBadge() {}
+  VirExternalBadge.displayName = "VirExternalBadge";
+  return VirExternalBadge;
 }

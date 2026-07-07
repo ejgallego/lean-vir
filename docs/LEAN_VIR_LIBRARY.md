@@ -261,17 +261,26 @@ use `Lean.Vir.RuntimeM`; `Lean.Vir.React.ReactM` is the narrower
 render-construction effect for React component APIs and lifts `RuntimeM`.
 
 - object marker: `Lean.Vir.React.Root`
+- object marker: `Lean.Vir.React.ElementType`
 - object marker: `Lean.Vir.React.StateSetter α`
+- object marker: `Lean.Vir.React.Ref α`
 - object marker: `Lean.Vir.React.Props`
+- object marker: `Lean.Vir.React.NodeChildren`
+- object marker: `Lean.Vir.React.DependencyList`
 - `Lean.Vir.React.Node`
 - `Lean.Vir.React.Property`
 - `Lean.Vir.React.PropValue`
 - `Lean.Vir.React.EventHandler`
+- `Lean.Vir.React.Props.Entry`
 - `Lean.Vir.React.State α`
 - `Lean.Vir.React.ReducerState state action`
 - `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.ElementType.ofTag : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.ElementType)`
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
-- `Lean.Vir.React.Node.createElement : @& String -> Option String -> Array Lean.Vir.React.Property -> Array Lean.Vir.React.EventHandler -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Node.createElement : @& Lean.Vir.Js Lean.Vir.React.ElementType -> Array Lean.Vir.React.Props.Entry -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Node.createElementTag : @& String -> Array Lean.Vir.React.Props.Entry -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Props.key : String -> Lean.Vir.React.Props.Entry`
+- `Lean.Vir.React.Props.ref : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)) -> Lean.Vir.React.Props.Entry`
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
 - `Lean.Vir.React.Root.createFromSelector : String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.React.Root))`
 - `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
@@ -280,17 +289,29 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
 - `Lean.Vir.React.Hooks.useReducer : (Lean.Vir.Js state -> Lean.Vir.Js action -> Lean.Vir.RuntimeM (Lean.Vir.Js state)) -> @& Lean.Vir.Js state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
+- `Lean.Vir.React.Hooks.useRef : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)))`
+- `Lean.Vir.React.Hooks.DependencyList.empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.DependencyList)`
+- `Lean.Vir.React.Hooks.DependencyList.push : @& Lean.Vir.Js Lean.Vir.React.DependencyList -> @& Lean.Vir.Js α -> Lean.Vir.React.ReactM Unit`
+- `Lean.Vir.React.Hooks.DependencyList.ofArray : @& Array (Lean.Vir.Js α) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.DependencyList)`
+- `Lean.Vir.React.Hooks.useMemo : Lean.Vir.React.ReactM (Lean.Vir.Js α) -> @& Lean.Vir.Js Lean.Vir.React.DependencyList -> Lean.Vir.React.ReactM (Lean.Vir.Js α)`
+- `Lean.Vir.React.Hooks.useMemoWithArrayDeps : Lean.Vir.React.ReactM (Lean.Vir.Js α) -> @& Array (Lean.Vir.Js β) -> Lean.Vir.React.ReactM (Lean.Vir.Js α)`
+- `Lean.Vir.React.Hooks.useMemoWithStringDeps : Lean.Vir.React.ReactM (Lean.Vir.Js α) -> @& Array String -> Lean.Vir.React.ReactM (Lean.Vir.Js α)`
+- `Lean.Vir.React.Hooks.useEffectWithDeps : @& Lean.Vir.Js Lean.Vir.React.DependencyList -> Lean.Vir.Browser.DomM (Lean.Vir.Js α) -> (@& Lean.Vir.Js α -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.React.ReactM Unit`
+- `Lean.Vir.React.Hooks.useEffectWithStringDeps : @& Array String -> Lean.Vir.Browser.DomM (Lean.Vir.Js α) -> (@& Lean.Vir.Js α -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.React.ReactM Unit`
 - `Lean.Vir.React.ReducerDispatch.dispatch : Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> Lean.Vir.Js action -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.RuntimeM (Lean.Vir.Js α)) -> Lean.Vir.RuntimeM Unit`
 
 `Node` is an opaque JavaScript-owned renderable marker. Lean constructs values
 with `Node.text` and `Node.createElement`; those public helpers explicitly
-convert text, tag, and key strings through `JsValue` before calling the
-low-level `react.node.*` host targets. Browser hosts construct native React
-nodes with `React.createElement` at that point. Rendering retains any Lean event
-callbacks embedded in the resource graph until the root is rerendered,
-unmounted, the package is reloaded, or the runtime is disposed.
+convert text through `JsValue`, build JavaScript-owned `Props`/`NodeChildren`
+resources, and then call the low-level `react.node.*` host targets.
+`Node.createElement` takes a JavaScript-owned `ElementType` resource, matching
+React's `type` parameter; `Node.createElementTag` and DOM helpers explicitly
+wrap ordinary tag strings with `ElementType.ofTag`. Browser hosts construct
+native React nodes with `React.createElement` at that point. Rendering retains
+any Lean event callbacks embedded in the resource graph until the root is
+rerendered, unmounted, the package is reloaded, or the runtime is disposed.
 
 `Root.render` is the host boundary for rendering a `ReactM` tree into an
 existing root. The JavaScript host invokes the received render action to obtain
@@ -467,11 +488,12 @@ const vir = await createVirRuntime({
 ```
 
 Host imports use an explicit JavaScript-resource boundary by default. Use
-`Lean.Vir.Js α` resources, containers of resources, or callbacks whose
-arguments/results are resource-shaped. Raw Lean scalars and structures are
-rejected unless the target is a built-in conversion primitive such as
-`js.nat.value` or `js.value.react.property`. `Unit` results should return
-`undefined` or `null`.
+`Unit`, `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources for
+JavaScript `null`, or callback arguments whose own arguments/results are
+`Unit` or resources. Nested callback arguments are rejected. Raw Lean scalars,
+structures, arrays, lists, options, and products are rejected unless the target
+is a built-in conversion primitive such as `js.nat.value` or
+`js.value.react.property`. `Unit` results should return `undefined` or `null`.
 
 Lean function values in host-import arguments are supported as callbacks from
 JavaScript into Lean. The JavaScript runtime roots the closure in the WASM shim,
@@ -504,6 +526,8 @@ Exported entrypoints support the current interface types:
 - nullary inductive enums
 - opaque `Lean.Vir.Js α` resources for JavaScript-owned objects, including
   browser and React object markers
+- `Lean.Vir.Js.Nullable α` resources for JavaScript `null` values, with
+  explicit `toOption`/`ofOption` helpers at the Lean API edge
 - Lean function values used as host callbacks
 - `Lean.Expr`
 - `Lean.Vir.React.Node` as an opaque JavaScript-owned resource under
@@ -515,7 +539,9 @@ are narrower than exports: low-level host declarations should expose
 `Lean.Vir.JsValue` or another explicit conversion target. JavaScript
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; DOM and React-root APIs use
 `Lean.Vir.Browser.DomM α`; render construction APIs use `ReactM α`. The current
-host boundary is synchronous; returning a JavaScript `Promise` is an error. The
+host boundary rejects raw Lean scalar, structure, array, list, option, and
+product imports and is synchronous; returning a JavaScript `Promise` is an
+error. The
 current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.

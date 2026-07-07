@@ -86,6 +86,11 @@ namespace Hooks
 
 def useState (initial : Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
 def useEffectWithDeps
+    (deps : Lean.Vir.Js DependencyList)
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit
+def useEffectWithStringDeps
     (deps : Array String)
     (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
     (cleanup : Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
@@ -112,9 +117,7 @@ def text (value : String) : ReactM (Lean.Vir.Js Node)
 
 def createElement
     (tag : String)
-    (key? : Option String)
-    (props : Array Property)
-    (handlers : Array EventHandler)
+    (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node)
 
@@ -164,15 +167,20 @@ end Lean.Vir.React
 
 `Lean.Vir.React.Node` is an opaque JavaScript-owned object marker and crosses
 the host boundary as `Lean.Vir.Js Node`. Lean builds nodes through
-`Node.text` and `Node.createElement`. Those public helpers convert text, tag,
-and key strings through `Lean.Vir.JsValue` before calling the private
-`react.node.*` host imports, so the low-level host boundary receives explicit
-`Lean.Vir.Js String` resources. The browser host constructs native React nodes
-immediately with `React.createElement`, while the virtual test host constructs
-equivalent virtual nodes. The package generator still represents the known
-`Property`, `PropValue`, and `EventHandler` payload shapes directly; the
-React-specific boundary is the native React node resource and callback
-ownership policy, not a private recursive wire codec.
+`Node.text` and `Node.createElement`. Those public helpers convert text, props,
+children, and dependency lists through explicit resource builders before calling
+the private `react.node.*` host imports. The low-level host boundary receives
+`Lean.Vir.Js ElementType`, `Lean.Vir.Js Props`, and
+`Lean.Vir.Js NodeChildren` resources, not generic lowered arrays. DOM tag names
+are explicitly wrapped through `ElementType.ofTag`/`react.elementType.tag`; JS
+component bindings can provide component element-type resources directly. The
+browser host constructs native React nodes immediately with
+`React.createElement`, while the virtual test host constructs equivalent
+virtual nodes. The package generator
+still represents the known `Property`, `PropValue`, and `EventHandler` payload
+shapes directly inside explicit conversion calls; the React-specific boundary is
+the native React node resource and callback ownership policy, not a private
+recursive wire codec.
 
 `Lean.Vir.RuntimeM` is the JavaScript runtime/resource effect: it can allocate
 or inspect `Lean.Vir.Js ...` values and update VIR runtime bookkeeping, but it
@@ -238,8 +246,8 @@ expects a non-empty suffix, matching the documented `data-*` shape.
 deduplicates them while preserving order, and lowers to `className`.
 `Property.style` builds React's object-valued `style` prop from camelCase
 `StyleProperty.mk` entries with string values. The keyed element helpers set
-React's `key` for list-like children while preserving the same props, handlers,
-and children conventions as their unkeyed counterparts.
+React's `key` through `Props.key` while preserving the same props-entry and
+children conventions as their unkeyed counterparts.
 
 `Property.string`/`bool`/`int`/`float`, `EventHandler.on`/`onUnit`, and
 `Node.elementWith`/`keyedElementWith` remain intentional escape hatches for
@@ -255,14 +263,21 @@ The browser React host binding is exposed from
 - `react.root.create` calls `ReactDOM.createRoot(container)`.
 - `react.node.text` creates a `ReactNode` resource for an explicit `Js String`
   text node.
-- `react.node.createElement` unwraps explicit `Js String` tag/key values,
-  validates props/handlers/children, calls
-  `React.createElement(tag, props, ...children)`, and returns a `ReactNode`
+- `react.props.empty`, `react.props.setKey`, `react.props.setRef`,
+  `react.props.setProperty`, and `react.props.setEventHandler` build a
+  JavaScript-owned React props resource from explicit conversions.
+- `react.node.children.empty` and `react.node.children.push` build a
+  JavaScript-owned child list resource from explicit `Js Node` children.
+- `react.elementType.tag` wraps an explicit `Js String` DOM tag as a
+  JavaScript-owned `ElementType` resource.
+- `react.node.createElement` unwraps the explicit `Js ElementType`, validates
+  the props and children resources, calls
+  `React.createElement(type, props, ...children)`, and returns a `ReactNode`
   resource.
 - `react.node.fragment` calls
   `React.createElement(React.Fragment, props, ...children)` in the browser host,
-  unwrapping an optional explicit `Js String` key, and returns a virtual
-  fragment node in tests.
+  reading any key from the props resource, and returns a virtual fragment node
+  in tests.
 - `react.root.render` invokes the received Lean `ReactM` render action, renders
   the retained native React node held by the resulting `ReactNode` resource,
   and releases the render callback.
@@ -285,15 +300,21 @@ The browser React host binding is exposed from
 - `react.useRef` calls `React.useRef` while rendering a component and returns a
   host-owned ref object. `react.ref.get` and `react.ref.set` read/write
   `.current`; they do not schedule a render.
+- `react.useMemo` calls `React.useMemo` while rendering a component. The
+  calculate callback runs in `ReactM`, dependencies are a JavaScript-owned
+  `DependencyList`, and the returned value stays in the `Js` resource lane.
 - `react.useEffect` calls `React.useEffect` while rendering a component. The
   current ABI is resource-shaped: setup returns a host resource and cleanup
   receives that resource when React cleans the effect up. The base binding
   exposes React's no-dependency behavior.
+- `react.deps.empty` and `react.deps.push` build a JavaScript-owned dependency
+  list resource from explicit `Js α` dependencies.
 - `react.useEffectWithDeps` is the same resource-shaped effect with a
-  Lean-provided string dependency list. The public helper converts each
-  dependency through `JsValue`, and the browser binding passes the unwrapped
-  strings as React's dependency array. It uses `Object.is` comparison to release
-  newly created Lean callbacks when the effect does not need to restart.
+  Lean-provided `Js DependencyList`. The browser binding passes the unwrapped
+  JavaScript values as React's dependency array and uses `Object.is` comparison
+  to release newly created Lean callbacks when the effect does not need to
+  restart. `useEffectWithStringDeps` remains a string convenience wrapper that
+  explicitly converts each string through `JsValue` first.
 - `js.string`, `js.nat`, `js.bool`, and `js.float` convert Lean scalar values into explicit
   `Lean.Vir.Js α` values through `RuntimeM` for examples that need primitive
   React state.

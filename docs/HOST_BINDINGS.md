@@ -13,16 +13,19 @@ installed by the browser runtime. Node tests and tools can use
 
 `@[vir_js]` is a JavaScript host boundary, not the same surface as an exported
 Lean declaration called from JavaScript. Host imports should expose
-`Lean.Vir.Js α` resources, resource-shaped containers, and callbacks whose
-arguments/results follow that same rule. Public Lean wrappers can convert to or
-from ordinary Lean values with `Lean.Vir.JsValue`.
+`Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources for JavaScript
+`null`, and callbacks whose own arguments/results are `Unit` or resources.
+Callbacks are accepted only as host-import arguments; nested callback arguments
+are rejected. Public Lean wrappers can convert to or from ordinary Lean values with
+`Lean.Vir.JsValue` and `Lean.Vir.Js.Nullable`.
 
-Raw Lean scalar and structure types are rejected in ordinary host imports. The
-supported boundary lanes are:
+Raw Lean scalar, structure, array, list, option, and product types are rejected
+in ordinary host imports. The supported boundary lanes are:
 
 | Lean type surface | Owner / shape | Import boundary | Use |
 | --- | --- | --- | --- |
 | `Lean.Vir.Js α` | JavaScript-owned host resource with phantom Lean shape | `wire` | Pass real JavaScript objects without decoding them in Lean. |
+| `Lean.Vir.Js.Nullable α` | JavaScript-owned nullable resource | `wire` | Pass JavaScript `null`/value results without generic Lean `Option` lowering. |
 | `Lean.Vir.JSL α` | JavaScript handle to a retained Lean-owned value | `objectHandle` | Let JavaScript store or route Lean values without structural conversion. |
 | Explicit conversion declarations | One side `Lean.Vir.Js ...`, one side an ordinary Lean value | `explicitConversion` | Decode or encode values at named host bindings such as `js.string.value` or `js.value.react.property`. |
 | Wire scalars and containers | JavaScript caller to exported Lean entrypoints | export ABI | Call public Lean functions from JavaScript without a host-import wrapper. |
@@ -95,23 +98,33 @@ Browser `react.root.*` targets are provided by
 `ReactDOMClient.createRoot`, `root.render`, and `root.unmount`.
 `react.node.text`, `react.node.createElement`, and `react.node.fragment`
 construct `ReactNode` resources. Their low-level host targets receive explicit
-`Lean.Vir.Js String` resources for text, tags, and keys; the public Lean
-helpers convert ordinary strings with `JsValue`. The browser binding uses
-`React.createElement` and `React.Fragment`, while the virtual binding builds
-test-visible virtual React nodes.
+`Lean.Vir.Js ElementType`, `Lean.Vir.Js Props`, and
+`Lean.Vir.Js NodeChildren` resources; `react.elementType.tag` wraps ordinary
+DOM tag strings, and component bindings can provide `Js ElementType` resources
+directly. Public Lean helpers convert ordinary strings with `JsValue` and
+populate props/children with explicit `react.props.*` and
+`react.node.children.*` calls. The browser binding uses `React.createElement`
+and `React.Fragment`, while the virtual binding builds test-visible virtual
+React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
 `Root.renderComponent root component props` API in a real React function
 component. The hook bindings `react.useState`, `react.useRef`,
-`react.useReducer`, `react.useEffect`, and `react.useEffectWithDeps` are
-render-time `ReactM` operations. `useRef` returns a host-owned React ref object;
-`react.ref.get` and `react.ref.set` are `RuntimeM` operations over its
-`current` field and do not schedule renders. `useReducer` keeps the low-level
+`react.useMemo`, `react.useReducer`, `react.useEffect`, and
+`react.useEffectWithDeps` are render-time `ReactM` operations. `useRef` returns
+a host-owned React ref object; `react.ref.get` and `react.ref.set` are
+`RuntimeM` operations over its `current` field and do not schedule renders.
+`useMemo` receives an explicit `Lean.Vir.Js DependencyList` and returns an
+explicit `Lean.Vir.Js α` value. `useReducer` keeps the low-level
 React boundary in `Js` resources. Reducer state and actions are typed by their
 JavaScript resource marker, so structured Lean-owned values use
 `Lean.Vir.JSL state` and `Lean.Vir.JSL action` explicitly with
 `Lean.Vir.LeanRef.toJSL`/`fromJSL` instead of `js.value.*` conversion targets.
 A retained Lean string therefore does not typecheck as a JavaScript-shaped
 `Js String`.
+`react.useMemo` and `react.useEffectWithDeps` receive a
+`Lean.Vir.Js DependencyList` built by `react.deps.empty` and
+`react.deps.push`, so dependency arrays do not cross the host boundary through
+generic array lowering.
 Reducer callbacks are retained per hook slot,
 replaced after committed renders, and released on failed render, unmount,
 package reload, or runtime dispose.
@@ -120,7 +133,8 @@ host resource, and cleanup receives the same resource at React's cleanup point.
 The no-deps binding reruns after committed renders. `useEffectWithDeps` maps to
 React's dependency-array form and compares the Lean-provided dependency list
 with `Object.is`; each dependency crosses the low-level host boundary as an
-explicit `Lean.Vir.Js String` resource.
+explicit `Lean.Vir.Js α` resource. `useEffectWithStringDeps` is only a
+convenience wrapper over explicit string conversion.
 `react.state.set` and `react.state.modify` are `RuntimeM` operations over
 `Lean.Vir.Js α` resources and share the same browser and virtual host resource
 store as React roots. The small `js.string`, `js.nat`, `js.bool`, and `js.float` scalar
@@ -199,16 +213,17 @@ const vir = await createVirRuntime({
 console.log(vir.call("bumpFromJs", 41)); // "42"
 ```
 
-Host imports are a JavaScript-resource boundary by default: use `Lean.Vir.Js α`
-resources, `Option`/`Array` containers of resources, and callback types whose
-arguments/results follow the same rule. Raw Lean scalars and structures are
-rejected unless they are part of a built-in conversion target such as
-`js.nat.value` or `js.value.react.property`. `Unit` returns use
-`undefined` or `null`. Function-valued Lean arguments are decoded as callable
-`VirCallback` objects. A host binding that stores a callback must eventually
-call `callback.release()` or rely on `VirRuntime.dispose()` to release any
-still-live callback roots. Host imports are synchronous; returning a
-`Promise` is an error.
+Host imports are a JavaScript-resource boundary by default: use `Unit`,
+`Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` for JavaScript `null`
+semantics, and callback arguments whose own arguments/results are `Unit` or
+resources.
+Raw Lean scalars, structures, arrays, lists, options, and products are rejected
+unless they are part of a built-in conversion target such as `js.nat.value` or
+`js.value.react.property`. `Unit` returns use `undefined` or `null`.
+Function-valued Lean arguments are decoded as callable `VirCallback` objects. A
+host binding that stores a callback must eventually call `callback.release()`
+or rely on `VirRuntime.dispose()` to release any still-live callback roots. Host
+imports are synchronous; returning a `Promise` is an error.
 
 ## Resource Lifetime
 

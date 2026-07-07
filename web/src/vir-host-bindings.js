@@ -23,7 +23,11 @@ import {
   normalizeProofWidgetsResolvedRef,
   normalizeProofWidgetsRpcRef,
 } from "./host/vir-virtual-host-bindings.js";
-import { createJsValueHostBindings } from "./host/vir-js-value-bindings.js";
+import {
+  createJsValueHostBindings,
+  createNullableValue,
+  nullablePayload,
+} from "./host/vir-js-value-bindings.js";
 import { VIR_HOST_DISPOSE } from "./host-resource.js";
 
 export {
@@ -72,16 +76,16 @@ export function createBrowserDocumentHostBindings(state = createHostResourceStat
       return undefined;
     },
     "browser.document.querySelector": (selector) =>
-      state.resourceForValue(queryDocumentElement(state.resolveResource(selector, "JsString"))),
+      state.resourceForValue(createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString")))),
   };
 }
 
 export function createBrowserEventHostBindings(state = createHostResourceState()) {
   return {
     "browser.event.target": (event) =>
-      resourceForElementTarget(state, state.resolveResource(event, "Event").target),
+      state.resourceForValue(nullableElementTarget(state.resolveResource(event, "Event").target)),
     "browser.event.currentTarget": (event) =>
-      resourceForElementTarget(state, state.resolveResource(event, "Event").currentTarget),
+      state.resourceForValue(nullableElementTarget(state.resolveResource(event, "Event").currentTarget)),
     "browser.event.preventDefault": (event) => {
       preventDefaultOnEvent(state.resolveResource(event, "Event"));
       return undefined;
@@ -91,7 +95,7 @@ export function createBrowserEventHostBindings(state = createHostResourceState()
       return undefined;
     },
     "browser.event.formValue": (event) =>
-      state.resourceForValue(formControlEventValue(state.resolveResource(event, "Event"))),
+      state.resourceForValue(createNullableValue(formControlEventValue(state.resolveResource(event, "Event")))),
   };
 }
 
@@ -110,7 +114,7 @@ export function createBrowserElementHostBindings(state = createHostResourceState
 
 export function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
   return createHtmlInputElementResourceHostBindings(state, {
-    fromElement: (element) => isInputElement(element) ? state.resourceForValue(element) : null,
+    fromElement: (element) => isInputElement(element) ? element : null,
   });
 }
 
@@ -162,7 +166,7 @@ export function createInfoviewHostBindings({ resources = createHostResourceState
         ...resources.resolveResource(ref, "RpcRef"),
         typeText: resources.resolveResource(typeText, "JsString"),
         context: resources.resolveResource(context, "JsString"),
-        ...(serverRef === null || serverRef === undefined ? {} : { serverRef }),
+        ...nullableField(resources, serverRef, "serverRef"),
       }),
     "js.value.proofwidgets.resolvedRef.value": (ref) =>
       normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
@@ -263,6 +267,11 @@ function revealInfoviewPosition(commandDispatcher, position) {
     return false;
   }
   return dispatchInfoviewCommand(commandDispatcher, "revealPosition", normalized);
+}
+
+function nullableField(resources, value, name) {
+  const payload = nullablePayload(resources, value);
+  return payload === null ? {} : { [name]: payload };
 }
 
 function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
@@ -443,8 +452,8 @@ function isElement(value) {
   return typeof globalThis.Element === "function" && value instanceof globalThis.Element;
 }
 
-function resourceForElementTarget(state, value) {
-  return isElement(value) ? state.resourceForValue(value) : null;
+function nullableElementTarget(value) {
+  return createNullableValue(isElement(value) ? value : null);
 }
 
 function formControlEventValue(event) {

@@ -28,7 +28,7 @@ def borderColor : String := vscodeColor "editorWidget-border" "#d0d7de"
 def border : String :=
   Lean.Vir.Examples.Style.border borderColor
 
-def shell : Property := style #[
+def shell : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "10px"),
   ("minWidth", "0"),
@@ -41,14 +41,14 @@ def shell : Property := style #[
   ("fontFamily", "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif")
 ]
 
-def title : Property := style #[
+def title : Props.Entry := style #[
   ("margin", "0"),
   ("fontSize", "1rem"),
   ("fontWeight", "780"),
   ("lineHeight", "1.25")
 ]
 
-def summary : Property := style #[
+def summary : Props.Entry := style #[
   ("margin", "0"),
   ("color", mutedFg),
   ("fontSize", "0.82rem"),
@@ -57,7 +57,7 @@ def summary : Property := style #[
   ("overflowWrap", "anywhere")
 ]
 
-def grid : Property := style #[
+def grid : Props.Entry := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "repeat(auto-fit, minmax(110px, 1fr))"),
   ("gap", "1px"),
@@ -67,7 +67,7 @@ def grid : Property := style #[
   ("background", borderColor)
 ]
 
-def metric : Property := style #[
+def metric : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "3px"),
   ("minWidth", "0"),
@@ -75,14 +75,14 @@ def metric : Property := style #[
   ("background", editorBg)
 ]
 
-def metricLabel : Property := style #[
+def metricLabel : Props.Entry := style #[
   ("color", mutedFg),
   ("fontSize", "0.66rem"),
   ("fontWeight", "780"),
   ("textTransform", "uppercase")
 ]
 
-def metricValue : Property := style #[
+def metricValue : Props.Entry := style #[
   ("overflow", "hidden"),
   ("textOverflow", "ellipsis"),
   ("whiteSpace", "nowrap"),
@@ -90,7 +90,7 @@ def metricValue : Property := style #[
   ("fontWeight", "720")
 ]
 
-def pre : Property := style #[
+def pre : Props.Entry := style #[
   ("margin", "0"),
   ("padding", "10px"),
   ("overflow", "auto"),
@@ -138,10 +138,10 @@ def firstHypothesisSummary (goal : Goal) : String :=
 
 def metric (label value : String) : ReactM (Lean.Vir.Js Node) := do
   let labelText ← Node.text label
-  let labelNode ← Node.spanWith #[Style.metricLabel] #[] #[labelText]
+  let labelNode ← Node.spanWith #[Style.metricLabel] #[labelText]
   let valueText ← Node.text value
-  let valueNode ← Node.strongWith #[Style.metricValue] #[] #[valueText]
-  Node.divWith #[Style.metric] #[] #[
+  let valueNode ← Node.strongWith #[Style.metricValue] #[valueText]
+  Node.divWith #[Style.metric] #[
     labelNode,
     valueNode
   ]
@@ -154,7 +154,7 @@ def metrics (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
   let hypotheses ← metric "Hypotheses" s!"{hypCount}"
   let selection ← metric "Selection" s!"{selectionCount}"
   let cursor ← metric "Cursor" surface.cursor.label
-  Node.divWith #[Property.id "react-proof-hello-metrics", Style.grid] #[] #[
+  Node.divWith #[Props.id "react-proof-hello-metrics", Style.grid] #[
     goals,
     hypotheses,
     selection,
@@ -165,23 +165,23 @@ def goalDetails (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
   match surface.goals[0]? with
   | none =>
       let text ← Node.text "Move the cursor into a proof to see its first goal."
-      Node.pWith #[Property.id "react-proof-hello-empty", Style.summary] #[] #[
+      Node.pWith #[Props.id "react-proof-hello-empty", Style.summary] #[
         text
       ]
   | some goal =>
       let titleText ← Node.text (goalSummary goal)
-      let title ← Node.pWith #[Property.id "react-proof-hello-goal-title", Style.summary] #[] #[
+      let title ← Node.pWith #[Props.id "react-proof-hello-goal-title", Style.summary] #[
         titleText
       ]
       let targetText ← Node.text goal.target
-      let target ← Node.preWith #[Property.id "react-proof-hello-target", Style.pre] #[] #[
+      let target ← Node.preWith #[Props.id "react-proof-hello-target", Style.pre] #[
         targetText
       ]
       let hypothesisText ← Node.text (firstHypothesisSummary goal)
-      let hypothesis ← Node.pWith #[Property.id "react-proof-hello-hypothesis", Style.summary] #[] #[
+      let hypothesis ← Node.pWith #[Props.id "react-proof-hello-hypothesis", Style.summary] #[
         hypothesisText
       ]
-      Node.articleWith #[Property.id "react-proof-hello-goal"] #[] #[
+      Node.articleWith #[Props.id "react-proof-hello-goal"] #[
         title,
         target,
         hypothesis
@@ -189,23 +189,22 @@ def goalDetails (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
 
 def View : Component Surface := fun surface => do
   let titleText ← Node.text "Hello ProofWidget from IRIF"
-  let title ← Node.h3With #[Property.id "react-proof-hello-title", Style.title] #[] #[
+  let title ← Node.h3With #[Props.id "react-proof-hello-title", Style.title] #[
     titleText
   ]
   let summaryText ← Node.text (firstGoalSummary surface)
-  let summary ← Node.pWith #[Property.id "react-proof-hello-summary", Style.summary] #[] #[
+  let summary ← Node.pWith #[Props.id "react-proof-hello-summary", Style.summary] #[
     summaryText
   ]
   let metricsNode ← metrics surface
   let details ← goalDetails surface
   Node.sectionWith
     #[
-      Property.id "react-proof-hello",
-      Property.role "region",
-      Property.ariaLabel "Minimal Lean proof widget",
+      Props.id "react-proof-hello",
+      Props.role "region",
+      Props.ariaLabel "Minimal Lean proof widget",
       Style.shell
     ]
-    #[]
     #[
       title,
       summary,

@@ -36,7 +36,7 @@ export function smokeVirtualReactEffect(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactCounter.mountEffect", selector), true);
   const element = documentState.elements.get(selector);
   assert.equal(element.textContent, "react:effect");
-  assertLiveCallbacks(runtime, 3);
+  assertLiveCallbacks(runtime, 5);
   assert.equal(reactElementById(element, "react-effect-label").tag, "span");
   element.reactRoot.unmount();
   assertUnmountCleanup(runtime, element);
@@ -52,6 +52,28 @@ export function smokeVirtualReactRefFragment(runtime, documentState, selector) {
   reactElementById(element, "react-ref-button").handlers.onClick({});
   assert.equal(element.reactRoot.current.kind, "fragment");
   assert.equal(element.textContent, "react:ref:1:1fragment child");
+  assertLiveCallbacks(runtime, 2);
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
+export function smokeVirtualReactMemo(runtime, documentState, selector) {
+  assert.equal(runtime.call("ReactCounter.mountMemo", selector), true);
+  const element = documentState.elements.get(selector);
+  assert.equal(element.textContent, "react:memo:42");
+  assertLiveCallbacks(runtime, 1);
+  assert.equal(reactElementById(element, "react-memo-label").tag, "span");
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
+export function smokeVirtualReactMemoStable(runtime, documentState, selector) {
+  assert.equal(runtime.call("ReactCounter.mountMemoStable", selector), true);
+  const element = documentState.elements.get(selector);
+  assert.equal(element.textContent, "react:memo-stable:0:0");
+  assertLiveCallbacks(runtime, 2);
+  reactElementById(element, "react-memo-stable-button").handlers.onClick({});
+  assert.equal(element.textContent, "react:memo-stable:1:0");
   assertLiveCallbacks(runtime, 2);
   element.reactRoot.unmount();
   assertUnmountCleanup(runtime, element);

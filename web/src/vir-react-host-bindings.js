@@ -36,10 +36,10 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
       createBrowserReactRootResource(state, ReactDOMClient.createRoot(target), React, hooks), {
         querySelector,
         createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
-        createNodeElementResource: (tag, key, props, handlers, children) =>
-          createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
-        createNodeFragmentResource: (key, children) =>
-          createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, key, children),
+        createNodeElementResource: (elementType, props, children) =>
+          createBrowserReactNodeElementResource(state, React.createElement, hooks, elementType, props, children),
+        createNodeFragmentResource: (props, children) =>
+          createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, props, children),
       }),
     ...createReactJsValueHostBindings(state),
     ...createReactStateHostBindings(state, hookRuntime),

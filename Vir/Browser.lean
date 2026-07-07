@@ -125,7 +125,10 @@ resource itself remains callback-scoped.
 Reference: [MDN `Event.target`](https://developer.mozilla.org/en-US/docs/Web/API/Event/target).
 -/
 @[vir_js "browser.event.target"]
-opaque target (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element))
+private opaque targetNullable (event : @& Lean.Vir.Js Event) : DomM (Lean.Vir.Js.Nullable Element)
+
+def target (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
+  Lean.Vir.Js.Nullable.toOption (← targetNullable event)
 
 /--
 Returns the current event target as a DOM element when the current target is an
@@ -137,7 +140,11 @@ resource itself remains callback-scoped.
 Reference: [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget).
 -/
 @[vir_js "browser.event.currentTarget"]
-opaque currentTarget (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element))
+private opaque currentTargetNullable (event : @& Lean.Vir.Js Event) :
+    DomM (Lean.Vir.Js.Nullable Element)
+
+def currentTarget (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js Element)) := do
+  Lean.Vir.Js.Nullable.toOption (← currentTargetNullable event)
 
 /--
 Prevents the default action for this event when the underlying browser event is
@@ -222,11 +229,13 @@ that need an element fixture should pre-seed it from JavaScript with
 Reference: [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector).
 -/
 @[vir_js "browser.document.querySelector"]
-private opaque querySelectorJs (selector : @& Lean.Vir.Js String) : DomM (Option (Lean.Vir.Js Element))
+private opaque querySelectorNullable
+    (selector : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.Nullable Element)
 
 def querySelector (selector : @& String) : DomM (Option (Lean.Vir.Js Element)) := do
   let jsSelector ← Lean.Vir.JsValue.ofString selector
-  querySelectorJs jsSelector
+  Lean.Vir.Js.Nullable.toOption (← querySelectorNullable jsSelector)
 
 end Document
 
@@ -276,14 +285,14 @@ wrapper for virtual document state.
 Reference: [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute).
 -/
 @[vir_js "browser.element.getAttribute"]
-private opaque getAttributeJs
+private opaque getAttributeNullable
     (element : @& Lean.Vir.Js Element)
     (name : @& Lean.Vir.Js String) :
-    DomM (Option (Lean.Vir.Js String))
+    DomM (Lean.Vir.Js.Nullable String)
 
 def getAttribute (element : @& Lean.Vir.Js Element) (name : @& String) : DomM (Option String) := do
   let jsName ← Lean.Vir.JsValue.ofString name
-  match ← getAttributeJs element jsName with
+  match ← Lean.Vir.Js.Nullable.toOption (← getAttributeNullable element jsName) with
   | none => pure none
   | some value =>
       let text ← Lean.Vir.JsValue.toString value
@@ -354,7 +363,12 @@ for virtual document state.
 Reference: [MDN `HTMLInputElement`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement).
 -/
 @[vir_js "browser.htmlInputElement.fromElement"]
-opaque fromElement (element : @& Lean.Vir.Js Element) : DomM (Option (Lean.Vir.Js HTMLInputElement))
+private opaque fromElementNullable
+    (element : @& Lean.Vir.Js Element) :
+    DomM (Lean.Vir.Js.Nullable HTMLInputElement)
+
+def fromElement (element : @& Lean.Vir.Js Element) : DomM (Option (Lean.Vir.Js HTMLInputElement)) := do
+  Lean.Vir.Js.Nullable.toOption (← fromElementNullable element)
 
 /--
 Reads the `checked` property of a checkbox or radio input.
@@ -459,10 +473,11 @@ returns `some value` for `HTMLInputElement`, `HTMLTextAreaElement`, and
 `HTMLSelectElement` targets, and `none` for other elements.
 -/
 @[vir_js "browser.event.formValue"]
-private opaque formValueJs? (event : @& Lean.Vir.Js Event) : DomM (Option (Lean.Vir.Js String))
+private opaque formValueNullable (event : @& Lean.Vir.Js Event) :
+    DomM (Lean.Vir.Js.Nullable String)
 
 def formValue? (event : @& Lean.Vir.Js Event) : DomM (Option String) := do
-  match ← formValueJs? event with
+  match ← Lean.Vir.Js.Nullable.toOption (← formValueNullable event) with
   | none => pure none
   | some value =>
       let text ← Lean.Vir.JsValue.toString value

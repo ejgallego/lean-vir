@@ -71,6 +71,16 @@ disposal.
 opaque Root : Type
 
 /--
+React element type value accepted by `React.createElement`.
+
+DOM tag strings are explicitly wrapped with `ElementType.ofTag`. Future
+JavaScript library bindings can return `Lean.Vir.Js ElementType` resources for
+component functions or React component objects and pass them to
+`Node.createElement` without inventing a parallel element-construction API.
+-/
+opaque ElementType : Type
+
+/--
 React state setter object returned by `useState`.
 
 The JavaScript host owns the underlying setter function. Lean code can retain
@@ -102,7 +112,8 @@ Default React props object marker.
 
 `Root.renderComponent` accepts Lean-side props directly. This marker names the
 JavaScript object shape used by hosts that want to pass an opaque props object
-through `Lean.Vir.Js Props`.
+through `Lean.Vir.Js Props`. Lean-authored element construction uses
+`Props.Entry` below to build this JavaScript-owned props object explicitly.
 -/
 opaque Props : Type
 
@@ -120,7 +131,13 @@ inductive PropValue where
   | style (entries : Array StyleProperty)
   | classList (classes : Array String)
 
-/-- A React property. Event handlers live in `EventHandler`, not `Property`. -/
+/--
+A non-event React property.
+
+Public element construction consumes `Props.Entry`, which can carry properties,
+event handlers, and special React props such as `key`. `Property` remains the
+typed non-event property payload used by the current host ABI.
+-/
 structure Property where
   name : String
   value : PropValue
@@ -129,6 +146,24 @@ structure Property where
 structure EventHandler where
   name : String
   callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit
+
+namespace Props
+
+/--
+One public React props entry.
+
+This is the React-shaped public lane: element construction receives one props
+array containing ordinary properties, event handlers, and special React props.
+`Node.createElement` lowers these entries into a JavaScript-owned `Props`
+resource before calling the low-level host import.
+-/
+inductive Entry where
+  | key (value : String)
+  | ref {α : Type} (value : Lean.Vir.Js (Ref (Lean.Vir.Js α)))
+  | property (value : Property)
+  | eventHandler (value : EventHandler)
+
+end Props
 
 /-- React state value and setter returned by `useState`. -/
 structure State (α : Type) where
@@ -158,6 +193,18 @@ nodes are constructed once with `React.createElement` instead of decoded from a
 private recursive tree on every render.
 -/
 opaque Node : Type
+
+/--
+JavaScript-owned React child list.
+
+Lean-facing builders accept ordinary Lean arrays for ergonomics, then populate
+this resource with explicit `react.node.children.*` calls before crossing the
+host boundary.
+-/
+opaque NodeChildren : Type
+
+/-- JavaScript-owned React hook dependency list. -/
+opaque DependencyList : Type
 
 /--
 A React function component authored in Lean.
@@ -439,6 +486,339 @@ opaque toJs (value : @& EventHandler) : Lean.Vir.RuntimeM (Lean.Vir.Js EventHand
 
 end EventHandler
 
+namespace Props
+
+/-- React `key` special prop. -/
+def key (value : String) : Entry :=
+  .key value
+
+/-- React `ref` special prop. -/
+def ref {α : Type} (value : Lean.Vir.Js (Ref (Lean.Vir.Js α))) : Entry :=
+  .ref value
+
+def property (value : Property) : Entry :=
+  .property value
+
+def eventHandler (value : EventHandler) : Entry :=
+  .eventHandler value
+
+def string (name value : String) : Entry :=
+  property <| Property.string name value
+
+def bool (name : String) (value : Bool) : Entry :=
+  property <| Property.bool name value
+
+def int (name : String) (value : Int) : Entry :=
+  property <| Property.int name value
+
+def float (name : String) (value : Float) : Entry :=
+  property <| Property.float name value
+
+def id (value : String) : Entry :=
+  property <| Property.id value
+
+def inputName (value : String) : Entry :=
+  property <| Property.inputName value
+
+def formName (value : String) : Entry :=
+  property <| Property.formName value
+
+def className (value : String) : Entry :=
+  property <| Property.className value
+
+def classList (classes : Array String) : Entry :=
+  property <| Property.classList classes
+
+def title (value : String) : Entry :=
+  property <| Property.title value
+
+def role (value : String) : Entry :=
+  property <| Property.role value
+
+def ariaLabel (value : String) : Entry :=
+  property <| Property.ariaLabel value
+
+def ariaHidden (value : Bool) : Entry :=
+  property <| Property.ariaHidden value
+
+def ariaControls (value : String) : Entry :=
+  property <| Property.ariaControls value
+
+def ariaCurrent (value : String) : Entry :=
+  property <| Property.ariaCurrent value
+
+def ariaDescribedBy (value : String) : Entry :=
+  property <| Property.ariaDescribedBy value
+
+def ariaExpanded (value : Bool) : Entry :=
+  property <| Property.ariaExpanded value
+
+def ariaLabelledBy (value : String) : Entry :=
+  property <| Property.ariaLabelledBy value
+
+def ariaLive (value : String) : Entry :=
+  property <| Property.ariaLive value
+
+def ariaPressed (value : Bool) : Entry :=
+  property <| Property.ariaPressed value
+
+def ariaSelected (value : Bool) : Entry :=
+  property <| Property.ariaSelected value
+
+def data (name value : String) : Entry :=
+  property <| Property.data name value
+
+def dataTestId (value : String) : Entry :=
+  property <| Property.dataTestId value
+
+def tabIndex (value : Int) : Entry :=
+  property <| Property.tabIndex value
+
+def style (entries : Array StyleProperty) : Entry :=
+  property <| Property.style entries
+
+def stylePairs (entries : Array (String × String)) : Entry :=
+  property <| Property.stylePairs entries
+
+def type (value : String) : Entry :=
+  property <| Property.type value
+
+def href (value : String) : Entry :=
+  property <| Property.href value
+
+def target (value : String) : Entry :=
+  property <| Property.target value
+
+def rel (value : String) : Entry :=
+  property <| Property.rel value
+
+def src (value : String) : Entry :=
+  property <| Property.src value
+
+def alt (value : String) : Entry :=
+  property <| Property.alt value
+
+def htmlFor (value : String) : Entry :=
+  property <| Property.htmlFor value
+
+def inputValue (value : String) : Entry :=
+  property <| Property.inputValue value
+
+def defaultValue (value : String) : Entry :=
+  property <| Property.defaultValue value
+
+def placeholder (value : String) : Entry :=
+  property <| Property.placeholder value
+
+def autoComplete (value : String) : Entry :=
+  property <| Property.autoComplete value
+
+def min (value : String) : Entry :=
+  property <| Property.min value
+
+def max (value : String) : Entry :=
+  property <| Property.max value
+
+def step (value : String) : Entry :=
+  property <| Property.step value
+
+def maxLength (value : Int) : Entry :=
+  property <| Property.maxLength value
+
+def width (value : Int) : Entry :=
+  property <| Property.width value
+
+def height (value : Int) : Entry :=
+  property <| Property.height value
+
+def rows (value : Int) : Entry :=
+  property <| Property.rows value
+
+def cols (value : Int) : Entry :=
+  property <| Property.cols value
+
+def checked (value : Bool) : Entry :=
+  property <| Property.checked value
+
+def defaultChecked (value : Bool) : Entry :=
+  property <| Property.defaultChecked value
+
+def disabled (value : Bool) : Entry :=
+  property <| Property.disabled value
+
+def multiple (value : Bool) : Entry :=
+  property <| Property.multiple value
+
+def readOnly (value : Bool) : Entry :=
+  property <| Property.readOnly value
+
+def required (value : Bool) : Entry :=
+  property <| Property.required value
+
+def selected (value : Bool) : Entry :=
+  property <| Property.selected value
+
+def on (name : String)
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.on name callback
+
+def onUnit (name : String) (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onUnit name callback
+
+def onClick (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onClick callback
+
+def onClickWith
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onClickWith callback
+
+def onDoubleClick (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onDoubleClick callback
+
+def onDoubleClickWith
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onDoubleClickWith callback
+
+def onInput
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onInput callback
+
+def onInputUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onInputUnit callback
+
+def onChange
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onChange callback
+
+def onChangeUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onChangeUnit callback
+
+def onFocus
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onFocus callback
+
+def onFocusUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onFocusUnit callback
+
+def onBlur
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onBlur callback
+
+def onBlurUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onBlurUnit callback
+
+def onKeyDown
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onKeyDown callback
+
+def onKeyDownUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onKeyDownUnit callback
+
+def onKeyUp
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onKeyUp callback
+
+def onKeyUpUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onKeyUpUnit callback
+
+def onMouseDown
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onMouseDown callback
+
+def onMouseDownUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onMouseDownUnit callback
+
+def onMouseUp
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onMouseUp callback
+
+def onMouseUpUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onMouseUpUnit callback
+
+def onMouseEnter
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onMouseEnter callback
+
+def onMouseEnterUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onMouseEnterUnit callback
+
+def onMouseLeave
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onMouseLeave callback
+
+def onMouseLeaveUnit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onMouseLeaveUnit callback
+
+def onSubmit (callback : Lean.Vir.Browser.DomM Unit) : Entry :=
+  eventHandler <| EventHandler.onSubmit callback
+
+def onSubmitWith
+    (callback : Lean.Vir.Js Lean.Vir.Browser.Event → Lean.Vir.Browser.DomM Unit) :
+    Entry :=
+  eventHandler <| EventHandler.onSubmitWith callback
+
+@[vir_js "react.props.empty"]
+opaque empty : ReactM (Lean.Vir.Js Lean.Vir.React.Props)
+
+@[vir_js "react.props.setKey"]
+private opaque setKeyJs
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (key : @& Lean.Vir.Js String) :
+    ReactM Unit
+
+@[vir_js "react.props.setProperty"]
+opaque setProperty
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (property : @& Lean.Vir.Js Property) :
+    ReactM Unit
+
+@[vir_js "react.props.setEventHandler"]
+opaque setEventHandler
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (handler : @& Lean.Vir.Js EventHandler) :
+    ReactM Unit
+
+@[vir_js "react.props.setRef"]
+opaque setRef {α : Type}
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (ref : @& Lean.Vir.Js (Ref (Lean.Vir.Js α))) :
+    ReactM Unit
+
+def setKey (props : @& Lean.Vir.Js Lean.Vir.React.Props) (key : @& String) : ReactM Unit := do
+  let jsKey ← stringToJs key
+  setKeyJs props jsKey
+
+def pushEntry (props : @& Lean.Vir.Js Lean.Vir.React.Props) : Entry → ReactM Unit
+  | .key value => setKey props value
+  | .ref value => setRef props value
+  | .property value => do
+      let jsValue ← Property.toJs value
+      setProperty props jsValue
+  | .eventHandler value => do
+      let jsValue ← EventHandler.toJs value
+      setEventHandler props jsValue
+
+def fromEntries (entries : Array Entry) : ReactM (Lean.Vir.Js Lean.Vir.React.Props) := do
+  let props ← empty
+  for entry in entries do
+    pushEntry props entry
+  pure props
+
+end Props
+
 namespace StateSetter
 
 @[vir_js "react.state.set"]
@@ -534,7 +914,7 @@ opaque useEffect {α : Type}
     (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
     ReactM Unit
 
-/--
+/-
 Runs a resource-shaped React effect with a dependency list.
 
 This is the dependency-array form of `useEffect`: React calls `setup` after the
@@ -542,20 +922,82 @@ initial committed render and after later commits where any dependency changes
 according to `Object.is`, and calls `cleanup` with the returned resource before
 replacement or unmount. Use `#[]` for React's empty dependency array behavior.
 -/
+namespace DependencyList
+
+@[vir_js "react.deps.empty"]
+opaque empty : ReactM (Lean.Vir.Js DependencyList)
+
+@[vir_js "react.deps.push"]
+opaque push {α : Type}
+    (deps : @& Lean.Vir.Js DependencyList)
+    (value : @& Lean.Vir.Js α) :
+    ReactM Unit
+
+def ofArray {α : Type} (deps : @& Array (Lean.Vir.Js α)) :
+    ReactM (Lean.Vir.Js DependencyList) := do
+  let jsDeps ← empty
+  for dep in deps do
+    push jsDeps dep
+  pure jsDeps
+
+def ofStrings (deps : @& Array String) : ReactM (Lean.Vir.Js DependencyList) := do
+  let jsDeps ← empty
+  for dep in deps do
+    let jsDep ← stringToJs dep
+    push jsDeps jsDep
+  pure jsDeps
+
+end DependencyList
+
+@[vir_js "react.useMemo"]
+opaque useMemo {α : Type}
+    (calculate : ReactM (Lean.Vir.Js α))
+    (deps : @& Lean.Vir.Js DependencyList) :
+    ReactM (Lean.Vir.Js α)
+
+def useMemoWithArrayDeps {α β : Type}
+    (calculate : ReactM (Lean.Vir.Js α))
+    (deps : @& Array (Lean.Vir.Js β)) :
+    ReactM (Lean.Vir.Js α) := do
+  let jsDeps ← DependencyList.ofArray deps
+  useMemo calculate jsDeps
+
+def useMemoWithStringDeps {α : Type}
+    (calculate : ReactM (Lean.Vir.Js α))
+    (deps : @& Array String) :
+    ReactM (Lean.Vir.Js α) := do
+  let jsDeps ← DependencyList.ofStrings deps
+  useMemo calculate jsDeps
+
 @[vir_js "react.useEffectWithDeps"]
 private opaque useEffectWithDepsJs {α : Type}
-    (deps : @& Array (Lean.Vir.Js String))
+    (deps : @& Lean.Vir.Js DependencyList)
     (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
     (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
     ReactM Unit
 
 def useEffectWithDeps {α : Type}
+    (deps : @& Lean.Vir.Js DependencyList)
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit :=
+  useEffectWithDepsJs deps setup cleanup
+
+def useEffectWithArrayDeps {α β : Type}
+    (deps : @& Array (Lean.Vir.Js β))
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit := do
+  let jsDeps ← DependencyList.ofArray deps
+  useEffectWithDeps jsDeps setup cleanup
+
+def useEffectWithStringDeps {α : Type}
     (deps : @& Array String)
     (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
     (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
     ReactM Unit := do
-  let jsDeps ← deps.mapM stringToJs
-  useEffectWithDepsJs jsDeps setup cleanup
+  let jsDeps ← DependencyList.ofStrings deps
+  useEffectWithDeps jsDeps setup cleanup
 
 end Hooks
 
@@ -585,6 +1027,17 @@ def modify
 
 end State
 
+namespace ElementType
+
+@[vir_js "react.elementType.tag"]
+private opaque tagJs (tag : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js ElementType)
+
+def ofTag (tag : @& String) : ReactM (Lean.Vir.Js ElementType) := do
+  let jsTag ← Lean.Vir.JsValue.ofString tag
+  tagJs jsTag
+
+end ElementType
+
 namespace Node
 
 @[vir_js "react.node.text"]
@@ -592,48 +1045,65 @@ private opaque textJs (value : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js Node
 
 @[vir_js "react.node.createElement"]
 private opaque createElementJs
-    (tag : @& Lean.Vir.Js String)
-    (key? : Option (Lean.Vir.Js String))
-    (props : Array (Lean.Vir.Js Property))
-    (handlers : Array (Lean.Vir.Js EventHandler))
-    (children : Array (Lean.Vir.Js Node)) :
+    (elementType : @& Lean.Vir.Js ElementType)
+    (props : @& Lean.Vir.Js Props)
+    (children : @& Lean.Vir.Js NodeChildren) :
     ReactM (Lean.Vir.Js Node)
 
 @[vir_js "react.node.fragment"]
-private opaque fragmentWithKeyJs (key? : Option (Lean.Vir.Js String)) (children : Array (Lean.Vir.Js Node)) :
+private opaque fragmentWithKeyJs
+    (props : @& Lean.Vir.Js Props)
+    (children : @& Lean.Vir.Js NodeChildren) :
     ReactM (Lean.Vir.Js Node)
 
-private def optionStringToJs : Option String → ReactM (Option (Lean.Vir.Js String))
-  | none => pure none
-  | some value => some <$> Lean.Vir.JsValue.ofString value
+namespace NodeChildren
 
-private def propsToJs (props : Array Property) : ReactM (Array (Lean.Vir.Js Property)) :=
-  props.mapM fun prop => Property.toJs prop
+@[vir_js "react.node.children.empty"]
+opaque empty : ReactM (Lean.Vir.Js NodeChildren)
 
-private def handlersToJs (handlers : Array EventHandler) : ReactM (Array (Lean.Vir.Js EventHandler)) :=
-  handlers.mapM fun handler => EventHandler.toJs handler
+@[vir_js "react.node.children.push"]
+opaque push
+    (children : @& Lean.Vir.Js NodeChildren)
+    (child : @& Lean.Vir.Js Node) :
+    ReactM Unit
+
+def ofArray (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js NodeChildren) := do
+  let jsChildren ← empty
+  for child in children do
+    push jsChildren child
+  pure jsChildren
+
+end NodeChildren
 
 def text (value : @& String) : ReactM (Lean.Vir.Js Node) := do
   let jsValue ← Lean.Vir.JsValue.ofString value
   textJs jsValue
 
 def createElement
-    (tag : @& String)
-    (key? : Option String)
-    (props : Array Property)
-    (handlers : Array EventHandler)
+    (elementType : @& Lean.Vir.Js ElementType)
+    (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node) := do
-  let jsTag ← Lean.Vir.JsValue.ofString tag
-  let jsKey ← optionStringToJs key?
-  let jsProps ← propsToJs props
-  let jsHandlers ← handlersToJs handlers
-  createElementJs jsTag jsKey jsProps jsHandlers children
+  let jsProps ← Props.fromEntries props
+  let jsChildren ← NodeChildren.ofArray children
+  createElementJs elementType jsProps jsChildren
+
+def createElementTag
+    (tag : @& String)
+    (props : Array Props.Entry := #[])
+    (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node) := do
+  let elementType ← ElementType.ofTag tag
+  createElement elementType props children
 
 def fragmentWithKey (key? : Option String) (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node) := do
-  let jsKey ← optionStringToJs key?
-  fragmentWithKeyJs jsKey children
+  let props ←
+    match key? with
+    | none => Props.empty
+    | some key => Props.fromEntries #[Props.key key]
+  let jsChildren ← NodeChildren.ofArray children
+  fragmentWithKeyJs props jsChildren
 
 def fragment (children : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
   fragmentWithKey none children
@@ -656,49 +1126,44 @@ def componentUnit (component : Component Unit) : ReactM (Lean.Vir.Js Node) :=
 /-- Raw element escape hatch. Prefer named helpers in the v0 DOM-like surface. -/
 def elementWith
     (tag : String)
-    (props : Array Property := #[])
-    (handlers : Array EventHandler := #[])
+    (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node) := #[]) :
     ReactM (Lean.Vir.Js Node) :=
-  createElement tag none props handlers children
+  createElementTag tag props children
 
-/-- Raw keyed element escape hatch. Prefer named helpers in the v0 DOM-like surface. -/
+/-- Raw keyed element escape hatch. Prefer `Props.key` in React-shaped code. -/
 def keyedElementWith
     (tag key : String)
-    (props : Array Property := #[])
-    (handlers : Array EventHandler := #[])
+    (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node) := #[]) :
     ReactM (Lean.Vir.Js Node) :=
-  createElement tag (some key) props handlers children
+  createElementTag tag (props.push (Props.key key)) children
 
 private def childElement (tag : String) (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node) :=
-  elementWith tag #[] #[] children
+  elementWith tag #[] children
 
 private def keyedChildElement (tag key : String) (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node) :=
-  keyedElementWith tag key #[] #[] children
+  keyedElementWith tag key #[] children
 
 private def childElementWith
     (tag : String)
-    (props : Array Property := #[])
-    (handlers : Array EventHandler := #[])
+    (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node) := #[]) :
     ReactM (Lean.Vir.Js Node) :=
-  elementWith tag props handlers children
+  elementWith tag props children
 
 private def keyedChildElementWith
     (tag key : String)
-    (props : Array Property := #[])
-    (handlers : Array EventHandler := #[])
+    (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node) := #[]) :
     ReactM (Lean.Vir.Js Node) :=
-  keyedElementWith tag key props handlers children
+  keyedElementWith tag key props children
 
 local macro "nodeChildElement " plain:ident keyed:ident withName:ident keyedWith:ident tag:str : command => do
   let keyName := Lean.mkIdent `key
   let propsName := Lean.mkIdent `props
-  let handlersName := Lean.mkIdent `handlers
   let childrenName := Lean.mkIdent `children
   `(
       section
@@ -710,71 +1175,63 @@ local macro "nodeChildElement " plain:ident keyed:ident withName:ident keyedWith
         keyedChildElement $tag $keyName $childrenName
 
       def $withName
-          ($propsName : Array Property := #[])
-          ($handlersName : Array EventHandler := #[])
+          ($propsName : Array Props.Entry := #[])
           ($childrenName : Array (Lean.Vir.Js Node) := #[]) :
           ReactM (Lean.Vir.Js Node) :=
-        childElementWith $tag $propsName $handlersName $childrenName
+        childElementWith $tag $propsName $childrenName
 
       def $keyedWith
           ($keyName : String)
-          ($propsName : Array Property := #[])
-          ($handlersName : Array EventHandler := #[])
+          ($propsName : Array Props.Entry := #[])
           ($childrenName : Array (Lean.Vir.Js Node) := #[]) :
           ReactM (Lean.Vir.Js Node) :=
-        keyedChildElementWith $tag $keyName $propsName $handlersName $childrenName
+        keyedChildElementWith $tag $keyName $propsName $childrenName
       end
     )
 
 local macro "nodeEmptyElement " plain:ident keyed:ident tag:str : command => do
   let keyName := Lean.mkIdent `key
   let propsName := Lean.mkIdent `props
-  let handlersName := Lean.mkIdent `handlers
   `(
       section
       def $plain
-          ($propsName : Array Property := #[])
-          ($handlersName : Array EventHandler := #[]) :
+          ($propsName : Array Props.Entry := #[]) :
           ReactM (Lean.Vir.Js Node) :=
-        elementWith $tag $propsName $handlersName #[]
+        elementWith $tag $propsName #[]
 
       def $keyed
           ($keyName : String)
-          ($propsName : Array Property := #[])
-          ($handlersName : Array EventHandler := #[]) :
+          ($propsName : Array Props.Entry := #[]) :
           ReactM (Lean.Vir.Js Node) :=
-        keyedElementWith $tag $keyName $propsName $handlersName #[]
+        keyedElementWith $tag $keyName $propsName #[]
       end
     )
 
 local macro "nodeButtonElement " plain:ident keyed:ident withName:ident keyedWith:ident : command => do
   let keyName := Lean.mkIdent `key
   let propsName := Lean.mkIdent `props
-  let handlersName := Lean.mkIdent `handlers
   let childrenName := Lean.mkIdent `children
   `(
       section
       def $plain ($childrenName : Array (Lean.Vir.Js Node)) : ReactM (Lean.Vir.Js Node) :=
-        elementWith "button" #[Property.type "button"] #[] $childrenName
+        elementWith "button" #[Props.type "button"] $childrenName
 
       def $keyed ($keyName : String) ($childrenName : Array (Lean.Vir.Js Node)) :
           ReactM (Lean.Vir.Js Node) :=
-        keyedElementWith "button" $keyName #[Property.type "button"] #[] $childrenName
+        keyedElementWith "button" $keyName #[Props.type "button"] $childrenName
 
       def $withName
-          ($propsName : Array Property := #[])
-          ($handlersName : Array EventHandler := #[])
+          ($propsName : Array Props.Entry := #[])
           ($childrenName : Array (Lean.Vir.Js Node) := #[]) :
           ReactM (Lean.Vir.Js Node) :=
-        elementWith "button" (#[Property.type "button"] ++ $propsName) $handlersName $childrenName
+        elementWith "button" (#[Props.type "button"] ++ $propsName) $childrenName
 
       def $keyedWith
           ($keyName : String)
-          ($propsName : Array Property := #[])
-          ($handlersName : Array EventHandler := #[])
+          ($propsName : Array Props.Entry := #[])
           ($childrenName : Array (Lean.Vir.Js Node) := #[]) :
           ReactM (Lean.Vir.Js Node) :=
-        keyedElementWith "button" $keyName (#[Property.type "button"] ++ $propsName) $handlersName $childrenName
+        keyedElementWith "button" $keyName (#[Props.type "button"] ++ $propsName) $childrenName
       end
     )
 
@@ -827,41 +1284,39 @@ nodeButtonElement button keyedButton buttonWith keyedButtonWith
 
 /-- Element builder shape used by text-child convenience helpers. -/
 abbrev TextBuilder :=
-  Array Property → Array EventHandler → Array (Lean.Vir.Js Node) → ReactM (Lean.Vir.Js Node)
+  Array Props.Entry → Array (Lean.Vir.Js Node) → ReactM (Lean.Vir.Js Node)
 
 /-- Builds one text node and passes it as the only child to `build`. -/
 def textWith
     (build : TextBuilder)
-    (props : Array Property)
-    (handlers : Array EventHandler)
+    (props : Array Props.Entry)
     (value : String) : ReactM (Lean.Vir.Js Node) := do
   let textNode ← text value
-  build props handlers #[textNode]
+  build props #[textNode]
 
-def codeText (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
-  textWith (fun props handlers children => codeWith props handlers children) props #[] value
+def codeText (props : Array Props.Entry) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props children => codeWith props children) props value
 
 def spanText (value : String) : ReactM (Lean.Vir.Js Node) := do
   let textNode ← text value
   span #[textNode]
 
-def spanTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
-  textWith (fun props handlers children => spanWith props handlers children) props #[] value
+def spanTextWith (props : Array Props.Entry) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props children => spanWith props children) props value
 
-def pTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
-  textWith (fun props handlers children => pWith props handlers children) props #[] value
+def pTextWith (props : Array Props.Entry) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props children => pWith props children) props value
 
-def h3TextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
-  textWith (fun props handlers children => h3With props handlers children) props #[] value
+def h3TextWith (props : Array Props.Entry) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props children => h3With props children) props value
 
-def strongTextWith (props : Array Property) (value : String) : ReactM (Lean.Vir.Js Node) :=
-  textWith (fun props handlers children => strongWith props handlers children) props #[] value
+def strongTextWith (props : Array Props.Entry) (value : String) : ReactM (Lean.Vir.Js Node) :=
+  textWith (fun props children => strongWith props children) props value
 
 def buttonTextWith
-    (props : Array Property)
-    (handlers : Array EventHandler)
+    (props : Array Props.Entry)
     (value : String) : ReactM (Lean.Vir.Js Node) :=
-  textWith (fun props handlers children => buttonWith props handlers children) props handlers value
+  textWith (fun props children => buttonWith props children) props value
 
 end Node
 

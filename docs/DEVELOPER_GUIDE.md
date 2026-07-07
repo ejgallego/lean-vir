@@ -238,8 +238,8 @@ sequenceDiagram
     Hooks->>React: React.useState(initial)
     React-->>Hooks: state value and setter
     Hooks-->>Lean: State (Lean.Vir.Js alpha)
-    Lean->>Host: Node.text / Node.createElement
-    Host->>React: React.createElement(tag, props, ...children)
+    Lean->>Host: Node.text / ElementType.ofTag / Node.createElement
+    Host->>React: React.createElement(type, props, ...children)
     Host-->>React: native React node
     React-->>Host: commit / later rerender
 ```

@@ -42,7 +42,7 @@ def greenFg : String := vscodeColor "charts-green" "#1a7f37"
 def purpleFg : String := vscodeColor "charts-purple" "#8250df"
 def orangeFg : String := vscodeColor "charts-orange" "#bc4c00"
 
-def widgetStyle : Property := style #[
+def widgetStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "12px"),
   ("minWidth", "0"),
@@ -55,7 +55,7 @@ def widgetStyle : Property := style #[
   ("fontFamily", "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif")
 ]
 
-def headerStyle : Property := style #[
+def headerStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "repeat(auto-fit, minmax(min(100%, 210px), 1fr))"),
   ("alignItems", "start"),
@@ -63,7 +63,7 @@ def headerStyle : Property := style #[
   ("minWidth", "0")
 ]
 
-def headingStyle : Property := style #[
+def headingStyle : Props.Entry := style #[
   ("margin", "0"),
   ("color", fg),
   ("fontSize", "1.05rem"),
@@ -71,7 +71,7 @@ def headingStyle : Property := style #[
   ("lineHeight", "1.25")
 ]
 
-def eyebrowStyle : Property := style #[
+def eyebrowStyle : Props.Entry := style #[
   ("margin", "0 0 3px"),
   ("color", subtleFg),
   ("fontSize", "0.68rem"),
@@ -80,7 +80,7 @@ def eyebrowStyle : Property := style #[
   ("textTransform", "uppercase")
 ]
 
-def sourceStyle : Property := style #[
+def sourceStyle : Props.Entry := style #[
   ("display", "flex"),
   ("flexWrap", "wrap"),
   ("gap", "6px"),
@@ -90,7 +90,7 @@ def sourceStyle : Property := style #[
   ("fontWeight", "700")
 ]
 
-def summaryStyle : Property := style #[
+def summaryStyle : Props.Entry := style #[
   ("margin", "0"),
   ("color", mutedFg),
   ("fontSize", "0.82rem"),
@@ -99,7 +99,7 @@ def summaryStyle : Property := style #[
   ("overflowWrap", "anywhere")
 ]
 
-def badgeStyle : Property := style #[
+def badgeStyle : Props.Entry := style #[
   ("display", "inline-flex"),
   ("alignItems", "center"),
   ("minHeight", "20px"),
@@ -113,14 +113,14 @@ def badgeStyle : Property := style #[
   ("whiteSpace", "nowrap")
 ]
 
-def apiStripStyle : Property := style #[
+def apiStripStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "repeat(auto-fit, minmax(126px, 1fr))"),
   ("gap", "6px"),
   ("minWidth", "0")
 ]
 
-def apiChipStyle (accent : String) : Property := style #[
+def apiChipStyle (accent : String) : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "2px"),
   ("minWidth", "0"),
@@ -133,7 +133,7 @@ def apiChipStyle (accent : String) : Property := style #[
   ("color", fg)
 ]
 
-def apiNameStyle : Property := style #[
+def apiNameStyle : Props.Entry := style #[
   ("color", subtleFg),
   ("fontSize", "0.66rem"),
   ("fontWeight", "800"),
@@ -143,7 +143,7 @@ def apiNameStyle : Property := style #[
   ("whiteSpace", "nowrap")
 ]
 
-def apiValueStyle : Property := style #[
+def apiValueStyle : Props.Entry := style #[
   ("color", fg),
   ("fontSize", "0.8rem"),
   ("fontWeight", "740"),
@@ -153,7 +153,7 @@ def apiValueStyle : Property := style #[
   ("whiteSpace", "nowrap")
 ]
 
-def metricGridStyle : Property := style #[
+def metricGridStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "repeat(auto-fit, minmax(92px, 1fr))"),
   ("gap", "1px"),
@@ -163,13 +163,13 @@ def metricGridStyle : Property := style #[
   ("background", borderColor)
 ]
 
-def metricStyle : Property := style #[
+def metricStyle : Props.Entry := style #[
   ("minWidth", "0"),
   ("padding", "8px 10px"),
   ("background", editorBg)
 ]
 
-def metricLabelStyle : Property := style #[
+def metricLabelStyle : Props.Entry := style #[
   ("display", "block"),
   ("color", subtleFg),
   ("fontSize", "0.66rem"),
@@ -178,7 +178,7 @@ def metricLabelStyle : Property := style #[
   ("textTransform", "uppercase")
 ]
 
-def metricValueStyle : Property := style #[
+def metricValueStyle : Props.Entry := style #[
   ("display", "block"),
   ("marginTop", "3px"),
   ("color", fg),
@@ -190,27 +190,27 @@ def metricValueStyle : Property := style #[
   ("whiteSpace", "nowrap")
 ]
 
-def layoutStyle : Property := style #[
+def layoutStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "repeat(auto-fit, minmax(min(100%, 220px), 1fr))"),
   ("gap", "12px"),
   ("minWidth", "0")
 ]
 
-def sidebarStyle : Property := style #[
+def sidebarStyle : Props.Entry := style #[
   ("display", "grid"),
   ("alignContent", "start"),
   ("gap", "8px"),
   ("minWidth", "0")
 ]
 
-def mainStyle : Property := style #[
+def mainStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "12px"),
   ("minWidth", "0")
 ]
 
-def panelLabelStyle : Property := style #[
+def panelLabelStyle : Props.Entry := style #[
   ("margin", "0"),
   ("color", subtleFg),
   ("fontSize", "0.68rem"),
@@ -218,7 +218,7 @@ def panelLabelStyle : Property := style #[
   ("textTransform", "uppercase")
 ]
 
-def listStyle : Property := style #[
+def listStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "8px"),
   ("margin", "0"),
@@ -226,7 +226,7 @@ def listStyle : Property := style #[
   ("listStyle", "none")
 ]
 
-def goalListStyle : Property := style #[
+def goalListStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "8px"),
   ("maxHeight", "280px"),
@@ -236,7 +236,7 @@ def goalListStyle : Property := style #[
   ("listStyle", "none")
 ]
 
-def hypothesesListStyle : Property := style #[
+def hypothesesListStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "8px"),
   ("maxHeight", "320px"),
@@ -246,7 +246,7 @@ def hypothesesListStyle : Property := style #[
   ("listStyle", "none")
 ]
 
-def surfacePanelStyle : Property := style #[
+def surfacePanelStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "repeat(auto-fit, minmax(150px, 1fr))"),
   ("gap", "1px"),
@@ -256,7 +256,7 @@ def surfacePanelStyle : Property := style #[
   ("background", borderColor)
 ]
 
-def surfaceCellStyle : Property := style #[
+def surfaceCellStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "3px"),
   ("minWidth", "0"),
@@ -264,7 +264,7 @@ def surfaceCellStyle : Property := style #[
   ("background", hoverBg)
 ]
 
-def surfaceCellLabelStyle : Property := style #[
+def surfaceCellLabelStyle : Props.Entry := style #[
   ("color", subtleFg),
   ("fontSize", "0.64rem"),
   ("fontWeight", "820"),
@@ -272,7 +272,7 @@ def surfaceCellLabelStyle : Property := style #[
   ("textTransform", "uppercase")
 ]
 
-def surfaceCellValueStyle : Property := style #[
+def surfaceCellValueStyle : Props.Entry := style #[
   ("color", fg),
   ("fontSize", "0.78rem"),
   ("fontWeight", "700"),
@@ -280,7 +280,7 @@ def surfaceCellValueStyle : Property := style #[
   ("overflowWrap", "anywhere")
 ]
 
-def goalButtonStyle (selected : Bool) : Property :=
+def goalButtonStyle (selected : Bool) : Props.Entry :=
   style <| #[
     ("display", "grid"),
     ("gridTemplateColumns", "minmax(0, 1fr)"),
@@ -297,7 +297,7 @@ def goalButtonStyle (selected : Bool) : Property :=
     ("cursor", "pointer")
   ]
 
-def goalButtonTopStyle : Property := style #[
+def goalButtonTopStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "minmax(0, 1fr) auto"),
   ("alignItems", "center"),
@@ -305,7 +305,7 @@ def goalButtonTopStyle : Property := style #[
   ("minWidth", "0")
 ]
 
-def goalMetaStyle : Property := style #[
+def goalMetaStyle : Props.Entry := style #[
   ("color", mutedFg),
   ("fontSize", "0.75rem"),
   ("fontWeight", "650"),
@@ -314,7 +314,7 @@ def goalMetaStyle : Property := style #[
   ("whiteSpace", "nowrap")
 ]
 
-def goalTargetPreviewStyle : Property := style #[
+def goalTargetPreviewStyle : Props.Entry := style #[
   ("display", "block"),
   ("minWidth", "0"),
   ("color", mutedFg),
@@ -326,7 +326,7 @@ def goalTargetPreviewStyle : Property := style #[
   ("whiteSpace", "nowrap")
 ]
 
-def detailStyle : Property := style #[
+def detailStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "12px"),
   ("minWidth", "0"),
@@ -336,7 +336,7 @@ def detailStyle : Property := style #[
   ("background", editorBg)
 ]
 
-def actionBarStyle : Property := style #[
+def actionBarStyle : Props.Entry := style #[
   ("display", "flex"),
   ("flexWrap", "wrap"),
   ("alignItems", "center"),
@@ -344,7 +344,7 @@ def actionBarStyle : Property := style #[
   ("minWidth", "0")
 ]
 
-def actionButtonStyle : Property := style #[
+def actionButtonStyle : Props.Entry := style #[
   ("minHeight", "30px"),
   ("padding", "0 10px"),
   ("border", border borderColor),
@@ -357,7 +357,7 @@ def actionButtonStyle : Property := style #[
   ("cursor", "pointer")
 ]
 
-def actionStatusStyle : Property := style #[
+def actionStatusStyle : Props.Entry := style #[
   ("minWidth", "0"),
   ("color", mutedFg),
   ("fontSize", "0.74rem"),
@@ -365,7 +365,7 @@ def actionStatusStyle : Property := style #[
   ("overflowWrap", "anywhere")
 ]
 
-def targetStyle : Property := style #[
+def targetStyle : Props.Entry := style #[
   ("minHeight", "78px"),
   ("margin", "0"),
   ("padding", "12px"),
@@ -376,12 +376,12 @@ def targetStyle : Property := style #[
   ("color", fg)
 ]
 
-def codeStyle : Property := style #[
+def codeStyle : Props.Entry := style #[
   ("fontFamily", "ui-monospace, SFMono-Regular, Menlo, Consolas, Liberation Mono, monospace"),
   ("whiteSpace", "pre-wrap")
 ]
 
-def hypothesisStyle : Property := style #[
+def hypothesisStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "5px"),
   ("minWidth", "0"),
@@ -395,12 +395,12 @@ def hypothesisStyle : Property := style #[
   ("overflowWrap", "anywhere")
 ]
 
-def hypothesisLineStyle : Property := style #[
+def hypothesisLineStyle : Props.Entry := style #[
   ("minWidth", "0"),
   ("overflowWrap", "anywhere")
 ]
 
-def hypothesisMetaStyle : Property := style #[
+def hypothesisMetaStyle : Props.Entry := style #[
   ("display", "flex"),
   ("flexWrap", "wrap"),
   ("gap", "5px"),
@@ -411,7 +411,7 @@ def hypothesisMetaStyle : Property := style #[
   ("fontWeight", "720")
 ]
 
-def inlineTokenStyle : Property := style #[
+def inlineTokenStyle : Props.Entry := style #[
   ("display", "inline-flex"),
   ("alignItems", "center"),
   ("minHeight", "18px"),
@@ -429,7 +429,7 @@ def inlineTokenStyle : Property := style #[
   ("whiteSpace", "nowrap")
 ]
 
-def emptyStateStyle : Property := style #[
+def emptyStateStyle : Props.Entry := style #[
   ("padding", "16px"),
   ("border", "1px dashed " ++ borderColor),
   ("borderRadius", "8px"),
@@ -438,7 +438,7 @@ def emptyStateStyle : Property := style #[
   ("fontSize", "0.9rem")
 ]
 
-def exprResultStyle : Property := style #[
+def exprResultStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "6px"),
   ("minWidth", "0"),
@@ -588,11 +588,10 @@ def selectedLocationIdsLabel (surface : Surface) : String :=
   commaList surface.selectedLocations "none"
 
 def apiChip (accent label value : String) : ReactM (Lean.Vir.Js Node) := do
-  let name ← Node.codeText #[Property.classList #["react-proof-api-name"], apiNameStyle] label
-  let valueNode ← Node.spanTextWith #[Property.classList #["react-proof-api-value"], apiValueStyle] value
+  let name ← Node.codeText #[Props.classList #["react-proof-api-name"], apiNameStyle] label
+  let valueNode ← Node.spanTextWith #[Props.classList #["react-proof-api-value"], apiValueStyle] value
   Node.spanWith
-    #[Property.classList #["react-proof-api-chip"], apiChipStyle accent]
-    #[]
+    #[Props.classList #["react-proof-api-chip"], apiChipStyle accent]
     #[
       name,
       valueNode
@@ -620,12 +619,11 @@ def apiStrip (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js Nod
     | some expr => expr.ref.label
   Node.navWith
     #[
-      Property.id "react-proof-api-strip",
-      Property.classList #["react-proof-api-strip"],
-      Property.ariaLabel "Proof widget API surface",
+      Props.id "react-proof-api-strip",
+      Props.classList #["react-proof-api-strip"],
+      Props.ariaLabel "Proof widget API surface",
       apiStripStyle
     ]
-    #[]
     #[
       goals,
       selections,
@@ -709,7 +707,7 @@ def commandStatus (label : String) (ok : Bool) : String :=
     label ++ " unavailable"
 
 def tokenView (value : String) : ReactM (Lean.Vir.Js Node) :=
-  Node.codeText #[Property.classList #["react-proof-token"], inlineTokenStyle] value
+  Node.codeText #[Props.classList #["react-proof-token"], inlineTokenStyle] value
 
 def tokenListView (values : Array String) (fallback : String) : ReactM (Array (Lean.Vir.Js Node)) :=
   match values.toList with
@@ -724,12 +722,12 @@ def hypothesisChildren (hypothesis : Hypothesis) : ReactM (Array (Lean.Vir.Js No
     | none => pure #[]
     | some value => do
         let sep ← Node.spanText " := "
-        let valueNode ← Node.codeText #[Property.classList #["react-proof-hypothesis-value"], codeStyle] value
+        let valueNode ← Node.codeText #[Props.classList #["react-proof-hypothesis-value"], codeStyle] value
         pure #[sep, valueNode]
-  let name ← Node.codeText #[Property.classList #["react-proof-hypothesis-name"], codeStyle] (hypothesisLabel hypothesis)
+  let name ← Node.codeText #[Props.classList #["react-proof-hypothesis-name"], codeStyle] (hypothesisLabel hypothesis)
   let colon ← Node.spanText " : "
-  let typeNode ← Node.codeText #[Property.classList #["react-proof-hypothesis-type"], codeStyle] hypothesis.type
-  let line ← Node.spanWith #[Property.classList #["react-proof-hypothesis-line"], hypothesisLineStyle] #[] <|
+  let typeNode ← Node.codeText #[Props.classList #["react-proof-hypothesis-type"], codeStyle] hypothesis.type
+  let line ← Node.spanWith #[Props.classList #["react-proof-hypothesis-line"], hypothesisLineStyle] <|
       #[
         name,
         colon,
@@ -737,23 +735,22 @@ def hypothesisChildren (hypothesis : Hypothesis) : ReactM (Array (Lean.Vir.Js No
       ] ++ valueSuffix
   let fvarLabel ← Node.spanText "fvarIds"
   let fvars ← tokenListView hypothesis.fvarIds "none"
-  let metaNode ← Node.spanWith #[Property.classList #["react-proof-hypothesis-meta"], hypothesisMetaStyle] #[] <|
+  let metaNode ← Node.spanWith #[Props.classList #["react-proof-hypothesis-meta"], hypothesisMetaStyle] <|
     #[fvarLabel] ++ fvars
   pure #[line, metaNode]
 
 def hypothesisView (hypothesis : Hypothesis) : ReactM (Lean.Vir.Js Node) := do
   let children ← hypothesisChildren hypothesis
   Node.keyedLiWith hypothesis.id
-    #[Property.classList #["react-proof-hypothesis"], Property.role "listitem", hypothesisStyle]
-    #[]
+    #[Props.classList #["react-proof-hypothesis"], Props.role "listitem", hypothesisStyle]
     children
 
 def hypothesesView (goal : Goal) : ReactM (Lean.Vir.Js Node) := do
   if goal.hypotheses.isEmpty then
     Node.pTextWith
       #[
-        Property.id "react-proof-hypotheses",
-        Property.classList #["react-proof-hypotheses", "is-empty"],
+        Props.id "react-proof-hypotheses",
+        Props.classList #["react-proof-hypotheses", "is-empty"],
         emptyStateStyle
       ]
       "No local hypotheses."
@@ -761,13 +758,12 @@ def hypothesesView (goal : Goal) : ReactM (Lean.Vir.Js Node) := do
     let hypotheses ← goal.hypotheses.mapM hypothesisView
     Node.ulWith
       #[
-        Property.id "react-proof-hypotheses",
-        Property.classList #["react-proof-hypotheses"],
-        Property.role "list",
-        Property.ariaLabel ("Hypotheses for " ++ goal.title),
+        Props.id "react-proof-hypotheses",
+        Props.classList #["react-proof-hypotheses"],
+        Props.role "list",
+        Props.ariaLabel ("Hypotheses for " ++ goal.title),
         hypothesesListStyle
       ]
-      #[]
       hypotheses
 
 def selectedClasses (selected : Bool) : Array String :=
@@ -782,49 +778,47 @@ def goalButton
     (goal : Goal) : ReactM (Lean.Vir.Js Node) := do
   let selected := goal.id == selectedId
   let title ← Node.spanTextWith
-    #[Property.classList #["react-proof-goal-title"]]
+    #[Props.classList #["react-proof-goal-title"]]
     goal.title
   let status ← Node.spanTextWith
-    #[Property.classList #["react-proof-goal-status"], badgeStyle]
+    #[Props.classList #["react-proof-goal-status"], badgeStyle]
     goal.status
-  let top ← Node.spanWith #[Property.classList #["react-proof-goal-top"], goalButtonTopStyle] #[] #[
+  let top ← Node.spanWith #[Props.classList #["react-proof-goal-top"], goalButtonTopStyle] #[
     title,
     status
   ]
   let metaNode ← Node.spanTextWith
-    #[Property.classList #["react-proof-goal-meta"], goalMetaStyle]
+    #[Props.classList #["react-proof-goal-meta"], goalMetaStyle]
     (goalKindLabel goal ++ " · " ++ goalIdentity goal ++ " · " ++ s!"{goal.hypotheses.size} local")
   let target ← Node.spanTextWith
-    #[Property.classList #["react-proof-goal-target"], goalTargetPreviewStyle]
+    #[Props.classList #["react-proof-goal-target"], goalTargetPreviewStyle]
     goal.target
   let button ← Node.buttonWith
     #[
-      Property.id ("react-proof-goal-" ++ goal.id),
-      Property.classList (selectedClasses selected),
-      Property.ariaPressed selected,
-      Property.ariaSelected selected,
-      Property.title goal.status,
-      Property.data "goal" goal.id,
-      goalButtonStyle selected
+      Props.id ("react-proof-goal-" ++ goal.id),
+      Props.classList (selectedClasses selected),
+      Props.ariaPressed selected,
+      Props.ariaSelected selected,
+      Props.title goal.status,
+      Props.data "goal" goal.id,
+      goalButtonStyle selected,
+      Props.onClick (selectGoal goal.id)
     ]
-    #[EventHandler.onClick (selectGoal goal.id)]
     #[top, metaNode, target]
   Node.keyedLiWith goal.id
-    #[Property.classList #["react-proof-goal-item"], Property.role "listitem"]
-    #[]
+    #[Props.classList #["react-proof-goal-item"], Props.role "listitem"]
     #[button]
 
 def goalList (surface : Surface) (selectGoal : String → DomM Unit) (selectedId : String) : ReactM (Lean.Vir.Js Node) := do
   let goals ← surface.goals.mapM (goalButton selectGoal selectedId)
   Node.ulWith
     #[
-      Property.id "react-proof-goal-list",
-      Property.classList #["react-proof-goal-list"],
-      Property.role "list",
-      Property.ariaLabel "Proof goals",
+      Props.id "react-proof-goal-list",
+      Props.classList #["react-proof-goal-list"],
+      Props.role "list",
+      Props.ariaLabel "Proof goals",
       goalListStyle
     ]
-    #[]
     goals
 
 def summaryText (surface : Surface) (goal : Goal) : String :=
@@ -834,9 +828,9 @@ def summaryText (surface : Surface) (goal : Goal) : String :=
   s!"{goal.title}; {hypCount} local {plural hypCount "hypothesis" "hypotheses"}; {goalCount} {plural goalCount "goal" "goals"} / {totalHypCount} {plural totalHypCount "hypothesis" "hypotheses"} at {cursorLabel surface}"
 
 def metricView (label value : String) : ReactM (Lean.Vir.Js Node) := do
-  let labelNode ← Node.spanTextWith #[Property.classList #["react-proof-metric-label"], metricLabelStyle] label
-  let valueNode ← Node.strongTextWith #[Property.classList #["react-proof-metric-value"], metricValueStyle] value
-  Node.divWith #[Property.classList #["react-proof-metric"], metricStyle] #[] #[
+  let labelNode ← Node.spanTextWith #[Props.classList #["react-proof-metric-label"], metricLabelStyle] label
+  let valueNode ← Node.strongTextWith #[Props.classList #["react-proof-metric-value"], metricValueStyle] value
+  Node.divWith #[Props.classList #["react-proof-metric"], metricStyle] #[
     labelNode,
     valueNode
   ]
@@ -852,7 +846,7 @@ def metricGrid (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js N
   let context ← metricView "Context" (selectedHypothesisCountLabel goal?)
   let selection ← metricView "Selection" (selectedLocationCountLabel surface)
   let cursor ← metricView "Cursor" (cursorLabel surface)
-  Node.divWith #[Property.id "react-proof-metrics", Property.classList #["react-proof-metrics"], metricGridStyle] #[] #[
+  Node.divWith #[Props.id "react-proof-metrics", Props.classList #["react-proof-metrics"], metricGridStyle] #[
     goals,
     context,
     selection,
@@ -860,9 +854,9 @@ def metricGrid (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js N
   ]
 
 def surfaceCell (label value : String) : ReactM (Lean.Vir.Js Node) := do
-  let labelNode ← Node.spanTextWith #[Property.classList #["react-proof-surface-label"], surfaceCellLabelStyle] label
-  let valueNode ← Node.spanTextWith #[Property.classList #["react-proof-surface-value"], surfaceCellValueStyle] value
-  Node.divWith #[Property.classList #["react-proof-surface-cell"], surfaceCellStyle] #[] #[
+  let labelNode ← Node.spanTextWith #[Props.classList #["react-proof-surface-label"], surfaceCellLabelStyle] label
+  let valueNode ← Node.spanTextWith #[Props.classList #["react-proof-surface-value"], surfaceCellValueStyle] value
+  Node.divWith #[Props.classList #["react-proof-surface-cell"], surfaceCellStyle] #[
     labelNode,
     valueNode
   ]
@@ -876,12 +870,11 @@ def surfacePanel (surface : Surface) (goal : Goal) : ReactM (Lean.Vir.Js Node) :
   let fvarIds ← surfaceCell "fvarIds" s!"{fvarCount goal}"
   Node.divWith
     #[
-      Property.id "react-proof-surface-panel",
-      Property.classList #["react-proof-surface-panel"],
-      Property.ariaLabel "Selected infoview surface",
+      Props.id "react-proof-surface-panel",
+      Props.classList #["react-proof-surface-panel"],
+      Props.ariaLabel "Selected infoview surface",
       surfacePanelStyle
     ]
-    #[]
     #[
       selected,
       selectedLocations,
@@ -897,13 +890,13 @@ def headerSummary (surface : Surface) (goal? : Option Goal) : String :=
   | some goal => summaryText surface goal
 
 def surfaceHeader (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.Js Node) := do
-  let eyebrow ← Node.pTextWith #[Property.classList #["react-proof-eyebrow"], eyebrowStyle] "Live Lean infoview"
+  let eyebrow ← Node.pTextWith #[Props.classList #["react-proof-eyebrow"], eyebrowStyle] "Live Lean infoview"
   let title ← Node.h3TextWith #[headingStyle] "Live ProofWidget"
-  let moduleBadge ← Node.spanTextWith #[Property.classList #["react-proof-module"], badgeStyle] "VIR"
-  let runtimeBadge ← Node.spanTextWith #[Property.classList #["react-proof-runtime"], badgeStyle] "React"
-  let liveBadge ← Node.spanTextWith #[Property.classList #["react-proof-live"], badgeStyle] "live"
-  let rangeBadge ← Node.spanTextWith #[Property.classList #["react-proof-range"], badgeStyle] (cursorLabel surface)
-  let source ← Node.pWith #[Property.classList #["react-proof-source"], sourceStyle] #[] #[
+  let moduleBadge ← Node.spanTextWith #[Props.classList #["react-proof-module"], badgeStyle] "VIR"
+  let runtimeBadge ← Node.spanTextWith #[Props.classList #["react-proof-runtime"], badgeStyle] "React"
+  let liveBadge ← Node.spanTextWith #[Props.classList #["react-proof-live"], badgeStyle] "live"
+  let rangeBadge ← Node.spanTextWith #[Props.classList #["react-proof-range"], badgeStyle] (cursorLabel surface)
+  let source ← Node.pWith #[Props.classList #["react-proof-source"], sourceStyle] #[
     moduleBadge,
     runtimeBadge,
     liveBadge,
@@ -911,21 +904,21 @@ def surfaceHeader (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.J
   ]
   let summaryNode ← Node.pTextWith
     #[
-      Property.id "react-proof-summary",
-      Property.classList #["react-proof-summary"],
-      Property.ariaLive "polite",
+      Props.id "react-proof-summary",
+      Props.classList #["react-proof-summary"],
+      Props.ariaLive "polite",
       summaryStyle
     ]
     (headerSummary surface goal?)
-  let heading ← Node.divWith #[Property.classList #["react-proof-heading"]] #[] #[
+  let heading ← Node.divWith #[Props.classList #["react-proof-heading"]] #[
     eyebrow,
     title,
     source,
     summaryNode
   ]
   let metrics ← metricGrid surface goal?
-  let side ← Node.divWith #[Property.classList #["react-proof-header-side"]] #[] #[metrics]
-  Node.headerWith #[Property.classList #["react-proof-header"], headerStyle] #[] #[
+  let side ← Node.divWith #[Props.classList #["react-proof-header-side"]] #[metrics]
+  Node.headerWith #[Props.classList #["react-proof-header"], headerStyle] #[
     heading,
     side
   ]
@@ -933,12 +926,12 @@ def surfaceHeader (surface : Surface) (goal? : Option Goal) : ReactM (Lean.Vir.J
 def actionButton (id label : String) (onClick : DomM Unit) : ReactM (Lean.Vir.Js Node) := do
   Node.buttonTextWith
     #[
-      Property.id id,
-      Property.classList #["react-proof-action"],
-      Property.type "button",
-      actionButtonStyle
+      Props.id id,
+      Props.classList #["react-proof-action"],
+      Props.type "button",
+      actionButtonStyle,
+      Props.onClick onClick
     ]
-    #[EventHandler.onClick onClick]
     label
 
 def actionBar
@@ -958,18 +951,17 @@ def actionBar
   let expr ← actionButton "react-proof-resolve-expr" "Resolve ExprWithCtx" resolveExpr
   let status ← Node.spanTextWith
     #[
-      Property.id "react-proof-action-status",
-      Property.classList #["react-proof-action-status"],
-      Property.ariaLive "polite",
+      Props.id "react-proof-action-status",
+      Props.classList #["react-proof-action-status"],
+      Props.ariaLive "polite",
       actionStatusStyle
     ]
     actionStatus
   Node.divWith
     #[
-      Property.classList #["react-proof-actions"],
+      Props.classList #["react-proof-actions"],
       actionBarStyle
     ]
-    #[]
     #[
       reveal,
       cursor,
@@ -992,19 +984,18 @@ def resolvedExprText (info : Lean.Vir.ProofWidgets.ResolvedRef) : String :=
 
 def exprResultView (result : String) : ReactM (Lean.Vir.Js Node) := do
   let label ← Node.pTextWith
-    #[Property.classList #["react-proof-panel-label"], panelLabelStyle]
+    #[Props.classList #["react-proof-panel-label"], panelLabelStyle]
     "Resolved ExprWithCtx"
-  let code ← Node.codeText #[Property.id "react-proof-expr-result-code", codeStyle] result
+  let code ← Node.codeText #[Props.id "react-proof-expr-result-code", codeStyle] result
   let panel ←
     Node.preWith
       #[
-        Property.id "react-proof-expr-result",
-        Property.classList #["react-proof-expr-result"],
+        Props.id "react-proof-expr-result",
+        Props.classList #["react-proof-expr-result"],
         exprResultStyle
       ]
-      #[]
       #[code]
-  Node.divWith #[Property.classList #["react-proof-expr-result-panel"]] #[] #[
+  Node.divWith #[Props.classList #["react-proof-expr-result-panel"]] #[
     label,
     panel
   ]
@@ -1012,17 +1003,16 @@ def exprResultView (result : String) : ReactM (Lean.Vir.Js Node) := do
 def emptyView (surface : Surface) : ReactM (Lean.Vir.Js Node) := do
   let header ← surfaceHeader surface none
   let apis ← apiStrip surface none
-  let empty ← Node.pTextWith #[Property.classList #["react-proof-empty"], emptyStateStyle]
+  let empty ← Node.pTextWith #[Props.classList #["react-proof-empty"], emptyStateStyle]
     "The current infoview snapshot has no goals."
   Node.sectionWith
     #[
-      Property.id "react-proof-widget",
-      Property.classList #["react-proof-widget"],
-      Property.role "region",
-      Property.ariaLabel "Lean proof widget",
+      Props.id "react-proof-widget",
+      Props.classList #["react-proof-widget"],
+      Props.role "region",
+      Props.ariaLabel "Lean proof widget",
       widgetStyle
     ]
-    #[]
     #[
       header,
       apis,
@@ -1040,29 +1030,28 @@ def detailView
     (resolveExpr : DomM Unit)
     (actionStatus : String)
     (exprResult : String) : ReactM (Lean.Vir.Js Node) := do
-  let title ← Node.h3TextWith #[Property.id "react-proof-selected-title", headingStyle] goal.title
-  let status ← Node.spanTextWith #[Property.id "react-proof-selected-status", badgeStyle] goal.status
-  let kind ← Node.spanTextWith #[Property.classList #["react-proof-selected-kind"], goalMetaStyle]
+  let title ← Node.h3TextWith #[Props.id "react-proof-selected-title", headingStyle] goal.title
+  let status ← Node.spanTextWith #[Props.id "react-proof-selected-status", badgeStyle] goal.status
+  let kind ← Node.spanTextWith #[Props.classList #["react-proof-selected-kind"], goalMetaStyle]
     (" " ++ goalKindLabel goal ++ " · " ++ selectionSummary surface)
-  let statusLine ← Node.pWith #[Property.classList #["react-proof-status-line"]] #[] #[status, kind]
+  let statusLine ← Node.pWith #[Props.classList #["react-proof-status-line"]] #[status, kind]
   let surfacePanelNode ← surfacePanel surface goal
   let actions ← actionBar goal revealCursor copyCursor copySelection copyTarget copyContext resolveExpr actionStatus
   let exprResultNode ← exprResultView exprResult
-  let targetLabel ← Node.pTextWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] "Target"
-  let targetCode ← Node.codeText #[Property.id "react-proof-target-code", codeStyle] goal.target
-  let target ← Node.preWith #[Property.id "react-proof-target", Property.classList #["react-proof-target"], targetStyle] #[] #[
+  let targetLabel ← Node.pTextWith #[Props.classList #["react-proof-panel-label"], panelLabelStyle] "Target"
+  let targetCode ← Node.codeText #[Props.id "react-proof-target-code", codeStyle] goal.target
+  let target ← Node.preWith #[Props.id "react-proof-target", Props.classList #["react-proof-target"], targetStyle] #[
     targetCode
   ]
-  let contextLabel ← Node.pTextWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] "Local context"
+  let contextLabel ← Node.pTextWith #[Props.classList #["react-proof-panel-label"], panelLabelStyle] "Local context"
   let hypotheses ← hypothesesView goal
   Node.articleWith
     #[
-      Property.id "react-proof-detail",
-      Property.classList #["react-proof-detail"],
-      Property.ariaLive "polite",
+      Props.id "react-proof-detail",
+      Props.classList #["react-proof-detail"],
+      Props.ariaLive "polite",
       detailStyle
     ]
-    #[]
     #[
       title,
       statusLine,
@@ -1092,9 +1081,9 @@ def View : Component ViewProps := fun props => do
   | some goal =>
       let header ← surfaceHeader props.surface (some goal)
       let apis ← apiStrip props.surface (some goal)
-      let goalsLabel ← Node.pTextWith #[Property.classList #["react-proof-panel-label"], panelLabelStyle] "Goals"
+      let goalsLabel ← Node.pTextWith #[Props.classList #["react-proof-panel-label"], panelLabelStyle] "Goals"
       let goals ← goalList props.surface props.selectGoal props.state.selectedGoalId
-      let sidebar ← Node.divWith #[Property.classList #["react-proof-sidebar"], sidebarStyle] #[] #[
+      let sidebar ← Node.divWith #[Props.classList #["react-proof-sidebar"], sidebarStyle] #[
         goalsLabel,
         goals
       ]
@@ -1109,20 +1098,19 @@ def View : Component ViewProps := fun props => do
         props.resolveExpr
         props.state.actionStatus
         props.state.exprResult
-      let main ← Node.divWith #[Property.classList #["react-proof-main"], mainStyle] #[] #[detail]
-      let layout ← Node.divWith #[Property.classList #["react-proof-layout"], layoutStyle] #[] #[
+      let main ← Node.divWith #[Props.classList #["react-proof-main"], mainStyle] #[detail]
+      let layout ← Node.divWith #[Props.classList #["react-proof-layout"], layoutStyle] #[
         sidebar,
         main
       ]
       Node.sectionWith
         #[
-          Property.id "react-proof-widget",
-          Property.classList #["react-proof-widget"],
-          Property.role "region",
-          Property.ariaLabel "Lean proof widget",
+          Props.id "react-proof-widget",
+          Props.classList #["react-proof-widget"],
+          Props.role "region",
+          Props.ariaLabel "Lean proof widget",
           widgetStyle
         ]
-        #[]
         #[
           header,
           apis,

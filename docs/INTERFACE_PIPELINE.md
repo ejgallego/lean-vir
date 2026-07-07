@@ -184,22 +184,30 @@ result type, and whether applying the callback returns a synchronous effect
 `VirCallback` objects. The `WIRE.FUNCTION` value payload carries no serialized
 numeric token; the runtime receives the internal closure root id through a side
 channel and releases the rooted Lean closure when the host-owned registration
-is done with it.
+is done with it. Functions are accepted only as host-import arguments; callback
+arguments and results must be `Unit` or resource descriptors, so nested
+callbacks are rejected.
 
 `Lean.Vir.React.Node` is a JavaScript-owned resource marker. The recursive
 structure of the rendered tree lives in the host resource graph created by
-`react.node.text` and `react.node.createElement`. Their scalar text/tag/key
-inputs are explicit `Lean.Vir.Js String` resources. Ordinary `Property`,
-`PropValue`, and `EventHandler` payloads cross only through explicit
-`js.value.react.property` and `js.value.react.eventHandler` conversion
-targets.
+`react.node.text` and `react.node.createElement`. Text inputs are explicit
+`Lean.Vir.Js String` resources. Element construction receives an explicit
+`Lean.Vir.Js ElementType` resource; DOM tag strings are wrapped by
+`react.elementType.tag`, and future component bindings can provide component
+element types directly. Props, children, and dependency lists are explicit
+React-owned resources built by `react.props.*`, `react.node.children.*`, and
+`react.deps.*`. Ordinary `Property`, `PropValue`, and `EventHandler` payloads
+cross only through explicit
+`js.value.react.property` and `js.value.react.eventHandler` conversion targets.
 
 Entry points and host imports can be pure functions or synchronous effect
 actions. Host imports are deliberately narrower than exports: low-level
-JavaScript imports should expose `Lean.Vir.Js α` resources, resource-shaped
-containers/callbacks, or explicit conversion targets such as `js.string.value`.
-Raw Lean scalar and structure host imports are rejected, except for declarations
-marked with `@[vir_js_explicit_conversion]` that convert between exactly one
+JavaScript imports should expose `Unit`, `Lean.Vir.Js α` resources,
+`Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callbacks whose own
+arguments/results are `Unit` or resources, or explicit conversion targets such as
+`js.string.value`. Raw Lean scalar, structure, array, list, option, and product
+host imports are rejected, except for declarations marked with
+`@[vir_js_explicit_conversion]` that convert between exactly one
 `Lean.Vir.Js ...` resource and one ordinary Lean value, or for the `js.leanRef`
 object-handle boundary. JavaScript
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; browser APIs use

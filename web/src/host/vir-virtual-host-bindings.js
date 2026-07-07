@@ -29,6 +29,7 @@ import {
   preventDefaultOnEvent,
   stopPropagationOnEvent,
 } from "./vir-host-resources.js";
+import { createNullableValue, nullablePayload } from "./vir-js-value-bindings.js";
 
 export function createVirtualDocumentState({
   title = "",
@@ -94,8 +95,10 @@ export function createVirtualEventState({
 
 export function createVirtualEventHostBindings(state = createVirtualDocumentState()) {
   return {
-    "browser.event.target": (event) => virtualEventElementResource(state, event, "target"),
-    "browser.event.currentTarget": (event) => virtualEventElementResource(state, event, "currentTarget"),
+    "browser.event.target": (event) =>
+      state.resources.resourceForValue(createNullableValue(virtualEventElementValue(state, event, "target"))),
+    "browser.event.currentTarget": (event) =>
+      state.resources.resourceForValue(createNullableValue(virtualEventElementValue(state, event, "currentTarget"))),
     "browser.event.preventDefault": (event) => {
       preventDefaultOnEvent(state.resources.resolveResource(event, "Event"));
       return undefined;
@@ -105,7 +108,7 @@ export function createVirtualEventHostBindings(state = createVirtualDocumentStat
       return undefined;
     },
     "browser.event.formValue": (event) =>
-      state.resources.resourceForValue(formControlEventValue(state.resources.resolveResource(event, "Event"))),
+      state.resources.resourceForValue(createNullableValue(formControlEventValue(state.resources.resolveResource(event, "Event")))),
   };
 }
 
@@ -126,9 +129,11 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       return undefined;
     },
     "browser.document.querySelector": (selector) =>
-      state.resources.resourceForValue(queryVirtualElementState(
-        state,
-        state.resources.resolveResource(selector, "JsString"),
+      state.resources.resourceForValue(createNullableValue(
+        queryVirtualElementState(
+          state,
+          state.resources.resolveResource(selector, "JsString"),
+        ),
       )),
     ...createVirtualEventHostBindings(state),
     ...createElementResourceHostBindings(state.resources, {
@@ -142,7 +147,7 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
         createVirtualEventListenerResource(state.resources, target, eventName, callback),
     }),
     ...createHtmlInputElementResourceHostBindings(state.resources, {
-      fromElement: (element) => state.resources.resourceForValue(element),
+      fromElement: (element) => element,
     }),
     ...createTimerResourceHostBindings(state.resources),
     ...createAnimationResourceHostBindings(state.resources, {
@@ -153,10 +158,10 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       createVirtualReactRootResource(state.resources, target, reactHooks), {
         querySelector: (selector) => queryVirtualElementState(state, selector),
         createNodeTextResource: (value) => createVirtualReactNodeTextResource(state.resources, value),
-        createNodeElementResource: (tag, key, props, handlers, children) =>
-          createVirtualReactNodeElementResource(state.resources, reactHooks, tag, key, props, handlers, children),
-        createNodeFragmentResource: (key, children) =>
-          createVirtualReactNodeFragmentResource(state.resources, key, children),
+        createNodeElementResource: (elementType, props, children) =>
+          createVirtualReactNodeElementResource(state.resources, reactHooks, elementType, props, children),
+        createNodeFragmentResource: (props, children) =>
+          createVirtualReactNodeFragmentResource(state.resources, props, children),
       }),
     ...createReactJsValueHostBindings(state.resources),
     ...createReactStateHostBindings(state.resources, reactHookRuntime),
@@ -202,7 +207,7 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
         ...state.resources.resolveResource(ref, "RpcRef"),
         typeText: state.resources.resolveResource(typeText, "JsString"),
         context: state.resources.resolveResource(context, "JsString"),
-        ...(serverRef === null || serverRef === undefined ? {} : { serverRef }),
+        ...nullableField(state.resources, serverRef, "serverRef"),
       }),
     "js.value.proofwidgets.resolvedRef.value": (ref) =>
       normalizeProofWidgetsResolvedRef(state.resources.resolveResource(ref, "ResolvedRef")),
@@ -259,6 +264,11 @@ function queryVirtualElementState(state, selector) {
   return element === undefined ? null : normalizeVirtualElementState(element);
 }
 
+function nullableField(resources, value, name) {
+  const payload = nullablePayload(resources, value);
+  return payload === null ? {} : { [name]: payload };
+}
+
 function normalizeVirtualElementState(element) {
   element.textContent ??= "";
   element.attributes ??= new Map();
@@ -278,18 +288,17 @@ function findVirtualReactElementNodeById(node, id) {
   return null;
 }
 
-function virtualEventElementResource(state, event, field) {
+function virtualEventElementValue(state, event, field) {
   const value = state.resources.resolveResource(event, "Event")?.[field];
   if (value === null || value === undefined) return null;
   if (typeof value === "string") {
-    return state.resources.resourceForValue(queryVirtualElementState(state, value));
+    return queryVirtualElementState(state, value);
   }
   if (isHostResource(value)) {
-    state.resources.resolveResource(value, "Element");
-    return value;
+    return state.resources.resolveResource(value, "Element");
   }
   if (typeof value === "object") {
-    return state.resources.resourceForValue(value);
+    return value;
   }
   return null;
 }

@@ -209,14 +209,16 @@ and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary. Host imports may additionally receive Lean function values as
 callbacks, including event handlers retained by `Lean.Vir.React.Node` resources
 created through `react.node.createElement`. Host imports are narrower than
-exports: low-level JavaScript imports use `Lean.Vir.Js α` resources,
-resource-shaped containers/callbacks, or explicit conversion targets such as
+exports: low-level JavaScript imports use `Unit`, `Lean.Vir.Js α` resources,
+`Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callback arguments
+whose own arguments/results are `Unit` or resources, or explicit conversion targets such as
 `js.nat.value`; concrete Lean-owned values can also opt into the
 `js.leanRef`/`js.leanRef.value`/`js.leanRef.release` object-handle boundary,
 which stores the Lean object behind a `Lean.Vir.JSL α` resource instead of
 decoding it to JavaScript. `LeanRef.releaseJSL` deterministically releases a
 handle.
-Other raw Lean scalar and structure imports are rejected by package generation.
+Other raw Lean scalar, structure, array, list, option, and product imports are
+rejected by package generation.
 Exported Lean entrypoints and host imports may be pure or use a
 recognized synchronous effect. JavaScript resource/runtime APIs use
 `Lean.Vir.RuntimeM α`; DOM and React-root imports use
@@ -299,9 +301,12 @@ Lean sources can call synchronous JavaScript functions through declarations
 marked with `@[vir_js "..."]`. See `docs/LEAN_VIR_LIBRARY.md` for the
 Lean-side API reference. The host-import boundary is deliberately narrower than
 the exported-call boundary: custom `@[vir_js]` declarations should use
-`Lean.Vir.Js α` resources, resource-shaped containers, and callbacks over those
-types. Raw Lean scalars and structures are rejected unless the declaration is an
-explicit conversion target such as `js.string.value` or `js.nat.value`.
+`Unit`, `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources for
+JavaScript `null`, and callback arguments whose own arguments/results are
+`Unit` or resources. Nested callbacks are rejected. Raw Lean scalars,
+structures, arrays, lists, options, and products are rejected unless the
+declaration is an explicit conversion target such as `js.string.value` or
+`js.nat.value`.
 
 Import one of the provided modules:
 
@@ -342,7 +347,8 @@ event, ReactNode, and React state for tests/tools.
 Custom target bindings are passed through `hostBindings`; user bindings
 override defaults. Bindings receive decoded JavaScript values and return a value
 matching the manifest host boundary mode. Ordinary host imports receive
-resource values; explicit conversion imports receive or return decoded scalar
+resource values, including `Js.Nullable` wrapper resources for nullable
+arguments/results; explicit conversion imports receive or return decoded scalar
 values for that converter. Host imports are synchronous; returning a
 `Promise` is an error. Object-style `imports` factory options are treated as
 overrides on top of the generated import table. If you provide a custom

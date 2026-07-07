@@ -12,7 +12,18 @@ import {
   releaseHostResource,
   requireExternrefTableSupport,
 } from "../host-resource.js";
-import { disposeReactNode } from "../react/vir-react-node.js";
+import {
+  createReactElementTypeTagResource,
+  createReactNodeChildrenResource,
+  createReactPropsResource,
+  disposeReactNode,
+  pushReactNodeChild,
+  setReactPropsEventHandler,
+  setReactPropsKey,
+  setReactPropsProperty,
+  setReactPropsRef,
+} from "../react/vir-react-node.js";
+import { createNullableValue } from "./vir-js-value-bindings.js";
 
 export class HostResourceState {
   constructor() {
@@ -179,9 +190,11 @@ export function createElementResourceHostBindings(resources, operations) {
       return undefined;
     },
     "browser.element.getAttribute": (element, name) =>
-      resources.resourceForValue(operations.getAttribute(
-        resources.resolveResource(element, "Element"),
-        resources.resolveResource(name, "JsString"),
+      resources.resourceForValue(createNullableValue(
+        operations.getAttribute(
+          resources.resolveResource(element, "Element"),
+          resources.resolveResource(name, "JsString"),
+        ),
       )),
     "browser.element.setAttribute": (element, name, value) => {
       operations.setAttribute(
@@ -213,7 +226,7 @@ export function createElementResourceHostBindings(resources, operations) {
 export function createHtmlInputElementResourceHostBindings(resources, { fromElement }) {
   return {
     "browser.htmlInputElement.fromElement": (element) =>
-      fromElement(resources.resolveResource(element, "Element")),
+      resources.resourceForValue(createNullableValue(fromElement(resources.resolveResource(element, "Element")))),
     "browser.htmlInputElement.getChecked": (input) =>
       resources.resourceForValue(resources.resolveResource(input, "HTMLInputElement").checked === true),
     "browser.htmlInputElement.setChecked": (input, checked) => {
@@ -314,20 +327,36 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       resources.resourceForValue(
         requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue(resources, value, "React Node text value"))
       ),
-    "react.node.createElement": (tag, key, props, handlers, children) =>
+    "react.elementType.tag": (tag) =>
+      resources.resourceForValue(createReactElementTypeTagResource(
+        jsStringValue(resources, tag, "React element type tag"),
+      )),
+    "react.props.empty": () =>
+      resources.resourceForValue(createReactPropsResource()),
+    "react.props.setKey": (props, key) =>
+      setReactPropsKey(resources, props, key),
+    "react.props.setProperty": (props, property) =>
+      setReactPropsProperty(resources, props, property),
+    "react.props.setEventHandler": (props, handler) =>
+      setReactPropsEventHandler(resources, props, handler),
+    "react.props.setRef": (props, ref) =>
+      setReactPropsRef(resources, props, ref),
+    "react.node.children.empty": () =>
+      resources.resourceForValue(createReactNodeChildrenResource()),
+    "react.node.children.push": (children, child) =>
+      pushReactNodeChild(resources, children, child),
+    "react.node.createElement": (elementType, props, children) =>
       resources.resourceForValue(
         requireReactNodeElementResourceFactory(createNodeElementResource)(
-          jsStringValue(resources, tag, "React Node element tag"),
-          optionalJsStringValue(resources, key, "React Node element key"),
-          reactNodeWireResources(resources, props, "React Node property"),
-          reactNodeWireResources(resources, handlers, "React Node event handler"),
+          elementType,
+          props,
           children,
         )
       ),
-    "react.node.fragment": (key, children) =>
+    "react.node.fragment": (props, children) =>
       resources.resourceForValue(
         requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(
-          optionalJsStringValue(resources, key, "React Node fragment key"),
+          props,
           children,
         )
       ),
@@ -418,13 +447,6 @@ function requireReactNodeFragmentResourceFactory(factory) {
   return factory;
 }
 
-function reactNodeWireResources(resources, values, label) {
-  if (!Array.isArray(values)) {
-    throw new Error(`${label}s must be an array`);
-  }
-  return values.map((value, index) => resources.resolveResource(value, `${label}[${index}]`));
-}
-
 export function createTimerResourceHostBindings(resources) {
   return {
     "browser.timer.setTimeout": (delayMs, callback) =>
@@ -473,13 +495,6 @@ function jsStringValue(resources, value, label) {
     throw new Error(`${label} must be a Js String`);
   }
   return text;
-}
-
-function optionalJsStringValue(resources, value, label) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  return jsStringValue(resources, value, label);
 }
 
 export function createTimeoutResource(resources, delayMs, callback) {

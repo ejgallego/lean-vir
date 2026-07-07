@@ -10,8 +10,8 @@ namespace Lean.Vir.Examples.Style
 
 open Lean.Vir.React
 
-def style (entries : Array (String × String)) : Property :=
-  Property.stylePairs entries
+def style (entries : Array (String × String)) : Props.Entry :=
+  Props.stylePairs entries
 
 def vscodeColor (name fallback : String) : String :=
   "var(--vscode-" ++ name ++ ", " ++ fallback ++ ")"

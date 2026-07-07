@@ -118,29 +118,18 @@ def InterfaceType.hostBoundaryKind : InterfaceType → String
   | .function .. => "callback"
   | .leanObject => "opaque Lean object"
 
-mutual
-
-partial def InterfaceType.isHostWireArgType : InterfaceType → Bool
+def InterfaceType.isHostWireValueType : InterfaceType → Bool
   | .unit => true
   | .resource .. => true
-  | .array element => element.isHostWireArgType
-  | .list element => element.isHostWireArgType
-  | .option element => element.isHostWireArgType
-  | .prod fst snd => fst.isHostWireArgType && snd.isHostWireArgType
+  | _ => false
+
+def InterfaceType.isHostWireArgType : InterfaceType → Bool
   | .function args result _ =>
-      args.all (fun (_, ty) => ty.isHostWireArgType) && result.isHostWireResultType
-  | _ => false
+      args.all (fun (_, ty) => ty.isHostWireValueType) && result.isHostWireValueType
+  | ty => ty.isHostWireValueType
 
-partial def InterfaceType.isHostWireResultType : InterfaceType → Bool
-  | .unit => true
-  | .resource .. => true
-  | .array element => element.isHostWireResultType
-  | .list element => element.isHostWireResultType
-  | .option element => element.isHostWireResultType
-  | .prod fst snd => fst.isHostWireResultType && snd.isHostWireResultType
-  | _ => false
-
-end
+def InterfaceType.isHostWireResultType (ty : InterfaceType) : Bool :=
+  ty.isHostWireValueType
 
 def isJsValueConversionSignature
     (args : Array InterfaceArg)
@@ -171,7 +160,7 @@ def isLeanObjectHandleSignature
     | _, _ => false
 
 def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
-  s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Lean.Vir.Js ...` resources and explicit conversion calls"
+  s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Unit`, `Lean.Vir.Js ...`, `Lean.Vir.Js.Nullable ...`, top-level callback arguments, or explicit conversion calls"
 
 def hostImportArgBoundaryDiagnostic? (arg : InterfaceArg) : Option String :=
   if arg.type.isHostWireArgType then

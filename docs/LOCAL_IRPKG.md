@@ -161,8 +161,10 @@ exported entrypoints and host imports. JavaScript resource/runtime APIs use
 `Lean.Vir.RuntimeM α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
 render-construction APIs use `Lean.Vir.React.ReactM α`. Host imports are
 narrower than exports: low-level JavaScript imports should expose
-`Lean.Vir.Js α` resources, resource-shaped containers/callbacks, or built-in
-named conversion targets. Raw Lean scalar and structure host imports are
+`Unit`, `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources,
+callback arguments whose own arguments/results are `Unit` or resources, or
+built-in named conversion targets. Nested callback arguments are rejected. Raw
+Lean scalar, structure, array, list, option, and product host imports are
 rejected.
 Host imports are currently synchronous, with at most 128 imported declarations
 and IR arity at most 6. Leading erased type parameters on host imports are

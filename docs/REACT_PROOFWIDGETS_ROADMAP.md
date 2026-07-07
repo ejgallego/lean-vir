@@ -125,23 +125,21 @@ Current RF status:
   `Lean.Vir.Js state` and `Lean.Vir.Js action` values. Lean-owned structured
   values use explicit `Lean.Vir.JSL` handles, distinct from JavaScript-shaped
   `Js` values.
-- `useEffectWithDeps` exposes React's dependency-array shape for string
-  dependencies, with callback release handled by the host layer when
-  dependencies are unchanged.
+- `useEffectWithDeps` exposes React's dependency-array shape through
+  JavaScript-owned dependency values, with callback release handled by the host
+  layer when dependencies are unchanged.
 - `useRef` exposes React-owned ref objects, and `Node.fragment` maps to
   `React.Fragment`.
 
 Remaining RF gaps to close in order:
 
 1. Add the next common hook bindings that existing React/ProofWidgets code
-   naturally expects: `useMemo`, `useCallback`, and later `useContext`.
-2. Broaden dependency values from strings to JavaScript resource values once
-   the `Js α` array/object story is strong enough for external library APIs.
-3. Add the remaining common DOM attributes/events needed by real ProofWidgets
+   naturally expects: `useCallback` and later `useContext`.
+2. Add the remaining common DOM attributes/events needed by real ProofWidgets
    examples.
-4. Add lightweight Lean-side linting for hook order and obvious render-time IO
+3. Add lightweight Lean-side linting for hook order and obvious render-time IO
    footguns, without changing the shallow React-compatible API.
-5. Keep StrictMode/concurrent-render callback-root behavior documented and
+4. Keep StrictMode/concurrent-render callback-root behavior documented and
    audited; do not invent non-React lifetime semantics to hide it.
 
 ## ProofWidgets Compatibility Layers

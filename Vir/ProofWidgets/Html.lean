@@ -149,6 +149,11 @@ namespace Html
 def text (value : String) : Html :=
   Lean.Vir.React.Node.text value
 
+private def propsFrom (attrs : Array Attr) (handlers : Array Handler) :
+    Array Lean.Vir.React.Props.Entry :=
+  attrs.map Lean.Vir.React.Props.property ++
+    handlers.map Lean.Vir.React.Props.eventHandler
+
 def children (items : Array Html) :
     ReactM (Array (Lean.Vir.Js Lean.Vir.React.Node)) :=
   items.mapM fun item => item
@@ -160,7 +165,7 @@ def elementWith
     (children : Array Html := #[]) :
     Html := do
   let childNodes ← Html.children children
-  Lean.Vir.React.Node.elementWith tag attrs handlers childNodes
+  Lean.Vir.React.Node.elementWith tag (propsFrom attrs handlers) childNodes
 
 def keyedElementWith
     (tag key : String)
@@ -169,7 +174,7 @@ def keyedElementWith
     (children : Array Html := #[]) :
     Html := do
   let childNodes ← Html.children children
-  Lean.Vir.React.Node.keyedElementWith tag key attrs handlers childNodes
+  Lean.Vir.React.Node.keyedElementWith tag key (propsFrom attrs handlers) childNodes
 
 def element
     (tag : String)
