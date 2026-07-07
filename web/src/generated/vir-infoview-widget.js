@@ -2460,7 +2460,7 @@ function interfaceEffectRuntimeTag(effect) {
   return isEffectfulInterfaceEffect(effect) ? 1 : 0;
 }
 
-// web/src/runtime/wire-tags.js
+// web/src/runtime/interface-tags.js
 var INTERFACE_TAG = Object.freeze({
   NAT: 0,
   INT: 1,
@@ -2503,13 +2503,13 @@ var JSON_INPUT_INTERFACE_TAGS = /* @__PURE__ */ new Set([
 
 // web/src/runtime/interface-manifest.js
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_VERSION = 5;
+var INTERFACE_MANIFEST_VERSION = 6;
 var HOST_IMPORT_BOUNDARY = Object.freeze({
   WIRE: "wire",
   EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle"
 });
-var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 5, metadata: {...}, exports: [...] }";
+var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 6, metadata: {...}, exports: [...] }";
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -2602,10 +2602,10 @@ function validateInterfaceType(type, label = "interface type") {
     throw new Error(`${label} must be an object`);
   }
   requireString(type.type, `${label}.type`);
-  if (!Number.isInteger(type.wireTag) || !SUPPORTED_INTERFACE_TAGS.has(type.wireTag)) {
-    throw new Error(`${label}.wireTag is not supported`);
+  if (!Number.isInteger(type.interfaceTag) || !SUPPORTED_INTERFACE_TAGS.has(type.interfaceTag)) {
+    throw new Error(`${label}.interfaceTag is not supported`);
   }
-  switch (type.wireTag) {
+  switch (type.interfaceTag) {
     case INTERFACE_TAG.SIMPLE_ENUM:
       validateSimpleEnumType(type, label);
       break;
@@ -2683,7 +2683,7 @@ function validateStructureType(type, label) {
       throw new Error(`${fieldLabel}.subobject must be a boolean`);
     }
     if (field.subobject === true) {
-      if (field.type?.wireTag !== INTERFACE_TAG.STRUCTURE) {
+      if (field.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE) {
         throw new Error(`${fieldLabel}.subobject field type must be a structure`);
       }
       if (field.layout?.kind !== "object") {
@@ -2800,7 +2800,7 @@ function validateRecursiveSelfType(type, label) {
   requireString(type.name, `${label}.name`);
 }
 function validateRecursiveSelfOwner(type, ownerName, label) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       if (type.name !== ownerName) {
         throw new Error(`${label}.name must match ${ownerName}`);
@@ -2835,7 +2835,7 @@ function validateRecursiveSelfOwner(type, ownerName, label) {
   }
 }
 function validateNoDanglingRecursiveSelf(type, label) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       throw new Error(`${label} cannot be recursiveSelf outside a recursive descriptor`);
     case INTERFACE_TAG.ARRAY:
@@ -2997,7 +2997,7 @@ function asBytes(bytes, label) {
 }
 function requireTypeField(type, field, label) {
   const child = type?.[field];
-  if (!child || !Number.isInteger(child.wireTag)) {
+  if (!child || !Number.isInteger(child.interfaceTag)) {
     throw new Error(`${label} is missing manifest type field ${field}`);
   }
   return child;
@@ -3026,7 +3026,7 @@ function requireStructureFields(type, label) {
     throw new Error(`${label} is missing manifest structure fields`);
   }
   for (const field of type.fields) {
-    if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
+    if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.interfaceTag)) {
       throw new Error(`${label} has an invalid manifest structure field`);
     }
     requireStructureFieldLayout(field.layout, `${label}.${field.name}`);
@@ -3039,7 +3039,7 @@ function requireTaggedUnionConstructors(type, label) {
   }
   for (const ctor of type.constructors) {
     const ctorLabel = requireConstructorHeader(ctor, label, "tagged-union");
-    if (!ctor.type || !Number.isInteger(ctor.type.wireTag)) {
+    if (!ctor.type || !Number.isInteger(ctor.type.interfaceTag)) {
       throw new Error(`${label} has an invalid manifest tagged-union constructor`);
     }
     requireStructureFieldLayout(ctor.layout, ctorLabel);
@@ -3059,7 +3059,7 @@ function requireCustomInductiveConstructors(type, label) {
       throw new Error(`${ctorLabel} has no fields but non-zero runtime field counts`);
     }
     for (const field of ctor.fields) {
-      if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
+      if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.interfaceTag)) {
         throw new Error(`${ctorLabel} has an invalid manifest custom inductive field`);
       }
       requireStructureFieldLayout(field.layout, `${ctorLabel}.${field.name}`);
@@ -3086,7 +3086,7 @@ function requireFunctionArgs(type, label) {
     throw new Error(`${label} is missing manifest function args`);
   }
   for (const arg of type.args) {
-    if (typeof arg?.name !== "string" || !arg.type || !Number.isInteger(arg.type.wireTag)) {
+    if (typeof arg?.name !== "string" || !arg.type || !Number.isInteger(arg.type.interfaceTag)) {
       throw new Error(`${label} has an invalid manifest function argument`);
     }
   }
@@ -3094,7 +3094,7 @@ function requireFunctionArgs(type, label) {
 }
 function requireFunctionResult(type, label) {
   const result = type?.result;
-  if (!result || !Number.isInteger(result.wireTag)) {
+  if (!result || !Number.isInteger(result.interfaceTag)) {
     throw new Error(`${label} is missing manifest function result`);
   }
   return result;
@@ -3246,7 +3246,7 @@ function normalizeStructure(value, fields, label) {
         requireStructureFields(field.type, `${label}.${field.name}`),
         `${label}.${field.name}`
       );
-    } else if (field.type?.wireTag === INTERFACE_TAG.OPTION) {
+    } else if (field.type?.interfaceTag === INTERFACE_TAG.OPTION) {
       normalized[field.name] = null;
     } else {
       throw new Error(`${label} is missing field ${field.name}`);
@@ -3484,7 +3484,7 @@ var OBJECT_VALUE_EXPORTS = [
   "vir_obj_usize_decimal"
 ];
 function objectArgumentSupported(type, selfType = null) {
-  const tag = type?.wireTag;
+  const tag = type?.interfaceTag;
   switch (tag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
@@ -3522,7 +3522,7 @@ function objectArgumentSupported(type, selfType = null) {
   }
 }
 function objectResultSupported(type, selfType = null) {
-  const tag = type?.wireTag;
+  const tag = type?.interfaceTag;
   switch (tag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
@@ -3564,7 +3564,7 @@ function hostWireArgumentSupported(type) {
   if (hostWireValueSupported(type)) {
     return true;
   }
-  if (type?.wireTag !== INTERFACE_TAG.FUNCTION) {
+  if (type?.interfaceTag !== INTERFACE_TAG.FUNCTION) {
     return false;
   }
   const args = requireFunctionArgs(type, "host wire callback");
@@ -3574,7 +3574,7 @@ function hostWireResultSupported(type) {
   return hostWireValueSupported(type);
 }
 function hostWireValueSupported(type) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.UNIT:
     case INTERFACE_TAG.RESOURCE:
       return true;
@@ -3583,7 +3583,7 @@ function hostWireValueSupported(type) {
   }
 }
 function objectTypeNeedsBoxedBoundary(type) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.FLOAT:
     case INTERFACE_TAG.FLOAT32:
     case INTERFACE_TAG.UINT64:
@@ -3632,7 +3632,7 @@ function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
     case "object":
       return fieldSupported(field.type, selfType);
     case "usize":
-      return field.type?.wireTag === INTERFACE_TAG.USIZE;
+      return field.type?.interfaceTag === INTERFACE_TAG.USIZE;
     case "scalar":
       return objectScalarFieldSupported(field.type, field.layout);
     default:
@@ -3790,7 +3790,7 @@ function objectScalarFieldSupported(type, layout) {
   if (layout?.kind !== "scalar") {
     return false;
   }
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.BOOL:
     case INTERFACE_TAG.SIMPLE_ENUM:
       return [1, 2, 4, 8].includes(layout.size);
@@ -3811,7 +3811,7 @@ function objectScalarFieldSupported(type, layout) {
 function writeObjectScalarField(bytes, type, layout, value, label, offset = null) {
   offset ??= scalarLayoutOffset(layout, bytes.byteLength, label);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.BOOL:
       if (typeof value !== "boolean") {
         throw new Error(`${label} must be a boolean`);
@@ -3851,7 +3851,7 @@ function writeObjectScalarField(bytes, type, layout, value, label, offset = null
 }
 function readObjectScalarField(view, type, layout, label, offset = null) {
   offset ??= scalarLayoutOffset(layout, view.byteLength, label);
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.BOOL:
       return readScalarUnsigned(view, offset, layout.size, label) !== 0n;
     case INTERFACE_TAG.UINT8:
@@ -3976,7 +3976,7 @@ var ObjectValueRuntime = class {
     return this.makeObjectValue(type, value, label);
   }
   makeObjectValue(type, value, label, selfType = null) {
-    const tag = type?.wireTag;
+    const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
@@ -4045,7 +4045,7 @@ var ObjectValueRuntime = class {
     }
   }
   makeObjectSequenceValue(sequenceType, value, label, selfType) {
-    const sequenceTag = sequenceType?.wireTag;
+    const sequenceTag = sequenceType?.interfaceTag;
     const builderName = sequenceTag === INTERFACE_TAG.ARRAY ? "vir_obj_array" : sequenceTag === INTERFACE_TAG.LIST ? "vir_obj_list" : null;
     if (builderName === null) {
       throw new Error(`${label} has unsupported object ABI sequence type`);
@@ -4870,7 +4870,7 @@ var ObjectValueRuntime = class {
     }
   }
   liftObjectValue(type, obj, label, selfType = null) {
-    const tag = type?.wireTag;
+    const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
@@ -5693,13 +5693,13 @@ var VirHostState = class {
   }
 };
 function isLeanObjectDescriptor(type) {
-  return type?.wireTag === INTERFACE_TAG.LEAN_OBJECT && type?.kind === "leanObject";
+  return type?.interfaceTag === INTERFACE_TAG.LEAN_OBJECT && type?.kind === "leanObject";
 }
 function isUnitDescriptor(type) {
-  return type?.wireTag === INTERFACE_TAG.UNIT;
+  return type?.interfaceTag === INTERFACE_TAG.UNIT;
 }
 function isGenericJsResourceDescriptor(type) {
-  return type?.wireTag === INTERFACE_TAG.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";
+  return type?.interfaceTag === INTERFACE_TAG.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";
 }
 function disposeHostBindings(bindings) {
   if (bindings === null || bindings === void 0) return;
@@ -6119,7 +6119,7 @@ function validateWidgetEntry(runtime, entryName) {
   if (entry === null || entry === void 0) {
     throw new Error(`VIR widget entry not found: ${entryName}`);
   }
-  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 2 || entry.args[0]?.type?.wireTag !== INTERFACE_TAG.STRING || entry.args[1]?.type?.wireTag !== INTERFACE_TAG.STRUCTURE || entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" || entry.result?.wireTag !== INTERFACE_TAG.BOOL) {
+  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 2 || entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING || entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE || entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" || entry.result?.interfaceTag !== INTERFACE_TAG.BOOL) {
     throw new Error(
       `VIR widget entry ${entryName} must be an effectful String -> Surface -> Bool entry (Lean: String -> Surface -> DomM Bool)`
     );
@@ -6134,7 +6134,7 @@ function validateWidgetUnmountEntry(runtime, entryName) {
   if (entry === null || entry === void 0) {
     throw new Error(`VIR widget unmount entry not found: ${entryName}`);
   }
-  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 1 || entry.args[0]?.type?.wireTag !== INTERFACE_TAG.STRING || entry.result?.wireTag !== INTERFACE_TAG.BOOL) {
+  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 1 || entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING || entry.result?.interfaceTag !== INTERFACE_TAG.BOOL) {
     throw new Error(
       `VIR widget unmount entry ${entryName} must be an effectful String -> Bool entry (Lean: String -> DomM Bool)`
     );

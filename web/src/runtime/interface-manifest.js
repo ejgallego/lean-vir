@@ -5,10 +5,10 @@ Author: Emilio J. Gallego Arias
 */
 
 import { formatInterfaceEffectPrefix, requireInterfaceEffect } from "./interface-effects.js";
-import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./wire-tags.js";
+import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./interface-tags.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 5;
+export const INTERFACE_MANIFEST_VERSION = 6;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   WIRE: "wire",
   EXPLICIT_CONVERSION: "explicitConversion",
@@ -16,7 +16,7 @@ export const HOST_IMPORT_BOUNDARY = Object.freeze({
 });
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
-  "embedded interface manifest must be { version: 5, metadata: {...}, exports: [...] }";
+  "embedded interface manifest must be { version: 6, metadata: {...}, exports: [...] }";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -122,10 +122,10 @@ export function validateInterfaceType(type, label = "interface type") {
     throw new Error(`${label} must be an object`);
   }
   requireString(type.type, `${label}.type`);
-  if (!Number.isInteger(type.wireTag) || !SUPPORTED_INTERFACE_TAGS.has(type.wireTag)) {
-    throw new Error(`${label}.wireTag is not supported`);
+  if (!Number.isInteger(type.interfaceTag) || !SUPPORTED_INTERFACE_TAGS.has(type.interfaceTag)) {
+    throw new Error(`${label}.interfaceTag is not supported`);
   }
-  switch (type.wireTag) {
+  switch (type.interfaceTag) {
     case INTERFACE_TAG.SIMPLE_ENUM:
       validateSimpleEnumType(type, label);
       break;
@@ -208,7 +208,7 @@ function validateStructureType(type, label) {
       throw new Error(`${fieldLabel}.subobject must be a boolean`);
     }
     if (field.subobject === true) {
-      if (field.type?.wireTag !== INTERFACE_TAG.STRUCTURE) {
+      if (field.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE) {
         throw new Error(`${fieldLabel}.subobject field type must be a structure`);
       }
       if (field.layout?.kind !== "object") {
@@ -335,7 +335,7 @@ function validateRecursiveSelfType(type, label) {
 }
 
 function validateRecursiveSelfOwner(type, ownerName, label) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       if (type.name !== ownerName) {
         throw new Error(`${label}.name must match ${ownerName}`);
@@ -375,7 +375,7 @@ function validateRecursiveSelfOwner(type, ownerName, label) {
 }
 
 function validateNoDanglingRecursiveSelf(type, label) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       throw new Error(`${label} cannot be recursiveSelf outside a recursive descriptor`);
     case INTERFACE_TAG.ARRAY:
@@ -473,7 +473,7 @@ export function manifestDiagnostics(manifest) {
 }
 
 export function formatInterfaceType(type) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.UNIT:
       return "Unit";
     case INTERFACE_TAG.SIMPLE_ENUM:
@@ -500,6 +500,6 @@ export function formatInterfaceType(type) {
     case INTERFACE_TAG.FUNCTION:
       return `(${(type.args ?? []).map((arg) => formatInterfaceType(arg.type)).join(", ")}) -> ${formatInterfaceEffectPrefix(type.effect)}${formatInterfaceType(type.result)}`;
     default:
-      return type?.type ?? `wireTag ${type?.wireTag ?? "?"}`;
+      return type?.type ?? `interfaceTag ${type?.interfaceTag ?? "?"}`;
   }
 }

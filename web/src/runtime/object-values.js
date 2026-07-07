@@ -15,7 +15,7 @@ import {
   taggedUnionConstructorAt,
 } from "./vir-codec.js";
 import { interfaceEffectRuntimeTag } from "./interface-effects.js";
-import { INTERFACE_TAG } from "./wire-tags.js";
+import { INTERFACE_TAG } from "./interface-tags.js";
 import {
   createHostResource,
   hostResourceValue,
@@ -107,7 +107,7 @@ export class ObjectValueRuntime {
   }
 
   makeObjectValue(type, value, label, selfType = null) {
-    const tag = type?.wireTag;
+    const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
@@ -177,7 +177,7 @@ export class ObjectValueRuntime {
   }
 
   makeObjectSequenceValue(sequenceType, value, label, selfType) {
-    const sequenceTag = sequenceType?.wireTag;
+    const sequenceTag = sequenceType?.interfaceTag;
     const builderName =
       sequenceTag === INTERFACE_TAG.ARRAY ? "vir_obj_array" :
       sequenceTag === INTERFACE_TAG.LIST ? "vir_obj_list" :
@@ -1068,7 +1068,7 @@ export class ObjectValueRuntime {
   }
 
   liftObjectValue(type, obj, label, selfType = null) {
-    const tag = type?.wireTag;
+    const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {

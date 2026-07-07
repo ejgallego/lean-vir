@@ -8,7 +8,7 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { INTERFACE_TAG, SUPPORTED_INTERFACE_TAGS } from "../web/src/runtime/wire-tags.js";
+import { INTERFACE_TAG, SUPPORTED_INTERFACE_TAGS } from "../web/src/runtime/interface-tags.js";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
@@ -30,9 +30,9 @@ function leanCtorToInterfaceTagKey(name) {
 }
 
 function leanInterfaceTags(source) {
-  const start = source.indexOf("def InterfaceType.wireTag");
+  const start = source.indexOf("def InterfaceType.interfaceTag");
   if (start < 0) {
-    throw new Error("missing Lean InterfaceType.wireTag definition");
+    throw new Error("missing Lean InterfaceType.interfaceTag definition");
   }
   const end = source.indexOf("\n\n", start);
   const block = source.slice(start, end < 0 ? undefined : end);
@@ -46,7 +46,7 @@ function leanInterfaceTags(source) {
     tags.set(key, value);
   }
   if (tags.size === 0) {
-    throw new Error("Lean InterfaceType.wireTag definition had no parseable cases");
+    throw new Error("Lean InterfaceType.interfaceTag definition had no parseable cases");
   }
   return tags;
 }
@@ -92,12 +92,12 @@ const interfaceSource = await readRepoText("Vir/GeneratePackage/Interface/Encode
 const leanTags = leanInterfaceTags(interfaceSource);
 const jsTags = new Map(Object.entries(INTERFACE_TAG));
 
-duplicateValues(leanTags, "Lean InterfaceType.wireTag");
+duplicateValues(leanTags, "Lean InterfaceType.interfaceTag");
 duplicateValues(jsTags, "JavaScript INTERFACE_TAG");
 
 for (const [key, value] of jsTags) {
   if (!leanTags.has(key)) {
-    throw new Error(`JavaScript INTERFACE_TAG.${key} is missing from Lean InterfaceType.wireTag`);
+    throw new Error(`JavaScript INTERFACE_TAG.${key} is missing from Lean InterfaceType.interfaceTag`);
   }
   if (leanTags.get(key) !== value) {
     throw new Error(`interface descriptor tag mismatch for ${key}: Lean=${leanTags.get(key)} JavaScript=${value}`);
@@ -109,7 +109,7 @@ for (const [key, value] of jsTags) {
 
 for (const [key] of leanTags) {
   if (!jsTags.has(key)) {
-    throw new Error(`Lean InterfaceType.wireTag case ${key} is missing from JavaScript INTERFACE_TAG`);
+    throw new Error(`Lean InterfaceType.interfaceTag case ${key} is missing from JavaScript INTERFACE_TAG`);
   }
 }
 

@@ -43,11 +43,11 @@ For host imports, the relevant descriptor family is:
 
 | Descriptor | Ordinary `wire` import | Other accepted path |
 | --- | --- | --- |
-| `WIRE.UNIT` | Argument or result | `js.leanRef.release` result |
-| `WIRE.RESOURCE` | Argument or result | Explicit conversions and `JSL` handles use the generic `Js` resource shape. |
-| `WIRE.FUNCTION` | Argument only | Callback arguments/results must be `WIRE.UNIT` or `WIRE.RESOURCE`. |
-| `WIRE.LEAN_OBJECT` | No | Only the `js.leanRef` / `js.leanRef.value` object-handle imports. |
-| Structural descriptors such as `WIRE.NAT`, `WIRE.STRING`, `WIRE.ARRAY`, and `WIRE.STRUCTURE` | No | Only JavaScript-to-Lean exports or declarations marked with `@[vir_js_explicit_conversion]`. |
+| `INTERFACE_TAG.UNIT` | Argument or result | `js.leanRef.release` result |
+| `INTERFACE_TAG.RESOURCE` | Argument or result | Explicit conversions and `JSL` handles use the generic `Js` resource shape. |
+| `INTERFACE_TAG.FUNCTION` | Argument only | Callback arguments/results must be `INTERFACE_TAG.UNIT` or `INTERFACE_TAG.RESOURCE`. |
+| `INTERFACE_TAG.LEAN_OBJECT` | No | Only the `js.leanRef` / `js.leanRef.value` object-handle imports. |
+| Structural descriptors such as `INTERFACE_TAG.NAT`, `INTERFACE_TAG.STRING`, `INTERFACE_TAG.ARRAY`, and `INTERFACE_TAG.STRUCTURE` | No | Only JavaScript-to-Lean exports or declarations marked with `@[vir_js_explicit_conversion]`. |
 
 For example, a package can define a named conversion for a Lean structure when
 the JavaScript host binding wants to inspect that structure and return a real

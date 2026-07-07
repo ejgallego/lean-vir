@@ -4,11 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { JSON_INPUT_INTERFACE_TAGS, INTERFACE_TAG } from "../runtime/wire-tags.js";
+import { JSON_INPUT_INTERFACE_TAGS, INTERFACE_TAG } from "../runtime/interface-tags.js";
 
 export function interfaceInputTag(type) {
-  if (type?.wireTag === INTERFACE_TAG.SIMPLE_ENUM) return "SELECT";
-  if (isJsonInputTag(type?.wireTag)) return "TEXTAREA";
+  if (type?.interfaceTag === INTERFACE_TAG.SIMPLE_ENUM) return "SELECT";
+  if (isJsonInputTag(type?.interfaceTag)) return "TEXTAREA";
   return "INPUT";
 }
 
@@ -29,7 +29,7 @@ export function isJsonInputTag(tag) {
 }
 
 export function defaultValueForType(type, selfType = null, depth = 0) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType && depth < 2 ? defaultValueForType(selfType, selfType, depth + 1) : null;
     case INTERFACE_TAG.NAT:

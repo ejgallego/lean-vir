@@ -44,7 +44,7 @@ The experimental `externref` path should be strict:
 
 The prototype uses direct side channels for opaque values while keeping the
 generic byte-payload dispatcher for ordinary scalar and structured values.
-`WIRE.RESOURCE` and `WIRE.FUNCTION` carry no serialized numeric payload.
+`INTERFACE_TAG.RESOURCE` and `INTERFACE_TAG.FUNCTION` carry no serialized numeric payload.
 JavaScript queues opaque `HostResource` objects before entering Wasm, and the
 shim queues those same objects back before JavaScript decodes resource results
 or host-import arguments. Lean closures are rooted in the shim and queued back

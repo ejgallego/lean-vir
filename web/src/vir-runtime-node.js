@@ -17,7 +17,7 @@ export {
   debugWasmUrlFor,
   fetchBytes,
   roundTripInterfaceTypeDescriptor,
-  sameInterfaceWireType,
+  sameInterfaceTypeDescriptor,
   VIR_HOST_DISPOSE,
   VIR_HOST_RESOLVE_BINDING,
   VirCallback,

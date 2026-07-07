@@ -40,8 +40,7 @@ unrelated responsibilities.
   object ABI lowering path.
 - `runtime/interface-manifest.js`: interface manifest validation, diagnostics,
   and type formatting helpers.
-- `runtime/wire-tags.js`: shared interface descriptor tag constants. Existing
-  `WIRE` exports remain compatibility aliases for `INTERFACE_TAG`.
+- `runtime/interface-tags.js`: shared interface descriptor tag constants.
 - `host-resource.js`: opaque host-resource objects and externref root tables.
 - `host/vir-host-resources.js`: host-resource store, liveness, teardown,
   timers, callbacks, and shared host-binding helpers.

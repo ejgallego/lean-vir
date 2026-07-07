@@ -13,7 +13,7 @@ import {
   requireTaggedUnionConstructors,
   requireTypeField,
 } from "./vir-codec.js";
-import { INTERFACE_TAG } from "./wire-tags.js";
+import { INTERFACE_TAG } from "./interface-tags.js";
 import {
   enumValue,
   normalizeBoundedUnsignedBigInt,
@@ -93,7 +93,7 @@ export const OBJECT_VALUE_EXPORTS = [
 ];
 
 export function objectArgumentSupported(type, selfType = null) {
-  const tag = type?.wireTag;
+  const tag = type?.interfaceTag;
   switch (tag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
@@ -133,7 +133,7 @@ export function objectArgumentSupported(type, selfType = null) {
 }
 
 export function objectResultSupported(type, selfType = null) {
-  const tag = type?.wireTag;
+  const tag = type?.interfaceTag;
   switch (tag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
@@ -177,7 +177,7 @@ export function hostWireArgumentSupported(type) {
   if (hostWireValueSupported(type)) {
     return true;
   }
-  if (type?.wireTag !== INTERFACE_TAG.FUNCTION) {
+  if (type?.interfaceTag !== INTERFACE_TAG.FUNCTION) {
     return false;
   }
   const args = requireFunctionArgs(type, "host wire callback");
@@ -190,7 +190,7 @@ export function hostWireResultSupported(type) {
 }
 
 function hostWireValueSupported(type) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.UNIT:
     case INTERFACE_TAG.RESOURCE:
       return true;
@@ -200,7 +200,7 @@ function hostWireValueSupported(type) {
 }
 
 export function objectTypeNeedsBoxedBoundary(type) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.FLOAT:
     case INTERFACE_TAG.FLOAT32:
     case INTERFACE_TAG.UINT64:
@@ -255,7 +255,7 @@ function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
     case "object":
       return fieldSupported(field.type, selfType);
     case "usize":
-      return field.type?.wireTag === INTERFACE_TAG.USIZE;
+      return field.type?.interfaceTag === INTERFACE_TAG.USIZE;
     case "scalar":
       return objectScalarFieldSupported(field.type, field.layout);
     default:
@@ -446,7 +446,7 @@ function objectScalarFieldSupported(type, layout) {
   if (layout?.kind !== "scalar") {
     return false;
   }
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.BOOL:
     case INTERFACE_TAG.SIMPLE_ENUM:
       return [1, 2, 4, 8].includes(layout.size);
@@ -468,7 +468,7 @@ function objectScalarFieldSupported(type, layout) {
 export function writeObjectScalarField(bytes, type, layout, value, label, offset = null) {
   offset ??= scalarLayoutOffset(layout, bytes.byteLength, label);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.BOOL:
       if (typeof value !== "boolean") {
         throw new Error(`${label} must be a boolean`);
@@ -509,7 +509,7 @@ export function writeObjectScalarField(bytes, type, layout, value, label, offset
 
 export function readObjectScalarField(view, type, layout, label, offset = null) {
   offset ??= scalarLayoutOffset(layout, view.byteLength, label);
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.BOOL:
       return readScalarUnsigned(view, offset, layout.size, label) !== 0n;
     case INTERFACE_TAG.UINT8:

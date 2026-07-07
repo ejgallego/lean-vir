@@ -395,7 +395,7 @@ Ordinary scalar and structured values use the interface value codec over the
 object ABI. Opaque resources cross the JS/Wasm boundary through
 `externref` side-channel imports, and Lean stores them as GC-finalized external
 objects that root JavaScript `HostResource` objects in the host runtime.
-`WIRE.FUNCTION` likewise avoids a serialized numeric token; Lean closures remain
+`INTERFACE_TAG.FUNCTION` likewise avoids a serialized numeric token; Lean closures remain
 represented by runtime-owned closure roots surfaced to JavaScript as opaque
 `VirCallback` objects.
 

@@ -5,9 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 /*
-The serialized manifest field is still named `wireTag` for package
-compatibility. These numeric tags now describe the interface value codec, not
-the ordinary host-import `wire` boundary.
+These numeric tags describe the interface value codec, not the ordinary
+host-import `wire` boundary.
 */
 export const INTERFACE_TAG = Object.freeze({
   NAT: 0,
@@ -38,13 +37,7 @@ export const INTERFACE_TAG = Object.freeze({
   LEAN_OBJECT: 27,
 });
 
-// Backward-compatible SDK alias. Prefer INTERFACE_TAG in new runtime code.
-export const WIRE = INTERFACE_TAG;
-
 export const SUPPORTED_INTERFACE_TAGS = new Set(Object.values(INTERFACE_TAG));
-
-// Backward-compatible SDK alias.
-export const SUPPORTED_WIRE_TAGS = SUPPORTED_INTERFACE_TAGS;
 
 export const JSON_INPUT_INTERFACE_TAGS = new Set([
   INTERFACE_TAG.EXPR,
@@ -56,6 +49,3 @@ export const JSON_INPUT_INTERFACE_TAGS = new Set([
   INTERFACE_TAG.TAGGED_UNION,
   INTERFACE_TAG.CUSTOM_INDUCTIVE,
 ]);
-
-// Backward-compatible SDK alias.
-export const JSON_INPUT_WIRE_TAGS = JSON_INPUT_INTERFACE_TAGS;

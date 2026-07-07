@@ -8,7 +8,7 @@ import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING } fr
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
 import { isVirCallback, releaseCallbacks } from "./callbacks.js";
 import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
-import { INTERFACE_TAG } from "./wire-tags.js";
+import { INTERFACE_TAG } from "./interface-tags.js";
 
 export class VirHostState {
   constructor({
@@ -193,15 +193,15 @@ export class VirHostState {
 }
 
 function isLeanObjectDescriptor(type) {
-  return type?.wireTag === INTERFACE_TAG.LEAN_OBJECT && type?.kind === "leanObject";
+  return type?.interfaceTag === INTERFACE_TAG.LEAN_OBJECT && type?.kind === "leanObject";
 }
 
 function isUnitDescriptor(type) {
-  return type?.wireTag === INTERFACE_TAG.UNIT;
+  return type?.interfaceTag === INTERFACE_TAG.UNIT;
 }
 
 function isGenericJsResourceDescriptor(type) {
-  return type?.wireTag === INTERFACE_TAG.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";
+  return type?.interfaceTag === INTERFACE_TAG.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";
 }
 
 function disposeHostBindings(bindings) {

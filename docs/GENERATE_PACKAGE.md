@@ -33,13 +33,8 @@ Targets have one of three modes:
   `DeclIndex` construction, and declaration-name collision diagnostics.
 - `Vir.GeneratePackage.Closure`: root resolution and transitive IR closure
   collection from typed `Lean.IR.Decl` values.
-- `Vir.GeneratePackage.Interface`: compatibility import shim for the split
-  interface modules.
 - `Vir.GeneratePackage.Interface.Encode`: interface labels, descriptor tags,
-  and descriptor JSON encoders. The JSON field remains `wireTag` for package
-  compatibility.
-- `Vir.GeneratePackage.Interface.Classify`: compatibility import shim for the
-  classifier modules.
+  and descriptor JSON encoders. The JSON descriptor field is `interfaceTag`.
 - `Vir.GeneratePackage.Interface.Classify.Basic`: shared classifier helpers,
   host effect recognition, abbrev-head unfolding, primitive/resource labels,
   layout helper utilities, and boxed-boundary checks.
@@ -144,7 +139,7 @@ Version constants are intentionally small and explicit:
 - `scripts/package-versions.mjs` owns the JavaScript-side expectations for
   package format, interface manifest, and runtime ABI versions.
 - `npm run check:package-abi` verifies those constants and the Lean/JavaScript
-  wire tag table agree.
+  interface tag table agree.
 
 Bump `packageFormatVersion` when the binary `.irpkg` encoding or decoder
 contract changes incompatibly. Update the JavaScript package-format constant,

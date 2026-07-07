@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { formatInterfaceEffectSuffix } from "../web/src/runtime/interface-effects.js";
 import { formatInterfaceType, manifestDiagnostics } from "../web/src/runtime/interface-manifest.js";
-import { INTERFACE_TAG } from "../web/src/runtime/wire-tags.js";
+import { INTERFACE_TAG } from "../web/src/runtime/interface-tags.js";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 
 function usage() {
@@ -107,7 +107,7 @@ function printDescriptorDetails(args, result) {
 }
 
 function descriptorSummary(type) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return `customInductive ${type.name ?? type.type ?? "?"} { ${customInductiveConstructors(type).join(", ")} }`;
     case INTERFACE_TAG.STRUCTURE:
@@ -129,7 +129,7 @@ function customInductiveConstructors(type) {
 }
 
 function descriptorLabel(type) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return `recursiveSelf ${type.name ?? type.type ?? "?"}`;
     case INTERFACE_TAG.ARRAY:
@@ -152,7 +152,7 @@ function descriptorLabel(type) {
 }
 
 function containsRecursiveSelf(type) {
-  switch (type?.wireTag) {
+  switch (type?.interfaceTag) {
     case INTERFACE_TAG.RECURSIVE_SELF:
       return true;
     case INTERFACE_TAG.ARRAY:

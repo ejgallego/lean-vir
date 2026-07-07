@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 
-import { INTERFACE_TAG } from "../web/src/runtime/wire-tags.js";
+import { INTERFACE_TAG } from "../web/src/runtime/interface-tags.js";
 import { createVirRuntime } from "../web/src/vir-runtime-node.js";
 
 const buildDir = new URL("../build/infoview-smoke/", import.meta.url);
@@ -195,10 +195,10 @@ assert.throws(
         entry: "WrongSurface.mount",
         effect: "dom",
         args: [
-          { type: { wireTag: INTERFACE_TAG.STRING } },
-          { type: { wireTag: INTERFACE_TAG.STRUCTURE, name: "Wrong.Surface" } },
+          { type: { interfaceTag: INTERFACE_TAG.STRING } },
+          { type: { interfaceTag: INTERFACE_TAG.STRUCTURE, name: "Wrong.Surface" } },
         ],
-        result: { wireTag: INTERFACE_TAG.BOOL },
+        result: { interfaceTag: INTERFACE_TAG.BOOL },
       }],
     },
   }, "WrongSurface.mount"),

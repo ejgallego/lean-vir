@@ -18,7 +18,7 @@ import { defaultPackageFile, packagePresets, wasmPublicFile } from "./pages/brow
 import { parseByteArrayInput, parseFloatText, parseIntText, parseNatText } from "./pages/input-parsers.js";
 import { assetPathFor, errorMessage, formatBytes, setReadyState } from "./pages/page-utils.js";
 import { fetchBytes } from "./vir-runtime.js";
-import { INTERFACE_TAG } from "./runtime/wire-tags.js";
+import { INTERFACE_TAG } from "./runtime/interface-tags.js";
 
 const statusEl = document.querySelector("#status");
 const packageName = document.querySelector("#dev-package-name");
@@ -129,7 +129,7 @@ function renderInputFields(entry) {
     const field = document.createElement(interfaceInputTag(input.type).toLowerCase());
     field.id = inputFieldId(input, index);
     field.dataset.inputIndex = String(index);
-    if (input.type?.wireTag === INTERFACE_TAG.SIMPLE_ENUM) {
+    if (input.type?.interfaceTag === INTERFACE_TAG.SIMPLE_ENUM) {
       for (const ctor of input.type?.constructors ?? []) {
         const option = document.createElement("option");
         option.value = ctor.jsName ?? ctor.name;
@@ -137,19 +137,19 @@ function renderInputFields(entry) {
         field.append(option);
       }
       field.value = inputDefault(input);
-    } else if (input.type?.wireTag === INTERFACE_TAG.NAT ||
-        input.type?.wireTag === INTERFACE_TAG.UINT8 ||
-        input.type?.wireTag === INTERFACE_TAG.UINT16 ||
-        input.type?.wireTag === INTERFACE_TAG.UINT32) {
+    } else if (input.type?.interfaceTag === INTERFACE_TAG.NAT ||
+        input.type?.interfaceTag === INTERFACE_TAG.UINT8 ||
+        input.type?.interfaceTag === INTERFACE_TAG.UINT16 ||
+        input.type?.interfaceTag === INTERFACE_TAG.UINT32) {
       field.type = "number";
       field.inputMode = "numeric";
       field.min = "0";
-    } else if (input.type?.wireTag === INTERFACE_TAG.FLOAT || input.type?.wireTag === INTERFACE_TAG.FLOAT32) {
+    } else if (input.type?.interfaceTag === INTERFACE_TAG.FLOAT || input.type?.interfaceTag === INTERFACE_TAG.FLOAT32) {
       field.type = "text";
       field.inputMode = "decimal";
-    } else if (isJsonInputTag(input.type?.wireTag)) {
+    } else if (isJsonInputTag(input.type?.interfaceTag)) {
       field.spellcheck = false;
-    } else if (input.type?.wireTag === INTERFACE_TAG.BOOL) {
+    } else if (input.type?.interfaceTag === INTERFACE_TAG.BOOL) {
       label.classList.add("dev-checkbox-field");
       field.type = "checkbox";
       field.checked = parseBoolText(inputOverride(entry, input, index) ?? inputDefault(input));
@@ -157,7 +157,7 @@ function renderInputFields(entry) {
       field.type = "text";
       field.inputMode = "text";
     }
-    if (input.type?.wireTag !== INTERFACE_TAG.SIMPLE_ENUM && input.type?.wireTag !== INTERFACE_TAG.BOOL) {
+    if (input.type?.interfaceTag !== INTERFACE_TAG.SIMPLE_ENUM && input.type?.interfaceTag !== INTERFACE_TAG.BOOL) {
       field.value = inputOverride(entry, input, index) ?? inputDefault(input);
     }
     label.append(caption, field);
@@ -244,7 +244,7 @@ function renderPackageMetadata(metadata) {
 
 function parseInputValue(input, field) {
   const text = field?.value ?? inputDefault(input);
-  switch (input.type?.wireTag) {
+  switch (input.type?.interfaceTag) {
     case INTERFACE_TAG.NAT:
     case INTERFACE_TAG.UINT64:
     case INTERFACE_TAG.USIZE:
@@ -339,7 +339,7 @@ function evaluateEntry(runtime, entry) {
   const values = inputs.map((input, index) => {
     const field = inputFields.querySelector(`[data-input-index='${index}']`);
     const value = parseInputValue(input, field);
-    if (field && input.type?.wireTag === INTERFACE_TAG.BYTE_ARRAY) {
+    if (field && input.type?.interfaceTag === INTERFACE_TAG.BYTE_ARRAY) {
       field.value = value.join(", ");
     }
     return value;
