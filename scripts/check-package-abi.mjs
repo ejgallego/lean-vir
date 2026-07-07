@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { INTERFACE_TAG, SUPPORTED_INTERFACE_TAGS } from "../web/src/runtime/interface-tags.js";
+import { HOST_IMPORT_BOUNDARY } from "../web/src/runtime/interface-manifest.js";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
@@ -25,7 +26,7 @@ function leanNatConstant(source, name) {
   return Number(match[1]);
 }
 
-function leanCtorToInterfaceTagKey(name) {
+function leanCtorToConstantKey(name) {
   return name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase();
 }
 
@@ -38,7 +39,7 @@ function leanInterfaceTags(source) {
   const block = source.slice(start, end < 0 ? undefined : end);
   const tags = new Map();
   for (const match of block.matchAll(/\|\s+\.([A-Za-z0-9_]+)\b[^=]*=>\s*(\d+)/g)) {
-    const key = leanCtorToInterfaceTagKey(match[1]);
+    const key = leanCtorToConstantKey(match[1]);
     const value = Number(match[2]);
     if (tags.has(key)) {
       throw new Error(`duplicate Lean interface descriptor tag key ${key}`);
@@ -49,6 +50,28 @@ function leanInterfaceTags(source) {
     throw new Error("Lean InterfaceType.interfaceTag definition had no parseable cases");
   }
   return tags;
+}
+
+function leanHostImportBoundaries(source) {
+  const start = source.indexOf("def HostImportBoundary.label");
+  if (start < 0) {
+    throw new Error("missing Lean HostImportBoundary.label definition");
+  }
+  const end = source.indexOf("\n\n", start);
+  const block = source.slice(start, end < 0 ? undefined : end);
+  const boundaries = new Map();
+  for (const match of block.matchAll(/\|\s+\.([A-Za-z0-9_]+)\b\s*=>\s*"([^"]+)"/g)) {
+    const key = leanCtorToConstantKey(match[1]);
+    const value = match[2];
+    if (boundaries.has(key)) {
+      throw new Error(`duplicate Lean host import boundary key ${key}`);
+    }
+    boundaries.set(key, value);
+  }
+  if (boundaries.size === 0) {
+    throw new Error("Lean HostImportBoundary.label definition had no parseable cases");
+  }
+  return boundaries;
 }
 
 function duplicateValues(entries, label) {
@@ -117,4 +140,29 @@ if (SUPPORTED_INTERFACE_TAGS.size !== jsTags.size) {
   throw new Error(`SUPPORTED_INTERFACE_TAGS has ${SUPPORTED_INTERFACE_TAGS.size} entries; INTERFACE_TAG has ${jsTags.size}`);
 }
 
-console.log(`package ABI guardrails ok: versions and ${jsTags.size} interface descriptor tags agree`);
+const interfaceBasicSource = await readRepoText("Vir/GeneratePackage/Basic.lean");
+const leanBoundaries = leanHostImportBoundaries(interfaceBasicSource);
+const jsBoundaries = new Map(Object.entries(HOST_IMPORT_BOUNDARY));
+
+duplicateValues(leanBoundaries, "Lean HostImportBoundary.label");
+duplicateValues(jsBoundaries, "JavaScript HOST_IMPORT_BOUNDARY");
+
+for (const [key, value] of jsBoundaries) {
+  if (!leanBoundaries.has(key)) {
+    throw new Error(`JavaScript HOST_IMPORT_BOUNDARY.${key} is missing from Lean HostImportBoundary.label`);
+  }
+  if (leanBoundaries.get(key) !== value) {
+    throw new Error(`host import boundary mismatch for ${key}: Lean=${leanBoundaries.get(key)} JavaScript=${value}`);
+  }
+}
+
+for (const [key] of leanBoundaries) {
+  if (!jsBoundaries.has(key)) {
+    throw new Error(`Lean HostImportBoundary.label case ${key} is missing from JavaScript HOST_IMPORT_BOUNDARY`);
+  }
+}
+
+console.log(
+  `package ABI guardrails ok: versions, ${jsTags.size} interface descriptor tags, and ` +
+  `${jsBoundaries.size} host import boundaries agree`,
+);

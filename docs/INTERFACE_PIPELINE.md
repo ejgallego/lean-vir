@@ -131,6 +131,8 @@ ordinary host-resource import mode. Lean assigns tags in
 `Vir.GeneratePackage.Interface.Encode`; JavaScript validates and dispatches
 them in `web/src/runtime/interface-tags.js`. Run `npm run check:package-abi`
 after editing either side.
+Manifest schema version 6 intentionally rejects the old `wireTag` field and
+`wire` host-import boundary label instead of accepting aliases.
 
 | Tag | JavaScript name | Lean interface type | Descriptor payload |
 | --- | --- | --- | --- |

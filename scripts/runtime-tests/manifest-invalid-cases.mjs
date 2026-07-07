@@ -20,6 +20,15 @@ export const invalidManifestCases = [
     pattern: /result\.interfaceTag is not supported/,
   },
   {
+    name: "legacy wireTag descriptor rejected",
+    mutate: (manifest) => {
+      const result = manifest.exports[0].result;
+      result.wireTag = result.interfaceTag;
+      delete result.interfaceTag;
+    },
+    pattern: /result\.interfaceTag is not supported/,
+  },
+  {
     name: "array without element type",
     mutate: (manifest) => {
       manifest.exports[0].args[0].type = { type: "Array Nat", interfaceTag: 16 };
@@ -382,6 +391,20 @@ export const invalidManifestCases = [
           name: "jsHost",
           target: "test.host",
           boundary: "implicit",
+          effect: "runtime",
+        },
+      ];
+    },
+    pattern: /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
+  },
+  {
+    name: "legacy wire host boundary rejected",
+    mutate: (manifest) => {
+      manifest.hostImports = [
+        {
+          name: "jsHost",
+          target: "test.host",
+          boundary: "wire",
           effect: "runtime",
         },
       ];
