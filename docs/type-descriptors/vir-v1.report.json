@@ -413,7 +413,7 @@
               "effect": "dom",
               "args": [
                 {
-                  "name": "event",
+                  "name": "arg1",
                   "type": {
                     "kind": "resource",
                     "name": "Lean.Vir.Browser.Event"
@@ -519,14 +519,14 @@
       "leanDescriptor": {
         "kind": "export",
         "lean": "Lean.Vir.TypeAnchors.reactPropertyIdentity",
-        "label": "reactPropertyIdentity",
+        "label": "Lean_Vir_TypeAnchors_reactPropertyIdentity",
         "source": "docs/type-descriptors/vir-v1.fixture.lean",
         "shape": {
           "kind": "function",
           "effect": "pure",
           "args": [
             {
-              "name": "property",
+              "name": "value",
               "type": {
                 "kind": "record",
                 "name": "Lean.Vir.React.Property",

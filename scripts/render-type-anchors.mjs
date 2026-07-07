@@ -403,6 +403,10 @@ ${rows}
 function renderHtmlAnchor(result, provenance) {
   const ts = result.tsSymbol;
   const href = sourceHref(ts?.source, provenance);
+  const leanHref = leanSourceHref(result.leanDescriptor?.source);
+  const leanMeta = leanHref === null
+    ? ""
+    : `\n          <span>Lean source: <a href="${escapeAttr(leanHref)}">${escapeHtml(result.leanDescriptor.source)}</a></span>`;
   const docsHref = documentationHref(provenance, result.ts);
   const primaryHref = docsHref ?? href;
   const docsMeta = docsHref === null
@@ -430,7 +434,7 @@ function renderHtmlAnchor(result, provenance) {
           <span class="badge ${escapeAttr(result.status)}" title="${escapeAttr(statusTitle(result))}">${escapeHtml(result.status)}</span>
         </div>
         <div class="meta">
-          <span>TypeScript source: <a href="${escapeAttr(href)}">${escapeHtml(sourceLabel(ts?.source))}</a></span>${docsMeta}
+          <span>TypeScript source: <a href="${escapeAttr(href)}">${escapeHtml(sourceLabel(ts?.source))}</a></span>${leanMeta}${docsMeta}
           <span>Relation: ${escapeHtml(relationLabel(result.relation))}</span>
           <span>Category: ${escapeHtml(result.category ?? "Type anchors")}</span>
           <span>Anchor: <code>${escapeHtml(result.id)}</code></span>
@@ -456,12 +460,14 @@ function renderAnchor(result) {
   const ts = result.tsSymbol;
   const hover = hoverText(result);
   const href = ts === undefined ? "#" : sourceHref(ts.source);
+  const leanHref = leanSourceHref(result.leanDescriptor?.source);
   const statusTitle = result.notes.length === 0 ? result.status : `${result.status}: ${result.notes.join("; ")}`;
   return [
     `:::definition "${label}"${lean}`,
     `<div class="vir-type-anchor vir-type-anchor-${escapeAttr(result.status)}" id="${escapeAttr(label)}" data-vir-type-anchor-hover="${escapeAttr(hover)}">`,
     `<p><strong>${escapeHtml(result.lean)}</strong> <span class="vir-type-anchor-status" title="${escapeAttr(statusTitle)}">${escapeHtml(result.status)}</span></p>`,
     `<p>Relation: ${escapeHtml(relationLabel(result.relation))}</p>`,
+    leanHref === null ? "" : `<p>Lean source: <a href="${escapeAttr(leanHref)}"><code>${escapeHtml(result.leanDescriptor.source)}</code></a></p>`,
     `<p>TypeScript: <a href="${escapeAttr(href)}" title="${escapeAttr(hover)}"><code>${escapeHtml(result.ts)}</code></a></p>`,
     ts?.display ? `<pre><code>${escapeHtml(ts.display)}</code></pre>` : "",
     result.notes.length === 0 ? "" : `<p>${escapeHtml(result.notes.join("; "))}</p>`,
@@ -488,6 +494,11 @@ function sourceHref(source, provenance = undefined) {
     ? `#L${source.startLine}`
     : `#L${source.startLine}-L${source.endLine}`;
   return `${file}${line}`;
+}
+
+function leanSourceHref(source) {
+  if (typeof source !== "string" || source.length === 0) return null;
+  return source.split("/").pop();
 }
 
 function groupResults(results) {

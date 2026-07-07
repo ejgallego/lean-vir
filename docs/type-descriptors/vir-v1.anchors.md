@@ -122,6 +122,7 @@ Sample callable shape used by the descriptor anchor fixture.
 Lean Int accepts one TypeScript union arm compatibly">
 <p><strong>Lean.Vir.TypeAnchors.reactPropertyIdentity</strong> <span class="vir-type-anchor-status" title="compatible: Lean Int accepts one TypeScript union arm compatibly">compatible</span></p>
 <p>Relation: audit</p>
+<p>Lean source: <a href="vir-v1.fixture.lean"><code>docs/type-descriptors/vir-v1.fixture.lean</code></a></p>
 <p>TypeScript: <a href="vir-v1.types.d.ts#L57-L58" title="compatible: Lean.Vir.TypeAnchors.reactPropertyIdentity -&gt; LeanVir.React.PropertyIdentity
 
 Sample callable shape used by the descriptor anchor fixture.

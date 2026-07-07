@@ -183,8 +183,8 @@
     <section class="summary" aria-label="Type anchor summary">
       <div class="summary-card exact"><strong>0</strong><span>exact</span></div>
       <div class="summary-card compatible"><strong>0</strong><span>compatible</span></div>
-      <div class="summary-card weak"><strong>22</strong><span>weak</span></div>
-      <div class="summary-card missing"><strong>11</strong><span>missing</span></div>
+      <div class="summary-card weak"><strong>33</strong><span>weak</span></div>
+      <div class="summary-card missing"><strong>0</strong><span>missing</span></div>
     </section>
     <section class="coverage" aria-labelledby="type-anchor-coverage">
       <h2 id="type-anchor-coverage">Coverage Matrix</h2>
@@ -227,18 +227,18 @@
           <tr>
             <td><strong>Rendered values and elements</strong></td>
             <td class="numeric"><details><summary>4 symbols</summary><ul><li><code>React.ReactNode</code></li><li><code>React.ReactElement</code></li><li><code>React.JSX.Element</code></li><li><code>React.JSX.ElementType</code></li></ul></details></td>
-            <td class="numeric"><details><summary>4 targets</summary><ul><li><code>Lean.Vir.React.Node</code></li><li><code>Lean.Vir.React.Element</code></li><li><code>Lean.Vir.React.JSX.Element</code></li><li><code>Lean.Vir.React.JSX.ElementType</code></li></ul></details></td>
-            <td>4 gap</td>
-            <td><span class="missing">4 missing</span></td>
-            <td>Coverage gap: these React surfaces have no Lean VIR descriptor yet.</td>
+            <td class="numeric"><details><summary>2 targets</summary><ul><li><code>Lean.Vir.React.Node</code></li><li><code>Lean.Vir.React.ElementType</code></li></ul></details></td>
+            <td>4 audit</td>
+            <td><span class="weak">4 weak</span></td>
+            <td>Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different.</td>
           </tr>
           <tr>
             <td><strong>Components and refs</strong></td>
             <td class="numeric"><details><summary>7 symbols</summary><ul><li><code>React.ElementType</code></li><li><code>React.ComponentType</code></li><li><code>React.JSXElementConstructor</code></li><li><code>React.FunctionComponent</code></li><li><code>React.FC</code></li><li><code>React.Ref</code></li><li><code>React.RefObject</code></li></ul></details></td>
-            <td class="numeric"><details><summary>6 targets</summary><ul><li><code>Lean.Vir.React.ElementType</code></li><li><code>Lean.Vir.React.ComponentType</code></li><li><code>Lean.Vir.React.JSXElementConstructor</code></li><li><code>Lean.Vir.React.FunctionComponent</code></li><li><code>Lean.Vir.React.Ref</code></li><li><code>Lean.Vir.React.RefObject</code></li></ul></details></td>
-            <td>7 gap</td>
-            <td><span class="missing">7 missing</span></td>
-            <td>Coverage gap: these React surfaces have no Lean VIR descriptor yet.</td>
+            <td class="numeric"><details><summary>3 targets</summary><ul><li><code>Lean.Vir.React.ElementType</code></li><li><code>Lean.Vir.React.Component</code></li><li><code>Lean.Vir.React.Ref</code></li></ul></details></td>
+            <td>7 audit</td>
+            <td><span class="weak">7 weak</span></td>
+            <td>Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different.</td>
           </tr>
         </tbody>
       </table>
@@ -1534,7 +1534,7 @@ kind differs: Lean record vs TypeScript opaque">React.EventHandler</a></h2>
             <pre><code>type Lean.Vir.React.EventHandler
 structure Lean.Vir.React.EventHandler {
   name: String
-  callback: (event: resource Lean.Vir.Browser.Event) -&gt; dom Unit
+  callback: (arg1: resource Lean.Vir.Browser.Event) -&gt; dom Unit
 }</code></pre>
           </section>
         </div>
@@ -1572,7 +1572,7 @@ kind differs: Lean record vs TypeScript opaque">React.ChangeEventHandler</a></h2
             <pre><code>type Lean.Vir.React.EventHandler
 structure Lean.Vir.React.EventHandler {
   name: String
-  callback: (event: resource Lean.Vir.Browser.Event) -&gt; dom Unit
+  callback: (arg1: resource Lean.Vir.Browser.Event) -&gt; dom Unit
 }</code></pre>
           </section>
         </div>
@@ -1608,7 +1608,7 @@ kind differs: Lean record vs TypeScript opaque">React.MouseEventHandler</a></h2>
             <pre><code>type Lean.Vir.React.EventHandler
 structure Lean.Vir.React.EventHandler {
   name: String
-  callback: (event: resource Lean.Vir.Browser.Event) -&gt; dom Unit
+  callback: (arg1: resource Lean.Vir.Browser.Event) -&gt; dom Unit
 }</code></pre>
           </section>
         </div>
@@ -1853,7 +1853,7 @@ missing TypeScript fields: callback, name; extra TypeScript fields: children, da
             <pre><code>type Lean.Vir.React.EventHandler
 structure Lean.Vir.React.EventHandler {
   name: String
-  callback: (event: resource Lean.Vir.Browser.Event) -&gt; dom Unit
+  callback: (arg1: resource Lean.Vir.Browser.Event) -&gt; dom Unit
 }</code></pre>
           </section>
         </div>
@@ -2177,22 +2177,23 @@ resource Lean.Vir.Browser.Event</code></pre>
       <section class="anchor-group" aria-labelledby="type-anchor-group-rendered_values_and_elements">
         <h2 class="group-title" id="type-anchor-group-rendered_values_and_elements">Rendered values and elements</h2>
         <div class="anchors">
-      <article class="anchor" id="type-anchor-react_render_react_node" data-vir-type-anchor-hover="missing: Lean.Vir.React.Node -&gt; React.ReactNode
+      <article class="anchor" id="type-anchor-react_render_react_node" data-vir-type-anchor-hover="weak: Lean.Vir.React.Node -&gt; React.ReactNode
 
-missing Lean descriptor Lean.Vir.React.Node">
+kind differs: Lean resource vs TypeScript union">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#children" title="missing: Lean.Vir.React.Node -&gt; React.ReactNode
+            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#children" title="weak: Lean.Vir.React.Node -&gt; React.ReactNode
 
-missing Lean descriptor Lean.Vir.React.Node">React.ReactNode</a></h2>
+kind differs: Lean resource vs TypeScript union">React.ReactNode</a></h2>
             <p class="lean-name">Lean: <code>Lean.Vir.React.Node</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.Node">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean resource vs TypeScript union">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L436-L449">node_modules/@types/react/index.d.ts:436</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#children">React.ReactNode</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Rendered values and elements</span>
           <span>Anchor: <code>react.render.react_node</code></span>
         </div>
@@ -2216,28 +2217,30 @@ missing Lean descriptor Lean.Vir.React.Node">React.ReactNode</a></h2>
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.Node
+resource Lean.Vir.React.Node</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.Node</p>
-        <p class="notes">Coverage gap: VIR does not yet expose a Lean descriptor for the full set of renderable React children.</p>
+        <p class="notes">kind differs: Lean resource vs TypeScript union</p>
+        <p class="notes">Audit anchor from React's broad renderable union to VIR's JavaScript-owned React node resource.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_render_react_element" data-vir-type-anchor-hover="missing: Lean.Vir.React.Element -&gt; React.ReactElement
+      <article class="anchor" id="type-anchor-react_render_react_element" data-vir-type-anchor-hover="weak: Lean.Vir.React.Node -&gt; React.ReactElement
 
-missing Lean descriptor Lean.Vir.React.Element">
+kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#children" title="missing: Lean.Vir.React.Element -&gt; React.ReactElement
+            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#children" title="weak: Lean.Vir.React.Node -&gt; React.ReactElement
 
-missing Lean descriptor Lean.Vir.React.Element">React.ReactElement</a></h2>
-            <p class="lean-name">Lean: <code>Lean.Vir.React.Element</code></p>
+kind differs: Lean resource vs TypeScript record">React.ReactElement</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.Node</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.Element">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean resource vs TypeScript record">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L325-L332">node_modules/@types/react/index.d.ts:325</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#children">React.ReactElement</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Rendered values and elements</span>
           <span>Anchor: <code>react.render.react_element</code></span>
         </div>
@@ -2255,28 +2258,30 @@ missing Lean descriptor Lean.Vir.React.Element">React.ReactElement</a></h2>
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.Node
+resource Lean.Vir.React.Node</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.Element</p>
-        <p class="notes">Coverage gap: VIR does not yet expose a Lean descriptor for JSX element values.</p>
+        <p class="notes">kind differs: Lean resource vs TypeScript record</p>
+        <p class="notes">Audit anchor from React element objects to VIR's React node resource lane.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_render_jsx_element" data-vir-type-anchor-hover="missing: Lean.Vir.React.JSX.Element -&gt; React.JSX.Element
+      <article class="anchor" id="type-anchor-react_render_jsx_element" data-vir-type-anchor-hover="weak: Lean.Vir.React.Node -&gt; React.JSX.Element
 
-missing Lean descriptor Lean.Vir.React.JSX.Element">
+kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/writing-markup-with-jsx" title="missing: Lean.Vir.React.JSX.Element -&gt; React.JSX.Element
+            <h2 class="ts-name"><a href="https://react.dev/learn/writing-markup-with-jsx" title="weak: Lean.Vir.React.Node -&gt; React.JSX.Element
 
-missing Lean descriptor Lean.Vir.React.JSX.Element">React.JSX.Element</a></h2>
-            <p class="lean-name">Lean: <code>Lean.Vir.React.JSX.Element</code></p>
+kind differs: Lean resource vs TypeScript record">React.JSX.Element</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.Node</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.JSX.Element">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean resource vs TypeScript record">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L4145">node_modules/@types/react/index.d.ts:4145</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/writing-markup-with-jsx">React.JSX.Element</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Rendered values and elements</span>
           <span>Anchor: <code>react.render.jsx_element</code></span>
         </div>
@@ -2287,28 +2292,30 @@ missing Lean descriptor Lean.Vir.React.JSX.Element">React.JSX.Element</a></h2>
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.Node
+resource Lean.Vir.React.Node</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.JSX.Element</p>
-        <p class="notes">Coverage gap: JSX's element interface has no corresponding VIR descriptor today.</p>
+        <p class="notes">kind differs: Lean resource vs TypeScript record</p>
+        <p class="notes">Audit anchor from JSX element values to VIR's React node resource lane.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_render_jsx_element_type" data-vir-type-anchor-hover="missing: Lean.Vir.React.JSX.ElementType -&gt; React.JSX.ElementType
+      <article class="anchor" id="type-anchor-react_render_jsx_element_type" data-vir-type-anchor-hover="weak: Lean.Vir.React.ElementType -&gt; React.JSX.ElementType
 
-missing Lean descriptor Lean.Vir.React.JSX.ElementType">
+kind differs: Lean resource vs TypeScript union">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/writing-markup-with-jsx" title="missing: Lean.Vir.React.JSX.ElementType -&gt; React.JSX.ElementType
+            <h2 class="ts-name"><a href="https://react.dev/learn/writing-markup-with-jsx" title="weak: Lean.Vir.React.ElementType -&gt; React.JSX.ElementType
 
-missing Lean descriptor Lean.Vir.React.JSX.ElementType">React.JSX.ElementType</a></h2>
-            <p class="lean-name">Lean: <code>Lean.Vir.React.JSX.ElementType</code></p>
+kind differs: Lean resource vs TypeScript union">React.JSX.ElementType</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.ElementType</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.JSX.ElementType">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean resource vs TypeScript union">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L4144">node_modules/@types/react/index.d.ts:4144</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/writing-markup-with-jsx">React.JSX.ElementType</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Rendered values and elements</span>
           <span>Anchor: <code>react.render.jsx_element_type</code></span>
         </div>
@@ -2319,33 +2326,35 @@ missing Lean descriptor Lean.Vir.React.JSX.ElementType">React.JSX.ElementType</a
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.ElementType
+resource Lean.Vir.React.ElementType</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.JSX.ElementType</p>
-        <p class="notes">Coverage gap: JSX element-type selection has no corresponding VIR descriptor today.</p>
+        <p class="notes">kind differs: Lean resource vs TypeScript union</p>
+        <p class="notes">Audit anchor from JSX element-type selection to VIR's JavaScript-owned React element-type resource.</p>
       </article>
         </div>
       </section>
       <section class="anchor-group" aria-labelledby="type-anchor-group-components_and_refs">
         <h2 class="group-title" id="type-anchor-group-components_and_refs">Components and refs</h2>
         <div class="anchors">
-      <article class="anchor" id="type-anchor-react_components_element_type" data-vir-type-anchor-hover="missing: Lean.Vir.React.ElementType -&gt; React.ElementType
+      <article class="anchor" id="type-anchor-react_components_element_type" data-vir-type-anchor-hover="weak: Lean.Vir.React.ElementType -&gt; React.ElementType
 
-missing Lean descriptor Lean.Vir.React.ElementType">
+kind differs: Lean resource vs TypeScript union">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="missing: Lean.Vir.React.ElementType -&gt; React.ElementType
+            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="weak: Lean.Vir.React.ElementType -&gt; React.ElementType
 
-missing Lean descriptor Lean.Vir.React.ElementType">React.ElementType</a></h2>
+kind differs: Lean resource vs TypeScript union">React.ElementType</a></h2>
             <p class="lean-name">Lean: <code>Lean.Vir.React.ElementType</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.ElementType">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean resource vs TypeScript union">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L109-L111">node_modules/@types/react/index.d.ts:109</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.ElementType</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.element_type</code></span>
         </div>
@@ -2358,28 +2367,30 @@ missing Lean descriptor Lean.Vir.React.ElementType">React.ElementType</a></h2>
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.ElementType
+resource Lean.Vir.React.ElementType</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.ElementType</p>
-        <p class="notes">Coverage gap: VIR does not yet describe component-or-tag values.</p>
+        <p class="notes">kind differs: Lean resource vs TypeScript union</p>
+        <p class="notes">Audit anchor from React's tag-or-component element type to VIR's explicit ElementType resource.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_components_component_type" data-vir-type-anchor-hover="missing: Lean.Vir.React.ComponentType -&gt; React.ComponentType
+      <article class="anchor" id="type-anchor-react_components_component_type" data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.ComponentType
 
-missing Lean descriptor Lean.Vir.React.ComponentType">
+kind differs: Lean function vs TypeScript union">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="missing: Lean.Vir.React.ComponentType -&gt; React.ComponentType
+            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="weak: Lean.Vir.React.Component -&gt; React.ComponentType
 
-missing Lean descriptor Lean.Vir.React.ComponentType">React.ComponentType</a></h2>
-            <p class="lean-name">Lean: <code>Lean.Vir.React.ComponentType</code></p>
+kind differs: Lean function vs TypeScript union">React.ComponentType</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.Component</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.ComponentType">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean function vs TypeScript union">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L124">node_modules/@types/react/index.d.ts:124</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.ComponentType</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.component_type</code></span>
         </div>
@@ -2390,28 +2401,30 @@ missing Lean descriptor Lean.Vir.React.ComponentType">React.ComponentType</a></h
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.Component
+(arg1: Unit) -&gt; react resource Lean.Vir.React.Node</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.ComponentType</p>
-        <p class="notes">Coverage gap: user-defined component types are outside the current VIR manifest.</p>
+        <p class="notes">kind differs: Lean function vs TypeScript union</p>
+        <p class="notes">Audit anchor from React component classes/functions to VIR's Lean-authored function component type.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_components_jsx_element_constructor" data-vir-type-anchor-hover="missing: Lean.Vir.React.JSXElementConstructor -&gt; React.JSXElementConstructor
+      <article class="anchor" id="type-anchor-react_components_jsx_element_constructor" data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.JSXElementConstructor
 
-missing Lean descriptor Lean.Vir.React.JSXElementConstructor">
+kind differs: Lean function vs TypeScript union">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="missing: Lean.Vir.React.JSXElementConstructor -&gt; React.JSXElementConstructor
+            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="weak: Lean.Vir.React.Component -&gt; React.JSXElementConstructor
 
-missing Lean descriptor Lean.Vir.React.JSXElementConstructor">React.JSXElementConstructor</a></h2>
-            <p class="lean-name">Lean: <code>Lean.Vir.React.JSXElementConstructor</code></p>
+kind differs: Lean function vs TypeScript union">React.JSXElementConstructor</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.Component</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.JSXElementConstructor">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean function vs TypeScript union">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L134-L139">node_modules/@types/react/index.d.ts:134</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.JSXElementConstructor</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.jsx_element_constructor</code></span>
         </div>
@@ -2427,36 +2440,38 @@ missing Lean descriptor Lean.Vir.React.JSXElementConstructor">React.JSXElementCo
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.Component
+(arg1: Unit) -&gt; react resource Lean.Vir.React.Node</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.JSXElementConstructor</p>
-        <p class="notes">Coverage gap: JSX component constructors are not represented by the current VIR manifest.</p>
+        <p class="notes">kind differs: Lean function vs TypeScript union</p>
+        <p class="notes">Audit anchor from JSX component constructors to VIR's Lean-authored function component type.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_components_function_component" data-vir-type-anchor-hover="missing: Lean.Vir.React.FunctionComponent -&gt; React.FunctionComponent
+      <article class="anchor" id="type-anchor-react_components_function_component" data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.FunctionComponent
 
 Represents the type of a function component. Can optionally
 receive a type argument that represents the props the component
 accepts.
 
-missing Lean descriptor Lean.Vir.React.FunctionComponent">
+kind differs: Lean function vs TypeScript record">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="missing: Lean.Vir.React.FunctionComponent -&gt; React.FunctionComponent
+            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="weak: Lean.Vir.React.Component -&gt; React.FunctionComponent
 
 Represents the type of a function component. Can optionally
 receive a type argument that represents the props the component
 accepts.
 
-missing Lean descriptor Lean.Vir.React.FunctionComponent">React.FunctionComponent</a></h2>
-            <p class="lean-name">Lean: <code>Lean.Vir.React.FunctionComponent</code></p>
+kind differs: Lean function vs TypeScript record">React.FunctionComponent</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.Component</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.FunctionComponent">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean function vs TypeScript record">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L1060-L1086">node_modules/@types/react/index.d.ts:1060</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.FunctionComponent</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.function_component</code></span>
         </div>
@@ -2493,39 +2508,41 @@ missing Lean descriptor Lean.Vir.React.FunctionComponent">React.FunctionComponen
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.Component
+(arg1: Unit) -&gt; react resource Lean.Vir.React.Node</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.FunctionComponent</p>
-        <p class="notes">Coverage gap: function component call signatures are not represented by the current VIR manifest.</p>
+        <p class="notes">kind differs: Lean function vs TypeScript record</p>
+        <p class="notes">Audit anchor from React function component call signatures to VIR's Lean component function.</p>
         <p class="hover">Represents the type of a function component. Can optionally
 receive a type argument that represents the props the component
 accepts.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_components_fc" data-vir-type-anchor-hover="missing: Lean.Vir.React.FunctionComponent -&gt; React.FC
+      <article class="anchor" id="type-anchor-react_components_fc" data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.FC
 
 Represents the type of a function component. Can optionally
 receive a type argument that represents the props the component
 receives.
 
-missing Lean descriptor Lean.Vir.React.FunctionComponent">
+kind differs: Lean function vs TypeScript record">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="missing: Lean.Vir.React.FunctionComponent -&gt; React.FC
+            <h2 class="ts-name"><a href="https://react.dev/learn/typescript#typescript-with-react-components" title="weak: Lean.Vir.React.Component -&gt; React.FC
 
 Represents the type of a function component. Can optionally
 receive a type argument that represents the props the component
 receives.
 
-missing Lean descriptor Lean.Vir.React.FunctionComponent">React.FC</a></h2>
-            <p class="lean-name">Lean: <code>Lean.Vir.React.FunctionComponent</code></p>
+kind differs: Lean function vs TypeScript record">React.FC</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.Component</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.FunctionComponent">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean function vs TypeScript record">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L1030">node_modules/@types/react/index.d.ts:1030</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/typescript#typescript-with-react-components">React.FC</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.components.fc</code></span>
         </div>
@@ -2536,35 +2553,37 @@ missing Lean descriptor Lean.Vir.React.FunctionComponent">React.FC</a></h2>
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.Component
+(arg1: Unit) -&gt; react resource Lean.Vir.React.Node</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.FunctionComponent</p>
-        <p class="notes">Coverage gap: React.FC is included as a common alias for function components.</p>
+        <p class="notes">kind differs: Lean function vs TypeScript record</p>
+        <p class="notes">Audit anchor for React.FC as a common alias for function components.</p>
         <p class="hover">Represents the type of a function component. Can optionally
 receive a type argument that represents the props the component
 receives.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_refs_ref" data-vir-type-anchor-hover="missing: Lean.Vir.React.Ref -&gt; React.Ref
+      <article class="anchor" id="type-anchor-react_refs_ref" data-vir-type-anchor-hover="weak: Lean.Vir.React.Ref -&gt; React.Ref
 
 A union type of all possible shapes for React refs.
 
-missing Lean descriptor Lean.Vir.React.Ref">
+kind differs: Lean resource vs TypeScript union">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/referencing-values-with-refs" title="missing: Lean.Vir.React.Ref -&gt; React.Ref
+            <h2 class="ts-name"><a href="https://react.dev/learn/referencing-values-with-refs" title="weak: Lean.Vir.React.Ref -&gt; React.Ref
 
 A union type of all possible shapes for React refs.
 
-missing Lean descriptor Lean.Vir.React.Ref">React.Ref</a></h2>
+kind differs: Lean resource vs TypeScript union">React.Ref</a></h2>
             <p class="lean-name">Lean: <code>Lean.Vir.React.Ref</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.Ref">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean resource vs TypeScript union">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L194">node_modules/@types/react/index.d.ts:194</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/referencing-values-with-refs">React.Ref</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.refs.ref</code></span>
         </div>
@@ -2575,29 +2594,31 @@ missing Lean descriptor Lean.Vir.React.Ref">React.Ref</a></h2>
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.Ref
+resource Lean.Vir.React.Ref</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.Ref</p>
-        <p class="notes">Coverage gap: refs are not represented in the current VIR React descriptor surface.</p>
+        <p class="notes">kind differs: Lean resource vs TypeScript union</p>
+        <p class="notes">Audit anchor from React's callback/object/null ref union to VIR's JavaScript-owned Ref resource.</p>
         <p class="hover">A union type of all possible shapes for React refs.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_refs_ref_object" data-vir-type-anchor-hover="missing: Lean.Vir.React.RefObject -&gt; React.RefObject
+      <article class="anchor" id="type-anchor-react_refs_ref_object" data-vir-type-anchor-hover="weak: Lean.Vir.React.Ref -&gt; React.RefObject
 
-missing Lean descriptor Lean.Vir.React.RefObject">
+kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
           <div class="name">
-            <h2 class="ts-name"><a href="https://react.dev/learn/referencing-values-with-refs" title="missing: Lean.Vir.React.RefObject -&gt; React.RefObject
+            <h2 class="ts-name"><a href="https://react.dev/learn/referencing-values-with-refs" title="weak: Lean.Vir.React.Ref -&gt; React.RefObject
 
-missing Lean descriptor Lean.Vir.React.RefObject">React.RefObject</a></h2>
-            <p class="lean-name">Lean: <code>Lean.Vir.React.RefObject</code></p>
+kind differs: Lean resource vs TypeScript record">React.RefObject</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.Ref</code></p>
           </div>
-          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.RefObject">missing</span>
+          <span class="badge weak" title="weak: kind differs: Lean resource vs TypeScript record">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts#L154-L159">node_modules/@types/react/index.d.ts:154</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
           <span>React docs: <a href="https://react.dev/learn/referencing-values-with-refs">React.RefObject</a></span>
-          <span>Relation: coverage gap</span>
+          <span>Relation: audit</span>
           <span>Category: Components and refs</span>
           <span>Anchor: <code>react.refs.ref_object</code></span>
         </div>
@@ -2613,11 +2634,12 @@ missing Lean descriptor Lean.Vir.React.RefObject">React.RefObject</a></h2>
           </section>
           <section>
             <p class="pane-title">Lean VIR descriptor</p>
-            <pre><code>missing Lean descriptor</code></pre>
+            <pre><code>type Lean.Vir.React.Ref
+resource Lean.Vir.React.Ref</code></pre>
           </section>
         </div>
-        <p class="notes">missing Lean descriptor Lean.Vir.React.RefObject</p>
-        <p class="notes">Coverage gap: ref objects are not represented in the current VIR React descriptor surface.</p>
+        <p class="notes">kind differs: Lean resource vs TypeScript record</p>
+        <p class="notes">Audit anchor from React's { current } object type to VIR's opaque Ref resource plus get/set helpers.</p>
       </article>
         </div>
       </section>
