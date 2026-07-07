@@ -63,7 +63,7 @@ try {
   };
 
   await writeFile(manifest, `${JSON.stringify({
-    version: 1,
+    version: 5,
     artifact: "lean-vir-ir-package",
     metadata: {},
     exports: [
