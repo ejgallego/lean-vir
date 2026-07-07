@@ -1,0 +1,676 @@
+{
+  "version": 1,
+  "generatedBy": "scripts/check-type-anchors.mjs",
+  "inputs": {
+    "descriptors": "docs/type-descriptors/vir-v1.json",
+    "lean": "docs/type-descriptors/vir-v1.manifest.json"
+  },
+  "summary": {
+    "exact": 2,
+    "compatible": 4,
+    "weak": 0,
+    "missing": 0
+  },
+  "results": [
+    {
+      "id": "react.style_property",
+      "lean": "Lean.Vir.React.StyleProperty",
+      "ts": "LeanVir.React.StyleProperty",
+      "status": "exact",
+      "notes": [],
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.StyleProperty",
+        "label": "Lean.Vir.React.StyleProperty",
+        "shape": {
+          "kind": "record",
+          "name": "Lean.Vir.React.StyleProperty",
+          "fields": {
+            "name": {
+              "kind": "primitive",
+              "name": "String"
+            },
+            "value": {
+              "kind": "primitive",
+              "name": "String"
+            }
+          }
+        }
+      },
+      "tsSymbol": {
+        "id": "LeanVir.React.StyleProperty",
+        "kind": "interface",
+        "source": {
+          "path": "docs/type-descriptors/vir-v1.types.d.ts",
+          "startLine": 30,
+          "startColumn": 5,
+          "endLine": 33,
+          "endColumn": 6
+        },
+        "display": "export interface StyleProperty {\n      name: string;\n      value: string;\n    }",
+        "hover": "A single React style object entry.",
+        "shape": {
+          "kind": "record",
+          "fields": {
+            "name": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "value": {
+              "kind": "primitive",
+              "name": "string"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "react.prop_value",
+      "lean": "Lean.Vir.React.PropValue",
+      "ts": "LeanVir.React.PropValue",
+      "status": "compatible",
+      "notes": [
+        "Lean Int accepts one TypeScript union arm compatibly"
+      ],
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.PropValue",
+        "label": "Lean.Vir.React.PropValue",
+        "shape": {
+          "kind": "variant",
+          "name": "Lean.Vir.React.PropValue",
+          "constructors": {
+            "string": {
+              "fields": {
+                "value": {
+                  "kind": "primitive",
+                  "name": "String"
+                }
+              }
+            },
+            "bool": {
+              "fields": {
+                "value": {
+                  "kind": "primitive",
+                  "name": "Bool"
+                }
+              }
+            },
+            "int": {
+              "fields": {
+                "value": {
+                  "kind": "primitive",
+                  "name": "Int"
+                }
+              }
+            },
+            "float": {
+              "fields": {
+                "value": {
+                  "kind": "primitive",
+                  "name": "Float"
+                }
+              }
+            },
+            "style": {
+              "fields": {
+                "entries": {
+                  "kind": "array",
+                  "element": {
+                    "kind": "record",
+                    "name": "Lean.Vir.React.StyleProperty",
+                    "fields": {
+                      "name": {
+                        "kind": "primitive",
+                        "name": "String"
+                      },
+                      "value": {
+                        "kind": "primitive",
+                        "name": "String"
+                      }
+                    }
+                  }
+                }
+              }
+            },
+            "classList": {
+              "fields": {
+                "classes": {
+                  "kind": "array",
+                  "element": {
+                    "kind": "primitive",
+                    "name": "String"
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "tsSymbol": {
+        "id": "LeanVir.React.PropValue",
+        "kind": "type",
+        "source": {
+          "path": "docs/type-descriptors/vir-v1.types.d.ts",
+          "startLine": 36,
+          "startColumn": 5,
+          "endLine": 42,
+          "endColumn": 50
+        },
+        "display": "export type PropValue =\n      | { kind: \"string\"; value: string }\n      | { kind: \"bool\"; value: boolean }\n      | { kind: \"int\"; value: LeanVir.Int }\n      | { kind: \"float\"; value: number }\n      | { kind: \"style\"; entries: LeanVir.React.StyleProperty[] }\n      | { kind: \"classList\"; classes: string[] };",
+        "hover": "Conservative v1 set of React property values.",
+        "shape": {
+          "kind": "variant",
+          "constructors": {
+            "string": {
+              "fields": {
+                "value": {
+                  "kind": "primitive",
+                  "name": "string"
+                }
+              }
+            },
+            "bool": {
+              "fields": {
+                "value": {
+                  "kind": "primitive",
+                  "name": "boolean"
+                }
+              }
+            },
+            "int": {
+              "fields": {
+                "value": {
+                  "kind": "ref",
+                  "id": "LeanVir.Int"
+                }
+              }
+            },
+            "float": {
+              "fields": {
+                "value": {
+                  "kind": "primitive",
+                  "name": "number"
+                }
+              }
+            },
+            "style": {
+              "fields": {
+                "entries": {
+                  "kind": "array",
+                  "element": {
+                    "kind": "ref",
+                    "id": "LeanVir.React.StyleProperty"
+                  }
+                }
+              }
+            },
+            "classList": {
+              "fields": {
+                "classes": {
+                  "kind": "array",
+                  "element": {
+                    "kind": "primitive",
+                    "name": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "react.property",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "LeanVir.React.Property",
+      "status": "compatible",
+      "notes": [
+        "Lean Int accepts one TypeScript union arm compatibly"
+      ],
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Property",
+        "label": "Lean.Vir.React.Property",
+        "shape": {
+          "kind": "record",
+          "name": "Lean.Vir.React.Property",
+          "fields": {
+            "name": {
+              "kind": "primitive",
+              "name": "String"
+            },
+            "value": {
+              "kind": "variant",
+              "name": "Lean.Vir.React.PropValue",
+              "constructors": {
+                "string": {
+                  "fields": {
+                    "value": {
+                      "kind": "primitive",
+                      "name": "String"
+                    }
+                  }
+                },
+                "bool": {
+                  "fields": {
+                    "value": {
+                      "kind": "primitive",
+                      "name": "Bool"
+                    }
+                  }
+                },
+                "int": {
+                  "fields": {
+                    "value": {
+                      "kind": "primitive",
+                      "name": "Int"
+                    }
+                  }
+                },
+                "float": {
+                  "fields": {
+                    "value": {
+                      "kind": "primitive",
+                      "name": "Float"
+                    }
+                  }
+                },
+                "style": {
+                  "fields": {
+                    "entries": {
+                      "kind": "array",
+                      "element": {
+                        "kind": "record",
+                        "name": "Lean.Vir.React.StyleProperty",
+                        "fields": {
+                          "name": {
+                            "kind": "primitive",
+                            "name": "String"
+                          },
+                          "value": {
+                            "kind": "primitive",
+                            "name": "String"
+                          }
+                        }
+                      }
+                    }
+                  }
+                },
+                "classList": {
+                  "fields": {
+                    "classes": {
+                      "kind": "array",
+                      "element": {
+                        "kind": "primitive",
+                        "name": "String"
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "tsSymbol": {
+        "id": "LeanVir.React.Property",
+        "kind": "interface",
+        "source": {
+          "path": "docs/type-descriptors/vir-v1.types.d.ts",
+          "startLine": 45,
+          "startColumn": 5,
+          "endLine": 48,
+          "endColumn": 6
+        },
+        "display": "export interface Property {\n      name: string;\n      value: LeanVir.React.PropValue;\n    }",
+        "hover": "A React property transported through the VIR manifest object ABI.",
+        "shape": {
+          "kind": "record",
+          "fields": {
+            "name": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "value": {
+              "kind": "ref",
+              "id": "LeanVir.React.PropValue"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "react.event_handler",
+      "lean": "Lean.Vir.React.EventHandler",
+      "ts": "LeanVir.React.EventHandler",
+      "status": "compatible",
+      "notes": [
+        "Lean Unit uses TypeScript void representation"
+      ],
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.EventHandler",
+        "label": "Lean.Vir.React.EventHandler",
+        "shape": {
+          "kind": "record",
+          "name": "Lean.Vir.React.EventHandler",
+          "fields": {
+            "name": {
+              "kind": "primitive",
+              "name": "String"
+            },
+            "callback": {
+              "kind": "function",
+              "effect": "dom",
+              "args": [
+                {
+                  "name": "event",
+                  "type": {
+                    "kind": "resource",
+                    "name": "Lean.Vir.Browser.Event"
+                  }
+                }
+              ],
+              "result": {
+                "kind": "primitive",
+                "name": "Unit"
+              }
+            }
+          }
+        }
+      },
+      "tsSymbol": {
+        "id": "LeanVir.React.EventHandler",
+        "kind": "interface",
+        "source": {
+          "path": "docs/type-descriptors/vir-v1.types.d.ts",
+          "startLine": 51,
+          "startColumn": 5,
+          "endLine": 54,
+          "endColumn": 6
+        },
+        "display": "export interface EventHandler {\n      name: string;\n      callback: (event: LeanVir.Js<LeanVir.Browser.Event>) => LeanVir.DomEffect<void>;\n    }",
+        "hover": "DOM-like React event handler backed by a retained Lean closure.",
+        "shape": {
+          "kind": "record",
+          "fields": {
+            "name": {
+              "kind": "primitive",
+              "name": "string"
+            },
+            "callback": {
+              "kind": "function",
+              "effect": "dom",
+              "args": [
+                {
+                  "name": "event",
+                  "type": {
+                    "kind": "resource",
+                    "name": "LeanVir.Browser.Event",
+                    "value": {
+                      "kind": "ref",
+                      "id": "LeanVir.Browser.Event"
+                    }
+                  }
+                }
+              ],
+              "result": {
+                "kind": "primitive",
+                "name": "void"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "browser.event",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "LeanVir.Browser.Event",
+      "status": "exact",
+      "notes": [],
+      "note": "Resource markers compare by identity suffix in v1.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.Browser.Event",
+        "label": "Event",
+        "shape": {
+          "kind": "resource",
+          "name": "Lean.Vir.Browser.Event"
+        }
+      },
+      "tsSymbol": {
+        "id": "LeanVir.Browser.Event",
+        "kind": "interface",
+        "source": {
+          "path": "docs/type-descriptors/vir-v1.types.d.ts",
+          "startLine": 23,
+          "startColumn": 5,
+          "endLine": 25,
+          "endColumn": 6
+        },
+        "display": "export interface Event {\n      readonly __resource: \"Event\";\n    }",
+        "hover": "Browser event resource marker.",
+        "shape": {
+          "kind": "resource",
+          "name": "LeanVir.Browser.Event"
+        }
+      }
+    },
+    {
+      "id": "react.property_identity",
+      "lean": "Lean.Vir.TypeAnchors.reactPropertyIdentity",
+      "ts": "LeanVir.React.PropertyIdentity",
+      "status": "compatible",
+      "notes": [
+        "Lean Int accepts one TypeScript union arm compatibly"
+      ],
+      "leanDescriptor": {
+        "kind": "export",
+        "lean": "Lean.Vir.TypeAnchors.reactPropertyIdentity",
+        "label": "reactPropertyIdentity",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "function",
+          "effect": "pure",
+          "args": [
+            {
+              "name": "property",
+              "type": {
+                "kind": "record",
+                "name": "Lean.Vir.React.Property",
+                "fields": {
+                  "name": {
+                    "kind": "primitive",
+                    "name": "String"
+                  },
+                  "value": {
+                    "kind": "variant",
+                    "name": "Lean.Vir.React.PropValue",
+                    "constructors": {
+                      "string": {
+                        "fields": {
+                          "value": {
+                            "kind": "primitive",
+                            "name": "String"
+                          }
+                        }
+                      },
+                      "bool": {
+                        "fields": {
+                          "value": {
+                            "kind": "primitive",
+                            "name": "Bool"
+                          }
+                        }
+                      },
+                      "int": {
+                        "fields": {
+                          "value": {
+                            "kind": "primitive",
+                            "name": "Int"
+                          }
+                        }
+                      },
+                      "float": {
+                        "fields": {
+                          "value": {
+                            "kind": "primitive",
+                            "name": "Float"
+                          }
+                        }
+                      },
+                      "style": {
+                        "fields": {
+                          "entries": {
+                            "kind": "array",
+                            "element": {
+                              "kind": "record",
+                              "name": "Lean.Vir.React.StyleProperty",
+                              "fields": {
+                                "name": {
+                                  "kind": "primitive",
+                                  "name": "String"
+                                },
+                                "value": {
+                                  "kind": "primitive",
+                                  "name": "String"
+                                }
+                              }
+                            }
+                          }
+                        }
+                      },
+                      "classList": {
+                        "fields": {
+                          "classes": {
+                            "kind": "array",
+                            "element": {
+                              "kind": "primitive",
+                              "name": "String"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          ],
+          "result": {
+            "kind": "record",
+            "name": "Lean.Vir.React.Property",
+            "fields": {
+              "name": {
+                "kind": "primitive",
+                "name": "String"
+              },
+              "value": {
+                "kind": "variant",
+                "name": "Lean.Vir.React.PropValue",
+                "constructors": {
+                  "string": {
+                    "fields": {
+                      "value": {
+                        "kind": "primitive",
+                        "name": "String"
+                      }
+                    }
+                  },
+                  "bool": {
+                    "fields": {
+                      "value": {
+                        "kind": "primitive",
+                        "name": "Bool"
+                      }
+                    }
+                  },
+                  "int": {
+                    "fields": {
+                      "value": {
+                        "kind": "primitive",
+                        "name": "Int"
+                      }
+                    }
+                  },
+                  "float": {
+                    "fields": {
+                      "value": {
+                        "kind": "primitive",
+                        "name": "Float"
+                      }
+                    }
+                  },
+                  "style": {
+                    "fields": {
+                      "entries": {
+                        "kind": "array",
+                        "element": {
+                          "kind": "record",
+                          "name": "Lean.Vir.React.StyleProperty",
+                          "fields": {
+                            "name": {
+                              "kind": "primitive",
+                              "name": "String"
+                            },
+                            "value": {
+                              "kind": "primitive",
+                              "name": "String"
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
+                  "classList": {
+                    "fields": {
+                      "classes": {
+                        "kind": "array",
+                        "element": {
+                          "kind": "primitive",
+                          "name": "String"
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "tsSymbol": {
+        "id": "LeanVir.React.PropertyIdentity",
+        "kind": "type",
+        "source": {
+          "path": "docs/type-descriptors/vir-v1.types.d.ts",
+          "startLine": 57,
+          "startColumn": 5,
+          "endLine": 58,
+          "endColumn": 68
+        },
+        "display": "export type PropertyIdentity =\n      (property: LeanVir.React.Property) => LeanVir.React.Property;",
+        "hover": "Sample callable shape used by the descriptor anchor fixture.",
+        "shape": {
+          "kind": "function",
+          "effect": "pure",
+          "args": [
+            {
+              "name": "property",
+              "type": {
+                "kind": "ref",
+                "id": "LeanVir.React.Property"
+              }
+            }
+          ],
+          "result": {
+            "kind": "ref",
+            "id": "LeanVir.React.Property"
+          }
+        }
+      }
+    }
+  ]
+}

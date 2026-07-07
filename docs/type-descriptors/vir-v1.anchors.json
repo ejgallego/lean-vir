@@ -1,0 +1,36 @@
+{
+  "version": 1,
+  "anchors": [
+    {
+      "id": "react.style_property",
+      "lean": "Lean.Vir.React.StyleProperty",
+      "ts": "LeanVir.React.StyleProperty"
+    },
+    {
+      "id": "react.prop_value",
+      "lean": "Lean.Vir.React.PropValue",
+      "ts": "LeanVir.React.PropValue"
+    },
+    {
+      "id": "react.property",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "LeanVir.React.Property"
+    },
+    {
+      "id": "react.event_handler",
+      "lean": "Lean.Vir.React.EventHandler",
+      "ts": "LeanVir.React.EventHandler"
+    },
+    {
+      "id": "browser.event",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "LeanVir.Browser.Event",
+      "note": "Resource markers compare by identity suffix in v1."
+    },
+    {
+      "id": "react.property_identity",
+      "lean": "Lean.Vir.TypeAnchors.reactPropertyIdentity",
+      "ts": "LeanVir.React.PropertyIdentity"
+    }
+  ]
+}
