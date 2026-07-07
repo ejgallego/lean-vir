@@ -134,12 +134,12 @@ Current RF status:
 Remaining RF gaps to close in order:
 
 1. Add the next common hook bindings that existing React/ProofWidgets code
-   naturally expects: `useMemo`, `useCallback`, and later `useContext`.
+   naturally expects: `useCallback` and later `useContext`.
 2. Add the remaining common DOM attributes/events needed by real ProofWidgets
    examples.
 3. Add lightweight Lean-side linting for hook order and obvious render-time IO
    footguns, without changing the shallow React-compatible API.
-5. Keep StrictMode/concurrent-render callback-root behavior documented and
+4. Keep StrictMode/concurrent-render callback-root behavior documented and
    audited; do not invent non-React lifetime semantics to hide it.
 
 ## ProofWidgets Compatibility Layers

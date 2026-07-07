@@ -34,6 +34,8 @@ import {
   smokeVirtualReactCheckbox,
   smokeVirtualReactCounter,
   smokeVirtualReactEffect,
+  smokeVirtualReactExternalComponent,
+  smokeVirtualReactMemo,
   smokeVirtualReactRefFragment,
   smokeVirtualReactInput,
   smokeVirtualProofWidgetsHtml,
@@ -178,7 +180,9 @@ ensureVirtualElements(reactDocumentState, [
   "#react-static",
   "#react-counter",
   "#react-effect",
+  "#react-memo",
   "#react-ref-fragment",
+  "#react-external-component",
   "#react-input",
   "#react-change",
   "#react-select-textarea",
@@ -208,7 +212,9 @@ assert.equal(missingSelectorRuntime.liveCallbacks.size, 0);
 missingSelectorRuntime.dispose();
 smokeVirtualReactCounter(reactRuntime, reactDocumentState, "#react-counter");
 smokeVirtualReactEffect(reactRuntime, reactDocumentState, "#react-effect");
+smokeVirtualReactMemo(reactRuntime, reactDocumentState, "#react-memo");
 smokeVirtualReactRefFragment(reactRuntime, reactDocumentState, "#react-ref-fragment");
+smokeVirtualReactExternalComponent(reactRuntime, reactDocumentState, "#react-external-component");
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
 smokeVirtualReactChangeInput(reactRuntime, reactDocumentState, "#react-change");
 smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select-textarea");
@@ -282,13 +288,16 @@ const renderMalformedReactNode = (node) => {
 const reactNodeText = (value) => malformedReactHost["react.node.text"](malformedReactJsString(value));
 const reactNodeProperty = (value) => malformedReactHost["js.value.react.property"](value);
 const reactNodeEventHandler = (value) => malformedReactHost["js.value.react.eventHandler"](value);
-const reactNodeProps = ({ key = null, props = [], handlers = [] } = {}) => {
+const reactNodeProps = ({ key = null, ref = null, props = [], handlers = [] } = {}) => {
   const resource = malformedReactHost["react.props.empty"]();
   if (key !== null && key !== undefined) {
     malformedReactHost["react.props.setKey"](
       resource,
       typeof key === "string" ? malformedReactJsString(key) : key,
     );
+  }
+  if (ref !== null && ref !== undefined) {
+    malformedReactHost["react.props.setRef"](resource, ref);
   }
   for (const prop of props) {
     malformedReactHost["react.props.setProperty"](resource, reactNodeProperty(prop));
@@ -308,16 +317,19 @@ const reactNodeChildren = (children = []) => {
 const reactNodeElement = ({
   tag = "div",
   key = null,
+  ref = null,
   props = [],
   handlers = [],
   children = [],
 } = {}) => malformedReactHost["react.node.createElement"](
   typeof tag === "string" ? reactElementTypeTag(tag) : tag,
-  reactNodeProps({ key, props, handlers }),
+  reactNodeProps({ key, ref, props, handlers }),
   reactNodeChildren(children),
 );
 const renderReactNodeElement = (fields) => renderMalformedReactNode(reactNodeElement(fields));
+const reactNodeRef = (current = null) => malformedReactDocumentState.resources.resourceForValue({ current });
 renderReactNodeElement({
+  ref: reactNodeRef("mounted"),
   props: [
     { name: "tabIndex", value: { kind: "int", value: "4" } },
     { name: "data-ratio", value: { kind: "float", value: 1.5 } },
@@ -329,6 +341,7 @@ assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactR
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props["data-ratio"], 1.5);
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.className, "alpha beta");
 assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.style.marginTop, "1px");
+assert.equal(malformedReactDocumentState.elements.get("#react-malformed").reactRoot.current.props.ref.current, "mounted");
 assert.throws(
   () => reactNodeText(1),
   /React Node text value must be a Js String/,
@@ -368,6 +381,19 @@ assert.throws(
 assert.throws(
   () => renderReactNodeElement({ key: malformedReactDocumentState.resources.resourceForValue(7) }),
   /React Node element key must be a Js String/,
+);
+assert.throws(
+  () => renderReactNodeElement({ ref: malformedReactJsString("not-a-ref") }),
+  /React Node element ref must be a React ref object or null/,
+);
+assert.throws(
+  () => renderMalformedReactNode(
+    malformedReactHost["react.node.fragment"](
+      reactNodeProps({ ref: reactNodeRef() }),
+      reactNodeChildren(),
+    ),
+  ),
+  /React Fragment props only support key/,
 );
 assert.throws(
   () => renderReactNodeElement({

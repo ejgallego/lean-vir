@@ -259,11 +259,16 @@ function createBrowserReactNodeFragmentResource(resources, createElement3, Fragm
   }));
 }
 function createReactPropsResource() {
-  return { kind: "ReactProps", key: null, properties: [], handlers: [] };
+  return { kind: "ReactProps", key: null, ref: null, properties: [], handlers: [] };
 }
 function setReactPropsKey(resources, propsResource, keyResource) {
   const props = resolveReactPropsResource(resources, propsResource);
   props.key = jsStringValue(resources, keyResource, "React Node element key");
+  return void 0;
+}
+function setReactPropsRef(resources, propsResource, refResource) {
+  const props = resolveReactPropsResource(resources, propsResource);
+  props.ref = resources.resolveResource(refResource, "ReactRef");
   return void 0;
 }
 function setReactPropsProperty(resources, propsResource, propertyResource) {
@@ -560,6 +565,9 @@ function reactPropsFromNode(state, fields, callLeanEventCallback2, hooks) {
   if (fields.props.key !== null && fields.props.key !== void 0) {
     props.key = fields.props.key;
   }
+  if (fields.props.ref !== null && fields.props.ref !== void 0) {
+    props.ref = fields.props.ref;
+  }
   for (const [name, value] of reactNodePropertyEntries(fields.props.properties)) {
     setReactObjectProperty(props, name, value);
   }
@@ -585,7 +593,7 @@ function reactFragmentProps(fields) {
   return props;
 }
 function validateReactFragmentProps(props) {
-  if (props.properties.length !== 0 || props.handlers.length !== 0) {
+  if (props.ref !== null || props.properties.length !== 0 || props.handlers.length !== 0) {
     throw new Error("React Fragment props only support key");
   }
 }
@@ -612,6 +620,7 @@ function normalizeReactProps(resources, props) {
   const value = resolveReactPropsResource(resources, props);
   return {
     key: reactNodeKey(value.key),
+    ref: reactNodeRef(value.ref),
     properties: reactNodeArray(value.properties, "props"),
     handlers: reactNodeArray(value.handlers, "handlers")
   };
@@ -628,6 +637,12 @@ function reactNodeKey(key) {
     throw new Error("React Node element key must be a string or null");
   }
   return key;
+}
+function reactNodeRef(ref) {
+  if (ref !== null && ref !== void 0 && (typeof ref !== "object" || Array.isArray(ref))) {
+    throw new Error("React Node element ref must be a React ref object or null");
+  }
+  return ref ?? null;
 }
 function reactNodeArray(value, label) {
   if (!Array.isArray(value)) {
@@ -1205,6 +1220,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     "react.props.setKey": (props, key) => setReactPropsKey(resources, props, key),
     "react.props.setProperty": (props, property) => setReactPropsProperty(resources, props, property),
     "react.props.setEventHandler": (props, handler) => setReactPropsEventHandler(resources, props, handler),
+    "react.props.setRef": (props, ref) => setReactPropsRef(resources, props, ref),
     "react.node.children.empty": () => resources.resourceForValue(createReactNodeChildrenResource()),
     "react.node.children.push": (children, child) => pushReactNodeChild(resources, children, child),
     "react.node.createElement": (elementType, props, children) => resources.resourceForValue(
@@ -1610,6 +1626,27 @@ function createBrowserReactHookRuntime(resources, React3) {
       currentComponent?.refs?.add(ref);
       return resources.resourceForValue(ref);
     },
+    useMemo(calculate, deps) {
+      if (typeof React3?.useMemo !== "function") {
+        releaseLeanCallback(calculate);
+        throw new Error("React.useMemo is not available");
+      }
+      try {
+        nextBrowserHook(currentComponent, "memo", "useMemo");
+      } catch (error) {
+        releaseLeanCallback(calculate);
+        throw error;
+      }
+      const dependencyList = normalizeCallbackDependencyListOrRelease(resources, deps, calculate);
+      try {
+        return React3.useMemo(
+          () => reactStatePayload(resources, calculate()),
+          dependencyList
+        );
+      } finally {
+        releaseLeanCallback(calculate);
+      }
+    },
     useEffect(setup, cleanup) {
       if (typeof React3?.useEffect !== "function") {
         releaseEffectCallbacks(setup, cleanup);
@@ -1675,6 +1712,7 @@ function createReactStateHostBindings(resources, hookRuntime) {
     "react.reducerState.value": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").value),
     "react.reducerState.dispatch": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").dispatch),
     "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
+    "react.useMemo": (calculate, deps) => resources.resourceForValue(hookRuntime.useMemo(calculate, deps)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
     "react.deps.empty": () => resources.resourceForValue(createReactDependencyListResource()),
     "react.deps.push": (deps, value) => {
@@ -1771,6 +1809,14 @@ function normalizeDependencyListOrRelease(resources, deps, setup, cleanup) {
     return normalizeDependencyList(resources, deps);
   } catch (error) {
     releaseEffectCallbacks(setup, cleanup);
+    throw error;
+  }
+}
+function normalizeCallbackDependencyListOrRelease(resources, deps, callback) {
+  try {
+    return normalizeDependencyList(resources, deps);
+  } catch (error) {
+    releaseLeanCallback(callback);
     throw error;
   }
 }
@@ -2371,6 +2417,7 @@ function createBrowserReactHostBindings(state = createHostResourceState(), {
   querySelector = queryBrowserElement
 } = {}) {
   const hookRuntime = createBrowserReactHookRuntime(state, React);
+  const externalBadge = createExternalBadgeComponent(React);
   const hooks = {
     ...createReactHostHooks(),
     hookRuntime
@@ -2383,7 +2430,8 @@ function createBrowserReactHostBindings(state = createHostResourceState(), {
       createNodeFragmentResource: (props, children) => createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, props, children)
     }),
     ...createReactJsValueHostBindings(state),
-    ...createReactStateHostBindings(state, hookRuntime)
+    ...createReactStateHostBindings(state, hookRuntime),
+    "test.react.externalBadge": () => state.resourceForValue(externalBadge)
   };
 }
 function createBrowserReactRootResource2(state, root, React3, hooks) {
@@ -2394,6 +2442,28 @@ function queryBrowserElement(selector) {
     throw new Error("React selector host bindings require globalThis.document");
   }
   return globalThis.document.querySelector(selector);
+}
+function createExternalBadgeComponent(React3) {
+  const render = (props = {}, ref = null) => {
+    const { children, ...rest } = props;
+    return React3.createElement("span", {
+      ...rest,
+      ref,
+      "data-external-component": "true"
+    }, children);
+  };
+  if (typeof React3?.forwardRef === "function") {
+    const component = React3.forwardRef(function VirExternalBadge2(props, ref) {
+      return render(props, ref);
+    });
+    component.displayName = "VirExternalBadge";
+    return component;
+  }
+  function VirExternalBadge(props) {
+    return render(props, props?.ref ?? null);
+  }
+  VirExternalBadge.displayName = "VirExternalBadge";
+  return VirExternalBadge;
 }
 
 // web/src/runtime/interface-effects.js

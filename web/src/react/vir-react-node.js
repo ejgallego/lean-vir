@@ -224,12 +224,18 @@ export function createVirtualReactNodeFragmentResource(resources, props, childre
 }
 
 export function createReactPropsResource() {
-  return { kind: "ReactProps", key: null, properties: [], handlers: [] };
+  return { kind: "ReactProps", key: null, ref: null, properties: [], handlers: [] };
 }
 
 export function setReactPropsKey(resources, propsResource, keyResource) {
   const props = resolveReactPropsResource(resources, propsResource);
   props.key = jsStringValue(resources, keyResource, "React Node element key");
+  return undefined;
+}
+
+export function setReactPropsRef(resources, propsResource, refResource) {
+  const props = resolveReactPropsResource(resources, propsResource);
+  props.ref = resources.resolveResource(refResource, "ReactRef");
   return undefined;
 }
 
@@ -584,6 +590,9 @@ function reactPropsFromNode(state, fields, callLeanEventCallback, hooks) {
   if (fields.props.key !== null && fields.props.key !== undefined) {
     props.key = fields.props.key;
   }
+  if (fields.props.ref !== null && fields.props.ref !== undefined) {
+    props.ref = fields.props.ref;
+  }
   for (const [name, value] of reactNodePropertyEntries(fields.props.properties)) {
     setReactObjectProperty(props, name, value);
   }
@@ -611,13 +620,16 @@ function reactFragmentProps(fields) {
 }
 
 function validateReactFragmentProps(props) {
-  if (props.properties.length !== 0 || props.handlers.length !== 0) {
+  if (props.ref !== null || props.properties.length !== 0 || props.handlers.length !== 0) {
     throw new Error("React Fragment props only support key");
   }
 }
 
 function virtualReactPropsFromNode(fields) {
   const props = {};
+  if (fields.props.ref !== null && fields.props.ref !== undefined) {
+    setReactObjectProperty(props, "ref", fields.props.ref);
+  }
   for (const [name, value] of reactNodePropertyEntries(fields.props.properties)) {
     setReactObjectProperty(props, name, value);
   }
@@ -680,6 +692,7 @@ function normalizeReactProps(resources, props) {
   const value = resolveReactPropsResource(resources, props);
   return {
     key: reactNodeKey(value.key),
+    ref: reactNodeRef(value.ref),
     properties: reactNodeArray(value.properties, "props"),
     handlers: reactNodeArray(value.handlers, "handlers"),
   };
@@ -698,6 +711,13 @@ function reactNodeKey(key) {
     throw new Error("React Node element key must be a string or null");
   }
   return key;
+}
+
+function reactNodeRef(ref) {
+  if (ref !== null && ref !== undefined && (typeof ref !== "object" || Array.isArray(ref))) {
+    throw new Error("React Node element ref must be a React ref object or null");
+  }
+  return ref ?? null;
 }
 
 function reactNodeArray(value, label) {

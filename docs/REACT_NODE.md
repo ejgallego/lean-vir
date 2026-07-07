@@ -263,9 +263,9 @@ The browser React host binding is exposed from
 - `react.root.create` calls `ReactDOM.createRoot(container)`.
 - `react.node.text` creates a `ReactNode` resource for an explicit `Js String`
   text node.
-- `react.props.empty`, `react.props.setKey`, `react.props.setProperty`, and
-  `react.props.setEventHandler` build a JavaScript-owned React props resource
-  from explicit conversions.
+- `react.props.empty`, `react.props.setKey`, `react.props.setRef`,
+  `react.props.setProperty`, and `react.props.setEventHandler` build a
+  JavaScript-owned React props resource from explicit conversions.
 - `react.node.children.empty` and `react.node.children.push` build a
   JavaScript-owned child list resource from explicit `Js Node` children.
 - `react.elementType.tag` wraps an explicit `Js String` DOM tag as a
@@ -300,6 +300,9 @@ The browser React host binding is exposed from
 - `react.useRef` calls `React.useRef` while rendering a component and returns a
   host-owned ref object. `react.ref.get` and `react.ref.set` read/write
   `.current`; they do not schedule a render.
+- `react.useMemo` calls `React.useMemo` while rendering a component. The
+  calculate callback runs in `ReactM`, dependencies are a JavaScript-owned
+  `DependencyList`, and the returned value stays in the `Js` resource lane.
 - `react.useEffect` calls `React.useEffect` while rendering a component. The
   current ABI is resource-shaped: setup returns a host resource and cleanup
   receives that resource when React cleans the effect up. The base binding

@@ -21,6 +21,7 @@ import {
   setReactPropsEventHandler,
   setReactPropsKey,
   setReactPropsProperty,
+  setReactPropsRef,
 } from "../react/vir-react-node.js";
 import { createNullableValue } from "./vir-js-value-bindings.js";
 
@@ -338,6 +339,8 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       setReactPropsProperty(resources, props, property),
     "react.props.setEventHandler": (props, handler) =>
       setReactPropsEventHandler(resources, props, handler),
+    "react.props.setRef": (props, ref) =>
+      setReactPropsRef(resources, props, ref),
     "react.node.children.empty": () =>
       resources.resourceForValue(createReactNodeChildrenResource()),
     "react.node.children.push": (children, child) =>

@@ -109,19 +109,22 @@ React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
 `Root.renderComponent root component props` API in a real React function
 component. The hook bindings `react.useState`, `react.useRef`,
-`react.useReducer`, `react.useEffect`, and `react.useEffectWithDeps` are
-render-time `ReactM` operations. `useRef` returns a host-owned React ref object;
-`react.ref.get` and `react.ref.set` are `RuntimeM` operations over its
-`current` field and do not schedule renders. `useReducer` keeps the low-level
+`react.useMemo`, `react.useReducer`, `react.useEffect`, and
+`react.useEffectWithDeps` are render-time `ReactM` operations. `useRef` returns
+a host-owned React ref object; `react.ref.get` and `react.ref.set` are
+`RuntimeM` operations over its `current` field and do not schedule renders.
+`useMemo` receives an explicit `Lean.Vir.Js DependencyList` and returns an
+explicit `Lean.Vir.Js α` value. `useReducer` keeps the low-level
 React boundary in `Js` resources. Reducer state and actions are typed by their
 JavaScript resource marker, so structured Lean-owned values use
 `Lean.Vir.JSL state` and `Lean.Vir.JSL action` explicitly with
 `Lean.Vir.LeanRef.toJSL`/`fromJSL` instead of `js.value.*` conversion targets.
 A retained Lean string therefore does not typecheck as a JavaScript-shaped
 `Js String`.
-`react.useEffectWithDeps` receives a `Lean.Vir.Js DependencyList` built by
-`react.deps.empty` and `react.deps.push`, so dependency arrays do not cross the
-host boundary through generic array lowering.
+`react.useMemo` and `react.useEffectWithDeps` receive a
+`Lean.Vir.Js DependencyList` built by `react.deps.empty` and
+`react.deps.push`, so dependency arrays do not cross the host boundary through
+generic array lowering.
 Reducer callbacks are retained per hook slot,
 replaced after committed renders, and released on failed render, unmount,
 package reload, or runtime dispose.

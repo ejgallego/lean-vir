@@ -159,6 +159,7 @@ resource before calling the low-level host import.
 -/
 inductive Entry where
   | key (value : String)
+  | ref {α : Type} (value : Lean.Vir.Js (Ref (Lean.Vir.Js α)))
   | property (value : Property)
   | eventHandler (value : EventHandler)
 
@@ -491,6 +492,10 @@ namespace Props
 def key (value : String) : Entry :=
   .key value
 
+/-- React `ref` special prop. -/
+def ref {α : Type} (value : Lean.Vir.Js (Ref (Lean.Vir.Js α))) : Entry :=
+  .ref value
+
 def property (value : Property) : Entry :=
   .property value
 
@@ -786,12 +791,19 @@ opaque setEventHandler
     (handler : @& Lean.Vir.Js EventHandler) :
     ReactM Unit
 
+@[vir_js "react.props.setRef"]
+opaque setRef {α : Type}
+    (props : @& Lean.Vir.Js Lean.Vir.React.Props)
+    (ref : @& Lean.Vir.Js (Ref (Lean.Vir.Js α))) :
+    ReactM Unit
+
 def setKey (props : @& Lean.Vir.Js Lean.Vir.React.Props) (key : @& String) : ReactM Unit := do
   let jsKey ← stringToJs key
   setKeyJs props jsKey
 
 def pushEntry (props : @& Lean.Vir.Js Lean.Vir.React.Props) : Entry → ReactM Unit
   | .key value => setKey props value
+  | .ref value => setRef props value
   | .property value => do
       let jsValue ← Property.toJs value
       setProperty props jsValue
@@ -936,6 +948,26 @@ def ofStrings (deps : @& Array String) : ReactM (Lean.Vir.Js DependencyList) := 
   pure jsDeps
 
 end DependencyList
+
+@[vir_js "react.useMemo"]
+opaque useMemo {α : Type}
+    (calculate : ReactM (Lean.Vir.Js α))
+    (deps : @& Lean.Vir.Js DependencyList) :
+    ReactM (Lean.Vir.Js α)
+
+def useMemoWithArrayDeps {α β : Type}
+    (calculate : ReactM (Lean.Vir.Js α))
+    (deps : @& Array (Lean.Vir.Js β)) :
+    ReactM (Lean.Vir.Js α) := do
+  let jsDeps ← DependencyList.ofArray deps
+  useMemo calculate jsDeps
+
+def useMemoWithStringDeps {α : Type}
+    (calculate : ReactM (Lean.Vir.Js α))
+    (deps : @& Array String) :
+    ReactM (Lean.Vir.Js α) := do
+  let jsDeps ← DependencyList.ofStrings deps
+  useMemo calculate jsDeps
 
 @[vir_js "react.useEffectWithDeps"]
 private opaque useEffectWithDepsJs {α : Type}

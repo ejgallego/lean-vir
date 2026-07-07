@@ -96,6 +96,27 @@ export function createBrowserReactHookRuntime(resources, React) {
       currentComponent?.refs?.add(ref);
       return resources.resourceForValue(ref);
     },
+    useMemo(calculate, deps) {
+      if (typeof React?.useMemo !== "function") {
+        releaseLeanCallback(calculate);
+        throw new Error("React.useMemo is not available");
+      }
+      try {
+        nextBrowserHook(currentComponent, "memo", "useMemo");
+      } catch (error) {
+        releaseLeanCallback(calculate);
+        throw error;
+      }
+      const dependencyList = normalizeCallbackDependencyListOrRelease(resources, deps, calculate);
+      try {
+        return React.useMemo(
+          () => reactStatePayload(resources, calculate()),
+          dependencyList,
+        );
+      } finally {
+        releaseLeanCallback(calculate);
+      }
+    },
     useEffect(setup, cleanup) {
       if (typeof React?.useEffect !== "function") {
         releaseEffectCallbacks(setup, cleanup);
@@ -266,6 +287,37 @@ export function createVirtualReactHookRuntime(resources) {
       }
       return resources.resourceForValue(hook.ref);
     },
+    useMemo(calculate, deps) {
+      if (currentComponent === null) {
+        releaseLeanCallback(calculate);
+        throw new Error("React.useMemo can only be called while rendering a component");
+      }
+      const dependencyList = normalizeCallbackDependencyListOrRelease(resources, deps, calculate);
+      const index = currentComponent.hookIndex++;
+      let hook = currentComponent.hooks[index];
+      if (hook === undefined) {
+        const value = callMemoCalculation(resources, calculate);
+        hook = {
+          kind: "memo",
+          value,
+          dependencyList: dependencyList.slice(),
+        };
+        currentComponent.hooks[index] = hook;
+        return value;
+      }
+      if (hook.kind !== "memo") {
+        releaseLeanCallback(calculate);
+        throw new Error("React hook order changed: expected useMemo");
+      }
+      if (dependencyListsEqual(hook.dependencyList, dependencyList)) {
+        releaseLeanCallback(calculate);
+        return hook.value;
+      }
+      const value = callMemoCalculation(resources, calculate);
+      hook.value = value;
+      hook.dependencyList = dependencyList.slice();
+      return value;
+    },
     useEffect(setup, cleanup) {
       if (currentComponent === null) {
         releaseEffectCallbacks(setup, cleanup);
@@ -329,6 +381,7 @@ export function createReactStateHostBindings(resources, hookRuntime) {
     "react.reducerState.dispatch": (state) =>
       resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").dispatch),
     "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
+    "react.useMemo": (calculate, deps) => resources.resourceForValue(hookRuntime.useMemo(calculate, deps)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
     "react.deps.empty": () => resources.resourceForValue(createReactDependencyListResource()),
     "react.deps.push": (deps, value) => {
@@ -438,6 +491,15 @@ function normalizeDependencyListOrRelease(resources, deps, setup, cleanup) {
   }
 }
 
+function normalizeCallbackDependencyListOrRelease(resources, deps, callback) {
+  try {
+    return normalizeDependencyList(resources, deps);
+  } catch (error) {
+    releaseLeanCallback(callback);
+    throw error;
+  }
+}
+
 function dependencyListsEqual(left, right) {
   if (!Array.isArray(left) || !Array.isArray(right) || left.length !== right.length) {
     return false;
@@ -489,6 +551,14 @@ function createVirtualRefHook(initial) {
     kind: "ref",
     ref: { current: initial },
   };
+}
+
+function callMemoCalculation(resources, calculate) {
+  try {
+    return reactStatePayload(resources, calculate());
+  } finally {
+    releaseLeanCallback(calculate);
+  }
 }
 
 function createBrowserEffect(setup, cleanup) {

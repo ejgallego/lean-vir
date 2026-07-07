@@ -57,6 +57,29 @@ export function smokeVirtualReactRefFragment(runtime, documentState, selector) {
   assertUnmountCleanup(runtime, element);
 }
 
+export function smokeVirtualReactMemo(runtime, documentState, selector) {
+  assert.equal(runtime.call("ReactCounter.mountMemo", selector), true);
+  const element = documentState.elements.get(selector);
+  assert.equal(element.textContent, "react:memo:42");
+  assertLiveCallbacks(runtime, 1);
+  assert.equal(reactElementById(element, "react-memo-label").tag, "span");
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
+export function smokeVirtualReactExternalComponent(runtime, documentState, selector) {
+  assert.equal(runtime.call("ReactCounter.mountExternalComponent", selector), true);
+  const element = documentState.elements.get(selector);
+  assert.equal(element.textContent, "external child");
+  assertLiveCallbacks(runtime, 1);
+  const badge = reactElementById(element, "react-external-badge");
+  assert.equal(badge.tag, "VirExternalBadge");
+  assert.equal(badge.props.ref.current, "unset");
+  assert.equal(virtualReactTextContent(badge), "external child");
+  element.reactRoot.unmount();
+  assertUnmountCleanup(runtime, element);
+}
+
 export function smokeVirtualReactInput(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactInput.mountInput", selector), true);
   const element = documentState.elements.get(selector);

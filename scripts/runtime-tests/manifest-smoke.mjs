@@ -258,6 +258,15 @@ assert.equal(reactUseEffectWithDepsImports[0]?.args[1]?.type?.kind, "function");
 assert.equal(reactUseEffectWithDepsImports[0]?.args[1]?.type?.effect, "dom");
 assert.equal(reactUseEffectWithDepsImports[0]?.args[2]?.type?.kind, "function");
 assert.equal(reactUseEffectWithDepsImports[0]?.args[2]?.type?.effect, "dom");
+const reactUseMemoImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useMemo");
+assert.equal(reactUseMemoImports.length, 1);
+assert.equal(reactUseMemoImports[0]?.effect, "react");
+assert.equal(reactUseMemoImports[0]?.args[0]?.type?.kind, "function");
+assert.equal(reactUseMemoImports[0]?.args[0]?.type?.effect, "react");
+assert.equal(reactUseMemoImports[0]?.args[0]?.type?.result?.type, "Js");
+assert.equal(reactUseMemoImports[0]?.args[1]?.type?.type, "Js");
+assert.equal(reactUseMemoImports[0]?.args[1]?.type?.name, "Lean.Vir.Js");
+assert.equal(reactUseMemoImports[0]?.result?.type, "Js");
 const reactRefGetImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.ref.get");
 assert.equal(reactRefGetImports.length, 1);
 assert.equal(reactRefGetImports[0]?.effect, "runtime");
@@ -434,6 +443,7 @@ for (const target of [
   "react.props.setKey",
   "react.props.setProperty",
   "react.props.setEventHandler",
+  "react.props.setRef",
 ]) {
   const entry = hostRuntime.interfaceManifest.hostImports.find((hostImport) => hostImport.target === target);
   assert.equal(entry?.effect, "react");
@@ -441,6 +451,10 @@ for (const target of [
   assert.equal(entry?.args[1]?.type?.type, "Js");
   assert.equal(entry?.result?.type, "Unit");
 }
+const externalBadgeImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.react.externalBadge");
+assert.equal(externalBadgeImport?.effect, "react");
+assert.equal(externalBadgeImport?.args.length, 0);
+assert.equal(externalBadgeImport?.result?.type, "Js");
 const reactChildrenEmptyImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "react.node.children.empty");
 assert.equal(reactChildrenEmptyImport?.effect, "react");
 assert.equal(reactChildrenEmptyImport?.args.length, 0);

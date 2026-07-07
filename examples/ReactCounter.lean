@@ -12,6 +12,9 @@ open Lean.Vir
 open Lean.Vir.Browser (DomM)
 open Lean.Vir.React
 
+@[vir_js "test.react.externalBadge"]
+opaque externalBadge : ReactM (Lean.Vir.Js ElementType)
+
 def label (value : Nat) : String :=
   "react:" ++ toString value
 
@@ -71,6 +74,20 @@ def effectProbe : Component Unit :=
 def mountEffect (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root effectProbe ()
 
+def memoProbe : Component Unit :=
+  fun _ => do
+    let dep ← JsValue.ofNat 1
+    let deps ← Hooks.DependencyList.ofArray #[dep]
+    let calculate : ReactM (Lean.Vir.Js Nat) := do
+      JsValue.ofNat 42
+    let value ← Hooks.useMemo calculate deps
+    let memoValue ← JsValue.toNat value
+    let text ← Node.text s!"react:memo:{memoValue}"
+    Node.spanWith #[Props.id "react-memo-label"] #[text]
+
+def mountMemo (selector : String) : DomM Bool :=
+  Root.mountFromSelector selector fun root => Root.renderComponent root memoProbe ()
+
 def refFragmentProbe : Component Unit :=
   fun _ => do
     let initial ← JsValue.ofNat 0
@@ -98,6 +115,19 @@ def refFragmentProbe : Component Unit :=
 
 def mountRefFragment (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root refFragmentProbe ()
+
+def externalComponentProbe : Component Unit :=
+  fun _ => do
+    let component ← externalBadge
+    let initial ← JsValue.ofString "unset"
+    let ref ← Hooks.useRef initial
+    let text ← Node.text "external child"
+    Node.createElement component
+      #[Props.id "react-external-badge", Props.ref ref]
+      #[text]
+
+def mountExternalComponent (selector : String) : DomM Bool :=
+  Root.mountFromSelector selector fun root => Root.renderComponent root externalComponentProbe ()
 
 def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text ("item:" ++ toString index)

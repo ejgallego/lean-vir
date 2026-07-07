@@ -263,6 +263,7 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - object marker: `Lean.Vir.React.Root`
 - object marker: `Lean.Vir.React.ElementType`
 - object marker: `Lean.Vir.React.StateSetter α`
+- object marker: `Lean.Vir.React.Ref α`
 - object marker: `Lean.Vir.React.Props`
 - object marker: `Lean.Vir.React.NodeChildren`
 - object marker: `Lean.Vir.React.DependencyList`
@@ -278,6 +279,8 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.createElement : @& Lean.Vir.Js Lean.Vir.React.ElementType -> Array Lean.Vir.React.Props.Entry -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Node.createElementTag : @& String -> Array Lean.Vir.React.Props.Entry -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Props.key : String -> Lean.Vir.React.Props.Entry`
+- `Lean.Vir.React.Props.ref : Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)) -> Lean.Vir.React.Props.Entry`
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
 - `Lean.Vir.React.Root.createFromSelector : String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.React.Root))`
 - `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
@@ -286,9 +289,13 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
 - `Lean.Vir.React.Hooks.useReducer : (Lean.Vir.Js state -> Lean.Vir.Js action -> Lean.Vir.RuntimeM (Lean.Vir.Js state)) -> @& Lean.Vir.Js state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
+- `Lean.Vir.React.Hooks.useRef : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js α)))`
 - `Lean.Vir.React.Hooks.DependencyList.empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.DependencyList)`
 - `Lean.Vir.React.Hooks.DependencyList.push : @& Lean.Vir.Js Lean.Vir.React.DependencyList -> @& Lean.Vir.Js α -> Lean.Vir.React.ReactM Unit`
 - `Lean.Vir.React.Hooks.DependencyList.ofArray : @& Array (Lean.Vir.Js α) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.DependencyList)`
+- `Lean.Vir.React.Hooks.useMemo : Lean.Vir.React.ReactM (Lean.Vir.Js α) -> @& Lean.Vir.Js Lean.Vir.React.DependencyList -> Lean.Vir.React.ReactM (Lean.Vir.Js α)`
+- `Lean.Vir.React.Hooks.useMemoWithArrayDeps : Lean.Vir.React.ReactM (Lean.Vir.Js α) -> @& Array (Lean.Vir.Js β) -> Lean.Vir.React.ReactM (Lean.Vir.Js α)`
+- `Lean.Vir.React.Hooks.useMemoWithStringDeps : Lean.Vir.React.ReactM (Lean.Vir.Js α) -> @& Array String -> Lean.Vir.React.ReactM (Lean.Vir.Js α)`
 - `Lean.Vir.React.Hooks.useEffectWithDeps : @& Lean.Vir.Js Lean.Vir.React.DependencyList -> Lean.Vir.Browser.DomM (Lean.Vir.Js α) -> (@& Lean.Vir.Js α -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.React.ReactM Unit`
 - `Lean.Vir.React.Hooks.useEffectWithStringDeps : @& Array String -> Lean.Vir.Browser.DomM (Lean.Vir.Js α) -> (@& Lean.Vir.Js α -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.React.ReactM Unit`
 - `Lean.Vir.React.ReducerDispatch.dispatch : Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> Lean.Vir.Js action -> Lean.Vir.RuntimeM Unit`
