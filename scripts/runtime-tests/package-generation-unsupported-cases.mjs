@@ -59,7 +59,19 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /jsCallbackResult/,
     /unsupported JavaScript import result/,
     /callback `Function` is not a JavaScript boundary type/,
-  ], ["freshCustomBump", "freshCustomCounter", "freshCustomCallbackResult"]);
+    /jsArrayLength/,
+    /unsupported JavaScript import argument `arrayItems`/,
+    /array `Array Js` is not a JavaScript boundary type/,
+    /jsListLength/,
+    /unsupported JavaScript import argument `listItems`/,
+    /list `List Js` is not a JavaScript boundary type/,
+  ], [
+    "freshCustomBump",
+    "freshCustomCounter",
+    "freshCustomCallbackResult",
+    "freshCustomArrayLength",
+    "freshCustomListLength",
+  ]);
 
   await assertUnsupportedInterfaceFixture(freshDir, "BadLeanRef.lean", [
     /actionToJs/,

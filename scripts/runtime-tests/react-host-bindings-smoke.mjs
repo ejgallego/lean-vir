@@ -262,6 +262,29 @@ const renderMalformedReactNode = (node) => {
 const reactNodeText = (value) => malformedReactHost["react.node.text"](malformedReactJsString(value));
 const reactNodeProperty = (value) => malformedReactHost["js.value.react.property"](value);
 const reactNodeEventHandler = (value) => malformedReactHost["js.value.react.eventHandler"](value);
+const reactNodeProps = ({ key = null, props = [], handlers = [] } = {}) => {
+  const resource = malformedReactHost["react.props.empty"]();
+  if (key !== null && key !== undefined) {
+    malformedReactHost["react.props.setKey"](
+      resource,
+      typeof key === "string" ? malformedReactJsString(key) : key,
+    );
+  }
+  for (const prop of props) {
+    malformedReactHost["react.props.setProperty"](resource, reactNodeProperty(prop));
+  }
+  for (const handler of handlers) {
+    malformedReactHost["react.props.setEventHandler"](resource, reactNodeEventHandler(handler));
+  }
+  return resource;
+};
+const reactNodeChildren = (children = []) => {
+  const resource = malformedReactHost["react.node.children.empty"]();
+  for (const child of children) {
+    malformedReactHost["react.node.children.push"](resource, child);
+  }
+  return resource;
+};
 const reactNodeElement = ({
   tag = "div",
   key = null,
@@ -270,10 +293,8 @@ const reactNodeElement = ({
   children = [],
 } = {}) => malformedReactHost["react.node.createElement"](
   typeof tag === "string" ? malformedReactJsString(tag) : tag,
-  typeof key === "string" ? malformedReactJsString(key) : key,
-  props.map(reactNodeProperty),
-  handlers.map(reactNodeEventHandler),
-  children,
+  reactNodeProps({ key, props, handlers }),
+  reactNodeChildren(children),
 );
 const renderReactNodeElement = (fields) => renderMalformedReactNode(reactNodeElement(fields));
 renderReactNodeElement({
@@ -293,8 +314,12 @@ assert.throws(
   /React Node text value must be a Js String/,
 );
 assert.throws(
-  () => malformedReactHost["react.node.createElement"](malformedReactJsString("div"), null, [], [], "children"),
-  /React Node children must be an array/,
+  () => malformedReactHost["react.node.createElement"](
+    malformedReactJsString("div"),
+    reactNodeProps(),
+    malformedReactJsString("children"),
+  ),
+  /ReactNodeChildren resource has invalid value/,
 );
 assert.throws(
   () => renderReactNodeElement({ children: [{}] }),

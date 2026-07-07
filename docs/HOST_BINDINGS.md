@@ -95,10 +95,12 @@ Browser `react.root.*` targets are provided by
 `ReactDOMClient.createRoot`, `root.render`, and `root.unmount`.
 `react.node.text`, `react.node.createElement`, and `react.node.fragment`
 construct `ReactNode` resources. Their low-level host targets receive explicit
-`Lean.Vir.Js String` resources for text, tags, and keys; the public Lean
-helpers convert ordinary strings with `JsValue`. The browser binding uses
-`React.createElement` and `React.Fragment`, while the virtual binding builds
-test-visible virtual React nodes.
+`Lean.Vir.Js String`, `Lean.Vir.Js Props`, and `Lean.Vir.Js NodeChildren`
+resources; the public Lean helpers convert ordinary strings with `JsValue` and
+populate props/children with explicit `react.props.*` and
+`react.node.children.*` calls. The browser binding uses `React.createElement`
+and `React.Fragment`, while the virtual binding builds test-visible virtual
+React nodes.
 `react.root.renderComponent` wraps the thunk produced by Lean's
 `Root.renderComponent root component props` API in a real React function
 component. The hook bindings `react.useState`, `react.useRef`,
@@ -112,6 +114,9 @@ JavaScript resource marker, so structured Lean-owned values use
 `Lean.Vir.LeanRef.toJSL`/`fromJSL` instead of `js.value.*` conversion targets.
 A retained Lean string therefore does not typecheck as a JavaScript-shaped
 `Js String`.
+`react.useEffectWithDeps` receives a `Lean.Vir.Js DependencyList` built by
+`react.deps.empty` and `react.deps.push`, so dependency arrays do not cross the
+host boundary through generic array lowering.
 Reducer callbacks are retained per hook slot,
 replaced after committed renders, and released on failed render, unmount,
 package reload, or runtime dispose.

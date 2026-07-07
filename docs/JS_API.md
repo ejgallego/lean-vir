@@ -216,7 +216,8 @@ resource-shaped containers/callbacks, or explicit conversion targets such as
 which stores the Lean object behind a `Lean.Vir.JSL α` resource instead of
 decoding it to JavaScript. `LeanRef.releaseJSL` deterministically releases a
 handle.
-Other raw Lean scalar and structure imports are rejected by package generation.
+Other raw Lean scalar, structure, array, and list imports are rejected by
+package generation.
 Exported Lean entrypoints and host imports may be pure or use a
 recognized synchronous effect. JavaScript resource/runtime APIs use
 `Lean.Vir.RuntimeM α`; DOM and React-root imports use

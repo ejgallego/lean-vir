@@ -153,10 +153,10 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       createVirtualReactRootResource(state.resources, target, reactHooks), {
         querySelector: (selector) => queryVirtualElementState(state, selector),
         createNodeTextResource: (value) => createVirtualReactNodeTextResource(state.resources, value),
-        createNodeElementResource: (tag, key, props, handlers, children) =>
-          createVirtualReactNodeElementResource(state.resources, reactHooks, tag, key, props, handlers, children),
-        createNodeFragmentResource: (key, children) =>
-          createVirtualReactNodeFragmentResource(state.resources, key, children),
+        createNodeElementResource: (tag, props, children) =>
+          createVirtualReactNodeElementResource(state.resources, reactHooks, tag, props, children),
+        createNodeFragmentResource: (props, children) =>
+          createVirtualReactNodeFragmentResource(state.resources, props, children),
       }),
     ...createReactJsValueHostBindings(state.resources),
     ...createReactStateHostBindings(state.resources, reactHookRuntime),

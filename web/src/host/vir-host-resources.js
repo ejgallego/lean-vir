@@ -12,7 +12,15 @@ import {
   releaseHostResource,
   requireExternrefTableSupport,
 } from "../host-resource.js";
-import { disposeReactNode } from "../react/vir-react-node.js";
+import {
+  createReactNodeChildrenResource,
+  createReactPropsResource,
+  disposeReactNode,
+  pushReactNodeChild,
+  setReactPropsEventHandler,
+  setReactPropsKey,
+  setReactPropsProperty,
+} from "../react/vir-react-node.js";
 
 export class HostResourceState {
   constructor() {
@@ -314,20 +322,30 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       resources.resourceForValue(
         requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue(resources, value, "React Node text value"))
       ),
-    "react.node.createElement": (tag, key, props, handlers, children) =>
+    "react.props.empty": () =>
+      resources.resourceForValue(createReactPropsResource()),
+    "react.props.setKey": (props, key) =>
+      setReactPropsKey(resources, props, key),
+    "react.props.setProperty": (props, property) =>
+      setReactPropsProperty(resources, props, property),
+    "react.props.setEventHandler": (props, handler) =>
+      setReactPropsEventHandler(resources, props, handler),
+    "react.node.children.empty": () =>
+      resources.resourceForValue(createReactNodeChildrenResource()),
+    "react.node.children.push": (children, child) =>
+      pushReactNodeChild(resources, children, child),
+    "react.node.createElement": (tag, props, children) =>
       resources.resourceForValue(
         requireReactNodeElementResourceFactory(createNodeElementResource)(
           jsStringValue(resources, tag, "React Node element tag"),
-          optionalJsStringValue(resources, key, "React Node element key"),
-          reactNodeWireResources(resources, props, "React Node property"),
-          reactNodeWireResources(resources, handlers, "React Node event handler"),
+          props,
           children,
         )
       ),
-    "react.node.fragment": (key, children) =>
+    "react.node.fragment": (props, children) =>
       resources.resourceForValue(
         requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(
-          optionalJsStringValue(resources, key, "React Node fragment key"),
+          props,
           children,
         )
       ),
@@ -418,13 +436,6 @@ function requireReactNodeFragmentResourceFactory(factory) {
   return factory;
 }
 
-function reactNodeWireResources(resources, values, label) {
-  if (!Array.isArray(values)) {
-    throw new Error(`${label}s must be an array`);
-  }
-  return values.map((value, index) => resources.resolveResource(value, `${label}[${index}]`));
-}
-
 export function createTimerResourceHostBindings(resources) {
   return {
     "browser.timer.setTimeout": (delayMs, callback) =>
@@ -473,13 +484,6 @@ function jsStringValue(resources, value, label) {
     throw new Error(`${label} must be a Js String`);
   }
   return text;
-}
-
-function optionalJsStringValue(resources, value, label) {
-  if (value === null || value === undefined) {
-    return null;
-  }
-  return jsStringValue(resources, value, label);
 }
 
 export function createTimeoutResource(resources, delayMs, callback) {

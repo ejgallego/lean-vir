@@ -128,8 +128,8 @@ artifact remains a core `wasm32-wasip1` module. WIT already has enums and
 variants, so the main mismatch for `Lean.Vir.React.Node` is not enum support.
 The current `Node` marker is resource-like: Lean constructs a
 JavaScript-owned `ReactNode` through `react.node.text` and
-`react.node.createElement`, and event-handler records passed to construction can
-embed callback closures.
+`react.node.createElement`, and event-handler records placed in explicit
+`Props` resources can embed callback closures.
 
 The intended alignment is:
 

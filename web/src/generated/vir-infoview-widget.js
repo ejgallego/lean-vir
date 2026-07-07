@@ -228,12 +228,12 @@ function createBrowserReactNodeTextResource(resources, value) {
     node: reactNodeTextValue(value)
   });
 }
-function createBrowserReactNodeElementResource(resources, createElement3, hooks, tag, key, props, handlers, children) {
+function createBrowserReactNodeElementResource(resources, createElement3, hooks, tag, props, children) {
   if (typeof createElement3 !== "function") {
     throw new Error("createBrowserReactNodeElementResource requires a React.createElement-compatible function");
   }
   const { callLeanEventCallback: callLeanEventCallback2 } = requireReactHostHooks(hooks);
-  return createReactNodeElementResource(resources, tag, key, props, handlers, children, (fields, childEntries) => {
+  return createReactNodeElementResource(resources, tag, props, children, (fields, childEntries) => {
     const { props: reactProps, callbacks } = reactPropsFromNode(resources, fields, callLeanEventCallback2, hooks);
     return {
       node: createElement3(fields.tag, reactProps, ...childEntries.map((child) => child.value.node)),
@@ -241,25 +241,49 @@ function createBrowserReactNodeElementResource(resources, createElement3, hooks,
     };
   });
 }
-function createBrowserReactNodeFragmentResource(resources, createElement3, Fragment2, key, children) {
+function createBrowserReactNodeFragmentResource(resources, createElement3, Fragment2, props, children) {
   if (typeof createElement3 !== "function") {
     throw new Error("createBrowserReactNodeFragmentResource requires a React.createElement-compatible function");
   }
   if (Fragment2 === null || Fragment2 === void 0) {
     throw new Error("createBrowserReactNodeFragmentResource requires React.Fragment");
   }
-  return createReactNodeFragmentResource(resources, key, children, (fields, childEntries) => ({
+  return createReactNodeFragmentResource(resources, props, children, (fields, childEntries) => ({
     node: createElement3(Fragment2, reactFragmentProps(fields), ...childEntries.map((child) => child.value.node))
   }));
 }
-function createReactNodeElementResource(resources, tag, key, props, handlers, children, createNode) {
+function createReactPropsResource() {
+  return { kind: "ReactProps", key: null, properties: [], handlers: [] };
+}
+function setReactPropsKey(resources, propsResource, keyResource) {
+  const props = resolveReactPropsResource(resources, propsResource);
+  props.key = jsStringValue(resources, keyResource, "React Node element key");
+  return void 0;
+}
+function setReactPropsProperty(resources, propsResource, propertyResource) {
+  const props = resolveReactPropsResource(resources, propsResource);
+  props.properties.push(resources.resolveResource(propertyResource, `React Node property[${props.properties.length}]`));
+  return void 0;
+}
+function setReactPropsEventHandler(resources, propsResource, handlerResource) {
+  const props = resolveReactPropsResource(resources, propsResource);
+  props.handlers.push(resources.resolveResource(handlerResource, `React Node event handler[${props.handlers.length}]`));
+  return void 0;
+}
+function createReactNodeChildrenResource() {
+  return { kind: "ReactNodeChildren", children: [] };
+}
+function pushReactNodeChild(resources, childrenResource, childResource) {
+  const children = resolveReactNodeChildrenBuilder(resources, childrenResource);
+  children.children.push(childResource);
+  return void 0;
+}
+function createReactNodeElementResource(resources, tag, props, children, createNode) {
   const childEntries = resolveReactNodeChildren(resources, children);
   const stats = reactNodeSubtreeStats(childEntries);
   const fields = {
     tag: reactNodeName(tag, "element tag"),
-    key: reactNodeKey(key),
-    props: reactNodeArray(props, "props"),
-    handlers: reactNodeArray(handlers, "handlers")
+    props: normalizeReactProps(resources, props)
   };
   let callbacks = [];
   try {
@@ -276,12 +300,13 @@ function createReactNodeElementResource(resources, tag, key, props, handlers, ch
     throw error;
   }
 }
-function createReactNodeFragmentResource(resources, key, children, createNode) {
+function createReactNodeFragmentResource(resources, props, children, createNode) {
   const childEntries = resolveReactNodeChildren(resources, children);
   const stats = reactNodeSubtreeStats(childEntries);
   const fields = {
-    key: reactNodeKey(key)
+    props: normalizeReactProps(resources, props)
   };
+  validateReactFragmentProps(fields.props);
   const created = createNode(fields, childEntries);
   return createReactNodeResource(resources, {
     node: created.node,
@@ -438,8 +463,16 @@ function finalizeReactNodeValue(resources, value) {
   value.children.length = 0;
   resources.removeDisposable(value);
 }
+function resolveReactNodeChildrenBuilder(resources, children) {
+  const value = resources.resolveResource(children, "ReactNodeChildren");
+  if (value?.kind !== "ReactNodeChildren") {
+    throw new Error("ReactNodeChildren resource has invalid value");
+  }
+  reactNodeArray(value.children, "children");
+  return value;
+}
 function resolveReactNodeChildren(resources, children) {
-  return reactNodeArray(children, "children").map((resource, index) => ({
+  return resolveReactNodeChildrenBuilder(resources, children).children.map((resource, index) => ({
     resource,
     value: resolveReactNodeResource(resources, resource, `React Node child[${index}]`)
   }));
@@ -518,13 +551,13 @@ function disposeReactComponent(component) {
 function reactPropsFromNode(state, fields, callLeanEventCallback2, hooks) {
   const props = {};
   const callbacks = [];
-  if (fields.key !== null && fields.key !== void 0) {
-    props.key = fields.key;
+  if (fields.props.key !== null && fields.props.key !== void 0) {
+    props.key = fields.props.key;
   }
-  for (const [name, value] of reactNodePropertyEntries(fields.props)) {
+  for (const [name, value] of reactNodePropertyEntries(fields.props.properties)) {
     setReactObjectProperty(props, name, value);
   }
-  for (const [name, callback] of reactNodeEventHandlerEntries(fields.handlers)) {
+  for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
     callbacks.push(callback);
     setReactObjectProperty(props, name, (event) => {
       beginReactNodeEventCallback(hooks);
@@ -540,10 +573,30 @@ function reactPropsFromNode(state, fields, callLeanEventCallback2, hooks) {
 }
 function reactFragmentProps(fields) {
   const props = {};
-  if (fields.key !== null && fields.key !== void 0) {
-    props.key = fields.key;
+  if (fields.props.key !== null && fields.props.key !== void 0) {
+    props.key = fields.props.key;
   }
   return props;
+}
+function validateReactFragmentProps(props) {
+  if (props.properties.length !== 0 || props.handlers.length !== 0) {
+    throw new Error("React Fragment props only support key");
+  }
+}
+function normalizeReactProps(resources, props) {
+  const value = resolveReactPropsResource(resources, props);
+  return {
+    key: reactNodeKey(value.key),
+    properties: reactNodeArray(value.properties, "props"),
+    handlers: reactNodeArray(value.handlers, "handlers")
+  };
+}
+function resolveReactPropsResource(resources, props) {
+  const value = resources.resolveResource(props, "ReactProps");
+  if (value?.kind !== "ReactProps") {
+    throw new Error("ReactProps resource has invalid value");
+  }
+  return value;
 }
 function reactNodeKey(key) {
   if (key !== null && key !== void 0 && typeof key !== "string") {
@@ -684,6 +737,13 @@ function reactClassListPropValue(classes) {
 function reactClassToken(value, index) {
   if (typeof value !== "string" || value.length === 0 || /\s/.test(value)) {
     throw new Error(`React PropValue.classList[${index}] must be a non-empty token without whitespace`);
+  }
+  return value;
+}
+function jsStringValue(resources, resource, label) {
+  const value = resources.resolveResource(resource, label);
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a Js String`);
   }
   return value;
 }
@@ -1005,20 +1065,24 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
   }
   return {
     "react.node.text": (value) => resources.resourceForValue(
-      requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue(resources, value, "React Node text value"))
+      requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue2(resources, value, "React Node text value"))
     ),
-    "react.node.createElement": (tag, key, props, handlers, children) => resources.resourceForValue(
+    "react.props.empty": () => resources.resourceForValue(createReactPropsResource()),
+    "react.props.setKey": (props, key) => setReactPropsKey(resources, props, key),
+    "react.props.setProperty": (props, property) => setReactPropsProperty(resources, props, property),
+    "react.props.setEventHandler": (props, handler) => setReactPropsEventHandler(resources, props, handler),
+    "react.node.children.empty": () => resources.resourceForValue(createReactNodeChildrenResource()),
+    "react.node.children.push": (children, child) => pushReactNodeChild(resources, children, child),
+    "react.node.createElement": (tag, props, children) => resources.resourceForValue(
       requireReactNodeElementResourceFactory(createNodeElementResource)(
-        jsStringValue(resources, tag, "React Node element tag"),
-        optionalJsStringValue(resources, key, "React Node element key"),
-        reactNodeWireResources(resources, props, "React Node property"),
-        reactNodeWireResources(resources, handlers, "React Node event handler"),
+        jsStringValue2(resources, tag, "React Node element tag"),
+        props,
         children
       )
     ),
-    "react.node.fragment": (key, children) => resources.resourceForValue(
+    "react.node.fragment": (props, children) => resources.resourceForValue(
       requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(
-        optionalJsStringValue(resources, key, "React Node fragment key"),
+        props,
         children
       )
     ),
@@ -1044,7 +1108,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     },
     "react.root.renderIntoSelector": (selector, node) => {
       const root = selectorRoot(
-        jsStringValue(resources, selector, "React root selector"),
+        jsStringValue2(resources, selector, "React root selector"),
         () => disposeUnrenderedReactNode(node)
       );
       if (root === null) {
@@ -1055,7 +1119,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     },
     "react.root.renderComponentIntoSelector": (selector, component) => {
       const root = selectorRoot(
-        jsStringValue(resources, selector, "React root selector"),
+        jsStringValue2(resources, selector, "React root selector"),
         () => releaseLeanCallback2(component)
       );
       if (root === null) {
@@ -1071,7 +1135,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
       return void 0;
     },
     "react.root.unmountSelector": (selector) => {
-      const mounted = rootsBySelector.get(jsStringValue(resources, selector, "React root selector"));
+      const mounted = rootsBySelector.get(jsStringValue2(resources, selector, "React root selector"));
       if (mounted === void 0) {
         return resources.resourceForValue(false);
       }
@@ -1103,12 +1167,6 @@ function requireReactNodeFragmentResourceFactory(factory) {
     throw new Error("react.node.fragment host binding requires a React Node fragment resource factory");
   }
   return factory;
-}
-function reactNodeWireResources(resources, values, label) {
-  if (!Array.isArray(values)) {
-    throw new Error(`${label}s must be an array`);
-  }
-  return values.map((value, index) => resources.resolveResource(value, `${label}[${index}]`));
 }
 function createTimerResourceHostBindings(resources) {
   return {
@@ -1146,18 +1204,12 @@ function jsNatAsDelay(resources, value) {
   }
   return Number(delay);
 }
-function jsStringValue(resources, value, label) {
+function jsStringValue2(resources, value, label) {
   const text = resources.resolveResource(value, label);
   if (typeof text !== "string") {
     throw new Error(`${label} must be a Js String`);
   }
   return text;
-}
-function optionalJsStringValue(resources, value, label) {
-  if (value === null || value === void 0) {
-    return null;
-  }
-  return jsStringValue(resources, value, label);
 }
 function createTimeoutResource(resources, delayMs, callback) {
   return createScheduledCallbackResource(resources, callback, {
@@ -1345,7 +1397,7 @@ function createJsValueHostBindings(resources) {
 }
 var jsValueCodecs = {
   "js.string": {
-    toJs: jsStringValue2,
+    toJs: jsStringValue3,
     fromJs: jsStringPayload
   },
   "js.nat": {
@@ -1361,7 +1413,7 @@ var jsValueCodecs = {
     fromJs: jsFloatPayload
   }
 };
-function jsStringValue2(value) {
+function jsStringValue3(value) {
   if (typeof value !== "string") {
     throw new Error("js.string expects a string");
   }
@@ -1570,6 +1622,11 @@ function createReactStateHostBindings(resources, hookRuntime) {
     "react.reducerState.dispatch": (state) => resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").dispatch),
     "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
+    "react.deps.empty": () => resources.resourceForValue(createReactDependencyListResource()),
+    "react.deps.push": (deps, value) => {
+      pushReactDependency(resources, deps, value);
+      return void 0;
+    },
     "react.useEffectWithDeps": (deps, setup, cleanup) => hookRuntime.useEffectWithDeps(deps, setup, cleanup),
     "react.ref.get": (ref) => resources.resourceForValue(resources.resolveResource(ref, "ReactRef").current),
     "react.ref.set": (ref, value) => {
@@ -1634,17 +1691,38 @@ function createBrowserReducerHook(resources) {
   };
   return hook;
 }
+function createReactDependencyListResource() {
+  return { kind: "ReactDependencyList", values: [] };
+}
+function pushReactDependency(resources, deps, value) {
+  const dependencyList = resolveReactDependencyListResource(resources, deps);
+  dependencyList.values.push(jsStringValue4(resources, value, `React dependency[${dependencyList.values.length}]`));
+}
 function normalizeDependencyList(resources, deps) {
-  if (!Array.isArray(deps)) {
-    throw new Error("React dependency list must be an array");
+  const dependencyList = resolveReactDependencyListResource(resources, deps);
+  if (!Array.isArray(dependencyList.values)) {
+    throw new Error("React dependency list values must be an array");
   }
-  return deps.map((dep, index) => {
-    const value = resources.resolveResource(dep, `React dependency[${index}]`);
+  return dependencyList.values.map((value, index) => {
     if (typeof value !== "string") {
       throw new Error(`React dependency[${index}] must be a Js String`);
     }
     return value;
   });
+}
+function resolveReactDependencyListResource(resources, deps) {
+  const dependencyList = resources.resolveResource(deps, "ReactDependencyList");
+  if (dependencyList?.kind !== "ReactDependencyList") {
+    throw new Error("ReactDependencyList resource has invalid value");
+  }
+  return dependencyList;
+}
+function jsStringValue4(resources, resource, label) {
+  const value = resources.resolveResource(resource, label);
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a Js String`);
+  }
+  return value;
 }
 function normalizeDependencyListOrRelease(resources, deps, setup, cleanup) {
   try {
@@ -2255,8 +2333,8 @@ function createBrowserReactHostBindings(state = createHostResourceState(), {
     ...createReactRootResourceHostBindings(state, (target) => createBrowserReactRootResource2(state, createRoot(target), React, hooks), {
       querySelector,
       createNodeTextResource: (value) => createBrowserReactNodeTextResource(state, value),
-      createNodeElementResource: (tag, key, props, handlers, children) => createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, key, props, handlers, children),
-      createNodeFragmentResource: (key, children) => createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, key, children)
+      createNodeElementResource: (tag, props, children) => createBrowserReactNodeElementResource(state, React.createElement, hooks, tag, props, children),
+      createNodeFragmentResource: (props, children) => createBrowserReactNodeFragmentResource(state, React.createElement, React.Fragment, props, children)
     }),
     ...createReactJsValueHostBindings(state),
     ...createReactStateHostBindings(state, hookRuntime)

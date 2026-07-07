@@ -379,7 +379,7 @@ def liveTickMs : UInt32 :=
 
 abbrev style := Lean.Vir.Examples.Style.style
 
-def widgetStyle : Property := style #[
+def widgetStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "8px"),
   ("minWidth", "0"),
@@ -393,13 +393,13 @@ def widgetStyle : Property := style #[
   ("fontFamily", "Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, Segoe UI, sans-serif")
 ]
 
-def bodyStyle : Property := style #[
+def bodyStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "8px"),
   ("minWidth", "0")
 ]
 
-def petStageStyle : Property := style #[
+def petStageStyle : Props.Entry := style #[
   ("display", "grid"),
   ("placeItems", "center"),
   ("gap", "6px"),
@@ -433,7 +433,7 @@ def petScreen : Tamagotchi.Mood → String
 def petInk (artwork : String) : String :=
   if Tamagotchi.normalizeArtwork artwork == "octopus" then "#314f78" else "#1e3328"
 
-def deviceStyle (state : Tamagotchi.PetState) : Property :=
+def deviceStyle (state : Tamagotchi.PetState) : Props.Entry :=
   let shell := petShell state.mood
   let shellDark := petShellDark state.mood
   style #[
@@ -452,7 +452,7 @@ def deviceStyle (state : Tamagotchi.PetState) : Property :=
     ("padding", "0")
   ]
 
-def screenStyle (state : Tamagotchi.PetState) : Property :=
+def screenStyle (state : Tamagotchi.PetState) : Props.Entry :=
   let screen := petScreen state.mood
   style #[
     ("position", "absolute"),
@@ -477,13 +477,13 @@ def screenStyle (state : Tamagotchi.PetState) : Property :=
     ("textAlign", "center")
   ]
 
-def actionGridStyle : Property := style #[
+def actionGridStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "repeat(5, minmax(0, 1fr))"),
   ("gap", "5px")
 ]
 
-def buttonStyle : Property := style #[
+def buttonStyle : Props.Entry := style #[
   ("minHeight", "31px"),
   ("padding", "0 8px"),
   ("border", "1px solid rgba(49, 79, 120, 0.28)"),
@@ -499,7 +499,7 @@ def buttonStyle : Property := style #[
   ("cursor", "pointer")
 ]
 
-def resetButtonStyle : Property := style #[
+def resetButtonStyle : Props.Entry := style #[
   ("minHeight", "26px"),
   ("padding", "0 9px"),
   ("border", "1px solid var(--vscode-editorWidget-border, #d0d7de)"),
@@ -512,7 +512,7 @@ def resetButtonStyle : Property := style #[
   ("cursor", "pointer")
 ]
 
-def progressWrapStyle : Property := style #[
+def progressWrapStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gridTemplateColumns", "minmax(0, 1fr) auto"),
   ("alignItems", "center"),
@@ -521,7 +521,7 @@ def progressWrapStyle : Property := style #[
   ("maxWidth", "138px")
 ]
 
-def progressStyle : Property := style #[
+def progressStyle : Props.Entry := style #[
   ("height", "8px"),
   ("minWidth", "0"),
   ("overflow", "hidden"),
@@ -537,7 +537,7 @@ def progressPercent (secondsLeft : Nat) : Nat :=
 def progressLabel (secondsLeft : Nat) : String :=
   s!"{secondsLeft}s"
 
-def progressFillStyle (secondsLeft : Nat) : Property := style #[
+def progressFillStyle (secondsLeft : Nat) : Props.Entry := style #[
   ("width", toString (progressPercent secondsLeft) ++ "%"),
   ("height", "100%"),
   ("borderRadius", "inherit"),
@@ -546,7 +546,7 @@ def progressFillStyle (secondsLeft : Nat) : Property := style #[
   ("transition", "width 260ms linear")
 ]
 
-def progressCounterStyle : Property := style #[
+def progressCounterStyle : Props.Entry := style #[
   ("minWidth", "28px"),
   ("textAlign", "right"),
   ("fontSize", "0.7rem"),
@@ -573,10 +573,9 @@ def widgetCss : String :=
   ".react-pet-widget .react-pet-progress-fill{transition:none!important;}" ++
   "}"
 
-def emptySpanWith (classes : Array String) (props : Array Property) : ReactM (Lean.Vir.Js Node) :=
+def emptySpanWith (classes : Array String) (props : Array Props.Entry) : ReactM (Lean.Vir.Js Node) :=
   Node.spanWith
-    (#[Property.classList classes, Property.ariaHidden true] ++ props)
-    #[]
+    (#[Props.classList classes, Props.ariaHidden true] ++ props)
     #[]
 
 def emptySpan (classes : Array String) : ReactM (Lean.Vir.Js Node) :=
@@ -585,7 +584,7 @@ def emptySpan (classes : Array String) : ReactM (Lean.Vir.Js Node) :=
 def pixelPart (classes : Array String) (entries : Array (String × String)) : ReactM (Lean.Vir.Js Node) :=
   emptySpanWith classes #[style entries]
 
-def petPixelStyle : Property := style #[
+def petPixelStyle : Props.Entry := style #[
   ("position", "relative"),
   ("width", "60px"),
   ("height", "54px"),
@@ -721,8 +720,8 @@ def pixelPet (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
   let signal ←
     Node.spanWith
       #[
-        Property.classList #["pet-signal"],
-        Property.ariaHidden true,
+        Props.classList #["pet-signal"],
+        Props.ariaHidden true,
         style #[
           ("position", "absolute"),
           ("top", "0"),
@@ -734,7 +733,6 @@ def pixelPet (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
           ("lineHeight", "1")
         ]
       ]
-      #[]
       #[signalText]
   let children ←
     if artwork == "octopus" then do
@@ -767,11 +765,10 @@ def pixelPet (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
       let footRight ← foot "33px" ink
       pure #[earLeft, earRight, body, footLeft, footRight, eyeLeft, eyeRight, mouth, signal]
   Node.divWith
-    #[Property.classList #["pet-pixel-pet", "vir-pet-dance"], Property.ariaHidden true, petPixelStyle]
-    #[]
+    #[Props.classList #["pet-pixel-pet", "vir-pet-dance"], Props.ariaHidden true, petPixelStyle]
     children
 
-def deviceButtonStyle (left right : Option String) : Property :=
+def deviceButtonStyle (left right : Option String) : Props.Entry :=
   let horizontal :=
     match left, right with
     | some value, _ => #[("left", value)]
@@ -793,22 +790,21 @@ def device (state : Tamagotchi.PetState) : ReactM (Lean.Vir.Js Node) := do
   let moodLabel := state.mood.label
   let pet ← pixelPet state
   let screenLabelText ← Node.text (displayName state ++ " / " ++ moodLabel)
-  let screenLabel ← Node.spanWith #[] #[] #[screenLabelText]
-  let screen ← Node.divWith #[Property.classList #["pet-screen"], screenStyle state] #[] #[pet, screenLabel]
+  let screenLabel ← Node.spanWith #[] #[screenLabelText]
+  let screen ← Node.divWith #[Props.classList #["pet-screen"], screenStyle state] #[pet, screenLabel]
   let leftButton ← emptySpanWith #["pet-device-button", "pet-device-button-left"] #[deviceButtonStyle (some "30px") none]
   let centerButton ← emptySpanWith #["pet-device-button", "pet-device-button-center"] #[deviceButtonStyle (some "55px") none]
   let rightButton ← emptySpanWith #["pet-device-button", "pet-device-button-right"] #[deviceButtonStyle none (some "30px")]
   Node.divWith
     #[
-      Property.id "react-pet-device",
-      Property.classList #["pet-device"],
-      Property.role "img",
-      Property.ariaLabel s!"{Tamagotchi.artLabel artwork} {displayName state} mood {moodLabel}",
-      Property.data "art" artwork,
-      Property.data "mood" moodLabel,
+      Props.id "react-pet-device",
+      Props.classList #["pet-device"],
+      Props.role "img",
+      Props.ariaLabel s!"{Tamagotchi.artLabel artwork} {displayName state} mood {moodLabel}",
+      Props.data "art" artwork,
+      Props.data "mood" moodLabel,
       deviceStyle state
     ]
-    #[]
     #[screen, leftButton, centerButton, rightButton]
 
 def normalizeViewState (state : Tamagotchi.PetState) : Tamagotchi.PetState :=
@@ -905,50 +901,45 @@ def useLiveTick (hook : ViewReducerState) : ReactM Unit := do
 
 def widgetStyleNode : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text widgetCss
-  Node.elementWith "style" #[] #[] #[text]
+  Node.elementWith "style" #[] #[text]
 
 def progressBar (secondsLeft : Nat) : ReactM (Lean.Vir.Js Node) := do
   let fill ←
     Node.divWith
       #[
-        Property.id "react-pet-progress-fill",
-        Property.classList #["react-pet-progress-fill"],
+        Props.id "react-pet-progress-fill",
+        Props.classList #["react-pet-progress-fill"],
         progressFillStyle secondsLeft
       ]
-      #[]
-      #[]
   let bar ←
     Node.divWith
       #[
-        Property.id "react-pet-progress",
-        Property.classList #["react-pet-progress"],
-        Property.role "progressbar",
-        Property.ariaLabel "Time until next mood change",
-        Property.title s!"Next mood change in {progressLabel secondsLeft}",
-        Property.int "aria-valuemin" 0,
-        Property.int "aria-valuemax" (Int.ofNat liveTickSeconds),
-        Property.int "aria-valuenow" (Int.ofNat secondsLeft),
+        Props.id "react-pet-progress",
+        Props.classList #["react-pet-progress"],
+        Props.role "progressbar",
+        Props.ariaLabel "Time until next mood change",
+        Props.title s!"Next mood change in {progressLabel secondsLeft}",
+        Props.int "aria-valuemin" 0,
+        Props.int "aria-valuemax" (Int.ofNat liveTickSeconds),
+        Props.int "aria-valuenow" (Int.ofNat secondsLeft),
         progressStyle
       ]
-      #[]
       #[fill]
   let counterText ← Node.text (progressLabel secondsLeft)
   let counter ←
     Node.spanWith
       #[
-        Property.id "react-pet-progress-counter",
-        Property.classList #["react-pet-progress-counter"],
-        Property.ariaHidden true,
+        Props.id "react-pet-progress-counter",
+        Props.classList #["react-pet-progress-counter"],
+        Props.ariaHidden true,
         progressCounterStyle
       ]
-      #[]
       #[counterText]
   Node.divWith
     #[
-      Property.classList #["react-pet-progress-wrap"],
+      Props.classList #["react-pet-progress-wrap"],
       progressWrapStyle
     ]
-    #[]
     #[bar, counter]
 
 def View : Component Unit := fun _ => do
@@ -961,32 +952,32 @@ def View : Component Unit := fun _ => do
     Node.keyedButtonWith
       action.label
       #[
-        Property.id ("react-pet-action-" ++ action.label),
-        Property.classList #["react-pet-action-button"],
-        Property.disabled (state.mood == .dead),
-        Property.ariaLabel ("Tamagotchi action " ++ action.label),
-        buttonStyle
+        Props.id ("react-pet-action-" ++ action.label),
+        Props.classList #["react-pet-action-button"],
+        Props.disabled (state.mood == .dead),
+        Props.ariaLabel ("Tamagotchi action " ++ action.label),
+        buttonStyle,
+        Props.onClick (dispatchViewAction hook (.care action))
       ]
-      #[EventHandler.onClick (dispatchViewAction hook (.care action))]
       #[text]
   let artInput ←
     Node.input
       #[
-        Property.id "react-pet-art-toggle",
-        Property.type "checkbox",
-        Property.checked (state.artwork == "octopus")
+        Props.id "react-pet-art-toggle",
+        Props.type "checkbox",
+        Props.checked (state.artwork == "octopus"),
+        Props.onChange fun event => do
+          match ← Lean.Vir.Browser.Event.inputChecked? event with
+          | none => pure ()
+          | some checked => dispatchViewAction hook (.artwork checked)
       ]
-      #[EventHandler.onChange fun event => do
-        match ← Lean.Vir.Browser.Event.inputChecked? event with
-        | none => pure ()
-        | some checked => dispatchViewAction hook (.artwork checked)]
   let artText ← Node.text "Octopus"
-  let artSpan ← Node.spanWith #[] #[] #[artText]
+  let artSpan ← Node.spanWith #[] #[artText]
   let artLabel ←
     Node.labelWith
       #[
-        Property.htmlFor "react-pet-art-toggle",
-        Property.classList #["react-pet-toggle"],
+        Props.htmlFor "react-pet-art-toggle",
+        Props.classList #["react-pet-toggle"],
         style #[
           ("display", "inline-flex"),
           ("alignItems", "center"),
@@ -996,14 +987,13 @@ def View : Component Unit := fun _ => do
           ("color", "var(--vscode-descriptionForeground, #53645a)")
         ]
       ]
-      #[]
       #[artInput, artSpan]
   let deviceNode ← device state
   let moodText ← Node.text state.mood.label
   let moodValueNode ←
     Node.spanWith
       #[
-        Property.id "react-pet-mood",
+        Props.id "react-pet-mood",
         style #[
           ("fontSize", "1.32rem"),
           ("fontWeight", "900"),
@@ -1011,30 +1001,31 @@ def View : Component Unit := fun _ => do
           ("color", "var(--vscode-editor-foreground, #20384a)")
         ]
       ]
-      #[]
       #[moodText]
   let progress ← progressBar view.secondsLeft
   let petState ←
     Node.divWith
-      #[Property.classList #["pet-state"], petStageStyle]
-      #[]
+      #[Props.classList #["pet-state"], petStageStyle]
       #[deviceNode, moodValueNode, progress]
   let actionButtons ← actions.mapM actionButton
   let actionsNode ←
     Node.divWith
-      #[Property.classList #["action-grid", "react-pet-actions"], actionGridStyle]
-      #[]
+      #[Props.classList #["action-grid", "react-pet-actions"], actionGridStyle]
       actionButtons
   let resetText ← Node.text "Reset"
   let reset ←
     Node.buttonWith
-      #[Property.id "react-pet-reset", Property.classList #["react-pet-reset-button"], resetButtonStyle]
-      #[EventHandler.onClick (dispatchViewAction hook .reset)]
+      #[
+        Props.id "react-pet-reset",
+        Props.classList #["react-pet-reset-button"],
+        resetButtonStyle,
+        Props.onClick (dispatchViewAction hook .reset)
+      ]
       #[resetText]
   let controls ←
     Node.divWith
       #[
-        Property.classList #["react-pet-controls"],
+        Props.classList #["react-pet-controls"],
         style #[
           ("display", "flex"),
           ("alignItems", "center"),
@@ -1042,22 +1033,19 @@ def View : Component Unit := fun _ => do
           ("gap", "8px")
         ]
       ]
-      #[]
       #[artLabel, reset]
   let body ←
     Node.divWith
-      #[Property.classList #["react-pet-body"], bodyStyle]
-      #[]
+      #[Props.classList #["react-pet-body"], bodyStyle]
       #[petState, actionsNode, controls]
   let css ← widgetStyleNode
   Node.divWith
     #[
-      Property.id "react-pet-widget",
-      Property.classList #["react-pet-widget"],
-      Property.data "mood" state.mood.label,
+      Props.id "react-pet-widget",
+      Props.classList #["react-pet-widget"],
+      Props.data "mood" state.mood.label,
       widgetStyle
     ]
-    #[]
     #[css, body]
 
 def mount (selector : String) : DomM Bool :=

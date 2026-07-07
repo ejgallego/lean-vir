@@ -22,19 +22,23 @@ def counter : Component Unit :=
     let countValue ← JsValue.toNat count.value
     let text ← Node.text (label countValue)
     Node.buttonWith
-      #[Property.id "react-counter-button"]
-      #[EventHandler.onClick do
-        State.modify count fun previous => do
-          let value ← JsValue.toNat previous
-          JsValue.ofNat (value + 1)]
+      #[
+        Props.id "react-counter-button",
+        Props.onClick do
+          State.modify count fun previous => do
+            let value ← JsValue.toNat previous
+            JsValue.ofNat (value + 1)
+      ]
       #[text]
 
 partial def renderInto (root : Lean.Vir.Js Root) (value : Nat) : DomM Unit := do
   Root.render root do
     let text ← Node.text (label value)
     Node.buttonWith
-      #[Property.id "react-counter-button"]
-      #[EventHandler.onClick (renderInto root (value + 1))]
+      #[
+        Props.id "react-counter-button",
+        Props.onClick (renderInto root (value + 1))
+      ]
       #[text]
 
 def mount (selector : String) : DomM Bool :=
@@ -45,7 +49,7 @@ def mountDefault : DomM Bool :=
 
 def staticTree : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text "react:static"
-  Node.spanWith #[Property.id "react-static-label"] #[] #[text]
+  Node.spanWith #[Props.id "react-static-label"] #[text]
 
 def renderStatic (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => do
@@ -57,7 +61,7 @@ def effectProbe : Component Unit :=
       (JsValue.ofNat 0)
       (fun _ => pure ())
     let text ← Node.text "react:effect"
-    Node.spanWith #[Property.id "react-effect-label"] #[] #[text]
+    Node.spanWith #[Props.id "react-effect-label"] #[text]
 
 def mountEffect (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => Root.renderComponent root effectProbe ()
@@ -73,16 +77,18 @@ def refFragmentProbe : Component Unit :=
     let labelText ← Node.text s!"react:ref:{countValue}:{lastValue}"
     let button ←
       Node.buttonWith
-        #[Property.id "react-ref-button"]
-        #[EventHandler.onClick do
-          State.modify count fun previous => do
-            let value ← JsValue.toNat previous
-            let next ← JsValue.ofNat (value + 1)
-            Ref.set lastClick next
-            pure next]
+        #[
+          Props.id "react-ref-button",
+          Props.onClick do
+            State.modify count fun previous => do
+              let value ← JsValue.toNat previous
+              let next ← JsValue.ofNat (value + 1)
+              Ref.set lastClick next
+              pure next
+        ]
         #[labelText]
     let markerText ← Node.text "fragment child"
-    let marker ← Node.spanWith #[Property.id "react-fragment-marker"] #[] #[markerText]
+    let marker ← Node.spanWith #[Props.id "react-fragment-marker"] #[markerText]
     Node.fragment #[button, marker]
 
 def mountRefFragment (selector : String) : DomM Bool :=
@@ -92,10 +98,9 @@ def benchTextSpan (index : Nat) : ReactM (Lean.Vir.Js Node) := do
   let text ← Node.text ("item:" ++ toString index)
   Node.spanWith
     #[
-      Property.className "react-bench-text",
-      Property.data "index" (toString index)
+      Props.className "react-bench-text",
+      Props.data "index" (toString index)
     ]
-    #[]
     #[text]
 
 partial def benchTextChildrenAux
@@ -114,8 +119,7 @@ def benchTextChildren (count : Nat) : ReactM (Array (Lean.Vir.Js Node)) :=
 def benchTextTree (count : Nat) : ReactM (Lean.Vir.Js Node) := do
   let children ← benchTextChildren count
   Node.divWith
-    #[Property.id "react-bench-text-tree", Property.className "react-bench-tree"]
-    #[]
+    #[Props.id "react-bench-text-tree", Props.className "react-bench-tree"]
     children
 
 partial def renderWideTextLoopAux (root : Lean.Vir.Js Root) (width remaining acc : Nat) : DomM Nat := do
@@ -137,11 +141,11 @@ def benchCallbackButton (root : Lean.Vir.Js Root) (index : Nat) : ReactM (Lean.V
   let text ← Node.text ("callback:" ++ toString index)
   Node.buttonWith
     #[
-      Property.className "react-bench-callback",
-      Property.data "index" (toString index)
+      Props.className "react-bench-callback",
+      Props.data "index" (toString index),
+      Props.onClick do
+        Root.render root (benchTextTree 1)
     ]
-    #[EventHandler.onClick do
-      Root.render root (benchTextTree 1)]
     #[text]
 
 partial def benchCallbackChildrenAux
@@ -161,8 +165,7 @@ def benchCallbackChildren (root : Lean.Vir.Js Root) (count : Nat) : ReactM (Arra
 def benchCallbackTree (root : Lean.Vir.Js Root) (count : Nat) : ReactM (Lean.Vir.Js Node) := do
   let children ← benchCallbackChildren root count
   Node.divWith
-    #[Property.id "react-bench-callback-tree", Property.className "react-bench-tree"]
-    #[]
+    #[Props.id "react-bench-callback-tree", Props.className "react-bench-tree"]
     children
 
 partial def renderCallbackTreeLoopAux (root : Lean.Vir.Js Root) (width remaining acc : Nat) : DomM Nat := do

@@ -54,11 +54,11 @@ The audit baseline is the public React 19.2 reference, checked on
 | Root creation | `createRoot(domNode, options?)` | `Root.create : Js Element -> DomM (Js Root)` | Close. Missing root options. Selector helpers are convenience, not core React. |
 | Root render | `root.render(reactNode)` | `Root.render root (ReactM (Js Node))`; `Root.renderComponent` | Close. `renderComponent` is the bridge that creates a real JS React component so hooks run under React. |
 | Root unmount | `root.unmount()` | `Root.unmount : Js Root -> DomM Unit` | Good. Resource cleanup is an explicit runtime concern. |
-| Element construction | `createElement(type, props, ...children)` | `Node.createElement tag key? props handlers children` | Partial. The host eventually calls React faithfully, but the public Lean call shape separates `key`, props, handlers, and child array. |
+| Element construction | `createElement(type, props, ...children)` | `Node.createElement tag props children` with `Array Props.Entry` | Close. Lean keeps an array for child-list ergonomics, but props now carry keys, properties, and handlers together. |
 | JSX | JSX elaborates to React elements | no native JSX-like syntax yet | Missing. Any future syntax should elaborate to `createElement`-shaped calls. |
 | Fragment | `<Fragment>` / `<>` | `Node.fragment`, `Node.keyedFragment` | Close. Naming is Lean-style but maps directly to React fragments. |
-| Props | one props argument, including event handlers and special fields such as `key`/`ref` | `Array Property` plus separate `Array EventHandler`; `key?` parameter | Mismatch. React treats handlers and most attributes as props. A single props model is the main API-fidelity target. |
-| Event handlers | props such as `onClick={...}` | `EventHandler.onClick ...` passed separately | Partial. Handler names match React, but placement outside props diverges. |
+| Props | one props argument, including event handlers and special fields such as `key`/`ref` | `Array Props.Entry` with `Props.key`, property helpers, and event helpers | Close. `ref` is not in the props lane yet. |
+| Event handlers | props such as `onClick={...}` | `Props.onClick ...` entries | Close. Handler names and placement now match React's props model. |
 | Children | variadic children after props | `Array (Js Node)` | Acceptable Lean adaptation, but the user-facing call should still read like React's child list. |
 | Text children | string/number child values | explicit `Node.text` resources | Acceptable low-level representation. Syntax/helpers should make text children feel like React children without implicit conversion. |
 | `useState` | returns `[state, setState]` | `Hooks.useState : Js a -> ReactM (State (Js a))` | Good semantic match. Explicit `JsValue` conversion is a necessary boundary. Scalar convenience wrappers should not become the core API. |
@@ -75,7 +75,7 @@ The audit baseline is the public React 19.2 reference, checked on
 
 ## Main Mismatches
 
-The biggest mismatch is `Node.createElement`. Today the Lean API exposes the
+The previous biggest mismatch was `Node.createElement`: Lean exposed the
 internal host decomposition:
 
 ```lean
@@ -88,19 +88,24 @@ React's public shape is:
 createElement(type, props, ...children)
 ```
 
-The host already recombines properties and handlers into the object passed to
-`React.createElement`. That means the runtime path is close, but the public
-Lean API exposes a non-React shape. The next API work should move toward a
-single props object or props builder that can carry attributes, handlers,
-`key`, and eventually `ref`, while keeping explicit conversions at the edges.
+The public surface now uses:
 
-The second mismatch is the hook surface. `useState`, `useReducer`, and `useRef`
+```lean
+Node.createElement tag props children
+```
+
+where `props : Array Props.Entry` can carry attributes, handlers, and `key`.
+The low-level host imports also use JavaScript-owned `Props` and `NodeChildren`
+resources instead of generic array lowering. The remaining element-construction
+gap is component element types and eventually `ref`.
+
+The next mismatch is the hook surface. `useState`, `useReducer`, and `useRef`
 are close enough to be trusted as the base. `useEffect` is semantically
 resource-safe but not shaped like React's optional cleanup/dependency API.
 `useMemo`, `useCallback`, and `useContext` are absent and should be added under
 their React names.
 
-The third mismatch is external component interop. Future JS library bindings
+Another mismatch is external component interop. Future JS library bindings
 need to pass JavaScript component values as element types, not just render DOM
 tag strings or Lean-authored components. This should be explicit and
 resource-shaped, but the authoring shape should still mirror React:
@@ -118,12 +123,10 @@ createElement component props children
    as scalar-specialized hooks unless they are clearly documented as optional
    examples or local adapters.
 
-2. Unify props and handlers in the public element API.
+2. Extend element construction to JavaScript component values.
 
-   Keep the existing host ABI if it is useful internally, but stop presenting
-   separated properties and event handlers as the React surface. This is the
-   most visible fidelity gap and it will matter for every later JS library
-   binding.
+   DOM tag strings work, but future library bindings need a component-resource
+   element type that still lowers to `createElement(type, props, ...children)`.
 
 3. Add missing hook bindings under React names.
 

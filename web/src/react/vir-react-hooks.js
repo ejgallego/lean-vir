@@ -330,6 +330,11 @@ export function createReactStateHostBindings(resources, hookRuntime) {
       resources.resourceForValue(resources.resolveResource(state, "ReactReducerState").dispatch),
     "react.useRef": (initial) => hookRuntime.useRef(reactStatePayload(resources, initial)),
     "react.useEffect": (setup, cleanup) => hookRuntime.useEffect(setup, cleanup),
+    "react.deps.empty": () => resources.resourceForValue(createReactDependencyListResource()),
+    "react.deps.push": (deps, value) => {
+      pushReactDependency(resources, deps, value);
+      return undefined;
+    },
     "react.useEffectWithDeps": (deps, setup, cleanup) => hookRuntime.useEffectWithDeps(deps, setup, cleanup),
     "react.ref.get": (ref) => resources.resourceForValue(resources.resolveResource(ref, "ReactRef").current),
     "react.ref.set": (ref, value) => {
@@ -399,17 +404,42 @@ function createBrowserReducerHook(resources) {
   return hook;
 }
 
+function createReactDependencyListResource() {
+  return { kind: "ReactDependencyList", values: [] };
+}
+
+function pushReactDependency(resources, deps, value) {
+  const dependencyList = resolveReactDependencyListResource(resources, deps);
+  dependencyList.values.push(jsStringValue(resources, value, `React dependency[${dependencyList.values.length}]`));
+}
+
 function normalizeDependencyList(resources, deps) {
-  if (!Array.isArray(deps)) {
-    throw new Error("React dependency list must be an array");
+  const dependencyList = resolveReactDependencyListResource(resources, deps);
+  if (!Array.isArray(dependencyList.values)) {
+    throw new Error("React dependency list values must be an array");
   }
-  return deps.map((dep, index) => {
-    const value = resources.resolveResource(dep, `React dependency[${index}]`);
+  return dependencyList.values.map((value, index) => {
     if (typeof value !== "string") {
       throw new Error(`React dependency[${index}] must be a Js String`);
     }
     return value;
   });
+}
+
+function resolveReactDependencyListResource(resources, deps) {
+  const dependencyList = resources.resolveResource(deps, "ReactDependencyList");
+  if (dependencyList?.kind !== "ReactDependencyList") {
+    throw new Error("ReactDependencyList resource has invalid value");
+  }
+  return dependencyList;
+}
+
+function jsStringValue(resources, resource, label) {
+  const value = resources.resolveResource(resource, label);
+  if (typeof value !== "string") {
+    throw new Error(`${label} must be a Js String`);
+  }
+  return value;
 }
 
 function normalizeDependencyListOrRelease(resources, deps, setup, cleanup) {

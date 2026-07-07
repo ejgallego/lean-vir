@@ -15,13 +15,13 @@ open Lean.Vir.Infoview (Surface)
 
 abbrev style := Lean.Vir.Examples.Style.style
 
-def shellStyle : Property := style #[
+def shellStyle : Props.Entry := style #[
   ("display", "grid"),
   ("gap", "10px"),
   ("minWidth", "0")
 ]
 
-def captionStyle : Property := style #[
+def captionStyle : Props.Entry := style #[
   ("margin", "0"),
   ("color", "var(--vscode-descriptionForeground, #57606a)"),
   ("fontSize", "0.78rem"),
@@ -32,19 +32,18 @@ def captionStyle : Property := style #[
 def View : Component Surface := fun surface => do
   let caption ← Node.pTextWith
     #[
-      Property.id "react-tamagotchi-widget-caption",
+      Props.id "react-tamagotchi-widget-caption",
       captionStyle
     ]
     ("Shared React Tamagotchi component at " ++ surface.cursor.label)
   let pet ← Node.component ReactTamagotchi.View ()
   Node.sectionWith
     #[
-      Property.id "react-tamagotchi-proof-widget",
-      Property.role "region",
-      Property.ariaLabel "Lean React Tamagotchi proof widget",
+      Props.id "react-tamagotchi-proof-widget",
+      Props.role "region",
+      Props.ariaLabel "Lean React Tamagotchi proof widget",
       shellStyle
     ]
-    #[]
     #[caption, pet]
 
 vir_proof_widget View with mountId := "vir-react-tamagotchi-widget"

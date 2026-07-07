@@ -123,8 +123,6 @@ mutual
 partial def InterfaceType.isHostWireArgType : InterfaceType → Bool
   | .unit => true
   | .resource .. => true
-  | .array element => element.isHostWireArgType
-  | .list element => element.isHostWireArgType
   | .option element => element.isHostWireArgType
   | .prod fst snd => fst.isHostWireArgType && snd.isHostWireArgType
   | .function args result _ =>
@@ -134,8 +132,6 @@ partial def InterfaceType.isHostWireArgType : InterfaceType → Bool
 partial def InterfaceType.isHostWireResultType : InterfaceType → Bool
   | .unit => true
   | .resource .. => true
-  | .array element => element.isHostWireResultType
-  | .list element => element.isHostWireResultType
   | .option element => element.isHostWireResultType
   | .prod fst snd => fst.isHostWireResultType && snd.isHostWireResultType
   | _ => false
