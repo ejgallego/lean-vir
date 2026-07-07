@@ -44,12 +44,17 @@ without committing generated package artifacts.
 
 ## React Corpus
 
-The React report is a small audit corpus sourced from the official React
+The React report is a curated audit corpus sourced from the official React
 TypeScript setup guidance. React's runtime package does not currently provide
 the declaration files used by TypeScript consumers; React's documentation points
-users at `@types/react` and `@types/react-dom`, so this repository uses those
-packages for descriptor generation and records that provenance in
+users at `@types/react` and `@types/react-dom`, so this repository extracts
+symbols from `@types/react` and records that provenance in
 `docs/type-descriptors/react-v1.provenance.json`.
+
+The selected TypeScript symbols live in
+`docs/type-descriptors/react-v1.symbols.txt`. Keep that list intentionally
+small enough to review, but broad enough to show attributes, style values,
+events, rendered values, components, refs, and JSX namespace types.
 
 Generate and render the React report with:
 
@@ -65,13 +70,17 @@ Or validate all generated React artifacts with:
 npm run check:react-type-anchors
 ```
 
-The React anchor set is intentionally conservative. It compares four broad
-VIR-side concepts against four official React TypeScript surfaces:
-`React.HTMLAttributes`, `React.CSSProperties`, `React.EventHandler`, and
-`React.SyntheticEvent`. Weak matches are expected here because the React
-declarations are substantially richer than VIR's current browser-facing
-descriptors. In this corpus, `weak` means "useful audit/documentation pointer",
-not "bad API".
+The React anchor set is intentionally conservative. Existing VIR-side concepts
+are compared against a broader set of official React TypeScript surfaces such
+as `React.HTMLAttributes`, `React.DOMAttributes`, `React.CSSProperties`,
+event specializations, and `React.JSX.IntrinsicElements`. Weak matches are
+expected here because the React declarations are substantially richer than
+VIR's current browser-facing descriptors.
+
+The report also includes explicit coverage gaps for React nodes, elements,
+component types, refs, and JSX element types. In this corpus, `weak` means
+"useful audit/documentation pointer", while `missing` means "important React
+surface with no corresponding Lean VIR descriptor yet".
 
 ## Output Contract
 
@@ -94,7 +103,8 @@ The pipeline has three public outputs.
 - `results[].lean` and `results[].ts`, the compared names;
 - `results[].status`, one of `exact`, `compatible`, `weak`, or `missing`;
 - `results[].notes`, short explanations for non-exact matches;
-- `results[].leanDescriptor` and `results[].tsSymbol`, when found.
+- `results[].category`, when provided by the anchor file, for grouped reports;
+- `results[].leanDescriptor` and `results[].tsSymbol`, when found;
 - `typeScriptProvenance`, when present in the descriptor JSON, with package and
   documentation sources used to build an enriched report.
 

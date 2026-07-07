@@ -356,6 +356,7 @@ function anchorResult(anchor, status, notes, leanDescriptor, tsSymbol) {
     ts: anchor.ts,
     status,
     notes,
+    ...(anchor.category ? { category: anchor.category } : {}),
     ...(anchor.note ? { note: anchor.note } : {}),
     ...(leanDescriptor ? { leanDescriptor } : {}),
     ...(tsSymbol ? { tsSymbol } : {}),

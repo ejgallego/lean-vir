@@ -1,0 +1,41 @@
+# Props and attributes
+React.Attributes
+React.ClassAttributes
+React.AriaAttributes
+React.DOMAttributes
+React.HTMLAttributes
+React.ButtonHTMLAttributes
+React.InputHTMLAttributes
+React.JSX.IntrinsicAttributes
+React.JSX.IntrinsicElements
+
+# Style and scalar prop values
+React.CSSProperties
+React.Key
+
+# Events
+React.EventHandler
+React.ChangeEventHandler
+React.MouseEventHandler
+React.SyntheticEvent
+React.ChangeEvent
+React.FocusEvent
+React.KeyboardEvent
+React.MouseEvent
+React.PointerEvent
+React.UIEvent
+
+# Rendered values and elements
+React.ReactNode
+React.ReactElement
+React.JSX.Element
+React.JSX.ElementType
+
+# Components and refs
+React.ElementType
+React.ComponentType
+React.JSXElementConstructor
+React.FunctionComponent
+React.FC
+React.Ref
+React.RefObject

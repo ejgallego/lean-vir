@@ -22,6 +22,7 @@ Options:
   --anchors FILE  Merge explicit Lean-to-TS anchors from JSON.
   --namespace NS  Treat a declared namespace as an exported descriptor root.
   --symbol ID     Keep only this TypeScript symbol id. Repeatable.
+  --symbols FILE  Keep TypeScript symbol ids listed in FILE.
   --provenance FILE
                   Merge descriptor provenance metadata from JSON.
   --out FILE      Write descriptor JSON to FILE. Defaults to stdout.
@@ -43,6 +44,7 @@ function parseArgs(argv) {
   let check = false;
   const namespaces = new Set();
   const symbols = new Set();
+  const symbolFiles = [];
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     switch (arg) {
@@ -60,6 +62,9 @@ function parseArgs(argv) {
         break;
       case "--symbol":
         symbols.add(requiredValue(argv, ++index, "--symbol"));
+        break;
+      case "--symbols":
+        symbolFiles.push(resolve(root, requiredValue(argv, ++index, "--symbols")));
         break;
       case "--provenance":
         provenance = requiredValue(argv, ++index, "--provenance");
@@ -88,6 +93,7 @@ function parseArgs(argv) {
     check,
     namespaces,
     symbols,
+    symbolFiles,
   };
 }
 
@@ -114,7 +120,11 @@ if (cli.out === null) {
   console.log(`wrote ${relative(root, cli.out)} (${descriptor.symbols.length} symbols)`);
 }
 
-async function generateDescriptorFile({ files, anchors, provenance, namespaces, symbols: requestedSymbols }) {
+async function generateDescriptorFile({ files, anchors, provenance, namespaces, symbols: requestedSymbols, symbolFiles }) {
+  const symbolFilter = new Set(requestedSymbols);
+  for (const file of symbolFiles) {
+    for (const id of await readSymbolIds(file)) symbolFilter.add(id);
+  }
   const fileSet = new Set(files.map((file) => resolve(file)));
   const program = ts.createProgram(files, {
     allowJs: false,
@@ -130,15 +140,15 @@ async function generateDescriptorFile({ files, anchors, provenance, namespaces, 
     .filter((sourceFile) => fileSet.has(resolve(sourceFile.fileName)));
   const symbols = [];
   const symbolIds = new Set();
-  const allowDuplicateIds = namespaces.size !== 0 || requestedSymbols.size !== 0;
+  const allowDuplicateIds = namespaces.size !== 0 || symbolFilter.size !== 0;
   for (const sourceFile of sourceFiles) {
     collectStatements(sourceFile.statements, sourceFile, [], symbols, symbolIds, namespaces, allowDuplicateIds);
   }
   let selectedSymbols = symbols;
-  if (requestedSymbols.size !== 0) {
-    selectedSymbols = symbols.filter((symbol) => requestedSymbols.has(symbol.id));
+  if (symbolFilter.size !== 0) {
+    selectedSymbols = symbols.filter((symbol) => symbolFilter.has(symbol.id));
     const found = new Set(selectedSymbols.map((symbol) => symbol.id));
-    for (const id of requestedSymbols) {
+    for (const id of symbolFilter) {
       if (!found.has(id)) throw new Error(`requested TypeScript symbol was not found: ${id}`);
     }
   }
@@ -161,7 +171,9 @@ async function generateDescriptorFile({ files, anchors, provenance, namespaces, 
 function collectStatements(statements, sourceFile, prefix, symbols, symbolIds, namespaces, allowDuplicateIds) {
   for (const statement of statements) {
     if (ts.isModuleDeclaration(statement) &&
-        (hasExportModifier(statement) || namespaceIsRequested(statement, prefix, namespaces))) {
+        (hasExportModifier(statement) ||
+         namespaceIsRequested(statement, prefix, namespaces) ||
+         isInsideRequestedNamespace(prefix, namespaces))) {
       const name = moduleDeclarationName(statement);
       if (name !== null && statement.body && ts.isModuleBlock(statement.body)) {
         collectStatements(statement.body.statements, sourceFile, [...prefix, name], symbols, symbolIds, namespaces, allowDuplicateIds);
@@ -178,6 +190,13 @@ function collectStatements(statements, sourceFile, prefix, symbols, symbolIds, n
     symbolIds.add(symbol.id);
     symbols.push(symbol);
   }
+}
+
+async function readSymbolIds(file) {
+  return (await readFile(file, "utf8"))
+    .split(/\r?\n/g)
+    .map((line) => line.replace(/#.*/u, "").trim())
+    .filter((line) => line.length !== 0);
 }
 
 function symbolForStatement(statement, sourceFile, prefix) {
@@ -444,7 +463,11 @@ function namespaceIsRequested(node, prefix, namespaces) {
 }
 
 function isInsideRequestedNamespace(prefix, namespaces) {
-  return namespaces.has(prefix.join("."));
+  const current = prefix.join(".");
+  for (const namespace of namespaces) {
+    if (current === namespace || current.startsWith(`${namespace}.`)) return true;
+  }
+  return false;
 }
 
 function propertyNameText(name) {

@@ -108,14 +108,19 @@ function renderMarkdownReport(report) {
     "```",
     "",
   ];
-  for (const result of report.results) {
-    lines.push(...renderAnchor(result), "");
+  for (const [category, results] of groupResults(report.results)) {
+    if (category !== "Type anchors") lines.push(`## ${category}`, "");
+    for (const result of results) {
+      lines.push(...renderAnchor(result), "");
+    }
   }
   return `${lines.join("\n").replace(/\n+$/g, "")}\n`;
 }
 
 function renderHtmlReport(report) {
-  const rows = report.results.map((result) => renderHtmlAnchor(result, report.typeScriptProvenance)).join("\n");
+  const sections = groupResults(report.results)
+    .map(([category, results]) => renderHtmlGroup(category, results, report.typeScriptProvenance))
+    .join("\n");
   const provenance = renderHtmlProvenance(report.typeScriptProvenance);
   return `<!doctype html>
 <html lang="en">
@@ -184,6 +189,13 @@ function renderHtmlReport(report) {
     .summary-card { padding: 12px; }
     .summary-card strong { display: block; font-size: 22px; }
     .summary-card span { color: var(--muted); }
+    .groups { display: grid; gap: 28px; }
+    .anchor-group { display: grid; gap: 12px; }
+    .group-title {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
     .anchors { display: grid; gap: 14px; }
     .anchor { padding: 16px; }
     .anchor-head {
@@ -233,6 +245,7 @@ function renderHtmlReport(report) {
       margin: 0;
       padding: 12px;
       overflow-x: auto;
+      max-height: 420px;
       background: var(--code);
       border: 1px solid var(--line);
       border-radius: 6px;
@@ -269,9 +282,9 @@ ${provenance}
       ${summaryCard("weak", report.summary.weak)}
       ${summaryCard("missing", report.summary.missing)}
     </section>
-    <section class="anchors" aria-label="Type anchors">
-${rows}
-    </section>
+    <div class="groups" aria-label="Type anchors">
+${sections}
+    </div>
   </main>
 </body>
 </html>
@@ -299,6 +312,16 @@ function summaryCard(label, count) {
   return `<div class="summary-card ${escapeAttr(label)}"><strong>${count}</strong><span>${escapeHtml(label)}</span></div>`;
 }
 
+function renderHtmlGroup(category, results, provenance) {
+  const rows = results.map((result) => renderHtmlAnchor(result, provenance)).join("\n");
+  return `      <section class="anchor-group" aria-labelledby="type-anchor-group-${escapeAttr(slug(category))}">
+        <h2 class="group-title" id="type-anchor-group-${escapeAttr(slug(category))}">${escapeHtml(category)}</h2>
+        <div class="anchors">
+${rows}
+        </div>
+      </section>`;
+}
+
 function renderHtmlAnchor(result, provenance) {
   const ts = result.tsSymbol;
   const href = sourceHref(ts?.source, provenance);
@@ -309,9 +332,12 @@ function renderHtmlAnchor(result, provenance) {
     : `\n          <span>React docs: <a href="${escapeAttr(docsHref)}">${escapeHtml(result.ts)}</a></span>`;
   const notes = result.notes.length === 0
     ? ""
-    : `<p class="notes">${escapeHtml(result.notes.join("; "))}</p>`;
+    : `\n        <p class="notes">${escapeHtml(result.notes.join("; "))}</p>`;
+  const note = result.note
+    ? `\n        <p class="notes">${escapeHtml(result.note)}</p>`
+    : "";
   const hover = ts?.hover
-    ? `<p class="hover">${escapeHtml(ts.hover)}</p>`
+    ? `\n        <p class="hover">${escapeHtml(ts.hover)}</p>`
     : "";
   const display = ts?.display
     ? escapeHtml(ts.display)
@@ -327,6 +353,7 @@ function renderHtmlAnchor(result, provenance) {
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="${escapeAttr(href)}">${escapeHtml(sourceLabel(ts?.source))}</a></span>${docsMeta}
+          <span>Category: ${escapeHtml(result.category ?? "Type anchors")}</span>
           <span>Anchor: <code>${escapeHtml(result.id)}</code></span>
         </div>
         <div class="comparison">
@@ -338,9 +365,7 @@ function renderHtmlAnchor(result, provenance) {
             <p class="pane-title">Lean VIR descriptor</p>
             <pre><code>${leanDisplay}</code></pre>
           </section>
-        </div>
-        ${notes}
-        ${hover}
+        </div>${notes}${note}${hover}
       </article>`;
 }
 
@@ -383,6 +408,16 @@ function sourceHref(source, provenance = undefined) {
     ? `#L${source.startLine}`
     : `#L${source.startLine}-L${source.endLine}`;
   return `${file}${line}`;
+}
+
+function groupResults(results) {
+  const groups = new Map();
+  for (const result of results) {
+    const category = result.category ?? "Type anchors";
+    if (!groups.has(category)) groups.set(category, []);
+    groups.get(category).push(result);
+  }
+  return [...groups.entries()];
 }
 
 function documentationHref(provenance, symbolId) {
