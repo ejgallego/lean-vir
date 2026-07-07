@@ -3480,8 +3480,6 @@ function hostWireTypeSupported(type, { allowFunction }) {
     case WIRE.UNIT:
     case WIRE.RESOURCE:
       return true;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
     case WIRE.OPTION:
       return hostWireTypeSupported(requireTypeField(type, "element", "host wire type"), { allowFunction });
     case WIRE.PROD:

@@ -17,8 +17,8 @@ Lean declaration called from JavaScript. Host imports should expose
 arguments/results follow that same rule. Public Lean wrappers can convert to or
 from ordinary Lean values with `Lean.Vir.JsValue`.
 
-Raw Lean scalar and structure types are rejected in ordinary host imports. The
-supported boundary lanes are:
+Raw Lean scalar, structure, array, and list types are rejected in ordinary host
+imports. The supported boundary lanes are:
 
 | Lean type surface | Owner / shape | Import boundary | Use |
 | --- | --- | --- | --- |

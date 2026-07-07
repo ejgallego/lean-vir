@@ -123,6 +123,8 @@ const jsResourceType = { type: "Js", wireTag: WIRE.RESOURCE, kind: "resource", n
 const leanObjectType = { type: "LeanObject", wireTag: WIRE.LEAN_OBJECT, kind: "leanObject" };
 const unitType = { type: "Unit", wireTag: WIRE.UNIT };
 const stringType = { type: "String", wireTag: WIRE.STRING };
+const arrayJsResourceType = { type: "Array Js", wireTag: WIRE.ARRAY, kind: "array", element: jsResourceType };
+const listJsResourceType = { type: "List Js", wireTag: WIRE.LIST, kind: "list", element: jsResourceType };
 assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
 assert.equal(typeof runtime.exports.vir_call_result_size, "undefined");
 const resourceValue = { name: "resource" };
@@ -158,12 +160,28 @@ assert.throws(
   () => runtime.makeHostWireObjectValue(stringType, "raw", "raw string host result"),
   /unsupported JavaScript host wire result type/,
 );
+assert.throws(
+  () => runtime.makeHostWireObjectValue(arrayJsResourceType, [], "array host result"),
+  /unsupported JavaScript host wire result type/,
+);
+assert.throws(
+  () => runtime.makeHostWireObjectValue(listJsResourceType, [], "list host result"),
+  /unsupported JavaScript host wire result type/,
+);
 withObjectString(runtime, "raw", (obj) => {
   assert.throws(
     () => runtime.liftHostWireObjectValue(stringType, obj, "raw string host argument"),
     /unsupported JavaScript host wire argument type/,
   );
 });
+assert.throws(
+  () => runtime.liftHostWireObjectValue(arrayJsResourceType, 0, "array host argument"),
+  /unsupported JavaScript host wire argument type/,
+);
+assert.throws(
+  () => runtime.liftHostWireObjectValue(listJsResourceType, 0, "list host argument"),
+  /unsupported JavaScript host wire argument type/,
+);
 let leanHandleObj = makeObjectString(runtime, "lean-ref");
 const leanHandleResource = runtime.makeLeanObjectHandleResource(leanHandleObj, "lean object handle");
 runtime.exports.vir_obj_dec(leanHandleObj);
