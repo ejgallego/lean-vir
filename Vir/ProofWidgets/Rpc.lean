@@ -43,7 +43,7 @@ private opaque rpcRefFinishJs
     (ref : @& Lean.Vir.Js RpcRef)
     (typeText : @& Lean.Vir.Js String)
     (context : @& Lean.Vir.Js String)
-    (serverRef : Option (Lean.Vir.Js ServerRef)) :
+    (serverRef : @& Lean.Vir.Js.Nullable ServerRef) :
     Lean.Vir.RuntimeM (Lean.Vir.Js RpcRef)
 
 private def RpcRef.toJs (ref : @& RpcRef) : Lean.Vir.RuntimeM (Lean.Vir.Js RpcRef) := do
@@ -55,7 +55,8 @@ private def RpcRef.toJs (ref : @& RpcRef) : Lean.Vir.RuntimeM (Lean.Vir.Js RpcRe
   let typeText ← Lean.Vir.JsValue.ofString ref.typeText
   let context ← Lean.Vir.JsValue.ofString ref.context
   let base ← rpcRefBaseJs id label typeName summary expression
-  rpcRefFinishJs base typeText context ref.serverRef
+  let serverRef ← Lean.Vir.Js.Nullable.ofOption ref.serverRef
+  rpcRefFinishJs base typeText context serverRef
 
 /--
 Resolved metadata for a ProofWidgets-style RPC reference.

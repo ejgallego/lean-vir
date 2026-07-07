@@ -797,6 +797,110 @@ function requireReactHostHooks(hooks) {
   return hooks;
 }
 
+// web/src/host/vir-js-value-bindings.js
+function createJsValueHostBindings(resources) {
+  const bindings = {};
+  for (const [target, codec] of Object.entries(jsValueCodecs)) {
+    bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
+    bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
+  }
+  bindings["js.nullable.null"] = () => resources.resourceForValue(createNullableValue(null));
+  bindings["js.nullable.of"] = (value) => resources.resourceForValue(createNullableValue(resources.resolveResource(value, "Js")));
+  bindings["js.nullable.isNull"] = (value) => resources.resourceForValue(nullablePayload(resources, value) === null);
+  bindings["js.nullable.value"] = (value) => {
+    const payload = nullablePayload(resources, value);
+    if (payload === null) {
+      throw new Error("js.nullable.value expects a non-null nullable value");
+    }
+    return resources.resourceForValue(payload);
+  };
+  return bindings;
+}
+var nullableBrand = /* @__PURE__ */ Symbol("lean-vir.jsNullable");
+function createNullableValue(value) {
+  return Object.freeze({
+    [nullableBrand]: true,
+    value: value === void 0 ? null : value
+  });
+}
+function nullablePayload(resources, value) {
+  const nullable = resources.resolveResource(value, "JsNullable");
+  if (typeof nullable !== "object" || nullable === null || nullable[nullableBrand] !== true) {
+    throw new Error("JsNullable resource must contain a nullable value");
+  }
+  return nullable.value === void 0 ? null : nullable.value;
+}
+var jsValueCodecs = {
+  "js.string": {
+    toJs: jsStringValue2,
+    fromJs: jsStringPayload
+  },
+  "js.nat": {
+    toJs: jsNatValue,
+    fromJs: jsNatPayload
+  },
+  "js.bool": {
+    toJs: jsBoolValue,
+    fromJs: jsBoolPayload
+  },
+  "js.float": {
+    toJs: jsFloatValue,
+    fromJs: jsFloatPayload
+  }
+};
+function jsStringValue2(value) {
+  if (typeof value !== "string") {
+    throw new Error("js.string expects a string");
+  }
+  return value;
+}
+function jsStringPayload(value) {
+  if (typeof value !== "string") {
+    throw new Error("js.string.value expects a JS string");
+  }
+  return value;
+}
+function jsNatValue(value) {
+  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
+    throw new Error("js.nat expects a natural number");
+  }
+  const text = String(value);
+  if (!/^(0|[1-9][0-9]*)$/.test(text)) {
+    throw new Error("js.nat expects a natural number");
+  }
+  return BigInt(text);
+}
+function jsNatPayload(value) {
+  if (typeof value !== "bigint" || value < 0n) {
+    throw new Error("js.nat.value expects a JS natural number");
+  }
+  return value;
+}
+function jsBoolValue(value) {
+  if (typeof value !== "boolean") {
+    throw new Error("js.bool expects a boolean");
+  }
+  return value;
+}
+function jsBoolPayload(value) {
+  if (typeof value !== "boolean") {
+    throw new Error("js.bool.value expects a JS boolean");
+  }
+  return value;
+}
+function jsFloatValue(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("js.float expects a finite number");
+  }
+  return value;
+}
+function jsFloatPayload(value) {
+  if (typeof value !== "number" || !Number.isFinite(value)) {
+    throw new Error("js.float.value expects a finite JS number");
+  }
+  return value;
+}
+
 // web/src/host/vir-host-resources.js
 var HostResourceState = class {
   constructor() {
@@ -948,9 +1052,11 @@ function createElementResourceHostBindings(resources, operations) {
       );
       return void 0;
     },
-    "browser.element.getAttribute": (element, name) => resources.resourceForValue(operations.getAttribute(
-      resources.resolveResource(element, "Element"),
-      resources.resolveResource(name, "JsString")
+    "browser.element.getAttribute": (element, name) => resources.resourceForValue(createNullableValue(
+      operations.getAttribute(
+        resources.resolveResource(element, "Element"),
+        resources.resolveResource(name, "JsString")
+      )
     )),
     "browser.element.setAttribute": (element, name, value) => {
       operations.setAttribute(
@@ -980,7 +1086,7 @@ function createElementResourceHostBindings(resources, operations) {
 }
 function createHtmlInputElementResourceHostBindings(resources, { fromElement }) {
   return {
-    "browser.htmlInputElement.fromElement": (element) => fromElement(resources.resolveResource(element, "Element")),
+    "browser.htmlInputElement.fromElement": (element) => resources.resourceForValue(createNullableValue(fromElement(resources.resolveResource(element, "Element")))),
     "browser.htmlInputElement.getChecked": (input) => resources.resourceForValue(resources.resolveResource(input, "HTMLInputElement").checked === true),
     "browser.htmlInputElement.setChecked": (input, checked) => {
       resources.resolveResource(input, "HTMLInputElement").checked = resources.resolveResource(checked, "JsBool");
@@ -1065,7 +1171,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
   }
   return {
     "react.node.text": (value) => resources.resourceForValue(
-      requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue2(resources, value, "React Node text value"))
+      requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue3(resources, value, "React Node text value"))
     ),
     "react.props.empty": () => resources.resourceForValue(createReactPropsResource()),
     "react.props.setKey": (props, key) => setReactPropsKey(resources, props, key),
@@ -1075,7 +1181,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     "react.node.children.push": (children, child) => pushReactNodeChild(resources, children, child),
     "react.node.createElement": (tag, props, children) => resources.resourceForValue(
       requireReactNodeElementResourceFactory(createNodeElementResource)(
-        jsStringValue2(resources, tag, "React Node element tag"),
+        jsStringValue3(resources, tag, "React Node element tag"),
         props,
         children
       )
@@ -1108,7 +1214,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     },
     "react.root.renderIntoSelector": (selector, node) => {
       const root = selectorRoot(
-        jsStringValue2(resources, selector, "React root selector"),
+        jsStringValue3(resources, selector, "React root selector"),
         () => disposeUnrenderedReactNode(node)
       );
       if (root === null) {
@@ -1119,7 +1225,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     },
     "react.root.renderComponentIntoSelector": (selector, component) => {
       const root = selectorRoot(
-        jsStringValue2(resources, selector, "React root selector"),
+        jsStringValue3(resources, selector, "React root selector"),
         () => releaseLeanCallback2(component)
       );
       if (root === null) {
@@ -1135,7 +1241,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
       return void 0;
     },
     "react.root.unmountSelector": (selector) => {
-      const mounted = rootsBySelector.get(jsStringValue2(resources, selector, "React root selector"));
+      const mounted = rootsBySelector.get(jsStringValue3(resources, selector, "React root selector"));
       if (mounted === void 0) {
         return resources.resourceForValue(false);
       }
@@ -1204,7 +1310,7 @@ function jsNatAsDelay(resources, value) {
   }
   return Number(delay);
 }
-function jsStringValue2(resources, value, label) {
+function jsStringValue3(resources, value, label) {
   const text = resources.resolveResource(value, label);
   if (typeof text !== "string") {
     throw new Error(`${label} must be a Js String`);
@@ -1384,86 +1490,6 @@ function createReactHostHooks() {
     flushReactNodeDisposals: flushReactNodeDisposals2,
     once
   };
-}
-
-// web/src/host/vir-js-value-bindings.js
-function createJsValueHostBindings(resources) {
-  const bindings = {};
-  for (const [target, codec] of Object.entries(jsValueCodecs)) {
-    bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
-    bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
-  }
-  return bindings;
-}
-var jsValueCodecs = {
-  "js.string": {
-    toJs: jsStringValue3,
-    fromJs: jsStringPayload
-  },
-  "js.nat": {
-    toJs: jsNatValue,
-    fromJs: jsNatPayload
-  },
-  "js.bool": {
-    toJs: jsBoolValue,
-    fromJs: jsBoolPayload
-  },
-  "js.float": {
-    toJs: jsFloatValue,
-    fromJs: jsFloatPayload
-  }
-};
-function jsStringValue3(value) {
-  if (typeof value !== "string") {
-    throw new Error("js.string expects a string");
-  }
-  return value;
-}
-function jsStringPayload(value) {
-  if (typeof value !== "string") {
-    throw new Error("js.string.value expects a JS string");
-  }
-  return value;
-}
-function jsNatValue(value) {
-  if (typeof value !== "string" && typeof value !== "number" && typeof value !== "bigint") {
-    throw new Error("js.nat expects a natural number");
-  }
-  const text = String(value);
-  if (!/^(0|[1-9][0-9]*)$/.test(text)) {
-    throw new Error("js.nat expects a natural number");
-  }
-  return BigInt(text);
-}
-function jsNatPayload(value) {
-  if (typeof value !== "bigint" || value < 0n) {
-    throw new Error("js.nat.value expects a JS natural number");
-  }
-  return value;
-}
-function jsBoolValue(value) {
-  if (typeof value !== "boolean") {
-    throw new Error("js.bool expects a boolean");
-  }
-  return value;
-}
-function jsBoolPayload(value) {
-  if (typeof value !== "boolean") {
-    throw new Error("js.bool.value expects a JS boolean");
-  }
-  return value;
-}
-function jsFloatValue(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error("js.float expects a finite number");
-  }
-  return value;
-}
-function jsFloatPayload(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error("js.float.value expects a finite JS number");
-  }
-  return value;
 }
 
 // web/src/react/vir-react-hooks.js
@@ -1985,13 +2011,13 @@ function createBrowserDocumentHostBindings(state = createHostResourceState()) {
       browserDocument().title = state.resolveResource(title, "JsString");
       return void 0;
     },
-    "browser.document.querySelector": (selector) => state.resourceForValue(queryDocumentElement(state.resolveResource(selector, "JsString")))
+    "browser.document.querySelector": (selector) => state.resourceForValue(createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString"))))
   };
 }
 function createBrowserEventHostBindings(state = createHostResourceState()) {
   return {
-    "browser.event.target": (event) => resourceForElementTarget(state, state.resolveResource(event, "Event").target),
-    "browser.event.currentTarget": (event) => resourceForElementTarget(state, state.resolveResource(event, "Event").currentTarget),
+    "browser.event.target": (event) => state.resourceForValue(nullableElementTarget(state.resolveResource(event, "Event").target)),
+    "browser.event.currentTarget": (event) => state.resourceForValue(nullableElementTarget(state.resolveResource(event, "Event").currentTarget)),
     "browser.event.preventDefault": (event) => {
       preventDefaultOnEvent(state.resolveResource(event, "Event"));
       return void 0;
@@ -2000,7 +2026,7 @@ function createBrowserEventHostBindings(state = createHostResourceState()) {
       stopPropagationOnEvent(state.resolveResource(event, "Event"));
       return void 0;
     },
-    "browser.event.formValue": (event) => state.resourceForValue(formControlEventValue(state.resolveResource(event, "Event")))
+    "browser.event.formValue": (event) => state.resourceForValue(createNullableValue(formControlEventValue(state.resolveResource(event, "Event"))))
   };
 }
 function createBrowserElementHostBindings(state = createHostResourceState()) {
@@ -2016,7 +2042,7 @@ function createBrowserElementHostBindings(state = createHostResourceState()) {
 }
 function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
   return createHtmlInputElementResourceHostBindings(state, {
-    fromElement: (element) => isInputElement(element) ? state.resourceForValue(element) : null
+    fromElement: (element) => isInputElement(element) ? element : null
   });
 }
 function createBrowserTimerHostBindings(state = createHostResourceState()) {
@@ -2054,7 +2080,7 @@ function createInfoviewHostBindings({ resources = createHostResourceState(), com
       ...resources.resolveResource(ref, "RpcRef"),
       typeText: resources.resolveResource(typeText, "JsString"),
       context: resources.resolveResource(context, "JsString"),
-      ...serverRef === null || serverRef === void 0 ? {} : { serverRef }
+      ...nullableField(resources, serverRef, "serverRef")
     }),
     "js.value.proofwidgets.resolvedRef.value": (ref) => normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
     "proofwidgets.rpc.inspectRef": (ref) => resources.resourceForValue(inspectProofWidgetsRpcRef(
@@ -2134,6 +2160,10 @@ function revealInfoviewPosition(commandDispatcher, position) {
     return false;
   }
   return dispatchInfoviewCommand(commandDispatcher, "revealPosition", normalized);
+}
+function nullableField(resources, value, name) {
+  const payload = nullablePayload(resources, value);
+  return payload === null ? {} : { [name]: payload };
 }
 function inspectProofWidgetsRpcRef(commandDispatcher, ref) {
   const normalized = normalizeProofWidgetsRpcRef(ref);
@@ -2299,8 +2329,8 @@ function isSelectElement(value) {
 function isElement(value) {
   return typeof globalThis.Element === "function" && value instanceof globalThis.Element;
 }
-function resourceForElementTarget(state, value) {
-  return isElement(value) ? state.resourceForValue(value) : null;
+function nullableElementTarget(value) {
+  return createNullableValue(isElement(value) ? value : null);
 }
 function formControlEventValue(event) {
   const currentValue = formControlValue(event?.currentTarget);
@@ -3480,10 +3510,6 @@ function hostWireTypeSupported(type, { allowFunction }) {
     case WIRE.UNIT:
     case WIRE.RESOURCE:
       return true;
-    case WIRE.OPTION:
-      return hostWireTypeSupported(requireTypeField(type, "element", "host wire type"), { allowFunction });
-    case WIRE.PROD:
-      return hostWireTypeSupported(requireTypeField(type, "fst", "host wire type"), { allowFunction }) && hostWireTypeSupported(requireTypeField(type, "snd", "host wire type"), { allowFunction });
     case WIRE.FUNCTION: {
       if (!allowFunction) {
         return false;

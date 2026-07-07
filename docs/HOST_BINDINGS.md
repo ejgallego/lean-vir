@@ -13,16 +13,18 @@ installed by the browser runtime. Node tests and tools can use
 
 `@[vir_js]` is a JavaScript host boundary, not the same surface as an exported
 Lean declaration called from JavaScript. Host imports should expose
-`Lean.Vir.Js α` resources, resource-shaped containers, and callbacks whose
-arguments/results follow that same rule. Public Lean wrappers can convert to or
-from ordinary Lean values with `Lean.Vir.JsValue`.
+`Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources for JavaScript
+`null`, and callbacks whose arguments/results follow that same rule. Public
+Lean wrappers can convert to or from ordinary Lean values with
+`Lean.Vir.JsValue` and `Lean.Vir.Js.Nullable`.
 
-Raw Lean scalar, structure, array, and list types are rejected in ordinary host
-imports. The supported boundary lanes are:
+Raw Lean scalar, structure, array, list, option, and product types are rejected
+in ordinary host imports. The supported boundary lanes are:
 
 | Lean type surface | Owner / shape | Import boundary | Use |
 | --- | --- | --- | --- |
 | `Lean.Vir.Js α` | JavaScript-owned host resource with phantom Lean shape | `wire` | Pass real JavaScript objects without decoding them in Lean. |
+| `Lean.Vir.Js.Nullable α` | JavaScript-owned nullable resource | `wire` | Pass JavaScript `null`/value results without generic Lean `Option` lowering. |
 | `Lean.Vir.JSL α` | JavaScript handle to a retained Lean-owned value | `objectHandle` | Let JavaScript store or route Lean values without structural conversion. |
 | Explicit conversion declarations | One side `Lean.Vir.Js ...`, one side an ordinary Lean value | `explicitConversion` | Decode or encode values at named host bindings such as `js.string.value` or `js.value.react.property`. |
 | Wire scalars and containers | JavaScript caller to exported Lean entrypoints | export ABI | Call public Lean functions from JavaScript without a host-import wrapper. |
@@ -204,16 +206,16 @@ const vir = await createVirRuntime({
 console.log(vir.call("bumpFromJs", 41)); // "42"
 ```
 
-Host imports are a JavaScript-resource boundary by default: use `Lean.Vir.Js α`
-resources, `Option`/`Array` containers of resources, and callback types whose
-arguments/results follow the same rule. Raw Lean scalars and structures are
-rejected unless they are part of a built-in conversion target such as
-`js.nat.value` or `js.value.react.property`. `Unit` returns use
-`undefined` or `null`. Function-valued Lean arguments are decoded as callable
-`VirCallback` objects. A host binding that stores a callback must eventually
-call `callback.release()` or rely on `VirRuntime.dispose()` to release any
-still-live callback roots. Host imports are synchronous; returning a
-`Promise` is an error.
+Host imports are a JavaScript-resource boundary by default: use `Unit`,
+`Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` for JavaScript `null`
+semantics, and callback types whose arguments/results follow the same rule.
+Raw Lean scalars, structures, arrays, lists, options, and products are rejected
+unless they are part of a built-in conversion target such as `js.nat.value` or
+`js.value.react.property`. `Unit` returns use `undefined` or `null`.
+Function-valued Lean arguments are decoded as callable `VirCallback` objects. A
+host binding that stores a callback must eventually call `callback.release()`
+or rely on `VirRuntime.dispose()` to release any still-live callback roots. Host
+imports are synchronous; returning a `Promise` is an error.
 
 ## Resource Lifetime
 

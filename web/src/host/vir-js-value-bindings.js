@@ -10,7 +10,36 @@ export function createJsValueHostBindings(resources) {
     bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
     bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
   }
+  bindings["js.nullable.null"] = () => resources.resourceForValue(createNullableValue(null));
+  bindings["js.nullable.of"] = (value) =>
+    resources.resourceForValue(createNullableValue(resources.resolveResource(value, "Js")));
+  bindings["js.nullable.isNull"] = (value) =>
+    resources.resourceForValue(nullablePayload(resources, value) === null);
+  bindings["js.nullable.value"] = (value) => {
+    const payload = nullablePayload(resources, value);
+    if (payload === null) {
+      throw new Error("js.nullable.value expects a non-null nullable value");
+    }
+    return resources.resourceForValue(payload);
+  };
   return bindings;
+}
+
+const nullableBrand = Symbol("lean-vir.jsNullable");
+
+export function createNullableValue(value) {
+  return Object.freeze({
+    [nullableBrand]: true,
+    value: value === undefined ? null : value,
+  });
+}
+
+export function nullablePayload(resources, value) {
+  const nullable = resources.resolveResource(value, "JsNullable");
+  if (typeof nullable !== "object" || nullable === null || nullable[nullableBrand] !== true) {
+    throw new Error("JsNullable resource must contain a nullable value");
+  }
+  return nullable.value === undefined ? null : nullable.value;
 }
 
 const jsValueCodecs = {

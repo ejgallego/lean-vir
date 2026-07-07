@@ -21,6 +21,7 @@ import {
   setReactPropsKey,
   setReactPropsProperty,
 } from "../react/vir-react-node.js";
+import { createNullableValue } from "./vir-js-value-bindings.js";
 
 export class HostResourceState {
   constructor() {
@@ -187,9 +188,11 @@ export function createElementResourceHostBindings(resources, operations) {
       return undefined;
     },
     "browser.element.getAttribute": (element, name) =>
-      resources.resourceForValue(operations.getAttribute(
-        resources.resolveResource(element, "Element"),
-        resources.resolveResource(name, "JsString"),
+      resources.resourceForValue(createNullableValue(
+        operations.getAttribute(
+          resources.resolveResource(element, "Element"),
+          resources.resolveResource(name, "JsString"),
+        ),
       )),
     "browser.element.setAttribute": (element, name, value) => {
       operations.setAttribute(
@@ -221,7 +224,7 @@ export function createElementResourceHostBindings(resources, operations) {
 export function createHtmlInputElementResourceHostBindings(resources, { fromElement }) {
   return {
     "browser.htmlInputElement.fromElement": (element) =>
-      fromElement(resources.resolveResource(element, "Element")),
+      resources.resourceForValue(createNullableValue(fromElement(resources.resolveResource(element, "Element")))),
     "browser.htmlInputElement.getChecked": (input) =>
       resources.resourceForValue(resources.resolveResource(input, "HTMLInputElement").checked === true),
     "browser.htmlInputElement.setChecked": (input, checked) => {

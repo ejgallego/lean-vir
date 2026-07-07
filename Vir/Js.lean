@@ -48,6 +48,63 @@ opaque toFloat (value : @& Js Float) : RuntimeM Float
 
 end JsValue
 
+namespace Js
+
+namespace Nullable
+
+/--
+Phantom marker for a JavaScript nullable value.
+
+Use `Js.Nullable α` for the resource handle. The host stores either JavaScript
+`null` or a JavaScript value with Lean-side phantom shape `α`.
+-/
+opaque Value (α : Type) : Type
+
+end Nullable
+
+/--
+JavaScript-owned nullable value.
+
+This is a resource with explicit `null` semantics. It is intentionally distinct
+from Lean's structural `Option`, so host imports can traffic in JavaScript
+values without generic option lowering.
+-/
+abbrev Nullable (α : Type) : Type :=
+  Lean.Vir.Js (Nullable.Value α)
+
+namespace Nullable
+
+@[vir_js "js.nullable.null"]
+opaque null {α : Type} : RuntimeM (Lean.Vir.Js.Nullable α)
+
+@[vir_js "js.nullable.of"]
+opaque ofJs {α : Type} (value : @& Lean.Vir.Js α) : RuntimeM (Lean.Vir.Js.Nullable α)
+
+@[vir_js "js.nullable.isNull"]
+private opaque isNullJs {α : Type} (value : @& Lean.Vir.Js.Nullable α) : RuntimeM (Lean.Vir.Js Bool)
+
+@[vir_js "js.nullable.value"]
+opaque get {α : Type} (value : @& Lean.Vir.Js.Nullable α) : RuntimeM (Lean.Vir.Js α)
+
+def isNull {α : Type} (value : @& Lean.Vir.Js.Nullable α) : RuntimeM Bool := do
+  let flag ← isNullJs value
+  Lean.Vir.JsValue.toBool flag
+
+def toOption {α : Type} (value : @& Lean.Vir.Js.Nullable α) : RuntimeM (Option (Lean.Vir.Js α)) := do
+  if ← isNull value then
+    pure none
+  else
+    some <$> get value
+
+def ofOption {α : Type} (value : Option (Lean.Vir.Js α)) : RuntimeM (Lean.Vir.Js.Nullable α) :=
+  match value with
+  | none => null
+  | some value => ofJs value
+
+end Nullable
+
+end Js
+
 namespace LeanRef
 
 /--

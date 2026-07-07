@@ -36,7 +36,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     },
   });
   const hostRuntime = await hostFactory.createRuntime({ irPackageBytes: await readFile(hostPackage) });
-  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 13);
+  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 16);
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshEchoBang")?.effect, "runtime");
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshTitleRoundtrip")?.effect, "dom");
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshReactValue")?.effect, "react");

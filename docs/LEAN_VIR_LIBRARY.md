@@ -471,11 +471,11 @@ const vir = await createVirRuntime({
 ```
 
 Host imports use an explicit JavaScript-resource boundary by default. Use
-`Lean.Vir.Js α` resources, containers of resources, or callbacks whose
-arguments/results are resource-shaped. Raw Lean scalars and structures are
-rejected unless the target is a built-in conversion primitive such as
-`js.nat.value` or `js.value.react.property`. `Unit` results should return
-`undefined` or `null`.
+`Unit`, `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources for
+JavaScript `null`, or callbacks whose arguments/results use those same shapes.
+Raw Lean scalars, structures, arrays, lists, options, and products are rejected
+unless the target is a built-in conversion primitive such as `js.nat.value` or
+`js.value.react.property`. `Unit` results should return `undefined` or `null`.
 
 Lean function values in host-import arguments are supported as callbacks from
 JavaScript into Lean. The JavaScript runtime roots the closure in the WASM shim,
@@ -508,6 +508,8 @@ Exported entrypoints support the current interface types:
 - nullary inductive enums
 - opaque `Lean.Vir.Js α` resources for JavaScript-owned objects, including
   browser and React object markers
+- `Lean.Vir.Js.Nullable α` resources for JavaScript `null` values, with
+  explicit `toOption`/`ofOption` helpers at the Lean API edge
 - Lean function values used as host callbacks
 - `Lean.Expr`
 - `Lean.Vir.React.Node` as an opaque JavaScript-owned resource under

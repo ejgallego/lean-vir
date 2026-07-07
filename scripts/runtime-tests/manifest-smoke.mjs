@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { createVirRuntime as createExportedBrowserVirRuntime } from "lean-vir";
 import {
+  createCommonHostBindings as createExportedCommonHostBindings,
   createBrowserDocumentHostBindings as createExportedBrowserDocumentHostBindings,
   createBrowserElementHostBindings as createExportedBrowserElementHostBindings,
   createHostResourceState as createExportedHostResourceState,
@@ -139,9 +140,15 @@ assert.throws(() => debugWasmUrlFor("module.bin"), /debugWasm requires a \.wasm 
     const primitiveResource = resources.resourceForValue(false);
     assert.equal(resources.resolveResource(primitiveResource, "Js"), false);
     assert.equal(resources.resourceForValue(false), primitiveResource);
+    const commonBindings = createExportedCommonHostBindings(resources);
     const documentBindings = createExportedBrowserDocumentHostBindings(resources);
     const elementBindings = createExportedBrowserElementHostBindings(resources);
-    const sharedElement = documentBindings["browser.document.querySelector"](resources.resourceForValue("#shared"));
+    const sharedElementNullable = documentBindings["browser.document.querySelector"](resources.resourceForValue("#shared"));
+    assert.equal(
+      resources.resolveResource(commonBindings["js.nullable.isNull"](sharedElementNullable), "JsBool"),
+      false,
+    );
+    const sharedElement = commonBindings["js.nullable.value"](sharedElementNullable);
     const sharedText = elementBindings["browser.element.getTextContent"](sharedElement);
     assert.equal(resources.resolveResource(sharedText, "JsString"), "shared element");
     assert.throws(
@@ -351,8 +358,8 @@ assert.equal(proofwidgetsRpcRefFinishImport?.effect, "runtime");
 assert.equal(proofwidgetsRpcRefFinishImport?.args[0]?.type?.type, "Js");
 assert.equal(proofwidgetsRpcRefFinishImport?.args[1]?.type?.type, "Js");
 assert.equal(proofwidgetsRpcRefFinishImport?.args[2]?.type?.type, "Js");
-assert.equal(proofwidgetsRpcRefFinishImport?.args[3]?.type?.kind, "option");
-assert.equal(proofwidgetsRpcRefFinishImport?.args[3]?.type?.element?.type, "Js");
+assert.equal(proofwidgetsRpcRefFinishImport?.args[3]?.type?.kind, "resource");
+assert.equal(proofwidgetsRpcRefFinishImport?.args[3]?.type?.name, "Lean.Vir.Js");
 assert.equal(proofwidgetsRpcRefFinishImport?.result?.type, "Js");
 const testCallNatCallbackImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.callNatCallback");
 assert.equal(testCallNatCallbackImport?.effect, "runtime");
@@ -465,10 +472,20 @@ assert.deepEqual(
 );
 const virtualQueryState = createVirtualDocumentState();
 const virtualQueryHost = createVirtualDocumentHostBindings(virtualQueryState);
-assert.equal(virtualQueryHost["browser.document.querySelector"](virtualQueryState.resources.resourceForValue("#missing")), null);
+const virtualNullableHost = createExportedCommonHostBindings(virtualQueryState.resources);
+assert.equal(
+  virtualQueryState.resources.resolveResource(
+    virtualNullableHost["js.nullable.isNull"](
+      virtualQueryHost["browser.document.querySelector"](virtualQueryState.resources.resourceForValue("#missing")),
+    ),
+    "JsBool",
+  ),
+  true,
+);
 ensureVirtualElementState(virtualQueryState, "#present");
-const virtualPresentElement =
-  virtualQueryHost["browser.document.querySelector"](virtualQueryState.resources.resourceForValue("#present"));
+const virtualPresentElement = virtualNullableHost["js.nullable.value"](
+  virtualQueryHost["browser.document.querySelector"](virtualQueryState.resources.resourceForValue("#present")),
+);
 assert.notEqual(virtualPresentElement, null);
 assert.equal(
   virtualQueryState.resources.resolveResource(
@@ -492,8 +509,20 @@ virtualQueryState.elements.get("#present").listeners.get("click")[0].dispatch(cr
   target: "#missing",
   currentTarget: "#missing",
 }));
-assert.equal(virtualMissingEventTarget, null);
-assert.equal(virtualMissingEventCurrentTarget, null);
+assert.equal(
+  virtualQueryState.resources.resolveResource(
+    virtualNullableHost["js.nullable.isNull"](virtualMissingEventTarget),
+    "JsBool",
+  ),
+  true,
+);
+assert.equal(
+  virtualQueryState.resources.resolveResource(
+    virtualNullableHost["js.nullable.isNull"](virtualMissingEventCurrentTarget),
+    "JsBool",
+  ),
+  true,
+);
 virtualQueryHost["browser.element.removeEventListener"](virtualMissingEventListener);
 const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
 assert.throws(

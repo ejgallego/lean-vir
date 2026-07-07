@@ -22,6 +22,12 @@ opaque jsArrayLength (arrayItems : Array (Lean.Vir.Js Nat)) : Lean.Vir.RuntimeM 
 @[vir_js "test.listLength"]
 opaque jsListLength (listItems : List (Lean.Vir.Js Nat)) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
+@[vir_js "test.optionValue"]
+opaque jsOptionValue (value : Option (Lean.Vir.Js Nat)) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
+
+@[vir_js "test.prodValue"]
+opaque jsProdValue (value : Lean.Vir.Js Nat × Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
+
 def freshCustomBump (n : Nat) : Nat :=
   jsBumpNat n
 
@@ -37,3 +43,10 @@ def freshCustomArrayLength (items : Array (Lean.Vir.Js Nat)) : Lean.Vir.RuntimeM
 
 def freshCustomListLength (items : List (Lean.Vir.Js Nat)) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat) :=
   jsListLength items
+
+def freshCustomOptionValue (value : Option (Lean.Vir.Js Nat)) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat) :=
+  jsOptionValue value
+
+def freshCustomProdValue (value : Lean.Vir.Js Nat × Lean.Vir.Js Nat) :
+    Lean.Vir.RuntimeM (Lean.Vir.Js Nat) :=
+  jsProdValue value

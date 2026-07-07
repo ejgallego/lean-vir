@@ -15,6 +15,7 @@ import {
 } from "../../web/src/host/vir-host-resources.js";
 import {
   createBrowserHostBindings,
+  createCommonHostBindings,
 } from "../../web/src/vir-host-bindings.js";
 import {
   createReactJsValueHostBindings,
@@ -221,8 +222,11 @@ assert.equal(reactRuntime.liveCallbacks.size, 0);
 const malformedReactDocumentState = createVirtualDocumentState();
 ensureVirtualElementState(malformedReactDocumentState, "#react-malformed");
 const malformedReactHost = createVirtualDocumentHostBindings(malformedReactDocumentState);
-const malformedReactContainer = malformedReactHost["browser.document.querySelector"](
-  malformedReactDocumentState.resources.resourceForValue("#react-malformed"),
+const malformedReactCommonHost = createCommonHostBindings(malformedReactDocumentState.resources);
+const malformedReactContainer = malformedReactCommonHost["js.nullable.value"](
+  malformedReactHost["browser.document.querySelector"](
+    malformedReactDocumentState.resources.resourceForValue("#react-malformed"),
+  ),
 );
 const malformedReactRoot = malformedReactHost["react.root.create"](malformedReactContainer);
 const malformedReactJsString = (value) => malformedReactDocumentState.resources.resourceForValue(value);
