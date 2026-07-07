@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "anchors": [
+    {
+      "id": "react.official.html_attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.HTMLAttributes",
+      "note": "Audit anchor from VIR's key/value property representation to React's full HTML attribute surface."
+    },
+    {
+      "id": "react.official.css_properties",
+      "lean": "Lean.Vir.React.PropValue",
+      "ts": "React.CSSProperties",
+      "note": "Audit anchor for the style branch of VIR PropValue."
+    },
+    {
+      "id": "react.official.event_handler",
+      "lean": "Lean.Vir.React.EventHandler",
+      "ts": "React.EventHandler",
+      "note": "Audit anchor from VIR retained callbacks to React's event handler type."
+    },
+    {
+      "id": "react.official.synthetic_event",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "React.SyntheticEvent",
+      "note": "Audit anchor from VIR event resources to React's synthetic event surface."
+    }
+  ]
+}

@@ -42,6 +42,37 @@ For normal package work, pass a real `.irpkg` with
 `vir-v1.manifest.json` fixture exists only to keep this first corpus testable
 without committing generated package artifacts.
 
+## React Corpus
+
+The React report is a small audit corpus sourced from the official React
+TypeScript setup guidance. React's runtime package does not currently provide
+the declaration files used by TypeScript consumers; React's documentation points
+users at `@types/react` and `@types/react-dom`, so this repository uses those
+packages for descriptor generation and records that provenance in
+`docs/type-descriptors/react-v1.provenance.json`.
+
+Generate and render the React report with:
+
+```bash
+npm run generate:react-type-descriptors
+npm run compare:react-type-anchors
+npm run render:react-type-anchors:html
+```
+
+Or validate all generated React artifacts with:
+
+```bash
+npm run check:react-type-anchors
+```
+
+The React anchor set is intentionally conservative. It compares four broad
+VIR-side concepts against four official React TypeScript surfaces:
+`React.HTMLAttributes`, `React.CSSProperties`, `React.EventHandler`, and
+`React.SyntheticEvent`. Weak matches are expected here because the React
+declarations are substantially richer than VIR's current browser-facing
+descriptors. In this corpus, `weak` means "useful audit/documentation pointer",
+not "bad API".
+
 ## Output Contract
 
 The pipeline has three public outputs.
@@ -64,6 +95,8 @@ The pipeline has three public outputs.
 - `results[].status`, one of `exact`, `compatible`, `weak`, or `missing`;
 - `results[].notes`, short explanations for non-exact matches;
 - `results[].leanDescriptor` and `results[].tsSymbol`, when found.
+- `typeScriptProvenance`, when present in the descriptor JSON, with package and
+  documentation sources used to build an enriched report.
 
 `vir-v1.anchors.md` is a rendered documentation fragment. It is not the source
 of truth. It exists so a Verso/Blueprint document or ordinary Markdown page can
@@ -72,7 +105,8 @@ show the same report with usable links and hovers.
 `vir-v1.anchors.html` is the standalone human-ready report. It treats the
 TypeScript declaration as the primary documentation surface and enriches each
 symbol with the Lean declaration, match status, notes, source jump, and hover
-text.
+text. Reports with provenance metadata also show the declaration package and
+documentation sources in the page header.
 
 ## Match Status
 

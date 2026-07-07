@@ -20,6 +20,10 @@
     "render:type-anchors": "node scripts/render-type-anchors.mjs --report docs/type-descriptors/vir-v1.report.json --out docs/type-descriptors/vir-v1.anchors.md",
     "render:type-anchors:html": "node scripts/render-type-anchors.mjs --format html --report docs/type-descriptors/vir-v1.report.json --out docs/type-descriptors/vir-v1.anchors.html",
     "check:type-anchors": "node scripts/generate-ts-descriptors.mjs --check --anchors docs/type-descriptors/vir-v1.anchors.json --out docs/type-descriptors/vir-v1.json docs/type-descriptors/vir-v1.types.d.ts && node scripts/check-type-anchors.mjs --check --descriptors docs/type-descriptors/vir-v1.json --manifest docs/type-descriptors/vir-v1.manifest.json --out docs/type-descriptors/vir-v1.report.json && node scripts/render-type-anchors.mjs --check --report docs/type-descriptors/vir-v1.report.json --out docs/type-descriptors/vir-v1.anchors.md && node scripts/render-type-anchors.mjs --check --format html --report docs/type-descriptors/vir-v1.report.json --out docs/type-descriptors/vir-v1.anchors.html && npm run test:type-anchors",
+    "generate:react-type-descriptors": "node scripts/generate-ts-descriptors.mjs --namespace React --provenance docs/type-descriptors/react-v1.provenance.json --anchors docs/type-descriptors/react-v1.anchors.json --out docs/type-descriptors/react-v1.json --symbol React.HTMLAttributes --symbol React.CSSProperties --symbol React.EventHandler --symbol React.SyntheticEvent node_modules/@types/react/index.d.ts",
+    "compare:react-type-anchors": "node scripts/check-type-anchors.mjs --descriptors docs/type-descriptors/react-v1.json --manifest docs/type-descriptors/vir-v1.manifest.json --out docs/type-descriptors/react-v1.report.json",
+    "render:react-type-anchors:html": "node scripts/render-type-anchors.mjs --format html --report docs/type-descriptors/react-v1.report.json --out docs/type-descriptors/react-v1.anchors.html",
+    "check:react-type-anchors": "node scripts/generate-ts-descriptors.mjs --check --namespace React --provenance docs/type-descriptors/react-v1.provenance.json --anchors docs/type-descriptors/react-v1.anchors.json --out docs/type-descriptors/react-v1.json --symbol React.HTMLAttributes --symbol React.CSSProperties --symbol React.EventHandler --symbol React.SyntheticEvent node_modules/@types/react/index.d.ts && node scripts/check-type-anchors.mjs --check --descriptors docs/type-descriptors/react-v1.json --manifest docs/type-descriptors/vir-v1.manifest.json --out docs/type-descriptors/react-v1.report.json && node scripts/render-type-anchors.mjs --check --format html --report docs/type-descriptors/react-v1.report.json --out docs/type-descriptors/react-v1.anchors.html",
     "test:type-anchors": "node scripts/type-anchor-smoke.mjs",
     "fetch:lean": "bash scripts/fetch-lean-source.sh",
     "build:infoview": "node scripts/build-infoview-widget.mjs",
@@ -69,6 +73,8 @@
     "dev": "vite --host 127.0.0.1"
   },
   "devDependencies": {
+    "@types/react": "^19.2.17",
+    "@types/react-dom": "^19.2.3",
     "esbuild": "^0.27.7",
     "typescript": "^6.0.3",
     "vite": "^8.0.13"

@@ -1,0 +1,37 @@
+{
+  "note": "React 19.2.7 does not ship bundled TypeScript declaration files. React's official TypeScript guide directs users to @types/react and @types/react-dom; this report uses that declaration source and links back to the official React documentation.",
+  "packages": [
+    {
+      "name": "react",
+      "version": "19.2.7",
+      "role": "runtime package"
+    },
+    {
+      "name": "@types/react",
+      "version": "19.2.17",
+      "role": "React-recommended TypeScript declarations"
+    }
+  ],
+  "docs": [
+    {
+      "title": "React: Using TypeScript",
+      "url": "https://react.dev/learn/typescript"
+    },
+    {
+      "title": "React DOM common components",
+      "url": "https://react.dev/reference/react-dom/components/common"
+    }
+  ],
+  "sourceMaps": [
+    {
+      "path": "node_modules/@types/react/index.d.ts",
+      "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts"
+    }
+  ],
+  "symbolDocs": {
+    "React.HTMLAttributes": "https://react.dev/reference/react-dom/components/common",
+    "React.CSSProperties": "https://react.dev/learn/typescript#style-props",
+    "React.EventHandler": "https://react.dev/learn/typescript#dom-events",
+    "React.SyntheticEvent": "https://react.dev/learn/typescript#dom-events"
+  }
+}
