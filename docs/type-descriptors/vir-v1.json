@@ -1,0 +1,355 @@
+{
+  "version": 1,
+  "generator": "scripts/generate-ts-descriptors.mjs",
+  "sources": [
+    "docs/type-descriptors/vir-v1.types.d.ts"
+  ],
+  "symbols": [
+    {
+      "id": "LeanVir.Browser.Event",
+      "kind": "interface",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 23,
+        "startColumn": 5,
+        "endLine": 25,
+        "endColumn": 6
+      },
+      "display": "export interface Event {\n      readonly __resource: \"Event\";\n    }",
+      "hover": "Browser event resource marker.",
+      "shape": {
+        "kind": "resource",
+        "name": "LeanVir.Browser.Event"
+      }
+    },
+    {
+      "id": "LeanVir.DomEffect",
+      "kind": "type",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 19,
+        "startColumn": 3,
+        "endLine": 19,
+        "endColumn": 32
+      },
+      "display": "export type DomEffect<T> = T;",
+      "hover": "Synchronous DOM effect marker used by VIR host callbacks.",
+      "shape": {
+        "kind": "ref",
+        "id": "LeanVir.T"
+      }
+    },
+    {
+      "id": "LeanVir.Int",
+      "kind": "type",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 13,
+        "startColumn": 3,
+        "endLine": 13,
+        "endColumn": 46
+      },
+      "display": "export type Int = string | number | bigint;",
+      "hover": "JavaScript representation accepted for Lean Int values.",
+      "shape": {
+        "kind": "union",
+        "options": [
+          {
+            "kind": "primitive",
+            "name": "string"
+          },
+          {
+            "kind": "primitive",
+            "name": "number"
+          },
+          {
+            "kind": "primitive",
+            "name": "bigint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LeanVir.Js",
+      "kind": "type",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 16,
+        "startColumn": 3,
+        "endLine": 16,
+        "endColumn": 53
+      },
+      "display": "export type Js<T> = { readonly __virResource: T };",
+      "hover": "JavaScript-owned resource handle carrying a Lean-side phantom marker.",
+      "shape": {
+        "kind": "record",
+        "fields": {
+          "__virResource": {
+            "kind": "ref",
+            "id": "LeanVir.T"
+          }
+        }
+      }
+    },
+    {
+      "id": "LeanVir.Nat",
+      "kind": "type",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 10,
+        "startColumn": 3,
+        "endLine": 10,
+        "endColumn": 46
+      },
+      "display": "export type Nat = string | number | bigint;",
+      "hover": "JavaScript representation accepted for Lean Nat values.",
+      "shape": {
+        "kind": "union",
+        "options": [
+          {
+            "kind": "primitive",
+            "name": "string"
+          },
+          {
+            "kind": "primitive",
+            "name": "number"
+          },
+          {
+            "kind": "primitive",
+            "name": "bigint"
+          }
+        ]
+      }
+    },
+    {
+      "id": "LeanVir.React.EventHandler",
+      "kind": "interface",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 51,
+        "startColumn": 5,
+        "endLine": 54,
+        "endColumn": 6
+      },
+      "display": "export interface EventHandler {\n      name: string;\n      callback: (event: LeanVir.Js<LeanVir.Browser.Event>) => LeanVir.DomEffect<void>;\n    }",
+      "hover": "DOM-like React event handler backed by a retained Lean closure.",
+      "shape": {
+        "kind": "record",
+        "fields": {
+          "name": {
+            "kind": "primitive",
+            "name": "string"
+          },
+          "callback": {
+            "kind": "function",
+            "effect": "dom",
+            "args": [
+              {
+                "name": "event",
+                "type": {
+                  "kind": "resource",
+                  "name": "LeanVir.Browser.Event",
+                  "value": {
+                    "kind": "ref",
+                    "id": "LeanVir.Browser.Event"
+                  }
+                }
+              }
+            ],
+            "result": {
+              "kind": "primitive",
+              "name": "void"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "LeanVir.React.Property",
+      "kind": "interface",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 45,
+        "startColumn": 5,
+        "endLine": 48,
+        "endColumn": 6
+      },
+      "display": "export interface Property {\n      name: string;\n      value: LeanVir.React.PropValue;\n    }",
+      "hover": "A React property transported through the VIR manifest object ABI.",
+      "shape": {
+        "kind": "record",
+        "fields": {
+          "name": {
+            "kind": "primitive",
+            "name": "string"
+          },
+          "value": {
+            "kind": "ref",
+            "id": "LeanVir.React.PropValue"
+          }
+        }
+      }
+    },
+    {
+      "id": "LeanVir.React.PropertyIdentity",
+      "kind": "type",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 57,
+        "startColumn": 5,
+        "endLine": 58,
+        "endColumn": 68
+      },
+      "display": "export type PropertyIdentity =\n      (property: LeanVir.React.Property) => LeanVir.React.Property;",
+      "hover": "Sample callable shape used by the descriptor anchor fixture.",
+      "shape": {
+        "kind": "function",
+        "effect": "pure",
+        "args": [
+          {
+            "name": "property",
+            "type": {
+              "kind": "ref",
+              "id": "LeanVir.React.Property"
+            }
+          }
+        ],
+        "result": {
+          "kind": "ref",
+          "id": "LeanVir.React.Property"
+        }
+      }
+    },
+    {
+      "id": "LeanVir.React.PropValue",
+      "kind": "type",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 36,
+        "startColumn": 5,
+        "endLine": 42,
+        "endColumn": 50
+      },
+      "display": "export type PropValue =\n      | { kind: \"string\"; value: string }\n      | { kind: \"bool\"; value: boolean }\n      | { kind: \"int\"; value: LeanVir.Int }\n      | { kind: \"float\"; value: number }\n      | { kind: \"style\"; entries: LeanVir.React.StyleProperty[] }\n      | { kind: \"classList\"; classes: string[] };",
+      "hover": "Conservative v1 set of React property values.",
+      "shape": {
+        "kind": "variant",
+        "constructors": {
+          "string": {
+            "fields": {
+              "value": {
+                "kind": "primitive",
+                "name": "string"
+              }
+            }
+          },
+          "bool": {
+            "fields": {
+              "value": {
+                "kind": "primitive",
+                "name": "boolean"
+              }
+            }
+          },
+          "int": {
+            "fields": {
+              "value": {
+                "kind": "ref",
+                "id": "LeanVir.Int"
+              }
+            }
+          },
+          "float": {
+            "fields": {
+              "value": {
+                "kind": "primitive",
+                "name": "number"
+              }
+            }
+          },
+          "style": {
+            "fields": {
+              "entries": {
+                "kind": "array",
+                "element": {
+                  "kind": "ref",
+                  "id": "LeanVir.React.StyleProperty"
+                }
+              }
+            }
+          },
+          "classList": {
+            "fields": {
+              "classes": {
+                "kind": "array",
+                "element": {
+                  "kind": "primitive",
+                  "name": "string"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "LeanVir.React.StyleProperty",
+      "kind": "interface",
+      "source": {
+        "path": "docs/type-descriptors/vir-v1.types.d.ts",
+        "startLine": 30,
+        "startColumn": 5,
+        "endLine": 33,
+        "endColumn": 6
+      },
+      "display": "export interface StyleProperty {\n      name: string;\n      value: string;\n    }",
+      "hover": "A single React style object entry.",
+      "shape": {
+        "kind": "record",
+        "fields": {
+          "name": {
+            "kind": "primitive",
+            "name": "string"
+          },
+          "value": {
+            "kind": "primitive",
+            "name": "string"
+          }
+        }
+      }
+    }
+  ],
+  "anchors": [
+    {
+      "id": "react.style_property",
+      "lean": "Lean.Vir.React.StyleProperty",
+      "ts": "LeanVir.React.StyleProperty"
+    },
+    {
+      "id": "react.prop_value",
+      "lean": "Lean.Vir.React.PropValue",
+      "ts": "LeanVir.React.PropValue"
+    },
+    {
+      "id": "react.property",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "LeanVir.React.Property"
+    },
+    {
+      "id": "react.event_handler",
+      "lean": "Lean.Vir.React.EventHandler",
+      "ts": "LeanVir.React.EventHandler"
+    },
+    {
+      "id": "browser.event",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "LeanVir.Browser.Event",
+      "note": "Resource markers compare by identity suffix in v1."
+    },
+    {
+      "id": "react.property_identity",
+      "lean": "Lean.Vir.TypeAnchors.reactPropertyIdentity",
+      "ts": "LeanVir.React.PropertyIdentity"
+    }
+  ]
+}
