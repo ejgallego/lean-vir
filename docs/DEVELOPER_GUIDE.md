@@ -269,7 +269,7 @@ Use this checklist when adding a new host-backed primitive:
    `Vir/GeneratePackage/Interface/Classify/Signature.lean` validate the
    argument and result types.
 4. Add the JavaScript binding in the relevant host module.
-5. If the binding retains a callback or host object, wire its cleanup into
+5. If the binding retains a callback or host object, connect its cleanup to
    `HostResourceState` or an equivalent disposer.
 6. Add runtime tests for the happy path, stale/released resources, package
    reload, and runtime disposal.

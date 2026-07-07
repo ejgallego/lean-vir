@@ -2505,7 +2505,7 @@ var JSON_INPUT_INTERFACE_TAGS = /* @__PURE__ */ new Set([
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
 var INTERFACE_MANIFEST_VERSION = 6;
 var HOST_IMPORT_BOUNDARY = Object.freeze({
-  WIRE: "wire",
+  HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle"
 });
@@ -2588,7 +2588,7 @@ function validateManifestHostImports(hostImports) {
 }
 function requireHostImportBoundary(value, label) {
   if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be wire, explicitConversion, or objectHandle`);
+    throw new Error(`${label} must be hostResource, explicitConversion, or objectHandle`);
   }
 }
 function requireUnique(seen, value, label, owner = "interface export") {
@@ -3560,20 +3560,20 @@ function objectResultSupported(type, selfType = null) {
       return false;
   }
 }
-function hostWireArgumentSupported(type) {
-  if (hostWireValueSupported(type)) {
+function hostResourceArgumentSupported(type) {
+  if (hostResourceValueSupported(type)) {
     return true;
   }
   if (type?.interfaceTag !== INTERFACE_TAG.FUNCTION) {
     return false;
   }
-  const args = requireFunctionArgs(type, "host wire callback");
-  return args.every((arg) => hostWireValueSupported(arg.type)) && hostWireValueSupported(requireFunctionResult(type, "host wire callback"));
+  const args = requireFunctionArgs(type, "host resource callback");
+  return args.every((arg) => hostResourceValueSupported(arg.type)) && hostResourceValueSupported(requireFunctionResult(type, "host resource callback"));
 }
-function hostWireResultSupported(type) {
-  return hostWireValueSupported(type);
+function hostResourceResultSupported(type) {
+  return hostResourceValueSupported(type);
 }
-function hostWireValueSupported(type) {
+function hostResourceValueSupported(type) {
   switch (type?.interfaceTag) {
     case INTERFACE_TAG.UNIT:
     case INTERFACE_TAG.RESOURCE:
@@ -3966,9 +3966,9 @@ var ObjectValueRuntime = class {
   hasObjectValueExports() {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
   }
-  makeHostWireObjectValue(type, value, label) {
-    if (!hostWireResultSupported(type)) {
-      throw new Error(`${label} has unsupported JavaScript host wire result type`);
+  makeHostResourceObjectValue(type, value, label) {
+    if (!hostResourceResultSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host resource result type`);
     }
     return this.makeObjectValue(type, value, label);
   }
@@ -4929,9 +4929,9 @@ var ObjectValueRuntime = class {
         throw new Error(`${label} has unsupported object ABI result type`);
     }
   }
-  liftHostWireObjectValue(type, obj, label) {
-    if (!hostWireArgumentSupported(type)) {
-      throw new Error(`${label} has unsupported JavaScript host wire argument type`);
+  liftHostResourceObjectValue(type, obj, label) {
+    if (!hostResourceArgumentSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host resource argument type`);
     }
     return this.liftObjectValue(type, obj, label);
   }
@@ -5611,7 +5611,7 @@ var VirHostState = class {
         throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
       }
       entry.args.forEach((arg, index) => {
-        const value2 = explicitConversionTarget ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostWireObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        const value2 = explicitConversionTarget ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostResourceObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
         if (isVirCallback(value2)) {
           liftedCallbacks.push(value2);
         }
@@ -5632,7 +5632,7 @@ var VirHostState = class {
       releaseCallbacks(liftedCallbacks);
       throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
     }
-    return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
+    return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostResourceObjectValue(entry.result, value, `${entry.target} result`);
   }
   callObjectHandle(entry, argvPtr, argc) {
     const argObjects = this.readObjectArgv(argvPtr, argc);
@@ -5646,10 +5646,10 @@ var VirHostState = class {
         this.leanObjectHandleCells.delete(cell);
       };
       this.leanObjectHandleCells.add(cell);
-      return this.runtime.makeHostWireObjectValue(entry.result, resource, `${entry.target} result`);
+      return this.runtime.makeHostResourceObjectValue(entry.result, resource, `${entry.target} result`);
     }
     if (entry.target === "js.leanRef.value" && entry.args.length === 1 && isGenericJsResourceDescriptor(entry.args[0]?.type) && isLeanObjectDescriptor(entry.result)) {
-      const resource = this.runtime.liftHostWireObjectValue(
+      const resource = this.runtime.liftHostResourceObjectValue(
         entry.args[0].type,
         argObjects[0],
         `${entry.target} argument ${entry.args[0].name}`
@@ -5657,14 +5657,14 @@ var VirHostState = class {
       return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} argument ${entry.args[0].name}`);
     }
     if (entry.target === "js.leanRef.release" && entry.args.length === 1 && isGenericJsResourceDescriptor(entry.args[0]?.type) && isUnitDescriptor(entry.result)) {
-      const resource = this.runtime.liftHostWireObjectValue(
+      const resource = this.runtime.liftHostResourceObjectValue(
         entry.args[0].type,
         argObjects[0],
         `${entry.target} argument ${entry.args[0].name}`
       );
       const cell = this.runtime.leanObjectHandleCell(resource, `${entry.target} argument ${entry.args[0].name}`);
       this.runtime.releaseLeanObjectHandleCell(cell);
-      return this.runtime.makeHostWireObjectValue(entry.result, void 0, `${entry.target} result`);
+      return this.runtime.makeHostResourceObjectValue(entry.result, void 0, `${entry.target} result`);
     }
     throw new Error(`Vir host import ${entry.target} has unsupported objectHandle signature`);
   }

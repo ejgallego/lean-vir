@@ -122,12 +122,12 @@ The embedded manifest currently supports:
 
 This broad surface is the interface value codec used by JavaScript-to-Lean
 exports and by declarations explicitly marked as conversions. It is not the
-ordinary Lean-to-JavaScript host-import `wire` boundary, which is deliberately
+ordinary Lean-to-JavaScript host-resource boundary, which is deliberately
 narrower and accepts only `Unit`, resources, and resource-shaped callbacks.
 
 The numeric descriptor tag table is part of the package ABI. The JSON field is
 named `interfaceTag`; these tags describe the interface value codec, not the
-ordinary host-import `wire` mode. Lean assigns tags in
+ordinary host-resource import mode. Lean assigns tags in
 `Vir.GeneratePackage.Interface.Encode`; JavaScript validates and dispatches
 them in `web/src/runtime/interface-tags.js`. Run `npm run check:package-abi`
 after editing either side.
@@ -224,7 +224,7 @@ resource/runtime APIs use `Lean.Vir.RuntimeM α`; browser APIs use
 mark an opaque declaration with
 `@[vir_js "target.name"]`, or use the starter declarations in `Vir.Common` and
 `Vir.Browser`. The manifest records each host import under `hostImports` with
-its slot, Lean name, JavaScript target, host boundary mode (`wire`,
+its slot, Lean name, JavaScript target, host boundary mode (`hostResource`,
 `explicitConversion`, or `objectHandle`), generated WASM symbol, low-level IR arity,
 leading erased argument count, JavaScript-visible arguments, result type, and
 effect.

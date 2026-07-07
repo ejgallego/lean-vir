@@ -10,7 +10,7 @@ import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./interface-tags.js";
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
 export const INTERFACE_MANIFEST_VERSION = 6;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
-  WIRE: "wire",
+  HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle",
 });
@@ -106,7 +106,7 @@ function validateManifestHostImports(hostImports) {
 
 function requireHostImportBoundary(value, label) {
   if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be wire, explicitConversion, or objectHandle`);
+    throw new Error(`${label} must be hostResource, explicitConversion, or objectHandle`);
   }
 }
 

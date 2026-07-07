@@ -180,7 +180,7 @@ virtual nodes. The package generator
 still represents the known `Property`, `PropValue`, and `EventHandler` payload
 shapes directly inside explicit conversion calls; the React-specific boundary is
 the native React node resource and callback ownership policy, not a private
-recursive wire codec.
+recursive structural codec.
 
 `Lean.Vir.RuntimeM` is the JavaScript runtime/resource effect: it can allocate
 or inspect `Lean.Vir.Js ...` values and update VIR runtime bookkeeping, but it

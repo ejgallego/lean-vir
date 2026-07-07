@@ -143,54 +143,54 @@ try {
   runtime.exports.vir_obj_dec(resourceObj);
   resourceObj = 0;
 }
-let hostWireResourceObj = runtime.makeHostWireObjectValue(resourceType, resourceArg, "resource host result");
+let hostResourceObj = runtime.makeHostResourceObjectValue(resourceType, resourceArg, "resource host result");
 try {
-  assert.equal(runtime.liftHostWireObjectValue(resourceType, hostWireResourceObj, "resource host argument"), resourceArg);
+  assert.equal(runtime.liftHostResourceObjectValue(resourceType, hostResourceObj, "resource host argument"), resourceArg);
 } finally {
-  runtime.exports.vir_obj_dec(hostWireResourceObj);
-  hostWireResourceObj = 0;
+  runtime.exports.vir_obj_dec(hostResourceObj);
+  hostResourceObj = 0;
 }
 assert.throws(
-  () => runtime.makeHostWireObjectValue(stringType, "raw", "raw string host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(stringType, "raw", "raw string host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(optionResourceType, null, "option host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(optionResourceType, null, "option host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(prodResourceType, { fst: resourceArg, snd: resourceArg }, "prod host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(prodResourceType, { fst: resourceArg, snd: resourceArg }, "prod host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(arrayJsResourceType, [], "array host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(arrayJsResourceType, [], "array host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(listJsResourceType, [], "list host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(listJsResourceType, [], "list host result"),
+  /unsupported JavaScript host resource result type/,
 );
 withObjectString(runtime, "raw", (obj) => {
   assert.throws(
-    () => runtime.liftHostWireObjectValue(stringType, obj, "raw string host argument"),
-    /unsupported JavaScript host wire argument type/,
+    () => runtime.liftHostResourceObjectValue(stringType, obj, "raw string host argument"),
+    /unsupported JavaScript host resource argument type/,
   );
 });
 assert.throws(
-  () => runtime.liftHostWireObjectValue(arrayJsResourceType, 0, "array host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(arrayJsResourceType, 0, "array host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 assert.throws(
-  () => runtime.liftHostWireObjectValue(listJsResourceType, 0, "list host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(listJsResourceType, 0, "list host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 assert.throws(
-  () => runtime.liftHostWireObjectValue(optionResourceType, 0, "option host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(optionResourceType, 0, "option host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 assert.throws(
-  () => runtime.liftHostWireObjectValue(prodResourceType, 0, "prod host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(prodResourceType, 0, "prod host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 let leanHandleObj = makeObjectString(runtime, "lean-ref");
 const leanHandleResource = runtime.makeLeanObjectHandleResource(leanHandleObj, "lean object handle");
@@ -230,7 +230,7 @@ try {
     hostLeanHandleResultObj = callHostImportObjects(leanHandleHostRuntime, 0, [hostLeanHandleObj]);
     leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleObj);
     hostLeanHandleObj = 0;
-    hostLeanHandleResource = leanHandleHostRuntime.liftHostWireObjectValue(
+    hostLeanHandleResource = leanHandleHostRuntime.liftHostResourceObjectValue(
       jsResourceType,
       hostLeanHandleResultObj,
       "host-state lean ref result",
@@ -258,7 +258,7 @@ try {
   const rewrappedHostLeanHandleResource = rewrappedLeanHandleResources.resourceForValue(
     hostResourceValue(hostLeanHandleResource),
   );
-  let hostLeanHandleReleaseArgObj = leanHandleHostRuntime.makeHostWireObjectValue(
+  let hostLeanHandleReleaseArgObj = leanHandleHostRuntime.makeHostResourceObjectValue(
     jsResourceType,
     rewrappedHostLeanHandleResource,
     "host-state lean ref release argument",
@@ -294,8 +294,8 @@ const callbackWithRawStringType = {
   result: unitType,
 };
 assert.throws(
-  () => runtime.liftHostWireObjectValue(callbackWithRawStringType, 0, "raw callback host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(callbackWithRawStringType, 0, "raw callback host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 const callbackWithResourceType = {
   type: "Function",
@@ -312,12 +312,12 @@ const callbackWithNestedCallbackType = {
   result: unitType,
 };
 assert.throws(
-  () => runtime.liftHostWireObjectValue(callbackWithNestedCallbackType, 0, "nested callback host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(callbackWithNestedCallbackType, 0, "nested callback host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(callbackWithResourceType, () => undefined, "callback host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(callbackWithResourceType, () => undefined, "callback host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(() => runtime.makeObjectValue(resourceType, { handle: 1 }, "resource argument"), /resource argument must be a live host resource/);
 releaseHostResource(resourceArg);

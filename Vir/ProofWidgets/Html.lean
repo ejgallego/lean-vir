@@ -15,7 +15,7 @@ ProofWidgets-style HTML value backed by a real React node construction action.
 
 This is intentionally a shallow facade over `Lean.Vir.React`: `Html.element`
 and `Html.text` allocate native React node resources through React's public
-APIs instead of building a second recursive wire tree.
+APIs instead of building a second recursive structural tree.
 -/
 abbrev Html : Type :=
   ReactM (Lean.Vir.Js Lean.Vir.React.Node)

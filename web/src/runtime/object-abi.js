@@ -173,23 +173,23 @@ export function objectResultSupported(type, selfType = null) {
   }
 }
 
-export function hostWireArgumentSupported(type) {
-  if (hostWireValueSupported(type)) {
+export function hostResourceArgumentSupported(type) {
+  if (hostResourceValueSupported(type)) {
     return true;
   }
   if (type?.interfaceTag !== INTERFACE_TAG.FUNCTION) {
     return false;
   }
-  const args = requireFunctionArgs(type, "host wire callback");
-  return args.every((arg) => hostWireValueSupported(arg.type)) &&
-    hostWireValueSupported(requireFunctionResult(type, "host wire callback"));
+  const args = requireFunctionArgs(type, "host resource callback");
+  return args.every((arg) => hostResourceValueSupported(arg.type)) &&
+    hostResourceValueSupported(requireFunctionResult(type, "host resource callback"));
 }
 
-export function hostWireResultSupported(type) {
-  return hostWireValueSupported(type);
+export function hostResourceResultSupported(type) {
+  return hostResourceValueSupported(type);
 }
 
-function hostWireValueSupported(type) {
+function hostResourceValueSupported(type) {
   switch (type?.interfaceTag) {
     case INTERFACE_TAG.UNIT:
     case INTERFACE_TAG.RESOURCE:

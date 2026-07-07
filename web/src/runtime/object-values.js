@@ -24,8 +24,8 @@ import {
 } from "../host-resource.js";
 import {
   OBJECT_VALUE_EXPORTS,
-  hostWireArgumentSupported,
-  hostWireResultSupported,
+  hostResourceArgumentSupported,
+  hostResourceResultSupported,
   objectLayoutPlan,
   objectLayoutSlotsFromPlan,
   readObjectScalarField as readObjectScalarFieldValue,
@@ -95,9 +95,9 @@ export class ObjectValueRuntime {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
   }
 
-  makeHostWireObjectValue(type, value, label) {
-    if (!hostWireResultSupported(type)) {
-      throw new Error(`${label} has unsupported JavaScript host wire result type`);
+  makeHostResourceObjectValue(type, value, label) {
+    if (!hostResourceResultSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host resource result type`);
     }
     return this.makeObjectValue(type, value, label);
   }
@@ -1128,9 +1128,9 @@ export class ObjectValueRuntime {
     }
   }
 
-  liftHostWireObjectValue(type, obj, label) {
-    if (!hostWireArgumentSupported(type)) {
-      throw new Error(`${label} has unsupported JavaScript host wire argument type`);
+  liftHostResourceObjectValue(type, obj, label) {
+    if (!hostResourceArgumentSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host resource argument type`);
     }
     return this.liftObjectValue(type, obj, label);
   }
