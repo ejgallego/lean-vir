@@ -111,6 +111,20 @@ function assertNatResourceReleased(jsBindings, resource) {
 }
 
 {
+  const { resources, stateBindings } = createReactStateSmokeBindings();
+  const deps = stateBindings["react.deps.empty"]();
+  const objectDependency = { marker: "dependency" };
+  stateBindings["react.deps.push"](deps, resources.resourceForValue(false));
+  stateBindings["react.deps.push"](deps, resources.resourceForValue(objectDependency));
+  assert.deepEqual(resources.resolveResource(deps, "ReactDependencyList").values, [false, objectDependency]);
+  assert.throws(
+    () => stateBindings["react.deps.push"](deps, resources.resourceForValue(null)),
+    /React dependency\[2\] resource is not live/,
+  );
+  resources.dispose();
+}
+
+{
   const { resources, jsBindings, stateBindings } = createReactStateSmokeBindings();
   let stateValue = 2n;
   const setter = resources.resourceForValue({
@@ -230,6 +244,8 @@ const malformedReactContainer = malformedReactCommonHost["js.nullable.value"](
 );
 const malformedReactRoot = malformedReactHost["react.root.create"](malformedReactContainer);
 const malformedReactJsString = (value) => malformedReactDocumentState.resources.resourceForValue(value);
+const reactElementTypeTag = (value) =>
+  malformedReactHost["react.elementType.tag"](malformedReactJsString(value));
 const renderMalformedReactNode = (node) => {
   let released = false;
   const render = Object.assign(() => node, {
@@ -296,7 +312,7 @@ const reactNodeElement = ({
   handlers = [],
   children = [],
 } = {}) => malformedReactHost["react.node.createElement"](
-  typeof tag === "string" ? malformedReactJsString(tag) : tag,
+  typeof tag === "string" ? reactElementTypeTag(tag) : tag,
   reactNodeProps({ key, props, handlers }),
   reactNodeChildren(children),
 );
@@ -321,6 +337,22 @@ assert.throws(
   () => malformedReactHost["react.node.createElement"](
     malformedReactJsString("div"),
     reactNodeProps(),
+    reactNodeChildren(),
+  ),
+  /React Node element type must be wrapped with react.elementType.tag/,
+);
+assert.throws(
+  () => malformedReactHost["react.node.createElement"](
+    malformedReactDocumentState.resources.resourceForValue({ component: true }),
+    reactNodeProps(),
+    reactNodeChildren(),
+  ),
+  /React Node element type must be a React element type/,
+);
+assert.throws(
+  () => malformedReactHost["react.node.createElement"](
+    reactElementTypeTag("div"),
+    reactNodeProps(),
     malformedReactJsString("children"),
   ),
   /ReactNodeChildren resource has invalid value/,
@@ -331,7 +363,7 @@ assert.throws(
 );
 assert.throws(
   () => renderReactNodeElement({ tag: "" }),
-  /React Node element tag must be a non-empty string/,
+  /React Node element type tag must be a non-empty string/,
 );
 assert.throws(
   () => renderReactNodeElement({ key: malformedReactDocumentState.resources.resourceForValue(7) }),

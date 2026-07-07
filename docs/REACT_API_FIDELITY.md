@@ -54,7 +54,7 @@ The audit baseline is the public React 19.2 reference, checked on
 | Root creation | `createRoot(domNode, options?)` | `Root.create : Js Element -> DomM (Js Root)` | Close. Missing root options. Selector helpers are convenience, not core React. |
 | Root render | `root.render(reactNode)` | `Root.render root (ReactM (Js Node))`; `Root.renderComponent` | Close. `renderComponent` is the bridge that creates a real JS React component so hooks run under React. |
 | Root unmount | `root.unmount()` | `Root.unmount : Js Root -> DomM Unit` | Good. Resource cleanup is an explicit runtime concern. |
-| Element construction | `createElement(type, props, ...children)` | `Node.createElement tag props children` with `Array Props.Entry` | Close. Lean keeps an array for child-list ergonomics, but props now carry keys, properties, and handlers together. |
+| Element construction | `createElement(type, props, ...children)` | `Node.createElement elementType props children` with `Array Props.Entry` | Close. `elementType : Js ElementType` mirrors React's `type`; Lean keeps an array for child-list ergonomics, and props carry keys, properties, and handlers together. |
 | JSX | JSX elaborates to React elements | no native JSX-like syntax yet | Missing. Any future syntax should elaborate to `createElement`-shaped calls. |
 | Fragment | `<Fragment>` / `<>` | `Node.fragment`, `Node.keyedFragment` | Close. Naming is Lean-style but maps directly to React fragments. |
 | Props | one props argument, including event handlers and special fields such as `key`/`ref` | `Array Props.Entry` with `Props.key`, property helpers, and event helpers | Close. `ref` is not in the props lane yet. |
@@ -67,11 +67,11 @@ The audit baseline is the public React 19.2 reference, checked on
 | dispatch | `dispatch(action)` | `ReducerDispatch.dispatch dispatch action` | Close. Action is explicitly `Js action`, which matches the JS-land reducer surface. |
 | `useRef` | returns ref object with `.current` | `Hooks.useRef`, `Ref.get`, `Ref.set` | Good. The explicit get/set API reflects the Wasm/Lean boundary. |
 | `useEffect` | `useEffect(setup, dependencies?)`; cleanup optional | `Hooks.useEffect setup cleanup`; `useEffectWithDeps deps setup cleanup` | Partial. Runtime cleanup discipline is useful, but the public shape is split and requires cleanup/resource forms. |
-| effect dependencies | any reactive JS values compared with `Object.is` | `Array String` | Mismatch. Needs a JS-value dependency representation. |
+| effect dependencies | any reactive JS values compared with `Object.is` | `Js DependencyList` built from `Js α` values | Close. Dependency values now stay JavaScript-owned; string deps are a convenience wrapper. |
 | `useMemo` | `useMemo(calculateValue, dependencies)` | not exposed | Missing. |
 | `useCallback` | `useCallback(fn, dependencies)` | not exposed | Missing. |
 | `useContext` | `useContext(SomeContext)` | not exposed | Missing. |
-| External JS components | component value passed as element type | no direct public component-resource wrapper | Missing. Required for future library bindings. |
+| External JS components | component value passed as element type | `Js ElementType` first argument to `Node.createElement` | Foundation present. Library bindings can return component element-type resources; concrete component wrappers remain future binding work. |
 
 ## Main Mismatches
 
@@ -91,13 +91,17 @@ createElement(type, props, ...children)
 The public surface now uses:
 
 ```lean
-Node.createElement tag props children
+Node.createElement elementType props children
 ```
 
-where `props : Array Props.Entry` can carry attributes, handlers, and `key`.
-The low-level host imports also use JavaScript-owned `Props` and `NodeChildren`
-resources instead of generic array lowering. The remaining element-construction
-gap is component element types and eventually `ref`.
+where `elementType : Js ElementType` is the React element type and
+`props : Array Props.Entry` can carry attributes, handlers, and `key`.
+DOM helper calls explicitly construct tag element types with
+`ElementType.ofTag`, and future JavaScript library bindings can return
+component element types directly. The low-level host imports also use
+JavaScript-owned `Props`, `NodeChildren`, and `ElementType` resources instead of
+generic array lowering. The remaining element-construction gap is `ref` plus
+concrete external component bindings.
 
 The next mismatch is the hook surface. `useState`, `useReducer`, and `useRef`
 are close enough to be trusted as the base. `useEffect` is semantically
@@ -105,10 +109,9 @@ resource-safe but not shaped like React's optional cleanup/dependency API.
 `useMemo`, `useCallback`, and `useContext` are absent and should be added under
 their React names.
 
-Another mismatch is external component interop. Future JS library bindings
-need to pass JavaScript component values as element types, not just render DOM
-tag strings or Lean-authored components. This should be explicit and
-resource-shaped, but the authoring shape should still mirror React:
+External component interop now has the right low-level lane: future JS library
+bindings should expose component values as `Js ElementType`, not as a separate
+Lean component DSL. The authoring shape stays React-like:
 
 ```lean
 createElement component props children
@@ -123,28 +126,23 @@ createElement component props children
    as scalar-specialized hooks unless they are clearly documented as optional
    examples or local adapters.
 
-2. Extend element construction to JavaScript component values.
+2. Add concrete external component bindings.
 
-   DOM tag strings work, but future library bindings need a component-resource
-   element type that still lowers to `createElement(type, props, ...children)`.
+   The core `Js ElementType` lane exists. The next step is to bind a real JS
+   component source through it and keep the call lowering to
+   `createElement(type, props, ...children)`.
 
 3. Add missing hook bindings under React names.
 
    Prioritize `useMemo`, `useCallback`, and `useContext`. Preserve React's
    dependency semantics as closely as the current `Js` value model allows.
 
-4. Broaden dependency arrays from strings to JavaScript values.
+4. Add `ref` to the props/element lane.
 
-   The long-term shape should represent dependency arrays as JS values compared
-   by React, not as a string-only convenience lane.
+   `key` is already represented in `Props.Entry`; `ref` should be represented
+   without changing the `createElement(type, props, ...children)` shape.
 
-5. Add external component values as element types.
-
-   This is needed before binding richer React libraries. The type should make
-   component ownership explicit, but the call should still look like creating a
-   React element from a component value, props, and children.
-
-6. Add syntax only after the core shape is right.
+5. Add syntax only after the core shape is right.
 
    JSX-like notation or ProofWidgets-style HTML combinators are useful, but
    they should elaborate to the faithful API. They should not hide conversions

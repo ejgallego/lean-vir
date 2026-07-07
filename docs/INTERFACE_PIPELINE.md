@@ -190,11 +190,14 @@ callbacks are rejected.
 
 `Lean.Vir.React.Node` is a JavaScript-owned resource marker. The recursive
 structure of the rendered tree lives in the host resource graph created by
-`react.node.text` and `react.node.createElement`. Their scalar text/tag inputs
-are explicit `Lean.Vir.Js String` resources, and props, children, and
-dependency lists are explicit React-owned resources built by `react.props.*`,
-`react.node.children.*`, and `react.deps.*`. Ordinary `Property`, `PropValue`,
-and `EventHandler` payloads cross only through explicit
+`react.node.text` and `react.node.createElement`. Text inputs are explicit
+`Lean.Vir.Js String` resources. Element construction receives an explicit
+`Lean.Vir.Js ElementType` resource; DOM tag strings are wrapped by
+`react.elementType.tag`, and future component bindings can provide component
+element types directly. Props, children, and dependency lists are explicit
+React-owned resources built by `react.props.*`, `react.node.children.*`, and
+`react.deps.*`. Ordinary `Property`, `PropValue`, and `EventHandler` payloads
+cross only through explicit
 `js.value.react.property` and `js.value.react.eventHandler` conversion targets.
 
 Entry points and host imports can be pure functions or synchronous effect

@@ -86,6 +86,11 @@ namespace Hooks
 
 def useState (initial : Lean.Vir.Js α) : ReactM (State (Lean.Vir.Js α))
 def useEffectWithDeps
+    (deps : Lean.Vir.Js DependencyList)
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit
+def useEffectWithStringDeps
     (deps : Array String)
     (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
     (cleanup : Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
@@ -162,13 +167,16 @@ end Lean.Vir.React
 
 `Lean.Vir.React.Node` is an opaque JavaScript-owned object marker and crosses
 the host boundary as `Lean.Vir.Js Node`. Lean builds nodes through
-`Node.text` and `Node.createElement`. Those public helpers convert text, tag,
-props, children, and dependency lists through explicit resource builders before
-calling the private `react.node.*` host imports. The low-level host boundary
-receives `Lean.Vir.Js String`, `Lean.Vir.Js Props`, and
-`Lean.Vir.Js NodeChildren` resources, not generic lowered arrays. The browser
-host constructs native React nodes immediately with `React.createElement`, while
-the virtual test host constructs equivalent virtual nodes. The package generator
+`Node.text` and `Node.createElement`. Those public helpers convert text, props,
+children, and dependency lists through explicit resource builders before calling
+the private `react.node.*` host imports. The low-level host boundary receives
+`Lean.Vir.Js ElementType`, `Lean.Vir.Js Props`, and
+`Lean.Vir.Js NodeChildren` resources, not generic lowered arrays. DOM tag names
+are explicitly wrapped through `ElementType.ofTag`/`react.elementType.tag`; JS
+component bindings can provide component element-type resources directly. The
+browser host constructs native React nodes immediately with
+`React.createElement`, while the virtual test host constructs equivalent
+virtual nodes. The package generator
 still represents the known `Property`, `PropValue`, and `EventHandler` payload
 shapes directly inside explicit conversion calls; the React-specific boundary is
 the native React node resource and callback ownership policy, not a private
@@ -260,9 +268,11 @@ The browser React host binding is exposed from
   from explicit conversions.
 - `react.node.children.empty` and `react.node.children.push` build a
   JavaScript-owned child list resource from explicit `Js Node` children.
-- `react.node.createElement` unwraps the explicit `Js String` tag, validates
+- `react.elementType.tag` wraps an explicit `Js String` DOM tag as a
+  JavaScript-owned `ElementType` resource.
+- `react.node.createElement` unwraps the explicit `Js ElementType`, validates
   the props and children resources, calls
-  `React.createElement(tag, props, ...children)`, and returns a `ReactNode`
+  `React.createElement(type, props, ...children)`, and returns a `ReactNode`
   resource.
 - `react.node.fragment` calls
   `React.createElement(React.Fragment, props, ...children)` in the browser host,
@@ -295,13 +305,13 @@ The browser React host binding is exposed from
   receives that resource when React cleans the effect up. The base binding
   exposes React's no-dependency behavior.
 - `react.deps.empty` and `react.deps.push` build a JavaScript-owned dependency
-  list resource from explicit `Js String` dependencies.
+  list resource from explicit `Js α` dependencies.
 - `react.useEffectWithDeps` is the same resource-shaped effect with a
-  Lean-provided string dependency list. The public helper converts each
-  dependency through `JsValue`, pushes it into the dependency-list resource, and
-  the browser binding passes the unwrapped strings as React's dependency array.
-  It uses `Object.is` comparison to release newly created Lean callbacks when
-  the effect does not need to restart.
+  Lean-provided `Js DependencyList`. The browser binding passes the unwrapped
+  JavaScript values as React's dependency array and uses `Object.is` comparison
+  to release newly created Lean callbacks when the effect does not need to
+  restart. `useEffectWithStringDeps` remains a string convenience wrapper that
+  explicitly converts each string through `JsValue` first.
 - `js.string`, `js.nat`, `js.bool`, and `js.float` convert Lean scalar values into explicit
   `Lean.Vir.Js α` values through `RuntimeM` for examples that need primitive
   React state.

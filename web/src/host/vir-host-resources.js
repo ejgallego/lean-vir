@@ -13,6 +13,7 @@ import {
   requireExternrefTableSupport,
 } from "../host-resource.js";
 import {
+  createReactElementTypeTagResource,
   createReactNodeChildrenResource,
   createReactPropsResource,
   disposeReactNode,
@@ -325,6 +326,10 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       resources.resourceForValue(
         requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue(resources, value, "React Node text value"))
       ),
+    "react.elementType.tag": (tag) =>
+      resources.resourceForValue(createReactElementTypeTagResource(
+        jsStringValue(resources, tag, "React element type tag"),
+      )),
     "react.props.empty": () =>
       resources.resourceForValue(createReactPropsResource()),
     "react.props.setKey": (props, key) =>
@@ -337,10 +342,10 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       resources.resourceForValue(createReactNodeChildrenResource()),
     "react.node.children.push": (children, child) =>
       pushReactNodeChild(resources, children, child),
-    "react.node.createElement": (tag, props, children) =>
+    "react.node.createElement": (elementType, props, children) =>
       resources.resourceForValue(
         requireReactNodeElementResourceFactory(createNodeElementResource)(
-          jsStringValue(resources, tag, "React Node element tag"),
+          elementType,
           props,
           children,
         )

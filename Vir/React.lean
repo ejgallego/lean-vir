@@ -71,6 +71,16 @@ disposal.
 opaque Root : Type
 
 /--
+React element type value accepted by `React.createElement`.
+
+DOM tag strings are explicitly wrapped with `ElementType.ofTag`. Future
+JavaScript library bindings can return `Lean.Vir.Js ElementType` resources for
+component functions or React component objects and pass them to
+`Node.createElement` without inventing a parallel element-construction API.
+-/
+opaque ElementType : Type
+
+/--
 React state setter object returned by `useState`.
 
 The JavaScript host owns the underlying setter function. Lean code can retain
@@ -906,10 +916,17 @@ namespace DependencyList
 opaque empty : ReactM (Lean.Vir.Js DependencyList)
 
 @[vir_js "react.deps.push"]
-opaque push
+opaque push {α : Type}
     (deps : @& Lean.Vir.Js DependencyList)
-    (value : @& Lean.Vir.Js String) :
+    (value : @& Lean.Vir.Js α) :
     ReactM Unit
+
+def ofArray {α : Type} (deps : @& Array (Lean.Vir.Js α)) :
+    ReactM (Lean.Vir.Js DependencyList) := do
+  let jsDeps ← empty
+  for dep in deps do
+    push jsDeps dep
+  pure jsDeps
 
 def ofStrings (deps : @& Array String) : ReactM (Lean.Vir.Js DependencyList) := do
   let jsDeps ← empty
@@ -928,12 +945,27 @@ private opaque useEffectWithDepsJs {α : Type}
     ReactM Unit
 
 def useEffectWithDeps {α : Type}
+    (deps : @& Lean.Vir.Js DependencyList)
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit :=
+  useEffectWithDepsJs deps setup cleanup
+
+def useEffectWithArrayDeps {α β : Type}
+    (deps : @& Array (Lean.Vir.Js β))
+    (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
+    (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
+    ReactM Unit := do
+  let jsDeps ← DependencyList.ofArray deps
+  useEffectWithDeps jsDeps setup cleanup
+
+def useEffectWithStringDeps {α : Type}
     (deps : @& Array String)
     (setup : Lean.Vir.Browser.DomM (Lean.Vir.Js α))
     (cleanup : @& Lean.Vir.Js α → Lean.Vir.Browser.DomM Unit) :
     ReactM Unit := do
   let jsDeps ← DependencyList.ofStrings deps
-  useEffectWithDepsJs jsDeps setup cleanup
+  useEffectWithDeps jsDeps setup cleanup
 
 end Hooks
 
@@ -963,6 +995,17 @@ def modify
 
 end State
 
+namespace ElementType
+
+@[vir_js "react.elementType.tag"]
+private opaque tagJs (tag : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js ElementType)
+
+def ofTag (tag : @& String) : ReactM (Lean.Vir.Js ElementType) := do
+  let jsTag ← Lean.Vir.JsValue.ofString tag
+  tagJs jsTag
+
+end ElementType
+
 namespace Node
 
 @[vir_js "react.node.text"]
@@ -970,7 +1013,7 @@ private opaque textJs (value : @& Lean.Vir.Js String) : ReactM (Lean.Vir.Js Node
 
 @[vir_js "react.node.createElement"]
 private opaque createElementJs
-    (tag : @& Lean.Vir.Js String)
+    (elementType : @& Lean.Vir.Js ElementType)
     (props : @& Lean.Vir.Js Props)
     (children : @& Lean.Vir.Js NodeChildren) :
     ReactM (Lean.Vir.Js Node)
@@ -1005,14 +1048,21 @@ def text (value : @& String) : ReactM (Lean.Vir.Js Node) := do
   textJs jsValue
 
 def createElement
-    (elementType : @& String)
+    (elementType : @& Lean.Vir.Js ElementType)
     (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node) := do
-  let jsTag ← Lean.Vir.JsValue.ofString elementType
   let jsProps ← Props.fromEntries props
   let jsChildren ← NodeChildren.ofArray children
-  createElementJs jsTag jsProps jsChildren
+  createElementJs elementType jsProps jsChildren
+
+def createElementTag
+    (tag : @& String)
+    (props : Array Props.Entry := #[])
+    (children : Array (Lean.Vir.Js Node)) :
+    ReactM (Lean.Vir.Js Node) := do
+  let elementType ← ElementType.ofTag tag
+  createElement elementType props children
 
 def fragmentWithKey (key? : Option String) (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node) := do
@@ -1047,7 +1097,7 @@ def elementWith
     (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node) := #[]) :
     ReactM (Lean.Vir.Js Node) :=
-  createElement tag props children
+  createElementTag tag props children
 
 /-- Raw keyed element escape hatch. Prefer `Props.key` in React-shaped code. -/
 def keyedElementWith
@@ -1055,7 +1105,7 @@ def keyedElementWith
     (props : Array Props.Entry := #[])
     (children : Array (Lean.Vir.Js Node) := #[]) :
     ReactM (Lean.Vir.Js Node) :=
-  createElement tag (props.push (Props.key key)) children
+  createElementTag tag (props.push (Props.key key)) children
 
 private def childElement (tag : String) (children : Array (Lean.Vir.Js Node)) :
     ReactM (Lean.Vir.Js Node) :=

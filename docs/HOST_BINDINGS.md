@@ -98,8 +98,10 @@ Browser `react.root.*` targets are provided by
 `ReactDOMClient.createRoot`, `root.render`, and `root.unmount`.
 `react.node.text`, `react.node.createElement`, and `react.node.fragment`
 construct `ReactNode` resources. Their low-level host targets receive explicit
-`Lean.Vir.Js String`, `Lean.Vir.Js Props`, and `Lean.Vir.Js NodeChildren`
-resources; the public Lean helpers convert ordinary strings with `JsValue` and
+`Lean.Vir.Js ElementType`, `Lean.Vir.Js Props`, and
+`Lean.Vir.Js NodeChildren` resources; `react.elementType.tag` wraps ordinary
+DOM tag strings, and component bindings can provide `Js ElementType` resources
+directly. Public Lean helpers convert ordinary strings with `JsValue` and
 populate props/children with explicit `react.props.*` and
 `react.node.children.*` calls. The browser binding uses `React.createElement`
 and `React.Fragment`, while the virtual binding builds test-visible virtual
@@ -128,7 +130,8 @@ host resource, and cleanup receives the same resource at React's cleanup point.
 The no-deps binding reruns after committed renders. `useEffectWithDeps` maps to
 React's dependency-array form and compares the Lean-provided dependency list
 with `Object.is`; each dependency crosses the low-level host boundary as an
-explicit `Lean.Vir.Js String` resource.
+explicit `Lean.Vir.Js α` resource. `useEffectWithStringDeps` is only a
+convenience wrapper over explicit string conversion.
 `react.state.set` and `react.state.modify` are `RuntimeM` operations over
 `Lean.Vir.Js α` resources and share the same browser and virtual host resource
 store as React roots. The small `js.string`, `js.nat`, `js.bool`, and `js.float` scalar

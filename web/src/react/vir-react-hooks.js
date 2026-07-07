@@ -410,7 +410,7 @@ function createReactDependencyListResource() {
 
 function pushReactDependency(resources, deps, value) {
   const dependencyList = resolveReactDependencyListResource(resources, deps);
-  dependencyList.values.push(jsStringValue(resources, value, `React dependency[${dependencyList.values.length}]`));
+  dependencyList.values.push(resources.resolveResource(value, `React dependency[${dependencyList.values.length}]`));
 }
 
 function normalizeDependencyList(resources, deps) {
@@ -418,12 +418,7 @@ function normalizeDependencyList(resources, deps) {
   if (!Array.isArray(dependencyList.values)) {
     throw new Error("React dependency list values must be an array");
   }
-  return dependencyList.values.map((value, index) => {
-    if (typeof value !== "string") {
-      throw new Error(`React dependency[${index}] must be a Js String`);
-    }
-    return value;
-  });
+  return dependencyList.values.slice();
 }
 
 function resolveReactDependencyListResource(resources, deps) {
@@ -432,14 +427,6 @@ function resolveReactDependencyListResource(resources, deps) {
     throw new Error("ReactDependencyList resource has invalid value");
   }
   return dependencyList;
-}
-
-function jsStringValue(resources, resource, label) {
-  const value = resources.resolveResource(resource, label);
-  if (typeof value !== "string") {
-    throw new Error(`${label} must be a Js String`);
-  }
-  return value;
 }
 
 function normalizeDependencyListOrRelease(resources, deps, setup, cleanup) {

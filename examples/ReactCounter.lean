@@ -60,6 +60,11 @@ def effectProbe : Component Unit :=
     Hooks.useEffect
       (JsValue.ofNat 0)
       (fun _ => pure ())
+    let dep ← JsValue.ofNat 1
+    let deps ← Hooks.DependencyList.ofArray #[dep]
+    Hooks.useEffectWithDeps deps
+      (JsValue.ofNat 0)
+      (fun _ => pure ())
     let text ← Node.text "react:effect"
     Node.spanWith #[Props.id "react-effect-label"] #[text]
 

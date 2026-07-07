@@ -895,7 +895,8 @@ def tick (hook : ViewReducerState) : DomM Unit :=
   dispatchViewAction hook .tick
 
 def useLiveTick (hook : ViewReducerState) : ReactM Unit := do
-  Hooks.useEffectWithDeps #[]
+  let deps ← Hooks.DependencyList.empty
+  Hooks.useEffectWithDeps deps
     (Lean.Vir.Browser.Timer.setInterval liveTickMs (tick hook))
     (fun interval => Lean.Vir.Browser.Timer.clearInterval interval)
 

@@ -53,6 +53,7 @@ export const demoHostImportTargets = [
   "proofwidgets.rpc.resolveRef",
   "react.deps.empty",
   "react.deps.push",
+  "react.elementType.tag",
   "react.node.children.empty",
   "react.node.children.push",
   "react.node.createElement",

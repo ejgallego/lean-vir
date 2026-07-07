@@ -261,6 +261,7 @@ use `Lean.Vir.RuntimeM`; `Lean.Vir.React.ReactM` is the narrower
 render-construction effect for React component APIs and lifts `RuntimeM`.
 
 - object marker: `Lean.Vir.React.Root`
+- object marker: `Lean.Vir.React.ElementType`
 - object marker: `Lean.Vir.React.StateSetter α`
 - object marker: `Lean.Vir.React.Props`
 - object marker: `Lean.Vir.React.NodeChildren`
@@ -273,8 +274,10 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.State α`
 - `Lean.Vir.React.ReducerState state action`
 - `Lean.Vir.React.Component props := props -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.ElementType.ofTag : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.ElementType)`
 - `Lean.Vir.React.Node.text : @& String -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
-- `Lean.Vir.React.Node.createElement : @& String -> Array Lean.Vir.React.Props.Entry -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Node.createElement : @& Lean.Vir.Js Lean.Vir.React.ElementType -> Array Lean.Vir.React.Props.Entry -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
+- `Lean.Vir.React.Node.createElementTag : @& String -> Array Lean.Vir.React.Props.Entry -> Array (Lean.Vir.Js Lean.Vir.React.Node) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)`
 - `Lean.Vir.React.Root.create : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root)`
 - `Lean.Vir.React.Root.createFromSelector : String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.React.Root))`
 - `Lean.Vir.React.Root.mountFromSelector : String -> (Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM Bool`
@@ -283,18 +286,25 @@ render-construction effect for React component APIs and lifts `RuntimeM`.
 - `Lean.Vir.React.Root.unmount : @& Lean.Vir.Js Lean.Vir.React.Root -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.React.Hooks.useState : @& Lean.Vir.Js α -> Lean.Vir.React.ReactM (Lean.Vir.React.State (Lean.Vir.Js α))`
 - `Lean.Vir.React.Hooks.useReducer : (Lean.Vir.Js state -> Lean.Vir.Js action -> Lean.Vir.RuntimeM (Lean.Vir.Js state)) -> @& Lean.Vir.Js state -> Lean.Vir.React.ReactM (Lean.Vir.React.ReducerState state action)`
+- `Lean.Vir.React.Hooks.DependencyList.empty : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.DependencyList)`
+- `Lean.Vir.React.Hooks.DependencyList.push : @& Lean.Vir.Js Lean.Vir.React.DependencyList -> @& Lean.Vir.Js α -> Lean.Vir.React.ReactM Unit`
+- `Lean.Vir.React.Hooks.DependencyList.ofArray : @& Array (Lean.Vir.Js α) -> Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.DependencyList)`
+- `Lean.Vir.React.Hooks.useEffectWithDeps : @& Lean.Vir.Js Lean.Vir.React.DependencyList -> Lean.Vir.Browser.DomM (Lean.Vir.Js α) -> (@& Lean.Vir.Js α -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.React.ReactM Unit`
+- `Lean.Vir.React.Hooks.useEffectWithStringDeps : @& Array String -> Lean.Vir.Browser.DomM (Lean.Vir.Js α) -> (@& Lean.Vir.Js α -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.React.ReactM Unit`
 - `Lean.Vir.React.ReducerDispatch.dispatch : Lean.Vir.Js (Lean.Vir.React.ReducerDispatch state action) -> Lean.Vir.Js action -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.set : Lean.Vir.React.State (Lean.Vir.Js α) -> Lean.Vir.Js α -> Lean.Vir.RuntimeM Unit`
 - `Lean.Vir.React.State.modify : Lean.Vir.React.State (Lean.Vir.Js α) -> (Lean.Vir.Js α -> Lean.Vir.RuntimeM (Lean.Vir.Js α)) -> Lean.Vir.RuntimeM Unit`
 
 `Node` is an opaque JavaScript-owned renderable marker. Lean constructs values
 with `Node.text` and `Node.createElement`; those public helpers explicitly
-convert text and tag strings through `JsValue`, build JavaScript-owned
-`Props`/`NodeChildren` resources, and then call the low-level `react.node.*`
-host targets. Browser hosts construct native React nodes with
-`React.createElement` at that point. Rendering retains any Lean event callbacks
-embedded in the resource graph until the root is rerendered, unmounted, the
-package is reloaded, or the runtime is disposed.
+convert text through `JsValue`, build JavaScript-owned `Props`/`NodeChildren`
+resources, and then call the low-level `react.node.*` host targets.
+`Node.createElement` takes a JavaScript-owned `ElementType` resource, matching
+React's `type` parameter; `Node.createElementTag` and DOM helpers explicitly
+wrap ordinary tag strings with `ElementType.ofTag`. Browser hosts construct
+native React nodes with `React.createElement` at that point. Rendering retains
+any Lean event callbacks embedded in the resource graph until the root is
+rerendered, unmounted, the package is reloaded, or the runtime is disposed.
 
 `Root.render` is the host boundary for rendering a `ReactM` tree into an
 existing root. The JavaScript host invokes the received render action to obtain

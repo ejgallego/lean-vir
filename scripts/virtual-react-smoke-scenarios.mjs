@@ -36,7 +36,7 @@ export function smokeVirtualReactEffect(runtime, documentState, selector) {
   assert.equal(runtime.call("ReactCounter.mountEffect", selector), true);
   const element = documentState.elements.get(selector);
   assert.equal(element.textContent, "react:effect");
-  assertLiveCallbacks(runtime, 3);
+  assertLiveCallbacks(runtime, 5);
   assert.equal(reactElementById(element, "react-effect-label").tag, "span");
   element.reactRoot.unmount();
   assertUnmountCleanup(runtime, element);

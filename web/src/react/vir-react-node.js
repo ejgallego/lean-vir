@@ -155,15 +155,22 @@ export function createBrowserReactNodeTextResource(resources, value) {
   });
 }
 
-export function createBrowserReactNodeElementResource(resources, createElement, hooks, tag, props, children) {
+export function createReactElementTypeTagResource(value) {
+  return {
+    kind: "ReactElementType",
+    value: reactNodeName(value, "element type tag"),
+  };
+}
+
+export function createBrowserReactNodeElementResource(resources, createElement, hooks, elementType, props, children) {
   if (typeof createElement !== "function") {
     throw new Error("createBrowserReactNodeElementResource requires a React.createElement-compatible function");
   }
   const { callLeanEventCallback } = requireReactHostHooks(hooks);
-  return createReactNodeElementResource(resources, tag, props, children, (fields, childEntries) => {
+  return createReactNodeElementResource(resources, elementType, props, children, (fields, childEntries) => {
     const { props: reactProps, callbacks } = reactPropsFromNode(resources, fields, callLeanEventCallback, hooks);
     return {
-      node: createElement(fields.tag, reactProps, ...childEntries.map((child) => child.value.node)),
+      node: createElement(fields.elementType, reactProps, ...childEntries.map((child) => child.value.node)),
       callbacks,
     };
   });
@@ -187,15 +194,15 @@ export function createVirtualReactNodeTextResource(resources, value) {
   });
 }
 
-export function createVirtualReactNodeElementResource(resources, hooks, tag, props, children) {
+export function createVirtualReactNodeElementResource(resources, hooks, elementType, props, children) {
   const { callLeanEventCallback } = requireReactHostHooks(hooks);
-  return createReactNodeElementResource(resources, tag, props, children, (fields, childEntries) => {
+  return createReactNodeElementResource(resources, elementType, props, children, (fields, childEntries) => {
     const { handlers: virtualHandlers, callbacks } =
       virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, hooks);
     return {
       node: {
         kind: "element",
-        tag: fields.tag,
+        tag: virtualReactElementTypeLabel(fields.elementType),
         key: fields.props.key,
         props: virtualReactPropsFromNode(fields),
         handlers: virtualHandlers,
@@ -248,11 +255,11 @@ export function pushReactNodeChild(resources, childrenResource, childResource) {
   return undefined;
 }
 
-export function createReactNodeElementResource(resources, tag, props, children, createNode) {
+export function createReactNodeElementResource(resources, elementType, props, children, createNode) {
   const childEntries = resolveReactNodeChildren(resources, children);
   const stats = reactNodeSubtreeStats(childEntries);
   const fields = {
-    tag: reactNodeName(tag, "element tag"),
+    elementType: normalizeReactElementType(resources, elementType),
     props: normalizeReactProps(resources, props),
   };
   let callbacks = [];
@@ -633,6 +640,40 @@ function virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, 
     });
   }
   return { handlers, callbacks };
+}
+
+function normalizeReactElementType(resources, elementType) {
+  const value = resources.resolveResource(elementType, "ReactElementType");
+  if (value?.kind === "ReactElementType") {
+    return reactNodeName(value.value, "element type tag");
+  }
+  return reactElementTypeValue(value, "React Node element type");
+}
+
+function reactElementTypeValue(value, label) {
+  if (typeof value === "string") {
+    throw new Error(`${label} must be wrapped with react.elementType.tag`);
+  }
+  if (typeof value === "function" || typeof value === "symbol") {
+    return value;
+  }
+  if (value !== null && typeof value === "object" && typeof value.$$typeof === "symbol") {
+    return value;
+  }
+  throw new Error(`${label} must be a React element type`);
+}
+
+function virtualReactElementTypeLabel(elementType) {
+  if (typeof elementType === "string") {
+    return elementType;
+  }
+  if (typeof elementType === "function") {
+    return elementType.displayName ?? elementType.name ?? "component";
+  }
+  if (typeof elementType === "symbol") {
+    return elementType.description ?? String(elementType);
+  }
+  return elementType?.displayName ?? elementType?.name ?? "component";
 }
 
 function normalizeReactProps(resources, props) {
