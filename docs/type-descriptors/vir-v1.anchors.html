@@ -88,8 +88,111 @@
     .coverage td.numeric { text-align: right; white-space: nowrap; }
     .coverage details summary { cursor: pointer; color: var(--fg); }
     .coverage ul { margin: 6px 0 0; padding-left: 18px; }
+    .report-tools {
+      margin: 0 0 18px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .tool-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .tool-head p { color: var(--muted); font-size: 13px; }
+    .filter-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.6fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(220px, 1.4fr);
+      gap: 12px;
+      align-items: end;
+    }
+    .filter {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .filter input[type="search"], .filter select {
+      width: 100%;
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--fg);
+      font: inherit;
+    }
+    .status-filter {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+    .status-options { display: flex; flex-wrap: wrap; gap: 6px; }
+    .status-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 36px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--fg);
+      font-weight: 500;
+    }
+    .report-body {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .anchor-index {
+      position: sticky;
+      top: 16px;
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .anchor-index h2 { margin-bottom: 8px; }
+    .anchor-index details { border-top: 1px solid var(--line); padding: 8px 0; }
+    .anchor-index details:first-of-type { border-top: 0; }
+    .anchor-index summary { cursor: pointer; font-weight: 600; }
+    .index-links { display: grid; gap: 4px; margin-top: 6px; }
+    .index-link {
+      display: grid;
+      grid-template-columns: 8px minmax(0, 1fr);
+      gap: 7px;
+      align-items: center;
+      padding: 4px 0;
+      color: var(--fg);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .index-link:hover { text-decoration: underline; }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+    .empty-state {
+      display: none;
+      padding: 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+    }
+    .empty-state[data-visible="true"] { display: block; }
     .groups { display: grid; gap: 28px; }
     .anchor-group { display: grid; gap: 12px; }
+    .anchor[hidden], .anchor-group[hidden], .index-link[hidden] { display: none; }
     .group-title {
       margin: 0;
       font-size: 20px;
@@ -164,6 +267,9 @@
       main { padding: 24px 12px 40px; }
       .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .coverage { overflow-x: auto; }
+      .filter-row { grid-template-columns: 1fr; }
+      .report-body { grid-template-columns: 1fr; }
+      .anchor-index { position: static; max-height: none; }
       .anchor-head { display: grid; }
       .comparison { grid-template-columns: 1fr; }
     }
@@ -181,6 +287,39 @@
       <div class="summary-card compatible"><strong>4</strong><span>compatible</span></div>
       <div class="summary-card weak"><strong>0</strong><span>weak</span></div>
       <div class="summary-card missing"><strong>0</strong><span>missing</span></div>
+    </section>
+    <section class="report-tools" aria-labelledby="type-anchor-browse">
+      <div class="tool-head">
+        <h2 id="type-anchor-browse">Browse</h2>
+        <p id="anchor-result-count">Showing 6 anchors</p>
+      </div>
+      <div class="filter-row">
+        <label class="filter">Search
+          <input id="anchor-search" type="search" autocomplete="off" placeholder="TypeScript or Lean symbol">
+        </label>
+        <label class="filter">Category
+          <select id="anchor-category">
+            <option value="">All categories</option>
+            <option value="Type anchors">Type anchors</option>
+          </select>
+        </label>
+        <label class="filter">Relation
+          <select id="anchor-relation">
+            <option value="">All relations</option>
+            <option value="audit">Audit</option>
+            <option value="coverageGap">Coverage gap</option>
+          </select>
+        </label>
+        <fieldset class="filter status-filter">
+          <legend>Status</legend>
+          <div class="status-options">
+            <label class="status-toggle exact"><input type="checkbox" value="exact" data-status-filter checked> exact</label>
+            <label class="status-toggle compatible"><input type="checkbox" value="compatible" data-status-filter checked> compatible</label>
+            <label class="status-toggle weak"><input type="checkbox" value="weak" data-status-filter checked> weak</label>
+            <label class="status-toggle missing"><input type="checkbox" value="missing" data-status-filter checked> missing</label>
+          </div>
+        </fieldset>
+      </div>
     </section>
     <section class="coverage" aria-labelledby="type-anchor-coverage">
       <h2 id="type-anchor-coverage">Coverage Matrix</h2>
@@ -207,11 +346,26 @@
         </tbody>
       </table>
     </section>
-    <div class="groups" aria-label="Type anchors">
-      <section class="anchor-group" aria-labelledby="type-anchor-group-type_anchors">
+    <div class="report-body">
+      <aside class="anchor-index" aria-labelledby="type-anchor-index">
+        <h2 id="type-anchor-index">Index</h2>
+        <details open data-index-group data-category="Type anchors">
+          <summary>Type anchors</summary>
+          <div class="index-links">
+            <a class="index-link exact" href="#type-anchor-react_style_property" data-index-link data-status="exact" data-category="Type anchors" data-relation="audit" data-search="react.style_property leanvir.react.styleproperty lean.vir.react.styleproperty"><span class="status-dot" aria-hidden="true"></span><span>LeanVir.React.StyleProperty</span></a>
+            <a class="index-link compatible" href="#type-anchor-react_prop_value" data-index-link data-status="compatible" data-category="Type anchors" data-relation="audit" data-search="react.prop_value leanvir.react.propvalue lean.vir.react.propvalue"><span class="status-dot" aria-hidden="true"></span><span>LeanVir.React.PropValue</span></a>
+            <a class="index-link compatible" href="#type-anchor-react_property" data-index-link data-status="compatible" data-category="Type anchors" data-relation="audit" data-search="react.property leanvir.react.property lean.vir.react.property"><span class="status-dot" aria-hidden="true"></span><span>LeanVir.React.Property</span></a>
+            <a class="index-link compatible" href="#type-anchor-react_event_handler" data-index-link data-status="compatible" data-category="Type anchors" data-relation="audit" data-search="react.event_handler leanvir.react.eventhandler lean.vir.react.eventhandler"><span class="status-dot" aria-hidden="true"></span><span>LeanVir.React.EventHandler</span></a>
+            <a class="index-link exact" href="#type-anchor-browser_event" data-index-link data-status="exact" data-category="Type anchors" data-relation="audit" data-search="browser.event leanvir.browser.event lean.vir.browser.event resource markers compare by identity suffix in v1."><span class="status-dot" aria-hidden="true"></span><span>LeanVir.Browser.Event</span></a>
+            <a class="index-link compatible" href="#type-anchor-react_property_identity" data-index-link data-status="compatible" data-category="Type anchors" data-relation="audit" data-search="react.property_identity leanvir.react.propertyidentity lean.vir.typeanchors.reactpropertyidentity"><span class="status-dot" aria-hidden="true"></span><span>LeanVir.React.PropertyIdentity</span></a>
+          </div>
+        </details>
+      </aside>
+      <div class="groups" aria-label="Type anchors">
+      <section class="anchor-group" data-anchor-group data-category="Type anchors" aria-labelledby="type-anchor-group-type_anchors">
         <h2 class="group-title" id="type-anchor-group-type_anchors">Type anchors</h2>
         <div class="anchors">
-      <article class="anchor" id="type-anchor-react_style_property" data-vir-type-anchor-hover="exact: Lean.Vir.React.StyleProperty -&gt; LeanVir.React.StyleProperty
+      <article class="anchor" id="type-anchor-react_style_property" data-anchor data-status="exact" data-category="Type anchors" data-relation="audit" data-search="react.style_property leanvir.react.styleproperty lean.vir.react.styleproperty" data-vir-type-anchor-hover="exact: Lean.Vir.React.StyleProperty -&gt; LeanVir.React.StyleProperty
 
 A single React style object entry.">
         <div class="anchor-head">
@@ -248,7 +402,7 @@ structure Lean.Vir.React.StyleProperty {
         </div>
         <p class="hover">A single React style object entry.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_prop_value" data-vir-type-anchor-hover="compatible: Lean.Vir.React.PropValue -&gt; LeanVir.React.PropValue
+      <article class="anchor" id="type-anchor-react_prop_value" data-anchor data-status="compatible" data-category="Type anchors" data-relation="audit" data-search="react.prop_value leanvir.react.propvalue lean.vir.react.propvalue" data-vir-type-anchor-hover="compatible: Lean.Vir.React.PropValue -&gt; LeanVir.React.PropValue
 
 Conservative v1 set of React property values.
 
@@ -296,7 +450,7 @@ inductive Lean.Vir.React.PropValue where
         <p class="notes">Lean Int accepts one TypeScript union arm compatibly</p>
         <p class="hover">Conservative v1 set of React property values.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_property" data-vir-type-anchor-hover="compatible: Lean.Vir.React.Property -&gt; LeanVir.React.Property
+      <article class="anchor" id="type-anchor-react_property" data-anchor data-status="compatible" data-category="Type anchors" data-relation="audit" data-search="react.property leanvir.react.property lean.vir.react.property" data-vir-type-anchor-hover="compatible: Lean.Vir.React.Property -&gt; LeanVir.React.Property
 
 A React property transported through the VIR manifest object ABI.
 
@@ -345,7 +499,7 @@ structure Lean.Vir.React.Property {
         <p class="notes">Lean Int accepts one TypeScript union arm compatibly</p>
         <p class="hover">A React property transported through the VIR manifest object ABI.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_event_handler" data-vir-type-anchor-hover="compatible: Lean.Vir.React.EventHandler -&gt; LeanVir.React.EventHandler
+      <article class="anchor" id="type-anchor-react_event_handler" data-anchor data-status="compatible" data-category="Type anchors" data-relation="audit" data-search="react.event_handler leanvir.react.eventhandler lean.vir.react.eventhandler" data-vir-type-anchor-hover="compatible: Lean.Vir.React.EventHandler -&gt; LeanVir.React.EventHandler
 
 DOM-like React event handler backed by a retained Lean closure.
 
@@ -387,7 +541,7 @@ structure Lean.Vir.React.EventHandler {
         <p class="notes">Lean Unit uses TypeScript void representation</p>
         <p class="hover">DOM-like React event handler backed by a retained Lean closure.</p>
       </article>
-      <article class="anchor" id="type-anchor-browser_event" data-vir-type-anchor-hover="exact: Lean.Vir.Browser.Event -&gt; LeanVir.Browser.Event
+      <article class="anchor" id="type-anchor-browser_event" data-anchor data-status="exact" data-category="Type anchors" data-relation="audit" data-search="browser.event leanvir.browser.event lean.vir.browser.event resource markers compare by identity suffix in v1." data-vir-type-anchor-hover="exact: Lean.Vir.Browser.Event -&gt; LeanVir.Browser.Event
 
 Browser event resource marker.">
         <div class="anchor-head">
@@ -421,7 +575,7 @@ resource Lean.Vir.Browser.Event</code></pre>
         <p class="notes">Resource markers compare by identity suffix in v1.</p>
         <p class="hover">Browser event resource marker.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_property_identity" data-vir-type-anchor-hover="compatible: Lean.Vir.TypeAnchors.reactPropertyIdentity -&gt; LeanVir.React.PropertyIdentity
+      <article class="anchor" id="type-anchor-react_property_identity" data-anchor data-status="compatible" data-category="Type anchors" data-relation="audit" data-search="react.property_identity leanvir.react.propertyidentity lean.vir.typeanchors.reactpropertyidentity" data-vir-type-anchor-hover="compatible: Lean.Vir.TypeAnchors.reactPropertyIdentity -&gt; LeanVir.React.PropertyIdentity
 
 Sample callable shape used by the descriptor anchor fixture.
 
@@ -461,7 +615,66 @@ Lean Int accepts one TypeScript union arm compatibly">LeanVir.React.PropertyIden
       </article>
         </div>
       </section>
+        <p class="empty-state" id="anchor-empty-state">No anchors match the current filters.</p>
+      </div>
     </div>
   </main>
+  <script>
+    (() => {
+      const anchors = [...document.querySelectorAll("[data-anchor]")];
+      const links = [...document.querySelectorAll("[data-index-link]")];
+      const groups = [...document.querySelectorAll("[data-anchor-group]")];
+      const indexGroups = [...document.querySelectorAll("[data-index-group]")];
+      const search = document.getElementById("anchor-search");
+      const category = document.getElementById("anchor-category");
+      const relation = document.getElementById("anchor-relation");
+      const statuses = [...document.querySelectorAll("[data-status-filter]")];
+      const count = document.getElementById("anchor-result-count");
+      const empty = document.getElementById("anchor-empty-state");
+
+      function selectedStatuses() {
+        return new Set(statuses.filter((input) => input.checked).map((input) => input.value));
+      }
+
+      function matches(node, activeStatuses, query) {
+        if (!activeStatuses.has(node.dataset.status)) return false;
+        if (category.value && node.dataset.category !== category.value) return false;
+        if (relation.value && node.dataset.relation !== relation.value) return false;
+        return query === "" || (node.dataset.search ?? "").includes(query);
+      }
+
+      function hasVisibleChild(group, selector) {
+        return [...group.querySelectorAll(selector)].some((node) => !node.hidden);
+      }
+
+      function update() {
+        const activeStatuses = selectedStatuses();
+        const query = search.value.trim().toLowerCase();
+        let shown = 0;
+        for (const anchor of anchors) {
+          const visible = matches(anchor, activeStatuses, query);
+          anchor.hidden = !visible;
+          if (visible) shown += 1;
+        }
+        for (const link of links) {
+          link.hidden = !matches(link, activeStatuses, query);
+        }
+        for (const group of groups) {
+          group.hidden = !hasVisibleChild(group, "[data-anchor]");
+        }
+        for (const group of indexGroups) {
+          group.hidden = !hasVisibleChild(group, "[data-index-link]");
+        }
+        count.textContent = "Showing " + shown + " of " + anchors.length + " anchors";
+        empty.dataset.visible = shown === 0 ? "true" : "false";
+      }
+
+      for (const input of [search, category, relation, ...statuses]) {
+        input.addEventListener("input", update);
+        input.addEventListener("change", update);
+      }
+      update();
+    })();
+  </script>
 </body>
 </html>

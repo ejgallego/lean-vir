@@ -88,8 +88,111 @@
     .coverage td.numeric { text-align: right; white-space: nowrap; }
     .coverage details summary { cursor: pointer; color: var(--fg); }
     .coverage ul { margin: 6px 0 0; padding-left: 18px; }
+    .report-tools {
+      margin: 0 0 18px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .tool-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .tool-head p { color: var(--muted); font-size: 13px; }
+    .filter-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.6fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(220px, 1.4fr);
+      gap: 12px;
+      align-items: end;
+    }
+    .filter {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .filter input[type="search"], .filter select {
+      width: 100%;
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--fg);
+      font: inherit;
+    }
+    .status-filter {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+    .status-options { display: flex; flex-wrap: wrap; gap: 6px; }
+    .status-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 36px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--fg);
+      font-weight: 500;
+    }
+    .report-body {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .anchor-index {
+      position: sticky;
+      top: 16px;
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .anchor-index h2 { margin-bottom: 8px; }
+    .anchor-index details { border-top: 1px solid var(--line); padding: 8px 0; }
+    .anchor-index details:first-of-type { border-top: 0; }
+    .anchor-index summary { cursor: pointer; font-weight: 600; }
+    .index-links { display: grid; gap: 4px; margin-top: 6px; }
+    .index-link {
+      display: grid;
+      grid-template-columns: 8px minmax(0, 1fr);
+      gap: 7px;
+      align-items: center;
+      padding: 4px 0;
+      color: var(--fg);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .index-link:hover { text-decoration: underline; }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+    .empty-state {
+      display: none;
+      padding: 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+    }
+    .empty-state[data-visible="true"] { display: block; }
     .groups { display: grid; gap: 28px; }
     .anchor-group { display: grid; gap: 12px; }
+    .anchor[hidden], .anchor-group[hidden], .index-link[hidden] { display: none; }
     .group-title {
       margin: 0;
       font-size: 20px;
@@ -164,6 +267,9 @@
       main { padding: 24px 12px 40px; }
       .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
       .coverage { overflow-x: auto; }
+      .filter-row { grid-template-columns: 1fr; }
+      .report-body { grid-template-columns: 1fr; }
+      .anchor-index { position: static; max-height: none; }
       .anchor-head { display: grid; }
       .comparison { grid-template-columns: 1fr; }
     }
@@ -185,6 +291,43 @@
       <div class="summary-card compatible"><strong>0</strong><span>compatible</span></div>
       <div class="summary-card weak"><strong>33</strong><span>weak</span></div>
       <div class="summary-card missing"><strong>0</strong><span>missing</span></div>
+    </section>
+    <section class="report-tools" aria-labelledby="type-anchor-browse">
+      <div class="tool-head">
+        <h2 id="type-anchor-browse">Browse</h2>
+        <p id="anchor-result-count">Showing 33 anchors</p>
+      </div>
+      <div class="filter-row">
+        <label class="filter">Search
+          <input id="anchor-search" type="search" autocomplete="off" placeholder="TypeScript or Lean symbol">
+        </label>
+        <label class="filter">Category
+          <select id="anchor-category">
+            <option value="">All categories</option>
+            <option value="Props and attributes">Props and attributes</option>
+            <option value="Style and prop values">Style and prop values</option>
+            <option value="Events">Events</option>
+            <option value="Rendered values and elements">Rendered values and elements</option>
+            <option value="Components and refs">Components and refs</option>
+          </select>
+        </label>
+        <label class="filter">Relation
+          <select id="anchor-relation">
+            <option value="">All relations</option>
+            <option value="audit">Audit</option>
+            <option value="coverageGap">Coverage gap</option>
+          </select>
+        </label>
+        <fieldset class="filter status-filter">
+          <legend>Status</legend>
+          <div class="status-options">
+            <label class="status-toggle exact"><input type="checkbox" value="exact" data-status-filter checked> exact</label>
+            <label class="status-toggle compatible"><input type="checkbox" value="compatible" data-status-filter checked> compatible</label>
+            <label class="status-toggle weak"><input type="checkbox" value="weak" data-status-filter checked> weak</label>
+            <label class="status-toggle missing"><input type="checkbox" value="missing" data-status-filter checked> missing</label>
+          </div>
+        </fieldset>
+      </div>
     </section>
     <section class="coverage" aria-labelledby="type-anchor-coverage">
       <h2 id="type-anchor-coverage">Coverage Matrix</h2>
@@ -243,11 +386,73 @@
         </tbody>
       </table>
     </section>
-    <div class="groups" aria-label="Type anchors">
-      <section class="anchor-group" aria-labelledby="type-anchor-group-props_and_attributes">
+    <div class="report-body">
+      <aside class="anchor-index" aria-labelledby="type-anchor-index">
+        <h2 id="type-anchor-index">Index</h2>
+        <details open data-index-group data-category="Props and attributes">
+          <summary>Props and attributes</summary>
+          <div class="index-links">
+            <a class="index-link weak" href="#type-anchor-react_props_attributes" data-index-link data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.attributes react.attributes lean.vir.react.property props and attributes audit anchor from vir's generic key/value property representation to react's reserved component attributes."><span class="status-dot" aria-hidden="true"></span><span>React.Attributes</span></a>
+            <a class="index-link weak" href="#type-anchor-react_props_html_attributes" data-index-link data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.html_attributes react.htmlattributes lean.vir.react.property props and attributes audit anchor from vir's key/value property representation to react's full html attribute surface."><span class="status-dot" aria-hidden="true"></span><span>React.HTMLAttributes</span></a>
+            <a class="index-link weak" href="#type-anchor-react_props_dom_attributes" data-index-link data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.dom_attributes react.domattributes lean.vir.react.property props and attributes audit anchor from vir properties to react's event-bearing dom attribute bag."><span class="status-dot" aria-hidden="true"></span><span>React.DOMAttributes</span></a>
+            <a class="index-link weak" href="#type-anchor-react_props_aria_attributes" data-index-link data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.aria_attributes react.ariaattributes lean.vir.react.property props and attributes audit anchor for accessibility attributes represented today as ordinary vir properties."><span class="status-dot" aria-hidden="true"></span><span>React.AriaAttributes</span></a>
+            <a class="index-link weak" href="#type-anchor-react_props_button_attributes" data-index-link data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.button_attributes react.buttonhtmlattributes lean.vir.react.property props and attributes audit anchor for one concrete element-specific attribute family."><span class="status-dot" aria-hidden="true"></span><span>React.ButtonHTMLAttributes</span></a>
+            <a class="index-link weak" href="#type-anchor-react_props_input_attributes" data-index-link data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.input_attributes react.inputhtmlattributes lean.vir.react.property props and attributes audit anchor for form input attributes, including value and change-handler surfaces."><span class="status-dot" aria-hidden="true"></span><span>React.InputHTMLAttributes</span></a>
+            <a class="index-link weak" href="#type-anchor-react_props_jsx_intrinsic_attributes" data-index-link data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.jsx_intrinsic_attributes react.jsx.intrinsicattributes lean.vir.react.property props and attributes audit anchor from generic properties to jsx's always-available intrinsic attributes."><span class="status-dot" aria-hidden="true"></span><span>React.JSX.IntrinsicAttributes</span></a>
+            <a class="index-link weak" href="#type-anchor-react_props_jsx_intrinsic_elements" data-index-link data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.jsx_intrinsic_elements react.jsx.intrinsicelements lean.vir.react.property props and attributes audit anchor for the full built-in jsx element table; this is intentionally broad."><span class="status-dot" aria-hidden="true"></span><span>React.JSX.IntrinsicElements</span></a>
+          </div>
+        </details>
+        <details open data-index-group data-category="Style and prop values">
+          <summary>Style and prop values</summary>
+          <div class="index-links">
+            <a class="index-link weak" href="#type-anchor-react_style_css_properties_prop_value" data-index-link data-status="weak" data-category="Style and prop values" data-relation="audit" data-search="react.style.css_properties_prop_value react.cssproperties lean.vir.react.propvalue style and prop values audit anchor for the style branch of vir propvalue."><span class="status-dot" aria-hidden="true"></span><span>React.CSSProperties</span></a>
+            <a class="index-link weak" href="#type-anchor-react_style_css_properties_style_property" data-index-link data-status="weak" data-category="Style and prop values" data-relation="audit" data-search="react.style.css_properties_style_property react.cssproperties lean.vir.react.styleproperty style and prop values audit anchor from vir's individual style-property entries to react's typed css property object."><span class="status-dot" aria-hidden="true"></span><span>React.CSSProperties</span></a>
+            <a class="index-link weak" href="#type-anchor-react_style_key_scalar" data-index-link data-status="weak" data-category="Style and prop values" data-relation="audit" data-search="react.style.key_scalar react.key lean.vir.react.propvalue style and prop values loose scalar audit anchor: react keys are not regular props, but they exercise the same string/number value boundary."><span class="status-dot" aria-hidden="true"></span><span>React.Key</span></a>
+          </div>
+        </details>
+        <details open data-index-group data-category="Events">
+          <summary>Events</summary>
+          <div class="index-links">
+            <a class="index-link weak" href="#type-anchor-react_events_event_handler" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.event_handler react.eventhandler lean.vir.react.eventhandler events audit anchor from vir retained callbacks to react's generic event handler type."><span class="status-dot" aria-hidden="true"></span><span>React.EventHandler</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_change_event_handler" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.change_event_handler react.changeeventhandler lean.vir.react.eventhandler events audit anchor for one common form event callback specialization."><span class="status-dot" aria-hidden="true"></span><span>React.ChangeEventHandler</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_mouse_event_handler" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.mouse_event_handler react.mouseeventhandler lean.vir.react.eventhandler events audit anchor for one common pointer callback specialization."><span class="status-dot" aria-hidden="true"></span><span>React.MouseEventHandler</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_dom_attributes" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.dom_attributes react.domattributes lean.vir.react.eventhandler events audit anchor from vir's named event handlers to react's dom event prop bag."><span class="status-dot" aria-hidden="true"></span><span>React.DOMAttributes</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_synthetic_event" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.synthetic_event react.syntheticevent lean.vir.browser.event events audit anchor from vir event resources to react's synthetic event base surface."><span class="status-dot" aria-hidden="true"></span><span>React.SyntheticEvent</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_change_event" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.change_event react.changeevent lean.vir.browser.event events audit anchor for a form event resource specialization."><span class="status-dot" aria-hidden="true"></span><span>React.ChangeEvent</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_focus_event" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.focus_event react.focusevent lean.vir.browser.event events audit anchor for focus event resource specialization."><span class="status-dot" aria-hidden="true"></span><span>React.FocusEvent</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_keyboard_event" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.keyboard_event react.keyboardevent lean.vir.browser.event events audit anchor for keyboard event resource specialization."><span class="status-dot" aria-hidden="true"></span><span>React.KeyboardEvent</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_mouse_event" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.mouse_event react.mouseevent lean.vir.browser.event events audit anchor for mouse event resource specialization."><span class="status-dot" aria-hidden="true"></span><span>React.MouseEvent</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_pointer_event" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.pointer_event react.pointerevent lean.vir.browser.event events audit anchor for pointer event resource specialization."><span class="status-dot" aria-hidden="true"></span><span>React.PointerEvent</span></a>
+            <a class="index-link weak" href="#type-anchor-react_events_ui_event" data-index-link data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.ui_event react.uievent lean.vir.browser.event events audit anchor for ui event resource specialization."><span class="status-dot" aria-hidden="true"></span><span>React.UIEvent</span></a>
+          </div>
+        </details>
+        <details open data-index-group data-category="Rendered values and elements">
+          <summary>Rendered values and elements</summary>
+          <div class="index-links">
+            <a class="index-link weak" href="#type-anchor-react_render_react_node" data-index-link data-status="weak" data-category="Rendered values and elements" data-relation="audit" data-search="react.render.react_node react.reactnode lean.vir.react.node rendered values and elements audit anchor from react's broad renderable union to vir's javascript-owned react node resource."><span class="status-dot" aria-hidden="true"></span><span>React.ReactNode</span></a>
+            <a class="index-link weak" href="#type-anchor-react_render_react_element" data-index-link data-status="weak" data-category="Rendered values and elements" data-relation="audit" data-search="react.render.react_element react.reactelement lean.vir.react.node rendered values and elements audit anchor from react element objects to vir's react node resource lane."><span class="status-dot" aria-hidden="true"></span><span>React.ReactElement</span></a>
+            <a class="index-link weak" href="#type-anchor-react_render_jsx_element" data-index-link data-status="weak" data-category="Rendered values and elements" data-relation="audit" data-search="react.render.jsx_element react.jsx.element lean.vir.react.node rendered values and elements audit anchor from jsx element values to vir's react node resource lane."><span class="status-dot" aria-hidden="true"></span><span>React.JSX.Element</span></a>
+            <a class="index-link weak" href="#type-anchor-react_render_jsx_element_type" data-index-link data-status="weak" data-category="Rendered values and elements" data-relation="audit" data-search="react.render.jsx_element_type react.jsx.elementtype lean.vir.react.elementtype rendered values and elements audit anchor from jsx element-type selection to vir's javascript-owned react element-type resource."><span class="status-dot" aria-hidden="true"></span><span>React.JSX.ElementType</span></a>
+          </div>
+        </details>
+        <details open data-index-group data-category="Components and refs">
+          <summary>Components and refs</summary>
+          <div class="index-links">
+            <a class="index-link weak" href="#type-anchor-react_components_element_type" data-index-link data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.element_type react.elementtype lean.vir.react.elementtype components and refs audit anchor from react's tag-or-component element type to vir's explicit elementtype resource."><span class="status-dot" aria-hidden="true"></span><span>React.ElementType</span></a>
+            <a class="index-link weak" href="#type-anchor-react_components_component_type" data-index-link data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.component_type react.componenttype lean.vir.react.component components and refs audit anchor from react component classes/functions to vir's lean-authored function component type."><span class="status-dot" aria-hidden="true"></span><span>React.ComponentType</span></a>
+            <a class="index-link weak" href="#type-anchor-react_components_jsx_element_constructor" data-index-link data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.jsx_element_constructor react.jsxelementconstructor lean.vir.react.component components and refs audit anchor from jsx component constructors to vir's lean-authored function component type."><span class="status-dot" aria-hidden="true"></span><span>React.JSXElementConstructor</span></a>
+            <a class="index-link weak" href="#type-anchor-react_components_function_component" data-index-link data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.function_component react.functioncomponent lean.vir.react.component components and refs audit anchor from react function component call signatures to vir's lean component function."><span class="status-dot" aria-hidden="true"></span><span>React.FunctionComponent</span></a>
+            <a class="index-link weak" href="#type-anchor-react_components_fc" data-index-link data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.fc react.fc lean.vir.react.component components and refs audit anchor for react.fc as a common alias for function components."><span class="status-dot" aria-hidden="true"></span><span>React.FC</span></a>
+            <a class="index-link weak" href="#type-anchor-react_refs_ref" data-index-link data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.refs.ref react.ref lean.vir.react.ref components and refs audit anchor from react's callback/object/null ref union to vir's javascript-owned ref resource."><span class="status-dot" aria-hidden="true"></span><span>React.Ref</span></a>
+            <a class="index-link weak" href="#type-anchor-react_refs_ref_object" data-index-link data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.refs.ref_object react.refobject lean.vir.react.ref components and refs audit anchor from react's { current } object type to vir's opaque ref resource plus get/set helpers."><span class="status-dot" aria-hidden="true"></span><span>React.RefObject</span></a>
+          </div>
+        </details>
+      </aside>
+      <div class="groups" aria-label="Type anchors">
+      <section class="anchor-group" data-anchor-group data-category="Props and attributes" aria-labelledby="type-anchor-group-props_and_attributes">
         <h2 class="group-title" id="type-anchor-group-props_and_attributes">Props and attributes</h2>
         <div class="anchors">
-      <article class="anchor" id="type-anchor-react_props_attributes" data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.Attributes
+      <article class="anchor" id="type-anchor-react_props_attributes" data-anchor data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.attributes react.attributes lean.vir.react.property props and attributes audit anchor from vir's generic key/value property representation to react's reserved component attributes." data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.Attributes
 
 missing TypeScript fields: name, value; extra TypeScript fields: key">
         <div class="anchor-head">
@@ -292,7 +497,7 @@ structure Lean.Vir.React.Property {
         <p class="notes">missing TypeScript fields: name, value; extra TypeScript fields: key</p>
         <p class="notes">Audit anchor from VIR's generic key/value property representation to React's reserved component attributes.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_props_html_attributes" data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.HTMLAttributes
+      <article class="anchor" id="type-anchor-react_props_html_attributes" data-anchor data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.html_attributes react.htmlattributes lean.vir.react.property props and attributes audit anchor from vir's key/value property representation to react's full html attribute surface." data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.HTMLAttributes
 
 missing TypeScript fields: name, value; extra TypeScript fields: about, accessKey, autoCapitalize, autoCorrect, autoFocus, autoSave, className, color, content, contentEditable, contextMenu, datatype, defaultChecked, defaultValue, dir, draggable, enterKeyHint, exportparts, hidden, id, inert, inlist, inputMode, is, itemID, itemProp, itemRef, itemScope, itemType, lang, nonce, part, popover, popoverTarget, popoverTargetAction, prefix, property, radioGroup, rel, resource, results, rev, role, security, slot, spellCheck, style, suppressContentEditableWarning, suppressHydrationWarning, tabIndex, title, translate, typeof, unselectable, vocab">
         <div class="anchor-head">
@@ -423,7 +628,7 @@ structure Lean.Vir.React.Property {
         <p class="notes">missing TypeScript fields: name, value; extra TypeScript fields: about, accessKey, autoCapitalize, autoCorrect, autoFocus, autoSave, className, color, content, contentEditable, contextMenu, datatype, defaultChecked, defaultValue, dir, draggable, enterKeyHint, exportparts, hidden, id, inert, inlist, inputMode, is, itemID, itemProp, itemRef, itemScope, itemType, lang, nonce, part, popover, popoverTarget, popoverTargetAction, prefix, property, radioGroup, rel, resource, results, rev, role, security, slot, spellCheck, style, suppressContentEditableWarning, suppressHydrationWarning, tabIndex, title, translate, typeof, unselectable, vocab</p>
         <p class="notes">Audit anchor from VIR's key/value property representation to React's full HTML attribute surface.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_props_dom_attributes" data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.DOMAttributes
+      <article class="anchor" id="type-anchor-react_props_dom_attributes" data-anchor data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.dom_attributes react.domattributes lean.vir.react.property props and attributes audit anchor from vir properties to react's event-bearing dom attribute bag." data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.DOMAttributes
 
 missing TypeScript fields: name, value; extra TypeScript fields: children, dangerouslySetInnerHTML, onAbort, onAbortCapture, onAnimationEnd, onAnimationEndCapture, onAnimationIteration, onAnimationIterationCapture, onAnimationStart, onAnimationStartCapture, onAuxClick, onAuxClickCapture, onBeforeInput, onBeforeInputCapture, onBeforeToggle, onBlur, onBlurCapture, onCanPlay, onCanPlayCapture, onCanPlayThrough, onCanPlayThroughCapture, onChange, onChangeCapture, onClick, onClickCapture, onCompositionEnd, onCompositionEndCapture, onCompositionStart, onCompositionStartCapture, onCompositionUpdate, onCompositionUpdateCapture, onContextMenu, onContextMenuCapture, onCopy, onCopyCapture, onCut, onCutCapture, onDoubleClick, onDoubleClickCapture, onDrag, onDragCapture, onDragEnd, onDragEndCapture, onDragEnter, onDragEnterCapture, onDragExit, onDragExitCapture, onDragLeave, onDragLeaveCapture, onDragOver, onDragOverCapture, onDragStart, onDragStartCapture, onDrop, onDropCapture, onDurationChange, onDurationChangeCapture, onEmptied, onEmptiedCapture, onEncrypted, onEncryptedCapture, onEnded, onEndedCapture, onError, onErrorCapture, onFocus, onFocusCapture, onGotPointerCapture, onGotPointerCaptureCapture, onInput, onInputCapture, onInvalid, onInvalidCapture, onKeyDown, onKeyDownCapture, onKeyPress, onKeyPressCapture, onKeyUp, onKeyUpCapture, onLoad, onLoadCapture, onLoadStart, onLoadStartCapture, onLoadedData, onLoadedDataCapture, onLoadedMetadata, onLoadedMetadataCapture, onLostPointerCapture, onLostPointerCaptureCapture, onMouseDown, onMouseDownCapture, onMouseEnter, onMouseLeave, onMouseMove, onMouseMoveCapture, onMouseOut, onMouseOutCapture, onMouseOver, onMouseOverCapture, onMouseUp, onMouseUpCapture, onPaste, onPasteCapture, onPause, onPauseCapture, onPlay, onPlayCapture, onPlaying, onPlayingCapture, onPointerCancel, onPointerCancelCapture, onPointerDown, onPointerDownCapture, onPointerEnter, onPointerLeave, onPointerMove, onPointerMoveCapture, onPointerOut, onPointerOutCapture, onPointerOver, onPointerOverCapture, onPointerUp, onPointerUpCapture, onProgress, onProgressCapture, onRateChange, onRateChangeCapture, onReset, onResetCapture, onScroll, onScrollCapture, onScrollEnd, onScrollEndCapture, onSeeked, onSeekedCapture, onSeeking, onSeekingCapture, onSelect, onSelectCapture, onStalled, onStalledCapture, onSubmit, onSubmitCapture, onSuspend, onSuspendCapture, onTimeUpdate, onTimeUpdateCapture, onToggle, onTouchCancel, onTouchCancelCapture, onTouchEnd, onTouchEndCapture, onTouchMove, onTouchMoveCapture, onTouchStart, onTouchStartCapture, onTransitionCancel, onTransitionCancelCapture, onTransitionEnd, onTransitionEndCapture, onTransitionRun, onTransitionRunCapture, onTransitionStart, onTransitionStartCapture, onVolumeChange, onVolumeChangeCapture, onWaiting, onWaitingCapture, onWheel, onWheelCapture">
         <div class="anchor-head">
@@ -675,7 +880,7 @@ structure Lean.Vir.React.Property {
         <p class="notes">missing TypeScript fields: name, value; extra TypeScript fields: children, dangerouslySetInnerHTML, onAbort, onAbortCapture, onAnimationEnd, onAnimationEndCapture, onAnimationIteration, onAnimationIterationCapture, onAnimationStart, onAnimationStartCapture, onAuxClick, onAuxClickCapture, onBeforeInput, onBeforeInputCapture, onBeforeToggle, onBlur, onBlurCapture, onCanPlay, onCanPlayCapture, onCanPlayThrough, onCanPlayThroughCapture, onChange, onChangeCapture, onClick, onClickCapture, onCompositionEnd, onCompositionEndCapture, onCompositionStart, onCompositionStartCapture, onCompositionUpdate, onCompositionUpdateCapture, onContextMenu, onContextMenuCapture, onCopy, onCopyCapture, onCut, onCutCapture, onDoubleClick, onDoubleClickCapture, onDrag, onDragCapture, onDragEnd, onDragEndCapture, onDragEnter, onDragEnterCapture, onDragExit, onDragExitCapture, onDragLeave, onDragLeaveCapture, onDragOver, onDragOverCapture, onDragStart, onDragStartCapture, onDrop, onDropCapture, onDurationChange, onDurationChangeCapture, onEmptied, onEmptiedCapture, onEncrypted, onEncryptedCapture, onEnded, onEndedCapture, onError, onErrorCapture, onFocus, onFocusCapture, onGotPointerCapture, onGotPointerCaptureCapture, onInput, onInputCapture, onInvalid, onInvalidCapture, onKeyDown, onKeyDownCapture, onKeyPress, onKeyPressCapture, onKeyUp, onKeyUpCapture, onLoad, onLoadCapture, onLoadStart, onLoadStartCapture, onLoadedData, onLoadedDataCapture, onLoadedMetadata, onLoadedMetadataCapture, onLostPointerCapture, onLostPointerCaptureCapture, onMouseDown, onMouseDownCapture, onMouseEnter, onMouseLeave, onMouseMove, onMouseMoveCapture, onMouseOut, onMouseOutCapture, onMouseOver, onMouseOverCapture, onMouseUp, onMouseUpCapture, onPaste, onPasteCapture, onPause, onPauseCapture, onPlay, onPlayCapture, onPlaying, onPlayingCapture, onPointerCancel, onPointerCancelCapture, onPointerDown, onPointerDownCapture, onPointerEnter, onPointerLeave, onPointerMove, onPointerMoveCapture, onPointerOut, onPointerOutCapture, onPointerOver, onPointerOverCapture, onPointerUp, onPointerUpCapture, onProgress, onProgressCapture, onRateChange, onRateChangeCapture, onReset, onResetCapture, onScroll, onScrollCapture, onScrollEnd, onScrollEndCapture, onSeeked, onSeekedCapture, onSeeking, onSeekingCapture, onSelect, onSelectCapture, onStalled, onStalledCapture, onSubmit, onSubmitCapture, onSuspend, onSuspendCapture, onTimeUpdate, onTimeUpdateCapture, onToggle, onTouchCancel, onTouchCancelCapture, onTouchEnd, onTouchEndCapture, onTouchMove, onTouchMoveCapture, onTouchStart, onTouchStartCapture, onTransitionCancel, onTransitionCancelCapture, onTransitionEnd, onTransitionEndCapture, onTransitionRun, onTransitionRunCapture, onTransitionStart, onTransitionStartCapture, onVolumeChange, onVolumeChangeCapture, onWaiting, onWaitingCapture, onWheel, onWheelCapture</p>
         <p class="notes">Audit anchor from VIR properties to React's event-bearing DOM attribute bag.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_props_aria_attributes" data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.AriaAttributes
+      <article class="anchor" id="type-anchor-react_props_aria_attributes" data-anchor data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.aria_attributes react.ariaattributes lean.vir.react.property props and attributes audit anchor for accessibility attributes represented today as ordinary vir properties." data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.AriaAttributes
 
 missing TypeScript fields: name, value; extra TypeScript fields: aria-activedescendant, aria-atomic, aria-autocomplete, aria-braillelabel, aria-brailleroledescription, aria-busy, aria-checked, aria-colcount, aria-colindex, aria-colindextext, aria-colspan, aria-controls, aria-current, aria-describedby, aria-description, aria-details, aria-disabled, aria-dropeffect, aria-errormessage, aria-expanded, aria-flowto, aria-grabbed, aria-haspopup, aria-hidden, aria-invalid, aria-keyshortcuts, aria-label, aria-labelledby, aria-level, aria-live, aria-modal, aria-multiline, aria-multiselectable, aria-orientation, aria-owns, aria-placeholder, aria-posinset, aria-pressed, aria-readonly, aria-relevant, aria-required, aria-roledescription, aria-rowcount, aria-rowindex, aria-rowindextext, aria-rowspan, aria-selected, aria-setsize, aria-sort, aria-valuemax, aria-valuemin, aria-valuenow, aria-valuetext">
         <div class="anchor-head">
@@ -939,7 +1144,7 @@ structure Lean.Vir.React.Property {
         <p class="notes">missing TypeScript fields: name, value; extra TypeScript fields: aria-activedescendant, aria-atomic, aria-autocomplete, aria-braillelabel, aria-brailleroledescription, aria-busy, aria-checked, aria-colcount, aria-colindex, aria-colindextext, aria-colspan, aria-controls, aria-current, aria-describedby, aria-description, aria-details, aria-disabled, aria-dropeffect, aria-errormessage, aria-expanded, aria-flowto, aria-grabbed, aria-haspopup, aria-hidden, aria-invalid, aria-keyshortcuts, aria-label, aria-labelledby, aria-level, aria-live, aria-modal, aria-multiline, aria-multiselectable, aria-orientation, aria-owns, aria-placeholder, aria-posinset, aria-pressed, aria-readonly, aria-relevant, aria-required, aria-roledescription, aria-rowcount, aria-rowindex, aria-rowindextext, aria-rowspan, aria-selected, aria-setsize, aria-sort, aria-valuemax, aria-valuemin, aria-valuenow, aria-valuetext</p>
         <p class="notes">Audit anchor for accessibility attributes represented today as ordinary VIR properties.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_props_button_attributes" data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.ButtonHTMLAttributes
+      <article class="anchor" id="type-anchor-react_props_button_attributes" data-anchor data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.button_attributes react.buttonhtmlattributes lean.vir.react.property props and attributes audit anchor for one concrete element-specific attribute family." data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.ButtonHTMLAttributes
 
 extra TypeScript fields: disabled, form, formAction, formEncType, formMethod, formNoValidate, formTarget, type; kind differs: Lean primitive vs TypeScript option; kind differs: Lean variant vs TypeScript union">
         <div class="anchor-head">
@@ -999,7 +1204,7 @@ structure Lean.Vir.React.Property {
         <p class="notes">extra TypeScript fields: disabled, form, formAction, formEncType, formMethod, formNoValidate, formTarget, type; kind differs: Lean primitive vs TypeScript option; kind differs: Lean variant vs TypeScript union</p>
         <p class="notes">Audit anchor for one concrete element-specific attribute family.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_props_input_attributes" data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.InputHTMLAttributes
+      <article class="anchor" id="type-anchor-react_props_input_attributes" data-anchor data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.input_attributes react.inputhtmlattributes lean.vir.react.property props and attributes audit anchor for form input attributes, including value and change-handler surfaces." data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.InputHTMLAttributes
 
 extra TypeScript fields: accept, alt, autoComplete, capture, checked, disabled, form, formAction, formEncType, formMethod, formNoValidate, formTarget, height, list, max, maxLength, min, minLength, multiple, onChange, pattern, placeholder, readOnly, required, size, src, step, type, width; kind differs: Lean primitive vs TypeScript option; kind differs: Lean variant vs TypeScript union">
         <div class="anchor-head">
@@ -1083,7 +1288,7 @@ structure Lean.Vir.React.Property {
         <p class="notes">extra TypeScript fields: accept, alt, autoComplete, capture, checked, disabled, form, formAction, formEncType, formMethod, formNoValidate, formTarget, height, list, max, maxLength, min, minLength, multiple, onChange, pattern, placeholder, readOnly, required, size, src, step, type, width; kind differs: Lean primitive vs TypeScript option; kind differs: Lean variant vs TypeScript union</p>
         <p class="notes">Audit anchor for form input attributes, including value and change-handler surfaces.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_props_jsx_intrinsic_attributes" data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.JSX.IntrinsicAttributes
+      <article class="anchor" id="type-anchor-react_props_jsx_intrinsic_attributes" data-anchor data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.jsx_intrinsic_attributes react.jsx.intrinsicattributes lean.vir.react.property props and attributes audit anchor from generic properties to jsx's always-available intrinsic attributes." data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.JSX.IntrinsicAttributes
 
 missing TypeScript fields: name, value">
         <div class="anchor-head">
@@ -1126,7 +1331,7 @@ structure Lean.Vir.React.Property {
         <p class="notes">missing TypeScript fields: name, value</p>
         <p class="notes">Audit anchor from generic properties to JSX's always-available intrinsic attributes.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_props_jsx_intrinsic_elements" data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.JSX.IntrinsicElements
+      <article class="anchor" id="type-anchor-react_props_jsx_intrinsic_elements" data-anchor data-status="weak" data-category="Props and attributes" data-relation="audit" data-search="react.props.jsx_intrinsic_elements react.jsx.intrinsicelements lean.vir.react.property props and attributes audit anchor for the full built-in jsx element table; this is intentionally broad." data-vir-type-anchor-hover="weak: Lean.Vir.React.Property -&gt; React.JSX.IntrinsicElements
 
 missing TypeScript fields: name, value; extra TypeScript fields: a, abbr, address, animate, animateMotion, animateTransform, area, article, aside, audio, b, base, bdi, bdo, big, blockquote, body, br, button, canvas, caption, center, circle, cite, clipPath, code, col, colgroup, data, datalist, dd, defs, del, desc, details, dfn, dialog, div, dl, dt, ellipse, em, embed, feBlend, feColorMatrix, feComponentTransfer, feComposite, feConvolveMatrix, feDiffuseLighting, feDisplacementMap, feDistantLight, feDropShadow, feFlood, feFuncA, feFuncB, feFuncG, feFuncR, feGaussianBlur, feImage, feMerge, feMergeNode, feMorphology, feOffset, fePointLight, feSpecularLighting, feSpotLight, feTile, feTurbulence, fieldset, figcaption, figure, filter, footer, foreignObject, form, g, h1, h2, h3, h4, h5, h6, head, header, hgroup, hr, html, i, iframe, image, img, input, ins, kbd, keygen, label, legend, li, line, linearGradient, link, main, map, mark, marker, mask, menu, menuitem, meta, metadata, meter, mpath, nav, noindex, noscript, object, ol, optgroup, option, output, p, param, path, pattern, picture, polygon, polyline, pre, progress, q, radialGradient, rect, rp, rt, ruby, s, samp, script, search, section, select, set, slot, small, source, span, stop, strong, style, sub, summary, sup, svg, switch, symbol, table, tbody, td, template, text, textPath, textarea, tfoot, th, thead, time, title, tr, track, tspan, u, ul, use, var, video, view, wbr, webview">
         <div class="anchor-head">
@@ -1354,10 +1559,10 @@ structure Lean.Vir.React.Property {
       </article>
         </div>
       </section>
-      <section class="anchor-group" aria-labelledby="type-anchor-group-style_and_prop_values">
+      <section class="anchor-group" data-anchor-group data-category="Style and prop values" aria-labelledby="type-anchor-group-style_and_prop_values">
         <h2 class="group-title" id="type-anchor-group-style_and_prop_values">Style and prop values</h2>
         <div class="anchors">
-      <article class="anchor" id="type-anchor-react_style_css_properties_prop_value" data-vir-type-anchor-hover="weak: Lean.Vir.React.PropValue -&gt; React.CSSProperties
+      <article class="anchor" id="type-anchor-react_style_css_properties_prop_value" data-anchor data-status="weak" data-category="Style and prop values" data-relation="audit" data-search="react.style.css_properties_prop_value react.cssproperties lean.vir.react.propvalue style and prop values audit anchor for the style branch of vir propvalue." data-vir-type-anchor-hover="weak: Lean.Vir.React.PropValue -&gt; React.CSSProperties
 
 kind differs: Lean variant vs TypeScript record">
         <div class="anchor-head">
@@ -1405,7 +1610,7 @@ inductive Lean.Vir.React.PropValue where
         <p class="notes">kind differs: Lean variant vs TypeScript record</p>
         <p class="notes">Audit anchor for the style branch of VIR PropValue.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_style_css_properties_style_property" data-vir-type-anchor-hover="weak: Lean.Vir.React.StyleProperty -&gt; React.CSSProperties
+      <article class="anchor" id="type-anchor-react_style_css_properties_style_property" data-anchor data-status="weak" data-category="Style and prop values" data-relation="audit" data-search="react.style.css_properties_style_property react.cssproperties lean.vir.react.styleproperty style and prop values audit anchor from vir's individual style-property entries to react's typed css property object." data-vir-type-anchor-hover="weak: Lean.Vir.React.StyleProperty -&gt; React.CSSProperties
 
 missing TypeScript fields: name, value">
         <div class="anchor-head">
@@ -1450,7 +1655,7 @@ structure Lean.Vir.React.StyleProperty {
         <p class="notes">missing TypeScript fields: name, value</p>
         <p class="notes">Audit anchor from VIR's individual style-property entries to React's typed CSS property object.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_style_key_scalar" data-vir-type-anchor-hover="weak: Lean.Vir.React.PropValue -&gt; React.Key
+      <article class="anchor" id="type-anchor-react_style_key_scalar" data-anchor data-status="weak" data-category="Style and prop values" data-relation="audit" data-search="react.style.key_scalar react.key lean.vir.react.propvalue style and prop values loose scalar audit anchor: react keys are not regular props, but they exercise the same string/number value boundary." data-vir-type-anchor-hover="weak: Lean.Vir.React.PropValue -&gt; React.Key
 
 A value which uniquely identifies a node among items in an array.
 
@@ -1502,10 +1707,10 @@ inductive Lean.Vir.React.PropValue where
       </article>
         </div>
       </section>
-      <section class="anchor-group" aria-labelledby="type-anchor-group-events">
+      <section class="anchor-group" data-anchor-group data-category="Events" aria-labelledby="type-anchor-group-events">
         <h2 class="group-title" id="type-anchor-group-events">Events</h2>
         <div class="anchors">
-      <article class="anchor" id="type-anchor-react_events_event_handler" data-vir-type-anchor-hover="weak: Lean.Vir.React.EventHandler -&gt; React.EventHandler
+      <article class="anchor" id="type-anchor-react_events_event_handler" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.event_handler react.eventhandler lean.vir.react.eventhandler events audit anchor from vir retained callbacks to react's generic event handler type." data-vir-type-anchor-hover="weak: Lean.Vir.React.EventHandler -&gt; React.EventHandler
 
 kind differs: Lean record vs TypeScript opaque">
         <div class="anchor-head">
@@ -1541,7 +1746,7 @@ structure Lean.Vir.React.EventHandler {
         <p class="notes">kind differs: Lean record vs TypeScript opaque</p>
         <p class="notes">Audit anchor from VIR retained callbacks to React's generic event handler type.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_change_event_handler" data-vir-type-anchor-hover="weak: Lean.Vir.React.EventHandler -&gt; React.ChangeEventHandler
+      <article class="anchor" id="type-anchor-react_events_change_event_handler" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.change_event_handler react.changeeventhandler lean.vir.react.eventhandler events audit anchor for one common form event callback specialization." data-vir-type-anchor-hover="weak: Lean.Vir.React.EventHandler -&gt; React.ChangeEventHandler
 
 kind differs: Lean record vs TypeScript opaque">
         <div class="anchor-head">
@@ -1579,7 +1784,7 @@ structure Lean.Vir.React.EventHandler {
         <p class="notes">kind differs: Lean record vs TypeScript opaque</p>
         <p class="notes">Audit anchor for one common form event callback specialization.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_mouse_event_handler" data-vir-type-anchor-hover="weak: Lean.Vir.React.EventHandler -&gt; React.MouseEventHandler
+      <article class="anchor" id="type-anchor-react_events_mouse_event_handler" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.mouse_event_handler react.mouseeventhandler lean.vir.react.eventhandler events audit anchor for one common pointer callback specialization." data-vir-type-anchor-hover="weak: Lean.Vir.React.EventHandler -&gt; React.MouseEventHandler
 
 kind differs: Lean record vs TypeScript opaque">
         <div class="anchor-head">
@@ -1615,7 +1820,7 @@ structure Lean.Vir.React.EventHandler {
         <p class="notes">kind differs: Lean record vs TypeScript opaque</p>
         <p class="notes">Audit anchor for one common pointer callback specialization.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_dom_attributes" data-vir-type-anchor-hover="weak: Lean.Vir.React.EventHandler -&gt; React.DOMAttributes
+      <article class="anchor" id="type-anchor-react_events_dom_attributes" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.dom_attributes react.domattributes lean.vir.react.eventhandler events audit anchor from vir's named event handlers to react's dom event prop bag." data-vir-type-anchor-hover="weak: Lean.Vir.React.EventHandler -&gt; React.DOMAttributes
 
 missing TypeScript fields: callback, name; extra TypeScript fields: children, dangerouslySetInnerHTML, onAbort, onAbortCapture, onAnimationEnd, onAnimationEndCapture, onAnimationIteration, onAnimationIterationCapture, onAnimationStart, onAnimationStartCapture, onAuxClick, onAuxClickCapture, onBeforeInput, onBeforeInputCapture, onBeforeToggle, onBlur, onBlurCapture, onCanPlay, onCanPlayCapture, onCanPlayThrough, onCanPlayThroughCapture, onChange, onChangeCapture, onClick, onClickCapture, onCompositionEnd, onCompositionEndCapture, onCompositionStart, onCompositionStartCapture, onCompositionUpdate, onCompositionUpdateCapture, onContextMenu, onContextMenuCapture, onCopy, onCopyCapture, onCut, onCutCapture, onDoubleClick, onDoubleClickCapture, onDrag, onDragCapture, onDragEnd, onDragEndCapture, onDragEnter, onDragEnterCapture, onDragExit, onDragExitCapture, onDragLeave, onDragLeaveCapture, onDragOver, onDragOverCapture, onDragStart, onDragStartCapture, onDrop, onDropCapture, onDurationChange, onDurationChangeCapture, onEmptied, onEmptiedCapture, onEncrypted, onEncryptedCapture, onEnded, onEndedCapture, onError, onErrorCapture, onFocus, onFocusCapture, onGotPointerCapture, onGotPointerCaptureCapture, onInput, onInputCapture, onInvalid, onInvalidCapture, onKeyDown, onKeyDownCapture, onKeyPress, onKeyPressCapture, onKeyUp, onKeyUpCapture, onLoad, onLoadCapture, onLoadStart, onLoadStartCapture, onLoadedData, onLoadedDataCapture, onLoadedMetadata, onLoadedMetadataCapture, onLostPointerCapture, onLostPointerCaptureCapture, onMouseDown, onMouseDownCapture, onMouseEnter, onMouseLeave, onMouseMove, onMouseMoveCapture, onMouseOut, onMouseOutCapture, onMouseOver, onMouseOverCapture, onMouseUp, onMouseUpCapture, onPaste, onPasteCapture, onPause, onPauseCapture, onPlay, onPlayCapture, onPlaying, onPlayingCapture, onPointerCancel, onPointerCancelCapture, onPointerDown, onPointerDownCapture, onPointerEnter, onPointerLeave, onPointerMove, onPointerMoveCapture, onPointerOut, onPointerOutCapture, onPointerOver, onPointerOverCapture, onPointerUp, onPointerUpCapture, onProgress, onProgressCapture, onRateChange, onRateChangeCapture, onReset, onResetCapture, onScroll, onScrollCapture, onScrollEnd, onScrollEndCapture, onSeeked, onSeekedCapture, onSeeking, onSeekingCapture, onSelect, onSelectCapture, onStalled, onStalledCapture, onSubmit, onSubmitCapture, onSuspend, onSuspendCapture, onTimeUpdate, onTimeUpdateCapture, onToggle, onTouchCancel, onTouchCancelCapture, onTouchEnd, onTouchEndCapture, onTouchMove, onTouchMoveCapture, onTouchStart, onTouchStartCapture, onTransitionCancel, onTransitionCancelCapture, onTransitionEnd, onTransitionEndCapture, onTransitionRun, onTransitionRunCapture, onTransitionStart, onTransitionStartCapture, onVolumeChange, onVolumeChangeCapture, onWaiting, onWaitingCapture, onWheel, onWheelCapture">
         <div class="anchor-head">
@@ -1860,7 +2065,7 @@ structure Lean.Vir.React.EventHandler {
         <p class="notes">missing TypeScript fields: callback, name; extra TypeScript fields: children, dangerouslySetInnerHTML, onAbort, onAbortCapture, onAnimationEnd, onAnimationEndCapture, onAnimationIteration, onAnimationIterationCapture, onAnimationStart, onAnimationStartCapture, onAuxClick, onAuxClickCapture, onBeforeInput, onBeforeInputCapture, onBeforeToggle, onBlur, onBlurCapture, onCanPlay, onCanPlayCapture, onCanPlayThrough, onCanPlayThroughCapture, onChange, onChangeCapture, onClick, onClickCapture, onCompositionEnd, onCompositionEndCapture, onCompositionStart, onCompositionStartCapture, onCompositionUpdate, onCompositionUpdateCapture, onContextMenu, onContextMenuCapture, onCopy, onCopyCapture, onCut, onCutCapture, onDoubleClick, onDoubleClickCapture, onDrag, onDragCapture, onDragEnd, onDragEndCapture, onDragEnter, onDragEnterCapture, onDragExit, onDragExitCapture, onDragLeave, onDragLeaveCapture, onDragOver, onDragOverCapture, onDragStart, onDragStartCapture, onDrop, onDropCapture, onDurationChange, onDurationChangeCapture, onEmptied, onEmptiedCapture, onEncrypted, onEncryptedCapture, onEnded, onEndedCapture, onError, onErrorCapture, onFocus, onFocusCapture, onGotPointerCapture, onGotPointerCaptureCapture, onInput, onInputCapture, onInvalid, onInvalidCapture, onKeyDown, onKeyDownCapture, onKeyPress, onKeyPressCapture, onKeyUp, onKeyUpCapture, onLoad, onLoadCapture, onLoadStart, onLoadStartCapture, onLoadedData, onLoadedDataCapture, onLoadedMetadata, onLoadedMetadataCapture, onLostPointerCapture, onLostPointerCaptureCapture, onMouseDown, onMouseDownCapture, onMouseEnter, onMouseLeave, onMouseMove, onMouseMoveCapture, onMouseOut, onMouseOutCapture, onMouseOver, onMouseOverCapture, onMouseUp, onMouseUpCapture, onPaste, onPasteCapture, onPause, onPauseCapture, onPlay, onPlayCapture, onPlaying, onPlayingCapture, onPointerCancel, onPointerCancelCapture, onPointerDown, onPointerDownCapture, onPointerEnter, onPointerLeave, onPointerMove, onPointerMoveCapture, onPointerOut, onPointerOutCapture, onPointerOver, onPointerOverCapture, onPointerUp, onPointerUpCapture, onProgress, onProgressCapture, onRateChange, onRateChangeCapture, onReset, onResetCapture, onScroll, onScrollCapture, onScrollEnd, onScrollEndCapture, onSeeked, onSeekedCapture, onSeeking, onSeekingCapture, onSelect, onSelectCapture, onStalled, onStalledCapture, onSubmit, onSubmitCapture, onSuspend, onSuspendCapture, onTimeUpdate, onTimeUpdateCapture, onToggle, onTouchCancel, onTouchCancelCapture, onTouchEnd, onTouchEndCapture, onTouchMove, onTouchMoveCapture, onTouchStart, onTouchStartCapture, onTransitionCancel, onTransitionCancelCapture, onTransitionEnd, onTransitionEndCapture, onTransitionRun, onTransitionRunCapture, onTransitionStart, onTransitionStartCapture, onVolumeChange, onVolumeChangeCapture, onWaiting, onWaitingCapture, onWheel, onWheelCapture</p>
         <p class="notes">Audit anchor from VIR's named event handlers to React's DOM event prop bag.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_synthetic_event" data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.SyntheticEvent
+      <article class="anchor" id="type-anchor-react_events_synthetic_event" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.synthetic_event react.syntheticevent lean.vir.browser.event events audit anchor from vir event resources to react's synthetic event base surface." data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.SyntheticEvent
 
 currentTarget - a reference to the element on which the event listener is registered.
 
@@ -1910,7 +2115,7 @@ target - a reference to the element from which the event was originally dispatch
 This might be a child element to the element on which the event listener is registered.
 If you thought this should be `EventTarget &amp; T`, see https://github.com/DefinitelyTyped/DefinitelyTyped/issues/11508#issuecomment-256045682</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_change_event" data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.ChangeEvent
+      <article class="anchor" id="type-anchor-react_events_change_event" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.change_event react.changeevent lean.vir.browser.event events audit anchor for a form event resource specialization." data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.ChangeEvent
 
 kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
@@ -1947,7 +2152,7 @@ resource Lean.Vir.Browser.Event</code></pre>
         <p class="notes">kind differs: Lean resource vs TypeScript record</p>
         <p class="notes">Audit anchor for a form event resource specialization.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_focus_event" data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.FocusEvent
+      <article class="anchor" id="type-anchor-react_events_focus_event" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.focus_event react.focusevent lean.vir.browser.event events audit anchor for focus event resource specialization." data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.FocusEvent
 
 kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
@@ -1983,7 +2188,7 @@ resource Lean.Vir.Browser.Event</code></pre>
         <p class="notes">kind differs: Lean resource vs TypeScript record</p>
         <p class="notes">Audit anchor for focus event resource specialization.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_keyboard_event" data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.KeyboardEvent
+      <article class="anchor" id="type-anchor-react_events_keyboard_event" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.keyboard_event react.keyboardevent lean.vir.browser.event events audit anchor for keyboard event resource specialization." data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.KeyboardEvent
 
 kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
@@ -2039,7 +2244,7 @@ resource Lean.Vir.Browser.Event</code></pre>
         <p class="notes">kind differs: Lean resource vs TypeScript record</p>
         <p class="notes">Audit anchor for keyboard event resource specialization.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_mouse_event" data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.MouseEvent
+      <article class="anchor" id="type-anchor-react_events_mouse_event" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.mouse_event react.mouseevent lean.vir.browser.event events audit anchor for mouse event resource specialization." data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.MouseEvent
 
 kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
@@ -2092,7 +2297,7 @@ resource Lean.Vir.Browser.Event</code></pre>
         <p class="notes">kind differs: Lean resource vs TypeScript record</p>
         <p class="notes">Audit anchor for mouse event resource specialization.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_pointer_event" data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.PointerEvent
+      <article class="anchor" id="type-anchor-react_events_pointer_event" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.pointer_event react.pointerevent lean.vir.browser.event events audit anchor for pointer event resource specialization." data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.PointerEvent
 
 kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
@@ -2136,7 +2341,7 @@ resource Lean.Vir.Browser.Event</code></pre>
         <p class="notes">kind differs: Lean resource vs TypeScript record</p>
         <p class="notes">Audit anchor for pointer event resource specialization.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_events_ui_event" data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.UIEvent
+      <article class="anchor" id="type-anchor-react_events_ui_event" data-anchor data-status="weak" data-category="Events" data-relation="audit" data-search="react.events.ui_event react.uievent lean.vir.browser.event events audit anchor for ui event resource specialization." data-vir-type-anchor-hover="weak: Lean.Vir.Browser.Event -&gt; React.UIEvent
 
 kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
@@ -2174,10 +2379,10 @@ resource Lean.Vir.Browser.Event</code></pre>
       </article>
         </div>
       </section>
-      <section class="anchor-group" aria-labelledby="type-anchor-group-rendered_values_and_elements">
+      <section class="anchor-group" data-anchor-group data-category="Rendered values and elements" aria-labelledby="type-anchor-group-rendered_values_and_elements">
         <h2 class="group-title" id="type-anchor-group-rendered_values_and_elements">Rendered values and elements</h2>
         <div class="anchors">
-      <article class="anchor" id="type-anchor-react_render_react_node" data-vir-type-anchor-hover="weak: Lean.Vir.React.Node -&gt; React.ReactNode
+      <article class="anchor" id="type-anchor-react_render_react_node" data-anchor data-status="weak" data-category="Rendered values and elements" data-relation="audit" data-search="react.render.react_node react.reactnode lean.vir.react.node rendered values and elements audit anchor from react's broad renderable union to vir's javascript-owned react node resource." data-vir-type-anchor-hover="weak: Lean.Vir.React.Node -&gt; React.ReactNode
 
 kind differs: Lean resource vs TypeScript union">
         <div class="anchor-head">
@@ -2224,7 +2429,7 @@ resource Lean.Vir.React.Node</code></pre>
         <p class="notes">kind differs: Lean resource vs TypeScript union</p>
         <p class="notes">Audit anchor from React's broad renderable union to VIR's JavaScript-owned React node resource.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_render_react_element" data-vir-type-anchor-hover="weak: Lean.Vir.React.Node -&gt; React.ReactElement
+      <article class="anchor" id="type-anchor-react_render_react_element" data-anchor data-status="weak" data-category="Rendered values and elements" data-relation="audit" data-search="react.render.react_element react.reactelement lean.vir.react.node rendered values and elements audit anchor from react element objects to vir's react node resource lane." data-vir-type-anchor-hover="weak: Lean.Vir.React.Node -&gt; React.ReactElement
 
 kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
@@ -2265,7 +2470,7 @@ resource Lean.Vir.React.Node</code></pre>
         <p class="notes">kind differs: Lean resource vs TypeScript record</p>
         <p class="notes">Audit anchor from React element objects to VIR's React node resource lane.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_render_jsx_element" data-vir-type-anchor-hover="weak: Lean.Vir.React.Node -&gt; React.JSX.Element
+      <article class="anchor" id="type-anchor-react_render_jsx_element" data-anchor data-status="weak" data-category="Rendered values and elements" data-relation="audit" data-search="react.render.jsx_element react.jsx.element lean.vir.react.node rendered values and elements audit anchor from jsx element values to vir's react node resource lane." data-vir-type-anchor-hover="weak: Lean.Vir.React.Node -&gt; React.JSX.Element
 
 kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
@@ -2299,7 +2504,7 @@ resource Lean.Vir.React.Node</code></pre>
         <p class="notes">kind differs: Lean resource vs TypeScript record</p>
         <p class="notes">Audit anchor from JSX element values to VIR's React node resource lane.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_render_jsx_element_type" data-vir-type-anchor-hover="weak: Lean.Vir.React.ElementType -&gt; React.JSX.ElementType
+      <article class="anchor" id="type-anchor-react_render_jsx_element_type" data-anchor data-status="weak" data-category="Rendered values and elements" data-relation="audit" data-search="react.render.jsx_element_type react.jsx.elementtype lean.vir.react.elementtype rendered values and elements audit anchor from jsx element-type selection to vir's javascript-owned react element-type resource." data-vir-type-anchor-hover="weak: Lean.Vir.React.ElementType -&gt; React.JSX.ElementType
 
 kind differs: Lean resource vs TypeScript union">
         <div class="anchor-head">
@@ -2335,10 +2540,10 @@ resource Lean.Vir.React.ElementType</code></pre>
       </article>
         </div>
       </section>
-      <section class="anchor-group" aria-labelledby="type-anchor-group-components_and_refs">
+      <section class="anchor-group" data-anchor-group data-category="Components and refs" aria-labelledby="type-anchor-group-components_and_refs">
         <h2 class="group-title" id="type-anchor-group-components_and_refs">Components and refs</h2>
         <div class="anchors">
-      <article class="anchor" id="type-anchor-react_components_element_type" data-vir-type-anchor-hover="weak: Lean.Vir.React.ElementType -&gt; React.ElementType
+      <article class="anchor" id="type-anchor-react_components_element_type" data-anchor data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.element_type react.elementtype lean.vir.react.elementtype components and refs audit anchor from react's tag-or-component element type to vir's explicit elementtype resource." data-vir-type-anchor-hover="weak: Lean.Vir.React.ElementType -&gt; React.ElementType
 
 kind differs: Lean resource vs TypeScript union">
         <div class="anchor-head">
@@ -2374,7 +2579,7 @@ resource Lean.Vir.React.ElementType</code></pre>
         <p class="notes">kind differs: Lean resource vs TypeScript union</p>
         <p class="notes">Audit anchor from React's tag-or-component element type to VIR's explicit ElementType resource.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_components_component_type" data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.ComponentType
+      <article class="anchor" id="type-anchor-react_components_component_type" data-anchor data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.component_type react.componenttype lean.vir.react.component components and refs audit anchor from react component classes/functions to vir's lean-authored function component type." data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.ComponentType
 
 kind differs: Lean function vs TypeScript union">
         <div class="anchor-head">
@@ -2408,7 +2613,7 @@ kind differs: Lean function vs TypeScript union">React.ComponentType</a></h2>
         <p class="notes">kind differs: Lean function vs TypeScript union</p>
         <p class="notes">Audit anchor from React component classes/functions to VIR's Lean-authored function component type.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_components_jsx_element_constructor" data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.JSXElementConstructor
+      <article class="anchor" id="type-anchor-react_components_jsx_element_constructor" data-anchor data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.jsx_element_constructor react.jsxelementconstructor lean.vir.react.component components and refs audit anchor from jsx component constructors to vir's lean-authored function component type." data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.JSXElementConstructor
 
 kind differs: Lean function vs TypeScript union">
         <div class="anchor-head">
@@ -2447,7 +2652,7 @@ kind differs: Lean function vs TypeScript union">React.JSXElementConstructor</a>
         <p class="notes">kind differs: Lean function vs TypeScript union</p>
         <p class="notes">Audit anchor from JSX component constructors to VIR's Lean-authored function component type.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_components_function_component" data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.FunctionComponent
+      <article class="anchor" id="type-anchor-react_components_function_component" data-anchor data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.function_component react.functioncomponent lean.vir.react.component components and refs audit anchor from react function component call signatures to vir's lean component function." data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.FunctionComponent
 
 Represents the type of a function component. Can optionally
 receive a type argument that represents the props the component
@@ -2518,7 +2723,7 @@ kind differs: Lean function vs TypeScript record">React.FunctionComponent</a></h
 receive a type argument that represents the props the component
 accepts.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_components_fc" data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.FC
+      <article class="anchor" id="type-anchor-react_components_fc" data-anchor data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.components.fc react.fc lean.vir.react.component components and refs audit anchor for react.fc as a common alias for function components." data-vir-type-anchor-hover="weak: Lean.Vir.React.Component -&gt; React.FC
 
 Represents the type of a function component. Can optionally
 receive a type argument that represents the props the component
@@ -2563,7 +2768,7 @@ kind differs: Lean function vs TypeScript record">React.FC</a></h2>
 receive a type argument that represents the props the component
 receives.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_refs_ref" data-vir-type-anchor-hover="weak: Lean.Vir.React.Ref -&gt; React.Ref
+      <article class="anchor" id="type-anchor-react_refs_ref" data-anchor data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.refs.ref react.ref lean.vir.react.ref components and refs audit anchor from react's callback/object/null ref union to vir's javascript-owned ref resource." data-vir-type-anchor-hover="weak: Lean.Vir.React.Ref -&gt; React.Ref
 
 A union type of all possible shapes for React refs.
 
@@ -2602,7 +2807,7 @@ resource Lean.Vir.React.Ref</code></pre>
         <p class="notes">Audit anchor from React's callback/object/null ref union to VIR's JavaScript-owned Ref resource.</p>
         <p class="hover">A union type of all possible shapes for React refs.</p>
       </article>
-      <article class="anchor" id="type-anchor-react_refs_ref_object" data-vir-type-anchor-hover="weak: Lean.Vir.React.Ref -&gt; React.RefObject
+      <article class="anchor" id="type-anchor-react_refs_ref_object" data-anchor data-status="weak" data-category="Components and refs" data-relation="audit" data-search="react.refs.ref_object react.refobject lean.vir.react.ref components and refs audit anchor from react's { current } object type to vir's opaque ref resource plus get/set helpers." data-vir-type-anchor-hover="weak: Lean.Vir.React.Ref -&gt; React.RefObject
 
 kind differs: Lean resource vs TypeScript record">
         <div class="anchor-head">
@@ -2643,7 +2848,66 @@ resource Lean.Vir.React.Ref</code></pre>
       </article>
         </div>
       </section>
+        <p class="empty-state" id="anchor-empty-state">No anchors match the current filters.</p>
+      </div>
     </div>
   </main>
+  <script>
+    (() => {
+      const anchors = [...document.querySelectorAll("[data-anchor]")];
+      const links = [...document.querySelectorAll("[data-index-link]")];
+      const groups = [...document.querySelectorAll("[data-anchor-group]")];
+      const indexGroups = [...document.querySelectorAll("[data-index-group]")];
+      const search = document.getElementById("anchor-search");
+      const category = document.getElementById("anchor-category");
+      const relation = document.getElementById("anchor-relation");
+      const statuses = [...document.querySelectorAll("[data-status-filter]")];
+      const count = document.getElementById("anchor-result-count");
+      const empty = document.getElementById("anchor-empty-state");
+
+      function selectedStatuses() {
+        return new Set(statuses.filter((input) => input.checked).map((input) => input.value));
+      }
+
+      function matches(node, activeStatuses, query) {
+        if (!activeStatuses.has(node.dataset.status)) return false;
+        if (category.value && node.dataset.category !== category.value) return false;
+        if (relation.value && node.dataset.relation !== relation.value) return false;
+        return query === "" || (node.dataset.search ?? "").includes(query);
+      }
+
+      function hasVisibleChild(group, selector) {
+        return [...group.querySelectorAll(selector)].some((node) => !node.hidden);
+      }
+
+      function update() {
+        const activeStatuses = selectedStatuses();
+        const query = search.value.trim().toLowerCase();
+        let shown = 0;
+        for (const anchor of anchors) {
+          const visible = matches(anchor, activeStatuses, query);
+          anchor.hidden = !visible;
+          if (visible) shown += 1;
+        }
+        for (const link of links) {
+          link.hidden = !matches(link, activeStatuses, query);
+        }
+        for (const group of groups) {
+          group.hidden = !hasVisibleChild(group, "[data-anchor]");
+        }
+        for (const group of indexGroups) {
+          group.hidden = !hasVisibleChild(group, "[data-index-link]");
+        }
+        count.textContent = "Showing " + shown + " of " + anchors.length + " anchors";
+        empty.dataset.visible = shown === 0 ? "true" : "false";
+      }
+
+      for (const input of [search, category, relation, ...statuses]) {
+        input.addEventListener("input", update);
+        input.addEventListener("change", update);
+      }
+      update();
+    })();
+  </script>
 </body>
 </html>
