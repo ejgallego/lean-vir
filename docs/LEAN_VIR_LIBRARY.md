@@ -539,8 +539,9 @@ are narrower than exports: low-level host declarations should expose
 `Lean.Vir.JsValue` or another explicit conversion target. JavaScript
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; DOM and React-root APIs use
 `Lean.Vir.Browser.DomM α`; render construction APIs use `ReactM α`. The current
-host boundary rejects raw Lean scalar, structure, array, and list imports and is
-synchronous; returning a JavaScript `Promise` is an error. The
+host boundary rejects raw Lean scalar, structure, array, list, option, and
+product imports and is synchronous; returning a JavaScript `Promise` is an
+error. The
 current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.
