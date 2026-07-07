@@ -162,8 +162,9 @@ without a package-owned signature fail.
 Package format 7 also records host-import arity, erased-prefix count, effect,
 and manifest type descriptors for Lean-to-JavaScript calls. The shim uses the
 arity/effect metadata to send borrowed Lean object arguments through
-`env.vir_js_call_objects`, and JavaScript uses the manifest descriptors to lift
-arguments and lower the owned Lean object result. Package format 8 adds the
+`env.vir_js_call_objects`, and JavaScript uses the interface value codec
+descriptors to lift arguments and lower the owned Lean object result. Package
+format 8 adds the
 opaque `leanObject` descriptor for generic LeanRef object handles, surfaced to
 Lean as `Lean.Vir.JSL α` so they do not typecheck as JavaScript-shaped `Js α`
 resources. The shim caches export signature summaries by package generation
@@ -390,8 +391,8 @@ by Lean itself.
 ## Future Wasm Interfaces
 
 The closure/resource bridge is intentionally conservative for `wasm32-wasip1`.
-Ordinary scalar and structured values still use the generic linear-memory byte
-payload dispatcher. Opaque resources cross the JS/Wasm boundary through
+Ordinary scalar and structured values use the interface value codec over the
+object ABI. Opaque resources cross the JS/Wasm boundary through
 `externref` side-channel imports, and Lean stores them as GC-finalized external
 objects that root JavaScript `HostResource` objects in the host runtime.
 `WIRE.FUNCTION` likewise avoids a serialized numeric token; Lean closures remain

@@ -28,14 +28,26 @@ in ordinary host imports. The supported boundary lanes are:
 | `Lean.Vir.Js.Nullable α` | JavaScript-owned nullable resource | `wire` | Pass JavaScript `null`/value results without generic Lean `Option` lowering. |
 | `Lean.Vir.JSL α` | JavaScript handle to a retained Lean-owned value | `objectHandle` | Let JavaScript store or route Lean values without structural conversion. |
 | Explicit conversion declarations | One side `Lean.Vir.Js ...`, one side an ordinary Lean value | `explicitConversion` | Decode or encode values at named host bindings such as `js.string.value` or `js.value.react.property`. |
-| Wire scalars and containers | JavaScript caller to exported Lean entrypoints | export ABI | Call public Lean functions from JavaScript without a host-import wrapper. |
+| Structural interface values | JavaScript caller to exported Lean entrypoints | interface value codec | Call public Lean functions from JavaScript without a host-import wrapper. |
 
 The package manifest records each host import boundary as `wire`,
 `explicitConversion`, or `objectHandle`, and the runtime dispatches them through
 the corresponding path. Explicit conversion declarations use
 `@[vir_js_explicit_conversion "..."]`; package generation validates their
 generic shape, and the JavaScript runtime still requires a matching host binding
-for the declared target.
+for the declared target. The manifest also records structural descriptor tags
+for exported Lean entrypoints; those tags belong to the interface value codec,
+not to the ordinary host-import `wire` boundary.
+
+For host imports, the relevant descriptor family is:
+
+| Descriptor | Ordinary `wire` import | Other accepted path |
+| --- | --- | --- |
+| `WIRE.UNIT` | Argument or result | `js.leanRef.release` result |
+| `WIRE.RESOURCE` | Argument or result | Explicit conversions and `JSL` handles use the generic `Js` resource shape. |
+| `WIRE.FUNCTION` | Argument only | Callback arguments/results must be `WIRE.UNIT` or `WIRE.RESOURCE`. |
+| `WIRE.LEAN_OBJECT` | No | Only the `js.leanRef` / `js.leanRef.value` object-handle imports. |
+| Structural descriptors such as `WIRE.NAT`, `WIRE.STRING`, `WIRE.ARRAY`, and `WIRE.STRUCTURE` | No | Only JavaScript-to-Lean exports or declarations marked with `@[vir_js_explicit_conversion]`. |
 
 For example, a package can define a named conversion for a Lean structure when
 the JavaScript host binding wants to inspect that structure and return a real

@@ -297,8 +297,8 @@ The JavaScript-to-Lean export surface and the Lean-to-JavaScript host-import
 surface are intentionally different.
 
 Exported Lean declarations can use the ordinary value types listed above. The
-runtime lowers JavaScript values into Lean objects and lifts Lean results back
-to JavaScript values.
+runtime uses the interface value codec to lower JavaScript values into Lean
+objects and lift Lean results back to JavaScript values.
 
 Declarations marked with `@[vir_js "..."]` are lower-level host imports. They
 must expose `Unit`, JavaScript resource types such as `Lean.Vir.Js α`,

@@ -93,7 +93,7 @@ npm run inspect:irpkg -- <package.irpkg>
 
 Add `--json` to emit the parsed package header and full embedded manifest.
 
-## Supported Interface Surface
+## Interface Value Codec Surface
 
 The embedded manifest currently supports:
 
@@ -120,10 +120,17 @@ The embedded manifest currently supports:
 - `Lean.Vir.React.Node`, represented as an opaque `Lean.Vir.Js` resource whose
   native React node is constructed by the React host bindings.
 
-The numeric `wireTag` table is part of the package ABI. Lean assigns tags in
-`Vir.GeneratePackage.Interface.Encode`; JavaScript validates and dispatches
-them in `web/src/runtime/wire-tags.js`. Run `npm run check:package-abi` after
-editing either side.
+This broad surface is the interface value codec used by JavaScript-to-Lean
+exports and by declarations explicitly marked as conversions. It is not the
+ordinary Lean-to-JavaScript host-import `wire` boundary, which is deliberately
+narrower and accepts only `Unit`, resources, and resource-shaped callbacks.
+
+The numeric descriptor tag table is part of the package ABI. The JSON field is
+still named `wireTag` for package compatibility, but these tags describe the
+interface value codec, not the ordinary host-import `wire` mode. Lean assigns
+tags in `Vir.GeneratePackage.Interface.Encode`; JavaScript validates and
+dispatches them in `web/src/runtime/wire-tags.js`. Run
+`npm run check:package-abi` after editing either side.
 
 | Tag | JavaScript name | Lean interface type | Descriptor payload |
 | --- | --- | --- | --- |
@@ -152,6 +159,7 @@ editing either side.
 | 24 | `WIRE.FUNCTION` | Callback function type | Argument descriptors, result descriptor, effect label. |
 | 25 | `WIRE.CUSTOM_INDUCTIVE` | Non-indexed custom inductive | Constructor descriptors and field layouts. |
 | 26 | `WIRE.RECURSIVE_SELF` | Recursive reference | Referenced owner name. |
+| 27 | `WIRE.LEAN_OBJECT` | Opaque retained Lean object | Object-handle boundary descriptor. |
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
@@ -255,12 +263,12 @@ so calls back into Lean lower arguments to owned objects and lift the owned obje
 result using JavaScript-side manifest metadata.
 
 Package loading validates every exported argument/result type before exposing
-the manifest to the UI or JS caller. The validator rejects unsupported wire
-tags, malformed recursive children, invalid enum constructors, inconsistent
-structure field layouts, bad `trivialFieldIndex` values, and duplicate export
-names. Runtime tests also round-trip every generated export type through the
-compact descriptor encoder/decoder so descriptor drift fails before a call
-enters WASM.
+the manifest to the UI or JS caller. The validator rejects unsupported
+descriptor tags, malformed recursive children, invalid enum constructors,
+inconsistent structure field layouts, bad `trivialFieldIndex` values, and
+duplicate export names. Runtime tests also round-trip every generated export
+type through the compact descriptor encoder/decoder so descriptor drift fails
+before a call enters WASM.
 
 The package generator also rejects ambiguous source-time names before writing a
 package. Different source targets in the same generator run must not define the
@@ -275,9 +283,9 @@ runtime validates the embedded manifest before exposing entries. For format 7
 and newer packages, the WASM shim uses the package-owned compact export
 signature table to validate object calls for `vir_call_resolved_objects`.
 Host-import dispatch uses package-owned arity/effect metadata, while
-JavaScript uses the manifest descriptors for argument/result conversion.
-Closure roots likewise store only arity/effect metadata; JavaScript keeps the
-full callback descriptor.
+JavaScript uses the interface value codec descriptors for argument/result
+conversion. Closure roots likewise store only arity/effect metadata;
+JavaScript keeps the full callback descriptor.
 
 This is acceptable for the current generated demo packages and local developer
 packages. It is not a hardened boundary for arbitrary remote `.irpkg` files.

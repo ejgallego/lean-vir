@@ -35,8 +35,9 @@ Targets have one of three modes:
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface`: compatibility import shim for the split
   interface modules.
-- `Vir.GeneratePackage.Interface.Encode`: interface labels, wire tags, and
-  descriptor JSON encoders.
+- `Vir.GeneratePackage.Interface.Encode`: interface labels, descriptor tags,
+  and descriptor JSON encoders. The JSON field remains `wireTag` for package
+  compatibility.
 - `Vir.GeneratePackage.Interface.Classify`: compatibility import shim for the
   classifier modules.
 - `Vir.GeneratePackage.Interface.Classify.Basic`: shared classifier helpers,
@@ -91,7 +92,7 @@ Targets have one of three modes:
 Use the smallest focused check that covers the edited boundary, then rely on CI
 for the full matrix.
 
-- Interface descriptor JSON or wire tags:
+- Interface descriptor JSON or descriptor tags:
   `npm run check:package-abi`, `lake build vir_irpkg`, and
   `npm run test:runtime -- package-generation`.
 - Interface type classification, abbrev unfolding, structures, inductives,
