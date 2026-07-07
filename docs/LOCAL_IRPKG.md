@@ -113,7 +113,7 @@ dev.html?package=local-quickstart.irpkg&entry=Quickstart.total
 The manifest includes package metadata plus one entry per export with its Lean
 declaration name, JavaScript name, argument types, result type, and recursive
 type tree. It also includes `hostImports` for Lean declarations marked with
-`@[vir_js "..."]`, including their `wire`, `explicitConversion`, or `objectHandle`
+`@[vir_js "..."]`, including their `hostResource`, `explicitConversion`, or `objectHandle`
 host boundary.
 JavaScript validates inputs against that manifest, lowers values to owned Lean
 objects with `vir_obj_*` helpers, and calls
@@ -159,8 +159,9 @@ explicit wasm32 boundary diagnostic.
 Pure functions and recognized synchronous effects are supported on both
 exported entrypoints and host imports. JavaScript resource/runtime APIs use
 `Lean.Vir.RuntimeM α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
-render-construction APIs use `Lean.Vir.React.ReactM α`. Host imports are
-narrower than exports: low-level JavaScript imports should expose
+render-construction APIs use `Lean.Vir.React.ReactM α`. Exported entrypoints
+use the structural interface value codec; host imports are narrower than
+exports: low-level JavaScript imports should expose
 `Unit`, `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources,
 callback arguments whose own arguments/results are `Unit` or resources, or
 built-in named conversion targets. Nested callback arguments are rejected. Raw

@@ -45,7 +45,7 @@ try {
   const codec = modules["runtime/vir-codec.js"];
   const reactNode = modules["react/vir-react-node.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
-  const wireTags = modules["runtime/wire-tags.js"];
+  const interfaceTags = modules["runtime/interface-tags.js"];
 
   assert.equal(typeof runtime.createVirRuntime, "function");
   assert.equal(typeof runtime.roundTripInterfaceTypeDescriptor, "function");
@@ -58,13 +58,16 @@ try {
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof reactNode.virtualReactTextContent, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
-  assert.equal(wireTags.WIRE.NAT, 0);
+  assert.equal(typeof runtime.sameInterfaceTypeDescriptor, "function");
+  assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);
+  assert.equal(interfaceTags.SUPPORTED_INTERFACE_TAGS.has(interfaceTags.INTERFACE_TAG.NAT), true);
+  assert.equal(interfaceTags.JSON_INPUT_INTERFACE_TAGS.has(interfaceTags.INTERFACE_TAG.ARRAY), true);
 
   const decoded = runtime.roundTripInterfaceTypeDescriptor({
     type: "Nat",
-    wireTag: wireTags.WIRE.NAT,
+    interfaceTag: interfaceTags.INTERFACE_TAG.NAT,
   });
-  assert.deepEqual(decoded, { wireTag: wireTags.WIRE.NAT });
+  assert.deepEqual(decoded, { interfaceTag: interfaceTags.INTERFACE_TAG.NAT });
 } finally {
   await rm(isolatedDir, { recursive: true, force: true });
 }

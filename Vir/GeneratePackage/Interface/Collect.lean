@@ -76,11 +76,11 @@ def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : Interf
 def boxedBoundaryDiagnostic (name : Name) : String :=
   s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
 
-def InterfaceType.isGenericJsResourceWire : InterfaceType → Bool
+def InterfaceType.isGenericJsResource : InterfaceType → Bool
   | .resource name label => name == `Lean.Vir.Js && label == "Js"
   | _ => false
 
-def InterfaceType.isLeanObjectWire : InterfaceType → Bool
+def InterfaceType.isLeanObjectHandle : InterfaceType → Bool
   | .leanObject => true
   | _ => false
 
@@ -118,18 +118,18 @@ def InterfaceType.hostBoundaryKind : InterfaceType → String
   | .function .. => "callback"
   | .leanObject => "opaque Lean object"
 
-def InterfaceType.isHostWireValueType : InterfaceType → Bool
+def InterfaceType.isHostResourceValueType : InterfaceType → Bool
   | .unit => true
   | .resource .. => true
   | _ => false
 
-def InterfaceType.isHostWireArgType : InterfaceType → Bool
+def InterfaceType.isHostResourceArgType : InterfaceType → Bool
   | .function args result _ =>
-      args.all (fun (_, ty) => ty.isHostWireValueType) && result.isHostWireValueType
-  | ty => ty.isHostWireValueType
+      args.all (fun (_, ty) => ty.isHostResourceValueType) && result.isHostResourceValueType
+  | ty => ty.isHostResourceValueType
 
-def InterfaceType.isHostWireResultType (ty : InterfaceType) : Bool :=
-  ty.isHostWireValueType
+def InterfaceType.isHostResourceResultType (ty : InterfaceType) : Bool :=
+  ty.isHostResourceValueType
 
 def isJsValueConversionSignature
     (args : Array InterfaceArg)
@@ -141,8 +141,8 @@ def isJsValueConversionSignature
     match args[0]? with
     | some arg =>
         args.size == 1 &&
-          ((arg.type.isGenericJsResourceWire && result.isExplicitConversionValue) ||
-            (arg.type.isExplicitConversionValue && result.isGenericJsResourceWire))
+          ((arg.type.isGenericJsResource && result.isExplicitConversionValue) ||
+            (arg.type.isExplicitConversionValue && result.isGenericJsResource))
     | none => false
 
 def isLeanObjectHandleSignature
@@ -154,22 +154,22 @@ def isLeanObjectHandleSignature
     false
   else
     match target, args[0]? with
-    | "js.leanRef", some arg => args.size == 1 && arg.type.isLeanObjectWire && result.isGenericJsResourceWire
-    | "js.leanRef.value", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result.isLeanObjectWire
-    | "js.leanRef.release", some arg => args.size == 1 && arg.type.isGenericJsResourceWire && result == .unit
+    | "js.leanRef", some arg => args.size == 1 && arg.type.isLeanObjectHandle && result.isGenericJsResource
+    | "js.leanRef.value", some arg => args.size == 1 && arg.type.isGenericJsResource && result.isLeanObjectHandle
+    | "js.leanRef.release", some arg => args.size == 1 && arg.type.isGenericJsResource && result == .unit
     | _, _ => false
 
 def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
   s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Unit`, `Lean.Vir.Js ...`, `Lean.Vir.Js.Nullable ...`, top-level callback arguments, or explicit conversion calls"
 
 def hostImportArgBoundaryDiagnostic? (arg : InterfaceArg) : Option String :=
-  if arg.type.isHostWireArgType then
+  if arg.type.isHostResourceArgType then
     none
   else
     some s!"unsupported JavaScript import argument `{arg.name}`: {hostBoundaryTypeDiagnostic arg.type}"
 
 def hostImportResultBoundaryDiagnostic? (result : InterfaceType) : Option String :=
-  if result.isHostWireResultType then
+  if result.isHostResourceResultType then
     none
   else
     some s!"unsupported JavaScript import result: {hostBoundaryTypeDiagnostic result}"
@@ -191,7 +191,7 @@ def hostImportBoundary
     match args.findSome? hostImportArgBoundaryDiagnostic? <|>
         hostImportResultBoundaryDiagnostic? result with
     | some reason => .error reason
-    | none => .ok .wire
+    | none => .ok .hostResource
 
 def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except PackageDiagnostic InterfaceExport) := do

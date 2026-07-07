@@ -75,19 +75,21 @@ sequenceDiagram
     JS->>RT: vir.call("entry", ...args)
     RT->>RT: lookup manifest entry
     RT->>Wasm: vir_resolve_call(name) on first use
-    RT->>Codec: normalize args with manifest descriptors
+    RT->>Codec: normalize args with interface descriptors
     RT->>Obj: lower args to Lean objects with vir_obj_* exports
     RT->>Wasm: vir_call_resolved_objects(slot, argv, argc)
     Wasm->>IR: evaluate packaged Lean declaration
     IR-->>Wasm: Lean result object
     Wasm-->>RT: result object
     RT->>Obj: inspect result object with vir_obj_* exports
-    RT->>Codec: lift result using manifest descriptor
+    RT->>Codec: lift result using interface descriptor
     RT-->>JS: JavaScript value
 ```
 
-The runtime uses the object ABI for manifest calls; it resolves each entry once
-and then calls `vir_call_resolved_objects(slot, ...)`.
+The runtime uses the interface value codec plus the object ABI for exported
+manifest calls. It resolves each entry once, lowers JavaScript values according
+to the export descriptors, and then calls
+`vir_call_resolved_objects(slot, ...)`.
 
 ## Lean-To-JavaScript Host Import Flow
 
@@ -267,7 +269,7 @@ Use this checklist when adding a new host-backed primitive:
    `Vir/GeneratePackage/Interface/Classify/Signature.lean` validate the
    argument and result types.
 4. Add the JavaScript binding in the relevant host module.
-5. If the binding retains a callback or host object, wire its cleanup into
+5. If the binding retains a callback or host object, connect its cleanup to
    `HostResourceState` or an equivalent disposer.
 6. Add runtime tests for the happy path, stale/released resources, package
    reload, and runtime disposal.

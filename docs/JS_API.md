@@ -94,7 +94,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `react/vir-react-hooks.js` | Shared React component hook runtime and typed state setter host bindings. |
 | `vir-react-host-bindings.js` | Browser React root/component/hook bindings; imports `react` and `react-dom/client`. |
 | `runtime/interface-manifest.js` | Manifest validation, diagnostics, and type formatting helpers. |
-| `runtime/wire-tags.js` | Shared wire tag constants and JSON-input tag set. |
+| `runtime/interface-tags.js` | Shared interface descriptor tag constants and JSON-input tag set. |
 
 Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
 `lean-vir/host-bindings`, or `lean-vir/react-host-bindings`. React browser
@@ -206,17 +206,20 @@ with nullary or runtime-payload constructors, opaque host resources, and
 objects; the `α` parameter is not decoded while the value remains in the JS
 object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
 and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
-boundary. Host imports may additionally receive Lean function values as
-callbacks, including event handlers retained by `Lean.Vir.React.Node` resources
-created through `react.node.createElement`. Host imports are narrower than
-exports: low-level JavaScript imports use `Unit`, `Lean.Vir.Js α` resources,
+boundary.
+
+The broad structural surface above is the interface value codec for
+JavaScript-to-Lean export calls. Host imports are narrower than exports:
+low-level JavaScript imports use `Unit`, `Lean.Vir.Js α` resources,
 `Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callback arguments
 whose own arguments/results are `Unit` or resources, or explicit conversion targets such as
 `js.nat.value`; concrete Lean-owned values can also opt into the
 `js.leanRef`/`js.leanRef.value`/`js.leanRef.release` object-handle boundary,
 which stores the Lean object behind a `Lean.Vir.JSL α` resource instead of
 decoding it to JavaScript. `LeanRef.releaseJSL` deterministically releases a
-handle.
+handle. Host imports may additionally receive Lean function values as
+callbacks, including event handlers retained by `Lean.Vir.React.Node` resources
+created through `react.node.createElement`.
 Other raw Lean scalar, structure, array, list, option, and product imports are
 rejected by package generation.
 Exported Lean entrypoints and host imports may be pure or use a
@@ -292,8 +295,8 @@ inner expression; metadata results preserve a structural `mdata` wrapper.
 
 Package loading validates the embedded interface manifest before any generated
 entry is exposed. Malformed type trees, invalid structure layouts, unsupported
-wire tags, duplicate export names, and bad enum constructor metadata are
-reported as package-load errors.
+interface descriptor tags, duplicate export names, and bad enum constructor
+metadata are reported as package-load errors.
 
 ## Lean To JavaScript Host Imports
 

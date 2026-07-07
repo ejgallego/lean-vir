@@ -5,18 +5,18 @@ Author: Emilio J. Gallego Arias
 */
 
 import { formatInterfaceEffectPrefix, requireInterfaceEffect } from "./interface-effects.js";
-import { SUPPORTED_WIRE_TAGS, WIRE } from "./wire-tags.js";
+import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./interface-tags.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 5;
+export const INTERFACE_MANIFEST_VERSION = 6;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
-  WIRE: "wire",
+  HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle",
 });
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
-  "embedded interface manifest must be { version: 5, metadata: {...}, exports: [...] }";
+  "embedded interface manifest must be { version: 6, metadata: {...}, exports: [...] }";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -106,7 +106,7 @@ function validateManifestHostImports(hostImports) {
 
 function requireHostImportBoundary(value, label) {
   if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be wire, explicitConversion, or objectHandle`);
+    throw new Error(`${label} must be hostResource, explicitConversion, or objectHandle`);
   }
 }
 
@@ -122,41 +122,41 @@ export function validateInterfaceType(type, label = "interface type") {
     throw new Error(`${label} must be an object`);
   }
   requireString(type.type, `${label}.type`);
-  if (!Number.isInteger(type.wireTag) || !SUPPORTED_WIRE_TAGS.has(type.wireTag)) {
-    throw new Error(`${label}.wireTag is not supported`);
+  if (!Number.isInteger(type.interfaceTag) || !SUPPORTED_INTERFACE_TAGS.has(type.interfaceTag)) {
+    throw new Error(`${label}.interfaceTag is not supported`);
   }
-  switch (type.wireTag) {
-    case WIRE.SIMPLE_ENUM:
+  switch (type.interfaceTag) {
+    case INTERFACE_TAG.SIMPLE_ENUM:
       validateSimpleEnumType(type, label);
       break;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       validateInterfaceType(type.element, `${label}.element`);
       break;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       validateInterfaceType(type.fst, `${label}.fst`);
       validateInterfaceType(type.snd, `${label}.snd`);
       break;
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       validateStructureType(type, label);
       break;
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       validateTaggedUnionType(type, label);
       break;
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       validateCustomInductiveType(type, label);
       break;
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       validateRecursiveSelfType(type, label);
       break;
-    case WIRE.RESOURCE:
+    case INTERFACE_TAG.RESOURCE:
       validateResourceType(type, label);
       break;
-    case WIRE.FUNCTION:
+    case INTERFACE_TAG.FUNCTION:
       validateFunctionType(type, label);
       break;
-    case WIRE.LEAN_OBJECT:
+    case INTERFACE_TAG.LEAN_OBJECT:
       validateLeanObjectType(type, label);
       break;
     default:
@@ -208,7 +208,7 @@ function validateStructureType(type, label) {
       throw new Error(`${fieldLabel}.subobject must be a boolean`);
     }
     if (field.subobject === true) {
-      if (field.type?.wireTag !== WIRE.STRUCTURE) {
+      if (field.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE) {
         throw new Error(`${fieldLabel}.subobject field type must be a structure`);
       }
       if (field.layout?.kind !== "object") {
@@ -335,35 +335,35 @@ function validateRecursiveSelfType(type, label) {
 }
 
 function validateRecursiveSelfOwner(type, ownerName, label) {
-  switch (type?.wireTag) {
-    case WIRE.RECURSIVE_SELF:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.RECURSIVE_SELF:
       if (type.name !== ownerName) {
         throw new Error(`${label}.name must match ${ownerName}`);
       }
       break;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       validateRecursiveSelfOwner(type.element, ownerName, `${label}.element`);
       break;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       validateRecursiveSelfOwner(type.fst, ownerName, `${label}.fst`);
       validateRecursiveSelfOwner(type.snd, ownerName, `${label}.snd`);
       break;
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       // A complete nested structure descriptor owns any recursiveSelf markers
       // below it; validateStructureType has already checked that owner locally.
       break;
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       for (const ctor of type.constructors ?? []) {
         validateRecursiveSelfOwner(ctor.type, ownerName, `${label}.${ctor.jsName}`);
       }
       break;
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       // A complete nested custom inductive descriptor owns any recursiveSelf
       // markers below it; validateCustomInductiveType has checked them locally.
       break;
-    case WIRE.FUNCTION:
+    case INTERFACE_TAG.FUNCTION:
       for (const arg of type.args ?? []) {
         validateRecursiveSelfOwner(arg.type, ownerName, `${label}.${arg.name}`);
       }
@@ -375,24 +375,24 @@ function validateRecursiveSelfOwner(type, ownerName, label) {
 }
 
 function validateNoDanglingRecursiveSelf(type, label) {
-  switch (type?.wireTag) {
-    case WIRE.RECURSIVE_SELF:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.RECURSIVE_SELF:
       throw new Error(`${label} cannot be recursiveSelf outside a recursive descriptor`);
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       validateNoDanglingRecursiveSelf(type.element, `${label}.element`);
       break;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       validateNoDanglingRecursiveSelf(type.fst, `${label}.fst`);
       validateNoDanglingRecursiveSelf(type.snd, `${label}.snd`);
       break;
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       for (const ctor of type.constructors ?? []) {
         validateNoDanglingRecursiveSelf(ctor.type, `${label}.${ctor.jsName}`);
       }
       break;
-    case WIRE.FUNCTION:
+    case INTERFACE_TAG.FUNCTION:
       for (const arg of type.args ?? []) {
         validateNoDanglingRecursiveSelf(arg.type, `${label}.${arg.name}`);
       }
@@ -473,33 +473,33 @@ export function manifestDiagnostics(manifest) {
 }
 
 export function formatInterfaceType(type) {
-  switch (type?.wireTag) {
-    case WIRE.UNIT:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.UNIT:
       return "Unit";
-    case WIRE.SIMPLE_ENUM:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       return type.type ?? "Enum";
-    case WIRE.ARRAY:
+    case INTERFACE_TAG.ARRAY:
       return `Array<${formatInterfaceType(type.element)}>`;
-    case WIRE.LIST:
+    case INTERFACE_TAG.LIST:
       return `List<${formatInterfaceType(type.element)}>`;
-    case WIRE.OPTION:
+    case INTERFACE_TAG.OPTION:
       return `Option<${formatInterfaceType(type.element)}>`;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return `Prod<${formatInterfaceType(type.fst)}, ${formatInterfaceType(type.snd)}>`;
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       return type.type ?? type.name ?? "Structure";
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       return type.type ?? type.name ?? "TaggedUnion";
-    case WIRE.CUSTOM_INDUCTIVE:
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return type.type ?? type.name ?? "Recursive";
-    case WIRE.RESOURCE:
+    case INTERFACE_TAG.RESOURCE:
       return type.type ?? type.name ?? "Resource";
-    case WIRE.LEAN_OBJECT:
+    case INTERFACE_TAG.LEAN_OBJECT:
       return type.type ?? "LeanObject";
-    case WIRE.FUNCTION:
+    case INTERFACE_TAG.FUNCTION:
       return `(${(type.args ?? []).map((arg) => formatInterfaceType(arg.type)).join(", ")}) -> ${formatInterfaceEffectPrefix(type.effect)}${formatInterfaceType(type.result)}`;
     default:
-      return type?.type ?? `wireTag ${type?.wireTag ?? "?"}`;
+      return type?.type ?? `interfaceTag ${type?.interfaceTag ?? "?"}`;
   }
 }

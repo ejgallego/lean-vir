@@ -8,7 +8,8 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
-import { WIRE, SUPPORTED_WIRE_TAGS } from "../web/src/runtime/wire-tags.js";
+import { INTERFACE_TAG, SUPPORTED_INTERFACE_TAGS } from "../web/src/runtime/interface-tags.js";
+import { HOST_IMPORT_BOUNDARY } from "../web/src/runtime/interface-manifest.js";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
@@ -25,30 +26,52 @@ function leanNatConstant(source, name) {
   return Number(match[1]);
 }
 
-function leanCtorToWireKey(name) {
+function leanCtorToConstantKey(name) {
   return name.replace(/([a-z0-9])([A-Z])/g, "$1_$2").toUpperCase();
 }
 
-function leanWireTags(source) {
-  const start = source.indexOf("def InterfaceType.wireTag");
+function leanInterfaceTags(source) {
+  const start = source.indexOf("def InterfaceType.interfaceTag");
   if (start < 0) {
-    throw new Error("missing Lean InterfaceType.wireTag definition");
+    throw new Error("missing Lean InterfaceType.interfaceTag definition");
   }
   const end = source.indexOf("\n\n", start);
   const block = source.slice(start, end < 0 ? undefined : end);
   const tags = new Map();
   for (const match of block.matchAll(/\|\s+\.([A-Za-z0-9_]+)\b[^=]*=>\s*(\d+)/g)) {
-    const key = leanCtorToWireKey(match[1]);
+    const key = leanCtorToConstantKey(match[1]);
     const value = Number(match[2]);
     if (tags.has(key)) {
-      throw new Error(`duplicate Lean wire tag key ${key}`);
+      throw new Error(`duplicate Lean interface descriptor tag key ${key}`);
     }
     tags.set(key, value);
   }
   if (tags.size === 0) {
-    throw new Error("Lean InterfaceType.wireTag definition had no parseable cases");
+    throw new Error("Lean InterfaceType.interfaceTag definition had no parseable cases");
   }
   return tags;
+}
+
+function leanHostImportBoundaries(source) {
+  const start = source.indexOf("def HostImportBoundary.label");
+  if (start < 0) {
+    throw new Error("missing Lean HostImportBoundary.label definition");
+  }
+  const end = source.indexOf("\n\n", start);
+  const block = source.slice(start, end < 0 ? undefined : end);
+  const boundaries = new Map();
+  for (const match of block.matchAll(/\|\s+\.([A-Za-z0-9_]+)\b\s*=>\s*"([^"]+)"/g)) {
+    const key = leanCtorToConstantKey(match[1]);
+    const value = match[2];
+    if (boundaries.has(key)) {
+      throw new Error(`duplicate Lean host import boundary key ${key}`);
+    }
+    boundaries.set(key, value);
+  }
+  if (boundaries.size === 0) {
+    throw new Error("Lean HostImportBoundary.label definition had no parseable cases");
+  }
+  return boundaries;
 }
 
 function duplicateValues(entries, label) {
@@ -63,7 +86,7 @@ function duplicateValues(entries, label) {
     }
   }
   if (duplicates.length !== 0) {
-    throw new Error(`${label} has duplicate wire tag values: ${duplicates.join("; ")}`);
+    throw new Error(`${label} has duplicate descriptor tag values: ${duplicates.join("; ")}`);
   }
 }
 
@@ -89,32 +112,57 @@ if (!Number.isSafeInteger(RUNTIME_ABI_VERSION) || RUNTIME_ABI_VERSION < 1) {
 }
 
 const interfaceSource = await readRepoText("Vir/GeneratePackage/Interface/Encode.lean");
-const leanTags = leanWireTags(interfaceSource);
-const jsTags = new Map(Object.entries(WIRE));
+const leanTags = leanInterfaceTags(interfaceSource);
+const jsTags = new Map(Object.entries(INTERFACE_TAG));
 
-duplicateValues(leanTags, "Lean InterfaceType.wireTag");
-duplicateValues(jsTags, "JavaScript WIRE");
+duplicateValues(leanTags, "Lean InterfaceType.interfaceTag");
+duplicateValues(jsTags, "JavaScript INTERFACE_TAG");
 
 for (const [key, value] of jsTags) {
   if (!leanTags.has(key)) {
-    throw new Error(`JavaScript WIRE.${key} is missing from Lean InterfaceType.wireTag`);
+    throw new Error(`JavaScript INTERFACE_TAG.${key} is missing from Lean InterfaceType.interfaceTag`);
   }
   if (leanTags.get(key) !== value) {
-    throw new Error(`wire tag mismatch for ${key}: Lean=${leanTags.get(key)} JavaScript=${value}`);
+    throw new Error(`interface descriptor tag mismatch for ${key}: Lean=${leanTags.get(key)} JavaScript=${value}`);
   }
-  if (!SUPPORTED_WIRE_TAGS.has(value)) {
-    throw new Error(`SUPPORTED_WIRE_TAGS is missing WIRE.${key}=${value}`);
+  if (!SUPPORTED_INTERFACE_TAGS.has(value)) {
+    throw new Error(`SUPPORTED_INTERFACE_TAGS is missing INTERFACE_TAG.${key}=${value}`);
   }
 }
 
 for (const [key] of leanTags) {
   if (!jsTags.has(key)) {
-    throw new Error(`Lean InterfaceType.wireTag case ${key} is missing from JavaScript WIRE`);
+    throw new Error(`Lean InterfaceType.interfaceTag case ${key} is missing from JavaScript INTERFACE_TAG`);
   }
 }
 
-if (SUPPORTED_WIRE_TAGS.size !== jsTags.size) {
-  throw new Error(`SUPPORTED_WIRE_TAGS has ${SUPPORTED_WIRE_TAGS.size} entries; WIRE has ${jsTags.size}`);
+if (SUPPORTED_INTERFACE_TAGS.size !== jsTags.size) {
+  throw new Error(`SUPPORTED_INTERFACE_TAGS has ${SUPPORTED_INTERFACE_TAGS.size} entries; INTERFACE_TAG has ${jsTags.size}`);
 }
 
-console.log(`package ABI guardrails ok: versions and ${jsTags.size} wire tags agree`);
+const interfaceBasicSource = await readRepoText("Vir/GeneratePackage/Basic.lean");
+const leanBoundaries = leanHostImportBoundaries(interfaceBasicSource);
+const jsBoundaries = new Map(Object.entries(HOST_IMPORT_BOUNDARY));
+
+duplicateValues(leanBoundaries, "Lean HostImportBoundary.label");
+duplicateValues(jsBoundaries, "JavaScript HOST_IMPORT_BOUNDARY");
+
+for (const [key, value] of jsBoundaries) {
+  if (!leanBoundaries.has(key)) {
+    throw new Error(`JavaScript HOST_IMPORT_BOUNDARY.${key} is missing from Lean HostImportBoundary.label`);
+  }
+  if (leanBoundaries.get(key) !== value) {
+    throw new Error(`host import boundary mismatch for ${key}: Lean=${leanBoundaries.get(key)} JavaScript=${value}`);
+  }
+}
+
+for (const [key] of leanBoundaries) {
+  if (!jsBoundaries.has(key)) {
+    throw new Error(`Lean HostImportBoundary.label case ${key} is missing from JavaScript HOST_IMPORT_BOUNDARY`);
+  }
+}
+
+console.log(
+  `package ABI guardrails ok: versions, ${jsTags.size} interface descriptor tags, and ` +
+  `${jsBoundaries.size} host import boundaries agree`,
+);

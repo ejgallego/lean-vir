@@ -38,7 +38,7 @@ def InterfaceType.label : InterfaceType → String
   | .expr => "Lean.Expr"
   | .leanObject => "LeanObject"
 
-def InterfaceType.wireTag : InterfaceType → Nat
+def InterfaceType.interfaceTag : InterfaceType → Nat
   | .unit => 22
   | .nat => 0
   | .int => 1
@@ -97,28 +97,28 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
   | .array element =>
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "array"),
         ("element", element.toJson)
       ]
   | .list element =>
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "list"),
         ("element", element.toJson)
       ]
   | .option element =>
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "option"),
         ("element", element.toJson)
       ]
   | .prod fst snd =>
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "prod"),
         ("fst", fst.toJson),
         ("snd", snd.toJson)
@@ -132,7 +132,7 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ]
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "simpleEnum"),
         ("constructors", jsonArray ctorJson)
       ]
@@ -150,7 +150,7 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ]
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "taggedUnion"),
         ("name", jsonName name),
         ("constructors", jsonArray ctorJson)
@@ -158,7 +158,7 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
   | .recursiveSelf name _ =>
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "recursiveSelf"),
         ("name", jsonName name)
       ]
@@ -181,7 +181,7 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ]
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "customInductive"),
         ("name", jsonName name),
         ("constructors", jsonArray ctorJson)
@@ -198,7 +198,7 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         jsonObject fieldFields
       let structureFields := #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "structure"),
         ("name", jsonName name),
         ("objectFieldCount", jsonNat objectFields),
@@ -213,7 +213,7 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
   | .resource name _ =>
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "resource"),
         ("name", jsonName name)
       ]
@@ -225,7 +225,7 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ]
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "function"),
         ("effect", jsonString effect.label),
         ("args", jsonArray argJson),
@@ -234,13 +234,13 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
   | .leanObject =>
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag),
+        ("interfaceTag", jsonNat ty.interfaceTag),
         ("kind", jsonString "leanObject")
       ]
   | _ =>
       jsonObject #[
         ("type", jsonString ty.label),
-        ("wireTag", jsonNat ty.wireTag)
+        ("interfaceTag", jsonNat ty.interfaceTag)
       ]
 
 end Vir.GeneratePackage

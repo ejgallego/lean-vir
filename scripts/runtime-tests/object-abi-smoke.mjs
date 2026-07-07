@@ -16,7 +16,7 @@ import {
 import {
   createHostResourceState,
 } from "../../web/src/host/vir-host-resources.js";
-import { WIRE } from "../../web/src/runtime/wire-tags.js";
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
 
 const { wasmBytes, irPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();
@@ -118,15 +118,15 @@ function withCallLaneCounters(runtime, body) {
   }
 }
 
-const resourceType = { type: "Resource", wireTag: WIRE.RESOURCE };
-const jsResourceType = { type: "Js", wireTag: WIRE.RESOURCE, kind: "resource", name: "Lean.Vir.Js" };
-const leanObjectType = { type: "LeanObject", wireTag: WIRE.LEAN_OBJECT, kind: "leanObject" };
-const unitType = { type: "Unit", wireTag: WIRE.UNIT };
-const stringType = { type: "String", wireTag: WIRE.STRING };
-const arrayJsResourceType = { type: "Array Js", wireTag: WIRE.ARRAY, kind: "array", element: jsResourceType };
-const listJsResourceType = { type: "List Js", wireTag: WIRE.LIST, kind: "list", element: jsResourceType };
-const optionResourceType = { type: "Option Resource", wireTag: WIRE.OPTION, element: resourceType };
-const prodResourceType = { type: "Prod Resource Resource", wireTag: WIRE.PROD, fst: resourceType, snd: resourceType };
+const resourceType = { type: "Resource", interfaceTag: INTERFACE_TAG.RESOURCE };
+const jsResourceType = { type: "Js", interfaceTag: INTERFACE_TAG.RESOURCE, kind: "resource", name: "Lean.Vir.Js" };
+const leanObjectType = { type: "LeanObject", interfaceTag: INTERFACE_TAG.LEAN_OBJECT, kind: "leanObject" };
+const unitType = { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT };
+const stringType = { type: "String", interfaceTag: INTERFACE_TAG.STRING };
+const arrayJsResourceType = { type: "Array Js", interfaceTag: INTERFACE_TAG.ARRAY, kind: "array", element: jsResourceType };
+const listJsResourceType = { type: "List Js", interfaceTag: INTERFACE_TAG.LIST, kind: "list", element: jsResourceType };
+const optionResourceType = { type: "Option Resource", interfaceTag: INTERFACE_TAG.OPTION, element: resourceType };
+const prodResourceType = { type: "Prod Resource Resource", interfaceTag: INTERFACE_TAG.PROD, fst: resourceType, snd: resourceType };
 assert.equal(typeof runtime.exports.vir_call_resolved, "undefined");
 assert.equal(typeof runtime.exports.vir_call_result_size, "undefined");
 const resourceValue = { name: "resource" };
@@ -143,54 +143,54 @@ try {
   runtime.exports.vir_obj_dec(resourceObj);
   resourceObj = 0;
 }
-let hostWireResourceObj = runtime.makeHostWireObjectValue(resourceType, resourceArg, "resource host result");
+let hostResourceObj = runtime.makeHostResourceObjectValue(resourceType, resourceArg, "resource host result");
 try {
-  assert.equal(runtime.liftHostWireObjectValue(resourceType, hostWireResourceObj, "resource host argument"), resourceArg);
+  assert.equal(runtime.liftHostResourceObjectValue(resourceType, hostResourceObj, "resource host argument"), resourceArg);
 } finally {
-  runtime.exports.vir_obj_dec(hostWireResourceObj);
-  hostWireResourceObj = 0;
+  runtime.exports.vir_obj_dec(hostResourceObj);
+  hostResourceObj = 0;
 }
 assert.throws(
-  () => runtime.makeHostWireObjectValue(stringType, "raw", "raw string host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(stringType, "raw", "raw string host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(optionResourceType, null, "option host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(optionResourceType, null, "option host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(prodResourceType, { fst: resourceArg, snd: resourceArg }, "prod host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(prodResourceType, { fst: resourceArg, snd: resourceArg }, "prod host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(arrayJsResourceType, [], "array host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(arrayJsResourceType, [], "array host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(listJsResourceType, [], "list host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(listJsResourceType, [], "list host result"),
+  /unsupported JavaScript host resource result type/,
 );
 withObjectString(runtime, "raw", (obj) => {
   assert.throws(
-    () => runtime.liftHostWireObjectValue(stringType, obj, "raw string host argument"),
-    /unsupported JavaScript host wire argument type/,
+    () => runtime.liftHostResourceObjectValue(stringType, obj, "raw string host argument"),
+    /unsupported JavaScript host resource argument type/,
   );
 });
 assert.throws(
-  () => runtime.liftHostWireObjectValue(arrayJsResourceType, 0, "array host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(arrayJsResourceType, 0, "array host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 assert.throws(
-  () => runtime.liftHostWireObjectValue(listJsResourceType, 0, "list host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(listJsResourceType, 0, "list host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 assert.throws(
-  () => runtime.liftHostWireObjectValue(optionResourceType, 0, "option host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(optionResourceType, 0, "option host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 assert.throws(
-  () => runtime.liftHostWireObjectValue(prodResourceType, 0, "prod host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(prodResourceType, 0, "prod host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 let leanHandleObj = makeObjectString(runtime, "lean-ref");
 const leanHandleResource = runtime.makeLeanObjectHandleResource(leanHandleObj, "lean object handle");
@@ -230,7 +230,7 @@ try {
     hostLeanHandleResultObj = callHostImportObjects(leanHandleHostRuntime, 0, [hostLeanHandleObj]);
     leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleObj);
     hostLeanHandleObj = 0;
-    hostLeanHandleResource = leanHandleHostRuntime.liftHostWireObjectValue(
+    hostLeanHandleResource = leanHandleHostRuntime.liftHostResourceObjectValue(
       jsResourceType,
       hostLeanHandleResultObj,
       "host-state lean ref result",
@@ -258,7 +258,7 @@ try {
   const rewrappedHostLeanHandleResource = rewrappedLeanHandleResources.resourceForValue(
     hostResourceValue(hostLeanHandleResource),
   );
-  let hostLeanHandleReleaseArgObj = leanHandleHostRuntime.makeHostWireObjectValue(
+  let hostLeanHandleReleaseArgObj = leanHandleHostRuntime.makeHostResourceObjectValue(
     jsResourceType,
     rewrappedHostLeanHandleResource,
     "host-state lean ref release argument",
@@ -288,36 +288,36 @@ try {
 }
 const callbackWithRawStringType = {
   type: "Function",
-  wireTag: WIRE.FUNCTION,
+  interfaceTag: INTERFACE_TAG.FUNCTION,
   effect: "io",
   args: [{ name: "value", type: stringType }],
   result: unitType,
 };
 assert.throws(
-  () => runtime.liftHostWireObjectValue(callbackWithRawStringType, 0, "raw callback host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(callbackWithRawStringType, 0, "raw callback host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 const callbackWithResourceType = {
   type: "Function",
-  wireTag: WIRE.FUNCTION,
+  interfaceTag: INTERFACE_TAG.FUNCTION,
   effect: "io",
   args: [{ name: "value", type: resourceType }],
   result: unitType,
 };
 const callbackWithNestedCallbackType = {
   type: "Function",
-  wireTag: WIRE.FUNCTION,
+  interfaceTag: INTERFACE_TAG.FUNCTION,
   effect: "io",
   args: [{ name: "callback", type: callbackWithResourceType }],
   result: unitType,
 };
 assert.throws(
-  () => runtime.liftHostWireObjectValue(callbackWithNestedCallbackType, 0, "nested callback host argument"),
-  /unsupported JavaScript host wire argument type/,
+  () => runtime.liftHostResourceObjectValue(callbackWithNestedCallbackType, 0, "nested callback host argument"),
+  /unsupported JavaScript host resource argument type/,
 );
 assert.throws(
-  () => runtime.makeHostWireObjectValue(callbackWithResourceType, () => undefined, "callback host result"),
-  /unsupported JavaScript host wire result type/,
+  () => runtime.makeHostResourceObjectValue(callbackWithResourceType, () => undefined, "callback host result"),
+  /unsupported JavaScript host resource result type/,
 );
 assert.throws(() => runtime.makeObjectValue(resourceType, { handle: 1 }, "resource argument"), /resource argument must be a live host resource/);
 releaseHostResource(resourceArg);
@@ -730,11 +730,11 @@ assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.floatScore", 3.25), "4")
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.float32Roundtrip", 1.25), 1.25);
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.baseByteArrayRoundtrip", [65, 66, 67]), Uint8Array.from([65, 66, 67]));
 const floatScaleEntry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.floatScale");
-assert.equal(floatScaleEntry.args[0].type.wireTag, WIRE.FLOAT);
-assert.equal(floatScaleEntry.result.wireTag, WIRE.FLOAT);
+assert.equal(floatScaleEntry.args[0].type.interfaceTag, INTERFACE_TAG.FLOAT);
+assert.equal(floatScaleEntry.result.interfaceTag, INTERFACE_TAG.FLOAT);
 const float32Entry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.float32Roundtrip");
-assert.equal(float32Entry.args[0].type.wireTag, WIRE.FLOAT32);
-assert.equal(float32Entry.result.wireTag, WIRE.FLOAT32);
+assert.equal(float32Entry.args[0].type.interfaceTag, INTERFACE_TAG.FLOAT32);
+assert.equal(float32Entry.result.interfaceTag, INTERFACE_TAG.FLOAT32);
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", null), "0");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionNatBump", { kind: "some", value: 41 }), "42");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.optionStringBang", null), "empty");
@@ -845,7 +845,7 @@ assert.equal(boxNatEntry.args[0].type.trivialFieldIndex, 0);
 const boxUInt32Entry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.boxUInt32Bump");
 assert.equal(boxUInt32Entry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box UInt32");
 assert.equal(boxUInt32Entry.args[0].type.trivialFieldIndex, 0);
-assert.equal(boxUInt32Entry.args[0].type.fields[0].type.wireTag, WIRE.UINT32);
+assert.equal(boxUInt32Entry.args[0].type.fields[0].type.interfaceTag, INTERFACE_TAG.UINT32);
 assert.equal(boxUInt32Entry.args[0].type.fields[0].layout.kind, "object");
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
   value: 41,
@@ -855,7 +855,7 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt32Bump", {
 const boxUInt64Entry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.boxUInt64Bump");
 assert.equal(boxUInt64Entry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.Box UInt64");
 assert.equal(boxUInt64Entry.args[0].type.trivialFieldIndex, 0);
-assert.equal(boxUInt64Entry.args[0].type.fields[0].type.wireTag, WIRE.UINT64);
+assert.equal(boxUInt64Entry.args[0].type.fields[0].type.interfaceTag, INTERFACE_TAG.UINT64);
 assert.equal(boxUInt64Entry.args[0].type.fields[0].layout.kind, "object");
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt64Bump", {
   value: "18446744073709551615",
@@ -865,7 +865,7 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.boxUInt64Bump", {
 const uint32BoxEntry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.uint32BoxBump");
 assert.equal(uint32BoxEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.UInt32Box");
 assert.equal(uint32BoxEntry.args[0].type.trivialFieldIndex, 0);
-assert.equal(uint32BoxEntry.args[0].type.fields[0].type.wireTag, WIRE.UINT32);
+assert.equal(uint32BoxEntry.args[0].type.fields[0].type.interfaceTag, INTERFACE_TAG.UINT32);
 assert.equal(uint32BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
   value: 41,
@@ -875,7 +875,7 @@ assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint32BoxBump", {
 const uint64BoxEntry = manifestEntry(runtime.interfaceManifest, "Vir.Fixtures.InterfaceShapes.uint64BoxBump");
 assert.equal(uint64BoxEntry.args[0].type.type, "Vir.Fixtures.InterfaceShapes.UInt64Box");
 assert.equal(uint64BoxEntry.args[0].type.trivialFieldIndex, 0);
-assert.equal(uint64BoxEntry.args[0].type.fields[0].type.wireTag, WIRE.UINT64);
+assert.equal(uint64BoxEntry.args[0].type.fields[0].type.interfaceTag, INTERFACE_TAG.UINT64);
 assert.equal(uint64BoxEntry.args[0].type.fields[0].layout.kind, "scalar");
 assert.deepEqual(runtime.call("Vir.Fixtures.InterfaceShapes.uint64BoxBump", {
   value: "18446744073709551615",

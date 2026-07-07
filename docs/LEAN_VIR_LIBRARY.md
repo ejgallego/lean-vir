@@ -545,7 +545,7 @@ error. The
 current package format supports up to 128 host imports with IR arity at most 6.
 Host-import metadata records both the low-level IR arity and the number of
 leading erased type parameters skipped before JavaScript-visible arguments.
-The JSON manifest also records each host import boundary as `wire`,
+The JSON manifest also records each host import boundary as `hostResource`,
 `explicitConversion`, or `objectHandle`, plus effect labels as `pure`, `runtime`, `io`,
 `dom`, or `react`.
 

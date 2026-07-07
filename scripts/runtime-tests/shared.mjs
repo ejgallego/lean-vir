@@ -19,7 +19,7 @@ import {
 } from "../browser-package-config.mjs";
 import {
   roundTripInterfaceTypeDescriptor,
-  sameInterfaceWireType,
+  sameInterfaceTypeDescriptor,
 } from "../../web/src/vir-runtime.js";
 import {
   INTERFACE_MANIFEST_ARTIFACT,
@@ -88,13 +88,13 @@ export function assertManifestTypeDescriptorsRoundTrip(manifest) {
     for (const arg of entry.args) {
       const decoded = roundTripInterfaceTypeDescriptor(arg.type, `${entry.entry} argument ${arg.name}`);
       assert.ok(
-        sameInterfaceWireType(arg.type, decoded),
+        sameInterfaceTypeDescriptor(arg.type, decoded),
         `${entry.entry} argument ${arg.name} descriptor should round-trip`,
       );
     }
     const decoded = roundTripInterfaceTypeDescriptor(entry.result, `${entry.entry} result`);
     assert.ok(
-      sameInterfaceWireType(entry.result, decoded),
+      sameInterfaceTypeDescriptor(entry.result, decoded),
       `${entry.entry} result descriptor should round-trip`,
     );
   }
@@ -135,8 +135,8 @@ const validManifestShape = {
       jsName: "ok",
       entry: "ok",
       source: "Ok.lean",
-      args: [{ name: "arg1", type: { type: "Nat", wireTag: 0 } }],
-      result: { type: "Nat", wireTag: 0 },
+      args: [{ name: "arg1", type: { type: "Nat", interfaceTag: 0 } }],
+      result: { type: "Nat", interfaceTag: 0 },
       effect: "pure",
     },
   ],

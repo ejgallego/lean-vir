@@ -192,7 +192,7 @@ def emitFieldLayout : StructureFieldLayout → EmitM Unit
       emitU32 offset
 
 partial def emitInterfaceType (type : InterfaceType) : EmitM Unit := do
-  emitU8 type.wireTag
+  emitU8 type.interfaceTag
   match type with
   | .array element
   | .list element

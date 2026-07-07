@@ -14,7 +14,7 @@ import {
 import { createBrowserReactHostBindings } from "./vir-react-host-bindings.js";
 import { createVirRuntime as createBundledVirRuntime } from "./vir-runtime.js";
 import { isEffectfulInterfaceEffect } from "./runtime/interface-effects.js";
-import { WIRE } from "./runtime/wire-tags.js";
+import { INTERFACE_TAG } from "./runtime/interface-tags.js";
 
 const e = React.createElement;
 let nextMountId = 0;
@@ -301,10 +301,10 @@ export function validateWidgetEntry(runtime, entryName) {
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 2 ||
-    entry.args[0]?.type?.wireTag !== WIRE.STRING ||
-    entry.args[1]?.type?.wireTag !== WIRE.STRUCTURE ||
+    entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING ||
+    entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE ||
     entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" ||
-    entry.result?.wireTag !== WIRE.BOOL
+    entry.result?.interfaceTag !== INTERFACE_TAG.BOOL
   ) {
     throw new Error(
       `VIR widget entry ${entryName} must be an effectful String -> Surface -> Bool entry ` +
@@ -327,8 +327,8 @@ export function validateWidgetUnmountEntry(runtime, entryName) {
   if (
     !isEffectfulInterfaceEffect(entry.effect) ||
     entry.args?.length !== 1 ||
-    entry.args[0]?.type?.wireTag !== WIRE.STRING ||
-    entry.result?.wireTag !== WIRE.BOOL
+    entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING ||
+    entry.result?.interfaceTag !== INTERFACE_TAG.BOOL
   ) {
     throw new Error(
       `VIR widget unmount entry ${entryName} must be an effectful String -> Bool entry ` +

@@ -42,7 +42,7 @@ try {
   const runtimeImport = manifest.hostImports.find((entry) => entry.target === "test.runtime.value");
   assert.ok(runtimeImport, "runtime host import missing");
   assert.equal(runtimeImport.effect, "runtime");
-  assert.equal(runtimeImport.boundary, "wire");
+  assert.equal(runtimeImport.boundary, "hostResource");
   assert.equal(runtimeImport.arity, 1);
   assert.equal(runtimeImport.erasedPrefixArgs, 0);
   assert.equal(runtimeImport.result.type, "Js");
@@ -87,7 +87,7 @@ try {
   );
   const lastHostSlot = hostSlotManifest.hostImports.find((entry) => entry.slot === 127);
   assert.equal(lastHostSlot?.symbol, "vir_js_import_127_1");
-  assert.equal(lastHostSlot?.boundary, "wire");
+  assert.equal(lastHostSlot?.boundary, "hostResource");
   assert.equal(lastHostSlot?.arity, 1);
 } finally {
   await rm(freshDir, { recursive: true, force: true });

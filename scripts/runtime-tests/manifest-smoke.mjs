@@ -197,7 +197,7 @@ const hostImportTarget = (target) => hostRuntime.interfaceManifest.hostImports.f
 const reactUseStateImports = hostRuntime.interfaceManifest.hostImports.filter((entry) => entry.target === "react.useState");
 assert.equal(reactUseStateImports.length, 1);
 assert.equal(reactUseStateImports[0]?.effect, "react");
-assert.equal(reactUseStateImports[0]?.boundary, "wire");
+assert.equal(reactUseStateImports[0]?.boundary, "hostResource");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.kind, "resource");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.name, "Lean.Vir.Js");
 assert.equal(reactUseStateImports[0]?.args[0]?.type?.type, "Js");
@@ -315,10 +315,10 @@ for (const target of [
 ]) {
   const entry = hostImportTarget(target);
   assert.equal(entry?.effect, "runtime");
-  assert.equal(entry?.boundary, "wire");
+  assert.equal(entry?.boundary, "hostResource");
 }
 const documentSetTitleImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "browser.document.setTitle");
-assert.equal(documentSetTitleImport?.boundary, "wire");
+assert.equal(documentSetTitleImport?.boundary, "hostResource");
 assert.equal(documentSetTitleImport?.args[0]?.type?.type, "Js");
 const documentGetTitleImport = hostRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "browser.document.getTitle");
 assert.equal(documentGetTitleImport?.result?.type, "Js");

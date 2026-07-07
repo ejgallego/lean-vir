@@ -13,16 +13,25 @@ export const invalidManifestCases = [
     pattern: /exports\[0\]\.effect must be one of pure, runtime, io, dom, or react/,
   },
   {
-    name: "unsupported wire tag",
+    name: "unsupported interface tag",
     mutate: (manifest) => {
-      manifest.exports[0].result = { type: "UnsupportedTag13", wireTag: 13 };
+      manifest.exports[0].result = { type: "UnsupportedTag13", interfaceTag: 13 };
     },
-    pattern: /result\.wireTag is not supported/,
+    pattern: /result\.interfaceTag is not supported/,
+  },
+  {
+    name: "legacy wireTag descriptor rejected",
+    mutate: (manifest) => {
+      const result = manifest.exports[0].result;
+      result.wireTag = result.interfaceTag;
+      delete result.interfaceTag;
+    },
+    pattern: /result\.interfaceTag is not supported/,
   },
   {
     name: "array without element type",
     mutate: (manifest) => {
-      manifest.exports[0].args[0].type = { type: "Array Nat", wireTag: 16 };
+      manifest.exports[0].args[0].type = { type: "Array Nat", interfaceTag: 16 };
     },
     pattern: /args\[0\]\.type\.element must be an object/,
   },
@@ -31,7 +40,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Mode",
-        wireTag: 14,
+        interfaceTag: 14,
         kind: "simpleEnum",
         constructors: [
           { name: "Mode.cold", jsName: "cold", tag: 0 },
@@ -46,7 +55,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Sum Nat Nat",
-        wireTag: 21,
+        interfaceTag: 21,
         kind: "taggedUnion",
         name: "Sum",
         constructors: [],
@@ -59,7 +68,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Tree Nat",
-        wireTag: 25,
+        interfaceTag: 25,
         kind: "customInductive",
         name: "Tree",
         constructors: [
@@ -82,7 +91,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Tree Nat",
-        wireTag: 25,
+        interfaceTag: 25,
         kind: "customInductive",
         name: "Tree",
         constructors: [
@@ -98,10 +107,10 @@ export const invalidManifestCases = [
                 name: "children",
                 type: {
                   type: "List Tree",
-                  wireTag: 17,
+                  interfaceTag: 17,
                   element: {
                     type: "Other",
-                    wireTag: 26,
+                    interfaceTag: 26,
                     kind: "recursiveSelf",
                     name: "Other",
                   },
@@ -120,7 +129,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Tree Nat",
-        wireTag: 26,
+        interfaceTag: 26,
         kind: "recursiveSelf",
         name: "Tree",
       };
@@ -132,10 +141,10 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Option Tree",
-        wireTag: 18,
+        interfaceTag: 18,
         element: {
           type: "Tree Nat",
-          wireTag: 26,
+          interfaceTag: 26,
           kind: "recursiveSelf",
           name: "Tree",
         },
@@ -148,7 +157,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Chain",
-        wireTag: 20,
+        interfaceTag: 20,
         kind: "structure",
         name: "Chain",
         objectFieldCount: 1,
@@ -159,10 +168,10 @@ export const invalidManifestCases = [
             name: "next",
             type: {
               type: "Option Chain",
-              wireTag: 18,
+              interfaceTag: 18,
               element: {
                 type: "Other",
-                wireTag: 26,
+                interfaceTag: 26,
                 kind: "recursiveSelf",
                 name: "Other",
               },
@@ -179,7 +188,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Tree Nat",
-        wireTag: 25,
+        interfaceTag: 25,
         kind: "customInductive",
         name: "Tree",
         constructors: [
@@ -193,12 +202,12 @@ export const invalidManifestCases = [
             fields: [
               {
                 name: "child",
-                type: { type: "Nat", wireTag: 0 },
+                type: { type: "Nat", interfaceTag: 0 },
                 layout: { kind: "object", index: 0 },
               },
               {
                 name: "child",
-                type: { type: "Nat", wireTag: 0 },
+                type: { type: "Nat", interfaceTag: 0 },
                 layout: { kind: "object", index: 1 },
               },
             ],
@@ -213,7 +222,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Tree Nat",
-        wireTag: 25,
+        interfaceTag: 25,
         kind: "customInductive",
         name: "Tree",
         constructors: [
@@ -227,7 +236,7 @@ export const invalidManifestCases = [
             fields: [
               {
                 name: "value",
-                type: { type: "Nat", wireTag: 0 },
+                type: { type: "Nat", interfaceTag: 0 },
                 layout: { kind: "object", index: 1 },
               },
             ],
@@ -242,7 +251,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Box Nat",
-        wireTag: 20,
+        interfaceTag: 20,
         kind: "structure",
         name: "Box",
         objectFieldCount: 1,
@@ -252,7 +261,7 @@ export const invalidManifestCases = [
         fields: [
           {
             name: "value",
-            type: { type: "Nat", wireTag: 0 },
+            type: { type: "Nat", interfaceTag: 0 },
             layout: { kind: "object", index: 0 },
           },
         ],
@@ -265,7 +274,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Box Nat",
-        wireTag: 20,
+        interfaceTag: 20,
         kind: "structure",
         name: "Box",
         objectFieldCount: 0,
@@ -274,7 +283,7 @@ export const invalidManifestCases = [
         fields: [
           {
             name: "value",
-            type: { type: "Nat", wireTag: 0 },
+            type: { type: "Nat", interfaceTag: 0 },
             layout: { kind: "object", index: 0 },
           },
         ],
@@ -287,7 +296,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "ScalarBox",
-        wireTag: 20,
+        interfaceTag: 20,
         kind: "structure",
         name: "ScalarBox",
         objectFieldCount: 0,
@@ -296,7 +305,7 @@ export const invalidManifestCases = [
         fields: [
           {
             name: "flag",
-            type: { type: "Bool", wireTag: 2 },
+            type: { type: "Bool", interfaceTag: 2 },
             layout: { kind: "scalar", size: 1, offset: 1 },
           },
         ],
@@ -323,7 +332,7 @@ export const invalidManifestCases = [
     mutate: (manifest) => {
       manifest.exports[0].result = {
         type: "Child",
-        wireTag: 20,
+        interfaceTag: 20,
         kind: "structure",
         name: "Child",
         objectFieldCount: 2,
@@ -335,7 +344,7 @@ export const invalidManifestCases = [
             subobject: true,
             type: {
               type: "Parent",
-              wireTag: 20,
+              interfaceTag: 20,
               kind: "structure",
               name: "Parent",
               objectFieldCount: 1,
@@ -344,7 +353,7 @@ export const invalidManifestCases = [
               fields: [
                 {
                   name: "value",
-                  type: { type: "Nat", wireTag: 0 },
+                  type: { type: "Nat", interfaceTag: 0 },
                   layout: { kind: "object", index: 0 },
                 },
               ],
@@ -353,7 +362,7 @@ export const invalidManifestCases = [
           },
           {
             name: "value",
-            type: { type: "Nat", wireTag: 0 },
+            type: { type: "Nat", interfaceTag: 0 },
             layout: { kind: "object", index: 1 },
           },
         ],
@@ -372,7 +381,7 @@ export const invalidManifestCases = [
         },
       ];
     },
-    pattern: /hostImports\[0\]\.boundary must be wire, explicitConversion, or objectHandle/,
+    pattern: /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
   },
   {
     name: "host import unsupported boundary",
@@ -386,6 +395,20 @@ export const invalidManifestCases = [
         },
       ];
     },
-    pattern: /hostImports\[0\]\.boundary must be wire, explicitConversion, or objectHandle/,
+    pattern: /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
+  },
+  {
+    name: "legacy wire host boundary rejected",
+    mutate: (manifest) => {
+      manifest.hostImports = [
+        {
+          name: "jsHost",
+          target: "test.host",
+          boundary: "wire",
+          effect: "runtime",
+        },
+      ];
+    },
+    pattern: /hostImports\[0\]\.boundary must be hostResource, explicitConversion, or objectHandle/,
   },
 ];

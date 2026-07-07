@@ -9,7 +9,7 @@ import {
   requireInterfaceEffect,
   sameRuntimeInterfaceEffect,
 } from "./interface-effects.js";
-import { WIRE } from "./wire-tags.js";
+import { INTERFACE_TAG } from "./interface-tags.js";
 
 export function asBytes(bytes, label) {
   if (bytes instanceof Uint8Array) {
@@ -85,24 +85,24 @@ export function roundTripInterfaceTypeDescriptor(type, label = "interface type")
   return decoded;
 }
 
-export function sameInterfaceWireType(expected, actual) {
-  return sameWireType(expected, actual);
+export function sameInterfaceTypeDescriptor(expected, actual) {
+  return sameTypeDescriptor(expected, actual);
 }
 
 export function encodeTypeDescriptor(writer, type, label) {
-  const tag = requireWireTag(type, label);
+  const tag = requireInterfaceTag(type, label);
   writer.u8(tag);
   switch (tag) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       encodeTypeDescriptor(writer, requireTypeField(type, "element", label), `${label}.element`);
       return;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       encodeTypeDescriptor(writer, requireTypeField(type, "fst", label), `${label}.fst`);
       encodeTypeDescriptor(writer, requireTypeField(type, "snd", label), `${label}.snd`);
       return;
-    case WIRE.STRUCTURE: {
+    case INTERFACE_TAG.STRUCTURE: {
       const fields = requireStructureFields(type, label);
       encodeRuntimeCounts(writer, type, label);
       writer.u32(requireStructureTrivialFieldIndex(type, label));
@@ -110,7 +110,7 @@ export function encodeTypeDescriptor(writer, type, label) {
       fields.forEach((field) => encodeFieldDescriptor(writer, field, `${label}.${field.name}`));
       return;
     }
-    case WIRE.TAGGED_UNION: {
+    case INTERFACE_TAG.TAGGED_UNION: {
       const constructors = requireTaggedUnionConstructors(type, label);
       writer.u32(constructors.length);
       constructors.forEach((ctor) => {
@@ -120,16 +120,16 @@ export function encodeTypeDescriptor(writer, type, label) {
       });
       return;
     }
-    case WIRE.CUSTOM_INDUCTIVE: {
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE: {
       const constructors = requireCustomInductiveConstructors(type, label);
       writer.u32(constructors.length);
       constructors.forEach((ctor) =>
         encodeCustomInductiveConstructorDescriptor(writer, ctor, `${label}.${ctor.jsName}`));
       return;
     }
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return;
-    case WIRE.FUNCTION: {
+    case INTERFACE_TAG.FUNCTION: {
       const args = requireFunctionArgs(type, label);
       writer.u8(interfaceEffectRuntimeTag(type.effect));
       writer.u32(args.length);
@@ -156,27 +156,27 @@ function encodeCustomInductiveConstructorDescriptor(writer, ctor, label) {
 export function decodeTypeDescriptor(reader) {
   const tag = reader.u8();
   switch (tag) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
-      return { wireTag: tag, element: decodeTypeDescriptor(reader) };
-    case WIRE.PROD:
-      return { wireTag: tag, fst: decodeTypeDescriptor(reader), snd: decodeTypeDescriptor(reader) };
-    case WIRE.STRUCTURE: {
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
+      return { interfaceTag: tag, element: decodeTypeDescriptor(reader) };
+    case INTERFACE_TAG.PROD:
+      return { interfaceTag: tag, fst: decodeTypeDescriptor(reader), snd: decodeTypeDescriptor(reader) };
+    case INTERFACE_TAG.STRUCTURE: {
       const counts = decodeRuntimeCounts(reader);
       const trivialFieldIndex = decodeStructureTrivialFieldIndex(reader.u32());
       const len = reader.u32();
       return {
-        wireTag: tag,
+        interfaceTag: tag,
         ...counts,
         ...(trivialFieldIndex === null ? {} : { trivialFieldIndex }),
         fields: decodeFieldDescriptors(reader, len),
       };
     }
-    case WIRE.TAGGED_UNION: {
+    case INTERFACE_TAG.TAGGED_UNION: {
       const len = reader.u32();
       return {
-        wireTag: tag,
+        interfaceTag: tag,
         constructors: Array.from({ length: len }, () => ({
           ...decodeRuntimeCounts(reader),
           layout: decodeStructureFieldLayout(reader),
@@ -184,10 +184,10 @@ export function decodeTypeDescriptor(reader) {
         })),
       };
     }
-    case WIRE.CUSTOM_INDUCTIVE: {
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE: {
       const len = reader.u32();
       return {
-        wireTag: tag,
+        interfaceTag: tag,
         constructors: Array.from({ length: len }, () => {
           const counts = decodeRuntimeCounts(reader);
           const fieldLen = reader.u32();
@@ -198,9 +198,9 @@ export function decodeTypeDescriptor(reader) {
         }),
       };
     }
-    case WIRE.RECURSIVE_SELF:
-      return { wireTag: tag };
-    case WIRE.FUNCTION: {
+    case INTERFACE_TAG.RECURSIVE_SELF:
+      return { interfaceTag: tag };
+    case INTERFACE_TAG.FUNCTION: {
       // Compact wasm descriptors only need the execution lane distinction:
       // pure callbacks use direct application, every source-level effect label
       // (`runtime`, `io`, `dom`, `react`) uses the effectful callback lane.
@@ -208,7 +208,7 @@ export function decodeTypeDescriptor(reader) {
       const effect = reader.u8() === 0 ? "pure" : "io";
       const len = reader.u32();
       return {
-        wireTag: tag,
+        interfaceTag: tag,
         effect,
         args: Array.from({ length: len }, (_, index) => ({
           name: `arg${index + 1}`,
@@ -218,7 +218,7 @@ export function decodeTypeDescriptor(reader) {
       };
     }
     default:
-      return { wireTag: tag };
+      return { interfaceTag: tag };
   }
 }
 
@@ -229,16 +229,16 @@ function decodeFieldDescriptors(reader, len) {
   }));
 }
 
-export function requireWireTag(type, label) {
-  if (!Number.isInteger(type?.wireTag)) {
-    throw new Error(`${label} is missing a manifest wireTag`);
+export function requireInterfaceTag(type, label) {
+  if (!Number.isInteger(type?.interfaceTag)) {
+    throw new Error(`${label} is missing a manifest interfaceTag`);
   }
-  return type.wireTag;
+  return type.interfaceTag;
 }
 
 export function requireTypeField(type, field, label) {
   const child = type?.[field];
-  if (!child || !Number.isInteger(child.wireTag)) {
+  if (!child || !Number.isInteger(child.interfaceTag)) {
     throw new Error(`${label} is missing manifest type field ${field}`);
   }
   return child;
@@ -338,7 +338,7 @@ export function requireStructureFields(type, label) {
     throw new Error(`${label} is missing manifest structure fields`);
   }
   for (const field of type.fields) {
-    if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
+    if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.interfaceTag)) {
       throw new Error(`${label} has an invalid manifest structure field`);
     }
     requireStructureFieldLayout(field.layout, `${label}.${field.name}`);
@@ -346,17 +346,17 @@ export function requireStructureFields(type, label) {
   return type.fields;
 }
 
-export function sameWireType(expected, actual) {
-  if (requireWireTag(expected, "expected result") !== actual?.wireTag) return false;
-  switch (expected.wireTag) {
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
-      return sameWireType(requireTypeField(expected, "element", "expected result"), actual.element);
-    case WIRE.PROD:
-      return sameWireType(requireTypeField(expected, "fst", "expected result"), actual.fst) &&
-        sameWireType(requireTypeField(expected, "snd", "expected result"), actual.snd);
-    case WIRE.STRUCTURE: {
+function sameTypeDescriptor(expected, actual) {
+  if (requireInterfaceTag(expected, "expected result") !== actual?.interfaceTag) return false;
+  switch (expected.interfaceTag) {
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
+      return sameTypeDescriptor(requireTypeField(expected, "element", "expected result"), actual.element);
+    case INTERFACE_TAG.PROD:
+      return sameTypeDescriptor(requireTypeField(expected, "fst", "expected result"), actual.fst) &&
+        sameTypeDescriptor(requireTypeField(expected, "snd", "expected result"), actual.snd);
+    case INTERFACE_TAG.STRUCTURE: {
       const fields = requireStructureFields(expected, "expected result");
       if (!Array.isArray(actual?.fields) || fields.length !== actual.fields.length) return false;
       if (!sameRuntimeCounts(expected, actual, "expected result") ||
@@ -366,19 +366,19 @@ export function sameWireType(expected, actual) {
       }
       return fields.every((field, index) =>
         sameStructureFieldLayout(field.layout, actual.fields[index]?.layout) &&
-        sameWireType(field.type, actual.fields[index]?.type));
+        sameTypeDescriptor(field.type, actual.fields[index]?.type));
     }
-    case WIRE.TAGGED_UNION: {
+    case INTERFACE_TAG.TAGGED_UNION: {
       const constructors = requireTaggedUnionConstructors(expected, "expected result");
       if (!Array.isArray(actual?.constructors) || constructors.length !== actual.constructors.length) return false;
       return constructors.every((ctor, index) => {
         const actualCtor = actual.constructors[index];
         return sameRuntimeCounts(ctor, actualCtor, "expected result") &&
           sameStructureFieldLayout(ctor.layout, actualCtor?.layout) &&
-          sameWireType(ctor.type, actualCtor?.type);
+          sameTypeDescriptor(ctor.type, actualCtor?.type);
       });
     }
-    case WIRE.CUSTOM_INDUCTIVE: {
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE: {
       const constructors = requireCustomInductiveConstructors(expected, "expected result");
       if (!Array.isArray(actual?.constructors) || constructors.length !== actual.constructors.length) return false;
       return constructors.every((ctor, index) => {
@@ -390,20 +390,20 @@ export function sameWireType(expected, actual) {
         }
         return ctor.fields.every((field, fieldIndex) =>
           sameStructureFieldLayout(field.layout, actualCtor.fields[fieldIndex]?.layout) &&
-          sameWireType(field.type, actualCtor.fields[fieldIndex]?.type));
+          sameTypeDescriptor(field.type, actualCtor.fields[fieldIndex]?.type));
       });
     }
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return true;
-    case WIRE.FUNCTION: {
+    case INTERFACE_TAG.FUNCTION: {
       const args = requireFunctionArgs(expected, "expected result");
       if (!sameRuntimeInterfaceEffect(expected.effect, actual?.effect) ||
           !Array.isArray(actual?.args) ||
           args.length !== actual.args.length) {
         return false;
       }
-      return args.every((arg, index) => sameWireType(arg.type, actual.args[index]?.type)) &&
-        sameWireType(requireFunctionResult(expected, "expected result"), actual.result);
+      return args.every((arg, index) => sameTypeDescriptor(arg.type, actual.args[index]?.type)) &&
+        sameTypeDescriptor(requireFunctionResult(expected, "expected result"), actual.result);
     }
     default:
       return true;
@@ -426,7 +426,7 @@ export function requireTaggedUnionConstructors(type, label) {
   for (const ctor of type.constructors) {
     const ctorLabel = requireConstructorHeader(ctor, label, "tagged-union");
     if (!ctor.type ||
-        !Number.isInteger(ctor.type.wireTag)) {
+        !Number.isInteger(ctor.type.interfaceTag)) {
       throw new Error(`${label} has an invalid manifest tagged-union constructor`);
     }
     requireStructureFieldLayout(ctor.layout, ctorLabel);
@@ -448,7 +448,7 @@ export function requireCustomInductiveConstructors(type, label) {
       throw new Error(`${ctorLabel} has no fields but non-zero runtime field counts`);
     }
     for (const field of ctor.fields) {
-      if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
+      if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.interfaceTag)) {
         throw new Error(`${ctorLabel} has an invalid manifest custom inductive field`);
       }
       requireStructureFieldLayout(field.layout, `${ctorLabel}.${field.name}`);
@@ -478,7 +478,7 @@ export function requireFunctionArgs(type, label) {
     throw new Error(`${label} is missing manifest function args`);
   }
   for (const arg of type.args) {
-    if (typeof arg?.name !== "string" || !arg.type || !Number.isInteger(arg.type.wireTag)) {
+    if (typeof arg?.name !== "string" || !arg.type || !Number.isInteger(arg.type.interfaceTag)) {
       throw new Error(`${label} has an invalid manifest function argument`);
     }
   }
@@ -487,7 +487,7 @@ export function requireFunctionArgs(type, label) {
 
 export function requireFunctionResult(type, label) {
   const result = type?.result;
-  if (!result || !Number.isInteger(result.wireTag)) {
+  if (!result || !Number.isInteger(result.interfaceTag)) {
     throw new Error(`${label} is missing manifest function result`);
   }
   return result;

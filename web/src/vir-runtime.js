@@ -23,7 +23,7 @@ export {
 } from "./runtime/callbacks.js";
 export {
   roundTripInterfaceTypeDescriptor,
-  sameInterfaceWireType,
+  sameInterfaceTypeDescriptor,
 } from "./runtime/vir-codec.js";
 
 export const VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";

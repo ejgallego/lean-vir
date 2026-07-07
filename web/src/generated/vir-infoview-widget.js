@@ -2460,8 +2460,8 @@ function interfaceEffectRuntimeTag(effect) {
   return isEffectfulInterfaceEffect(effect) ? 1 : 0;
 }
 
-// web/src/runtime/wire-tags.js
-var WIRE = Object.freeze({
+// web/src/runtime/interface-tags.js
+var INTERFACE_TAG = Object.freeze({
   NAT: 0,
   INT: 1,
   BOOL: 2,
@@ -2489,27 +2489,27 @@ var WIRE = Object.freeze({
   RECURSIVE_SELF: 26,
   LEAN_OBJECT: 27
 });
-var SUPPORTED_WIRE_TAGS = new Set(Object.values(WIRE));
-var JSON_INPUT_WIRE_TAGS = /* @__PURE__ */ new Set([
-  WIRE.EXPR,
-  WIRE.ARRAY,
-  WIRE.LIST,
-  WIRE.OPTION,
-  WIRE.PROD,
-  WIRE.STRUCTURE,
-  WIRE.TAGGED_UNION,
-  WIRE.CUSTOM_INDUCTIVE
+var SUPPORTED_INTERFACE_TAGS = new Set(Object.values(INTERFACE_TAG));
+var JSON_INPUT_INTERFACE_TAGS = /* @__PURE__ */ new Set([
+  INTERFACE_TAG.EXPR,
+  INTERFACE_TAG.ARRAY,
+  INTERFACE_TAG.LIST,
+  INTERFACE_TAG.OPTION,
+  INTERFACE_TAG.PROD,
+  INTERFACE_TAG.STRUCTURE,
+  INTERFACE_TAG.TAGGED_UNION,
+  INTERFACE_TAG.CUSTOM_INDUCTIVE
 ]);
 
 // web/src/runtime/interface-manifest.js
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_VERSION = 5;
+var INTERFACE_MANIFEST_VERSION = 6;
 var HOST_IMPORT_BOUNDARY = Object.freeze({
-  WIRE: "wire",
+  HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle"
 });
-var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 5, metadata: {...}, exports: [...] }";
+var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 6, metadata: {...}, exports: [...] }";
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -2588,7 +2588,7 @@ function validateManifestHostImports(hostImports) {
 }
 function requireHostImportBoundary(value, label) {
   if (!Object.values(HOST_IMPORT_BOUNDARY).includes(value)) {
-    throw new Error(`${label} must be wire, explicitConversion, or objectHandle`);
+    throw new Error(`${label} must be hostResource, explicitConversion, or objectHandle`);
   }
 }
 function requireUnique(seen, value, label, owner = "interface export") {
@@ -2602,41 +2602,41 @@ function validateInterfaceType(type, label = "interface type") {
     throw new Error(`${label} must be an object`);
   }
   requireString(type.type, `${label}.type`);
-  if (!Number.isInteger(type.wireTag) || !SUPPORTED_WIRE_TAGS.has(type.wireTag)) {
-    throw new Error(`${label}.wireTag is not supported`);
+  if (!Number.isInteger(type.interfaceTag) || !SUPPORTED_INTERFACE_TAGS.has(type.interfaceTag)) {
+    throw new Error(`${label}.interfaceTag is not supported`);
   }
-  switch (type.wireTag) {
-    case WIRE.SIMPLE_ENUM:
+  switch (type.interfaceTag) {
+    case INTERFACE_TAG.SIMPLE_ENUM:
       validateSimpleEnumType(type, label);
       break;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       validateInterfaceType(type.element, `${label}.element`);
       break;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       validateInterfaceType(type.fst, `${label}.fst`);
       validateInterfaceType(type.snd, `${label}.snd`);
       break;
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       validateStructureType(type, label);
       break;
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       validateTaggedUnionType(type, label);
       break;
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       validateCustomInductiveType(type, label);
       break;
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       validateRecursiveSelfType(type, label);
       break;
-    case WIRE.RESOURCE:
+    case INTERFACE_TAG.RESOURCE:
       validateResourceType(type, label);
       break;
-    case WIRE.FUNCTION:
+    case INTERFACE_TAG.FUNCTION:
       validateFunctionType(type, label);
       break;
-    case WIRE.LEAN_OBJECT:
+    case INTERFACE_TAG.LEAN_OBJECT:
       validateLeanObjectType(type, label);
       break;
     default:
@@ -2683,7 +2683,7 @@ function validateStructureType(type, label) {
       throw new Error(`${fieldLabel}.subobject must be a boolean`);
     }
     if (field.subobject === true) {
-      if (field.type?.wireTag !== WIRE.STRUCTURE) {
+      if (field.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE) {
         throw new Error(`${fieldLabel}.subobject field type must be a structure`);
       }
       if (field.layout?.kind !== "object") {
@@ -2800,31 +2800,31 @@ function validateRecursiveSelfType(type, label) {
   requireString(type.name, `${label}.name`);
 }
 function validateRecursiveSelfOwner(type, ownerName, label) {
-  switch (type?.wireTag) {
-    case WIRE.RECURSIVE_SELF:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.RECURSIVE_SELF:
       if (type.name !== ownerName) {
         throw new Error(`${label}.name must match ${ownerName}`);
       }
       break;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       validateRecursiveSelfOwner(type.element, ownerName, `${label}.element`);
       break;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       validateRecursiveSelfOwner(type.fst, ownerName, `${label}.fst`);
       validateRecursiveSelfOwner(type.snd, ownerName, `${label}.snd`);
       break;
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       break;
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       for (const ctor of type.constructors ?? []) {
         validateRecursiveSelfOwner(ctor.type, ownerName, `${label}.${ctor.jsName}`);
       }
       break;
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       break;
-    case WIRE.FUNCTION:
+    case INTERFACE_TAG.FUNCTION:
       for (const arg of type.args ?? []) {
         validateRecursiveSelfOwner(arg.type, ownerName, `${label}.${arg.name}`);
       }
@@ -2835,24 +2835,24 @@ function validateRecursiveSelfOwner(type, ownerName, label) {
   }
 }
 function validateNoDanglingRecursiveSelf(type, label) {
-  switch (type?.wireTag) {
-    case WIRE.RECURSIVE_SELF:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.RECURSIVE_SELF:
       throw new Error(`${label} cannot be recursiveSelf outside a recursive descriptor`);
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       validateNoDanglingRecursiveSelf(type.element, `${label}.element`);
       break;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       validateNoDanglingRecursiveSelf(type.fst, `${label}.fst`);
       validateNoDanglingRecursiveSelf(type.snd, `${label}.snd`);
       break;
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       for (const ctor of type.constructors ?? []) {
         validateNoDanglingRecursiveSelf(ctor.type, `${label}.${ctor.jsName}`);
       }
       break;
-    case WIRE.FUNCTION:
+    case INTERFACE_TAG.FUNCTION:
       for (const arg of type.args ?? []) {
         validateNoDanglingRecursiveSelf(arg.type, `${label}.${arg.name}`);
       }
@@ -2997,7 +2997,7 @@ function asBytes(bytes, label) {
 }
 function requireTypeField(type, field, label) {
   const child = type?.[field];
-  if (!child || !Number.isInteger(child.wireTag)) {
+  if (!child || !Number.isInteger(child.interfaceTag)) {
     throw new Error(`${label} is missing manifest type field ${field}`);
   }
   return child;
@@ -3026,7 +3026,7 @@ function requireStructureFields(type, label) {
     throw new Error(`${label} is missing manifest structure fields`);
   }
   for (const field of type.fields) {
-    if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
+    if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.interfaceTag)) {
       throw new Error(`${label} has an invalid manifest structure field`);
     }
     requireStructureFieldLayout(field.layout, `${label}.${field.name}`);
@@ -3039,7 +3039,7 @@ function requireTaggedUnionConstructors(type, label) {
   }
   for (const ctor of type.constructors) {
     const ctorLabel = requireConstructorHeader(ctor, label, "tagged-union");
-    if (!ctor.type || !Number.isInteger(ctor.type.wireTag)) {
+    if (!ctor.type || !Number.isInteger(ctor.type.interfaceTag)) {
       throw new Error(`${label} has an invalid manifest tagged-union constructor`);
     }
     requireStructureFieldLayout(ctor.layout, ctorLabel);
@@ -3059,7 +3059,7 @@ function requireCustomInductiveConstructors(type, label) {
       throw new Error(`${ctorLabel} has no fields but non-zero runtime field counts`);
     }
     for (const field of ctor.fields) {
-      if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.wireTag)) {
+      if (typeof field?.name !== "string" || !field.type || !Number.isInteger(field.type.interfaceTag)) {
         throw new Error(`${ctorLabel} has an invalid manifest custom inductive field`);
       }
       requireStructureFieldLayout(field.layout, `${ctorLabel}.${field.name}`);
@@ -3086,7 +3086,7 @@ function requireFunctionArgs(type, label) {
     throw new Error(`${label} is missing manifest function args`);
   }
   for (const arg of type.args) {
-    if (typeof arg?.name !== "string" || !arg.type || !Number.isInteger(arg.type.wireTag)) {
+    if (typeof arg?.name !== "string" || !arg.type || !Number.isInteger(arg.type.interfaceTag)) {
       throw new Error(`${label} has an invalid manifest function argument`);
     }
   }
@@ -3094,7 +3094,7 @@ function requireFunctionArgs(type, label) {
 }
 function requireFunctionResult(type, label) {
   const result = type?.result;
-  if (!result || !Number.isInteger(result.wireTag)) {
+  if (!result || !Number.isInteger(result.interfaceTag)) {
     throw new Error(`${label} is missing manifest function result`);
   }
   return result;
@@ -3246,7 +3246,7 @@ function normalizeStructure(value, fields, label) {
         requireStructureFields(field.type, `${label}.${field.name}`),
         `${label}.${field.name}`
       );
-    } else if (field.type?.wireTag === WIRE.OPTION) {
+    } else if (field.type?.interfaceTag === INTERFACE_TAG.OPTION) {
       normalized[field.name] = null;
     } else {
       throw new Error(`${label} is missing field ${field.name}`);
@@ -3484,111 +3484,111 @@ var OBJECT_VALUE_EXPORTS = [
   "vir_obj_usize_decimal"
 ];
 function objectArgumentSupported(type, selfType = null) {
-  const tag = type?.wireTag;
+  const tag = type?.interfaceTag;
   switch (tag) {
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
-    case WIRE.UNIT:
-    case WIRE.RESOURCE:
-    case WIRE.BOOL:
-    case WIRE.NAT:
-    case WIRE.INT:
-    case WIRE.STRING:
-    case WIRE.UINT8:
-    case WIRE.UINT16:
-    case WIRE.UINT32:
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-    case WIRE.BYTE_ARRAY:
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-    case WIRE.EXPR:
-    case WIRE.SIMPLE_ENUM:
+    case INTERFACE_TAG.UNIT:
+    case INTERFACE_TAG.RESOURCE:
+    case INTERFACE_TAG.BOOL:
+    case INTERFACE_TAG.NAT:
+    case INTERFACE_TAG.INT:
+    case INTERFACE_TAG.STRING:
+    case INTERFACE_TAG.UINT8:
+    case INTERFACE_TAG.UINT16:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.USIZE:
+    case INTERFACE_TAG.BYTE_ARRAY:
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
+    case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       return true;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       return objectArgumentSupported(requireTypeField(type, "element", "object argument"), selfType);
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return objectArgumentSupported(requireTypeField(type, "fst", "object argument"), selfType) && objectArgumentSupported(requireTypeField(type, "snd", "object argument"), selfType);
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       return objectStructureSupported(type, objectArgumentSupported);
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       return objectTaggedUnionSupported(type, objectArgumentSupported);
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return objectCustomInductiveSupported(type, objectArgumentSupported);
     default:
       return false;
   }
 }
 function objectResultSupported(type, selfType = null) {
-  const tag = type?.wireTag;
+  const tag = type?.interfaceTag;
   switch (tag) {
-    case WIRE.RECURSIVE_SELF:
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return selfType !== null;
-    case WIRE.UNIT:
-    case WIRE.RESOURCE:
-    case WIRE.FUNCTION:
-    case WIRE.BOOL:
-    case WIRE.NAT:
-    case WIRE.INT:
-    case WIRE.STRING:
-    case WIRE.UINT8:
-    case WIRE.UINT16:
-    case WIRE.UINT32:
-    case WIRE.UINT64:
-    case WIRE.USIZE:
-    case WIRE.BYTE_ARRAY:
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-    case WIRE.EXPR:
-    case WIRE.SIMPLE_ENUM:
+    case INTERFACE_TAG.UNIT:
+    case INTERFACE_TAG.RESOURCE:
+    case INTERFACE_TAG.FUNCTION:
+    case INTERFACE_TAG.BOOL:
+    case INTERFACE_TAG.NAT:
+    case INTERFACE_TAG.INT:
+    case INTERFACE_TAG.STRING:
+    case INTERFACE_TAG.UINT8:
+    case INTERFACE_TAG.UINT16:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.USIZE:
+    case INTERFACE_TAG.BYTE_ARRAY:
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
+    case INTERFACE_TAG.EXPR:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       return true;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       return objectResultSupported(requireTypeField(type, "element", "object result"), selfType);
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return objectResultSupported(requireTypeField(type, "fst", "object result"), selfType) && objectResultSupported(requireTypeField(type, "snd", "object result"), selfType);
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       return objectStructureSupported(type, objectResultSupported);
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       return objectTaggedUnionSupported(type, objectResultSupported);
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return objectCustomInductiveSupported(type, objectResultSupported);
     default:
       return false;
   }
 }
-function hostWireArgumentSupported(type) {
-  if (hostWireValueSupported(type)) {
+function hostResourceArgumentSupported(type) {
+  if (hostResourceValueSupported(type)) {
     return true;
   }
-  if (type?.wireTag !== WIRE.FUNCTION) {
+  if (type?.interfaceTag !== INTERFACE_TAG.FUNCTION) {
     return false;
   }
-  const args = requireFunctionArgs(type, "host wire callback");
-  return args.every((arg) => hostWireValueSupported(arg.type)) && hostWireValueSupported(requireFunctionResult(type, "host wire callback"));
+  const args = requireFunctionArgs(type, "host resource callback");
+  return args.every((arg) => hostResourceValueSupported(arg.type)) && hostResourceValueSupported(requireFunctionResult(type, "host resource callback"));
 }
-function hostWireResultSupported(type) {
-  return hostWireValueSupported(type);
+function hostResourceResultSupported(type) {
+  return hostResourceValueSupported(type);
 }
-function hostWireValueSupported(type) {
-  switch (type?.wireTag) {
-    case WIRE.UNIT:
-    case WIRE.RESOURCE:
+function hostResourceValueSupported(type) {
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.UNIT:
+    case INTERFACE_TAG.RESOURCE:
       return true;
     default:
       return false;
   }
 }
 function objectTypeNeedsBoxedBoundary(type) {
-  switch (type?.wireTag) {
-    case WIRE.FLOAT:
-    case WIRE.FLOAT32:
-    case WIRE.UINT64:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.FLOAT:
+    case INTERFACE_TAG.FLOAT32:
+    case INTERFACE_TAG.UINT64:
       return true;
-    case WIRE.STRUCTURE: {
+    case INTERFACE_TAG.STRUCTURE: {
       const fields = requireStructureFields(type, "object boundary");
       const trivial = trivialStructureField(type, fields);
       return trivial !== null && objectTypeNeedsBoxedBoundary(trivial.type);
@@ -3632,7 +3632,7 @@ function objectFieldPlanSupported(fieldPlan, fieldSupported, selfType) {
     case "object":
       return fieldSupported(field.type, selfType);
     case "usize":
-      return field.type?.wireTag === WIRE.USIZE;
+      return field.type?.interfaceTag === INTERFACE_TAG.USIZE;
     case "scalar":
       return objectScalarFieldSupported(field.type, field.layout);
     default:
@@ -3790,19 +3790,19 @@ function objectScalarFieldSupported(type, layout) {
   if (layout?.kind !== "scalar") {
     return false;
   }
-  switch (type?.wireTag) {
-    case WIRE.BOOL:
-    case WIRE.SIMPLE_ENUM:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.BOOL:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       return [1, 2, 4, 8].includes(layout.size);
-    case WIRE.UINT8:
+    case INTERFACE_TAG.UINT8:
       return layout.size === 1;
-    case WIRE.UINT16:
+    case INTERFACE_TAG.UINT16:
       return layout.size === 2;
-    case WIRE.UINT32:
-    case WIRE.FLOAT32:
+    case INTERFACE_TAG.UINT32:
+    case INTERFACE_TAG.FLOAT32:
       return layout.size === 4;
-    case WIRE.UINT64:
-    case WIRE.FLOAT:
+    case INTERFACE_TAG.UINT64:
+    case INTERFACE_TAG.FLOAT:
       return layout.size === 8;
     default:
       return false;
@@ -3811,38 +3811,38 @@ function objectScalarFieldSupported(type, layout) {
 function writeObjectScalarField(bytes, type, layout, value, label, offset = null) {
   offset ??= scalarLayoutOffset(layout, bytes.byteLength, label);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  switch (type?.wireTag) {
-    case WIRE.BOOL:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.BOOL:
       if (typeof value !== "boolean") {
         throw new Error(`${label} must be a boolean`);
       }
       writeScalarUnsigned(view, offset, layout.size, value ? 1n : 0n, label);
       return;
-    case WIRE.UINT8:
+    case INTERFACE_TAG.UINT8:
       requireScalarSize(layout, 1, label);
       view.setUint8(offset, normalizeInteger(value, label, 0, 255));
       return;
-    case WIRE.UINT16:
+    case INTERFACE_TAG.UINT16:
       requireScalarSize(layout, 2, label);
       view.setUint16(offset, normalizeInteger(value, label, 0, 65535), true);
       return;
-    case WIRE.UINT32:
+    case INTERFACE_TAG.UINT32:
       requireScalarSize(layout, 4, label);
       view.setUint32(offset, normalizeUint32(value, label), true);
       return;
-    case WIRE.UINT64:
+    case INTERFACE_TAG.UINT64:
       requireScalarSize(layout, 8, label);
       view.setBigUint64(offset, normalizeBoundedUnsignedBigInt(value, label, MAX_UINT64, "UInt64"), true);
       return;
-    case WIRE.FLOAT:
+    case INTERFACE_TAG.FLOAT:
       requireScalarSize(layout, 8, label);
       view.setFloat64(offset, normalizeFloat(value, label), true);
       return;
-    case WIRE.FLOAT32:
+    case INTERFACE_TAG.FLOAT32:
       requireScalarSize(layout, 4, label);
       view.setFloat32(offset, Math.fround(normalizeFloat(value, label)), true);
       return;
-    case WIRE.SIMPLE_ENUM:
+    case INTERFACE_TAG.SIMPLE_ENUM:
       writeScalarUnsigned(view, offset, layout.size, BigInt(normalizeEnum(value, type, label)), label);
       return;
     default:
@@ -3851,28 +3851,28 @@ function writeObjectScalarField(bytes, type, layout, value, label, offset = null
 }
 function readObjectScalarField(view, type, layout, label, offset = null) {
   offset ??= scalarLayoutOffset(layout, view.byteLength, label);
-  switch (type?.wireTag) {
-    case WIRE.BOOL:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.BOOL:
       return readScalarUnsigned(view, offset, layout.size, label) !== 0n;
-    case WIRE.UINT8:
+    case INTERFACE_TAG.UINT8:
       requireScalarSize(layout, 1, label);
       return view.getUint8(offset);
-    case WIRE.UINT16:
+    case INTERFACE_TAG.UINT16:
       requireScalarSize(layout, 2, label);
       return view.getUint16(offset, true);
-    case WIRE.UINT32:
+    case INTERFACE_TAG.UINT32:
       requireScalarSize(layout, 4, label);
       return view.getUint32(offset, true);
-    case WIRE.UINT64:
+    case INTERFACE_TAG.UINT64:
       requireScalarSize(layout, 8, label);
       return view.getBigUint64(offset, true).toString();
-    case WIRE.FLOAT:
+    case INTERFACE_TAG.FLOAT:
       requireScalarSize(layout, 8, label);
       return view.getFloat64(offset, true);
-    case WIRE.FLOAT32:
+    case INTERFACE_TAG.FLOAT32:
       requireScalarSize(layout, 4, label);
       return Math.fround(view.getFloat32(offset, true));
-    case WIRE.SIMPLE_ENUM: {
+    case INTERFACE_TAG.SIMPLE_ENUM: {
       const tag = readScalarUnsigned(view, offset, layout.size, label);
       if (tag > BigInt(Number.MAX_SAFE_INTEGER)) {
         throw new Error(`${label} enum tag is too large for JavaScript`);
@@ -3966,9 +3966,9 @@ var ObjectValueRuntime = class {
   hasObjectValueExports() {
     return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
   }
-  makeHostWireObjectValue(type, value, label) {
-    if (!hostWireResultSupported(type)) {
-      throw new Error(`${label} has unsupported JavaScript host wire result type`);
+  makeHostResourceObjectValue(type, value, label) {
+    if (!hostResourceResultSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host resource result type`);
     }
     return this.makeObjectValue(type, value, label);
   }
@@ -3976,77 +3976,77 @@ var ObjectValueRuntime = class {
     return this.makeObjectValue(type, value, label);
   }
   makeObjectValue(type, value, label, selfType = null) {
-    const tag = type?.wireTag;
+    const tag = type?.interfaceTag;
     switch (tag) {
-      case WIRE.RECURSIVE_SELF:
+      case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
           throw new Error(`${label} has a recursive self reference without an enclosing type`);
         }
         return this.makeObjectValue(selfType, value, label, selfType);
-      case WIRE.UNIT:
+      case INTERFACE_TAG.UNIT:
         if (value !== void 0 && value !== null) throw new Error(`${label} must be undefined or null`);
         return this.makeObjectScalar(0, label);
-      case WIRE.RESOURCE:
+      case INTERFACE_TAG.RESOURCE:
         return this.makeObjectResource(value, label);
-      case WIRE.FUNCTION:
+      case INTERFACE_TAG.FUNCTION:
         throw new Error(`${label} cannot be a JavaScript function at this boundary`);
-      case WIRE.BOOL:
+      case INTERFACE_TAG.BOOL:
         if (typeof value !== "boolean") throw new Error(`${label} must be a boolean`);
         return this.makeObjectScalar(value ? 1 : 0, label);
-      case WIRE.UINT8:
+      case INTERFACE_TAG.UINT8:
         return this.makeObjectScalar(normalizeInteger(value, label, 0, 255), label);
-      case WIRE.UINT16:
+      case INTERFACE_TAG.UINT16:
         return this.makeObjectScalar(normalizeInteger(value, label, 0, 65535), label);
-      case WIRE.SIMPLE_ENUM:
+      case INTERFACE_TAG.SIMPLE_ENUM:
         return this.makeObjectScalar(normalizeEnum(value, type, label), label);
-      case WIRE.NAT:
+      case INTERFACE_TAG.NAT:
         return this.makeObjectDecimal("vir_obj_nat", normalizeDecimal(value, label, { signed: false }), label);
-      case WIRE.INT:
+      case INTERFACE_TAG.INT:
         return this.makeObjectDecimal("vir_obj_int", normalizeDecimal(value, label, { signed: true }), label);
-      case WIRE.STRING:
+      case INTERFACE_TAG.STRING:
         return this.makeObjectString(value, label);
-      case WIRE.UINT32:
+      case INTERFACE_TAG.UINT32:
         return this.makeObjectUint32(value, label);
-      case WIRE.UINT64:
+      case INTERFACE_TAG.UINT64:
         return this.makeObjectDecimal(
           "vir_obj_uint64",
           normalizeBoundedUnsignedDecimal(value, label, MAX_UINT642, "UInt64"),
           label
         );
-      case WIRE.USIZE:
+      case INTERFACE_TAG.USIZE:
         return this.makeObjectDecimal(
           "vir_obj_usize",
           normalizeBoundedUnsignedDecimal(value, label, this.usizeMaxValue(), "USize"),
           label
         );
-      case WIRE.BYTE_ARRAY:
+      case INTERFACE_TAG.BYTE_ARRAY:
         return this.makeObjectByteArray(value, label);
-      case WIRE.FLOAT:
+      case INTERFACE_TAG.FLOAT:
         return this.makeObjectFloat(value, label);
-      case WIRE.FLOAT32:
+      case INTERFACE_TAG.FLOAT32:
         return this.makeObjectFloat32(value, label);
-      case WIRE.EXPR:
+      case INTERFACE_TAG.EXPR:
         return this.makeObjectExpr(value, label);
-      case WIRE.ARRAY:
-      case WIRE.LIST:
+      case INTERFACE_TAG.ARRAY:
+      case INTERFACE_TAG.LIST:
         return this.makeObjectSequenceValue(type, value, label, selfType);
-      case WIRE.OPTION:
+      case INTERFACE_TAG.OPTION:
         return this.makeObjectOptionValue(type, value, label, selfType);
-      case WIRE.PROD:
+      case INTERFACE_TAG.PROD:
         return this.makeObjectProdValue(type, value, label, selfType);
-      case WIRE.STRUCTURE:
+      case INTERFACE_TAG.STRUCTURE:
         return this.makeObjectStructureValue(type, value, label);
-      case WIRE.TAGGED_UNION:
+      case INTERFACE_TAG.TAGGED_UNION:
         return this.makeObjectTaggedUnionValue(type, value, label);
-      case WIRE.CUSTOM_INDUCTIVE:
+      case INTERFACE_TAG.CUSTOM_INDUCTIVE:
         return this.makeObjectCustomInductiveValue(type, value, label);
       default:
         throw new Error(`${label} has unsupported object ABI argument type`);
     }
   }
   makeObjectSequenceValue(sequenceType, value, label, selfType) {
-    const sequenceTag = sequenceType?.wireTag;
-    const builderName = sequenceTag === WIRE.ARRAY ? "vir_obj_array" : sequenceTag === WIRE.LIST ? "vir_obj_list" : null;
+    const sequenceTag = sequenceType?.interfaceTag;
+    const builderName = sequenceTag === INTERFACE_TAG.ARRAY ? "vir_obj_array" : sequenceTag === INTERFACE_TAG.LIST ? "vir_obj_list" : null;
     if (builderName === null) {
       throw new Error(`${label} has unsupported object ABI sequence type`);
     }
@@ -4870,68 +4870,68 @@ var ObjectValueRuntime = class {
     }
   }
   liftObjectValue(type, obj, label, selfType = null) {
-    const tag = type?.wireTag;
+    const tag = type?.interfaceTag;
     switch (tag) {
-      case WIRE.RECURSIVE_SELF:
+      case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
           throw new Error(`${label} has a recursive self reference without an enclosing type`);
         }
         return this.liftObjectValue(selfType, obj, label, selfType);
-      case WIRE.UNIT:
+      case INTERFACE_TAG.UNIT:
         return void 0;
-      case WIRE.RESOURCE:
+      case INTERFACE_TAG.RESOURCE:
         return this.liftObjectResource(obj, label);
-      case WIRE.FUNCTION:
+      case INTERFACE_TAG.FUNCTION:
         return this.liftObjectFunction(type, obj, label);
-      case WIRE.BOOL:
+      case INTERFACE_TAG.BOOL:
         return this.readObjectScalar(obj, label) !== 0;
-      case WIRE.UINT8:
+      case INTERFACE_TAG.UINT8:
         return this.readBoundedObjectScalar(obj, label, 255);
-      case WIRE.UINT16:
+      case INTERFACE_TAG.UINT16:
         return this.readBoundedObjectScalar(obj, label, 65535);
-      case WIRE.SIMPLE_ENUM:
+      case INTERFACE_TAG.SIMPLE_ENUM:
         return enumValue(type, this.readObjectScalar(obj, label));
-      case WIRE.NAT:
+      case INTERFACE_TAG.NAT:
         return this.readObjectDecimal(obj, "vir_obj_nat_decimal");
-      case WIRE.INT:
+      case INTERFACE_TAG.INT:
         return this.readObjectDecimal(obj, "vir_obj_int_decimal");
-      case WIRE.STRING:
+      case INTERFACE_TAG.STRING:
         return this.readObjectString(obj);
-      case WIRE.UINT32:
+      case INTERFACE_TAG.UINT32:
         return this.exports.vir_obj_uint32_value(obj) >>> 0;
-      case WIRE.UINT64:
+      case INTERFACE_TAG.UINT64:
         return this.readObjectDecimal(obj, "vir_obj_uint64_decimal");
-      case WIRE.USIZE:
+      case INTERFACE_TAG.USIZE:
         return this.readObjectDecimal(obj, "vir_obj_usize_decimal");
-      case WIRE.BYTE_ARRAY:
+      case INTERFACE_TAG.BYTE_ARRAY:
         return this.readObjectByteArray(obj);
-      case WIRE.FLOAT:
+      case INTERFACE_TAG.FLOAT:
         return this.exports.vir_obj_float_value(obj);
-      case WIRE.FLOAT32:
+      case INTERFACE_TAG.FLOAT32:
         return Math.fround(this.exports.vir_obj_float32_value(obj));
-      case WIRE.EXPR:
+      case INTERFACE_TAG.EXPR:
         return this.liftObjectExpr(obj, label);
-      case WIRE.ARRAY:
+      case INTERFACE_TAG.ARRAY:
         return this.liftObjectArrayValue(type, obj, label, selfType);
-      case WIRE.LIST:
+      case INTERFACE_TAG.LIST:
         return this.liftObjectListValue(type, obj, label, selfType);
-      case WIRE.OPTION:
+      case INTERFACE_TAG.OPTION:
         return this.liftObjectOptionValue(type, obj, label, selfType);
-      case WIRE.PROD:
+      case INTERFACE_TAG.PROD:
         return this.liftObjectProdValue(type, obj, label, selfType);
-      case WIRE.STRUCTURE:
+      case INTERFACE_TAG.STRUCTURE:
         return this.liftObjectStructureValue(type, obj, label);
-      case WIRE.TAGGED_UNION:
+      case INTERFACE_TAG.TAGGED_UNION:
         return this.liftObjectTaggedUnionValue(type, obj, label);
-      case WIRE.CUSTOM_INDUCTIVE:
+      case INTERFACE_TAG.CUSTOM_INDUCTIVE:
         return this.liftObjectCustomInductiveValue(type, obj, label);
       default:
         throw new Error(`${label} has unsupported object ABI result type`);
     }
   }
-  liftHostWireObjectValue(type, obj, label) {
-    if (!hostWireArgumentSupported(type)) {
-      throw new Error(`${label} has unsupported JavaScript host wire argument type`);
+  liftHostResourceObjectValue(type, obj, label) {
+    if (!hostResourceArgumentSupported(type)) {
+      throw new Error(`${label} has unsupported JavaScript host resource argument type`);
     }
     return this.liftObjectValue(type, obj, label);
   }
@@ -5611,7 +5611,7 @@ var VirHostState = class {
         throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
       }
       entry.args.forEach((arg, index) => {
-        const value2 = explicitConversionTarget ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostWireObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+        const value2 = explicitConversionTarget ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostResourceObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
         if (isVirCallback(value2)) {
           liftedCallbacks.push(value2);
         }
@@ -5632,7 +5632,7 @@ var VirHostState = class {
       releaseCallbacks(liftedCallbacks);
       throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
     }
-    return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostWireObjectValue(entry.result, value, `${entry.target} result`);
+    return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostResourceObjectValue(entry.result, value, `${entry.target} result`);
   }
   callObjectHandle(entry, argvPtr, argc) {
     const argObjects = this.readObjectArgv(argvPtr, argc);
@@ -5646,10 +5646,10 @@ var VirHostState = class {
         this.leanObjectHandleCells.delete(cell);
       };
       this.leanObjectHandleCells.add(cell);
-      return this.runtime.makeHostWireObjectValue(entry.result, resource, `${entry.target} result`);
+      return this.runtime.makeHostResourceObjectValue(entry.result, resource, `${entry.target} result`);
     }
     if (entry.target === "js.leanRef.value" && entry.args.length === 1 && isGenericJsResourceDescriptor(entry.args[0]?.type) && isLeanObjectDescriptor(entry.result)) {
-      const resource = this.runtime.liftHostWireObjectValue(
+      const resource = this.runtime.liftHostResourceObjectValue(
         entry.args[0].type,
         argObjects[0],
         `${entry.target} argument ${entry.args[0].name}`
@@ -5657,14 +5657,14 @@ var VirHostState = class {
       return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} argument ${entry.args[0].name}`);
     }
     if (entry.target === "js.leanRef.release" && entry.args.length === 1 && isGenericJsResourceDescriptor(entry.args[0]?.type) && isUnitDescriptor(entry.result)) {
-      const resource = this.runtime.liftHostWireObjectValue(
+      const resource = this.runtime.liftHostResourceObjectValue(
         entry.args[0].type,
         argObjects[0],
         `${entry.target} argument ${entry.args[0].name}`
       );
       const cell = this.runtime.leanObjectHandleCell(resource, `${entry.target} argument ${entry.args[0].name}`);
       this.runtime.releaseLeanObjectHandleCell(cell);
-      return this.runtime.makeHostWireObjectValue(entry.result, void 0, `${entry.target} result`);
+      return this.runtime.makeHostResourceObjectValue(entry.result, void 0, `${entry.target} result`);
     }
     throw new Error(`Vir host import ${entry.target} has unsupported objectHandle signature`);
   }
@@ -5693,13 +5693,13 @@ var VirHostState = class {
   }
 };
 function isLeanObjectDescriptor(type) {
-  return type?.wireTag === WIRE.LEAN_OBJECT && type?.kind === "leanObject";
+  return type?.interfaceTag === INTERFACE_TAG.LEAN_OBJECT && type?.kind === "leanObject";
 }
 function isUnitDescriptor(type) {
-  return type?.wireTag === WIRE.UNIT;
+  return type?.interfaceTag === INTERFACE_TAG.UNIT;
 }
 function isGenericJsResourceDescriptor(type) {
-  return type?.wireTag === WIRE.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";
+  return type?.interfaceTag === INTERFACE_TAG.RESOURCE && type?.kind === "resource" && type?.name === "Lean.Vir.Js";
 }
 function disposeHostBindings(bindings) {
   if (bindings === null || bindings === void 0) return;
@@ -6119,7 +6119,7 @@ function validateWidgetEntry(runtime, entryName) {
   if (entry === null || entry === void 0) {
     throw new Error(`VIR widget entry not found: ${entryName}`);
   }
-  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 2 || entry.args[0]?.type?.wireTag !== WIRE.STRING || entry.args[1]?.type?.wireTag !== WIRE.STRUCTURE || entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" || entry.result?.wireTag !== WIRE.BOOL) {
+  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 2 || entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING || entry.args[1]?.type?.interfaceTag !== INTERFACE_TAG.STRUCTURE || entry.args[1]?.type?.name !== "Lean.Vir.Infoview.Surface" || entry.result?.interfaceTag !== INTERFACE_TAG.BOOL) {
     throw new Error(
       `VIR widget entry ${entryName} must be an effectful String -> Surface -> Bool entry (Lean: String -> Surface -> DomM Bool)`
     );
@@ -6134,7 +6134,7 @@ function validateWidgetUnmountEntry(runtime, entryName) {
   if (entry === null || entry === void 0) {
     throw new Error(`VIR widget unmount entry not found: ${entryName}`);
   }
-  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 1 || entry.args[0]?.type?.wireTag !== WIRE.STRING || entry.result?.wireTag !== WIRE.BOOL) {
+  if (!isEffectfulInterfaceEffect(entry.effect) || entry.args?.length !== 1 || entry.args[0]?.type?.interfaceTag !== INTERFACE_TAG.STRING || entry.result?.interfaceTag !== INTERFACE_TAG.BOOL) {
     throw new Error(
       `VIR widget unmount entry ${entryName} must be an effectful String -> Bool entry (Lean: String -> DomM Bool)`
     );

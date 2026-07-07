@@ -24,18 +24,30 @@ in ordinary host imports. The supported boundary lanes are:
 
 | Lean type surface | Owner / shape | Import boundary | Use |
 | --- | --- | --- | --- |
-| `Lean.Vir.Js α` | JavaScript-owned host resource with phantom Lean shape | `wire` | Pass real JavaScript objects without decoding them in Lean. |
-| `Lean.Vir.Js.Nullable α` | JavaScript-owned nullable resource | `wire` | Pass JavaScript `null`/value results without generic Lean `Option` lowering. |
+| `Lean.Vir.Js α` | JavaScript-owned host resource with phantom Lean shape | `hostResource` | Pass real JavaScript objects without decoding them in Lean. |
+| `Lean.Vir.Js.Nullable α` | JavaScript-owned nullable resource | `hostResource` | Pass JavaScript `null`/value results without generic Lean `Option` lowering. |
 | `Lean.Vir.JSL α` | JavaScript handle to a retained Lean-owned value | `objectHandle` | Let JavaScript store or route Lean values without structural conversion. |
 | Explicit conversion declarations | One side `Lean.Vir.Js ...`, one side an ordinary Lean value | `explicitConversion` | Decode or encode values at named host bindings such as `js.string.value` or `js.value.react.property`. |
-| Wire scalars and containers | JavaScript caller to exported Lean entrypoints | export ABI | Call public Lean functions from JavaScript without a host-import wrapper. |
+| Structural interface values | JavaScript caller to exported Lean entrypoints | interface value codec | Call public Lean functions from JavaScript without a host-import wrapper. |
 
-The package manifest records each host import boundary as `wire`,
+The package manifest records each host import boundary as `hostResource`,
 `explicitConversion`, or `objectHandle`, and the runtime dispatches them through
 the corresponding path. Explicit conversion declarations use
 `@[vir_js_explicit_conversion "..."]`; package generation validates their
 generic shape, and the JavaScript runtime still requires a matching host binding
-for the declared target.
+for the declared target. The manifest also records structural descriptor tags
+for exported Lean entrypoints; those tags belong to the interface value codec,
+not to the ordinary host-resource import boundary.
+
+For host imports, the relevant descriptor family is:
+
+| Descriptor | Ordinary `hostResource` import | Other accepted path |
+| --- | --- | --- |
+| `INTERFACE_TAG.UNIT` | Argument or result | `js.leanRef.release` result |
+| `INTERFACE_TAG.RESOURCE` | Argument or result | Explicit conversions and `JSL` handles use the generic `Js` resource shape. |
+| `INTERFACE_TAG.FUNCTION` | Argument only | Callback arguments/results must be `INTERFACE_TAG.UNIT` or `INTERFACE_TAG.RESOURCE`. |
+| `INTERFACE_TAG.LEAN_OBJECT` | No | Only the `js.leanRef` / `js.leanRef.value` object-handle imports. |
+| Structural descriptors such as `INTERFACE_TAG.NAT`, `INTERFACE_TAG.STRING`, `INTERFACE_TAG.ARRAY`, and `INTERFACE_TAG.STRUCTURE` | No | Only JavaScript-to-Lean exports or declarations marked with `@[vir_js_explicit_conversion]`. |
 
 For example, a package can define a named conversion for a Lean structure when
 the JavaScript host binding wants to inspect that structure and return a real

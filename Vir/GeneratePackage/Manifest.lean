@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.GeneratePackage.Interface
+import Vir.GeneratePackage.Interface.Collect
 import Vir.GeneratePackage.PackageFormat
 
 open Lean

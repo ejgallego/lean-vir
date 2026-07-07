@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { formatInterfaceEffectSuffix } from "../web/src/runtime/interface-effects.js";
 import { formatInterfaceType, manifestDiagnostics } from "../web/src/runtime/interface-manifest.js";
-import { WIRE } from "../web/src/runtime/wire-tags.js";
+import { INTERFACE_TAG } from "../web/src/runtime/interface-tags.js";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 
 function usage() {
@@ -107,10 +107,10 @@ function printDescriptorDetails(args, result) {
 }
 
 function descriptorSummary(type) {
-  switch (type?.wireTag) {
-    case WIRE.CUSTOM_INDUCTIVE:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return `customInductive ${type.name ?? type.type ?? "?"} { ${customInductiveConstructors(type).join(", ")} }`;
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       if (!containsRecursiveSelf(type)) return null;
       return `structure ${type.name ?? type.type ?? "?"} { ${(type.fields ?? []).map((field) =>
         `${field.name}: ${descriptorLabel(field.type)}`).join(", ")} }`;
@@ -129,22 +129,22 @@ function customInductiveConstructors(type) {
 }
 
 function descriptorLabel(type) {
-  switch (type?.wireTag) {
-    case WIRE.RECURSIVE_SELF:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return `recursiveSelf ${type.name ?? type.type ?? "?"}`;
-    case WIRE.ARRAY:
+    case INTERFACE_TAG.ARRAY:
       return `Array<${descriptorLabel(type.element)}>`;
-    case WIRE.LIST:
+    case INTERFACE_TAG.LIST:
       return `List<${descriptorLabel(type.element)}>`;
-    case WIRE.OPTION:
+    case INTERFACE_TAG.OPTION:
       return `Option<${descriptorLabel(type.element)}>`;
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return `Prod<${descriptorLabel(type.fst)}, ${descriptorLabel(type.snd)}>`;
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return `customInductive ${type.name ?? type.type ?? "?"}`;
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       return `structure ${type.name ?? type.type ?? "?"}`;
-    case WIRE.LEAN_OBJECT:
+    case INTERFACE_TAG.LEAN_OBJECT:
       return type.type ?? "LeanObject";
     default:
       return formatInterfaceType(type);
@@ -152,23 +152,23 @@ function descriptorLabel(type) {
 }
 
 function containsRecursiveSelf(type) {
-  switch (type?.wireTag) {
-    case WIRE.RECURSIVE_SELF:
+  switch (type?.interfaceTag) {
+    case INTERFACE_TAG.RECURSIVE_SELF:
       return true;
-    case WIRE.ARRAY:
-    case WIRE.LIST:
-    case WIRE.OPTION:
+    case INTERFACE_TAG.ARRAY:
+    case INTERFACE_TAG.LIST:
+    case INTERFACE_TAG.OPTION:
       return containsRecursiveSelf(type.element);
-    case WIRE.PROD:
+    case INTERFACE_TAG.PROD:
       return containsRecursiveSelf(type.fst) || containsRecursiveSelf(type.snd);
-    case WIRE.STRUCTURE:
+    case INTERFACE_TAG.STRUCTURE:
       return (type.fields ?? []).some((field) => containsRecursiveSelf(field.type));
-    case WIRE.TAGGED_UNION:
+    case INTERFACE_TAG.TAGGED_UNION:
       return (type.constructors ?? []).some((ctor) => containsRecursiveSelf(ctor.type));
-    case WIRE.CUSTOM_INDUCTIVE:
+    case INTERFACE_TAG.CUSTOM_INDUCTIVE:
       return (type.constructors ?? []).some((ctor) =>
         (ctor.fields ?? []).some((field) => containsRecursiveSelf(field.type)));
-    case WIRE.FUNCTION:
+    case INTERFACE_TAG.FUNCTION:
       return (type.args ?? []).some((arg) => containsRecursiveSelf(arg.type)) ||
         containsRecursiveSelf(type.result);
     default:

@@ -93,7 +93,7 @@ npm run inspect:irpkg -- <package.irpkg>
 
 Add `--json` to emit the parsed package header and full embedded manifest.
 
-## Supported Interface Surface
+## Interface Value Codec Surface
 
 The embedded manifest currently supports:
 
@@ -120,38 +120,48 @@ The embedded manifest currently supports:
 - `Lean.Vir.React.Node`, represented as an opaque `Lean.Vir.Js` resource whose
   native React node is constructed by the React host bindings.
 
-The numeric `wireTag` table is part of the package ABI. Lean assigns tags in
+This broad surface is the interface value codec used by JavaScript-to-Lean
+exports and by declarations explicitly marked as conversions. It is not the
+ordinary Lean-to-JavaScript host-resource boundary, which is deliberately
+narrower and accepts only `Unit`, resources, and resource-shaped callbacks.
+
+The numeric descriptor tag table is part of the package ABI. The JSON field is
+named `interfaceTag`; these tags describe the interface value codec, not the
+ordinary host-resource import mode. Lean assigns tags in
 `Vir.GeneratePackage.Interface.Encode`; JavaScript validates and dispatches
-them in `web/src/runtime/wire-tags.js`. Run `npm run check:package-abi` after
-editing either side.
+them in `web/src/runtime/interface-tags.js`. Run `npm run check:package-abi`
+after editing either side.
+Manifest schema version 6 intentionally rejects the old `wireTag` field and
+`wire` host-import boundary label instead of accepting aliases.
 
 | Tag | JavaScript name | Lean interface type | Descriptor payload |
 | --- | --- | --- | --- |
-| 0 | `WIRE.NAT` | `Nat` | Primitive. |
-| 1 | `WIRE.INT` | `Int` | Primitive. |
-| 2 | `WIRE.BOOL` | `Bool` | Primitive. |
-| 3 | `WIRE.STRING` | `String` | Primitive. |
-| 4 | `WIRE.UINT8` | `UInt8` | Primitive. |
-| 5 | `WIRE.UINT16` | `UInt16` | Primitive. |
-| 6 | `WIRE.UINT32` | `UInt32` | Primitive. |
-| 7 | `WIRE.UINT64` | `UInt64` | Primitive. |
-| 8 | `WIRE.USIZE` | `USize` | Primitive. |
-| 9 | `WIRE.BYTE_ARRAY` | `ByteArray` | Primitive byte data. |
-| 10 | `WIRE.FLOAT` | `Float` | Primitive. |
-| 11 | `WIRE.FLOAT32` | `Float32` | Primitive. |
-| 14 | `WIRE.SIMPLE_ENUM` | Nullary inductive enum | Constructor names and tags. |
-| 15 | `WIRE.EXPR` | `Lean.Expr` | Structural expression object. |
-| 16 | `WIRE.ARRAY` | `Array α` | Element descriptor. |
-| 17 | `WIRE.LIST` | `List α` | Element descriptor. |
-| 18 | `WIRE.OPTION` | `Option α` | Element descriptor. |
-| 19 | `WIRE.PROD` | `α × β` | `fst` and `snd` descriptors. |
-| 20 | `WIRE.STRUCTURE` | Structure | Name, runtime layout counts, fields, optional trivial field. |
-| 21 | `WIRE.TAGGED_UNION` | `Sum` / `Except` | Constructor descriptors with payload layout. |
-| 22 | `WIRE.UNIT` | `Unit` | Primitive. |
-| 23 | `WIRE.RESOURCE` | `@[vir_js]` resource marker | Resource name. |
-| 24 | `WIRE.FUNCTION` | Callback function type | Argument descriptors, result descriptor, effect label. |
-| 25 | `WIRE.CUSTOM_INDUCTIVE` | Non-indexed custom inductive | Constructor descriptors and field layouts. |
-| 26 | `WIRE.RECURSIVE_SELF` | Recursive reference | Referenced owner name. |
+| 0 | `INTERFACE_TAG.NAT` | `Nat` | Primitive. |
+| 1 | `INTERFACE_TAG.INT` | `Int` | Primitive. |
+| 2 | `INTERFACE_TAG.BOOL` | `Bool` | Primitive. |
+| 3 | `INTERFACE_TAG.STRING` | `String` | Primitive. |
+| 4 | `INTERFACE_TAG.UINT8` | `UInt8` | Primitive. |
+| 5 | `INTERFACE_TAG.UINT16` | `UInt16` | Primitive. |
+| 6 | `INTERFACE_TAG.UINT32` | `UInt32` | Primitive. |
+| 7 | `INTERFACE_TAG.UINT64` | `UInt64` | Primitive. |
+| 8 | `INTERFACE_TAG.USIZE` | `USize` | Primitive. |
+| 9 | `INTERFACE_TAG.BYTE_ARRAY` | `ByteArray` | Primitive byte data. |
+| 10 | `INTERFACE_TAG.FLOAT` | `Float` | Primitive. |
+| 11 | `INTERFACE_TAG.FLOAT32` | `Float32` | Primitive. |
+| 14 | `INTERFACE_TAG.SIMPLE_ENUM` | Nullary inductive enum | Constructor names and tags. |
+| 15 | `INTERFACE_TAG.EXPR` | `Lean.Expr` | Structural expression object. |
+| 16 | `INTERFACE_TAG.ARRAY` | `Array α` | Element descriptor. |
+| 17 | `INTERFACE_TAG.LIST` | `List α` | Element descriptor. |
+| 18 | `INTERFACE_TAG.OPTION` | `Option α` | Element descriptor. |
+| 19 | `INTERFACE_TAG.PROD` | `α × β` | `fst` and `snd` descriptors. |
+| 20 | `INTERFACE_TAG.STRUCTURE` | Structure | Name, runtime layout counts, fields, optional trivial field. |
+| 21 | `INTERFACE_TAG.TAGGED_UNION` | `Sum` / `Except` | Constructor descriptors with payload layout. |
+| 22 | `INTERFACE_TAG.UNIT` | `Unit` | Primitive. |
+| 23 | `INTERFACE_TAG.RESOURCE` | `@[vir_js]` resource marker | Resource name. |
+| 24 | `INTERFACE_TAG.FUNCTION` | Callback function type | Argument descriptors, result descriptor, effect label. |
+| 25 | `INTERFACE_TAG.CUSTOM_INDUCTIVE` | Non-indexed custom inductive | Constructor descriptors and field layouts. |
+| 26 | `INTERFACE_TAG.RECURSIVE_SELF` | Recursive reference | Referenced owner name. |
+| 27 | `INTERFACE_TAG.LEAN_OBJECT` | Opaque retained Lean object | Object-handle boundary descriptor. |
 
 Large exact integer values are returned to JavaScript as decimal strings to
 avoid truncating them to JavaScript numbers.
@@ -181,12 +191,12 @@ Function-valued interface types are used for Lean callbacks passed to
 JavaScript host imports. Their descriptors record the callback argument list,
 result type, and whether applying the callback returns a synchronous effect
 (`RuntimeM`, `IO`, `DomM`, or `ReactM`). JavaScript receives these values as
-`VirCallback` objects. The `WIRE.FUNCTION` value payload carries no serialized
-numeric token; the runtime receives the internal closure root id through a side
-channel and releases the rooted Lean closure when the host-owned registration
-is done with it. Functions are accepted only as host-import arguments; callback
-arguments and results must be `Unit` or resource descriptors, so nested
-callbacks are rejected.
+`VirCallback` objects. The `INTERFACE_TAG.FUNCTION` value payload carries no
+serialized numeric token; the runtime receives the internal closure root id
+through a side channel and releases the rooted Lean closure when the host-owned
+registration is done with it. Functions are accepted only as host-import
+arguments; callback arguments and results must be `Unit` or resource
+descriptors, so nested callbacks are rejected.
 
 `Lean.Vir.React.Node` is a JavaScript-owned resource marker. The recursive
 structure of the rendered tree lives in the host resource graph created by
@@ -216,7 +226,7 @@ resource/runtime APIs use `Lean.Vir.RuntimeM α`; browser APIs use
 mark an opaque declaration with
 `@[vir_js "target.name"]`, or use the starter declarations in `Vir.Common` and
 `Vir.Browser`. The manifest records each host import under `hostImports` with
-its slot, Lean name, JavaScript target, host boundary mode (`wire`,
+its slot, Lean name, JavaScript target, host boundary mode (`hostResource`,
 `explicitConversion`, or `objectHandle`), generated WASM symbol, low-level IR arity,
 leading erased argument count, JavaScript-visible arguments, result type, and
 effect.
@@ -255,12 +265,12 @@ so calls back into Lean lower arguments to owned objects and lift the owned obje
 result using JavaScript-side manifest metadata.
 
 Package loading validates every exported argument/result type before exposing
-the manifest to the UI or JS caller. The validator rejects unsupported wire
-tags, malformed recursive children, invalid enum constructors, inconsistent
-structure field layouts, bad `trivialFieldIndex` values, and duplicate export
-names. Runtime tests also round-trip every generated export type through the
-compact descriptor encoder/decoder so descriptor drift fails before a call
-enters WASM.
+the manifest to the UI or JS caller. The validator rejects unsupported
+descriptor tags, malformed recursive children, invalid enum constructors,
+inconsistent structure field layouts, bad `trivialFieldIndex` values, and
+duplicate export names. Runtime tests also round-trip every generated export
+type through the compact descriptor encoder/decoder so descriptor drift fails
+before a call enters WASM.
 
 The package generator also rejects ambiguous source-time names before writing a
 package. Different source targets in the same generator run must not define the
@@ -275,9 +285,9 @@ runtime validates the embedded manifest before exposing entries. For format 7
 and newer packages, the WASM shim uses the package-owned compact export
 signature table to validate object calls for `vir_call_resolved_objects`.
 Host-import dispatch uses package-owned arity/effect metadata, while
-JavaScript uses the manifest descriptors for argument/result conversion.
-Closure roots likewise store only arity/effect metadata; JavaScript keeps the
-full callback descriptor.
+JavaScript uses the interface value codec descriptors for argument/result
+conversion. Closure roots likewise store only arity/effect metadata;
+JavaScript keeps the full callback descriptor.
 
 This is acceptable for the current generated demo packages and local developer
 packages. It is not a hardened boundary for arbitrary remote `.irpkg` files.

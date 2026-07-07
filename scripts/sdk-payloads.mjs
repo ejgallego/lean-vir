@@ -22,7 +22,7 @@ export const SDK_PAYLOADS = [
   ["js/runtime/vir-value-normalizers.js", "web/src/runtime/vir-value-normalizers.js"],
   ["js/runtime/interface-effects.js", "web/src/runtime/interface-effects.js"],
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],
-  ["js/runtime/wire-tags.js", "web/src/runtime/wire-tags.js"],
+  ["js/runtime/interface-tags.js", "web/src/runtime/interface-tags.js"],
   ["js/host/vir-host-resources.js", "web/src/host/vir-host-resources.js"],
   ["js/host/vir-js-value-bindings.js", "web/src/host/vir-js-value-bindings.js"],
   ["js/host/vir-virtual-host-bindings.js", "web/src/host/vir-virtual-host-bindings.js"],
