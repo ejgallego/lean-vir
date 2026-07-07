@@ -160,7 +160,7 @@ def isLeanObjectHandleSignature
     | _, _ => false
 
 def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
-  s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Lean.Vir.Js ...` resources and explicit conversion calls"
+  s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Unit`, `Lean.Vir.Js ...`, `Lean.Vir.Js.Nullable ...`, top-level callback arguments, or explicit conversion calls"
 
 def hostImportArgBoundaryDiagnostic? (arg : InterfaceArg) : Option String :=
   if arg.type.isHostWireArgType then

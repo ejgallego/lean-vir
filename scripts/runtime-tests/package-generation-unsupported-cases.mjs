@@ -53,6 +53,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /jsBumpNat/,
     /unsupported JavaScript import argument `n`/,
     /raw Lean type `Nat` is not a JavaScript boundary type/,
+    /Lean\.Vir\.Js\.Nullable/,
     /jsBumpCounter/,
     /unsupported JavaScript import argument `counter`/,
     /structure `HostCounter` is not a JavaScript boundary type/,
