@@ -9,22 +9,16 @@ import { asBytes } from "./runtime/vir-codec.js";
 import { VirHostState } from "./runtime/host-state.js";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
 
-export { VirRuntime } from "./runtime/core.js";
 export {
   hasExternrefTableSupport,
   requireExternrefTableSupport,
 } from "./vir-host-bindings.js";
 export {
   VIR_HOST_DISPOSE,
-  VIR_HOST_RESOLVE_BINDING,
 } from "./host-resource.js";
 export {
   VirCallback,
 } from "./runtime/callbacks.js";
-export {
-  roundTripInterfaceTypeDescriptor,
-  sameInterfaceTypeDescriptor,
-} from "./runtime/vir-codec.js";
 
 export const VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
 export const VIR_WASM_DEV_FILE = "vir-upstream.dev.wasm";

@@ -48,22 +48,34 @@ try {
   const interfaceTags = modules["runtime/interface-tags.js"];
 
   assert.equal(typeof runtime.createVirRuntime, "function");
-  assert.equal(typeof runtime.roundTripInterfaceTypeDescriptor, "function");
+  assert.equal(typeof runtime.createVirRuntimeFactory, "function");
+  assert.equal(typeof runtime.createVirImports, "function");
+  assert.equal(typeof runtime.VirCallback, "function");
+  assert.equal(typeof runtime.VIR_HOST_DISPOSE, "symbol");
   assert.equal(runtime.VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
   assert.equal(runtime.VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
   assert.equal(runtime.debugWasmUrlFor("./wasm/vir-upstream.wasm"), "./wasm/vir-upstream.dev.wasm");
+  assert.equal(Object.hasOwn(runtime, "VirRuntime"), false);
+  assert.equal(Object.hasOwn(runtime, "VIR_HOST_RESOLVE_BINDING"), false);
+  assert.equal(Object.hasOwn(runtime, "roundTripInterfaceTypeDescriptor"), false);
+  assert.equal(Object.hasOwn(runtime, "sameInterfaceTypeDescriptor"), false);
   assert.equal(nodeRuntime.debugWasmUrlFor, runtime.debugWasmUrlFor);
   assert.equal(typeof nodeRuntime.createVirRuntime, "function");
+  assert.equal(Object.hasOwn(nodeRuntime, "VirRuntime"), false);
+  assert.equal(Object.hasOwn(nodeRuntime, "VIR_HOST_RESOLVE_BINDING"), false);
+  assert.equal(Object.hasOwn(nodeRuntime, "roundTripInterfaceTypeDescriptor"), false);
+  assert.equal(Object.hasOwn(nodeRuntime, "sameInterfaceTypeDescriptor"), false);
   assert.equal(typeof hostBindings.createHostResourceState, "function");
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
+  assert.equal(typeof codec.roundTripInterfaceTypeDescriptor, "function");
   assert.equal(typeof reactNode.virtualReactTextContent, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
-  assert.equal(typeof runtime.sameInterfaceTypeDescriptor, "function");
+  assert.equal(typeof codec.sameInterfaceTypeDescriptor, "function");
   assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);
   assert.equal(interfaceTags.SUPPORTED_INTERFACE_TAGS.has(interfaceTags.INTERFACE_TAG.NAT), true);
   assert.equal(interfaceTags.JSON_INPUT_INTERFACE_TAGS.has(interfaceTags.INTERFACE_TAG.ARRAY), true);
 
-  const decoded = runtime.roundTripInterfaceTypeDescriptor({
+  const decoded = codec.roundTripInterfaceTypeDescriptor({
     type: "Nat",
     interfaceTag: interfaceTags.INTERFACE_TAG.NAT,
   });

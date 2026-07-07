@@ -114,8 +114,8 @@ server, and open the server URL.
 
 To build the same archive locally, run `npm run build:local-artifact`.
 
-The latest developer SDK artifact contains the stable JavaScript runtime files,
-the release `vir-upstream.wasm`, the optimized debug companion
+The latest developer SDK artifact contains the JavaScript runtime entry files,
+their internal helper modules, the release `vir-upstream.wasm`, the optimized debug companion
 `vir-upstream.dev.wasm`, and a machine-readable `lean-vir-artifact.json`
 manifest:
 

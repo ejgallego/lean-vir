@@ -5,20 +5,20 @@ and host-binding implementations. Keep public entry points stable and move
 implementation detail into narrower helper modules when files start mixing
 unrelated responsibilities.
 
-## Public Runtime Entry Points
+## Runtime Entry Points
 
-- `vir-runtime.js`: public runtime facade, WASM instantiation, package loading
+- `vir-runtime.js`: public package/SDK runtime facade, WASM instantiation, package loading
   convenience helpers, and host import wiring.
-- `vir-runtime-node.js`: Node/test wrapper that installs virtual browser and
+- `vir-runtime-node.js`: public package/SDK Node/test wrapper that installs virtual browser and
   React host bindings.
-- `vir-host-bindings.js`: public common/browser host-binding factories and
+- `vir-host-bindings.js`: public package/SDK common/browser host-binding factories and
   stable re-exports.
-- `vir-react-host-bindings.js`: browser React root, component, and hook
+- `vir-react-host-bindings.js`: public package/SDK browser React root, component, and hook
   bindings. This entry imports `react` and `react-dom/client`; keep React
   dependencies out of the generic runtime and host-binding entry points.
-- `browser-react-runtime.js`: browser convenience factory that composes generic
+- `browser-react-runtime.js`: repository browser convenience factory that composes generic
   browser bindings with React bindings.
-- `vir-infoview-widget.js`: live infoview widget shell that loads WASM,
+- `vir-infoview-widget.js`: repository live infoview widget shell that loads WASM,
   requests fresh `.irpkg` packages from Lean, and mounts Lean-authored React
   widgets.
 
@@ -72,9 +72,11 @@ unrelated responsibilities.
 
 ## Maintenance Notes
 
-- Keep SDK-visible imports under the public entry points above unless a new
-  package export is intentional. The SDK artifact mirrors these subdirectories
-  under `js/` so internal imports resolve without wrapper files.
+- Keep application-facing imports under the package/SDK entry points above
+  unless a new package export is intentional. The SDK artifact mirrors runtime,
+  host, and React helper subdirectories under `js/` so internal relative
+  imports resolve without wrapper files; those nested modules are not a stable
+  application API.
 - Keep React imports isolated to `vir-react-host-bindings.js` and modules that
   intentionally compose it.
 - Regenerate `generated/vir-infoview-widget.js` with

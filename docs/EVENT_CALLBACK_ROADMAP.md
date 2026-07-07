@@ -114,6 +114,10 @@ callback from the current callback.
 - Wasm GC and typed function references are useful to track, but Lean closures
   are currently Lean heap objects managed by Lean's runtime. They are not a
   replacement for the explicit root/release bridge in this phase.
+- Research whether `funcref`/typed-function-reference tables can simplify the
+  host callback path. The key question is whether a table can remove meaningful
+  JavaScript dispatch/root bookkeeping without obscuring Lean closure ownership
+  or making package reload/dispose semantics harder to enforce.
 
 References:
 

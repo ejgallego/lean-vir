@@ -20,7 +20,7 @@ import {
 import {
   roundTripInterfaceTypeDescriptor,
   sameInterfaceTypeDescriptor,
-} from "../../web/src/vir-runtime.js";
+} from "../../web/src/runtime/vir-codec.js";
 import {
   INTERFACE_MANIFEST_ARTIFACT,
   INTERFACE_MANIFEST_VERSION,

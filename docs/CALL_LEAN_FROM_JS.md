@@ -341,7 +341,7 @@ const vir = await createVirRuntime({
   irPackageUrl: "/assets/my-app.irpkg",
   defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => resources.resourceForValue(hostResourceValue(n) + 1n),
+    "demo.bumpNat": (n) => resources.resourceForValue(resources.resolveResource(n, "JsNat") + 1n),
   },
 });
 

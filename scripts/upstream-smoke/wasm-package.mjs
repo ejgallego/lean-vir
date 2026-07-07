@@ -4,7 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createVirImports, VirRuntime } from "../../web/src/vir-runtime.js";
+import { createVirImports } from "../../web/src/vir-runtime.js";
+import { VirRuntime } from "../../web/src/runtime/core.js";
 
 const requiredFunctionExports = [
   "vir_alloc_bytes",

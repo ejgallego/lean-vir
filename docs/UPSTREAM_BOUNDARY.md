@@ -95,6 +95,11 @@ Together they supply:
   `VirCallback` objects.
 - name construction primitives needed by `src/util/name.cpp`.
 
+The exported `vir_obj_*`, `vir_call_resolved_objects`, closure-root, and
+`env.vir_js_call_objects` symbols are internal WASM/runtime ABI hooks. They are
+stable only within a matching `lean_vir` revision and should not be treated as
+the JavaScript application API.
+
 The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
 disabled. The pinned Lean source checkout contains the runtime sources but does
 not include vendored mimalloc sources for a WASI rebuild, so this selects Lean's

@@ -16,12 +16,8 @@ export {
   createVirImports,
   debugWasmUrlFor,
   fetchBytes,
-  roundTripInterfaceTypeDescriptor,
-  sameInterfaceTypeDescriptor,
   VIR_HOST_DISPOSE,
-  VIR_HOST_RESOLVE_BINDING,
   VirCallback,
-  VirRuntime,
   VIR_WASM_DEV_FILE,
   VIR_WASM_RELEASE_FILE,
 } from "./vir-runtime.js";

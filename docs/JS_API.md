@@ -101,6 +101,10 @@ Application code normally imports only `lean-vir`, `lean-vir/vir-runtime-node`,
 bindings are intentionally exported only from
 `lean-vir/react-host-bindings`, keeping `lean-vir/host-bindings` free of React
 and `react-dom/client` dependencies.
+The SDK archive also contains the nested `runtime/`, `host/`, and `react/`
+modules because those public entry files use relative imports. Treat those
+nested modules as revision-locked internals unless this document explicitly
+names an entry point above.
 
 ## Host Bindings
 
@@ -384,7 +388,7 @@ const vir = await createVirRuntime({
   irPackageUrl: "custom.irpkg",
   defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
-    "demo.bumpNat": (n) => resources.resourceForValue(hostResourceValue(n) + 1n),
+    "demo.bumpNat": (n) => resources.resourceForValue(resources.resolveResource(n, "JsNat") + 1n),
   },
 });
 
