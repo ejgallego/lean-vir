@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "aliases": [
+    {
+      "lean": "Lean.Vir.React.Root",
+      "type": "Lean.Vir.Js Lean.Vir.React.Root",
+      "via": "Lean.Vir.TypeAnchors.reactRootIdentity",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "descriptor": "resource"
+    }
+  ]
+}

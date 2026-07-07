@@ -1,0 +1,562 @@
+{
+  "version": 1,
+  "generator": "scripts/generate-ts-descriptors.mjs",
+  "sources": [
+    "node_modules/@types/react-dom/client.d.ts"
+  ],
+  "symbols": [
+    {
+      "id": "createRoot",
+      "kind": "function",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 86,
+        "startColumn": 1,
+        "endLine": 86,
+        "endColumn": 79,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "export function createRoot(container: Container, options?: RootOptions): Root;",
+      "hover": "createRoot lets you create a root to display React components inside a browser DOM node.",
+      "shape": {
+        "kind": "function",
+        "effect": "pure",
+        "args": [
+          {
+            "name": "container",
+            "type": {
+              "kind": "ref",
+              "id": "Container"
+            }
+          },
+          {
+            "name": "options",
+            "optional": true,
+            "type": {
+              "kind": "ref",
+              "id": "RootOptions"
+            }
+          }
+        ],
+        "result": {
+          "kind": "ref",
+          "id": "Root"
+        }
+      }
+    },
+    {
+      "id": "hydrateRoot",
+      "kind": "function",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 101,
+        "startColumn": 1,
+        "endLine": 105,
+        "endColumn": 9,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "export function hydrateRoot(\n    container: Element | Document,\n    initialChildren: React.ReactNode,\n    options?: HydrationOptions,\n): Root;",
+      "hover": "Same as `createRoot()`, but is used to hydrate a container whose HTML contents were rendered by ReactDOMServer.\n\nReact will attempt to attach event listeners to the existing markup.\n\n**Example Usage**\n\n```jsx\nhydrateRoot(document.querySelector('#root'), <App />)\n```",
+      "shape": {
+        "kind": "function",
+        "effect": "pure",
+        "args": [
+          {
+            "name": "container",
+            "type": {
+              "kind": "union",
+              "options": [
+                {
+                  "kind": "ref",
+                  "id": "Element"
+                },
+                {
+                  "kind": "ref",
+                  "id": "Document"
+                }
+              ]
+            }
+          },
+          {
+            "name": "initialChildren",
+            "type": {
+              "kind": "ref",
+              "id": "React.ReactNode"
+            }
+          },
+          {
+            "name": "options",
+            "optional": true,
+            "type": {
+              "kind": "ref",
+              "id": "HydrationOptions"
+            }
+          }
+        ],
+        "result": {
+          "kind": "ref",
+          "id": "Root"
+        }
+      }
+    },
+    {
+      "id": "HydrationOptions",
+      "kind": "interface",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 16,
+        "startColumn": 1,
+        "endLine": 35,
+        "endColumn": 2,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "export interface HydrationOptions {\n    formState?: ReactFormState | null;\n    /**\n     * Prefix for `useId`.\n     */\n    identifierPrefix?: string;\n    onUncaughtError?:\n        | ((error: unknown, errorInfo: { componentStack?: string | undefined }) => void)\n        | undefined;\n    onRecoverableError?: (error: unknown, errorInfo: ErrorInfo) => void;\n    onCaughtError?:\n        | ((\n            error: unknown,\n            errorInfo: {\n                componentStack?: string | undefined;\n                errorBoundary?: React.Component<unknown> | undefined;\n            },\n        ) => void)\n        | undefined;\n}",
+      "hover": "",
+      "shape": {
+        "kind": "record",
+        "fields": {
+          "formState": {
+            "kind": "option",
+            "element": {
+              "kind": "ref",
+              "id": "ReactFormState"
+            }
+          },
+          "identifierPrefix": {
+            "kind": "primitive",
+            "name": "string"
+          },
+          "onUncaughtError": {
+            "kind": "option",
+            "element": {
+              "kind": "function",
+              "effect": "pure",
+              "args": [
+                {
+                  "name": "error",
+                  "type": {
+                    "kind": "opaque",
+                    "name": "unknown"
+                  }
+                },
+                {
+                  "name": "errorInfo",
+                  "type": {
+                    "kind": "record",
+                    "fields": {
+                      "componentStack": {
+                        "kind": "option",
+                        "element": {
+                          "kind": "primitive",
+                          "name": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              ],
+              "result": {
+                "kind": "primitive",
+                "name": "void"
+              }
+            }
+          },
+          "onRecoverableError": {
+            "kind": "function",
+            "effect": "pure",
+            "args": [
+              {
+                "name": "error",
+                "type": {
+                  "kind": "opaque",
+                  "name": "unknown"
+                }
+              },
+              {
+                "name": "errorInfo",
+                "type": {
+                  "kind": "ref",
+                  "id": "ErrorInfo"
+                }
+              }
+            ],
+            "result": {
+              "kind": "primitive",
+              "name": "void"
+            }
+          },
+          "onCaughtError": {
+            "kind": "option",
+            "element": {
+              "kind": "function",
+              "effect": "pure",
+              "args": [
+                {
+                  "name": "error",
+                  "type": {
+                    "kind": "opaque",
+                    "name": "unknown"
+                  }
+                },
+                {
+                  "name": "errorInfo",
+                  "type": {
+                    "kind": "record",
+                    "fields": {
+                      "componentStack": {
+                        "kind": "option",
+                        "element": {
+                          "kind": "primitive",
+                          "name": "string"
+                        }
+                      },
+                      "errorBoundary": {
+                        "kind": "option",
+                        "element": {
+                          "kind": "ref",
+                          "id": "React.Component",
+                          "args": [
+                            {
+                              "kind": "opaque",
+                              "name": "unknown"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ],
+              "result": {
+                "kind": "primitive",
+                "name": "void"
+              }
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "Root",
+      "kind": "interface",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 61,
+        "startColumn": 1,
+        "endLine": 64,
+        "endColumn": 2,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "export interface Root {\n    render(children: React.ReactNode): void;\n    unmount(): void;\n}",
+      "hover": "",
+      "shape": {
+        "kind": "record",
+        "fields": {
+          "render": {
+            "kind": "function",
+            "effect": "pure",
+            "args": [
+              {
+                "name": "children",
+                "type": {
+                  "kind": "ref",
+                  "id": "React.ReactNode"
+                }
+              }
+            ],
+            "result": {
+              "kind": "primitive",
+              "name": "void"
+            }
+          },
+          "unmount": {
+            "kind": "function",
+            "effect": "pure",
+            "args": [],
+            "result": {
+              "kind": "primitive",
+              "name": "void"
+            }
+          }
+        }
+      }
+    },
+    {
+      "id": "Root.render",
+      "kind": "method",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 62,
+        "startColumn": 5,
+        "endLine": 62,
+        "endColumn": 45,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "render(children: React.ReactNode): void;",
+      "hover": "",
+      "shape": {
+        "kind": "function",
+        "effect": "pure",
+        "args": [
+          {
+            "name": "children",
+            "type": {
+              "kind": "ref",
+              "id": "React.ReactNode"
+            }
+          }
+        ],
+        "result": {
+          "kind": "primitive",
+          "name": "void"
+        }
+      }
+    },
+    {
+      "id": "Root.unmount",
+      "kind": "method",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 63,
+        "startColumn": 5,
+        "endLine": 63,
+        "endColumn": 21,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "unmount(): void;",
+      "hover": "",
+      "shape": {
+        "kind": "function",
+        "effect": "pure",
+        "args": [],
+        "result": {
+          "kind": "primitive",
+          "name": "void"
+        }
+      }
+    },
+    {
+      "id": "RootOptions",
+      "kind": "interface",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 37,
+        "startColumn": 1,
+        "endLine": 55,
+        "endColumn": 2,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "export interface RootOptions {\n    /**\n     * Prefix for `useId`.\n     */\n    identifierPrefix?: string;\n    onUncaughtError?:\n        | ((error: unknown, errorInfo: { componentStack?: string | undefined }) => void)\n        | undefined;\n    onRecoverableError?: (error: unknown, errorInfo: ErrorInfo) => void;\n    onCaughtError?:\n        | ((\n            error: unknown,\n            errorInfo: {\n                componentStack?: string | undefined;\n                errorBoundary?: React.Component<unknown> | undefined;\n            },\n        ) => void)\n        | undefined;\n}",
+      "hover": "",
+      "shape": {
+        "kind": "record",
+        "fields": {
+          "identifierPrefix": {
+            "kind": "primitive",
+            "name": "string"
+          },
+          "onUncaughtError": {
+            "kind": "option",
+            "element": {
+              "kind": "function",
+              "effect": "pure",
+              "args": [
+                {
+                  "name": "error",
+                  "type": {
+                    "kind": "opaque",
+                    "name": "unknown"
+                  }
+                },
+                {
+                  "name": "errorInfo",
+                  "type": {
+                    "kind": "record",
+                    "fields": {
+                      "componentStack": {
+                        "kind": "option",
+                        "element": {
+                          "kind": "primitive",
+                          "name": "string"
+                        }
+                      }
+                    }
+                  }
+                }
+              ],
+              "result": {
+                "kind": "primitive",
+                "name": "void"
+              }
+            }
+          },
+          "onRecoverableError": {
+            "kind": "function",
+            "effect": "pure",
+            "args": [
+              {
+                "name": "error",
+                "type": {
+                  "kind": "opaque",
+                  "name": "unknown"
+                }
+              },
+              {
+                "name": "errorInfo",
+                "type": {
+                  "kind": "ref",
+                  "id": "ErrorInfo"
+                }
+              }
+            ],
+            "result": {
+              "kind": "primitive",
+              "name": "void"
+            }
+          },
+          "onCaughtError": {
+            "kind": "option",
+            "element": {
+              "kind": "function",
+              "effect": "pure",
+              "args": [
+                {
+                  "name": "error",
+                  "type": {
+                    "kind": "opaque",
+                    "name": "unknown"
+                  }
+                },
+                {
+                  "name": "errorInfo",
+                  "type": {
+                    "kind": "record",
+                    "fields": {
+                      "componentStack": {
+                        "kind": "option",
+                        "element": {
+                          "kind": "primitive",
+                          "name": "string"
+                        }
+                      },
+                      "errorBoundary": {
+                        "kind": "option",
+                        "element": {
+                          "kind": "ref",
+                          "id": "React.Component",
+                          "args": [
+                            {
+                              "kind": "opaque",
+                              "name": "unknown"
+                            }
+                          ]
+                        }
+                      }
+                    }
+                  }
+                }
+              ],
+              "result": {
+                "kind": "primitive",
+                "name": "void"
+              }
+            }
+          }
+        }
+      }
+    }
+  ],
+  "anchors": [
+    {
+      "id": "react_dom.root.resource",
+      "category": "React DOM root",
+      "lean": "Lean.Vir.React.Root",
+      "ts": "Root",
+      "relation": "audit",
+      "portIntent": {
+        "disposition": "bind",
+        "representation": "hostResource",
+        "ownership": "hostOwned",
+        "lifetime": "until unmount or runtime disposal"
+      },
+      "note": "The TypeScript object interface is intentionally represented by a JavaScript-owned VIR resource."
+    },
+    {
+      "id": "react_dom.root.render",
+      "category": "React DOM root",
+      "lean": "Lean.Vir.TypeAnchors.reactRootRenderCall",
+      "ts": "Root.render",
+      "relation": "audit",
+      "portIntent": {
+        "disposition": "bind",
+        "effect": "dom",
+        "receiver": "borrowed",
+        "retention": "callbacks until rerender, unmount, or runtime disposal"
+      }
+    },
+    {
+      "id": "react_dom.root.unmount",
+      "category": "React DOM root",
+      "lean": "Lean.Vir.TypeAnchors.reactRootUnmountCall",
+      "ts": "Root.unmount",
+      "relation": "audit",
+      "portIntent": {
+        "disposition": "bind",
+        "effect": "dom",
+        "receiver": "borrowed",
+        "lifecycle": "release retained render state"
+      }
+    },
+    {
+      "id": "react_dom.root.create",
+      "category": "React DOM root",
+      "lean": "Lean.Vir.TypeAnchors.reactRootCreateCall",
+      "ts": "createRoot",
+      "relation": "audit",
+      "portIntent": {
+        "disposition": "bind",
+        "effect": "dom",
+        "container": "borrowed",
+        "resultOwnership": "hostOwned",
+        "resultRepresentation": "hostResource",
+        "omittedOptionalParameters": [
+          "options"
+        ]
+      },
+      "note": "VIR binds root creation but does not yet expose the optional RootOptions argument."
+    },
+    {
+      "id": "react_dom.root.options",
+      "category": "React DOM options",
+      "lean": "Lean.Vir.React.RootOptions",
+      "ts": "RootOptions",
+      "relation": "coverageGap",
+      "portIntent": {
+        "disposition": "unsupported"
+      },
+      "note": "Root creation options are an explicit coverage gap."
+    },
+    {
+      "id": "react_dom.hydration.entrypoint",
+      "category": "React DOM hydration",
+      "lean": "Lean.Vir.React.Root.hydrateRoot",
+      "ts": "hydrateRoot",
+      "relation": "coverageGap",
+      "portIntent": {
+        "disposition": "unsupported"
+      },
+      "note": "Hydration is not exposed by the current VIR React surface."
+    },
+    {
+      "id": "react_dom.hydration.options",
+      "category": "React DOM hydration",
+      "lean": "Lean.Vir.React.HydrationOptions",
+      "ts": "HydrationOptions",
+      "relation": "coverageGap",
+      "portIntent": {
+        "disposition": "unsupported"
+      },
+      "note": "Hydration options are paired with the unsupported hydration entry point."
+    }
+  ]
+}
