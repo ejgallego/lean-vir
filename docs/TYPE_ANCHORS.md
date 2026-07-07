@@ -34,13 +34,25 @@ reader can jump, and this is the text that should appear in a hover.
 The comparator reads descriptor JSON and a Lean VIR interface manifest:
 
 ```bash
+npm run generate:lean-type-anchor-manifest
 npm run compare:type-anchors
 ```
 
-For normal package work, pass a real `.irpkg` with
-`scripts/check-type-anchors.mjs --irpkg <package.irpkg>`. The checked-in
-`vir-v1.manifest.json` fixture exists only to keep this first corpus testable
-without committing generated package artifacts.
+`docs/type-descriptors/vir-v1.manifest.json` is generated from the real Lean
+anchor module `docs/type-descriptors/vir-v1.fixture.lean` and the roots listed
+in `docs/type-descriptors/vir-v1.roots.txt`. The module is deliberately small:
+it exports identity/call wrappers that force the package generator to describe
+the current `Vir.React` surface.
+
+Some React-side Lean types are transported as `Lean.Vir.Js α` resources. The
+VIR manifest can erase the phantom `α` and report only the generic `Js`
+resource, so the manifest generator also records lightweight
+`metadata.typeAnchorAliases` inferred from the Lean source signatures. Future
+generated React bindings should be able to replace or extend this hand-curated
+anchor module and emit the same alias metadata.
+
+For ad hoc package work, pass a real `.irpkg` directly with
+`scripts/check-type-anchors.mjs --irpkg <package.irpkg>`.
 
 ## React Corpus
 
@@ -77,10 +89,10 @@ event specializations, and `React.JSX.IntrinsicElements`. Weak matches are
 expected here because the React declarations are substantially richer than
 VIR's current browser-facing descriptors.
 
-The report also includes explicit coverage gaps for React nodes, elements,
-component types, refs, and JSX element types. In this corpus, `weak` means
-"useful audit/documentation pointer", while `missing` means "important React
-surface with no corresponding Lean VIR descriptor yet".
+The report points React nodes, elements, component types, refs, and JSX element
+types at the closest current `Lean.Vir.React` resource or function-component
+surface. In this corpus, `weak` means "useful audit/documentation pointer",
+while `missing` means "stale anchor or genuinely absent Lean VIR descriptor".
 
 The rendered report starts with a coverage matrix. The matrix groups anchors by
 category and separates two relation kinds:
@@ -92,7 +104,7 @@ category and separates two relation kinds:
 
 ## Output Contract
 
-The pipeline has three public outputs.
+The pipeline has four public outputs.
 
 `vir-v1.json` is the TypeScript descriptor index. Consumers may rely on:
 
@@ -117,6 +129,16 @@ The pipeline has three public outputs.
 - `coverage.categories[]`, the matrix used by the human-readable reports;
 - `typeScriptProvenance`, when present in the descriptor JSON, with package and
   documentation sources used to build an enriched report.
+
+`vir-v1.manifest.json` is the normalized Lean descriptor fixture. Consumers may
+rely on:
+
+- `version = 5`, the VIR interface manifest version;
+- `exports[]`, the Lean wrapper declarations generated from the anchor module;
+- `exports[].source`, a repository-relative pointer to the Lean source;
+- `metadata.targets[]`, the package generator target and roots;
+- `metadata.typeAnchorAliases[]`, best-effort aliases from erased `Js α`
+  resources back to their Lean phantom type names.
 
 `vir-v1.anchors.md` is a rendered documentation fragment. It is not the source
 of truth. It exists so a Verso/Blueprint document or ordinary Markdown page can

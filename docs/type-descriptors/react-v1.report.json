@@ -86,8 +86,8 @@
   "summary": {
     "exact": 0,
     "compatible": 0,
-    "weak": 22,
-    "missing": 11
+    "weak": 33,
+    "missing": 0
   },
   "coverage": {
     "categories": [
@@ -192,14 +192,14 @@
         "category": "Rendered values and elements",
         "anchors": 4,
         "relations": {
-          "audit": 0,
-          "coverageGap": 4
+          "audit": 4,
+          "coverageGap": 0
         },
         "status": {
           "exact": 0,
           "compatible": 0,
-          "weak": 0,
-          "missing": 4
+          "weak": 4,
+          "missing": 0
         },
         "typeScriptSymbols": [
           "React.ReactNode",
@@ -209,31 +209,27 @@
         ],
         "leanTargets": [
           "Lean.Vir.React.Node",
-          "Lean.Vir.React.Element",
-          "Lean.Vir.React.JSX.Element",
-          "Lean.Vir.React.JSX.ElementType"
+          "Lean.Vir.React.ElementType"
         ],
-        "leanDescriptors": [],
-        "missingLeanTargets": [
+        "leanDescriptors": [
           "Lean.Vir.React.Node",
-          "Lean.Vir.React.Element",
-          "Lean.Vir.React.JSX.Element",
-          "Lean.Vir.React.JSX.ElementType"
+          "Lean.Vir.React.ElementType"
         ],
-        "interpretation": "Coverage gap: these React surfaces have no Lean VIR descriptor yet."
+        "missingLeanTargets": [],
+        "interpretation": "Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different."
       },
       {
         "category": "Components and refs",
         "anchors": 7,
         "relations": {
-          "audit": 0,
-          "coverageGap": 7
+          "audit": 7,
+          "coverageGap": 0
         },
         "status": {
           "exact": 0,
           "compatible": 0,
-          "weak": 0,
-          "missing": 7
+          "weak": 7,
+          "missing": 0
         },
         "typeScriptSymbols": [
           "React.ElementType",
@@ -246,22 +242,16 @@
         ],
         "leanTargets": [
           "Lean.Vir.React.ElementType",
-          "Lean.Vir.React.ComponentType",
-          "Lean.Vir.React.JSXElementConstructor",
-          "Lean.Vir.React.FunctionComponent",
-          "Lean.Vir.React.Ref",
-          "Lean.Vir.React.RefObject"
+          "Lean.Vir.React.Component",
+          "Lean.Vir.React.Ref"
         ],
-        "leanDescriptors": [],
-        "missingLeanTargets": [
+        "leanDescriptors": [
           "Lean.Vir.React.ElementType",
-          "Lean.Vir.React.ComponentType",
-          "Lean.Vir.React.JSXElementConstructor",
-          "Lean.Vir.React.FunctionComponent",
-          "Lean.Vir.React.Ref",
-          "Lean.Vir.React.RefObject"
+          "Lean.Vir.React.Component",
+          "Lean.Vir.React.Ref"
         ],
-        "interpretation": "Coverage gap: these React surfaces have no Lean VIR descriptor yet."
+        "missingLeanTargets": [],
+        "interpretation": "Audit coverage: VIR has a related descriptor, but the React type surface is richer or structurally different."
       }
     ]
   },
@@ -8361,7 +8351,7 @@
               "effect": "dom",
               "args": [
                 {
-                  "name": "event",
+                  "name": "arg1",
                   "type": {
                     "kind": "resource",
                     "name": "Lean.Vir.Browser.Event"
@@ -8422,7 +8412,7 @@
               "effect": "dom",
               "args": [
                 {
-                  "name": "event",
+                  "name": "arg1",
                   "type": {
                     "kind": "resource",
                     "name": "Lean.Vir.Browser.Event"
@@ -8499,7 +8489,7 @@
               "effect": "dom",
               "args": [
                 {
-                  "name": "event",
+                  "name": "arg1",
                   "type": {
                     "kind": "resource",
                     "name": "Lean.Vir.Browser.Event"
@@ -8573,7 +8563,7 @@
               "effect": "dom",
               "args": [
                 {
-                  "name": "event",
+                  "name": "arg1",
                   "type": {
                     "kind": "resource",
                     "name": "Lean.Vir.Browser.Event"
@@ -11273,13 +11263,24 @@
       "id": "react.render.react_node",
       "lean": "Lean.Vir.React.Node",
       "ts": "React.ReactNode",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.Node"
+        "kind differs: Lean resource vs TypeScript union"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Rendered values and elements",
-      "note": "Coverage gap: VIR does not yet expose a Lean descriptor for the full set of renderable React children.",
+      "note": "Audit anchor from React's broad renderable union to VIR's JavaScript-owned React node resource.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Node",
+        "label": "Lean.Vir.Js Lean.Vir.React.Node",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "resource",
+          "name": "Lean.Vir.React.Node",
+          "resource": "Lean.Vir.Js Lean.Vir.React.Node"
+        }
+      },
       "tsSymbol": {
         "id": "React.ReactNode",
         "kind": "type",
@@ -11357,15 +11358,26 @@
     },
     {
       "id": "react.render.react_element",
-      "lean": "Lean.Vir.React.Element",
+      "lean": "Lean.Vir.React.Node",
       "ts": "React.ReactElement",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.Element"
+        "kind differs: Lean resource vs TypeScript record"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Rendered values and elements",
-      "note": "Coverage gap: VIR does not yet expose a Lean descriptor for JSX element values.",
+      "note": "Audit anchor from React element objects to VIR's React node resource lane.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Node",
+        "label": "Lean.Vir.Js Lean.Vir.React.Node",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "resource",
+          "name": "Lean.Vir.React.Node",
+          "resource": "Lean.Vir.Js Lean.Vir.React.Node"
+        }
+      },
       "tsSymbol": {
         "id": "React.ReactElement",
         "kind": "interface",
@@ -11402,15 +11414,26 @@
     },
     {
       "id": "react.render.jsx_element",
-      "lean": "Lean.Vir.React.JSX.Element",
+      "lean": "Lean.Vir.React.Node",
       "ts": "React.JSX.Element",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.JSX.Element"
+        "kind differs: Lean resource vs TypeScript record"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Rendered values and elements",
-      "note": "Coverage gap: JSX's element interface has no corresponding VIR descriptor today.",
+      "note": "Audit anchor from JSX element values to VIR's React node resource lane.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Node",
+        "label": "Lean.Vir.Js Lean.Vir.React.Node",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "resource",
+          "name": "Lean.Vir.React.Node",
+          "resource": "Lean.Vir.Js Lean.Vir.React.Node"
+        }
+      },
       "tsSymbol": {
         "id": "React.JSX.Element",
         "kind": "interface",
@@ -11431,15 +11454,26 @@
     },
     {
       "id": "react.render.jsx_element_type",
-      "lean": "Lean.Vir.React.JSX.ElementType",
+      "lean": "Lean.Vir.React.ElementType",
       "ts": "React.JSX.ElementType",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.JSX.ElementType"
+        "kind differs: Lean resource vs TypeScript union"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Rendered values and elements",
-      "note": "Coverage gap: JSX element-type selection has no corresponding VIR descriptor today.",
+      "note": "Audit anchor from JSX element-type selection to VIR's JavaScript-owned React element-type resource.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.ElementType",
+        "label": "Lean.Vir.Js Lean.Vir.React.ElementType",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "resource",
+          "name": "Lean.Vir.React.ElementType",
+          "resource": "Lean.Vir.Js Lean.Vir.React.ElementType"
+        }
+      },
       "tsSymbol": {
         "id": "React.JSX.ElementType",
         "kind": "type",
@@ -11477,13 +11511,24 @@
       "id": "react.components.element_type",
       "lean": "Lean.Vir.React.ElementType",
       "ts": "React.ElementType",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.ElementType"
+        "kind differs: Lean resource vs TypeScript union"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Components and refs",
-      "note": "Coverage gap: VIR does not yet describe component-or-tag values.",
+      "note": "Audit anchor from React's tag-or-component element type to VIR's explicit ElementType resource.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.ElementType",
+        "label": "Lean.Vir.Js Lean.Vir.React.ElementType",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "resource",
+          "name": "Lean.Vir.React.ElementType",
+          "resource": "Lean.Vir.Js Lean.Vir.React.ElementType"
+        }
+      },
       "tsSymbol": {
         "id": "React.ElementType",
         "kind": "type",
@@ -11519,15 +11564,39 @@
     },
     {
       "id": "react.components.component_type",
-      "lean": "Lean.Vir.React.ComponentType",
+      "lean": "Lean.Vir.React.Component",
       "ts": "React.ComponentType",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.ComponentType"
+        "kind differs: Lean function vs TypeScript union"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Components and refs",
-      "note": "Coverage gap: user-defined component types are outside the current VIR manifest.",
+      "note": "Audit anchor from React component classes/functions to VIR's Lean-authored function component type.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Component",
+        "label": "Lean.Vir.React.Component",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "function",
+          "effect": "react",
+          "args": [
+            {
+              "name": "arg1",
+              "type": {
+                "kind": "primitive",
+                "name": "Unit"
+              }
+            }
+          ],
+          "result": {
+            "kind": "resource",
+            "name": "Lean.Vir.React.Node",
+            "resource": "Lean.Vir.Js Lean.Vir.React.Node"
+          }
+        }
+      },
       "tsSymbol": {
         "id": "React.ComponentType",
         "kind": "type",
@@ -11569,15 +11638,39 @@
     },
     {
       "id": "react.components.jsx_element_constructor",
-      "lean": "Lean.Vir.React.JSXElementConstructor",
+      "lean": "Lean.Vir.React.Component",
       "ts": "React.JSXElementConstructor",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.JSXElementConstructor"
+        "kind differs: Lean function vs TypeScript union"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Components and refs",
-      "note": "Coverage gap: JSX component constructors are not represented by the current VIR manifest.",
+      "note": "Audit anchor from JSX component constructors to VIR's Lean-authored function component type.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Component",
+        "label": "Lean.Vir.React.Component",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "function",
+          "effect": "react",
+          "args": [
+            {
+              "name": "arg1",
+              "type": {
+                "kind": "primitive",
+                "name": "Unit"
+              }
+            }
+          ],
+          "result": {
+            "kind": "resource",
+            "name": "Lean.Vir.React.Node",
+            "resource": "Lean.Vir.Js Lean.Vir.React.Node"
+          }
+        }
+      },
       "tsSymbol": {
         "id": "React.JSXElementConstructor",
         "kind": "type",
@@ -11635,15 +11728,39 @@
     },
     {
       "id": "react.components.function_component",
-      "lean": "Lean.Vir.React.FunctionComponent",
+      "lean": "Lean.Vir.React.Component",
       "ts": "React.FunctionComponent",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.FunctionComponent"
+        "kind differs: Lean function vs TypeScript record"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Components and refs",
-      "note": "Coverage gap: function component call signatures are not represented by the current VIR manifest.",
+      "note": "Audit anchor from React function component call signatures to VIR's Lean component function.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Component",
+        "label": "Lean.Vir.React.Component",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "function",
+          "effect": "react",
+          "args": [
+            {
+              "name": "arg1",
+              "type": {
+                "kind": "primitive",
+                "name": "Unit"
+              }
+            }
+          ],
+          "result": {
+            "kind": "resource",
+            "name": "Lean.Vir.React.Node",
+            "resource": "Lean.Vir.Js Lean.Vir.React.Node"
+          }
+        }
+      },
       "tsSymbol": {
         "id": "React.FunctionComponent",
         "kind": "interface",
@@ -11676,15 +11793,39 @@
     },
     {
       "id": "react.components.fc",
-      "lean": "Lean.Vir.React.FunctionComponent",
+      "lean": "Lean.Vir.React.Component",
       "ts": "React.FC",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.FunctionComponent"
+        "kind differs: Lean function vs TypeScript record"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Components and refs",
-      "note": "Coverage gap: React.FC is included as a common alias for function components.",
+      "note": "Audit anchor for React.FC as a common alias for function components.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Component",
+        "label": "Lean.Vir.React.Component",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "function",
+          "effect": "react",
+          "args": [
+            {
+              "name": "arg1",
+              "type": {
+                "kind": "primitive",
+                "name": "Unit"
+              }
+            }
+          ],
+          "result": {
+            "kind": "resource",
+            "name": "Lean.Vir.React.Node",
+            "resource": "Lean.Vir.Js Lean.Vir.React.Node"
+          }
+        }
+      },
       "tsSymbol": {
         "id": "React.FC",
         "kind": "type",
@@ -11713,13 +11854,24 @@
       "id": "react.refs.ref",
       "lean": "Lean.Vir.React.Ref",
       "ts": "React.Ref",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.Ref"
+        "kind differs: Lean resource vs TypeScript union"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Components and refs",
-      "note": "Coverage gap: refs are not represented in the current VIR React descriptor surface.",
+      "note": "Audit anchor from React's callback/object/null ref union to VIR's JavaScript-owned Ref resource.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Ref",
+        "label": "Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js String))",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "resource",
+          "name": "Lean.Vir.React.Ref",
+          "resource": "Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js String))"
+        }
+      },
       "tsSymbol": {
         "id": "React.Ref",
         "kind": "type",
@@ -11768,15 +11920,26 @@
     },
     {
       "id": "react.refs.ref_object",
-      "lean": "Lean.Vir.React.RefObject",
+      "lean": "Lean.Vir.React.Ref",
       "ts": "React.RefObject",
-      "status": "missing",
+      "status": "weak",
       "notes": [
-        "missing Lean descriptor Lean.Vir.React.RefObject"
+        "kind differs: Lean resource vs TypeScript record"
       ],
-      "relation": "coverageGap",
+      "relation": "audit",
       "category": "Components and refs",
-      "note": "Coverage gap: ref objects are not represented in the current VIR React descriptor surface.",
+      "note": "Audit anchor from React's { current } object type to VIR's opaque Ref resource plus get/set helpers.",
+      "leanDescriptor": {
+        "kind": "type",
+        "lean": "Lean.Vir.React.Ref",
+        "label": "Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js String))",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "shape": {
+          "kind": "resource",
+          "name": "Lean.Vir.React.Ref",
+          "resource": "Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js String))"
+        }
+      },
       "tsSymbol": {
         "id": "React.RefObject",
         "kind": "interface",

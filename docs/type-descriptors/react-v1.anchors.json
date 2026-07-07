@@ -160,77 +160,88 @@
       "category": "Rendered values and elements",
       "lean": "Lean.Vir.React.Node",
       "ts": "React.ReactNode",
-      "note": "Coverage gap: VIR does not yet expose a Lean descriptor for the full set of renderable React children."
+      "relation": "audit",
+      "note": "Audit anchor from React's broad renderable union to VIR's JavaScript-owned React node resource."
     },
     {
       "id": "react.render.react_element",
       "category": "Rendered values and elements",
-      "lean": "Lean.Vir.React.Element",
+      "lean": "Lean.Vir.React.Node",
       "ts": "React.ReactElement",
-      "note": "Coverage gap: VIR does not yet expose a Lean descriptor for JSX element values."
+      "relation": "audit",
+      "note": "Audit anchor from React element objects to VIR's React node resource lane."
     },
     {
       "id": "react.render.jsx_element",
       "category": "Rendered values and elements",
-      "lean": "Lean.Vir.React.JSX.Element",
+      "lean": "Lean.Vir.React.Node",
       "ts": "React.JSX.Element",
-      "note": "Coverage gap: JSX's element interface has no corresponding VIR descriptor today."
+      "relation": "audit",
+      "note": "Audit anchor from JSX element values to VIR's React node resource lane."
     },
     {
       "id": "react.render.jsx_element_type",
       "category": "Rendered values and elements",
-      "lean": "Lean.Vir.React.JSX.ElementType",
+      "lean": "Lean.Vir.React.ElementType",
       "ts": "React.JSX.ElementType",
-      "note": "Coverage gap: JSX element-type selection has no corresponding VIR descriptor today."
+      "relation": "audit",
+      "note": "Audit anchor from JSX element-type selection to VIR's JavaScript-owned React element-type resource."
     },
     {
       "id": "react.components.element_type",
       "category": "Components and refs",
       "lean": "Lean.Vir.React.ElementType",
       "ts": "React.ElementType",
-      "note": "Coverage gap: VIR does not yet describe component-or-tag values."
+      "relation": "audit",
+      "note": "Audit anchor from React's tag-or-component element type to VIR's explicit ElementType resource."
     },
     {
       "id": "react.components.component_type",
       "category": "Components and refs",
-      "lean": "Lean.Vir.React.ComponentType",
+      "lean": "Lean.Vir.React.Component",
       "ts": "React.ComponentType",
-      "note": "Coverage gap: user-defined component types are outside the current VIR manifest."
+      "relation": "audit",
+      "note": "Audit anchor from React component classes/functions to VIR's Lean-authored function component type."
     },
     {
       "id": "react.components.jsx_element_constructor",
       "category": "Components and refs",
-      "lean": "Lean.Vir.React.JSXElementConstructor",
+      "lean": "Lean.Vir.React.Component",
       "ts": "React.JSXElementConstructor",
-      "note": "Coverage gap: JSX component constructors are not represented by the current VIR manifest."
+      "relation": "audit",
+      "note": "Audit anchor from JSX component constructors to VIR's Lean-authored function component type."
     },
     {
       "id": "react.components.function_component",
       "category": "Components and refs",
-      "lean": "Lean.Vir.React.FunctionComponent",
+      "lean": "Lean.Vir.React.Component",
       "ts": "React.FunctionComponent",
-      "note": "Coverage gap: function component call signatures are not represented by the current VIR manifest."
+      "relation": "audit",
+      "note": "Audit anchor from React function component call signatures to VIR's Lean component function."
     },
     {
       "id": "react.components.fc",
       "category": "Components and refs",
-      "lean": "Lean.Vir.React.FunctionComponent",
+      "lean": "Lean.Vir.React.Component",
       "ts": "React.FC",
-      "note": "Coverage gap: React.FC is included as a common alias for function components."
+      "relation": "audit",
+      "note": "Audit anchor for React.FC as a common alias for function components."
     },
     {
       "id": "react.refs.ref",
       "category": "Components and refs",
       "lean": "Lean.Vir.React.Ref",
       "ts": "React.Ref",
-      "note": "Coverage gap: refs are not represented in the current VIR React descriptor surface."
+      "relation": "audit",
+      "note": "Audit anchor from React's callback/object/null ref union to VIR's JavaScript-owned Ref resource."
     },
     {
       "id": "react.refs.ref_object",
       "category": "Components and refs",
-      "lean": "Lean.Vir.React.RefObject",
+      "lean": "Lean.Vir.React.Ref",
       "ts": "React.RefObject",
-      "note": "Coverage gap: ref objects are not represented in the current VIR React descriptor surface."
+      "relation": "audit",
+      "note": "Audit anchor from React's { current } object type to VIR's opaque Ref resource plus get/set helpers."
     }
   ]
 }

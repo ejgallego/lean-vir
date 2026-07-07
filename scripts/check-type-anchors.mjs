@@ -163,6 +163,7 @@ function validateTsDescriptors(value) {
 
 function collectLeanDescriptors(manifest) {
   const descriptors = new Map();
+  const exportsByEntry = new Map();
   for (const entry of manifest.exports) {
     const descriptor = {
       kind: "export",
@@ -179,6 +180,7 @@ function collectLeanDescriptors(manifest) {
     addLeanDescriptor(descriptors, entry.entry, descriptor);
     addLeanDescriptor(descriptors, entry.id, descriptor);
     addLeanDescriptor(descriptors, entry.jsName, descriptor);
+    exportsByEntry.set(entry.entry, { entry, descriptor });
     collectLeanTypes(descriptors, entry.result);
     for (const arg of entry.args ?? []) collectLeanTypes(descriptors, arg.type);
   }
@@ -200,7 +202,87 @@ function collectLeanDescriptors(manifest) {
     collectLeanTypes(descriptors, entry.result);
     for (const arg of entry.args ?? []) collectLeanTypes(descriptors, arg.type);
   }
+  collectLeanTypeAnchorAliases(descriptors, manifest, exportsByEntry);
   return descriptors;
+}
+
+function collectLeanTypeAnchorAliases(descriptors, manifest, exportsByEntry) {
+  const aliases = manifest.metadata?.typeAnchorAliases;
+  if (!Array.isArray(aliases)) return;
+  for (const alias of aliases) {
+    if (typeof alias?.lean !== "string" || typeof alias.via !== "string") continue;
+    const via = exportsByEntry.get(alias.via);
+    const descriptor = {
+      kind: "type",
+      lean: alias.lean,
+      label: alias.type ?? alias.lean,
+      source: alias.source ?? via?.descriptor.source,
+      shape: leanAliasShape(alias, via?.entry, via?.descriptor),
+    };
+    addLeanDescriptor(descriptors, alias.lean, descriptor);
+    addLeanDescriptor(descriptors, alias.type, descriptor);
+  }
+}
+
+function leanAliasShape(alias, entry, viaDescriptor) {
+  if (alias.descriptor === "resource") {
+    return { kind: "resource", name: alias.lean, resource: alias.type };
+  }
+  if (alias.shapeFrom?.startsWith("arg:") && entry !== undefined) {
+    const argName = alias.shapeFrom.slice("arg:".length);
+    const arg = (entry.args ?? []).find((candidate) => candidate.name === argName);
+    if (arg !== undefined) {
+      const shape = leanShape(arg.type);
+      return typeof alias.resultResource === "string"
+        ? replaceGenericJsResource(shape, alias.resultResource)
+        : shape;
+    }
+  }
+  if (alias.descriptor === "function" && viaDescriptor !== undefined) {
+    return viaDescriptor.shape;
+  }
+  return { kind: "opaque", name: alias.type ?? alias.lean };
+}
+
+function replaceGenericJsResource(shape, resourceName) {
+  if (shape === null || typeof shape !== "object") return shape;
+  if (shape.kind === "resource" && shape.name === "Lean.Vir.Js") {
+    return { ...shape, name: resourceName, resource: `Lean.Vir.Js ${resourceName}` };
+  }
+  if (shape.kind === "function") {
+    return {
+      ...shape,
+      args: (shape.args ?? []).map((arg) => ({ ...arg, type: replaceGenericJsResource(arg.type, resourceName) })),
+      result: replaceGenericJsResource(shape.result, resourceName),
+    };
+  }
+  if (shape.kind === "array" || shape.kind === "option") {
+    return { ...shape, element: replaceGenericJsResource(shape.element, resourceName) };
+  }
+  if (shape.kind === "tuple") {
+    return { ...shape, elements: (shape.elements ?? []).map((item) => replaceGenericJsResource(item, resourceName)) };
+  }
+  if (shape.kind === "record") {
+    return {
+      ...shape,
+      fields: Object.fromEntries(Object.entries(shape.fields ?? {})
+        .map(([name, field]) => [name, replaceGenericJsResource(field, resourceName)])),
+    };
+  }
+  if (shape.kind === "variant") {
+    return {
+      ...shape,
+      constructors: Object.fromEntries(Object.entries(shape.constructors ?? {}).map(([name, ctor]) => [
+        name,
+        {
+          ...ctor,
+          fields: Object.fromEntries(Object.entries(ctor.fields ?? {})
+            .map(([fieldName, field]) => [fieldName, replaceGenericJsResource(field, resourceName)])),
+        },
+      ])),
+    };
+  }
+  return shape;
 }
 
 function collectLeanTypes(descriptors, type) {
