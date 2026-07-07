@@ -65,6 +65,13 @@
     .summary-card { padding: 12px; }
     .summary-card strong { display: block; font-size: 22px; }
     .summary-card span { color: var(--muted); }
+    .groups { display: grid; gap: 28px; }
+    .anchor-group { display: grid; gap: 12px; }
+    .group-title {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
     .anchors { display: grid; gap: 14px; }
     .anchor { padding: 16px; }
     .anchor-head {
@@ -114,6 +121,7 @@
       margin: 0;
       padding: 12px;
       overflow-x: auto;
+      max-height: 420px;
       background: var(--code);
       border: 1px solid var(--line);
       border-radius: 6px;
@@ -150,7 +158,10 @@
       <div class="summary-card weak"><strong>0</strong><span>weak</span></div>
       <div class="summary-card missing"><strong>0</strong><span>missing</span></div>
     </section>
-    <section class="anchors" aria-label="Type anchors">
+    <div class="groups" aria-label="Type anchors">
+      <section class="anchor-group" aria-labelledby="type-anchor-group-type_anchors">
+        <h2 class="group-title" id="type-anchor-group-type_anchors">Type anchors</h2>
+        <div class="anchors">
       <article class="anchor" id="type-anchor-react_style_property" data-vir-type-anchor-hover="exact: Lean.Vir.React.StyleProperty -&gt; LeanVir.React.StyleProperty
 
 A single React style object entry.">
@@ -165,6 +176,7 @@ A single React style object entry.">LeanVir.React.StyleProperty</a></h2>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L30-L33">docs/type-descriptors/vir-v1.types.d.ts:30</a></span>
+          <span>Category: Type anchors</span>
           <span>Anchor: <code>react.style_property</code></span>
         </div>
         <div class="comparison">
@@ -184,7 +196,6 @@ structure Lean.Vir.React.StyleProperty {
 }</code></pre>
           </section>
         </div>
-        
         <p class="hover">A single React style object entry.</p>
       </article>
       <article class="anchor" id="type-anchor-react_prop_value" data-vir-type-anchor-hover="compatible: Lean.Vir.React.PropValue -&gt; LeanVir.React.PropValue
@@ -205,6 +216,7 @@ Lean Int accepts one TypeScript union arm compatibly">LeanVir.React.PropValue</a
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L36-L42">docs/type-descriptors/vir-v1.types.d.ts:36</a></span>
+          <span>Category: Type anchors</span>
           <span>Anchor: <code>react.prop_value</code></span>
         </div>
         <div class="comparison">
@@ -251,6 +263,7 @@ Lean Int accepts one TypeScript union arm compatibly">LeanVir.React.Property</a>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L45-L48">docs/type-descriptors/vir-v1.types.d.ts:45</a></span>
+          <span>Category: Type anchors</span>
           <span>Anchor: <code>react.property</code></span>
         </div>
         <div class="comparison">
@@ -298,6 +311,7 @@ Lean Unit uses TypeScript void representation">LeanVir.React.EventHandler</a></h
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L51-L54">docs/type-descriptors/vir-v1.types.d.ts:51</a></span>
+          <span>Category: Type anchors</span>
           <span>Anchor: <code>react.event_handler</code></span>
         </div>
         <div class="comparison">
@@ -334,6 +348,7 @@ Browser event resource marker.">LeanVir.Browser.Event</a></h2>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L23-L25">docs/type-descriptors/vir-v1.types.d.ts:23</a></span>
+          <span>Category: Type anchors</span>
           <span>Anchor: <code>browser.event</code></span>
         </div>
         <div class="comparison">
@@ -349,7 +364,7 @@ Browser event resource marker.">LeanVir.Browser.Event</a></h2>
 resource Lean.Vir.Browser.Event</code></pre>
           </section>
         </div>
-        
+        <p class="notes">Resource markers compare by identity suffix in v1.</p>
         <p class="hover">Browser event resource marker.</p>
       </article>
       <article class="anchor" id="type-anchor-react_property_identity" data-vir-type-anchor-hover="compatible: Lean.Vir.TypeAnchors.reactPropertyIdentity -&gt; LeanVir.React.PropertyIdentity
@@ -370,6 +385,7 @@ Lean Int accepts one TypeScript union arm compatibly">LeanVir.React.PropertyIden
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="vir-v1.types.d.ts#L57-L58">docs/type-descriptors/vir-v1.types.d.ts:57</a></span>
+          <span>Category: Type anchors</span>
           <span>Anchor: <code>react.property_identity</code></span>
         </div>
         <div class="comparison">
@@ -387,7 +403,9 @@ Lean Int accepts one TypeScript union arm compatibly">LeanVir.React.PropertyIden
         <p class="notes">Lean Int accepts one TypeScript union arm compatibly</p>
         <p class="hover">Sample callable shape used by the descriptor anchor fixture.</p>
       </article>
-    </section>
+        </div>
+      </section>
+    </div>
   </main>
 </body>
 </html>
