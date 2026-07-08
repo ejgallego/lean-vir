@@ -43,6 +43,8 @@ const sourceIdentityPaths = [
   "wasm/upstream_shim/package/decl_provider.h",
   "wasm/upstream_shim/package/package_binary_reader.h",
   "wasm/upstream_shim/package/package_decl_provider_types.h",
+  "wasm/upstream_shim/package/package_ir_builders.cpp",
+  "wasm/upstream_shim/package/package_ir_builders.h",
   "wasm/upstream_shim/interpreter/interpreter_bridge.cpp",
   "wasm/upstream_shim/interpreter/interpreter_bridge.h",
   "wasm/upstream_shim/abi/call_abi.cpp",
