@@ -520,6 +520,66 @@ private:
     }
 };
 
+static std::vector<decl_entry> read_decl_entries(reader & r, uint32_t count) {
+    std::vector<decl_entry> entries;
+    entries.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        object * n = r.name();
+        object * boxed_base = r.boolean() ? r.name() : nullptr;
+        object * d = r.decl(n);
+        entries.push_back({ n, boxed_base, d });
+    }
+    return entries;
+}
+
+static std::vector<init_global_entry> read_init_entries(reader & r) {
+    uint32_t count = r.u32();
+    std::vector<init_global_entry> entries;
+    entries.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        object * n = r.name();
+        object * init_name = r.name();
+        entries.push_back({ n, init_name });
+    }
+    return entries;
+}
+
+static std::vector<host_import_entry> read_host_imports(reader & r) {
+    uint32_t count = r.u32();
+    std::vector<host_import_entry> entries;
+    entries.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        entries.push_back(r.host_import());
+    }
+    return entries;
+}
+
+static std::vector<export_call_summary_entry> read_export_summaries(reader & r) {
+    uint32_t count = r.u32();
+    std::vector<export_call_summary_entry> entries;
+    entries.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        entries.push_back(r.export_summary());
+    }
+    return entries;
+}
+
+static std::vector<uint32_t> build_call_summary_indices(
+    std::vector<decl_entry> const & entries,
+    std::vector<export_call_summary_entry> const & export_summaries) {
+    std::vector<uint32_t> indices(entries.size(), UINT32_MAX);
+    for (size_t i = 0; i < entries.size(); i++) {
+        object * call_name = entries[i].boxed_base ? entries[i].boxed_base : entries[i].name;
+        for (size_t j = 0; j < export_summaries.size(); j++) {
+            if (lean_name_eq(call_name, export_summaries[j].name)) {
+                indices[i] = static_cast<uint32_t>(j);
+                break;
+            }
+        }
+    }
+    return indices;
+}
+
 } // namespace
 
 bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & out, std::string & error) {
@@ -547,37 +607,10 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
         return false;
     }
 
-    std::vector<decl_entry> entries;
-    entries.reserve(count);
-    for (uint32_t i = 0; i < count; i++) {
-        object * n = r.name();
-        object * boxed_base = r.boolean() ? r.name() : nullptr;
-        object * d = r.decl(n);
-        entries.push_back({ n, boxed_base, d });
-    }
-
-    std::vector<init_global_entry> init_entries;
-    uint32_t init_count = r.u32();
-    init_entries.reserve(init_count);
-    for (uint32_t i = 0; i < init_count; i++) {
-        object * n = r.name();
-        object * init_name = r.name();
-        init_entries.push_back({ n, init_name });
-    }
-
-    std::vector<host_import_entry> host_imports;
-    uint32_t host_import_count = r.u32();
-    host_imports.reserve(host_import_count);
-    for (uint32_t i = 0; i < host_import_count; i++) {
-        host_imports.push_back(r.host_import());
-    }
-
-    std::vector<export_call_summary_entry> export_summaries;
-    uint32_t export_summary_count = r.u32();
-    export_summaries.reserve(export_summary_count);
-    for (uint32_t i = 0; i < export_summary_count; i++) {
-        export_summaries.push_back(r.export_summary());
-    }
+    std::vector<decl_entry> entries = read_decl_entries(r, count);
+    std::vector<init_global_entry> init_entries = read_init_entries(r);
+    std::vector<host_import_entry> host_imports = read_host_imports(r);
+    std::vector<export_call_summary_entry> export_summaries = read_export_summaries(r);
     if (!r.ok) {
         error = r.error();
         return false;
@@ -593,16 +626,7 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
         return false;
     }
 
-    std::vector<uint32_t> call_summary_indices(entries.size(), UINT32_MAX);
-    for (size_t i = 0; i < entries.size(); i++) {
-        object * call_name = entries[i].boxed_base ? entries[i].boxed_base : entries[i].name;
-        for (size_t j = 0; j < export_summaries.size(); j++) {
-            if (lean_name_eq(call_name, export_summaries[j].name)) {
-                call_summary_indices[i] = static_cast<uint32_t>(j);
-                break;
-            }
-        }
-    }
+    std::vector<uint32_t> call_summary_indices = build_call_summary_indices(entries, export_summaries);
 
     out.entries = std::move(entries);
     out.init_entries = std::move(init_entries);
