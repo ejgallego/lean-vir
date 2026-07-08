@@ -15,8 +15,10 @@ package lookup, and temporary runtime glue live here instead.
   trampolines used by restricted `dlsym` lookup.
 - `signature_cache.h` and `signature_cache.cpp`: package-call signature
   summaries keyed by the current loaded package generation.
-- `object_abi.cpp`: owned `lean_object *` helpers used by the runtime object
-  call path and boundary tests.
+- `object_abi.cpp`: generic owned `lean_object *` helpers used by the runtime
+  object call path and boundary tests.
+- `object_expr_abi.cpp`: temporary `Lean.Level`, `Lean.Expr`, literal, and
+  name-string helpers used by current object-boundary fixtures.
 - `resource_abi.h` and `resource_abi.cpp`: shared external resource class for
   `Lean.Vir.Js α` values.
 - `call_signature_summary.h` and `call_signature_summary.cpp`: streaming package-call

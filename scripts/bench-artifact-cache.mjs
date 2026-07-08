@@ -56,6 +56,7 @@ const sourceIdentityPaths = [
   "wasm/upstream_shim/signature_cache.cpp",
   "wasm/upstream_shim/signature_cache.h",
   "wasm/upstream_shim/object_abi.cpp",
+  "wasm/upstream_shim/object_expr_abi.cpp",
   "wasm/upstream_shim/package_decl_provider.cpp",
   "wasm/upstream_shim/package_ir_decoder.cpp",
   "wasm/upstream_shim/platform_stubs.cpp",

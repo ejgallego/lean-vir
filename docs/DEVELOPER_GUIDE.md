@@ -53,6 +53,8 @@ For WASI/runtime boundary work, read:
 7. `wasm/upstream_shim/package_ir_decoder.cpp`
 8. `wasm/upstream_shim/native_symbols.cpp`
 9. `wasm/upstream_shim/native_symbol_lookup.cpp`
+10. `wasm/upstream_shim/object_abi.cpp`
+11. `wasm/upstream_shim/object_expr_abi.cpp`
 
 For benchmark work, read:
 

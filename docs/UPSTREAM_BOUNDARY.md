@@ -62,6 +62,10 @@ not a fork of Lean. It is split by responsibility:
 - `call_signature_summary.cpp` owns the streaming package-call signature parser used
   to compute call arity and boxed-boundary requirements.
 - `name_utils.cpp` owns shared Lean `Name` construction helpers.
+- `object_abi.cpp` owns generic owned `lean_object *` helpers used by the
+  runtime object call path.
+- `object_expr_abi.cpp` owns the temporary `Lean.Level`, `Lean.Expr`, literal,
+  and name-string helpers used by current object-boundary fixtures.
 - `resource_abi.cpp` owns the shared external resource class used by
   `Lean.Vir.Js α` values.
 - `native_symbols.cpp` owns the explicit native extern wrappers.
