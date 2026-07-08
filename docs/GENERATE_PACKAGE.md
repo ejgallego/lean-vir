@@ -100,7 +100,8 @@ for the full matrix.
 - Native extern declarations: `npm run check:native-externs`. If entries are
   added, removed, or renamed, also run
   `node scripts/check-boundary-registry.mjs --write` and
-  `npm run check:boundary-registry`.
+  `npm run check:boundary-registry`. If wrapper symbols or helper macros
+  changed, also run `npm run check:native-wrappers`.
 - Manifest metadata, diagnostics, duplicate export checks, or report output:
   `lake build vir_irpkg`, `npm run generate:irpkg -- examples/Fib.lean
   /tmp/vir-fib.irpkg fib`, and inspect the generated report when diagnostics
@@ -203,6 +204,7 @@ lake build vir_irpkg
 npm run check:package-abi
 npm run check:native-externs
 npm run check:boundary-registry
+npm run check:native-wrappers
 bash scripts/build-lean-lib.sh
 npm run generate:irpkg -- examples/Fib.lean /tmp/vir-fib.irpkg fib
 npm run test:runtime -- package-generation

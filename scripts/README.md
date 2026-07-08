@@ -29,6 +29,14 @@ map lives in `docs/HARNESS.md`.
 - `npm run generate:irpkg`
   Build the local Lean library and `vir_irpkg` generator executable, then
   generate one manifest-bearing `.irpkg`.
+- `npm run inspect:native-wrappers`
+  Print a generated inventory of the current boxed native extern wrappers,
+  grouped by generated helper wrappers, direct-call candidates, and custom shim
+  behavior.
+- `npm run check:native-wrappers`
+  Run the same inventory in check mode, including validation that
+  macro-generated helper wrappers use the helper implied by
+  `Vir/GeneratePackage/NativeExterns.lean`.
 - `npm run test:upstream`
   Build the demo and run the upstream interpreter smoke test.
 - `npm run test:upstream:no-build`
@@ -111,6 +119,8 @@ The split helpers below are the intended extension points for focused changes:
   artifact, and executable lookup helpers live in `scripts/file-utils.mjs`.
 - IR package generator setup lives in `scripts/irpkg-generator.mjs`; reuse it
   instead of shelling out through `lean --run tools/GeneratePackage.lean`.
+- Native wrapper inventory lives in `scripts/inventory-native-wrappers.mjs`;
+  keep it as an inspection aid until regular wrapper generation exists.
 - Benchmark sample parsing and formatting live in `scripts/bench-utils.mjs`.
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.

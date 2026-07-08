@@ -108,6 +108,7 @@ npm run build:demo-package
 npm run build:site
 npm run check:api-coverage
 npm run check:native-externs
+npm run check:native-wrappers
 ```
 
 Package generation and inspection:
@@ -140,10 +141,10 @@ npm test
 ```
 
 `npm test` runs the package ABI check, native extern ABI check, boundary
-registry check, API coverage docs check, and Wasm extension probes, builds the
-demo artifacts once, then reuses those artifacts for upstream smoke, infoview
-widget smoke, JavaScript runtime tests, and the fixture suite. It is the default
-pre-merge signal for code changes.
+registry check, native wrapper check, API coverage docs check, and Wasm
+extension probes, builds the demo artifacts once, then reuses those artifacts
+for upstream smoke, infoview widget smoke, JavaScript runtime tests, and the
+fixture suite. It is the default pre-merge signal for code changes.
 
 ## Smallest Useful Check
 
@@ -152,7 +153,9 @@ pre-merge signal for code changes.
 - Shim/native extern registry changes:
   `npm run check:native-externs`,
   `node scripts/check-boundary-registry.mjs --write`, then
-  `npm run check:boundary-registry`
+  `npm run check:boundary-registry` and `npm run check:native-wrappers`
+- Boxed native wrapper changes:
+  `npm run check:boundary-registry` and `npm run check:native-wrappers`
 - API coverage documentation changes:
   `npm run check:api-coverage`
 - Upstream interpreter or WASI boundary changes:

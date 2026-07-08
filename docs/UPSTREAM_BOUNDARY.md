@@ -335,10 +335,27 @@ renaming native extern entries; this regenerates
 `wasm/upstream_shim/runtime/native_symbols_registry.inc`. The regular
 `npm run check:boundary-registry` guard then verifies that the generated
 registry is current and that every native extern has a matching `dlsym` symbol
-plus either a handwritten boxed wrapper in
+plus either a boxed wrapper in
 `wasm/upstream_shim/runtime/native_symbols.cpp` or a native constant entry in the
 generated registry. `npm test` runs these checks before the smoke and fixture
 suites.
+
+The boxed wrappers can be inventoried with:
+
+```bash
+npm run inspect:native-wrappers
+```
+
+This groups wrappers into generated helper wrappers, regular direct-call wrappers,
+direct-call wrappers that retain a borrowed result, aliases, and custom shim
+behavior. The inventory is intentionally informational for now. It gives the
+wrapper-generation work a concrete target without introducing another
+handwritten ABI table. The helper class is macro-generated from the native
+symbol and shared boxing helper. `npm run check:native-wrappers` additionally
+verifies that each generated helper wrapper uses the helper implied by the
+Lean-side ABI table. Future generation should target the direct-call class next,
+while wrappers classified as aliases or custom behavior remain explicit until
+their policy is modeled separately.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
