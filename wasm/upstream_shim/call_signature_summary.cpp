@@ -13,7 +13,7 @@ Author: Emilio J. Gallego Arias
 namespace lean {
 namespace {
 
-enum class wire_type : uint8_t {
+enum class interface_type_tag : uint8_t {
     Unit = 22,
     Nat = 0,
     Int = 1,
@@ -94,33 +94,33 @@ public:
     }
 };
 
-static bool is_known_wire_type(wire_type tag) {
+static bool is_known_interface_type_tag(interface_type_tag tag) {
     switch (tag) {
-    case wire_type::Unit:
-    case wire_type::Nat:
-    case wire_type::Int:
-    case wire_type::Bool:
-    case wire_type::String:
-    case wire_type::UInt8:
-    case wire_type::UInt16:
-    case wire_type::UInt32:
-    case wire_type::UInt64:
-    case wire_type::USize:
-    case wire_type::ByteArray:
-    case wire_type::Float:
-    case wire_type::Float32:
-    case wire_type::Array:
-    case wire_type::List:
-    case wire_type::Option:
-    case wire_type::Prod:
-    case wire_type::Structure:
-    case wire_type::TaggedUnion:
-    case wire_type::CustomInductive:
-    case wire_type::RecursiveSelf:
-    case wire_type::SimpleEnum:
-    case wire_type::Resource:
-    case wire_type::Function:
-    case wire_type::Expr:
+    case interface_type_tag::Unit:
+    case interface_type_tag::Nat:
+    case interface_type_tag::Int:
+    case interface_type_tag::Bool:
+    case interface_type_tag::String:
+    case interface_type_tag::UInt8:
+    case interface_type_tag::UInt16:
+    case interface_type_tag::UInt32:
+    case interface_type_tag::UInt64:
+    case interface_type_tag::USize:
+    case interface_type_tag::ByteArray:
+    case interface_type_tag::Float:
+    case interface_type_tag::Float32:
+    case interface_type_tag::Array:
+    case interface_type_tag::List:
+    case interface_type_tag::Option:
+    case interface_type_tag::Prod:
+    case interface_type_tag::Structure:
+    case interface_type_tag::TaggedUnion:
+    case interface_type_tag::CustomInductive:
+    case interface_type_tag::RecursiveSelf:
+    case interface_type_tag::SimpleEnum:
+    case interface_type_tag::Resource:
+    case interface_type_tag::Function:
+    case interface_type_tag::Expr:
         return true;
     default:
         return false;
@@ -162,26 +162,26 @@ static bool decode_field_descriptor_needs_boxed_wasm32_boundary(signature_reader
 }
 
 static bool decode_type_needs_boxed_wasm32_boundary(signature_reader & r) {
-    wire_type tag = static_cast<wire_type>(r.u8());
-    if (!is_known_wire_type(tag)) {
-        r.fail("unsupported wire type tag " + std::to_string(static_cast<uint8_t>(tag)));
+    interface_type_tag tag = static_cast<interface_type_tag>(r.u8());
+    if (!is_known_interface_type_tag(tag)) {
+        r.fail("unsupported interface type tag " + std::to_string(static_cast<uint8_t>(tag)));
         return false;
     }
     switch (tag) {
-    case wire_type::Float:
-    case wire_type::Float32:
-    case wire_type::UInt64:
+    case interface_type_tag::Float:
+    case interface_type_tag::Float32:
+    case interface_type_tag::UInt64:
         return true;
-    case wire_type::Array:
-    case wire_type::List:
-    case wire_type::Option:
+    case interface_type_tag::Array:
+    case interface_type_tag::List:
+    case interface_type_tag::Option:
         decode_type_needs_boxed_wasm32_boundary(r);
         return false;
-    case wire_type::Prod:
+    case interface_type_tag::Prod:
         decode_type_needs_boxed_wasm32_boundary(r);
         decode_type_needs_boxed_wasm32_boundary(r);
         return false;
-    case wire_type::Structure: {
+    case interface_type_tag::Structure: {
         decode_runtime_counts(r);
         uint32_t trivial_field = r.u32();
         uint32_t field_count = r.u32();
@@ -197,7 +197,7 @@ static bool decode_type_needs_boxed_wasm32_boundary(signature_reader & r) {
         }
         return trivial_field == UINT32_MAX ? false : needs_boxed;
     }
-    case wire_type::TaggedUnion: {
+    case interface_type_tag::TaggedUnion: {
         uint32_t variant_count = r.u32();
         for (uint32_t i = 0; i < variant_count; i++) {
             decode_runtime_counts(r);
@@ -208,7 +208,7 @@ static bool decode_type_needs_boxed_wasm32_boundary(signature_reader & r) {
         }
         return false;
     }
-    case wire_type::CustomInductive: {
+    case interface_type_tag::CustomInductive: {
         uint32_t variant_count = r.u32();
         for (uint32_t i = 0; i < variant_count; i++) {
             decode_runtime_counts(r);
@@ -222,7 +222,7 @@ static bool decode_type_needs_boxed_wasm32_boundary(signature_reader & r) {
         }
         return false;
     }
-    case wire_type::Function: {
+    case interface_type_tag::Function: {
         r.u8();
         uint32_t arg_count = r.u32();
         for (uint32_t i = 0; i < arg_count; i++) {
