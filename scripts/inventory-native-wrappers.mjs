@@ -7,6 +7,8 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+import { parseGeneratedWrapperMacros } from "./native-wrapper-macros.mjs";
+
 const nativeExternsPath = new URL("../Vir/GeneratePackage/NativeExterns.lean", import.meta.url);
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
 const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols_registry.inc", import.meta.url);
@@ -118,28 +120,8 @@ function parseWrappers(source) {
       body: match[3],
     });
   }
-  const generatedHelperRegex =
-    /^VIR_DEFINE_BOX_(UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+),\s*([A-Za-z0-9_]+)\)$/gm;
-  for (const match of source.matchAll(generatedHelperRegex)) {
-    const symbol = match[2];
-    wrappers.set(`${symbol}___boxed`, {
-      name: `${symbol}___boxed`,
-      generatedHelper: true,
-      arity: match[1].toLowerCase(),
-      symbol,
-      helper: match[3],
-    });
-  }
-  const generatedDropTypeObjectRegex =
-    /^VIR_DEFINE_DROP_TYPE_OBJECT_(UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+)\)$/gm;
-  for (const match of source.matchAll(generatedDropTypeObjectRegex)) {
-    const symbol = match[2];
-    wrappers.set(`${symbol}___boxed`, {
-      name: `${symbol}___boxed`,
-      generatedDropTypeObject: true,
-      arity: match[1].toLowerCase(),
-      symbol,
-    });
+  for (const wrapper of parseGeneratedWrapperMacros(source)) {
+    wrappers.set(wrapper.name, wrapper);
   }
   return wrappers;
 }
@@ -204,6 +186,20 @@ function classifyWrapper(wrapper, entries) {
     return {
       kind: "generated-direct",
       reason: `macro-generated drop-type ${wrapper.arity} object forwarder`,
+    };
+  }
+
+  if (wrapper.generatedBorrowedObject) {
+    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
+      return {
+        kind: "generated-direct-mismatch",
+        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
+      };
+    }
+    const prefix = wrapper.dropType ? "drop-type borrowed-object" : "borrowed-object";
+    return {
+      kind: "generated-direct",
+      reason: `macro-generated ${prefix} ${wrapper.arity} forwarder`,
     };
   }
 
@@ -273,11 +269,25 @@ function helperForSignature(nativeExtern) {
   return null;
 }
 
+function paramCountForArity(arity) {
+  switch (arity) {
+    case "unary":
+      return 1;
+    case "binary":
+      return 2;
+    case "ternary":
+      return 3;
+    default:
+      return null;
+  }
+}
+
 function validateDropTypeObjectSignature(nativeExtern, arity) {
-  const expectedParamCount = arity === "unary" ? 2 : arity === "binary" ? 3 : null;
-  if (expectedParamCount === null) {
+  const forwardedParamCount = paramCountForArity(arity);
+  if (forwardedParamCount === null) {
     return `unsupported generated direct arity ${arity}`;
   }
+  const expectedParamCount = forwardedParamCount + 1;
   if (nativeExtern.params.length !== expectedParamCount) {
     return `expected ${expectedParamCount} params, found ${nativeExtern.params.length}`;
   }
@@ -300,6 +310,52 @@ function validateDropTypeObjectSignature(nativeExtern, arity) {
     return `result is ${nativeExtern.resultType}, expected object or tobject`;
   }
   return null;
+}
+
+function validateBorrowedObjectSignature(nativeExtern, arity, dropType) {
+  const forwardedParamCount = paramCountForArity(arity);
+  if (forwardedParamCount === null) {
+    return `unsupported generated direct arity ${arity}`;
+  }
+
+  const expectedParamCount = forwardedParamCount + (dropType ? 1 : 0);
+  if (nativeExtern.params.length !== expectedParamCount) {
+    return `expected ${expectedParamCount} params, found ${nativeExtern.params.length}`;
+  }
+
+  const forwardedParams = dropType ? nativeExtern.params.slice(1) : nativeExtern.params;
+  if (dropType) {
+    const typeParam = nativeExtern.params[0];
+    if (typeParam.type !== "erased") {
+      return `first param is ${typeParam.type}, expected erased`;
+    }
+    if (typeParam.borrow) {
+      return "first param is borrowed; generated forwarder drops an owned erased param";
+    }
+  }
+
+  for (const param of forwardedParams) {
+    if (!param.borrow) {
+      return `param ${param.index} is owned; generated borrowed forwarder only supports borrowed params`;
+    }
+    if (!["object", "tobject"].includes(param.type)) {
+      return `param ${param.index} is ${param.type}, expected object or tobject`;
+    }
+  }
+  if (!["object", "tobject", "tagged"].includes(nativeExtern.resultType)) {
+    return `result is ${nativeExtern.resultType}, expected object, tobject, or tagged`;
+  }
+  return null;
+}
+
+function validateGeneratedDirectSignature(wrapper, nativeExtern) {
+  if (wrapper.generatedDropTypeObject) {
+    return validateDropTypeObjectSignature(nativeExtern, wrapper.arity);
+  }
+  if (wrapper.generatedBorrowedObject) {
+    return validateBorrowedObjectSignature(nativeExtern, wrapper.arity, wrapper.dropType);
+  }
+  return "unsupported generated direct wrapper macro";
 }
 
 const [nativeExternsSource, nativeSymbols, nativeRegistry] = await Promise.all([
@@ -356,7 +412,7 @@ for (const [wrapperName, groupEntries] of grouped.entries()) {
         item.reason = `${entry.leanName}: no native extern entry found`;
         break;
       }
-      const reason = validateDropTypeObjectSignature(nativeExtern, wrapper.arity);
+      const reason = validateGeneratedDirectSignature(wrapper, nativeExtern);
       if (reason) {
         item.kind = "generated-direct-mismatch";
         item.reason = `${entry.leanName}: ${reason}`;

@@ -352,10 +352,13 @@ retain a borrowed result, aliases, and custom shim behavior. The inventory gives
 wrapper-generation work a concrete target without introducing another
 handwritten ABI table. `npm run check:native-wrappers` verifies that generated
 helper wrappers use the helper implied by the Lean-side ABI table, and that
-generated direct-call wrappers match their narrow modeled ABI shape. Remaining
-regular direct-call wrappers should move into generated classes only after their
-ownership and boxing policy is modeled; aliases and custom behavior remain
-explicit until their policy is modeled separately.
+generated direct-call wrappers match their narrow modeled ABI shape. The current
+generated direct classes cover owned object forwarders that drop an erased type
+argument, plus borrowed object forwarders that release the borrowed boxes after
+the native call. Remaining regular direct-call wrappers should move into
+generated classes only after their ownership and boxing policy is modeled;
+aliases and custom behavior remain explicit until their policy is modeled
+separately.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
