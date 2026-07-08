@@ -6,6 +6,8 @@ Author: Emilio J. Gallego Arias
 
 export function parseGeneratedWrapperMacros(source) {
   const wrappers = [];
+  const symbolPattern = "([A-Za-z0-9_]+)";
+  const scalarKindPattern = "(FLOAT|UINT8|UINT16|UINT32|UINT64|USIZE)";
 
   const generatedHelperRegex =
     /^VIR_DEFINE_BOX_(UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+),\s*([A-Za-z0-9_]+)\)$/gm;
@@ -59,7 +61,10 @@ export function parseGeneratedWrapperMacros(source) {
   }
 
   const generatedOwnedScalarScalarRegex =
-    /^VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER\(([A-Za-z0-9_]+),\s*(FLOAT|UINT8|UINT16|UINT32|UINT64|USIZE),\s*(FLOAT|UINT8|UINT16|UINT32|UINT64|USIZE)\)$/gm;
+    new RegExp(
+      `^VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER\\(${symbolPattern},\\s*${scalarKindPattern},\\s*${scalarKindPattern}\\)$`,
+      "gm",
+    );
   for (const match of source.matchAll(generatedOwnedScalarScalarRegex)) {
     const symbol = match[1];
     wrappers.push({
@@ -73,7 +78,10 @@ export function parseGeneratedWrapperMacros(source) {
   }
 
   const generatedOwnedScalarObjectlikeRegex =
-    /^VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER\(([A-Za-z0-9_]+),\s*(FLOAT|UINT8|UINT16|UINT32|UINT64|USIZE)\)$/gm;
+    new RegExp(
+      `^VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER\\(${symbolPattern},\\s*${scalarKindPattern}\\)$`,
+      "gm",
+    );
   for (const match of source.matchAll(generatedOwnedScalarObjectlikeRegex)) {
     const symbol = match[1];
     wrappers.push({
