@@ -75,7 +75,7 @@ asks for that machinery.
 - The current browser `fib` input range is `0..17`.
 - Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified.
 - Put demo-only WASI stubs and fixture providers under `wasm/upstream_shim/`.
-- Keep the static declaration provider behind `wasm/upstream_shim/decl_provider.h`;
+- Keep the static declaration provider behind `wasm/upstream_shim/package/decl_provider.h`;
   future module-backed loading should replace that provider, not the upstream
   interpreter or the platform shim.
 - Do not add native lookup support until a real demo case requires it.
