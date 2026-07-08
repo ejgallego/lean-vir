@@ -10,7 +10,6 @@ Author: Emilio J. Gallego Arias
 
 #include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 
 #include <string>
 #include <utility>
@@ -39,7 +38,7 @@ static bool g_package_loaded = false;
 static uint32_t g_package_generation = 1;
 static uint32_t g_package_format_version = 0;
 
-static void clear_loaded_package() {
+static void clear_loaded_package_state() {
     for (decl_entry const & entry : g_entries) {
         lean_dec(entry.name);
         if (entry.boxed_base) {
@@ -71,9 +70,9 @@ static void clear_loaded_package() {
     }
 }
 
-static bool load_package(uint8_t const * data, size_t size) {
+static bool load_package_state(uint8_t const * data, size_t size) {
     g_last_error.clear();
-    clear_loaded_package();
+    clear_loaded_package_state();
 
     decoded_ir_package decoded;
     if (!decode_ir_package(data, size, decoded, g_last_error)) {
@@ -121,7 +120,7 @@ static bool run_init_global(init_global_entry const & entry) {
     return false;
 }
 
-static bool run_package_initializers() {
+static bool run_package_initializers_state() {
     if (g_init_entries.empty()) {
         return true;
     }
@@ -169,6 +168,18 @@ static export_call_summary_entry const * package_call_summary_entry(uint32_t slo
 }
 
 } // namespace
+
+void clear_loaded_package() {
+    clear_loaded_package_state();
+}
+
+bool load_package(uint8_t const * data, size_t size) {
+    return load_package_state(data, size);
+}
+
+bool run_package_initializers() {
+    return run_package_initializers_state();
+}
 
 object * find_package_decl(object * n) {
     for (decl_entry const & entry : g_entries) {
@@ -302,42 +313,3 @@ uint32_t package_interface_manifest_size() {
 }
 
 } // namespace lean::vir
-
-extern "C" void * vir_alloc_bytes(uint32_t size) {
-    return malloc(size == 0 ? 1 : size);
-}
-
-extern "C" void vir_free_bytes(void * ptr) {
-    free(ptr);
-}
-
-extern "C" uint32_t vir_load_ir_package(uint8_t const * data, uint32_t size) {
-    if (!lean::vir::load_package(data, size)) {
-        return 0;
-    }
-    if (!lean::vir::run_package_initializers()) {
-        lean::vir::clear_loaded_package();
-        return 0;
-    }
-    return lean::vir::package_decl_count();
-}
-
-extern "C" char const * vir_last_package_error(void) {
-    return lean::vir::last_package_error();
-}
-
-extern "C" uint32_t vir_last_package_error_size(void) {
-    return lean::vir::last_package_error_size();
-}
-
-extern "C" char const * vir_package_interface_manifest(void) {
-    return lean::vir::package_interface_manifest();
-}
-
-extern "C" uint32_t vir_package_interface_manifest_size(void) {
-    return lean::vir::package_interface_manifest_size();
-}
-
-extern "C" uint32_t vir_package_decl_count(void) {
-    return lean::vir::package_decl_count();
-}

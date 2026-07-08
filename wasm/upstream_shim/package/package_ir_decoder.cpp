@@ -5,314 +5,35 @@ Author: Emilio J. Gallego Arias
 */
 
 #include "package_decl_provider_types.h"
+#include "package_binary_reader.h"
+#include "package_ir_builders.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
-#include <initializer_list>
 #include <string>
 #include <utility>
 #include <vector>
 
 #include "library/ir_types.h"
 
-namespace lean {
-extern "C" obj_res lean_name_mk_string(obj_arg prefix, obj_arg suffix);
-extern "C" obj_res lean_name_mk_numeral(obj_arg prefix, obj_arg suffix);
-}
-
 namespace lean::vir {
 namespace {
 
 using ir::type;
+using namespace package_ir;
 
 static bool supported_package_version(uint32_t version) {
     return version == 9;
 }
 
-static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
-    object * obj = lean_alloc_ctor(tag, fields.size(), scalar_size);
-    unsigned idx = 0;
-    for (object * field : fields) {
-        lean_inc(field);
-        lean_ctor_set(obj, idx, field);
-        idx++;
-    }
-    return obj;
-}
-
-static object * mk_nat(size_t n) {
-    return lean_usize_to_nat(n);
-}
-
-static object * mk_name_str(object * prefix, std::string const & part) {
-    object * suffix = lean_mk_string(part.c_str());
-    object * result = lean_name_mk_string(prefix, suffix);
-    lean_dec(prefix);
-    lean_dec(suffix);
-    return result;
-}
-
-static object * mk_name_num(object * prefix, size_t value) {
-    object * suffix = mk_nat(value);
-    object * result = lean_name_mk_numeral(prefix, suffix);
-    lean_dec(prefix);
-    lean_dec(suffix);
-    return result;
-}
-
-static object * mk_array(std::vector<object *> const & fields) {
-    object * array = lean_alloc_array(fields.size(), fields.size());
-    size_t idx = 0;
-    for (object * field : fields) {
-        lean_inc(field);
-        lean_array_set_core(array, idx, field);
-        idx++;
-    }
-    return array;
-}
-
-static object * mk_arg_var(size_t var) {
-    return mk_ctor(0, { mk_nat(var) });
-}
-
-static object * mk_arg_erased() {
-    return lean_box(1);
-}
-
-static object * mk_lit_num(object * value) {
-    object * lit_val = mk_ctor(0, { value });
-    lean_dec(value);
-    object * expr = mk_ctor(11, { lit_val });
-    lean_dec(lit_val);
-    return expr;
-}
-
-static object * mk_lit_num(size_t value) {
-    return mk_lit_num(mk_nat(value));
-}
-
-static object * mk_lit_str(std::string const & value) {
-    object * str = lean_mk_string(value.c_str());
-    object * lit_val = mk_ctor(1, { str });
-    lean_dec(str);
-    object * expr = mk_ctor(11, { lit_val });
-    lean_dec(lit_val);
-    return expr;
-}
-
-static object * mk_ctor_info(object * n, size_t tag, size_t size = 0, size_t usize = 0, size_t ssize = 0) {
-    return mk_ctor(0, { n, mk_nat(tag), mk_nat(size), mk_nat(usize), mk_nat(ssize) });
-}
-
-static object * mk_ctor_expr(object * ctor_info, object * args) {
-    return mk_ctor(0, { ctor_info, args });
-}
-
-static object * mk_reset(size_t n, size_t var) {
-    return mk_ctor(1, { mk_nat(n), mk_nat(var) });
-}
-
-static object * mk_reuse(size_t var, object * ctor_info, bool update_header, object * args) {
-    object * obj = mk_ctor(2, { mk_nat(var), ctor_info, args }, sizeof(uint8_t));
-    lean_ctor_set_uint8(obj, 3 * sizeof(void *), update_header ? 1 : 0);
-    return obj;
-}
-
-static object * mk_proj(size_t idx, size_t var) {
-    return mk_ctor(3, { mk_nat(idx), mk_nat(var) });
-}
-
-static object * mk_uproj(size_t idx, size_t var) {
-    return mk_ctor(4, { mk_nat(idx), mk_nat(var) });
-}
-
-static object * mk_sproj(size_t idx, size_t offset, size_t var) {
-    return mk_ctor(5, { mk_nat(idx), mk_nat(offset), mk_nat(var) });
-}
-
-static object * mk_fap(object * fn, object * args) {
-    return mk_ctor(6, { fn, args });
-}
-
-static object * mk_pap(object * fn, object * args) {
-    return mk_ctor(7, { fn, args });
-}
-
-static object * mk_ap(size_t var, object * args) {
-    return mk_ctor(8, { mk_nat(var), args });
-}
-
-static object * mk_box(type t, size_t var) {
-    return mk_ctor(9, { lean_box(static_cast<unsigned>(t)), mk_nat(var) });
-}
-
-static object * mk_unbox(size_t var) {
-    return mk_ctor(10, { mk_nat(var) });
-}
-
-static object * mk_is_shared(size_t var) {
-    return mk_ctor(12, { mk_nat(var) });
-}
-
-static object * mk_param(size_t var, type t, bool borrow) {
-    object * obj = mk_ctor(0, { mk_nat(var), lean_box(static_cast<unsigned>(t)) }, sizeof(uint8_t));
-    lean_ctor_set_uint8(obj, 2 * sizeof(void *), borrow ? 1 : 0);
-    return obj;
-}
-
-static object * mk_ctor_alt(object * ctor_info, object * body) {
-    return mk_ctor(0, { ctor_info, body });
-}
-
-static object * mk_default_alt(object * body) {
-    return mk_ctor(1, { body });
-}
-
-static object * mk_vdecl(size_t var, type var_type, object * expr, object * cont) {
-    return mk_ctor(0, { mk_nat(var), lean_box(static_cast<unsigned>(var_type)), expr, cont });
-}
-
-static object * mk_jdecl(size_t jp, object * params, object * body, object * cont) {
-    return mk_ctor(1, { mk_nat(jp), params, body, cont });
-}
-
-static object * mk_set(size_t target, size_t idx, object * arg, object * cont) {
-    return mk_ctor(2, { mk_nat(target), mk_nat(idx), arg, cont });
-}
-
-static object * mk_set_tag(size_t target, size_t tag, object * cont) {
-    return mk_ctor(3, { mk_nat(target), mk_nat(tag), cont });
-}
-
-static object * mk_uset(size_t target, size_t idx, size_t source, object * cont) {
-    return mk_ctor(4, { mk_nat(target), mk_nat(idx), mk_nat(source), cont });
-}
-
-static object * mk_sset(size_t target, size_t idx, size_t offset, size_t source, type t, object * cont) {
-    return mk_ctor(5, { mk_nat(target), mk_nat(idx), mk_nat(offset), mk_nat(source), lean_box(static_cast<unsigned>(t)), cont });
-}
-
-static object * mk_inc(size_t var, size_t amount, bool maybe_scalar, object * cont) {
-    object * obj = mk_ctor(6, { mk_nat(var), mk_nat(amount), cont }, sizeof(uint8_t));
-    lean_ctor_set_uint8(obj, 3 * sizeof(void *), maybe_scalar ? 1 : 0);
-    return obj;
-}
-
-static object * mk_dec(size_t var, size_t amount, bool maybe_scalar, object * cont) {
-    object * obj = mk_ctor(7, { mk_nat(var), mk_nat(amount), cont }, sizeof(uint8_t));
-    lean_ctor_set_uint8(obj, 3 * sizeof(void *), maybe_scalar ? 1 : 0);
-    return obj;
-}
-
-static object * mk_del(size_t var, object * cont) {
-    return mk_ctor(8, { mk_nat(var), cont });
-}
-
-static object * mk_case(object * type_name, size_t var, type var_type, object * alts) {
-    return mk_ctor(9, { type_name, mk_nat(var), lean_box(static_cast<unsigned>(var_type)), alts });
-}
-
-static object * mk_ret(object * arg) {
-    return mk_ctor(10, { arg });
-}
-
-static object * mk_jmp(size_t jp, object * args) {
-    return mk_ctor(11, { mk_nat(jp), args });
-}
-
-static object * mk_unreachable() {
-    return lean_box(12);
-}
-
-static object * mk_fun_decl(object * fn, object * params, type result_type, object * body) {
-    return mk_ctor(0, { fn, params, lean_box(static_cast<unsigned>(result_type)), body });
-}
-
-static object * mk_extern_decl(object * fn, object * params, type result_type) {
-    return mk_ctor(1, { fn, params, lean_box(static_cast<unsigned>(result_type)), lean_box(0) });
-}
-
-class reader {
-    uint8_t const * m_data;
-    size_t m_size;
-    size_t m_pos = 0;
-
+class reader : public package_binary_reader {
 public:
-    bool ok = true;
-
-    reader(uint8_t const * data, size_t size):
-        m_data(data),
-        m_size(size) {
-    }
-
-    std::string const & error() const {
-        return m_error;
-    }
-
-    bool at_end() const {
-        return m_pos == m_size;
-    }
-
-    size_t pos() const {
-        return m_pos;
-    }
-
-    void fail(std::string const & message) {
-        if (ok) {
-            ok = false;
-            m_error = "byte " + std::to_string(m_pos) + ": " + message;
-        }
-    }
-
-    uint8_t u8() {
-        if (!ok) {
-            return 0;
-        }
-        if (m_pos >= m_size) {
-            fail("unexpected end of IR package");
-            return 0;
-        }
-        return m_data[m_pos++];
-    }
-
-    bool boolean() {
-        uint8_t value = u8();
-        if (value == 0) {
-            return false;
-        }
-        if (value == 1) {
-            return true;
-        }
-        fail("invalid boolean tag " + std::to_string(value));
-        return false;
-    }
-
-    uint32_t u32() {
-        uint32_t b0 = u8();
-        uint32_t b1 = u8();
-        uint32_t b2 = u8();
-        uint32_t b3 = u8();
-        return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
-    }
+    using package_binary_reader::package_binary_reader;
 
     object * nat() {
         std::string decimal = string();
         return lean_cstr_to_nat(decimal.c_str());
-    }
-
-    std::string string() {
-        uint32_t len = u32();
-        if (!ok) {
-            return std::string();
-        }
-        if (len > m_size - m_pos) {
-            fail("string length " + std::to_string(len) + " exceeds remaining package bytes");
-            return std::string();
-        }
-        std::string out(reinterpret_cast<char const *>(m_data + m_pos), len);
-        m_pos += len;
-        return out;
     }
 
     object * name() {
@@ -580,8 +301,6 @@ public:
     }
 
 private:
-    std::string m_error;
-
     template <typename F>
     std::vector<object *> object_array(F read_one) {
         uint32_t count = u32();
@@ -593,6 +312,66 @@ private:
         return out;
     }
 };
+
+static std::vector<decl_entry> read_decl_entries(reader & r, uint32_t count) {
+    std::vector<decl_entry> entries;
+    entries.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        object * n = r.name();
+        object * boxed_base = r.boolean() ? r.name() : nullptr;
+        object * d = r.decl(n);
+        entries.push_back({ n, boxed_base, d });
+    }
+    return entries;
+}
+
+static std::vector<init_global_entry> read_init_entries(reader & r) {
+    uint32_t count = r.u32();
+    std::vector<init_global_entry> entries;
+    entries.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        object * n = r.name();
+        object * init_name = r.name();
+        entries.push_back({ n, init_name });
+    }
+    return entries;
+}
+
+static std::vector<host_import_entry> read_host_imports(reader & r) {
+    uint32_t count = r.u32();
+    std::vector<host_import_entry> entries;
+    entries.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        entries.push_back(r.host_import());
+    }
+    return entries;
+}
+
+static std::vector<export_call_summary_entry> read_export_summaries(reader & r) {
+    uint32_t count = r.u32();
+    std::vector<export_call_summary_entry> entries;
+    entries.reserve(count);
+    for (uint32_t i = 0; i < count; i++) {
+        entries.push_back(r.export_summary());
+    }
+    return entries;
+}
+
+static std::vector<uint32_t> build_call_summary_indices(
+    std::vector<decl_entry> const & entries,
+    std::vector<export_call_summary_entry> const & export_summaries) {
+    std::vector<uint32_t> indices(entries.size(), UINT32_MAX);
+    for (size_t i = 0; i < entries.size(); i++) {
+        object * call_name = entries[i].boxed_base ? entries[i].boxed_base : entries[i].name;
+        for (size_t j = 0; j < export_summaries.size(); j++) {
+            if (lean_name_eq(call_name, export_summaries[j].name)) {
+                indices[i] = static_cast<uint32_t>(j);
+                break;
+            }
+        }
+    }
+    return indices;
+}
 
 } // namespace
 
@@ -621,37 +400,10 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
         return false;
     }
 
-    std::vector<decl_entry> entries;
-    entries.reserve(count);
-    for (uint32_t i = 0; i < count; i++) {
-        object * n = r.name();
-        object * boxed_base = r.boolean() ? r.name() : nullptr;
-        object * d = r.decl(n);
-        entries.push_back({ n, boxed_base, d });
-    }
-
-    std::vector<init_global_entry> init_entries;
-    uint32_t init_count = r.u32();
-    init_entries.reserve(init_count);
-    for (uint32_t i = 0; i < init_count; i++) {
-        object * n = r.name();
-        object * init_name = r.name();
-        init_entries.push_back({ n, init_name });
-    }
-
-    std::vector<host_import_entry> host_imports;
-    uint32_t host_import_count = r.u32();
-    host_imports.reserve(host_import_count);
-    for (uint32_t i = 0; i < host_import_count; i++) {
-        host_imports.push_back(r.host_import());
-    }
-
-    std::vector<export_call_summary_entry> export_summaries;
-    uint32_t export_summary_count = r.u32();
-    export_summaries.reserve(export_summary_count);
-    for (uint32_t i = 0; i < export_summary_count; i++) {
-        export_summaries.push_back(r.export_summary());
-    }
+    std::vector<decl_entry> entries = read_decl_entries(r, count);
+    std::vector<init_global_entry> init_entries = read_init_entries(r);
+    std::vector<host_import_entry> host_imports = read_host_imports(r);
+    std::vector<export_call_summary_entry> export_summaries = read_export_summaries(r);
     if (!r.ok) {
         error = r.error();
         return false;
@@ -667,16 +419,7 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
         return false;
     }
 
-    std::vector<uint32_t> call_summary_indices(entries.size(), UINT32_MAX);
-    for (size_t i = 0; i < entries.size(); i++) {
-        object * call_name = entries[i].boxed_base ? entries[i].boxed_base : entries[i].name;
-        for (size_t j = 0; j < export_summaries.size(); j++) {
-            if (lean_name_eq(call_name, export_summaries[j].name)) {
-                call_summary_indices[i] = static_cast<uint32_t>(j);
-                break;
-            }
-        }
-    }
+    std::vector<uint32_t> call_summary_indices = build_call_summary_indices(entries, export_summaries);
 
     out.entries = std::move(entries);
     out.init_entries = std::move(init_entries);

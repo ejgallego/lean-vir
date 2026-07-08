@@ -36,6 +36,13 @@ uint32_t package_decl_count();
 bool package_loaded();
 uint32_t package_generation();
 uint32_t package_format_version();
+void clear_loaded_package();
+bool load_package(uint8_t const * data, size_t size);
+bool run_package_initializers();
+char const * last_package_error();
+uint32_t last_package_error_size();
+char const * package_interface_manifest();
+uint32_t package_interface_manifest_size();
 
 }
 
