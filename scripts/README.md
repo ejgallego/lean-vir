@@ -31,8 +31,8 @@ map lives in `docs/HARNESS.md`.
   generate one manifest-bearing `.irpkg`.
 - `npm run inspect:native-wrappers`
   Print a generated inventory of the current boxed native extern wrappers,
-  grouped by generated helper wrappers, direct-call candidates, and custom shim
-  behavior.
+  grouped by generated helper/direct wrappers, remaining direct-call candidates,
+  and custom shim behavior.
 - `npm run check:native-wrappers`
   Run the same inventory in check mode, including validation that
   macro-generated wrappers use the helper or direct-call shape implied by

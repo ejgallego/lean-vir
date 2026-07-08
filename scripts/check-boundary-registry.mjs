@@ -6,6 +6,8 @@ Author: Emilio J. Gallego Arias
 
 import { readFile, writeFile } from "node:fs/promises";
 
+import { generatedWrapperNames } from "./native-wrapper-macros.mjs";
+
 const nativeExternsPath = new URL("../Vir/GeneratePackage/NativeExterns.lean", import.meta.url);
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
 const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols_registry.inc", import.meta.url);
@@ -107,11 +109,8 @@ function parseBoxedWrappers(source) {
   const wrappers = new Set(
     [...source.matchAll(/extern "C" lean_object \* ([A-Za-z0-9_]+___boxed)\(/g)].map((match) => match[1])
   );
-  for (const match of source.matchAll(/^VIR_DEFINE_BOX_(?:UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+),\s*[A-Za-z0-9_]+\)$/gm)) {
-    wrappers.add(`${match[1]}___boxed`);
-  }
-  for (const match of source.matchAll(/^VIR_DEFINE_DROP_TYPE_OBJECT_(?:UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+)\)$/gm)) {
-    wrappers.add(`${match[1]}___boxed`);
+  for (const wrapper of generatedWrapperNames(source)) {
+    wrappers.add(wrapper);
   }
   return wrappers;
 }
