@@ -31,6 +31,11 @@ that the TypeScript declaration is the implementation source of truth. It says:
 for this symbol id, this is the authored TypeScript shape, this is where a
 reader can jump, and this is the text that should appear in a hover.
 
+Interfaces with named methods also expose method-level symbols, such as
+`Root.render`, in addition to the containing interface. This keeps reports
+reviewable when a Lean binding corresponds to one method rather than the whole
+TypeScript object shape.
+
 The comparator reads descriptor JSON and a Lean VIR interface manifest:
 
 ```bash
@@ -101,6 +106,29 @@ category and separates two relation kinds:
   descriptor, but may still be structurally weaker or richer than VIR.
 - `coverage gap`: a React TypeScript surface is intentionally listed even
   though the current Lean VIR manifest has no descriptor for it.
+
+## React DOM Client Corpus
+
+The React DOM client report covers the official `react-dom/client` root API
+surface from `@types/react-dom/client`:
+
+```bash
+npm run generate:react-dom-client-type-descriptors
+npm run compare:react-dom-client-type-anchors
+npm run render:react-dom-client-type-anchors:html
+```
+
+Or validate all generated React DOM client artifacts with:
+
+```bash
+npm run check:react-dom-client-type-anchors
+```
+
+This corpus anchors `Root`, `Root.render`, `Root.unmount`, and `createRoot` to
+the current `Lean.Vir.React.Root` surface. It also lists `RootOptions`,
+`hydrateRoot`, and `HydrationOptions` as explicit coverage gaps so the report
+tracks the broader official client API without implying that VIR already
+models hydration or root options.
 
 ## Output Contract
 

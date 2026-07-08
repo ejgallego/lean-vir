@@ -31,6 +31,10 @@ try {
     value: string;
   }
 
+  export interface Controls {
+    reset(value: string): void;
+  }
+
   /** Lean exact integer shape. */
   export type Count = string | number | bigint;
 
@@ -44,6 +48,7 @@ try {
     anchors: [
       { id: "box", lean: "Demo.Box", ts: "Demo.Box" },
       { id: "box_fn", lean: "Demo.bump", ts: "Demo.BoxFn" },
+      { id: "reset", lean: "Demo.reset", ts: "Demo.Controls.reset" },
       { id: "missing", lean: "Demo.Missing", ts: "Demo.Box" },
     ],
   }, null, 2)}\n`);
@@ -82,6 +87,17 @@ try {
         result: boxType,
         effect: "pure",
       },
+      {
+        id: "reset",
+        jsName: "reset",
+        entry: "Demo.reset",
+        source: "Demo.lean",
+        args: [
+          { name: "value", type: { type: "String", interfaceTag: INTERFACE_TAG.STRING } },
+        ],
+        result: { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT },
+        effect: "pure",
+      },
     ],
     hostImports: [],
     diagnostics: [],
@@ -94,10 +110,11 @@ try {
   const comparison = JSON.parse(await readFile(report, "utf8"));
   assert.deepEqual(comparison.summary, {
     exact: 1,
-    compatible: 1,
+    compatible: 2,
     weak: 0,
     missing: 1,
   });
+  assert.equal(comparison.results.find((result) => result.ts === "Demo.Controls.reset")?.tsSymbol.kind, "method");
   const markdown = await readFile(rendered, "utf8");
   assert.match(markdown, /href="types\.d\.ts#L3-L5"/);
   assert.match(markdown, /title="exact: Demo\.Box -&gt; Demo\.Box/);

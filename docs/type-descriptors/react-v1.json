@@ -7439,6 +7439,23 @@
             "kind": "primitive",
             "name": "string"
           },
+          "getModifierState": {
+            "kind": "function",
+            "effect": "pure",
+            "args": [
+              {
+                "name": "key",
+                "type": {
+                  "kind": "ref",
+                  "id": "React.ModifierKey"
+                }
+              }
+            ],
+            "result": {
+              "kind": "primitive",
+              "name": "boolean"
+            }
+          },
           "key": {
             "kind": "primitive",
             "name": "string"
@@ -7512,6 +7529,23 @@
           "ctrlKey": {
             "kind": "primitive",
             "name": "boolean"
+          },
+          "getModifierState": {
+            "kind": "function",
+            "effect": "pure",
+            "args": [
+              {
+                "name": "key",
+                "type": {
+                  "kind": "ref",
+                  "id": "React.ModifierKey"
+                }
+              }
+            ],
+            "result": {
+              "kind": "primitive",
+              "name": "boolean"
+            }
           },
           "metaKey": {
             "kind": "primitive",

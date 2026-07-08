@@ -181,15 +181,19 @@ function collectStatements(statements, sourceFile, prefix, symbols, symbolIds, n
       continue;
     }
     if (!hasExportModifier(statement) && !isInsideRequestedNamespace(prefix, namespaces)) continue;
-    const symbol = symbolForStatement(statement, sourceFile, prefix);
-    if (symbol === null) continue;
-    if (symbolIds.has(symbol.id)) {
-      if (allowDuplicateIds) continue;
-      throw new Error(`duplicate TypeScript descriptor id ${symbol.id}`);
+    for (const symbol of symbolsForStatement(statement, sourceFile, prefix)) {
+      addCollectedSymbol(symbol, symbols, symbolIds, allowDuplicateIds);
     }
-    symbolIds.add(symbol.id);
-    symbols.push(symbol);
   }
+}
+
+function addCollectedSymbol(symbol, symbols, symbolIds, allowDuplicateIds) {
+  if (symbolIds.has(symbol.id)) {
+    if (allowDuplicateIds) return;
+    throw new Error(`duplicate TypeScript descriptor id ${symbol.id}`);
+  }
+  symbolIds.add(symbol.id);
+  symbols.push(symbol);
 }
 
 async function readSymbolIds(file) {
@@ -197,6 +201,15 @@ async function readSymbolIds(file) {
     .split(/\r?\n/g)
     .map((line) => line.replace(/#.*/u, "").trim())
     .filter((line) => line.length !== 0);
+}
+
+function symbolsForStatement(statement, sourceFile, prefix) {
+  const symbol = symbolForStatement(statement, sourceFile, prefix);
+  if (symbol === null) return [];
+  if (ts.isInterfaceDeclaration(statement)) {
+    return [symbol, ...interfaceMethodSymbols(statement, sourceFile, prefix)];
+  }
+  return [symbol];
 }
 
 function symbolForStatement(statement, sourceFile, prefix) {
@@ -219,6 +232,25 @@ function symbolForStatement(statement, sourceFile, prefix) {
   return null;
 }
 
+function interfaceMethodSymbols(node, sourceFile, prefix) {
+  const owner = [...prefix, node.name.text].join(".");
+  const methodSymbols = [];
+  for (const member of node.members) {
+    if (!ts.isMethodSignature(member)) continue;
+    const name = propertyNameText(member.name);
+    if (name === null) continue;
+    methodSymbols.push({
+      id: `${owner}.${name}`,
+      kind: "method",
+      source: sourceRange(member, sourceFile),
+      display: compactDisplay(member.getText(sourceFile)),
+      hover: jsDocText(member),
+      shape: functionShape(member.parameters, member.type, sourceFile, prefix),
+    });
+  }
+  return methodSymbols;
+}
+
 function declarationSymbol(node, sourceFile, prefix, name, kind, shape) {
   const id = [...prefix, name].join(".");
   const source = sourceRange(node, sourceFile);
@@ -235,10 +267,15 @@ function declarationSymbol(node, sourceFile, prefix, name, kind, shape) {
 function interfaceShape(node, sourceFile, prefix) {
   const fields = {};
   for (const member of node.members) {
-    if (!ts.isPropertySignature(member) || member.type === undefined) continue;
-    const name = propertyNameText(member.name);
-    if (name === null) continue;
-    fields[name] = normalizeTypeNode(member.type, sourceFile, prefix);
+    if (ts.isPropertySignature(member) && member.type !== undefined) {
+      const name = propertyNameText(member.name);
+      if (name === null) continue;
+      fields[name] = normalizeTypeNode(member.type, sourceFile, prefix);
+    } else if (ts.isMethodSignature(member)) {
+      const name = propertyNameText(member.name);
+      if (name === null) continue;
+      fields[name] = functionShape(member.parameters, member.type, sourceFile, prefix);
+    }
   }
   if (Object.keys(fields).length === 1 &&
       fields.__resource?.kind === "literal" &&
@@ -330,10 +367,15 @@ function normalizeTypeNode(node, sourceFile, prefix) {
 function typeLiteralShape(node, sourceFile, prefix) {
   const fields = {};
   for (const member of node.members) {
-    if (!ts.isPropertySignature(member) || member.type === undefined) continue;
-    const name = propertyNameText(member.name);
-    if (name === null) continue;
-    fields[name] = normalizeTypeNode(member.type, sourceFile, prefix);
+    if (ts.isPropertySignature(member) && member.type !== undefined) {
+      const name = propertyNameText(member.name);
+      if (name === null) continue;
+      fields[name] = normalizeTypeNode(member.type, sourceFile, prefix);
+    } else if (ts.isMethodSignature(member)) {
+      const name = propertyNameText(member.name);
+      if (name === null) continue;
+      fields[name] = functionShape(member.parameters, member.type, sourceFile, prefix);
+    }
   }
   return { kind: "record", fields };
 }

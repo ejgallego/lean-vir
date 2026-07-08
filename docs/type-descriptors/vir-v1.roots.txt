@@ -15,3 +15,7 @@ Lean.Vir.TypeAnchors.reactStateSetterIdentity
 Lean.Vir.TypeAnchors.reactReducerStateIdentity
 Lean.Vir.TypeAnchors.reactReducerDispatchIdentity
 Lean.Vir.TypeAnchors.reactComponentCall
+Lean.Vir.TypeAnchors.reactRootIdentity
+Lean.Vir.TypeAnchors.reactRootCreateCall
+Lean.Vir.TypeAnchors.reactRootRenderCall
+Lean.Vir.TypeAnchors.reactRootUnmountCall

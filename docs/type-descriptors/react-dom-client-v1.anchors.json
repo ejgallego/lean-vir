@@ -1,0 +1,61 @@
+{
+  "version": 1,
+  "anchors": [
+    {
+      "id": "react_dom.root.resource",
+      "category": "React DOM roots",
+      "lean": "Lean.Vir.React.Root",
+      "ts": "Root",
+      "relation": "audit",
+      "note": "Audit anchor from ReactDOMClient Root objects to VIR's JavaScript-owned React root resource."
+    },
+    {
+      "id": "react_dom.root.render",
+      "category": "React DOM roots",
+      "lean": "Lean.Vir.TypeAnchors.reactRootRenderCall",
+      "ts": "Root.render",
+      "relation": "audit",
+      "note": "Audit anchor from ReactDOMClient Root.render(children) to VIR Root.render."
+    },
+    {
+      "id": "react_dom.root.unmount",
+      "category": "React DOM roots",
+      "lean": "Lean.Vir.TypeAnchors.reactRootUnmountCall",
+      "ts": "Root.unmount",
+      "relation": "audit",
+      "note": "Audit anchor from ReactDOMClient Root.unmount() to VIR Root.unmount."
+    },
+    {
+      "id": "react_dom.root.create",
+      "category": "React DOM roots",
+      "lean": "Lean.Vir.TypeAnchors.reactRootCreateCall",
+      "ts": "createRoot",
+      "relation": "audit",
+      "note": "Audit anchor from ReactDOMClient.createRoot(container, options?) to VIR Root.create; VIR does not expose root options yet."
+    },
+    {
+      "id": "react_dom.root.options",
+      "category": "React DOM roots",
+      "lean": "Lean.Vir.React.RootOptions",
+      "ts": "RootOptions",
+      "relation": "coverageGap",
+      "note": "Coverage gap: React root options are not represented in the current VIR Root.create surface."
+    },
+    {
+      "id": "react_dom.hydration.entrypoint",
+      "category": "React DOM hydration",
+      "lean": "Lean.Vir.React.Root.hydrateRoot",
+      "ts": "hydrateRoot",
+      "relation": "coverageGap",
+      "note": "Coverage gap: VIR does not currently expose ReactDOMClient.hydrateRoot."
+    },
+    {
+      "id": "react_dom.hydration.options",
+      "category": "React DOM hydration",
+      "lean": "Lean.Vir.React.HydrationOptions",
+      "ts": "HydrationOptions",
+      "relation": "coverageGap",
+      "note": "Coverage gap paired with hydrateRoot: hydration options have no current VIR descriptor."
+    }
+  ]
+}

@@ -97,4 +97,25 @@ def reactComponentCall
     Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node) :=
   component ()
 
+def reactRootIdentity
+    (value : Lean.Vir.Js Lean.Vir.React.Root) :
+    Lean.Vir.Js Lean.Vir.React.Root :=
+  value
+
+def reactRootCreateCall
+    (container : Lean.Vir.Js Lean.Vir.Browser.Element) :
+    Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.React.Root) :=
+  Lean.Vir.React.Root.create container
+
+def reactRootRenderCall
+    (root : Lean.Vir.Js Lean.Vir.React.Root)
+    (node : Lean.Vir.React.ReactM (Lean.Vir.Js Lean.Vir.React.Node)) :
+    Lean.Vir.Browser.DomM Unit :=
+  Lean.Vir.React.Root.render root node
+
+def reactRootUnmountCall
+    (root : Lean.Vir.Js Lean.Vir.React.Root) :
+    Lean.Vir.Browser.DomM Unit :=
+  Lean.Vir.React.Root.unmount root
+
 end Lean.Vir.TypeAnchors

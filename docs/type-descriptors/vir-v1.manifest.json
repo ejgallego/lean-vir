@@ -3,7 +3,7 @@
   "artifact": "lean-vir-ir-package",
   "metadata": {
     "generator": "tools/GeneratePackage.lean",
-    "packageFormatVersion": 8,
+    "packageFormatVersion": 9,
     "manifestVersion": 6,
     "leanVersion": "4.32.0-rc1",
     "leanToolchain": "leanprover/lean4:4.32.0-rc1",
@@ -29,7 +29,11 @@
           "Lean.Vir.TypeAnchors.reactStateSetterIdentity",
           "Lean.Vir.TypeAnchors.reactReducerStateIdentity",
           "Lean.Vir.TypeAnchors.reactReducerDispatchIdentity",
-          "Lean.Vir.TypeAnchors.reactComponentCall"
+          "Lean.Vir.TypeAnchors.reactComponentCall",
+          "Lean.Vir.TypeAnchors.reactRootIdentity",
+          "Lean.Vir.TypeAnchors.reactRootCreateCall",
+          "Lean.Vir.TypeAnchors.reactRootRenderCall",
+          "Lean.Vir.TypeAnchors.reactRootUnmountCall"
         ],
         "resolvedRoots": [
           "Lean.Vir.TypeAnchors.reactStylePropertyIdentity",
@@ -63,13 +67,28 @@
           "Lean.Vir.TypeAnchors.reactReducerDispatchIdentity",
           "Lean.Vir.TypeAnchors.reactReducerDispatchIdentity._boxed",
           "Lean.Vir.TypeAnchors.reactComponentCall",
-          "Lean.Vir.TypeAnchors.reactComponentCall._boxed"
+          "Lean.Vir.TypeAnchors.reactComponentCall._boxed",
+          "Lean.Vir.TypeAnchors.reactRootIdentity",
+          "Lean.Vir.TypeAnchors.reactRootIdentity._boxed",
+          "Lean.Vir.TypeAnchors.reactRootCreateCall",
+          "Lean.Vir.TypeAnchors.reactRootCreateCall._boxed",
+          "Lean.Vir.TypeAnchors.reactRootRenderCall",
+          "Lean.Vir.TypeAnchors.reactRootRenderCall._boxed",
+          "Lean.Vir.TypeAnchors.reactRootUnmountCall",
+          "Lean.Vir.TypeAnchors.reactRootUnmountCall._boxed"
         ],
         "packageOnly": false,
         "dropEvalCommands": true
       }
     ],
     "typeAnchorAliases": [
+      {
+        "lean": "Lean.Vir.Browser.Element",
+        "type": "Lean.Vir.Js Lean.Vir.Browser.Element",
+        "via": "Lean.Vir.TypeAnchors.reactRootCreateCall",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "descriptor": "resource"
+      },
       {
         "lean": "Lean.Vir.Browser.Event",
         "type": "Lean.Vir.Js Lean.Vir.Browser.Event",
@@ -122,6 +141,13 @@
         "descriptor": "resource"
       },
       {
+        "lean": "Lean.Vir.React.Node",
+        "type": "Lean.Vir.Js Lean.Vir.React.Node",
+        "via": "Lean.Vir.TypeAnchors.reactRootRenderCall",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "descriptor": "resource"
+      },
+      {
         "lean": "Lean.Vir.React.Props",
         "type": "Lean.Vir.Js Lean.Vir.React.Props",
         "via": "Lean.Vir.TypeAnchors.reactPropsIdentity",
@@ -139,6 +165,34 @@
         "lean": "Lean.Vir.React.Ref",
         "type": "Lean.Vir.Js (Lean.Vir.React.Ref (Lean.Vir.Js String))",
         "via": "Lean.Vir.TypeAnchors.reactRefIdentity",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "descriptor": "resource"
+      },
+      {
+        "lean": "Lean.Vir.React.Root",
+        "type": "Lean.Vir.Js Lean.Vir.React.Root",
+        "via": "Lean.Vir.TypeAnchors.reactRootCreateCall",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "descriptor": "resource"
+      },
+      {
+        "lean": "Lean.Vir.React.Root",
+        "type": "Lean.Vir.Js Lean.Vir.React.Root",
+        "via": "Lean.Vir.TypeAnchors.reactRootIdentity",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "descriptor": "resource"
+      },
+      {
+        "lean": "Lean.Vir.React.Root",
+        "type": "Lean.Vir.Js Lean.Vir.React.Root",
+        "via": "Lean.Vir.TypeAnchors.reactRootRenderCall",
+        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "descriptor": "resource"
+      },
+      {
+        "lean": "Lean.Vir.React.Root",
+        "type": "Lean.Vir.Js Lean.Vir.React.Root",
+        "via": "Lean.Vir.TypeAnchors.reactRootUnmountCall",
         "source": "docs/type-descriptors/vir-v1.fixture.lean",
         "descriptor": "resource"
       },
@@ -1550,8 +1604,213 @@
         "name": "Lean.Vir.Js"
       },
       "effect": "react"
+    },
+    {
+      "id": "Lean_Vir_TypeAnchors_reactRootIdentity",
+      "jsName": "Lean_Vir_TypeAnchors_reactRootIdentity",
+      "entry": "Lean.Vir.TypeAnchors.reactRootIdentity",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "args": [
+        {
+          "name": "value",
+          "type": {
+            "type": "ReactRoot",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.React.Root"
+          }
+        }
+      ],
+      "result": {
+        "type": "ReactRoot",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.React.Root"
+      },
+      "effect": "pure"
+    },
+    {
+      "id": "Lean_Vir_TypeAnchors_reactRootCreateCall",
+      "jsName": "Lean_Vir_TypeAnchors_reactRootCreateCall",
+      "entry": "Lean.Vir.TypeAnchors.reactRootCreateCall",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "args": [
+        {
+          "name": "container",
+          "type": {
+            "type": "Element",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Browser.Element"
+          }
+        }
+      ],
+      "result": {
+        "type": "ReactRoot",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.React.Root"
+      },
+      "effect": "dom"
+    },
+    {
+      "id": "Lean_Vir_TypeAnchors_reactRootRenderCall",
+      "jsName": "Lean_Vir_TypeAnchors_reactRootRenderCall",
+      "entry": "Lean.Vir.TypeAnchors.reactRootRenderCall",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "args": [
+        {
+          "name": "root",
+          "type": {
+            "type": "ReactRoot",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.React.Root"
+          }
+        },
+        {
+          "name": "node",
+          "type": {
+            "type": "Function",
+            "interfaceTag": 24,
+            "kind": "function",
+            "effect": "react",
+            "args": [],
+            "result": {
+              "type": "Js",
+              "interfaceTag": 23,
+              "kind": "resource",
+              "name": "Lean.Vir.Js"
+            }
+          }
+        }
+      ],
+      "result": {
+        "type": "Unit",
+        "interfaceTag": 22
+      },
+      "effect": "dom"
+    },
+    {
+      "id": "Lean_Vir_TypeAnchors_reactRootUnmountCall",
+      "jsName": "Lean_Vir_TypeAnchors_reactRootUnmountCall",
+      "entry": "Lean.Vir.TypeAnchors.reactRootUnmountCall",
+      "source": "docs/type-descriptors/vir-v1.fixture.lean",
+      "args": [
+        {
+          "name": "root",
+          "type": {
+            "type": "ReactRoot",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.React.Root"
+          }
+        }
+      ],
+      "result": {
+        "type": "Unit",
+        "interfaceTag": 22
+      },
+      "effect": "dom"
     }
   ],
-  "hostImports": [],
+  "hostImports": [
+    {
+      "slot": 0,
+      "name": "Lean.Vir.React.Root.create",
+      "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
+      "target": "react.root.create",
+      "boundary": "hostResource",
+      "symbol": "vir_js_import_0_2",
+      "arity": 2,
+      "erasedPrefixArgs": 0,
+      "args": [
+        {
+          "name": "container",
+          "type": {
+            "type": "Element",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.Browser.Element"
+          }
+        }
+      ],
+      "result": {
+        "type": "ReactRoot",
+        "interfaceTag": 23,
+        "kind": "resource",
+        "name": "Lean.Vir.React.Root"
+      },
+      "effect": "dom"
+    },
+    {
+      "slot": 1,
+      "name": "Lean.Vir.React.Root.render",
+      "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
+      "target": "react.root.render",
+      "boundary": "hostResource",
+      "symbol": "vir_js_import_1_3",
+      "arity": 3,
+      "erasedPrefixArgs": 0,
+      "args": [
+        {
+          "name": "root",
+          "type": {
+            "type": "ReactRoot",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.React.Root"
+          }
+        },
+        {
+          "name": "node",
+          "type": {
+            "type": "Function",
+            "interfaceTag": 24,
+            "kind": "function",
+            "effect": "react",
+            "args": [],
+            "result": {
+              "type": "Js",
+              "interfaceTag": 23,
+              "kind": "resource",
+              "name": "Lean.Vir.Js"
+            }
+          }
+        }
+      ],
+      "result": {
+        "type": "Unit",
+        "interfaceTag": 22
+      },
+      "effect": "dom"
+    },
+    {
+      "slot": 2,
+      "name": "Lean.Vir.React.Root.unmount",
+      "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
+      "target": "react.root.unmount",
+      "boundary": "hostResource",
+      "symbol": "vir_js_import_2_2",
+      "arity": 2,
+      "erasedPrefixArgs": 0,
+      "args": [
+        {
+          "name": "root",
+          "type": {
+            "type": "ReactRoot",
+            "interfaceTag": 23,
+            "kind": "resource",
+            "name": "Lean.Vir.React.Root"
+          }
+        }
+      ],
+      "result": {
+        "type": "Unit",
+        "interfaceTag": 22
+      },
+      "effect": "dom"
+    }
+  ],
   "diagnostics": []
 }
