@@ -23,7 +23,7 @@ call slots.
 ## Policy
 
 - Keep `third_party/lean4-src/src/library/ir_interpreter.cpp` unmodified.
-- Compile the exact upstream file against the pinned Lean `v4.31.0`
+- Compile the exact upstream file against the pinned Lean `v4.32.0-rc1`
   headers.
 - Link real Lean runtime source files into the WASI probe before adding local
   stubs.
