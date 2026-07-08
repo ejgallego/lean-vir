@@ -327,14 +327,18 @@ This keeps the Lean heap reference count explicit while avoiding any change to
 the upstream interpreter file.
 
 `Vir/GeneratePackage/NativeExterns.lean` is the source of truth for native extern
-registrations. Run `node scripts/check-boundary-registry.mjs --write` after
-changing its `nativeExterns` table; this regenerates
+registrations. Run `npm run check:native-externs` after changing its
+`nativeExterns` table; this verifies that the table's parameter, borrow, and
+result ABI matches Lean's imported IR declarations. Run
+`node scripts/check-boundary-registry.mjs --write` after adding, removing, or
+renaming native extern entries; this regenerates
 `wasm/upstream_shim/native_symbols_registry.inc`. The regular
 `npm run check:boundary-registry` guard then verifies that the generated
 registry is current and that every native extern has a matching `dlsym` symbol
 plus either a handwritten boxed wrapper in
 `wasm/upstream_shim/native_symbols.cpp` or a native constant entry in the
-generated registry. `npm test` runs this before the smoke and fixture suites.
+generated registry. `npm test` runs these checks before the smoke and fixture
+suites.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to

@@ -208,7 +208,7 @@ def nativeExterns : Array NativeExtern := #[
       param 4 false .tobject,
       param 5 false .void
     ],
-    resultType := .tobject,
+    resultType := .tagged,
     symbol := "lean_st_ref_set"
   },
   {
@@ -273,7 +273,7 @@ def nativeExterns : Array NativeExtern := #[
   },
   {
     name := `Array.mkEmpty,
-    params := #[param 1 false .erased, param 2 false .tagged],
+    params := #[param 1 false .erased, param 2 true .tobject],
     resultType := .object,
     symbol := "lean_array_mk_empty"
   },
@@ -375,7 +375,7 @@ def nativeExterns : Array NativeExtern := #[
   },
   {
     name := `Array.replicate,
-    params := #[param 1 false .erased, param 2 true .tobject, param 3 false .tobject],
+    params := #[param 1 false .erased, param 2 false .tobject, param 3 false .tobject],
     resultType := .object,
     symbol := "lean_mk_array"
   },
@@ -580,7 +580,7 @@ def nativeExterns : Array NativeExtern := #[
   {
     name := `String.Internal.length,
     params := #[param 1 true .object],
-    resultType := .tagged,
+    resultType := .tobject,
     symbol := "lean_string_length"
   },
   {
@@ -1259,7 +1259,7 @@ def nativeExterns : Array NativeExtern := #[
   },
   {
     name := `Lean.Expr.data,
-    params := #[param 1 true .tobject],
+    params := #[param 1 true .object],
     resultType := .uint64,
     symbol := "lean_expr_data"
   }

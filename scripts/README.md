@@ -50,6 +50,9 @@ map lives in `docs/HARNESS.md`.
   Probe optional JS/Wasm interop features such as `externref` and JSPI.
   Missing `externref` support fails because the experimental React resource
   prototype requires it; unsupported JSPI is reported as skipped.
+- `npm run check:native-externs`
+  Verify that `Vir/GeneratePackage/NativeExterns.lean` matches Lean's imported
+  IR parameter, borrow, and result ABI for every registered native extern.
 - `npm run test:fixtures`
   Run the fixture host-oracle suite. Use `VIR_FIXTURE_FILTER=<substring>` to
   narrow it.
