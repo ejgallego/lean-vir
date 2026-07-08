@@ -301,15 +301,20 @@ extern "C" lean_object * lean_st_ref_take___boxed(
     return value;
 }
 
-extern "C" lean_object * lean_task_pure___boxed(lean_object * type, lean_object * value) {
-    lean_dec(type);
-    return lean_task_pure(value);
-}
+#define VIR_DEFINE_DROP_TYPE_OBJECT_UNARY_WRAPPER(symbol) \
+    extern "C" lean_object * symbol##___boxed(lean_object * type, lean_object * a) { \
+        lean_dec(type); \
+        return symbol(a); \
+    }
 
-extern "C" lean_object * lean_task_get_own___boxed(lean_object * type, lean_object * task) {
-    lean_dec(type);
-    return lean_task_get_own(task);
-}
+#define VIR_DEFINE_DROP_TYPE_OBJECT_BINARY_WRAPPER(symbol) \
+    extern "C" lean_object * symbol##___boxed(lean_object * type, lean_object * a, lean_object * b) { \
+        lean_dec(type); \
+        return symbol(a, b); \
+    }
+
+VIR_DEFINE_DROP_TYPE_OBJECT_UNARY_WRAPPER(lean_task_pure)
+VIR_DEFINE_DROP_TYPE_OBJECT_UNARY_WRAPPER(lean_task_get_own)
 
 extern "C" lean_object * lean_task_map___boxed(
     lean_object * alpha,
@@ -352,10 +357,7 @@ extern "C" lean_object * lean_array_mk___boxed(lean_object * type, lean_object *
     return array;
 }
 
-extern "C" lean_object * lean_array_push___boxed(lean_object * type, lean_object * array, lean_object * value) {
-    lean_dec(type);
-    return lean_array_push(array, value);
-}
+VIR_DEFINE_DROP_TYPE_OBJECT_BINARY_WRAPPER(lean_array_push)
 
 extern "C" lean_object * lean_array_to_list___boxed(lean_object * type, lean_object * array) {
     lean_dec(type);
@@ -466,15 +468,12 @@ extern "C" lean_object * lean_array_set___boxed(lean_object * type, lean_object 
     return result;
 }
 
-extern "C" lean_object * lean_array_pop___boxed(lean_object * type, lean_object * array) {
-    lean_dec(type);
-    return lean_array_pop(array);
-}
+VIR_DEFINE_DROP_TYPE_OBJECT_UNARY_WRAPPER(lean_array_pop)
 
-extern "C" lean_object * lean_mk_array___boxed(lean_object * type, lean_object * size, lean_object * value) {
-    lean_dec(type);
-    return lean_mk_array(size, value);
-}
+VIR_DEFINE_DROP_TYPE_OBJECT_BINARY_WRAPPER(lean_mk_array)
+
+#undef VIR_DEFINE_DROP_TYPE_OBJECT_UNARY_WRAPPER
+#undef VIR_DEFINE_DROP_TYPE_OBJECT_BINARY_WRAPPER
 
 extern "C" lean_object * lean_array_swap___boxed(lean_object * type, lean_object * array, lean_object * i, lean_object * j) {
     lean_dec(type);

@@ -100,7 +100,7 @@ for the full matrix.
 - Native extern declarations: `npm run check:native-externs`. If entries are
   added, removed, or renamed, also run
   `node scripts/check-boundary-registry.mjs --write` and
-  `npm run check:boundary-registry`. If wrapper symbols or helper macros
+  `npm run check:boundary-registry`. If wrapper symbols or generated wrapper macros
   changed, also run `npm run check:native-wrappers`.
 - Manifest metadata, diagnostics, duplicate export checks, or report output:
   `lake build vir_irpkg`, `npm run generate:irpkg -- examples/Fib.lean

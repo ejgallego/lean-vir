@@ -130,6 +130,17 @@ function parseWrappers(source) {
       helper: match[3],
     });
   }
+  const generatedDropTypeObjectRegex =
+    /^VIR_DEFINE_DROP_TYPE_OBJECT_(UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+)\)$/gm;
+  for (const match of source.matchAll(generatedDropTypeObjectRegex)) {
+    const symbol = match[2];
+    wrappers.set(`${symbol}___boxed`, {
+      name: `${symbol}___boxed`,
+      generatedDropTypeObject: true,
+      arity: match[1].toLowerCase(),
+      symbol,
+    });
+  }
   return wrappers;
 }
 
@@ -171,7 +182,7 @@ function classifyWrapper(wrapper, entries) {
   }
 
   if (wrapper.generatedHelper) {
-    if (!entries.some((entry) => entry.symbol === wrapper.symbol)) {
+    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
       return {
         kind: "generated-helper-mismatch",
         reason: `generated helper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
@@ -180,6 +191,19 @@ function classifyWrapper(wrapper, entries) {
     return {
       kind: "generated-helper",
       reason: `macro-generated ${wrapper.arity} helper via ${wrapper.helper}`,
+    };
+  }
+
+  if (wrapper.generatedDropTypeObject) {
+    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
+      return {
+        kind: "generated-direct-mismatch",
+        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
+      };
+    }
+    return {
+      kind: "generated-direct",
+      reason: `macro-generated drop-type ${wrapper.arity} object forwarder`,
     };
   }
 
@@ -249,6 +273,35 @@ function helperForSignature(nativeExtern) {
   return null;
 }
 
+function validateDropTypeObjectSignature(nativeExtern, arity) {
+  const expectedParamCount = arity === "unary" ? 2 : arity === "binary" ? 3 : null;
+  if (expectedParamCount === null) {
+    return `unsupported generated direct arity ${arity}`;
+  }
+  if (nativeExtern.params.length !== expectedParamCount) {
+    return `expected ${expectedParamCount} params, found ${nativeExtern.params.length}`;
+  }
+  const [typeParam, ...forwardedParams] = nativeExtern.params;
+  if (typeParam.type !== "erased") {
+    return `first param is ${typeParam.type}, expected erased`;
+  }
+  if (typeParam.borrow) {
+    return "first param is borrowed; generated forwarder drops an owned erased param";
+  }
+  for (const param of forwardedParams) {
+    if (param.borrow) {
+      return `param ${param.index} is borrowed; generated forwarder only supports owned params`;
+    }
+    if (!["object", "tobject"].includes(param.type)) {
+      return `param ${param.index} is ${param.type}, expected object or tobject`;
+    }
+  }
+  if (!["object", "tobject"].includes(nativeExtern.resultType)) {
+    return `result is ${nativeExtern.resultType}, expected object or tobject`;
+  }
+  return null;
+}
+
 const [nativeExternsSource, nativeSymbols, nativeRegistry] = await Promise.all([
   readFile(nativeExternsPath, "utf8"),
   readFile(nativeSymbolsPath, "utf8"),
@@ -295,6 +348,22 @@ for (const [wrapperName, groupEntries] of grouped.entries()) {
       }
     }
   }
+  if (item.kind === "generated-direct") {
+    for (const entry of groupEntries) {
+      const nativeExtern = nativeExterns.get(entry.leanName);
+      if (!nativeExtern) {
+        item.kind = "generated-direct-mismatch";
+        item.reason = `${entry.leanName}: no native extern entry found`;
+        break;
+      }
+      const reason = validateDropTypeObjectSignature(nativeExtern, wrapper.arity);
+      if (reason) {
+        item.kind = "generated-direct-mismatch";
+        item.reason = `${entry.leanName}: ${reason}`;
+        break;
+      }
+    }
+  }
   inventory.push(item);
 }
 
@@ -311,12 +380,14 @@ for (const wrapperName of wrappers.keys()) {
 
 const kindOrder = [
   "generated-helper",
+  "generated-direct",
   "regular-helper",
   "regular-direct",
   "regular-direct-retain",
   "custom-alias",
   "custom",
   "generated-helper-mismatch",
+  "generated-direct-mismatch",
   "missing",
   "extra",
 ];
@@ -344,8 +415,16 @@ if (args.has("--json")) {
   const shouldList = (kind) =>
     args.has("--all") ||
     (args.has("--check")
-      ? ["generated-helper-mismatch", "missing", "extra"].includes(kind)
-      : ["generated-helper-mismatch", "regular-direct-retain", "custom-alias", "custom", "missing", "extra"].includes(kind));
+      ? ["generated-helper-mismatch", "generated-direct-mismatch", "missing", "extra"].includes(kind)
+      : [
+          "generated-helper-mismatch",
+          "generated-direct-mismatch",
+          "regular-direct-retain",
+          "custom-alias",
+          "custom",
+          "missing",
+          "extra",
+        ].includes(kind));
 
   for (const kind of kindOrder) {
     const group = byKind.get(kind) ?? [];
@@ -363,7 +442,7 @@ if (args.has("--json")) {
 
 if (args.has("--check")) {
   const failures = inventory.filter((item) =>
-    ["generated-helper-mismatch", "missing", "extra"].includes(item.kind)
+    ["generated-helper-mismatch", "generated-direct-mismatch", "missing", "extra"].includes(item.kind)
   );
   if (failures.length !== 0) {
     if (args.has("--json")) {

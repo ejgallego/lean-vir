@@ -35,7 +35,7 @@ map lives in `docs/HARNESS.md`.
   behavior.
 - `npm run check:native-wrappers`
   Run the same inventory in check mode, including validation that
-  macro-generated helper wrappers use the helper implied by
+  macro-generated wrappers use the helper or direct-call shape implied by
   `Vir/GeneratePackage/NativeExterns.lean`.
 - `npm run test:upstream`
   Build the demo and run the upstream interpreter smoke test.

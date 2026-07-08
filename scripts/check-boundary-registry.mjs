@@ -110,6 +110,9 @@ function parseBoxedWrappers(source) {
   for (const match of source.matchAll(/^VIR_DEFINE_BOX_(?:UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+),\s*[A-Za-z0-9_]+\)$/gm)) {
     wrappers.add(`${match[1]}___boxed`);
   }
+  for (const match of source.matchAll(/^VIR_DEFINE_DROP_TYPE_OBJECT_(?:UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+)\)$/gm)) {
+    wrappers.add(`${match[1]}___boxed`);
+  }
   return wrappers;
 }
 

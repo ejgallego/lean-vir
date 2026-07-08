@@ -346,16 +346,16 @@ The boxed wrappers can be inventoried with:
 npm run inspect:native-wrappers
 ```
 
-This groups wrappers into generated helper wrappers, regular direct-call wrappers,
-direct-call wrappers that retain a borrowed result, aliases, and custom shim
-behavior. The inventory is intentionally informational for now. It gives the
+This groups wrappers into generated helper wrappers, generated direct-call
+wrappers, remaining regular direct-call wrappers, direct-call wrappers that
+retain a borrowed result, aliases, and custom shim behavior. The inventory gives
 wrapper-generation work a concrete target without introducing another
-handwritten ABI table. The helper class is macro-generated from the native
-symbol and shared boxing helper. `npm run check:native-wrappers` additionally
-verifies that each generated helper wrapper uses the helper implied by the
-Lean-side ABI table. Future generation should target the direct-call class next,
-while wrappers classified as aliases or custom behavior remain explicit until
-their policy is modeled separately.
+handwritten ABI table. `npm run check:native-wrappers` verifies that generated
+helper wrappers use the helper implied by the Lean-side ABI table, and that
+generated direct-call wrappers match their narrow modeled ABI shape. Remaining
+regular direct-call wrappers should move into generated classes only after their
+ownership and boxing policy is modeled; aliases and custom behavior remain
+explicit until their policy is modeled separately.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
