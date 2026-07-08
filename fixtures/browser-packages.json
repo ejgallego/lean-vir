@@ -154,7 +154,9 @@
           "roots": [
             "Vir.Fixtures.FormatPretty.formatPrettyPreview",
             "Vir.Fixtures.FormatPretty.formatPrettyAtWidth",
-            "Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth"
+            "Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth",
+            "Vir.Fixtures.FormatPretty.formatBoundaryPretty",
+            "Vir.Fixtures.FormatPretty.formatBoundaryRoundtrip"
           ]
         }
       ],

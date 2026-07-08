@@ -89,4 +89,10 @@ def formatPrettyCaseAtWidth (caseName : PrettyCase) (width : Nat) : String :=
   | .nested => Format.pretty nestedDoc width
   | .all => formatPrettyAtWidth width
 
+def formatBoundaryPretty (doc : Format) (width : Nat) : String :=
+  Format.pretty doc (demoWidth width)
+
+def formatBoundaryRoundtrip (doc : Format) : Format :=
+  Format.group (Format.tag 7 doc) .fill
+
 end Vir.Fixtures.FormatPretty

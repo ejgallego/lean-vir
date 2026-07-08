@@ -583,6 +583,34 @@ assert.equal(objectCounters.objectCalls, 36);
 assert.equal(objectCounters.bytePayloadCalls, 0);
 
 const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
+  const fmt = {
+    nil: () => ({ kind: "nil" }),
+    line: () => ({ kind: "line" }),
+    align: (force) => ({ kind: "align", value: force }),
+    text: (value) => ({ kind: "text", value }),
+    nest: (indent, f) => ({ kind: "nest", fields: { indent, f } }),
+    append: (arg1, arg2) => ({ kind: "append", fields: { arg1, arg2 } }),
+    group: (arg1, behavior = "fill") => ({ kind: "group", fields: { arg1, behavior } }),
+    tag: (arg1, arg2) => ({ kind: "tag", fields: { arg1, arg2 } }),
+  };
+  const formatGroupDoc = fmt.group(
+    fmt.append(fmt.text("hello"), fmt.append(fmt.line(), fmt.text("world"))),
+  );
+  const formatConstructorSweepDoc = fmt.group(
+    fmt.append(
+      fmt.nil(),
+      fmt.nest(
+        "2",
+        fmt.append(
+          fmt.tag(
+            "7",
+            fmt.append(fmt.text("."), fmt.append(fmt.align(false), fmt.text("alpha"))),
+          ),
+          fmt.append(fmt.line(), fmt.text("beta")),
+        ),
+      ),
+    ),
+  );
   assert.match(
     prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyPreview"),
     /^wide group:\nhello world/,
@@ -595,9 +623,43 @@ const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
     prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12),
     "[alpha,\n beta,\n gamma]",
   );
+  assert.equal(
+    prettyRuntime.call("Vir.Fixtures.FormatPretty.formatBoundaryPretty", formatGroupDoc, 8),
+    "hello\nworld",
+  );
+  assert.equal(
+    prettyRuntime.call("Vir.Fixtures.FormatPretty.formatBoundaryPretty", formatConstructorSweepDoc, 4),
+    ".alpha\n  beta",
+  );
+  assert.deepEqual(
+    prettyRuntime.call("Vir.Fixtures.FormatPretty.formatBoundaryRoundtrip", formatConstructorSweepDoc),
+    fmt.group(fmt.tag("7", formatConstructorSweepDoc)),
+  );
 });
-assert.equal(prettyCounters.objectCalls, 3);
+assert.equal(prettyCounters.objectCalls, 6);
 assert.equal(prettyCounters.bytePayloadCalls, 0);
+const formatBoundaryEntry = manifestEntry(
+  prettyRuntime.interfaceManifest,
+  "Vir.Fixtures.FormatPretty.formatBoundaryPretty",
+);
+const formatType = formatBoundaryEntry.args[0].type;
+assert.equal(formatType.kind, "customInductive");
+assert.equal(formatType.name, "Std.Format");
+assert.deepEqual(formatType.constructors.map((ctor) => ctor.jsName), [
+  "nil",
+  "line",
+  "align",
+  "text",
+  "nest",
+  "append",
+  "group",
+  "tag",
+]);
+const groupCtor = formatType.constructors.find((ctor) => ctor.jsName === "group");
+assert.ok(groupCtor, "Std.Format manifest should include group constructor");
+const groupBehaviorField = groupCtor.fields.find((field) => field.name === "behavior");
+assert.ok(groupBehaviorField, "Std.Format.group manifest should include behavior field");
+assert.equal(groupBehaviorField.type.kind, "simpleEnum");
 assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
