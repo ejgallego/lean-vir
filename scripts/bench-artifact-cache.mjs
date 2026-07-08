@@ -61,7 +61,10 @@ const sourceIdentityPaths = [
   "wasm/upstream_shim/object_expr_abi.cpp",
   "wasm/upstream_shim/package_decl_provider.cpp",
   "wasm/upstream_shim/package_ir_decoder.cpp",
-  "wasm/upstream_shim/platform_stubs.cpp",
+  "wasm/upstream_shim/runtime_environment_stubs.cpp",
+  "wasm/upstream_shim/package_init_bridge.cpp",
+  "wasm/upstream_shim/runtime_value_stubs.cpp",
+  "wasm/upstream_shim/io_stubs.cpp",
   "wasm/upstream_shim/resource_abi.cpp",
   "wasm/upstream_shim/resource_abi.h",
 ];

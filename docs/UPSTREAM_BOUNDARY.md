@@ -73,7 +73,9 @@ not a fork of Lean. It is split by responsibility:
 - `native_symbol_lookup.cpp` owns the generated native registry include,
   restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
   stubs.
-- `platform_stubs.cpp` owns WASI/platform and environment fidelity stubs.
+- `runtime_environment_stubs.cpp`, `package_init_bridge.cpp`,
+  `runtime_value_stubs.cpp`, and `io_stubs.cpp` own the WASI/platform,
+  initializer, value-helper, and demo IO stubs.
 - `lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
   constructor replacements for exported Lean-library constructors.
 - `package_ir_decoder.cpp` owns `.irpkg` binary decoding and Lean IR object
@@ -370,15 +372,18 @@ environment bridges: `evalConstCore` delegates to upstream `lean_eval_const`,
 `evalCheckMeta` is accepted for the demo. That is the next fidelity boundary to
 remove if we want parser loading to behave exactly like a full Lean runtime.
 
-`platform_stubs.cpp` keeps the remaining platform boundary explicit:
+The runtime/platform stub files keep the remaining platform boundary explicit:
 
 - runtime budget and tracing hooks (`check_system`, heartbeat reset, time tasks,
-  and trace scopes) are inert in this single-threaded demo build;
+  and trace scopes) live in `runtime_environment_stubs.cpp` and are inert in
+  this single-threaded demo build;
 - initializer metadata queries are package-backed, using the same init-global
   table that `vir_load_ir_package` executes through upstream `lean_run_init`;
-- option registration, sorry dependency lookup, and stderr/error printing remain
-  demo no-ops because the package generator and JavaScript runtime provide the
-  active diagnostics for this path.
+- option registration, sorry dependency lookup, and export-name lookup remain
+  demo no-ops in `runtime_environment_stubs.cpp`;
+- stderr/error printing remains a demo no-op in `io_stubs.cpp` because the
+  package generator and JavaScript runtime provide the active diagnostics for
+  this path.
 
 ## Future Loading Path
 

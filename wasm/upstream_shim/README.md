@@ -32,8 +32,13 @@ package lookup, and temporary runtime glue live here instead.
   restricted symbol lookup, symbol-stem support, and C++ exception stubs.
 - `native_symbols_registry.inc`: generated registry of native extern names from
   `Vir/GeneratePackage/NativeExterns.lean`. Do not edit it by hand.
-- `platform_stubs.cpp`: WASI/demo stubs for Lean platform APIs that are inert,
-  package-backed, or deliberately fail-fast in this environment.
+- `runtime_environment_stubs.cpp`: inert runtime-budget, tracing, option, and
+  environment hooks for this single-threaded demo build.
+- `package_init_bridge.cpp`: package-backed initializer-name lookup used by
+  upstream initializer guards.
+- `runtime_value_stubs.cpp`: small runtime value helpers that are not yet
+  supplied by linked Lean runtime sources.
+- `io_stubs.cpp`: demo stderr/error-reporting no-ops.
 - `lean_object_constructors.cpp`: temporary Lean `Name`, `Level`, and `Expr`
   constructors needed by current fixtures.
 - `package_ir_decoder.cpp`: `.irpkg` binary decoder and Lean IR object
@@ -42,6 +47,25 @@ package lookup, and temporary runtime glue live here instead.
   `package_decl_provider.cpp`: the package-backed static declaration provider.
   Future module-backed loading should replace this layer.
 - `engine_bench.cpp`: local benchmark harness entry point.
+
+## Code Attribution
+
+This table attributes the local shim code by ownership and package-format
+coupling. Line counts are approximate and are meant for sizing, not policy.
+
+| Area | Files | Approx. LOC | Package coupling | Notes |
+| --- | --- | ---: | --- | --- |
+| Package decoding and materialization | `package_ir_decoder.cpp`, `package_decl_provider_types.h` | 870 | Direct | Reads `.irpkg` bytes and reconstructs Lean IR objects. Main target if we reduce package encoding complexity. |
+| Loaded package state and declaration provider | `package_decl_provider.cpp`, `decl_provider.h` | 394 | Direct | Owns loaded package indices, declaration lookup, call slots, interface manifest, and init globals. |
+| Package call signatures | `call_signature_summary.cpp/.h`, `signature_cache.cpp/.h` | 398 | Direct metadata | Decodes compact export signatures used by `vir_call_resolved_objects`; likely shrinks if package metadata becomes closer to generated code. |
+| Host import dispatch | `host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |
+| Native extern support | `native_symbols.cpp`, `native_symbol_lookup.cpp`, `native_symbols_registry.inc` | 1696 | Declaration/native symbol coupling | Mostly runtime coverage and lookup policy, not package byte-format parsing. |
+| JavaScript package-call ABI | `call_abi.cpp` | 129 | Consumes package metadata | Thin JS-facing entry point over call slots and cached signatures. |
+| Upstream interpreter bridge | `interpreter_bridge.cpp/.h` | 102 | Low | Initializes the upstream interpreter and provides `lean_ir_find_env_decl` hooks. |
+| Object/resource/closure ABI | `object_abi.cpp`, `object_expr_abi.cpp`, `resource_abi.cpp/.h`, `closure_abi.cpp` | 776 | Low | Runtime object boundary used after explicit lowering; `object_expr_abi.cpp` is fixture/parser support. |
+| Lean object construction helpers | `lean_object_constructors.cpp`, `name_utils.cpp/.h` | 435 | Support | Temporary constructors and name helpers needed while package decoding constructs Lean objects directly. |
+| Platform/runtime stubs | `runtime_environment_stubs.cpp`, `package_init_bridge.cpp`, `runtime_value_stubs.cpp`, `io_stubs.cpp` | 167 | Mostly low | Runtime glue; `package_init_bridge.cpp` is package-backed but not package-format parsing. |
+| Benchmark harness | `engine_bench.cpp` | 211 | None | Local benchmark entry point; not linked into the browser WASM. |
 
 ## Editing Rules
 
