@@ -43,6 +43,7 @@ const sourceIdentityPaths = [
   "wasm/upstream_shim/decl_provider.h",
   "wasm/upstream_shim/call_signature_summary.cpp",
   "wasm/upstream_shim/call_signature_summary.h",
+  "wasm/upstream_shim/closure_abi.cpp",
   "wasm/upstream_shim/host_import_trampolines.cpp",
   "wasm/upstream_shim/lean_object_constructors.cpp",
   "wasm/upstream_shim/name_utils.cpp",

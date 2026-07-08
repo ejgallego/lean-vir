@@ -7,8 +7,9 @@ package lookup, and temporary runtime glue live here instead.
 
 ## File Map
 
-- `shim.cpp`: package call entry points, Lean closure roots, and
-  `lean_ir_find_env_decl` hooks.
+- `shim.cpp`: package call entry points and `lean_ir_find_env_decl` hooks.
+- `closure_abi.cpp`: Lean closure roots and callback calls used when function
+  values cross to JavaScript.
 - `host_import_trampolines.cpp`: package-scoped JavaScript host-import
   trampolines used by restricted `dlsym` lookup.
 - `signature_cache.h` and `signature_cache.cpp`: package-call signature

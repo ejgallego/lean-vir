@@ -53,8 +53,9 @@ the interpreter's name formatting and diagnostics.
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
 
-- `shim.cpp` owns the package call surface, closure roots, and
-  `lean_ir_find_env_decl` hooks.
+- `shim.cpp` owns the package call surface and `lean_ir_find_env_decl` hooks.
+- `closure_abi.cpp` owns Lean closure roots and callback calls used when
+  function values cross to JavaScript.
 - `host_import_trampolines.cpp` owns the package-scoped JavaScript host-import
   trampoline grid used by restricted `dlsym` lookup.
 - `call_signature_summary.cpp` owns the streaming package-call signature parser used
@@ -91,7 +92,7 @@ Together they supply:
   slot.
 - package-scoped JavaScript host import trampolines for declarations marked
   with `@[vir_js "..."]`, routed through `env.vir_js_call_objects`.
-- Lean closure roots for function-valued host-import arguments. The shim owns
+- Lean closure roots for function-valued host-import arguments. The closure ABI owns
   `vir_obj_closure_root`, `vir_closure_call_objects`, and
   `vir_closure_release`; JavaScript owns the host-side lifetime policy for
   `VirCallback` objects.

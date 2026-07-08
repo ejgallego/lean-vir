@@ -158,6 +158,7 @@ shim_sources=(
   "wasm/upstream_shim/name_utils.cpp"
   "wasm/upstream_shim/signature_cache.cpp"
   "wasm/upstream_shim/object_abi.cpp"
+  "wasm/upstream_shim/closure_abi.cpp"
   "wasm/upstream_shim/host_import_trampolines.cpp"
   "wasm/upstream_shim/native_symbols.cpp"
   "wasm/upstream_shim/platform_stubs.cpp"
@@ -620,9 +621,10 @@ report_start=$SECONDS
   echo
   echo "## Current Shim Scope"
   echo
-  echo "\`wasm/upstream_shim/shim.cpp\` supplies the package call surface,"
-  echo "closure bridge, and declaration lookup hooks. \`host_import_trampolines.cpp\`"
-  echo "supplies the package-scoped JavaScript host-import trampoline grid."
+  echo "\`wasm/upstream_shim/shim.cpp\` supplies the package call surface"
+  echo "and declaration lookup hooks. \`closure_abi.cpp\` supplies Lean closure"
+  echo "roots and callback calls. \`host_import_trampolines.cpp\` supplies the"
+  echo "package-scoped JavaScript host-import trampoline grid."
   echo "\`signature_cache.cpp\` owns cached package-call signature summaries."
   echo "\`call_signature_summary.cpp\` streams compact package signatures to compute"
   echo "arity and boxed-boundary requirements. \`name_utils.cpp\` contains shared"
