@@ -174,6 +174,7 @@ shim_sources=(
 shim_deps=(
   "wasm/upstream_shim/package/decl_provider.h"
   "wasm/upstream_shim/interpreter/interpreter_bridge.h"
+  "wasm/upstream_shim/package/package_binary_reader.h"
   "wasm/upstream_shim/package/package_decl_provider_types.h"
   "wasm/upstream_shim/runtime/name_utils.h"
   "wasm/upstream_shim/abi/resource_abi.h"

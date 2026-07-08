@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 #include "package_decl_provider_types.h"
+#include "package_binary_reader.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -233,86 +234,13 @@ static object * mk_extern_decl(object * fn, object * params, type result_type) {
     return mk_ctor(1, { fn, params, lean_box(static_cast<unsigned>(result_type)), lean_box(0) });
 }
 
-class reader {
-    uint8_t const * m_data;
-    size_t m_size;
-    size_t m_pos = 0;
-
+class reader : public package_binary_reader {
 public:
-    bool ok = true;
-
-    reader(uint8_t const * data, size_t size):
-        m_data(data),
-        m_size(size) {
-    }
-
-    std::string const & error() const {
-        return m_error;
-    }
-
-    bool at_end() const {
-        return m_pos == m_size;
-    }
-
-    size_t pos() const {
-        return m_pos;
-    }
-
-    void fail(std::string const & message) {
-        if (ok) {
-            ok = false;
-            m_error = "byte " + std::to_string(m_pos) + ": " + message;
-        }
-    }
-
-    uint8_t u8() {
-        if (!ok) {
-            return 0;
-        }
-        if (m_pos >= m_size) {
-            fail("unexpected end of IR package");
-            return 0;
-        }
-        return m_data[m_pos++];
-    }
-
-    bool boolean() {
-        uint8_t value = u8();
-        if (value == 0) {
-            return false;
-        }
-        if (value == 1) {
-            return true;
-        }
-        fail("invalid boolean tag " + std::to_string(value));
-        return false;
-    }
-
-    uint32_t u32() {
-        uint32_t b0 = u8();
-        uint32_t b1 = u8();
-        uint32_t b2 = u8();
-        uint32_t b3 = u8();
-        return b0 | (b1 << 8) | (b2 << 16) | (b3 << 24);
-    }
+    using package_binary_reader::package_binary_reader;
 
     object * nat() {
         std::string decimal = string();
         return lean_cstr_to_nat(decimal.c_str());
-    }
-
-    std::string string() {
-        uint32_t len = u32();
-        if (!ok) {
-            return std::string();
-        }
-        if (len > m_size - m_pos) {
-            fail("string length " + std::to_string(len) + " exceeds remaining package bytes");
-            return std::string();
-        }
-        std::string out(reinterpret_cast<char const *>(m_data + m_pos), len);
-        m_pos += len;
-        return out;
     }
 
     object * name() {
@@ -580,8 +508,6 @@ public:
     }
 
 private:
-    std::string m_error;
-
     template <typename F>
     std::vector<object *> object_array(F read_one) {
         uint32_t count = u32();

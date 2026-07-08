@@ -28,7 +28,7 @@ coupling. Line counts are approximate and are meant for sizing, not policy.
 
 | Area | Files | Approx. LOC | Package coupling | Notes |
 | --- | --- | ---: | --- | --- |
-| Package decoding and materialization | `package/package_ir_decoder.cpp`, `package/package_decl_provider_types.h` | 749 | Direct | Reads `.irpkg` bytes and reconstructs Lean IR objects. Main target if we reduce package encoding complexity. |
+| Package decoding and materialization | `package/package_ir_decoder.cpp`, `package/package_binary_reader.h`, `package/package_decl_provider_types.h` | 770 | Direct | Reads `.irpkg` bytes and reconstructs Lean IR objects. Main target if we reduce package encoding complexity. |
 | Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 394 | Direct | Owns loaded package indices, declaration lookup, call slots, direct export call summaries, interface manifest, and init globals. |
 | Host import dispatch | `package/host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |
 | Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `runtime/native_symbols_registry.inc` | 1696 | Declaration/native symbol coupling | Mostly runtime coverage and lookup policy, not package byte-format parsing. |

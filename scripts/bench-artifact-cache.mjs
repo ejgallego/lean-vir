@@ -41,6 +41,7 @@ const sourceIdentityPaths = [
   "scripts/generate-ir-package.sh",
   "tools/GeneratePackage.lean",
   "wasm/upstream_shim/package/decl_provider.h",
+  "wasm/upstream_shim/package/package_binary_reader.h",
   "wasm/upstream_shim/package/package_decl_provider_types.h",
   "wasm/upstream_shim/interpreter/interpreter_bridge.cpp",
   "wasm/upstream_shim/interpreter/interpreter_bridge.h",
