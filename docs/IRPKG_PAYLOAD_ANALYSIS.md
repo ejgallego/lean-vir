@@ -45,6 +45,12 @@ hand-maintained twice: once in Lean emission and once in C++ decoding. The C++
 side also owns object construction details and reference-counting behavior while
 materializing upstream `Lean.IR` values.
 
+The first schema-centralization step is now the declaration payload tag table:
+`scripts/ir-codec-tags.mjs` generates `Vir/GeneratePackage/PackageIRTags.lean`
+and `wasm/upstream_shim/package/package_ir_tags.h`. This removes duplicated
+numeric tag literals from the Lean emitter and C++ decoder, but the field order
+and object materialization code are still intentionally direct handwritten code.
+
 ## Main Risks
 
 1. **Schema drift.** Every supported `Lean.IR.Expr`, `FnBody`, `Alt`, `Arg`,
@@ -65,9 +71,10 @@ materializing upstream `Lean.IR` values.
    extern entries, IR node tags, name/string bytes, and repeated names. This
    tells us whether size comes from names, bodies, imported closures, or native
    extern entries before changing the format.
-2. **Centralize the declaration codec schema.** A generated codec table could
-   emit the Lean encoder tags and the C++ decoder switches from one source of
-   truth. That is a maintenance win without a runtime manifest interpreter.
+2. **Extend declaration codec schema generation.** The tag table is centralized.
+   The next step would be a generated field-order schema or generated decoder
+   skeleton for the IR cases, still producing direct Lean/C++ code rather than a
+   runtime manifest interpreter.
 3. **Review native extern entries.** Native externs are encoded as full extern
    declarations today. If they can become a smaller explicit native-symbol
    section, that reduces payload bytes and may simplify part of the decoder.
@@ -76,5 +83,5 @@ materializing upstream `Lean.IR` values.
    proves it is worth the added decoder state.
 
 The strongest candidate is therefore not compression. It is a declaration
-payload inventory tool followed by codec schema generation, because that attacks
-both package size understanding and the shim-side maintenance burden.
+payload inventory tool followed by deeper codec schema generation, because that
+attacks both package size understanding and the shim-side maintenance burden.

@@ -37,6 +37,11 @@ map lives in `docs/HARNESS.md`.
   Run the same inventory in check mode, including validation that
   macro-generated wrappers use the helper or direct-call shape implied by
   `Vir/GeneratePackage/NativeExterns.lean`.
+- `npm run generate:ir-codec-tags`
+  Refresh generated Lean/C++ constants for declaration payload tag bytes from
+  `scripts/ir-codec-tags.mjs`.
+- `npm run check:ir-codec-tags`
+  Verify that the generated declaration codec tag files are current.
 - `npm run test:upstream`
   Build the demo and run the upstream interpreter smoke test.
 - `npm run test:upstream:no-build`
@@ -121,6 +126,8 @@ The split helpers below are the intended extension points for focused changes:
   instead of shelling out through `lean --run tools/GeneratePackage.lean`.
 - Native wrapper inventory lives in `scripts/inventory-native-wrappers.mjs`;
   keep it as an inspection aid until regular wrapper generation exists.
+- Declaration payload tag values live in `scripts/ir-codec-tags.mjs`; run
+  `npm run generate:ir-codec-tags` after changing them.
 - Benchmark sample parsing and formatting live in `scripts/bench-utils.mjs`.
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.

@@ -180,6 +180,7 @@ shim_deps=(
   "wasm/upstream_shim/package/package_binary_reader.h"
   "wasm/upstream_shim/package/package_decl_provider_types.h"
   "wasm/upstream_shim/package/package_ir_builders.h"
+  "wasm/upstream_shim/package/package_ir_tags.h"
   "wasm/upstream_shim/package/package_section_directory.h"
   "wasm/upstream_shim/runtime/name_utils.h"
   "wasm/upstream_shim/abi/resource_abi.h"
