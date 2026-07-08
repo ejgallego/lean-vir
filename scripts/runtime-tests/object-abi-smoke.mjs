@@ -349,6 +349,8 @@ const inspected = spawnSync("node", ["scripts/inspect-irpkg.mjs", defaultPackage
 });
 assert.equal(inspected.status, 0, inspected.stderr || inspected.stdout);
 assert.ok(inspected.stdout.includes(`package: ${defaultPackagePath}`));
+assert.match(inspected.stdout, /sections: 5/);
+assert.match(inspected.stdout, /interfaceManifest kind=5/);
 assert.match(inspected.stdout, new RegExp(`exports: ${runtime.interfaceManifest.exports.length}`));
 assert.match(inspected.stdout, /host imports: 0/);
 assert.match(inspected.stdout, /fib\(arg1: Nat\) -> Nat \[fib\]/);
@@ -366,6 +368,8 @@ assert.equal(inspectedJson.status, 0, inspectedJson.stderr || inspectedJson.stdo
 const inspectedInfo = JSON.parse(inspectedJson.stdout);
 assert.equal(inspectedInfo.package.version, PACKAGE_FORMAT_VERSION);
 assert.equal(inspectedInfo.package.declarationCount, runtime.packageInfo.count);
+assert.equal(inspectedInfo.package.sections.length, 5);
+assert.ok(inspectedInfo.package.sections.some((section) => section.name === "interfaceManifest"));
 assert.equal(inspectedInfo.manifest.exports.length, runtime.interfaceManifest.exports.length);
 assert.equal(inspectedInfo.manifest.hostImports.length, 0);
 assert.equal(runtime.exportsByName.SortDemo_demo(), "192");

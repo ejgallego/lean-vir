@@ -70,13 +70,16 @@ npm run inspect:irpkg -- build/generated/local.irpkg
 ```
 
 The inspector reads the embedded manifest from the `.irpkg` itself and prints
-the package format, declaration count, metadata, source targets, exports,
-host imports, argument/result types, and diagnostics. Use `--json` for bug
-reports or tooling:
+the package format, declaration count, section directory, metadata, source
+targets, exports, host imports, argument/result types, and diagnostics. Use
+`--json` for bug reports or tooling:
 
 ```bash
 npm run inspect:irpkg -- --json build/generated/local.irpkg
 ```
+
+For the binary envelope fields and current section IDs, see
+`docs/IRPKG_FORMAT.md`.
 
 ## Load The Package
 
@@ -120,9 +123,9 @@ objects with `vir_obj_*` helpers, and calls
 `vir_call_resolved_objects`. When interpreted Lean code reaches a host import,
 the shim calls the runtime's `env.vir_js_call_objects` import with borrowed Lean
 object arguments, and JavaScript returns an owned Lean object result. Package
-format 9 keeps package-owned direct summaries for object-call validation and
+format 10 keeps package-owned direct summaries for object-call validation and
 package-owned arity/effect metadata for host-import dispatch and callback
-rooting.
+rooting in named package sections.
 
 Supported interface types:
 

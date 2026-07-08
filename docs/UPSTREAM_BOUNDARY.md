@@ -78,8 +78,10 @@ not a fork of Lean. It is split by responsibility:
   WASI/platform, initializer, value-helper, and demo IO stubs.
 - `runtime/lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
   constructor replacements for exported Lean-library constructors.
-- `package/package_ir_decoder.cpp` owns `.irpkg` binary decoding and Lean IR object
-  materialization.
+- `package/package_section_directory.cpp` owns `.irpkg` envelope and section
+  directory decoding.
+- `package/package_ir_decoder.cpp` owns section payload decoding and Lean IR
+  object materialization.
 - `package/package_decl_provider.cpp` owns loaded package state, declaration lookup,
   host import metadata, and initializer execution.
 - `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
@@ -158,8 +160,9 @@ example sources, walks `FAp`/`PAP` references, and can now fall back to
 the elaborated environment. This is still package-backed loading, not full
 module loading, but it lets fixtures include small upstream library closures
 such as `List.reverse._redArg`. The generator then emits a small binary package.
-`wasm/upstream_shim/package/package_ir_decoder.cpp` decodes that package into the
-upstream interpreter's expected object layout at runtime, and
+`wasm/upstream_shim/package/package_section_directory.cpp` reads the package
+envelope, `wasm/upstream_shim/package/package_ir_decoder.cpp` decodes section
+payloads into the upstream interpreter's expected object layout at runtime, and
 `wasm/upstream_shim/package/package_decl_provider.cpp` owns the loaded package state.
 The generator report separates missing Lean IR declarations from missing native
 extern registrations, and the package decoder exposes its last load error for
@@ -175,10 +178,10 @@ loading an `.irpkg`, it resolves a manifest export once with
 uses `0` as the failure sentinel. Repeated calls then use
 `vir_call_resolved_objects(slot, argv, argc)` with owned Lean object arguments.
 
-In package format 9, the package contains a direct export call-summary table.
-`vir_call_resolved_objects` uses that table to validate object argument counts,
-effect handling, and boxed wasm32 boundary requirements. Resolved calls without
-a package-owned summary fail.
+In package format 10, the package has an explicit section directory and a direct
+export call-summary section. `vir_call_resolved_objects` uses that table to
+validate object argument counts, effect handling, and boxed wasm32 boundary
+requirements. Resolved calls without a package-owned summary fail.
 The package also records host-import arity, erased-prefix count, and effect
 metadata for Lean-to-JavaScript calls. The shim uses that metadata to send
 borrowed Lean object arguments through `env.vir_js_call_objects`, and JavaScript

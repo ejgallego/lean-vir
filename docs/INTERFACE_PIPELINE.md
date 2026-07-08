@@ -247,8 +247,9 @@ not in the manifest resource descriptor. Naked marker types such as
 `Lean.Vir.Browser.Element` remain unsupported boundary types because they do not
 cross as `Lean.Vir.Js α`.
 
-The recursive type tree is embedded in the JSON manifest. Package format 9
-also embeds a direct package-owned export call-summary table.
+The recursive type tree is embedded in the JSON manifest. Package format 10
+stores package payloads behind a small section directory and embeds a direct
+package-owned export call-summary table.
 Normal `vir_call_resolved_objects` calls carry only owned Lean object pointers;
 the WASM shim looks up the direct summary from the loaded package to validate
 argument count, effects, and boxed wasm32 boundary requirements.

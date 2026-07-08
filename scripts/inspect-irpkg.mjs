@@ -55,6 +55,10 @@ function printText(info) {
   console.log(`bytes: ${info.byteLength}`);
   console.log(`format: ${info.package.version}`);
   console.log(`declarations: ${info.package.declarationCount}`);
+  console.log(`sections: ${info.package.sections.length}`);
+  for (const section of info.package.sections) {
+    console.log(`  - ${section.name} kind=${section.kind} offset=${section.offset} bytes=${section.byteLength}`);
+  }
   console.log(`manifest: ${info.manifest.version}`);
   console.log(`generator: ${metadata.generator ?? "unknown"}`);
   console.log(`toolchain: ${metadata.leanToolchain ?? metadata.leanVersion ?? "unknown"}`);
