@@ -33,7 +33,7 @@ class reader : public package_binary_reader {
 public:
     using package_binary_reader::package_binary_reader;
 
-    object * nat() {
+    object * ir_nat_literal() {
         std::string decimal = string();
         return lean_cstr_to_nat(decimal.c_str());
     }
@@ -85,7 +85,7 @@ public:
         }
     }
 
-    object * arg() {
+    object * ir_arg() {
         uint8_t tag = u8();
         if (!ok) {
             return mk_arg_erased();
@@ -102,18 +102,18 @@ public:
         return mk_arg_erased();
     }
 
-    std::vector<object *> args() {
-        return object_array([&] { return arg(); });
+    std::vector<object *> ir_args() {
+        return object_array([&] { return ir_arg(); });
     }
 
-    object * lit() {
+    object * ir_lit_expr() {
         uint8_t tag = u8();
         if (!ok) {
             return mk_lit_num(static_cast<size_t>(0));
         }
         switch (static_cast<tags::literal_tag>(tag)) {
         case tags::literal_tag::Num:
-            return mk_lit_num(nat());
+            return mk_lit_num(ir_nat_literal());
         case tags::literal_tag::String:
             return mk_lit_str(string());
         }
@@ -121,7 +121,7 @@ public:
         return mk_lit_num(static_cast<size_t>(0));
     }
 
-    object * ctor_info() {
+    object * ir_ctor_info() {
         object * n = name();
         uint32_t cidx = u32();
         uint32_t size = u32();
@@ -130,15 +130,15 @@ public:
         return mk_ctor_info(n, cidx, size, usize, ssize);
     }
 
-    object * expr() {
+    object * ir_expr() {
         uint8_t tag = u8();
         if (!ok) {
             return mk_lit_num(static_cast<size_t>(0));
         }
         switch (static_cast<tags::expr_tag>(tag)) {
         case tags::expr_tag::Ctor: {
-            object * info = ctor_info();
-            object * ctor_args = mk_array(args());
+            object * info = ir_ctor_info();
+            object * ctor_args = mk_array(ir_args());
             return mk_ctor_expr(info, ctor_args);
         }
         case tags::expr_tag::Reset: {
@@ -148,9 +148,9 @@ public:
         }
         case tags::expr_tag::Reuse: {
             uint32_t var = u32();
-            object * info = ctor_info();
+            object * info = ir_ctor_info();
             bool update_header = boolean();
-            object * ctor_args = mk_array(args());
+            object * ctor_args = mk_array(ir_args());
             return mk_reuse(var, info, update_header, ctor_args);
         }
         case tags::expr_tag::Proj: {
@@ -171,17 +171,17 @@ public:
         }
         case tags::expr_tag::Fap: {
             object * fn = name();
-            object * fn_args = mk_array(args());
+            object * fn_args = mk_array(ir_args());
             return mk_fap(fn, fn_args);
         }
         case tags::expr_tag::Pap: {
             object * fn = name();
-            object * fn_args = mk_array(args());
+            object * fn_args = mk_array(ir_args());
             return mk_pap(fn, fn_args);
         }
         case tags::expr_tag::Ap: {
             uint32_t var = u32();
-            object * fn_args = mk_array(args());
+            object * fn_args = mk_array(ir_args());
             return mk_ap(var, fn_args);
         }
         case tags::expr_tag::Box: {
@@ -194,7 +194,7 @@ public:
             return mk_unbox(var);
         }
         case tags::expr_tag::Lit:
-            return lit();
+            return ir_lit_expr();
         case tags::expr_tag::IsShared: {
             uint32_t var = u32();
             return mk_is_shared(var);
@@ -205,30 +205,30 @@ public:
         }
     }
 
-    object * param() {
+    object * ir_param() {
         uint32_t var = u32();
         bool borrow = boolean();
         type t = ir_type();
         return mk_param(var, t, borrow);
     }
 
-    std::vector<object *> params() {
-        return object_array([&] { return param(); });
+    std::vector<object *> ir_params() {
+        return object_array([&] { return ir_param(); });
     }
 
-    object * alt() {
+    object * ir_alt() {
         uint8_t tag = u8();
         if (!ok) {
             return mk_default_alt(mk_unreachable());
         }
         switch (static_cast<tags::alt_tag>(tag)) {
         case tags::alt_tag::Ctor: {
-            object * info = ctor_info();
-            object * alt_body = body();
+            object * info = ir_ctor_info();
+            object * alt_body = ir_body();
             return mk_ctor_alt(info, alt_body);
         }
         case tags::alt_tag::Default: {
-            object * alt_body = body();
+            object * alt_body = ir_body();
             return mk_default_alt(alt_body);
         }
         }
@@ -236,11 +236,11 @@ public:
         return mk_default_alt(mk_unreachable());
     }
 
-    std::vector<object *> alts() {
-        return object_array([&] { return alt(); });
+    std::vector<object *> ir_alts() {
+        return object_array([&] { return ir_alt(); });
     }
 
-    object * body() {
+    object * ir_body() {
         uint8_t tag = u8();
         if (!ok) {
             return mk_unreachable();
@@ -249,35 +249,35 @@ public:
         case tags::body_tag::VDecl: {
             uint32_t var = u32();
             type t = ir_type();
-            object * value = expr();
-            object * cont = body();
+            object * value = ir_expr();
+            object * cont = ir_body();
             return mk_vdecl(var, t, value, cont);
         }
         case tags::body_tag::JDecl: {
             uint32_t jp = u32();
-            object * ps = mk_array(params());
-            object * value = body();
-            object * cont = body();
+            object * ps = mk_array(ir_params());
+            object * value = ir_body();
+            object * cont = ir_body();
             return mk_jdecl(jp, ps, value, cont);
         }
         case tags::body_tag::Set: {
             uint32_t var = u32();
             uint32_t idx = u32();
-            object * value = arg();
-            object * cont = body();
+            object * value = ir_arg();
+            object * cont = ir_body();
             return mk_set(var, idx, value, cont);
         }
         case tags::body_tag::SetTag: {
             uint32_t var = u32();
             uint32_t cidx = u32();
-            object * cont = body();
+            object * cont = ir_body();
             return mk_set_tag(var, cidx, cont);
         }
         case tags::body_tag::USet: {
             uint32_t target = u32();
             uint32_t idx = u32();
             uint32_t source = u32();
-            object * cont = body();
+            object * cont = ir_body();
             return mk_uset(target, idx, source, cont);
         }
         case tags::body_tag::SSet: {
@@ -286,7 +286,7 @@ public:
             uint32_t offset = u32();
             uint32_t source = u32();
             type t = ir_type();
-            object * cont = body();
+            object * cont = ir_body();
             return mk_sset(target, idx, offset, source, t, cont);
         }
         case tags::body_tag::Inc: {
@@ -294,7 +294,7 @@ public:
             uint32_t amount = u32();
             bool maybe_scalar = boolean();
             (void)boolean();
-            object * cont = body();
+            object * cont = ir_body();
             return mk_inc(var, amount, maybe_scalar, cont);
         }
         case tags::body_tag::Dec: {
@@ -302,28 +302,28 @@ public:
             uint32_t amount = u32();
             bool maybe_scalar = boolean();
             (void)boolean();
-            object * cont = body();
+            object * cont = ir_body();
             return mk_dec(var, amount, maybe_scalar, cont);
         }
         case tags::body_tag::Del: {
             uint32_t var = u32();
-            object * cont = body();
+            object * cont = ir_body();
             return mk_del(var, cont);
         }
         case tags::body_tag::Case: {
             object * tid = name();
             uint32_t var = u32();
             type t = ir_type();
-            object * case_alts = mk_array(alts());
+            object * case_alts = mk_array(ir_alts());
             return mk_case(tid, var, t, case_alts);
         }
         case tags::body_tag::Ret: {
-            object * value = arg();
+            object * value = ir_arg();
             return mk_ret(value);
         }
         case tags::body_tag::Jmp: {
             uint32_t jp = u32();
-            object * jmp_args = mk_array(args());
+            object * jmp_args = mk_array(ir_args());
             return mk_jmp(jp, jmp_args);
         }
         case tags::body_tag::Unreachable:
@@ -334,13 +334,13 @@ public:
         }
     }
 
-    object * decl(object * fn) {
+    object * ir_decl(object * fn) {
         uint8_t tag = u8();
-        object * ps = mk_array(params());
+        object * ps = mk_array(ir_params());
         type result_type = ir_type();
         switch (static_cast<tags::decl_tag>(tag)) {
         case tags::decl_tag::Fun: {
-            object * fn_body = body();
+            object * fn_body = ir_body();
             return mk_fun_decl(fn, ps, result_type, fn_body);
         }
         case tags::decl_tag::Extern:
@@ -381,14 +381,14 @@ private:
     }
 };
 
-static std::vector<decl_entry> read_decl_entries(reader & r, uint32_t count) {
+static std::vector<decl_entry> read_ir_decl_entries(reader & r, uint32_t count) {
     std::vector<decl_entry> entries;
     entries.reserve(count);
     for (uint32_t i = 0; i < count; i++) {
         object * n = r.name();
         object * boxed_base = r.boolean() ? r.name() : nullptr;
         lean_inc(n);
-        object * d = r.decl(n);
+        object * d = r.ir_decl(n);
         entries.push_back({ n, boxed_base, d });
     }
     return entries;
@@ -518,7 +518,7 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
     }
 
     reader decls_reader(data + directory.declarations.offset, directory.declarations.byte_length);
-    out.entries = read_decl_entries(decls_reader, count);
+    out.entries = read_ir_decl_entries(decls_reader, count);
     if (!finish_section(decls_reader, package_section_label(package_section_declarations), error)) {
         return false;
     }

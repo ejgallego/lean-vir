@@ -53,8 +53,8 @@ Package IR constructor helpers consume owned child references, and the decoded
 package owner releases the complete graph both when a later section fails and
 when the package state is cleared.
 
-Declaration payload tags are generated from `scripts/ir-codec-tags.mjs` into
-`Vir/GeneratePackage/PackageIRTags.lean` and
+IR declaration payload tags are generated from `scripts/ir-codec-tags.mjs`
+into `Vir/GeneratePackage/PackageIRTags.lean` and
 `wasm/upstream_shim/package/package_ir_tags.h`. Run
 `npm run generate:ir-codec-tags` after changing tag assignments.
 
