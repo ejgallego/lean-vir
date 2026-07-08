@@ -50,7 +50,8 @@ For WASI/runtime boundary work, read:
 4. `wasm/upstream_shim/closure_abi.cpp`
 5. `wasm/upstream_shim/host_import_trampolines.cpp`
 6. `wasm/upstream_shim/package_decl_provider.cpp`
-7. `wasm/upstream_shim/native_symbols.cpp`
+7. `wasm/upstream_shim/package_ir_decoder.cpp`
+8. `wasm/upstream_shim/native_symbols.cpp`
 
 For benchmark work, read:
 

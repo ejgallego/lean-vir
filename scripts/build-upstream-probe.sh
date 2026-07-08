@@ -163,11 +163,13 @@ shim_sources=(
   "wasm/upstream_shim/native_symbols.cpp"
   "wasm/upstream_shim/platform_stubs.cpp"
   "wasm/upstream_shim/vir_shim.cpp"
+  "wasm/upstream_shim/package_ir_decoder.cpp"
   "wasm/upstream_shim/package_decl_provider.cpp"
 )
 
 shim_deps=(
   "wasm/upstream_shim/decl_provider.h"
+  "wasm/upstream_shim/package_decl_provider_types.h"
   "wasm/upstream_shim/call_signature_summary.h"
   "wasm/upstream_shim/name_utils.h"
   "wasm/upstream_shim/resource_abi.h"
@@ -634,10 +636,12 @@ report_start=$SECONDS
   echo "\`wasm/upstream_shim/native_symbols.cpp\` supplies the explicit native"
   echo "extern wrappers plus generated registry include and restricted \`dlsym\` lookup;"
   echo "\`platform_stubs.cpp\`"
-  echo "contains the remaining host/platform stubs. \`package_decl_provider.cpp\`"
-  echo "loads \`$generated_package\`, a single-file declaration package emitted from"
-  echo "typed \`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`. The browser"
-  echo "demos run through the real upstream interpreter."
+  echo "contains the remaining host/platform stubs. \`package_ir_decoder.cpp\`"
+  echo "decodes \`$generated_package\`, a single-file declaration package emitted from"
+  echo "typed \`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`, into Lean IR"
+  echo "objects. \`package_decl_provider.cpp\` owns the loaded package state and"
+  echo "declaration lookup facade. The browser demos run through the real upstream"
+  echo "interpreter."
 } > "$report"
 report_seconds=$((SECONDS - report_start))
 

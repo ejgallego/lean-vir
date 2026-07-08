@@ -70,8 +70,10 @@ not a fork of Lean. It is split by responsibility:
 - `platform_stubs.cpp` owns WASI/platform and environment fidelity stubs.
 - `lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
   constructor replacements for exported Lean-library constructors.
-- `package_decl_provider.cpp` owns package decoding, declaration lookup, host
-  import metadata, and initializer execution.
+- `package_ir_decoder.cpp` owns `.irpkg` binary decoding and Lean IR object
+  materialization.
+- `package_decl_provider.cpp` owns loaded package state, declaration lookup,
+  host import metadata, and initializer execution.
 - `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
   from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
   packages; `docs/GENERATE_PACKAGE.md` maps the full split generator, and
@@ -148,11 +150,12 @@ example sources, walks `FAp`/`PAP` references, and can now fall back to
 the elaborated environment. This is still package-backed loading, not full
 module loading, but it lets fixtures include small upstream library closures
 such as `List.reverse._redArg`. The generator then emits a small binary package.
-`wasm/upstream_shim/package_decl_provider.cpp` decodes that package into the
-upstream interpreter's expected object layout at runtime. The generator report
-separates missing Lean IR declarations from missing native extern
-registrations, and the package decoder exposes its last load error for browser
-and smoke-test diagnostics.
+`wasm/upstream_shim/package_ir_decoder.cpp` decodes that package into the
+upstream interpreter's expected object layout at runtime, and
+`wasm/upstream_shim/package_decl_provider.cpp` owns the loaded package state.
+The generator report separates missing Lean IR declarations from missing native
+extern registrations, and the package decoder exposes its last load error for
+browser and smoke-test diagnostics.
 See `docs/GENERATE_PACKAGE.md` for the package generator module map and
 diagnostic flow.
 

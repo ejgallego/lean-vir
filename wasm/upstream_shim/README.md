@@ -31,8 +31,11 @@ package lookup, and temporary runtime glue live here instead.
   package-backed, or deliberately fail-fast in this environment.
 - `lean_object_constructors.cpp`: temporary Lean `Name`, `Level`, and `Expr`
   constructors needed by current fixtures.
-- `decl_provider.h` and `package_decl_provider.cpp`: the package-backed static
-  declaration provider. Future module-backed loading should replace this layer.
+- `package_ir_decoder.cpp`: `.irpkg` binary decoder and Lean IR object
+  materializer.
+- `decl_provider.h`, `package_decl_provider_types.h`, and
+  `package_decl_provider.cpp`: the package-backed static declaration provider.
+  Future module-backed loading should replace this layer.
 - `engine_bench.cpp`: local benchmark harness entry point.
 
 ## Editing Rules
