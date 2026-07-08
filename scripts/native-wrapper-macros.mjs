@@ -46,7 +46,7 @@ export function parseGeneratedWrapperMacros(source) {
   }
 
   const generatedBorrowedScalarRegex =
-    /^VIR_DEFINE_BORROWED_OBJECT_(UINT8|UINT32|UINT64)_(UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+)\)$/gm;
+    /^VIR_DEFINE_BORROWED_OBJECT_(UINT8|UINT32|UINT64|USIZE)_(UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+)\)$/gm;
   for (const match of source.matchAll(generatedBorrowedScalarRegex)) {
     const symbol = match[3];
     wrappers.push({
@@ -54,6 +54,33 @@ export function parseGeneratedWrapperMacros(source) {
       generatedBorrowedScalar: true,
       resultType: match[1].toLowerCase(),
       arity: match[2].toLowerCase(),
+      symbol,
+    });
+  }
+
+  const generatedOwnedScalarScalarRegex =
+    /^VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER\(([A-Za-z0-9_]+),\s*(FLOAT|UINT8|UINT16|UINT32|UINT64|USIZE),\s*(FLOAT|UINT8|UINT16|UINT32|UINT64|USIZE)\)$/gm;
+  for (const match of source.matchAll(generatedOwnedScalarScalarRegex)) {
+    const symbol = match[1];
+    wrappers.push({
+      name: `${symbol}___boxed`,
+      generatedOwnedScalarScalar: true,
+      paramType: match[2].toLowerCase(),
+      resultType: match[3].toLowerCase(),
+      arity: "unary",
+      symbol,
+    });
+  }
+
+  const generatedOwnedScalarObjectlikeRegex =
+    /^VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER\(([A-Za-z0-9_]+),\s*(FLOAT|UINT8|UINT16|UINT32|UINT64|USIZE)\)$/gm;
+  for (const match of source.matchAll(generatedOwnedScalarObjectlikeRegex)) {
+    const symbol = match[1];
+    wrappers.push({
+      name: `${symbol}___boxed`,
+      generatedOwnedScalarObjectlike: true,
+      paramType: match[2].toLowerCase(),
+      arity: "unary",
       symbol,
     });
   }

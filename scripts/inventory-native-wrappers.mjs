@@ -218,6 +218,32 @@ function classifyWrapper(wrapper, entries) {
     };
   }
 
+  if (wrapper.generatedOwnedScalarScalar) {
+    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
+      return {
+        kind: "generated-direct-mismatch",
+        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
+      };
+    }
+    return {
+      kind: "generated-direct",
+      reason: `macro-generated owned-scalar ${wrapper.arity} forwarder ${wrapper.paramType} -> ${wrapper.resultType}`,
+    };
+  }
+
+  if (wrapper.generatedOwnedScalarObjectlike) {
+    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
+      return {
+        kind: "generated-direct-mismatch",
+        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
+      };
+    }
+    return {
+      kind: "generated-direct",
+      reason: `macro-generated owned-scalar ${wrapper.arity} forwarder ${wrapper.paramType} -> objectlike`,
+    };
+  }
+
   const compactBody = wrapper.body.trim().replace(/\s+/g, " ");
   const mentionsSymbol = mentionsRegisteredSymbol(wrapper.body, entries);
   const callsSymbol = callsRegisteredSymbol(wrapper.body, entries);
@@ -439,6 +465,50 @@ function validateBorrowedScalarSignature(nativeExtern, arity, resultType) {
   return null;
 }
 
+function validateOwnedScalarScalarSignature(nativeExtern, arity, paramType, resultType) {
+  const forwardedParamCount = paramCountForArity(arity);
+  if (forwardedParamCount === null) {
+    return `unsupported generated direct arity ${arity}`;
+  }
+
+  if (nativeExtern.params.length !== forwardedParamCount) {
+    return `expected ${forwardedParamCount} params, found ${nativeExtern.params.length}`;
+  }
+  const [param] = nativeExtern.params;
+  if (param.borrow) {
+    return `param ${param.index} is borrowed; generated owned scalar wrapper only supports owned params`;
+  }
+  if (param.type !== paramType) {
+    return `param ${param.index} is ${param.type}, expected ${paramType}`;
+  }
+  if (nativeExtern.resultType !== resultType) {
+    return `result is ${nativeExtern.resultType}, expected ${resultType}`;
+  }
+  return null;
+}
+
+function validateOwnedScalarObjectlikeSignature(nativeExtern, arity, paramType) {
+  const forwardedParamCount = paramCountForArity(arity);
+  if (forwardedParamCount === null) {
+    return `unsupported generated direct arity ${arity}`;
+  }
+
+  if (nativeExtern.params.length !== forwardedParamCount) {
+    return `expected ${forwardedParamCount} params, found ${nativeExtern.params.length}`;
+  }
+  const [param] = nativeExtern.params;
+  if (param.borrow) {
+    return `param ${param.index} is borrowed; generated owned scalar wrapper only supports owned params`;
+  }
+  if (param.type !== paramType) {
+    return `param ${param.index} is ${param.type}, expected ${paramType}`;
+  }
+  if (!objectLikeTypes.has(nativeExtern.resultType)) {
+    return `result is ${nativeExtern.resultType}, expected objectlike`;
+  }
+  return null;
+}
+
 function validateGeneratedDirectSignature(wrapper, nativeExtern) {
   if (wrapper.generatedDropTypeObject) {
     return validateDropTypeObjectSignature(nativeExtern, wrapper.arity);
@@ -448,6 +518,17 @@ function validateGeneratedDirectSignature(wrapper, nativeExtern) {
   }
   if (wrapper.generatedBorrowedScalar) {
     return validateBorrowedScalarSignature(nativeExtern, wrapper.arity, wrapper.resultType);
+  }
+  if (wrapper.generatedOwnedScalarScalar) {
+    return validateOwnedScalarScalarSignature(
+      nativeExtern,
+      wrapper.arity,
+      wrapper.paramType,
+      wrapper.resultType,
+    );
+  }
+  if (wrapper.generatedOwnedScalarObjectlike) {
+    return validateOwnedScalarObjectlikeSignature(nativeExtern, wrapper.arity, wrapper.paramType);
   }
   return "unsupported generated direct wrapper macro";
 }
