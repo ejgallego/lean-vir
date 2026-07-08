@@ -363,6 +363,18 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-string-compare-ordering",
+      "source": "fixtures/JsonCompress.lean",
+      "entry": "Vir.Fixtures.JsonCompress.stringCompareScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-json-compress-wrapper-object",
+      "source": "fixtures/JsonCompress.lean",
+      "entry": "Vir.Fixtures.JsonCompress.jsonCompressWrapperObjScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-task-pure-get",
       "source": "fixtures/Task.lean",
       "entry": "Vir.Fixtures.Task.taskPureGetScore",

@@ -607,6 +607,11 @@ assert.equal(
   prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "fill", 28),
   "lean ir runs format.pretty\ninside wasm",
 );
+assert.equal(leanRuntime.call("Vir.Fixtures.JsonCompress.jsonCompressObj"), "{\"ok\":true}");
+assert.equal(
+  leanRuntime.call("Vir.Fixtures.JsonCompress.jsonCompressWrapperObj"),
+  "{\"ok\":true,\"segments\":[\"alpha\",\"beta\"]}",
+);
 assert.deepEqual(leanRuntime.call("Vir.Fixtures.ExprPrinter.constNatExpr"), {
   kind: "const",
   name: "Nat",

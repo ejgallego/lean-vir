@@ -730,7 +730,7 @@ def nativeExterns : Array NativeExtern := #[
   {
     name := `String.compare,
     params := #[param 1 true .object, param 2 true .object],
-    resultType := .tagged,
+    resultType := .uint8,
     symbol := "lean_string_compare"
   },
   {

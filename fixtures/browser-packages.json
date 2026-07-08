@@ -165,11 +165,20 @@
       "file": "fixtures-lean.irpkg",
       "label": "Lean Expr, parser, Task",
       "report": "build/generated/fixtures-lean.report.md",
-      "targets": [],
+      "targets": [
+        {
+          "source": "fixtures/JsonCompress.lean",
+          "roots": [
+            "Vir.Fixtures.JsonCompress.jsonCompressObj",
+            "Vir.Fixtures.JsonCompress.jsonCompressWrapperObj"
+          ]
+        }
+      ],
       "fixtureSources": [
         "fixtures/ExprPrinter.lean",
         "fixtures/LeanParser.lean",
         "fixtures/LeanParserHeader.lean",
+        "fixtures/JsonCompress.lean",
         "fixtures/Task.lean"
       ]
     },
