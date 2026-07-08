@@ -64,9 +64,10 @@ not a fork of Lean. It is split by responsibility:
 - `name_utils.cpp` owns shared Lean `Name` construction helpers.
 - `resource_abi.cpp` owns the shared external resource class used by
   `Lean.Vir.Js α` values.
-- `native_symbols.cpp` owns the explicit native extern wrappers, generated
-  native registry include, restricted `dlsym` lookup, native symbol stem
-  lookup, and C++ exception stubs.
+- `native_symbols.cpp` owns the explicit native extern wrappers.
+- `native_symbol_lookup.cpp` owns the generated native registry include,
+  restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
+  stubs.
 - `platform_stubs.cpp` owns WASI/platform and environment fidelity stubs.
 - `lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
   constructor replacements for exported Lean-library constructors.
@@ -327,9 +328,9 @@ changing its `nativeExterns` table; this regenerates
 `wasm/upstream_shim/native_symbols_registry.inc`. The regular
 `npm run check:boundary-registry` guard then verifies that the generated
 registry is current and that every native extern has a matching `dlsym` symbol
-plus either a handwritten boxed wrapper or a native constant entry in
-`wasm/upstream_shim/native_symbols.cpp`. `npm test` runs this before the smoke
-and fixture suites.
+plus either a handwritten boxed wrapper in
+`wasm/upstream_shim/native_symbols.cpp` or a native constant entry in the
+generated registry. `npm test` runs this before the smoke and fixture suites.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to

@@ -23,8 +23,10 @@ package lookup, and temporary runtime glue live here instead.
   signature parser used to compute call arity and boxed-boundary requirements.
 - `name_utils.h` and `name_utils.cpp`: shared Lean `Name` helpers for package
   call resolution and object construction.
-- `native_symbols.cpp`: handwritten native extern wrappers, restricted symbol
-  lookup, and symbol-stem support for declarations carried in `.irpkg` files.
+- `native_symbols.cpp`: handwritten native extern wrappers for declarations
+  carried in `.irpkg` files.
+- `native_symbol_lookup.cpp`: generated native extern registry include,
+  restricted symbol lookup, symbol-stem support, and C++ exception stubs.
 - `native_symbols_registry.inc`: generated registry of native extern names from
   `tools/GeneratePackage.lean`. Do not edit it by hand.
 - `platform_stubs.cpp`: WASI/demo stubs for Lean platform APIs that are inert,
