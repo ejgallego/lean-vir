@@ -26,6 +26,14 @@ def intArithmeticScore : Nat :=
   let x : Int := ((10 : Int) + (-3 : Int)) * (2 : Int) - (5 : Int)
   x.toNat
 
+def intCompareScore : Nat :=
+  let a : Int := -12
+  let b : Int := 5
+  let c : Int := -12
+  (if a = c then 10 else 0) +
+  (if a <= b then 20 else 0) +
+  (if b <= a then 100 else 5)
+
 def uint32OfNatToNatScore : Nat :=
   let n := Nat.shiftLeft 7 4
   let x := UInt32.ofNat n
@@ -143,6 +151,12 @@ def uintConversionParserDataScore : Nat :=
   let narrowed := wide.toUSize
   let byte := (511 : UInt32).toUInt8
   narrowed.toNat + byte.toNat
+
+def uint16UInt32ConversionScore : Nat :=
+  let narrow : UInt16 := 65000
+  let widened := narrow.toUInt32
+  let wrapped := (70000 : UInt32).toUInt16
+  widened.toNat + wrapped.toNat
 
 def arrayProofOpsScore : Nat :=
   let xs : Array Nat := Array.emptyWithCapacity 4

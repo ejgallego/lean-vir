@@ -136,6 +136,18 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_int_dec_lt"
   },
   {
+    name := `Int.decEq,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_int_dec_eq"
+  },
+  {
+    name := `Int.decLe,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_int_dec_le"
+  },
+  {
     name := `Int.natAbs,
     params := #[param 1 true .tobject],
     resultType := .tobject,
@@ -848,6 +860,12 @@ def nativeExterns : Array NativeExtern := #[
     symbol := "lean_uint16_to_nat"
   },
   {
+    name := `UInt16.toUInt32,
+    params := #[param 1 false .uint16],
+    resultType := .uint32,
+    symbol := "lean_uint16_to_uint32"
+  },
+  {
     name := `UInt16.add,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
@@ -960,6 +978,12 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .uint32],
     resultType := .uint8,
     symbol := "lean_uint32_to_uint8"
+  },
+  {
+    name := `UInt32.toUInt16,
+    params := #[param 1 false .uint32],
+    resultType := .uint16,
+    symbol := "lean_uint32_to_uint16"
   },
   {
     name := `UInt32.toUInt64,
