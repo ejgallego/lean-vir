@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 /*
-These numeric tags describe the interface value codec, not the ordinary
+These numeric tags describe interface descriptors, not the ordinary
 host-resource import boundary.
 */
 export const INTERFACE_TAG = Object.freeze({

@@ -86,9 +86,9 @@ sequenceDiagram
     RT-->>JS: JavaScript value
 ```
 
-The runtime uses the interface value codec plus the object ABI for exported
-manifest calls. It resolves each entry once, lowers JavaScript values according
-to the export descriptors, and then calls
+The runtime uses interface descriptors plus the object ABI for exported manifest
+calls. It resolves each entry once, lowers JavaScript values according to the
+export descriptors, and then calls
 `vir_call_resolved_objects(slot, ...)`.
 
 ## Lean-To-JavaScript Host Import Flow

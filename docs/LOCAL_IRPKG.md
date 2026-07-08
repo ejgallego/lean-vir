@@ -160,8 +160,8 @@ Pure functions and recognized synchronous effects are supported on both
 exported entrypoints and host imports. JavaScript resource/runtime APIs use
 `Lean.Vir.RuntimeM α`; browser APIs use `Lean.Vir.Browser.DomM α`; React
 render-construction APIs use `Lean.Vir.React.ReactM α`. Exported entrypoints
-use the structural interface value codec; host imports are narrower than
-exports: low-level JavaScript imports should expose
+use descriptor-guided object lowering; host imports are narrower than exports:
+low-level JavaScript imports should expose
 `Unit`, `Lean.Vir.Js α` resources, `Lean.Vir.Js.Nullable α` resources,
 callback arguments whose own arguments/results are `Unit` or resources, or
 built-in named conversion targets. Nested callback arguments are rejected. Raw
