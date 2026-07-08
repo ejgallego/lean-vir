@@ -76,7 +76,7 @@ records, trivial scalar wrappers, `Tagged Profile`, `Metered`, extended records,
 recursive structures/custom inductives, `Sum`/`Except` tagged unions, and
 nullary/unary/binary pretty-printer calls.
 JavaScript lowers inputs with the matching `vir_obj_*` constructor,
-`vir_obj_array`, `vir_obj_list`, `vir_obj_ctor`, or `vir_obj_ctor_layout`, calls
+`vir_obj_array`, `vir_obj_ctor`, or `vir_obj_ctor_layout`, calls
 `vir_call_resolved_objects`, and lifts the owned result with the matching
 inspection helpers. The scalar host/resource and React rows repeat one exported
 operation from JavaScript where possible, so they stress boundary conversion

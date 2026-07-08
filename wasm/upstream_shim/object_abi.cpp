@@ -225,47 +225,6 @@ extern "C" lean::object * vir_obj_ctor_layout(
     return obj;
 }
 
-extern "C" lean::object * vir_obj_list(lean::object ** values, uint32_t len) {
-    if (values == nullptr && len != 0) {
-        return nullptr;
-    }
-    for (uint32_t i = 0; i < len; i++) {
-        if (values[i] == nullptr) {
-            return nullptr;
-        }
-    }
-    lean::object * out = lean_box(0);
-    for (uint32_t i = len; i > 0; i--) {
-        lean::object * cons = lean_alloc_ctor(1, 2, 0);
-        lean_ctor_set(cons, 0, values[i - 1]);
-        lean_ctor_set(cons, 1, out);
-        out = cons;
-    }
-    return out;
-}
-
-extern "C" uint32_t vir_obj_list_is_nil(lean::object * value) {
-    return lean_is_scalar(value) && lean_unbox(value) == 0 ? 1 : 0;
-}
-
-extern "C" lean::object * vir_obj_list_head(lean::object * value) {
-    if (lean_is_scalar(value) || lean_ctor_num_objs(value) < 2) {
-        return nullptr;
-    }
-    lean::object * head = lean_ctor_get(value, 0);
-    lean_inc(head);
-    return head;
-}
-
-extern "C" lean::object * vir_obj_list_tail(lean::object * value) {
-    if (lean_is_scalar(value) || lean_ctor_num_objs(value) < 2) {
-        return nullptr;
-    }
-    lean::object * tail = lean_ctor_get(value, 1);
-    lean_inc(tail);
-    return tail;
-}
-
 extern "C" lean::object * vir_obj_scalar(uint32_t value) {
     return lean_box(value);
 }

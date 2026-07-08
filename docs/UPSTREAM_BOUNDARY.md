@@ -203,33 +203,9 @@ descriptor-bearing named payload format was removed earlier, and the resolved
 byte payload fallback has now been removed as well. `call_signature_summary.cpp` is a
 signature-summary parser, not a runtime value codec.
 
-The shim also exposes the first experimental Lean object ABI helpers:
-
-- `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
-- `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
-- `vir_obj_array` / `vir_obj_array_size` / `vir_obj_array_get`
-- `vir_obj_list` / `vir_obj_list_is_nil` / `vir_obj_list_head` /
-  `vir_obj_list_tail`
-- `vir_obj_ctor`
-- `vir_obj_ctor_layout` / `vir_obj_ctor_usize_decimal` /
-  `vir_obj_ctor_scalar_data`
-- `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
-- `vir_obj_tag` / `vir_obj_field`
-- `vir_obj_nat` / `vir_obj_nat_decimal`
-- `vir_obj_expr_*`, `vir_obj_level_*`, and `vir_obj_literal_*` for direct
-  `Lean.Expr` values
-- `vir_obj_name_string` / `vir_obj_name_string_size`
-- `vir_obj_resource` / `vir_obj_resource_externref`
-- `vir_obj_closure_root` for Lean function values crossing to JavaScript
-- `vir_obj_int` / `vir_obj_int_decimal`
-- `vir_obj_uint32` / `vir_obj_uint32_value`
-- `vir_obj_uint64` / `vir_obj_uint64_decimal`
-- `vir_obj_usize` / `vir_obj_usize_decimal`
-- `vir_obj_float` / `vir_obj_float_value`
-- `vir_obj_float32` / `vir_obj_float32_value`
-- `vir_obj_decimal_size`
-- `vir_obj_inc` / `vir_obj_dec`
-- `vir_call_resolved_objects`
+The shim also exposes the first experimental Lean object ABI helpers. The
+complete value/call export surface is documented in
+[OBJECT_ABI.md](OBJECT_ABI.md#export-surface).
 
 These helpers are still internal runtime primitives, not public Lean signature
 forms. They are the first step toward moving value lowering/lifting out of the
@@ -238,9 +214,11 @@ Lean object references; `vir_call_resolved_objects` consumes owned arguments and
 returns an owned result. String and byte-array data pointers are borrowed and
 must be read before the object is released. Decimal scalar inspection uses a
 shim-owned scratch buffer that must be read before the next decimal inspection
-call. `vir_obj_array` and `vir_obj_list` consume owned element references and
-return one owned sequence object. `vir_obj_array_get`, `vir_obj_list_head`,
-`vir_obj_list_tail`, and `vir_obj_field` return new owned references.
+call. `vir_obj_array` consumes owned element references and returns one owned
+array object. `vir_obj_array_get` and `vir_obj_field` return new owned
+references. Lean lists use the generic scalar/constructor helpers: nil is scalar
+constructor tag `0`, and cons is constructor tag `1` with head and tail object
+fields.
 `vir_obj_ctor` consumes owned object-field references. See
 [OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and ownership rules.
 
