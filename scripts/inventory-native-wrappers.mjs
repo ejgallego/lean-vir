@@ -203,6 +203,19 @@ function classifyWrapper(wrapper, entries) {
     };
   }
 
+  if (wrapper.generatedBorrowedScalar) {
+    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
+      return {
+        kind: "generated-direct-mismatch",
+        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
+      };
+    }
+    return {
+      kind: "generated-direct",
+      reason: `macro-generated borrowed-object ${wrapper.arity} forwarder returning ${wrapper.resultType}`,
+    };
+  }
+
   const compactBody = wrapper.body.trim().replace(/\s+/g, " ");
   const mentionsSymbol = mentionsRegisteredSymbol(wrapper.body, entries);
   const callsSymbol = callsRegisteredSymbol(wrapper.body, entries);
@@ -348,12 +361,38 @@ function validateBorrowedObjectSignature(nativeExtern, arity, dropType) {
   return null;
 }
 
+function validateBorrowedScalarSignature(nativeExtern, arity, resultType) {
+  const forwardedParamCount = paramCountForArity(arity);
+  if (forwardedParamCount === null) {
+    return `unsupported generated direct arity ${arity}`;
+  }
+
+  if (nativeExtern.params.length !== forwardedParamCount) {
+    return `expected ${forwardedParamCount} params, found ${nativeExtern.params.length}`;
+  }
+  for (const param of nativeExtern.params) {
+    if (!param.borrow) {
+      return `param ${param.index} is owned; generated borrowed scalar wrapper only supports borrowed params`;
+    }
+    if (!["object", "tobject"].includes(param.type)) {
+      return `param ${param.index} is ${param.type}, expected object or tobject`;
+    }
+  }
+  if (nativeExtern.resultType !== resultType) {
+    return `result is ${nativeExtern.resultType}, expected ${resultType}`;
+  }
+  return null;
+}
+
 function validateGeneratedDirectSignature(wrapper, nativeExtern) {
   if (wrapper.generatedDropTypeObject) {
     return validateDropTypeObjectSignature(nativeExtern, wrapper.arity);
   }
   if (wrapper.generatedBorrowedObject) {
     return validateBorrowedObjectSignature(nativeExtern, wrapper.arity, wrapper.dropType);
+  }
+  if (wrapper.generatedBorrowedScalar) {
+    return validateBorrowedScalarSignature(nativeExtern, wrapper.arity, wrapper.resultType);
   }
   return "unsupported generated direct wrapper macro";
 }
