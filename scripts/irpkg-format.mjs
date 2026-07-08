@@ -34,6 +34,21 @@ export async function readIrPackageFile(path) {
 }
 
 export function readIrPackageInfo(input, { path = null } = {}) {
+  const info = readIrPackageInfoInternal(input, { path });
+  return {
+    path: info.path,
+    byteLength: info.byteLength,
+    package: {
+      magic: info.package.magic,
+      version: info.package.version,
+      declarationCount: info.package.declarationCount,
+      sections: info.package.sections.map(publicSectionInfo),
+    },
+    manifest: info.manifest,
+  };
+}
+
+function readIrPackageInfoInternal(input, { path = null } = {}) {
   const bytes = asBytes(input);
   const header = readHeader(bytes);
   if (header.magic !== IR_PACKAGE_MAGIC) {
@@ -42,7 +57,7 @@ export function readIrPackageInfo(input, { path = null } = {}) {
   if (header.version !== PACKAGE_FORMAT_VERSION) {
     throw new Error(`unsupported IR package version ${header.version}`);
   }
-  const { sections, nextOffset: sectionDirectoryEnd } = readSectionDirectory(bytes, header.nextOffset);
+  const sections = readSectionDirectory(bytes, header.nextOffset);
   for (const kind of Object.values(IR_PACKAGE_SECTION)) {
     requireSection(sections, kind);
   }
@@ -62,11 +77,7 @@ export function readIrPackageInfo(input, { path = null } = {}) {
       magic: header.magic,
       version: header.version,
       declarationCount: header.declarationCount,
-      sectionDirectoryEnd,
       sections,
-      manifestOffset: manifestSection.offset,
-      manifestByteLength: manifestString.byteLength,
-      manifestSectionByteLength: manifestSection.byteLength,
     },
     manifest: validateInterfaceManifest(manifest),
   };
@@ -74,7 +85,7 @@ export function readIrPackageInfo(input, { path = null } = {}) {
 
 export function replaceIrPackageManifest(input, manifest) {
   const bytes = asBytes(input);
-  const info = readIrPackageInfo(bytes);
+  const info = readIrPackageInfoInternal(bytes);
   const manifestText = JSON.stringify(validateInterfaceManifest(manifest));
   const manifestBytes = textEncoder.encode(manifestText);
   const manifestSection = requireSection(info.package.sections, IR_PACKAGE_SECTION.INTERFACE_MANIFEST);
@@ -145,7 +156,16 @@ function readSectionDirectory(bytes, offset) {
       directoryEntryOffset,
     });
   }
-  return { sections, nextOffset: offset };
+  return sections;
+}
+
+function publicSectionInfo(section) {
+  return {
+    kind: section.kind,
+    name: section.name,
+    offset: section.offset,
+    byteLength: section.byteLength,
+  };
 }
 
 function requireSection(sections, kind) {

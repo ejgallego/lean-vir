@@ -54,4 +54,4 @@ npm run inspect:irpkg -- build/generated/pretty-printer.irpkg
 The text output prints the package byte length, format, declaration count, and
 section directory before the manifest summary. The JSON output exposes the same
 data under `package.sections`, including each section's `kind`, `name`,
-`offset`, `byteLength`, and `directoryEntryOffset`.
+`offset`, and `byteLength`.
