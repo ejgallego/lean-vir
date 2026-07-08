@@ -191,6 +191,11 @@ static size_t substring_repaired_pos(lean_object * s, lean_object * p) {
         return helper(a, b, symbol); \
     }
 
+#define VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(symbol) \
+    extern "C" lean_object * symbol##___boxed(lean_object * a) { \
+        return symbol(a); \
+    }
+
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_add, box_object_binary)
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_sub, box_object_binary)
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_dec_eq, box_object_predicate)
@@ -204,9 +209,7 @@ VIR_DEFINE_BOX_UNARY_WRAPPER(lean_nat_log2, box_object_unary)
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_shiftl, box_object_binary)
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_shiftr, box_object_binary)
 
-extern "C" lean_object * lean_nat_to_int___boxed(lean_object * a) {
-    return lean_nat_to_int(a);
-}
+VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(lean_nat_to_int)
 
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_add, box_object_binary)
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_sub, box_object_binary)
@@ -599,9 +602,7 @@ extern "C" lean_object * lean_array_fswap___boxed(lean_object * type, lean_objec
     return result;
 }
 
-extern "C" lean_object * lean_byte_array_mk___boxed(lean_object * array) {
-    return lean_byte_array_mk(array);
-}
+VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(lean_byte_array_mk)
 
 extern "C" lean_object * lean_byte_array_push___boxed(lean_object * array, lean_object * value) {
     uint8_t byte = static_cast<uint8_t>(lean_unbox(value));
@@ -681,9 +682,7 @@ extern "C" lean_object * lean_string_append___boxed(lean_object * a, lean_object
     return result;
 }
 
-extern "C" lean_object * lean_string_mk___boxed(lean_object * chars) {
-    return lean_string_mk(chars);
-}
+VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(lean_string_mk)
 
 VIR_DEFINE_BORROWED_OBJECT_UNARY_WRAPPER(lean_string_to_utf8)
 
@@ -1105,6 +1104,7 @@ VIR_DEFINE_BORROWED_OBJECT_UINT64_UNARY_WRAPPER(lean_expr_data)
 #undef VIR_BOX_UINT32
 #undef VIR_BOX_UINT64
 #undef VIR_BOX_USIZE
+#undef VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER
 #undef VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER
 #undef VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER
 
