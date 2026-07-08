@@ -17,6 +17,10 @@ abbrev EmitM := StateT ByteArray (Except String)
 
 def maxU32 : Nat := 4294967295
 
+structure PackageSection where
+  kind : Nat
+  bytes : ByteArray
+
 def withEmitContext (context : String) (action : EmitM α) : EmitM α :=
   fun bytes =>
     match action.run bytes with
@@ -39,6 +43,9 @@ def emitU32 (value : Nat) : EmitM Unit := do
 
 def emitBytes (chunk : ByteArray) : EmitM Unit :=
   modify fun bytes => bytes.append chunk
+
+def currentByteOffset : EmitM Nat := do
+  return (← get).size
 
 def emitString (value : String) : EmitM Unit := do
   let bytes := value.toUTF8
@@ -195,16 +202,53 @@ def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
     emitName entry.name
     emitName entry.initName
 
+def emitToBytes (action : EmitM Unit) : Except String ByteArray := do
+  let (_, bytes) ← action.run ByteArray.empty
+  return bytes
+
+def emitSectionDirectoryEntry (pkgSection : PackageSection) (offset : Nat) : EmitM Unit := do
+  emitU32 pkgSection.kind
+  emitU32 offset
+  emitU32 pkgSection.bytes.size
+
+def emitPackageSectionDirectory (sections : Array PackageSection) : EmitM Unit := do
+  emitU32 sections.size
+  let directoryStart ← currentByteOffset
+  let payloadStart := directoryStart + sections.size * 12
+  discard <| sections.foldlM (init := payloadStart) fun offset pkgSection => do
+    emitSectionDirectoryEntry pkgSection offset
+    return offset + pkgSection.bytes.size
+
+def emitPackageSectionPayloads (sections : Array PackageSection) : EmitM Unit :=
+  sections.forM fun pkgSection => emitBytes pkgSection.bytes
+
+def packageSections (closure : Closure) (manifest : InterfaceManifest) : Except String (Array PackageSection) := do
+  let decls ← emitToBytes do
+    closure.decls.forM emitDeclEntry
+    closure.externs.forM emitExternEntry
+  let initGlobals ← emitToBytes do
+    emitArray closure.initGlobals emitInitGlobal
+  let hostImports ← emitToBytes do
+    emitArray manifest.hostImports emitHostImport
+  let exportSummaries ← emitToBytes do
+    emitArray manifest.exports emitInterfaceExportSummary
+  let interfaceManifest ← emitToBytes do
+    emitString manifest.toJson
+  return #[
+    { kind := packageSectionDeclarations, bytes := decls },
+    { kind := packageSectionInitGlobals, bytes := initGlobals },
+    { kind := packageSectionHostImports, bytes := hostImports },
+    { kind := packageSectionExportSummaries, bytes := exportSummaries },
+    { kind := packageSectionInterfaceManifest, bytes := interfaceManifest }
+  ]
+
 def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit := do
+  let sections ← packageSections closure manifest
   emitString "lean-vir-ir-package"
   emitU32 currentPackageFormatVersion
   emitU32 (closure.decls.size + closure.externs.size)
-  closure.decls.forM emitDeclEntry
-  closure.externs.forM emitExternEntry
-  emitArray closure.initGlobals emitInitGlobal
-  emitArray manifest.hostImports emitHostImport
-  emitArray manifest.exports emitInterfaceExportSummary
-  emitString manifest.toJson
+  emitPackageSectionDirectory sections
+  emitPackageSectionPayloads sections
 
 def emitPackage (closure : Closure) (manifest : InterfaceManifest) : Except String ByteArray := do
   let (_, bytes) <- (emitPackageM closure manifest).run ByteArray.empty

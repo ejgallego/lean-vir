@@ -489,6 +489,9 @@ Inspect the embedded manifest without loading the browser:
 npm run inspect:irpkg -- build/generated/fib.irpkg
 ```
 
+The inspector also prints the package section directory so the binary envelope,
+manifest, and loader-visible payloads can be reviewed together.
+
 Serve the generated `.irpkg` next to `vir-upstream.wasm`, or upload it through
 `/dev.html` while iterating locally. The runtime only needs URLs or bytes for
 the two assets:

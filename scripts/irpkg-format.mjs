@@ -7,11 +7,27 @@ Author: Emilio J. Gallego Arias
 import { readFile } from "node:fs/promises";
 
 import { INTERFACE_MANIFEST_ARTIFACT, validateInterfaceManifest } from "../web/src/runtime/interface-manifest.js";
+import { PACKAGE_FORMAT_VERSION } from "./package-versions.mjs";
 
 const textDecoder = new TextDecoder();
 const textEncoder = new TextEncoder();
 
 export const IR_PACKAGE_MAGIC = "lean-vir-ir-package";
+export const IR_PACKAGE_SECTION = Object.freeze({
+  DECLARATIONS: 1,
+  INIT_GLOBALS: 2,
+  HOST_IMPORTS: 3,
+  EXPORT_SUMMARIES: 4,
+  INTERFACE_MANIFEST: 5,
+});
+
+const SECTION_NAMES = new Map([
+  [IR_PACKAGE_SECTION.DECLARATIONS, "declarations"],
+  [IR_PACKAGE_SECTION.INIT_GLOBALS, "initGlobals"],
+  [IR_PACKAGE_SECTION.HOST_IMPORTS, "hostImports"],
+  [IR_PACKAGE_SECTION.EXPORT_SUMMARIES, "exportSummaries"],
+  [IR_PACKAGE_SECTION.INTERFACE_MANIFEST, "interfaceManifest"],
+]);
 
 export async function readIrPackageFile(path) {
   return readIrPackageInfo(await readFile(path), { path });
@@ -23,10 +39,22 @@ export function readIrPackageInfo(input, { path = null } = {}) {
   if (header.magic !== IR_PACKAGE_MAGIC) {
     throw new Error(`invalid IR package magic \`${header.magic}\``);
   }
-  if (header.version < 4) {
-    throw new Error(`IR package version ${header.version} does not contain an embedded interface manifest`);
+  if (header.version !== PACKAGE_FORMAT_VERSION) {
+    throw new Error(`unsupported IR package version ${header.version}`);
   }
-  const { offset: manifestOffset, byteLength: manifestByteLength, manifest } = readTrailingManifest(bytes);
+  const { sections, nextOffset: sectionDirectoryEnd } = readSectionDirectory(bytes, header.nextOffset);
+  for (const kind of Object.values(IR_PACKAGE_SECTION)) {
+    requireSection(sections, kind);
+  }
+  const manifestSection = requireSection(sections, IR_PACKAGE_SECTION.INTERFACE_MANIFEST);
+  const manifestString = readString(bytes, manifestSection.offset);
+  if (manifestString.nextOffset !== manifestSection.offset + manifestSection.byteLength) {
+    throw new Error("interface manifest section has trailing bytes");
+  }
+  const manifest = JSON.parse(manifestString.value);
+  if (manifest?.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
+    throw new Error("IR package interface manifest has an invalid artifact marker");
+  }
   return {
     path,
     byteLength: bytes.byteLength,
@@ -34,10 +62,13 @@ export function readIrPackageInfo(input, { path = null } = {}) {
       magic: header.magic,
       version: header.version,
       declarationCount: header.declarationCount,
-      manifestOffset,
-      manifestByteLength,
+      sectionDirectoryEnd,
+      sections,
+      manifestOffset: manifestSection.offset,
+      manifestByteLength: manifestString.byteLength,
+      manifestSectionByteLength: manifestSection.byteLength,
     },
-    manifest,
+    manifest: validateInterfaceManifest(manifest),
   };
 }
 
@@ -46,10 +77,27 @@ export function replaceIrPackageManifest(input, manifest) {
   const info = readIrPackageInfo(bytes);
   const manifestText = JSON.stringify(validateInterfaceManifest(manifest));
   const manifestBytes = textEncoder.encode(manifestText);
-  const output = new Uint8Array(info.package.manifestOffset + 4 + manifestBytes.byteLength);
-  output.set(bytes.subarray(0, info.package.manifestOffset), 0);
-  writeU32(output, info.package.manifestOffset, manifestBytes.byteLength);
-  output.set(manifestBytes, info.package.manifestOffset + 4);
+  const manifestSection = requireSection(info.package.sections, IR_PACKAGE_SECTION.INTERFACE_MANIFEST);
+  const newManifestSectionByteLength = 4 + manifestBytes.byteLength;
+  const oldManifestEnd = manifestSection.offset + manifestSection.byteLength;
+  const newManifestEnd = manifestSection.offset + newManifestSectionByteLength;
+  const delta = newManifestSectionByteLength - manifestSection.byteLength;
+  const output = new Uint8Array(bytes.byteLength + delta);
+  output.set(bytes.subarray(0, manifestSection.offset), 0);
+  writeU32(output, manifestSection.offset, manifestBytes.byteLength);
+  output.set(manifestBytes, manifestSection.offset + 4);
+  output.set(bytes.subarray(oldManifestEnd), newManifestEnd);
+  for (const section of info.package.sections) {
+    const offset = section.offset > manifestSection.offset ? section.offset + delta : section.offset;
+    writeU32(output, section.directoryEntryOffset + 4, offset);
+    writeU32(
+      output,
+      section.directoryEntryOffset + 8,
+      section.kind === IR_PACKAGE_SECTION.INTERFACE_MANIFEST
+        ? newManifestSectionByteLength
+        : section.byteLength,
+    );
+  }
   return output;
 }
 
@@ -58,7 +106,7 @@ export function encodeInvalidMagicPackage() {
   const bytes = new Uint8Array(4 + magicBytes.byteLength + 8);
   writeU32(bytes, 0, magicBytes.byteLength);
   bytes.set(magicBytes, 4);
-  writeU32(bytes, 4 + magicBytes.byteLength, 4);
+  writeU32(bytes, 4 + magicBytes.byteLength, PACKAGE_FORMAT_VERSION);
   writeU32(bytes, 8 + magicBytes.byteLength, 0);
   return bytes;
 }
@@ -70,28 +118,49 @@ function readHeader(bytes) {
   const version = readU32(bytes, offset);
   offset += 4;
   const declarationCount = readU32(bytes, offset);
-  return { magic: magic.value, version, declarationCount };
+  offset += 4;
+  return { magic: magic.value, version, declarationCount, nextOffset: offset };
 }
 
-function readTrailingManifest(bytes) {
-  for (let offset = bytes.byteLength - 4; offset >= 0; offset -= 1) {
-    const byteLength = readU32OrNull(bytes, offset);
-    if (byteLength === null || offset + 4 + byteLength !== bytes.byteLength) {
-      continue;
+function readSectionDirectory(bytes, offset) {
+  const sectionCount = readU32(bytes, offset);
+  offset += 4;
+  const sections = [];
+  for (let index = 0; index < sectionCount; index += 1) {
+    const directoryEntryOffset = offset;
+    const kind = readU32(bytes, offset);
+    offset += 4;
+    const sectionOffset = readU32(bytes, offset);
+    offset += 4;
+    const byteLength = readU32(bytes, offset);
+    offset += 4;
+    if (sectionOffset > bytes.byteLength || byteLength > bytes.byteLength - sectionOffset) {
+      throw new Error(`IR package section ${kind} exceeds package byte length`);
     }
-    const text = textDecoder.decode(bytes.subarray(offset + 4));
-    let manifest;
-    try {
-      manifest = JSON.parse(text);
-    } catch {
-      continue;
-    }
-    if (manifest?.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
-      continue;
-    }
-    return { offset, byteLength, manifest: validateInterfaceManifest(manifest) };
+    sections.push({
+      kind,
+      name: sectionName(kind),
+      offset: sectionOffset,
+      byteLength,
+      directoryEntryOffset,
+    });
   }
-  throw new Error("IR package does not contain a valid trailing interface manifest");
+  return { sections, nextOffset: offset };
+}
+
+function requireSection(sections, kind) {
+  const matches = sections.filter((section) => section.kind === kind);
+  if (matches.length === 0) {
+    throw new Error(`IR package is missing section ${sectionName(kind)}`);
+  }
+  if (matches.length > 1) {
+    throw new Error(`IR package has duplicate section ${sectionName(kind)}`);
+  }
+  return matches[0];
+}
+
+function sectionName(kind) {
+  return SECTION_NAMES.get(kind) ?? `unknown(${kind})`;
 }
 
 function readString(bytes, offset) {
@@ -103,6 +172,7 @@ function readString(bytes, offset) {
   }
   return {
     value: textDecoder.decode(bytes.subarray(start, end)),
+    byteLength,
     nextOffset: end,
   };
 }

@@ -37,10 +37,11 @@ The same package encoder also supports focused developer packages through
 public source definitions for a single Lean file. The `/dev.html` Vite entry
 point loads a served or uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls
-go through `vir_call_resolved_objects`; package format 9 stores direct
-package-call summaries, while `web/src/runtime/object-values.js` lowers JavaScript
-values to owned Lean objects before the core runtime calls the upstream
-interpreter through a package-local slot.
+go through `vir_call_resolved_objects`; package format 10 stores direct
+package-call summaries in a sectioned `.irpkg`, while
+`web/src/runtime/object-values.js` lowers JavaScript values to owned Lean
+objects before the core runtime calls the upstream interpreter through a
+package-local slot.
 
 The browser keeps a Lean-rendered DOM Tamagotchi as the top-level interactive
 demo over the same upstream interpreter artifact. Lean registers the pet

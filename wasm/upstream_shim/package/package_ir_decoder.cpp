@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 #include "package_decl_provider_types.h"
 #include "package_binary_reader.h"
 #include "package_ir_builders.h"
+#include "package_section_directory.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -24,7 +25,7 @@ using ir::type;
 using namespace package_ir;
 
 static bool supported_package_version(uint32_t version) {
-    return version == 9;
+    return version == 10;
 }
 
 class reader : public package_binary_reader {
@@ -357,6 +358,18 @@ static std::vector<export_call_summary_entry> read_export_summaries(reader & r) 
     return entries;
 }
 
+static bool finish_section(reader const & r, char const * label, std::string & error) {
+    if (!r.ok) {
+        error = std::string("invalid IR package section `") + label + "`: " + r.error();
+        return false;
+    }
+    if (!r.at_end()) {
+        error = std::string("trailing bytes in IR package section `") + label + "` at byte " + std::to_string(r.pos());
+        return false;
+    }
+    return true;
+}
+
 static std::vector<uint32_t> build_call_summary_indices(
     std::vector<decl_entry> const & entries,
     std::vector<export_call_summary_entry> const & export_summaries) {
@@ -400,22 +413,42 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
         return false;
     }
 
-    std::vector<decl_entry> entries = read_decl_entries(r, count);
-    std::vector<init_global_entry> init_entries = read_init_entries(r);
-    std::vector<host_import_entry> host_imports = read_host_imports(r);
-    std::vector<export_call_summary_entry> export_summaries = read_export_summaries(r);
-    if (!r.ok) {
-        error = r.error();
+    package_section_directory directory;
+    if (!read_package_section_directory(r, size, directory, error)) {
         return false;
     }
 
-    std::string interface_manifest = r.string();
+    reader decls_reader(data + directory.declarations.offset, directory.declarations.byte_length);
+    std::vector<decl_entry> entries = read_decl_entries(decls_reader, count);
+    if (!finish_section(decls_reader, package_section_label(package_section_declarations), error)) {
+        return false;
+    }
+
+    reader init_reader(data + directory.init_globals.offset, directory.init_globals.byte_length);
+    std::vector<init_global_entry> init_entries = read_init_entries(init_reader);
+    if (!finish_section(init_reader, package_section_label(package_section_init_globals), error)) {
+        return false;
+    }
+
+    reader host_import_reader(data + directory.host_imports.offset, directory.host_imports.byte_length);
+    std::vector<host_import_entry> host_imports = read_host_imports(host_import_reader);
+    if (!finish_section(host_import_reader, package_section_label(package_section_host_imports), error)) {
+        return false;
+    }
+
+    reader export_summary_reader(data + directory.export_summaries.offset, directory.export_summaries.byte_length);
+    std::vector<export_call_summary_entry> export_summaries = read_export_summaries(export_summary_reader);
+    if (!finish_section(export_summary_reader, package_section_label(package_section_export_summaries), error)) {
+        return false;
+    }
+
+    reader manifest_reader(data + directory.interface_manifest.offset, directory.interface_manifest.byte_length);
+    std::string interface_manifest = manifest_reader.string();
     if (interface_manifest.empty()) {
         error = "IR package is missing an embedded interface manifest";
         return false;
     }
-    if (!r.at_end()) {
-        error = "trailing bytes after IR package at byte " + std::to_string(r.pos());
+    if (!finish_section(manifest_reader, package_section_label(package_section_interface_manifest), error)) {
         return false;
     }
 
