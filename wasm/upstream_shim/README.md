@@ -16,9 +16,8 @@ package lookup, and temporary runtime glue live here instead.
   resources.
 - `interpreter/`: upstream interpreter lifecycle, `lean_ir_find_env_decl` hooks,
   and boxed interpreter execution.
-- `runtime/`: handwritten native extern wrappers, restricted native symbol
-  lookup, temporary Lean object constructors/name helpers, and WASI/runtime
-  stubs.
+- `runtime/`: native extern wrappers, restricted native symbol lookup,
+  temporary Lean object constructors/name helpers, and WASI/runtime stubs.
 - `bench/`: local benchmark harness entry point. It is not linked into the
   browser WASM.
 
@@ -54,6 +53,7 @@ Lean-side table matches Lean's imported IR signatures:
 
 ```bash
 npm run check:native-externs
+npm run check:native-wrappers
 ```
 
 When adding or removing native extern wrappers, regenerate and check the
@@ -62,6 +62,7 @@ registry:
 ```bash
 node scripts/check-boundary-registry.mjs --write
 node scripts/check-boundary-registry.mjs
+npm run check:native-wrappers
 ```
 
 The usual boundary validation is:

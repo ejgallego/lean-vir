@@ -181,89 +181,41 @@ static size_t substring_repaired_pos(lean_object * s, lean_object * p) {
     return lean_string_is_valid_pos(s, p) ? nat_to_size_or_max(p) : end;
 }
 
-extern "C" lean_object * lean_nat_add___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_nat_add);
-}
+#define VIR_DEFINE_BOX_UNARY_WRAPPER(symbol, helper) \
+    extern "C" lean_object * symbol##___boxed(lean_object * a) { \
+        return helper(a, symbol); \
+    }
 
-extern "C" lean_object * lean_nat_sub___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_nat_sub);
-}
+#define VIR_DEFINE_BOX_BINARY_WRAPPER(symbol, helper) \
+    extern "C" lean_object * symbol##___boxed(lean_object * a, lean_object * b) { \
+        return helper(a, b, symbol); \
+    }
 
-extern "C" lean_object * lean_nat_dec_eq___boxed(lean_object * a, lean_object * b) {
-    return box_object_predicate(a, b, lean_nat_dec_eq);
-}
-
-extern "C" lean_object * lean_nat_dec_le___boxed(lean_object * a, lean_object * b) {
-    return box_object_predicate(a, b, lean_nat_dec_le);
-}
-
-extern "C" lean_object * lean_nat_dec_lt___boxed(lean_object * a, lean_object * b) {
-    return box_object_predicate(a, b, lean_nat_dec_lt);
-}
-
-extern "C" lean_object * lean_nat_mul___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_nat_mul);
-}
-
-extern "C" lean_object * lean_nat_div___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_nat_div);
-}
-
-extern "C" lean_object * lean_nat_mod___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_nat_mod);
-}
-
-extern "C" lean_object * lean_nat_pow___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_nat_pow);
-}
-
-extern "C" lean_object * lean_nat_log2___boxed(lean_object * a) {
-    return box_object_unary(a, lean_nat_log2);
-}
-
-extern "C" lean_object * lean_nat_shiftl___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_nat_shiftl);
-}
-
-extern "C" lean_object * lean_nat_shiftr___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_nat_shiftr);
-}
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_add, box_object_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_sub, box_object_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_dec_eq, box_object_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_dec_le, box_object_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_dec_lt, box_object_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_mul, box_object_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_div, box_object_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_mod, box_object_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_pow, box_object_binary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_nat_log2, box_object_unary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_shiftl, box_object_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_shiftr, box_object_binary)
 
 extern "C" lean_object * lean_nat_to_int___boxed(lean_object * a) {
     return lean_nat_to_int(a);
 }
 
-extern "C" lean_object * lean_int_add___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_int_add);
-}
-
-extern "C" lean_object * lean_int_sub___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_int_sub);
-}
-
-extern "C" lean_object * lean_int_mul___boxed(lean_object * a, lean_object * b) {
-    return box_object_binary(a, b, lean_int_mul);
-}
-
-extern "C" lean_object * lean_int_neg___boxed(lean_object * a) {
-    return box_object_unary(a, lean_int_neg);
-}
-
-extern "C" lean_object * lean_int_dec_lt___boxed(lean_object * a, lean_object * b) {
-    return box_object_predicate(a, b, lean_int_dec_lt);
-}
-
-extern "C" lean_object * lean_int_dec_eq___boxed(lean_object * a, lean_object * b) {
-    return box_object_predicate(a, b, lean_int_dec_eq);
-}
-
-extern "C" lean_object * lean_int_dec_le___boxed(lean_object * a, lean_object * b) {
-    return box_object_predicate(a, b, lean_int_dec_le);
-}
-
-extern "C" lean_object * lean_nat_abs___boxed(lean_object * a) {
-    return box_object_unary(a, lean_nat_abs);
-}
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_add, box_object_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_sub, box_object_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_mul, box_object_binary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_int_neg, box_object_unary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_dec_lt, box_object_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_dec_eq, box_object_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_dec_le, box_object_predicate)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_nat_abs, box_object_unary)
 
 extern "C" lean_object * lean_system_platform_nbits___boxed(lean_object * unit) {
     lean_dec(unit);
@@ -616,29 +568,12 @@ extern "C" lean_object * l_USize_ofNatLT___boxed(lean_object * a, lean_object * 
     return lean_box_usize(result);
 }
 
-extern "C" lean_object * lean_usize_add___boxed(lean_object * a, lean_object * b) {
-    return box_usize_binary(a, b, lean_usize_add);
-}
-
-extern "C" lean_object * lean_usize_sub___boxed(lean_object * a, lean_object * b) {
-    return box_usize_binary(a, b, lean_usize_sub);
-}
-
-extern "C" lean_object * lean_usize_mul___boxed(lean_object * a, lean_object * b) {
-    return box_usize_binary(a, b, lean_usize_mul);
-}
-
-extern "C" lean_object * lean_usize_land___boxed(lean_object * a, lean_object * b) {
-    return box_usize_binary(a, b, lean_usize_land);
-}
-
-extern "C" lean_object * lean_usize_shift_left___boxed(lean_object * a, lean_object * b) {
-    return box_usize_binary(a, b, lean_usize_shift_left);
-}
-
-extern "C" lean_object * lean_usize_shift_right___boxed(lean_object * a, lean_object * b) {
-    return box_usize_binary(a, b, lean_usize_shift_right);
-}
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_add, box_usize_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_sub, box_usize_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_mul, box_usize_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_land, box_usize_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_shift_left, box_usize_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_shift_right, box_usize_binary)
 
 extern "C" lean_object * lean_usize_to_nat___boxed(lean_object * a) {
     lean_object * result = lean_usize_to_nat(lean_unbox_usize(a));
@@ -646,17 +581,9 @@ extern "C" lean_object * lean_usize_to_nat___boxed(lean_object * a) {
     return result;
 }
 
-extern "C" lean_object * lean_usize_dec_eq___boxed(lean_object * a, lean_object * b) {
-    return box_usize_predicate(a, b, lean_usize_dec_eq);
-}
-
-extern "C" lean_object * lean_usize_dec_lt___boxed(lean_object * a, lean_object * b) {
-    return box_usize_predicate(a, b, lean_usize_dec_lt);
-}
-
-extern "C" lean_object * lean_usize_dec_le___boxed(lean_object * a, lean_object * b) {
-    return box_usize_predicate(a, b, lean_usize_dec_le);
-}
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_eq, box_usize_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_lt, box_usize_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_le, box_usize_predicate)
 
 extern "C" lean_object * lean_string_of_usize___boxed(lean_object * a) {
     lean_object * result = lean_string_of_usize(lean_unbox_usize(a));
@@ -956,65 +883,21 @@ extern "C" lean_object * lean_uint8_to_uint32___boxed(lean_object * a) {
     return lean_box_uint32(result);
 }
 
-extern "C" lean_object * lean_uint8_add___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_add);
-}
-
-extern "C" lean_object * lean_uint8_sub___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_sub);
-}
-
-extern "C" lean_object * lean_uint8_mul___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_mul);
-}
-
-extern "C" lean_object * lean_uint8_div___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_div);
-}
-
-extern "C" lean_object * lean_uint8_mod___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_mod);
-}
-
-extern "C" lean_object * lean_uint8_land___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_land);
-}
-
-extern "C" lean_object * lean_uint8_lor___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_lor);
-}
-
-extern "C" lean_object * lean_uint8_xor___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_xor);
-}
-
-extern "C" lean_object * lean_uint8_shift_left___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_shift_left);
-}
-
-extern "C" lean_object * lean_uint8_shift_right___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_shift_right);
-}
-
-extern "C" lean_object * lean_uint8_complement___boxed(lean_object * a) {
-    return box_uint8_unary(a, lean_uint8_complement);
-}
-
-extern "C" lean_object * lean_uint8_neg___boxed(lean_object * a) {
-    return box_uint8_unary(a, lean_uint8_neg);
-}
-
-extern "C" lean_object * lean_uint8_dec_eq___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_dec_eq);
-}
-
-extern "C" lean_object * lean_uint8_dec_lt___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_dec_lt);
-}
-
-extern "C" lean_object * lean_uint8_dec_le___boxed(lean_object * a, lean_object * b) {
-    return box_uint8_binary(a, b, lean_uint8_dec_le);
-}
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_add, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_sub, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_mul, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_div, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_mod, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_land, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_lor, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_xor, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_shift_left, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_shift_right, box_uint8_binary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint8_complement, box_uint8_unary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint8_neg, box_uint8_unary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_dec_eq, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_dec_lt, box_uint8_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_dec_le, box_uint8_binary)
 
 extern "C" lean_object * lean_uint16_to_nat___boxed(lean_object * a) {
     lean_object * result = lean_uint16_to_nat(static_cast<uint16_t>(lean_unbox(a)));
@@ -1028,65 +911,21 @@ extern "C" lean_object * lean_uint16_to_uint32___boxed(lean_object * a) {
     return lean_box_uint32(result);
 }
 
-extern "C" lean_object * lean_uint16_add___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_add);
-}
-
-extern "C" lean_object * lean_uint16_sub___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_sub);
-}
-
-extern "C" lean_object * lean_uint16_mul___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_mul);
-}
-
-extern "C" lean_object * lean_uint16_div___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_div);
-}
-
-extern "C" lean_object * lean_uint16_mod___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_mod);
-}
-
-extern "C" lean_object * lean_uint16_land___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_land);
-}
-
-extern "C" lean_object * lean_uint16_lor___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_lor);
-}
-
-extern "C" lean_object * lean_uint16_xor___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_xor);
-}
-
-extern "C" lean_object * lean_uint16_shift_left___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_shift_left);
-}
-
-extern "C" lean_object * lean_uint16_shift_right___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_binary(a, b, lean_uint16_shift_right);
-}
-
-extern "C" lean_object * lean_uint16_complement___boxed(lean_object * a) {
-    return box_uint16_unary(a, lean_uint16_complement);
-}
-
-extern "C" lean_object * lean_uint16_neg___boxed(lean_object * a) {
-    return box_uint16_unary(a, lean_uint16_neg);
-}
-
-extern "C" lean_object * lean_uint16_dec_eq___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_predicate(a, b, lean_uint16_dec_eq);
-}
-
-extern "C" lean_object * lean_uint16_dec_lt___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_predicate(a, b, lean_uint16_dec_lt);
-}
-
-extern "C" lean_object * lean_uint16_dec_le___boxed(lean_object * a, lean_object * b) {
-    return box_uint16_predicate(a, b, lean_uint16_dec_le);
-}
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_add, box_uint16_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_sub, box_uint16_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_mul, box_uint16_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_div, box_uint16_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_mod, box_uint16_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_land, box_uint16_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_lor, box_uint16_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_xor, box_uint16_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_shift_left, box_uint16_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_shift_right, box_uint16_binary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint16_complement, box_uint16_unary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint16_neg, box_uint16_unary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_dec_eq, box_uint16_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_dec_lt, box_uint16_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_dec_le, box_uint16_predicate)
 
 extern "C" lean_object * lean_uint32_of_nat___boxed(lean_object * a) {
     uint32_t result = lean_uint32_of_nat(a);
@@ -1125,65 +964,21 @@ extern "C" lean_object * lean_uint32_to_uint64___boxed(lean_object * a) {
     return lean_box_uint64(result);
 }
 
-extern "C" lean_object * lean_uint32_add___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_add);
-}
-
-extern "C" lean_object * lean_uint32_sub___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_sub);
-}
-
-extern "C" lean_object * lean_uint32_mul___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_mul);
-}
-
-extern "C" lean_object * lean_uint32_div___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_div);
-}
-
-extern "C" lean_object * lean_uint32_mod___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_mod);
-}
-
-extern "C" lean_object * lean_uint32_land___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_land);
-}
-
-extern "C" lean_object * lean_uint32_lor___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_lor);
-}
-
-extern "C" lean_object * lean_uint32_xor___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_xor);
-}
-
-extern "C" lean_object * lean_uint32_shift_left___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_shift_left);
-}
-
-extern "C" lean_object * lean_uint32_shift_right___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_binary(a, b, lean_uint32_shift_right);
-}
-
-extern "C" lean_object * lean_uint32_complement___boxed(lean_object * a) {
-    return box_uint32_unary(a, lean_uint32_complement);
-}
-
-extern "C" lean_object * lean_uint32_neg___boxed(lean_object * a) {
-    return box_uint32_unary(a, lean_uint32_neg);
-}
-
-extern "C" lean_object * lean_uint32_dec_eq___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_predicate(a, b, lean_uint32_dec_eq);
-}
-
-extern "C" lean_object * lean_uint32_dec_lt___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_predicate(a, b, lean_uint32_dec_lt);
-}
-
-extern "C" lean_object * lean_uint32_dec_le___boxed(lean_object * a, lean_object * b) {
-    return box_uint32_predicate(a, b, lean_uint32_dec_le);
-}
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_add, box_uint32_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_sub, box_uint32_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_mul, box_uint32_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_div, box_uint32_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_mod, box_uint32_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_land, box_uint32_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_lor, box_uint32_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_xor, box_uint32_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_shift_left, box_uint32_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_shift_right, box_uint32_binary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint32_complement, box_uint32_unary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint32_neg, box_uint32_unary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_dec_eq, box_uint32_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_dec_lt, box_uint32_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_dec_le, box_uint32_predicate)
 
 extern "C" lean_object * lean_uint64_of_nat___boxed(lean_object * a) {
     uint64_t result = lean_uint64_of_nat(a);
@@ -1191,9 +986,7 @@ extern "C" lean_object * lean_uint64_of_nat___boxed(lean_object * a) {
     return lean_box_uint64(result);
 }
 
-extern "C" lean_object * lean_uint64_mix_hash___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_mix_hash);
-}
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_mix_hash, box_uint64_binary)
 
 extern "C" lean_object * l_UInt64_ofNatLT___boxed(lean_object * a, lean_object * proof) {
     uint64_t result = lean_uint64_of_nat(a);
@@ -1226,65 +1019,24 @@ extern "C" lean_object * lean_uint64_to_uint8___boxed(lean_object * a) {
     return lean_box(result);
 }
 
-extern "C" lean_object * lean_uint64_add___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_add);
-}
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_add, box_uint64_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_sub, box_uint64_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_mul, box_uint64_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_div, box_uint64_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_mod, box_uint64_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_land, box_uint64_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_lor, box_uint64_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_xor, box_uint64_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_shift_left, box_uint64_binary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_shift_right, box_uint64_binary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint64_complement, box_uint64_unary)
+VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint64_neg, box_uint64_unary)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_dec_eq, box_uint64_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_dec_lt, box_uint64_predicate)
+VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_dec_le, box_uint64_predicate)
 
-extern "C" lean_object * lean_uint64_sub___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_sub);
-}
-
-extern "C" lean_object * lean_uint64_mul___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_mul);
-}
-
-extern "C" lean_object * lean_uint64_div___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_div);
-}
-
-extern "C" lean_object * lean_uint64_mod___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_mod);
-}
-
-extern "C" lean_object * lean_uint64_land___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_land);
-}
-
-extern "C" lean_object * lean_uint64_lor___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_lor);
-}
-
-extern "C" lean_object * lean_uint64_xor___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_xor);
-}
-
-extern "C" lean_object * lean_uint64_shift_left___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_shift_left);
-}
-
-extern "C" lean_object * lean_uint64_shift_right___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_binary(a, b, lean_uint64_shift_right);
-}
-
-extern "C" lean_object * lean_uint64_complement___boxed(lean_object * a) {
-    return box_uint64_unary(a, lean_uint64_complement);
-}
-
-extern "C" lean_object * lean_uint64_neg___boxed(lean_object * a) {
-    return box_uint64_unary(a, lean_uint64_neg);
-}
-
-extern "C" lean_object * lean_uint64_dec_eq___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_predicate(a, b, lean_uint64_dec_eq);
-}
-
-extern "C" lean_object * lean_uint64_dec_lt___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_predicate(a, b, lean_uint64_dec_lt);
-}
-
-extern "C" lean_object * lean_uint64_dec_le___boxed(lean_object * a, lean_object * b) {
-    return box_uint64_predicate(a, b, lean_uint64_dec_le);
-}
+#undef VIR_DEFINE_BOX_UNARY_WRAPPER
+#undef VIR_DEFINE_BOX_BINARY_WRAPPER
 
 extern "C" lean_object * lean_uint64_to_float___boxed(lean_object * a) {
     double result = lean_uint64_to_float(lean_unbox_uint64(a));
