@@ -119,6 +119,8 @@ npm run prepare:irpkg -- examples/quickstart.virpkg.json
 npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json
 npm run inspect:irpkg -- web/public/local-quickstart.irpkg
 npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
+npm run inspect:native-wrappers
+npm run inspect:native-wrapper-shapes
 npm run size:wasm
 node scripts/run-fixtures.mjs --help
 ```
