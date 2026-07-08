@@ -46,16 +46,16 @@ For WASI/runtime boundary work, read:
 
 1. `docs/UPSTREAM_BOUNDARY.md`
 2. `wasm/upstream_shim/README.md`
-3. `wasm/upstream_shim/interpreter_bridge.cpp`
-4. `wasm/upstream_shim/call_abi.cpp`
-5. `wasm/upstream_shim/closure_abi.cpp`
-6. `wasm/upstream_shim/host_import_trampolines.cpp`
-7. `wasm/upstream_shim/package_decl_provider.cpp`
-8. `wasm/upstream_shim/package_ir_decoder.cpp`
-9. `wasm/upstream_shim/native_symbols.cpp`
-10. `wasm/upstream_shim/native_symbol_lookup.cpp`
-11. `wasm/upstream_shim/object_abi.cpp`
-12. `wasm/upstream_shim/object_expr_abi.cpp`
+3. `wasm/upstream_shim/interpreter/interpreter_bridge.cpp`
+4. `wasm/upstream_shim/abi/call_abi.cpp`
+5. `wasm/upstream_shim/abi/closure_abi.cpp`
+6. `wasm/upstream_shim/package/host_import_trampolines.cpp`
+7. `wasm/upstream_shim/package/package_decl_provider.cpp`
+8. `wasm/upstream_shim/package/package_ir_decoder.cpp`
+9. `wasm/upstream_shim/runtime/native_symbols.cpp`
+10. `wasm/upstream_shim/runtime/native_symbol_lookup.cpp`
+11. `wasm/upstream_shim/abi/object_abi.cpp`
+12. `wasm/upstream_shim/abi/object_expr_abi.cpp`
 
 For benchmark work, read:
 

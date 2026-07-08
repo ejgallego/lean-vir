@@ -53,40 +53,40 @@ the interpreter's name formatting and diagnostics.
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
 
-- `interpreter_bridge.cpp` owns upstream interpreter lifecycle,
+- `interpreter/interpreter_bridge.cpp` owns upstream interpreter lifecycle,
   `lean_ir_find_env_decl` hooks, and boxed function execution.
-- `call_abi.cpp` owns the package call surface exposed to JavaScript.
-- `closure_abi.cpp` owns Lean closure roots and callback calls used when
+- `abi/call_abi.cpp` owns the package call surface exposed to JavaScript.
+- `abi/closure_abi.cpp` owns Lean closure roots and callback calls used when
   function values cross to JavaScript.
-- `host_import_trampolines.cpp` owns the package-scoped JavaScript host-import
+- `package/host_import_trampolines.cpp` owns the package-scoped JavaScript host-import
   trampoline grid used by restricted `dlsym` lookup.
-- `call_signature_summary.cpp` owns the streaming package-call signature parser used
+- `package/call_signature_summary.cpp` owns the streaming package-call signature parser used
   to compute call arity and boxed-boundary requirements.
-- `name_utils.cpp` owns shared Lean `Name` construction helpers.
-- `object_abi.cpp` owns generic owned `lean_object *` helpers used by the
+- `runtime/name_utils.cpp` owns shared Lean `Name` construction helpers.
+- `abi/object_abi.cpp` owns generic owned `lean_object *` helpers used by the
   runtime object call path.
-- `object_expr_abi.cpp` owns the temporary `Lean.Level`, `Lean.Expr`, literal,
+- `abi/object_expr_abi.cpp` owns the temporary `Lean.Level`, `Lean.Expr`, literal,
   and name-string helpers used by current object-boundary fixtures.
-- `resource_abi.cpp` owns the shared external resource class used by
+- `abi/resource_abi.cpp` owns the shared external resource class used by
   `Lean.Vir.Js α` values.
-- `native_symbols.cpp` owns the explicit native extern wrappers.
-- `native_symbol_lookup.cpp` owns the generated native registry include,
+- `runtime/native_symbols.cpp` owns the explicit native extern wrappers.
+- `runtime/native_symbol_lookup.cpp` owns the generated native registry include,
   restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
   stubs.
-- `runtime_environment_stubs.cpp`, `package_init_bridge.cpp`,
-  `runtime_value_stubs.cpp`, and `io_stubs.cpp` own the WASI/platform,
-  initializer, value-helper, and demo IO stubs.
-- `lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
+- `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`,
+  `runtime/runtime_value_stubs.cpp`, and `runtime/io_stubs.cpp` own the
+  WASI/platform, initializer, value-helper, and demo IO stubs.
+- `runtime/lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
   constructor replacements for exported Lean-library constructors.
-- `package_ir_decoder.cpp` owns `.irpkg` binary decoding and Lean IR object
+- `package/package_ir_decoder.cpp` owns `.irpkg` binary decoding and Lean IR object
   materialization.
-- `package_decl_provider.cpp` owns loaded package state, declaration lookup,
+- `package/package_decl_provider.cpp` owns loaded package state, declaration lookup,
   host import metadata, and initializer execution.
 - `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
   from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
   packages; `docs/GENERATE_PACKAGE.md` maps the full split generator, and
   `tools/GeneratePackage.lean` is the CLI wrapper.
-- `decl_provider.h` is the replacement point for a future module-backed
+- `package/decl_provider.h` is the replacement point for a future module-backed
   provider.
 
 Together they supply:
@@ -158,9 +158,9 @@ example sources, walks `FAp`/`PAP` references, and can now fall back to
 the elaborated environment. This is still package-backed loading, not full
 module loading, but it lets fixtures include small upstream library closures
 such as `List.reverse._redArg`. The generator then emits a small binary package.
-`wasm/upstream_shim/package_ir_decoder.cpp` decodes that package into the
+`wasm/upstream_shim/package/package_ir_decoder.cpp` decodes that package into the
 upstream interpreter's expected object layout at runtime, and
-`wasm/upstream_shim/package_decl_provider.cpp` owns the loaded package state.
+`wasm/upstream_shim/package/package_decl_provider.cpp` owns the loaded package state.
 The generator report separates missing Lean IR declarations from missing native
 extern registrations, and the package decoder exposes its last load error for
 browser and smoke-test diagnostics.
@@ -215,8 +215,9 @@ and effectful calls also use object arguments/results.
 
 The shim no longer exposes a JavaScript-to-Lean value byte payload call. The
 descriptor-bearing named payload format was removed earlier, and the resolved
-byte payload fallback has now been removed as well. `call_signature_summary.cpp` is a
-signature-summary parser, not a runtime value codec.
+byte payload fallback has now been removed as well.
+`package/call_signature_summary.cpp` is a signature-summary parser, not a
+runtime value codec.
 
 The shim also exposes the first experimental Lean object ABI helpers. The
 complete value/call export surface is documented in
@@ -304,7 +305,7 @@ the start index is consumed.
 distinct native stem in the shim because their boxed arities differ, but all
 three wrappers delegate to the same linked runtime helper,
 `lean_string_utf8_set`.
-`lean_object_constructors.cpp` also owns minimal `Lean.Expr`/`Lean.Level` object
+`runtime/lean_object_constructors.cpp` also owns minimal `Lean.Expr`/`Lean.Level` object
 construction for direct object-ABI calls, so JavaScript can lower structural
 boundary values into real `Lean.Expr` objects without depending on Lean-library
 exported constructor wrappers.
@@ -335,17 +336,17 @@ registrations. Run `npm run check:native-externs` after changing its
 result ABI matches Lean's imported IR declarations. Run
 `node scripts/check-boundary-registry.mjs --write` after adding, removing, or
 renaming native extern entries; this regenerates
-`wasm/upstream_shim/native_symbols_registry.inc`. The regular
+`wasm/upstream_shim/runtime/native_symbols_registry.inc`. The regular
 `npm run check:boundary-registry` guard then verifies that the generated
 registry is current and that every native extern has a matching `dlsym` symbol
 plus either a handwritten boxed wrapper in
-`wasm/upstream_shim/native_symbols.cpp` or a native constant entry in the
+`wasm/upstream_shim/runtime/native_symbols.cpp` or a native constant entry in the
 generated registry. `npm test` runs these checks before the smoke and fixture
 suites.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
-`decl_provider.h`. Today that provider is backed by a small package decoded from
+`package/decl_provider.h`. Today that provider is backed by a small package decoded from
 `Lean.IR.Decl` data. Later it can be backed by generated module data or a real
 environment loader without changing `ir_interpreter.cpp` or the WASI/platform
 shim.
@@ -356,7 +357,7 @@ The remaining gap is fidelity, not execution. The demo bodies now come from the
 real Lean compiler IR for the example sources and selected imported IR
 declarations, but they are loaded from a demo-specific package instead of Lean's
 generated module data. A later provider can replace this package with generated
-module data behind `decl_provider.h`.
+module data behind `package/decl_provider.h`.
 
 The parser vertical target now reaches `Lean.Parser.parseHeader`. Package
 generation records initialized globals as `(declaration, initializer)`
@@ -375,13 +376,13 @@ remove if we want parser loading to behave exactly like a full Lean runtime.
 The runtime/platform stub files keep the remaining platform boundary explicit:
 
 - runtime budget and tracing hooks (`check_system`, heartbeat reset, time tasks,
-  and trace scopes) live in `runtime_environment_stubs.cpp` and are inert in
+  and trace scopes) live in `runtime/runtime_environment_stubs.cpp` and are inert in
   this single-threaded demo build;
 - initializer metadata queries are package-backed, using the same init-global
   table that `vir_load_ir_package` executes through upstream `lean_run_init`;
 - option registration, sorry dependency lookup, and export-name lookup remain
-  demo no-ops in `runtime_environment_stubs.cpp`;
-- stderr/error printing remains a demo no-op in `io_stubs.cpp` because the
+  demo no-ops in `runtime/runtime_environment_stubs.cpp`;
+- stderr/error printing remains a demo no-op in `runtime/io_stubs.cpp` because the
   package generator and JavaScript runtime provide the active diagnostics for
   this path.
 

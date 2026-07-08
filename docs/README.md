@@ -28,8 +28,8 @@ ownership diagrams.
 - WASI/runtime boundary work: read
   [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md),
   `wasm/upstream_shim/README.md`,
-  `wasm/upstream_shim/interpreter_bridge.cpp`, and
-  `wasm/upstream_shim/call_abi.cpp`.
+  `wasm/upstream_shim/interpreter/interpreter_bridge.cpp`, and
+  `wasm/upstream_shim/abi/call_abi.cpp`.
 - Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
   `scripts/bench-vir.mjs`, and `scripts/bench-utils.mjs`.
 

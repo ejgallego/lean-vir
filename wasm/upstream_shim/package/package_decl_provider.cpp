@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 #include "decl_provider.h"
-#include "interpreter_bridge.h"
+#include "interpreter/interpreter_bridge.h"
 #include "package_decl_provider_types.h"
 
 #include <stddef.h>

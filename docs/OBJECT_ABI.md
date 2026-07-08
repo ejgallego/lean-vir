@@ -241,7 +241,7 @@ runtime counts on every visit.
 6. Host import and callback integration: rooted resource and closure helpers
    let Lean-to-JS calls and retained callbacks exchange objects directly.
 7. Value codec retirement: the JavaScript value codec and C++ runtime value
-   codec have been removed; `call_signature_summary.cpp` now only computes compact
+   codec have been removed; `package/call_signature_summary.cpp` now only computes compact
    package-call signature summaries.
 
 ## Risks

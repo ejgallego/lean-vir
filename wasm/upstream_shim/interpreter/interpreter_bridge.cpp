@@ -6,8 +6,8 @@ Author: Emilio J. Gallego Arias
 
 #include "interpreter_bridge.h"
 
-#include "decl_provider.h"
-#include "name_utils.h"
+#include "package/decl_provider.h"
+#include "runtime/name_utils.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -80,4 +80,3 @@ extern "C" lean::object * lean_ir_find_env_decl_boxed(lean::object *, lean::obje
 extern "C" uint32_t vir_upstream_target_pointer_bytes(void) {
     return sizeof(void *);
 }
-

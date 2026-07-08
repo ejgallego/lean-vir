@@ -4,11 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-#include "interpreter_bridge.h"
+#include "interpreter/interpreter_bridge.h"
 
-#include "decl_provider.h"
-#include "name_utils.h"
-#include "signature_cache.h"
+#include "package/decl_provider.h"
+#include "package/signature_cache.h"
+#include "runtime/name_utils.h"
 
 #include <stdint.h>
 
@@ -126,4 +126,3 @@ extern "C" char const * vir_call_error(void) {
 extern "C" uint32_t vir_call_error_size(void) {
     return static_cast<uint32_t>(lean::vir::g_call_error.size());
 }
-

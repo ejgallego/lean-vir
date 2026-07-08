@@ -17,8 +17,8 @@ demo_package="$(
     'import { defaultPackageFile, publicArtifactPath } from "./scripts/browser-package-config.mjs"; console.log(publicArtifactPath(defaultPackageFile));'
 )"
 package_header="$out/vir_fixtures_basic_package.inc"
-bench_source="wasm/upstream_shim/engine_bench.cpp"
-bench_object="$obj_dir/wasm_upstream_shim_engine_bench.o"
+bench_source="wasm/upstream_shim/bench/engine_bench.cpp"
+bench_object="$obj_dir/wasm_upstream_shim_bench_engine_bench.o"
 bench_wasm="$out/vir-engine-bench.wasm"
 
 bash scripts/build-upstream-probe.sh
