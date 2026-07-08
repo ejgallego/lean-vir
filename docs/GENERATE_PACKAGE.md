@@ -43,7 +43,7 @@ Targets have one of three modes:
   and inductives.
 - `Vir.GeneratePackage.Interface.Classify.Signature`: top-level export and host
   import signature classification.
-- `Vir.GeneratePackage.Interface.Collect`: export discovery, export signature
+- `Vir.GeneratePackage.Interface.Collect`: export discovery, export call-summary
   extraction, duplicate-avoidance helpers, boxed-boundary diagnostics, and
   host-import collection for `@[vir_js "..."]` declarations.
 - `Vir.GeneratePackage.Json`: small JSON string, array, object, and primitive

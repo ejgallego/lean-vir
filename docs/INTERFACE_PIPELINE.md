@@ -232,9 +232,9 @@ its slot, Lean name, JavaScript target, host boundary mode (`hostResource`,
 leading erased argument count, JavaScript-visible arguments, result type, and
 effect.
 The JSON manifest keeps the source-level effect classification for review and
-tooling: `pure`, `runtime`, `io`, `dom`, or `react`. The compact wasm call
-descriptor still lowers that to the runtime distinction the shim needs today:
-pure versus effectful.
+tooling: `pure`, `runtime`, `io`, `dom`, or `react`. The binary package
+summary stores only the runtime distinction the shim needs today: pure versus
+effectful.
 
 `Lean.Vir.Js α` is always represented as the generic `Js` resource. Its type
 parameter is a Lean-side phantom while the value remains in the JavaScript

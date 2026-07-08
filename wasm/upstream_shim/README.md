@@ -8,7 +8,7 @@ package lookup, and temporary runtime glue live here instead.
 ## Directory Map
 
 - `package/`: `.irpkg` decoding, loaded package state, declaration lookup,
-  call-slot/signature metadata, host-import metadata, and package-backed
+  call-slot summary metadata, host-import metadata, and package-backed
   initializer-name lookup. Future module-backed loading should replace this
   layer first.
 - `abi/`: exported JS/WASM ABI entry points for package calls, closures, owned
