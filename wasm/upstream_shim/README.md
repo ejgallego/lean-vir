@@ -30,7 +30,8 @@ coupling. Line counts are approximate and are meant for sizing, not policy.
 | --- | --- | ---: | --- | --- |
 | Package decoding | `package/package_ir_decoder.cpp`, `package/package_binary_reader.h`, `package/package_decl_provider_types.h` | 587 | Direct | Reads `.irpkg` bytes, validates the package envelope, and decodes sections. Main target if we reduce package encoding complexity. |
 | Package IR object materialization | `package/package_ir_builders.cpp`, `package/package_ir_builders.h` | 285 | Direct IR object layout | Reconstructs Lean IR objects from decoded package fields. |
-| Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 394 | Direct | Owns loaded package indices, declaration lookup, call slots, direct export call summaries, interface manifest, and init globals. |
+| Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 373 | Direct | Owns loaded package indices, declaration lookup, call slots, direct export call summaries, interface manifest, and init globals. |
+| Package load ABI | `package/package_loader_abi.cpp` | 49 | Direct | Exposes package byte allocation, package loading, package errors, and interface manifest access to JavaScript. |
 | Host import dispatch | `package/host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |
 | Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `runtime/native_symbols_registry.inc` | 1696 | Declaration/native symbol coupling | Mostly runtime coverage and lookup policy, not package byte-format parsing. |
 | JavaScript package-call ABI | `abi/call_abi.cpp` | 122 | Consumes package metadata | Thin JS-facing entry point over call slots and direct call summaries. |
