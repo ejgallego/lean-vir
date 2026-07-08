@@ -115,6 +115,8 @@ The embedded manifest currently supports:
 - non-indexed custom inductives with zero or more runtime payload fields per
   constructor, including direct recursive references through supported
   container shapes;
+  constructor fields typed as `optParam α default` are described as `α` while
+  remaining explicit runtime fields when the constructor layout stores them;
 - direct `Lean.Expr`, represented at the JavaScript boundary as structural
   expression objects;
 - `Lean.Vir.React.Node`, represented as an opaque `Lean.Vir.Js` resource whose

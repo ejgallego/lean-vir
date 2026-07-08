@@ -254,6 +254,9 @@ results are returned as `{ kind, value }`. Non-indexed custom inductives use
 canonical constructor objects only: nullary constructors accept and return
 `{ kind }`, single-field constructors accept and return `{ kind, value }`,
 and multi-field constructors accept and return `{ kind, fields }`.
+Constructor fields whose Lean type is `optParam α default` use the same
+JavaScript representation as `α`; they are still explicit fields in the
+canonical constructor object when the runtime constructor stores them.
 For example, a recursive `Tree Nat` value with constructors
 `leaf (value : Nat)` and `branch (left right : Tree Nat)` is:
 

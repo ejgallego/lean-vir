@@ -107,6 +107,13 @@ def simpleInterfaceType? (e : Lean.Expr) : Option InterfaceType :=
   | some `Lean.Expr => some .expr
   | _ => none
 
+def optParamType? (e : Lean.Expr) : Option Lean.Expr := do
+  let (fn, args) := (stripMData e).getAppFnArgs
+  if fn == `optParam then
+    args[0]?
+  else
+    none
+
 def jsResourceMarker? (e : Lean.Expr) : Option (Name × String) := do
   let name ← constName? e
   match name with

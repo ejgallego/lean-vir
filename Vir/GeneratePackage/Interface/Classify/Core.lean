@@ -190,9 +190,13 @@ partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (E
 
 partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : CoreM (Except String InterfaceType) := do
   let e := stripMData e
-  match e with
-  | .forallE .. => functionType e
-  | .bvar _ => return .ok .leanObject
+  if let some e := optParamType? e then
+    interfaceType e seenTypes
+  else match e with
+  | .forallE .. =>
+      functionType e
+  | .bvar _ =>
+      return .ok .leanObject
   | _ =>
       let env ← getEnv
       match simpleInterfaceType? e <|> resourceInterfaceType? e with
