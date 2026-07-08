@@ -15,9 +15,11 @@ const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols
 
 const args = new Set(process.argv.slice(2));
 for (const arg of args) {
-  if (!["--all", "--check", "--json"].includes(arg)) {
+  if (!["--all", "--check", "--json", "--regular-direct-shapes"].includes(arg)) {
     console.error(`unknown argument: ${arg}`);
-    console.error("usage: node scripts/inventory-native-wrappers.mjs [--all] [--check] [--json]");
+    console.error(
+      "usage: node scripts/inventory-native-wrappers.mjs [--all] [--check] [--json] [--regular-direct-shapes]",
+    );
     process.exit(2);
   }
 }
@@ -255,6 +257,59 @@ function formatSymbols(entries) {
   return symbols.map((symbol) => `\`${symbol}\``).join(", ");
 }
 
+function formatNativeExternParam(param) {
+  return `${param.borrow ? "borrowed" : "owned"} ${param.type}`;
+}
+
+function formatNativeExternSignature(nativeExtern) {
+  const params = nativeExtern.params.map(formatNativeExternParam).join(", ");
+  return `${params || "no params"} -> ${nativeExtern.resultType}`;
+}
+
+const scalarTypes = new Set(["float", "float32", "uint8", "uint16", "uint32", "uint64", "usize"]);
+const objectLikeTypes = new Set(["object", "tagged", "tobject"]);
+
+function modelType(type) {
+  if (scalarTypes.has(type)) {
+    return "scalar";
+  }
+  if (objectLikeTypes.has(type)) {
+    return "objectlike";
+  }
+  return type;
+}
+
+function formatNativeExternModelParam(param) {
+  return `${param.borrow ? "borrowed" : "owned"} ${modelType(param.type)}`;
+}
+
+function formatNativeExternModelSignature(nativeExtern) {
+  const params = nativeExtern.params.map(formatNativeExternModelParam).join(", ");
+  return `${params || "no params"} -> ${modelType(nativeExtern.resultType)}`;
+}
+
+function nativeExternSignaturesForItem(item) {
+  const signatures = [];
+  for (const entry of item.entries) {
+    const nativeExtern = nativeExterns.get(entry.leanName);
+    signatures.push(
+      nativeExtern ? formatNativeExternSignature(nativeExtern) : `${entry.leanName}: missing extern`,
+    );
+  }
+  return [...new Set(signatures)];
+}
+
+function nativeExternModelSignaturesForItem(item) {
+  const signatures = [];
+  for (const entry of item.entries) {
+    const nativeExtern = nativeExterns.get(entry.leanName);
+    signatures.push(
+      nativeExtern ? formatNativeExternModelSignature(nativeExtern) : `${entry.leanName}: missing extern`,
+    );
+  }
+  return [...new Set(signatures)];
+}
+
 function helperForSignature(nativeExtern) {
   const types = nativeExtern.params.map((param) => param.type);
   if (types.length === 1) {
@@ -397,6 +452,158 @@ function validateGeneratedDirectSignature(wrapper, nativeExtern) {
   return "unsupported generated direct wrapper macro";
 }
 
+function parseWrapperParamNames(params) {
+  return [...params.matchAll(/\blean_object\s*\*\s*([A-Za-z0-9_]+)/g)].map((match) => match[1]);
+}
+
+function uniqueMatches(source, regex) {
+  return [...new Set([...source.matchAll(regex)].map((match) => match[0]))].sort();
+}
+
+function decedParamNames(body, params) {
+  return params.filter((param) => new RegExp(`\\blean_dec\\s*\\(\\s*${escapeRegExp(param)}\\s*\\)`).test(body));
+}
+
+function nativeCallStyle(body, entries) {
+  const compactBody = body.trim().replace(/\s+/g, " ");
+  for (const entry of entries) {
+    const symbol = escapeRegExp(entry.symbol);
+    if (new RegExp(`^return\\s+${symbol}\\s*\\(`).test(compactBody)) {
+      return "call=direct-return";
+    }
+    if (new RegExp(`\\bresult\\s*=\\s*${symbol}\\s*\\(`).test(compactBody)) {
+      return "call=result-assignment";
+    }
+    if (new RegExp(`\\b${symbol}\\s*\\(`).test(compactBody)) {
+      return "call=direct";
+    }
+  }
+  return "call=unknown";
+}
+
+function resultReturnStyle(body) {
+  const compactBody = body.trim().replace(/\s+/g, " ");
+  const boxedResult = /\breturn\s+(lean_box(?:_[A-Za-z0-9]+)?)\s*\(\s*result\s*\)\s*;/.exec(
+    compactBody,
+  );
+  if (boxedResult) {
+    return `return=${boxedResult[1]}(result)`;
+  }
+  if (/\breturn\s+result\s*;/.test(compactBody)) {
+    return "return=result";
+  }
+  if (/\breturn\s+[A-Za-z0-9_]+\s*\([^;]*\)\s*;/.test(compactBody)) {
+    return "return=call";
+  }
+  return "return=custom";
+}
+
+function resultReturnModel(body) {
+  const compactBody = body.trim().replace(/\s+/g, " ");
+  if (/\breturn\s+lean_box(?:_[A-Za-z0-9]+)?\s*\(\s*result\s*\)\s*;/.test(compactBody)) {
+    return "return=boxed-scalar";
+  }
+  if (/\breturn\s+result\s*;/.test(compactBody)) {
+    return "return=result";
+  }
+  if (/\breturn\s+[A-Za-z0-9_]+\s*\([^;]*\)\s*;/.test(compactBody)) {
+    return "return=call";
+  }
+  return "return=custom";
+}
+
+function decModel(decedCount, paramCount) {
+  if (decedCount === 0) {
+    return "decs=none";
+  }
+  if (decedCount === paramCount) {
+    return "decs=all";
+  }
+  return "decs=partial";
+}
+
+function wrapperPlumbingSignature(wrapper, entries) {
+  const params = parseWrapperParamNames(wrapper.params);
+  const decs = decedParamNames(wrapper.body, params);
+  const unboxes = uniqueMatches(wrapper.body, /\blean_unbox(?:_[A-Za-z0-9]+)?\b/g);
+  const parts = [
+    nativeCallStyle(wrapper.body, entries),
+    resultReturnStyle(wrapper.body),
+    `unbox=${unboxes.length === 0 ? "none" : unboxes.join("+")}`,
+    `decs=${decs.length}/${params.length}`,
+  ];
+  return parts.join("; ");
+}
+
+function wrapperPlumbingModel(wrapper, entries) {
+  const params = parseWrapperParamNames(wrapper.params);
+  const decs = decedParamNames(wrapper.body, params);
+  const unboxes = uniqueMatches(wrapper.body, /\blean_unbox(?:_[A-Za-z0-9]+)?\b/g);
+  const parts = [
+    nativeCallStyle(wrapper.body, entries),
+    resultReturnModel(wrapper.body),
+    `unbox=${unboxes.length === 0 ? "none" : "scalar"}`,
+    decModel(decs.length, params.length),
+  ];
+  return parts.join("; ");
+}
+
+function buildRegularDirectShapes(inventory) {
+  const byShape = new Map();
+  for (const item of inventory) {
+    if (item.kind !== "regular-direct") {
+      continue;
+    }
+    const wrapper = wrappers.get(item.wrapper);
+    const exactSignatures = nativeExternSignaturesForItem(item);
+    const modelSignatures = nativeExternModelSignaturesForItem(item);
+    const model = modelSignatures.join(" | ");
+    const plumbing = wrapper ? wrapperPlumbingModel(wrapper, item.entries) : "missing wrapper";
+    const detail = wrapper ? wrapperPlumbingSignature(wrapper, item.entries) : "missing wrapper";
+    const key = `${model}\n${plumbing}`;
+    const group = byShape.get(key) ?? {
+      model,
+      plumbing,
+      exactSignatures: new Set(),
+      details: new Set(),
+      items: [],
+    };
+    for (const signature of exactSignatures) {
+      group.exactSignatures.add(signature);
+    }
+    group.details.add(detail);
+    group.items.push(item);
+    byShape.set(key, group);
+  }
+  return [...byShape.values()]
+    .map((shape) => ({
+      ...shape,
+      exactSignatures: [...shape.exactSignatures].sort(),
+      details: [...shape.details].sort(),
+    }))
+    .sort(
+      (lhs, rhs) =>
+        rhs.items.length - lhs.items.length ||
+        lhs.model.localeCompare(rhs.model) ||
+        lhs.plumbing.localeCompare(rhs.plumbing),
+    );
+}
+
+function printRegularDirectShapes(shapes) {
+  console.log("\n## regular-direct shapes");
+  for (const shape of shapes) {
+    console.log(`\n- ${shape.items.length} wrapper(s): ${shape.model}`);
+    console.log(`  plumbing: ${shape.plumbing}`);
+    console.log(`  exact signatures: ${shape.exactSignatures.join(" | ")}`);
+    if (shape.details.length > 1) {
+      console.log(`  detail variants: ${shape.details.join(" | ")}`);
+    }
+    for (const item of shape.items) {
+      console.log(`  - \`${item.wrapper}\`: ${formatEntryNames(item.entries)}`);
+    }
+  }
+}
+
 const [nativeExternsSource, nativeSymbols, nativeRegistry] = await Promise.all([
   readFile(nativeExternsPath, "utf8"),
   readFile(nativeSymbolsPath, "utf8"),
@@ -493,8 +700,13 @@ for (const item of inventory) {
   byKind.set(item.kind, group);
 }
 
+const regularDirectShapes = args.has("--regular-direct-shapes") ? buildRegularDirectShapes(inventory) : [];
+
 if (args.has("--json")) {
-  console.log(JSON.stringify({ constants, inventory }, null, 2));
+  const payload = args.has("--regular-direct-shapes")
+    ? { constants, inventory, regularDirectShapes }
+    : { constants, inventory };
+  console.log(JSON.stringify(payload, null, 2));
 } else {
   console.log(
     `native wrapper inventory: ${inventory.length} boxed wrappers, ${entries.length} boxed registry entries, ` +
@@ -507,8 +719,10 @@ if (args.has("--json")) {
     }
   }
 
+  const shapeOnly = args.has("--regular-direct-shapes") && !args.has("--all") && !args.has("--check");
   const shouldList = (kind) =>
-    args.has("--all") ||
+    !shapeOnly &&
+    (args.has("--all") ||
     (args.has("--check")
       ? ["generated-helper-mismatch", "generated-direct-mismatch", "missing", "extra"].includes(kind)
       : [
@@ -519,7 +733,7 @@ if (args.has("--json")) {
           "custom",
           "missing",
           "extra",
-        ].includes(kind));
+        ].includes(kind)));
 
   for (const kind of kindOrder) {
     const group = byKind.get(kind) ?? [];
@@ -532,6 +746,10 @@ if (args.has("--json")) {
       const symbols = item.entries.length === 0 ? "(none)" : formatSymbols(item.entries);
       console.log(`- \`${item.wrapper}\`: ${names}; symbols ${symbols}; ${item.reason}`);
     }
+  }
+
+  if (args.has("--regular-direct-shapes")) {
+    printRegularDirectShapes(regularDirectShapes);
   }
 }
 

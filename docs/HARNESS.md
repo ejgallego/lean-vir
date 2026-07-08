@@ -109,6 +109,8 @@ npm run build:site
 npm run check:api-coverage
 npm run check:native-externs
 npm run check:native-wrappers
+npm run inspect:native-wrappers
+npm run inspect:native-wrapper-shapes
 ```
 
 Package generation and inspection:
