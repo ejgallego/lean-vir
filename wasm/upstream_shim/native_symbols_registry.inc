@@ -24,6 +24,8 @@ The boxed wrappers remain handwritten in `native_symbols.cpp`.
     X("Int.mul", "lean_int_mul", lean_int_mul___boxed) \
     X("Int.neg", "lean_int_neg", lean_int_neg___boxed) \
     X("Int.decLt", "lean_int_dec_lt", lean_int_dec_lt___boxed) \
+    X("Int.decEq", "lean_int_dec_eq", lean_int_dec_eq___boxed) \
+    X("Int.decLe", "lean_int_dec_le", lean_int_dec_le___boxed) \
     X("Int.natAbs", "lean_nat_abs", lean_nat_abs___boxed) \
     X("System.Platform.getNumBits", "lean_system_platform_nbits", lean_system_platform_nbits___boxed) \
     X("panicCore", "lean_panic_fn_borrowed", lean_panic_fn_borrowed___boxed) \
@@ -137,6 +139,7 @@ The boxed wrappers remain handwritten in `native_symbols.cpp`.
     X("UInt8.decLt", "lean_uint8_dec_lt", lean_uint8_dec_lt___boxed) \
     X("UInt8.decLe", "lean_uint8_dec_le", lean_uint8_dec_le___boxed) \
     X("UInt16.toNat", "lean_uint16_to_nat", lean_uint16_to_nat___boxed) \
+    X("UInt16.toUInt32", "lean_uint16_to_uint32", lean_uint16_to_uint32___boxed) \
     X("UInt16.add", "lean_uint16_add", lean_uint16_add___boxed) \
     X("UInt16.sub", "lean_uint16_sub", lean_uint16_sub___boxed) \
     X("UInt16.mul", "lean_uint16_mul", lean_uint16_mul___boxed) \
@@ -156,6 +159,7 @@ The boxed wrappers remain handwritten in `native_symbols.cpp`.
     X("UInt32.ofNatLT", "l_UInt32_ofNatLT", l_UInt32_ofNatLT___boxed) \
     X("UInt32.toNat", "lean_uint32_to_nat", lean_uint32_to_nat___boxed) \
     X("UInt32.toUInt8", "lean_uint32_to_uint8", lean_uint32_to_uint8___boxed) \
+    X("UInt32.toUInt16", "lean_uint32_to_uint16", lean_uint32_to_uint16___boxed) \
     X("UInt32.toUInt64", "lean_uint32_to_uint64", lean_uint32_to_uint64___boxed) \
     X("UInt32.add", "lean_uint32_add", lean_uint32_add___boxed) \
     X("UInt32.sub", "lean_uint32_sub", lean_uint32_sub___boxed) \

@@ -253,6 +253,14 @@ extern "C" lean_object * lean_int_dec_lt___boxed(lean_object * a, lean_object * 
     return box_object_predicate(a, b, lean_int_dec_lt);
 }
 
+extern "C" lean_object * lean_int_dec_eq___boxed(lean_object * a, lean_object * b) {
+    return box_object_predicate(a, b, lean_int_dec_eq);
+}
+
+extern "C" lean_object * lean_int_dec_le___boxed(lean_object * a, lean_object * b) {
+    return box_object_predicate(a, b, lean_int_dec_le);
+}
+
 extern "C" lean_object * lean_nat_abs___boxed(lean_object * a) {
     return box_object_unary(a, lean_nat_abs);
 }
@@ -1014,6 +1022,12 @@ extern "C" lean_object * lean_uint16_to_nat___boxed(lean_object * a) {
     return result;
 }
 
+extern "C" lean_object * lean_uint16_to_uint32___boxed(lean_object * a) {
+    uint32_t result = lean_uint16_to_uint32(static_cast<uint16_t>(lean_unbox(a)));
+    lean_dec(a);
+    return lean_box_uint32(result);
+}
+
 extern "C" lean_object * lean_uint16_add___boxed(lean_object * a, lean_object * b) {
     return box_uint16_binary(a, b, lean_uint16_add);
 }
@@ -1095,6 +1109,12 @@ extern "C" lean_object * lean_uint32_to_nat___boxed(lean_object * a) {
 
 extern "C" lean_object * lean_uint32_to_uint8___boxed(lean_object * a) {
     uint8_t result = lean_uint32_to_uint8(lean_unbox_uint32(a));
+    lean_dec(a);
+    return lean_box(result);
+}
+
+extern "C" lean_object * lean_uint32_to_uint16___boxed(lean_object * a) {
+    uint16_t result = lean_uint32_to_uint16(lean_unbox_uint32(a));
     lean_dec(a);
     return lean_box(result);
 }
