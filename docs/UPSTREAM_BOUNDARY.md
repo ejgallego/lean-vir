@@ -60,8 +60,8 @@ not a fork of Lean. It is split by responsibility:
   function values cross to JavaScript.
 - `package/host_import_trampolines.cpp` owns the package-scoped JavaScript host-import
   trampoline grid used by restricted `dlsym` lookup.
-- `package/call_signature_summary.cpp` owns the streaming package-call signature parser used
-  to compute call arity and boxed-boundary requirements.
+- `package/package_decl_provider.cpp` owns direct package-call summaries used
+  to compute call arity, IO handling, and boxed-boundary requirements.
 - `runtime/name_utils.cpp` owns shared Lean `Name` construction helpers.
 - `abi/object_abi.cpp` owns generic owned `lean_object *` helpers used by the
   runtime object call path.
@@ -175,21 +175,18 @@ loading an `.irpkg`, it resolves a manifest export once with
 uses `0` as the failure sentinel. Repeated calls then use
 `vir_call_resolved_objects(slot, argv, argc)` with owned Lean object arguments.
 
-In package format 7 and newer, the package contains a compact export signature
-table. `vir_call_resolved_objects` uses that table to validate object argument
-counts, effect handling, and boxed wasm32 boundary requirements. Resolved calls
-without a package-owned signature fail.
-Package format 7 also records host-import arity, erased-prefix count, effect,
-and manifest type descriptors for Lean-to-JavaScript calls. The shim uses the
-arity/effect metadata to send borrowed Lean object arguments through
-`env.vir_js_call_objects`, and JavaScript uses interface descriptors to lift
-arguments and lower the owned Lean object result. Package
-format 8 adds the
+In package format 9, the package contains a direct export call-summary table.
+`vir_call_resolved_objects` uses that table to validate object argument counts,
+effect handling, and boxed wasm32 boundary requirements. Resolved calls without
+a package-owned summary fail.
+The package also records host-import arity, erased-prefix count, and effect
+metadata for Lean-to-JavaScript calls. The shim uses that metadata to send
+borrowed Lean object arguments through `env.vir_js_call_objects`, and JavaScript
+uses the JSON manifest descriptors to lift arguments and lower the owned Lean
+object result. The
 opaque `leanObject` descriptor for generic LeanRef object handles, surfaced to
 Lean as `Lean.Vir.JSL α` so they do not typecheck as JavaScript-shaped `Js α`
-resources. The shim caches export signature summaries by package generation
-and slot, so compact signature bytes are streamed once per loaded package
-rather than on every call.
+resources.
 
 `vir_call_resolved_objects(slot, argv, argc)` is the first object ABI call
 helper. It accepts an array of owned `lean_object *` arguments, consumes those
@@ -216,8 +213,7 @@ and effectful calls also use object arguments/results.
 The shim no longer exposes a JavaScript-to-Lean value byte payload call. The
 descriptor-bearing named payload format was removed earlier, and the resolved
 byte payload fallback has now been removed as well.
-`package/call_signature_summary.cpp` is a signature-summary parser, not a
-runtime value codec.
+Package-call summaries are direct metadata, not a runtime value codec.
 
 The shim also exposes the first experimental Lean object ABI helpers. The
 complete value/call export surface is documented in

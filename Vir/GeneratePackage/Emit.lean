@@ -245,17 +245,13 @@ def emitHostImport (entry : HostImport) : EmitM Unit := do
     emitU32 entry.arity
     emitU32 entry.erasedPrefixArgs
     emitBool entry.effect.isEffectful
-    emitU32 entry.args.size
-    entry.args.forM (fun arg => emitInterfaceType arg.type)
-    emitInterfaceType entry.result
 
 def emitInterfaceExportSignature (entry : InterfaceExport) : EmitM Unit := do
   withEmitContext s!"while encoding interface export signature `{entry.entry}`" do
     emitName entry.entry
     emitBool entry.effect.isEffectful
     emitU32 entry.args.size
-    entry.args.forM (fun arg => emitInterfaceType arg.type)
-    emitInterfaceType entry.result
+    emitBool (interfaceNeedsBoxedCallBoundary entry.args entry.result)
 
 def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
   withEmitContext s!"while encoding initializer global `{entry.name}`" do

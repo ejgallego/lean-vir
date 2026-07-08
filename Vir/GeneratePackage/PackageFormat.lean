@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 namespace Vir.GeneratePackage
 
-def currentPackageFormatVersion : Nat := 8
+def currentPackageFormatVersion : Nat := 9
 
 def currentInterfaceManifestVersion : Nat := 6
 

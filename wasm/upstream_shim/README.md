@@ -29,12 +29,11 @@ coupling. Line counts are approximate and are meant for sizing, not policy.
 
 | Area | Files | Approx. LOC | Package coupling | Notes |
 | --- | --- | ---: | --- | --- |
-| Package decoding and materialization | `package/package_ir_decoder.cpp`, `package/package_decl_provider_types.h` | 870 | Direct | Reads `.irpkg` bytes and reconstructs Lean IR objects. Main target if we reduce package encoding complexity. |
-| Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 394 | Direct | Owns loaded package indices, declaration lookup, call slots, interface manifest, and init globals. |
-| Package call signatures | `package/call_signature_summary.cpp/.h`, `package/signature_cache.cpp/.h` | 398 | Direct metadata | Decodes compact export signatures used by `vir_call_resolved_objects`; likely shrinks if package metadata becomes closer to generated code. |
+| Package decoding and materialization | `package/package_ir_decoder.cpp`, `package/package_decl_provider_types.h` | 749 | Direct | Reads `.irpkg` bytes and reconstructs Lean IR objects. Main target if we reduce package encoding complexity. |
+| Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 394 | Direct | Owns loaded package indices, declaration lookup, call slots, direct export call summaries, interface manifest, and init globals. |
 | Host import dispatch | `package/host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |
 | Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `runtime/native_symbols_registry.inc` | 1696 | Declaration/native symbol coupling | Mostly runtime coverage and lookup policy, not package byte-format parsing. |
-| JavaScript package-call ABI | `abi/call_abi.cpp` | 129 | Consumes package metadata | Thin JS-facing entry point over call slots and cached signatures. |
+| JavaScript package-call ABI | `abi/call_abi.cpp` | 122 | Consumes package metadata | Thin JS-facing entry point over call slots and direct call summaries. |
 | Upstream interpreter bridge | `interpreter/interpreter_bridge.cpp/.h` | 102 | Low | Initializes the upstream interpreter and provides `lean_ir_find_env_decl` hooks. |
 | Object/resource/closure ABI | `abi/object_abi.cpp`, `abi/object_expr_abi.cpp`, `abi/resource_abi.cpp/.h`, `abi/closure_abi.cpp` | 776 | Low | Runtime object boundary used after explicit lowering; `object_expr_abi.cpp` is fixture/parser support. |
 | Lean object construction helpers | `runtime/lean_object_constructors.cpp`, `runtime/name_utils.cpp/.h` | 435 | Support | Temporary constructors and name helpers needed while package decoding constructs Lean objects directly. |

@@ -31,8 +31,8 @@ namespace {
 static std::vector<decl_entry> g_entries;
 static std::vector<init_global_entry> g_init_entries;
 static std::vector<host_import_entry> g_host_imports;
-static std::vector<export_signature_entry> g_export_signatures;
-static std::vector<uint32_t> g_call_signature_indices;
+static std::vector<export_call_summary_entry> g_export_summaries;
+static std::vector<uint32_t> g_call_summary_indices;
 static std::string g_interface_manifest;
 static std::string g_last_error;
 static bool g_package_loaded = false;
@@ -54,14 +54,14 @@ static void clear_loaded_package() {
     for (host_import_entry const & entry : g_host_imports) {
         lean_dec(entry.name);
     }
-    for (export_signature_entry const & entry : g_export_signatures) {
+    for (export_call_summary_entry const & entry : g_export_summaries) {
         lean_dec(entry.name);
     }
     g_entries.clear();
     g_init_entries.clear();
     g_host_imports.clear();
-    g_export_signatures.clear();
-    g_call_signature_indices.clear();
+    g_export_summaries.clear();
+    g_call_summary_indices.clear();
     g_interface_manifest.clear();
     g_package_loaded = false;
     g_package_format_version = 0;
@@ -83,8 +83,8 @@ static bool load_package(uint8_t const * data, size_t size) {
     g_entries = std::move(decoded.entries);
     g_init_entries = std::move(decoded.init_entries);
     g_host_imports = std::move(decoded.host_imports);
-    g_export_signatures = std::move(decoded.export_signatures);
-    g_call_signature_indices = std::move(decoded.call_signature_indices);
+    g_export_summaries = std::move(decoded.export_summaries);
+    g_call_summary_indices = std::move(decoded.call_summary_indices);
     g_interface_manifest = std::move(decoded.interface_manifest);
     g_package_loaded = true;
     g_package_format_version = decoded.format_version;
@@ -157,15 +157,15 @@ static object * package_entry_call_name(decl_entry const & entry) {
     return entry.boxed_base ? entry.boxed_base : entry.name;
 }
 
-static export_signature_entry const * package_call_signature_entry(uint32_t slot) {
-    if (slot == 0 || slot > g_call_signature_indices.size()) {
+static export_call_summary_entry const * package_call_summary_entry(uint32_t slot) {
+    if (slot == 0 || slot > g_call_summary_indices.size()) {
         return nullptr;
     }
-    uint32_t signature_index = g_call_signature_indices[slot - 1];
-    if (signature_index == UINT32_MAX || signature_index >= g_export_signatures.size()) {
+    uint32_t summary_index = g_call_summary_indices[slot - 1];
+    if (summary_index == UINT32_MAX || summary_index >= g_export_summaries.size()) {
         return nullptr;
     }
-    return &g_export_signatures[signature_index];
+    return &g_export_summaries[summary_index];
 }
 
 } // namespace
@@ -215,19 +215,15 @@ bool package_call_slot_has_boxed_decl(uint32_t slot) {
     return entry != nullptr && entry->boxed_base != nullptr;
 }
 
-char const * package_call_signature(uint32_t slot) {
-    export_signature_entry const * signature = package_call_signature_entry(slot);
-    return signature == nullptr ? nullptr : signature->signature.data();
-}
-
-uint32_t package_call_signature_size(uint32_t slot) {
-    export_signature_entry const * signature = package_call_signature_entry(slot);
-    return signature == nullptr ? 0 : static_cast<uint32_t>(signature->signature.size());
-}
-
-bool package_call_is_io(uint32_t slot) {
-    export_signature_entry const * signature = package_call_signature_entry(slot);
-    return signature != nullptr && signature->is_io;
+bool package_call_summary(uint32_t slot, package_call_runtime_summary & out) {
+    export_call_summary_entry const * summary = package_call_summary_entry(slot);
+    if (summary == nullptr) {
+        return false;
+    }
+    out.arg_count = summary->arg_count;
+    out.is_io = summary->is_io;
+    out.needs_boxed_wasm32_boundary = summary->needs_boxed_wasm32_boundary;
+    return true;
 }
 
 char const * find_host_import_symbol(object * n) {

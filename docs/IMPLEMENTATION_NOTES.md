@@ -37,9 +37,8 @@ The same package encoder also supports focused developer packages through
 public source definitions for a single Lean file. The `/dev.html` Vite entry
 point loads a served or uploaded `.irpkg` into a fresh WASM instance, reads the
 embedded interface manifest, and generates controls from that manifest. Calls
-go through `vir_call_resolved_objects`; the local
-`wasm/upstream_shim/package/call_signature_summary.cpp` parser now computes package-call
-signature summaries, while `web/src/runtime/object-values.js` lowers JavaScript
+go through `vir_call_resolved_objects`; package format 9 stores direct
+package-call summaries, while `web/src/runtime/object-values.js` lowers JavaScript
 values to owned Lean objects before the core runtime calls the upstream
 interpreter through a package-local slot.
 
@@ -111,8 +110,8 @@ This remains intentionally narrower than generic layout allocation. A plain
 `vir_obj_ctor` path cannot safely fabricate `Lean.Expr`, because the runtime
 object carries cached expression data that is not present as an ordinary public
 constructor field. Closures, host imports, resources, and effectful calls now
-use object arguments/results as well; compact codec use is limited to package
-signature summary metadata.
+use object arguments/results as well; package-call validation uses direct
+summary metadata emitted by the package generator.
 
 The first reusable pretty-printing component is deliberately
 `pretty-printer.irpkg`, which packages `Std.Format.pretty` rather than Lean's

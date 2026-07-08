@@ -36,18 +36,19 @@ struct host_import_entry {
     bool is_io;
 };
 
-struct export_signature_entry {
+struct export_call_summary_entry {
     object * name;
     bool is_io;
-    std::string signature;
+    uint32_t arg_count;
+    bool needs_boxed_wasm32_boundary;
 };
 
 struct decoded_ir_package {
     std::vector<decl_entry> entries;
     std::vector<init_global_entry> init_entries;
     std::vector<host_import_entry> host_imports;
-    std::vector<export_signature_entry> export_signatures;
-    std::vector<uint32_t> call_signature_indices;
+    std::vector<export_call_summary_entry> export_summaries;
+    std::vector<uint32_t> call_summary_indices;
     std::string interface_manifest;
     uint32_t format_version = 0;
 };

@@ -7,7 +7,6 @@ Author: Emilio J. Gallego Arias
 #include "interpreter/interpreter_bridge.h"
 
 #include "package/decl_provider.h"
-#include "package/signature_cache.h"
 #include "runtime/name_utils.h"
 
 #include <stdint.h>
@@ -74,41 +73,36 @@ extern "C" lean::object * vir_call_resolved_objects(
         return nullptr;
     }
     bool has_boxed_decl = lean::vir::package_call_slot_has_boxed_decl(call_slot);
-    lean::package_call_signature const * signature = lean::cached_package_call_signature(call_slot);
-    if (signature == nullptr) {
+    lean::vir::package_call_runtime_summary summary{};
+    if (!lean::vir::package_call_summary(call_slot, summary)) {
         lean::vir::cleanup_object_call_args(argc, argv);
-        lean::vir::g_call_error = "object call requires a package-owned call signature";
+        lean::vir::g_call_error = "object call requires a package-owned call summary";
         return nullptr;
     }
-    if (!signature->ok) {
+    if (!has_boxed_decl && summary.needs_boxed_wasm32_boundary) {
         lean::vir::cleanup_object_call_args(argc, argv);
-        lean::vir::g_call_error = signature->error;
+        lean::vir::g_call_error = "object call requires a boxed package declaration for this call summary";
         return nullptr;
     }
-    if (!has_boxed_decl && signature->needs_boxed_wasm32_boundary) {
-        lean::vir::cleanup_object_call_args(argc, argv);
-        lean::vir::g_call_error = "object call requires a boxed package declaration for this signature";
-        return nullptr;
-    }
-    if (argc != signature->arg_count) {
+    if (argc != summary.arg_count) {
         lean::vir::cleanup_object_call_args(argc, argv);
         lean::vir::g_call_error =
-            "object call argument count mismatch: package signature expects " +
-            std::to_string(signature->arg_count) +
+            "object call argument count mismatch: package call summary expects " +
+            std::to_string(summary.arg_count) +
             ", got " + std::to_string(argc);
         return nullptr;
     }
 
     std::vector<lean::object *> args;
-    args.reserve(argc + (signature->is_io ? 1 : 0));
+    args.reserve(argc + (summary.is_io ? 1 : 0));
     for (uint32_t i = 0; i < argc; i++) {
         args.push_back(argv[i]);
     }
-    if (signature->is_io) {
+    if (summary.is_io) {
         args.push_back(lean_io_mk_world());
     }
     lean::object * result = lean::vir::run_interpreter_function(fn_obj, args.size(), args.data());
-    if (signature->is_io) {
+    if (summary.is_io) {
         if (!lean_io_result_is_ok(result)) {
             lean_dec(result);
             lean::vir::g_call_error = "IO action failed";
