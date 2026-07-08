@@ -7,8 +7,9 @@ package lookup, and temporary runtime glue live here instead.
 
 ## File Map
 
-- `vir_shim.cpp`: main upstream-interpreter bridge: package call entry points
-  and `lean_ir_find_env_decl` hooks.
+- `interpreter_bridge.h` and `interpreter_bridge.cpp`: upstream interpreter
+  lifecycle, `lean_ir_find_env_decl` hooks, and boxed function execution.
+- `call_abi.cpp`: package call entry points exposed to the JavaScript runtime.
 - `closure_abi.cpp`: Lean closure roots and callback calls used when function
   values cross to JavaScript.
 - `host_import_trampolines.cpp`: package-scoped JavaScript host-import

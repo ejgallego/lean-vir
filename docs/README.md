@@ -27,7 +27,9 @@ ownership diagrams.
   `web/src/host/vir-host-resources.js`, and `web/src/react/`.
 - WASI/runtime boundary work: read
   [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md),
-  `wasm/upstream_shim/README.md`, and `wasm/upstream_shim/vir_shim.cpp`.
+  `wasm/upstream_shim/README.md`,
+  `wasm/upstream_shim/interpreter_bridge.cpp`, and
+  `wasm/upstream_shim/call_abi.cpp`.
 - Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
   `scripts/bench-vir.mjs`, and `scripts/bench-utils.mjs`.
 

@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 #include "decl_provider.h"
+#include "interpreter_bridge.h"
 #include "package_decl_provider_types.h"
 
 #include <stddef.h>
@@ -125,7 +126,7 @@ static bool run_package_initializers() {
         return true;
     }
 
-    vir_ensure_ir_interpreter_initialized();
+    ensure_ir_interpreter_initialized();
     scoped_io_initializing scope;
     for (init_global_entry const & entry : g_init_entries) {
         if (!run_init_global(entry)) {

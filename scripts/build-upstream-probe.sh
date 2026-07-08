@@ -155,6 +155,8 @@ shim_sources=(
   "wasm/upstream_shim/lean_object_constructors.cpp"
   "wasm/upstream_shim/resource_abi.cpp"
   "wasm/upstream_shim/call_signature_summary.cpp"
+  "wasm/upstream_shim/interpreter_bridge.cpp"
+  "wasm/upstream_shim/call_abi.cpp"
   "wasm/upstream_shim/name_utils.cpp"
   "wasm/upstream_shim/signature_cache.cpp"
   "wasm/upstream_shim/object_abi.cpp"
@@ -164,13 +166,13 @@ shim_sources=(
   "wasm/upstream_shim/native_symbols.cpp"
   "wasm/upstream_shim/native_symbol_lookup.cpp"
   "wasm/upstream_shim/platform_stubs.cpp"
-  "wasm/upstream_shim/vir_shim.cpp"
   "wasm/upstream_shim/package_ir_decoder.cpp"
   "wasm/upstream_shim/package_decl_provider.cpp"
 )
 
 shim_deps=(
   "wasm/upstream_shim/decl_provider.h"
+  "wasm/upstream_shim/interpreter_bridge.h"
   "wasm/upstream_shim/package_decl_provider_types.h"
   "wasm/upstream_shim/call_signature_summary.h"
   "wasm/upstream_shim/name_utils.h"
@@ -625,9 +627,10 @@ report_start=$SECONDS
   echo
   echo "## Current Shim Scope"
   echo
-  echo "\`wasm/upstream_shim/vir_shim.cpp\` supplies the package call surface"
-  echo "and declaration lookup hooks. \`closure_abi.cpp\` supplies Lean closure"
-  echo "roots and callback calls. \`host_import_trampolines.cpp\` supplies the"
+  echo "\`wasm/upstream_shim/interpreter_bridge.cpp\` supplies upstream"
+  echo "interpreter lifecycle and declaration lookup hooks. \`call_abi.cpp\`"
+  echo "supplies the package call surface. \`closure_abi.cpp\` supplies Lean"
+  echo "closure roots and callback calls. \`host_import_trampolines.cpp\` supplies the"
   echo "package-scoped JavaScript host-import trampoline grid."
   echo "\`signature_cache.cpp\` owns cached package-call signature summaries."
   echo "\`call_signature_summary.cpp\` streams compact package signatures to compute"
