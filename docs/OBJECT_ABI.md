@@ -4,9 +4,9 @@ This note records the JavaScript-driven construction and inspection path for
 Lean runtime objects.
 
 The object ABI is now the JavaScript runtime call surface for package
-entrypoints, host imports, callbacks, and resources. The compact binary codec
-that remains in this area encodes package type descriptors/signatures, not
-runtime values.
+entrypoints, host imports, callbacks, and resources. Interface descriptors now
+remain in the embedded JSON manifest and JavaScript runtime helpers; the C++
+package call path consumes only direct summary metadata, not descriptor bytes.
 
 ## Boundary Policy
 
@@ -158,7 +158,7 @@ result that JavaScript must release with `vir_obj_dec` after lifting. A returned
 pointer of `0` is the null failure sentinel; JavaScript should inspect
 `vir_call_error_size` for the diagnostic. The helper uses a generated `_boxed`
 declaration when the package has one. If there is no `_boxed` declaration, it
-may call the base declaration only when the package signature does not require a
+may call the base declaration only when the package call summary does not require a
 boxed wasm32 boundary for the top-level argument or result type.
 
 Immediate scalar objects are allowed. They are still non-null object values at
@@ -241,8 +241,8 @@ runtime counts on every visit.
 6. Host import and callback integration: rooted resource and closure helpers
    let Lean-to-JS calls and retained callbacks exchange objects directly.
 7. Value codec retirement: the JavaScript value codec and C++ runtime value
-   codec have been removed; `call_signature_summary.cpp` now only computes compact
-   package-call signature summaries.
+   codec have been removed; object calls now validate against direct
+   package-call summary metadata.
 
 ## Risks
 
@@ -254,7 +254,7 @@ runtime counts on every visit.
 - String conversion still copies between JS UTF-16 and Lean UTF-8. This ABI can
   avoid descriptor overhead, but it does not make Lean strings share JS storage.
 - Descriptor-free object calls must trust package metadata. The package version
-  needs to stay tied to the generated signature/layout tables used by the JS
+  needs to stay tied to the generated summary/layout metadata used by the JS
   lowering code.
 - JS-facing bindings should choose between ordinary value types and
   `Lean.Vir.Js α` resources based on semantics, not on the current lower-level

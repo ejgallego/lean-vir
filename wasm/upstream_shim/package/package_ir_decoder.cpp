@@ -27,7 +27,7 @@ namespace {
 using ir::type;
 
 static bool supported_package_version(uint32_t version) {
-    return 1 <= version && version <= 8;
+    return version == 9;
 }
 
 static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
@@ -258,17 +258,6 @@ public:
         return m_pos;
     }
 
-    std::string bytes_from(size_t start, size_t end) const {
-        if (start > end || end > m_size) {
-            return std::string();
-        }
-        return std::string(reinterpret_cast<char const *>(m_data + start), end - start);
-    }
-
-    void set_version(uint32_t version) {
-        m_version = version;
-    }
-
     void fail(std::string const & message) {
         if (ok) {
             ok = false;
@@ -384,10 +373,7 @@ public:
     object * lit() {
         uint8_t tag = u8();
         if (tag == 0) {
-            if (m_version >= 2) {
-                return mk_lit_num(nat());
-            }
-            return mk_lit_num(u32());
+            return mk_lit_num(nat());
         }
         if (tag == 1) {
             return mk_lit_str(string());
@@ -575,128 +561,26 @@ public:
         return mk_extern_decl(fn, ps, result_type);
     }
 
-    void interface_type() {
-        uint8_t tag = u8();
-        switch (tag) {
-        case 16:
-        case 17:
-        case 18:
-            interface_type();
-            break;
-        case 19:
-            interface_type();
-            interface_type();
-            break;
-        case 20: {
-            u32(); // object field count
-            u32(); // usize field count
-            u32(); // scalar byte size
-            u32(); // trivial field index, or UINT32_MAX
-            uint32_t field_count = u32();
-            for (uint32_t i = 0; i < field_count; i++) {
-                u8();  // field layout tag
-                u32(); // object/usize index
-                u32(); // scalar size
-                u32(); // scalar offset
-                interface_type();
-            }
-            break;
-        }
-        case 21: {
-            uint32_t variant_count = u32();
-            for (uint32_t i = 0; i < variant_count; i++) {
-                u32(); // object field count
-                u32(); // usize field count
-                u32(); // scalar byte size
-                u8();  // field layout tag
-                u32(); // object/usize index
-                u32(); // scalar size
-                u32(); // scalar offset
-                interface_type();
-            }
-            break;
-        }
-        case 25: {
-            uint32_t variant_count = u32();
-            for (uint32_t i = 0; i < variant_count; i++) {
-                u32(); // object field count
-                u32(); // usize field count
-                u32(); // scalar byte size
-                uint32_t field_count = u32();
-                for (uint32_t j = 0; j < field_count; j++) {
-                    u8();  // field layout tag
-                    u32(); // object/usize index
-                    u32(); // scalar size
-                    u32(); // scalar offset
-                    interface_type();
-                }
-            }
-            break;
-        }
-        case 24: {
-            boolean(); // effect
-            uint32_t arg_count = u32();
-            for (uint32_t i = 0; i < arg_count; i++) {
-                interface_type();
-            }
-            interface_type();
-            break;
-        }
-        case 0:
-        case 1:
-        case 2:
-        case 3:
-        case 4:
-        case 5:
-        case 6:
-        case 7:
-        case 8:
-        case 9:
-        case 10:
-        case 11:
-        case 14:
-        case 15:
-        case 22:
-        case 23:
-        case 26:
-        case 27:
-            break;
-        default:
-            fail("unsupported interface type tag " + std::to_string(tag));
-            break;
-        }
-    }
-
-    std::string signature_bytes() {
-        size_t signature_start = pos();
-        uint32_t argc = u32();
-        for (uint32_t i = 0; i < argc; i++) {
-            interface_type();
-        }
-        interface_type();
-        return bytes_from(signature_start, pos());
-    }
-
     host_import_entry host_import() {
         object * n = name();
         std::string target = string();
         std::string symbol = string();
         uint32_t arity = u32();
-        uint32_t erased_prefix_args = m_version >= 6 ? u32() : 0;
+        uint32_t erased_prefix_args = u32();
         bool is_io = boolean();
-        signature_bytes();
         return { n, target, symbol, arity, erased_prefix_args, is_io };
     }
 
-    export_signature_entry export_signature() {
+    export_call_summary_entry export_summary() {
         object * n = name();
         bool is_io = boolean();
-        return { n, is_io, signature_bytes() };
+        uint32_t arg_count = u32();
+        bool needs_boxed_wasm32_boundary = boolean();
+        return { n, is_io, arg_count, needs_boxed_wasm32_boundary };
     }
 
 private:
     std::string m_error;
-    uint32_t m_version = 1;
 
     template <typename F>
     std::vector<object *> object_array(F read_one) {
@@ -736,7 +620,6 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
         error = "unsupported IR package version " + std::to_string(version);
         return false;
     }
-    r.set_version(version);
 
     std::vector<decl_entry> entries;
     entries.reserve(count);
@@ -748,53 +631,48 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
     }
 
     std::vector<init_global_entry> init_entries;
-    if (version >= 3) {
-        uint32_t init_count = r.u32();
-        init_entries.reserve(init_count);
-        for (uint32_t i = 0; i < init_count; i++) {
-            object * n = r.name();
-            object * init_name = r.name();
-            init_entries.push_back({ n, init_name });
-        }
+    uint32_t init_count = r.u32();
+    init_entries.reserve(init_count);
+    for (uint32_t i = 0; i < init_count; i++) {
+        object * n = r.name();
+        object * init_name = r.name();
+        init_entries.push_back({ n, init_name });
     }
+
     std::vector<host_import_entry> host_imports;
-    if (version >= 5) {
-        uint32_t host_import_count = r.u32();
-        host_imports.reserve(host_import_count);
-        for (uint32_t i = 0; i < host_import_count; i++) {
-            host_imports.push_back(r.host_import());
-        }
+    uint32_t host_import_count = r.u32();
+    host_imports.reserve(host_import_count);
+    for (uint32_t i = 0; i < host_import_count; i++) {
+        host_imports.push_back(r.host_import());
     }
-    std::vector<export_signature_entry> export_signatures;
-    if (version >= 7) {
-        uint32_t export_signature_count = r.u32();
-        export_signatures.reserve(export_signature_count);
-        for (uint32_t i = 0; i < export_signature_count; i++) {
-            export_signatures.push_back(r.export_signature());
-        }
+
+    std::vector<export_call_summary_entry> export_summaries;
+    uint32_t export_summary_count = r.u32();
+    export_summaries.reserve(export_summary_count);
+    for (uint32_t i = 0; i < export_summary_count; i++) {
+        export_summaries.push_back(r.export_summary());
     }
     if (!r.ok) {
         error = r.error();
         return false;
     }
-    std::string interface_manifest;
-    if (version >= 4) {
-        interface_manifest = r.string();
-        if (interface_manifest.empty()) {
-            error = "IR package is missing an embedded interface manifest";
-            return false;
-        }
+
+    std::string interface_manifest = r.string();
+    if (interface_manifest.empty()) {
+        error = "IR package is missing an embedded interface manifest";
+        return false;
     }
     if (!r.at_end()) {
         error = "trailing bytes after IR package at byte " + std::to_string(r.pos());
         return false;
     }
-    std::vector<uint32_t> call_signature_indices(entries.size(), UINT32_MAX);
+
+    std::vector<uint32_t> call_summary_indices(entries.size(), UINT32_MAX);
     for (size_t i = 0; i < entries.size(); i++) {
         object * call_name = entries[i].boxed_base ? entries[i].boxed_base : entries[i].name;
-        for (size_t j = 0; j < export_signatures.size(); j++) {
-            if (lean_name_eq(call_name, export_signatures[j].name)) {
-                call_signature_indices[i] = static_cast<uint32_t>(j);
+        for (size_t j = 0; j < export_summaries.size(); j++) {
+            if (lean_name_eq(call_name, export_summaries[j].name)) {
+                call_summary_indices[i] = static_cast<uint32_t>(j);
                 break;
             }
         }
@@ -803,8 +681,8 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
     out.entries = std::move(entries);
     out.init_entries = std::move(init_entries);
     out.host_imports = std::move(host_imports);
-    out.export_signatures = std::move(export_signatures);
-    out.call_signature_indices = std::move(call_signature_indices);
+    out.export_summaries = std::move(export_summaries);
+    out.call_summary_indices = std::move(call_summary_indices);
     out.interface_manifest = std::move(interface_manifest);
     out.format_version = version;
     return true;

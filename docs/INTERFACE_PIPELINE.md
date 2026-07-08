@@ -232,9 +232,9 @@ its slot, Lean name, JavaScript target, host boundary mode (`hostResource`,
 leading erased argument count, JavaScript-visible arguments, result type, and
 effect.
 The JSON manifest keeps the source-level effect classification for review and
-tooling: `pure`, `runtime`, `io`, `dom`, or `react`. The compact wasm call
-descriptor still lowers that to the runtime distinction the shim needs today:
-pure versus effectful.
+tooling: `pure`, `runtime`, `io`, `dom`, or `react`. The binary package
+summary stores only the runtime distinction the shim needs today: pure versus
+effectful.
 
 `Lean.Vir.Js α` is always represented as the generic `Js` resource. Its type
 parameter is a Lean-side phantom while the value remains in the JavaScript
@@ -245,18 +245,18 @@ not in the manifest resource descriptor. Naked marker types such as
 `Lean.Vir.Browser.Element` remain unsupported boundary types because they do not
 cross as `Lean.Vir.Js α`.
 
-The recursive type tree is embedded in the JSON manifest and, for package
-format 7 and newer, also in a compact package-owned export signature table.
+The recursive type tree is embedded in the JSON manifest. Package format 9
+also embeds a direct package-owned export call-summary table.
 Normal `vir_call_resolved_objects` calls carry only owned Lean object pointers;
-the WASM shim looks up the argument/result descriptors from the loaded package
-to validate argument count, effects, and boxed wasm32 boundary requirements.
+the WASM shim looks up the direct summary from the loaded package to validate
+argument count, effects, and boxed wasm32 boundary requirements.
 The descriptor-bearing named call format and the resolved value-byte lane have
 been removed; this is intentionally still an internal package ABI, not a
 committed component-model boundary.
-Lean-to-JavaScript host imports use the same package-owned signature idea in
-format 7: the shim and `VirHostState` exchange borrowed/owned Lean object
+Lean-to-JavaScript host imports use package-owned arity/effect metadata: the
+shim and `VirHostState` exchange borrowed/owned Lean object
 arguments and results for package-declared host imports through
-`env.vir_js_call_objects`. Format 8 adds the `leanObject` descriptor used by
+`env.vir_js_call_objects`. The `leanObject` descriptor is used by
 generic `Lean.Vir.LeanRef.toJSL` / `fromJSL` / `releaseJSL` object handles. On
 the Lean side those handles are surfaced as `Lean.Vir.JSL α`, an alias that
 remains distinct from JavaScript-shaped `Js α` resources.
@@ -282,9 +282,9 @@ boundaries when they reduce to a supported interface type.
 ## Current Trust Boundary
 
 The manifest and package payload are trusted in this prototype. The JavaScript
-runtime validates the embedded manifest before exposing entries. For format 7
-and newer packages, the WASM shim uses the package-owned compact export
-signature table to validate object calls for `vir_call_resolved_objects`.
+runtime validates the embedded manifest before exposing entries. The WASM shim
+uses the package-owned direct export call-summary table to validate object
+calls for `vir_call_resolved_objects`.
 Host-import dispatch uses package-owned arity/effect metadata, while
 JavaScript uses interface descriptors for argument/result object
 lowering/lifting. Closure roots likewise store only arity/effect metadata;
@@ -298,7 +298,7 @@ consume CPU or WASM memory, make the tab unresponsive, or publish package ABI
 metadata that does not match the packaged Lean declaration.
 
 The remaining hardening path is to validate package-owned layout descriptors
-inside the WASM shim, reject inconsistent export/signature tables at load time,
+inside the WASM shim, reject inconsistent export call summaries at load time,
 and add size/depth/execution limits around package loading and calls.
 
 ## WIT Direction

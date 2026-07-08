@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-#include "decl_provider.h"
+#include "package/decl_provider.h"
 
 #include <stddef.h>
 #include <stdlib.h>

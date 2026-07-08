@@ -174,69 +174,6 @@ def emitExternEntry (ext : NativeExtern) : EmitM Unit := do
     emitArray ext.params emitParam
     emitType ext.resultType
 
-def emitFieldLayout : StructureFieldLayout → EmitM Unit
-  | .object index => do
-      emitU8 0
-      emitU32 index
-      emitU32 0
-      emitU32 0
-  | .usize index => do
-      emitU8 1
-      emitU32 index
-      emitU32 0
-      emitU32 0
-  | .scalar size offset => do
-      emitU8 2
-      emitU32 0
-      emitU32 size
-      emitU32 offset
-
-partial def emitInterfaceType (type : InterfaceType) : EmitM Unit := do
-  emitU8 type.interfaceTag
-  match type with
-  | .array element
-  | .list element
-  | .option element =>
-      emitInterfaceType element
-  | .prod fst snd =>
-      emitInterfaceType fst
-      emitInterfaceType snd
-  | .taggedUnion _ _ constructors =>
-      emitU32 constructors.size
-      constructors.forM fun (_, _, fieldType, layout, objectFields, usizeFields, scalarBytes) => do
-        emitU32 objectFields
-        emitU32 usizeFields
-        emitU32 scalarBytes
-        emitFieldLayout layout
-        emitInterfaceType fieldType
-  | .recursiveSelf .. =>
-      pure ()
-  | .customInductive _ _ constructors =>
-      emitU32 constructors.size
-      constructors.forM fun (_, _, objectFields, usizeFields, scalarBytes, fields) => do
-        emitU32 objectFields
-        emitU32 usizeFields
-        emitU32 scalarBytes
-        emitU32 fields.size
-        fields.forM fun (_, fieldType, layout) => do
-          emitFieldLayout layout
-          emitInterfaceType fieldType
-  | .structure _ _ trivialField? objectFields usizeFields scalarBytes fields =>
-      emitU32 objectFields
-      emitU32 usizeFields
-      emitU32 scalarBytes
-      emitU32 (trivialField?.getD 0xffffffff)
-      emitU32 fields.size
-      fields.forM fun (_, fieldType, layout, _) => do
-        emitFieldLayout layout
-        emitInterfaceType fieldType
-  | .function args result effect =>
-      emitBool effect.isEffectful
-      emitU32 args.size
-      args.forM fun (_, argType) => emitInterfaceType argType
-      emitInterfaceType result
-  | _ => pure ()
-
 def emitHostImport (entry : HostImport) : EmitM Unit := do
   withEmitContext s!"while encoding JavaScript import `{entry.name}` mapped to `{entry.target}`" do
     emitName entry.name
@@ -245,17 +182,13 @@ def emitHostImport (entry : HostImport) : EmitM Unit := do
     emitU32 entry.arity
     emitU32 entry.erasedPrefixArgs
     emitBool entry.effect.isEffectful
-    emitU32 entry.args.size
-    entry.args.forM (fun arg => emitInterfaceType arg.type)
-    emitInterfaceType entry.result
 
-def emitInterfaceExportSignature (entry : InterfaceExport) : EmitM Unit := do
-  withEmitContext s!"while encoding interface export signature `{entry.entry}`" do
+def emitInterfaceExportSummary (entry : InterfaceExport) : EmitM Unit := do
+  withEmitContext s!"while encoding interface export call summary `{entry.entry}`" do
     emitName entry.entry
     emitBool entry.effect.isEffectful
     emitU32 entry.args.size
-    entry.args.forM (fun arg => emitInterfaceType arg.type)
-    emitInterfaceType entry.result
+    emitBool (interfaceNeedsBoxedCallBoundary entry.args entry.result)
 
 def emitInitGlobal (entry : InitGlobal) : EmitM Unit := do
   withEmitContext s!"while encoding initializer global `{entry.name}`" do
@@ -270,7 +203,7 @@ def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit
   closure.externs.forM emitExternEntry
   emitArray closure.initGlobals emitInitGlobal
   emitArray manifest.hostImports emitHostImport
-  emitArray manifest.exports emitInterfaceExportSignature
+  emitArray manifest.exports emitInterfaceExportSummary
   emitString manifest.toJson
 
 def emitPackage (closure : Closure) (manifest : InterfaceManifest) : Except String ByteArray := do

@@ -9,7 +9,7 @@ Author: Emilio J. Gallego Arias
 #include <initializer_list>
 #include <string>
 
-#include "name_utils.h"
+#include "runtime/name_utils.h"
 #include "runtime/object.h"
 
 static std::string g_obj_name_string_result;

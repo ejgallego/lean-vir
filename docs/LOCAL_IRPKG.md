@@ -120,8 +120,9 @@ objects with `vir_obj_*` helpers, and calls
 `vir_call_resolved_objects`. When interpreted Lean code reaches a host import,
 the shim calls the runtime's `env.vir_js_call_objects` import with borrowed Lean
 object arguments, and JavaScript returns an owned Lean object result. Package
-format 7 and newer keep package-owned signatures for object-call validation and
-callback rooting.
+format 9 keeps package-owned direct summaries for object-call validation and
+package-owned arity/effect metadata for host-import dispatch and callback
+rooting.
 
 Supported interface types:
 
