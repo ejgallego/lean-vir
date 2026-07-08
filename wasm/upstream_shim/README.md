@@ -7,28 +7,39 @@ package lookup, and temporary runtime glue live here instead.
 
 ## File Map
 
-- `shim.cpp`: package call entry points, JavaScript host-import trampolines,
-  Lean closure roots, and `lean_ir_find_env_decl` hooks.
+- `vir_shim.cpp`: main upstream-interpreter bridge: package call entry points
+  and `lean_ir_find_env_decl` hooks.
+- `closure_abi.cpp`: Lean closure roots and callback calls used when function
+  values cross to JavaScript.
+- `host_import_trampolines.cpp`: package-scoped JavaScript host-import
+  trampolines used by restricted `dlsym` lookup.
 - `signature_cache.h` and `signature_cache.cpp`: package-call signature
   summaries keyed by the current loaded package generation.
-- `object_abi.cpp`: owned `lean_object *` helpers used by the runtime object
-  call path and boundary tests.
+- `object_abi.cpp`: generic owned `lean_object *` helpers used by the runtime
+  object call path and boundary tests.
+- `object_expr_abi.cpp`: temporary `Lean.Level`, `Lean.Expr`, literal, and
+  name-string helpers used by current object-boundary fixtures.
 - `resource_abi.h` and `resource_abi.cpp`: shared external resource class for
   `Lean.Vir.Js α` values.
 - `call_signature_summary.h` and `call_signature_summary.cpp`: streaming package-call
   signature parser used to compute call arity and boxed-boundary requirements.
 - `name_utils.h` and `name_utils.cpp`: shared Lean `Name` helpers for package
   call resolution and object construction.
-- `native_symbols.cpp`: handwritten native extern wrappers, restricted symbol
-  lookup, and symbol-stem support for declarations carried in `.irpkg` files.
+- `native_symbols.cpp`: handwritten native extern wrappers for declarations
+  carried in `.irpkg` files.
+- `native_symbol_lookup.cpp`: generated native extern registry include,
+  restricted symbol lookup, symbol-stem support, and C++ exception stubs.
 - `native_symbols_registry.inc`: generated registry of native extern names from
   `tools/GeneratePackage.lean`. Do not edit it by hand.
 - `platform_stubs.cpp`: WASI/demo stubs for Lean platform APIs that are inert,
   package-backed, or deliberately fail-fast in this environment.
 - `lean_object_constructors.cpp`: temporary Lean `Name`, `Level`, and `Expr`
   constructors needed by current fixtures.
-- `decl_provider.h` and `package_decl_provider.cpp`: the package-backed static
-  declaration provider. Future module-backed loading should replace this layer.
+- `package_ir_decoder.cpp`: `.irpkg` binary decoder and Lean IR object
+  materializer.
+- `decl_provider.h`, `package_decl_provider_types.h`, and
+  `package_decl_provider.cpp`: the package-backed static declaration provider.
+  Future module-backed loading should replace this layer.
 - `engine_bench.cpp`: local benchmark harness entry point.
 
 ## Editing Rules

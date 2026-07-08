@@ -206,7 +206,8 @@ function mapAreaFor(input) {
   }
   if (input.includes("third_party_lean4-src_src_runtime_")) return "Lean C runtime";
   if (input.includes("third_party_lean4-src_src_util_name.cpp.o")) return "Lean name support";
-  if (input.includes("wasm_upstream_shim_native_symbols.cpp.o")) return "VIR native extern registry";
+  if (input.includes("wasm_upstream_shim_native_symbols.cpp.o")) return "VIR native extern wrappers";
+  if (input.includes("wasm_upstream_shim_native_symbol_lookup.cpp.o")) return "VIR native extern registry";
   if (input.includes("wasm_upstream_shim_")) return "VIR WASI/JS shim and package ABI";
   return "Other";
 }

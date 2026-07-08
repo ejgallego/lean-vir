@@ -41,33 +41,84 @@ flowchart LR
   ResultObj --> Release["vir_obj_dec"]
 ```
 
-The exported object helper surface includes:
+## Export Surface
 
-- `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
-- `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
-- `vir_obj_array` / `vir_obj_array_size` / `vir_obj_array_get`
-- `vir_obj_list` / `vir_obj_list_is_nil` / `vir_obj_list_head` /
-  `vir_obj_list_tail`
-- `vir_obj_ctor`
-- `vir_obj_ctor_layout` / `vir_obj_ctor_usize_decimal` /
-  `vir_obj_ctor_scalar_data`
-- `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
-- `vir_obj_tag` / `vir_obj_field`
-- `vir_obj_expr_*`, `vir_obj_level_*`, and `vir_obj_literal_*` for direct
-  `Lean.Expr` values
-- `vir_obj_name_string` / `vir_obj_name_string_size`
-- `vir_obj_resource` / `vir_obj_resource_externref`
-- `vir_obj_closure_root` for Lean function values crossing to JavaScript
-- `vir_obj_nat` / `vir_obj_nat_decimal`
-- `vir_obj_int` / `vir_obj_int_decimal`
-- `vir_obj_uint32` / `vir_obj_uint32_value`
-- `vir_obj_uint64` / `vir_obj_uint64_decimal`
-- `vir_obj_usize` / `vir_obj_usize_decimal`
-- `vir_obj_float` / `vir_obj_float_value`
-- `vir_obj_float32` / `vir_obj_float32_value`
-- `vir_obj_decimal_size`
-- `vir_obj_inc` / `vir_obj_dec`
-- `vir_call_resolved_objects`
+This table is the human-readable object ABI contract. The smoke test guards the
+required export names; this table documents what each export is for and what
+ownership rule JavaScript must follow. Package loading, package manifest, and
+raw wasm memory allocation exports are part of the broader package ABI and are
+documented in [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md).
+
+| Export | Role | Ownership and lifetime |
+| --- | --- | --- |
+| `vir_resolve_call` | Resolve a package entry name to a stable call slot. | Does not transfer object ownership. |
+| `vir_call_resolved_objects` | Call a resolved package slot with already-lowered Lean object arguments. | Consumes all argument objects after accepting a non-null `argv`; returns one owned result object or `0` on failure. |
+| `vir_call_error` | Return a borrowed pointer to the last package object-call diagnostic. | Borrowed until the next object call or package/runtime teardown. |
+| `vir_call_error_size` | Return the byte length of `vir_call_error`. | No object ownership. |
+| `vir_obj_string` | Build a Lean `String` from UTF-8 bytes. | Returns an owned Lean string object. |
+| `vir_obj_string_data` | Inspect a Lean `String` as UTF-8 bytes. | Returns a borrowed pointer into the live string object. |
+| `vir_obj_string_size` | Return the byte length for `vir_obj_string_data`. | No object ownership. |
+| `vir_obj_byte_array` | Build a Lean `ByteArray` from bytes. | Returns an owned Lean byte-array object. |
+| `vir_obj_byte_array_data` | Inspect a Lean `ByteArray` as bytes. | Returns a borrowed pointer into the live byte-array object. |
+| `vir_obj_byte_array_size` | Return the byte length for `vir_obj_byte_array_data`. | No object ownership. |
+| `vir_obj_array` | Build a Lean `Array` from owned element objects. | Consumes all element objects on success; returns an owned array object. |
+| `vir_obj_array_size` | Return a Lean `Array` size. | No object ownership. |
+| `vir_obj_array_get` | Read one Lean `Array` element. | Returns a new owned reference to the element. |
+| `vir_obj_ctor` | Allocate a constructor with object fields only. | Consumes all field objects on success; returns an owned constructor object. |
+| `vir_obj_ctor_layout` | Allocate a constructor with object fields, `USize` slots, and packed scalar bytes. | Consumes object fields on success; returns an owned constructor object. |
+| `vir_obj_ctor_usize_decimal` | Inspect one constructor `USize` slot as decimal text. | Returns a borrowed pointer into shim-owned decimal scratch storage. |
+| `vir_obj_ctor_scalar_data` | Inspect the packed scalar byte area of a constructor. | Returns a borrowed pointer into the live constructor object. |
+| `vir_obj_scalar` | Build an immediate scalar constructor value. | Returns a non-null Lean scalar object value; refcount operations are no-ops. |
+| `vir_obj_is_scalar` | Test whether an object is an immediate scalar. | No object ownership. |
+| `vir_obj_scalar_value` | Read an immediate scalar value. | No object ownership. |
+| `vir_obj_tag` | Read a constructor tag. | No object ownership. |
+| `vir_obj_field` | Read one object field from a constructor. | Returns a new owned reference to the field. |
+| `vir_obj_nat` | Build a Lean `Nat` from decimal text. | Returns an owned Nat object. |
+| `vir_obj_nat_decimal` | Inspect a Lean `Nat` as decimal text. | Returns a borrowed pointer into shim-owned decimal scratch storage. |
+| `vir_obj_int` | Build a Lean `Int` from signed decimal text. | Returns an owned Int object. |
+| `vir_obj_int_decimal` | Inspect a Lean `Int` as signed decimal text. | Returns a borrowed pointer into shim-owned decimal scratch storage. |
+| `vir_obj_uint32` | Build a Lean `UInt32`. | Returns an owned boxed `UInt32` object. |
+| `vir_obj_uint32_value` | Inspect a Lean `UInt32`. | No object ownership. |
+| `vir_obj_uint64` | Build a Lean `UInt64` from decimal text. | Returns an owned boxed `UInt64` object. |
+| `vir_obj_uint64_decimal` | Inspect a Lean `UInt64` as decimal text. | Returns a borrowed pointer into shim-owned decimal scratch storage. |
+| `vir_obj_usize` | Build a Lean `USize` from decimal text. | Returns an owned boxed `USize` object. |
+| `vir_obj_usize_decimal` | Inspect a Lean `USize` as decimal text. | Returns a borrowed pointer into shim-owned decimal scratch storage. |
+| `vir_obj_float` | Build a Lean `Float`. | Returns an owned boxed float object. |
+| `vir_obj_float_value` | Inspect a Lean `Float`. | No object ownership. |
+| `vir_obj_float32` | Build a Lean `Float32`. | Returns an owned boxed float32 object. |
+| `vir_obj_float32_value` | Inspect a Lean `Float32`. | No object ownership. |
+| `vir_obj_decimal_size` | Return the byte length of the most recent decimal inspection result. | No object ownership. |
+| `vir_obj_level_zero` | Build `Lean.Level.zero`. | Returns the scalar zero level. |
+| `vir_obj_level_succ` | Build `Lean.Level.succ`. | Consumes the child level on success; returns an owned level object. |
+| `vir_obj_level_max` | Build `Lean.Level.max`. | Consumes both level arguments on success; returns an owned level object. |
+| `vir_obj_level_imax` | Build `Lean.Level.imax`. | Consumes both level arguments on success; returns an owned level object. |
+| `vir_obj_level_param` | Build `Lean.Level.param` from a dotted name. | Returns an owned level object. |
+| `vir_obj_level_mvar` | Build `Lean.Level.mvar` from a dotted name. | Returns an owned level object. |
+| `vir_obj_literal_nat` | Build a `Lean.Literal.natVal`. | Returns an owned literal object. |
+| `vir_obj_literal_string` | Build a `Lean.Literal.strVal`. | Returns an owned literal object. |
+| `vir_obj_expr_bvar` | Build `Lean.Expr.bvar`. | Returns an owned expression object. |
+| `vir_obj_expr_fvar` | Build `Lean.Expr.fvar`. | Returns an owned expression object. |
+| `vir_obj_expr_mvar` | Build `Lean.Expr.mvar`. | Returns an owned expression object. |
+| `vir_obj_expr_sort` | Build `Lean.Expr.sort`. | Consumes the level on success; returns an owned expression object. |
+| `vir_obj_expr_const` | Build `Lean.Expr.const` from a name and level list. | Consumes the level list on success; returns an owned expression object. |
+| `vir_obj_expr_app` | Build `Lean.Expr.app`. | Consumes function and argument expressions on success; returns an owned expression object. |
+| `vir_obj_expr_lambda` | Build `Lean.Expr.lam`. | Consumes type and body expressions on success; returns an owned expression object. |
+| `vir_obj_expr_forall` | Build `Lean.Expr.forallE`. | Consumes type and body expressions on success; returns an owned expression object. |
+| `vir_obj_expr_let` | Build `Lean.Expr.letE`. | Consumes type, value, and body expressions on success; returns an owned expression object. |
+| `vir_obj_expr_lit` | Build `Lean.Expr.lit`. | Consumes the literal on success; returns an owned expression object. |
+| `vir_obj_expr_proj` | Build `Lean.Expr.proj`. | Consumes the structure expression on success; returns an owned expression object. |
+| `vir_obj_expr_scalar_u8` | Inspect packed `Lean.Expr` scalar metadata such as binder info. | No object ownership. |
+| `vir_obj_name_string` | Inspect a Lean `Name` object as dotted text. | Returns a borrowed pointer into shim-owned string scratch storage. |
+| `vir_obj_name_string_size` | Return the byte length of `vir_obj_name_string`. | No object ownership. |
+| `vir_obj_resource` | Wrap a JavaScript `externref` resource as a Lean object. | Returns an owned Lean resource object rooted through the host resource table. |
+| `vir_obj_resource_externref` | Recover the JavaScript `externref` from a Lean resource object. | Returns the host reference; Lean object ownership is unchanged. |
+| `vir_obj_closure_root` | Root a Lean function object so JavaScript can call it later. | Retains the function through the closure root table; input object ownership is unchanged. |
+| `vir_closure_call_objects` | Call a rooted Lean closure with owned Lean object arguments. | Consumes all argument objects after accepting a non-null `argv`; returns one owned result object or `0` on failure. |
+| `vir_closure_call_error` | Return a borrowed pointer to the last closure-call diagnostic. | Borrowed until the next closure call or runtime teardown. |
+| `vir_closure_call_error_size` | Return the byte length of `vir_closure_call_error`. | No object ownership. |
+| `vir_closure_release` | Release a rooted Lean closure by root id. | Releases the root-table reference; returns whether the root id was live. |
+| `vir_obj_inc` | Retain one Lean object reference. | Adds one reference for heap objects; scalar objects are no-ops. |
+| `vir_obj_dec` | Release one Lean object reference. | Drops one reference for heap objects; scalar objects are no-ops. |
 
 Strings and byte arrays return borrowed pointers into the Lean object. JavaScript
 must read the bytes while the object is still live. The pointer becomes invalid
@@ -78,10 +129,9 @@ call or runtime teardown.
 `vir_obj_array` consumes an array of owned Lean object pointers and returns one
 owned Lean array object. If it fails before consuming them, JavaScript still owns
 the element references and must release them.
-`vir_obj_list` follows the same ownership rule and builds a Lean list in input
-order.
-`vir_obj_array_get`, `vir_obj_list_head`, and `vir_obj_list_tail` return new
-owned references that JavaScript must release after lifting.
+Lean lists are built through the generic constructor surface: nil is scalar
+constructor tag `0`, and cons is constructor tag `1` with head and tail object
+fields. There are deliberately no dedicated `vir_obj_list*` exports.
 `vir_obj_ctor` consumes owned field references and returns one owned constructor
 object with object fields only. `vir_obj_ctor_layout` is the manifest-driven
 variant: JavaScript supplies dense object fields, dense `USize` slots, and the
@@ -165,8 +215,8 @@ inspection helper plus
 `vir_obj_decimal_size`, and release the owned result with `vir_obj_dec`.
 Byte-array calls use `vir_obj_byte_array` and lift the result with
 `vir_obj_byte_array_data` / `vir_obj_byte_array_size`. Sequence calls lower each
-supported element to an owned object and pack those objects with `vir_obj_array`
-or `vir_obj_list`.
+supported element to an owned object. Arrays pack those objects with
+`vir_obj_array`; lists use the generic scalar/constructor helpers.
 The JavaScript runtime caches package-owned object call support and validated
 layout plans per manifest owner. Each lowered value still gets fresh owned Lean
 objects and fresh constructor buffers, but repeated records and inductive
@@ -180,9 +230,8 @@ runtime counts on every visit.
 2. Object call helpers: resolved calls that accept already-lowered owned object
    arguments and return an owned object result.
 3. Bulk builders: arrays, strings, and byte arrays with fewer intermediate
-   copies for common browser data. The first sequence builders handle shallow
-   object arrays and lists; generated metadata should eventually drive the
-   general case.
+   copies for common browser data. Lists use the generic scalar/constructor
+   surface; generated metadata should eventually drive the general case.
 4. Generated layout support: structures and inductives lowered by package
    metadata instead of ad hoc descriptors, including object, `USize`, and scalar
    runtime fields.

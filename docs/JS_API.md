@@ -212,8 +212,8 @@ object lane. DOM and React object markers such as `Lean.Vir.Browser.Element`
 and `Lean.Vir.React.Root` must therefore appear as `Lean.Vir.Js ...` at the
 boundary.
 
-The broad structural surface above is the interface value codec for
-JavaScript-to-Lean export calls. Host imports are narrower than exports:
+The broad structural surface above is the descriptor-guided object lowering
+surface for JavaScript-to-Lean export calls. Host imports are narrower than exports:
 low-level JavaScript imports use `Unit`, `Lean.Vir.Js α` resources,
 `Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callback arguments
 whose own arguments/results are `Unit` or resources, or explicit conversion targets such as

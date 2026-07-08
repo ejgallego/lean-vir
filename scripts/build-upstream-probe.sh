@@ -158,14 +158,20 @@ shim_sources=(
   "wasm/upstream_shim/name_utils.cpp"
   "wasm/upstream_shim/signature_cache.cpp"
   "wasm/upstream_shim/object_abi.cpp"
+  "wasm/upstream_shim/object_expr_abi.cpp"
+  "wasm/upstream_shim/closure_abi.cpp"
+  "wasm/upstream_shim/host_import_trampolines.cpp"
   "wasm/upstream_shim/native_symbols.cpp"
+  "wasm/upstream_shim/native_symbol_lookup.cpp"
   "wasm/upstream_shim/platform_stubs.cpp"
-  "wasm/upstream_shim/shim.cpp"
+  "wasm/upstream_shim/vir_shim.cpp"
+  "wasm/upstream_shim/package_ir_decoder.cpp"
   "wasm/upstream_shim/package_decl_provider.cpp"
 )
 
 shim_deps=(
   "wasm/upstream_shim/decl_provider.h"
+  "wasm/upstream_shim/package_decl_provider_types.h"
   "wasm/upstream_shim/call_signature_summary.h"
   "wasm/upstream_shim/name_utils.h"
   "wasm/upstream_shim/resource_abi.h"
@@ -317,10 +323,6 @@ exports=(
   -Wl,--export=vir_obj_level_param
   -Wl,--export=vir_obj_level_succ
   -Wl,--export=vir_obj_level_zero
-  -Wl,--export=vir_obj_list
-  -Wl,--export=vir_obj_list_is_nil
-  -Wl,--export=vir_obj_list_head
-  -Wl,--export=vir_obj_list_tail
   -Wl,--export=vir_obj_literal_nat
   -Wl,--export=vir_obj_literal_string
   -Wl,--export=vir_obj_name_string
@@ -623,21 +625,27 @@ report_start=$SECONDS
   echo
   echo "## Current Shim Scope"
   echo
-  echo "\`wasm/upstream_shim/shim.cpp\` supplies the package call surface,"
-  echo "closure bridge, and declaration lookup hooks. \`signature_cache.cpp\`"
-  echo "owns cached package-call signature summaries."
+  echo "\`wasm/upstream_shim/vir_shim.cpp\` supplies the package call surface"
+  echo "and declaration lookup hooks. \`closure_abi.cpp\` supplies Lean closure"
+  echo "roots and callback calls. \`host_import_trampolines.cpp\` supplies the"
+  echo "package-scoped JavaScript host-import trampoline grid."
+  echo "\`signature_cache.cpp\` owns cached package-call signature summaries."
   echo "\`call_signature_summary.cpp\` streams compact package signatures to compute"
   echo "arity and boxed-boundary requirements. \`name_utils.cpp\` contains shared"
-  echo "Lean name construction helpers. \`object_abi.cpp\` and \`resource_abi.cpp\` supply"
-  echo "owned Lean object and JavaScript resource helpers used by the runtime"
-  echo "object-call path."
+  echo "Lean name construction helpers. \`object_abi.cpp\` supplies generic owned"
+  echo "Lean object helpers, \`object_expr_abi.cpp\` supplies temporary Level/Expr"
+  echo "helpers, and \`resource_abi.cpp\` supplies JavaScript resource helpers used"
+  echo "by the runtime object-call path."
   echo "\`wasm/upstream_shim/native_symbols.cpp\` supplies the explicit native"
-  echo "extern wrappers plus generated registry include and restricted \`dlsym\` lookup;"
-  echo "\`platform_stubs.cpp\`"
-  echo "contains the remaining host/platform stubs. \`package_decl_provider.cpp\`"
-  echo "loads \`$generated_package\`, a single-file declaration package emitted from"
-  echo "typed \`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`. The browser"
-  echo "demos run through the real upstream interpreter."
+  echo "extern wrappers. \`native_symbol_lookup.cpp\` supplies the generated registry"
+  echo "include, restricted \`dlsym\` lookup, symbol-stem lookup, and C++ exception"
+  echo "stubs; \`platform_stubs.cpp\`"
+  echo "contains the remaining host/platform stubs. \`package_ir_decoder.cpp\`"
+  echo "decodes \`$generated_package\`, a single-file declaration package emitted from"
+  echo "typed \`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`, into Lean IR"
+  echo "objects. \`package_decl_provider.cpp\` owns the loaded package state and"
+  echo "declaration lookup facade. The browser demos run through the real upstream"
+  echo "interpreter."
 } > "$report"
 report_seconds=$((SECONDS - report_start))
 

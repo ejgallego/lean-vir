@@ -28,7 +28,7 @@ in ordinary host imports. The supported boundary lanes are:
 | `Lean.Vir.Js.Nullable α` | JavaScript-owned nullable resource | `hostResource` | Pass JavaScript `null`/value results without generic Lean `Option` lowering. |
 | `Lean.Vir.JSL α` | JavaScript handle to a retained Lean-owned value | `objectHandle` | Let JavaScript store or route Lean values without structural conversion. |
 | Explicit conversion declarations | One side `Lean.Vir.Js ...`, one side an ordinary Lean value | `explicitConversion` | Decode or encode values at named host bindings such as `js.string.value` or `js.value.react.property`. |
-| Structural interface values | JavaScript caller to exported Lean entrypoints | interface value codec | Call public Lean functions from JavaScript without a host-import wrapper. |
+| Structural interface values | JavaScript caller to exported Lean entrypoints | descriptor-guided object lowering | Call public Lean functions from JavaScript without a host-import wrapper. |
 
 The package manifest records each host import boundary as `hostResource`,
 `explicitConversion`, or `objectHandle`, and the runtime dispatches them through
@@ -36,7 +36,7 @@ the corresponding path. Explicit conversion declarations use
 `@[vir_js_explicit_conversion "..."]`; package generation validates their
 generic shape, and the JavaScript runtime still requires a matching host binding
 for the declared target. The manifest also records structural descriptor tags
-for exported Lean entrypoints; those tags belong to the interface value codec,
+for exported Lean entrypoints; those tags belong to the interface descriptors,
 not to the ordinary host-resource import boundary.
 
 For host imports, the relevant descriptor family is:

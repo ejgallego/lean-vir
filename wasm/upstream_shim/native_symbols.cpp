@@ -8,13 +8,11 @@ Author: Emilio J. Gallego Arias
 
 #include <stddef.h>
 #include <stdint.h>
-#include <stdlib.h>
 #include <string.h>
 
 #include <algorithm>
 #include <initializer_list>
 #include <limits>
-#include <string>
 #include <vector>
 
 #include "kernel/environment.h"
@@ -1369,75 +1367,4 @@ extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_ob
     lean_object * result = lean_alloc_ctor(1, 1, 0);
     lean_ctor_set(result, 0, lean_box(0));
     return result;
-}
-
-// Generated from Vir/GeneratePackage/NativeExterns.lean nativeExterns; keep wrappers handwritten above.
-#include "native_symbols_registry.inc"
-
-struct NativeSymbol {
-    char const * lean_name;
-    char const * stem;
-    char const * dlsym_name;
-    void * address;
-};
-
-static NativeSymbol const g_native_symbols[] = {
-#define VIR_NATIVE_BOXED_ENTRY(lean_name, stem, fn) \
-    { lean_name, stem, stem "___boxed", reinterpret_cast<void *>(fn) },
-#define VIR_NATIVE_CONST_ENTRY(lean_name, stem, ptr) \
-    { lean_name, stem, stem, reinterpret_cast<void *>(ptr) },
-    VIR_NATIVE_SYMBOLS(VIR_NATIVE_BOXED_ENTRY, VIR_NATIVE_CONST_ENTRY)
-#undef VIR_NATIVE_CONST_ENTRY
-#undef VIR_NATIVE_BOXED_ENTRY
-#undef VIR_NATIVE_SYMBOLS
-};
-
-extern "C" void * dlsym(void *, char const * sym) {
-    for (NativeSymbol const & entry : g_native_symbols) {
-        if (strcmp(sym, entry.dlsym_name) == 0) {
-            return entry.address;
-        }
-    }
-    if (void * host_import = lean::vir::host_import_trampoline(sym)) {
-        return host_import;
-    }
-    return nullptr;
-}
-
-static char const * known_symbol_stem(lean::name const & n) {
-    if (char const * symbol = lean::vir::find_host_import_symbol(n.raw())) {
-        return symbol;
-    }
-    std::string dotted = n.to_string();
-    for (NativeSymbol const & entry : g_native_symbols) {
-        if (dotted == entry.lean_name) {
-            return entry.stem;
-        }
-    }
-    return nullptr;
-}
-
-extern "C" lean::obj_res lean_get_symbol_stem(lean::obj_arg env, lean::obj_arg fn) {
-    lean_dec(env);
-    lean::name n(fn);
-    if (char const * stem = known_symbol_stem(n)) {
-        return lean_mk_string(stem);
-    }
-    std::string fallback = n.to_string();
-    return lean_mk_string(fallback.c_str());
-}
-
-extern "C" lean::obj_res lean_mk_mangled_boxed_name(lean::obj_arg str) {
-    lean::string_ref stem(str);
-    std::string boxed = stem.to_std_string() + "___boxed";
-    return lean_mk_string(boxed.c_str());
-}
-
-extern "C" void * __cxa_allocate_exception(size_t size) {
-    return malloc(size == 0 ? 1 : size);
-}
-
-extern "C" [[noreturn]] void __cxa_throw(void *, void *, void (*)(void *)) {
-    __builtin_trap();
-    abort();
 }

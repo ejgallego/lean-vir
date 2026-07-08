@@ -53,21 +53,32 @@ the interpreter's name formatting and diagnostics.
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
 
-- `shim.cpp` owns the package call surface, host import trampolines, closure
-  roots, and `lean_ir_find_env_decl` hooks.
+- `vir_shim.cpp` owns the package call surface and `lean_ir_find_env_decl`
+  hooks.
+- `closure_abi.cpp` owns Lean closure roots and callback calls used when
+  function values cross to JavaScript.
+- `host_import_trampolines.cpp` owns the package-scoped JavaScript host-import
+  trampoline grid used by restricted `dlsym` lookup.
 - `call_signature_summary.cpp` owns the streaming package-call signature parser used
   to compute call arity and boxed-boundary requirements.
 - `name_utils.cpp` owns shared Lean `Name` construction helpers.
+- `object_abi.cpp` owns generic owned `lean_object *` helpers used by the
+  runtime object call path.
+- `object_expr_abi.cpp` owns the temporary `Lean.Level`, `Lean.Expr`, literal,
+  and name-string helpers used by current object-boundary fixtures.
 - `resource_abi.cpp` owns the shared external resource class used by
   `Lean.Vir.Js α` values.
-- `native_symbols.cpp` owns the explicit native extern wrappers, generated
-  native registry include, restricted `dlsym` lookup, native symbol stem
-  lookup, and C++ exception stubs.
+- `native_symbols.cpp` owns the explicit native extern wrappers.
+- `native_symbol_lookup.cpp` owns the generated native registry include,
+  restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
+  stubs.
 - `platform_stubs.cpp` owns WASI/platform and environment fidelity stubs.
 - `lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
   constructor replacements for exported Lean-library constructors.
-- `package_decl_provider.cpp` owns package decoding, declaration lookup, host
-  import metadata, and initializer execution.
+- `package_ir_decoder.cpp` owns `.irpkg` binary decoding and Lean IR object
+  materialization.
+- `package_decl_provider.cpp` owns loaded package state, declaration lookup,
+  host import metadata, and initializer execution.
 - `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
   from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
   packages; `docs/GENERATE_PACKAGE.md` maps the full split generator, and
@@ -89,7 +100,7 @@ Together they supply:
   slot.
 - package-scoped JavaScript host import trampolines for declarations marked
   with `@[vir_js "..."]`, routed through `env.vir_js_call_objects`.
-- Lean closure roots for function-valued host-import arguments. The shim owns
+- Lean closure roots for function-valued host-import arguments. The closure ABI owns
   `vir_obj_closure_root`, `vir_closure_call_objects`, and
   `vir_closure_release`; JavaScript owns the host-side lifetime policy for
   `VirCallback` objects.
@@ -144,11 +155,12 @@ example sources, walks `FAp`/`PAP` references, and can now fall back to
 the elaborated environment. This is still package-backed loading, not full
 module loading, but it lets fixtures include small upstream library closures
 such as `List.reverse._redArg`. The generator then emits a small binary package.
-`wasm/upstream_shim/package_decl_provider.cpp` decodes that package into the
-upstream interpreter's expected object layout at runtime. The generator report
-separates missing Lean IR declarations from missing native extern
-registrations, and the package decoder exposes its last load error for browser
-and smoke-test diagnostics.
+`wasm/upstream_shim/package_ir_decoder.cpp` decodes that package into the
+upstream interpreter's expected object layout at runtime, and
+`wasm/upstream_shim/package_decl_provider.cpp` owns the loaded package state.
+The generator report separates missing Lean IR declarations from missing native
+extern registrations, and the package decoder exposes its last load error for
+browser and smoke-test diagnostics.
 See `docs/GENERATE_PACKAGE.md` for the package generator module map and
 diagnostic flow.
 
@@ -167,8 +179,8 @@ without a package-owned signature fail.
 Package format 7 also records host-import arity, erased-prefix count, effect,
 and manifest type descriptors for Lean-to-JavaScript calls. The shim uses the
 arity/effect metadata to send borrowed Lean object arguments through
-`env.vir_js_call_objects`, and JavaScript uses the interface value codec
-descriptors to lift arguments and lower the owned Lean object result. Package
+`env.vir_js_call_objects`, and JavaScript uses interface descriptors to lift
+arguments and lower the owned Lean object result. Package
 format 8 adds the
 opaque `leanObject` descriptor for generic LeanRef object handles, surfaced to
 Lean as `Lean.Vir.JSL α` so they do not typecheck as JavaScript-shaped `Js α`
@@ -203,33 +215,9 @@ descriptor-bearing named payload format was removed earlier, and the resolved
 byte payload fallback has now been removed as well. `call_signature_summary.cpp` is a
 signature-summary parser, not a runtime value codec.
 
-The shim also exposes the first experimental Lean object ABI helpers:
-
-- `vir_obj_string` / `vir_obj_string_data` / `vir_obj_string_size`
-- `vir_obj_byte_array` / `vir_obj_byte_array_data` / `vir_obj_byte_array_size`
-- `vir_obj_array` / `vir_obj_array_size` / `vir_obj_array_get`
-- `vir_obj_list` / `vir_obj_list_is_nil` / `vir_obj_list_head` /
-  `vir_obj_list_tail`
-- `vir_obj_ctor`
-- `vir_obj_ctor_layout` / `vir_obj_ctor_usize_decimal` /
-  `vir_obj_ctor_scalar_data`
-- `vir_obj_scalar` / `vir_obj_is_scalar` / `vir_obj_scalar_value`
-- `vir_obj_tag` / `vir_obj_field`
-- `vir_obj_nat` / `vir_obj_nat_decimal`
-- `vir_obj_expr_*`, `vir_obj_level_*`, and `vir_obj_literal_*` for direct
-  `Lean.Expr` values
-- `vir_obj_name_string` / `vir_obj_name_string_size`
-- `vir_obj_resource` / `vir_obj_resource_externref`
-- `vir_obj_closure_root` for Lean function values crossing to JavaScript
-- `vir_obj_int` / `vir_obj_int_decimal`
-- `vir_obj_uint32` / `vir_obj_uint32_value`
-- `vir_obj_uint64` / `vir_obj_uint64_decimal`
-- `vir_obj_usize` / `vir_obj_usize_decimal`
-- `vir_obj_float` / `vir_obj_float_value`
-- `vir_obj_float32` / `vir_obj_float32_value`
-- `vir_obj_decimal_size`
-- `vir_obj_inc` / `vir_obj_dec`
-- `vir_call_resolved_objects`
+The shim also exposes the first experimental Lean object ABI helpers. The
+complete value/call export surface is documented in
+[OBJECT_ABI.md](OBJECT_ABI.md#export-surface).
 
 These helpers are still internal runtime primitives, not public Lean signature
 forms. They are the first step toward moving value lowering/lifting out of the
@@ -238,9 +226,11 @@ Lean object references; `vir_call_resolved_objects` consumes owned arguments and
 returns an owned result. String and byte-array data pointers are borrowed and
 must be read before the object is released. Decimal scalar inspection uses a
 shim-owned scratch buffer that must be read before the next decimal inspection
-call. `vir_obj_array` and `vir_obj_list` consume owned element references and
-return one owned sequence object. `vir_obj_array_get`, `vir_obj_list_head`,
-`vir_obj_list_tail`, and `vir_obj_field` return new owned references.
+call. `vir_obj_array` consumes owned element references and returns one owned
+array object. `vir_obj_array_get` and `vir_obj_field` return new owned
+references. Lean lists use the generic scalar/constructor helpers: nil is scalar
+constructor tag `0`, and cons is constructor tag `1` with head and tail object
+fields.
 `vir_obj_ctor` consumes owned object-field references. See
 [OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and ownership rules.
 
@@ -342,9 +332,9 @@ changing its `nativeExterns` table; this regenerates
 `wasm/upstream_shim/native_symbols_registry.inc`. The regular
 `npm run check:boundary-registry` guard then verifies that the generated
 registry is current and that every native extern has a matching `dlsym` symbol
-plus either a handwritten boxed wrapper or a native constant entry in
-`wasm/upstream_shim/native_symbols.cpp`. `npm test` runs this before the smoke
-and fixture suites.
+plus either a handwritten boxed wrapper in
+`wasm/upstream_shim/native_symbols.cpp` or a native constant entry in the
+generated registry. `npm test` runs this before the smoke and fixture suites.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
@@ -396,8 +386,8 @@ by Lean itself.
 ## Future Wasm Interfaces
 
 The closure/resource bridge is intentionally conservative for `wasm32-wasip1`.
-Ordinary scalar and structured values use the interface value codec over the
-object ABI. Opaque resources cross the JS/Wasm boundary through
+Ordinary scalar and structured values use descriptor-guided object lowering over
+the object ABI. Opaque resources cross the JS/Wasm boundary through
 `externref` side-channel imports, and Lean stores them as GC-finalized external
 objects that root JavaScript `HostResource` objects in the host runtime.
 `INTERFACE_TAG.FUNCTION` likewise avoids a serialized numeric token; Lean closures remain

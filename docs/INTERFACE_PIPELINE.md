@@ -120,13 +120,14 @@ The embedded manifest currently supports:
 - `Lean.Vir.React.Node`, represented as an opaque `Lean.Vir.Js` resource whose
   native React node is constructed by the React host bindings.
 
-This broad surface is the interface value codec used by JavaScript-to-Lean
-exports and by declarations explicitly marked as conversions. It is not the
-ordinary Lean-to-JavaScript host-resource boundary, which is deliberately
-narrower and accepts only `Unit`, resources, and resource-shaped callbacks.
+This broad surface is the descriptor-guided object lowering used by
+JavaScript-to-Lean exports and by declarations explicitly marked as
+conversions. It is not the ordinary Lean-to-JavaScript host-resource boundary,
+which is deliberately narrower and accepts only `Unit`, resources, and
+resource-shaped callbacks.
 
 The numeric descriptor tag table is part of the package ABI. The JSON field is
-named `interfaceTag`; these tags describe the interface value codec, not the
+named `interfaceTag`; these tags describe interface descriptors, not the
 ordinary host-resource import mode. Lean assigns tags in
 `Vir.GeneratePackage.Interface.Encode`; JavaScript validates and dispatches
 them in `web/src/runtime/interface-tags.js`. Run `npm run check:package-abi`
@@ -285,8 +286,8 @@ runtime validates the embedded manifest before exposing entries. For format 7
 and newer packages, the WASM shim uses the package-owned compact export
 signature table to validate object calls for `vir_call_resolved_objects`.
 Host-import dispatch uses package-owned arity/effect metadata, while
-JavaScript uses the interface value codec descriptors for argument/result
-conversion. Closure roots likewise store only arity/effect metadata;
+JavaScript uses interface descriptors for argument/result object
+lowering/lifting. Closure roots likewise store only arity/effect metadata;
 JavaScript keeps the full callback descriptor.
 
 This is acceptable for the current generated demo packages and local developer

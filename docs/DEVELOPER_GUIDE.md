@@ -46,9 +46,15 @@ For WASI/runtime boundary work, read:
 
 1. `docs/UPSTREAM_BOUNDARY.md`
 2. `wasm/upstream_shim/README.md`
-3. `wasm/upstream_shim/shim.cpp`
-4. `wasm/upstream_shim/package_decl_provider.cpp`
-5. `wasm/upstream_shim/native_symbols.cpp`
+3. `wasm/upstream_shim/vir_shim.cpp`
+4. `wasm/upstream_shim/closure_abi.cpp`
+5. `wasm/upstream_shim/host_import_trampolines.cpp`
+6. `wasm/upstream_shim/package_decl_provider.cpp`
+7. `wasm/upstream_shim/package_ir_decoder.cpp`
+8. `wasm/upstream_shim/native_symbols.cpp`
+9. `wasm/upstream_shim/native_symbol_lookup.cpp`
+10. `wasm/upstream_shim/object_abi.cpp`
+11. `wasm/upstream_shim/object_expr_abi.cpp`
 
 For benchmark work, read:
 
@@ -86,9 +92,9 @@ sequenceDiagram
     RT-->>JS: JavaScript value
 ```
 
-The runtime uses the interface value codec plus the object ABI for exported
-manifest calls. It resolves each entry once, lowers JavaScript values according
-to the export descriptors, and then calls
+The runtime uses interface descriptors plus the object ABI for exported manifest
+calls. It resolves each entry once, lowers JavaScript values according to the
+export descriptors, and then calls
 `vir_call_resolved_objects(slot, ...)`.
 
 ## Lean-To-JavaScript Host Import Flow

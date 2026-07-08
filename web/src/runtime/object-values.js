@@ -178,11 +178,7 @@ export class ObjectValueRuntime {
 
   makeObjectSequenceValue(sequenceType, value, label, selfType) {
     const sequenceTag = sequenceType?.interfaceTag;
-    const builderName =
-      sequenceTag === INTERFACE_TAG.ARRAY ? "vir_obj_array" :
-      sequenceTag === INTERFACE_TAG.LIST ? "vir_obj_list" :
-      null;
-    if (builderName === null) {
+    if (sequenceTag !== INTERFACE_TAG.ARRAY && sequenceTag !== INTERFACE_TAG.LIST) {
       throw new Error(`${label} has unsupported object ABI sequence type`);
     }
     const values = normalizeArray(value, label);
@@ -196,7 +192,9 @@ export class ObjectValueRuntime {
       for (let index = 0; index < values.length; index++) {
         elementObjs.push(this.makeObjectValue(elementType, values[index], `${label}[${index}]`, selfType));
       }
-      return this.makeObjectSequenceFromOwnedElements(builderName, elementObjs, label);
+      return sequenceTag === INTERFACE_TAG.ARRAY
+        ? this.makeObjectArrayFromOwnedElements(elementObjs, label)
+        : this.makeObjectListFromOwnedElements(elementObjs, label);
     } finally {
       this.releaseOwnedObjects(elementObjs);
     }
@@ -553,7 +551,7 @@ export class ObjectValueRuntime {
       values.forEach((level, index) => {
         levelObjs.push(this.makeObjectLevel(level, `${label}[${index}]`));
       });
-      return this.makeObjectSequenceFromOwnedElements("vir_obj_list", levelObjs, label);
+      return this.makeObjectListFromOwnedElements(levelObjs, label);
     } finally {
       this.releaseOwnedObjects(levelObjs);
     }
@@ -677,22 +675,42 @@ export class ObjectValueRuntime {
     }
   }
 
-  makeObjectSequenceFromOwnedElements(builderName, elementObjs, label) {
+  makeObjectArrayFromOwnedElements(elementObjs, label) {
     let valuesPtr = 0;
     try {
       if (elementObjs.length !== 0) {
         valuesPtr = this.allocByteLength(elementObjs.length * 4, `${label} pointer array`);
         this.writePointerArray(valuesPtr, elementObjs);
       }
-      const sequenceObj = this.exports[builderName](valuesPtr, elementObjs.length);
+      const sequenceObj = this.exports.vir_obj_array(valuesPtr, elementObjs.length);
       if (sequenceObj === 0) {
-        throw new Error(`${label} could not be lowered to a Lean sequence object`);
+        throw new Error(`${label} could not be lowered to a Lean array object`);
       }
       elementObjs.length = 0;
       return sequenceObj;
     } finally {
       if (valuesPtr !== 0) {
         this.freeBytes(valuesPtr);
+      }
+    }
+  }
+
+  makeObjectListFromOwnedElements(elementObjs, label) {
+    let tail = this.makeObjectScalar(0, `${label}.nil`);
+    try {
+      for (let index = elementObjs.length - 1; index >= 0; index--) {
+        const fields = [elementObjs[index], tail];
+        const cons = this.makeObjectCtorFromOwnedFields(1, fields, `${label}[${index}]`);
+        elementObjs[index] = 0;
+        tail = cons;
+      }
+      elementObjs.length = 0;
+      const list = tail;
+      tail = 0;
+      return list;
+    } finally {
+      if (tail !== 0) {
+        this.exports.vir_obj_dec(tail);
       }
     }
   }
@@ -1008,45 +1026,8 @@ export class ObjectValueRuntime {
   }
 
   liftObjectLevelList(obj, label) {
-    const values = [];
-    let cursor = obj;
-    let ownsCursor = false;
-    try {
-      while (this.exports.vir_obj_list_is_nil(cursor) === 0) {
-        const index = values.length;
-        const head = this.exports.vir_obj_list_head(cursor);
-        if (head === 0) {
-          throw new Error(`${label}[${index}] is unavailable`);
-        }
-        try {
-          values.push(this.liftObjectLevel(head, `${label}[${index}]`));
-        } finally {
-          this.exports.vir_obj_dec(head);
-        }
-
-        let tail = this.exports.vir_obj_list_tail(cursor);
-        try {
-          if (tail === 0) {
-            throw new Error(`${label} tail after index ${index} is unavailable`);
-          }
-          if (ownsCursor) {
-            this.exports.vir_obj_dec(cursor);
-          }
-          cursor = tail;
-          ownsCursor = true;
-          tail = 0;
-        } finally {
-          if (tail !== 0) {
-            this.exports.vir_obj_dec(tail);
-          }
-        }
-      }
-      return values;
-    } finally {
-      if (ownsCursor) {
-        this.exports.vir_obj_dec(cursor);
-      }
-    }
+    return this.liftObjectConstructorList(obj, label, (head, index) =>
+      this.liftObjectLevel(head, `${label}[${index}]`));
   }
 
   liftObjectLiteral(obj, label) {
@@ -1212,27 +1193,37 @@ export class ObjectValueRuntime {
 
   liftObjectListValue(type, obj, label, selfType) {
     const elementType = requireTypeField(type, "element", label);
+    return this.liftObjectConstructorList(obj, label, (head, index) =>
+      this.liftObjectValue(elementType, head, `${label}[${index}]`, selfType));
+  }
+
+  liftObjectConstructorList(obj, label, liftElement) {
     const values = [];
     let cursor = obj;
     let ownsCursor = false;
     try {
-      while (this.exports.vir_obj_list_is_nil(cursor) === 0) {
-        const index = values.length;
-        const head = this.exports.vir_obj_list_head(cursor);
-        if (head === 0) {
-          throw new Error(`${label}[${index}] is unavailable`);
+      while (true) {
+        if (this.exports.vir_obj_is_scalar(cursor) !== 0) {
+          const tag = this.exports.vir_obj_scalar_value(cursor) >>> 0;
+          if (tag !== 0) {
+            throw new Error(`${label} has unsupported Lean.List scalar tag ${tag}`);
+          }
+          return values;
         }
+        const tag = this.exports.vir_obj_tag(cursor);
+        if (tag !== 1) {
+          throw new Error(`${label} has unsupported Lean.List constructor tag ${tag}`);
+        }
+        const index = values.length;
+        const head = this.ownedObjectField(cursor, 0, `${label}[${index}]`);
         try {
-          values.push(this.liftObjectValue(elementType, head, `${label}[${index}]`, selfType));
+          values.push(liftElement(head, index));
         } finally {
           this.exports.vir_obj_dec(head);
         }
 
-        let tail = this.exports.vir_obj_list_tail(cursor);
+        let tail = this.ownedObjectField(cursor, 1, `${label} tail after index ${index}`);
         try {
-          if (tail === 0) {
-            throw new Error(`${label} tail after index ${index} is unavailable`);
-          }
           if (ownsCursor) {
             this.exports.vir_obj_dec(cursor);
           }
@@ -1245,7 +1236,6 @@ export class ObjectValueRuntime {
           }
         }
       }
-      return values;
     } finally {
       if (ownsCursor) {
         this.exports.vir_obj_dec(cursor);
