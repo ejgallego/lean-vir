@@ -53,7 +53,8 @@ the interpreter's name formatting and diagnostics.
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
 
-- `shim.cpp` owns the package call surface and `lean_ir_find_env_decl` hooks.
+- `vir_shim.cpp` owns the package call surface and `lean_ir_find_env_decl`
+  hooks.
 - `closure_abi.cpp` owns Lean closure roots and callback calls used when
   function values cross to JavaScript.
 - `host_import_trampolines.cpp` owns the package-scoped JavaScript host-import

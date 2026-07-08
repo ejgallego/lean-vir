@@ -162,7 +162,7 @@ shim_sources=(
   "wasm/upstream_shim/host_import_trampolines.cpp"
   "wasm/upstream_shim/native_symbols.cpp"
   "wasm/upstream_shim/platform_stubs.cpp"
-  "wasm/upstream_shim/shim.cpp"
+  "wasm/upstream_shim/vir_shim.cpp"
   "wasm/upstream_shim/package_decl_provider.cpp"
 )
 
@@ -621,7 +621,7 @@ report_start=$SECONDS
   echo
   echo "## Current Shim Scope"
   echo
-  echo "\`wasm/upstream_shim/shim.cpp\` supplies the package call surface"
+  echo "\`wasm/upstream_shim/vir_shim.cpp\` supplies the package call surface"
   echo "and declaration lookup hooks. \`closure_abi.cpp\` supplies Lean closure"
   echo "roots and callback calls. \`host_import_trampolines.cpp\` supplies the"
   echo "package-scoped JavaScript host-import trampoline grid."

@@ -46,7 +46,7 @@ For WASI/runtime boundary work, read:
 
 1. `docs/UPSTREAM_BOUNDARY.md`
 2. `wasm/upstream_shim/README.md`
-3. `wasm/upstream_shim/shim.cpp`
+3. `wasm/upstream_shim/vir_shim.cpp`
 4. `wasm/upstream_shim/closure_abi.cpp`
 5. `wasm/upstream_shim/host_import_trampolines.cpp`
 6. `wasm/upstream_shim/package_decl_provider.cpp`

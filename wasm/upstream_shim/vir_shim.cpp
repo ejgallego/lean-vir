@@ -11,7 +11,6 @@ Author: Emilio J. Gallego Arias
 #include <stddef.h>
 #include <stdint.h>
 
-#include <initializer_list>
 #include <string>
 #include <vector>
 
@@ -27,19 +26,11 @@ extern lean_object * l_ByteArray_empty;
 namespace lean {
 namespace {
 
-static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, unsigned scalar_size = 0) {
-    object * obj = lean_alloc_ctor(tag, fields.size(), scalar_size);
-    unsigned idx = 0;
-    for (object * field : fields) {
-        lean_inc(field);
-        lean_ctor_set(obj, idx, field);
-        idx++;
-    }
-    return obj;
-}
-
 static object * mk_some(object * value) {
-    return mk_ctor(1, { value });
+    object * obj = lean_alloc_ctor(1, 1, 0);
+    lean_inc(value);
+    lean_ctor_set(obj, 0, value);
+    return obj;
 }
 
 static void ensure_ir_interpreter_initialized() {

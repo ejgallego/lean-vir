@@ -50,7 +50,7 @@ const sourceIdentityPaths = [
   "wasm/upstream_shim/name_utils.h",
   "wasm/upstream_shim/native_symbols.cpp",
   "wasm/upstream_shim/native_symbols_registry.inc",
-  "wasm/upstream_shim/shim.cpp",
+  "wasm/upstream_shim/vir_shim.cpp",
   "wasm/upstream_shim/signature_cache.cpp",
   "wasm/upstream_shim/signature_cache.h",
   "wasm/upstream_shim/object_abi.cpp",
