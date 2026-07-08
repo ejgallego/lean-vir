@@ -97,6 +97,10 @@ for the full matrix.
 - Export discovery or host-import collection: `lake build vir_irpkg`,
   `npm run check:boundary-registry`, and
   `npm run test:runtime -- package-generation`.
+- Native extern declarations: `npm run check:native-externs`. If entries are
+  added, removed, or renamed, also run
+  `node scripts/check-boundary-registry.mjs --write` and
+  `npm run check:boundary-registry`.
 - Manifest metadata, diagnostics, duplicate export checks, or report output:
   `lake build vir_irpkg`, `npm run generate:irpkg -- examples/Fib.lean
   /tmp/vir-fib.irpkg fib`, and inspect the generated report when diagnostics
@@ -175,7 +179,9 @@ stopped:
   needed.
 - `Missing Native Extern Registrations`: the closure reached a Lean runtime
   primitive that needs a local demo shim. Add the registration in
-  `Vir.GeneratePackage.NativeExterns`, then rerun the boundary-registry check.
+  `Vir.GeneratePackage.NativeExterns`, then run `npm run check:native-externs`;
+  if the registry entries changed, regenerate and rerun the boundary-registry
+  check.
 - `Package Diagnostics`: a requested export or host import could not be
   represented in the manifest. Typical causes are unsupported argument/result
   types, duplicate export ids or JavaScript names, and declaration-name
@@ -195,6 +201,7 @@ Useful checks after generator edits:
 ```bash
 lake build vir_irpkg
 npm run check:package-abi
+npm run check:native-externs
 npm run check:boundary-registry
 bash scripts/build-lean-lib.sh
 npm run generate:irpkg -- examples/Fib.lean /tmp/vir-fib.irpkg fib

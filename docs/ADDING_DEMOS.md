@@ -14,7 +14,8 @@ rebuilding the upstream interpreter.
 3. Run `npm run check:package`.
 4. Inspect the relevant `build/generated/*.report.md`.
 5. If you add or change a native extern in `Vir/GeneratePackage/NativeExterns.lean`, run
-   `node scripts/check-boundary-registry.mjs --write`, then
+   `npm run check:native-externs`. If you add, remove, or rename a native extern
+   entry, also run `node scripts/check-boundary-registry.mjs --write`, then
    `npm run check:boundary-registry`. This is not needed for `@[vir_js "..."]`
    host imports; those appear in the report's JavaScript host import section
    instead of the native registry.

@@ -30,7 +30,7 @@ package lookup, and temporary runtime glue live here instead.
 - `native_symbol_lookup.cpp`: generated native extern registry include,
   restricted symbol lookup, symbol-stem support, and C++ exception stubs.
 - `native_symbols_registry.inc`: generated registry of native extern names from
-  `tools/GeneratePackage.lean`. Do not edit it by hand.
+  `Vir/GeneratePackage/NativeExterns.lean`. Do not edit it by hand.
 - `platform_stubs.cpp`: WASI/demo stubs for Lean platform APIs that are inert,
   package-backed, or deliberately fail-fast in this environment.
 - `lean_object_constructors.cpp`: temporary Lean `Name`, `Level`, and `Expr`
@@ -50,6 +50,13 @@ package lookup, and temporary runtime glue live here instead.
 - Do not add native lookup support until a real demo case requires it.
 - Prefer fail-fast stubs over fabricated kernel metadata when the package does
   not provide enough information.
+
+When editing native extern declarations or wrappers, first check that the
+Lean-side table matches Lean's imported IR signatures:
+
+```bash
+npm run check:native-externs
+```
 
 When adding or removing native extern wrappers, regenerate and check the
 registry:
