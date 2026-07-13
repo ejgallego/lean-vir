@@ -186,6 +186,19 @@ wrapper after the old callbacks, resources, host state, and binding leases are
 torn down. Nothing containing an old Wasm pointer or package-local slot may
 cross the handover.
 
+The current runtime treats the active package set as containing exactly one
+`.irpkg`; that cardinality is not intended as a permanent boundary. Future
+modular loading should extend the same candidate-instance handover to the whole
+package set: construct a fresh instance, load and validate the complete set,
+then adopt it atomically. Adding, updating, or removing one package should not
+leave the active instance with a partially updated dependency graph.
+
+Manifest export indices are scoped to one package manifest and are not global
+or stable package identities. A future multi-package call ABI will need package
+context, an aggregate manifest, or an opaque handle around that index. This
+work deliberately leaves package handles, dependency and initializer ordering,
+conflict policy, and individual unload semantics undefined.
+
 Within one instance, the package decoder owns every object it materializes.
 The helpers in `package_ir_builders.*` consume their owned object arguments,
 and the decoded-package owner releases top-level declarations, names,
