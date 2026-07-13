@@ -51,6 +51,13 @@ struct decoded_ir_package {
     std::vector<uint32_t> call_summary_indices;
     std::string interface_manifest;
     uint32_t format_version = 0;
+
+    decoded_ir_package() = default;
+    decoded_ir_package(decoded_ir_package const &) = delete;
+    decoded_ir_package & operator=(decoded_ir_package const &) = delete;
+    ~decoded_ir_package();
+
+    void clear();
 };
 
 bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & out, std::string & error);

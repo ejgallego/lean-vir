@@ -20,7 +20,6 @@ static object * mk_ctor(unsigned tag, std::initializer_list<object *> fields, un
     object * obj = lean_alloc_ctor(tag, fields.size(), scalar_size);
     unsigned idx = 0;
     for (object * field : fields) {
-        lean_inc(field);
         lean_ctor_set(obj, idx, field);
         idx++;
     }
@@ -53,7 +52,6 @@ object * mk_array(std::vector<object *> const & fields) {
     object * array = lean_alloc_array(fields.size(), fields.size());
     size_t idx = 0;
     for (object * field : fields) {
-        lean_inc(field);
         lean_array_set_core(array, idx, field);
         idx++;
     }
@@ -70,10 +68,7 @@ object * mk_arg_erased() {
 
 object * mk_lit_num(object * value) {
     object * lit_val = mk_ctor(0, { value });
-    lean_dec(value);
-    object * expr = mk_ctor(11, { lit_val });
-    lean_dec(lit_val);
-    return expr;
+    return mk_ctor(11, { lit_val });
 }
 
 object * mk_lit_num(size_t value) {
@@ -83,10 +78,7 @@ object * mk_lit_num(size_t value) {
 object * mk_lit_str(std::string const & value) {
     object * str = lean_mk_string(value.c_str());
     object * lit_val = mk_ctor(1, { str });
-    lean_dec(str);
-    object * expr = mk_ctor(11, { lit_val });
-    lean_dec(lit_val);
-    return expr;
+    return mk_ctor(11, { lit_val });
 }
 
 object * mk_ctor_info(object * n, size_t tag, size_t size, size_t usize, size_t ssize) {

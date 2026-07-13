@@ -81,7 +81,7 @@ not a fork of Lean. It is split by responsibility:
 - `package/package_section_directory.cpp` owns `.irpkg` envelope and section
   directory decoding.
 - `package/package_ir_decoder.cpp` owns section payload decoding and Lean IR
-  object materialization.
+  object materialization, including cleanup of partial decode graphs.
 - `package/package_decl_provider.cpp` owns loaded package state, declaration lookup,
   host import metadata, and initializer execution.
 - `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
