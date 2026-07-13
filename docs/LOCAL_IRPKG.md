@@ -120,7 +120,11 @@ type tree. It also includes `hostImports` for Lean declarations marked with
 host boundary.
 JavaScript validates inputs against that manifest, lowers values to owned Lean
 objects with `vir_obj_*` helpers, and calls
-`vir_call_resolved_objects`. When interpreted Lean code reaches a host import,
+`vir_call_resolved_objects`. The runtime maps all three public manifest keys
+(`entry`, `id`, and `jsName`) to the manifest export's array index; Wasm then
+uses the structurally decoded export-summary table to select the package-local
+call slot. Lean display names are not split or reparsed. When interpreted Lean
+code reaches a host import,
 the shim calls the runtime's `env.vir_js_call_objects` import with borrowed Lean
 object arguments, and JavaScript returns an owned Lean object result. Package
 format 10 keeps package-owned direct summaries for object-call validation and

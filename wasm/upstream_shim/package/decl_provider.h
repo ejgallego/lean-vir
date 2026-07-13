@@ -22,7 +22,8 @@ struct package_call_runtime_summary {
 object * find_package_decl(object * name);
 object * find_package_boxed_decl(object * name);
 object * find_package_init_name(object * name);
-uint32_t package_call_slot_for_name(object * name);
+uint32_t package_call_slot_for_text(char const * text, size_t len);
+uint32_t package_call_slot_for_export(uint32_t export_index);
 object * package_call_slot_name(uint32_t slot);
 bool package_call_slot_has_boxed_decl(uint32_t slot);
 bool package_call_summary(uint32_t slot, package_call_runtime_summary & out);

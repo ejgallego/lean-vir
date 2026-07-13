@@ -13,6 +13,7 @@ const requiredFunctionExports = [
   "vir_last_package_error",
   "vir_last_package_error_size",
   "vir_resolve_call",
+  "vir_resolve_call_export",
   "vir_call_resolved_objects",
   "vir_call_error",
   "vir_call_error_size",

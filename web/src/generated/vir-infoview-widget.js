@@ -5173,13 +5173,17 @@ function requireString2(value, label) {
 }
 
 // web/src/runtime/core.js
-var textEncoder2 = new TextEncoder();
 var textDecoder = new TextDecoder();
 var MAX_UINT322 = 0xffffffffn;
 var MAX_UINT643 = 0xffffffffffffffffn;
 var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
 var VirRuntime = class extends ObjectValueRuntime {
-  constructor(exports, { module = null, packageInfo = null, hostState = null } = {}) {
+  constructor(exports, {
+    module = null,
+    packageInfo = null,
+    hostState = null,
+    createReplacementRuntime = null
+  } = {}) {
     super();
     this.exports = exports;
     this.module = module;
@@ -5193,6 +5197,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
     this.disposed = false;
     this.liveCallbacks = /* @__PURE__ */ new Set();
+    this.createReplacementRuntime = createReplacementRuntime;
     this.hostState?.attachRuntime(this);
     if (!this.exports.memory) {
       throw new Error("WASM memory export is missing");
@@ -5217,13 +5222,18 @@ var VirRuntime = class extends ObjectValueRuntime {
   }
   loadIrPackageBytes(bytes) {
     this.requireLiveRuntime();
-    this.requireFunction("vir_alloc_bytes");
-    this.requireFunction("vir_load_ir_package");
     const packageBytes = asBytes(bytes, "IR package bytes");
     if (this.hasPackageState() || this.liveCallbacks.size !== 0) {
-      this.teardownPackageResources();
+      if (typeof this.createReplacementRuntime !== "function") {
+        throw new Error("IR package reload requires a factory-managed VirRuntime");
+      }
+      return this.replaceIrPackageBytes(packageBytes);
     }
-    this.clearPackageMetadata();
+    return this.installIrPackageBytes(packageBytes);
+  }
+  installIrPackageBytes(packageBytes) {
+    this.requireFunction("vir_alloc_bytes");
+    this.requireFunction("vir_load_ir_package");
     const ptr = this.allocBytes(packageBytes);
     try {
       const count = this.exports.vir_load_ir_package(ptr, packageBytes.byteLength);
@@ -5252,6 +5262,40 @@ var VirRuntime = class extends ObjectValueRuntime {
       this.freeBytes(ptr);
     }
   }
+  replaceIrPackageBytes(packageBytes) {
+    const replacement = this.createReplacementRuntime();
+    let packageInfo;
+    try {
+      packageInfo = replacement.installIrPackageBytes(packageBytes);
+    } catch (error) {
+      replacement.dispose({ disposeBindings: false });
+      throw error;
+    }
+    try {
+      this.teardownPackageResources();
+    } catch (error) {
+      replacement.dispose({ disposeBindings: false });
+      throw error;
+    }
+    this.adoptRuntimeState(replacement);
+    return packageInfo;
+  }
+  adoptRuntimeState(replacement) {
+    this.exports = replacement.exports;
+    this.module = replacement.module;
+    this.hostState = replacement.hostState;
+    this.packageInfo = replacement.packageInfo;
+    this.interfaceManifest = replacement.interfaceManifest;
+    this.packageMetadata = replacement.packageMetadata;
+    this.boxedCallEntryNames = replacement.boxedCallEntryNames;
+    this.liveCallbacks = replacement.liveCallbacks;
+    this.hostState?.attachRuntime(this);
+    this.rebuildManifestExports();
+    replacement.disposed = true;
+    replacement.hostState = null;
+    replacement.liveCallbacks = /* @__PURE__ */ new Set();
+    replacement.exportsByName = /* @__PURE__ */ Object.create(null);
+  }
   clearPackageMetadata() {
     this.packageInfo = null;
     this.interfaceManifest = null;
@@ -5263,7 +5307,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
   }
   hasPackageState() {
-    return this.packageInfo !== null || this.interfaceManifest !== null || this.packageMetadata !== null;
+    return this.packageInfo !== null || this.interfaceManifest !== null || this.packageMetadata !== null || (this.exports.vir_package_interface_manifest_size?.() ?? 0) !== 0 || (this.packageDeclCount() ?? 0) !== 0;
   }
   readPackageManifest() {
     this.requireFunction("vir_package_interface_manifest");
@@ -5280,13 +5324,13 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.exportsByName = /* @__PURE__ */ Object.create(null);
     this.entriesByName = /* @__PURE__ */ Object.create(null);
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
-    for (const entry of this.interfaceManifest?.exports ?? []) {
+    const entries = this.interfaceManifest?.exports ?? [];
+    for (let exportIndex = 0; exportIndex < entries.length; exportIndex += 1) {
+      const entry = entries[exportIndex];
       registerManifestEntryKey(this.entriesByName, entry.entry, entry);
       registerManifestEntryKey(this.entriesByName, entry.id, entry);
       registerManifestEntryKey(this.entriesByName, entry.jsName, entry);
-      this.entryCallCache.set(entry, {
-        nameBytes: textEncoder2.encode(entry.entry)
-      });
+      this.entryCallCache.set(entry, { exportIndex });
       if (entry.jsName && isIdentifier(entry.jsName)) {
         this.exportsByName[entry.jsName] = (...args) => this.callEntry(entry, args);
       }
@@ -5304,7 +5348,7 @@ var VirRuntime = class extends ObjectValueRuntime {
   }
   callEntry(entry, args) {
     this.requireLiveRuntime();
-    this.requireFunction("vir_resolve_call");
+    this.requireFunction("vir_resolve_call_export");
     if (args.length !== entry.args.length) {
       throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
     }
@@ -5360,7 +5404,11 @@ var VirRuntime = class extends ObjectValueRuntime {
   callCacheFor(entry) {
     let cache = this.entryCallCache.get(entry);
     if (cache === void 0) {
-      cache = { nameBytes: textEncoder2.encode(entry.entry) };
+      const exportIndex = this.interfaceManifest?.exports?.indexOf(entry) ?? -1;
+      if (exportIndex < 0) {
+        throw new Error("interface entry does not belong to this runtime");
+      }
+      cache = { exportIndex };
       this.entryCallCache.set(entry, cache);
     }
     return cache;
@@ -5369,17 +5417,12 @@ var VirRuntime = class extends ObjectValueRuntime {
     if (cache.callSlot !== void 0) {
       return cache.callSlot;
     }
-    const namePtr = this.allocBytes(cache.nameBytes);
-    try {
-      const callSlot = this.exports.vir_resolve_call(namePtr, cache.nameBytes.byteLength) >>> 0;
-      if (callSlot === 0) {
-        throw new Error(this.lastCallError() || `call entry not found: ${entry.entry}`);
-      }
-      cache.callSlot = callSlot;
-      return callSlot;
-    } finally {
-      this.freeBytes(namePtr);
+    const callSlot = this.exports.vir_resolve_call_export(cache.exportIndex) >>> 0;
+    if (callSlot === 0) {
+      throw new Error(this.lastCallError() || `call entry not found: ${entry.entry}`);
     }
+    cache.callSlot = callSlot;
+    return callSlot;
   }
   lastCallError() {
     const len = this.exports.vir_call_error_size?.() ?? 0;
@@ -5480,15 +5523,15 @@ var VirRuntime = class extends ObjectValueRuntime {
     const len = this.exports.vir_closure_call_error_size?.() ?? 0;
     return len === 0 ? "" : this.readWasmString(this.exports.vir_closure_call_error(), len);
   }
-  dispose() {
+  dispose({ disposeBindings = true } = {}) {
     if (this.disposed) return;
-    this.teardownPackageResources();
+    this.teardownPackageResources({ disposeBindings });
     this.disposed = true;
     this.hostState = null;
     this.exportsByName = /* @__PURE__ */ Object.create(null);
   }
-  teardownPackageResources() {
-    this.hostState?.dispose();
+  teardownPackageResources({ disposeBindings = true } = {}) {
+    this.hostState?.dispose({ disposeBindings });
     this.releaseLiveCallbacks();
   }
   releaseLiveCallbacks() {
@@ -5521,13 +5564,17 @@ function isIdentifier(text) {
 var VirHostState = class {
   constructor({
     hostBindings = null,
-    defaultHostBindings = createBrowserHostBindings()
+    defaultHostBindings = createBrowserHostBindings(),
+    releaseHostBindings = null,
+    releaseDefaultHostBindings = null
   } = {}) {
     this.exports = null;
     this.manifest = null;
     this.hostImports = [];
     this.userBindings = hostBindings;
     this.defaultBindings = defaultHostBindings;
+    this.releaseHostBindings = releaseHostBindings;
+    this.releaseDefaultHostBindings = releaseDefaultHostBindings;
     this.runtime = null;
     this.resourceRoots = new ExternrefResourceRoots();
     this.leanObjectHandleCells = /* @__PURE__ */ new Set();
@@ -5659,12 +5706,18 @@ var VirHostState = class {
     const view = new DataView(this.exports.memory.buffer, argvPtr, argc * 4);
     return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
   }
-  dispose() {
+  dispose({ disposeBindings = true } = {}) {
     this.clearCallError();
     this.clearResourceRoots();
     try {
-      disposeHostBindings(this.userBindings);
-      disposeHostBindings(this.defaultBindings);
+      const disposeUserBindings = this.releaseHostBindings?.() ?? true;
+      if (disposeBindings && disposeUserBindings) {
+        disposeHostBindings(this.userBindings);
+      }
+      const disposeDefaults = this.releaseDefaultHostBindings?.() ?? true;
+      if (disposeBindings && disposeDefaults) {
+        disposeHostBindings(this.defaultBindings);
+      }
     } finally {
       this.releaseLeanObjectHandleCells();
     }
@@ -5802,6 +5855,8 @@ var VirRuntimeFactory = class {
     this.imports = imports;
     this.hostBindings = hostBindings;
     this.defaultHostBindings = defaultHostBindings;
+    this.hostBindingsLease = new HostBindingsLease(hostBindings);
+    this.defaultHostBindingsLease = defaultHostBindings !== null && typeof defaultHostBindings !== "function" ? new HostBindingsLease(defaultHostBindings) : null;
   }
   async module() {
     if (this.wasmModule !== null) {
@@ -5818,25 +5873,67 @@ var VirRuntimeFactory = class {
   }
   async instantiate() {
     const module = await this.module();
+    return this.instantiateModule(module);
+  }
+  instantiateModule(module, { disposeBindingsOnFailure = true } = {}) {
+    const hostBindings = this.hostBindingsLease.acquire();
     const defaultHostBindings = typeof this.defaultHostBindings === "function" ? this.defaultHostBindings() : this.defaultHostBindings ?? createBrowserHostBindings();
+    const defaultHostBindingsLease = this.defaultHostBindingsLease ?? new HostBindingsLease(defaultHostBindings);
+    const defaultBindings = defaultHostBindingsLease.acquire();
     const hostState = new VirHostState({
-      hostBindings: this.hostBindings,
-      defaultHostBindings
+      hostBindings: hostBindings.value,
+      defaultHostBindings: defaultBindings.value,
+      releaseHostBindings: hostBindings.release,
+      releaseDefaultHostBindings: defaultBindings.release
     });
-    const imports = typeof this.imports === "function" ? this.imports(module, hostState) : createVirImports(module, this.imports ?? {}, hostState);
-    const instance = await WebAssembly.instantiate(module, imports);
-    hostState.attach(instance.exports);
-    instance.exports.__wasm_call_ctors?.();
-    const runtime = new VirRuntime(instance.exports, { module, hostState });
-    return runtime;
+    try {
+      const imports = typeof this.imports === "function" ? this.imports(module, hostState) : createVirImports(module, this.imports ?? {}, hostState);
+      const instance = new WebAssembly.Instance(module, imports);
+      hostState.attach(instance.exports);
+      instance.exports.__wasm_call_ctors?.();
+      return new VirRuntime(instance.exports, {
+        module,
+        hostState,
+        createReplacementRuntime: () => this.instantiateModule(module, {
+          disposeBindingsOnFailure: false
+        })
+      });
+    } catch (error) {
+      hostState.dispose({ disposeBindings: disposeBindingsOnFailure });
+      throw error;
+    }
   }
   async createRuntime({ irPackageBytes = null, irPackageUrl = null } = {}) {
     const runtime = await this.instantiate();
-    if (irPackageBytes !== null || irPackageUrl !== null) {
-      const bytes = irPackageBytes ?? await this.fetchBytes(irPackageUrl);
-      await runtime.loadIrPackageBytes(bytes);
+    try {
+      if (irPackageBytes !== null || irPackageUrl !== null) {
+        const bytes = irPackageBytes ?? await this.fetchBytes(irPackageUrl);
+        runtime.loadIrPackageBytes(bytes);
+      }
+      return runtime;
+    } catch (error) {
+      runtime.dispose();
+      throw error;
     }
-    return runtime;
+  }
+};
+var HostBindingsLease = class {
+  constructor(value) {
+    this.value = value;
+    this.references = 0;
+  }
+  acquire() {
+    this.references += 1;
+    let live = true;
+    return {
+      value: this.value,
+      release: () => {
+        if (!live) return false;
+        live = false;
+        this.references -= 1;
+        return this.references === 0;
+      }
+    };
   }
 };
 function selectWasmUrl({ wasmUrl, wasmDebugUrl, debugWasm }) {

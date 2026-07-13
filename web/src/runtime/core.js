@@ -17,7 +17,6 @@ import {
   objectTypeNeedsBoxedBoundary,
 } from "./object-abi.js";
 
-const textEncoder = new TextEncoder();
 const textDecoder = new TextDecoder();
 const MAX_UINT32 = 0xffffffffn;
 const MAX_UINT64 = 0xffffffffffffffffn;
@@ -190,13 +189,13 @@ export class VirRuntime extends ObjectValueRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
-    for (const entry of this.interfaceManifest?.exports ?? []) {
+    const entries = this.interfaceManifest?.exports ?? [];
+    for (let exportIndex = 0; exportIndex < entries.length; exportIndex += 1) {
+      const entry = entries[exportIndex];
       registerManifestEntryKey(this.entriesByName, entry.entry, entry);
       registerManifestEntryKey(this.entriesByName, entry.id, entry);
       registerManifestEntryKey(this.entriesByName, entry.jsName, entry);
-      this.entryCallCache.set(entry, {
-        nameBytes: textEncoder.encode(entry.entry),
-      });
+      this.entryCallCache.set(entry, { exportIndex });
       if (entry.jsName && isIdentifier(entry.jsName)) {
         this.exportsByName[entry.jsName] = (...args) => this.callEntry(entry, args);
       }
@@ -217,7 +216,7 @@ export class VirRuntime extends ObjectValueRuntime {
 
   callEntry(entry, args) {
     this.requireLiveRuntime();
-    this.requireFunction("vir_resolve_call");
+    this.requireFunction("vir_resolve_call_export");
     if (args.length !== entry.args.length) {
       throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
     }
@@ -284,7 +283,11 @@ export class VirRuntime extends ObjectValueRuntime {
   callCacheFor(entry) {
     let cache = this.entryCallCache.get(entry);
     if (cache === undefined) {
-      cache = { nameBytes: textEncoder.encode(entry.entry) };
+      const exportIndex = this.interfaceManifest?.exports?.indexOf(entry) ?? -1;
+      if (exportIndex < 0) {
+        throw new Error("interface entry does not belong to this runtime");
+      }
+      cache = { exportIndex };
       this.entryCallCache.set(entry, cache);
     }
     return cache;
@@ -294,17 +297,12 @@ export class VirRuntime extends ObjectValueRuntime {
     if (cache.callSlot !== undefined) {
       return cache.callSlot;
     }
-    const namePtr = this.allocBytes(cache.nameBytes);
-    try {
-      const callSlot = this.exports.vir_resolve_call(namePtr, cache.nameBytes.byteLength) >>> 0;
-      if (callSlot === 0) {
-        throw new Error(this.lastCallError() || `call entry not found: ${entry.entry}`);
-      }
-      cache.callSlot = callSlot;
-      return callSlot;
-    } finally {
-      this.freeBytes(namePtr);
+    const callSlot = this.exports.vir_resolve_call_export(cache.exportIndex) >>> 0;
+    if (callSlot === 0) {
+      throw new Error(this.lastCallError() || `call entry not found: ${entry.entry}`);
     }
+    cache.callSlot = callSlot;
+    return callSlot;
   }
 
   lastCallError() {
