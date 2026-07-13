@@ -186,6 +186,12 @@ wrapper after the old callbacks, resources, host state, and binding leases are
 torn down. Nothing containing an old Wasm pointer or package-local slot may
 cross the handover.
 
+Teardown is best-effort and terminal. Host-binding disposers, resource
+disposers, Lean object handles, and closure roots are all attempted in a stable
+order; multiple failures are reported to JavaScript as an `AggregateError`
+afterward. If old-instance teardown fails during handover, the candidate is
+also disposed and the public wrapper is marked disposed.
+
 The current runtime treats the active package set as containing exactly one
 `.irpkg`; that cardinality is not intended as a permanent boundary. Future
 modular loading should extend the same candidate-instance handover to the whole
@@ -365,6 +371,13 @@ arguments to owned objects, and lifts the owned object result returned by
 `vir_closure_release`. The closure root table is re-entrant: executing a callback
 can register nested closures and may reallocate the table while a callback is
 running.
+The JavaScript import dispatcher records synchronous host exceptions out of
+band because the C++ trampoline must return a structurally valid Lean object.
+Both top-level object calls and closure calls clear and consume that same error
+slot around their execution, so the trampoline's boxed placeholder cannot turn
+a host exception into a successful retained-callback result. Callback roots
+created while lifting a host call are released if any later phase of that call
+fails; only a completely successful binding may retain them.
 This keeps the Lean heap reference count explicit while avoiding any change to
 the upstream interpreter file.
 

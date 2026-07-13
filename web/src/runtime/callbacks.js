@@ -4,6 +4,8 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
+
 const virCallbackStates = new WeakMap();
 
 export class VirCallback {
@@ -19,8 +21,10 @@ export class VirCallback {
     const state = requireVirCallbackState(this);
     if (state.released) return false;
     state.released = true;
-    state.runtime.releaseClosure(state.rootId);
-    state.runtime.untrackCallback(this);
+    const errors = [];
+    collectCleanupError(errors, () => state.runtime.releaseClosure(state.rootId));
+    collectCleanupError(errors, () => state.runtime.untrackCallback(this));
+    throwCollectedErrors(errors, "Vir callback release failed");
     return true;
   }
 
@@ -58,10 +62,17 @@ export function isVirCallback(value) {
 }
 
 export function releaseCallbacks(callbacks) {
-  for (const callback of callbacks) {
-    callback.release();
+  const pending = Array.from(callbacks);
+  if (Array.isArray(callbacks)) {
+    callbacks.length = 0;
+  } else if (typeof callbacks.clear === "function") {
+    callbacks.clear();
   }
-  callbacks.length = 0;
+  const errors = [];
+  for (const callback of pending) {
+    collectCleanupError(errors, () => callback.release());
+  }
+  throwCollectedErrors(errors, "Vir callback releases failed");
 }
 
 function requireVirCallbackState(callback) {

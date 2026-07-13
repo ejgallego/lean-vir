@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import { VirRuntime } from "./runtime/core.js";
 import { asBytes } from "./runtime/vir-codec.js";
 import { VirHostState } from "./runtime/host-state.js";
+import { collectCleanupError, throwCollectedErrors } from "./runtime/cleanup.js";
 import { createBrowserHostBindings } from "./vir-host-bindings.js";
 
 export {
@@ -169,8 +170,9 @@ export class VirRuntimeFactory {
         }),
       });
     } catch (error) {
-      hostState.dispose({ disposeBindings: disposeBindingsOnFailure });
-      throw error;
+      const errors = [error];
+      collectCleanupError(errors, () => hostState.dispose({ disposeBindings: disposeBindingsOnFailure }));
+      throwCollectedErrors(errors, "VirRuntime instantiation failed during cleanup");
     }
   }
 
@@ -183,8 +185,9 @@ export class VirRuntimeFactory {
       }
       return runtime;
     } catch (error) {
-      runtime.dispose();
-      throw error;
+      const errors = [error];
+      collectCleanupError(errors, () => runtime.dispose());
+      throwCollectedErrors(errors, "VirRuntime creation failed during cleanup");
     }
   }
 }

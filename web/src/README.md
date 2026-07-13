@@ -28,6 +28,8 @@ unrelated responsibilities.
   codec.
 - `runtime/callbacks.js`: JavaScript callable Lean closure wrappers,
   callback state tracking, release, and disposal helpers.
+- `runtime/cleanup.js`: shared cleanup error collection and deterministic
+  single/aggregate reporting.
 - `runtime/core.js`: package loading, manifest export tables, call resolution,
   memory helpers, and runtime/callback lifecycle.
 - `runtime/object-values.js`: object ABI lowering and lifting between

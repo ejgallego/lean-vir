@@ -6,7 +6,8 @@ Author: Emilio J. Gallego Arias
 
 import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING } from "../host-resource.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
-import { isVirCallback, releaseCallbacks } from "./callbacks.js";
+import { releaseCallbacks } from "./callbacks.js";
+import { collectCleanupError, throwCollectedErrors, throwWithCleanup } from "./cleanup.js";
 import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
 
@@ -28,6 +29,7 @@ export class VirHostState {
     this.resourceRoots = new ExternrefResourceRoots();
     this.leanObjectHandleCells = new Set();
     this.callError = null;
+    this.disposed = false;
   }
 
   attach(exports) {
@@ -76,6 +78,9 @@ export class VirHostState {
   }
 
   callObjects(slot, argvPtr, argc) {
+    if (this.disposed) {
+      throw new Error("Vir host state has been disposed");
+    }
     if (this.exports === null) {
       throw new Error("Vir host import called before WASM exports were attached");
     }
@@ -95,7 +100,7 @@ export class VirHostState {
     }
 
     const args = [];
-    const liftedCallbacks = [];
+    const liftedCallbacks = new Set();
     const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION;
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
@@ -103,32 +108,30 @@ export class VirHostState {
         throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
       }
       entry.args.forEach((arg, index) => {
-        const value = explicitConversionTarget
-          ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`)
-          : this.runtime.liftHostResourceObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
-        if (isVirCallback(value)) {
-          liftedCallbacks.push(value);
+        const callbacksBeforeArgument = new Set(this.runtime.liveCallbacks);
+        try {
+          const value = explicitConversionTarget
+            ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`)
+            : this.runtime.liftHostResourceObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+          args.push(value);
+        } finally {
+          captureCallbacksCreatedSince(this.runtime.liveCallbacks, callbacksBeforeArgument, liftedCallbacks);
         }
-        args.push(value);
       });
+      const value = binding(...args);
+      if (isPromiseLike(value)) {
+        throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
+      }
+      return explicitConversionTarget
+        ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`)
+        : this.runtime.makeHostResourceObjectValue(entry.result, value, `${entry.target} result`);
     } catch (error) {
-      releaseCallbacks(liftedCallbacks);
-      throw error;
+      throwWithCleanup(
+        error,
+        () => releaseCallbacks(liftedCallbacks),
+        `Vir host import ${entry.target} failed during callback cleanup`,
+      );
     }
-    let value;
-    try {
-      value = binding(...args);
-    } catch (error) {
-      releaseCallbacks(liftedCallbacks);
-      throw error;
-    }
-    if (isPromiseLike(value)) {
-      releaseCallbacks(liftedCallbacks);
-      throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
-    }
-    return explicitConversionTarget
-      ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`)
-      : this.runtime.makeHostResourceObjectValue(entry.result, value, `${entry.target} result`);
   }
 
   callObjectHandle(entry, argvPtr, argc) {
@@ -178,27 +181,35 @@ export class VirHostState {
   }
 
   dispose({ disposeBindings = true } = {}) {
+    if (this.disposed) return false;
+    this.disposed = true;
+    const errors = [];
     this.clearCallError();
-    this.clearResourceRoots();
-    try {
-      const disposeUserBindings = this.releaseHostBindings?.() ?? true;
-      if (disposeBindings && disposeUserBindings) {
-        disposeHostBindings(this.userBindings);
-      }
-      const disposeDefaults = this.releaseDefaultHostBindings?.() ?? true;
-      if (disposeBindings && disposeDefaults) {
-        disposeHostBindings(this.defaultBindings);
-      }
-    } finally {
-      this.releaseLeanObjectHandleCells();
+    collectCleanupError(errors, () => this.clearResourceRoots());
+
+    const userRelease = collectCleanupError(errors, () => this.releaseHostBindings?.() ?? true);
+    if (disposeBindings && userRelease.ok && userRelease.value) {
+      collectCleanupError(errors, () => disposeHostBindings(this.userBindings));
     }
+    const defaultRelease = collectCleanupError(errors, () => this.releaseDefaultHostBindings?.() ?? true);
+    if (disposeBindings && defaultRelease.ok && defaultRelease.value) {
+      collectCleanupError(errors, () => disposeHostBindings(this.defaultBindings));
+    }
+
+    collectCleanupError(errors, () => this.releaseLeanObjectHandleCells());
+    this.runtime = null;
+    this.exports = null;
+    throwCollectedErrors(errors, "Vir host state disposal failed");
+    return true;
   }
 
   releaseLeanObjectHandleCells() {
+    const errors = [];
     for (const cell of Array.from(this.leanObjectHandleCells)) {
-      this.runtime.releaseLeanObjectHandleCell(cell);
+      collectCleanupError(errors, () => this.runtime.releaseLeanObjectHandleCell(cell));
     }
     this.leanObjectHandleCells.clear();
+    throwCollectedErrors(errors, "Lean object handle release failed");
   }
 }
 
@@ -249,4 +260,12 @@ function lookupHostBindingIn(target, bindings) {
 
 function isPromiseLike(value) {
   return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
+}
+
+function captureCallbacksCreatedSince(liveCallbacks, callbacksBeforeArgument, liftedCallbacks) {
+  for (const callback of liveCallbacks) {
+    if (!callbacksBeforeArgument.has(callback)) {
+      liftedCallbacks.add(callback);
+    }
+  }
 }

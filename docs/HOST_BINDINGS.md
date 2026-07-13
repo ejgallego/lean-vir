@@ -235,7 +235,11 @@ unless they are part of a built-in conversion target such as `js.nat.value` or
 Function-valued Lean arguments are decoded as callable `VirCallback` objects. A
 host binding that stores a callback must eventually call `callback.release()`
 or rely on `VirRuntime.dispose()` to release any still-live callback roots. Host
-imports are synchronous; returning a `Promise` is an error.
+imports are synchronous; returning a `Promise` is an error. Callback ownership
+transfers to the binding only when the complete host call, including result
+conversion, succeeds. The runtime releases callbacks created by a failed
+argument conversion, throwing binding, Promise result, or failed result
+conversion.
 
 ## Resource Lifetime
 
@@ -319,9 +323,17 @@ need a focused pass once the API and examples are more mature:
 - later calls through `vir.call(...)`, `exportsByName`, or a callback fail with
   a disposed-runtime error.
 
+Teardown attempts every item in those groups even when a disposer throws. It
+then reports the sole cleanup error directly or multiple errors as an
+`AggregateError` in cleanup order. Runtime state is terminal before the error
+is reported, so repeated runtime disposal is a no-op and cannot rerun partially
+completed user cleanup. The underlying resource store is fully cleared but
+remains reusable by a fresh-instance package handover.
+
 Calling `vir.loadIrPackageBytes(...)` on a runtime that already has a package
-loaded performs the same package-resource cleanup before installing the new
-manifest.
+loaded performs the same package-resource cleanup during fresh-instance
+handover. If old-instance cleanup throws, the prepared candidate is discarded
+and the public runtime is left disposed rather than half-switched.
 
 ## References
 
