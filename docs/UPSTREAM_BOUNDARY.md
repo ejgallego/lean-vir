@@ -204,11 +204,6 @@ declaration when present. The returned call slot is package-local, 1-based, and
 uses `0` as the failure sentinel. Repeated calls then use
 `vir_call_resolved_objects(slot, argv, argc)` with owned Lean object arguments.
 
-`vir_resolve_call(name, len)` remains a low-level compatibility export. It
-compares the input with canonical escaped renderings of decoded names and does
-not reconstruct a `Name` by splitting dotted text. The JavaScript application
-API uses the export-index path.
-
 In package format 10, the package has an explicit section directory and a direct
 export call-summary section. `vir_call_resolved_objects` uses that table to
 validate object argument counts, effect handling, and boxed wasm32 boundary

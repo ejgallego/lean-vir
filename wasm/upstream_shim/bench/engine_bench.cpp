@@ -6,7 +6,6 @@ Author: Emilio J. Gallego Arias
 
 #include <stdint.h>
 #include <stdio.h>
-#include <string.h>
 #include <time.h>
 
 typedef struct lean_object lean_object;
@@ -14,7 +13,7 @@ typedef struct lean_object lean_object;
 extern "C" uint32_t vir_load_ir_package(uint8_t const * data, uint32_t size);
 extern "C" uint32_t vir_last_package_error_size(void);
 extern "C" char const * vir_last_package_error(void);
-extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len);
+extern "C" uint32_t vir_resolve_call_export(uint32_t export_index);
 extern "C" lean_object * vir_call_resolved_objects(uint32_t call_slot, lean_object ** argv, uint32_t argc);
 extern "C" char const * vir_call_error(void);
 extern "C" uint32_t vir_call_error_size(void);
@@ -50,6 +49,9 @@ extern "C" void vir_resource_release(uint32_t root_id) {
 static bool g_benchmark_failed = false;
 static uint32_t g_fib_slot = 0;
 static uint32_t g_sort_slot = 0;
+// These indices follow the export order of the embedded fixtures-basic package.
+static constexpr uint32_t fib_export_index = 0;
+static constexpr uint32_t sort_export_index = 2;
 
 static uint64_t monotonic_nanos() {
     struct timespec ts;
@@ -78,8 +80,8 @@ static lean_object * make_nat(uint32_t value) {
     return vir_obj_nat(text, static_cast<uint32_t>(len));
 }
 
-static uint32_t parse_nat_result(lean_object * value) {
-    char const * data = vir_obj_nat_decimal(value);
+static uint32_t parse_nat_result(lean_object * result) {
+    char const * data = vir_obj_nat_decimal(result);
     uint32_t len = vir_obj_decimal_size();
     if (data == nullptr || len == 0) {
         fprintf(stderr, "invalid Nat result object\n");
@@ -97,11 +99,11 @@ static uint32_t parse_nat_result(lean_object * value) {
     return value;
 }
 
-static uint32_t resolve_call_slot(char const * name) {
-    uint32_t slot = vir_resolve_call(name, static_cast<uint32_t>(strlen(name)));
+static uint32_t resolve_call_slot(uint32_t export_index, char const * name) {
+    uint32_t slot = vir_resolve_call_export(export_index);
     if (slot == 0) {
         uint32_t error_len = vir_call_error_size();
-        fprintf(stderr, "vir_resolve_call(%s) failed", name);
+        fprintf(stderr, "vir_resolve_call_export(%u, %s) failed", export_index, name);
         if (error_len != 0) {
             fprintf(stderr, ": %.*s", static_cast<int>(error_len), vir_call_error());
         }
@@ -199,8 +201,8 @@ int main() {
         fprintf(stderr, "\n");
         return 1;
     }
-    g_fib_slot = resolve_call_slot("fib");
-    g_sort_slot = resolve_call_slot("SortDemo.demoFromArray");
+    g_fib_slot = resolve_call_slot(fib_export_index, "fib");
+    g_sort_slot = resolve_call_slot(sort_export_index, "SortDemo.demoFromArray");
     if (g_fib_slot == 0 || g_sort_slot == 0) {
         return 1;
     }

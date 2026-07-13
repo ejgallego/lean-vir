@@ -31,24 +31,6 @@ static void cleanup_object_call_args(uint32_t argc, object ** args) {
 
 } // namespace lean::vir
 
-extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len) {
-    lean::vir::g_call_error.clear();
-    if (name_text == nullptr) {
-        lean::vir::g_call_error = "call name pointer is null";
-        return 0;
-    }
-    if (!lean::vir::package_loaded()) {
-        lean::vir::g_call_error = "no IR package has been loaded";
-        return 0;
-    }
-
-    uint32_t slot = lean::vir::package_call_slot_for_text(name_text, name_len);
-    if (slot == 0) {
-        lean::vir::g_call_error = "call entry not found";
-    }
-    return slot;
-}
-
 extern "C" uint32_t vir_resolve_call_export(uint32_t export_index) {
     lean::vir::g_call_error.clear();
     if (!lean::vir::package_loaded()) {

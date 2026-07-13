@@ -12,7 +12,6 @@ const requiredFunctionExports = [
   "vir_load_ir_package",
   "vir_last_package_error",
   "vir_last_package_error_size",
-  "vir_resolve_call",
   "vir_resolve_call_export",
   "vir_call_resolved_objects",
   "vir_call_error",
@@ -131,6 +130,9 @@ function assertRequiredExports(exports) {
     if (typeof exports[name] !== "function") {
       throw new Error(`${name} export is missing`);
     }
+  }
+  if (exports.vir_resolve_call !== undefined) {
+    throw new Error("removed vir_resolve_call export is still present");
   }
   if (!exports.memory) {
     throw new Error("memory export is missing");

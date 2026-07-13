@@ -107,7 +107,6 @@ const baseStringInput = "Lean IR boundary Aé∀Z ".repeat(8);
 const baseByteArrayInput = Uint8Array.from(Array.from({ length: 128 }, (_, index) => (index * 17) & 0xff));
 const baseArrayNatInput = Array.from({ length: 64 }, (_, index) => index + 1);
 const baseArrayStringInput = Array.from({ length: 32 }, (_, index) => `s${index}`);
-const textEncoder = new TextEncoder();
 const args = parseArgs(process.argv.slice(2));
 
 function parseArgs(argv) {
@@ -418,17 +417,8 @@ function checksumByteArray(value) {
   return value.length + (value[0] ?? 0) + (value[value.length - 1] ?? 0);
 }
 
-function resolveRawCallSlot(entry, nameBytes) {
-  const namePtr = runtime.allocBytes(nameBytes);
-  try {
-    return resolveRawCallSlotPtr(entry, namePtr, nameBytes.byteLength);
-  } finally {
-    runtime.freeBytes(namePtr);
-  }
-}
-
-function resolveRawCallSlotPtr(entry, namePtr, nameLen) {
-  const callSlot = runtime.exports.vir_resolve_call(namePtr, nameLen) >>> 0;
+function resolveRawCallSlot(entry, exportIndex) {
+  const callSlot = runtime.exports.vir_resolve_call_export(exportIndex) >>> 0;
   if (callSlot === 0) {
     throw new Error(runtime.lastCallError() || `call entry not found: ${entry.entry}`);
   }
@@ -448,29 +438,27 @@ function callRawResolvedObjects(entry, callSlot) {
 }
 
 function benchTopLevelDispatch(entry) {
-  const nameBytes = textEncoder.encode(entry.entry);
-  const callSlot = resolveRawCallSlot(entry, nameBytes);
-  const namePtr = runtime.allocBytes(nameBytes);
-  try {
-    const resolveEachCall = benchWasmRepeated("resolve-each-call", dispatchIterations, () => {
-      let acc = 0;
-      for (let i = 0; i < dispatchIterations; i++) {
-        const resolvedSlot = resolveRawCallSlotPtr(entry, namePtr, nameBytes.byteLength);
-        acc += Number(callRawResolvedObjects(entry, resolvedSlot));
-      }
-      return acc;
-    });
-    const cachedSlot = benchWasmRepeated("cached-slot", dispatchIterations, () => {
-      let acc = 0;
-      for (let i = 0; i < dispatchIterations; i++) {
-        acc += Number(callRawResolvedObjects(entry, callSlot));
-      }
-      return acc;
-    });
-    return { resolveEachCall, cachedSlot };
-  } finally {
-    runtime.freeBytes(namePtr);
+  const exportIndex = runtime.interfaceManifest.exports.indexOf(entry);
+  if (exportIndex < 0) {
+    throw new Error(`benchmark interface entry is not part of the active manifest: ${entry.entry}`);
   }
+  const callSlot = resolveRawCallSlot(entry, exportIndex);
+  const resolveEachCall = benchWasmRepeated("resolve-each-call", dispatchIterations, () => {
+    let acc = 0;
+    for (let i = 0; i < dispatchIterations; i++) {
+      const resolvedSlot = resolveRawCallSlot(entry, exportIndex);
+      acc += Number(callRawResolvedObjects(entry, resolvedSlot));
+    }
+    return acc;
+  });
+  const cachedSlot = benchWasmRepeated("cached-slot", dispatchIterations, () => {
+    let acc = 0;
+    for (let i = 0; i < dispatchIterations; i++) {
+      acc += Number(callRawResolvedObjects(entry, callSlot));
+    }
+    return acc;
+  });
+  return { resolveEachCall, cachedSlot };
 }
 
 const dispatchEntry = manifestEntry("Vir.Fixtures.Basic.branchAndSub");

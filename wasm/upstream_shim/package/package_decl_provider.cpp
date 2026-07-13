@@ -135,16 +135,6 @@ static bool run_package_initializers_state() {
     return true;
 }
 
-static uint32_t package_call_slot_matching(std::string const & text, bool boxed_name) {
-    for (size_t i = 0; i < g_entries.size(); i++) {
-        object * candidate = boxed_name ? g_entries[i].boxed_base : g_entries[i].name;
-        if (candidate && name(candidate, true).escape() == text) {
-            return static_cast<uint32_t>(i + 1);
-        }
-    }
-    return 0;
-}
-
 static uint32_t package_call_slot_matching_export(uint32_t export_index, bool boxed_entry) {
     for (size_t i = 0; i < g_entries.size(); i++) {
         if ((g_entries[i].boxed_base != nullptr) != boxed_entry) {
@@ -218,15 +208,6 @@ object * find_package_init_name(object * n) {
         }
     }
     return nullptr;
-}
-
-uint32_t package_call_slot_for_text(char const * text, size_t len) {
-    if (text == nullptr) {
-        return 0;
-    }
-    std::string call_name(text, len);
-    uint32_t boxed_slot = package_call_slot_matching(call_name, true);
-    return boxed_slot != 0 ? boxed_slot : package_call_slot_matching(call_name, false);
 }
 
 uint32_t package_call_slot_for_export(uint32_t export_index) {
