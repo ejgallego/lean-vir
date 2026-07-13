@@ -10,14 +10,16 @@ import { tmpdir } from "node:os";
 import { join, readRuntimeArtifacts } from "./shared.mjs";
 import { runFreshPackageSmoke } from "./package-generation-fresh-cases.mjs";
 import { runHostPackageSmoke } from "./package-generation-host-cases.mjs";
+import { runIrPackageLifecycleSmoke } from "./package-generation-lifecycle-cases.mjs";
 import { runUnsupportedInterfaceSmoke } from "./package-generation-unsupported-cases.mjs";
 
-const { wasmBytes } = await readRuntimeArtifacts();
+const { wasmBytes, leanPackageBytes } = await readRuntimeArtifacts();
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-fresh-"));
 try {
   await runFreshPackageSmoke({ freshDir, wasmBytes });
   await runUnsupportedInterfaceSmoke(freshDir);
   await runHostPackageSmoke({ freshDir, wasmBytes });
+  await runIrPackageLifecycleSmoke({ freshDir, wasmBytes, leanPackageBytes });
 } finally {
   await rm(freshDir, { recursive: true, force: true });
 }

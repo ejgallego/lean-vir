@@ -1056,14 +1056,10 @@ assert.throws(
   () => first.loadIrPackageBytes(badPackage),
   /invalid IR package magic/,
 );
-assert.equal(first.packageInfo, null);
-assert.equal(first.interfaceManifest, null);
-assert.equal(first.packageMetadata, null);
-assert.equal(first.packageDeclCount(), 0);
-assert.throws(
-  () => first.call("fib", 8),
-  /interface entry not found: fib/,
-);
+assert.notEqual(first.packageInfo, null);
+assert.notEqual(first.interfaceManifest, null);
+assert.notEqual(first.packageMetadata, null);
+assert.equal(first.call("fib", 8), "21");
 
 assert.throws(
   () => runtime.call("fib", -1),

@@ -24,7 +24,12 @@ const MAX_UINT64 = 0xffffffffffffffffn;
 const OBJECT_CALL_UNAVAILABLE = Symbol("object-call-unavailable");
 
 export class VirRuntime extends ObjectValueRuntime {
-  constructor(exports, { module = null, packageInfo = null, hostState = null } = {}) {
+  constructor(exports, {
+    module = null,
+    packageInfo = null,
+    hostState = null,
+    createReplacementRuntime = null,
+  } = {}) {
     super();
     this.exports = exports;
     this.module = module;
@@ -38,6 +43,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.entryCallCache = new WeakMap();
     this.disposed = false;
     this.liveCallbacks = new Set();
+    this.createReplacementRuntime = createReplacementRuntime;
     this.hostState?.attachRuntime(this);
 
     if (!this.exports.memory) {
@@ -68,14 +74,19 @@ export class VirRuntime extends ObjectValueRuntime {
 
   loadIrPackageBytes(bytes) {
     this.requireLiveRuntime();
-    this.requireFunction("vir_alloc_bytes");
-    this.requireFunction("vir_load_ir_package");
-
     const packageBytes = asBytes(bytes, "IR package bytes");
     if (this.hasPackageState() || this.liveCallbacks.size !== 0) {
-      this.teardownPackageResources();
+      if (typeof this.createReplacementRuntime !== "function") {
+        throw new Error("IR package reload requires a factory-managed VirRuntime");
+      }
+      return this.replaceIrPackageBytes(packageBytes);
     }
-    this.clearPackageMetadata();
+    return this.installIrPackageBytes(packageBytes);
+  }
+
+  installIrPackageBytes(packageBytes) {
+    this.requireFunction("vir_alloc_bytes");
+    this.requireFunction("vir_load_ir_package");
     const ptr = this.allocBytes(packageBytes);
     try {
       const count = this.exports.vir_load_ir_package(ptr, packageBytes.byteLength);
@@ -105,6 +116,44 @@ export class VirRuntime extends ObjectValueRuntime {
     }
   }
 
+  replaceIrPackageBytes(packageBytes) {
+    const replacement = this.createReplacementRuntime();
+    let packageInfo;
+    try {
+      packageInfo = replacement.installIrPackageBytes(packageBytes);
+    } catch (error) {
+      replacement.dispose({ disposeBindings: false });
+      throw error;
+    }
+
+    try {
+      this.teardownPackageResources();
+    } catch (error) {
+      replacement.dispose({ disposeBindings: false });
+      throw error;
+    }
+    this.adoptRuntimeState(replacement);
+    return packageInfo;
+  }
+
+  adoptRuntimeState(replacement) {
+    this.exports = replacement.exports;
+    this.module = replacement.module;
+    this.hostState = replacement.hostState;
+    this.packageInfo = replacement.packageInfo;
+    this.interfaceManifest = replacement.interfaceManifest;
+    this.packageMetadata = replacement.packageMetadata;
+    this.boxedCallEntryNames = replacement.boxedCallEntryNames;
+    this.liveCallbacks = replacement.liveCallbacks;
+    this.hostState?.attachRuntime(this);
+    this.rebuildManifestExports();
+
+    replacement.disposed = true;
+    replacement.hostState = null;
+    replacement.liveCallbacks = new Set();
+    replacement.exportsByName = Object.create(null);
+  }
+
   clearPackageMetadata() {
     this.packageInfo = null;
     this.interfaceManifest = null;
@@ -117,7 +166,11 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   hasPackageState() {
-    return this.packageInfo !== null || this.interfaceManifest !== null || this.packageMetadata !== null;
+    return this.packageInfo !== null ||
+      this.interfaceManifest !== null ||
+      this.packageMetadata !== null ||
+      (this.exports.vir_package_interface_manifest_size?.() ?? 0) !== 0 ||
+      (this.packageDeclCount() ?? 0) !== 0;
   }
 
   readPackageManifest() {
@@ -368,16 +421,16 @@ export class VirRuntime extends ObjectValueRuntime {
     return len === 0 ? "" : this.readWasmString(this.exports.vir_closure_call_error(), len);
   }
 
-  dispose() {
+  dispose({ disposeBindings = true } = {}) {
     if (this.disposed) return;
-    this.teardownPackageResources();
+    this.teardownPackageResources({ disposeBindings });
     this.disposed = true;
     this.hostState = null;
     this.exportsByName = Object.create(null);
   }
 
-  teardownPackageResources() {
-    this.hostState?.dispose();
+  teardownPackageResources({ disposeBindings = true } = {}) {
+    this.hostState?.dispose({ disposeBindings });
     this.releaseLiveCallbacks();
   }
 

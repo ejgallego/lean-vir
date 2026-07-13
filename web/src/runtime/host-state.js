@@ -14,12 +14,16 @@ export class VirHostState {
   constructor({
     hostBindings = null,
     defaultHostBindings = createBrowserHostBindings(),
+    releaseHostBindings = null,
+    releaseDefaultHostBindings = null,
   } = {}) {
     this.exports = null;
     this.manifest = null;
     this.hostImports = [];
     this.userBindings = hostBindings;
     this.defaultBindings = defaultHostBindings;
+    this.releaseHostBindings = releaseHostBindings;
+    this.releaseDefaultHostBindings = releaseDefaultHostBindings;
     this.runtime = null;
     this.resourceRoots = new ExternrefResourceRoots();
     this.leanObjectHandleCells = new Set();
@@ -173,12 +177,18 @@ export class VirHostState {
     return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
   }
 
-  dispose() {
+  dispose({ disposeBindings = true } = {}) {
     this.clearCallError();
     this.clearResourceRoots();
     try {
-      disposeHostBindings(this.userBindings);
-      disposeHostBindings(this.defaultBindings);
+      const disposeUserBindings = this.releaseHostBindings?.() ?? true;
+      if (disposeBindings && disposeUserBindings) {
+        disposeHostBindings(this.userBindings);
+      }
+      const disposeDefaults = this.releaseDefaultHostBindings?.() ?? true;
+      if (disposeBindings && disposeDefaults) {
+        disposeHostBindings(this.defaultBindings);
+      }
     } finally {
       this.releaseLeanObjectHandleCells();
     }
