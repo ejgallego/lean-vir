@@ -106,6 +106,33 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(aliasIoEntry.effect, "io");
   assert.equal(aliasIoEntry.result.type, "Nat");
 
+  const escapedSource = join(freshDir, "EscapedCallNames.lean");
+  const escapedPackage = join(freshDir, "escaped-call-names.irpkg");
+  const escapedReport = join(freshDir, "escaped-call-names.report.md");
+  await writeRuntimeFixture(escapedSource, "EscapedCallNames.lean");
+  const escapedGenerated = runVirIrpkg([
+    escapedPackage,
+    escapedReport,
+    "--target-all",
+    escapedSource,
+  ]);
+  assert.equal(escapedGenerated.status, 0, escapedGenerated.stderr || escapedGenerated.stdout);
+  const escapedRuntime = await factory.createRuntime({
+    irPackageBytes: await readFile(escapedPackage),
+  });
+  const dottedEntry = manifestEntry(escapedRuntime.interfaceManifest, "«foo.bar»");
+  assert.equal(dottedEntry.id, "_foo_bar_");
+  assert.equal(dottedEntry.jsName, "_foo_bar_");
+  assert.equal(escapedRuntime.call(dottedEntry.entry, 3), "4");
+  assert.equal(escapedRuntime.call(dottedEntry.id, 4), "5");
+  assert.equal(escapedRuntime.call(dottedEntry.jsName, 5), "6");
+  assert.equal(escapedRuntime.exportsByName[dottedEntry.jsName](6), "7");
+  const numericTextEntry = manifestEntry(escapedRuntime.interfaceManifest, "Numeric.«1»");
+  assert.equal(escapedRuntime.call(numericTextEntry.entry, 7), "9");
+  assert.equal(escapedRuntime.call(numericTextEntry.id, 8), "10");
+  assert.equal(escapedRuntime.call(numericTextEntry.jsName, 9), "11");
+  escapedRuntime.dispose();
+
   const freshAliasEntry = manifestEntry(freshManifest, "freshAliasBump");
   assert.equal(freshAliasEntry.args[0].type.type, "Nat");
   assert.equal(freshAliasEntry.result.type, "Nat");

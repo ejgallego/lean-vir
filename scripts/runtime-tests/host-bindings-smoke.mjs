@@ -8,6 +8,7 @@ import {
   createVirRuntime,
   createVirtualDocumentState,
   ensureVirtualElementState,
+  VIR_HOST_DISPOSE,
 } from "../../web/src/vir-runtime-node.js";
 import {
   assert,
@@ -179,18 +180,35 @@ assert.deepEqual(pendingRecords.splice(0), []);
 
 const reloadDocumentState = createVirtualDocumentState();
 const reloadRecords = [];
+let reloadBindingDisposals = 0;
+const reloadBindings = {
+  ...createCallbackHostBindings(reloadRecords),
+  [VIR_HOST_DISPOSE]() {
+    reloadBindingDisposals += 1;
+  },
+};
 const reloadRuntime = await createVirRuntime({
   wasmBytes,
   irPackageBytes: hostPackageBytes,
   virtualDocumentState: reloadDocumentState,
-  hostBindings: createCallbackHostBindings(reloadRecords),
+  hostBindings: reloadBindings,
 });
 ensureVirtualElementState(reloadDocumentState, "#reload");
 assert.equal(reloadRuntime.call("HostInterop.mountCallbackEvent", "#reload"), "1");
 assert.equal(reloadRuntime.call("HostInterop.timeoutRecord", 90), "1");
 assert.equal(reloadRuntime.call("HostInterop.animationRecord", 100), "1");
 assert.equal(reloadRuntime.liveCallbacks.size, 3);
+const badReloadPackage = Uint8Array.from(hostPackageBytes);
+badReloadPackage[4] ^= 1;
+assert.throws(
+  () => reloadRuntime.loadIrPackageBytes(badReloadPackage),
+  /invalid IR package magic/,
+);
+assert.equal(reloadBindingDisposals, 0);
+assert.equal(reloadRuntime.liveCallbacks.size, 3);
+assert.equal(reloadRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
 reloadRuntime.loadIrPackageBytes(irPackageBytes);
+assert.equal(reloadBindingDisposals, 0);
 assert.equal(reloadRuntime.packageInfo.hostImports, 0);
 assert.equal(reloadRuntime.liveCallbacks.size, 0);
 assert.throws(() => reloadRuntime.call("HostInterop.callbackRoundTrip", 1), /interface entry not found/);
@@ -199,6 +217,7 @@ reloadDocumentState.elements.get("#reload").listeners.get("click")?.[0]?.dispatc
 await wait(40);
 assert.deepEqual(reloadRecords.splice(0), []);
 reloadRuntime.dispose();
+assert.equal(reloadBindingDisposals, 1);
 
 ensureTamagotchiVirtualDom(virtualDocumentState);
 assert.equal(hostRuntime.call("Tamagotchi.uiMountFromDom"), "8");

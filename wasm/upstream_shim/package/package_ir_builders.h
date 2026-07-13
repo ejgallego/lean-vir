@@ -18,6 +18,8 @@ namespace lean::vir::package_ir {
 
 using ir::type;
 
+// Every builder consumes each `object *` argument and returns one owned result.
+// `mk_array` likewise consumes every object stored in `fields`.
 object * mk_name_str(object * prefix, std::string const & part);
 object * mk_name_num(object * prefix, size_t value);
 object * mk_array(std::vector<object *> const & fields);

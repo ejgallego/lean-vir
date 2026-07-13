@@ -82,7 +82,7 @@ sequenceDiagram
 
     JS->>RT: vir.call("entry", ...args)
     RT->>RT: lookup manifest entry
-    RT->>Wasm: vir_resolve_call(name) on first use
+    RT->>Wasm: vir_resolve_call_export(manifest index) on first use
     RT->>Codec: normalize args with interface descriptors
     RT->>Obj: lower args to Lean objects with vir_obj_* exports
     RT->>Wasm: vir_call_resolved_objects(slot, argv, argc)

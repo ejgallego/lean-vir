@@ -135,10 +135,12 @@ static bool run_package_initializers_state() {
     return true;
 }
 
-static uint32_t package_call_slot_matching(object * n, bool boxed_name) {
+static uint32_t package_call_slot_matching_export(uint32_t export_index, bool boxed_entry) {
     for (size_t i = 0; i < g_entries.size(); i++) {
-        object * candidate = boxed_name ? g_entries[i].boxed_base : g_entries[i].name;
-        if (candidate && lean_name_eq(n, candidate)) {
+        if ((g_entries[i].boxed_base != nullptr) != boxed_entry) {
+            continue;
+        }
+        if (i < g_call_summary_indices.size() && g_call_summary_indices[i] == export_index) {
             return static_cast<uint32_t>(i + 1);
         }
     }
@@ -208,9 +210,12 @@ object * find_package_init_name(object * n) {
     return nullptr;
 }
 
-uint32_t package_call_slot_for_name(object * n) {
-    uint32_t boxed_slot = package_call_slot_matching(n, true);
-    return boxed_slot != 0 ? boxed_slot : package_call_slot_matching(n, false);
+uint32_t package_call_slot_for_export(uint32_t export_index) {
+    if (export_index >= g_export_summaries.size()) {
+        return 0;
+    }
+    uint32_t boxed_slot = package_call_slot_matching_export(export_index, true);
+    return boxed_slot != 0 ? boxed_slot : package_call_slot_matching_export(export_index, false);
 }
 
 object * package_call_slot_name(uint32_t slot) {

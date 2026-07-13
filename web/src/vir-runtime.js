@@ -113,6 +113,11 @@ export class VirRuntimeFactory {
     this.imports = imports;
     this.hostBindings = hostBindings;
     this.defaultHostBindings = defaultHostBindings;
+    this.hostBindingsLease = new HostBindingsLease(hostBindings);
+    this.defaultHostBindingsLease =
+      defaultHostBindings !== null && typeof defaultHostBindings !== "function"
+        ? new HostBindingsLease(defaultHostBindings)
+        : null;
   }
 
   async module() {
@@ -131,32 +136,77 @@ export class VirRuntimeFactory {
 
   async instantiate() {
     const module = await this.module();
+    return this.instantiateModule(module);
+  }
+
+  instantiateModule(module, { disposeBindingsOnFailure = true } = {}) {
+    const hostBindings = this.hostBindingsLease.acquire();
     const defaultHostBindings =
       typeof this.defaultHostBindings === "function"
         ? this.defaultHostBindings()
         : (this.defaultHostBindings ?? createBrowserHostBindings());
+    const defaultHostBindingsLease = this.defaultHostBindingsLease ?? new HostBindingsLease(defaultHostBindings);
+    const defaultBindings = defaultHostBindingsLease.acquire();
     const hostState = new VirHostState({
-      hostBindings: this.hostBindings,
-      defaultHostBindings,
+      hostBindings: hostBindings.value,
+      defaultHostBindings: defaultBindings.value,
+      releaseHostBindings: hostBindings.release,
+      releaseDefaultHostBindings: defaultBindings.release,
     });
-    const imports =
-      typeof this.imports === "function"
-        ? this.imports(module, hostState)
-        : createVirImports(module, this.imports ?? {}, hostState);
-    const instance = await WebAssembly.instantiate(module, imports);
-    hostState.attach(instance.exports);
-    instance.exports.__wasm_call_ctors?.();
-    const runtime = new VirRuntime(instance.exports, { module, hostState });
-    return runtime;
+    try {
+      const imports =
+        typeof this.imports === "function"
+          ? this.imports(module, hostState)
+          : createVirImports(module, this.imports ?? {}, hostState);
+      const instance = new WebAssembly.Instance(module, imports);
+      hostState.attach(instance.exports);
+      instance.exports.__wasm_call_ctors?.();
+      return new VirRuntime(instance.exports, {
+        module,
+        hostState,
+        createReplacementRuntime: () => this.instantiateModule(module, {
+          disposeBindingsOnFailure: false,
+        }),
+      });
+    } catch (error) {
+      hostState.dispose({ disposeBindings: disposeBindingsOnFailure });
+      throw error;
+    }
   }
 
   async createRuntime({ irPackageBytes = null, irPackageUrl = null } = {}) {
     const runtime = await this.instantiate();
-    if (irPackageBytes !== null || irPackageUrl !== null) {
-      const bytes = irPackageBytes ?? (await this.fetchBytes(irPackageUrl));
-      await runtime.loadIrPackageBytes(bytes);
+    try {
+      if (irPackageBytes !== null || irPackageUrl !== null) {
+        const bytes = irPackageBytes ?? (await this.fetchBytes(irPackageUrl));
+        runtime.loadIrPackageBytes(bytes);
+      }
+      return runtime;
+    } catch (error) {
+      runtime.dispose();
+      throw error;
     }
-    return runtime;
+  }
+}
+
+class HostBindingsLease {
+  constructor(value) {
+    this.value = value;
+    this.references = 0;
+  }
+
+  acquire() {
+    this.references += 1;
+    let live = true;
+    return {
+      value: this.value,
+      release: () => {
+        if (!live) return false;
+        live = false;
+        this.references -= 1;
+        return this.references === 0;
+      },
+    };
   }
 }
 

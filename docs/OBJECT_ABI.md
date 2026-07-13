@@ -51,7 +51,7 @@ documented in [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md).
 
 | Export | Role | Ownership and lifetime |
 | --- | --- | --- |
-| `vir_resolve_call` | Resolve a package entry name to a stable call slot. | Does not transfer object ownership. |
+| `vir_resolve_call_export` | Resolve a zero-based manifest export index through the package's structural export-summary table. | Returns a package-local slot and does not transfer object ownership. This is the JavaScript runtime path. |
 | `vir_call_resolved_objects` | Call a resolved package slot with already-lowered Lean object arguments. | Consumes all argument objects after accepting a non-null `argv`; returns one owned result object or `0` on failure. |
 | `vir_call_error` | Return a borrowed pointer to the last package object-call diagnostic. | Borrowed until the next object call or package/runtime teardown. |
 | `vir_call_error_size` | Return the byte length of `vir_call_error`. | No object ownership. |

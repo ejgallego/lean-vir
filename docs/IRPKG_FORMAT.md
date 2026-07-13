@@ -43,6 +43,16 @@ stream used. Format 10 makes the envelope self-describing; it does not add
 deeper semantic validation beyond required sections, bounds, duplicate-section
 checks, and section-local trailing-byte checks.
 
+The export-summary array order is also the structural call identity used by
+`vir_resolve_call_export`. JavaScript resolves all public keys for a manifest
+export to that export's array index, so escaped dots and string-versus-numeric
+name components are never recovered by parsing `Name.toString` output.
+
+Decoded Lean objects are runtime-owned, not views into the package bytes.
+Package IR constructor helpers consume owned child references, and the decoded
+package owner releases the complete graph both when a later section fails and
+when the package state is cleared.
+
 ## Inspecting
 
 Use:

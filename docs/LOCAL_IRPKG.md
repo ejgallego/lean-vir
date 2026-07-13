@@ -120,7 +120,11 @@ type tree. It also includes `hostImports` for Lean declarations marked with
 host boundary.
 JavaScript validates inputs against that manifest, lowers values to owned Lean
 objects with `vir_obj_*` helpers, and calls
-`vir_call_resolved_objects`. When interpreted Lean code reaches a host import,
+`vir_call_resolved_objects`. The runtime maps all three public manifest keys
+(`entry`, `id`, and `jsName`) to the manifest export's array index; Wasm then
+uses the structurally decoded export-summary table to select the package-local
+call slot. Lean display names are not split or reparsed. When interpreted Lean
+code reaches a host import,
 the shim calls the runtime's `env.vir_js_call_objects` import with borrowed Lean
 object arguments, and JavaScript returns an owned Lean object result. Package
 format 10 keeps package-owned direct summaries for object-call validation and
@@ -193,6 +197,18 @@ This is still the single-file declaration package path. It does not load
 `.olean`, `.ir`, or full Lean module data. The package generator elaborates the
 source with Lean 4.32.0-rc1, extracts typed `Lean.IR.Decl` values, and writes the
 current package format. The WASM side decodes that package into real Lean IR
-objects and serves them through `lean_ir_find_env_decl`. Loading a new package
-replaces the previous provider state; a failed load clears it so stale
-declarations cannot be called accidentally.
+objects and serves them through `lean_ir_find_env_decl`.
+
+Replacing a package through `VirRuntime.loadIrPackageBytes` creates a fresh
+Wasm interpreter instance and loads and validates the candidate there first.
+On success, the existing public `VirRuntime` object adopts the candidate and
+then exposes its manifest and call slots. The old instance's callbacks,
+resources, and per-instance host state are released during handover. Object
+pointers, callback roots, resource roots, and cached package slots from the old
+instance are invalid after that handover.
+
+Replacement is atomic at the public runtime boundary: if candidate loading or
+manifest validation fails, the candidate is discarded and the previous
+package remains callable. The fresh-instance rule is required because the
+upstream interpreter keeps native-symbol and initializer-global caches for the
+lifetime of an interpreter instance.

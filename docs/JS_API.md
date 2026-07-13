@@ -187,6 +187,32 @@ const first = await factory.createRuntime({ irPackageBytes });
 const second = await factory.createRuntime({ irPackageBytes });
 ```
 
+## Replacing A Package
+
+`vir.loadIrPackageBytes(bytes)` is synchronous once the Wasm module has been
+compiled. Calling it on a loaded, factory-managed runtime preserves the public
+`vir` object but replaces its underlying Wasm instance:
+
+```js
+const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
+const vir = await factory.createRuntime({ irPackageBytes: firstPackage });
+
+vir.loadIrPackageBytes(secondPackage);
+console.log(vir.call("SecondPackage.entry"));
+```
+
+The second package is loaded, initialized, and manifest-validated in a fresh
+candidate instance before handover. If that work fails, the candidate is
+disposed and the first package remains usable. After a successful handover,
+old object pointers, `VirCallback` objects, host-resource roots, and resolved
+call slots are invalid. The runtime releases the old package resources once,
+reattaches the new host state to the same public wrapper, and rebuilds its
+manifest lookup and call caches.
+
+Factories reuse the compiled `WebAssembly.Module`, not interpreter state.
+User-supplied binding maps shared across a handover are reference-leased so
+their cleanup hook runs once when the final runtime using the map is disposed.
+
 ## Calls And Manifest
 
 - `vir.interfaceManifest` is the embedded package manifest.
@@ -436,9 +462,10 @@ numeric root id.
 
 `vir.dispose()` releases any `VirCallback` objects still tracked by the runtime
 and calls host-binding cleanup hooks. Calling `vir.loadIrPackageBytes(...)` on a
-runtime that already has a package loaded performs the same package-resource
-cleanup before installing the new manifest. See `docs/HOST_BINDINGS.md` for the
-built-in resource cleanup behavior.
+runtime that already has a package loaded performs an atomic fresh-instance
+replacement as described above. Old package resources are cleaned up only
+after the candidate package has loaded successfully. See `docs/HOST_BINDINGS.md`
+for the built-in resource cleanup behavior.
 
 See `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed callback ownership
 contract and follow-up work.

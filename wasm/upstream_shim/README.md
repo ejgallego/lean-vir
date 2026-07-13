@@ -29,13 +29,13 @@ coupling. Line counts are approximate and are meant for sizing, not policy.
 | Area | Files | Approx. LOC | Package coupling | Notes |
 | --- | --- | ---: | --- | --- |
 | Package envelope decoding | `package/package_section_directory.cpp`, `package/package_section_directory.h`, `package/package_binary_reader.h`, `package/package_decl_provider_types.h` | 289 | Direct | Reads the `.irpkg` header and section directory, checks required sections, and validates section bounds. |
-| Package payload decoding | `package/package_ir_decoder.cpp` | 467 | Direct | Decodes section payloads into package declarations, init globals, host imports, export summaries, and the embedded manifest. |
-| Package IR object materialization | `package/package_ir_builders.cpp`, `package/package_ir_builders.h` | 285 | Direct IR object layout | Reconstructs Lean IR objects from decoded package fields. |
-| Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 373 | Direct | Owns loaded package indices, declaration lookup, call slots, direct export call summaries, interface manifest, and init globals. |
+| Package payload decoding | `package/package_ir_decoder.cpp` | 552 | Direct | Decodes section payloads into package declarations, init globals, host imports, export summaries, and the embedded manifest, with scoped cleanup for partial graphs. |
+| Package IR object materialization | `package/package_ir_builders.cpp`, `package/package_ir_builders.h` | 279 | Direct IR object layout | Reconstructs Lean IR objects from decoded package fields under a consuming-child ownership convention. |
+| Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 398 | Direct | Owns loaded package indices, declaration lookup, structural export-index call slots, direct export call summaries, interface manifest, and init globals. |
 | Package load ABI | `package/package_loader_abi.cpp` | 49 | Direct | Exposes package byte allocation, package loading, package errors, and interface manifest access to JavaScript. |
 | Host import dispatch | `package/host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |
 | Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `runtime/native_symbols_registry.inc` | 1696 | Declaration/native symbol coupling | Mostly runtime coverage and lookup policy, not package byte-format parsing. |
-| JavaScript package-call ABI | `abi/call_abi.cpp` | 122 | Consumes package metadata | Thin JS-facing entry point over call slots and direct call summaries. |
+| JavaScript package-call ABI | `abi/call_abi.cpp` | 134 | Consumes package metadata | Thin JS-facing entry point over call slots and direct call summaries. |
 | Upstream interpreter bridge | `interpreter/interpreter_bridge.cpp/.h` | 102 | Low | Initializes the upstream interpreter and provides `lean_ir_find_env_decl` hooks. |
 | Object/resource/closure ABI | `abi/object_abi.cpp`, `abi/object_expr_abi.cpp`, `abi/resource_abi.cpp/.h`, `abi/closure_abi.cpp` | 776 | Low | Runtime object boundary used after explicit lowering; `object_expr_abi.cpp` is fixture/parser support. |
 | Lean object construction helpers | `runtime/lean_object_constructors.cpp`, `runtime/name_utils.cpp/.h` | 435 | Support | Temporary constructors and name helpers needed while package decoding constructs Lean objects directly. |

@@ -81,7 +81,7 @@ not a fork of Lean. It is split by responsibility:
 - `package/package_section_directory.cpp` owns `.irpkg` envelope and section
   directory decoding.
 - `package/package_ir_decoder.cpp` owns section payload decoding and Lean IR
-  object materialization.
+  object materialization, including cleanup of partial decode graphs.
 - `package/package_decl_provider.cpp` owns loaded package state, declaration lookup,
   host import metadata, and initializer execution.
 - `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
@@ -100,9 +100,9 @@ Together they supply:
 - small WASI/platform stubs for C++ exception throwing, trace/time/options
   hooks, and the few environment helpers pulled in by the interpreter.
 - the generic package call interface used by the JavaScript runtime for
-  manifest-supported functions. The runtime resolves each export once with
-  `vir_resolve_call` and then calls `vir_call_resolved_objects` with the cached
-  slot.
+  manifest-supported functions. The runtime resolves each manifest export once
+  with `vir_resolve_call_export` and then calls `vir_call_resolved_objects` with
+  the cached slot.
 - package-scoped JavaScript host import trampolines for declarations marked
   with `@[vir_js "..."]`, routed through `env.vir_js_call_objects`.
 - Lean closure roots for function-valued host-import arguments. The closure ABI owns
@@ -170,11 +170,50 @@ browser and smoke-test diagnostics.
 See `docs/GENERATE_PACKAGE.md` for the package generator module map and
 diagnostic flow.
 
+## Package Instance Lifecycle
+
+The upstream interpreter caches native-symbol results and initialized globals
+for its process lifetime. The local provider can clear decoded declarations,
+but it cannot prove a complete reset of those upstream caches without changing
+`third_party/lean4-src/src/library/ir_interpreter.cpp`. Public package
+replacement therefore uses a fresh `WebAssembly.Instance` while reusing the
+already-compiled `WebAssembly.Module`.
+
+`VirRuntime.loadIrPackageBytes` first instantiates and fully loads a candidate.
+A candidate failure disposes only that instance, leaving the active package
+callable. A successful candidate is handed to the existing public runtime
+wrapper after the old callbacks, resources, host state, and binding leases are
+torn down. Nothing containing an old Wasm pointer or package-local slot may
+cross the handover.
+
+The current runtime treats the active package set as containing exactly one
+`.irpkg`; that cardinality is not intended as a permanent boundary. Future
+modular loading should extend the same candidate-instance handover to the whole
+package set: construct a fresh instance, load and validate the complete set,
+then adopt it atomically. Adding, updating, or removing one package should not
+leave the active instance with a partially updated dependency graph.
+
+Manifest export indices are scoped to one package manifest and are not global
+or stable package identities. A future multi-package call ABI will need package
+context, an aggregate manifest, or an opaque handle around that index. This
+work deliberately leaves package handles, dependency and initializer ordering,
+conflict policy, and individual unload semantics undefined.
+
+Within one instance, the package decoder owns every object it materializes.
+The helpers in `package_ir_builders.*` consume their owned object arguments,
+and the decoded-package owner releases top-level declarations, names,
+initializer mappings, host imports, and export summaries on failure or clear.
+The decoder also reads binary fields into named locals before constructor calls;
+its correctness does not depend on C++ argument evaluation order.
+
 ## Package Call ABI
 
-The browser runtime does not send a dotted Lean entry name on every call. After
-loading an `.irpkg`, it resolves a manifest export once with
-`vir_resolve_call(name, len)`. The returned slot is package-local, 1-based, and
+The browser runtime does not send or parse a Lean display name on every call.
+After loading an `.irpkg`, it maps `entry`, `id`, and `jsName` to one manifest
+export record and resolves that record's zero-based array index with
+`vir_resolve_call_export(export_index)`. The provider matches the index against
+the structurally decoded export-summary names, preferring the generated boxed
+declaration when present. The returned call slot is package-local, 1-based, and
 uses `0` as the failure sentinel. Repeated calls then use
 `vir_call_resolved_objects(slot, argv, argc)` with owned Lean object arguments.
 

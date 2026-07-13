@@ -7,7 +7,6 @@ Author: Emilio J. Gallego Arias
 #include "interpreter/interpreter_bridge.h"
 
 #include "package/decl_provider.h"
-#include "runtime/name_utils.h"
 
 #include <stdint.h>
 
@@ -32,21 +31,16 @@ static void cleanup_object_call_args(uint32_t argc, object ** args) {
 
 } // namespace lean::vir
 
-extern "C" uint32_t vir_resolve_call(char const * name_text, uint32_t name_len) {
+extern "C" uint32_t vir_resolve_call_export(uint32_t export_index) {
     lean::vir::g_call_error.clear();
-    if (name_text == nullptr) {
-        lean::vir::g_call_error = "call name pointer is null";
-        return 0;
-    }
     if (!lean::vir::package_loaded()) {
         lean::vir::g_call_error = "no IR package has been loaded";
         return 0;
     }
 
-    lean::name fn = lean::name_from_dotted(name_text, name_len);
-    uint32_t slot = lean::vir::package_call_slot_for_name(fn.to_obj_arg());
+    uint32_t slot = lean::vir::package_call_slot_for_export(export_index);
     if (slot == 0) {
-        lean::vir::g_call_error = "call entry not found";
+        lean::vir::g_call_error = "package export is not registered";
     }
     return slot;
 }
