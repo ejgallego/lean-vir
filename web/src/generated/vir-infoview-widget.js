@@ -5777,7 +5777,7 @@ var VirHostState = class {
     return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
   }
   dispose({ disposeBindings = true } = {}) {
-    if (this.disposed) return false;
+    if (this.disposed) return;
     this.disposed = true;
     const errors = [];
     this.clearCallError();
@@ -5794,7 +5794,6 @@ var VirHostState = class {
     this.runtime = null;
     this.exports = null;
     throwCollectedErrors(errors, "Vir host state disposal failed");
-    return true;
   }
   releaseLeanObjectHandleCells() {
     const errors = [];

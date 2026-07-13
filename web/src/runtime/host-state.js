@@ -181,7 +181,7 @@ export class VirHostState {
   }
 
   dispose({ disposeBindings = true } = {}) {
-    if (this.disposed) return false;
+    if (this.disposed) return;
     this.disposed = true;
     const errors = [];
     this.clearCallError();
@@ -200,7 +200,6 @@ export class VirHostState {
     this.runtime = null;
     this.exports = null;
     throwCollectedErrors(errors, "Vir host state disposal failed");
-    return true;
   }
 
   releaseLeanObjectHandleCells() {

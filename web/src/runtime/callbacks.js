@@ -57,10 +57,6 @@ export function createVirCallback(runtime, rootId, type) {
   return callback;
 }
 
-export function isVirCallback(value) {
-  return typeof value === "function" && virCallbackStates.has(value);
-}
-
 export function releaseCallbacks(callbacks) {
   const pending = Array.from(callbacks);
   if (Array.isArray(callbacks)) {
