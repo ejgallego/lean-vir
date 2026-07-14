@@ -24,7 +24,9 @@ import {
   leanPackageFile,
   packageFiles,
   packagePresets,
+  prettyPackageFile,
 } from "./browser-package-config.mjs";
+import { packageInfoFor } from "./browser-smoke-dev-runner.mjs";
 
 export async function smokeLanding(cdp, origin) {
   await navigate(cdp, `${origin}${basePath}`);
@@ -87,6 +89,7 @@ export async function smokeLanding(cdp, origin) {
 }
 
 export async function smokeFormatWorkbench(cdp, origin) {
+  const packageInfo = await packageInfoFor(prettyPackageFile);
   await navigate(cdp, `${origin}${basePath}format.html?case=list&width=12`);
   await waitForBrowserState(cdp, `(() => {
     const status = document.querySelector("#format-status")?.textContent?.trim();
@@ -111,7 +114,7 @@ export async function smokeFormatWorkbench(cdp, origin) {
     source: document.querySelector("#format-source")?.textContent,
   })`);
   assert.equal(loaded.status, "Ready");
-  assert.equal(loaded.exports, "4");
+  assert.equal(loaded.exports, String(packageInfo.manifest.exports.length));
   assert.equal(loaded.width, "12");
   assert.equal(loaded.active, "list");
   assert.equal(loaded.ruler, "|------------| 12");
@@ -138,6 +141,7 @@ export async function smokeFormatWorkbench(cdp, origin) {
 }
 
 export async function smokePackagePreset(cdp, origin) {
+  const packageInfo = await packageInfoFor(hostPackageFile);
   await navigate(cdp, `${origin}${basePath}dev.html`);
   await waitForReady(cdp);
   const state = await evaluate(cdp, `({
@@ -167,7 +171,7 @@ export async function smokePackagePreset(cdp, origin) {
     status: "Ready",
     packageName: hostPackageFile,
     packageUrl: hostPackageFile,
-    entryCount: 52,
+    entryCount: packageInfo.manifest.exports.length,
   });
 }
 
