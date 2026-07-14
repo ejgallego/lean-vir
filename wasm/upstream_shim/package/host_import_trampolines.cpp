@@ -45,6 +45,9 @@ static object * call_js_import(uint32_t slot, uint32_t argc, object ** args) {
         slot,
         args == nullptr ? nullptr : args + erased_prefix_args,
         js_argc);
+    // JavaScript records host exceptions out of band and consumes them at the
+    // owning top-level or closure call. Keep the interpreter result structurally
+    // valid until that boundary reports the recorded exception.
     if (value == nullptr) {
         value = lean_box(0);
     }

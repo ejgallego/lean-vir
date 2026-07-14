@@ -14,6 +14,7 @@ const root = new URL("..", import.meta.url).pathname;
 const tests = [
   { id: "manifest", file: "scripts/runtime-tests/manifest-smoke.mjs", group: "pure" },
   { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", group: "pure" },
+  { id: "callback-lifecycle", file: "scripts/runtime-tests/callback-lifecycle-smoke.mjs", group: "pure" },
   { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },
   { id: "object-abi", file: "scripts/runtime-tests/object-abi-smoke.mjs", group: "pure" },
   { id: "package-generator", file: "scripts/runtime-tests/package-generator-smoke.mjs", group: "lean" },

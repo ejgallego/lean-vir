@@ -24,6 +24,7 @@ import {
   setReactPropsRef,
 } from "../react/vir-react-node.js";
 import { createNullableValue } from "./vir-js-value-bindings.js";
+import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
 
 export class HostResourceState {
   constructor() {
@@ -72,15 +73,20 @@ export class HostResourceState {
   withTemporaryResourceScope(run) {
     const scope = new Set();
     this.temporaryResourceScopes.push(scope);
+    const errors = [];
+    let result;
     try {
-      return run();
+      const attempted = collectCleanupError(errors, run);
+      result = attempted.value;
     } finally {
       this.temporaryResourceScopes.pop();
       for (const resource of Array.from(scope)) {
-        this.releaseResource(resource);
+        collectCleanupError(errors, () => this.releaseResource(resource));
       }
       scope.clear();
     }
+    throwCollectedErrors(errors, "temporary host resource scope cleanup failed");
+    return result;
   }
 
   releaseResource(resource) {
@@ -145,29 +151,40 @@ export class HostResourceState {
   }
 
   dispose() {
+    const errors = [];
     for (const value of Array.from(this.disposables)) {
-      if (typeof value.dispose === "function") {
-        value.dispose();
-      } else if (typeof value.remove === "function") {
-        value.remove();
-      } else if (typeof value.clear === "function") {
-        value.clear();
-      } else if (typeof value.cancel === "function") {
-        value.cancel();
-      } else if (typeof value.unmount === "function") {
-        value.unmount();
-      }
+      collectCleanupError(errors, () => disposeHostResourceValue(value));
     }
     this.disposables.clear();
     for (const resource of Array.from(this.liveResources)) {
-      this.releaseResource(resource);
+      collectCleanupError(errors, () => this.releaseResource(resource));
     }
     this.resources = new WeakMap();
     this.primitiveResources.clear();
     this.liveResources.clear();
     this.temporaryResourceScopes.length = 0;
+    throwCollectedErrors(errors, "host resource disposal failed");
     return undefined;
   }
+}
+
+function disposeHostResourceValue(value) {
+  if (typeof value.dispose === "function") {
+    return value.dispose();
+  }
+  if (typeof value.remove === "function") {
+    return value.remove();
+  }
+  if (typeof value.clear === "function") {
+    return value.clear();
+  }
+  if (typeof value.cancel === "function") {
+    return value.cancel();
+  }
+  if (typeof value.unmount === "function") {
+    return value.unmount();
+  }
+  return undefined;
 }
 
 function isWeakMapKey(value) {

@@ -14,6 +14,7 @@ export const SDK_PAYLOADS = [
   ["js/vir-react-dom-client.js", "web/src/vir-react-dom-client.js"],
   ["js/host-resource.js", "web/src/host-resource.js"],
   ["js/runtime/callbacks.js", "web/src/runtime/callbacks.js"],
+  ["js/runtime/cleanup.js", "web/src/runtime/cleanup.js"],
   ["js/runtime/core.js", "web/src/runtime/core.js"],
   ["js/runtime/object-values.js", "web/src/runtime/object-values.js"],
   ["js/runtime/vir-codec.js", "web/src/runtime/vir-codec.js"],

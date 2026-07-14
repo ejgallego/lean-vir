@@ -80,6 +80,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `vir-runtime.js` | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring. |
 | `vir-runtime-node.js` | Node wrapper that installs virtual browser and React host bindings for tests/tools. |
 | `runtime/callbacks.js` | JavaScript callable Lean closure wrappers, callback state tracking, release, and disposal helpers. |
+| `runtime/cleanup.js` | Cleanup error collection with deterministic single-error and aggregate reporting. |
 | `runtime/core.js` | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
 | `runtime/object-values.js` | Object ABI lowering and lifting between JavaScript values and owned Lean objects. |
 | `runtime/vir-codec.js` | Binary reader/writer and interface type descriptor codec. |
@@ -208,6 +209,11 @@ old object pointers, `VirCallback` objects, host-resource roots, and resolved
 call slots are invalid. The runtime releases the old package resources once,
 reattaches the new host state to the same public wrapper, and rebuilds its
 manifest lookup and call caches.
+
+If cleanup of the old instance throws during handover, cleanup still attempts
+every old resource and callback, the candidate is discarded, and the public
+wrapper becomes disposed. This avoids exposing either a partially torn-down
+old instance or a partially adopted replacement.
 
 Factories reuse the compiled `WebAssembly.Module`, not interpreter state.
 User-supplied binding maps shared across a handover are reference-leased so
@@ -431,7 +437,11 @@ default bindings. `Unit` returns use `undefined` or `null`. Function-valued
 Lean arguments are decoded as callable `VirCallback` objects. A host binding
 that stores a callback must eventually call `callback.release()` or rely on
 `VirRuntime.dispose()` to release any still-live callback roots. Host imports
-are synchronous; returning a `Promise` is an error. Object-style
+are synchronous; returning a `Promise` is an error. If argument conversion,
+the binding itself, the synchronous-result check, or result conversion fails,
+the runtime releases every callback newly lifted for that host call. A
+successful binding may retain those callbacks under the ownership rule above.
+Object-style
 `imports` factory options are treated as overrides on top of the generated
 import table. If you provide a custom `imports` function to
 `createVirRuntimeFactory`, call `createVirImports(module, overrides, hostState)`
@@ -460,8 +470,18 @@ values flow from Lean to JavaScript as callable `VirCallback` objects backed by
 internal closure root ids. `VirCallback` objects intentionally do not expose a
 numeric root id.
 
+Synchronous JavaScript exceptions raised by a host binding are recorded by the
+Wasm import boundary and consumed by the owning call. This applies equally to
+top-level exports and retained callbacks: the original host error is thrown
+once before any placeholder interpreter result can be treated as success.
+
 `vir.dispose()` releases any `VirCallback` objects still tracked by the runtime
-and calls host-binding cleanup hooks. Calling `vir.loadIrPackageBytes(...)` on a
+and calls host-binding cleanup hooks. Cleanup is terminal and best-effort: all
+binding hooks, resources, Lean object handles, and callbacks are attempted even
+if one throws. One cleanup failure is rethrown directly; multiple failures are
+reported as an `AggregateError` in cleanup order. The runtime remains disposed,
+and a later `dispose()` is a no-op.
+Calling `vir.loadIrPackageBytes(...)` on a
 runtime that already has a package loaded performs an atomic fresh-instance
 replacement as described above. Old package resources are cleaned up only
 after the candidate package has loaded successfully. See `docs/HOST_BINDINGS.md`

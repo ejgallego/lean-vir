@@ -2,8 +2,7 @@
 
 `Lean.Vir.Browser.Element.addEventListener`, `Timer.setTimeout`, and
 `Animation.requestAnimationFrame` are the callback APIs for browser-driven
-reentry into Lean. The earlier string-named event entrypoint binding has been
-removed; event listeners now use retained Lean closures directly.
+reentry into Lean. Event listeners use retained Lean closures directly.
 
 ## Current Contract
 
@@ -20,11 +19,21 @@ removed; event listeners now use retained Lean closures directly.
   `vir_closure_release` export to decrement the rooted Lean closure.
 - Browser listener, timeout, and animation-frame bindings retain callbacks until
   the registration fires, is cancelled/removed, or the runtime is disposed.
+- A host import may retain its lifted callbacks only after argument conversion,
+  binding execution, synchronous-result validation, and result conversion all
+  succeed. Failure in any phase releases the callbacks created for that import;
+  callbacks retained by successful nested calls remain live.
+- Synchronous host exceptions are relayed to the owning top-level call or
+  retained callback call instead of accepting the trampoline's placeholder
+  result as success.
 - `VirRuntime.dispose()` runs host-binding cleanup and releases any remaining
-  callback roots. After disposal, `vir.call(...)` and callback calls fail.
-- Loading a new package into an existing runtime first tears down host-owned
-  registrations from the previous package and releases outstanding callback
-  roots.
+  callback roots. Cleanup attempts every binding, resource, object handle, and
+  callback before reporting failures, and the runtime remains terminal even if
+  cleanup throws. After disposal, `vir.call(...)` and callback calls fail.
+- Loading a new package into an existing runtime validates a fresh candidate
+  before tearing down host-owned registrations and callback roots from the
+  previous package. If old-instance cleanup fails, the candidate is discarded
+  and the public runtime remains disposed.
 
 The runtime is still synchronous at the host-import boundary. A JavaScript host
 binding must not return a `Promise`; asynchronous browser APIs are represented by
@@ -73,6 +82,11 @@ callback from the current callback.
   `test.callNatCallback` host import using explicit `Js Nat` values;
 - double release, call-after-release, and stale closure root failure;
 - nested callback argument errors while Lean is inside a host import;
+- retained-callback host-error propagation through direct, event, timer, and
+  animation calls;
+- failed host-import callback rollback during argument conversion, binding
+  execution, Promise-result validation, and result conversion, including
+  reentrant ownership isolation;
 - callback-backed event listener dispatch, listener removal, and runtime
   teardown cleanup;
 - one-shot `setTimeout`, cancelled timeout, and a recursive timeout loop;
@@ -87,6 +101,8 @@ callback from the current callback.
 - browser-page smoke coverage for real DOM click dispatch, `setTimeout`,
   `requestAnimationFrame`, cancellation/removal, package reload cleanup, and
   direct runtime disposal;
+- callback, resource, binding, and package-handover cleanup when disposers throw,
+  including preservation of simultaneous primary and cleanup failures;
 - manifest descriptor round-trips for host-import function types.
 
 ## Remaining Work

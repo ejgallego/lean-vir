@@ -941,6 +941,29 @@ function jsFloatPayload(value) {
   return value;
 }
 
+// web/src/runtime/cleanup.js
+function collectCleanupError(errors, cleanup) {
+  try {
+    return { ok: true, value: cleanup() };
+  } catch (error) {
+    errors.push(asError(error));
+    return { ok: false, value: void 0 };
+  }
+}
+function throwCollectedErrors(errors, message) {
+  if (errors.length === 0) return;
+  if (errors.length === 1) throw errors[0];
+  throw new AggregateError(errors, message);
+}
+function throwWithCleanup(error, cleanup, message) {
+  const errors = [asError(error)];
+  collectCleanupError(errors, cleanup);
+  throwCollectedErrors(errors, message);
+}
+function asError(error) {
+  return error instanceof Error ? error : new Error(String(error));
+}
+
 // web/src/host/vir-host-resources.js
 var HostResourceState = class {
   constructor() {
@@ -986,15 +1009,20 @@ var HostResourceState = class {
   withTemporaryResourceScope(run) {
     const scope = /* @__PURE__ */ new Set();
     this.temporaryResourceScopes.push(scope);
+    const errors = [];
+    let result;
     try {
-      return run();
+      const attempted = collectCleanupError(errors, run);
+      result = attempted.value;
     } finally {
       this.temporaryResourceScopes.pop();
       for (const resource of Array.from(scope)) {
-        this.releaseResource(resource);
+        collectCleanupError(errors, () => this.releaseResource(resource));
       }
       scope.clear();
     }
+    throwCollectedErrors(errors, "temporary host resource scope cleanup failed");
+    return result;
   }
   releaseResource(resource) {
     const value = hostResourceValue(resource);
@@ -1052,30 +1080,40 @@ var HostResourceState = class {
     return value;
   }
   dispose() {
+    const errors = [];
     for (const value of Array.from(this.disposables)) {
-      if (typeof value.dispose === "function") {
-        value.dispose();
-      } else if (typeof value.remove === "function") {
-        value.remove();
-      } else if (typeof value.clear === "function") {
-        value.clear();
-      } else if (typeof value.cancel === "function") {
-        value.cancel();
-      } else if (typeof value.unmount === "function") {
-        value.unmount();
-      }
+      collectCleanupError(errors, () => disposeHostResourceValue(value));
     }
     this.disposables.clear();
     for (const resource of Array.from(this.liveResources)) {
-      this.releaseResource(resource);
+      collectCleanupError(errors, () => this.releaseResource(resource));
     }
     this.resources = /* @__PURE__ */ new WeakMap();
     this.primitiveResources.clear();
     this.liveResources.clear();
     this.temporaryResourceScopes.length = 0;
+    throwCollectedErrors(errors, "host resource disposal failed");
     return void 0;
   }
 };
+function disposeHostResourceValue(value) {
+  if (typeof value.dispose === "function") {
+    return value.dispose();
+  }
+  if (typeof value.remove === "function") {
+    return value.remove();
+  }
+  if (typeof value.clear === "function") {
+    return value.clear();
+  }
+  if (typeof value.cancel === "function") {
+    return value.cancel();
+  }
+  if (typeof value.unmount === "function") {
+    return value.unmount();
+  }
+  return void 0;
+}
 function isWeakMapKey(value) {
   return typeof value === "object" && value !== null || typeof value === "function";
 }
@@ -2936,8 +2974,10 @@ var VirCallback = class {
     const state = requireVirCallbackState(this);
     if (state.released) return false;
     state.released = true;
-    state.runtime.releaseClosure(state.rootId);
-    state.runtime.untrackCallback(this);
+    const errors = [];
+    collectCleanupError(errors, () => state.runtime.releaseClosure(state.rootId));
+    collectCleanupError(errors, () => state.runtime.untrackCallback(this));
+    throwCollectedErrors(errors, "Vir callback release failed");
     return true;
   }
   dispose() {
@@ -2965,14 +3005,18 @@ function createVirCallback(runtime, rootId, type) {
   runtime.trackCallback(callback);
   return callback;
 }
-function isVirCallback(value) {
-  return typeof value === "function" && virCallbackStates.has(value);
-}
 function releaseCallbacks(callbacks) {
-  for (const callback of callbacks) {
-    callback.release();
+  const pending = Array.from(callbacks);
+  if (Array.isArray(callbacks)) {
+    callbacks.length = 0;
+  } else if (typeof callbacks.clear === "function") {
+    callbacks.clear();
   }
-  callbacks.length = 0;
+  const errors = [];
+  for (const callback of pending) {
+    collectCleanupError(errors, () => callback.release());
+  }
+  throwCollectedErrors(errors, "Vir callback releases failed");
 }
 function requireVirCallbackState(callback) {
   const state = virCallbackStates.get(callback);
@@ -5268,14 +5312,17 @@ var VirRuntime = class extends ObjectValueRuntime {
     try {
       packageInfo = replacement.installIrPackageBytes(packageBytes);
     } catch (error) {
-      replacement.dispose({ disposeBindings: false });
-      throw error;
+      const errors = [error];
+      collectCleanupError(errors, () => replacement.dispose({ disposeBindings: false }));
+      throwCollectedErrors(errors, "IR package replacement setup failed");
     }
     try {
       this.teardownPackageResources();
     } catch (error) {
-      replacement.dispose({ disposeBindings: false });
-      throw error;
+      const errors = [error];
+      collectCleanupError(errors, () => replacement.dispose());
+      this.markDisposed();
+      throwCollectedErrors(errors, "IR package replacement teardown failed");
     }
     this.adoptRuntimeState(replacement);
     return packageInfo;
@@ -5497,12 +5544,22 @@ var VirRuntime = class extends ObjectValueRuntime {
     let argvPtr = 0;
     let resultObj = 0;
     try {
+      this.hostState?.clearCallError();
       if (argObjs.length !== 0) {
         argvPtr = this.allocByteLength(argObjs.length * 4, "callback argv pointer array");
         this.writePointerArray(argvPtr, argObjs);
       }
-      resultObj = this.exports.vir_closure_call_objects(rootId, argvPtr, argObjs.length);
+      try {
+        resultObj = this.exports.vir_closure_call_objects(rootId, argvPtr, argObjs.length);
+      } catch (error) {
+        const hostError2 = this.hostState?.takeCallError();
+        throw hostError2 ?? error;
+      }
       argObjs.length = 0;
+      const hostError = this.hostState?.takeCallError();
+      if (hostError) {
+        throw hostError;
+      }
       if (resultObj === 0) {
         throw new Error(this.lastClosureCallError() || "closure call failed");
       }
@@ -5525,19 +5582,30 @@ var VirRuntime = class extends ObjectValueRuntime {
   }
   dispose({ disposeBindings = true } = {}) {
     if (this.disposed) return;
-    this.teardownPackageResources({ disposeBindings });
+    this.disposed = true;
+    const errors = [];
+    collectCleanupError(errors, () => this.teardownPackageResources({ disposeBindings }));
+    this.markDisposed();
+    throwCollectedErrors(errors, "VirRuntime disposal failed");
+  }
+  teardownPackageResources({ disposeBindings = true } = {}) {
+    const errors = [];
+    collectCleanupError(errors, () => this.hostState?.dispose({ disposeBindings }));
+    collectCleanupError(errors, () => this.releaseLiveCallbacks());
+    throwCollectedErrors(errors, "VirRuntime package resource teardown failed");
+  }
+  releaseLiveCallbacks() {
+    const callbacks = Array.from(this.liveCallbacks);
+    try {
+      releaseCallbacks(callbacks);
+    } finally {
+      this.liveCallbacks.clear();
+    }
+  }
+  markDisposed() {
     this.disposed = true;
     this.hostState = null;
     this.exportsByName = /* @__PURE__ */ Object.create(null);
-  }
-  teardownPackageResources({ disposeBindings = true } = {}) {
-    this.hostState?.dispose({ disposeBindings });
-    this.releaseLiveCallbacks();
-  }
-  releaseLiveCallbacks() {
-    for (const callback of Array.from(this.liveCallbacks)) {
-      callback.release();
-    }
   }
 };
 function registerManifestEntryKey(map, key, entry) {
@@ -5579,6 +5647,7 @@ var VirHostState = class {
     this.resourceRoots = new ExternrefResourceRoots();
     this.leanObjectHandleCells = /* @__PURE__ */ new Set();
     this.callError = null;
+    this.disposed = false;
   }
   attach(exports) {
     this.exports = exports;
@@ -5616,6 +5685,9 @@ var VirHostState = class {
     this.resourceRoots.clear();
   }
   callObjects(slot, argvPtr, argc) {
+    if (this.disposed) {
+      throw new Error("Vir host state has been disposed");
+    }
     if (this.exports === null) {
       throw new Error("Vir host import called before WASM exports were attached");
     }
@@ -5634,7 +5706,7 @@ var VirHostState = class {
       throw new Error(`Vir host import binding not found: ${entry.target}`);
     }
     const args = [];
-    const liftedCallbacks = [];
+    const liftedCallbacks = /* @__PURE__ */ new Set();
     const explicitConversionTarget = entry.boundary === HOST_IMPORT_BOUNDARY.EXPLICIT_CONVERSION;
     try {
       const argObjects = this.readObjectArgv(argvPtr, argc);
@@ -5642,28 +5714,26 @@ var VirHostState = class {
         throw new Error(`Vir host import ${entry.target} expects ${entry.args.length} arguments, got ${argObjects.length}`);
       }
       entry.args.forEach((arg, index) => {
-        const value2 = explicitConversionTarget ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostResourceObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
-        if (isVirCallback(value2)) {
-          liftedCallbacks.push(value2);
+        const callbacksBeforeArgument = new Set(this.runtime.liveCallbacks);
+        try {
+          const value2 = explicitConversionTarget ? this.runtime.liftExplicitConversionObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`) : this.runtime.liftHostResourceObjectValue(arg.type, argObjects[index], `${entry.target} argument ${arg.name}`);
+          args.push(value2);
+        } finally {
+          captureCallbacksCreatedSince(this.runtime.liveCallbacks, callbacksBeforeArgument, liftedCallbacks);
         }
-        args.push(value2);
       });
+      const value = binding(...args);
+      if (isPromiseLike(value)) {
+        throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
+      }
+      return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostResourceObjectValue(entry.result, value, `${entry.target} result`);
     } catch (error) {
-      releaseCallbacks(liftedCallbacks);
-      throw error;
+      throwWithCleanup(
+        error,
+        () => releaseCallbacks(liftedCallbacks),
+        `Vir host import ${entry.target} failed during callback cleanup`
+      );
     }
-    let value;
-    try {
-      value = binding(...args);
-    } catch (error) {
-      releaseCallbacks(liftedCallbacks);
-      throw error;
-    }
-    if (isPromiseLike(value)) {
-      releaseCallbacks(liftedCallbacks);
-      throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
-    }
-    return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`) : this.runtime.makeHostResourceObjectValue(entry.result, value, `${entry.target} result`);
   }
   callObjectHandle(entry, argvPtr, argc) {
     const argObjects = this.readObjectArgv(argvPtr, argc);
@@ -5707,26 +5777,31 @@ var VirHostState = class {
     return Array.from({ length: argc }, (_value, index) => view.getUint32(index * 4, true));
   }
   dispose({ disposeBindings = true } = {}) {
+    if (this.disposed) return;
+    this.disposed = true;
+    const errors = [];
     this.clearCallError();
-    this.clearResourceRoots();
-    try {
-      const disposeUserBindings = this.releaseHostBindings?.() ?? true;
-      if (disposeBindings && disposeUserBindings) {
-        disposeHostBindings(this.userBindings);
-      }
-      const disposeDefaults = this.releaseDefaultHostBindings?.() ?? true;
-      if (disposeBindings && disposeDefaults) {
-        disposeHostBindings(this.defaultBindings);
-      }
-    } finally {
-      this.releaseLeanObjectHandleCells();
+    collectCleanupError(errors, () => this.clearResourceRoots());
+    const userRelease = collectCleanupError(errors, () => this.releaseHostBindings?.() ?? true);
+    if (disposeBindings && userRelease.ok && userRelease.value) {
+      collectCleanupError(errors, () => disposeHostBindings(this.userBindings));
     }
+    const defaultRelease = collectCleanupError(errors, () => this.releaseDefaultHostBindings?.() ?? true);
+    if (disposeBindings && defaultRelease.ok && defaultRelease.value) {
+      collectCleanupError(errors, () => disposeHostBindings(this.defaultBindings));
+    }
+    collectCleanupError(errors, () => this.releaseLeanObjectHandleCells());
+    this.runtime = null;
+    this.exports = null;
+    throwCollectedErrors(errors, "Vir host state disposal failed");
   }
   releaseLeanObjectHandleCells() {
+    const errors = [];
     for (const cell of Array.from(this.leanObjectHandleCells)) {
-      this.runtime.releaseLeanObjectHandleCell(cell);
+      collectCleanupError(errors, () => this.runtime.releaseLeanObjectHandleCell(cell));
     }
     this.leanObjectHandleCells.clear();
+    throwCollectedErrors(errors, "Lean object handle release failed");
   }
 };
 function isLeanObjectDescriptor(type) {
@@ -5770,6 +5845,13 @@ function lookupHostBindingIn(target, bindings) {
 }
 function isPromiseLike(value) {
   return value !== null && (typeof value === "object" || typeof value === "function") && typeof value.then === "function";
+}
+function captureCallbacksCreatedSince(liveCallbacks, callbacksBeforeArgument, liftedCallbacks) {
+  for (const callback of liveCallbacks) {
+    if (!callbacksBeforeArgument.has(callback)) {
+      liftedCallbacks.add(callback);
+    }
+  }
 }
 
 // web/src/vir-runtime.js
@@ -5899,8 +5981,9 @@ var VirRuntimeFactory = class {
         })
       });
     } catch (error) {
-      hostState.dispose({ disposeBindings: disposeBindingsOnFailure });
-      throw error;
+      const errors = [error];
+      collectCleanupError(errors, () => hostState.dispose({ disposeBindings: disposeBindingsOnFailure }));
+      throwCollectedErrors(errors, "VirRuntime instantiation failed during cleanup");
     }
   }
   async createRuntime({ irPackageBytes = null, irPackageUrl = null } = {}) {
@@ -5912,8 +5995,9 @@ var VirRuntimeFactory = class {
       }
       return runtime;
     } catch (error) {
-      runtime.dispose();
-      throw error;
+      const errors = [error];
+      collectCleanupError(errors, () => runtime.dispose());
+      throwCollectedErrors(errors, "VirRuntime creation failed during cleanup");
     }
   }
 };

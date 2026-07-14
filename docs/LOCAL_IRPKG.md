@@ -212,3 +212,7 @@ manifest validation fails, the candidate is discarded and the previous
 package remains callable. The fresh-instance rule is required because the
 upstream interpreter keeps native-symbol and initializer-global caches for the
 lifetime of an interpreter instance.
+If old-instance cleanup fails after candidate validation, cleanup still
+attempts all old resources and callbacks, the candidate is discarded, and the
+public wrapper becomes deterministically disposed. A half-cleaned old instance
+is never returned to service.
