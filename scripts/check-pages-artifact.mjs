@@ -6,7 +6,8 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 import { execFile } from "node:child_process";
-import { readFile, stat } from "node:fs/promises";
+import { copyFile, mkdtemp, readFile, rm, stat, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
@@ -19,7 +20,9 @@ import {
   leanPackageFile,
   localPackageFiles,
 } from "./browser-package-config.mjs";
+import { assertDistReady, requiredDistFiles } from "./browser-smoke-harness.mjs";
 import { isGeneratedPublicFile } from "./file-utils.mjs";
+import { IR_PACKAGE_MAGIC } from "./irpkg-format.mjs";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
 import { sdkArchiveEntries } from "./sdk-payloads.mjs";
 
@@ -128,6 +131,8 @@ assert.ok(reactHtml.includes("react-pet-root"), "react.html should contain the R
 for (const file of generatedPublicFiles) {
   await assertFile(file, minGeneratedPublicFileSize(file));
 }
+await assertDistReady(fileURLToPath(distDir));
+await assertStalePackageRejectedBeforeBrowser();
 await assertLocalBundle("downloads/lean-vir-local.tar.gz");
 await assertSdkBundle("downloads/lean-vir-sdk.tar.gz");
 
@@ -135,4 +140,32 @@ console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner,
 
 function minGeneratedPublicFileSize(file) {
   return localPackageFileSet.has(file) ? 128 : 1024;
+}
+
+async function assertStalePackageRejectedBeforeBrowser() {
+  const staleRoot = await mkdtemp(join(tmpdir(), "lean-vir-stale-dist-"));
+  try {
+    for (const file of requiredDistFiles) {
+      await copyFile(new URL(file, distDir), join(staleRoot, file));
+    }
+    const bytes = Uint8Array.from(await assertFile(defaultPackageFile, 128));
+    const versionOffset = 4 + new TextEncoder().encode(IR_PACKAGE_MAGIC).byteLength;
+    const staleVersion = PACKAGE_FORMAT_VERSION - 1;
+    new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength)
+      .setUint32(versionOffset, staleVersion, true);
+    await writeFile(join(staleRoot, defaultPackageFile), bytes);
+
+    await assert.rejects(
+      () => assertDistReady(staleRoot),
+      (error) => {
+        assert.ok(error instanceof Error);
+        assert.ok(error.message.includes(defaultPackageFile));
+        assert.match(error.message, new RegExp(`unsupported IR package version ${staleVersion}`));
+        assert.match(error.message, /run npm run build:site first/);
+        return true;
+      },
+    );
+  } finally {
+    await rm(staleRoot, { recursive: true, force: true });
+  }
 }

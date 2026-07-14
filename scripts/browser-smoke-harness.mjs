@@ -16,9 +16,18 @@ import { createServer as createNetServer } from "node:net";
 
 import { generatedPublicFiles } from "./browser-package-config.mjs";
 import { pathExists, requireChromiumExecutable } from "./file-utils.mjs";
+import { readIrPackageFile } from "./irpkg-format.mjs";
 
 export const distRoot = fileURLToPath(new URL("../web/dist/", import.meta.url));
 export const basePath = "/lean-vir/";
+export const requiredDistFiles = Object.freeze([
+  "index.html",
+  "dev.html",
+  "format.html",
+  "react.html",
+  "runtime-example.html",
+  ...generatedPublicFiles,
+]);
 
 const contentTypes = new Map([
   [".css", "text/css; charset=utf-8"],
@@ -29,23 +38,36 @@ const contentTypes = new Map([
   [".wasm", "application/wasm"],
 ]);
 
-export async function assertDistReady() {
-  const required = [
-    "index.html",
-    "dev.html",
-    "format.html",
-    "runtime-example.html",
-    ...generatedPublicFiles,
-  ];
+export async function assertDistReady(root = distRoot) {
   const missing = [];
-  for (const path of required) {
-    if (!(await pathExists(resolve(distRoot, path)))) {
+  for (const path of requiredDistFiles) {
+    if (!(await pathExists(resolve(root, path)))) {
       missing.push(path);
     }
   }
   if (missing.length !== 0) {
     throw new Error(
       `web/dist is missing browser smoke artifacts (${missing.join(", ")}); run npm run build:site first`,
+    );
+  }
+  await assertBrowserPackagesCompatible(
+    root,
+    generatedPublicFiles.filter((path) => path.endsWith(".irpkg")),
+  );
+}
+
+async function assertBrowserPackagesCompatible(root, packageFiles) {
+  const incompatible = [];
+  for (const path of packageFiles) {
+    try {
+      await readIrPackageFile(resolve(root, path));
+    } catch (error) {
+      incompatible.push(`${path}: ${error instanceof Error ? error.message : String(error)}`);
+    }
+  }
+  if (incompatible.length !== 0) {
+    throw new Error(
+      `web/dist has incompatible browser smoke packages (${incompatible.join("; ")}); run npm run build:site first`,
     );
   }
 }
