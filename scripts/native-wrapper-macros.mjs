@@ -93,6 +93,18 @@ export function parseGeneratedWrapperMacros(source) {
     });
   }
 
+  const generatedOwnedObjectlikeRegex =
+    new RegExp(`^VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER\\(${symbolPattern}\\)$`, "gm");
+  for (const match of source.matchAll(generatedOwnedObjectlikeRegex)) {
+    const symbol = match[1];
+    wrappers.push({
+      name: `${symbol}___boxed`,
+      generatedOwnedObjectlike: true,
+      arity: "unary",
+      symbol,
+    });
+  }
+
   return wrappers;
 }
 
