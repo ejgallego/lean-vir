@@ -34,6 +34,7 @@ export const demoHostImportTargets = [
   "infoview.documentPosition",
   "js.bool",
   "js.bool.value",
+  "js.float",
   "js.float.value",
   "js.leanRef",
   "js.leanRef.value",

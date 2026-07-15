@@ -13,6 +13,7 @@ const root = new URL("..", import.meta.url).pathname;
 
 const tests = [
   { id: "manifest", file: "scripts/runtime-tests/manifest-smoke.mjs", group: "pure" },
+  { id: "js-float", file: "scripts/runtime-tests/js-float-fidelity-smoke.mjs", group: "pure" },
   { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", group: "pure" },
   { id: "callback-lifecycle", file: "scripts/runtime-tests/callback-lifecycle-smoke.mjs", group: "pure" },
   { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },

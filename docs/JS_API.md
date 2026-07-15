@@ -272,6 +272,10 @@ are returned as `Uint8Array`; `Float` and `Float32` values are JavaScript
 numbers. Top-level `Float`, `Float32`, `UInt64`, and trivial wrappers over them
 use generated Lean `_boxed` declarations automatically.
 
+`Lean.Vir.JsValue.ofFloat` and `Lean.Vir.JsValue.toFloat` also accept every
+JavaScript number and preserve NaN, infinities, and signed zero across the
+opaque `Lean.Vir.Js Float` resource boundary.
+
 Nullary inductive enums are accepted as constructor names, generated JavaScript
 names, or constructor indexes. Results are returned as the constructor's
 generated JavaScript name.

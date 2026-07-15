@@ -26,6 +26,9 @@ import {
 import { createNullableValue } from "./vir-js-value-bindings.js";
 import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
 
+// Map uses SameValueZero; remap -0 so primitive interning follows Object.is.
+const negativeZeroPrimitiveKey = Symbol("lean-vir.negativeZero");
+
 export class HostResourceState {
   constructor() {
     requireExternrefTableSupport();
@@ -42,10 +45,11 @@ export class HostResourceState {
       return this.temporaryResourceForValue(value);
     }
     if (!isWeakMapKey(value)) {
-      let resource = this.primitiveResources.get(value);
+      const key = primitiveResourceKey(value);
+      let resource = this.primitiveResources.get(key);
       if (!isHostResource(resource) || hostResourceValue(resource) === null) {
         resource = createHostResource(value);
-        this.primitiveResources.set(value, resource);
+        this.primitiveResources.set(key, resource);
       }
       this.liveResources.add(resource);
       return resource;
@@ -96,8 +100,9 @@ export class HostResourceState {
         this.resources.delete(value);
       }
     } else if (value !== null && value !== undefined) {
-      if (this.primitiveResources.get(value) === resource) {
-        this.primitiveResources.delete(value);
+      const key = primitiveResourceKey(value);
+      if (this.primitiveResources.get(key) === resource) {
+        this.primitiveResources.delete(key);
       }
     }
     if (isHostResource(resource)) {
@@ -109,7 +114,7 @@ export class HostResourceState {
 
   releaseValueResource(value) {
     if (!isWeakMapKey(value)) {
-      const resource = this.primitiveResources.get(value);
+      const resource = this.primitiveResources.get(primitiveResourceKey(value));
       if (resource !== undefined) {
         this.releaseResource(resource);
       }
@@ -189,6 +194,12 @@ function disposeHostResourceValue(value) {
 
 function isWeakMapKey(value) {
   return (typeof value === "object" && value !== null) || typeof value === "function";
+}
+
+function primitiveResourceKey(value) {
+  return typeof value === "number" && Object.is(value, -0)
+    ? negativeZeroPrimitiveKey
+    : value;
 }
 
 export function createHostResourceState() {
