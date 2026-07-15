@@ -39,6 +39,10 @@ public:
         return m_pos;
     }
 
+    size_t remaining() const {
+        return m_size - m_pos;
+    }
+
     void fail(std::string const & message) {
         if (ok) {
             ok = false;

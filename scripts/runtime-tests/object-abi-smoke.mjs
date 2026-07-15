@@ -1052,6 +1052,18 @@ assert.equal(badPackageRuntime.interfaceManifest, null);
 assert.equal(badPackageRuntime.packageMetadata, null);
 assert.equal(badPackageRuntime.packageDeclCount(), 0);
 
+assert.throws(
+  () => badPackageRuntime.loadIrPackageBytes(invalidateFirstDeclarationNameTag(irPackageBytes)),
+  /unsupported name tag 255/,
+);
+assert.equal(badPackageRuntime.packageInfo, null);
+
+assert.throws(
+  () => badPackageRuntime.loadIrPackageBytes(oversizeDeclarationCount(irPackageBytes)),
+  /declaration count 4294967295 exceeds remaining section bytes/,
+);
+assert.equal(badPackageRuntime.packageInfo, null);
+
 const partialDecodeRuntime = await factory.createRuntime();
 const partialDeclarationPackage = truncateDeclarationSection(irPackageBytes);
 const partialDecodePages = [];
@@ -1086,22 +1098,44 @@ assert.throws(
 function truncateDeclarationSection(packageBytes) {
   const bytes = Uint8Array.from(packageBytes);
   const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const declarations = findPackageSection(view, 1);
+  const declarationBytes = view.getUint32(declarations.byteLengthOffset, true);
+  assert.ok(declarationBytes > 32, "IR package declarations section is too small to truncate");
+  view.setUint32(declarations.byteLengthOffset, declarationBytes - 32, true);
+  return bytes;
+}
+
+function invalidateFirstDeclarationNameTag(packageBytes) {
+  const bytes = Uint8Array.from(packageBytes);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const declarations = findPackageSection(view, 1);
+  bytes[declarations.offset] = 255;
+  return bytes;
+}
+
+function oversizeDeclarationCount(packageBytes) {
+  const bytes = Uint8Array.from(packageBytes);
+  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
+  const magicByteLength = view.getUint32(0, true);
+  const declarationCountOffset = 4 + magicByteLength + 4;
+  view.setUint32(declarationCountOffset, 0xffffffff, true);
+  return bytes;
+}
+
+function findPackageSection(view, kind) {
   const magicByteLength = view.getUint32(0, true);
   const sectionCountOffset = 4 + magicByteLength + 8;
   const sectionCount = view.getUint32(sectionCountOffset, true);
-  let declarationsLengthOffset = -1;
   for (let index = 0; index < sectionCount; index += 1) {
     const directoryEntryOffset = sectionCountOffset + 4 + index * 12;
-    if (view.getUint32(directoryEntryOffset, true) === 1) {
-      declarationsLengthOffset = directoryEntryOffset + 8;
-      break;
+    if (view.getUint32(directoryEntryOffset, true) === kind) {
+      return {
+        offset: view.getUint32(directoryEntryOffset + 4, true),
+        byteLengthOffset: directoryEntryOffset + 8,
+      };
     }
   }
-  assert.notEqual(declarationsLengthOffset, -1, "IR package declarations section is missing");
-  const declarationBytes = view.getUint32(declarationsLengthOffset, true);
-  assert.ok(declarationBytes > 32, "IR package declarations section is too small to truncate");
-  view.setUint32(declarationsLengthOffset, declarationBytes - 32, true);
-  return bytes;
+  throw new Error(`IR package section ${kind} is missing`);
 }
 first.dispose();
 second.dispose();

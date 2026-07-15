@@ -173,15 +173,17 @@ object * mk_sset(size_t target, size_t idx, size_t offset, size_t source, type t
     return mk_ctor(5, { mk_nat(target), mk_nat(idx), mk_nat(offset), mk_nat(source), lean_box(static_cast<unsigned>(t)), cont });
 }
 
-object * mk_inc(size_t var, size_t amount, bool maybe_scalar, object * cont) {
-    object * obj = mk_ctor(6, { mk_nat(var), mk_nat(amount), cont }, sizeof(uint8_t));
+object * mk_inc(size_t var, size_t amount, bool maybe_scalar, bool persistent, object * cont) {
+    object * obj = mk_ctor(6, { mk_nat(var), mk_nat(amount), cont }, 2 * sizeof(uint8_t));
     lean_ctor_set_uint8(obj, 3 * sizeof(void *), maybe_scalar ? 1 : 0);
+    lean_ctor_set_uint8(obj, 3 * sizeof(void *) + sizeof(uint8_t), persistent ? 1 : 0);
     return obj;
 }
 
-object * mk_dec(size_t var, size_t amount, bool maybe_scalar, object * cont) {
-    object * obj = mk_ctor(7, { mk_nat(var), mk_nat(amount), cont }, sizeof(uint8_t));
+object * mk_dec(size_t var, size_t amount, bool maybe_scalar, bool persistent, object * cont) {
+    object * obj = mk_ctor(7, { mk_nat(var), mk_nat(amount), cont }, 2 * sizeof(uint8_t));
     lean_ctor_set_uint8(obj, 3 * sizeof(void *), maybe_scalar ? 1 : 0);
+    lean_ctor_set_uint8(obj, 3 * sizeof(void *) + sizeof(uint8_t), persistent ? 1 : 0);
     return obj;
 }
 
@@ -206,11 +208,16 @@ object * mk_unreachable() {
 }
 
 object * mk_fun_decl(object * fn, object * params, type result_type, object * body) {
-    return mk_ctor(0, { fn, params, lean_box(static_cast<unsigned>(result_type)), body });
+    // `DeclInfo` has one object field, `sorryDep?`; packages materialize `none`.
+    object * info = mk_ctor(0, { lean_box(0) });
+    return mk_ctor(0, { fn, params, lean_box(static_cast<unsigned>(result_type)), body, info });
 }
 
 object * mk_extern_decl(object * fn, object * params, type result_type) {
-    return mk_ctor(1, { fn, params, lean_box(static_cast<unsigned>(result_type)), lean_box(0) });
+    // `ExternAttrData` has one object field, `entries`; package lookup uses the
+    // static native registry, so the reconstructed IR declaration stores `[]`.
+    object * extern_data = mk_ctor(0, { lean_box(0) });
+    return mk_ctor(1, { fn, params, lean_box(static_cast<unsigned>(result_type)), extern_data });
 }
 
 }

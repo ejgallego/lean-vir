@@ -33,6 +33,27 @@ class reader : public package_binary_reader {
 public:
     using package_binary_reader::package_binary_reader;
 
+    uint32_t bounded_count(char const * label, size_t min_item_bytes = 1) {
+        uint32_t count = u32();
+        if (!count_fits(count, label, min_item_bytes)) {
+            return 0;
+        }
+        return count;
+    }
+
+    bool count_fits(uint32_t count, char const * label, size_t min_item_bytes = 1) {
+        if (!ok) {
+            return false;
+        }
+        if (min_item_bytes == 0 || count > remaining() / min_item_bytes) {
+            fail(
+                std::string(label) + " count " + std::to_string(count) +
+                " exceeds remaining section bytes " + std::to_string(remaining()));
+            return false;
+        }
+        return true;
+    }
+
     object * ir_nat_literal() {
         std::string decimal = string();
         return lean_cstr_to_nat(decimal.c_str());
@@ -293,17 +314,17 @@ public:
             uint32_t var = u32();
             uint32_t amount = u32();
             bool maybe_scalar = boolean();
-            (void)boolean();
+            bool persistent = boolean();
             object * cont = ir_body();
-            return mk_inc(var, amount, maybe_scalar, cont);
+            return mk_inc(var, amount, maybe_scalar, persistent, cont);
         }
         case tags::body_tag::Dec: {
             uint32_t var = u32();
             uint32_t amount = u32();
             bool maybe_scalar = boolean();
-            (void)boolean();
+            bool persistent = boolean();
             object * cont = ir_body();
-            return mk_dec(var, amount, maybe_scalar, cont);
+            return mk_dec(var, amount, maybe_scalar, persistent, cont);
         }
         case tags::body_tag::Del: {
             uint32_t var = u32();
@@ -371,10 +392,10 @@ public:
 private:
     template <typename F>
     std::vector<object *> object_array(F read_one) {
-        uint32_t count = u32();
+        uint32_t count = bounded_count("IR object array");
         std::vector<object *> out;
         out.reserve(count);
-        for (uint32_t i = 0; i < count; i++) {
+        for (uint32_t i = 0; i < count && ok; i++) {
             out.push_back(read_one());
         }
         return out;
@@ -383,8 +404,11 @@ private:
 
 static std::vector<decl_entry> read_ir_decl_entries(reader & r, uint32_t count) {
     std::vector<decl_entry> entries;
+    if (!r.count_fits(count, "declaration")) {
+        return entries;
+    }
     entries.reserve(count);
-    for (uint32_t i = 0; i < count; i++) {
+    for (uint32_t i = 0; i < count && r.ok; i++) {
         object * n = r.name();
         object * boxed_base = r.boolean() ? r.name() : nullptr;
         lean_inc(n);
@@ -395,10 +419,10 @@ static std::vector<decl_entry> read_ir_decl_entries(reader & r, uint32_t count) 
 }
 
 static std::vector<init_global_entry> read_init_entries(reader & r) {
-    uint32_t count = r.u32();
+    uint32_t count = r.bounded_count("initializer entry", 2);
     std::vector<init_global_entry> entries;
     entries.reserve(count);
-    for (uint32_t i = 0; i < count; i++) {
+    for (uint32_t i = 0; i < count && r.ok; i++) {
         object * n = r.name();
         object * init_name = r.name();
         entries.push_back({ n, init_name });
@@ -407,20 +431,20 @@ static std::vector<init_global_entry> read_init_entries(reader & r) {
 }
 
 static std::vector<host_import_entry> read_host_imports(reader & r) {
-    uint32_t count = r.u32();
+    uint32_t count = r.bounded_count("host import entry");
     std::vector<host_import_entry> entries;
     entries.reserve(count);
-    for (uint32_t i = 0; i < count; i++) {
+    for (uint32_t i = 0; i < count && r.ok; i++) {
         entries.push_back(r.host_import());
     }
     return entries;
 }
 
 static std::vector<export_call_summary_entry> read_export_summaries(reader & r) {
-    uint32_t count = r.u32();
+    uint32_t count = r.bounded_count("export summary entry");
     std::vector<export_call_summary_entry> entries;
     entries.reserve(count);
-    for (uint32_t i = 0; i < count; i++) {
+    for (uint32_t i = 0; i < count && r.ok; i++) {
         entries.push_back(r.export_summary());
     }
     return entries;
