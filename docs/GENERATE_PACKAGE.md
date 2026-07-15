@@ -25,8 +25,9 @@ Targets have one of three modes:
 
 - `Vir.GeneratePackage.Basic`: shared data structures, package metadata
   shapes, package ABI limits, and default browser targets.
-- `Vir.GeneratePackage.PackageFormat`: current package and interface manifest
-  version constants used by generated metadata.
+- `Vir.GeneratePackage.PackageFormat`: package magic, package section kinds,
+  and current package/interface-manifest version constants used by generated
+  bytes and metadata.
 - `Vir.GeneratePackage.PackageIRTags`: tracked generated constants for package
   `Name` and declaration-IR wire tags. `scripts/ir-codec-tags.mjs` is the source
   of truth.
@@ -149,11 +150,13 @@ Version constants are intentionally small and explicit:
   `packageFormatVersion` and `manifestVersion` metadata values.
 - `scripts/package-versions.mjs` owns the JavaScript-side expectations for
   package format, interface manifest, and runtime ABI versions.
-- `npm run check:package-abi` verifies those constants and the Lean/JavaScript
-  interface tag table agree.
+- `npm run check:package-abi` verifies package magic, versions, and section
+  kinds across Lean, C++, and JavaScript, plus the Lean/JavaScript interface tag
+  and host-boundary tables.
 - `scripts/ir-codec-tags.mjs` owns the format-10 package `Name` and
   declaration-IR tag assignments; `npm run check:ir-codec-tags` verifies that
-  the tracked Lean/C++ outputs agree with it.
+  the tracked Lean/C++ outputs agree with it and that the emitter/decoder use
+  every non-reserved tag.
 
 Bump `packageFormatVersion` when the binary `.irpkg` encoding or decoder
 contract changes incompatibly. Update the JavaScript package-format constant,

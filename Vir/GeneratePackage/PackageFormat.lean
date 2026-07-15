@@ -6,6 +6,8 @@ Author: Emilio J. Gallego Arias
 
 namespace Vir.GeneratePackage
 
+def packageMagic : String := "lean-vir-ir-package"
+
 def currentPackageFormatVersion : Nat := 10
 
 def currentInterfaceManifestVersion : Nat := 6

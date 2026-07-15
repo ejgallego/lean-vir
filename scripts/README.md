@@ -41,7 +41,8 @@ map lives in `docs/HARNESS.md`.
   Refresh generated Lean/C++ constants for IR declaration payload tag bytes
   from `scripts/ir-codec-tags.mjs`.
 - `npm run check:ir-codec-tags`
-  Verify that the generated IR declaration codec tag files are current.
+  Verify that the generated IR declaration codec tag files are current and
+  that the Lean emitter and C++ decoder use every non-reserved tag.
 - `npm run test:upstream`
   Build the demo and run the upstream interpreter smoke test.
 - `npm run test:upstream:no-build`

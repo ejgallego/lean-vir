@@ -11,9 +11,16 @@ import { fileURLToPath } from "node:url";
 
 import { IR_CODEC_TAG_GROUPS } from "./ir-codec-tags.mjs";
 
-const writeMode = process.argv.includes("--write");
+const args = process.argv.slice(2);
+for (const arg of args) {
+  if (arg !== "--write") {
+    throw new Error(`unknown argument ${JSON.stringify(arg)}; expected --write or no arguments`);
+  }
+}
+const writeMode = args.includes("--write");
 
 validateGroups();
+await validateTagUses();
 
 const generatedFiles = [
   {
@@ -50,7 +57,12 @@ function validateGroups() {
     enumNames.add(group.cppEnum);
 
     const values = new Set();
+    const cppTags = new Set();
     for (const [cppTag, value] of group.tags) {
+      if (cppTags.has(cppTag)) {
+        throw new Error(`duplicate ${group.cppEnum} tag name ${cppTag}`);
+      }
+      cppTags.add(cppTag);
       const name = leanName(group.leanPrefix, cppTag);
       if (leanNames.has(name)) {
         throw new Error(`duplicate Lean tag constant ${name}`);
@@ -66,7 +78,7 @@ function validateGroups() {
     }
     for (const [value, reason] of group.reserved ?? []) {
       if (values.has(value)) {
-        throw new Error(`${group.cppEnum} reserves tag value ${value} more than once`);
+        throw new Error(`${group.cppEnum} reserved tag duplicates value ${value}`);
       }
       values.add(value);
       if (!Number.isInteger(value) || value < 0 || value > 255) {
@@ -74,6 +86,27 @@ function validateGroups() {
       }
       if (typeof reason !== "string" || reason.length === 0) {
         throw new Error(`${group.cppEnum} reserved tag ${value} must explain why it is reserved`);
+      }
+    }
+  }
+}
+
+async function validateTagUses() {
+  const leanPath = new URL("../Vir/GeneratePackage/Emit.lean", import.meta.url);
+  const cppPath = new URL("../wasm/upstream_shim/package/package_ir_decoder.cpp", import.meta.url);
+  const [leanSource, cppSource] = await Promise.all([
+    readFile(leanPath, "utf8"),
+    readFile(cppPath, "utf8"),
+  ]);
+  for (const group of IR_CODEC_TAG_GROUPS) {
+    for (const [cppTag] of group.tags) {
+      const leanUse = `PackageIRTags.${leanName(group.leanPrefix, cppTag)}`;
+      if (!leanSource.includes(leanUse)) {
+        throw new Error(`${fileURLToPath(leanPath)} does not use generated tag ${leanUse}`);
+      }
+      const cppUse = `tags::${group.cppEnum}::${cppTag}`;
+      if (!cppSource.includes(cppUse)) {
+        throw new Error(`${fileURLToPath(cppPath)} does not use generated tag ${cppUse}`);
       }
     }
   }
@@ -145,4 +178,4 @@ for (const file of generatedFiles) {
   }
 }
 
-console.log(`IR codec tag files ${writeMode ? "updated" : "are current"}`);
+console.log(`IR codec tag files and uses ${writeMode ? "updated" : "are current"}`);

@@ -9,7 +9,8 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { INTERFACE_TAG, SUPPORTED_INTERFACE_TAGS } from "../web/src/runtime/interface-tags.js";
-import { HOST_IMPORT_BOUNDARY } from "../web/src/runtime/interface-manifest.js";
+import { HOST_IMPORT_BOUNDARY, INTERFACE_MANIFEST_ARTIFACT } from "../web/src/runtime/interface-manifest.js";
+import { IR_PACKAGE_MAGIC, IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
 
 const repoRoot = new URL("..", import.meta.url).pathname;
@@ -24,6 +25,26 @@ function leanNatConstant(source, name) {
     throw new Error(`missing Lean Nat constant ${name}`);
   }
   return Number(match[1]);
+}
+
+function matchedValue(source, pattern, label) {
+  const match = pattern.exec(source);
+  if (!match) {
+    throw new Error(`missing ${label}`);
+  }
+  return match[1];
+}
+
+function leanStringConstant(source, name) {
+  return matchedValue(
+    source,
+    new RegExp(`def\\s+${name}\\s*:\\s*String\\s*:=\\s*"([^"]*)"`),
+    `Lean String constant ${name}`,
+  );
+}
+
+function cppNatConstant(source, name) {
+  return Number(matchedValue(source, new RegExp(`\\b${name}\\s*=\\s*(\\d+)`), `C++ constant ${name}`));
 }
 
 function leanCtorToConstantKey(name) {
@@ -111,6 +132,55 @@ if (!Number.isSafeInteger(RUNTIME_ABI_VERSION) || RUNTIME_ABI_VERSION < 1) {
   throw new Error(`runtime ABI version must be a positive safe integer, got ${RUNTIME_ABI_VERSION}`);
 }
 
+const emitSource = await readRepoText("Vir/GeneratePackage/Emit.lean");
+const manifestEncodeSource = await readRepoText("Vir/GeneratePackage/Manifest/Encode.lean");
+const packageDecoderSource = await readRepoText("wasm/upstream_shim/package/package_ir_decoder.cpp");
+const packageSectionsSource = await readRepoText("wasm/upstream_shim/package/package_section_directory.h");
+
+assertEqual(
+  leanStringConstant(packageFormat, "packageMagic"),
+  IR_PACKAGE_MAGIC,
+  "package magic mismatch in Lean",
+);
+if (!/emitString\s+packageMagic\b/.test(emitSource)) {
+  throw new Error("Lean IR package emitter does not use packageMagic");
+}
+if (!/\("artifact",\s*jsonString\s+packageMagic\)/.test(manifestEncodeSource)) {
+  throw new Error("Lean manifest encoder does not use packageMagic");
+}
+assertEqual(INTERFACE_MANIFEST_ARTIFACT, IR_PACKAGE_MAGIC, "manifest artifact mismatch in JavaScript");
+assertEqual(
+  matchedValue(packageDecoderSource, /magic\s*!=\s*"([^"]+)"/, "C++ IR package magic"),
+  IR_PACKAGE_MAGIC,
+  "package magic mismatch in C++ decoder",
+);
+assertEqual(
+  Number(matchedValue(packageDecoderSource, /return\s+version\s*==\s*(\d+)/, "C++ package format version")),
+  PACKAGE_FORMAT_VERSION,
+  "package format version mismatch in C++ decoder",
+);
+
+const packageSections = [
+  ["packageSectionDeclarations", "package_section_declarations", "DECLARATIONS"],
+  ["packageSectionInitGlobals", "package_section_init_globals", "INIT_GLOBALS"],
+  ["packageSectionHostImports", "package_section_host_imports", "HOST_IMPORTS"],
+  ["packageSectionExportSummaries", "package_section_export_summaries", "EXPORT_SUMMARIES"],
+  ["packageSectionInterfaceManifest", "package_section_interface_manifest", "INTERFACE_MANIFEST"],
+];
+for (const [leanName, cppName, jsName] of packageSections) {
+  const leanValue = leanNatConstant(packageFormat, leanName);
+  assertEqual(
+    cppNatConstant(packageSectionsSource, cppName),
+    leanValue,
+    `package section ${jsName} mismatch in C++`,
+  );
+  assertEqual(
+    IR_PACKAGE_SECTION[jsName],
+    leanValue,
+    `package section ${jsName} mismatch in JavaScript`,
+  );
+}
+
 const interfaceSource = await readRepoText("Vir/GeneratePackage/Interface/Encode.lean");
 const leanTags = leanInterfaceTags(interfaceSource);
 const jsTags = new Map(Object.entries(INTERFACE_TAG));
@@ -163,6 +233,6 @@ for (const [key] of leanBoundaries) {
 }
 
 console.log(
-  `package ABI guardrails ok: versions, ${jsTags.size} interface descriptor tags, and ` +
-  `${jsBoundaries.size} host import boundaries agree`,
+  `package ABI guardrails ok: magic, versions, ${packageSections.length} package sections, ` +
+  `${jsTags.size} interface descriptor tags, and ${jsBoundaries.size} host import boundaries agree`,
 );

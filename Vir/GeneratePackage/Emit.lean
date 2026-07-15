@@ -245,7 +245,7 @@ def packageSections (closure : Closure) (manifest : InterfaceManifest) : Except 
 
 def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit := do
   let sections ← packageSections closure manifest
-  emitString "lean-vir-ir-package"
+  emitString packageMagic
   emitU32 currentPackageFormatVersion
   emitU32 (closure.decls.size + closure.externs.size)
   emitPackageSectionDirectory sections
