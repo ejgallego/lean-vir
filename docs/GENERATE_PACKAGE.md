@@ -29,8 +29,8 @@ Targets have one of three modes:
   version constants used by generated metadata.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures.
-- `Vir.GeneratePackage.Frontend`: Lean frontend loading, source preprocessing,
-  `DeclIndex` construction, and declaration-name collision diagnostics.
+- `Vir.GeneratePackage.Frontend`: unchanged source elaboration, `DeclIndex`
+  construction, and declaration-name collision diagnostics.
 - `Vir.GeneratePackage.Closure`: root resolution and transitive IR closure
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface.Encode`: interface labels, descriptor tags,
@@ -59,10 +59,9 @@ Targets have one of three modes:
 ## Data Flow
 
 1. The CLI turns each target argument into a `Target`.
-2. `Frontend.frontendEnv` elaborates each source with async elaboration
-   disabled. By default it drops top-level `#eval` command lines before
-   elaboration so demo examples do not run during package generation. The
-   choice is recorded as `metadata.targets[].dropEvalCommands`.
+2. `Frontend.frontendEnv` elaborates each source unchanged with async
+   elaboration disabled. Frontend commands such as `#eval` follow normal Lean
+   semantics and may produce output during package generation.
 3. `Frontend.loadDeclIndex` records each source environment, source-local IR
    declaration names, and a name-to-declaration index. If two different source
    targets define the same Lean declaration name, the index records a
@@ -118,10 +117,9 @@ must not depend on source order.
 The same source may appear in more than one target mode. This is useful when a
 package needs a public export target plus a package-only support target.
 
-The `#eval` preprocessing is intentionally line based. It is meant for demo
-files that contain top-level examples, not for arbitrary source rewriting. If a
-future target must preserve top-level `#eval` commands, set
-`Target.dropEvalCommands := false` for that caller.
+The generator does not rewrite source commands. A target containing `#eval`,
+`run_cmd`, macros, or initializers is responsible for their normal elaboration
+behavior and any resulting output.
 
 ## Interface Notes
 
@@ -191,9 +189,9 @@ stopped:
   trivial wrappers over them require a generated `_boxed` declaration for the
   wasm32 interpreter call boundary. The generator auto-includes the boxed
   declaration when it exists, and reports this diagnostic when it does not.
-- `#eval` preprocessing: top-level `#eval` command lines are dropped by default
-  so examples do not run during generation. Internal callers that need them can
-  set `Target.dropEvalCommands := false`.
+- Noisy frontend output: source commands such as `#eval` run with normal Lean
+  semantics during generation. Keep executable examples out of API modules if
+  their output is not wanted in package builds.
 
 ## Focused Checks
 

@@ -47,17 +47,6 @@ def isVirJsExplicitConversionDecl : Decl → Bool
   | .extern _ _ _ data => virJsExplicitConversionTargetFromExternData? data |>.isSome
   | _ => false
 
-def dropEvalCommandLines (input : String) : String :=
-  "\n".intercalate <|
-    input.splitOn "\n" |>.filter fun line =>
-      !(line.trimAsciiStart.copy.startsWith "#eval")
-
-def frontendSource (target : Target) (contents : String) : String :=
-  if target.dropEvalCommands then
-    dropEvalCommandLines contents
-  else
-    contents
-
 def moduleNameFor (path : System.FilePath) : Name :=
   .str (.str `VirIRInput (path.fileStem.getD "Input")) "Generated"
 
@@ -67,7 +56,7 @@ unsafe def frontendEnv (target : Target) : IO Environment := do
   let contents <- IO.FS.readFile target.source
   let opts := Elab.async.set ({} : Options) false
   let fileName := target.source.toString
-  match <- Elab.runFrontend (frontendSource target contents) opts fileName (moduleNameFor target.source) with
+  match <- Elab.runFrontend contents opts fileName (moduleNameFor target.source) with
   | some env => return env
   | none => throw <| IO.userError s!"Lean frontend failed for {fileName}"
 

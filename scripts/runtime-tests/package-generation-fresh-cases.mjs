@@ -39,7 +39,6 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(freshManifest.metadata.targets[0].source, freshSource);
   assert.equal(freshManifest.metadata.targets[0].mode, "all");
   assert.deepEqual(freshManifest.metadata.targets[0].roots, []);
-  assert.equal(freshManifest.metadata.targets[0].dropEvalCommands, true);
   assert.ok(freshManifest.metadata.targets[0].resolvedRoots.includes("freshBump"));
   assertManifestTypeDescriptorsRoundTrip(freshManifest);
 
