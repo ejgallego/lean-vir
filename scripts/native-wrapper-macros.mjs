@@ -105,6 +105,22 @@ export function parseGeneratedWrapperMacros(source) {
     });
   }
 
+  const generatedOwnedObjectlikeScalarRegex =
+    new RegExp(
+      `^VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER\\(${symbolPattern},\\s*${scalarKindPattern}\\)$`,
+      "gm",
+    );
+  for (const match of source.matchAll(generatedOwnedObjectlikeScalarRegex)) {
+    const symbol = match[1];
+    wrappers.push({
+      name: `${symbol}___boxed`,
+      generatedOwnedObjectlikeScalar: true,
+      paramType: match[2].toLowerCase(),
+      arity: "binary",
+      symbol,
+    });
+  }
+
   return wrappers;
 }
 

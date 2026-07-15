@@ -427,6 +427,13 @@ extern "C" lean_object * lean_st_ref_take___boxed(
         return result; \
     }
 
+#define VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER(symbol, param_kind) \
+    extern "C" lean_object * symbol##___boxed(lean_object * a, lean_object * b) { \
+        VIR_NATIVE_##param_kind value = VIR_UNBOX_##param_kind(b); \
+        lean_dec(b); \
+        return symbol(a, value); \
+    }
+
 VIR_DEFINE_DROP_TYPE_OBJECT_UNARY_WRAPPER(lean_task_pure)
 VIR_DEFINE_DROP_TYPE_OBJECT_UNARY_WRAPPER(lean_task_get_own)
 
@@ -604,11 +611,7 @@ extern "C" lean_object * lean_array_fswap___boxed(lean_object * type, lean_objec
 
 VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(lean_byte_array_mk)
 
-extern "C" lean_object * lean_byte_array_push___boxed(lean_object * array, lean_object * value) {
-    uint8_t byte = static_cast<uint8_t>(lean_unbox(value));
-    lean_dec(value);
-    return lean_byte_array_push(array, byte);
-}
+VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER(lean_byte_array_push, UINT8)
 
 VIR_DEFINE_BORROWED_OBJECT_UINT8_BINARY_WRAPPER(lean_byte_array_get)
 
@@ -715,11 +718,7 @@ extern "C" lean_object * l_String_set___boxed(lean_object * s, lean_object * pos
     return l_String_Pos_Raw_set___boxed(s, pos, c);
 }
 
-extern "C" lean_object * lean_string_push___boxed(lean_object * s, lean_object * c) {
-    uint32_t ch = lean_unbox_uint32(c);
-    lean_dec(c);
-    return lean_string_push(s, ch);
-}
+VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER(lean_string_push, UINT32)
 
 extern "C" lean_object * lean_string_pushn___boxed(lean_object * s, lean_object * c, lean_object * n) {
     uint32_t ch = lean_unbox_uint32(c);
@@ -1107,6 +1106,7 @@ VIR_DEFINE_BORROWED_OBJECT_UINT64_UNARY_WRAPPER(lean_expr_data)
 #undef VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER
 #undef VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER
 #undef VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER
+#undef VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER
 
 extern "C" lean_object * lean_is_reserved_name___boxed(lean_object * env, lean_object * n) {
     lean::elab_environment ienv(lean_box(0));

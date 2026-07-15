@@ -257,6 +257,19 @@ function classifyWrapper(wrapper, entries) {
     };
   }
 
+  if (wrapper.generatedOwnedObjectlikeScalar) {
+    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
+      return {
+        kind: "generated-direct-mismatch",
+        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
+      };
+    }
+    return {
+      kind: "generated-direct",
+      reason: `macro-generated owned-objectlike/scalar ${wrapper.arity} forwarder ${wrapper.paramType}`,
+    };
+  }
+
   const compactBody = wrapper.body.trim().replace(/\s+/g, " ");
   const mentionsSymbol = mentionsRegisteredSymbol(wrapper.body, entries);
   const callsSymbol = callsRegisteredSymbol(wrapper.body, entries);
@@ -544,6 +557,34 @@ function validateOwnedObjectlikeSignature(nativeExtern, arity) {
   return null;
 }
 
+function validateOwnedObjectlikeScalarSignature(nativeExtern, arity, scalarType) {
+  const forwardedParamCount = paramCountForArity(arity);
+  if (forwardedParamCount === null) {
+    return `unsupported generated direct arity ${arity}`;
+  }
+
+  if (nativeExtern.params.length !== forwardedParamCount) {
+    return `expected ${forwardedParamCount} params, found ${nativeExtern.params.length}`;
+  }
+  const [objectParam, scalarParam] = nativeExtern.params;
+  if (objectParam.borrow) {
+    return `param ${objectParam.index} is borrowed; generated owned objectlike/scalar wrapper only supports owned objectlike params`;
+  }
+  if (!["object", "tobject"].includes(objectParam.type)) {
+    return `param ${objectParam.index} is ${objectParam.type}, expected object or tobject`;
+  }
+  if (scalarParam.borrow) {
+    return `param ${scalarParam.index} is borrowed; generated owned objectlike/scalar wrapper only supports owned scalar params`;
+  }
+  if (scalarParam.type !== scalarType) {
+    return `param ${scalarParam.index} is ${scalarParam.type}, expected ${scalarType}`;
+  }
+  if (!["object", "tobject"].includes(nativeExtern.resultType)) {
+    return `result is ${nativeExtern.resultType}, expected object or tobject`;
+  }
+  return null;
+}
+
 function validateGeneratedDirectSignature(wrapper, nativeExtern) {
   if (wrapper.generatedDropTypeObject) {
     return validateDropTypeObjectSignature(nativeExtern, wrapper.arity);
@@ -567,6 +608,9 @@ function validateGeneratedDirectSignature(wrapper, nativeExtern) {
   }
   if (wrapper.generatedOwnedObjectlike) {
     return validateOwnedObjectlikeSignature(nativeExtern, wrapper.arity);
+  }
+  if (wrapper.generatedOwnedObjectlikeScalar) {
+    return validateOwnedObjectlikeScalarSignature(nativeExtern, wrapper.arity, wrapper.paramType);
   }
   return "unsupported generated direct wrapper macro";
 }
