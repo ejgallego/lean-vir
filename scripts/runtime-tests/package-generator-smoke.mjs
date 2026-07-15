@@ -9,6 +9,7 @@ import { tmpdir } from "node:os";
 
 import {
   assert,
+  ensureVirIrpkgBuilt,
   join,
   manifestEntry,
   readFile,
@@ -20,6 +21,64 @@ import {
 
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-generator-"));
 try {
+  ensureVirIrpkgBuilt();
+
+  const jsonProbeSource = join(freshDir, "JsonControls.lean");
+  await writeFile(jsonProbeSource, [
+    "import Vir.GeneratePackage.Json",
+    "",
+    "open Vir.GeneratePackage",
+    "",
+    "def allJsonControlChars : String :=",
+    "  String.ofList ((List.range 32).map Char.ofNat)",
+    "",
+    "#eval IO.println (jsonString allJsonControlChars)",
+    "",
+  ].join("\n"));
+
+  const encodedControls = spawnSync("lake", ["env", "lean", jsonProbeSource], {
+    encoding: "utf8",
+  });
+  assert.equal(encodedControls.status, 0, encodedControls.stderr || encodedControls.stdout);
+  const controlChars = Array.from({ length: 32 }, (_, codePoint) =>
+    String.fromCodePoint(codePoint)).join("");
+  assert.equal(JSON.parse(encodedControls.stdout), controlChars);
+
+  const evalSource = join(freshDir, "EvalSourceHandling.lean");
+  const evalPackage = join(freshDir, "eval-source-handling.irpkg");
+  const evalReport = join(freshDir, "eval-source-handling.report.md");
+  const evalSentinel = "VIR_GENERATOR_EVAL";
+  await writeRuntimeFixture(evalSource, "EvalSourceHandling.lean");
+
+  const generatedEvalSource = runVirIrpkg([
+    evalPackage,
+    evalReport,
+    "--target-all",
+    evalSource,
+  ]);
+  assert.equal(
+    generatedEvalSource.status,
+    0,
+    generatedEvalSource.stderr || generatedEvalSource.stdout,
+  );
+  for (const suffix of ["SINGLE", "BANG", "MULTILINE", "NESTED"]) {
+    assert.match(generatedEvalSource.stdout, new RegExp(`${evalSentinel}_${suffix}`));
+  }
+  assert.doesNotMatch(generatedEvalSource.stdout, new RegExp(`${evalSentinel}_(COMMENT|STRING)`));
+
+  const inspectedEvalSource = spawnSync(
+    "node",
+    ["scripts/inspect-irpkg.mjs", "--json", evalPackage],
+    { encoding: "utf8" },
+  );
+  assert.equal(
+    inspectedEvalSource.status,
+    0,
+    inspectedEvalSource.stderr || inspectedEvalSource.stdout,
+  );
+  const evalSourceManifest = JSON.parse(inspectedEvalSource.stdout).manifest;
+  manifestEntry(evalSourceManifest, "evalSourceValue");
+
   const runtimeSource = join(freshDir, "RuntimeEffect.lean");
   const runtimePackage = join(freshDir, "runtime-effect.irpkg");
   const runtimeReport = join(freshDir, "runtime-effect.report.md");

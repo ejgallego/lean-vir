@@ -10,18 +10,8 @@ open Lean
 
 namespace Vir.GeneratePackage
 
-def jsonEscape (text : String) : String :=
-  text.foldl (fun out c =>
-    match c with
-    | '"' => out ++ "\\\""
-    | '\\' => out ++ "\\\\"
-    | '\n' => out ++ "\\n"
-    | '\r' => out ++ "\\r"
-    | '\t' => out ++ "\\t"
-    | _ => out.push c) ""
-
 def jsonString (text : String) : String :=
-  "\"" ++ jsonEscape text ++ "\""
+  Lean.Json.renderString text
 
 def jsonArray (items : Array String) : String :=
   "[" ++ ",".intercalate items.toList ++ "]"

@@ -22,8 +22,7 @@ That command:
 The generated `.irpkg` is the only browser artifact needed by `/dev.html`.
 After the package is loaded, the runner reads the embedded manifest and creates
 the UI entries automatically. The manifest metadata records the package format,
-Lean toolchain, generation time, source targets, resolved roots, and whether the
-target dropped top-level `#eval` command lines before elaboration.
+Lean toolchain, generation time, source targets, and resolved roots.
 
 `web/public/*.irpkg` files are generated local assets and are ignored by git.
 Pass multiple config files to reuse the same prepared `vir_irpkg` generator:

@@ -23,8 +23,6 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
     mode := mode
     roots := target.roots
     resolvedRoots := resolvedRootsForTarget index target
-    packageOnly := target.packageOnly
-    dropEvalCommands := target.dropEvalCommands
   }
 
 def collectPackageMetadata (generatedAt : String) (targets : Array Target) (index : DeclIndex) : PackageMetadata :=

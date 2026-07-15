@@ -57,9 +57,7 @@ def PackageTargetMetadata.toJson (target : PackageTargetMetadata) : String :=
     ("source", jsonString target.source),
     ("mode", jsonString target.mode),
     ("roots", jsonArray (target.roots.map jsonName)),
-    ("resolvedRoots", jsonArray (target.resolvedRoots.map jsonName)),
-    ("packageOnly", jsonBool target.packageOnly),
-    ("dropEvalCommands", jsonBool target.dropEvalCommands)
+    ("resolvedRoots", jsonArray (target.resolvedRoots.map jsonName))
   ]
 
 def PackageMetadata.toJson (metadata : PackageMetadata) : String :=

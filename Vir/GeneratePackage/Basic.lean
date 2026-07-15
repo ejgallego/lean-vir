@@ -60,12 +60,6 @@ structure Target where
   roots : Array Name
   includeAll : Bool := false
   packageOnly : Bool := false
-  /--
-  Drop top-level `#eval` command lines before frontend elaboration. This keeps
-  demo/example sources importable by the package generator without running local
-  examples as part of generation.
-  -/
-  dropEvalCommands : Bool := true
 
 structure LoadedDecl where
   source : String
@@ -190,8 +184,6 @@ structure PackageTargetMetadata where
   mode : String
   roots : Array Name
   resolvedRoots : Array Name
-  packageOnly : Bool
-  dropEvalCommands : Bool
 
 structure PackageMetadata where
   generator : String
