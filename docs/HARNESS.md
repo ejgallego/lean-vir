@@ -277,7 +277,11 @@ in parallel without re-fetching Lean source or reinstalling the WASI SDK.
 ## Browser Smoke
 
 `npm run test:pages:browser` runs a built `web/dist/` site against headless
-Chromium over the Chrome DevTools Protocol.
+Chromium over the Chrome DevTools Protocol. This is an explicit no-build path:
+before starting Chromium, it checks that every required artifact exists and
+that each `.irpkg` has the current package and interface-manifest versions.
+Missing or incompatible artifacts fail early and report `npm run build:site`
+as the refresh command.
 
 The script searches common Linux/macOS Chromium paths and `PATH`. If Chromium
 is elsewhere, set:

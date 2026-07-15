@@ -31,7 +31,6 @@ export async function smokeReactReview(cdp, origin) {
     bubbles: true,
     cancelable: true,
   });
-  await setInputValueAndDispatch(cdp, "#react-pet-name-input", "Ada", "input");
   await setTextareaValueAndDispatch(cdp, "#react-note-input", "hello", "input");
   await clickSelector(cdp, "#react-proof-goal-step");
   await clickSelector(cdp, "#react-checkbox-input");
@@ -42,7 +41,10 @@ export async function smokeReactReview(cdp, origin) {
     state.change === "Grace" &&
     state.selectTextarea === "note:hello; flavor:vanilla" &&
     state.checkbox === "checked:true" &&
-    state.petSummary === "Ada is happy; last rename; care 3/5; turn 0" &&
+    state.petMood === "happy" &&
+    state.petWidgetMood === "happy" &&
+    state.petDeviceMood === "happy" &&
+    state.petDeviceLabel === "Octopus Octi mood happy" &&
     state.proofTitle === "Induction step" &&
     state.proofApi?.includes("Surface.goals3") &&
     state.proofApi?.includes("Hypothesis.fvarIds3 fvars") &&
@@ -62,18 +64,20 @@ export async function smokeReactReview(cdp, origin) {
   await clickSelector(cdp, "#react-pet-action-ignore");
 
   await waitForBrowserState(cdp, reactReviewStateScript(`
-    state.petSummary === "Ada is hungry; last ignore; care 2/5; turn 1" &&
     state.petMood === "hungry" &&
-    state.petTrace === "happyhungry" &&
-    state.petTraceRole === "list" &&
-    state.petTraceAriaLabel === "Mood trace: happy -> hungry"
+    state.petWidgetMood === "hungry" &&
+    state.petDeviceMood === "hungry" &&
+    state.petDeviceLabel === "Octopus Octi mood hungry"
   `), {
     timeoutMessage: "React Tamagotchi action did not update",
   });
   await clickSelector(cdp, "#react-pet-art-toggle");
 
   const reviewState = await waitForBrowserState(cdp, reactReviewStateScript(`
-    state.petSummary === "Ada is hungry; last artwork; care 2/5; turn 1" &&
+    state.petMood === "hungry" &&
+    state.petWidgetMood === "hungry" &&
+    state.petDeviceMood === "hungry" &&
+    state.petDeviceLabel === "Virtual pet Mochi mood hungry" &&
     state.petArt === "pet" &&
     state.petToggleChecked === false &&
     state.proofTitle === "Induction step" &&
@@ -95,11 +99,10 @@ export async function smokeReactReview(cdp, origin) {
     className: "react-attributes is-mounted",
     color: "rgb(1, 2, 3)",
     marginTop: "4px",
-    petSummary: "Ada is hungry; last artwork; care 2/5; turn 1",
     petMood: "hungry",
-    petTrace: "happyhungry",
-    petTraceRole: "list",
-    petTraceAriaLabel: "Mood trace: happy -> hungry",
+    petWidgetMood: "hungry",
+    petDeviceMood: "hungry",
+    petDeviceLabel: "Virtual pet Mochi mood hungry",
     petArt: "pet",
     petToggleChecked: false,
     proofTitle: "Induction step",
@@ -117,22 +120,29 @@ function reactReviewStateScript(condition) {
     const flavorSelect = document.querySelector("#react-flavor-select");
     const checkbox = document.querySelector("#react-checkbox-input");
     const attributes = document.querySelector("#react-attributes-widget");
-    const petNameInput = document.querySelector("#react-pet-name-input");
+    const petWidget = document.querySelector("#react-pet-widget");
+    const petDevice = document.querySelector("#react-pet-device");
     const petToggle = document.querySelector("#react-pet-art-toggle");
     const proofStepGoal = document.querySelector("#react-proof-goal-step");
     const proofApiStrip = document.querySelector("#react-proof-api-strip");
-    const mounted =
-      counterButton instanceof HTMLButtonElement &&
-      nameInput instanceof HTMLInputElement &&
-      changeInput instanceof HTMLInputElement &&
-      noteInput instanceof HTMLTextAreaElement &&
-      flavorSelect instanceof HTMLSelectElement &&
-      checkbox instanceof HTMLInputElement &&
-      attributes instanceof HTMLElement &&
-      petNameInput instanceof HTMLInputElement &&
-      petToggle instanceof HTMLInputElement &&
-      proofStepGoal instanceof HTMLButtonElement &&
-      proofApiStrip instanceof HTMLElement;
+    const mountChecks = {
+      counterButton: counterButton instanceof HTMLButtonElement,
+      nameInput: nameInput instanceof HTMLInputElement,
+      changeInput: changeInput instanceof HTMLInputElement,
+      noteInput: noteInput instanceof HTMLTextAreaElement,
+      flavorSelect: flavorSelect instanceof HTMLSelectElement,
+      checkbox: checkbox instanceof HTMLInputElement,
+      attributes: attributes instanceof HTMLElement,
+      petWidget: petWidget instanceof HTMLElement,
+      petDevice: petDevice instanceof HTMLElement,
+      petToggle: petToggle instanceof HTMLInputElement,
+      proofStepGoal: proofStepGoal instanceof HTMLButtonElement,
+      proofApiStrip: proofApiStrip instanceof HTMLElement,
+    };
+    const missingMounts = Object.entries(mountChecks)
+      .filter(([_name, present]) => !present)
+      .map(([name]) => name);
+    const mounted = missingMounts.length === 0;
     const state = {
       status: document.querySelector("#react-review-status")?.textContent?.trim(),
       counter: counterButton?.textContent,
@@ -143,12 +153,11 @@ function reactReviewStateScript(condition) {
       className: attributes?.className,
       color: attributes?.style.color,
       marginTop: attributes?.style.marginTop,
-      petSummary: document.querySelector("#react-pet-summary")?.textContent,
       petMood: document.querySelector("#react-pet-mood")?.textContent,
-      petTrace: document.querySelector("#react-pet-trace")?.textContent,
-      petTraceRole: document.querySelector("#react-pet-trace")?.getAttribute("role"),
-      petTraceAriaLabel: document.querySelector("#react-pet-trace")?.getAttribute("aria-label"),
-      petArt: document.querySelector("#react-pet-device")?.dataset.art,
+      petWidgetMood: petWidget?.dataset.mood,
+      petDeviceMood: petDevice?.dataset.mood,
+      petDeviceLabel: petDevice?.getAttribute("aria-label"),
+      petArt: petDevice?.dataset.art,
       petToggleChecked: petToggle instanceof HTMLInputElement ? petToggle.checked : undefined,
       proofTitle: document.querySelector("#react-proof-selected-title")?.textContent,
       proofApi: document.querySelector("#react-proof-api-strip")?.textContent,
@@ -158,6 +167,7 @@ function reactReviewStateScript(condition) {
       ready: Boolean(${condition}),
       value: state,
       mounted,
+      missingMounts,
       ...state,
     };
   })()`;
