@@ -6,53 +6,13 @@ Author: Emilio J. Gallego Arias
 
 import { readFile, writeFile } from "node:fs/promises";
 
+import { parseNativeExterns } from "./native-externs.mjs";
 import { generatedWrapperNames } from "./native-wrapper-macros.mjs";
 
 const nativeExternsPath = new URL("../Vir/GeneratePackage/NativeExterns.lean", import.meta.url);
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
 const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols_registry.inc", import.meta.url);
 const writeMode = process.argv.includes("--write");
-
-function nativeNameParts(name) {
-  return name.split(".");
-}
-
-function cppNameKey(parts) {
-  return parts.join(".");
-}
-
-function normalizeNativeName(nameExpr) {
-  const trimmed = nameExpr.trim();
-  if (trimmed.startsWith("`")) {
-    return trimmed.slice(1);
-  }
-  const privateEnvironmentMatch = trimmed.match(/^privateEnvironmentName\s+"([^"]+)"$/);
-  if (privateEnvironmentMatch) {
-    return `_private.Lean.Environment.0.Lean.Environment.${privateEnvironmentMatch[1]}`;
-  }
-  throw new Error(`unsupported native extern name expression: ${trimmed}`);
-}
-
-function parseNativeExterns(source) {
-  const entries = [];
-  const externsMatch = source.match(/def nativeExterns : Array NativeExtern := #\[((?:.|\n)*?)\n\]/);
-  if (!externsMatch) {
-    throw new Error("could not find nativeExterns table");
-  }
-
-  const blockRegex = /\{\s*name := ([^,\n]+(?:\s+"[^"]+")?),\s*params := #\[(.*?)\],\s*resultType := [^,]+,\s*symbol := "([^"]+)"(?:,\s*deps := #\[(.*?)\])?\s*\}/gs;
-  for (const match of externsMatch[1].matchAll(blockRegex)) {
-    const name = normalizeNativeName(match[1]);
-    const params = [...match[2].matchAll(/\bparam\s+\d+/g)].map((paramMatch) => paramMatch[0]);
-    entries.push({
-      name,
-      parts: nativeNameParts(name),
-      params,
-      symbol: match[3],
-    });
-  }
-  return entries;
-}
 
 function cString(value) {
   return JSON.stringify(value);
@@ -149,7 +109,7 @@ const expectedDlsymSymbols = new Set();
 const expectedWrappers = new Set();
 
 for (const entry of nativeExterns) {
-  const key = cppNameKey(entry.parts);
+  const key = entry.name;
   expectedDlsymSymbols.add(expectedDlsymSymbol(entry));
   const wrapper = expectedWrapper(entry);
   if (wrapper) {
@@ -174,7 +134,7 @@ for (const entry of nativeExterns) {
 }
 
 for (const [key, entry] of nativeRegistryEntries.entries()) {
-  if (!nativeExterns.some((nativeExtern) => cppNameKey(nativeExtern.parts) === key)) {
+  if (!nativeExterns.some((nativeExtern) => nativeExtern.name === key)) {
     failures.push(`${key}: native registry has extra entry`);
   }
   if (!expectedDlsymSymbols.has(entry.dlsymSymbol)) {

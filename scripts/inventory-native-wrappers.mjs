@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+import { parseNativeExterns } from "./native-externs.mjs";
 import { parseGeneratedWrapperMacros } from "./native-wrapper-macros.mjs";
 
 const nativeExternsPath = new URL("../Vir/GeneratePackage/NativeExterns.lean", import.meta.url);
@@ -46,69 +47,6 @@ function parseRegistry(source) {
     }
   }
   return { entries, constants };
-}
-
-function normalizeNativeName(nameExpr) {
-  const trimmed = nameExpr.trim();
-  if (trimmed.startsWith("`")) {
-    return trimmed.slice(1);
-  }
-  const privateEnvironmentMatch = trimmed.match(/^privateEnvironmentName\s+"([^"]+)"$/);
-  if (privateEnvironmentMatch) {
-    return `_private.Lean.Environment.0.Lean.Environment.${privateEnvironmentMatch[1]}`;
-  }
-  throw new Error(`unsupported native extern name expression: ${trimmed}`);
-}
-
-function parseIRType(source) {
-  const trimmed = source.trim();
-  const simple = /^\.(float|uint8|uint16|uint32|uint64|usize|erased|object|tobject|float32|tagged|void)$/.exec(
-    trimmed,
-  );
-  if (simple) {
-    return simple[1];
-  }
-  const named = /^\.(struct|union)\s+/.exec(trimmed);
-  if (named) {
-    return named[1];
-  }
-  return trimmed;
-}
-
-function parseParam(paramSource) {
-  const match = /\bparam\s+(\d+)\s+(true|false)\s+([^,\]]+)/.exec(paramSource.trim());
-  if (!match) {
-    throw new Error(`unsupported native extern param expression: ${paramSource.trim()}`);
-  }
-  return {
-    index: Number(match[1]),
-    borrow: match[2] === "true",
-    type: parseIRType(match[3]),
-  };
-}
-
-function parseNativeExterns(source) {
-  const externsMatch = source.match(/def nativeExterns : Array NativeExtern := #\[((?:.|\n)*?)\n\]/);
-  if (!externsMatch) {
-    throw new Error("could not find nativeExterns table");
-  }
-
-  const entries = new Map();
-  const blockRegex =
-    /\{\s*name := ([^,\n]+(?:\s+"[^"]+")?),\s*params := #\[(.*?)\],\s*resultType := ([^,\n]+),\s*symbol := "([^"]+)"(?:,\s*deps := #\[(.*?)\])?\s*\}/gs;
-  for (const match of externsMatch[1].matchAll(blockRegex)) {
-    const name = normalizeNativeName(match[1]);
-    const params = [...match[2].matchAll(/\bparam\s+\d+\s+(?:true|false)\s+[^,\]]+/g)].map((paramMatch) =>
-      parseParam(paramMatch[0]),
-    );
-    entries.set(name, {
-      name,
-      params,
-      resultType: parseIRType(match[3]),
-      symbol: match[4],
-    });
-  }
-  return entries;
 }
 
 function parseWrappers(source) {
@@ -735,7 +673,9 @@ const [nativeExternsSource, nativeSymbols, nativeRegistry] = await Promise.all([
   readFile(nativeRegistryPath, "utf8"),
 ]);
 
-const nativeExterns = parseNativeExterns(nativeExternsSource);
+const nativeExterns = new Map(
+  parseNativeExterns(nativeExternsSource).map((nativeExtern) => [nativeExtern.name, nativeExtern]),
+);
 const { entries, constants } = parseRegistry(nativeRegistry);
 const wrappers = parseWrappers(nativeSymbols);
 const grouped = entriesByWrapper(entries);
