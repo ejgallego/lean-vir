@@ -165,6 +165,8 @@ code changes.
 - IR package name/declaration tag changes:
   `npm run generate:ir-codec-tags`, then `npm run check:ir-codec-tags` and
   `npm run test:upstream`
+- IR package decoder validation or failure cleanup:
+  `npm run test:runtime -- package-decoder`
 - Upstream interpreter or WASI boundary changes:
   `npm run test:upstream`
 - Upstream smoke after `npm run build:demo` has already refreshed the WASM and

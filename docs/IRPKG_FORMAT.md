@@ -16,7 +16,9 @@ multi-byte integers are unsigned little-endian 32-bit values.
 | declaration count | u32 | Number of declaration entries in the declarations section. |
 | section count | u32 | Number of section directory entries. |
 
-Strings are encoded as `u32 byteLength` followed by UTF-8 bytes.
+Strings are encoded as `u32 byteLength` followed by UTF-8 bytes. They are
+length-delimited rather than NUL-terminated, so embedded zero bytes are
+preserved.
 
 ## Section Directory
 

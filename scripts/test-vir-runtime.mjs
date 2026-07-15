@@ -18,6 +18,7 @@ const tests = [
   { id: "callback-lifecycle", file: "scripts/runtime-tests/callback-lifecycle-smoke.mjs", group: "pure" },
   { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },
   { id: "object-abi", file: "scripts/runtime-tests/object-abi-smoke.mjs", group: "pure" },
+  { id: "package-decoder", file: "scripts/runtime-tests/package-decoder-smoke.mjs", group: "pure" },
   { id: "package-generator", file: "scripts/runtime-tests/package-generator-smoke.mjs", group: "lean" },
   { id: "package-generation", file: "scripts/runtime-tests/package-generation-smoke.mjs", group: "lean" },
   { id: "sdk-import", file: "scripts/runtime-tests/sdk-import-smoke.mjs", group: "lean" },

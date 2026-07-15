@@ -33,27 +33,6 @@ class reader : public package_binary_reader {
 public:
     using package_binary_reader::package_binary_reader;
 
-    uint32_t bounded_count(char const * label, size_t min_item_bytes = 1) {
-        uint32_t count = u32();
-        if (!count_fits(count, label, min_item_bytes)) {
-            return 0;
-        }
-        return count;
-    }
-
-    bool count_fits(uint32_t count, char const * label, size_t min_item_bytes = 1) {
-        if (!ok) {
-            return false;
-        }
-        if (min_item_bytes == 0 || count > remaining() / min_item_bytes) {
-            fail(
-                std::string(label) + " count " + std::to_string(count) +
-                " exceeds remaining section bytes " + std::to_string(remaining()));
-            return false;
-        }
-        return true;
-    }
-
     object * ir_nat_literal() {
         std::string decimal = string();
         return lean_cstr_to_nat(decimal.c_str());
@@ -124,7 +103,7 @@ public:
     }
 
     std::vector<object *> ir_args() {
-        return object_array([&] { return ir_arg(); });
+        return object_array("IR argument", 1, [&] { return ir_arg(); });
     }
 
     object * ir_lit_expr() {
@@ -234,7 +213,7 @@ public:
     }
 
     std::vector<object *> ir_params() {
-        return object_array([&] { return ir_param(); });
+        return object_array("IR parameter", 6, [&] { return ir_param(); });
     }
 
     object * ir_alt() {
@@ -258,7 +237,7 @@ public:
     }
 
     std::vector<object *> ir_alts() {
-        return object_array([&] { return ir_alt(); });
+        return object_array("IR alternative", 2, [&] { return ir_alt(); });
     }
 
     object * ir_body() {
@@ -391,8 +370,8 @@ public:
 
 private:
     template <typename F>
-    std::vector<object *> object_array(F read_one) {
-        uint32_t count = bounded_count("IR object array");
+    std::vector<object *> object_array(char const * label, size_t min_item_bytes, F read_one) {
+        uint32_t count = bounded_count(label, min_item_bytes);
         std::vector<object *> out;
         out.reserve(count);
         for (uint32_t i = 0; i < count && ok; i++) {
@@ -404,7 +383,7 @@ private:
 
 static std::vector<decl_entry> read_ir_decl_entries(reader & r, uint32_t count) {
     std::vector<decl_entry> entries;
-    if (!r.count_fits(count, "declaration")) {
+    if (!r.count_fits(count, "declaration", 8)) {
         return entries;
     }
     entries.reserve(count);
@@ -431,7 +410,7 @@ static std::vector<init_global_entry> read_init_entries(reader & r) {
 }
 
 static std::vector<host_import_entry> read_host_imports(reader & r) {
-    uint32_t count = r.bounded_count("host import entry");
+    uint32_t count = r.bounded_count("host import entry", 18);
     std::vector<host_import_entry> entries;
     entries.reserve(count);
     for (uint32_t i = 0; i < count && r.ok; i++) {
@@ -441,7 +420,7 @@ static std::vector<host_import_entry> read_host_imports(reader & r) {
 }
 
 static std::vector<export_call_summary_entry> read_export_summaries(reader & r) {
-    uint32_t count = r.bounded_count("export summary entry");
+    uint32_t count = r.bounded_count("export summary entry", 7);
     std::vector<export_call_summary_entry> entries;
     entries.reserve(count);
     for (uint32_t i = 0; i < count && r.ok; i++) {
@@ -567,11 +546,11 @@ bool decode_ir_package(uint8_t const * data, size_t size, decoded_ir_package & o
 
     reader manifest_reader(data + directory.interface_manifest.offset, directory.interface_manifest.byte_length);
     out.interface_manifest = manifest_reader.string();
-    if (out.interface_manifest.empty()) {
-        error = "IR package is missing an embedded interface manifest";
+    if (!finish_section(manifest_reader, package_section_label(package_section_interface_manifest), error)) {
         return false;
     }
-    if (!finish_section(manifest_reader, package_section_label(package_section_interface_manifest), error)) {
+    if (out.interface_manifest.empty()) {
+        error = "IR package is missing an embedded interface manifest";
         return false;
     }
 

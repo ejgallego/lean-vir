@@ -28,7 +28,7 @@ object * mk_arg_erased();
 object * mk_lit_num(object * value);
 object * mk_lit_num(size_t value);
 object * mk_lit_str(std::string const & value);
-object * mk_ctor_info(object * n, size_t tag, size_t size = 0, size_t usize = 0, size_t ssize = 0);
+object * mk_ctor_info(object * n, size_t tag, size_t size, size_t usize, size_t ssize);
 object * mk_ctor_expr(object * ctor_info, object * args);
 object * mk_reset(size_t n, size_t var);
 object * mk_reuse(size_t var, object * ctor_info, bool update_header, object * args);

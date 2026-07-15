@@ -4,7 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createVirRuntime, createVirRuntimeFactory } from "../../web/src/vir-runtime-node.js";
+import { createVirRuntime } from "../../web/src/vir-runtime-node.js";
 import { defaultPackageFile, publicArtifactPath } from "../browser-package-config.mjs";
 import { PACKAGE_FORMAT_VERSION } from "../package-versions.mjs";
 import {
@@ -1024,123 +1024,10 @@ assert.throws(
   /profileScore argument profile is missing field tags/,
 );
 
-const factory = createVirRuntimeFactory({ wasmBytes });
-const unloaded = await factory.createRuntime();
-assert.equal(unloaded.packageInfo, null);
-assert.equal(unloaded.packageDeclCount(), 0);
-assert.throws(
-  () => unloaded.call("fib", 8),
-  /interface entry not found: fib/,
-);
-const first = await factory.createRuntime({ irPackageBytes });
-const second = await factory.createRuntime({ irPackageBytes });
-assert.equal(first.call("SortDemo.demo"), "192");
-assert.equal(second.call("fib", 8), "21");
-
-const badPackageRuntime = await factory.createRuntime();
-const badPackage = Uint8Array.from([
-  3, 0, 0, 0, 98, 97, 100,
-  1, 0, 0, 0,
-  0, 0, 0, 0,
-]);
-assert.throws(
-  () => badPackageRuntime.loadIrPackageBytes(badPackage),
-  /invalid IR package magic/,
-);
-assert.equal(badPackageRuntime.packageInfo, null);
-assert.equal(badPackageRuntime.interfaceManifest, null);
-assert.equal(badPackageRuntime.packageMetadata, null);
-assert.equal(badPackageRuntime.packageDeclCount(), 0);
-
-assert.throws(
-  () => badPackageRuntime.loadIrPackageBytes(invalidateFirstDeclarationNameTag(irPackageBytes)),
-  /unsupported name tag 255/,
-);
-assert.equal(badPackageRuntime.packageInfo, null);
-
-assert.throws(
-  () => badPackageRuntime.loadIrPackageBytes(oversizeDeclarationCount(irPackageBytes)),
-  /declaration count 4294967295 exceeds remaining section bytes/,
-);
-assert.equal(badPackageRuntime.packageInfo, null);
-
-const partialDecodeRuntime = await factory.createRuntime();
-const partialDeclarationPackage = truncateDeclarationSection(irPackageBytes);
-const partialDecodePages = [];
-for (let iteration = 0; iteration < 30; iteration += 1) {
-  assert.throws(
-    () => partialDecodeRuntime.loadIrPackageBytes(partialDeclarationPackage),
-    /invalid IR package section `declarations`:/,
-  );
-  partialDecodePages.push(partialDecodeRuntime.exports.memory.buffer.byteLength / 65536);
-}
-const warmedPartialDecodePages = partialDecodePages.slice(5);
-assert.ok(
-  Math.max(...warmedPartialDecodePages) - Math.min(...warmedPartialDecodePages) <= 1,
-  `partial package decoding should reuse memory after warm-up; pages: ${partialDecodePages.join(", ")}`,
-);
-partialDecodeRuntime.dispose();
-
-assert.throws(
-  () => first.loadIrPackageBytes(badPackage),
-  /invalid IR package magic/,
-);
-assert.notEqual(first.packageInfo, null);
-assert.notEqual(first.interfaceManifest, null);
-assert.notEqual(first.packageMetadata, null);
-assert.equal(first.call("fib", 8), "21");
-
 assert.throws(
   () => runtime.call("fib", -1),
   /fib argument arg1 must be non-negative/,
 );
-
-function truncateDeclarationSection(packageBytes) {
-  const bytes = Uint8Array.from(packageBytes);
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const declarations = findPackageSection(view, 1);
-  const declarationBytes = view.getUint32(declarations.byteLengthOffset, true);
-  assert.ok(declarationBytes > 32, "IR package declarations section is too small to truncate");
-  view.setUint32(declarations.byteLengthOffset, declarationBytes - 32, true);
-  return bytes;
-}
-
-function invalidateFirstDeclarationNameTag(packageBytes) {
-  const bytes = Uint8Array.from(packageBytes);
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const declarations = findPackageSection(view, 1);
-  bytes[declarations.offset] = 255;
-  return bytes;
-}
-
-function oversizeDeclarationCount(packageBytes) {
-  const bytes = Uint8Array.from(packageBytes);
-  const view = new DataView(bytes.buffer, bytes.byteOffset, bytes.byteLength);
-  const magicByteLength = view.getUint32(0, true);
-  const declarationCountOffset = 4 + magicByteLength + 4;
-  view.setUint32(declarationCountOffset, 0xffffffff, true);
-  return bytes;
-}
-
-function findPackageSection(view, kind) {
-  const magicByteLength = view.getUint32(0, true);
-  const sectionCountOffset = 4 + magicByteLength + 8;
-  const sectionCount = view.getUint32(sectionCountOffset, true);
-  for (let index = 0; index < sectionCount; index += 1) {
-    const directoryEntryOffset = sectionCountOffset + 4 + index * 12;
-    if (view.getUint32(directoryEntryOffset, true) === kind) {
-      return {
-        offset: view.getUint32(directoryEntryOffset + 4, true),
-        byteLengthOffset: directoryEntryOffset + 8,
-      };
-    }
-  }
-  throw new Error(`IR package section ${kind} is missing`);
-}
-first.dispose();
-second.dispose();
-badPackageRuntime.dispose();
-unloaded.dispose();
 runtime.dispose();
 prettyRuntime.dispose();
 leanRuntime.dispose();

@@ -43,6 +43,31 @@ public:
         return m_size - m_pos;
     }
 
+    bool count_fits(uint32_t count, char const * label, size_t min_item_bytes) {
+        if (!ok) {
+            return false;
+        }
+        if (min_item_bytes == 0) {
+            fail(std::string(label) + " minimum item size must be positive");
+            return false;
+        }
+        if (count > remaining() / min_item_bytes) {
+            fail(
+                std::string(label) + " count " + std::to_string(count) +
+                " exceeds remaining section bytes " + std::to_string(remaining()));
+            return false;
+        }
+        return true;
+    }
+
+    uint32_t bounded_count(char const * label, size_t min_item_bytes) {
+        uint32_t count = u32();
+        if (!count_fits(count, label, min_item_bytes)) {
+            return 0;
+        }
+        return count;
+    }
+
     void fail(std::string const & message) {
         if (ok) {
             ok = false;
