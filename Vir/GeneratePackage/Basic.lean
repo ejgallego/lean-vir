@@ -81,6 +81,7 @@ structure NativeExtern where
   params : Array Param
   resultType : IRType
   symbol : String
+  generateBoxedWrapper : Bool := false
   deps : Array Name := #[]
 
 structure InitGlobal where

@@ -77,7 +77,7 @@ export function parseNativeExterns(source) {
   const entries = [];
   const names = new Set();
   const blockRegex =
-    /\{\s*name := ([^,\n]+(?:\s+"[^"]+")?),\s*params := #\[([^}]*?)\],\s*resultType := ([^,\n]+),\s*symbol := "([^"]+)"(?:,\s*deps := #\[([^}]*?)\])?\s*\}/gs;
+    /\{\s*name := ([^,\n]+(?:\s+"[^"]+")?),\s*params := #\[([^}]*?)\],\s*resultType := ([^,\n]+),\s*symbol := "([^"]+)"(?:,\s*generateBoxedWrapper := (true|false))?(?:,\s*deps := #\[([^}]*?)\])?\s*\}/gs;
   let cursor = 0;
   for (const match of table.matchAll(blockRegex)) {
     assertOnlySeparators("table", table.slice(cursor, match.index));
@@ -91,6 +91,7 @@ export function parseNativeExterns(source) {
       params: parseParams(match[2]),
       resultType: parseIRType(match[3]),
       symbol: match[4],
+      generateBoxedWrapper: match[5] === "true",
     });
     cursor = match.index + match[0].length;
   }

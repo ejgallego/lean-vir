@@ -54,9 +54,10 @@ For WASI/runtime boundary work, read:
 8. `wasm/upstream_shim/package/package_section_directory.cpp`
 9. `wasm/upstream_shim/package/package_ir_decoder.cpp`
 10. `wasm/upstream_shim/runtime/native_symbols.cpp`
-11. `wasm/upstream_shim/runtime/native_symbol_lookup.cpp`
-12. `wasm/upstream_shim/abi/object_abi.cpp`
-13. `wasm/upstream_shim/abi/object_expr_abi.cpp`
+11. `tools/GenerateNativeWrappers.lean`
+12. `wasm/upstream_shim/runtime/native_symbol_lookup.cpp`
+13. `wasm/upstream_shim/abi/object_abi.cpp`
+14. `wasm/upstream_shim/abi/object_expr_abi.cpp`
 
 For benchmark work, read:
 

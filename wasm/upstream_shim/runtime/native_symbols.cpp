@@ -502,8 +502,6 @@ extern "C" lean_object * lean_array_to_list___boxed(lean_object * type, lean_obj
 
 VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_UNARY_WRAPPER(lean_array_get_size)
 
-VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER(lean_array_size)
-
 extern "C" lean_object * lean_array_uget___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
     lean_dec(type);
     lean_object * result = lean_array_uget(array, lean_unbox_usize(index));
@@ -715,8 +713,6 @@ extern "C" lean_object * l_String_Pos_Raw_set___boxed(lean_object * s, lean_obje
 extern "C" lean_object * l_String_set___boxed(lean_object * s, lean_object * pos, lean_object * c) {
     return l_String_Pos_Raw_set___boxed(s, pos, c);
 }
-
-VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER(lean_string_push, UINT32)
 
 extern "C" lean_object * lean_string_pushn___boxed(lean_object * s, lean_object * c, lean_object * n) {
     uint32_t ch = lean_unbox_uint32(c);
@@ -1014,13 +1010,6 @@ VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_dec_le, box_uint64_predicate)
 #undef VIR_DEFINE_BOX_BINARY_WRAPPER
 
 VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_uint64_to_float, UINT64, FLOAT)
-
-extern "C" lean_object * lean_float_scaleb___boxed(lean_object * a, lean_object * b) {
-    double result = lean_float_scaleb(lean_unbox_float(a), b);
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box_float(result);
-}
 
 VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_float_to_uint32, FLOAT, UINT32)
 
