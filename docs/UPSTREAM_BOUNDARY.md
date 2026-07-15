@@ -134,11 +134,14 @@ accessors in `ir_interpreter.cpp`. A package-backed provider therefore has to
 return `Option decl` values using the same constructor layout:
 
 - `decl` uses `Fun`/`Extern` constructors and carries `fun_id`, parameters,
-  result type, and `fn_body`.
-- `fn_body` uses the real `VDecl`, `Dec`, `Case`, `Ret`, and later additional
-  body constructors.
-- `expr` uses the real `Lit`, `FAp`, `Ctor`, and `Proj` constructors for the
-  current fixture closure.
+  result type, and `fn_body`. Function declaration metadata is reconstructed as
+  `none`, and extern attributes as an empty array, because the interpreter does
+  not consume those fields.
+- `fn_body`, `expr`, and `alt` use the real upstream constructors. The
+  package codec covers every constructor in those current IR types rather than
+  only the cases reached by one fixture closure.
+- scalar `IRType` cases are decoded directly; `IRType.struct` and
+  `IRType.union` remain explicit package-generation errors.
 - `arg` uses constructor-backed variables and scalar erased arguments.
 - arrays must be Lean array objects, not C arrays.
 

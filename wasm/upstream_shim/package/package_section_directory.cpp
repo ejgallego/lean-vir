@@ -54,7 +54,7 @@ bool read_package_section_directory(
     package_section_directory & out,
     std::string & error) {
     out = package_section_directory{};
-    uint32_t count = r.u32();
+    uint32_t count = r.bounded_count("section directory entry", 12);
     if (!r.ok) {
         error = r.error();
         return false;

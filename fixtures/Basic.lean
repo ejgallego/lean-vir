@@ -148,6 +148,9 @@ def stringUtf8ByteScore (a b c : String) : Nat :=
 def upstreamStringUtf8ByteScore : Nat :=
   stringUtf8ByteScore "lean" "-vir" "wasm"
 
+def upstreamEmbeddedNulLiteralByteSize : Nat :=
+  "a\x00b".utf8ByteSize
+
 def stringByteAtScore (s : String) (h : (⟨1⟩ : String.Pos.Raw) < s.rawEndPos) : Nat :=
   (s.getUTF8Byte ⟨1⟩ h).toNat
 

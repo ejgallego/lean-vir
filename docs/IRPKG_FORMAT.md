@@ -16,7 +16,9 @@ multi-byte integers are unsigned little-endian 32-bit values.
 | declaration count | u32 | Number of declaration entries in the declarations section. |
 | section count | u32 | Number of section directory entries. |
 
-Strings are encoded as `u32 byteLength` followed by UTF-8 bytes.
+Strings are encoded as `u32 byteLength` followed by UTF-8 bytes. They are
+length-delimited rather than NUL-terminated, so embedded zero bytes are
+preserved.
 
 ## Section Directory
 
@@ -52,6 +54,23 @@ Decoded Lean objects are runtime-owned, not views into the package bytes.
 Package IR constructor helpers consume owned child references, and the decoded
 package owner releases the complete graph both when a later section fails and
 when the package state is cleared.
+
+Package `Name` tags and IR declaration payload tags are generated from
+`scripts/ir-codec-tags.mjs` into
+`Vir/GeneratePackage/PackageIRTags.lean` and
+`wasm/upstream_shim/package/package_ir_tags.h`. Name encoding is shared by the
+declaration, initializer-global, host-import, and export-summary sections; the
+other generated tag groups are specific to IR declarations.
+
+These assignments are part of the format-10 wire contract. Do not renumber or
+reuse them without reviewing whether `packageFormatVersion` must change. IR
+type tags `10` and `11` remain reserved for the currently unsupported
+`Lean.IR.IRType.struct` and `Lean.IR.IRType.union` cases. After editing the
+source table, run `npm run generate:ir-codec-tags`, then
+`npm run check:ir-codec-tags`.
+
+See `docs/IRPKG_PAYLOAD_ANALYSIS.md` for a measured package-section snapshot
+and the current declaration-codec maintenance analysis.
 
 ## Inspecting
 

@@ -30,10 +30,34 @@ static object * mk_nat(size_t n) {
     return lean_usize_to_nat(n);
 }
 
+static object * mk_lean_string(std::string const & value) {
+    return lean_mk_string_from_bytes(value.data(), value.size());
+}
+
+static void set_bool_scalar(object * obj, size_t object_fields, size_t scalar_index, bool value) {
+    lean_ctor_set_uint8(
+        obj,
+        object_fields * sizeof(void *) + scalar_index * sizeof(uint8_t),
+        value ? 1 : 0);
+}
+
+static object * mk_refcount_body(
+    unsigned tag,
+    size_t var,
+    size_t amount,
+    bool maybe_scalar,
+    bool persistent,
+    object * cont) {
+    object * obj = mk_ctor(tag, { mk_nat(var), mk_nat(amount), cont }, 2 * sizeof(uint8_t));
+    set_bool_scalar(obj, 3, 0, maybe_scalar);
+    set_bool_scalar(obj, 3, 1, persistent);
+    return obj;
+}
+
 }
 
 object * mk_name_str(object * prefix, std::string const & part) {
-    object * suffix = lean_mk_string(part.c_str());
+    object * suffix = mk_lean_string(part);
     object * result = lean_name_mk_string(prefix, suffix);
     lean_dec(prefix);
     lean_dec(suffix);
@@ -76,7 +100,7 @@ object * mk_lit_num(size_t value) {
 }
 
 object * mk_lit_str(std::string const & value) {
-    object * str = lean_mk_string(value.c_str());
+    object * str = mk_lean_string(value);
     object * lit_val = mk_ctor(1, { str });
     return mk_ctor(11, { lit_val });
 }
@@ -95,7 +119,7 @@ object * mk_reset(size_t n, size_t var) {
 
 object * mk_reuse(size_t var, object * ctor_info, bool update_header, object * args) {
     object * obj = mk_ctor(2, { mk_nat(var), ctor_info, args }, sizeof(uint8_t));
-    lean_ctor_set_uint8(obj, 3 * sizeof(void *), update_header ? 1 : 0);
+    set_bool_scalar(obj, 3, 0, update_header);
     return obj;
 }
 
@@ -137,7 +161,7 @@ object * mk_is_shared(size_t var) {
 
 object * mk_param(size_t var, type t, bool borrow) {
     object * obj = mk_ctor(0, { mk_nat(var), lean_box(static_cast<unsigned>(t)) }, sizeof(uint8_t));
-    lean_ctor_set_uint8(obj, 2 * sizeof(void *), borrow ? 1 : 0);
+    set_bool_scalar(obj, 2, 0, borrow);
     return obj;
 }
 
@@ -173,16 +197,12 @@ object * mk_sset(size_t target, size_t idx, size_t offset, size_t source, type t
     return mk_ctor(5, { mk_nat(target), mk_nat(idx), mk_nat(offset), mk_nat(source), lean_box(static_cast<unsigned>(t)), cont });
 }
 
-object * mk_inc(size_t var, size_t amount, bool maybe_scalar, object * cont) {
-    object * obj = mk_ctor(6, { mk_nat(var), mk_nat(amount), cont }, sizeof(uint8_t));
-    lean_ctor_set_uint8(obj, 3 * sizeof(void *), maybe_scalar ? 1 : 0);
-    return obj;
+object * mk_inc(size_t var, size_t amount, bool maybe_scalar, bool persistent, object * cont) {
+    return mk_refcount_body(6, var, amount, maybe_scalar, persistent, cont);
 }
 
-object * mk_dec(size_t var, size_t amount, bool maybe_scalar, object * cont) {
-    object * obj = mk_ctor(7, { mk_nat(var), mk_nat(amount), cont }, sizeof(uint8_t));
-    lean_ctor_set_uint8(obj, 3 * sizeof(void *), maybe_scalar ? 1 : 0);
-    return obj;
+object * mk_dec(size_t var, size_t amount, bool maybe_scalar, bool persistent, object * cont) {
+    return mk_refcount_body(7, var, amount, maybe_scalar, persistent, cont);
 }
 
 object * mk_del(size_t var, object * cont) {
@@ -206,11 +226,16 @@ object * mk_unreachable() {
 }
 
 object * mk_fun_decl(object * fn, object * params, type result_type, object * body) {
-    return mk_ctor(0, { fn, params, lean_box(static_cast<unsigned>(result_type)), body });
+    // `DeclInfo` has one object field, `sorryDep?`; packages materialize `none`.
+    object * info = mk_ctor(0, { lean_box(0) });
+    return mk_ctor(0, { fn, params, lean_box(static_cast<unsigned>(result_type)), body, info });
 }
 
 object * mk_extern_decl(object * fn, object * params, type result_type) {
-    return mk_ctor(1, { fn, params, lean_box(static_cast<unsigned>(result_type)), lean_box(0) });
+    // `ExternAttrData` has one object field, `entries`; package lookup uses the
+    // static native registry, so the reconstructed IR declaration stores `[]`.
+    object * extern_data = mk_ctor(0, { lean_box(0) });
+    return mk_ctor(1, { fn, params, lean_box(static_cast<unsigned>(result_type)), extern_data });
 }
 
 }

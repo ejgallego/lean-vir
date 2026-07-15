@@ -72,9 +72,12 @@ The generated report has separate sections for the two common failure modes:
   is effectful.
 
 If the package generator reaches an unsupported IR shape, it reports the
-declaration being encoded and the unsupported package field. That usually means
-the package encoder/decoder needs one more constructor or type case before the
-new demo can run.
+declaration being encoded and the unsupported package field. The declaration
+codec currently covers all `Arg`, `Expr`, `Alt`, and `FnBody` constructors;
+the explicit IR payload exclusions are `IRType.struct` and `IRType.union`.
+If a future Lean toolchain adds another constructor or a demo reaches one of
+those types, update the generated tag schema plus the direct Lean encoder and
+C++ decoder before the new demo can run.
 
 `build/fixtures/summary.json` also records imported IR declarations and native
 extern dependencies per fixture. Use it to see whether a new fixture is growing

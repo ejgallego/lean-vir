@@ -69,6 +69,7 @@ build_module Vir/Examples/Style.lean
 build_module Vir/Examples/Tamagotchi.lean
 build_module Vir/GeneratePackage/Basic.lean
 build_module Vir/GeneratePackage/PackageFormat.lean
+build_module Vir/GeneratePackage/PackageIRTags.lean
 build_module Vir/GeneratePackage/NativeExterns.lean
 build_module Vir/GeneratePackage/Frontend.lean
 build_module Vir/GeneratePackage/Closure.lean

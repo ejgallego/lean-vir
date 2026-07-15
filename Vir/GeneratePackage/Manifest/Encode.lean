@@ -77,7 +77,7 @@ def PackageMetadata.toJson (metadata : PackageMetadata) : String :=
 def InterfaceManifest.toJson (manifest : InterfaceManifest) : String :=
   jsonObject #[
     ("version", jsonNat currentInterfaceManifestVersion),
-    ("artifact", jsonString "lean-vir-ir-package"),
+    ("artifact", jsonString packageMagic),
     ("metadata", manifest.metadata.toJson),
     ("exports", jsonArray (manifest.exports.map InterfaceExport.toJson)),
     ("hostImports", jsonArray (manifest.hostImports.map HostImport.toJson)),

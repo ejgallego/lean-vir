@@ -28,9 +28,9 @@ coupling. Line counts are approximate and are meant for sizing, not policy.
 
 | Area | Files | Approx. LOC | Package coupling | Notes |
 | --- | --- | ---: | --- | --- |
-| Package envelope decoding | `package/package_section_directory.cpp`, `package/package_section_directory.h`, `package/package_binary_reader.h`, `package/package_decl_provider_types.h` | 289 | Direct | Reads the `.irpkg` header and section directory, checks required sections, and validates section bounds. |
-| Package payload decoding | `package/package_ir_decoder.cpp` | 552 | Direct | Decodes section payloads into package declarations, init globals, host imports, export summaries, and the embedded manifest, with scoped cleanup for partial graphs. |
-| Package IR object materialization | `package/package_ir_builders.cpp`, `package/package_ir_builders.h` | 279 | Direct IR object layout | Reconstructs Lean IR objects from decoded package fields under a consuming-child ownership convention. |
+| Package envelope decoding | `package/package_section_directory.cpp`, `package/package_section_directory.h`, `package/package_binary_reader.h`, `package/package_decl_provider_types.h` | 325 | Direct | Reads the `.irpkg` header and section directory, checks required sections, and validates section bounds. |
+| Package payload decoding | `package/package_ir_decoder.cpp` | 562 | Direct | Decodes section payloads into package declarations, init globals, host imports, export summaries, and the embedded manifest, with scoped cleanup for partial graphs. |
+| Package IR object materialization | `package/package_ir_builders.cpp`, `package/package_ir_builders.h` | 304 | Direct IR object layout | Reconstructs Lean IR objects from decoded package fields under a consuming-child ownership convention. |
 | Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 398 | Direct | Owns loaded package indices, declaration lookup, structural export-index call slots, direct export call summaries, interface manifest, and init globals. |
 | Package load ABI | `package/package_loader_abi.cpp` | 49 | Direct | Exposes package byte allocation, package loading, package errors, and interface manifest access to JavaScript. |
 | Host import dispatch | `package/host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |

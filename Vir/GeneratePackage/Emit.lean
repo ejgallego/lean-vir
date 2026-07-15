@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import Vir.GeneratePackage.Manifest.Encode
 import Vir.GeneratePackage.PackageFormat
+import Vir.GeneratePackage.PackageIRTags
 
 open Lean
 
@@ -53,43 +54,43 @@ def emitString (value : String) : EmitM Unit := do
   emitBytes bytes
 
 partial def emitName : Name -> EmitM Unit
-  | .anonymous => emitU8 0
+  | .anonymous => emitU8 PackageIRTags.nameAnonymous
   | .str pre part => do
-      emitU8 1
+      emitU8 PackageIRTags.nameString
       emitName pre
       emitString part
   | .num pre idx => do
-      emitU8 2
+      emitU8 PackageIRTags.nameNumeral
       emitName pre
       emitU32 idx
 
 def emitType : IRType -> EmitM Unit
-  | .float => emitU8 0
-  | .uint8 => emitU8 1
-  | .uint16 => emitU8 2
-  | .uint32 => emitU8 3
-  | .uint64 => emitU8 4
-  | .usize => emitU8 5
-  | .erased => emitU8 6
-  | .object => emitU8 7
-  | .tobject => emitU8 8
-  | .float32 => emitU8 9
+  | .float => emitU8 PackageIRTags.irTypeFloat
+  | .uint8 => emitU8 PackageIRTags.irTypeUInt8
+  | .uint16 => emitU8 PackageIRTags.irTypeUInt16
+  | .uint32 => emitU8 PackageIRTags.irTypeUInt32
+  | .uint64 => emitU8 PackageIRTags.irTypeUInt64
+  | .usize => emitU8 PackageIRTags.irTypeUSize
+  | .erased => emitU8 PackageIRTags.irTypeErased
+  | .object => emitU8 PackageIRTags.irTypeObject
+  | .tobject => emitU8 PackageIRTags.irTypeTObject
+  | .float32 => emitU8 PackageIRTags.irTypeFloat32
   | .struct .. => throw "unsupported IR type: struct values are not encoded by the demo package yet"
   | .union .. => throw "unsupported IR type: union values are not encoded by the demo package yet"
-  | .tagged => emitU8 12
-  | .void => emitU8 13
+  | .tagged => emitU8 PackageIRTags.irTypeTagged
+  | .void => emitU8 PackageIRTags.irTypeVoid
 
 def emitArray (items : Array α) (emitItem : α -> EmitM Unit) : EmitM Unit := do
   emitU32 items.size
   items.forM emitItem
 
 def emitArg : Arg -> EmitM Unit
-  | .var id => emitU8 0 *> emitU32 id.idx
-  | .erased => emitU8 1
+  | .var id => emitU8 PackageIRTags.argVar *> emitU32 id.idx
+  | .erased => emitU8 PackageIRTags.argErased
 
 def emitLit : LitVal -> EmitM Unit
-  | .num value => emitU8 0 *> emitString (toString value)
-  | .str value => emitU8 1 *> emitString value
+  | .num value => emitU8 PackageIRTags.litNum *> emitString (toString value)
+  | .str value => emitU8 PackageIRTags.litString *> emitString value
 
 def emitCtorInfo (info : CtorInfo) : EmitM Unit := do
   emitName info.name
@@ -99,24 +100,24 @@ def emitCtorInfo (info : CtorInfo) : EmitM Unit := do
   emitU32 info.ssize
 
 partial def emitExpr : IR.Expr -> EmitM Unit
-  | .ctor info args => emitU8 0 *> emitCtorInfo info *> emitArray args emitArg
-  | .reset n x => emitU8 1 *> emitU32 n *> emitU32 x.idx
+  | .ctor info args => emitU8 PackageIRTags.exprCtor *> emitCtorInfo info *> emitArray args emitArg
+  | .reset n x => emitU8 PackageIRTags.exprReset *> emitU32 n *> emitU32 x.idx
   | .reuse x info updtHeader args => do
-      emitU8 2; emitU32 x.idx; emitCtorInfo info; emitBool updtHeader; emitArray args emitArg
-  | .proj i x => emitU8 3 *> emitU32 i *> emitU32 x.idx
-  | .uproj i x => emitU8 4 *> emitU32 i *> emitU32 x.idx
-  | .sproj i offset x => emitU8 5 *> emitU32 i *> emitU32 offset *> emitU32 x.idx
-  | .fap f args => emitU8 6 *> emitName f *> emitArray args emitArg
-  | .pap f args => emitU8 7 *> emitName f *> emitArray args emitArg
-  | .ap x args => emitU8 8 *> emitU32 x.idx *> emitArray args emitArg
-  | .box ty x => emitU8 9 *> emitType ty *> emitU32 x.idx
-  | .unbox x => emitU8 10 *> emitU32 x.idx
-  | .lit value => emitU8 11 *> emitLit value
-  | .isShared x => emitU8 12 *> emitU32 x.idx
+      emitU8 PackageIRTags.exprReuse; emitU32 x.idx; emitCtorInfo info; emitBool updtHeader; emitArray args emitArg
+  | .proj i x => emitU8 PackageIRTags.exprProj *> emitU32 i *> emitU32 x.idx
+  | .uproj i x => emitU8 PackageIRTags.exprUProj *> emitU32 i *> emitU32 x.idx
+  | .sproj i offset x => emitU8 PackageIRTags.exprSProj *> emitU32 i *> emitU32 offset *> emitU32 x.idx
+  | .fap f args => emitU8 PackageIRTags.exprFap *> emitName f *> emitArray args emitArg
+  | .pap f args => emitU8 PackageIRTags.exprPap *> emitName f *> emitArray args emitArg
+  | .ap x args => emitU8 PackageIRTags.exprAp *> emitU32 x.idx *> emitArray args emitArg
+  | .box ty x => emitU8 PackageIRTags.exprBox *> emitType ty *> emitU32 x.idx
+  | .unbox x => emitU8 PackageIRTags.exprUnbox *> emitU32 x.idx
+  | .lit value => emitU8 PackageIRTags.exprLit *> emitLit value
+  | .isShared x => emitU8 PackageIRTags.exprIsShared *> emitU32 x.idx
 
 partial def emitAlt : Alt -> EmitM Unit
-  | .ctor info body => emitU8 0 *> emitCtorInfo info *> emitBody body
-  | .default body => emitU8 1 *> emitBody body
+  | .ctor info body => emitU8 PackageIRTags.altCtor *> emitCtorInfo info *> emitBody body
+  | .default body => emitU8 PackageIRTags.altDefault *> emitBody body
 where
   emitParam (p : Param) : EmitM Unit := do
     emitU32 p.x.idx
@@ -125,28 +126,28 @@ where
 
   emitBody : FnBody -> EmitM Unit
     | .vdecl x ty expr cont => do
-        emitU8 0; emitU32 x.idx; emitType ty; emitExpr expr; emitBody cont
+        emitU8 PackageIRTags.bodyVDecl; emitU32 x.idx; emitType ty; emitExpr expr; emitBody cont
     | .jdecl jp params body cont => do
-        emitU8 1; emitU32 jp.idx; emitArray params emitParam; emitBody body; emitBody cont
+        emitU8 PackageIRTags.bodyJDecl; emitU32 jp.idx; emitArray params emitParam; emitBody body; emitBody cont
     | .set x i arg cont => do
-        emitU8 2; emitU32 x.idx; emitU32 i; emitArg arg; emitBody cont
+        emitU8 PackageIRTags.bodySet; emitU32 x.idx; emitU32 i; emitArg arg; emitBody cont
     | .setTag x cidx cont => do
-        emitU8 3; emitU32 x.idx; emitU32 cidx; emitBody cont
+        emitU8 PackageIRTags.bodySetTag; emitU32 x.idx; emitU32 cidx; emitBody cont
     | .uset x i y cont => do
-        emitU8 4; emitU32 x.idx; emitU32 i; emitU32 y.idx; emitBody cont
+        emitU8 PackageIRTags.bodyUSet; emitU32 x.idx; emitU32 i; emitU32 y.idx; emitBody cont
     | .sset x i offset y ty cont => do
-        emitU8 5; emitU32 x.idx; emitU32 i; emitU32 offset; emitU32 y.idx; emitType ty; emitBody cont
+        emitU8 PackageIRTags.bodySSet; emitU32 x.idx; emitU32 i; emitU32 offset; emitU32 y.idx; emitType ty; emitBody cont
     | .inc x n maybeScalar persistent cont => do
-        emitU8 6; emitU32 x.idx; emitU32 n; emitBool maybeScalar; emitBool persistent; emitBody cont
+        emitU8 PackageIRTags.bodyInc; emitU32 x.idx; emitU32 n; emitBool maybeScalar; emitBool persistent; emitBody cont
     | .dec x n maybeScalar persistent cont => do
-        emitU8 7; emitU32 x.idx; emitU32 n; emitBool maybeScalar; emitBool persistent; emitBody cont
+        emitU8 PackageIRTags.bodyDec; emitU32 x.idx; emitU32 n; emitBool maybeScalar; emitBool persistent; emitBody cont
     | .del x cont => do
-        emitU8 8; emitU32 x.idx; emitBody cont
+        emitU8 PackageIRTags.bodyDel; emitU32 x.idx; emitBody cont
     | .case tid x ty alts => do
-        emitU8 9; emitName tid; emitU32 x.idx; emitType ty; emitArray alts emitAlt
-    | .ret arg => emitU8 10 *> emitArg arg
-    | .jmp jp args => emitU8 11 *> emitU32 jp.idx *> emitArray args emitArg
-    | .unreachable => emitU8 12
+        emitU8 PackageIRTags.bodyCase; emitName tid; emitU32 x.idx; emitType ty; emitArray alts emitAlt
+    | .ret arg => emitU8 PackageIRTags.bodyRet *> emitArg arg
+    | .jmp jp args => emitU8 PackageIRTags.bodyJmp *> emitU32 jp.idx *> emitArray args emitArg
+    | .unreachable => emitU8 PackageIRTags.bodyUnreachable
 
 def emitParam (p : Param) : EmitM Unit :=
   emitAlt.emitParam p
@@ -165,19 +166,19 @@ def emitDeclEntry (loaded : LoadedDecl) : EmitM Unit := do
     emitEntryHeader loaded.decl.name
     match loaded.decl with
     | .fdecl _ params resultType body _ => do
-        emitU8 0
+        emitU8 PackageIRTags.declFun
         emitArray params emitParam
         emitType resultType
         emitBody body
     | .extern _ params resultType _ => do
-        emitU8 1
+        emitU8 PackageIRTags.declExtern
         emitArray params emitParam
         emitType resultType
 
 def emitExternEntry (ext : NativeExtern) : EmitM Unit := do
   withEmitContext s!"while encoding native extern `{ext.name}` mapped to `{ext.symbol}`" do
     emitEntryHeader ext.name
-    emitU8 1
+    emitU8 PackageIRTags.declExtern
     emitArray ext.params emitParam
     emitType ext.resultType
 
@@ -244,7 +245,7 @@ def packageSections (closure : Closure) (manifest : InterfaceManifest) : Except 
 
 def emitPackageM (closure : Closure) (manifest : InterfaceManifest) : EmitM Unit := do
   let sections ← packageSections closure manifest
-  emitString "lean-vir-ir-package"
+  emitString packageMagic
   emitU32 currentPackageFormatVersion
   emitU32 (closure.decls.size + closure.externs.size)
   emitPackageSectionDirectory sections
