@@ -9,12 +9,26 @@ The snapshot below was generated on 2026-07-15 with Lean
 numbers as a representative baseline, not as values that update automatically
 when the browser package set changes.
 
+To reproduce the source data, generate the packages and inspect each one:
+
+```bash
+npm run probe:upstream
+for package in demo-host fixtures-basic fixtures-boundary fixtures-lean pretty-printer; do
+  npm run inspect:irpkg -- --json "build/generated/${package}.irpkg" > "/tmp/${package}.json"
+done
+```
+
+The JSON reports expose the total byte length, declaration count, per-section
+byte lengths, and manifest export/host-import arrays used by the tables below.
+Record the Lean toolchain and date with any refreshed snapshot so later changes
+can be compared against the same inputs.
+
 ## Section Sizes
 
 | Package | Total bytes | Declaration bytes | Decl % | Manifest bytes | Manifest % | Export-summary bytes | Host-import bytes | Init-global bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
 | `demo-host.irpkg` | 1,132,278 | 1,027,863 | 90.8 | 90,828 | 8.0 | 2,402 | 11,086 | 4 |
-| `fixtures-basic.irpkg` | 312,398 | 235,025 | 75.2 | 70,308 | 22.5 | 6,962 | 4 | 4 |
+| `fixtures-basic.irpkg` | 313,420 | 235,568 | 75.2 | 70,710 | 22.6 | 7,039 | 4 | 4 |
 | `fixtures-boundary.irpkg` | 59,887 | 48,361 | 80.8 | 9,686 | 16.2 | 1,737 | 4 | 4 |
 | `fixtures-lean.irpkg` | 908,498 | 894,529 | 98.5 | 9,767 | 1.1 | 1,578 | 4 | 2,525 |
 | `pretty-printer.irpkg` | 102,536 | 90,901 | 88.7 | 11,107 | 10.8 | 425 | 4 | 4 |
@@ -24,7 +38,7 @@ The corresponding entry counts are:
 | Package | Declarations | Exports | Host imports |
 | --- | ---: | ---: | ---: |
 | `demo-host.irpkg` | 3,082 | 55 | 83 |
-| `fixtures-basic.irpkg` | 727 | 105 | 0 |
+| `fixtures-basic.irpkg` | 730 | 106 | 0 |
 | `fixtures-boundary.irpkg` | 259 | 26 | 0 |
 | `fixtures-lean.irpkg` | 1,555 | 25 | 0 |
 | `pretty-printer.irpkg` | 217 | 6 | 0 |
@@ -33,9 +47,9 @@ Aggregate over these five packages:
 
 | Section | Bytes | Share |
 | --- | ---: | ---: |
-| Declarations | 2,296,679 | 91.3% |
-| Interface manifest | 191,696 | 7.6% |
-| Export summaries | 13,104 | 0.5% |
+| Declarations | 2,297,222 | 91.3% |
+| Interface manifest | 192,098 | 7.6% |
+| Export summaries | 13,181 | 0.5% |
 | Host imports | 11,102 | 0.4% |
 | Init globals | 2,541 | 0.1% |
 | Package headers and section directories | 475 | <0.1% |
