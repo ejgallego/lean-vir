@@ -160,114 +160,90 @@ function customMarker(body) {
   return markers.find(([, pattern]) => pattern.test(body))?.[0] ?? null;
 }
 
+function classifyGeneratedWrapper(wrapper, entries, kind, mismatchLabel, reason) {
+  if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
+    return {
+      kind: `${kind}-mismatch`,
+      reason: `${mismatchLabel} wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
+    };
+  }
+  return { kind, reason };
+}
+
+function classifyGeneratedDirectWrapper(wrapper, entries, reason) {
+  return classifyGeneratedWrapper(wrapper, entries, "generated-direct", "generated direct wrapper", reason);
+}
+
 function classifyWrapper(wrapper, entries) {
   if (!wrapper) {
     return { kind: "missing", reason: "registry entry has no boxed wrapper definition" };
   }
 
   if (wrapper.generatedHelper) {
-    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
-      return {
-        kind: "generated-helper-mismatch",
-        reason: `generated helper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
-      };
-    }
-    return {
-      kind: "generated-helper",
-      reason: `macro-generated ${wrapper.arity} helper via ${wrapper.helper}`,
-    };
+    return classifyGeneratedWrapper(
+      wrapper,
+      entries,
+      "generated-helper",
+      "generated helper",
+      `macro-generated ${wrapper.arity} helper via ${wrapper.helper}`,
+    );
   }
 
   if (wrapper.generatedDropTypeObject) {
-    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
-      return {
-        kind: "generated-direct-mismatch",
-        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
-      };
-    }
-    return {
-      kind: "generated-direct",
-      reason: `macro-generated drop-type ${wrapper.arity} object forwarder`,
-    };
+    return classifyGeneratedDirectWrapper(
+      wrapper,
+      entries,
+      `macro-generated drop-type ${wrapper.arity} object forwarder`,
+    );
   }
 
   if (wrapper.generatedBorrowedObject) {
-    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
-      return {
-        kind: "generated-direct-mismatch",
-        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
-      };
-    }
     const prefix = wrapper.dropType ? "drop-type borrowed-object" : "borrowed-object";
-    return {
-      kind: "generated-direct",
-      reason: `macro-generated ${prefix} ${wrapper.arity} forwarder`,
-    };
+    return classifyGeneratedDirectWrapper(
+      wrapper,
+      entries,
+      `macro-generated ${prefix} ${wrapper.arity} forwarder`,
+    );
   }
 
   if (wrapper.generatedBorrowedScalar) {
-    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
-      return {
-        kind: "generated-direct-mismatch",
-        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
-      };
-    }
-    return {
-      kind: "generated-direct",
-      reason: `macro-generated borrowed-object ${wrapper.arity} forwarder returning ${wrapper.resultType}`,
-    };
+    return classifyGeneratedDirectWrapper(
+      wrapper,
+      entries,
+      `macro-generated borrowed-object ${wrapper.arity} forwarder returning ${wrapper.resultType}`,
+    );
   }
 
   if (wrapper.generatedOwnedScalarScalar) {
-    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
-      return {
-        kind: "generated-direct-mismatch",
-        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
-      };
-    }
-    return {
-      kind: "generated-direct",
-      reason: `macro-generated owned-scalar ${wrapper.arity} forwarder ${wrapper.paramType} -> ${wrapper.resultType}`,
-    };
+    return classifyGeneratedDirectWrapper(
+      wrapper,
+      entries,
+      `macro-generated owned-scalar ${wrapper.arity} forwarder ${wrapper.paramType} -> ${wrapper.resultType}`,
+    );
   }
 
   if (wrapper.generatedOwnedScalarObjectlike) {
-    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
-      return {
-        kind: "generated-direct-mismatch",
-        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
-      };
-    }
-    return {
-      kind: "generated-direct",
-      reason: `macro-generated owned-scalar ${wrapper.arity} forwarder ${wrapper.paramType} -> objectlike`,
-    };
+    return classifyGeneratedDirectWrapper(
+      wrapper,
+      entries,
+      `macro-generated owned-scalar ${wrapper.arity} forwarder ${wrapper.paramType} -> objectlike`,
+    );
   }
 
   if (wrapper.generatedOwnedObjectlike) {
-    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
-      return {
-        kind: "generated-direct-mismatch",
-        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
-      };
-    }
-    return {
-      kind: "generated-direct",
-      reason: `macro-generated owned-objectlike ${wrapper.arity} forwarder`,
-    };
+    return classifyGeneratedDirectWrapper(
+      wrapper,
+      entries,
+      `macro-generated owned-objectlike ${wrapper.arity} forwarder`,
+    );
   }
 
   if (wrapper.generatedOwnedObjectlikeScalar) {
-    if (!entries.every((entry) => entry.symbol === wrapper.symbol)) {
-      return {
-        kind: "generated-direct-mismatch",
-        reason: `generated direct wrapper wraps ${wrapper.symbol}, but registry has ${formatSymbols(entries)}`,
-      };
-    }
-    return {
-      kind: "generated-direct",
-      reason: `macro-generated owned-objectlike/scalar ${wrapper.arity} forwarder ${wrapper.paramType}`,
-    };
+    return classifyGeneratedDirectWrapper(
+      wrapper,
+      entries,
+      `macro-generated owned-objectlike/scalar ${wrapper.arity} forwarder ${wrapper.paramType}`,
+    );
   }
 
   const compactBody = wrapper.body.trim().replace(/\s+/g, " ");
@@ -402,14 +378,25 @@ function paramCountForArity(arity) {
   }
 }
 
-function validateDropTypeObjectSignature(nativeExtern, arity) {
+function validateArityParamCount(nativeExtern, arity, extraParamCount = 0) {
   const forwardedParamCount = paramCountForArity(arity);
   if (forwardedParamCount === null) {
-    return `unsupported generated direct arity ${arity}`;
+    return { reason: `unsupported generated direct arity ${arity}` };
   }
-  const expectedParamCount = forwardedParamCount + 1;
+
+  const expectedParamCount = forwardedParamCount + extraParamCount;
   if (nativeExtern.params.length !== expectedParamCount) {
-    return `expected ${expectedParamCount} params, found ${nativeExtern.params.length}`;
+    return {
+      reason: `expected ${expectedParamCount} params, found ${nativeExtern.params.length}`,
+    };
+  }
+  return { forwardedParamCount };
+}
+
+function validateDropTypeObjectSignature(nativeExtern, arity) {
+  const paramCount = validateArityParamCount(nativeExtern, arity, 1);
+  if (paramCount.reason) {
+    return paramCount.reason;
   }
   const [typeParam, ...forwardedParams] = nativeExtern.params;
   if (typeParam.type !== "erased") {
@@ -433,14 +420,9 @@ function validateDropTypeObjectSignature(nativeExtern, arity) {
 }
 
 function validateBorrowedObjectSignature(nativeExtern, arity, dropType) {
-  const forwardedParamCount = paramCountForArity(arity);
-  if (forwardedParamCount === null) {
-    return `unsupported generated direct arity ${arity}`;
-  }
-
-  const expectedParamCount = forwardedParamCount + (dropType ? 1 : 0);
-  if (nativeExtern.params.length !== expectedParamCount) {
-    return `expected ${expectedParamCount} params, found ${nativeExtern.params.length}`;
+  const paramCount = validateArityParamCount(nativeExtern, arity, dropType ? 1 : 0);
+  if (paramCount.reason) {
+    return paramCount.reason;
   }
 
   const forwardedParams = dropType ? nativeExtern.params.slice(1) : nativeExtern.params;
@@ -469,13 +451,9 @@ function validateBorrowedObjectSignature(nativeExtern, arity, dropType) {
 }
 
 function validateBorrowedScalarSignature(nativeExtern, arity, resultType) {
-  const forwardedParamCount = paramCountForArity(arity);
-  if (forwardedParamCount === null) {
-    return `unsupported generated direct arity ${arity}`;
-  }
-
-  if (nativeExtern.params.length !== forwardedParamCount) {
-    return `expected ${forwardedParamCount} params, found ${nativeExtern.params.length}`;
+  const paramCount = validateArityParamCount(nativeExtern, arity);
+  if (paramCount.reason) {
+    return paramCount.reason;
   }
   for (const param of nativeExtern.params) {
     if (!param.borrow) {
@@ -492,13 +470,9 @@ function validateBorrowedScalarSignature(nativeExtern, arity, resultType) {
 }
 
 function validateOwnedScalarScalarSignature(nativeExtern, arity, paramType, resultType) {
-  const forwardedParamCount = paramCountForArity(arity);
-  if (forwardedParamCount === null) {
-    return `unsupported generated direct arity ${arity}`;
-  }
-
-  if (nativeExtern.params.length !== forwardedParamCount) {
-    return `expected ${forwardedParamCount} params, found ${nativeExtern.params.length}`;
+  const paramCount = validateArityParamCount(nativeExtern, arity);
+  if (paramCount.reason) {
+    return paramCount.reason;
   }
   const [param] = nativeExtern.params;
   if (param.borrow) {
@@ -514,13 +488,9 @@ function validateOwnedScalarScalarSignature(nativeExtern, arity, paramType, resu
 }
 
 function validateOwnedScalarObjectlikeSignature(nativeExtern, arity, paramType) {
-  const forwardedParamCount = paramCountForArity(arity);
-  if (forwardedParamCount === null) {
-    return `unsupported generated direct arity ${arity}`;
-  }
-
-  if (nativeExtern.params.length !== forwardedParamCount) {
-    return `expected ${forwardedParamCount} params, found ${nativeExtern.params.length}`;
+  const paramCount = validateArityParamCount(nativeExtern, arity);
+  if (paramCount.reason) {
+    return paramCount.reason;
   }
   const [param] = nativeExtern.params;
   if (param.borrow) {
@@ -536,13 +506,9 @@ function validateOwnedScalarObjectlikeSignature(nativeExtern, arity, paramType) 
 }
 
 function validateOwnedObjectlikeSignature(nativeExtern, arity) {
-  const forwardedParamCount = paramCountForArity(arity);
-  if (forwardedParamCount === null) {
-    return `unsupported generated direct arity ${arity}`;
-  }
-
-  if (nativeExtern.params.length !== forwardedParamCount) {
-    return `expected ${forwardedParamCount} params, found ${nativeExtern.params.length}`;
+  const paramCount = validateArityParamCount(nativeExtern, arity);
+  if (paramCount.reason) {
+    return paramCount.reason;
   }
   const [param] = nativeExtern.params;
   if (param.borrow) {
@@ -558,13 +524,9 @@ function validateOwnedObjectlikeSignature(nativeExtern, arity) {
 }
 
 function validateOwnedObjectlikeScalarSignature(nativeExtern, arity, scalarType) {
-  const forwardedParamCount = paramCountForArity(arity);
-  if (forwardedParamCount === null) {
-    return `unsupported generated direct arity ${arity}`;
-  }
-
-  if (nativeExtern.params.length !== forwardedParamCount) {
-    return `expected ${forwardedParamCount} params, found ${nativeExtern.params.length}`;
+  const paramCount = validateArityParamCount(nativeExtern, arity);
+  if (paramCount.reason) {
+    return paramCount.reason;
   }
   const [objectParam, scalarParam] = nativeExtern.params;
   if (objectParam.borrow) {
