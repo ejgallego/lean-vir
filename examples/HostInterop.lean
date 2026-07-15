@@ -48,6 +48,10 @@ def titleHandshakeLoop (count : Nat) : DomM Nat :=
 def callbackRoundTrip (n : Nat) : Lean.Vir.RuntimeM Nat :=
   callNatCallback n fun value => value + 7
 
+def floatRoundTrip (value : Float) : Lean.Vir.RuntimeM Float := do
+  let jsValue ← Lean.Vir.JsValue.ofFloat value
+  Lean.Vir.JsValue.toFloat jsValue
+
 partial def callbackRoundTripLoopAux : Nat → Nat → Lean.Vir.RuntimeM Nat
   | 0, acc => pure acc
   | n + 1, acc => do

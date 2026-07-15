@@ -152,7 +152,9 @@ convenience wrapper over explicit string conversion.
 store as React roots. The small `js.string`, `js.nat`, `js.bool`, and `js.float` scalar
 helpers are runtime-level `Lean.Vir.JsValue` bindings used by both common host
 helpers and React state examples. They let examples use primitive state without
-giving APIs such as `react.useState` a scalar ABI.
+giving APIs such as `react.useState` a scalar ABI. `JsValue.ofFloat` and
+`JsValue.toFloat` preserve every JavaScript number, including NaN, positive and
+negative infinity, and the sign of zero.
 `Root.render` accepts a `ReactM (Lean.Vir.Js Node)` tree. The
 `react.root.render` host binding receives that render action as a releasable
 callback, invokes it to obtain the concrete `Js Node` resource, renders the
@@ -256,9 +258,10 @@ The default rule is retained ownership. A binding that calls
 `resourceForValue(value)` creates or reuses a live `HostResource` wrapper that
 remains valid until the binding-specific cleanup path releases it, the package
 is reloaded, or the runtime is disposed. Object and function values are
-interned by identity through a `WeakMap`; primitive values are interned by
-value. Releasing a resource invalidates that wrapper, and the store only removes
-an interned mapping when the released wrapper is the current mapping for that
+interned by identity through a `WeakMap`; primitive values use `Object.is`
+semantics, so NaN is reused while positive and negative zero remain distinct.
+Releasing a resource invalidates that wrapper, and the store only removes an
+interned mapping when the released wrapper is the current mapping for that
 JavaScript value.
 
 Built-in retained resources include DOM elements, React roots, React state

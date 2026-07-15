@@ -108,15 +108,15 @@ function jsBoolPayload(value) {
 }
 
 function jsFloatValue(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error("js.float expects a finite number");
+  if (typeof value !== "number") {
+    throw new Error("js.float expects a number");
   }
   return value;
 }
 
 function jsFloatPayload(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error("js.float.value expects a finite JS number");
+  if (typeof value !== "number") {
+    throw new Error("js.float.value expects a JS number");
   }
   return value;
 }

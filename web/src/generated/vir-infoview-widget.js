@@ -929,14 +929,14 @@ function jsBoolPayload(value) {
   return value;
 }
 function jsFloatValue(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error("js.float expects a finite number");
+  if (typeof value !== "number") {
+    throw new Error("js.float expects a number");
   }
   return value;
 }
 function jsFloatPayload(value) {
-  if (typeof value !== "number" || !Number.isFinite(value)) {
-    throw new Error("js.float.value expects a finite JS number");
+  if (typeof value !== "number") {
+    throw new Error("js.float.value expects a JS number");
   }
   return value;
 }
@@ -965,6 +965,7 @@ function asError(error) {
 }
 
 // web/src/host/vir-host-resources.js
+var negativeZeroPrimitiveKey = /* @__PURE__ */ Symbol("lean-vir.negativeZero");
 var HostResourceState = class {
   constructor() {
     requireExternrefTableSupport();
@@ -980,10 +981,11 @@ var HostResourceState = class {
       return this.temporaryResourceForValue(value);
     }
     if (!isWeakMapKey(value)) {
-      let resource2 = this.primitiveResources.get(value);
+      const key = primitiveResourceKey(value);
+      let resource2 = this.primitiveResources.get(key);
       if (!isHostResource(resource2) || hostResourceValue(resource2) === null) {
         resource2 = createHostResource(value);
-        this.primitiveResources.set(value, resource2);
+        this.primitiveResources.set(key, resource2);
       }
       this.liveResources.add(resource2);
       return resource2;
@@ -1031,8 +1033,9 @@ var HostResourceState = class {
         this.resources.delete(value);
       }
     } else if (value !== null && value !== void 0) {
-      if (this.primitiveResources.get(value) === resource) {
-        this.primitiveResources.delete(value);
+      const key = primitiveResourceKey(value);
+      if (this.primitiveResources.get(key) === resource) {
+        this.primitiveResources.delete(key);
       }
     }
     if (isHostResource(resource)) {
@@ -1043,7 +1046,7 @@ var HostResourceState = class {
   }
   releaseValueResource(value) {
     if (!isWeakMapKey(value)) {
-      const resource2 = this.primitiveResources.get(value);
+      const resource2 = this.primitiveResources.get(primitiveResourceKey(value));
       if (resource2 !== void 0) {
         this.releaseResource(resource2);
       }
@@ -1116,6 +1119,9 @@ function disposeHostResourceValue(value) {
 }
 function isWeakMapKey(value) {
   return typeof value === "object" && value !== null || typeof value === "function";
+}
+function primitiveResourceKey(value) {
+  return typeof value === "number" && Object.is(value, -0) ? negativeZeroPrimitiveKey : value;
 }
 function createHostResourceState() {
   return new HostResourceState();

@@ -40,9 +40,17 @@ opaque ofBool (value : Bool) : RuntimeM (Js Bool)
 @[vir_js_explicit_conversion "js.bool.value"]
 opaque toBool (value : @& Js Bool) : RuntimeM Bool
 
+/--
+Wrap a Lean `Float` as a JavaScript number without narrowing its IEEE-754
+value. NaN, infinities, and signed zero are preserved.
+-/
 @[vir_js_explicit_conversion "js.float"]
 opaque ofFloat (value : Float) : RuntimeM (Js Float)
 
+/--
+Decode a JavaScript number as a Lean `Float` without narrowing its IEEE-754
+value. NaN, infinities, and signed zero are preserved.
+-/
 @[vir_js_explicit_conversion "js.float.value"]
 opaque toFloat (value : @& Js Float) : RuntimeM Float
 

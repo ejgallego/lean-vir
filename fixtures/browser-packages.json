@@ -52,6 +52,7 @@
             "HostInterop.titleHandshake",
             "HostInterop.titleHandshakeLoop",
             "HostInterop.callbackRoundTrip",
+            "HostInterop.floatRoundTrip",
             "HostInterop.callbackRoundTripLoop",
             "HostInterop.mountCallbackEvent",
             "HostInterop.mountAndRemoveCallbackEvent",
