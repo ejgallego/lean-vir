@@ -3,7 +3,7 @@
   "artifact": "lean-vir-ir-package",
   "metadata": {
     "generator": "tools/GeneratePackage.lean",
-    "packageFormatVersion": 9,
+    "packageFormatVersion": 10,
     "manifestVersion": 6,
     "leanVersion": "4.32.0-rc1",
     "leanToolchain": "leanprover/lean4:4.32.0-rc1",
@@ -76,9 +76,7 @@
           "Lean.Vir.TypeAnchors.reactRootRenderCall._boxed",
           "Lean.Vir.TypeAnchors.reactRootUnmountCall",
           "Lean.Vir.TypeAnchors.reactRootUnmountCall._boxed"
-        ],
-        "packageOnly": false,
-        "dropEvalCommands": true
+        ]
       }
     ],
     "typeAnchorAliases": [
