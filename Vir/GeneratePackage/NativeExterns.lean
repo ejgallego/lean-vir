@@ -311,7 +311,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.usize,
     params := #[param 1 false .erased, param 2 true .object],
     resultType := .usize,
-    symbol := "lean_array_size"
+    symbol := "lean_array_size",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.uget,
@@ -563,7 +564,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.push,
     params := #[param 1 false .object, param 2 false .uint32],
     resultType := .object,
-    symbol := "lean_string_push"
+    symbol := "lean_string_push",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Internal.pushn,
@@ -1223,7 +1225,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Float.scaleB,
     params := #[param 1 false .float, param 2 true .tobject],
     resultType := .float,
-    symbol := "lean_float_scaleb"
+    symbol := "lean_float_scaleb",
+    generateBoxedWrapper := true
   },
   {
     name := `Float.toUInt32,

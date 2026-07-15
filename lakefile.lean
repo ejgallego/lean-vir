@@ -15,3 +15,7 @@ lean_exe vir_irpkg where
 lean_exe vir_fetch_sdk where
   root := `tools.VirFetchSdk
   supportInterpreter := true
+
+lean_exe vir_native_wrappers where
+  root := `tools.GenerateNativeWrappers
+  supportInterpreter := true

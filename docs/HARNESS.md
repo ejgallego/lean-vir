@@ -76,6 +76,8 @@ The most useful generated diagnostics are:
 
 - `build/upstream-probe/boundary.md`
 - `build/upstream-probe/link.map`
+- `build/upstream-probe/generated/native_wrappers.cpp`
+- `build/upstream-probe/generated/native_wrappers_registry.inc`
 - `build/generated/*.report.md`
 - `build/fixtures/summary.json`
 - `build/fixtures/*.report.md`
@@ -159,7 +161,8 @@ code changes.
   `node scripts/check-boundary-registry.mjs --write`, then
   `npm run check:boundary-registry` and `npm run check:native-wrappers`
 - Boxed native wrapper changes:
-  `npm run check:boundary-registry` and `npm run check:native-wrappers`
+  `npm run check:boundary-registry`, `npm run check:native-wrappers`, and
+  `npm run test:upstream`
 - API coverage documentation changes:
   `npm run check:api-coverage`
 - IR package name/declaration tag changes:

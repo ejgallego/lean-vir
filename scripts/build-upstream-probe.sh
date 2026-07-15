@@ -42,6 +42,9 @@ wasm_stack_size="${VIR_WASM_STACK_SIZE:-1048576}"
 upstream="$src/src/library/ir_interpreter.cpp"
 overlay_include="$out/include"
 obj_dir="$out/obj"
+generated_dir="$out/generated"
+generated_native_wrappers="$generated_dir/native_wrappers.cpp"
+generated_native_registry="$generated_dir/native_wrappers_registry.inc"
 wasm="$out/ir_interpreter.allow-undefined.wasm"
 strict_wasm="$out/ir_interpreter.strict.wasm"
 demo_wasm="web/public/vir-upstream.wasm"
@@ -87,6 +90,7 @@ fi
 
 mkdir -p "$out"
 mkdir -p "$obj_dir"
+mkdir -p "$generated_dir"
 mkdir -p "$overlay_include/lean"
 mkdir -p web/public
 
@@ -107,6 +111,13 @@ for package in "${browser_packages[@]}"; do
   fi
 done
 package_seconds=$((SECONDS - package_start))
+
+wrapper_generation_start=$SECONDS
+lake build vir_native_wrappers
+lake env .lake/build/bin/vir_native_wrappers \
+  "$generated_native_wrappers" \
+  "$generated_native_registry"
+wrapper_generation_seconds=$((SECONDS - wrapper_generation_start))
 
 src_commit="unknown"
 if git -C "$src" rev-parse HEAD >/dev/null 2>&1; then
@@ -151,6 +162,10 @@ support_sources=(
   "$src/src/util/name.cpp"
 )
 
+generated_sources=(
+  "$generated_native_wrappers"
+)
+
 shim_sources=(
   "wasm/upstream_shim/runtime/lean_object_constructors.cpp"
   "wasm/upstream_shim/abi/resource_abi.cpp"
@@ -184,7 +199,11 @@ shim_deps=(
   "wasm/upstream_shim/package/package_section_directory.h"
   "wasm/upstream_shim/runtime/name_utils.h"
   "wasm/upstream_shim/abi/resource_abi.h"
+)
+
+native_symbol_lookup_deps=(
   "wasm/upstream_shim/runtime/native_symbols_registry.inc"
+  "$generated_native_registry"
 )
 
 common_flags=(
@@ -197,6 +216,7 @@ common_flags=(
   "-I$src/src/include"
   "-I$lean_prefix/include"
   "-I$src/src"
+  "-I$generated_dir"
   -Iwasm/upstream_shim
   -ffunction-sections
   -fdata-sections
@@ -251,23 +271,25 @@ compile_one() {
 compiled_count=0
 compile_start=$SECONDS
 upstream_obj="$obj_dir/ir_interpreter.o"
-stable_objects=("$upstream_obj")
+object_files=("$upstream_obj")
 compile_one "$upstream" "$upstream_obj"
 
-for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]}"; do
+for source in "${runtime_sources[@]}" "${support_sources[@]}" "${generated_sources[@]}" "${shim_sources[@]}"; do
   object="$(object_for_source "$source")"
-  if [[ "$source" == wasm/upstream_shim/* ]]; then
+  if [ "$source" = "wasm/upstream_shim/runtime/native_symbol_lookup.cpp" ]; then
+    compile_one "$source" "$object" "${shim_deps[@]}" "${native_symbol_lookup_deps[@]}"
+  elif [[ "$source" == wasm/upstream_shim/* ]]; then
     compile_one "$source" "$object" "${shim_deps[@]}"
   else
     compile_one "$source" "$object"
   fi
-  stable_objects+=("$object")
+  object_files+=("$object")
 done
 compile_seconds=$((SECONDS - compile_start))
-printf '%s\n' "${stable_objects[@]}" > "$out/objects.txt"
+printf '%s\n' "${object_files[@]}" > "$out/objects.txt"
 
 link_objects=(
-  "${stable_objects[@]}"
+  "${object_files[@]}"
 )
 
 link_flags=(
@@ -498,6 +520,7 @@ env_import_count="$(wc -l < "$env_imports" | tr -d ' ')"
 wasi_import_count="$(wc -l < "$wasi_imports" | tr -d ' ')"
 runtime_source_count="${#runtime_sources[@]}"
 support_source_count="${#support_sources[@]}"
+generated_source_count="${#generated_sources[@]}"
 shim_source_count="${#shim_sources[@]}"
 report_total_seconds=$((SECONDS - script_start))
 report_start=$SECONDS
@@ -524,6 +547,7 @@ report_start=$SECONDS
   echo "- Object cache: \`$obj_dir\`"
   echo "- Real Lean runtime sources linked: $runtime_source_count"
   echo "- Lean support sources linked: $support_source_count"
+  echo "- Compiler-generated native wrapper sources linked: $generated_source_count"
   echo "- Local WASI shim sources linked: $shim_source_count"
   echo "- Generated browser IR packages:"
   for package in "${browser_packages[@]}"; do
@@ -537,6 +561,7 @@ report_start=$SECONDS
   echo "## Timing"
   echo
   echo "- Browser package generation: ${package_seconds}s"
+  echo "- Native wrapper generation: ${wrapper_generation_seconds}s"
   echo "- Object compile phase: ${compile_seconds}s"
   echo "- Objects compiled in this run: $compiled_count"
   echo "- Link phase: ${link_seconds}s"
@@ -564,6 +589,12 @@ report_start=$SECONDS
   echo "## Linked Lean Support Sources"
   echo
   for path in "${support_sources[@]}"; do
+    printf -- '- `%s`\n' "$path"
+  done
+  echo
+  echo "## Linked Compiler-Generated Sources"
+  echo
+  for path in "${generated_sources[@]}"; do
     printf -- '- `%s`\n' "$path"
   done
   echo
@@ -644,8 +675,9 @@ report_start=$SECONDS
   echo "Lean object helpers, \`abi/object_expr_abi.cpp\` supplies temporary Level/Expr"
   echo "helpers, and \`abi/resource_abi.cpp\` supplies JavaScript resource helpers used"
   echo "by the runtime object-call path."
-  echo "\`wasm/upstream_shim/runtime/native_symbols.cpp\` supplies the explicit native"
-  echo "extern wrappers. \`runtime/native_symbol_lookup.cpp\` supplies the generated registry"
+  echo "\`wasm/upstream_shim/runtime/native_symbols.cpp\` supplies shim-specific native"
+  echo "extern wrappers. \`$generated_native_wrappers\` supplies standard boxed adapters"
+  echo "emitted by Lean's compiler. \`runtime/native_symbol_lookup.cpp\` supplies the registries,"
   echo "include, restricted \`dlsym\` lookup, symbol-stem lookup, and C++ exception"
   echo "stubs. \`runtime/runtime_environment_stubs.cpp\`, \`package/package_init_bridge.cpp\`,"
   echo "\`runtime/runtime_value_stubs.cpp\`, and \`runtime/io_stubs.cpp\` contain the remaining"
@@ -668,7 +700,7 @@ if [ "$copied_demo_dev_wasm" = "1" ]; then
   echo "wrote $demo_dev_wasm (debug, optimized unstripped)"
 fi
 echo "strict unresolved symbols: $unresolved_count"
-echo "upstream probe timing: packages=${package_seconds}s compile=${compile_seconds}s link=${link_seconds}s report=${report_seconds}s total=$((SECONDS - script_start))s compiled_objects=$compiled_count link_reused=$([ "$needs_link" = "0" ] && echo "yes" || echo "no")"
+echo "upstream probe timing: packages=${package_seconds}s wrappers=${wrapper_generation_seconds}s compile=${compile_seconds}s link=${link_seconds}s report=${report_seconds}s total=$((SECONDS - script_start))s compiled_objects=$compiled_count link_reused=$([ "$needs_link" = "0" ] && echo "yes" || echo "no")"
 if [ "$strict_status" != "0" ]; then
   exit "$strict_status"
 fi

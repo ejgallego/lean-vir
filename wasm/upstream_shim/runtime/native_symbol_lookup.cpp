@@ -17,12 +17,18 @@ Author: Emilio J. Gallego Arias
 
 // Generated from Vir/GeneratePackage/NativeExterns.lean nativeExterns.
 #include "native_symbols_registry.inc"
+// Generated at build time by vir_native_wrappers using Lean's compiler pipeline.
+#include "native_wrappers_registry.inc"
+
+#define VIR_ALL_NATIVE_SYMBOLS(X, X_CONST) \
+    VIR_NATIVE_SYMBOLS(X, X_CONST) \
+    VIR_COMPILER_NATIVE_SYMBOLS(X)
 
 extern "C" lean_object * l_ByteArray_empty;
 
 #define VIR_DECLARE_NATIVE_BOXED(lean_name, stem, fn) extern "C" lean_object * fn(...);
 #define VIR_DECLARE_NATIVE_CONST(lean_name, stem, ptr)
-VIR_NATIVE_SYMBOLS(VIR_DECLARE_NATIVE_BOXED, VIR_DECLARE_NATIVE_CONST)
+VIR_ALL_NATIVE_SYMBOLS(VIR_DECLARE_NATIVE_BOXED, VIR_DECLARE_NATIVE_CONST)
 #undef VIR_DECLARE_NATIVE_CONST
 #undef VIR_DECLARE_NATIVE_BOXED
 
@@ -40,7 +46,7 @@ static NativeSymbol const g_native_symbols[] = {
     { lean_name, stem, stem "___boxed", reinterpret_cast<void *>(fn) },
 #define VIR_NATIVE_CONST_ENTRY(lean_name, stem, ptr) \
     { lean_name, stem, stem, reinterpret_cast<void *>(ptr) },
-    VIR_NATIVE_SYMBOLS(VIR_NATIVE_BOXED_ENTRY, VIR_NATIVE_CONST_ENTRY)
+    VIR_ALL_NATIVE_SYMBOLS(VIR_NATIVE_BOXED_ENTRY, VIR_NATIVE_CONST_ENTRY)
 #undef VIR_NATIVE_CONST_ENTRY
 #undef VIR_NATIVE_BOXED_ENTRY
 };
@@ -60,6 +66,10 @@ static char const * known_symbol_stem(lean::name const & n) {
 }
 
 } // namespace
+
+#undef VIR_ALL_NATIVE_SYMBOLS
+#undef VIR_COMPILER_NATIVE_SYMBOLS
+#undef VIR_NATIVE_SYMBOLS
 
 extern "C" void * dlsym(void *, char const * sym) {
     for (NativeSymbol const & entry : g_native_symbols) {

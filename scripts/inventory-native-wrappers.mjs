@@ -692,6 +692,9 @@ const [nativeExternsSource, nativeSymbols, nativeRegistry] = await Promise.all([
 const nativeExterns = new Map(
   parseNativeExterns(nativeExternsSource).map((nativeExtern) => [nativeExtern.name, nativeExtern]),
 );
+const compilerGeneratedExterns = [...nativeExterns.values()].filter(
+  (nativeExtern) => nativeExtern.generateBoxedWrapper,
+);
 const { entries, constants } = parseRegistry(nativeRegistry);
 const wrappers = parseWrappers(nativeSymbols);
 const grouped = entriesByWrapper(entries);
@@ -750,6 +753,19 @@ for (const [wrapperName, groupEntries] of grouped.entries()) {
   inventory.push(item);
 }
 
+for (const nativeExtern of compilerGeneratedExterns) {
+  inventory.push({
+    wrapper: `${nativeExtern.name}._boxed`,
+    entries: [{
+      leanName: nativeExtern.name,
+      symbol: nativeExtern.symbol,
+      wrapper: `${nativeExtern.name}._boxed`,
+    }],
+    kind: "compiler-generated",
+    reason: "emitted by Lean's standard LCNF boxing and C emission pipeline",
+  });
+}
+
 for (const wrapperName of wrappers.keys()) {
   if (!grouped.has(wrapperName)) {
     inventory.push({
@@ -762,6 +778,7 @@ for (const wrapperName of wrappers.keys()) {
 }
 
 const kindOrder = [
+  "compiler-generated",
   "generated-helper",
   "generated-direct",
   "regular-helper",
@@ -791,6 +808,7 @@ if (args.has("--json")) {
 } else {
   console.log(
     `native wrapper inventory: ${inventory.length} boxed wrappers, ${entries.length} boxed registry entries, ` +
+      `${compilerGeneratedExterns.length} compiler-generated registry entries, ` +
       `${constants.length} native constants`,
   );
   for (const kind of kindOrder) {

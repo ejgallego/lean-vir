@@ -16,8 +16,9 @@ package lookup, and temporary runtime glue live here instead.
   resources.
 - `interpreter/`: upstream interpreter lifecycle, `lean_ir_find_env_decl` hooks,
   and boxed interpreter execution.
-- `runtime/`: native extern wrappers, restricted native symbol lookup,
-  temporary Lean object constructors/name helpers, and WASI/runtime stubs.
+- `runtime/`: shim-specific native extern wrappers, restricted native symbol
+  lookup for both shim and compiler-generated wrappers, temporary Lean object
+  constructors/name helpers, and WASI/runtime stubs.
 - `bench/`: local benchmark harness entry point. It is not linked into the
   browser WASM.
 
@@ -34,7 +35,7 @@ coupling. Line counts are approximate and are meant for sizing, not policy.
 | Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 398 | Direct | Owns loaded package indices, declaration lookup, structural export-index call slots, direct export call summaries, interface manifest, and init globals. |
 | Package load ABI | `package/package_loader_abi.cpp` | 49 | Direct | Exposes package byte allocation, package loading, package errors, and interface manifest access to JavaScript. |
 | Host import dispatch | `package/host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |
-| Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `runtime/native_symbols_registry.inc` | 1696 | Declaration/native symbol coupling | Mostly runtime coverage and lookup policy, not package byte-format parsing. |
+| Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `runtime/native_symbols_registry.inc`, `tools/GenerateNativeWrappers.lean` | 1529 | Declaration/native symbol coupling | Standard boxed adapters can be emitted by Lean's compiler into build-local C; custom wrappers remain in the shim. Mostly runtime coverage and lookup policy, not package byte-format parsing. |
 | JavaScript package-call ABI | `abi/call_abi.cpp` | 134 | Consumes package metadata | Thin JS-facing entry point over call slots and direct call summaries. |
 | Upstream interpreter bridge | `interpreter/interpreter_bridge.cpp/.h` | 102 | Low | Initializes the upstream interpreter and provides `lean_ir_find_env_decl` hooks. |
 | Object/resource/closure ABI | `abi/object_abi.cpp`, `abi/object_expr_abi.cpp`, `abi/resource_abi.cpp/.h`, `abi/closure_abi.cpp` | 776 | Low | Runtime object boundary used after explicit lowering; `object_expr_abi.cpp` is fixture/parser support. |
@@ -67,6 +68,12 @@ node scripts/check-boundary-registry.mjs --write
 node scripts/check-boundary-registry.mjs
 npm run check:native-wrappers
 ```
+
+Set `generateBoxedWrapper := true` on a native extern when the normal Lean
+compiler-generated boxed adapter is sufficient. `npm run probe:upstream`
+generates its C source and registry fragment under `build/upstream-probe/` and
+links the resulting object statically. Keep wrappers with extra control flow,
+runtime substitutions, or WASI policy in `runtime/native_symbols.cpp`.
 
 The usual boundary validation is:
 

@@ -69,10 +69,16 @@ not a fork of Lean. It is split by responsibility:
   and name-string helpers used by current object-boundary fixtures.
 - `abi/resource_abi.cpp` owns the shared external resource class used by
   `Lean.Vir.Js α` values.
-- `runtime/native_symbols.cpp` owns the explicit native extern wrappers.
+- `runtime/native_symbols.cpp` owns native extern wrappers that still require
+  shim-specific implementation or policy.
 - `runtime/native_symbol_lookup.cpp` owns the generated native registry include,
   restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
   stubs.
+- `tools/GenerateNativeWrappers.lean` recompiles native externs marked with
+  `generateBoxedWrapper` in `Vir/GeneratePackage/NativeExterns.lean`, selects
+  their `_boxed` LCNF declarations, and emits their C definitions and registry
+  entries through Lean's standard compiler pipeline. The build cross-compiles
+  that generated C and links it statically into the WASI module.
 - `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`,
   `runtime/runtime_value_stubs.cpp`, and `runtime/io_stubs.cpp` own the
   WASI/platform, initializer, value-helper, and demo IO stubs.
@@ -124,8 +130,26 @@ ordinary allocator path while still compiling Lean's real runtime code.
 The build compiles stable sources into cached objects under
 `build/upstream-probe/obj`. Example edits regenerate the relevant
 `web/public/*.irpkg` package without recompiling or relinking the WASM artifact.
-The artifact is relinked only when stable objects, link flags, the Lean source
-commit, or the runtime config overlay change.
+Compiler-generated native wrappers and their registry fragment live under
+`build/upstream-probe/generated`; they are build artifacts and are not checked
+into Git. The artifact is relinked only when stable or generated objects, link
+flags, the Lean source commit, or the runtime config overlay change.
+
+## Native Boxed Wrappers
+
+The upstream interpreter invokes native code through homogeneous boxed calls.
+For an extern with scalar or borrowed parameters, Lean's compiler normally
+provides a `_boxed` declaration whose native symbol has the `___boxed` suffix.
+That wrapper performs scalar unboxing/boxing and the reference-count updates
+inferred by the normal LCNF passes before calling the raw extern symbol.
+
+VIR keeps the final WASI module statically linked. Standard adapters can be
+marked with `generateBoxedWrapper := true` in the native extern table; the
+build then recompiles those imported extern declarations and emits only their
+compiler-generated boxed wrappers. `Array.usize`, `String.push`, and
+`Float.scaleB` are the initial representative set. Wrappers that implement
+additional behavior, unavailable runtime services, or deliberate WASI policy
+remain explicit in `runtime/native_symbols.cpp`.
 
 ## Real IR Declarations
 
@@ -393,10 +417,10 @@ renaming native extern entries; this regenerates
 `wasm/upstream_shim/runtime/native_symbols_registry.inc`. The regular
 `npm run check:boundary-registry` guard then verifies that the generated
 registry is current and that every native extern has a matching `dlsym` symbol
-plus either a boxed wrapper in
-`wasm/upstream_shim/runtime/native_symbols.cpp` or a native constant entry in the
-generated registry. `npm test` runs these checks before the smoke and fixture
-suites.
+plus one of a boxed wrapper in `wasm/upstream_shim/runtime/native_symbols.cpp`,
+a compiler-generated wrapper selected by the native extern entry, or a native
+constant entry in the generated registry. `npm test` runs these checks before
+the smoke and fixture suites.
 
 The boxed wrappers can be inventoried with:
 
@@ -404,32 +428,26 @@ The boxed wrappers can be inventoried with:
 npm run inspect:native-wrappers
 ```
 
-This groups wrappers into generated helper wrappers, generated direct-call
-wrappers, remaining regular direct-call wrappers, direct-call wrappers that
-retain a borrowed result, aliases, and custom shim behavior. The inventory gives
-wrapper-generation work a concrete target without introducing another
-handwritten ABI table. The remaining regular direct-call wrappers can be grouped
-by broad ABI and wrapper-plumbing model with:
+This groups wrappers into compiler-generated wrappers, shim macro-generated
+helpers and direct calls, remaining regular direct calls, direct calls that
+retain a borrowed result, aliases, and custom shim behavior. The inventory
+gives wrapper-generation work a concrete target without introducing another
+handwritten ABI table. The remaining regular direct-call wrappers can be
+grouped by broad ABI and wrapper-plumbing model with:
 
 ```bash
 npm run inspect:native-wrapper-shapes
 ```
 
-Use that shape report to pick the next generated class: model the exact
-ownership and boxing policy, add a checker for that policy against the
-Lean-side native extern table, then convert only the wrappers in the matching
-group. `npm run check:native-wrappers` verifies that generated helper wrappers
-use the helper implied by the Lean-side ABI table, and that generated
-direct-call wrappers match their narrow modeled ABI shape. The current generated
-direct classes cover owned object forwarders that drop an erased type argument,
-owned objectlike unary passthroughs, owned objectlike/scalar binary forwarders,
-borrowed object forwarders that release the borrowed boxes after the native call,
-borrowed object forwarders that box scalar native results, borrowed object
-forwarders that drop an erased type argument before boxing a scalar result, and
-owned scalar unary forwarders that return either scalar or objectlike results.
-Remaining regular direct-call wrappers should move into generated classes only
-after their ownership and boxing policy is modeled; aliases and custom behavior
-remain explicit until their policy is modeled separately.
+Use that shape report to select the next compiler-generation candidates. For a
+standard ABI adapter, mark the native extern, build and exercise the generated
+wrapper, then remove its shim definition. Add another shim macro class only
+when Lean's normal compiler output cannot express the required runtime or WASI
+policy. `npm run check:native-wrappers` continues to verify that the remaining
+shim helper wrappers use the helper implied by the Lean-side ABI table and that
+shim direct-call macros match their narrow modeled ABI shape. Aliases, retained
+borrowed results, and custom behavior remain explicit until their policy is
+handled separately.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
