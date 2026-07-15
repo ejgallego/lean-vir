@@ -145,10 +145,11 @@ function classifyWrapper(wrapper, entries) {
   }
 
   if (wrapper.generatedBorrowedScalar) {
+    const prefix = wrapper.dropType ? "drop-type borrowed-object" : "borrowed-object";
     return classifyGeneratedDirectWrapper(
       wrapper,
       entries,
-      `macro-generated borrowed-object ${wrapper.arity} forwarder returning ${wrapper.resultType}`,
+      `macro-generated ${prefix} ${wrapper.arity} forwarder returning ${wrapper.resultType}`,
     );
   }
 
@@ -357,7 +358,7 @@ function validateDropTypeObjectSignature(nativeExtern, arity) {
   return null;
 }
 
-function validateBorrowedObjectSignature(nativeExtern, arity, dropType) {
+function validateBorrowedObjectParams(nativeExtern, arity, dropType, wrapperLabel) {
   const paramCount = validateArityParamCount(nativeExtern, arity, dropType ? 1 : 0);
   if (paramCount.reason) {
     return paramCount.reason;
@@ -376,11 +377,24 @@ function validateBorrowedObjectSignature(nativeExtern, arity, dropType) {
 
   for (const param of forwardedParams) {
     if (!param.borrow) {
-      return `param ${param.index} is owned; generated borrowed forwarder only supports borrowed params`;
+      return `param ${param.index} is owned; ${wrapperLabel} only supports borrowed params`;
     }
     if (!["object", "tobject"].includes(param.type)) {
       return `param ${param.index} is ${param.type}, expected object or tobject`;
     }
+  }
+  return null;
+}
+
+function validateBorrowedObjectSignature(nativeExtern, arity, dropType) {
+  const reason = validateBorrowedObjectParams(
+    nativeExtern,
+    arity,
+    dropType,
+    "generated borrowed forwarder",
+  );
+  if (reason) {
+    return reason;
   }
   if (!["object", "tobject", "tagged"].includes(nativeExtern.resultType)) {
     return `result is ${nativeExtern.resultType}, expected object, tobject, or tagged`;
@@ -388,18 +402,15 @@ function validateBorrowedObjectSignature(nativeExtern, arity, dropType) {
   return null;
 }
 
-function validateBorrowedScalarSignature(nativeExtern, arity, resultType) {
-  const paramCount = validateArityParamCount(nativeExtern, arity);
-  if (paramCount.reason) {
-    return paramCount.reason;
-  }
-  for (const param of nativeExtern.params) {
-    if (!param.borrow) {
-      return `param ${param.index} is owned; generated borrowed scalar wrapper only supports borrowed params`;
-    }
-    if (!["object", "tobject"].includes(param.type)) {
-      return `param ${param.index} is ${param.type}, expected object or tobject`;
-    }
+function validateBorrowedScalarSignature(nativeExtern, arity, resultType, dropType) {
+  const reason = validateBorrowedObjectParams(
+    nativeExtern,
+    arity,
+    dropType,
+    "generated borrowed scalar wrapper",
+  );
+  if (reason) {
+    return reason;
   }
   if (nativeExtern.resultType !== resultType) {
     return `result is ${nativeExtern.resultType}, expected ${resultType}`;
@@ -493,7 +504,12 @@ function validateGeneratedDirectSignature(wrapper, nativeExtern) {
     return validateBorrowedObjectSignature(nativeExtern, wrapper.arity, wrapper.dropType);
   }
   if (wrapper.generatedBorrowedScalar) {
-    return validateBorrowedScalarSignature(nativeExtern, wrapper.arity, wrapper.resultType);
+    return validateBorrowedScalarSignature(
+      nativeExtern,
+      wrapper.arity,
+      wrapper.resultType,
+      wrapper.dropType,
+    );
   }
   if (wrapper.generatedOwnedScalarScalar) {
     return validateOwnedScalarScalarSignature(

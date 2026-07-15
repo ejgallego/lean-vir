@@ -232,13 +232,6 @@ extern "C" lean_object * lean_panic_fn_borrowed___boxed(lean_object * type, lean
     return result;
 }
 
-extern "C" lean_object * lean_ptr_addr___boxed(lean_object * type, lean_object * value) {
-    lean_dec(type);
-    size_t result = lean_ptr_addr(value);
-    lean_dec(value);
-    return lean_box_usize(result);
-}
-
 extern "C" lean_object * lean_io_initializing___boxed(lean_object * world) {
     lean_dec(world);
     return lean_box(g_vir_io_initializing);
@@ -368,6 +361,16 @@ extern "C" lean_object * lean_st_ref_take___boxed(
         lean_dec(a); \
         return lean_box_usize(result); \
     }
+
+#define VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER(symbol) \
+    extern "C" lean_object * symbol##___boxed(lean_object * type, lean_object * a) { \
+        lean_dec(type); \
+        size_t result = symbol(a); \
+        lean_dec(a); \
+        return lean_box_usize(result); \
+    }
+
+VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER(lean_ptr_addr)
 
 #define VIR_DEFINE_BORROWED_OBJECT_UINT8_BINARY_WRAPPER(symbol) \
     extern "C" lean_object * symbol##___boxed(lean_object * a, lean_object * b) { \
@@ -499,12 +502,7 @@ extern "C" lean_object * lean_array_to_list___boxed(lean_object * type, lean_obj
 
 VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_UNARY_WRAPPER(lean_array_get_size)
 
-extern "C" lean_object * lean_array_size___boxed(lean_object * type, lean_object * array) {
-    lean_dec(type);
-    size_t result = lean_array_size(array);
-    lean_dec(array);
-    return lean_box_usize(result);
-}
+VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER(lean_array_size)
 
 extern "C" lean_object * lean_array_uget___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
     lean_dec(type);
@@ -1084,6 +1082,7 @@ VIR_DEFINE_BORROWED_OBJECT_UINT64_UNARY_WRAPPER(lean_expr_data)
 #undef VIR_DEFINE_BORROWED_OBJECT_UINT32_BINARY_WRAPPER
 #undef VIR_DEFINE_BORROWED_OBJECT_UINT64_UNARY_WRAPPER
 #undef VIR_DEFINE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER
+#undef VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER
 
 #undef VIR_NATIVE_FLOAT
 #undef VIR_NATIVE_UINT8

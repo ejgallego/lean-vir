@@ -48,14 +48,15 @@ export function parseGeneratedWrapperMacros(source) {
   }
 
   const generatedBorrowedScalarRegex =
-    /^VIR_DEFINE_BORROWED_OBJECT_(UINT8|UINT32|UINT64|USIZE)_(UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+)\)$/gm;
+    /^VIR_DEFINE_(DROP_TYPE_)?BORROWED_OBJECT_(UINT8|UINT32|UINT64|USIZE)_(UNARY|BINARY)_WRAPPER\(([A-Za-z0-9_]+)\)$/gm;
   for (const match of source.matchAll(generatedBorrowedScalarRegex)) {
-    const symbol = match[3];
+    const symbol = match[4];
     wrappers.push({
       name: `${symbol}___boxed`,
       generatedBorrowedScalar: true,
-      resultType: match[1].toLowerCase(),
-      arity: match[2].toLowerCase(),
+      dropType: match[1] !== undefined,
+      resultType: match[2].toLowerCase(),
+      arity: match[3].toLowerCase(),
       symbol,
     });
   }

@@ -421,8 +421,9 @@ direct-call wrappers match their narrow modeled ABI shape. The current generated
 direct classes cover owned object forwarders that drop an erased type argument,
 owned objectlike unary passthroughs, owned objectlike/scalar binary forwarders,
 borrowed object forwarders that release the borrowed boxes after the native call,
-borrowed object forwarders that box scalar native results, and owned scalar
-unary forwarders that return either scalar or objectlike results.
+borrowed object forwarders that box scalar native results, borrowed object
+forwarders that drop an erased type argument before boxing a scalar result, and
+owned scalar unary forwarders that return either scalar or objectlike results.
 Remaining regular direct-call wrappers should move into generated classes only
 after their ownership and boxing policy is modeled; aliases and custom behavior
 remain explicit until their policy is modeled separately.
