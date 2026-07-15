@@ -23,6 +23,8 @@ def irTypeTObject : Nat := 8
 def irTypeFloat32 : Nat := 9
 def irTypeTagged : Nat := 12
 def irTypeVoid : Nat := 13
+-- Tag 10 is reserved: Lean.IR.IRType.struct is not supported by the package codec.
+-- Tag 11 is reserved: Lean.IR.IRType.union is not supported by the package codec.
 
 def argVar : Nat := 0
 def argErased : Nat := 1

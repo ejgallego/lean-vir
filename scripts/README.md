@@ -82,8 +82,8 @@ map lives in `docs/HARNESS.md`.
 
 ## Generated Outputs
 
-Generated files are local artifacts unless the maintainer explicitly asks for a
-tracked artifact-policy change:
+The build and packaging outputs below are local artifacts unless the maintainer
+explicitly asks for a tracked artifact-policy change:
 
 - `build/`
 - `web/dist/`
@@ -94,6 +94,11 @@ tracked artifact-policy change:
 - `web/public/downloads/`
 - `.tools/`
 - `third_party/lean4-src/`
+
+The codec constants in `Vir/GeneratePackage/PackageIRTags.lean` and
+`wasm/upstream_shim/package/package_ir_tags.h` are intentionally tracked
+generated sources. Refresh them with `npm run generate:ir-codec-tags` and check
+them with `npm run check:ir-codec-tags`.
 
 Useful diagnostic reports include `build/upstream-probe/boundary.md`,
 `build/upstream-probe/link.map`, `build/generated/*.report.md`, and
@@ -127,7 +132,8 @@ The split helpers below are the intended extension points for focused changes:
 - Native wrapper inventory lives in `scripts/inventory-native-wrappers.mjs`;
   keep it as an inspection aid until regular wrapper generation exists.
 - IR declaration payload tag values live in `scripts/ir-codec-tags.mjs`; run
-  `npm run generate:ir-codec-tags` after changing them.
+  `npm run generate:ir-codec-tags` and `npm run check:ir-codec-tags` after
+  changing them.
 - Benchmark sample parsing and formatting live in `scripts/bench-utils.mjs`.
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.

@@ -27,6 +27,9 @@ Targets have one of three modes:
   shapes, package ABI limits, and default browser targets.
 - `Vir.GeneratePackage.PackageFormat`: current package and interface manifest
   version constants used by generated metadata.
+- `Vir.GeneratePackage.PackageIRTags`: tracked generated constants for package
+  `Name` and declaration-IR wire tags. `scripts/ir-codec-tags.mjs` is the source
+  of truth.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures.
 - `Vir.GeneratePackage.Frontend`: Lean frontend loading, source preprocessing,
@@ -90,6 +93,9 @@ for the full matrix.
 - Interface descriptor JSON or descriptor tags:
   `npm run check:package-abi`, `lake build vir_irpkg`, and
   `npm run test:runtime -- package-generation`.
+- Package `Name` or declaration-IR tag assignments:
+  `npm run generate:ir-codec-tags`, `npm run check:ir-codec-tags`,
+  `lake build vir_irpkg`, and `npm run test:upstream`.
 - Interface type classification, abbrev unfolding, structures, inductives,
   resources, effects, or boxed-boundary checks: `lake build vir_irpkg` and
   `npm run generate:irpkg -- examples/Fib.lean /tmp/vir-fib.irpkg fib`. Add a
@@ -145,6 +151,9 @@ Version constants are intentionally small and explicit:
   package format, interface manifest, and runtime ABI versions.
 - `npm run check:package-abi` verifies those constants and the Lean/JavaScript
   interface tag table agree.
+- `scripts/ir-codec-tags.mjs` owns the format-10 package `Name` and
+  declaration-IR tag assignments; `npm run check:ir-codec-tags` verifies that
+  the tracked Lean/C++ outputs agree with it.
 
 Bump `packageFormatVersion` when the binary `.irpkg` encoding or decoder
 contract changes incompatibly. Update the JavaScript package-format constant,
@@ -165,6 +174,7 @@ After any version bump, run at least:
 ```bash
 lake build vir_irpkg
 npm run check:package-abi
+npm run check:ir-codec-tags
 npm run build:demo
 npm run test:runtime -- package-generation
 ```
@@ -202,6 +212,7 @@ Useful checks after generator edits:
 ```bash
 lake build vir_irpkg
 npm run check:package-abi
+npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:boundary-registry
 npm run check:native-wrappers

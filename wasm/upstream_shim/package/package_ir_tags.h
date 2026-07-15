@@ -28,6 +28,8 @@ enum class ir_type_tag : uint8_t {
     Float32 = 9,
     Tagged = 12,
     Void = 13,
+    // Tag 10 is reserved: Lean.IR.IRType.struct is not supported by the package codec.
+    // Tag 11 is reserved: Lean.IR.IRType.union is not supported by the package codec.
 };
 
 enum class arg_tag : uint8_t {

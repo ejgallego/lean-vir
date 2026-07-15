@@ -107,6 +107,7 @@ npm run build:demo:release
 npm run build:demo-package
 npm run build:site
 npm run check:api-coverage
+npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:native-wrappers
 ```
@@ -142,11 +143,12 @@ npm run test:pages:browser
 npm test
 ```
 
-`npm test` runs the package ABI check, native extern ABI check, boundary
-registry check, native wrapper check, API coverage docs check, and Wasm
-extension probes, builds the demo artifacts once, then reuses those artifacts
-for upstream smoke, infoview widget smoke, JavaScript runtime tests, and the
-fixture suite. It is the default pre-merge signal for code changes.
+`npm test` runs the package ABI check, IR codec tag freshness check, native
+extern ABI check, boundary registry check, native wrapper check, API coverage
+docs check, and Wasm extension probes, builds the demo artifacts once, then
+reuses those artifacts for upstream smoke, infoview widget smoke, JavaScript
+runtime tests, and the fixture suite. It is the default pre-merge signal for
+code changes.
 
 ## Smallest Useful Check
 
@@ -160,6 +162,9 @@ fixture suite. It is the default pre-merge signal for code changes.
   `npm run check:boundary-registry` and `npm run check:native-wrappers`
 - API coverage documentation changes:
   `npm run check:api-coverage`
+- IR package name/declaration tag changes:
+  `npm run generate:ir-codec-tags`, then `npm run check:ir-codec-tags` and
+  `npm run test:upstream`
 - Upstream interpreter or WASI boundary changes:
   `npm run test:upstream`
 - Upstream smoke after `npm run build:demo` has already refreshed the WASM and

@@ -13,6 +13,8 @@ import { IR_CODEC_TAG_GROUPS } from "./ir-codec-tags.mjs";
 
 const writeMode = process.argv.includes("--write");
 
+validateGroups();
+
 const generatedFiles = [
   {
     path: new URL("../Vir/GeneratePackage/PackageIRTags.lean", import.meta.url),
@@ -48,7 +50,7 @@ function validateGroups() {
     enumNames.add(group.cppEnum);
 
     const values = new Set();
-    for (const [leanTag, cppTag, value] of group.tags) {
+    for (const [cppTag, value] of group.tags) {
       const name = leanName(group.leanPrefix, cppTag);
       if (leanNames.has(name)) {
         throw new Error(`duplicate Lean tag constant ${name}`);
@@ -59,14 +61,25 @@ function validateGroups() {
       }
       values.add(value);
       if (!Number.isInteger(value) || value < 0 || value > 255) {
-        throw new Error(`${group.cppEnum}.${leanTag} must be a u8 tag, got ${value}`);
+        throw new Error(`${group.cppEnum}.${cppTag} must be a u8 tag, got ${value}`);
+      }
+    }
+    for (const [value, reason] of group.reserved ?? []) {
+      if (values.has(value)) {
+        throw new Error(`${group.cppEnum} reserves tag value ${value} more than once`);
+      }
+      values.add(value);
+      if (!Number.isInteger(value) || value < 0 || value > 255) {
+        throw new Error(`${group.cppEnum} reserved tag must be a u8, got ${value}`);
+      }
+      if (typeof reason !== "string" || reason.length === 0) {
+        throw new Error(`${group.cppEnum} reserved tag ${value} must explain why it is reserved`);
       }
     }
   }
 }
 
 function generateLeanTags() {
-  validateGroups();
   const lines = [
     ...headerLines("lean"),
     "namespace Vir.GeneratePackage",
@@ -75,8 +88,11 @@ function generateLeanTags() {
     "",
   ];
   for (const group of IR_CODEC_TAG_GROUPS) {
-    for (const [_leanTag, cppTag, value] of group.tags) {
+    for (const [cppTag, value] of group.tags) {
       lines.push(`def ${leanName(group.leanPrefix, cppTag)} : Nat := ${value}`);
+    }
+    for (const [value, reason] of group.reserved ?? []) {
+      lines.push(`-- Tag ${value} is reserved: ${reason}.`);
     }
     lines.push("");
   }
@@ -85,7 +101,6 @@ function generateLeanTags() {
 }
 
 function generateCppTags() {
-  validateGroups();
   const lines = [
     ...headerLines("cpp"),
     "#pragma once",
@@ -97,8 +112,11 @@ function generateCppTags() {
   ];
   for (const group of IR_CODEC_TAG_GROUPS) {
     lines.push(`enum class ${group.cppEnum} : uint8_t {`);
-    for (const [leanTag, cppTag, value] of group.tags) {
+    for (const [cppTag, value] of group.tags) {
       lines.push(`    ${cppTag} = ${value},`);
+    }
+    for (const [value, reason] of group.reserved ?? []) {
+      lines.push(`    // Tag ${value} is reserved: ${reason}.`);
     }
     lines.push("};", "");
   }
