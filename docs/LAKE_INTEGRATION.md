@@ -121,7 +121,14 @@ leaves the existing package and its entry state unchanged.
 
 [`examples/SlidesCanvas.lean`](../examples/SlidesCanvas.lean) builds its status
 element and canvas, draws a moving rectangle, and schedules every animation
-frame entirely from Lean. The public rectangle API keeps ordinary Lean floats:
+frame entirely from Lean. Build its package with the same facet used by client
+projects:
+
+```text
+lake build +SlidesCanvas:vir
+```
+
+The public rectangle API keeps ordinary Lean floats:
 
 ```lean
 def Lean.Vir.Browser.CanvasRenderingContext2D.fillRect

@@ -10,6 +10,22 @@ repo="$(pwd -P)"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/lean-vir-lake-facets.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 
+lake build +SlidesCanvas:vir
+
+canvas_package="$repo/.lake/build/vir/modules/SlidesCanvas.irpkg"
+canvas_report="$repo/.lake/build/vir/reports/SlidesCanvas.report.md"
+test -f "$canvas_package"
+test -f "$canvas_report"
+
+node "$repo/scripts/inspect-irpkg.mjs" --json "$canvas_package" > "$tmp/canvas-package.json"
+node --input-type=module -e '
+  import fs from "node:fs";
+  const manifest = JSON.parse(fs.readFileSync(process.argv[1], "utf8")).manifest;
+  if (manifest.exports.length !== 1) process.exit(1);
+  if (manifest.exports[0]?.entry !== "SlidesCanvas.mount") process.exit(1);
+  if (manifest.exports[0]?.startup !== true) process.exit(1);
+' "$tmp/canvas-package.json"
+
 mkdir -p "$tmp/Smoke" "$tmp/sdk-source/lean-vir-sdk/js"
 
 printf '%s\n' \

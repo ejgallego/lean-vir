@@ -93,7 +93,12 @@ The module facet writes the `.irpkg` and report under `.lake/build/vir/`; the
 package facet installs the versioned browser SDK. `VirRuntime.runEntries()`
 runs `@[vir_entry]` declarations once in manifest order. See
 [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
-Lean-authored [canvas slide example](examples/SlidesCanvas.lean).
+Lean-authored [canvas slide example](examples/SlidesCanvas.lean), which is a
+real Lake target in this repository:
+
+```bash
+lake build +SlidesCanvas:vir
+```
 
 ## Calling Lean From JavaScript
 

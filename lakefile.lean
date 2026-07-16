@@ -8,6 +8,11 @@ package lean_vir where
 lean_lib Vir where
   globs := #[.andSubmodules `Vir]
 
+/-- Non-default, buildable sources used by the public VIR examples. -/
+lean_lib VirExamples where
+  srcDir := "examples"
+  roots := #[`SlidesCanvas]
+
 lean_exe vir_irpkg where
   root := `tools.GeneratePackage
   supportInterpreter := true
