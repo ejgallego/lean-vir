@@ -132,6 +132,20 @@ if (!Number.isSafeInteger(RUNTIME_ABI_VERSION) || RUNTIME_ABI_VERSION < 1) {
   throw new Error(`runtime ABI version must be a positive safe integer, got ${RUNTIME_ABI_VERSION}`);
 }
 
+const packageJson = JSON.parse(await readRepoText("package.json"));
+const sdkFetcherSource = await readRepoText("tools/VirFetchSdk.lean");
+const lakefileSource = await readRepoText("lakefile.lean");
+assertEqual(
+  leanStringConstant(sdkFetcherSource, "sdkVersion"),
+  packageJson.version,
+  "SDK fetcher version mismatch",
+);
+assertEqual(
+  leanStringConstant(lakefileSource, "virSdkVersion"),
+  packageJson.version,
+  "Lake SDK facet version mismatch",
+);
+
 const emitSource = await readRepoText("Vir/GeneratePackage/Emit.lean");
 const manifestEncodeSource = await readRepoText("Vir/GeneratePackage/Manifest/Encode.lean");
 const packageDecoderSource = await readRepoText("wasm/upstream_shim/package/package_ir_decoder.cpp");
@@ -234,5 +248,5 @@ for (const [key] of leanBoundaries) {
 
 console.log(
   `package ABI guardrails ok: magic, versions, ${packageSections.length} package sections, ` +
-  `${jsTags.size} interface descriptor tags, and ${jsBoundaries.size} host import boundaries agree`,
+  `${jsTags.size} interface descriptor tags, ${jsBoundaries.size} host import boundaries, and SDK ${packageJson.version} agree`,
 );

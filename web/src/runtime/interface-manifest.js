@@ -43,6 +43,7 @@ function requireNonNegativeInteger(value, label) {
 
 export function validateInterfaceManifest(manifest) {
   if (!isRecord(manifest) ||
+      !Number.isInteger(manifest.version) ||
       (manifest.version < MIN_INTERFACE_MANIFEST_VERSION ||
         manifest.version > INTERFACE_MANIFEST_VERSION) ||
       !isRecord(manifest.metadata) ||
@@ -58,12 +59,12 @@ export function validateInterfaceManifest(manifest) {
   if (manifest.hostImports !== undefined && !Array.isArray(manifest.hostImports)) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
-  validateManifestExports(manifest.exports);
+  validateManifestExports(manifest.exports, manifest.version);
   validateManifestHostImports(manifest.hostImports ?? []);
   return manifest;
 }
 
-function validateManifestExports(exports) {
+function validateManifestExports(exports, manifestVersion) {
   const entries = new Set();
   const ids = new Set();
   const jsNames = new Set();
@@ -77,10 +78,15 @@ function validateManifestExports(exports) {
     requireOptionalString(entry.jsName, `${label}.jsName`);
     requireOptionalString(entry.source, `${label}.source`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
-    if (entry.startup !== undefined && typeof entry.startup !== "boolean") {
+    if (manifestVersion >= 7 && typeof entry.startup !== "boolean") {
       throw new Error(`${label}.startup must be a boolean`);
     }
-    entry.startup ??= false;
+    if (manifestVersion < 7) {
+      if (entry.startup !== undefined && typeof entry.startup !== "boolean") {
+        throw new Error(`${label}.startup must be a boolean`);
+      }
+      entry.startup ??= false;
+    }
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== undefined) requireUnique(ids, entry.id, `${label}.id`);
     if (entry.jsName !== undefined) requireUnique(jsNames, entry.jsName, `${label}.jsName`);

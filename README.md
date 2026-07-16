@@ -91,7 +91,8 @@ lake build :virSdk
 
 The module facet writes the `.irpkg` and report under `.lake/build/vir/`; the
 package facet installs the versioned browser SDK. `VirRuntime.runEntries()`
-runs `@[vir_entry]` declarations once in manifest order. See
+runs `@[vir_entry]` declarations in manifest order and skips each entry after
+it succeeds. See
 [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
 Lean-authored [canvas slide example](examples/SlidesCanvas.lean), which is a
 real Lake target in this repository:
@@ -175,8 +176,9 @@ the commit-artifact path.
 
 Tagged releases publish the same archive as a durable
 [GitHub Releases](https://github.com/ejgallego/lean-vir/releases) asset. The
-`:virSdk` facet defaults to `v0.1.0`; `vir_fetch_sdk --tag <tag>` selects a
-different release, while commit-pinned clients can continue to use `--commit`.
+`:virSdk` facet defaults to `v0.1.0` once that release has been published;
+`vir_fetch_sdk --tag <tag>` selects a different release, while unreleased or
+commit-pinned clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 
 ## Where To Go Next
 

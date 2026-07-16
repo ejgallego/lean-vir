@@ -136,6 +136,7 @@ npm run test:infoview
 npm run test:runtime
 npm run test:runtime:pure
 npm run test:runtime:lean
+npm run test:lake
 npm run test:wasm-extensions
 npm run test:fixtures
 npm run test:fixtures:no-build
@@ -182,6 +183,8 @@ code changes.
   `npm run test:runtime:pure`
 - Runtime package generation or SDK artifact import checks:
   `npm run test:runtime:lean`
+- Lake module/package facets, marked-module selection, or SDK installer changes:
+  `npm run test:lake`
 - Local JS engine Wasm interop feature availability, such as `externref` or JSPI:
   `npm run test:wasm-extensions`
 - A single runtime smoke id/path substring:
@@ -271,6 +274,16 @@ when comparing CI runs:
 - `npm run test:fixtures` prints build, generator, fixture-run, and slowest
   fixture timings; the JSON summary also records per-fixture phase timings.
 
+## SDK Releases
+
+Tags named `v<package.json version>` trigger `.github/workflows/release-sdk.yml`,
+which validates the tag, builds `lean-vir-sdk.tar.gz`, and uploads it to the
+matching GitHub release. Create the tag from the final merged commit so the
+archive manifest records the revision clients actually depend on. Before that
+tag exists, test consumers with `VIR_SDK_ARCHIVE` or the commit-artifact fetch
+path; the zero-argument `:virSdk` facet intentionally targets the tagged
+release.
+
 ## CI Shape
 
 The CI workflow keeps one job responsible for fetching the pinned Lean source,
@@ -279,9 +292,10 @@ installing the WASI SDK, building the release-profile
 `web/public/vir-upstream.dev.wasm`, generating browser `.irpkg` files, and
 running upstream smoke. That job uploads the demo artifacts. The pure runtime
 job downloads those artifacts and runs without installing Lean. The
-Lean-dependent runtime job installs Lean only for package generation and SDK
-metadata smoke tests. The fixture job also downloads the demo artifacts and runs
-in parallel without re-fetching Lean source or reinstalling the WASI SDK.
+Lean-dependent runtime job installs Lean for the Lake facet, package-generation,
+and SDK metadata smoke tests. The fixture job also downloads the demo artifacts
+and runs in parallel without re-fetching Lean source or reinstalling the WASI
+SDK.
 
 ## Browser Smoke
 

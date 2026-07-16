@@ -51,6 +51,13 @@ inductive Source where
   | url (url : String)
   | commit (sha : String)
 
+def redactCommandArgs (args : Array String) : Array String :=
+  args.map fun arg =>
+    if arg.startsWith "Authorization:" then
+      "Authorization: <redacted>"
+    else
+      arg
+
 def run (cmd : String) (args : Array String) : IO String := do
   let out ← IO.Process.output { cmd := cmd, args := args }
   if out.exitCode != 0 then
@@ -58,7 +65,8 @@ def run (cmd : String) (args : Array String) : IO String := do
     let stdout := out.stdout.trimAscii.toString
     let detail :=
       if stderr.isEmpty then stdout else stderr
-    throw <| IO.userError s!"{cmd} {String.intercalate " " args.toList} failed ({out.exitCode}): {detail}"
+    let displayArgs := redactCommandArgs args
+    throw <| IO.userError s!"{cmd} {String.intercalate " " displayArgs.toList} failed ({out.exitCode}): {detail}"
   return out.stdout.trimAscii.toString
 
 def jsonField (json : Json) (field : String) (read : Json → Except String α) : IO α := do
@@ -133,6 +141,9 @@ def githubToken? : IO (Option String) := do
       catch _ =>
         return none
 
+def needsGitHubAuthentication (url : String) : Bool :=
+  url.startsWith "https://api.github.com/"
+
 def fetchUrl (url : String) (dest : FilePath) : IO Unit := do
   if let some parent := dest.parent then
     IO.FS.createDirAll parent
@@ -144,8 +155,9 @@ def fetchUrl (url : String) (dest : FilePath) : IO Unit := do
     "-H", "Accept: application/vnd.github+json",
     "-H", "X-GitHub-Api-Version: 2022-11-28"
   ]
-  if let some token ← githubToken? then
-    args := (args.push "-H").push s!"Authorization: Bearer {token}"
+  if needsGitHubAuthentication url then
+    if let some token ← githubToken? then
+      args := (args.push "-H").push s!"Authorization: Bearer {token}"
   args := ((args.push "--output").push dest.toString).push url
   discard <| run "curl" args
 
@@ -201,6 +213,17 @@ def fetchCommitArchive (opts : Options) (commit : String) (dest : FilePath) : IO
     catch _ =>
       pure ()
 
+def verifySdkFiles (sdkDir : FilePath) (manifest : Json) : IO Unit := do
+  let files ← jsonField manifest "files" Json.getArr?
+  for file in files do
+    let relPath ← jsonField file "path" Json.getStr?
+    let expected ← jsonField file "sha256" Json.getStr?
+    let filePath := sdkDir / FilePath.mk relPath
+    let hashLine ← run "sha256sum" #[filePath.toString]
+    let actual := (hashLine.splitOn " ").head?.getD ""
+    if actual != expected then
+      throw <| IO.userError s!"checksum mismatch for {relPath}: expected {expected}, got {actual}"
+
 def installArchive
     (archive : FilePath)
     (outDir : FilePath)
@@ -230,23 +253,12 @@ def installArchive
     if let some expectCommit := expectCommit? then
       if actualCommit != expectCommit then
         throw <| IO.userError s!"SDK commit mismatch: expected {expectCommit}, got {actualCommit}"
-    try
+    verifySdkFiles sdkDir manifest
+    if ← outDir.pathExists then
       IO.FS.removeDirAll outDir
-    catch _ =>
-      pure ()
     if let some parent := outDir.parent then
       IO.FS.createDirAll parent
     discard <| run "mv" #[sdkDir.toString, outDir.toString]
-    let installedManifest ← readJsonFile (outDir / "lean-vir-artifact.json")
-    let files ← jsonField installedManifest "files" Json.getArr?
-    for file in files do
-      let relPath ← jsonField file "path" Json.getStr?
-      let expected ← jsonField file "sha256" Json.getStr?
-      let filePath := outDir / FilePath.mk relPath
-      let hashLine ← run "sha256sum" #[filePath.toString]
-      let actual := (hashLine.splitOn " ").head?.getD ""
-      if actual != expected then
-        throw <| IO.userError s!"checksum mismatch for {relPath}: expected {expected}, got {actual}"
   finally
     try
       IO.FS.removeDirAll tmpRoot

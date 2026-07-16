@@ -42,7 +42,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
-    this.startupEntriesRun = false;
+    this.completedStartupEntries = new Set();
     this.disposed = false;
     this.liveCallbacks = new Set();
     this.createReplacementRuntime = createReplacementRuntime;
@@ -58,7 +58,7 @@ export class VirRuntime extends ObjectValueRuntime {
       this.packageMetadata = this.interfaceManifest.metadata;
       this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
-      this.startupEntriesRun = false;
+      this.completedStartupEntries = new Set();
     }
   }
 
@@ -150,7 +150,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.interfaceManifest = replacement.interfaceManifest;
     this.packageMetadata = replacement.packageMetadata;
     this.boxedCallEntryNames = replacement.boxedCallEntryNames;
-    this.startupEntriesRun = replacement.startupEntriesRun;
+    this.completedStartupEntries = replacement.completedStartupEntries;
     this.liveCallbacks = replacement.liveCallbacks;
     this.hostState?.attachRuntime(this);
     this.rebuildManifestExports();
@@ -170,7 +170,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
-    this.startupEntriesRun = false;
+    this.completedStartupEntries = new Set();
   }
 
   hasPackageState() {
@@ -228,17 +228,12 @@ export class VirRuntime extends ObjectValueRuntime {
     if (this.interfaceManifest === null) {
       throw new Error("cannot run VIR entries before loading an IR package");
     }
-    if (this.startupEntriesRun) {
-      return [];
-    }
-    this.startupEntriesRun = true;
-    const results = [];
     for (const entry of this.interfaceManifest.exports) {
-      if (entry.startup) {
-        results.push(this.callEntry(entry, []));
+      if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
+        this.callEntry(entry, []);
+        this.completedStartupEntries.add(entry.entry);
       }
     }
-    return results;
   }
 
   callEntry(entry, args) {

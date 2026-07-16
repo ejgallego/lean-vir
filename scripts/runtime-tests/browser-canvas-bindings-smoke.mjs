@@ -79,23 +79,47 @@ const ctx = {
 };
 const canvas = { width: 300, height: 150, getContext: (kind) => kind === "2d" ? ctx : null };
 const canvasBindings = createBrowserCanvasHostBindings(state);
+assert.equal(canvasBindings["browser.htmlCanvasElement.fromElement"](canvas).value, canvas);
+assert.equal(canvasBindings["browser.htmlCanvasElement.fromElement"]({}).value, null);
 assert.equal(canvasBindings["browser.htmlCanvasElement.getWidth"](canvas), 300n);
+assert.equal(canvasBindings["browser.htmlCanvasElement.getHeight"](canvas), 150n);
 canvasBindings["browser.htmlCanvasElement.setWidth"](canvas, 640n);
 canvasBindings["browser.htmlCanvasElement.setHeight"](canvas, 360n);
 assert.equal(canvas.width, 640);
 assert.equal(canvas.height, 360);
+assert.equal(canvasBindings["browser.htmlCanvasElement.getContext2D"](canvas).value, ctx);
+canvasBindings["browser.canvas2d.clearRect"](ctx, 0, 0, 640, 360);
 canvasBindings["browser.canvas2d.fillRect"](ctx, 1.5, 2.5, 30, 40);
+canvasBindings["browser.canvas2d.strokeRect"](ctx, 3, 4, 50, 60);
+canvasBindings["browser.canvas2d.beginPath"](ctx);
+canvasBindings["browser.canvas2d.moveTo"](ctx, 1, 2);
+canvasBindings["browser.canvas2d.lineTo"](ctx, 3, 4);
 canvasBindings["browser.canvas2d.arc"](ctx, 5, 6, 7, 0, 3.14);
+canvasBindings["browser.canvas2d.closePath"](ctx);
+canvasBindings["browser.canvas2d.fill"](ctx);
+canvasBindings["browser.canvas2d.stroke"](ctx);
 canvasBindings["browser.canvas2d.setFillStyle"](ctx, "#f80");
 canvasBindings["browser.canvas2d.setStrokeStyle"](ctx, "black");
 canvasBindings["browser.canvas2d.setLineWidth"](ctx, 2.25);
+canvasBindings["browser.canvas2d.save"](ctx);
 canvasBindings["browser.canvas2d.translate"](ctx, 4, 8);
 canvasBindings["browser.canvas2d.rotate"](ctx, 0.5);
+canvasBindings["browser.canvas2d.restore"](ctx);
 assert.deepEqual(canvasCalls, [
+  ["clearRect", 0, 0, 640, 360],
   ["fillRect", 1.5, 2.5, 30, 40],
+  ["strokeRect", 3, 4, 50, 60],
+  ["beginPath"],
+  ["moveTo", 1, 2],
+  ["lineTo", 3, 4],
   ["arc", 5, 6, 7, 0, 3.14],
+  ["closePath"],
+  ["fill"],
+  ["stroke"],
+  ["save"],
   ["translate", 4, 8],
   ["rotate", 0.5],
+  ["restore"],
 ]);
 assert.equal(ctx.fillStyle, "#f80");
 assert.equal(ctx.strokeStyle, "black");

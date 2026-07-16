@@ -87,6 +87,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run test:lake
       - name: Download demo artifacts
         uses: actions/download-artifact@v4
         with:

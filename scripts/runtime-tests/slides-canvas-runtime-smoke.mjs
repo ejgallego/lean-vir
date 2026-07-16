@@ -138,8 +138,8 @@ try {
     defaultHostBindings: createBrowserHostBindings(),
   });
   try {
-    assert.deepEqual(runtime.runEntries(), [undefined]);
-    assert.deepEqual(runtime.runEntries(), []);
+    assert.equal(runtime.runEntries(), undefined);
+    assert.equal(runtime.runEntries(), undefined);
     assert.equal(slideRoot.children.length, 2);
 
     const [status, canvas] = slideRoot.children;

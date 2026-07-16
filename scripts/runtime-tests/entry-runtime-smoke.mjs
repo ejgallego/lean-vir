@@ -25,7 +25,7 @@ function entry(name, startup) {
 const calls = [];
 const runtime = Object.create(VirRuntime.prototype);
 runtime.disposed = false;
-runtime.startupEntriesRun = false;
+runtime.completedStartupEntries = new Set();
 runtime.interfaceManifest = {
   exports: [entry("first", true), entry("ordinary", false), entry("second", true)],
 };
@@ -35,12 +35,12 @@ runtime.callEntry = (candidate, args) => {
   return candidate.entry;
 };
 
-assert.deepEqual(runtime.runEntries(), ["first", "second"]);
+assert.equal(runtime.runEntries(), undefined);
 assert.deepEqual(calls, ["first", "second"]);
-assert.deepEqual(runtime.runEntries(), []);
+assert.equal(runtime.runEntries(), undefined);
 assert.deepEqual(calls, ["first", "second"]);
 
-runtime.startupEntriesRun = true;
+runtime.completedStartupEntries = new Set(["first", "second"]);
 runtime.createReplacementRuntime = () => ({
   installIrPackageBytes() {
     throw new Error("replacement rejected");
@@ -48,7 +48,25 @@ runtime.createReplacementRuntime = () => ({
   dispose() {},
 });
 assert.throws(() => runtime.replaceIrPackageBytes(new Uint8Array()), /replacement rejected/);
-assert.equal(runtime.startupEntriesRun, true);
+assert.deepEqual([...runtime.completedStartupEntries], ["first", "second"]);
+
+runtime.completedStartupEntries = new Set();
+runtime.interfaceManifest = {
+  exports: [entry("beforeFailure", true), entry("failsOnce", true), entry("afterFailure", true)],
+};
+let shouldFail = true;
+runtime.callEntry = (candidate) => {
+  calls.push(candidate.entry);
+  if (candidate.entry === "failsOnce" && shouldFail) {
+    shouldFail = false;
+    throw new Error("startup failed");
+  }
+};
+assert.throws(() => runtime.runEntries(), /startup failed/);
+assert.deepEqual([...runtime.completedStartupEntries], ["beforeFailure"]);
+assert.equal(runtime.runEntries(), undefined);
+assert.deepEqual([...runtime.completedStartupEntries], ["beforeFailure", "failsOnce", "afterFailure"]);
+assert.deepEqual(calls.slice(-4), ["beforeFailure", "failsOnce", "failsOnce", "afterFailure"]);
 
 const legacyManifest = validateInterfaceManifest({
   version: 6,

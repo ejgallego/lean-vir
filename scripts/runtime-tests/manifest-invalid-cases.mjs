@@ -6,6 +6,34 @@ Author: Emilio J. Gallego Arias
 
 export const invalidManifestCases = [
   {
+    name: "missing manifest version",
+    mutate: (manifest) => {
+      delete manifest.version;
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "string manifest version",
+    mutate: (manifest) => {
+      manifest.version = "7";
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "fractional manifest version",
+    mutate: (manifest) => {
+      manifest.version = 6.5;
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "missing v7 startup marker",
+    mutate: (manifest) => {
+      delete manifest.exports[0].startup;
+    },
+    pattern: /exports\[0\]\.startup must be a boolean/,
+  },
+  {
     name: "non-boolean startup marker",
     mutate: (manifest) => {
       manifest.exports[0].startup = "yes";

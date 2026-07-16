@@ -73,9 +73,26 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
   let fetcherJob ← vir_fetch_sdk.fetch
   let sdkDir := pkg.buildDir / "vir" / "sdk"
   let manifestPath := sdkDir / "lean-vir-artifact.json"
+  let archive? ← IO.getEnv "VIR_SDK_ARCHIVE"
+  let url? ← IO.getEnv "VIR_SDK_URL"
+  let tag? ← IO.getEnv "VIR_SDK_TAG"
+  let commit? ← IO.getEnv "VIR_SDK_COMMIT"
+  let expectCommit? ← IO.getEnv "VIR_SDK_EXPECT_COMMIT"
+  let repo? ← IO.getEnv "VIR_SDK_REPO"
+  let sourceConfig := String.intercalate "\n" [
+    s!"archive={archive?.getD ""}",
+    s!"url={url?.getD ""}",
+    s!"tag={tag?.getD ""}",
+    s!"commit={commit?.getD ""}",
+    s!"expectCommit={expectCommit?.getD ""}",
+    s!"repo={repo?.getD ""}"
+  ]
   fetcherJob.mapM fun fetcher => do
     addTrace (← computeTrace fetcher)
     addPureTrace virSdkVersion "VIR SDK version"
+    addPureTrace sourceConfig "VIR SDK source"
+    if let some archive := archive? then
+      addTrace (← computeTrace (System.FilePath.mk archive))
     buildFileUnlessUpToDate' (text := true) manifestPath do
       createParentDirs manifestPath
       proc {

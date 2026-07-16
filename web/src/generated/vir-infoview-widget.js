@@ -2664,7 +2664,7 @@ function requireNonNegativeInteger(value, label) {
   }
 }
 function validateInterfaceManifest(manifest) {
-  if (!isRecord(manifest) || (manifest.version < MIN_INTERFACE_MANIFEST_VERSION || manifest.version > INTERFACE_MANIFEST_VERSION) || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
+  if (!isRecord(manifest) || !Number.isInteger(manifest.version) || (manifest.version < MIN_INTERFACE_MANIFEST_VERSION || manifest.version > INTERFACE_MANIFEST_VERSION) || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
     throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
   }
   if (manifest.artifact !== void 0 && manifest.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
@@ -2676,11 +2676,11 @@ function validateInterfaceManifest(manifest) {
   if (manifest.hostImports !== void 0 && !Array.isArray(manifest.hostImports)) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
-  validateManifestExports(manifest.exports);
+  validateManifestExports(manifest.exports, manifest.version);
   validateManifestHostImports(manifest.hostImports ?? []);
   return manifest;
 }
-function validateManifestExports(exports) {
+function validateManifestExports(exports, manifestVersion) {
   const entries = /* @__PURE__ */ new Set();
   const ids = /* @__PURE__ */ new Set();
   const jsNames = /* @__PURE__ */ new Set();
@@ -2694,10 +2694,15 @@ function validateManifestExports(exports) {
     requireOptionalString(entry.jsName, `${label}.jsName`);
     requireOptionalString(entry.source, `${label}.source`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
-    if (entry.startup !== void 0 && typeof entry.startup !== "boolean") {
+    if (manifestVersion >= 7 && typeof entry.startup !== "boolean") {
       throw new Error(`${label}.startup must be a boolean`);
     }
-    entry.startup ??= false;
+    if (manifestVersion < 7) {
+      if (entry.startup !== void 0 && typeof entry.startup !== "boolean") {
+        throw new Error(`${label}.startup must be a boolean`);
+      }
+      entry.startup ??= false;
+    }
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== void 0) requireUnique(ids, entry.id, `${label}.id`);
     if (entry.jsName !== void 0) requireUnique(jsNames, entry.jsName, `${label}.jsName`);
@@ -5354,7 +5359,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.exportsByName = /* @__PURE__ */ Object.create(null);
     this.entriesByName = /* @__PURE__ */ Object.create(null);
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
-    this.startupEntriesRun = false;
+    this.completedStartupEntries = /* @__PURE__ */ new Set();
     this.disposed = false;
     this.liveCallbacks = /* @__PURE__ */ new Set();
     this.createReplacementRuntime = createReplacementRuntime;
@@ -5368,7 +5373,7 @@ var VirRuntime = class extends ObjectValueRuntime {
       this.packageMetadata = this.interfaceManifest.metadata;
       this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
-      this.startupEntriesRun = false;
+      this.completedStartupEntries = /* @__PURE__ */ new Set();
     }
   }
   targetPointerBytes() {
@@ -5452,7 +5457,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.interfaceManifest = replacement.interfaceManifest;
     this.packageMetadata = replacement.packageMetadata;
     this.boxedCallEntryNames = replacement.boxedCallEntryNames;
-    this.startupEntriesRun = replacement.startupEntriesRun;
+    this.completedStartupEntries = replacement.completedStartupEntries;
     this.liveCallbacks = replacement.liveCallbacks;
     this.hostState?.attachRuntime(this);
     this.rebuildManifestExports();
@@ -5470,7 +5475,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.exportsByName = /* @__PURE__ */ Object.create(null);
     this.entriesByName = /* @__PURE__ */ Object.create(null);
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
-    this.startupEntriesRun = false;
+    this.completedStartupEntries = /* @__PURE__ */ new Set();
   }
   hasPackageState() {
     return this.packageInfo !== null || this.interfaceManifest !== null || this.packageMetadata !== null || (this.exports.vir_package_interface_manifest_size?.() ?? 0) !== 0 || (this.packageDeclCount() ?? 0) !== 0;
@@ -5517,17 +5522,12 @@ var VirRuntime = class extends ObjectValueRuntime {
     if (this.interfaceManifest === null) {
       throw new Error("cannot run VIR entries before loading an IR package");
     }
-    if (this.startupEntriesRun) {
-      return [];
-    }
-    this.startupEntriesRun = true;
-    const results = [];
     for (const entry of this.interfaceManifest.exports) {
-      if (entry.startup) {
-        results.push(this.callEntry(entry, []));
+      if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
+        this.callEntry(entry, []);
+        this.completedStartupEntries.add(entry.entry);
       }
     }
-    return results;
   }
   callEntry(entry, args) {
     this.requireLiveRuntime();

@@ -36,7 +36,7 @@ declarations fails with a diagnostic instead of silently producing an empty
 package.
 
 Lean module-system files can import the marker definitions without pulling in
-the legacy VIR library:
+the full browser-facing `Vir` library:
 
 ```lean
 module
@@ -77,16 +77,18 @@ lean_exe my_slides where
   needs := #[`+MySlides.Runtime:vir]
 ```
 
-For a Verso Slides integration, the intended configuration is:
+A Verso Slides integration can expose configuration shaped like:
 
 ```lean
 vir := some { module := `MySlides.Runtime }
 ```
 
-The renderer copies the generated `.irpkg` and SDK beside the presentation,
-creates its mount element, waits for Reveal initialization, loads the runtime,
-and calls `vir.runEntries()`. It should call `vir.dispose()` during page
-teardown and render initialization failures visibly.
+That integration should copy the generated `.irpkg` and SDK beside the
+presentation, create its mount element, wait for Reveal initialization, load
+the runtime, and call `vir.runEntries()`. It should call `vir.dispose()` during
+page teardown and render initialization failures visibly. This is the
+integration contract; Verso still needs to land the corresponding renderer
+configuration.
 
 ## Install The Browser SDK
 
@@ -94,28 +96,31 @@ teardown and render initialization failures visibly.
 lake build :virSdk
 ```
 
-This installs release `v0.1.0` under `.lake/build/vir/sdk/`. The installer
-checks the SDK version, runtime ABI, non-empty source commit, and every manifest
-checksum. Set `VIR_SDK_ARCHIVE=/path/to/lean-vir-sdk.tar.gz` to use a local or
-CI-provided archive without network access. The facet is cached by Lake.
+This installs release `v0.1.0` under `.lake/build/vir/sdk/`. The corresponding
+GitHub release must exist; for an unreleased revision, use a local archive or
+the commit fetch described below. The installer checks the SDK version,
+runtime ABI, non-empty source commit, and every manifest checksum. Set
+`VIR_SDK_ARCHIVE=/path/to/lean-vir-sdk.tar.gz` to use a local or CI-provided
+archive without network access. Lake tracks the selected source and local
+archive contents when caching the facet.
 
 The browser host can then load and run all startup entries in manifest order:
 
 ```js
 import { createVirRuntime } from "./vir/sdk/js/vir-runtime.js";
-import { createBrowserHostBindings } from "./vir/sdk/js/vir-host-bindings.js";
 
 const vir = await createVirRuntime({
   wasmUrl: "./vir/sdk/wasm/vir-upstream.wasm",
   irPackageUrl: "./vir/modules/MySlides/Runtime.irpkg",
-  hostBindings: createBrowserHostBindings(),
 });
 vir.runEntries();
 ```
 
-`runEntries()` is ordered and once-only for each successfully loaded package.
-A successful replacement package resets the entry state; a failed replacement
-leaves the existing package and its entry state unchanged.
+`runEntries()` invokes startup entries in manifest order and records each one
+only after it succeeds. Calling it again skips completed entries; if an entry
+throws, a retry resumes at that entry without repeating earlier successful
+work. A successful replacement package resets the entry state; a failed
+replacement leaves the existing package and its entry state unchanged.
 
 ## Canvas Example
 
