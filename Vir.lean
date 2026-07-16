@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
+import Vir.Attributes
 import Vir.Host
 import Vir.Runtime
 import Vir.Js

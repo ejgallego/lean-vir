@@ -17,6 +17,7 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
   let mode :=
     if target.packageOnly then "packageOnly"
     else if target.includeAll then "all"
+    else if target.includeMarked then "marked"
     else "explicit"
   {
     source := target.source.toString
@@ -77,7 +78,14 @@ def collectInterfaceManifest
           reason := "source environment was not loaded"
         } }
     | some env =>
-        for name in exportCandidatesFor index target do
+        let candidates := exportCandidatesFor index target
+        if target.includeMarked && candidates.isEmpty then
+          manifest := { manifest with diagnostics := manifest.diagnostics.push {
+            name := .anonymous,
+            source,
+            reason := "no declarations are marked with `@[vir_export]` or `@[vir_entry]`"
+          } }
+        for name in candidates do
           match ← runCoreForSource source env (interfaceExportFor index source name) with
           | .ok entry =>
               if !manifest.exports.any (fun existing => existing.entry == entry.entry) then

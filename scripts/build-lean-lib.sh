@@ -59,6 +59,7 @@ build_module() {
   fi
 }
 
+build_module Vir/Attributes.lean
 build_module Vir/Host.lean
 build_module Vir/Runtime.lean
 build_module Vir/Js.lean

@@ -6,6 +6,13 @@ Author: Emilio J. Gallego Arias
 
 export const invalidManifestCases = [
   {
+    name: "non-boolean startup marker",
+    mutate: (manifest) => {
+      manifest.exports[0].startup = "yes";
+    },
+    pattern: /exports\[0\]\.startup must be a boolean/,
+  },
+  {
     name: "unsupported export effect",
     mutate: (manifest) => {
       manifest.exports[0].effect = "sideEffect";

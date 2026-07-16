@@ -85,6 +85,8 @@ def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   if target.includeAll then
     index.sourceDecls.findSome? (fun (source, names) =>
       if source == target.source.toString then some names else none) |>.getD #[]
+  else if target.includeMarked then
+    markedDeclNamesFor index target
   else
     target.roots
 

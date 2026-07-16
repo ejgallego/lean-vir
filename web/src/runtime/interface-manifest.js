@@ -8,7 +8,8 @@ import { formatInterfaceEffectPrefix, requireInterfaceEffect } from "./interface
 import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./interface-tags.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 6;
+export const INTERFACE_MANIFEST_VERSION = 7;
+export const MIN_INTERFACE_MANIFEST_VERSION = 6;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
@@ -16,7 +17,7 @@ export const HOST_IMPORT_BOUNDARY = Object.freeze({
 });
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
-  "embedded interface manifest must be { version: 6, metadata: {...}, exports: [...] }";
+  "embedded interface manifest must be { version: 6 or 7, metadata: {...}, exports: [...] }";
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -42,7 +43,8 @@ function requireNonNegativeInteger(value, label) {
 
 export function validateInterfaceManifest(manifest) {
   if (!isRecord(manifest) ||
-      manifest.version !== INTERFACE_MANIFEST_VERSION ||
+      (manifest.version < MIN_INTERFACE_MANIFEST_VERSION ||
+        manifest.version > INTERFACE_MANIFEST_VERSION) ||
       !isRecord(manifest.metadata) ||
       !Array.isArray(manifest.exports)) {
     throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
@@ -75,6 +77,10 @@ function validateManifestExports(exports) {
     requireOptionalString(entry.jsName, `${label}.jsName`);
     requireOptionalString(entry.source, `${label}.source`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
+    if (entry.startup !== undefined && typeof entry.startup !== "boolean") {
+      throw new Error(`${label}.startup must be a boolean`);
+    }
+    entry.startup ??= false;
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== undefined) requireUnique(ids, entry.id, `${label}.id`);
     if (entry.jsName !== undefined) requireUnique(jsNames, entry.jsName, `${label}.jsName`);
