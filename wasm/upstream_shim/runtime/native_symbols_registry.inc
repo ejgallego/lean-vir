@@ -57,8 +57,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X_CONST("ByteArray.empty", "l_ByteArray_empty", &l_ByteArray_empty) \
     X("ByteArray.push", "lean_byte_array_push", lean_byte_array_push___boxed) \
     X("ByteArray.get!", "lean_byte_array_get", lean_byte_array_get___boxed) \
-    X("ByteArray.get", "lean_byte_array_fget", lean_byte_array_fget___boxed) \
-    X("ByteArray.set!", "lean_byte_array_set", lean_byte_array_set___boxed) \
     X("ByteArray.extract", "l_ByteArray_extract", l_ByteArray_extract___boxed) \
     X("ByteArray.size", "lean_byte_array_size", lean_byte_array_size___boxed) \
     X("ByteArray.validateUTF8", "lean_string_validate_utf8", lean_string_validate_utf8___boxed) \

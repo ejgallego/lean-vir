@@ -543,22 +543,6 @@ VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER(lean_byte_array_push, UINT8)
 
 VIR_DEFINE_BORROWED_OBJECT_UINT8_BINARY_WRAPPER(lean_byte_array_get)
 
-extern "C" lean_object * lean_byte_array_fget___boxed(lean_object * array, lean_object * index, lean_object * proof) {
-    uint8_t result = lean_byte_array_fget(array, index);
-    lean_dec(array);
-    lean_dec(index);
-    lean_dec(proof);
-    return lean_box(result);
-}
-
-extern "C" lean_object * lean_byte_array_set___boxed(lean_object * array, lean_object * index, lean_object * value) {
-    uint8_t byte = static_cast<uint8_t>(lean_unbox(value));
-    lean_dec(value);
-    lean_object * result = lean_byte_array_set(array, index, byte);
-    lean_dec(index);
-    return result;
-}
-
 extern "C" lean_object * l_ByteArray_extract___boxed(lean_object * array, lean_object * start, lean_object * stop) {
     lean_object * len = lean_nat_sub(stop, start);
     lean_object * result = lean_byte_array_copy_slice(

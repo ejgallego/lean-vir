@@ -428,13 +428,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `ByteArray.get,
     params := #[param 1 true .object, param 2 true .tobject, param 3 false .erased],
     resultType := .uint8,
-    symbol := "lean_byte_array_fget"
+    symbol := "lean_byte_array_fget",
+    generateBoxedWrapper := true
   },
   {
     name := `ByteArray.set!,
     params := #[param 1 false .object, param 2 true .tobject, param 3 false .uint8],
     resultType := .object,
-    symbol := "lean_byte_array_set"
+    symbol := "lean_byte_array_set",
+    generateBoxedWrapper := true
   },
   {
     name := `ByteArray.extract,
