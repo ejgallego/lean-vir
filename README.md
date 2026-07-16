@@ -7,11 +7,11 @@ declarations in the browser through Lean's real IR interpreter compiled to
 For downstream Lake packages, the preferred workflow is:
 
 1. add `lean_vir` as a pinned Lake dependency;
-2. mark browser exports with `@[vir_export]` and startup actions with
-   `@[vir_entry]`;
+2. mark browser exports with `@[vir_export]` and startup hooks with
+   `@[vir_startup]`;
 3. build the module's `.irpkg` with its `:vir` facet and install the matching
    browser SDK with `:virSdk`;
-4. load the package and call `runEntries()` from the browser host.
+4. load the package and call `runStartupEntries()` from the browser host.
 
 See [Lake Facets And Lean Browser Entries](#lake-facets-and-lean-browser-entries)
 for the short form and [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) for
@@ -36,7 +36,7 @@ import Vir
 @[vir_export]
 def answer : Nat := 42
 
-@[vir_entry]
+@[vir_startup]
 def mount : Lean.Vir.Browser.DomM Unit := pure ()
 ```
 
@@ -46,8 +46,8 @@ lake build :virSdk
 ```
 
 The module facet writes the `.irpkg` and report under `.lake/build/vir/`; the
-package facet installs the versioned browser SDK. `VirRuntime.runEntries()`
-runs `@[vir_entry]` declarations in manifest order and skips each entry after
+package facet installs the versioned browser SDK. `vir.runStartupEntries()`
+runs `@[vir_startup]` declarations in manifest order and skips each hook after
 it succeeds. See
 [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
 Lean-authored [canvas slide example](examples/SlidesCanvas.lean), which is a

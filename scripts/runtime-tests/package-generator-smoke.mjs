@@ -88,7 +88,7 @@ try {
     "@[vir_export]",
     "def markedValue (n : Nat) : Nat := n + 1",
     "",
-    "@[vir_entry]",
+    "@[vir_startup]",
     "def markedStartup : Lean.Vir.Browser.DomM Unit := pure ()",
     "",
     "def notMarked : Nat := 37",
@@ -151,13 +151,13 @@ try {
     noMarkedSource,
   ]);
   assert.notEqual(generatedWithoutMarks.status, 0);
-  assert.match(generatedWithoutMarks.stderr, /no declarations are marked with `@\[vir_export\]` or `@\[vir_entry\]`/);
+  assert.match(generatedWithoutMarks.stderr, /no declarations are marked with `@\[vir_export\]` or `@\[vir_startup\]`/);
 
   const badEntrySource = join(freshDir, "BadMarkedEntry.lean");
   await writeFile(badEntrySource, [
     "import Vir",
     "",
-    "@[vir_entry]",
+    "@[vir_startup]",
     "def badStartup (_n : Nat) : Lean.Vir.Browser.DomM Unit := pure ()",
     "",
   ].join("\n"));
@@ -168,7 +168,7 @@ try {
     badEntrySource,
   ]);
   assert.notEqual(generatedBadEntry.status, 0);
-  assert.match(generatedBadEntry.stderr, /marked with `@\[vir_entry\]` must take no JavaScript arguments/);
+  assert.match(generatedBadEntry.stderr, /marked with `@\[vir_startup\]` must take no JavaScript arguments/);
 
   const runtimeSource = join(freshDir, "RuntimeEffect.lean");
   const runtimePackage = join(freshDir, "runtime-effect.irpkg");

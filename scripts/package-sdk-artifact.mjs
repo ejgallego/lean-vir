@@ -86,7 +86,7 @@ modules can resolve relative imports. They remain internal implementation
 modules and may change with the matching lean_vir revision.
 
 In a Lake client package, mark JavaScript-callable declarations with
-@[vir_export] and startup actions with @[vir_entry], then build the module
+@[vir_export] and startup hooks with @[vir_startup], then build the module
 package and matching SDK:
 
   lake build +MyApp.Runtime:vir
@@ -113,7 +113,7 @@ Minimal browser usage:
     irPackageUrl: "./my-app.irpkg",
   });
 
-  vir.runEntries();
+  vir.runStartupEntries();
 
 Call vir.dispose() when the page or application is torn down.
 

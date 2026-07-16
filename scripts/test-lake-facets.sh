@@ -68,7 +68,7 @@ printf '%s\n' \
   '@[vir_export]' \
   'def Smoke.Runtime.value : Nat := 42' \
   '' \
-  '@[vir_entry]' \
+  '@[vir_startup]' \
   'def Smoke.Runtime.start : DomM Unit := pure ()' > "$tmp/Smoke/Runtime.lean"
 
 printf '%s\n' \
@@ -88,7 +88,7 @@ printf '%s\n' \
   '@[vir_export]' \
   'public def Smoke.NewRuntime.value : Nat := 43' \
   '' \
-  '@[vir_entry]' \
+  '@[vir_startup]' \
   'public def Smoke.NewRuntime.start : Unit := ()' > "$tmp/Smoke/NewRuntime.lean"
 
 printf '%s\n' 'export const smoke = true;' > "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js"

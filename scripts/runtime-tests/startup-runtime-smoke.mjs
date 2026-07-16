@@ -14,7 +14,7 @@ function entry(name, startup) {
     id: name,
     jsName: name,
     entry: name,
-    source: "EntryRuntime.lean",
+    source: "StartupRuntime.lean",
     args: [],
     result: { type: "Unit", interfaceTag: 22 },
     effect: "dom",
@@ -35,9 +35,9 @@ runtime.callEntry = (candidate, args) => {
   return candidate.entry;
 };
 
-assert.equal(runtime.runEntries(), undefined);
+assert.equal(runtime.runStartupEntries(), undefined);
 assert.deepEqual(calls, ["first", "second"]);
-assert.equal(runtime.runEntries(), undefined);
+assert.equal(runtime.runStartupEntries(), undefined);
 assert.deepEqual(calls, ["first", "second"]);
 
 runtime.completedStartupEntries = new Set(["first", "second"]);
@@ -62,9 +62,9 @@ runtime.callEntry = (candidate) => {
     throw new Error("startup failed");
   }
 };
-assert.throws(() => runtime.runEntries(), /startup failed/);
+assert.throws(() => runtime.runStartupEntries(), /startup failed/);
 assert.deepEqual([...runtime.completedStartupEntries], ["beforeFailure"]);
-assert.equal(runtime.runEntries(), undefined);
+assert.equal(runtime.runStartupEntries(), undefined);
 assert.deepEqual([...runtime.completedStartupEntries], ["beforeFailure", "failsOnce", "afterFailure"]);
 assert.deepEqual(calls.slice(-4), ["beforeFailure", "failsOnce", "failsOnce", "afterFailure"]);
 
@@ -75,4 +75,4 @@ const legacyManifest = validateInterfaceManifest({
 });
 assert.equal(legacyManifest.exports[0].startup, false);
 
-console.log("vir startup entry runtime smoke ok");
+console.log("vir startup hook runtime smoke ok");

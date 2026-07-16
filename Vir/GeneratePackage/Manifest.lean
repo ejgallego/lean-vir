@@ -83,7 +83,7 @@ def collectInterfaceManifest
           manifest := { manifest with diagnostics := manifest.diagnostics.push {
             name := .anonymous,
             source,
-            reason := "no declarations are marked with `@[vir_export]` or `@[vir_entry]`"
+            reason := "no declarations are marked with `@[vir_export]` or `@[vir_startup]`"
           } }
         for name in candidates do
           match ← runCoreForSource source env (interfaceExportFor index source name) with

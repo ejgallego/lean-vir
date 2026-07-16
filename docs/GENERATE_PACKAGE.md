@@ -21,7 +21,7 @@ Targets have one of five modes:
 - `--target-all <source.lean>`: auto-discover public source definitions as
   roots and exports.
 - `--target-marked <source.lean>`: package declarations marked with
-  `@[vir_export]` or `@[vir_entry]` in a source file.
+  `@[vir_export]` or `@[vir_startup]` in a source file.
 - `--target-marked-module <driver.lean> <module>`: package marked declarations
   owned by one imported module while excluding marked declarations from its
   dependencies. The Lake `:vir` module facet uses this mode with a generated
@@ -74,7 +74,7 @@ Targets have one of five modes:
    elaboration disabled. Frontend commands such as `#eval` follow normal Lean
    semantics and may produce output during package generation.
 3. `Frontend.loadDeclIndex` records each source environment, source-local IR
-   declaration names, `@[vir_export]` and `@[vir_entry]` marker sets, and a
+   declaration names, `@[vir_export]` and `@[vir_startup]` marker sets, and a
    name-to-declaration index. Module-marked targets filter those sets to
    declarations owned by the requested module. If two different source targets
    define the same Lean declaration name, the index records a diagnostic instead

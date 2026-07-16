@@ -218,12 +218,12 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
               else if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
               else
-                let startup := index.virEntries.contains name
+                let startup := index.virStartups.contains name
                 if startup && (!args.isEmpty || result != .unit) then
                   return .error {
                     name,
                     source,
-                    reason := "declarations marked with `@[vir_entry]` must take no JavaScript arguments and return `Unit`"
+                    reason := "declarations marked with `@[vir_startup]` must take no JavaScript arguments and return `Unit`"
                   }
                 let jsName := jsNameFor name
                 return .ok { id := jsName, jsName, entry := name, source, args, result, effect, startup }

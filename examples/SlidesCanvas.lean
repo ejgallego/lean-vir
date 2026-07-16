@@ -28,7 +28,7 @@ partial def drawFrame
   pure ()
 
 /-- Builds and starts the slide's DOM and canvas animation entirely from Lean. -/
-@[vir_entry]
+@[vir_startup]
 def mount : DomM Unit := do
   match ← Document.querySelector "#vir-slide-root" with
   | none => pure ()

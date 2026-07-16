@@ -146,8 +146,8 @@ try {
       const hostImport = runtime.interfaceManifest.hostImports.find((entry) => entry.target === target);
       assert.equal(hostImport?.boundary, "explicitConversion");
     }
-    assert.equal(runtime.runEntries(), undefined);
-    assert.equal(runtime.runEntries(), undefined);
+    assert.equal(runtime.runStartupEntries(), undefined);
+    assert.equal(runtime.runStartupEntries(), undefined);
     assert.equal(slideRoot.children.length, 2);
 
     const [status, canvas] = slideRoot.children;

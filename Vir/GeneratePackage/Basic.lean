@@ -78,7 +78,7 @@ structure DeclIndex where
   envs : Array (String × Environment) := #[]
   sourceDecls : Array (String × Array Name) := #[]
   virExports : NameSet := {}
-  virEntries : NameSet := {}
+  virStartups : NameSet := {}
   diagnostics : Array DeclIndexDiagnostic := #[]
 
 structure NativeExtern where

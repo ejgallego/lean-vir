@@ -16,7 +16,7 @@ const tests = [
   { id: "js-float", file: "scripts/runtime-tests/js-float-fidelity-smoke.mjs", group: "pure" },
   { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", group: "pure" },
   { id: "browser-canvas-bindings", file: "scripts/runtime-tests/browser-canvas-bindings-smoke.mjs", group: "pure" },
-  { id: "startup-entries", file: "scripts/runtime-tests/entry-runtime-smoke.mjs", group: "pure" },
+  { id: "startup-hooks", file: "scripts/runtime-tests/startup-runtime-smoke.mjs", group: "pure" },
   { id: "callback-lifecycle", file: "scripts/runtime-tests/callback-lifecycle-smoke.mjs", group: "pure" },
   { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },
   { id: "object-abi", file: "scripts/runtime-tests/object-abi-smoke.mjs", group: "pure" },

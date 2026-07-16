@@ -223,7 +223,7 @@ export class VirRuntime extends ObjectValueRuntime {
     return this.callEntry(entry, args);
   }
 
-  runEntries() {
+  runStartupEntries() {
     this.requireLiveRuntime();
     if (this.interfaceManifest === null) {
       throw new Error("cannot run VIR entries before loading an IR package");

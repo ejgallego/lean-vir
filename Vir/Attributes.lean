@@ -14,10 +14,10 @@ public section
 register_label_attr vir_export
 
 /--
-Marks a declaration as a VIR package startup entrypoint.
+Marks a declaration as a VIR package startup hook.
 
-Startup entrypoints are also exported. Package generation requires them to take
+Startup hooks are also exported. Package generation requires them to take
 no JavaScript arguments and return `Unit` (possibly through a supported effect
 such as `DomM`).
 -/
-register_label_attr vir_entry
+register_label_attr vir_startup

@@ -27,7 +27,7 @@ described under [Install The Browser SDK](#install-the-browser-sdk).
 ## Mark The Browser Surface
 
 Import `Vir` and mark JavaScript-callable declarations with `@[vir_export]`.
-Use `@[vir_entry]` for startup actions that the browser host should run after
+Use `@[vir_startup]` for startup hooks that the browser host should run after
 loading the package. An entry is also an export and must take no JavaScript
 arguments and return `Unit` through a supported effect such as `DomM`.
 
@@ -41,7 +41,7 @@ namespace MySlides.Runtime
 @[vir_export]
 def answer : Nat := 42
 
-@[vir_entry]
+@[vir_startup]
 def mount : DomM Unit := do
   let some root ← Document.querySelector "#vir-slide-root" | pure ()
   Element.setTextContent root "This DOM was updated from Lean"
@@ -106,8 +106,8 @@ vir := some { module := `MySlides.Runtime }
 
 That integration should copy the generated `.irpkg` and SDK beside the
 presentation, create its mount element, wait for Reveal initialization, load
-the runtime, and call `vir.runEntries()`. It should call `vir.dispose()` during
-page teardown and render initialization failures visibly. This is the
+the runtime, and call `vir.runStartupEntries()`. It should call `vir.dispose()`
+during page teardown and render initialization failures visibly. This is the
 integration contract; Verso still needs to land the corresponding renderer
 configuration.
 
@@ -136,7 +136,7 @@ Before accepting a cached SDK manifest, the facet rechecks every listed payload
 checksum. A missing or modified payload invalidates the manifest target and
 reinstalls the SDK from the configured source.
 
-The browser host can then load and run all startup entries in manifest order:
+The browser host can then load and run all startup hooks in manifest order:
 
 ```js
 import { createVirRuntime } from "./vir/sdk/js/vir-runtime.js";
@@ -145,12 +145,12 @@ const vir = await createVirRuntime({
   wasmUrl: "./vir/sdk/wasm/vir-upstream.wasm",
   irPackageUrl: "./vir/modules/MySlides/Runtime.irpkg",
 });
-vir.runEntries();
+vir.runStartupEntries();
 ```
 
-`runEntries()` invokes startup entries in manifest order and records each one
-only after it succeeds. Calling it again skips completed entries; if an entry
-throws, a retry resumes at that entry without repeating earlier successful
+`runStartupEntries()` invokes startup hooks in manifest order and records each
+one only after it succeeds. Calling it again skips completed hooks; if a hook
+throws, a retry resumes at that hook without repeating earlier successful
 work. A successful replacement package resets the entry state; a failed
 replacement leaves the existing package and its entry state unchanged.
 

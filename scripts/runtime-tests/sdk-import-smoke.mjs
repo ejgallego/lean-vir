@@ -29,7 +29,7 @@ async function extractSdk(tempDir) {
   const sdkRoot = join(tempDir, "lean-vir-sdk");
   const readme = await readFile(join(sdkRoot, "README.txt"), "utf8");
   assert.match(readme, /lake build :virSdk/);
-  assert.match(readme, /vir\.runEntries\(\)/);
+  assert.match(readme, /vir\.runStartupEntries\(\)/);
   await writeFile(join(sdkRoot, "package.json"), "{\"type\":\"module\"}\n");
   return join(sdkRoot, "js");
 }

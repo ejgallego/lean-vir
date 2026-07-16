@@ -86,11 +86,11 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
       | none =>
           index := { index with localDecls := index.localDecls.insert decl.name loaded }
     let exports ← labelledDecls env `vir_export
-    let entries ← labelledDecls env `vir_entry
+    let startups ← labelledDecls env `vir_startup
     index := {
       index with
       virExports := exports.foldl (fun selected name => selected.insert name) index.virExports
-      virEntries := entries.foldl (fun selected name => selected.insert name) index.virEntries
+      virStartups := startups.foldl (fun selected name => selected.insert name) index.virStartups
     }
     index := { index with sourceDecls := index.sourceDecls.push (target.source.toString, names) }
   return index
@@ -132,7 +132,7 @@ def markedDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
   | some env =>
       match target.markedModule? with
       | some moduleName =>
-          (index.virExports ∪ index.virEntries).foldl (init := #[]) fun names name =>
+          (index.virExports ∪ index.virStartups).foldl (init := #[]) fun names name =>
             match env.getModuleIdxFor? name with
             | some moduleIdx =>
                 if env.header.moduleNames[moduleIdx]? == some moduleName then names.push name else names
@@ -141,6 +141,6 @@ def markedDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
           index.sourceDecls.findSome? (fun (source, names) =>
             if source == target.source.toString then some names else none) |>.getD #[]
           |>.filter fun name =>
-            index.virExports.contains name || index.virEntries.contains name
+            index.virExports.contains name || index.virStartups.contains name
 
 end Vir.GeneratePackage
