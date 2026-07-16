@@ -151,6 +151,11 @@ assertEqual(
   "SDK fetcher version mismatch",
 );
 assertEqual(
+  leanNatConstant(sdkFetcherSource, "sdkRuntimeAbiVersion"),
+  RUNTIME_ABI_VERSION,
+  "SDK fetcher runtime ABI version mismatch",
+);
+assertEqual(
   leanStringConstant(lakefileSource, "virSdkVersion"),
   packageJson.version,
   "Lake SDK facet version mismatch",

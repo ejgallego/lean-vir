@@ -5,6 +5,25 @@ browser-loadable `.irpkg`, plus a package facet for installing the matching
 JavaScript/Wasm SDK. This is intentionally a focused browser-program workflow,
 not a general Lean-to-Wasm compiler.
 
+## Add The Lake Dependency
+
+Pin `lean_vir` to a release tag or exact commit in the client
+`lakefile.lean`:
+
+```lean
+require lean_vir from git
+  "https://github.com/ejgallego/lean-vir" @ "<tag-or-commit>"
+```
+
+Then resolve the dependency once:
+
+```text
+lake update lean_vir
+```
+
+Use the same pinned revision when selecting an unreleased SDK artifact, as
+described under [Install The Browser SDK](#install-the-browser-sdk).
+
 ## Mark The Browser Surface
 
 Import `Vir` and mark JavaScript-callable declarations with `@[vir_export]`.
@@ -98,10 +117,18 @@ configuration.
 lake build :virSdk
 ```
 
-This installs release `v0.1.0` under `.lake/build/vir/sdk/`. The corresponding
-GitHub release must exist; for an unreleased revision, use a local archive or
-the commit fetch described below. The installer checks the SDK version,
-runtime ABI, non-empty source commit, and every manifest checksum. Set
+This installs the release matching the installed `lean_vir` package version
+under `.lake/build/vir/sdk/`. The corresponding GitHub release must exist; for
+an unreleased revision, select the exact pinned commit:
+
+```text
+VIR_SDK_COMMIT=<lean-vir-revision> lake build :virSdk
+```
+
+The commit fetch checks that the downloaded artifact was built from that exact
+revision. The installer also checks the SDK version, runtime ABI, non-empty
+source commit, and every manifest checksum. GitHub Actions artifact downloads
+require `GITHUB_TOKEN` or an authenticated `gh` CLI. Set
 `VIR_SDK_ARCHIVE=/path/to/lean-vir-sdk.tar.gz` to use a local or CI-provided
 archive without network access. Lake tracks the selected source and local
 archive contents when caching the facet.

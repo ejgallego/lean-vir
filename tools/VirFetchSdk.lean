@@ -13,6 +13,8 @@ namespace Vir.FetchSdk
 
 def sdkVersion : String := "0.1.0"
 
+def sdkRuntimeAbiVersion : Nat := 1
+
 structure Options where
   out : FilePath := "web/public/vendor/lean-vir"
   archive? : Option String := none
@@ -241,7 +243,7 @@ def verifyInstalledSdk
   if version != expectVersion then
     throw <| IO.userError s!"SDK version mismatch: expected {expectVersion}, got {version}"
   let abi ← jsonField manifest "runtimeAbiVersion" Json.getNat?
-  if abi != 1 then
+  if abi != sdkRuntimeAbiVersion then
     throw <| IO.userError s!"unsupported SDK runtime ABI version: {abi}"
   let actualCommit ← jsonField manifest "gitCommit" Json.getStr?
   if actualCommit.isEmpty then

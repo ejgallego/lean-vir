@@ -277,12 +277,12 @@ when comparing CI runs:
 ## SDK Releases
 
 Tags named `v<package.json version>` trigger `.github/workflows/release-sdk.yml`,
-which validates the tag, builds `lean-vir-sdk.tar.gz`, and uploads it to the
-matching GitHub release. Create the tag from the final merged commit so the
-archive manifest records the revision clients actually depend on. Before that
-tag exists, test consumers with `VIR_SDK_ARCHIVE` or the commit-artifact fetch
-path; the zero-argument `:virSdk` facet intentionally targets the tagged
-release.
+which validates the tag and ABI versions, builds `lean-vir-sdk.tar.gz`, imports
+the packaged SDK modules, and uploads it to the matching GitHub release. Create
+the tag from the final merged commit so the archive manifest records the
+revision clients actually depend on. Before that tag exists, test consumers
+with `VIR_SDK_ARCHIVE` or the commit-artifact fetch path; the zero-argument
+`:virSdk` facet intentionally targets the tagged release.
 
 ## CI Shape
 

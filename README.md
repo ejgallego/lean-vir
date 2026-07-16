@@ -4,16 +4,58 @@ Lean VIR runs selected [Lean 4](https://github.com/leanprover/lean4)
 declarations in the browser through Lean's real IR interpreter compiled to
 `wasm32-wasip1`.
 
-The primary workflow is:
+For downstream Lake packages, the preferred workflow is:
 
-1. write a Lean file;
-2. choose one or more declarations to export;
-3. generate a `.irpkg` package;
-4. load it in the browser package runner.
+1. add `lean_vir` as a pinned Lake dependency;
+2. mark browser exports with `@[vir_export]` and startup actions with
+   `@[vir_entry]`;
+3. build the module's `.irpkg` with its `:vir` facet and install the matching
+   browser SDK with `:virSdk`;
+4. load the package and call `runEntries()` from the browser host.
 
-The browser runner reads the embedded interface manifest and builds runnable
-controls automatically. For supported argument and result types, adding another
-browser entry point is just adding another Lean root name to the package command.
+See [Lake Facets And Lean Browser Entries](#lake-facets-and-lean-browser-entries)
+for the short form and [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) for
+the complete client workflow. The repository-local package runner remains the
+quickest way to explore one Lean file manually: it reads the embedded interface
+manifest and builds runnable controls automatically.
+
+## Lake Facets And Lean Browser Entries
+
+Pin `lean_vir` in the client `lakefile.lean`:
+
+```lean
+require lean_vir from git
+  "https://github.com/ejgallego/lean-vir" @ "<tag-or-commit>"
+```
+
+Then mark exports directly in Lean and build the containing module:
+
+```lean
+import Vir
+
+@[vir_export]
+def answer : Nat := 42
+
+@[vir_entry]
+def mount : Lean.Vir.Browser.DomM Unit := pure ()
+```
+
+```bash
+lake build +MySlides.Runtime:vir
+lake build :virSdk
+```
+
+The module facet writes the `.irpkg` and report under `.lake/build/vir/`; the
+package facet installs the versioned browser SDK. `VirRuntime.runEntries()`
+runs `@[vir_entry]` declarations in manifest order and skips each entry after
+it succeeds. See
+[docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
+Lean-authored [canvas slide example](examples/SlidesCanvas.lean), which is a
+real Lake target in this repository:
+
+```bash
+lake build +SlidesCanvas:vir
+```
 
 ## One Lean File To Browser
 
@@ -70,35 +112,6 @@ Inspect a package without starting the browser:
 ```bash
 npm run inspect:irpkg -- web/public/local-quickstart.irpkg
 npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
-```
-
-## Lake Facets And Lean Browser Entries
-
-Lake clients can mark exports directly in Lean and build the containing module:
-
-```lean
-@[vir_export]
-def answer : Nat := 42
-
-@[vir_entry]
-def mount : Lean.Vir.Browser.DomM Unit := pure ()
-```
-
-```bash
-lake build +MySlides.Runtime:vir
-lake build :virSdk
-```
-
-The module facet writes the `.irpkg` and report under `.lake/build/vir/`; the
-package facet installs the versioned browser SDK. `VirRuntime.runEntries()`
-runs `@[vir_entry]` declarations in manifest order and skips each entry after
-it succeeds. See
-[docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
-Lean-authored [canvas slide example](examples/SlidesCanvas.lean), which is a
-real Lake target in this repository:
-
-```bash
-lake build +SlidesCanvas:vir
 ```
 
 ## Calling Lean From JavaScript
@@ -176,7 +189,8 @@ the commit-artifact path.
 
 Tagged releases publish the same archive as a durable
 [GitHub Releases](https://github.com/ejgallego/lean-vir/releases) asset. The
-`:virSdk` facet defaults to `v0.1.0` once that release has been published;
+`:virSdk` facet defaults to the release matching the installed `lean_vir`
+package version once that release has been published;
 `vir_fetch_sdk --tag <tag>` selects a different release, while unreleased or
 commit-pinned clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 

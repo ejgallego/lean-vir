@@ -10,7 +10,9 @@ including `fixtures-basic.irpkg`, `demo-host.irpkg`, `pretty-printer.irpkg`,
 
 For calling packaged Lean declarations from JavaScript, see
 `docs/CALL_LEAN_FROM_JS.md`. For the config-driven path, see
-`docs/INTERFACE_PIPELINE.md`.
+`docs/INTERFACE_PIPELINE.md`. For marking declarations with `@[vir_export]` or
+`@[vir_entry]` and building their module through Lake, see
+`docs/LAKE_INTEGRATION.md`.
 
 ## Generate A Package
 
