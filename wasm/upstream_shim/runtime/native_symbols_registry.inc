@@ -72,17 +72,13 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("USize.decEq", "lean_usize_dec_eq", lean_usize_dec_eq___boxed) \
     X("USize.decLt", "lean_usize_dec_lt", lean_usize_dec_lt___boxed) \
     X("USize.decLe", "lean_usize_dec_le", lean_usize_dec_le___boxed) \
-    X("String.append", "lean_string_append", lean_string_append___boxed) \
-    X("String.Internal.append", "lean_string_append", lean_string_append___boxed) \
     X("String.ofList", "lean_string_mk", lean_string_mk___boxed) \
     X("String.toUTF8", "lean_string_to_utf8", lean_string_to_utf8___boxed) \
-    X("String.ofByteArray", "lean_string_from_utf8_unchecked", lean_string_from_utf8_unchecked___boxed) \
     X("String.hash", "lean_string_hash", lean_string_hash___boxed) \
     X("String.Internal.pushn", "lean_string_pushn", lean_string_pushn___boxed) \
     X("String.length", "lean_string_length", lean_string_length___boxed) \
     X("String.Internal.length", "lean_string_length", lean_string_length___boxed) \
     X("String.utf8ByteSize", "lean_string_utf8_byte_size", lean_string_utf8_byte_size___boxed) \
-    X("String.getUTF8Byte", "lean_string_get_byte_fast", lean_string_get_byte_fast___boxed) \
     X("String.Pos.set", "l_String_Pos_set", l_String_Pos_set___boxed) \
     X("String.Pos.Raw.set", "l_String_Pos_Raw_set", l_String_Pos_Raw_set___boxed) \
     X("String.set", "l_String_set", l_String_set___boxed) \
@@ -90,15 +86,11 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("String.Internal.posOf", "lean_string_posof", lean_string_posof___boxed) \
     X("String.Internal.offsetOfPos", "lean_string_offsetofpos", lean_string_offsetofpos___boxed) \
     X("String.Pos.Raw.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
-    X("String.Pos.next", "lean_string_utf8_next_fast", lean_string_utf8_next_fast___boxed) \
-    X("String.Pos.Raw.next'", "lean_string_utf8_next_fast", lean_string_utf8_next_fast___boxed) \
     X("String.Internal.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
     X("String.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
     X("String.Pos.Raw.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
     X("String.Pos.Raw.prev", "lean_string_utf8_prev", lean_string_utf8_prev___boxed) \
-    X("String.decodeChar", "lean_string_utf8_get_fast", lean_string_utf8_get_fast___boxed) \
     X("String.Pos.Raw.get", "lean_string_utf8_get", lean_string_utf8_get___boxed) \
-    X("String.Pos.Raw.get'", "lean_string_utf8_get_fast", lean_string_utf8_get_fast___boxed) \
     X("String.Internal.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
     X("String.Pos.Raw.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
     X("String.Pos.Raw.isValid", "lean_string_is_valid_pos", lean_string_is_valid_pos___boxed) \
@@ -106,7 +98,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("String.decEq", "lean_string_dec_eq", lean_string_dec_eq___boxed) \
     X("String.decidableLT", "lean_string_dec_lt", lean_string_dec_lt___boxed) \
     X("String.compare", "lean_string_compare", lean_string_compare___boxed) \
-    X("String.Slice.Pattern.Internal.memcmpStr", "lean_string_memcmp", lean_string_memcmp___boxed) \
     X("Substring.Raw.Internal.beq", "lean_substring_beq", lean_substring_beq___boxed) \
     X("Lean.Name.beq", "lean_name_eq", lean_name_eq___boxed) \
     X("UInt8.toNat", "lean_uint8_to_nat", lean_uint8_to_nat___boxed) \

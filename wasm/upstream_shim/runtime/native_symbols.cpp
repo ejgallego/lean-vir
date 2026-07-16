@@ -585,21 +585,9 @@ VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_eq, box_usize_predicate)
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_lt, box_usize_predicate)
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_le, box_usize_predicate)
 
-extern "C" lean_object * lean_string_append___boxed(lean_object * a, lean_object * b) {
-    lean_object * result = lean_string_append(a, b);
-    lean_dec(b);
-    return result;
-}
-
 VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(lean_string_mk)
 
 VIR_DEFINE_BORROWED_OBJECT_UNARY_WRAPPER(lean_string_to_utf8)
-
-extern "C" lean_object * lean_string_from_utf8_unchecked___boxed(lean_object * bytes, lean_object * proof) {
-    lean_object * result = lean_string_from_utf8_unchecked(bytes);
-    lean_dec(proof);
-    return result;
-}
 
 VIR_DEFINE_BORROWED_OBJECT_UINT64_UNARY_WRAPPER(lean_string_hash)
 
@@ -643,14 +631,6 @@ VIR_DEFINE_BORROWED_OBJECT_UNARY_WRAPPER(lean_string_length)
 
 VIR_DEFINE_BORROWED_OBJECT_UNARY_WRAPPER(lean_string_utf8_byte_size)
 
-extern "C" lean_object * lean_string_get_byte_fast___boxed(lean_object * s, lean_object * pos, lean_object * proof) {
-    uint8_t result = lean_string_get_byte_fast(s, pos);
-    lean_dec(s);
-    lean_dec(pos);
-    lean_dec(proof);
-    return lean_box(result);
-}
-
 VIR_DEFINE_BORROWED_OBJECT_BINARY_WRAPPER(lean_string_utf8_next)
 
 extern "C" lean_object * lean_string_posof___boxed(lean_object * s, lean_object * c) {
@@ -690,14 +670,6 @@ extern "C" lean_object * lean_string_offsetofpos___boxed(lean_object * s, lean_o
     return lean_box(offset);
 }
 
-extern "C" lean_object * lean_string_utf8_next_fast___boxed(lean_object * s, lean_object * pos, lean_object * proof) {
-    lean_object * result = lean_string_utf8_next_fast(s, pos);
-    lean_dec(s);
-    lean_dec(pos);
-    lean_dec(proof);
-    return result;
-}
-
 VIR_DEFINE_BORROWED_OBJECT_TERNARY_WRAPPER(lean_string_utf8_extract)
 
 VIR_DEFINE_BORROWED_OBJECT_BINARY_WRAPPER(lean_string_utf8_prev)
@@ -706,14 +678,6 @@ VIR_DEFINE_BORROWED_OBJECT_BINARY_WRAPPER(lean_string_utf8_prev)
 #undef VIR_DEFINE_BORROWED_OBJECT_BINARY_WRAPPER
 #undef VIR_DEFINE_BORROWED_OBJECT_TERNARY_WRAPPER
 #undef VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_UNARY_WRAPPER
-
-extern "C" lean_object * lean_string_utf8_get_fast___boxed(lean_object * s, lean_object * pos, lean_object * proof) {
-    uint32_t result = lean_string_utf8_get_fast(s, pos);
-    lean_dec(s);
-    lean_dec(pos);
-    lean_dec(proof);
-    return lean_box_uint32(result);
-}
 
 VIR_DEFINE_BORROWED_OBJECT_UINT32_BINARY_WRAPPER(lean_string_utf8_get)
 
@@ -751,25 +715,6 @@ extern "C" lean_object * lean_string_compare___boxed(lean_object * a, lean_objec
     lean_dec(a);
     lean_dec(b);
     return result;
-}
-
-extern "C" lean_object * lean_string_memcmp___boxed(
-    lean_object * lhs,
-    lean_object * rhs,
-    lean_object * lstart,
-    lean_object * rstart,
-    lean_object * len,
-    lean_object * h1,
-    lean_object * h2) {
-    uint8_t result = lean_string_memcmp(lhs, rhs, lstart, rstart, len);
-    lean_dec(lhs);
-    lean_dec(rhs);
-    lean_dec(lstart);
-    lean_dec(rstart);
-    lean_dec(len);
-    lean_dec(h1);
-    lean_dec(h2);
-    return lean_box(result);
 }
 
 extern "C" lean_object * lean_substring_beq___boxed(lean_object * lhs, lean_object * rhs) {
