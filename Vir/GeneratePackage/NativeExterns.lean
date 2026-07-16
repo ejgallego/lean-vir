@@ -646,7 +646,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.Internal.pushn,
     params := #[param 1 false .object, param 2 false .uint32, param 3 false .tobject],
     resultType := .object,
-    symbol := "lean_string_pushn"
+    symbol := "lean_string_pushn",
+    generateBoxedWrapper := true
   },
   {
     name := `String.length,
@@ -708,13 +709,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.Internal.posOf,
     params := #[param 1 false .object, param 2 false .uint32],
     resultType := .tobject,
-    symbol := "lean_string_posof"
+    symbol := "lean_string_posof",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Internal.offsetOfPos,
     params := #[param 1 false .object, param 2 false .tobject],
     resultType := .tobject,
-    symbol := "lean_string_offsetofpos"
+    symbol := "lean_string_offsetofpos",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Pos.Raw.next,
@@ -811,7 +814,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.Internal.contains,
     params := #[param 1 false .object, param 2 false .uint32],
     resultType := .uint8,
-    symbol := "lean_string_contains"
+    symbol := "lean_string_contains",
+    generateBoxedWrapper := true
   },
   {
     name := `String.decEq,
@@ -845,7 +849,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Substring.Raw.Internal.beq,
     params := #[param 1 false .object, param 2 false .object],
     resultType := .uint8,
-    symbol := "lean_substring_beq"
+    symbol := "lean_substring_beq",
+    generateBoxedWrapper := true
   },
   {
     name := `Lean.Name.beq,

@@ -51,6 +51,12 @@ The probe links these upstream runtime sources:
 It also links `src/util/name.cpp`, which is not runtime proper but is needed by
 the interpreter's name formatting and diagnostics.
 
+For Lean-defined native exports whose implementation closure is available in
+the pinned compiler output rather than the imported kernel environment, the
+probe also cross-compiles the corresponding stage0 sources. The current String
+support set is `Init/Prelude.c` plus `Init/Data/String/{Defs,Basic,Search,Substring}.c`.
+The final generated report lists this set explicitly.
+
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
 
@@ -83,6 +89,12 @@ not a fork of Lean. It is split by responsibility:
   as `ByteArray.extract` also contributes its compiler-generated raw body. The
   build cross-compiles that generated C and links it statically into the WASI
   module.
+- `scripts/build-upstream-probe.sh` prelinks local native exceptions, the
+  generated wrapper object, and pinned stage0 support into one relocatable
+  native-support object. Duplicate-symbol tolerance is confined to this
+  prelink: local exceptions take precedence over upstream support, and generated
+  adapters take precedence over duplicate stage0 adapters. An `llvm-nm` audit
+  rejects collisions outside the local provider symbols and generated object.
 - `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`,
   `runtime/runtime_value_stubs.cpp`, and `runtime/io_stubs.cpp` own the
   WASI/platform, initializer, value-helper, and demo IO providers. Local raw
@@ -140,8 +152,9 @@ The build compiles stable sources into cached objects under
 `web/public/*.irpkg` package without recompiling or relinking the WASM artifact.
 Compiler-generated native wrappers and their registry fragment live under
 `build/upstream-probe/generated`; they are build artifacts and are not checked
-into Git. The artifact is relinked only when stable or generated objects, link
-flags, the Lean source commit, or the generated runtime overlays change.
+into Git. The relocatable native-support bundle lives in the object cache. The
+artifact is relinked only when stable or generated objects, link flags, the
+Lean source commit, or the generated runtime overlays change.
 
 ## Native Boxed Wrappers
 
@@ -155,14 +168,19 @@ VIR keeps the final WASI module statically linked. Standard adapters can be
 marked with `generateBoxedWrapper := true` in the native extern table; the
 build then recompiles those imported declarations and emits their
 compiler-generated boxed wrappers together with any selected Lean-defined raw
-body they require. The native extern table is the source of truth for the
-current selection; `npm run inspect:native-wrappers` reports it without
-duplicating an evolving declaration list here. Wrappers that implement
-additional behavior or deliberate ownership policy remain explicit in
-`runtime/native_symbols.cpp`. When VIR substitutes a local raw implementation
-for an unavailable runtime service or WASI policy, that implementation belongs
-in the relevant provider file and its boxed adapter is still generated whenever
-the standard compiler output is correct.
+body available to the generator. If an exported Lean implementation depends on
+compiler-generated imported declarations that are present only in compiled
+library output, the probe links the pinned upstream-generated support module
+instead. This is how the `String.Internal` search/position operations and
+`Substring.Raw.Internal.beq` use their normal compiler wrappers and upstream
+raw implementations without copying either into the shim. The native extern
+table remains the source of truth for wrapper selection;
+`npm run inspect:native-wrappers` reports it without duplicating the full list
+here. Wrappers that implement additional behavior or deliberate ownership
+policy remain explicit in `runtime/native_symbols.cpp`. When VIR substitutes a
+local raw implementation for an unavailable runtime service or WASI policy,
+that implementation belongs in the relevant provider file and its boxed
+adapter is still generated whenever the standard compiler output is correct.
 
 `npm run check:native-wrappers` rejects ordinary handwritten direct adapters.
 The intentional ownership exceptions are the borrowed array getters

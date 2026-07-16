@@ -13,9 +13,4 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("Array.ugetBorrowed", "lean_array_uget_borrowed", lean_array_uget_borrowed___boxed) \
     X("Array.getInternalBorrowed", "lean_array_fget_borrowed", lean_array_fget_borrowed___boxed) \
     X("Array.get!InternalBorrowed", "lean_array_get_borrowed", lean_array_get_borrowed___boxed) \
-    X_CONST("ByteArray.empty", "l_ByteArray_empty", &l_ByteArray_empty) \
-    X("String.Internal.pushn", "lean_string_pushn", lean_string_pushn___boxed) \
-    X("String.Internal.posOf", "lean_string_posof", lean_string_posof___boxed) \
-    X("String.Internal.offsetOfPos", "lean_string_offsetofpos", lean_string_offsetofpos___boxed) \
-    X("String.Internal.contains", "lean_string_contains", lean_string_contains___boxed) \
-    X("Substring.Raw.Internal.beq", "lean_substring_beq", lean_substring_beq___boxed)
+    X_CONST("ByteArray.empty", "l_ByteArray_empty", &l_ByteArray_empty)

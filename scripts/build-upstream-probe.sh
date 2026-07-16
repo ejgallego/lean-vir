@@ -33,6 +33,18 @@ else
   exit 1
 fi
 
+wasm_ld="${WASM_LD:-$(command -v wasm-ld || true)}"
+if [ -z "$wasm_ld" ]; then
+  echo "error: wasm-ld not found. Run npm run install:wasi or set WASM_LD." >&2
+  exit 1
+fi
+
+llvm_nm="${LLVM_NM:-$(command -v llvm-nm || true)}"
+if [ -z "$llvm_nm" ]; then
+  echo "error: llvm-nm not found. Run npm run install:wasi or set LLVM_NM." >&2
+  exit 1
+fi
+
 lean_prefix="${LEAN_PREFIX:-$(lean --print-prefix)}"
 target="${WASI_TARGET:-wasm32-wasip1}"
 wasm_opt_level="${VIR_WASM_OPT_LEVEL:--O3}"
@@ -176,12 +188,20 @@ support_sources=(
   "$src/src/util/name.cpp"
 )
 
-generated_sources=(
-  "$generated_native_wrappers"
+lean_support_sources=(
+  "$src/stage0/stdlib/Init/Prelude.c"
+  "$src/stage0/stdlib/Init/Data/String/Defs.c"
+  "$src/stage0/stdlib/Init/Data/String/Basic.c"
+  "$src/stage0/stdlib/Init/Data/String/Search.c"
+  "$src/stage0/stdlib/Init/Data/String/Substring.c"
+)
+
+local_native_support_sources=(
+  "wasm/upstream_shim/runtime/lean_object_constructors.cpp"
+  "wasm/upstream_shim/runtime/native_symbols.cpp"
 )
 
 shim_sources=(
-  "wasm/upstream_shim/runtime/lean_object_constructors.cpp"
   "wasm/upstream_shim/abi/resource_abi.cpp"
   "wasm/upstream_shim/interpreter/interpreter_bridge.cpp"
   "wasm/upstream_shim/abi/call_abi.cpp"
@@ -190,7 +210,6 @@ shim_sources=(
   "wasm/upstream_shim/abi/object_expr_abi.cpp"
   "wasm/upstream_shim/abi/closure_abi.cpp"
   "wasm/upstream_shim/package/host_import_trampolines.cpp"
-  "wasm/upstream_shim/runtime/native_symbols.cpp"
   "wasm/upstream_shim/runtime/native_symbol_lookup.cpp"
   "wasm/upstream_shim/runtime/runtime_environment_stubs.cpp"
   "wasm/upstream_shim/package/package_init_bridge.cpp"
@@ -276,10 +295,14 @@ compile_one() {
     done
   fi
   if [ "$needs_compile" = "1" ]; then
+    local language_flags=()
+    if [[ "$source" == *.c ]]; then
+      language_flags=(-x c++)
+    fi
     mkdir -p "$(dirname "$object")"
     echo "compile $source"
     compiled_count=$((compiled_count + 1))
-    "$cxx" "${common_flags[@]}" -c "$source" -o "$object"
+    "$cxx" "${common_flags[@]}" "${language_flags[@]}" -c "$source" -o "$object"
   fi
 }
 
@@ -289,7 +312,7 @@ upstream_obj="$obj_dir/ir_interpreter.o"
 object_files=("$upstream_obj")
 compile_one "$upstream" "$upstream_obj"
 
-for source in "${runtime_sources[@]}" "${support_sources[@]}" "${generated_sources[@]}" "${shim_sources[@]}"; do
+for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]}"; do
   object="$(object_for_source "$source")"
   if [ "$source" = "wasm/upstream_shim/runtime/native_symbol_lookup.cpp" ]; then
     compile_one "$source" "$object" "${shim_deps[@]}" "${native_symbol_lookup_deps[@]}"
@@ -300,6 +323,76 @@ for source in "${runtime_sources[@]}" "${support_sources[@]}" "${generated_sourc
   fi
   object_files+=("$object")
 done
+
+native_support_objects=()
+for source in "${local_native_support_sources[@]}" "$generated_native_wrappers" "${lean_support_sources[@]}"; do
+  object="$(object_for_source "$source")"
+  if [[ "$source" == wasm/upstream_shim/* ]]; then
+    compile_one "$source" "$object" "${shim_deps[@]}"
+  else
+    compile_one "$source" "$object"
+  fi
+  native_support_objects+=("$object")
+done
+
+native_support_duplicate_symbols="$obj_dir/native-support-duplicate-symbols.txt"
+native_support_allowed_duplicates="$obj_dir/native-support-allowed-duplicates.txt"
+native_support_unexpected_duplicates="$obj_dir/native-support-unexpected-duplicates.txt"
+{
+  printf '%s\n' l_ByteArray_empty lean_name_mk_numeral lean_name_mk_string
+  "$llvm_nm" --format=posix --defined-only --extern-only \
+    "$(object_for_source "$generated_native_wrappers")" | awk 'NF >= 2 { print $1 }'
+} | sort -u > "$native_support_allowed_duplicates"
+{
+  for object in "${native_support_objects[@]}"; do
+    "$llvm_nm" --format=posix --defined-only --extern-only "$object"
+  done
+} | awk 'NF >= 2 { print $1 }' | sort | uniq -d > "$native_support_duplicate_symbols"
+comm -23 "$native_support_duplicate_symbols" "$native_support_allowed_duplicates" \
+  > "$native_support_unexpected_duplicates"
+if [ -s "$native_support_unexpected_duplicates" ]; then
+  echo "error: unexpected duplicate symbols in native support bundle:" >&2
+  sed 's/^/  /' "$native_support_unexpected_duplicates" >&2
+  exit 1
+fi
+
+native_support_bundle="$obj_dir/native_support.o"
+native_support_link_stamp="$obj_dir/native-support-link.stamp"
+native_support_link_stamp_tmp="$native_support_link_stamp.tmp"
+{
+  printf 'wasm_ld=%s\n' "$wasm_ld"
+  printf 'link_flag=%s\n' --relocatable --allow-undefined --allow-multiple-definition
+  printf 'input=%s\n' "${native_support_objects[@]}"
+} > "$native_support_link_stamp_tmp"
+if ! cmp -s "$native_support_link_stamp_tmp" "$native_support_link_stamp"; then
+  mv "$native_support_link_stamp_tmp" "$native_support_link_stamp"
+else
+  rm "$native_support_link_stamp_tmp"
+fi
+
+needs_native_support_link=0
+if [ ! -f "$native_support_bundle" ] || [ "$native_support_link_stamp" -nt "$native_support_bundle" ]; then
+  needs_native_support_link=1
+else
+  for object in "${native_support_objects[@]}"; do
+    if [ "$object" -nt "$native_support_bundle" ]; then
+      needs_native_support_link=1
+      break
+    fi
+  done
+fi
+if [ "$needs_native_support_link" = "1" ]; then
+  echo "link $native_support_bundle"
+  # Keep duplicate tolerance inside this bundle. Local exceptions come first,
+  # then generated wrappers, then pinned stage0 modules that provide raw bodies.
+  "$wasm_ld" \
+    --relocatable \
+    --allow-undefined \
+    --allow-multiple-definition \
+    -o "$native_support_bundle" \
+    "${native_support_objects[@]}"
+fi
+object_files+=("$native_support_bundle")
 compile_seconds=$((SECONDS - compile_start))
 printf '%s\n' "${object_files[@]}" > "$out/objects.txt"
 
@@ -347,6 +440,7 @@ link_stamp_tmp="$link_stamp.tmp"
   printf 'link_flag=%s\n' "${link_flags[@]}"
   printf 'export=%s\n' "${exports[@]}"
   printf 'allowed_undefined=%s\n' "$(cat "$allowed_undefined")"
+  printf 'input=%s\n' "${link_objects[@]}"
 } > "$link_stamp_tmp"
 if ! cmp -s "$link_stamp_tmp" "$link_stamp"; then
   mv "$link_stamp_tmp" "$link_stamp"
@@ -475,7 +569,10 @@ env_import_count="$(wc -l < "$env_imports" | tr -d ' ')"
 wasi_import_count="$(wc -l < "$wasi_imports" | tr -d ' ')"
 runtime_source_count="${#runtime_sources[@]}"
 support_source_count="${#support_sources[@]}"
-generated_source_count="${#generated_sources[@]}"
+generated_source_count=1
+lean_generated_support_source_count="${#lean_support_sources[@]}"
+local_native_support_source_count="${#local_native_support_sources[@]}"
+native_support_duplicate_count="$(wc -l < "$native_support_duplicate_symbols" | tr -d ' ')"
 shim_source_count="${#shim_sources[@]}"
 report_total_seconds=$((SECONDS - script_start))
 report_start=$SECONDS
@@ -496,6 +593,8 @@ report_start=$SECONDS
   echo "- Requested WASM profile: \`$wasm_profile\`"
   echo "- Browser WASM output profile: \`$wasm_output_profile\`"
   echo "- Compiler: \`$cxx\`"
+  echo "- Relocatable linker: \`$wasm_ld\`"
+  echo "- Native support symbol inspector: \`$llvm_nm\`"
   echo "- Initial wasm memory: $wasm_initial_memory bytes"
   echo "- Wasm stack size: $wasm_stack_size bytes"
   echo "- Generated config overlay: \`$overlay_include/lean/config.h\`"
@@ -503,6 +602,9 @@ report_start=$SECONDS
   echo "- Real Lean runtime sources linked: $runtime_source_count"
   echo "- Lean support sources linked: $support_source_count"
   echo "- Compiler-generated native wrapper sources linked: $generated_source_count"
+  echo "- Pinned compiler-generated Lean support sources linked: $lean_generated_support_source_count"
+  echo "- Local native support sources linked: $local_native_support_source_count"
+  echo "- Audited duplicate native support symbols: $native_support_duplicate_count"
   echo "- Local WASI shim sources linked: $shim_source_count"
   echo "- Generated browser IR packages:"
   for package in "${browser_packages[@]}"; do
@@ -547,11 +649,27 @@ report_start=$SECONDS
     printf -- '- `%s`\n' "$path"
   done
   echo
-  echo "## Linked Compiler-Generated Sources"
+  echo "## Linked Compiler-Generated Native Wrapper Sources"
   echo
-  for path in "${generated_sources[@]}"; do
+  printf -- '- `%s`\n' "$generated_native_wrappers"
+  echo
+  echo "## Linked Pinned Compiler-Generated Lean Support Sources"
+  echo
+  for path in "${lean_support_sources[@]}"; do
     printf -- '- `%s`\n' "$path"
   done
+  echo
+  echo "## Linked Local Native Support Sources"
+  echo
+  for path in "${local_native_support_sources[@]}"; do
+    printf -- '- `%s`\n' "$path"
+  done
+  echo
+  echo "## Audited Native Support Duplicate Symbols"
+  echo
+  while IFS= read -r sym; do
+    printf -- '- `%s`\n' "$sym"
+  done < "$native_support_duplicate_symbols"
   echo
   echo "## Linked Local Shim Sources"
   echo
@@ -632,7 +750,9 @@ report_start=$SECONDS
   echo "by the runtime object-call path."
   echo "\`wasm/upstream_shim/runtime/native_symbols.cpp\` supplies shim-specific native"
   echo "extern wrappers. \`$generated_native_wrappers\` supplies standard boxed adapters"
-  echo "emitted by Lean's compiler. \`runtime/native_symbol_lookup.cpp\` supplies the registries,"
+  echo "emitted by Lean's compiler. Pinned stage0 sources supply selected Lean-defined raw"
+  echo "exports. These inputs are prelinked with audited, bundle-local duplicate handling."
+  echo "\`runtime/native_symbol_lookup.cpp\` supplies the registries,"
   echo "include, restricted \`dlsym\` lookup, symbol-stem lookup, and C++ exception"
   echo "stubs. \`runtime/runtime_environment_stubs.cpp\`, \`package/package_init_bridge.cpp\`,"
   echo "\`runtime/runtime_value_stubs.cpp\`, and \`runtime/io_stubs.cpp\` contain the remaining"

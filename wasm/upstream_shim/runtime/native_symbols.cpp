@@ -7,8 +7,6 @@ Author: Emilio J. Gallego Arias
 #include "package/decl_provider.h"
 
 #include <stddef.h>
-#include <stdint.h>
-#include <string.h>
 
 #include <algorithm>
 #include <initializer_list>
@@ -30,16 +28,6 @@ Author: Emilio J. Gallego Arias
 
 extern "C" {
 lean_object * l_ByteArray_empty = nullptr;
-uint8_t lean_string_is_valid_pos(lean_object * str, lean_object * pos);
-}
-
-static size_t nat_to_size_or_max(lean_object * n) {
-    return lean_is_scalar(n) ? lean_unbox(n) : SIZE_MAX;
-}
-
-static size_t substring_repaired_pos(lean_object * s, lean_object * p) {
-    size_t end = lean_string_size(s) - 1;
-    return lean_string_is_valid_pos(s, p) ? nat_to_size_or_max(p) : end;
 }
 
 extern "C" lean_object * lean_array_mk___boxed(lean_object * type, lean_object * list) {
@@ -106,103 +94,6 @@ extern "C" lean_object * lean_array_get_borrowed___boxed(lean_object * type, lea
     lean_dec(array);
     lean_dec(index);
     return result;
-}
-
-extern "C" lean_object * lean_string_pushn___boxed(lean_object * s, lean_object * c, lean_object * n) {
-    uint32_t ch = lean_unbox_uint32(c);
-    size_t count = nat_to_size_or_max(n);
-    lean_dec(c);
-    lean_dec(n);
-    if (count == SIZE_MAX) {
-        lean_dec(s);
-        __builtin_trap();
-    }
-    for (size_t i = 0; i < count; i++) {
-        s = lean_string_push(s, ch);
-    }
-    return s;
-}
-
-extern "C" lean_object * lean_string_posof___boxed(lean_object * s, lean_object * c) {
-    uint32_t needle = lean_unbox_uint32(c);
-    lean_dec(c);
-
-    lean_object * pos = lean_box(0);
-    while (!lean_string_utf8_at_end(s, pos)) {
-        if (lean_string_utf8_get(s, pos) == needle) {
-            lean_dec(s);
-            return pos;
-        }
-        lean_object * next = lean_string_utf8_next(s, pos);
-        lean_dec(pos);
-        pos = next;
-    }
-
-    lean_dec(s);
-    return pos;
-}
-
-extern "C" lean_object * lean_string_offsetofpos___boxed(lean_object * s, lean_object * pos) {
-    size_t target = nat_to_size_or_max(pos);
-    lean_object * current = lean_box(0);
-    size_t offset = 0;
-
-    while (nat_to_size_or_max(current) < target && !lean_string_utf8_at_end(s, current)) {
-        lean_object * next = lean_string_utf8_next(s, current);
-        lean_dec(current);
-        current = next;
-        offset++;
-    }
-
-    lean_dec(current);
-    lean_dec(pos);
-    lean_dec(s);
-    return lean_box(offset);
-}
-
-extern "C" lean_object * lean_string_contains___boxed(lean_object * s, lean_object * c) {
-    uint32_t needle = lean_unbox_uint32(c);
-    lean_dec(c);
-    uint8_t found = 0;
-    lean_object * pos = lean_box(0);
-    while (!lean_string_utf8_at_end(s, pos)) {
-        if (lean_string_utf8_get(s, pos) == needle) {
-            found = 1;
-            break;
-        }
-        lean_object * next = lean_string_utf8_next(s, pos);
-        lean_dec(pos);
-        pos = next;
-    }
-    lean_dec(pos);
-    lean_dec(s);
-    return lean_box(found);
-}
-
-extern "C" lean_object * lean_substring_beq___boxed(lean_object * lhs, lean_object * rhs) {
-    lean_object * lhs_str = lean_ctor_get(lhs, 0);
-    lean_object * lhs_start_pos = lean_ctor_get(lhs, 1);
-    lean_object * lhs_stop_pos = lean_ctor_get(lhs, 2);
-    lean_object * rhs_str = lean_ctor_get(rhs, 0);
-    lean_object * rhs_start_pos = lean_ctor_get(rhs, 1);
-    lean_object * rhs_stop_pos = lean_ctor_get(rhs, 2);
-
-    size_t lhs_start = substring_repaired_pos(lhs_str, lhs_start_pos);
-    size_t lhs_stop = substring_repaired_pos(lhs_str, lhs_stop_pos);
-    size_t rhs_start = substring_repaired_pos(rhs_str, rhs_start_pos);
-    size_t rhs_stop = substring_repaired_pos(rhs_str, rhs_stop_pos);
-    size_t lhs_size = lhs_stop >= lhs_start ? lhs_stop - lhs_start : 0;
-    size_t rhs_size = rhs_stop >= rhs_start ? rhs_stop - rhs_start : 0;
-
-    uint8_t result = 0;
-    if (lhs_size == rhs_size &&
-        lhs_start + lhs_size <= lean_string_size(lhs_str) - 1 &&
-        rhs_start + rhs_size <= lean_string_size(rhs_str) - 1) {
-        result = memcmp(lean_string_cstr(lhs_str) + lhs_start, lean_string_cstr(rhs_str) + rhs_start, lhs_size) == 0;
-    }
-    lean_dec(lhs);
-    lean_dec(rhs);
-    return lean_box(result);
 }
 
 extern "C" lean_object * lean_is_reserved_name___boxed(lean_object * env, lean_object * n) {
