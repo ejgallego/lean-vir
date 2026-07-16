@@ -8,23 +8,14 @@ Compiler-generated wrappers are registered by a build-local generated include.
 #define VIR_NATIVE_SYMBOLS(X, X_CONST) \
     X("_private.Lean.Environment.0.Lean.Environment.isReservedName", "lean_is_reserved_name", lean_is_reserved_name___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.evalCheckMeta", "lean_eval_check_meta", lean_eval_check_meta___boxed) \
-    X("Array.mkEmpty", "lean_array_mk_empty", lean_array_mk_empty___boxed) \
-    X("Array.emptyWithCapacity", "lean_array_mk_empty", lean_array_mk_empty___boxed) \
     X("Array.mk", "lean_array_mk", lean_array_mk___boxed) \
     X("Array.toList", "lean_array_to_list", lean_array_to_list___boxed) \
     X("Array.ugetBorrowed", "lean_array_uget_borrowed", lean_array_uget_borrowed___boxed) \
     X("Array.getInternalBorrowed", "lean_array_fget_borrowed", lean_array_fget_borrowed___boxed) \
     X("Array.get!InternalBorrowed", "lean_array_get_borrowed", lean_array_get_borrowed___boxed) \
     X_CONST("ByteArray.empty", "l_ByteArray_empty", &l_ByteArray_empty) \
-    X("ByteArray.extract", "l_ByteArray_extract", l_ByteArray_extract___boxed) \
-    X("USize.ofNatLT", "l_USize_ofNatLT", l_USize_ofNatLT___boxed) \
     X("String.Internal.pushn", "lean_string_pushn", lean_string_pushn___boxed) \
-    X("String.Pos.set", "l_String_Pos_set", l_String_Pos_set___boxed) \
-    X("String.Pos.Raw.set", "l_String_Pos_Raw_set", l_String_Pos_Raw_set___boxed) \
-    X("String.set", "l_String_set", l_String_set___boxed) \
     X("String.Internal.posOf", "lean_string_posof", lean_string_posof___boxed) \
     X("String.Internal.offsetOfPos", "lean_string_offsetofpos", lean_string_offsetofpos___boxed) \
     X("String.Internal.contains", "lean_string_contains", lean_string_contains___boxed) \
-    X("Substring.Raw.Internal.beq", "lean_substring_beq", lean_substring_beq___boxed) \
-    X("UInt32.ofNatLT", "l_UInt32_ofNatLT", l_UInt32_ofNatLT___boxed) \
-    X("UInt64.ofNatLT", "l_UInt64_ofNatLT", l_UInt64_ofNatLT___boxed)
+    X("Substring.Raw.Internal.beq", "lean_substring_beq", lean_substring_beq___boxed)

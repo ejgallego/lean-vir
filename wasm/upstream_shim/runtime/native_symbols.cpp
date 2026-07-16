@@ -30,14 +30,6 @@ Author: Emilio J. Gallego Arias
 
 extern "C" {
 lean_object * l_ByteArray_empty = nullptr;
-lean_object * lean_byte_array_copy_slice(
-    lean_object * src,
-    lean_object * src_off,
-    lean_object * dest,
-    lean_object * dest_off,
-    lean_object * len,
-    bool exact);
-lean_object * lean_string_utf8_set(lean_object * str, lean_object * pos, uint32_t c);
 uint8_t lean_string_is_valid_pos(lean_object * str, lean_object * pos);
 }
 
@@ -48,13 +40,6 @@ static size_t nat_to_size_or_max(lean_object * n) {
 static size_t substring_repaired_pos(lean_object * s, lean_object * p) {
     size_t end = lean_string_size(s) - 1;
     return lean_string_is_valid_pos(s, p) ? nat_to_size_or_max(p) : end;
-}
-
-extern "C" lean_object * lean_array_mk_empty___boxed(lean_object * type, lean_object * capacity) {
-    lean_dec(type);
-    lean_object * result = lean_mk_empty_array_with_capacity(capacity);
-    lean_dec(capacity);
-    return result;
 }
 
 extern "C" lean_object * lean_array_mk___boxed(lean_object * type, lean_object * list) {
@@ -121,50 +106,6 @@ extern "C" lean_object * lean_array_get_borrowed___boxed(lean_object * type, lea
     lean_dec(array);
     lean_dec(index);
     return result;
-}
-
-extern "C" lean_object * l_ByteArray_extract___boxed(lean_object * array, lean_object * start, lean_object * stop) {
-    lean_object * len = lean_nat_sub(stop, start);
-    lean_object * result = lean_byte_array_copy_slice(
-        array,
-        start,
-        lean_mk_empty_byte_array(lean_box(0)),
-        lean_box(0),
-        len,
-        true);
-    lean_dec(array);
-    lean_dec(start);
-    lean_dec(stop);
-    lean_dec(len);
-    return result;
-}
-
-extern "C" lean_object * l_USize_ofNatLT___boxed(lean_object * a, lean_object * proof) {
-    size_t result = lean_usize_of_nat(a);
-    lean_dec(a);
-    lean_dec(proof);
-    return lean_box_usize(result);
-}
-
-extern "C" lean_object * l_String_Pos_set___boxed(lean_object * s, lean_object * pos, lean_object * c, lean_object * proof) {
-    uint32_t ch = lean_unbox_uint32(c);
-    lean_dec(c);
-    lean_object * result = lean_string_utf8_set(s, pos, ch);
-    lean_dec(pos);
-    lean_dec(proof);
-    return result;
-}
-
-extern "C" lean_object * l_String_Pos_Raw_set___boxed(lean_object * s, lean_object * pos, lean_object * c) {
-    uint32_t ch = lean_unbox_uint32(c);
-    lean_dec(c);
-    lean_object * result = lean_string_utf8_set(s, pos, ch);
-    lean_dec(pos);
-    return result;
-}
-
-extern "C" lean_object * l_String_set___boxed(lean_object * s, lean_object * pos, lean_object * c) {
-    return l_String_Pos_Raw_set___boxed(s, pos, c);
 }
 
 extern "C" lean_object * lean_string_pushn___boxed(lean_object * s, lean_object * c, lean_object * n) {
@@ -262,20 +203,6 @@ extern "C" lean_object * lean_substring_beq___boxed(lean_object * lhs, lean_obje
     lean_dec(lhs);
     lean_dec(rhs);
     return lean_box(result);
-}
-
-extern "C" lean_object * l_UInt32_ofNatLT___boxed(lean_object * a, lean_object * proof) {
-    uint32_t result = lean_uint32_of_nat(a);
-    lean_dec(a);
-    lean_dec(proof);
-    return lean_box_uint32(result);
-}
-
-extern "C" lean_object * l_UInt64_ofNatLT___boxed(lean_object * a, lean_object * proof) {
-    uint64_t result = lean_uint64_of_nat(a);
-    lean_dec(a);
-    lean_dec(proof);
-    return lean_box_uint64(result);
 }
 
 extern "C" lean_object * lean_is_reserved_name___boxed(lean_object * env, lean_object * n) {

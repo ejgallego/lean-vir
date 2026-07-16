@@ -75,11 +75,14 @@ not a fork of Lean. It is split by responsibility:
 - `runtime/native_symbol_lookup.cpp` owns the generated native registry include,
   restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
   stubs.
-- `tools/GenerateNativeWrappers.lean` recompiles native externs marked with
-  `generateBoxedWrapper` in `Vir/GeneratePackage/NativeExterns.lean`, selects
-  their `_boxed` LCNF declarations, and emits their C definitions and registry
-  entries through Lean's standard compiler pipeline. The build cross-compiles
-  that generated C and links it statically into the WASI module.
+- `tools/GenerateNativeWrappers.lean` recompiles declarations marked with
+  `generateBoxedWrapper` in `Vir/GeneratePackage/NativeExterns.lean` and emits
+  their selected declaration bodies, `_boxed` LCNF declarations, and registry
+  entries through Lean's standard compiler pipeline. Most selected declarations
+  need only an extern prototype plus the boxed adapter; Lean-defined support such
+  as `ByteArray.extract` also contributes its compiler-generated raw body. The
+  build cross-compiles that generated C and links it statically into the WASI
+  module.
 - `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`,
   `runtime/runtime_value_stubs.cpp`, and `runtime/io_stubs.cpp` own the
   WASI/platform, initializer, value-helper, and demo IO providers. Local raw
@@ -150,10 +153,11 @@ inferred by the normal LCNF passes before calling the raw extern symbol.
 
 VIR keeps the final WASI module statically linked. Standard adapters can be
 marked with `generateBoxedWrapper := true` in the native extern table; the
-build then recompiles those imported extern declarations and emits only their
-compiler-generated boxed wrappers. The native extern table is the source of
-truth for the current selection; `npm run inspect:native-wrappers` reports it
-without duplicating an evolving declaration list here. Wrappers that implement
+build then recompiles those imported declarations and emits their
+compiler-generated boxed wrappers together with any selected Lean-defined raw
+body they require. The native extern table is the source of truth for the
+current selection; `npm run inspect:native-wrappers` reports it without
+duplicating an evolving declaration list here. Wrappers that implement
 additional behavior or deliberate ownership policy remain explicit in
 `runtime/native_symbols.cpp`. When VIR substitutes a local raw implementation
 for an unavailable runtime service or WASI policy, that implementation belongs

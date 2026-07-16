@@ -73,10 +73,12 @@ npm run check:native-wrappers
 
 Set `generateBoxedWrapper := true` on a native extern when the normal Lean
 compiler-generated boxed adapter is sufficient. `npm run probe:upstream`
-generates its C source and registry fragment under `build/upstream-probe/` and
-links the resulting object statically. Keep wrappers with extra control flow or
-ownership adaptation in `runtime/native_symbols.cpp`. Put local raw substitutes
-for unavailable runtime services or WASI policy in the focused runtime provider
+generates the selected declaration bodies, boxed adapters, and registry fragment
+under `build/upstream-probe/`, then links the resulting object statically. This
+includes compiler-generated raw bodies for selected Lean-defined support such as
+`ByteArray.extract`. Keep wrappers with extra control flow or ownership
+adaptation in `runtime/native_symbols.cpp`. Put local raw substitutes for
+unavailable runtime services or WASI policy in the focused runtime provider
 files, and continue to generate their boxed adapters when the normal compiler
 output is sufficient.
 

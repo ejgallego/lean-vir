@@ -309,13 +309,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.mkEmpty,
     params := #[param 1 false .erased, param 2 true .tobject],
     resultType := .object,
-    symbol := "lean_array_mk_empty"
+    symbol := "lean_array_mk_empty",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.emptyWithCapacity,
     params := #[param 1 false .erased, param 2 true .tobject],
     resultType := .object,
-    symbol := "lean_array_mk_empty"
+    symbol := "lean_array_mk_empty",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.mk,
@@ -483,7 +485,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `ByteArray.extract,
     params := #[param 1 true .object, param 2 false .tobject, param 3 true .tobject],
     resultType := .object,
-    symbol := "l_ByteArray_extract"
+    symbol := "l_ByteArray_extract",
+    generateBoxedWrapper := true
   },
   {
     name := `ByteArray.size,
@@ -510,7 +513,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `USize.ofNatLT,
     params := #[param 1 true .tobject, param 2 false .erased],
     resultType := .usize,
-    symbol := "l_USize_ofNatLT"
+    symbol := "l_USize_ofNatLT",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.add,
@@ -676,19 +680,22 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.Pos.set,
     params := #[param 1 false .object, param 2 false .tobject, param 3 false .uint32, param 4 false .erased],
     resultType := .object,
-    symbol := "l_String_Pos_set"
+    symbol := "l_String_Pos_set",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Pos.Raw.set,
     params := #[param 1 false .object, param 2 true .tobject, param 3 false .uint32],
     resultType := .object,
-    symbol := "l_String_Pos_Raw_set"
+    symbol := "l_String_Pos_Raw_set",
+    generateBoxedWrapper := true
   },
   {
     name := `String.set,
     params := #[param 1 false .object, param 2 true .tobject, param 3 false .uint32],
     resultType := .object,
-    symbol := "l_String_set"
+    symbol := "l_String_set",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Internal.next,
@@ -1096,7 +1103,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `UInt32.ofNatLT,
     params := #[param 1 true .tobject, param 2 false .erased],
     resultType := .uint32,
-    symbol := "l_UInt32_ofNatLT"
+    symbol := "l_UInt32_ofNatLT",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.toNat,
@@ -1249,7 +1257,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `UInt64.ofNatLT,
     params := #[param 1 true .tobject, param 2 false .erased],
     resultType := .uint64,
-    symbol := "l_UInt64_ofNatLT"
+    symbol := "l_UInt64_ofNatLT",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.toNat,
