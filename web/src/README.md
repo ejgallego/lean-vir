@@ -38,6 +38,8 @@ unrelated responsibilities.
   roots, host-binding lookup, and host-binding disposal.
 - `runtime/object-abi.js`: object ABI support checks, layout planning, scalar
   field packing, and unpacking helpers used by the object-value runtime.
+- `runtime/object-abi-exports.js`: shared object ABI export-name manifest used
+  by runtime availability checks and Wasm linker tooling.
 - `runtime/vir-value-normalizers.js`: JavaScript input normalization for the
   object ABI lowering path.
 - `runtime/interface-manifest.js`: interface manifest validation, diagnostics,

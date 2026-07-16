@@ -86,6 +86,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/vir-codec.js` | Binary reader/writer and interface type descriptor codec. |
 | `runtime/host-state.js` | Host import dispatch state, externref roots, host-binding lookup, and disposal. |
 | `runtime/object-abi.js` | Object ABI support checks, layout planning, scalar packing, and unpacking helpers. |
+| `runtime/object-abi-exports.js` | Shared object ABI export-name manifest used by runtime checks and Wasm linker tooling. |
 | `runtime/vir-value-normalizers.js` | Input normalization helpers used by object ABI lowering. |
 | `vir-host-bindings.js` | Public common/browser host binding factories and stable re-exports. |
 | `host-resource.js` | Opaque host-resource objects and externref root tables. |

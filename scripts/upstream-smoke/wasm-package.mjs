@@ -17,6 +17,8 @@ const requiredFunctionExports = [
   "vir_call_error",
   "vir_call_error_size",
   "vir_closure_call_objects",
+  "vir_closure_call_error",
+  "vir_closure_call_error_size",
   "vir_closure_release",
   "vir_package_interface_manifest",
   "vir_package_interface_manifest_size",

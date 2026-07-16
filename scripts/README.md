@@ -135,6 +135,9 @@ The split helpers below are the intended extension points for focused changes:
 - IR declaration payload tag values live in `scripts/ir-codec-tags.mjs`; run
   `npm run generate:ir-codec-tags` and `npm run check:ir-codec-tags` after
   changing them.
+- Object ABI linker flags come from `scripts/object-abi-linker-flags.mjs`,
+  which consumes the shared runtime export-name manifest rather than keeping a
+  second linker-only list.
 - Benchmark sample parsing and formatting live in `scripts/bench-utils.mjs`.
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
