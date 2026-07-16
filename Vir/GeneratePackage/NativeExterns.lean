@@ -522,7 +522,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `USize.repr,
     params := #[param 1 true .usize],
     resultType := .object,
-    symbol := "lean_string_of_usize"
+    symbol := "lean_string_of_usize",
+    generateBoxedWrapper := true
   },
   {
     name := `String.append,
@@ -1238,7 +1239,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Lean.Level.mkData,
     params := #[param 1 false .uint64, param 2 false .tobject, param 3 false .uint8, param 4 false .uint8],
     resultType := .uint64,
-    symbol := "lean_level_mk_data"
+    symbol := "lean_level_mk_data",
+    generateBoxedWrapper := true
   },
   {
     name := `Lean.Expr.mkData,
@@ -1252,13 +1254,15 @@ def nativeExterns : Array NativeExtern := #[
       param 7 false .uint8
     ],
     resultType := .uint64,
-    symbol := "lean_expr_mk_data"
+    symbol := "lean_expr_mk_data",
+    generateBoxedWrapper := true
   },
   {
     name := `Lean.Expr.mkAppData,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_expr_mk_app_data"
+    symbol := "lean_expr_mk_app_data",
+    generateBoxedWrapper := true
   },
   {
     name := `Lean.Expr.data,
