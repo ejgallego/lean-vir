@@ -390,13 +390,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.swapIfInBounds,
     params := #[param 1 false .erased, param 2 false .object, param 3 true .tobject, param 4 true .tobject],
     resultType := .object,
-    symbol := "lean_array_swap"
+    symbol := "lean_array_swap",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.swap,
     params := #[param 1 false .erased, param 2 false .object, param 3 true .tobject, param 4 true .tobject, param 5 false .erased, param 6 false .erased],
     resultType := .object,
-    symbol := "lean_array_fswap"
+    symbol := "lean_array_fswap",
+    generateBoxedWrapper := true
   },
   {
     name := `ByteArray.mk,

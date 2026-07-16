@@ -53,8 +53,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("Array.get!InternalBorrowed", "lean_array_get_borrowed", lean_array_get_borrowed___boxed) \
     X("Array.pop", "lean_array_pop", lean_array_pop___boxed) \
     X("Array.replicate", "lean_mk_array", lean_mk_array___boxed) \
-    X("Array.swapIfInBounds", "lean_array_swap", lean_array_swap___boxed) \
-    X("Array.swap", "lean_array_fswap", lean_array_fswap___boxed) \
     X("ByteArray.mk", "lean_byte_array_mk", lean_byte_array_mk___boxed) \
     X_CONST("ByteArray.empty", "l_ByteArray_empty", &l_ByteArray_empty) \
     X("ByteArray.push", "lean_byte_array_push", lean_byte_array_push___boxed) \

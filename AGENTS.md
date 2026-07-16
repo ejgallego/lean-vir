@@ -78,7 +78,9 @@ asks for that machinery.
 - Keep the static declaration provider behind `wasm/upstream_shim/package/decl_provider.h`;
   future module-backed loading should replace that provider, not the upstream
   interpreter or the platform shim.
-- Do not add native lookup support until a real demo case requires it.
+- Keep native lookup restricted to symbols declared by the native extern table
+  and generated registries; do not expose general dynamic lookup without a
+  concrete runtime case.
 
 ## Documentation Map
 
