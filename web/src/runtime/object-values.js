@@ -92,7 +92,8 @@ function requireLeanObjectHandleCell(resource, runtime, label) {
 
 export class ObjectValueRuntime {
   hasObjectValueExports() {
-    return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
+    return ["vir_call_resolved_objects", ...OBJECT_VALUE_EXPORTS]
+      .every((name) => typeof this.exports[name] === "function");
   }
 
   makeHostResourceObjectValue(type, value, label) {
@@ -831,14 +832,6 @@ export class ObjectValueRuntime {
         this.exports.vir_obj_dec(resultObj);
       }
     }
-  }
-
-  hasObjectCallExports(...names) {
-    return (
-      typeof this.exports.vir_call_resolved_objects === "function" &&
-      typeof this.exports.vir_obj_dec === "function" &&
-      names.every((name) => typeof this.exports[name] === "function")
-    );
   }
 
   readObjectByteArray(obj) {

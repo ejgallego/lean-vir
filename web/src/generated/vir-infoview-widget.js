@@ -3464,10 +3464,17 @@ function hasOwn(value, key) {
   return Object.prototype.hasOwnProperty.call(value, key);
 }
 
-// web/src/runtime/object-abi.js
-var MAX_UINT32 = 0xffffffffn;
-var MAX_UINT64 = 0xffffffffffffffffn;
-var objectLayoutPlanCache = /* @__PURE__ */ new WeakMap();
+// web/src/runtime/object-abi-exports.js
+var OBJECT_ABI_CALL_EXPORTS = [
+  "vir_resolve_call_export",
+  "vir_call_resolved_objects",
+  "vir_call_error",
+  "vir_call_error_size",
+  "vir_closure_call_objects",
+  "vir_closure_call_error",
+  "vir_closure_call_error_size",
+  "vir_closure_release"
+];
 var OBJECT_VALUE_EXPORTS = [
   "vir_obj_array",
   "vir_obj_array_get",
@@ -3480,6 +3487,7 @@ var OBJECT_VALUE_EXPORTS = [
   "vir_obj_ctor_scalar_data",
   "vir_obj_ctor_usize_decimal",
   "vir_obj_closure_root",
+  "vir_obj_dec",
   "vir_obj_decimal_size",
   "vir_obj_expr_app",
   "vir_obj_expr_bvar",
@@ -3529,6 +3537,15 @@ var OBJECT_VALUE_EXPORTS = [
   "vir_obj_usize",
   "vir_obj_usize_decimal"
 ];
+var OBJECT_ABI_EXPORTS = [
+  ...OBJECT_ABI_CALL_EXPORTS,
+  ...OBJECT_VALUE_EXPORTS
+];
+
+// web/src/runtime/object-abi.js
+var MAX_UINT32 = 0xffffffffn;
+var MAX_UINT64 = 0xffffffffffffffffn;
+var objectLayoutPlanCache = /* @__PURE__ */ new WeakMap();
 function objectArgumentSupported(type, selfType = null) {
   const tag = type?.interfaceTag;
   switch (tag) {
@@ -4010,7 +4027,7 @@ function requireLeanObjectHandleCell(resource, runtime, label) {
 }
 var ObjectValueRuntime = class {
   hasObjectValueExports() {
-    return this.hasObjectCallExports(...OBJECT_VALUE_EXPORTS);
+    return ["vir_call_resolved_objects", ...OBJECT_VALUE_EXPORTS].every((name) => typeof this.exports[name] === "function");
   }
   makeHostResourceObjectValue(type, value, label) {
     if (!hostResourceResultSupported(type)) {
@@ -4698,9 +4715,6 @@ var ObjectValueRuntime = class {
         this.exports.vir_obj_dec(resultObj);
       }
     }
-  }
-  hasObjectCallExports(...names) {
-    return typeof this.exports.vir_call_resolved_objects === "function" && typeof this.exports.vir_obj_dec === "function" && names.every((name) => typeof this.exports[name] === "function");
   }
   readObjectByteArray(obj) {
     return this.readWasmBytes(

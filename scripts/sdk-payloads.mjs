@@ -20,6 +20,7 @@ export const SDK_PAYLOADS = [
   ["js/runtime/vir-codec.js", "web/src/runtime/vir-codec.js"],
   ["js/runtime/host-state.js", "web/src/runtime/host-state.js"],
   ["js/runtime/object-abi.js", "web/src/runtime/object-abi.js"],
+  ["js/runtime/object-abi-exports.js", "web/src/runtime/object-abi-exports.js"],
   ["js/runtime/vir-value-normalizers.js", "web/src/runtime/vir-value-normalizers.js"],
   ["js/runtime/interface-effects.js", "web/src/runtime/interface-effects.js"],
   ["js/runtime/interface-manifest.js", "web/src/runtime/interface-manifest.js"],

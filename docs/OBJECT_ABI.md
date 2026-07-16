@@ -48,6 +48,8 @@ required export names; this table documents what each export is for and what
 ownership rule JavaScript must follow. Package loading, package manifest, and
 raw wasm memory allocation exports are part of the broader package ABI and are
 documented in [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md).
+The export-name list lives in `web/src/runtime/object-abi-exports.js`; the
+upstream linker script and JavaScript runtime consume that same manifest.
 
 | Export | Role | Ownership and lifetime |
 | --- | --- | --- |
