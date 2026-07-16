@@ -669,12 +669,6 @@ VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_eq, box_usize_predicate)
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_lt, box_usize_predicate)
 VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_le, box_usize_predicate)
 
-extern "C" lean_object * lean_string_of_usize___boxed(lean_object * a) {
-    lean_object * result = lean_string_of_usize(lean_unbox_usize(a));
-    lean_dec(a);
-    return result;
-}
-
 extern "C" lean_object * lean_string_append___boxed(lean_object * a, lean_object * b) {
     lean_object * result = lean_string_append(a, b);
     lean_dec(b);
@@ -1012,56 +1006,6 @@ VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_dec_le, box_uint64_predicate)
 VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_uint64_to_float, UINT64, FLOAT)
 
 VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_float_to_uint32, FLOAT, UINT32)
-
-extern "C" lean_object * lean_level_mk_data___boxed(
-    lean_object * h,
-    lean_object * depth,
-    lean_object * has_mvar,
-    lean_object * has_param) {
-    uint64_t result = lean_level_mk_data(
-        lean_unbox_uint64(h),
-        depth,
-        static_cast<uint8_t>(lean_unbox(has_mvar)),
-        static_cast<uint8_t>(lean_unbox(has_param)));
-    lean_dec(h);
-    lean_dec(depth);
-    lean_dec(has_mvar);
-    lean_dec(has_param);
-    return lean_box_uint64(result);
-}
-
-extern "C" lean_object * lean_expr_mk_data___boxed(
-    lean_object * hash,
-    lean_object * bvar_range,
-    lean_object * approx_depth,
-    lean_object * has_fvar,
-    lean_object * has_expr_mvar,
-    lean_object * has_level_mvar,
-    lean_object * has_level_param) {
-    uint64_t result = lean_expr_mk_data(
-        lean_unbox_uint64(hash),
-        bvar_range,
-        lean_unbox_uint32(approx_depth),
-        static_cast<uint8_t>(lean_unbox(has_fvar)),
-        static_cast<uint8_t>(lean_unbox(has_expr_mvar)),
-        static_cast<uint8_t>(lean_unbox(has_level_mvar)),
-        static_cast<uint8_t>(lean_unbox(has_level_param)));
-    lean_dec(hash);
-    lean_dec(bvar_range);
-    lean_dec(approx_depth);
-    lean_dec(has_fvar);
-    lean_dec(has_expr_mvar);
-    lean_dec(has_level_mvar);
-    lean_dec(has_level_param);
-    return lean_box_uint64(result);
-}
-
-extern "C" lean_object * lean_expr_mk_app_data___boxed(lean_object * f_data, lean_object * a_data) {
-    uint64_t result = lean_expr_mk_app_data(lean_unbox_uint64(f_data), lean_unbox_uint64(a_data));
-    lean_dec(f_data);
-    lean_dec(a_data);
-    return lean_box_uint64(result);
-}
 
 VIR_DEFINE_BORROWED_OBJECT_UINT64_UNARY_WRAPPER(lean_expr_data)
 

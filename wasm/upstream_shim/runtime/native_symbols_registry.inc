@@ -82,7 +82,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("USize.decEq", "lean_usize_dec_eq", lean_usize_dec_eq___boxed) \
     X("USize.decLt", "lean_usize_dec_lt", lean_usize_dec_lt___boxed) \
     X("USize.decLe", "lean_usize_dec_le", lean_usize_dec_le___boxed) \
-    X("USize.repr", "lean_string_of_usize", lean_string_of_usize___boxed) \
     X("String.append", "lean_string_append", lean_string_append___boxed) \
     X("String.Internal.append", "lean_string_append", lean_string_append___boxed) \
     X("String.ofList", "lean_string_mk", lean_string_mk___boxed) \
@@ -199,7 +198,4 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("UInt64.decLe", "lean_uint64_dec_le", lean_uint64_dec_le___boxed) \
     X("UInt64.toFloat", "lean_uint64_to_float", lean_uint64_to_float___boxed) \
     X("Float.toUInt32", "lean_float_to_uint32", lean_float_to_uint32___boxed) \
-    X("Lean.Level.mkData", "lean_level_mk_data", lean_level_mk_data___boxed) \
-    X("Lean.Expr.mkData", "lean_expr_mk_data", lean_expr_mk_data___boxed) \
-    X("Lean.Expr.mkAppData", "lean_expr_mk_app_data", lean_expr_mk_app_data___boxed) \
     X("Lean.Expr.data", "lean_expr_data", lean_expr_data___boxed)
