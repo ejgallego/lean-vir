@@ -47,6 +47,8 @@ ownership diagrams.
 
 ## User And Integration Guides
 
+- [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md): marked VIR exports, Lake facets,
+  SDK installation, and the all-Lean Slides canvas workflow.
 - [LOCAL_IRPKG.md](LOCAL_IRPKG.md): local `.irpkg` package generation and
   `/dev.html` loading.
 - [CALL_LEAN_FROM_JS.md](CALL_LEAN_FROM_JS.md): calling exported Lean

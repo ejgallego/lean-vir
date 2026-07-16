@@ -11,6 +11,8 @@ open System
 
 namespace Vir.FetchSdk
 
+def sdkVersion : String := "0.1.0"
+
 structure Options where
   out : FilePath := "web/public/vendor/lean-vir"
   archive? : Option String := none
@@ -18,13 +20,14 @@ structure Options where
   tag? : Option String := none
   commit? : Option String := none
   expectCommit? : Option String := none
+  expectVersion : String := sdkVersion
   artifactName : String := "lean-vir-sdk"
   repo : String := "ejgallego/lean-vir"
 
 def usage : String :=
-  "usage: lake exe lean_vir/vir_fetch_sdk [--out DIR] (--archive FILE | --url URL | --tag TAG | --commit SHA [--repo OWNER/REPO])\n\n" ++
+  "usage: lake exe lean_vir/vir_fetch_sdk [--out DIR] [--archive FILE | --url URL | --tag TAG | --commit SHA [--repo OWNER/REPO]]\n\n" ++
   "Installs a lean-vir-sdk.tar.gz archive into DIR and verifies lean-vir-artifact.json checksums.\n\n" ++
-  "Use --expect-commit SHA to reject an SDK built from a different lean-vir commit.\n\n" ++
+  s!"The default source is release v{sdkVersion}. Use --expect-version VERSION or --expect-commit SHA to reject a mismatched SDK.\n\n" ++
   "Environment fallbacks: VIR_SDK_ARCHIVE, VIR_SDK_URL, VIR_SDK_TAG, VIR_SDK_COMMIT, VIR_SDK_EXPECT_COMMIT, VIR_SDK_REPO."
 
 partial def parseArgs (args : List String) (opts : Options := {}) : Except String Options :=
@@ -36,6 +39,7 @@ partial def parseArgs (args : List String) (opts : Options := {}) : Except Strin
   | "--tag" :: value :: rest => parseArgs rest { opts with tag? := some value }
   | "--commit" :: value :: rest => parseArgs rest { opts with commit? := some value }
   | "--expect-commit" :: value :: rest => parseArgs rest { opts with expectCommit? := some value }
+  | "--expect-version" :: value :: rest => parseArgs rest { opts with expectVersion := value }
   | "--artifact-name" :: value :: rest => parseArgs rest { opts with artifactName := value }
   | "--repo" :: value :: rest => parseArgs rest { opts with repo := value }
   | "--help" :: _ => .error usage
@@ -101,7 +105,8 @@ def sourceFromOptions (opts : Options) : IO Source := do
                               match commit? with
                               | some commit => return .commit commit
                               | none =>
-                                  throw <| IO.userError s!"no SDK source specified\n\n{usage}"
+                                  let repo := repo.getD opts.repo
+                                  return .url s!"https://github.com/{repo}/releases/download/v{sdkVersion}/lean-vir-sdk.tar.gz"
 
 def expectedCommitFromOptions (opts : Options) : IO (Option String) := do
   match opts.expectCommit? with
@@ -196,7 +201,11 @@ def fetchCommitArchive (opts : Options) (commit : String) (dest : FilePath) : IO
     catch _ =>
       pure ()
 
-def installArchive (archive : FilePath) (outDir : FilePath) (expectCommit? : Option String) : IO Unit := do
+def installArchive
+    (archive : FilePath)
+    (outDir : FilePath)
+    (expectVersion : String)
+    (expectCommit? : Option String) : IO Unit := do
   let stamp ← IO.monoMsNow
   let tmpRoot := FilePath.mk s!"/tmp/lean-vir-sdk-fetch-{stamp}"
   let unpackDir := tmpRoot / "unpack"
@@ -209,11 +218,16 @@ def installArchive (archive : FilePath) (outDir : FilePath) (expectCommit? : Opt
     let name ← jsonField manifest "name" Json.getStr?
     if name != "lean-vir-sdk" then
       throw <| IO.userError s!"expected SDK manifest name `lean-vir-sdk`, got `{name}`"
+    let version ← jsonField manifest "version" Json.getStr?
+    if version != expectVersion then
+      throw <| IO.userError s!"SDK version mismatch: expected {expectVersion}, got {version}"
     let abi ← jsonField manifest "runtimeAbiVersion" Json.getNat?
     if abi != 1 then
       throw <| IO.userError s!"unsupported SDK runtime ABI version: {abi}"
+    let actualCommit ← jsonField manifest "gitCommit" Json.getStr?
+    if actualCommit.isEmpty then
+      throw <| IO.userError "SDK manifest gitCommit must not be empty"
     if let some expectCommit := expectCommit? then
-      let actualCommit ← jsonField manifest "gitCommit" Json.getStr?
       if actualCommit != expectCommit then
         throw <| IO.userError s!"SDK commit mismatch: expected {expectCommit}, got {actualCommit}"
     try
@@ -267,7 +281,7 @@ def runMain (args : List String) : IO UInt32 := do
               fetchCommitArchive opts commit archive
               pure (archive, some archive)
         try
-          installArchive archive opts.out expectCommit?
+          installArchive archive opts.out opts.expectVersion expectCommit?
         finally
           if let some cleanup := cleanup? then
             try

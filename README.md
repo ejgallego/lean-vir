@@ -72,6 +72,29 @@ npm run inspect:irpkg -- web/public/local-quickstart.irpkg
 npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
 ```
 
+## Lake Facets And Lean Browser Entries
+
+Lake clients can mark exports directly in Lean and build the containing module:
+
+```lean
+@[vir_export]
+def answer : Nat := 42
+
+@[vir_entry]
+def mount : Lean.Vir.Browser.DomM Unit := pure ()
+```
+
+```bash
+lake build +MySlides.Runtime:vir
+lake build :virSdk
+```
+
+The module facet writes the `.irpkg` and report under `.lake/build/vir/`; the
+package facet installs the versioned browser SDK. `VirRuntime.runEntries()`
+runs `@[vir_entry]` declarations once in manifest order. See
+[docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
+Lean-authored [canvas slide example](examples/SlidesCanvas.lean).
+
 ## Calling Lean From JavaScript
 
 Use `/dev.html` for quick manual testing. In an app, load the same `.irpkg` with
@@ -145,10 +168,10 @@ authentication for Actions artifact downloads, so set `GITHUB_TOKEN` or run
 [`gh auth login`](https://cli.github.com/manual/gh_auth_login) once before using
 the commit-artifact path.
 
-When durable release assets exist, the same fetcher can use
-[GitHub Releases](https://github.com/ejgallego/lean-vir/releases) through
-`vir_fetch_sdk --tag <tag>`. Until then, commit-pinned clients should use
-`--commit`.
+Tagged releases publish the same archive as a durable
+[GitHub Releases](https://github.com/ejgallego/lean-vir/releases) asset. The
+`:virSdk` facet defaults to `v0.1.0`; `vir_fetch_sdk --tag <tag>` selects a
+different release, while commit-pinned clients can continue to use `--commit`.
 
 ## Where To Go Next
 
@@ -158,6 +181,8 @@ When durable release assets exist, the same fetcher can use
   call-flow diagrams, and object ownership.
 - [docs/LOCAL_IRPKG.md](docs/LOCAL_IRPKG.md) for the full local package
   workflow.
+- [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) for marked exports,
+  Lake facets, SDK installation, and Lean-authored Slides code.
 - [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for calling exported
   Lean declarations from app JavaScript.
 - [docs/JS_API.md](docs/JS_API.md) for using the runtime wrapper from
