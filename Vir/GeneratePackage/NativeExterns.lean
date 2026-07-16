@@ -192,7 +192,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `ptrAddrUnsafe,
     params := #[param 1 false .erased, param 2 true .tobject],
     resultType := .usize,
-    symbol := "lean_ptr_addr"
+    symbol := "lean_ptr_addr",
+    generateBoxedWrapper := true
   },
   {
     name := `IO.initializing,
@@ -274,13 +275,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `Task.pure,
     params := #[param 1 false .erased, param 2 false .tobject],
     resultType := .object,
-    symbol := "lean_task_pure"
+    symbol := "lean_task_pure",
+    generateBoxedWrapper := true
   },
   {
     name := `Task.get,
     params := #[param 1 false .erased, param 2 false .object],
     resultType := .tobject,
-    symbol := "lean_task_get_own"
+    symbol := "lean_task_get_own",
+    generateBoxedWrapper := true
   },
   {
     name := `Task.map,
@@ -317,7 +320,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.push,
     params := #[param 1 false .erased, param 2 false .object, param 3 false .tobject],
     resultType := .object,
-    symbol := "lean_array_push"
+    symbol := "lean_array_push",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.toList,
@@ -329,7 +333,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.size,
     params := #[param 1 false .erased, param 2 true .object],
     resultType := .tagged,
-    symbol := "lean_array_get_size"
+    symbol := "lean_array_get_size",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.usize,
@@ -402,13 +407,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.pop,
     params := #[param 1 false .erased, param 2 false .object],
     resultType := .object,
-    symbol := "lean_array_pop"
+    symbol := "lean_array_pop",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.replicate,
     params := #[param 1 false .erased, param 2 false .tobject, param 3 false .tobject],
     resultType := .object,
-    symbol := "lean_mk_array"
+    symbol := "lean_mk_array",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.swapIfInBounds,
@@ -428,7 +435,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `ByteArray.mk,
     params := #[param 1 false .object],
     resultType := .object,
-    symbol := "lean_byte_array_mk"
+    symbol := "lean_byte_array_mk",
+    generateBoxedWrapper := true
   },
   {
     name := `ByteArray.empty,
@@ -440,13 +448,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `ByteArray.push,
     params := #[param 1 false .object, param 2 false .uint8],
     resultType := .object,
-    symbol := "lean_byte_array_push"
+    symbol := "lean_byte_array_push",
+    generateBoxedWrapper := true
   },
   {
     name := `ByteArray.get!,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_byte_array_get"
+    symbol := "lean_byte_array_get",
+    generateBoxedWrapper := true
   },
   {
     name := `ByteArray.get,
@@ -472,13 +482,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `ByteArray.size,
     params := #[param 1 true .object],
     resultType := .tagged,
-    symbol := "lean_byte_array_size"
+    symbol := "lean_byte_array_size",
+    generateBoxedWrapper := true
   },
   {
     name := `ByteArray.validateUTF8,
     params := #[param 1 true .object],
     resultType := .uint8,
-    symbol := "lean_string_validate_utf8"
+    symbol := "lean_string_validate_utf8",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.ofNat,
@@ -588,13 +600,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.ofList,
     params := #[param 1 false .tobject],
     resultType := .object,
-    symbol := "lean_string_mk"
+    symbol := "lean_string_mk",
+    generateBoxedWrapper := true
   },
   {
     name := `String.toUTF8,
     params := #[param 1 true .object],
     resultType := .object,
-    symbol := "lean_string_to_utf8"
+    symbol := "lean_string_to_utf8",
+    generateBoxedWrapper := true
   },
   {
     name := `String.ofByteArray,
@@ -607,7 +621,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.hash,
     params := #[param 1 true .object],
     resultType := .uint64,
-    symbol := "lean_string_hash"
+    symbol := "lean_string_hash",
+    generateBoxedWrapper := true
   },
   {
     name := `String.push,
@@ -626,19 +641,22 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.length,
     params := #[param 1 true .object],
     resultType := .tagged,
-    symbol := "lean_string_length"
+    symbol := "lean_string_length",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Internal.length,
     params := #[param 1 true .object],
     resultType := .tobject,
-    symbol := "lean_string_length"
+    symbol := "lean_string_length",
+    generateBoxedWrapper := true
   },
   {
     name := `String.utf8ByteSize,
     params := #[param 1 true .object],
     resultType := .tagged,
-    symbol := "lean_string_utf8_byte_size"
+    symbol := "lean_string_utf8_byte_size",
+    generateBoxedWrapper := true
   },
   {
     name := `String.getUTF8Byte,
@@ -669,7 +687,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.Internal.next,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_string_utf8_next"
+    symbol := "lean_string_utf8_next",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Internal.posOf,
@@ -687,7 +706,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.Pos.Raw.next,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_string_utf8_next"
+    symbol := "lean_string_utf8_next",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Pos.next,
@@ -707,25 +727,29 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.Internal.extract,
     params := #[param 1 true .object, param 2 true .tobject, param 3 true .tobject],
     resultType := .object,
-    symbol := "lean_string_utf8_extract"
+    symbol := "lean_string_utf8_extract",
+    generateBoxedWrapper := true
   },
   {
     name := `String.extract,
     params := #[param 1 true .object, param 2 true .tobject, param 3 true .tobject],
     resultType := .object,
-    symbol := "lean_string_utf8_extract"
+    symbol := "lean_string_utf8_extract",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Pos.Raw.extract,
     params := #[param 1 true .object, param 2 true .tobject, param 3 true .tobject],
     resultType := .object,
-    symbol := "lean_string_utf8_extract"
+    symbol := "lean_string_utf8_extract",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Pos.Raw.prev,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_string_utf8_prev"
+    symbol := "lean_string_utf8_prev",
+    generateBoxedWrapper := true
   },
   {
     name := `String.decodeChar,
@@ -738,7 +762,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.Pos.Raw.get,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint32,
-    symbol := "lean_string_utf8_get"
+    symbol := "lean_string_utf8_get",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Pos.Raw.get',
@@ -751,19 +776,22 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.Internal.atEnd,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_string_utf8_at_end"
+    symbol := "lean_string_utf8_at_end",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Pos.Raw.atEnd,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_string_utf8_at_end"
+    symbol := "lean_string_utf8_at_end",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Pos.Raw.isValid,
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_string_is_valid_pos"
+    symbol := "lean_string_is_valid_pos",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Internal.contains,
@@ -775,13 +803,15 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.decEq,
     params := #[param 1 true .object, param 2 true .object],
     resultType := .uint8,
-    symbol := "lean_string_dec_eq"
+    symbol := "lean_string_dec_eq",
+    generateBoxedWrapper := true
   },
   {
     name := `String.decidableLT,
     params := #[param 1 true .object, param 2 true .object],
     resultType := .uint8,
-    symbol := "lean_string_dec_lt"
+    symbol := "lean_string_dec_lt",
+    generateBoxedWrapper := true
   },
   {
     name := `String.compare,
@@ -806,7 +836,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Lean.Name.beq,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_name_eq"
+    symbol := "lean_name_eq",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.toNat,
@@ -1397,7 +1428,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Lean.Expr.data,
     params := #[param 1 true .object],
     resultType := .uint64,
-    symbol := "lean_expr_data"
+    symbol := "lean_expr_data",
+    generateBoxedWrapper := true
   }
 ]
 

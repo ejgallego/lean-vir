@@ -7,7 +7,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
 
 #define VIR_NATIVE_SYMBOLS(X, X_CONST) \
     X("System.Platform.getNumBits", "lean_system_platform_nbits", lean_system_platform_nbits___boxed) \
-    X("ptrAddrUnsafe", "lean_ptr_addr", lean_ptr_addr___boxed) \
     X("IO.initializing", "lean_io_initializing", lean_io_initializing___boxed) \
     X("ST.Prim.mkRef", "lean_st_mk_ref", lean_st_mk_ref___boxed) \
     X("ST.Prim.Ref.get", "lean_st_ref_get", lean_st_ref_get___boxed) \
@@ -15,58 +14,27 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("ST.Prim.Ref.take", "lean_st_ref_take", lean_st_ref_take___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.isReservedName", "lean_is_reserved_name", lean_is_reserved_name___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.evalCheckMeta", "lean_eval_check_meta", lean_eval_check_meta___boxed) \
-    X("Task.pure", "lean_task_pure", lean_task_pure___boxed) \
-    X("Task.get", "lean_task_get_own", lean_task_get_own___boxed) \
     X("Task.map", "lean_task_map", lean_task_map___boxed) \
     X("Array.mkEmpty", "lean_array_mk_empty", lean_array_mk_empty___boxed) \
     X("Array.emptyWithCapacity", "lean_array_mk_empty", lean_array_mk_empty___boxed) \
     X("Array.mk", "lean_array_mk", lean_array_mk___boxed) \
-    X("Array.push", "lean_array_push", lean_array_push___boxed) \
     X("Array.toList", "lean_array_to_list", lean_array_to_list___boxed) \
-    X("Array.size", "lean_array_get_size", lean_array_get_size___boxed) \
     X("Array.ugetBorrowed", "lean_array_uget_borrowed", lean_array_uget_borrowed___boxed) \
     X("Array.getInternalBorrowed", "lean_array_fget_borrowed", lean_array_fget_borrowed___boxed) \
     X("Array.get!InternalBorrowed", "lean_array_get_borrowed", lean_array_get_borrowed___boxed) \
-    X("Array.pop", "lean_array_pop", lean_array_pop___boxed) \
-    X("Array.replicate", "lean_mk_array", lean_mk_array___boxed) \
-    X("ByteArray.mk", "lean_byte_array_mk", lean_byte_array_mk___boxed) \
     X_CONST("ByteArray.empty", "l_ByteArray_empty", &l_ByteArray_empty) \
-    X("ByteArray.push", "lean_byte_array_push", lean_byte_array_push___boxed) \
-    X("ByteArray.get!", "lean_byte_array_get", lean_byte_array_get___boxed) \
     X("ByteArray.extract", "l_ByteArray_extract", l_ByteArray_extract___boxed) \
-    X("ByteArray.size", "lean_byte_array_size", lean_byte_array_size___boxed) \
-    X("ByteArray.validateUTF8", "lean_string_validate_utf8", lean_string_validate_utf8___boxed) \
     X("USize.ofNatLT", "l_USize_ofNatLT", l_USize_ofNatLT___boxed) \
-    X("String.ofList", "lean_string_mk", lean_string_mk___boxed) \
-    X("String.toUTF8", "lean_string_to_utf8", lean_string_to_utf8___boxed) \
-    X("String.hash", "lean_string_hash", lean_string_hash___boxed) \
     X("String.Internal.pushn", "lean_string_pushn", lean_string_pushn___boxed) \
-    X("String.length", "lean_string_length", lean_string_length___boxed) \
-    X("String.Internal.length", "lean_string_length", lean_string_length___boxed) \
-    X("String.utf8ByteSize", "lean_string_utf8_byte_size", lean_string_utf8_byte_size___boxed) \
     X("String.Pos.set", "l_String_Pos_set", l_String_Pos_set___boxed) \
     X("String.Pos.Raw.set", "l_String_Pos_Raw_set", l_String_Pos_Raw_set___boxed) \
     X("String.set", "l_String_set", l_String_set___boxed) \
-    X("String.Internal.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
     X("String.Internal.posOf", "lean_string_posof", lean_string_posof___boxed) \
     X("String.Internal.offsetOfPos", "lean_string_offsetofpos", lean_string_offsetofpos___boxed) \
-    X("String.Pos.Raw.next", "lean_string_utf8_next", lean_string_utf8_next___boxed) \
-    X("String.Internal.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
-    X("String.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
-    X("String.Pos.Raw.extract", "lean_string_utf8_extract", lean_string_utf8_extract___boxed) \
-    X("String.Pos.Raw.prev", "lean_string_utf8_prev", lean_string_utf8_prev___boxed) \
-    X("String.Pos.Raw.get", "lean_string_utf8_get", lean_string_utf8_get___boxed) \
-    X("String.Internal.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
-    X("String.Pos.Raw.atEnd", "lean_string_utf8_at_end", lean_string_utf8_at_end___boxed) \
-    X("String.Pos.Raw.isValid", "lean_string_is_valid_pos", lean_string_is_valid_pos___boxed) \
     X("String.Internal.contains", "lean_string_contains", lean_string_contains___boxed) \
-    X("String.decEq", "lean_string_dec_eq", lean_string_dec_eq___boxed) \
-    X("String.decidableLT", "lean_string_dec_lt", lean_string_dec_lt___boxed) \
     X("String.compare", "lean_string_compare", lean_string_compare___boxed) \
     X("Substring.Raw.Internal.beq", "lean_substring_beq", lean_substring_beq___boxed) \
-    X("Lean.Name.beq", "lean_name_eq", lean_name_eq___boxed) \
     X("UInt8.toUInt32", "lean_uint8_to_uint32", lean_uint8_to_uint32___boxed) \
     X("UInt32.ofNatLT", "l_UInt32_ofNatLT", l_UInt32_ofNatLT___boxed) \
     X("UInt64.ofNatLT", "l_UInt64_ofNatLT", l_UInt64_ofNatLT___boxed) \
-    X("UInt64.toUInt8", "lean_uint64_to_uint8", lean_uint64_to_uint8___boxed) \
-    X("Lean.Expr.data", "lean_expr_data", lean_expr_data___boxed)
+    X("UInt64.toUInt8", "lean_uint64_to_uint8", lean_uint64_to_uint8___boxed)

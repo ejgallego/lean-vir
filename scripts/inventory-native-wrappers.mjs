@@ -26,7 +26,7 @@ const intentionalDirectWrapperExceptions = new Map([
 // handwritten ordinary-wrapper population from growing again between batches.
 const expectedMacroGeneratedWrapperCounts = new Map([
   ["generated-helper", 0],
-  ["generated-direct", 27],
+  ["generated-direct", 0],
 ]);
 
 const args = new Set(process.argv.slice(2));
