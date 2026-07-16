@@ -36,18 +36,7 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("ByteArray.extract", "l_ByteArray_extract", l_ByteArray_extract___boxed) \
     X("ByteArray.size", "lean_byte_array_size", lean_byte_array_size___boxed) \
     X("ByteArray.validateUTF8", "lean_string_validate_utf8", lean_string_validate_utf8___boxed) \
-    X("USize.ofNat", "lean_usize_of_nat", lean_usize_of_nat___boxed) \
     X("USize.ofNatLT", "l_USize_ofNatLT", l_USize_ofNatLT___boxed) \
-    X("USize.add", "lean_usize_add", lean_usize_add___boxed) \
-    X("USize.sub", "lean_usize_sub", lean_usize_sub___boxed) \
-    X("USize.mul", "lean_usize_mul", lean_usize_mul___boxed) \
-    X("USize.land", "lean_usize_land", lean_usize_land___boxed) \
-    X("USize.shiftLeft", "lean_usize_shift_left", lean_usize_shift_left___boxed) \
-    X("USize.shiftRight", "lean_usize_shift_right", lean_usize_shift_right___boxed) \
-    X("USize.toNat", "lean_usize_to_nat", lean_usize_to_nat___boxed) \
-    X("USize.decEq", "lean_usize_dec_eq", lean_usize_dec_eq___boxed) \
-    X("USize.decLt", "lean_usize_dec_lt", lean_usize_dec_lt___boxed) \
-    X("USize.decLe", "lean_usize_dec_le", lean_usize_dec_le___boxed) \
     X("String.ofList", "lean_string_mk", lean_string_mk___boxed) \
     X("String.toUTF8", "lean_string_to_utf8", lean_string_to_utf8___boxed) \
     X("String.hash", "lean_string_hash", lean_string_hash___boxed) \
@@ -76,83 +65,8 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("String.compare", "lean_string_compare", lean_string_compare___boxed) \
     X("Substring.Raw.Internal.beq", "lean_substring_beq", lean_substring_beq___boxed) \
     X("Lean.Name.beq", "lean_name_eq", lean_name_eq___boxed) \
-    X("UInt8.toNat", "lean_uint8_to_nat", lean_uint8_to_nat___boxed) \
     X("UInt8.toUInt32", "lean_uint8_to_uint32", lean_uint8_to_uint32___boxed) \
-    X("UInt8.add", "lean_uint8_add", lean_uint8_add___boxed) \
-    X("UInt8.sub", "lean_uint8_sub", lean_uint8_sub___boxed) \
-    X("UInt8.mul", "lean_uint8_mul", lean_uint8_mul___boxed) \
-    X("UInt8.div", "lean_uint8_div", lean_uint8_div___boxed) \
-    X("UInt8.mod", "lean_uint8_mod", lean_uint8_mod___boxed) \
-    X("UInt8.land", "lean_uint8_land", lean_uint8_land___boxed) \
-    X("UInt8.lor", "lean_uint8_lor", lean_uint8_lor___boxed) \
-    X("UInt8.xor", "lean_uint8_xor", lean_uint8_xor___boxed) \
-    X("UInt8.shiftLeft", "lean_uint8_shift_left", lean_uint8_shift_left___boxed) \
-    X("UInt8.shiftRight", "lean_uint8_shift_right", lean_uint8_shift_right___boxed) \
-    X("UInt8.complement", "lean_uint8_complement", lean_uint8_complement___boxed) \
-    X("UInt8.neg", "lean_uint8_neg", lean_uint8_neg___boxed) \
-    X("UInt8.decEq", "lean_uint8_dec_eq", lean_uint8_dec_eq___boxed) \
-    X("UInt8.decLt", "lean_uint8_dec_lt", lean_uint8_dec_lt___boxed) \
-    X("UInt8.decLe", "lean_uint8_dec_le", lean_uint8_dec_le___boxed) \
-    X("UInt16.toNat", "lean_uint16_to_nat", lean_uint16_to_nat___boxed) \
-    X("UInt16.toUInt32", "lean_uint16_to_uint32", lean_uint16_to_uint32___boxed) \
-    X("UInt16.add", "lean_uint16_add", lean_uint16_add___boxed) \
-    X("UInt16.sub", "lean_uint16_sub", lean_uint16_sub___boxed) \
-    X("UInt16.mul", "lean_uint16_mul", lean_uint16_mul___boxed) \
-    X("UInt16.div", "lean_uint16_div", lean_uint16_div___boxed) \
-    X("UInt16.mod", "lean_uint16_mod", lean_uint16_mod___boxed) \
-    X("UInt16.land", "lean_uint16_land", lean_uint16_land___boxed) \
-    X("UInt16.lor", "lean_uint16_lor", lean_uint16_lor___boxed) \
-    X("UInt16.xor", "lean_uint16_xor", lean_uint16_xor___boxed) \
-    X("UInt16.shiftLeft", "lean_uint16_shift_left", lean_uint16_shift_left___boxed) \
-    X("UInt16.shiftRight", "lean_uint16_shift_right", lean_uint16_shift_right___boxed) \
-    X("UInt16.complement", "lean_uint16_complement", lean_uint16_complement___boxed) \
-    X("UInt16.neg", "lean_uint16_neg", lean_uint16_neg___boxed) \
-    X("UInt16.decEq", "lean_uint16_dec_eq", lean_uint16_dec_eq___boxed) \
-    X("UInt16.decLt", "lean_uint16_dec_lt", lean_uint16_dec_lt___boxed) \
-    X("UInt16.decLe", "lean_uint16_dec_le", lean_uint16_dec_le___boxed) \
-    X("UInt32.ofNat", "lean_uint32_of_nat", lean_uint32_of_nat___boxed) \
     X("UInt32.ofNatLT", "l_UInt32_ofNatLT", l_UInt32_ofNatLT___boxed) \
-    X("UInt32.toNat", "lean_uint32_to_nat", lean_uint32_to_nat___boxed) \
-    X("UInt32.toUInt8", "lean_uint32_to_uint8", lean_uint32_to_uint8___boxed) \
-    X("UInt32.toUInt16", "lean_uint32_to_uint16", lean_uint32_to_uint16___boxed) \
-    X("UInt32.toUInt64", "lean_uint32_to_uint64", lean_uint32_to_uint64___boxed) \
-    X("UInt32.add", "lean_uint32_add", lean_uint32_add___boxed) \
-    X("UInt32.sub", "lean_uint32_sub", lean_uint32_sub___boxed) \
-    X("UInt32.mul", "lean_uint32_mul", lean_uint32_mul___boxed) \
-    X("UInt32.div", "lean_uint32_div", lean_uint32_div___boxed) \
-    X("UInt32.mod", "lean_uint32_mod", lean_uint32_mod___boxed) \
-    X("UInt32.land", "lean_uint32_land", lean_uint32_land___boxed) \
-    X("UInt32.lor", "lean_uint32_lor", lean_uint32_lor___boxed) \
-    X("UInt32.xor", "lean_uint32_xor", lean_uint32_xor___boxed) \
-    X("UInt32.shiftLeft", "lean_uint32_shift_left", lean_uint32_shift_left___boxed) \
-    X("UInt32.shiftRight", "lean_uint32_shift_right", lean_uint32_shift_right___boxed) \
-    X("UInt32.complement", "lean_uint32_complement", lean_uint32_complement___boxed) \
-    X("UInt32.neg", "lean_uint32_neg", lean_uint32_neg___boxed) \
-    X("UInt32.decEq", "lean_uint32_dec_eq", lean_uint32_dec_eq___boxed) \
-    X("UInt32.decLt", "lean_uint32_dec_lt", lean_uint32_dec_lt___boxed) \
-    X("UInt32.decLe", "lean_uint32_dec_le", lean_uint32_dec_le___boxed) \
-    X("UInt64.ofNat", "lean_uint64_of_nat", lean_uint64_of_nat___boxed) \
-    X("mixHash", "lean_uint64_mix_hash", lean_uint64_mix_hash___boxed) \
     X("UInt64.ofNatLT", "l_UInt64_ofNatLT", l_UInt64_ofNatLT___boxed) \
-    X("UInt64.toNat", "lean_uint64_to_nat", lean_uint64_to_nat___boxed) \
-    X("UInt64.toUSize", "lean_uint64_to_usize", lean_uint64_to_usize___boxed) \
-    X("UInt64.toUInt32", "lean_uint64_to_uint32", lean_uint64_to_uint32___boxed) \
     X("UInt64.toUInt8", "lean_uint64_to_uint8", lean_uint64_to_uint8___boxed) \
-    X("UInt64.add", "lean_uint64_add", lean_uint64_add___boxed) \
-    X("UInt64.sub", "lean_uint64_sub", lean_uint64_sub___boxed) \
-    X("UInt64.mul", "lean_uint64_mul", lean_uint64_mul___boxed) \
-    X("UInt64.div", "lean_uint64_div", lean_uint64_div___boxed) \
-    X("UInt64.mod", "lean_uint64_mod", lean_uint64_mod___boxed) \
-    X("UInt64.land", "lean_uint64_land", lean_uint64_land___boxed) \
-    X("UInt64.lor", "lean_uint64_lor", lean_uint64_lor___boxed) \
-    X("UInt64.xor", "lean_uint64_xor", lean_uint64_xor___boxed) \
-    X("UInt64.shiftLeft", "lean_uint64_shift_left", lean_uint64_shift_left___boxed) \
-    X("UInt64.shiftRight", "lean_uint64_shift_right", lean_uint64_shift_right___boxed) \
-    X("UInt64.complement", "lean_uint64_complement", lean_uint64_complement___boxed) \
-    X("UInt64.neg", "lean_uint64_neg", lean_uint64_neg___boxed) \
-    X("UInt64.decEq", "lean_uint64_dec_eq", lean_uint64_dec_eq___boxed) \
-    X("UInt64.decLt", "lean_uint64_dec_lt", lean_uint64_dec_lt___boxed) \
-    X("UInt64.decLe", "lean_uint64_dec_le", lean_uint64_dec_le___boxed) \
-    X("UInt64.toFloat", "lean_uint64_to_float", lean_uint64_to_float___boxed) \
-    X("Float.toUInt32", "lean_float_to_uint32", lean_float_to_uint32___boxed) \
     X("Lean.Expr.data", "lean_expr_data", lean_expr_data___boxed)

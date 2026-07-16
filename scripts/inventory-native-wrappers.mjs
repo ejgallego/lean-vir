@@ -25,8 +25,8 @@ const intentionalDirectWrapperExceptions = new Map([
 // macro-generated family moves to Lean's compiler. The check prevents the
 // handwritten ordinary-wrapper population from growing again between batches.
 const expectedMacroGeneratedWrapperCounts = new Map([
-  ["generated-helper", 70],
-  ["generated-direct", 43],
+  ["generated-helper", 0],
+  ["generated-direct", 27],
 ]);
 
 const args = new Set(process.argv.slice(2));

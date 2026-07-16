@@ -65,93 +65,6 @@ extern "C" uint8_t vir_get_io_initializing(void) {
     return g_vir_io_initializing;
 }
 
-static lean_object * box_uint8_binary(lean_object * a, lean_object * b, uint8_t (*fn)(uint8_t, uint8_t)) {
-    uint8_t result = fn(static_cast<uint8_t>(lean_unbox(a)), static_cast<uint8_t>(lean_unbox(b)));
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box(result);
-}
-
-static lean_object * box_uint8_unary(lean_object * a, uint8_t (*fn)(uint8_t)) {
-    uint8_t result = fn(static_cast<uint8_t>(lean_unbox(a)));
-    lean_dec(a);
-    return lean_box(result);
-}
-
-static lean_object * box_uint16_binary(lean_object * a, lean_object * b, uint16_t (*fn)(uint16_t, uint16_t)) {
-    uint16_t result = fn(static_cast<uint16_t>(lean_unbox(a)), static_cast<uint16_t>(lean_unbox(b)));
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box(result);
-}
-
-static lean_object * box_uint16_unary(lean_object * a, uint16_t (*fn)(uint16_t)) {
-    uint16_t result = fn(static_cast<uint16_t>(lean_unbox(a)));
-    lean_dec(a);
-    return lean_box(result);
-}
-
-static lean_object * box_uint16_predicate(lean_object * a, lean_object * b, uint8_t (*fn)(uint16_t, uint16_t)) {
-    uint8_t result = fn(static_cast<uint16_t>(lean_unbox(a)), static_cast<uint16_t>(lean_unbox(b)));
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box(result);
-}
-
-static lean_object * box_uint32_binary(lean_object * a, lean_object * b, uint32_t (*fn)(uint32_t, uint32_t)) {
-    uint32_t result = fn(lean_unbox_uint32(a), lean_unbox_uint32(b));
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box_uint32(result);
-}
-
-static lean_object * box_uint32_unary(lean_object * a, uint32_t (*fn)(uint32_t)) {
-    uint32_t result = fn(lean_unbox_uint32(a));
-    lean_dec(a);
-    return lean_box_uint32(result);
-}
-
-static lean_object * box_uint32_predicate(lean_object * a, lean_object * b, uint8_t (*fn)(uint32_t, uint32_t)) {
-    uint8_t result = fn(lean_unbox_uint32(a), lean_unbox_uint32(b));
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box(result);
-}
-
-static lean_object * box_usize_binary(lean_object * a, lean_object * b, size_t (*fn)(size_t, size_t)) {
-    size_t result = fn(lean_unbox_usize(a), lean_unbox_usize(b));
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box_usize(result);
-}
-
-static lean_object * box_usize_predicate(lean_object * a, lean_object * b, uint8_t (*fn)(size_t, size_t)) {
-    uint8_t result = fn(lean_unbox_usize(a), lean_unbox_usize(b));
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box(result);
-}
-
-static lean_object * box_uint64_binary(lean_object * a, lean_object * b, uint64_t (*fn)(uint64_t, uint64_t)) {
-    uint64_t result = fn(lean_unbox_uint64(a), lean_unbox_uint64(b));
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box_uint64(result);
-}
-
-static lean_object * box_uint64_unary(lean_object * a, uint64_t (*fn)(uint64_t)) {
-    uint64_t result = fn(lean_unbox_uint64(a));
-    lean_dec(a);
-    return lean_box_uint64(result);
-}
-
-static lean_object * box_uint64_predicate(lean_object * a, lean_object * b, uint8_t (*fn)(uint64_t, uint64_t)) {
-    uint8_t result = fn(lean_unbox_uint64(a), lean_unbox_uint64(b));
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box(result);
-}
-
 static size_t nat_to_size_or_max(lean_object * n) {
     return lean_is_scalar(n) ? lean_unbox(n) : SIZE_MAX;
 }
@@ -160,16 +73,6 @@ static size_t substring_repaired_pos(lean_object * s, lean_object * p) {
     size_t end = lean_string_size(s) - 1;
     return lean_string_is_valid_pos(s, p) ? nat_to_size_or_max(p) : end;
 }
-
-#define VIR_DEFINE_BOX_UNARY_WRAPPER(symbol, helper) \
-    extern "C" lean_object * symbol##___boxed(lean_object * a) { \
-        return helper(a, symbol); \
-    }
-
-#define VIR_DEFINE_BOX_BINARY_WRAPPER(symbol, helper) \
-    extern "C" lean_object * symbol##___boxed(lean_object * a, lean_object * b) { \
-        return helper(a, b, symbol); \
-    }
 
 #define VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(symbol) \
     extern "C" lean_object * symbol##___boxed(lean_object * a) { \
@@ -344,40 +247,8 @@ VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER(lean_ptr_addr)
         return lean_box_uint64(result); \
     }
 
-#define VIR_NATIVE_FLOAT double
 #define VIR_NATIVE_UINT8 uint8_t
-#define VIR_NATIVE_UINT16 uint16_t
-#define VIR_NATIVE_UINT32 uint32_t
-#define VIR_NATIVE_UINT64 uint64_t
-#define VIR_NATIVE_USIZE size_t
-
-#define VIR_UNBOX_FLOAT(a) lean_unbox_float(a)
 #define VIR_UNBOX_UINT8(a) static_cast<uint8_t>(lean_unbox(a))
-#define VIR_UNBOX_UINT16(a) static_cast<uint16_t>(lean_unbox(a))
-#define VIR_UNBOX_UINT32(a) lean_unbox_uint32(a)
-#define VIR_UNBOX_UINT64(a) lean_unbox_uint64(a)
-#define VIR_UNBOX_USIZE(a) lean_unbox_usize(a)
-
-#define VIR_BOX_FLOAT(result) lean_box_float(result)
-#define VIR_BOX_UINT8(result) lean_box(result)
-#define VIR_BOX_UINT16(result) lean_box(result)
-#define VIR_BOX_UINT32(result) lean_box_uint32(result)
-#define VIR_BOX_UINT64(result) lean_box_uint64(result)
-#define VIR_BOX_USIZE(result) lean_box_usize(result)
-
-#define VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(symbol, param_kind, result_kind) \
-    extern "C" lean_object * symbol##___boxed(lean_object * a) { \
-        VIR_NATIVE_##result_kind result = symbol(VIR_UNBOX_##param_kind(a)); \
-        lean_dec(a); \
-        return VIR_BOX_##result_kind(result); \
-    }
-
-#define VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER(symbol, param_kind) \
-    extern "C" lean_object * symbol##___boxed(lean_object * a) { \
-        lean_object * result = symbol(VIR_UNBOX_##param_kind(a)); \
-        lean_dec(a); \
-        return result; \
-    }
 
 #define VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER(symbol, param_kind) \
     extern "C" lean_object * symbol##___boxed(lean_object * a, lean_object * b) { \
@@ -515,27 +386,12 @@ VIR_DEFINE_BORROWED_OBJECT_UNARY_WRAPPER(lean_byte_array_size)
 
 VIR_DEFINE_BORROWED_OBJECT_UINT8_UNARY_WRAPPER(lean_string_validate_utf8)
 
-VIR_DEFINE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER(lean_usize_of_nat)
-
 extern "C" lean_object * l_USize_ofNatLT___boxed(lean_object * a, lean_object * proof) {
     size_t result = lean_usize_of_nat(a);
     lean_dec(a);
     lean_dec(proof);
     return lean_box_usize(result);
 }
-
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_add, box_usize_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_sub, box_usize_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_mul, box_usize_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_land, box_usize_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_shift_left, box_usize_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_shift_right, box_usize_binary)
-
-VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER(lean_usize_to_nat, USIZE)
-
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_eq, box_usize_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_lt, box_usize_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_usize_dec_le, box_usize_predicate)
 
 VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(lean_string_mk)
 
@@ -697,51 +553,11 @@ extern "C" lean_object * lean_substring_beq___boxed(lean_object * lhs, lean_obje
 
 VIR_DEFINE_BORROWED_OBJECT_UINT8_BINARY_WRAPPER(lean_name_eq)
 
-VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER(lean_uint8_to_nat, UINT8)
-
 extern "C" lean_object * lean_uint8_to_uint32___boxed(lean_object * a) {
     uint32_t result = static_cast<uint32_t>(lean_unbox(a));
     lean_dec(a);
     return lean_box_uint32(result);
 }
-
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_add, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_sub, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_mul, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_div, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_mod, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_land, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_lor, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_xor, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_shift_left, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_shift_right, box_uint8_binary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint8_complement, box_uint8_unary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint8_neg, box_uint8_unary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_dec_eq, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_dec_lt, box_uint8_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint8_dec_le, box_uint8_binary)
-
-VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER(lean_uint16_to_nat, UINT16)
-
-VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_uint16_to_uint32, UINT16, UINT32)
-
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_add, box_uint16_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_sub, box_uint16_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_mul, box_uint16_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_div, box_uint16_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_mod, box_uint16_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_land, box_uint16_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_lor, box_uint16_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_xor, box_uint16_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_shift_left, box_uint16_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_shift_right, box_uint16_binary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint16_complement, box_uint16_unary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint16_neg, box_uint16_unary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_dec_eq, box_uint16_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_dec_lt, box_uint16_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint16_dec_le, box_uint16_predicate)
-
-VIR_DEFINE_BORROWED_OBJECT_UINT32_UNARY_WRAPPER(lean_uint32_of_nat)
 
 extern "C" lean_object * l_UInt32_ofNatLT___boxed(lean_object * a, lean_object * proof) {
     uint32_t result = lean_uint32_of_nat(a);
@@ -750,34 +566,6 @@ extern "C" lean_object * l_UInt32_ofNatLT___boxed(lean_object * a, lean_object *
     return lean_box_uint32(result);
 }
 
-VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER(lean_uint32_to_nat, UINT32)
-
-VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_uint32_to_uint8, UINT32, UINT8)
-
-VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_uint32_to_uint16, UINT32, UINT16)
-
-VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_uint32_to_uint64, UINT32, UINT64)
-
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_add, box_uint32_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_sub, box_uint32_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_mul, box_uint32_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_div, box_uint32_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_mod, box_uint32_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_land, box_uint32_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_lor, box_uint32_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_xor, box_uint32_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_shift_left, box_uint32_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_shift_right, box_uint32_binary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint32_complement, box_uint32_unary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint32_neg, box_uint32_unary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_dec_eq, box_uint32_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_dec_lt, box_uint32_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint32_dec_le, box_uint32_predicate)
-
-VIR_DEFINE_BORROWED_OBJECT_UINT64_UNARY_WRAPPER(lean_uint64_of_nat)
-
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_mix_hash, box_uint64_binary)
-
 extern "C" lean_object * l_UInt64_ofNatLT___boxed(lean_object * a, lean_object * proof) {
     uint64_t result = lean_uint64_of_nat(a);
     lean_dec(a);
@@ -785,40 +573,11 @@ extern "C" lean_object * l_UInt64_ofNatLT___boxed(lean_object * a, lean_object *
     return lean_box_uint64(result);
 }
 
-VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER(lean_uint64_to_nat, UINT64)
-
-VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_uint64_to_usize, UINT64, USIZE)
-
-VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_uint64_to_uint32, UINT64, UINT32)
-
 extern "C" lean_object * lean_uint64_to_uint8___boxed(lean_object * a) {
     uint8_t result = static_cast<uint8_t>(lean_unbox_uint64(a));
     lean_dec(a);
     return lean_box(result);
 }
-
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_add, box_uint64_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_sub, box_uint64_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_mul, box_uint64_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_div, box_uint64_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_mod, box_uint64_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_land, box_uint64_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_lor, box_uint64_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_xor, box_uint64_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_shift_left, box_uint64_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_shift_right, box_uint64_binary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint64_complement, box_uint64_unary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_uint64_neg, box_uint64_unary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_dec_eq, box_uint64_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_dec_lt, box_uint64_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_uint64_dec_le, box_uint64_predicate)
-
-#undef VIR_DEFINE_BOX_UNARY_WRAPPER
-#undef VIR_DEFINE_BOX_BINARY_WRAPPER
-
-VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_uint64_to_float, UINT64, FLOAT)
-
-VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER(lean_float_to_uint32, FLOAT, UINT32)
 
 VIR_DEFINE_BORROWED_OBJECT_UINT64_UNARY_WRAPPER(lean_expr_data)
 
@@ -830,27 +589,9 @@ VIR_DEFINE_BORROWED_OBJECT_UINT64_UNARY_WRAPPER(lean_expr_data)
 #undef VIR_DEFINE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER
 #undef VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_USIZE_UNARY_WRAPPER
 
-#undef VIR_NATIVE_FLOAT
 #undef VIR_NATIVE_UINT8
-#undef VIR_NATIVE_UINT16
-#undef VIR_NATIVE_UINT32
-#undef VIR_NATIVE_UINT64
-#undef VIR_NATIVE_USIZE
-#undef VIR_UNBOX_FLOAT
 #undef VIR_UNBOX_UINT8
-#undef VIR_UNBOX_UINT16
-#undef VIR_UNBOX_UINT32
-#undef VIR_UNBOX_UINT64
-#undef VIR_UNBOX_USIZE
-#undef VIR_BOX_FLOAT
-#undef VIR_BOX_UINT8
-#undef VIR_BOX_UINT16
-#undef VIR_BOX_UINT32
-#undef VIR_BOX_UINT64
-#undef VIR_BOX_USIZE
 #undef VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER
-#undef VIR_DEFINE_OWNED_SCALAR_SCALAR_UNARY_WRAPPER
-#undef VIR_DEFINE_OWNED_SCALAR_OBJECTLIKE_UNARY_WRAPPER
 #undef VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER
 
 extern "C" lean_object * lean_is_reserved_name___boxed(lean_object * env, lean_object * n) {

@@ -484,7 +484,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `USize.ofNat,
     params := #[param 1 true .tobject],
     resultType := .usize,
-    symbol := "lean_usize_of_nat"
+    symbol := "lean_usize_of_nat",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.ofNatLT,
@@ -496,61 +497,71 @@ def nativeExterns : Array NativeExtern := #[
     name := `USize.add,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .usize,
-    symbol := "lean_usize_add"
+    symbol := "lean_usize_add",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.sub,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .usize,
-    symbol := "lean_usize_sub"
+    symbol := "lean_usize_sub",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.mul,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .usize,
-    symbol := "lean_usize_mul"
+    symbol := "lean_usize_mul",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.land,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .usize,
-    symbol := "lean_usize_land"
+    symbol := "lean_usize_land",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.shiftLeft,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .usize,
-    symbol := "lean_usize_shift_left"
+    symbol := "lean_usize_shift_left",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.shiftRight,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .usize,
-    symbol := "lean_usize_shift_right"
+    symbol := "lean_usize_shift_right",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.toNat,
     params := #[param 1 false .usize],
     resultType := .tobject,
-    symbol := "lean_usize_to_nat"
+    symbol := "lean_usize_to_nat",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.decEq,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .uint8,
-    symbol := "lean_usize_dec_eq"
+    symbol := "lean_usize_dec_eq",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.decLt,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .uint8,
-    symbol := "lean_usize_dec_lt"
+    symbol := "lean_usize_dec_lt",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.decLe,
     params := #[param 1 false .usize, param 2 false .usize],
     resultType := .uint8,
-    symbol := "lean_usize_dec_le"
+    symbol := "lean_usize_dec_le",
+    generateBoxedWrapper := true
   },
   {
     name := `USize.repr,
@@ -801,7 +812,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `UInt8.toNat,
     params := #[param 1 false .uint8],
     resultType := .tagged,
-    symbol := "lean_uint8_to_nat"
+    symbol := "lean_uint8_to_nat",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.toUInt32,
@@ -813,199 +825,232 @@ def nativeExterns : Array NativeExtern := #[
     name := `UInt8.add,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_add"
+    symbol := "lean_uint8_add",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.sub,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_sub"
+    symbol := "lean_uint8_sub",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.mul,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_mul"
+    symbol := "lean_uint8_mul",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.div,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_div"
+    symbol := "lean_uint8_div",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.mod,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_mod"
+    symbol := "lean_uint8_mod",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.land,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_land"
+    symbol := "lean_uint8_land",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.lor,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_lor"
+    symbol := "lean_uint8_lor",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.xor,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_xor"
+    symbol := "lean_uint8_xor",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.shiftLeft,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_shift_left"
+    symbol := "lean_uint8_shift_left",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.shiftRight,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_shift_right"
+    symbol := "lean_uint8_shift_right",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.complement,
     params := #[param 1 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_complement"
+    symbol := "lean_uint8_complement",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.neg,
     params := #[param 1 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_neg"
+    symbol := "lean_uint8_neg",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.decEq,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_dec_eq"
+    symbol := "lean_uint8_dec_eq",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.decLt,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_dec_lt"
+    symbol := "lean_uint8_dec_lt",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.decLe,
     params := #[param 1 false .uint8, param 2 false .uint8],
     resultType := .uint8,
-    symbol := "lean_uint8_dec_le"
+    symbol := "lean_uint8_dec_le",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.toNat,
     params := #[param 1 false .uint16],
     resultType := .tagged,
-    symbol := "lean_uint16_to_nat"
+    symbol := "lean_uint16_to_nat",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.toUInt32,
     params := #[param 1 false .uint16],
     resultType := .uint32,
-    symbol := "lean_uint16_to_uint32"
+    symbol := "lean_uint16_to_uint32",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.add,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_add"
+    symbol := "lean_uint16_add",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.sub,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_sub"
+    symbol := "lean_uint16_sub",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.mul,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_mul"
+    symbol := "lean_uint16_mul",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.div,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_div"
+    symbol := "lean_uint16_div",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.mod,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_mod"
+    symbol := "lean_uint16_mod",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.land,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_land"
+    symbol := "lean_uint16_land",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.lor,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_lor"
+    symbol := "lean_uint16_lor",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.xor,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_xor"
+    symbol := "lean_uint16_xor",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.shiftLeft,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_shift_left"
+    symbol := "lean_uint16_shift_left",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.shiftRight,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_shift_right"
+    symbol := "lean_uint16_shift_right",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.complement,
     params := #[param 1 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_complement"
+    symbol := "lean_uint16_complement",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.neg,
     params := #[param 1 false .uint16],
     resultType := .uint16,
-    symbol := "lean_uint16_neg"
+    symbol := "lean_uint16_neg",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.decEq,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint8,
-    symbol := "lean_uint16_dec_eq"
+    symbol := "lean_uint16_dec_eq",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.decLt,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint8,
-    symbol := "lean_uint16_dec_lt"
+    symbol := "lean_uint16_dec_lt",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt16.decLe,
     params := #[param 1 false .uint16, param 2 false .uint16],
     resultType := .uint8,
-    symbol := "lean_uint16_dec_le"
+    symbol := "lean_uint16_dec_le",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.ofNat,
     params := #[param 1 true .tobject],
     resultType := .uint32,
-    symbol := "lean_uint32_of_nat"
+    symbol := "lean_uint32_of_nat",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.ofNatLT,
@@ -1017,127 +1062,148 @@ def nativeExterns : Array NativeExtern := #[
     name := `UInt32.toNat,
     params := #[param 1 false .uint32],
     resultType := .tobject,
-    symbol := "lean_uint32_to_nat"
+    symbol := "lean_uint32_to_nat",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.toUInt8,
     params := #[param 1 false .uint32],
     resultType := .uint8,
-    symbol := "lean_uint32_to_uint8"
+    symbol := "lean_uint32_to_uint8",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.toUInt16,
     params := #[param 1 false .uint32],
     resultType := .uint16,
-    symbol := "lean_uint32_to_uint16"
+    symbol := "lean_uint32_to_uint16",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.toUInt64,
     params := #[param 1 false .uint32],
     resultType := .uint64,
-    symbol := "lean_uint32_to_uint64"
+    symbol := "lean_uint32_to_uint64",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.add,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_add"
+    symbol := "lean_uint32_add",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.sub,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_sub"
+    symbol := "lean_uint32_sub",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.mul,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_mul"
+    symbol := "lean_uint32_mul",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.div,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_div"
+    symbol := "lean_uint32_div",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.mod,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_mod"
+    symbol := "lean_uint32_mod",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.land,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_land"
+    symbol := "lean_uint32_land",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.lor,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_lor"
+    symbol := "lean_uint32_lor",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.xor,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_xor"
+    symbol := "lean_uint32_xor",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.shiftLeft,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_shift_left"
+    symbol := "lean_uint32_shift_left",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.shiftRight,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_shift_right"
+    symbol := "lean_uint32_shift_right",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.complement,
     params := #[param 1 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_complement"
+    symbol := "lean_uint32_complement",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.neg,
     params := #[param 1 false .uint32],
     resultType := .uint32,
-    symbol := "lean_uint32_neg"
+    symbol := "lean_uint32_neg",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.decEq,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint8,
-    symbol := "lean_uint32_dec_eq"
+    symbol := "lean_uint32_dec_eq",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.decLt,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint8,
-    symbol := "lean_uint32_dec_lt"
+    symbol := "lean_uint32_dec_lt",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt32.decLe,
     params := #[param 1 false .uint32, param 2 false .uint32],
     resultType := .uint8,
-    symbol := "lean_uint32_dec_le"
+    symbol := "lean_uint32_dec_le",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.ofNat,
     params := #[param 1 true .tobject],
     resultType := .uint64,
-    symbol := "lean_uint64_of_nat"
+    symbol := "lean_uint64_of_nat",
+    generateBoxedWrapper := true
   },
   {
     name := `mixHash,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_mix_hash"
+    symbol := "lean_uint64_mix_hash",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.ofNatLT,
@@ -1149,19 +1215,22 @@ def nativeExterns : Array NativeExtern := #[
     name := `UInt64.toNat,
     params := #[param 1 false .uint64],
     resultType := .tobject,
-    symbol := "lean_uint64_to_nat"
+    symbol := "lean_uint64_to_nat",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.toUSize,
     params := #[param 1 false .uint64],
     resultType := .usize,
-    symbol := "lean_uint64_to_usize"
+    symbol := "lean_uint64_to_usize",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.toUInt32,
     params := #[param 1 false .uint64],
     resultType := .uint32,
-    symbol := "lean_uint64_to_uint32"
+    symbol := "lean_uint64_to_uint32",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.toUInt8,
@@ -1173,97 +1242,113 @@ def nativeExterns : Array NativeExtern := #[
     name := `UInt64.add,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_add"
+    symbol := "lean_uint64_add",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.sub,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_sub"
+    symbol := "lean_uint64_sub",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.mul,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_mul"
+    symbol := "lean_uint64_mul",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.div,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_div"
+    symbol := "lean_uint64_div",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.mod,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_mod"
+    symbol := "lean_uint64_mod",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.land,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_land"
+    symbol := "lean_uint64_land",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.lor,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_lor"
+    symbol := "lean_uint64_lor",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.xor,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_xor"
+    symbol := "lean_uint64_xor",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.shiftLeft,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_shift_left"
+    symbol := "lean_uint64_shift_left",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.shiftRight,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_shift_right"
+    symbol := "lean_uint64_shift_right",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.complement,
     params := #[param 1 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_complement"
+    symbol := "lean_uint64_complement",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.neg,
     params := #[param 1 false .uint64],
     resultType := .uint64,
-    symbol := "lean_uint64_neg"
+    symbol := "lean_uint64_neg",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.decEq,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint8,
-    symbol := "lean_uint64_dec_eq"
+    symbol := "lean_uint64_dec_eq",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.decLt,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint8,
-    symbol := "lean_uint64_dec_lt"
+    symbol := "lean_uint64_dec_lt",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.decLe,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint8,
-    symbol := "lean_uint64_dec_le"
+    symbol := "lean_uint64_dec_le",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.toFloat,
     params := #[param 1 false .uint64],
     resultType := .float,
-    symbol := "lean_uint64_to_float"
+    symbol := "lean_uint64_to_float",
+    generateBoxedWrapper := true
   },
   {
     name := `Float.scaleB,
@@ -1276,7 +1361,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Float.toUInt32,
     params := #[param 1 false .float],
     resultType := .uint32,
-    symbol := "lean_float_to_uint32"
+    symbol := "lean_float_to_uint32",
+    generateBoxedWrapper := true
   },
   {
     name := `Lean.Level.mkData,
