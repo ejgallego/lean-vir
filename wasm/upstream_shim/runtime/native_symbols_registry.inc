@@ -6,11 +6,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
 */
 
 #define VIR_NATIVE_SYMBOLS(X, X_CONST) \
-    X("IO.initializing", "lean_io_initializing", lean_io_initializing___boxed) \
-    X("ST.Prim.mkRef", "lean_st_mk_ref", lean_st_mk_ref___boxed) \
-    X("ST.Prim.Ref.get", "lean_st_ref_get", lean_st_ref_get___boxed) \
-    X("ST.Prim.Ref.set", "lean_st_ref_set", lean_st_ref_set___boxed) \
-    X("ST.Prim.Ref.take", "lean_st_ref_take", lean_st_ref_take___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.isReservedName", "lean_is_reserved_name", lean_is_reserved_name___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.evalCheckMeta", "lean_eval_check_meta", lean_eval_check_meta___boxed) \
     X("Array.mkEmpty", "lean_array_mk_empty", lean_array_mk_empty___boxed) \

@@ -82,7 +82,9 @@ not a fork of Lean. It is split by responsibility:
   that generated C and links it statically into the WASI module.
 - `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`,
   `runtime/runtime_value_stubs.cpp`, and `runtime/io_stubs.cpp` own the
-  WASI/platform, initializer, value-helper, and demo IO stubs.
+  WASI/platform, initializer, value-helper, and demo IO providers. Local raw
+  extern implementations belong in these focused provider files even when
+  Lean's compiler can generate their ordinary boxed adapters.
 - `runtime/lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
   constructor replacements for exported Lean-library constructors.
 - `package/package_section_directory.cpp` owns `.irpkg` envelope and section
@@ -152,15 +154,21 @@ build then recompiles those imported extern declarations and emits only their
 compiler-generated boxed wrappers. The native extern table is the source of
 truth for the current selection; `npm run inspect:native-wrappers` reports it
 without duplicating an evolving declaration list here. Wrappers that implement
-additional behavior, unavailable runtime services, or deliberate WASI policy
-remain explicit in `runtime/native_symbols.cpp`.
+additional behavior or deliberate ownership policy remain explicit in
+`runtime/native_symbols.cpp`. When VIR substitutes a local raw implementation
+for an unavailable runtime service or WASI policy, that implementation belongs
+in the relevant provider file and its boxed adapter is still generated whenever
+the standard compiler output is correct.
 
 `npm run check:native-wrappers` rejects ordinary handwritten direct adapters.
-The intentional ownership exception is `Array.ugetBorrowed`: its raw result is
-borrowed from the array, while Lean's standard emitted boxed wrapper releases
-the array without first retaining that result. The explicit shim wrapper keeps
-the required retain visible and the inventory check fails if this exception is
-removed, reclassified, or duplicated without updating the policy.
+The intentional ownership exceptions are the borrowed array getters
+`Array.ugetBorrowed`, `Array.fgetBorrowed`, and `Array.getBorrowed`: their raw
+results are borrowed from the array, while a standard emitted boxed wrapper
+would release the array without first retaining the result. The explicit shim
+wrapper for `Array.ugetBorrowed` retains the result before releasing the array;
+the other two wrappers deliberately call the corresponding owned runtime APIs.
+The inventory keeps `Array.ugetBorrowed` as the canonical guarded exception and
+classifies the two owned-runtime substitutions as custom wrappers.
 
 ## Real IR Declarations
 
@@ -364,9 +372,11 @@ and `Task.bind`, and `Lean.addDecl` can use `BaseIO.mapTask`. The current
 `pretty-printer.irpkg` intentionally stops at `Std.Format.pretty`; supporting
 `ppExpr` requires broadening the runtime boundary to Meta/Environment task and
 promise support plus the parenthesizer/formatter interpreter externs.
-`IO.initializing` is modeled as post-initialization, and `ST.Prim.mkRef`/
-`ST.Prim.Ref.get` cover single-threaded ref allocation/read semantics. Mutation,
-blocking IO, and scheduler behavior are still outside the demo boundary.
+`runtime/io_stubs.cpp` provides the local raw `IO.initializing` and
+`ST.Prim.Ref` operations, while Lean's compiler generates their boxed ABI
+adapters. `IO.initializing` is modeled as post-initialization, and the ST
+providers cover single-threaded reference allocation, read, write, and take
+semantics. Blocking IO and scheduler behavior remain outside the demo boundary.
 They are backed by a generated native registry include; a full native symbol
 loader is still out of scope. The public String search/drop fixture currently
 imports a small upstream IR closure and adds native registrations for the

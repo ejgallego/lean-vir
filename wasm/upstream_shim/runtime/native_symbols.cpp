@@ -41,16 +41,6 @@ lean_object * lean_string_utf8_set(lean_object * str, lean_object * pos, uint32_
 uint8_t lean_string_is_valid_pos(lean_object * str, lean_object * pos);
 }
 
-static uint8_t g_vir_io_initializing = 0;
-
-extern "C" void vir_set_io_initializing(uint8_t value) {
-    g_vir_io_initializing = value ? 1 : 0;
-}
-
-extern "C" uint8_t vir_get_io_initializing(void) {
-    return g_vir_io_initializing;
-}
-
 static size_t nat_to_size_or_max(lean_object * n) {
     return lean_is_scalar(n) ? lean_unbox(n) : SIZE_MAX;
 }
@@ -58,71 +48,6 @@ static size_t nat_to_size_or_max(lean_object * n) {
 static size_t substring_repaired_pos(lean_object * s, lean_object * p) {
     size_t end = lean_string_size(s) - 1;
     return lean_string_is_valid_pos(s, p) ? nat_to_size_or_max(p) : end;
-}
-
-extern "C" lean_object * lean_io_initializing___boxed(lean_object * world) {
-    lean_dec(world);
-    return lean_box(g_vir_io_initializing);
-}
-
-extern "C" lean_object * lean_st_mk_ref___boxed(
-    lean_object * sigma,
-    lean_object * alpha,
-    lean_object * value,
-    lean_object * world) {
-    lean_dec(sigma);
-    lean_dec(alpha);
-    lean_dec(world);
-    lean_ref_object * ref = reinterpret_cast<lean_ref_object *>(lean_alloc_small_object(sizeof(lean_ref_object)));
-    lean_set_st_header(reinterpret_cast<lean_object *>(ref), LeanRef, 0);
-    ref->m_value = value;
-    return reinterpret_cast<lean_object *>(ref);
-}
-
-extern "C" lean_object * lean_st_ref_get___boxed(
-    lean_object * sigma,
-    lean_object * alpha,
-    lean_object * ref,
-    lean_object * world) {
-    lean_dec(sigma);
-    lean_dec(alpha);
-    lean_dec(world);
-    lean_object * value = lean_to_ref(ref)->m_value;
-    lean_inc(value);
-    lean_dec(ref);
-    return value;
-}
-
-extern "C" lean_object * lean_st_ref_set___boxed(
-    lean_object * sigma,
-    lean_object * alpha,
-    lean_object * ref,
-    lean_object * value,
-    lean_object * world) {
-    lean_dec(sigma);
-    lean_dec(alpha);
-    lean_dec(world);
-    lean_ref_object * ref_obj = lean_to_ref(ref);
-    lean_object * old_value = ref_obj->m_value;
-    ref_obj->m_value = value;
-    lean_dec(old_value);
-    lean_dec(ref);
-    return lean_box(0);
-}
-
-extern "C" lean_object * lean_st_ref_take___boxed(
-    lean_object * sigma,
-    lean_object * alpha,
-    lean_object * ref,
-    lean_object * world) {
-    lean_dec(sigma);
-    lean_dec(alpha);
-    lean_dec(world);
-    lean_ref_object * ref_obj = lean_to_ref(ref);
-    lean_object * value = ref_obj->m_value;
-    ref_obj->m_value = nullptr;
-    lean_dec(ref);
-    return value;
 }
 
 extern "C" lean_object * lean_array_mk_empty___boxed(lean_object * type, lean_object * capacity) {

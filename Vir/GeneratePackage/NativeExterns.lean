@@ -200,7 +200,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `IO.initializing,
     params := #[param 1 false .void],
     resultType := .uint8,
-    symbol := "lean_io_initializing"
+    symbol := "lean_io_initializing",
+    generateBoxedWrapper := true
   },
   {
     name := `ST.Prim.mkRef,
@@ -211,7 +212,8 @@ def nativeExterns : Array NativeExtern := #[
       param 4 false .void
     ],
     resultType := .tobject,
-    symbol := "lean_st_mk_ref"
+    symbol := "lean_st_mk_ref",
+    generateBoxedWrapper := true
   },
   {
     name := `ST.Prim.Ref.get,
@@ -222,7 +224,8 @@ def nativeExterns : Array NativeExtern := #[
       param 4 false .void
     ],
     resultType := .tobject,
-    symbol := "lean_st_ref_get"
+    symbol := "lean_st_ref_get",
+    generateBoxedWrapper := true
   },
   {
     name := `ST.Prim.Ref.set,
@@ -234,7 +237,8 @@ def nativeExterns : Array NativeExtern := #[
       param 5 false .void
     ],
     resultType := .tagged,
-    symbol := "lean_st_ref_set"
+    symbol := "lean_st_ref_set",
+    generateBoxedWrapper := true
   },
   {
     name := `ST.Prim.Ref.take,
@@ -245,7 +249,8 @@ def nativeExterns : Array NativeExtern := #[
       param 4 false .void
     ],
     resultType := .tobject,
-    symbol := "lean_st_ref_take"
+    symbol := "lean_st_ref_take",
+    generateBoxedWrapper := true
   },
   {
     name := privateEnvironmentName "isReservedName",
