@@ -537,24 +537,6 @@ VIR_DEFINE_DROP_TYPE_OBJECT_BINARY_WRAPPER(lean_mk_array)
 #undef VIR_DEFINE_DROP_TYPE_OBJECT_UNARY_WRAPPER
 #undef VIR_DEFINE_DROP_TYPE_OBJECT_BINARY_WRAPPER
 
-extern "C" lean_object * lean_array_swap___boxed(lean_object * type, lean_object * array, lean_object * i, lean_object * j) {
-    lean_dec(type);
-    lean_object * result = lean_array_swap(array, i, j);
-    lean_dec(i);
-    lean_dec(j);
-    return result;
-}
-
-extern "C" lean_object * lean_array_fswap___boxed(lean_object * type, lean_object * array, lean_object * i, lean_object * j, lean_object * hi, lean_object * hj) {
-    lean_dec(type);
-    lean_object * result = lean_array_fswap(array, i, j);
-    lean_dec(i);
-    lean_dec(j);
-    lean_dec(hi);
-    lean_dec(hj);
-    return result;
-}
-
 VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(lean_byte_array_mk)
 
 VIR_DEFINE_OWNED_OBJECTLIKE_SCALAR_BINARY_WRAPPER(lean_byte_array_push, UINT8)
