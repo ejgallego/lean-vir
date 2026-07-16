@@ -318,7 +318,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.uget,
     params := #[param 1 false .erased, param 2 true .object, param 3 false .usize, param 4 false .erased],
     resultType := .tobject,
-    symbol := "lean_array_uget"
+    symbol := "lean_array_uget",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.ugetBorrowed,
@@ -330,7 +331,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.getInternal,
     params := #[param 1 false .erased, param 2 true .object, param 3 true .tobject, param 4 false .erased],
     resultType := .tobject,
-    symbol := "lean_array_fget"
+    symbol := "lean_array_fget",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.getInternalBorrowed,
@@ -342,7 +344,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.get!Internal,
     params := #[param 1 false .erased, param 2 true .tobject, param 3 true .object, param 4 true .tobject],
     resultType := .tobject,
-    symbol := "lean_array_get"
+    symbol := "lean_array_get",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.get!InternalBorrowed,
@@ -354,19 +357,22 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.uset,
     params := #[param 1 false .erased, param 2 false .object, param 3 false .usize, param 4 false .tobject, param 5 false .erased],
     resultType := .object,
-    symbol := "lean_array_uset"
+    symbol := "lean_array_uset",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.set,
     params := #[param 1 false .erased, param 2 false .object, param 3 true .tobject, param 4 false .tobject, param 5 false .erased],
     resultType := .object,
-    symbol := "lean_array_fset"
+    symbol := "lean_array_fset",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.set!,
     params := #[param 1 false .erased, param 2 false .object, param 3 true .tobject, param 4 false .tobject],
     resultType := .object,
-    symbol := "lean_array_set"
+    symbol := "lean_array_set",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.pop,

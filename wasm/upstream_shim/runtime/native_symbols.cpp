@@ -502,28 +502,10 @@ extern "C" lean_object * lean_array_to_list___boxed(lean_object * type, lean_obj
 
 VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_UNARY_WRAPPER(lean_array_get_size)
 
-extern "C" lean_object * lean_array_uget___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
-    lean_dec(type);
-    lean_object * result = lean_array_uget(array, lean_unbox_usize(index));
-    lean_dec(array);
-    lean_dec(index);
-    lean_dec(proof);
-    return result;
-}
-
 extern "C" lean_object * lean_array_uget_borrowed___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
     lean_dec(type);
     lean_object * result = lean_array_uget_borrowed(array, lean_unbox_usize(index));
     lean_inc(result);
-    lean_dec(array);
-    lean_dec(index);
-    lean_dec(proof);
-    return result;
-}
-
-extern "C" lean_object * lean_array_fget___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
-    lean_dec(type);
-    lean_object * result = lean_array_fget(array, index);
     lean_dec(array);
     lean_dec(index);
     lean_dec(proof);
@@ -539,43 +521,11 @@ extern "C" lean_object * lean_array_fget_borrowed___boxed(lean_object * type, le
     return result;
 }
 
-extern "C" lean_object * lean_array_get___boxed(lean_object * type, lean_object * default_value, lean_object * array, lean_object * index) {
-    lean_dec(type);
-    lean_object * result = lean_array_get(default_value, array, index);
-    lean_dec(default_value);
-    lean_dec(array);
-    lean_dec(index);
-    return result;
-}
-
 extern "C" lean_object * lean_array_get_borrowed___boxed(lean_object * type, lean_object * default_value, lean_object * array, lean_object * index) {
     lean_dec(type);
     lean_object * result = lean_array_get(default_value, array, index);
     lean_dec(default_value);
     lean_dec(array);
-    lean_dec(index);
-    return result;
-}
-
-extern "C" lean_object * lean_array_uset___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * value, lean_object * proof) {
-    lean_dec(type);
-    lean_object * result = lean_array_uset(array, lean_unbox_usize(index), value);
-    lean_dec(index);
-    lean_dec(proof);
-    return result;
-}
-
-extern "C" lean_object * lean_array_fset___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * value, lean_object * proof) {
-    lean_dec(type);
-    lean_object * result = lean_array_fset(array, index, value);
-    lean_dec(index);
-    lean_dec(proof);
-    return result;
-}
-
-extern "C" lean_object * lean_array_set___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * value) {
-    lean_dec(type);
-    lean_object * result = lean_array_set(array, index, value);
     lean_dec(index);
     return result;
 }

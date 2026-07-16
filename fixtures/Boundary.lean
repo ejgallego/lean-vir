@@ -159,15 +159,19 @@ def uint16UInt32ConversionScore : Nat :=
   widened.toNat + wrapped.toNat
 
 def arrayProofOpsScore : Nat :=
-  let xs : Array Nat := Array.emptyWithCapacity 4
-  let xs := (xs.push 10).push 20 |>.push 30
-  let mid := xs.getInternal 1 (by decide)
-  let xs := xs.set 0 99 (by decide)
-  let xs := xs.swap 0 2 (by decide) (by decide)
-  mid +
-  xs.getInternal 0 (by decide) +
-  xs.getInternal 1 (by decide) +
-  xs.getInternal 2 (by decide)
+  let xs : Array Nat := #[10, 20, 30]
+  let checked := xs.getInternal 1 (by decide)
+  let fallback := xs.get!Internal 2
+  let unchecked := xs.uget 0 (by decide)
+  let setResult := xs.set 0 40 (by decide)
+  let setBangResult := xs.set! 1 50
+  let usetResult := (#[10, 20, 30] : Array Nat).uset 2 60 (by simp)
+  let swapped := xs.swap 0 2 (by decide) (by decide)
+  checked + fallback + unchecked +
+    setResult.get!Internal 0 +
+    setBangResult.get!Internal 1 +
+    usetResult.get!Internal 2 +
+    swapped.get!Internal 0
 
 def byteArrayMkGetScore : Nat :=
   let bytes : ByteArray := ByteArray.mk #[65, 66, 67]

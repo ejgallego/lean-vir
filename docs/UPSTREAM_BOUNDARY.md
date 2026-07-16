@@ -146,8 +146,9 @@ inferred by the normal LCNF passes before calling the raw extern symbol.
 VIR keeps the final WASI module statically linked. Standard adapters can be
 marked with `generateBoxedWrapper := true` in the native extern table; the
 build then recompiles those imported extern declarations and emits only their
-compiler-generated boxed wrappers. `Array.usize`, `String.push`, and
-`Float.scaleB` are the initial representative set. Wrappers that implement
+compiler-generated boxed wrappers. The native extern table is the source of
+truth for the current selection; `npm run inspect:native-wrappers` reports it
+without duplicating an evolving declaration list here. Wrappers that implement
 additional behavior, unavailable runtime services, or deliberate WASI policy
 remain explicit in `runtime/native_symbols.cpp`.
 
