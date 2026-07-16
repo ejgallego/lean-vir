@@ -21,6 +21,14 @@ const intentionalDirectWrapperExceptions = new Map([
   ],
 ]);
 
+// Migration ratchet, not wrapper metadata: lower these counts whenever another
+// macro-generated family moves to Lean's compiler. The check prevents the
+// handwritten ordinary-wrapper population from growing again between batches.
+const expectedMacroGeneratedWrapperCounts = new Map([
+  ["generated-helper", 70],
+  ["generated-direct", 43],
+]);
+
 const args = new Set(process.argv.slice(2));
 for (const arg of args) {
   if (!["--all", "--check", "--json", "--regular-direct-shapes"].includes(arg)) {
@@ -866,9 +874,9 @@ if (args.has("--check")) {
   const directPolicyFailures = [];
   const foundDirectExceptions = new Set();
   for (const item of inventory) {
-    if (item.kind === "regular-direct") {
+    if (item.kind === "regular-helper" || item.kind === "regular-direct") {
       directPolicyFailures.push(
-        `${item.wrapper}: ordinary direct adapter must be compiler-generated or explicitly custom`,
+        `${item.wrapper}: ordinary adapter must be compiler-generated or explicitly custom`,
       );
     } else if (item.kind === "regular-direct-retain") {
       const reason = intentionalDirectWrapperExceptions.get(item.wrapper);
@@ -882,6 +890,14 @@ if (args.has("--check")) {
   for (const [wrapper, reason] of intentionalDirectWrapperExceptions) {
     if (!foundDirectExceptions.has(wrapper)) {
       directPolicyFailures.push(`${wrapper}: expected direct ownership exception is missing (${reason})`);
+    }
+  }
+  for (const [kind, expected] of expectedMacroGeneratedWrapperCounts) {
+    const actual = (byKind.get(kind) ?? []).length;
+    if (actual !== expected) {
+      directPolicyFailures.push(
+        `${kind}: expected ${expected} handwritten wrapper(s), found ${actual}; update the migration ratchet with the intentional conversion`,
+      );
     }
   }
   if (failures.length !== 0 || directPolicyFailures.length !== 0) {

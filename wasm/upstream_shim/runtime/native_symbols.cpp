@@ -65,26 +65,6 @@ extern "C" uint8_t vir_get_io_initializing(void) {
     return g_vir_io_initializing;
 }
 
-static lean_object * box_object_binary(lean_object * a, lean_object * b, lean_object * (*fn)(lean_object *, lean_object *)) {
-    lean_object * result = fn(a, b);
-    lean_dec(a);
-    lean_dec(b);
-    return result;
-}
-
-static lean_object * box_object_unary(lean_object * a, lean_object * (*fn)(lean_object *)) {
-    lean_object * result = fn(a);
-    lean_dec(a);
-    return result;
-}
-
-static lean_object * box_object_predicate(lean_object * a, lean_object * b, uint8_t (*fn)(lean_object *, lean_object *)) {
-    uint8_t result = fn(a, b);
-    lean_dec(a);
-    lean_dec(b);
-    return lean_box(result);
-}
-
 static lean_object * box_uint8_binary(lean_object * a, lean_object * b, uint8_t (*fn)(uint8_t, uint8_t)) {
     uint8_t result = fn(static_cast<uint8_t>(lean_unbox(a)), static_cast<uint8_t>(lean_unbox(b)));
     lean_dec(a);
@@ -195,30 +175,6 @@ static size_t substring_repaired_pos(lean_object * s, lean_object * p) {
     extern "C" lean_object * symbol##___boxed(lean_object * a) { \
         return symbol(a); \
     }
-
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_add, box_object_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_sub, box_object_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_dec_eq, box_object_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_dec_le, box_object_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_dec_lt, box_object_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_mul, box_object_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_div, box_object_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_mod, box_object_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_pow, box_object_binary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_nat_log2, box_object_unary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_shiftl, box_object_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_nat_shiftr, box_object_binary)
-
-VIR_DEFINE_OWNED_OBJECTLIKE_UNARY_WRAPPER(lean_nat_to_int)
-
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_add, box_object_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_sub, box_object_binary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_mul, box_object_binary)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_int_neg, box_object_unary)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_dec_lt, box_object_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_dec_eq, box_object_predicate)
-VIR_DEFINE_BOX_BINARY_WRAPPER(lean_int_dec_le, box_object_predicate)
-VIR_DEFINE_BOX_UNARY_WRAPPER(lean_nat_abs, box_object_unary)
 
 extern "C" lean_object * lean_system_platform_nbits___boxed(lean_object * unit) {
     lean_dec(unit);

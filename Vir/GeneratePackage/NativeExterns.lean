@@ -25,133 +25,155 @@ def nativeExterns : Array NativeExtern := #[
     name := `Nat.add,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_add"
+    symbol := "lean_nat_add",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.sub,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_sub"
+    symbol := "lean_nat_sub",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.decEq,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_nat_dec_eq"
+    symbol := "lean_nat_dec_eq",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.decLe,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_nat_dec_le"
+    symbol := "lean_nat_dec_le",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.ble,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_nat_dec_le"
+    symbol := "lean_nat_dec_le",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.decLt,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_nat_dec_lt"
+    symbol := "lean_nat_dec_lt",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.mul,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_mul"
+    symbol := "lean_nat_mul",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.div,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_div"
+    symbol := "lean_nat_div",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.mod,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_mod"
+    symbol := "lean_nat_mod",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.pow,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_pow"
+    symbol := "lean_nat_pow",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.log2,
     params := #[param 1 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_log2"
+    symbol := "lean_nat_log2",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.shiftLeft,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_shiftl"
+    symbol := "lean_nat_shiftl",
+    generateBoxedWrapper := true
   },
   {
     name := `Nat.shiftRight,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_shiftr"
+    symbol := "lean_nat_shiftr",
+    generateBoxedWrapper := true
   },
   {
     name := `Int.ofNat,
     params := #[param 1 false .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_to_int"
+    symbol := "lean_nat_to_int",
+    generateBoxedWrapper := true
   },
   {
     name := `Int.add,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_int_add"
+    symbol := "lean_int_add",
+    generateBoxedWrapper := true
   },
   {
     name := `Int.sub,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_int_sub"
+    symbol := "lean_int_sub",
+    generateBoxedWrapper := true
   },
   {
     name := `Int.mul,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
-    symbol := "lean_int_mul"
+    symbol := "lean_int_mul",
+    generateBoxedWrapper := true
   },
   {
     name := `Int.neg,
     params := #[param 1 true .tobject],
     resultType := .tobject,
-    symbol := "lean_int_neg"
+    symbol := "lean_int_neg",
+    generateBoxedWrapper := true
   },
   {
     name := `Int.decLt,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_int_dec_lt"
+    symbol := "lean_int_dec_lt",
+    generateBoxedWrapper := true
   },
   {
     name := `Int.decEq,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_int_dec_eq"
+    symbol := "lean_int_dec_eq",
+    generateBoxedWrapper := true
   },
   {
     name := `Int.decLe,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .uint8,
-    symbol := "lean_int_dec_le"
+    symbol := "lean_int_dec_le",
+    generateBoxedWrapper := true
   },
   {
     name := `Int.natAbs,
     params := #[param 1 true .tobject],
     resultType := .tobject,
-    symbol := "lean_nat_abs"
+    symbol := "lean_nat_abs",
+    generateBoxedWrapper := true
   },
   {
     name := `System.Platform.getNumBits,

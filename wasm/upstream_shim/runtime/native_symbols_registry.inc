@@ -6,28 +6,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
 */
 
 #define VIR_NATIVE_SYMBOLS(X, X_CONST) \
-    X("Nat.add", "lean_nat_add", lean_nat_add___boxed) \
-    X("Nat.sub", "lean_nat_sub", lean_nat_sub___boxed) \
-    X("Nat.decEq", "lean_nat_dec_eq", lean_nat_dec_eq___boxed) \
-    X("Nat.decLe", "lean_nat_dec_le", lean_nat_dec_le___boxed) \
-    X("Nat.ble", "lean_nat_dec_le", lean_nat_dec_le___boxed) \
-    X("Nat.decLt", "lean_nat_dec_lt", lean_nat_dec_lt___boxed) \
-    X("Nat.mul", "lean_nat_mul", lean_nat_mul___boxed) \
-    X("Nat.div", "lean_nat_div", lean_nat_div___boxed) \
-    X("Nat.mod", "lean_nat_mod", lean_nat_mod___boxed) \
-    X("Nat.pow", "lean_nat_pow", lean_nat_pow___boxed) \
-    X("Nat.log2", "lean_nat_log2", lean_nat_log2___boxed) \
-    X("Nat.shiftLeft", "lean_nat_shiftl", lean_nat_shiftl___boxed) \
-    X("Nat.shiftRight", "lean_nat_shiftr", lean_nat_shiftr___boxed) \
-    X("Int.ofNat", "lean_nat_to_int", lean_nat_to_int___boxed) \
-    X("Int.add", "lean_int_add", lean_int_add___boxed) \
-    X("Int.sub", "lean_int_sub", lean_int_sub___boxed) \
-    X("Int.mul", "lean_int_mul", lean_int_mul___boxed) \
-    X("Int.neg", "lean_int_neg", lean_int_neg___boxed) \
-    X("Int.decLt", "lean_int_dec_lt", lean_int_dec_lt___boxed) \
-    X("Int.decEq", "lean_int_dec_eq", lean_int_dec_eq___boxed) \
-    X("Int.decLe", "lean_int_dec_le", lean_int_dec_le___boxed) \
-    X("Int.natAbs", "lean_nat_abs", lean_nat_abs___boxed) \
     X("System.Platform.getNumBits", "lean_system_platform_nbits", lean_system_platform_nbits___boxed) \
     X("ptrAddrUnsafe", "lean_ptr_addr", lean_ptr_addr___boxed) \
     X("IO.initializing", "lean_io_initializing", lean_io_initializing___boxed) \
