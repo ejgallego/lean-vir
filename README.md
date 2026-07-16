@@ -40,6 +40,10 @@ def answer : Nat := 42
 def mount : Lean.Vir.Browser.DomM Unit := pure ()
 ```
 
+Use `@[vir_export]` for declarations that JavaScript calls explicitly. A
+`@[vir_startup]` hook is also exported, but the host normally invokes it through
+`vir.runStartupEntries()` after loading the package.
+
 ```bash
 lake build +MySlides.Runtime:vir
 lake build :virSdk

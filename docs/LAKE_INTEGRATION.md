@@ -17,7 +17,7 @@ require lean_vir from git
 
 Then resolve the dependency once:
 
-```text
+```bash
 lake update lean_vir
 ```
 
@@ -28,8 +28,9 @@ described under [Install The Browser SDK](#install-the-browser-sdk).
 
 Import `Vir` and mark JavaScript-callable declarations with `@[vir_export]`.
 Use `@[vir_startup]` for startup hooks that the browser host should run after
-loading the package. An entry is also an export and must take no JavaScript
-arguments and return `Unit` through a supported effect such as `DomM`.
+loading the package. A startup hook is also an export and must take no
+JavaScript arguments and return `Unit` through a supported effect such as
+`DomM`.
 
 ```lean
 import Vir
@@ -48,6 +49,17 @@ def mount : DomM Unit := do
 
 end MySlides.Runtime
 ```
+
+Choose the marker according to how the browser host should invoke the
+declaration:
+
+- `@[vir_export]` makes a declaration callable explicitly with `vir.call(...)`.
+- `@[vir_startup]` is also an export and sets `startup: true` in the manifest;
+  `vir.runStartupEntries()` invokes it as a startup hook.
+
+Startup hooks must take no JavaScript arguments and return `Unit`, possibly
+through a supported effect such as `DomM`. Ordinary exports use the full
+supported argument and result surface.
 
 Only declarations marked in the requested module are selected. Imported
 declarations are not implicitly re-exported. A marked build with no matching
@@ -71,7 +83,7 @@ broader browser library has not yet migrated to the module system.
 
 ## Build The Module
 
-```text
+```bash
 lake build +MySlides.Runtime:vir
 ```
 
@@ -113,7 +125,7 @@ configuration.
 
 ## Install The Browser SDK
 
-```text
+```bash
 lake build :virSdk
 ```
 
@@ -121,7 +133,7 @@ This installs the release matching the installed `lean_vir` package version
 under `.lake/build/vir/sdk/`. The corresponding GitHub release must exist; for
 an unreleased revision, select the exact pinned commit:
 
-```text
+```bash
 VIR_SDK_COMMIT=<lean-vir-revision> lake build :virSdk
 ```
 
@@ -161,7 +173,7 @@ element and canvas, draws a moving rectangle, and schedules every animation
 frame entirely from Lean. Build its package with the same facet used by client
 projects:
 
-```text
+```bash
 lake build +SlidesCanvas:vir
 ```
 

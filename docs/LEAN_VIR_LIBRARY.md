@@ -14,15 +14,32 @@ Package generation commands run that step automatically and add
 `build/lean-lib` to `LEAN_PATH`, so local `.lean` sources can import the
 modules below.
 
-## User Workflow
+## Package Markers
+
+`Vir.Attributes` provides the markers used by the Lake `:vir` module facet.
+Importing `Vir` also imports these attributes.
+
+- `@[vir_export]` selects a declaration for explicit JavaScript calls.
+- `@[vir_startup]` selects a zero-argument, `Unit`-returning startup hook. A
+  startup hook is also an export and carries `startup: true` in the interface
+  manifest.
+
+After loading the generated package, JavaScript calls ordinary exports with
+`vir.call(...)` and invokes startup hooks with `vir.runStartupEntries()`.
+See [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md) for the complete downstream Lake
+workflow.
+
+## Local One-File Workflow
 
 For the built-in browser and common host imports, the Lean code is the only
 piece users need to write. The JavaScript runtime already provides default
 bindings for `common.*` and `browser.*` targets. Browser packages that call
 `Lean.Vir.React.Root.*` or `Lean.Vir.React.Hooks.*` should also install the
 bindings from `lean-vir/react-host-bindings`; the Node wrapper provides virtual
-React bindings for tests. The JavaScript-side binding composition reference lives in
-`docs/JS_API.md`.
+React bindings for tests. The JavaScript-side binding composition reference
+lives in [JS_API.md](JS_API.md). This section documents the repository-local
+package generator; downstream Lake packages should prefer the facet workflow
+above.
 
 1. Import the Lean module that provides the host import.
 

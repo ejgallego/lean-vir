@@ -30,7 +30,10 @@ private def virModuleOutput (mod : Module) (kind ext : String) : System.FilePath
 
 private def virSdkVersion : String := "0.1.0"
 
-/-- Build a marked VIR package for one compiled Lean module. -/
+/--
+Build a VIR package from the module's `@[vir_export]` and `@[vir_startup]`
+declarations.
+-/
 module_facet vir (mod : Module) : System.FilePath := do
   let generatorJob ← vir_irpkg.fetch
   let moduleJob ← mod.leanArts.fetch
@@ -70,7 +73,10 @@ module_facet vir (mod : Module) : System.FilePath := do
         }
       return packagePath
 
-/-- Install the matching browser runtime SDK under the package build directory. -/
+/--
+Install and verify the matching VIR browser SDK under the package build
+directory.
+-/
 package_facet virSdk (pkg : Package) : System.FilePath := do
   let fetcherJob ← vir_fetch_sdk.fetch
   let sdkDir := pkg.buildDir / "vir" / "sdk"

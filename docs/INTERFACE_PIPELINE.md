@@ -134,7 +134,8 @@ ordinary host-resource import mode. Lean assigns tags in
 them in `web/src/runtime/interface-tags.js`. Run `npm run check:package-abi`
 after editing either side.
 Manifest schema version 7 requires every export to carry an explicit Boolean
-`startup` marker. The runtime still accepts version 6 manifests and normalizes
+`startup` marker. Package generation sets it for declarations marked with
+`@[vir_startup]`. The runtime still accepts version 6 manifests and normalizes
 a missing marker to `false`. Version 6 intentionally rejected the old
 `wireTag` field and `wire` host-import boundary label instead of accepting
 aliases.
