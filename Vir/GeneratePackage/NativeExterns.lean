@@ -179,7 +179,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `System.Platform.getNumBits,
     params := #[param 1 false .tagged],
     resultType := .tobject,
-    symbol := "lean_system_platform_nbits"
+    symbol := "lean_system_platform_nbits",
+    generateBoxedWrapper := true
   },
   {
     name := `panicCore,
@@ -296,7 +297,8 @@ def nativeExterns : Array NativeExtern := #[
       param 6 false .uint8
     ],
     resultType := .object,
-    symbol := "lean_task_map"
+    symbol := "lean_task_map",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.mkEmpty,
@@ -817,7 +819,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `String.compare,
     params := #[param 1 true .object, param 2 true .object],
     resultType := .uint8,
-    symbol := "lean_string_compare"
+    symbol := "lean_string_compare",
+    generateBoxedWrapper := true
   },
   {
     name := `String.Slice.Pattern.Internal.memcmpStr,
@@ -850,7 +853,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `UInt8.toUInt32,
     params := #[param 1 false .uint8],
     resultType := .uint32,
-    symbol := "lean_uint8_to_uint32"
+    symbol := "lean_uint8_to_uint32",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt8.add,
@@ -1267,7 +1271,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `UInt64.toUInt8,
     params := #[param 1 false .uint64],
     resultType := .uint8,
-    symbol := "lean_uint64_to_uint8"
+    symbol := "lean_uint64_to_uint8",
+    generateBoxedWrapper := true
   },
   {
     name := `UInt64.add,

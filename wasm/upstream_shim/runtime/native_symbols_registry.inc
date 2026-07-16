@@ -6,7 +6,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
 */
 
 #define VIR_NATIVE_SYMBOLS(X, X_CONST) \
-    X("System.Platform.getNumBits", "lean_system_platform_nbits", lean_system_platform_nbits___boxed) \
     X("IO.initializing", "lean_io_initializing", lean_io_initializing___boxed) \
     X("ST.Prim.mkRef", "lean_st_mk_ref", lean_st_mk_ref___boxed) \
     X("ST.Prim.Ref.get", "lean_st_ref_get", lean_st_ref_get___boxed) \
@@ -14,7 +13,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("ST.Prim.Ref.take", "lean_st_ref_take", lean_st_ref_take___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.isReservedName", "lean_is_reserved_name", lean_is_reserved_name___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.evalCheckMeta", "lean_eval_check_meta", lean_eval_check_meta___boxed) \
-    X("Task.map", "lean_task_map", lean_task_map___boxed) \
     X("Array.mkEmpty", "lean_array_mk_empty", lean_array_mk_empty___boxed) \
     X("Array.emptyWithCapacity", "lean_array_mk_empty", lean_array_mk_empty___boxed) \
     X("Array.mk", "lean_array_mk", lean_array_mk___boxed) \
@@ -32,9 +30,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("String.Internal.posOf", "lean_string_posof", lean_string_posof___boxed) \
     X("String.Internal.offsetOfPos", "lean_string_offsetofpos", lean_string_offsetofpos___boxed) \
     X("String.Internal.contains", "lean_string_contains", lean_string_contains___boxed) \
-    X("String.compare", "lean_string_compare", lean_string_compare___boxed) \
     X("Substring.Raw.Internal.beq", "lean_substring_beq", lean_substring_beq___boxed) \
-    X("UInt8.toUInt32", "lean_uint8_to_uint32", lean_uint8_to_uint32___boxed) \
     X("UInt32.ofNatLT", "l_UInt32_ofNatLT", l_UInt32_ofNatLT___boxed) \
-    X("UInt64.ofNatLT", "l_UInt64_ofNatLT", l_UInt64_ofNatLT___boxed) \
-    X("UInt64.toUInt8", "lean_uint64_to_uint8", lean_uint64_to_uint8___boxed)
+    X("UInt64.ofNatLT", "l_UInt64_ofNatLT", l_UInt64_ofNatLT___boxed)

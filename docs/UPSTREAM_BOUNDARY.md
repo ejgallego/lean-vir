@@ -45,6 +45,7 @@ The probe links these upstream runtime sources:
 - `src/runtime/mpz.cpp`
 - `src/runtime/object.cpp`
 - `src/runtime/object_ref.cpp`
+- `src/runtime/platform.cpp`
 - `src/runtime/utf8.cpp`
 
 It also links `src/util/name.cpp`, which is not runtime proper but is needed by
@@ -122,10 +123,12 @@ The exported `vir_obj_*`, `vir_call_resolved_objects`, closure-root, and
 stable only within a matching `lean_vir` revision and should not be treated as
 the JavaScript application API.
 
-The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
-disabled. The pinned Lean source checkout contains the runtime sources but does
-not include vendored mimalloc sources for a WASI rebuild, so this selects Lean's
-ordinary allocator path while still compiling Lean's real runtime code.
+The WASI probe generates local `lean/config.h` and `githash.h` overlays. The
+config overlay leaves `LEAN_MIMALLOC` disabled because the pinned Lean source
+checkout does not include vendored mimalloc sources for a WASI rebuild; this
+selects Lean's ordinary allocator path while still compiling Lean's real
+runtime code. The git-hash overlay records the pinned source commit, and the
+probe supplies Lean's normal `LEAN_BUILD_TYPE` input for `platform.cpp`.
 
 The build compiles stable sources into cached objects under
 `build/upstream-probe/obj`. Example edits regenerate the relevant
@@ -133,7 +136,7 @@ The build compiles stable sources into cached objects under
 Compiler-generated native wrappers and their registry fragment live under
 `build/upstream-probe/generated`; they are build artifacts and are not checked
 into Git. The artifact is relinked only when stable or generated objects, link
-flags, the Lean source commit, or the runtime config overlay change.
+flags, the Lean source commit, or the generated runtime overlays change.
 
 ## Native Boxed Wrappers
 

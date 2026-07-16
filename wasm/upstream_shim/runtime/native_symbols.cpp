@@ -60,11 +60,6 @@ static size_t substring_repaired_pos(lean_object * s, lean_object * p) {
     return lean_string_is_valid_pos(s, p) ? nat_to_size_or_max(p) : end;
 }
 
-extern "C" lean_object * lean_system_platform_nbits___boxed(lean_object * unit) {
-    lean_dec(unit);
-    return lean_box(sizeof(void*) == 8 ? 64 : 32);
-}
-
 extern "C" lean_object * lean_io_initializing___boxed(lean_object * world) {
     lean_dec(world);
     return lean_box(g_vir_io_initializing);
@@ -128,22 +123,6 @@ extern "C" lean_object * lean_st_ref_take___boxed(
     ref_obj->m_value = nullptr;
     lean_dec(ref);
     return value;
-}
-
-extern "C" lean_object * lean_task_map___boxed(
-    lean_object * alpha,
-    lean_object * beta,
-    lean_object * fn,
-    lean_object * task,
-    lean_object * prio,
-    lean_object * sync) {
-    lean_dec(alpha);
-    lean_dec(beta);
-    unsigned prio_value = static_cast<unsigned>(lean_unbox(prio));
-    uint8_t sync_value = static_cast<uint8_t>(lean_unbox(sync));
-    lean_dec(prio);
-    lean_dec(sync);
-    return lean_task_map_core(fn, task, prio_value, sync_value, false);
 }
 
 extern "C" lean_object * lean_array_mk_empty___boxed(lean_object * type, lean_object * capacity) {
@@ -334,15 +313,6 @@ extern "C" lean_object * lean_string_contains___boxed(lean_object * s, lean_obje
     return lean_box(found);
 }
 
-extern "C" lean_object * lean_string_compare___boxed(lean_object * a, lean_object * b) {
-    lean_object * result = lean_string_eq(a, b)
-        ? lean_box(1)
-        : lean_box(lean_string_lt(a, b) ? 0 : 2);
-    lean_dec(a);
-    lean_dec(b);
-    return result;
-}
-
 extern "C" lean_object * lean_substring_beq___boxed(lean_object * lhs, lean_object * rhs) {
     lean_object * lhs_str = lean_ctor_get(lhs, 0);
     lean_object * lhs_start_pos = lean_ctor_get(lhs, 1);
@@ -369,12 +339,6 @@ extern "C" lean_object * lean_substring_beq___boxed(lean_object * lhs, lean_obje
     return lean_box(result);
 }
 
-extern "C" lean_object * lean_uint8_to_uint32___boxed(lean_object * a) {
-    uint32_t result = static_cast<uint32_t>(lean_unbox(a));
-    lean_dec(a);
-    return lean_box_uint32(result);
-}
-
 extern "C" lean_object * l_UInt32_ofNatLT___boxed(lean_object * a, lean_object * proof) {
     uint32_t result = lean_uint32_of_nat(a);
     lean_dec(a);
@@ -387,12 +351,6 @@ extern "C" lean_object * l_UInt64_ofNatLT___boxed(lean_object * a, lean_object *
     lean_dec(a);
     lean_dec(proof);
     return lean_box_uint64(result);
-}
-
-extern "C" lean_object * lean_uint64_to_uint8___boxed(lean_object * a) {
-    uint8_t result = static_cast<uint8_t>(lean_unbox_uint64(a));
-    lean_dec(a);
-    return lean_box(result);
 }
 
 extern "C" lean_object * lean_is_reserved_name___boxed(lean_object * env, lean_object * n) {
