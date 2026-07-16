@@ -844,6 +844,8 @@ function createJsValueHostBindings(resources) {
     bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
     bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
   }
+  bindings["js.string.owned"] = (value) => resources.ownedResourceForValue(jsStringValue2(value));
+  bindings["js.float.owned"] = (value) => resources.ownedResourceForValue(jsFloatValue(value));
   bindings["js.nullable.null"] = () => resources.resourceForValue(createNullableValue(null));
   bindings["js.nullable.of"] = (value) => resources.resourceForValue(createNullableValue(resources.resolveResource(value, "Js")));
   bindings["js.nullable.isNull"] = (value) => resources.resourceForValue(nullablePayload(resources, value) === null);
@@ -998,10 +1000,16 @@ var HostResourceState = class {
     this.liveResources.add(resource);
     return resource;
   }
-  temporaryResourceForValue(value) {
+  // Creates a unique resource whose receiver is responsible for releasing it.
+  ownedResourceForValue(value) {
     if (value === null || value === void 0) return null;
     const resource = createHostResource(value);
     this.liveResources.add(resource);
+    return resource;
+  }
+  temporaryResourceForValue(value) {
+    const resource = this.ownedResourceForValue(value);
+    if (resource === null) return null;
     const scope = this.temporaryResourceScopes.at(-1);
     if (scope !== void 0) {
       scope.add(resource);
@@ -1130,11 +1138,11 @@ function createElementResourceHostBindings(resources, operations) {
   return {
     "browser.element.getTextContent": (element) => resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
     "browser.element.setTextContent": (element, text) => {
-      operations.setTextContent(
-        resources.resolveResource(element, "Element"),
-        resources.resolveResource(text, "JsString")
-      );
-      return void 0;
+      const target = resources.resolveResource(element, "Element");
+      return withConsumedResources(resources, [[text, "JsString"]], (resolvedText) => {
+        operations.setTextContent(target, resolvedText);
+        return void 0;
+      });
     },
     "browser.element.getAttribute": (element, name) => resources.resourceForValue(createNullableValue(
       operations.getAttribute(
@@ -1167,6 +1175,23 @@ function createElementResourceHostBindings(resources, operations) {
       return void 0;
     }
   };
+}
+function withConsumedResources(resources, inputs, run) {
+  const consumed = [];
+  const errors = [];
+  const attempted = collectCleanupError(errors, () => {
+    const values = inputs.map(([resource, label]) => {
+      const value = resources.resolveResource(resource, label);
+      consumed.push(resource);
+      return value;
+    });
+    return run(...values);
+  });
+  for (const resource of new Set(consumed)) {
+    collectCleanupError(errors, () => resources.releaseResource(resource));
+  }
+  throwCollectedErrors(errors, "consumed host resource cleanup failed");
+  return attempted.value;
 }
 function createHtmlInputElementResourceHostBindings(resources, { fromElement }) {
   return {
@@ -2179,7 +2204,6 @@ function createBrowserElementHostBindings(state = createHostResourceState()) {
 }
 function createBrowserCanvasHostBindings(state = createHostResourceState()) {
   const value = (resource, label) => state.resolveResource(resource, label);
-  const number = (resource) => value(resource, "JsFloat");
   return {
     "browser.htmlCanvasElement.fromElement": (element) => {
       const candidate = value(element, "Element");
@@ -2197,39 +2221,40 @@ function createBrowserCanvasHostBindings(state = createHostResourceState()) {
       return void 0;
     },
     "browser.htmlCanvasElement.getContext2D": (canvas) => state.resourceForValue(createNullableValue(value(canvas, "HTMLCanvasElement").getContext("2d"))),
-    "browser.canvas2d.clearRect": (ctx, x, y, width, height) => value(ctx, "CanvasRenderingContext2D").clearRect(number(x), number(y), number(width), number(height)),
-    "browser.canvas2d.fillRect": (ctx, x, y, width, height) => value(ctx, "CanvasRenderingContext2D").fillRect(number(x), number(y), number(width), number(height)),
-    "browser.canvas2d.strokeRect": (ctx, x, y, width, height) => value(ctx, "CanvasRenderingContext2D").strokeRect(number(x), number(y), number(width), number(height)),
+    "browser.canvas2d.clearRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").clearRect(...args)),
+    "browser.canvas2d.fillRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").fillRect(...args)),
+    "browser.canvas2d.strokeRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").strokeRect(...args)),
     "browser.canvas2d.beginPath": (ctx) => value(ctx, "CanvasRenderingContext2D").beginPath(),
     "browser.canvas2d.closePath": (ctx) => value(ctx, "CanvasRenderingContext2D").closePath(),
-    "browser.canvas2d.moveTo": (ctx, x, y) => value(ctx, "CanvasRenderingContext2D").moveTo(number(x), number(y)),
-    "browser.canvas2d.lineTo": (ctx, x, y) => value(ctx, "CanvasRenderingContext2D").lineTo(number(x), number(y)),
-    "browser.canvas2d.arc": (ctx, x, y, radius, startAngle, endAngle) => value(ctx, "CanvasRenderingContext2D").arc(
-      number(x),
-      number(y),
-      number(radius),
-      number(startAngle),
-      number(endAngle)
-    ),
+    "browser.canvas2d.moveTo": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").moveTo(...args)),
+    "browser.canvas2d.lineTo": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").lineTo(...args)),
+    "browser.canvas2d.arc": (ctx, x, y, radius, startAngle, endAngle) => withCanvasNumbers(state, [x, y, radius, startAngle, endAngle], (...args) => value(ctx, "CanvasRenderingContext2D").arc(...args)),
     "browser.canvas2d.fill": (ctx) => value(ctx, "CanvasRenderingContext2D").fill(),
     "browser.canvas2d.stroke": (ctx) => value(ctx, "CanvasRenderingContext2D").stroke(),
-    "browser.canvas2d.setFillStyle": (ctx, style) => {
-      value(ctx, "CanvasRenderingContext2D").fillStyle = value(style, "JsString");
+    "browser.canvas2d.setFillStyle": (ctx, style) => withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
+      value(ctx, "CanvasRenderingContext2D").fillStyle = resolvedStyle;
       return void 0;
-    },
-    "browser.canvas2d.setStrokeStyle": (ctx, style) => {
-      value(ctx, "CanvasRenderingContext2D").strokeStyle = value(style, "JsString");
+    }),
+    "browser.canvas2d.setStrokeStyle": (ctx, style) => withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
+      value(ctx, "CanvasRenderingContext2D").strokeStyle = resolvedStyle;
       return void 0;
-    },
-    "browser.canvas2d.setLineWidth": (ctx, width) => {
-      value(ctx, "CanvasRenderingContext2D").lineWidth = number(width);
+    }),
+    "browser.canvas2d.setLineWidth": (ctx, width) => withCanvasNumbers(state, [width], (resolvedWidth) => {
+      value(ctx, "CanvasRenderingContext2D").lineWidth = resolvedWidth;
       return void 0;
-    },
+    }),
     "browser.canvas2d.save": (ctx) => value(ctx, "CanvasRenderingContext2D").save(),
     "browser.canvas2d.restore": (ctx) => value(ctx, "CanvasRenderingContext2D").restore(),
-    "browser.canvas2d.translate": (ctx, x, y) => value(ctx, "CanvasRenderingContext2D").translate(number(x), number(y)),
-    "browser.canvas2d.rotate": (ctx, angle) => value(ctx, "CanvasRenderingContext2D").rotate(number(angle))
+    "browser.canvas2d.translate": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").translate(...args)),
+    "browser.canvas2d.rotate": (ctx, angle) => withCanvasNumbers(state, [angle], (resolvedAngle) => value(ctx, "CanvasRenderingContext2D").rotate(resolvedAngle))
   };
+}
+function withCanvasNumbers(state, resources, run) {
+  return withConsumedResources(
+    state,
+    resources.map((resource) => [resource, "JsFloat"]),
+    run
+  );
 }
 function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
   return createHtmlInputElementResourceHostBindings(state, {
@@ -2644,7 +2669,7 @@ var HOST_IMPORT_BOUNDARY = Object.freeze({
   EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle"
 });
-var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 6 or 7, metadata: {...}, exports: [...] }";
+var INTERFACE_MANIFEST_SHAPE_ERROR = `embedded interface manifest must be { version: ${MIN_INTERFACE_MANIFEST_VERSION} through ${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }`;
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }

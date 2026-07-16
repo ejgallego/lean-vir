@@ -96,6 +96,12 @@ opaque HTMLCanvasElement : Type
 /-- Browser two-dimensional canvas rendering context. -/
 opaque CanvasRenderingContext2D : Type
 
+@[vir_js_explicit_conversion "js.string.owned"]
+private opaque ownedString (value : @& String) : Lean.Vir.RuntimeM (Lean.Vir.Js String)
+
+@[vir_js_explicit_conversion "js.float.owned"]
+private opaque ownedFloat (value : Float) : Lean.Vir.RuntimeM (Lean.Vir.Js Float)
+
 /--
 Browser timeout object class returned by `setTimeout`.
 
@@ -243,10 +249,10 @@ def querySelector (selector : @& String) : DomM (Option (Lean.Vir.Js Element)) :
   let jsSelector ← Lean.Vir.JsValue.ofString selector
   Lean.Vir.Js.Nullable.toOption (← querySelectorNullable jsSelector)
 
-/-- Creates a DOM element with the given HTML tag name. -/
 @[vir_js "browser.document.createElement"]
 private opaque createElementJs (tagName : @& Lean.Vir.Js String) : DomM (Lean.Vir.Js Element)
 
+/-- Creates a DOM element with the given HTML tag name. -/
 def createElement (tagName : @& String) : DomM (Lean.Vir.Js Element) := do
   createElementJs (← Lean.Vir.JsValue.ofString tagName)
 
@@ -285,7 +291,7 @@ private opaque setTextContentJs
     DomM Unit
 
 def setTextContent (element : @& Lean.Vir.Js Element) (text : @& String) : DomM Unit := do
-  let jsText ← Lean.Vir.JsValue.ofString text
+  let jsText ← ownedString text
   setTextContentJs element jsText
 
 /--
@@ -347,6 +353,7 @@ private opaque addJs
     (element : @& Lean.Vir.Js Element)
     (className : @& Lean.Vir.Js String) : DomM Unit
 
+/-- Adds a CSS class to an element. -/
 def add (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Unit := do
   addJs element (← Lean.Vir.JsValue.ofString className)
 
@@ -355,6 +362,7 @@ private opaque removeJs
     (element : @& Lean.Vir.Js Element)
     (className : @& Lean.Vir.Js String) : DomM Unit
 
+/-- Removes a CSS class from an element. -/
 def remove (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Unit := do
   removeJs element (← Lean.Vir.JsValue.ofString className)
 
@@ -363,6 +371,7 @@ private opaque toggleJs
     (element : @& Lean.Vir.Js Element)
     (className : @& Lean.Vir.Js String) : DomM (Lean.Vir.Js Bool)
 
+/-- Toggles a CSS class and returns whether it is present afterward. -/
 def toggle (element : @& Lean.Vir.Js Element) (className : @& String) : DomM Bool := do
   Lean.Vir.JsValue.toBool (← toggleJs element (← Lean.Vir.JsValue.ofString className))
 
@@ -376,6 +385,7 @@ private opaque setPropertyJs
     (element : @& Lean.Vir.Js Element)
     (name value : @& Lean.Vir.Js String) : DomM Unit
 
+/-- Sets a CSS custom or ordinary property on an element's inline style. -/
 def setProperty
     (element : @& Lean.Vir.Js Element)
     (name value : @& String) : DomM Unit := do
@@ -523,6 +533,7 @@ def fromElement
 private opaque getWidthJs
     (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM (Lean.Vir.Js Nat)
 
+/-- Returns the canvas bitmap width. -/
 def getWidth (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM Nat := do
   Lean.Vir.JsValue.toNat (← getWidthJs canvas)
 
@@ -531,6 +542,7 @@ private opaque setWidthJs
     (canvas : @& Lean.Vir.Js HTMLCanvasElement)
     (width : @& Lean.Vir.Js Nat) : DomM Unit
 
+/-- Sets the canvas bitmap width. -/
 def setWidth (canvas : @& Lean.Vir.Js HTMLCanvasElement) (width : Nat) : DomM Unit := do
   setWidthJs canvas (← Lean.Vir.JsValue.ofNat width)
 
@@ -538,6 +550,7 @@ def setWidth (canvas : @& Lean.Vir.Js HTMLCanvasElement) (width : Nat) : DomM Un
 private opaque getHeightJs
     (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM (Lean.Vir.Js Nat)
 
+/-- Returns the canvas bitmap height. -/
 def getHeight (canvas : @& Lean.Vir.Js HTMLCanvasElement) : DomM Nat := do
   Lean.Vir.JsValue.toNat (← getHeightJs canvas)
 
@@ -546,6 +559,7 @@ private opaque setHeightJs
     (canvas : @& Lean.Vir.Js HTMLCanvasElement)
     (height : @& Lean.Vir.Js Nat) : DomM Unit
 
+/-- Sets the canvas bitmap height. -/
 def setHeight (canvas : @& Lean.Vir.Js HTMLCanvasElement) (height : Nat) : DomM Unit := do
   setHeightJs canvas (← Lean.Vir.JsValue.ofNat height)
 
@@ -554,6 +568,7 @@ private opaque getContext2DNullable
     (canvas : @& Lean.Vir.Js HTMLCanvasElement) :
     DomM (Lean.Vir.Js.Nullable CanvasRenderingContext2D)
 
+/-- Returns the canvas's two-dimensional rendering context when available. -/
 def getContext2D
     (canvas : @& Lean.Vir.Js HTMLCanvasElement) :
     DomM (Option (Lean.Vir.Js CanvasRenderingContext2D)) := do
@@ -565,13 +580,14 @@ namespace CanvasRenderingContext2D
 
 private def withFloat (value : Float)
     (next : Lean.Vir.Js Float → DomM α) : DomM α := do
-  next (← Lean.Vir.JsValue.ofFloat value)
+  next (← ownedFloat value)
 
 @[vir_js "browser.canvas2d.clearRect"]
 private opaque clearRectJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x y width height : @& Lean.Vir.Js Float) : DomM Unit
 
+/-- Clears an axis-aligned rectangle to transparent black. -/
 def clearRect
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x y width height : Float) : DomM Unit :=
@@ -598,6 +614,7 @@ private opaque strokeRectJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x y width height : @& Lean.Vir.Js Float) : DomM Unit
 
+/-- Strokes an axis-aligned rectangle in the current stroke style. -/
 def strokeRect
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x y width height : Float) : DomM Unit :=
@@ -605,9 +622,11 @@ def strokeRect
   withFloat width fun width => withFloat height fun height =>
   strokeRectJs ctx x y width height
 
+/-- Starts a new path. -/
 @[vir_js "browser.canvas2d.beginPath"]
 opaque beginPath (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
 
+/-- Closes the current path by joining it back to its start. -/
 @[vir_js "browser.canvas2d.closePath"]
 opaque closePath (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
 
@@ -616,6 +635,7 @@ private opaque moveToJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x y : @& Lean.Vir.Js Float) : DomM Unit
 
+/-- Moves the current path point without drawing. -/
 def moveTo (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (x y : Float) : DomM Unit :=
   withFloat x fun x => withFloat y fun y => moveToJs ctx x y
 
@@ -624,6 +644,7 @@ private opaque lineToJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x y : @& Lean.Vir.Js Float) : DomM Unit
 
+/-- Adds a line from the current path point to `(x, y)`. -/
 def lineTo (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (x y : Float) : DomM Unit :=
   withFloat x fun x => withFloat y fun y => lineToJs ctx x y
 
@@ -632,6 +653,7 @@ private opaque arcJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x y radius startAngle endAngle : @& Lean.Vir.Js Float) : DomM Unit
 
+/-- Adds a clockwise circular arc to the current path. -/
 def arc
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x y radius startAngle endAngle : Float) : DomM Unit :=
@@ -639,9 +661,11 @@ def arc
   withFloat startAngle fun startAngle => withFloat endAngle fun endAngle =>
   arcJs ctx x y radius startAngle endAngle
 
+/-- Fills the current path. -/
 @[vir_js "browser.canvas2d.fill"]
 opaque fill (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
 
+/-- Strokes the current path. -/
 @[vir_js "browser.canvas2d.stroke"]
 opaque stroke (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
 
@@ -650,31 +674,36 @@ private opaque setFillStyleJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (style : @& Lean.Vir.Js String) : DomM Unit
 
+/-- Sets the context's CSS fill style. -/
 def setFillStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (style : @& String) : DomM Unit := do
-  setFillStyleJs ctx (← Lean.Vir.JsValue.ofString style)
+  setFillStyleJs ctx (← ownedString style)
 
 @[vir_js "browser.canvas2d.setStrokeStyle"]
 private opaque setStrokeStyleJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (style : @& Lean.Vir.Js String) : DomM Unit
 
+/-- Sets the context's CSS stroke style. -/
 def setStrokeStyle
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (style : @& String) : DomM Unit := do
-  setStrokeStyleJs ctx (← Lean.Vir.JsValue.ofString style)
+  setStrokeStyleJs ctx (← ownedString style)
 
 @[vir_js "browser.canvas2d.setLineWidth"]
 private opaque setLineWidthJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (width : @& Lean.Vir.Js Float) : DomM Unit
 
+/-- Sets the context's stroke width. -/
 def setLineWidth
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (width : Float) : DomM Unit :=
   withFloat width fun width => setLineWidthJs ctx width
 
+/-- Saves the current drawing state. -/
 @[vir_js "browser.canvas2d.save"]
 opaque save (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
 
+/-- Restores the most recently saved drawing state. -/
 @[vir_js "browser.canvas2d.restore"]
 opaque restore (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) : DomM Unit
 
@@ -683,6 +712,7 @@ private opaque translateJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (x y : @& Lean.Vir.Js Float) : DomM Unit
 
+/-- Translates the current transformation matrix. -/
 def translate (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (x y : Float) : DomM Unit :=
   withFloat x fun x => withFloat y fun y => translateJs ctx x y
 
@@ -691,6 +721,7 @@ private opaque rotateJs
     (ctx : @& Lean.Vir.Js CanvasRenderingContext2D)
     (angle : @& Lean.Vir.Js Float) : DomM Unit
 
+/-- Rotates the current transformation matrix by radians. -/
 def rotate (ctx : @& Lean.Vir.Js CanvasRenderingContext2D) (angle : Float) : DomM Unit :=
   withFloat angle fun angle => rotateJs ctx angle
 

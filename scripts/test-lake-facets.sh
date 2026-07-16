@@ -13,6 +13,22 @@ sdk_version="$(node -p 'require("./package.json").version')"
 tmp="$(mktemp -d "${TMPDIR:-/tmp}/lean-vir-lake-facets.XXXXXX")"
 trap 'rm -rf "$tmp"' EXIT
 
+write_sdk_manifest() {
+  local sdk_dir="$1"
+  local commit="$2"
+  local hash="$3"
+  printf '%s\n' \
+    '{' \
+    '  "name": "lean-vir-sdk",' \
+    "  \"version\": \"$sdk_version\"," \
+    "  \"gitCommit\": \"$commit\"," \
+    '  "runtimeAbiVersion": 1,' \
+    '  "files": [' \
+    "    {\"path\": \"js/vir-runtime.js\", \"sha256\": \"$hash\"}" \
+    '  ]' \
+    '}' > "$sdk_dir/lean-vir-artifact.json"
+}
+
 lake build +SlidesCanvas:vir
 
 canvas_package="$repo/.lake/build/vir/modules/SlidesCanvas.irpkg"
@@ -77,30 +93,13 @@ printf '%s\n' \
 
 printf '%s\n' 'export const smoke = true;' > "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js"
 sdk_hash="$(sha256sum "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js" | cut -d' ' -f1)"
-printf '%s\n' \
-  '{' \
-  '  "name": "lean-vir-sdk",' \
-  "  \"version\": \"$sdk_version\"," \
-  '  "gitCommit": "lake-facet-smoke",' \
-  '  "runtimeAbiVersion": 1,' \
-  '  "files": [' \
-  "    {\"path\": \"js/vir-runtime.js\", \"sha256\": \"$sdk_hash\"}" \
-  '  ]' \
-  '}' > "$tmp/sdk-source/lean-vir-sdk/lean-vir-artifact.json"
+write_sdk_manifest "$tmp/sdk-source/lean-vir-sdk" "lake-facet-smoke" "$sdk_hash"
 tar -czf "$tmp/lean-vir-sdk.tar.gz" -C "$tmp/sdk-source" lean-vir-sdk
 
 mkdir -p "$tmp/sdk-bad/lean-vir-sdk/js" "$tmp/existing-sdk"
 printf '%s\n' 'export const smoke = false;' > "$tmp/sdk-bad/lean-vir-sdk/js/vir-runtime.js"
-printf '%s\n' \
-  '{' \
-  '  "name": "lean-vir-sdk",' \
-  "  \"version\": \"$sdk_version\"," \
-  '  "gitCommit": "lake-facet-smoke",' \
-  '  "runtimeAbiVersion": 1,' \
-  '  "files": [' \
-  '    {"path": "js/vir-runtime.js", "sha256": "0000000000000000000000000000000000000000000000000000000000000000"}' \
-  '  ]' \
-  '}' > "$tmp/sdk-bad/lean-vir-sdk/lean-vir-artifact.json"
+write_sdk_manifest "$tmp/sdk-bad/lean-vir-sdk" "lake-facet-smoke" \
+  "0000000000000000000000000000000000000000000000000000000000000000"
 tar -czf "$tmp/lean-vir-sdk-bad.tar.gz" -C "$tmp/sdk-bad" lean-vir-sdk
 printf '%s\n' 'keep-existing-sdk' > "$tmp/existing-sdk/marker.txt"
 
@@ -126,6 +125,10 @@ lake -d "$tmp" build +Smoke.NewRuntime:vir
 package="$tmp/.lake/build/vir/modules/Smoke/Runtime.irpkg"
 report="$tmp/.lake/build/vir/reports/Smoke/Runtime.report.md"
 test -f "$package"
+test -f "$report"
+
+rm -f "$report"
+lake -d "$tmp" build +Smoke.Runtime:vir
 test -f "$report"
 
 module_package="$tmp/.lake/build/vir/modules/Smoke/NewRuntime.irpkg"
@@ -157,19 +160,14 @@ VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build :virSdk
 test -f "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"
 test -f "$tmp/.lake/build/vir/sdk/lean-vir-artifact.json"
 
+rm -f "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"
+VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build :virSdk
+grep -q 'smoke = true' "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"
+
 mkdir -p "$tmp/sdk-source-2/lean-vir-sdk/js"
 printf '%s\n' 'export const smoke = false;' > "$tmp/sdk-source-2/lean-vir-sdk/js/vir-runtime.js"
 sdk_hash="$(sha256sum "$tmp/sdk-source-2/lean-vir-sdk/js/vir-runtime.js" | cut -d' ' -f1)"
-printf '%s\n' \
-  '{' \
-  '  "name": "lean-vir-sdk",' \
-  "  \"version\": \"$sdk_version\"," \
-  '  "gitCommit": "lake-facet-smoke-2",' \
-  '  "runtimeAbiVersion": 1,' \
-  '  "files": [' \
-  "    {\"path\": \"js/vir-runtime.js\", \"sha256\": \"$sdk_hash\"}" \
-  '  ]' \
-  '}' > "$tmp/sdk-source-2/lean-vir-sdk/lean-vir-artifact.json"
+write_sdk_manifest "$tmp/sdk-source-2/lean-vir-sdk" "lake-facet-smoke-2" "$sdk_hash"
 tar -czf "$tmp/lean-vir-sdk-2.tar.gz" -C "$tmp/sdk-source-2" lean-vir-sdk
 
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk-2.tar.gz" lake -d "$tmp" build :virSdk

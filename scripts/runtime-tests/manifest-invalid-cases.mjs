@@ -4,6 +4,11 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import {
+  INTERFACE_MANIFEST_VERSION,
+  MIN_INTERFACE_MANIFEST_VERSION,
+} from "../../web/src/runtime/interface-manifest.js";
+
 export const invalidManifestCases = [
   {
     name: "missing manifest version",
@@ -23,6 +28,20 @@ export const invalidManifestCases = [
     name: "fractional manifest version",
     mutate: (manifest) => {
       manifest.version = 6.5;
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "obsolete manifest version",
+    mutate: (manifest) => {
+      manifest.version = MIN_INTERFACE_MANIFEST_VERSION - 1;
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "future manifest version",
+    mutate: (manifest) => {
+      manifest.version = INTERFACE_MANIFEST_VERSION + 1;
     },
     pattern: /embedded interface manifest must be/,
   },

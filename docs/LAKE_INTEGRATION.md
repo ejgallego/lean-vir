@@ -67,6 +67,8 @@ For current, legacy Lean modules the generator re-elaborates the module source.
 When Lake supplies compiled module IR, the facet depends on that `.ir` and uses
 a generated `import all MySlides.Runtime` driver. In both modes, Lake tracks the
 compiled module and VIR generator as dependencies.
+The `.irpkg` is the facet's returned artifact; if its report sidecar is missing,
+the next facet build regenerates both files.
 
 An executable or renderer that consumes the package should declare the facet as
 a build dependency:
@@ -103,6 +105,9 @@ runtime ABI, non-empty source commit, and every manifest checksum. Set
 `VIR_SDK_ARCHIVE=/path/to/lean-vir-sdk.tar.gz` to use a local or CI-provided
 archive without network access. Lake tracks the selected source and local
 archive contents when caching the facet.
+Before accepting a cached SDK manifest, the facet rechecks every listed payload
+checksum. A missing or modified payload invalidates the manifest target and
+reinstalls the SDK from the configured source.
 
 The browser host can then load and run all startup entries in manifest order:
 
@@ -142,7 +147,8 @@ def Lean.Vir.Browser.CanvasRenderingContext2D.fillRect
     DomM Unit
 ```
 
-VIR converts these values to temporary JavaScript resources internally. The
-same browser surface includes DOM element creation and mutation, class/style
-updates, canvas sizing and context lookup, paths, styles, transforms, and
-animation-frame callbacks.
+VIR converts these values to one-shot JavaScript resources that the canvas
+binding consumes after each synchronous call, so animation frames do not retain
+their coordinate values. The same browser surface includes DOM element
+creation and mutation, class/style updates, canvas sizing and context lookup,
+paths, styles, transforms, and animation-frame callbacks.

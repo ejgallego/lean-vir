@@ -227,10 +227,12 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
 - object markers: `Element`, `Event`, `EventListener`, `HTMLInputElement`,
-  `Timeout`, and `AnimationFrame`
+  `HTMLCanvasElement`, `CanvasRenderingContext2D`, `Timeout`, and
+  `AnimationFrame`
 - `Lean.Vir.Browser.Document.getTitle : Lean.Vir.Browser.DomM String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Document.querySelector : @& String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
+- `Lean.Vir.Browser.Document.createElement : @& String -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element)`
 - `Lean.Vir.Browser.Event.target : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
@@ -242,6 +244,8 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM (Option String)`
 - `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Element.appendChild` and `remove` provide basic DOM tree mutation.
+- `Lean.Vir.Browser.Element.ClassList.add`, `remove`, and `toggle` update CSS classes; `Element.Style.setProperty` updates inline style properties.
 - `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.EventListener)`
 - `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Js Lean.Vir.Browser.EventListener -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`
@@ -249,6 +253,10 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Bool -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.HTMLInputElement.getValue : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Lean.Vir.Browser.DomM String`
 - `Lean.Vir.Browser.HTMLInputElement.setValue : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.HTMLCanvasElement.fromElement`, `getWidth`, `setWidth`, `getHeight`, `setHeight`, and `getContext2D` narrow and configure canvas elements.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.clearRect`, `fillRect`, and `strokeRect` accept ordinary Lean `Float` coordinates.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.beginPath`, `closePath`, `moveTo`, `lineTo`, `arc`, `fill`, and `stroke` provide basic path drawing.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyle`, `setStrokeStyle`, `setLineWidth`, `save`, `restore`, `translate`, and `rotate` configure drawing state and transforms.
 - `Lean.Vir.Browser.Timer.setTimeout : UInt32 -> Lean.Vir.Browser.DomM Unit -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Timeout)`
 - `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Js Lean.Vir.Browser.Timeout -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame)`

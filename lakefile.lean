@@ -43,6 +43,8 @@ module_facet vir (mod : Module) : System.FilePath := do
       addLeanTrace
       addTrace (← computeTrace generator)
       addPureTrace moduleName "VIR module"
+      if (← packagePath.pathExists) && !(← reportPath.pathExists) then
+        IO.FS.removeFile packagePath
       buildFileUnlessUpToDate' packagePath do
         createParentDirs driverPath
         createParentDirs packagePath
@@ -93,6 +95,14 @@ package_facet virSdk (pkg : Package) : System.FilePath := do
     addPureTrace sourceConfig "VIR SDK source"
     if let some archive := archive? then
       addTrace (← computeTrace (System.FilePath.mk archive))
+    if ← manifestPath.pathExists then
+      let verification ← IO.Process.output {
+        cmd := fetcher.toString
+        args := #["--verify-installed", sdkDir.toString, "--expect-version", virSdkVersion]
+        env := ← getAugmentedEnv
+      }
+      if verification.exitCode != 0 then
+        IO.FS.removeFile manifestPath
     buildFileUnlessUpToDate' (text := true) manifestPath do
       createParentDirs manifestPath
       proc {

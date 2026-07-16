@@ -279,6 +279,7 @@ assert.equal(reactRefSetImports[0]?.args[0]?.type?.kind, "resource");
 assert.equal(reactRefSetImports[0]?.args[1]?.type?.type, "Js");
 for (const target of [
   "js.string",
+  "js.string.owned",
   "js.string.value",
   "js.nat",
   "js.nat.value",

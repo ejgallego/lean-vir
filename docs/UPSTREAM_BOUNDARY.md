@@ -382,7 +382,7 @@ including a wide `UInt64.toNat` fixture returned through the manifest-driven
 package-call path, package-backed `Nat` literals wider than 32 bits,
 `USize` `sub`/`mul`/`land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`,
 `ByteArray.mk`/`ByteArray.get`, and
-`Float.scaleB`/`toUInt32`. Parser-adjacent hash/name/substring/pointer-address
+`Float.sub`/`scaleB`/`toUInt32`. Parser-adjacent hash/name/substring/pointer-address
 primitives (`mixHash`, `Lean.Name.beq`, `Substring.Raw.Internal.beq`, and
 `ptrAddrUnsafe`) are covered by a separate unsafe fixture that only compares
 stable same-object pointer equality. The parser input fixture additionally runs

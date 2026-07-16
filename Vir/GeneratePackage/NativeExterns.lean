@@ -1410,6 +1410,13 @@ def nativeExterns : Array NativeExtern := #[
     generateBoxedWrapper := true
   },
   {
+    name := `Float.sub,
+    params := #[param 1 false .float, param 2 false .float],
+    resultType := .float,
+    symbol := "lean_float_sub",
+    generateBoxedWrapper := true
+  },
+  {
     name := `Float.scaleB,
     params := #[param 1 false .float, param 2 true .tobject],
     resultType := .float,

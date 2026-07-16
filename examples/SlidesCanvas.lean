@@ -14,8 +14,9 @@ partial def drawFrame
     (ctx : Lean.Vir.Js CanvasRenderingContext2D)
     (status : Lean.Vir.Js Element)
     (frame : Nat)
+    (origin : Float)
     (timestamp : Float) : DomM Unit := do
-  let x := Float.scaleB timestamp (-4)
+  let x := Float.scaleB (timestamp - origin) (-4)
   CanvasRenderingContext2D.clearRect ctx 0.0 0.0 640.0 360.0
   CanvasRenderingContext2D.setFillStyle ctx "#2563eb"
   CanvasRenderingContext2D.fillRect ctx x 124.0 72.0 72.0
@@ -23,7 +24,7 @@ partial def drawFrame
   CanvasRenderingContext2D.setLineWidth ctx 3.0
   CanvasRenderingContext2D.strokeRect ctx x 124.0 72.0 72.0
   Element.setTextContent status s!"Lean animation frame: {frame}"
-  let _ ← Animation.requestAnimationFrame (drawFrame ctx status (frame + 1))
+  let _ ← Animation.requestAnimationFrame (drawFrame ctx status (frame + 1) origin)
   pure ()
 
 /-- Builds and starts the slide's DOM and canvas animation entirely from Lean. -/
@@ -47,7 +48,8 @@ def mount : DomM Unit := do
           match ← HTMLCanvasElement.getContext2D canvas with
           | none => Element.setTextContent status "CanvasRenderingContext2D is unavailable"
           | some ctx =>
-              let _ ← Animation.requestAnimationFrame (drawFrame ctx status 0)
+              let _ ← Animation.requestAnimationFrame fun timestamp =>
+                drawFrame ctx status 0 timestamp timestamp
               pure ()
 
 end SlidesCanvas

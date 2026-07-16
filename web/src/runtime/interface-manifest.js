@@ -17,7 +17,8 @@ export const HOST_IMPORT_BOUNDARY = Object.freeze({
 });
 
 export const INTERFACE_MANIFEST_SHAPE_ERROR =
-  "embedded interface manifest must be { version: 6 or 7, metadata: {...}, exports: [...] }";
+  `embedded interface manifest must be { version: ${MIN_INTERFACE_MANIFEST_VERSION} through ` +
+  `${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }`;
 
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);

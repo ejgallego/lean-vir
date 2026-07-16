@@ -7,7 +7,10 @@ Author: Emilio J. Gallego Arias
 import { mkdtemp, rm } from "node:fs/promises";
 import { tmpdir } from "node:os";
 
-import { createBrowserHostBindings } from "../../web/src/vir-host-bindings.js";
+import {
+  createBrowserHostBindings,
+  createHostResourceState,
+} from "../../web/src/vir-host-bindings.js";
 import { createVirRuntime } from "../../web/src/vir-runtime.js";
 import {
   assert,
@@ -132,12 +135,17 @@ try {
   assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 
   const { wasmBytes } = await readRuntimeArtifacts();
+  const resources = createHostResourceState();
   const runtime = await createVirRuntime({
     wasmBytes,
     irPackageBytes: await readFile(packagePath),
-    defaultHostBindings: createBrowserHostBindings(),
+    defaultHostBindings: createBrowserHostBindings({ resources }),
   });
   try {
+    for (const target of ["js.float.owned", "js.string.owned"]) {
+      const hostImport = runtime.interfaceManifest.hostImports.find((entry) => entry.target === target);
+      assert.equal(hostImport?.boundary, "explicitConversion");
+    }
     assert.equal(runtime.runEntries(), undefined);
     assert.equal(runtime.runEntries(), undefined);
     assert.equal(slideRoot.children.length, 2);
@@ -149,22 +157,45 @@ try {
     assert.equal(canvas.width, 640);
     assert.equal(canvas.height, 360);
     assert.equal(queuedFrames.size, 1);
+    const mountedResourceCounts = resources.debugResourceCounts();
 
     const [[frameId, drawFrame]] = queuedFrames.entries();
     queuedFrames.delete(frameId);
-    drawFrame(160);
+    drawFrame(20_000);
+    assert.deepEqual(hostErrors, []);
 
     assert.deepEqual(drawCalls, [
       ["clearRect", 0, 0, 640, 360],
-      ["fillRect", 10, 124, 72, 72],
-      ["strokeRect", 10, 124, 72, 72],
+      ["fillRect", 0, 124, 72, 72],
+      ["strokeRect", 0, 124, 72, 72],
     ]);
     assert.equal(context2d.fillStyle, "#2563eb");
     assert.equal(context2d.strokeStyle, "#0f172a");
     assert.equal(context2d.lineWidth, 3);
     assert.equal(status.textContent, "Lean animation frame: 0");
     assert.equal(queuedFrames.size, 1, "the Lean callback should schedule the next frame");
+    assert.deepEqual(
+      resources.debugResourceCounts(),
+      mountedResourceCounts,
+      "a frame should consume its temporary float and text resources",
+    );
+
+    const [[secondFrameId, secondDrawFrame]] = queuedFrames.entries();
+    queuedFrames.delete(secondFrameId);
+    secondDrawFrame(20_160);
     assert.deepEqual(hostErrors, []);
+    assert.deepEqual(drawCalls.slice(3), [
+      ["clearRect", 0, 0, 640, 360],
+      ["fillRect", 10, 124, 72, 72],
+      ["strokeRect", 10, 124, 72, 72],
+    ]);
+    assert.equal(status.textContent, "Lean animation frame: 1");
+    assert.equal(queuedFrames.size, 1, "the Lean callback should keep scheduling frames");
+    assert.deepEqual(
+      resources.debugResourceCounts(),
+      mountedResourceCounts,
+      "repeated frames should not accumulate scalar host resources",
+    );
   } finally {
     runtime.dispose();
   }
