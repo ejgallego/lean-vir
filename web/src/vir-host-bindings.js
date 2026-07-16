@@ -77,6 +77,8 @@ export function createBrowserDocumentHostBindings(state = createHostResourceStat
     },
     "browser.document.querySelector": (selector) =>
       state.resourceForValue(createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString")))),
+    "browser.document.createElement": (tagName) =>
+      state.resourceForValue(browserDocument().createElement(state.resolveResource(tagName, "JsString"))),
   };
 }
 
@@ -100,7 +102,8 @@ export function createBrowserEventHostBindings(state = createHostResourceState()
 }
 
 export function createBrowserElementHostBindings(state = createHostResourceState()) {
-  return createElementResourceHostBindings(state, {
+  return {
+    ...createElementResourceHostBindings(state, {
     getTextContent: (target) => target.textContent ?? "",
     setTextContent: (target, text) => {
       target.textContent = text;
@@ -109,7 +112,99 @@ export function createBrowserElementHostBindings(state = createHostResourceState
     setAttribute: (target, name, value) => target.setAttribute(name, value),
     createEventListener: (target, eventName, callback) =>
       createBrowserEventListenerResource(state, target, eventName, callback),
-  });
+    }),
+    "browser.element.appendChild": (parent, child) => {
+      state.resolveResource(parent, "Element").appendChild(state.resolveResource(child, "Element"));
+      return undefined;
+    },
+    "browser.element.remove": (element) => {
+      state.resolveResource(element, "Element").remove();
+      return undefined;
+    },
+    "browser.element.classList.add": (element, className) => {
+      state.resolveResource(element, "Element").classList.add(state.resolveResource(className, "JsString"));
+      return undefined;
+    },
+    "browser.element.classList.remove": (element, className) => {
+      state.resolveResource(element, "Element").classList.remove(state.resolveResource(className, "JsString"));
+      return undefined;
+    },
+    "browser.element.classList.toggle": (element, className) =>
+      state.resourceForValue(
+        state.resolveResource(element, "Element").classList.toggle(
+          state.resolveResource(className, "JsString"),
+        ),
+      ),
+    "browser.element.style.setProperty": (element, name, value) => {
+      state.resolveResource(element, "Element").style.setProperty(
+        state.resolveResource(name, "JsString"),
+        state.resolveResource(value, "JsString"),
+      );
+      return undefined;
+    },
+  };
+}
+
+export function createBrowserCanvasHostBindings(state = createHostResourceState()) {
+  const value = (resource, label) => state.resolveResource(resource, label);
+  const number = (resource) => value(resource, "JsFloat");
+  return {
+    "browser.htmlCanvasElement.fromElement": (element) => {
+      const candidate = value(element, "Element");
+      const canvas = isCanvasElement(candidate) ? candidate : null;
+      return state.resourceForValue(createNullableValue(canvas));
+    },
+    "browser.htmlCanvasElement.getWidth": (canvas) =>
+      state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").width)),
+    "browser.htmlCanvasElement.setWidth": (canvas, width) => {
+      value(canvas, "HTMLCanvasElement").width = Number(value(width, "JsNat"));
+      return undefined;
+    },
+    "browser.htmlCanvasElement.getHeight": (canvas) =>
+      state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").height)),
+    "browser.htmlCanvasElement.setHeight": (canvas, height) => {
+      value(canvas, "HTMLCanvasElement").height = Number(value(height, "JsNat"));
+      return undefined;
+    },
+    "browser.htmlCanvasElement.getContext2D": (canvas) =>
+      state.resourceForValue(createNullableValue(value(canvas, "HTMLCanvasElement").getContext("2d"))),
+    "browser.canvas2d.clearRect": (ctx, x, y, width, height) =>
+      value(ctx, "CanvasRenderingContext2D").clearRect(number(x), number(y), number(width), number(height)),
+    "browser.canvas2d.fillRect": (ctx, x, y, width, height) =>
+      value(ctx, "CanvasRenderingContext2D").fillRect(number(x), number(y), number(width), number(height)),
+    "browser.canvas2d.strokeRect": (ctx, x, y, width, height) =>
+      value(ctx, "CanvasRenderingContext2D").strokeRect(number(x), number(y), number(width), number(height)),
+    "browser.canvas2d.beginPath": (ctx) => value(ctx, "CanvasRenderingContext2D").beginPath(),
+    "browser.canvas2d.closePath": (ctx) => value(ctx, "CanvasRenderingContext2D").closePath(),
+    "browser.canvas2d.moveTo": (ctx, x, y) =>
+      value(ctx, "CanvasRenderingContext2D").moveTo(number(x), number(y)),
+    "browser.canvas2d.lineTo": (ctx, x, y) =>
+      value(ctx, "CanvasRenderingContext2D").lineTo(number(x), number(y)),
+    "browser.canvas2d.arc": (ctx, x, y, radius, startAngle, endAngle) =>
+      value(ctx, "CanvasRenderingContext2D").arc(
+        number(x), number(y), number(radius), number(startAngle), number(endAngle),
+      ),
+    "browser.canvas2d.fill": (ctx) => value(ctx, "CanvasRenderingContext2D").fill(),
+    "browser.canvas2d.stroke": (ctx) => value(ctx, "CanvasRenderingContext2D").stroke(),
+    "browser.canvas2d.setFillStyle": (ctx, style) => {
+      value(ctx, "CanvasRenderingContext2D").fillStyle = value(style, "JsString");
+      return undefined;
+    },
+    "browser.canvas2d.setStrokeStyle": (ctx, style) => {
+      value(ctx, "CanvasRenderingContext2D").strokeStyle = value(style, "JsString");
+      return undefined;
+    },
+    "browser.canvas2d.setLineWidth": (ctx, width) => {
+      value(ctx, "CanvasRenderingContext2D").lineWidth = number(width);
+      return undefined;
+    },
+    "browser.canvas2d.save": (ctx) => value(ctx, "CanvasRenderingContext2D").save(),
+    "browser.canvas2d.restore": (ctx) => value(ctx, "CanvasRenderingContext2D").restore(),
+    "browser.canvas2d.translate": (ctx, x, y) =>
+      value(ctx, "CanvasRenderingContext2D").translate(number(x), number(y)),
+    "browser.canvas2d.rotate": (ctx, angle) =>
+      value(ctx, "CanvasRenderingContext2D").rotate(number(angle)),
+  };
 }
 
 export function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
@@ -203,6 +298,7 @@ export function createBrowserHostBindings({
     ...createBrowserEventHostBindings(state),
     ...createBrowserElementHostBindings(state),
     ...createBrowserHtmlInputElementHostBindings(state),
+    ...createBrowserCanvasHostBindings(state),
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
     ...createInfoviewHostBindings({ resources: state, commandDispatcher: infoviewCommandDispatcher }),
@@ -239,6 +335,13 @@ function browserDocument() {
 
 function queryDocumentElement(selector) {
   return browserDocument().querySelector(selector);
+}
+
+function isCanvasElement(value) {
+  const Canvas = globalThis.HTMLCanvasElement;
+  return typeof Canvas === "function"
+    ? value instanceof Canvas
+    : value !== null && typeof value === "object" && typeof value.getContext === "function";
 }
 
 function writeTextToHostClipboard(text) {

@@ -2117,7 +2117,8 @@ function createBrowserDocumentHostBindings(state = createHostResourceState()) {
       browserDocument().title = state.resolveResource(title, "JsString");
       return void 0;
     },
-    "browser.document.querySelector": (selector) => state.resourceForValue(createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString"))))
+    "browser.document.querySelector": (selector) => state.resourceForValue(createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString")))),
+    "browser.document.createElement": (tagName) => state.resourceForValue(browserDocument().createElement(state.resolveResource(tagName, "JsString")))
   };
 }
 function createBrowserEventHostBindings(state = createHostResourceState()) {
@@ -2136,15 +2137,99 @@ function createBrowserEventHostBindings(state = createHostResourceState()) {
   };
 }
 function createBrowserElementHostBindings(state = createHostResourceState()) {
-  return createElementResourceHostBindings(state, {
-    getTextContent: (target) => target.textContent ?? "",
-    setTextContent: (target, text) => {
-      target.textContent = text;
+  return {
+    ...createElementResourceHostBindings(state, {
+      getTextContent: (target) => target.textContent ?? "",
+      setTextContent: (target, text) => {
+        target.textContent = text;
+      },
+      getAttribute: (target, name) => target.getAttribute(name) ?? null,
+      setAttribute: (target, name, value) => target.setAttribute(name, value),
+      createEventListener: (target, eventName, callback) => createBrowserEventListenerResource(state, target, eventName, callback)
+    }),
+    "browser.element.appendChild": (parent, child) => {
+      state.resolveResource(parent, "Element").appendChild(state.resolveResource(child, "Element"));
+      return void 0;
     },
-    getAttribute: (target, name) => target.getAttribute(name) ?? null,
-    setAttribute: (target, name, value) => target.setAttribute(name, value),
-    createEventListener: (target, eventName, callback) => createBrowserEventListenerResource(state, target, eventName, callback)
-  });
+    "browser.element.remove": (element) => {
+      state.resolveResource(element, "Element").remove();
+      return void 0;
+    },
+    "browser.element.classList.add": (element, className) => {
+      state.resolveResource(element, "Element").classList.add(state.resolveResource(className, "JsString"));
+      return void 0;
+    },
+    "browser.element.classList.remove": (element, className) => {
+      state.resolveResource(element, "Element").classList.remove(state.resolveResource(className, "JsString"));
+      return void 0;
+    },
+    "browser.element.classList.toggle": (element, className) => state.resourceForValue(
+      state.resolveResource(element, "Element").classList.toggle(
+        state.resolveResource(className, "JsString")
+      )
+    ),
+    "browser.element.style.setProperty": (element, name, value) => {
+      state.resolveResource(element, "Element").style.setProperty(
+        state.resolveResource(name, "JsString"),
+        state.resolveResource(value, "JsString")
+      );
+      return void 0;
+    }
+  };
+}
+function createBrowserCanvasHostBindings(state = createHostResourceState()) {
+  const value = (resource, label) => state.resolveResource(resource, label);
+  const number = (resource) => value(resource, "JsFloat");
+  return {
+    "browser.htmlCanvasElement.fromElement": (element) => {
+      const candidate = value(element, "Element");
+      const canvas = isCanvasElement(candidate) ? candidate : null;
+      return state.resourceForValue(createNullableValue(canvas));
+    },
+    "browser.htmlCanvasElement.getWidth": (canvas) => state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").width)),
+    "browser.htmlCanvasElement.setWidth": (canvas, width) => {
+      value(canvas, "HTMLCanvasElement").width = Number(value(width, "JsNat"));
+      return void 0;
+    },
+    "browser.htmlCanvasElement.getHeight": (canvas) => state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").height)),
+    "browser.htmlCanvasElement.setHeight": (canvas, height) => {
+      value(canvas, "HTMLCanvasElement").height = Number(value(height, "JsNat"));
+      return void 0;
+    },
+    "browser.htmlCanvasElement.getContext2D": (canvas) => state.resourceForValue(createNullableValue(value(canvas, "HTMLCanvasElement").getContext("2d"))),
+    "browser.canvas2d.clearRect": (ctx, x, y, width, height) => value(ctx, "CanvasRenderingContext2D").clearRect(number(x), number(y), number(width), number(height)),
+    "browser.canvas2d.fillRect": (ctx, x, y, width, height) => value(ctx, "CanvasRenderingContext2D").fillRect(number(x), number(y), number(width), number(height)),
+    "browser.canvas2d.strokeRect": (ctx, x, y, width, height) => value(ctx, "CanvasRenderingContext2D").strokeRect(number(x), number(y), number(width), number(height)),
+    "browser.canvas2d.beginPath": (ctx) => value(ctx, "CanvasRenderingContext2D").beginPath(),
+    "browser.canvas2d.closePath": (ctx) => value(ctx, "CanvasRenderingContext2D").closePath(),
+    "browser.canvas2d.moveTo": (ctx, x, y) => value(ctx, "CanvasRenderingContext2D").moveTo(number(x), number(y)),
+    "browser.canvas2d.lineTo": (ctx, x, y) => value(ctx, "CanvasRenderingContext2D").lineTo(number(x), number(y)),
+    "browser.canvas2d.arc": (ctx, x, y, radius, startAngle, endAngle) => value(ctx, "CanvasRenderingContext2D").arc(
+      number(x),
+      number(y),
+      number(radius),
+      number(startAngle),
+      number(endAngle)
+    ),
+    "browser.canvas2d.fill": (ctx) => value(ctx, "CanvasRenderingContext2D").fill(),
+    "browser.canvas2d.stroke": (ctx) => value(ctx, "CanvasRenderingContext2D").stroke(),
+    "browser.canvas2d.setFillStyle": (ctx, style) => {
+      value(ctx, "CanvasRenderingContext2D").fillStyle = value(style, "JsString");
+      return void 0;
+    },
+    "browser.canvas2d.setStrokeStyle": (ctx, style) => {
+      value(ctx, "CanvasRenderingContext2D").strokeStyle = value(style, "JsString");
+      return void 0;
+    },
+    "browser.canvas2d.setLineWidth": (ctx, width) => {
+      value(ctx, "CanvasRenderingContext2D").lineWidth = number(width);
+      return void 0;
+    },
+    "browser.canvas2d.save": (ctx) => value(ctx, "CanvasRenderingContext2D").save(),
+    "browser.canvas2d.restore": (ctx) => value(ctx, "CanvasRenderingContext2D").restore(),
+    "browser.canvas2d.translate": (ctx, x, y) => value(ctx, "CanvasRenderingContext2D").translate(number(x), number(y)),
+    "browser.canvas2d.rotate": (ctx, angle) => value(ctx, "CanvasRenderingContext2D").rotate(number(angle))
+  };
 }
 function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
   return createHtmlInputElementResourceHostBindings(state, {
@@ -2216,6 +2301,7 @@ function createBrowserHostBindings({
     ...createBrowserEventHostBindings(state),
     ...createBrowserElementHostBindings(state),
     ...createBrowserHtmlInputElementHostBindings(state),
+    ...createBrowserCanvasHostBindings(state),
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
     ...createInfoviewHostBindings({ resources: state, commandDispatcher: infoviewCommandDispatcher }),
@@ -2240,6 +2326,10 @@ function browserDocument() {
 }
 function queryDocumentElement(selector) {
   return browserDocument().querySelector(selector);
+}
+function isCanvasElement(value) {
+  const Canvas = globalThis.HTMLCanvasElement;
+  return typeof Canvas === "function" ? value instanceof Canvas : value !== null && typeof value === "object" && typeof value.getContext === "function";
 }
 function writeTextToHostClipboard(text) {
   const copiedSynchronously = copyTextWithExecCommand(text);
@@ -2547,13 +2637,14 @@ var JSON_INPUT_INTERFACE_TAGS = /* @__PURE__ */ new Set([
 
 // web/src/runtime/interface-manifest.js
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_VERSION = 6;
+var INTERFACE_MANIFEST_VERSION = 7;
+var MIN_INTERFACE_MANIFEST_VERSION = 6;
 var HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle"
 });
-var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 6, metadata: {...}, exports: [...] }";
+var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 6 or 7, metadata: {...}, exports: [...] }";
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -2573,7 +2664,7 @@ function requireNonNegativeInteger(value, label) {
   }
 }
 function validateInterfaceManifest(manifest) {
-  if (!isRecord(manifest) || manifest.version !== INTERFACE_MANIFEST_VERSION || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
+  if (!isRecord(manifest) || (manifest.version < MIN_INTERFACE_MANIFEST_VERSION || manifest.version > INTERFACE_MANIFEST_VERSION) || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
     throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
   }
   if (manifest.artifact !== void 0 && manifest.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
@@ -2603,6 +2694,10 @@ function validateManifestExports(exports) {
     requireOptionalString(entry.jsName, `${label}.jsName`);
     requireOptionalString(entry.source, `${label}.source`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
+    if (entry.startup !== void 0 && typeof entry.startup !== "boolean") {
+      throw new Error(`${label}.startup must be a boolean`);
+    }
+    entry.startup ??= false;
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== void 0) requireUnique(ids, entry.id, `${label}.id`);
     if (entry.jsName !== void 0) requireUnique(jsNames, entry.jsName, `${label}.jsName`);
@@ -5259,6 +5354,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.exportsByName = /* @__PURE__ */ Object.create(null);
     this.entriesByName = /* @__PURE__ */ Object.create(null);
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
+    this.startupEntriesRun = false;
     this.disposed = false;
     this.liveCallbacks = /* @__PURE__ */ new Set();
     this.createReplacementRuntime = createReplacementRuntime;
@@ -5272,6 +5368,7 @@ var VirRuntime = class extends ObjectValueRuntime {
       this.packageMetadata = this.interfaceManifest.metadata;
       this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
+      this.startupEntriesRun = false;
     }
   }
   targetPointerBytes() {
@@ -5355,6 +5452,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.interfaceManifest = replacement.interfaceManifest;
     this.packageMetadata = replacement.packageMetadata;
     this.boxedCallEntryNames = replacement.boxedCallEntryNames;
+    this.startupEntriesRun = replacement.startupEntriesRun;
     this.liveCallbacks = replacement.liveCallbacks;
     this.hostState?.attachRuntime(this);
     this.rebuildManifestExports();
@@ -5372,6 +5470,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.exportsByName = /* @__PURE__ */ Object.create(null);
     this.entriesByName = /* @__PURE__ */ Object.create(null);
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
+    this.startupEntriesRun = false;
   }
   hasPackageState() {
     return this.packageInfo !== null || this.interfaceManifest !== null || this.packageMetadata !== null || (this.exports.vir_package_interface_manifest_size?.() ?? 0) !== 0 || (this.packageDeclCount() ?? 0) !== 0;
@@ -5412,6 +5511,23 @@ var VirRuntime = class extends ObjectValueRuntime {
       throw new Error(`interface entry not found: ${name}`);
     }
     return this.callEntry(entry, args);
+  }
+  runEntries() {
+    this.requireLiveRuntime();
+    if (this.interfaceManifest === null) {
+      throw new Error("cannot run VIR entries before loading an IR package");
+    }
+    if (this.startupEntriesRun) {
+      return [];
+    }
+    this.startupEntriesRun = true;
+    const results = [];
+    for (const entry of this.interfaceManifest.exports) {
+      if (entry.startup) {
+        results.push(this.callEntry(entry, []));
+      }
+    }
+    return results;
   }
   callEntry(entry, args) {
     this.requireLiveRuntime();

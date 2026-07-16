@@ -42,6 +42,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
+    this.startupEntriesRun = false;
     this.disposed = false;
     this.liveCallbacks = new Set();
     this.createReplacementRuntime = createReplacementRuntime;
@@ -57,6 +58,7 @@ export class VirRuntime extends ObjectValueRuntime {
       this.packageMetadata = this.interfaceManifest.metadata;
       this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
+      this.startupEntriesRun = false;
     }
   }
 
@@ -148,6 +150,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.interfaceManifest = replacement.interfaceManifest;
     this.packageMetadata = replacement.packageMetadata;
     this.boxedCallEntryNames = replacement.boxedCallEntryNames;
+    this.startupEntriesRun = replacement.startupEntriesRun;
     this.liveCallbacks = replacement.liveCallbacks;
     this.hostState?.attachRuntime(this);
     this.rebuildManifestExports();
@@ -167,6 +170,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
+    this.startupEntriesRun = false;
   }
 
   hasPackageState() {
@@ -217,6 +221,24 @@ export class VirRuntime extends ObjectValueRuntime {
       throw new Error(`interface entry not found: ${name}`);
     }
     return this.callEntry(entry, args);
+  }
+
+  runEntries() {
+    this.requireLiveRuntime();
+    if (this.interfaceManifest === null) {
+      throw new Error("cannot run VIR entries before loading an IR package");
+    }
+    if (this.startupEntriesRun) {
+      return [];
+    }
+    this.startupEntriesRun = true;
+    const results = [];
+    for (const entry of this.interfaceManifest.exports) {
+      if (entry.startup) {
+        results.push(this.callEntry(entry, []));
+      }
+    }
+    return results;
   }
 
   callEntry(entry, args) {

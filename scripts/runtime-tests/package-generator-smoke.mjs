@@ -79,6 +79,97 @@ try {
   const evalSourceManifest = JSON.parse(inspectedEvalSource.stdout).manifest;
   manifestEntry(evalSourceManifest, "evalSourceValue");
 
+  const markedSource = join(freshDir, "MarkedExports.lean");
+  const markedPackage = join(freshDir, "marked-exports.irpkg");
+  const markedReport = join(freshDir, "marked-exports.report.md");
+  await writeFile(markedSource, [
+    "import Vir",
+    "",
+    "@[vir_export]",
+    "def markedValue (n : Nat) : Nat := n + 1",
+    "",
+    "@[vir_entry]",
+    "def markedStartup : Lean.Vir.Browser.DomM Unit := pure ()",
+    "",
+    "def notMarked : Nat := 37",
+    "",
+  ].join("\n"));
+  const generatedMarked = runVirIrpkg([
+    markedPackage,
+    markedReport,
+    "--target-marked",
+    markedSource,
+  ]);
+  assert.equal(generatedMarked.status, 0, generatedMarked.stderr || generatedMarked.stdout);
+  const inspectedMarked = spawnSync(
+    "node",
+    ["scripts/inspect-irpkg.mjs", "--json", markedPackage],
+    { encoding: "utf8" },
+  );
+  assert.equal(inspectedMarked.status, 0, inspectedMarked.stderr || inspectedMarked.stdout);
+  const markedManifest = JSON.parse(inspectedMarked.stdout).manifest;
+  assert.deepEqual(
+    markedManifest.exports.map((entry) => entry.entry).sort(),
+    ["markedStartup", "markedValue"],
+  );
+  assert.equal(manifestEntry(markedManifest, "markedValue").startup, false);
+  assert.equal(manifestEntry(markedManifest, "markedStartup").startup, true);
+
+  const slidesPackage = join(freshDir, "slides-canvas.irpkg");
+  const generatedSlides = runVirIrpkg([
+    slidesPackage,
+    join(freshDir, "slides-canvas.report.md"),
+    "--target-marked",
+    "examples/SlidesCanvas.lean",
+  ]);
+  assert.equal(generatedSlides.status, 0, generatedSlides.stderr || generatedSlides.stdout);
+  const inspectedSlides = spawnSync(
+    "node",
+    ["scripts/inspect-irpkg.mjs", "--json", slidesPackage],
+    { encoding: "utf8" },
+  );
+  assert.equal(inspectedSlides.status, 0, inspectedSlides.stderr || inspectedSlides.stdout);
+  const slidesManifest = JSON.parse(inspectedSlides.stdout).manifest;
+  assert.equal(manifestEntry(slidesManifest, "SlidesCanvas.mount").startup, true);
+  for (const target of [
+    "browser.document.createElement",
+    "browser.canvas2d.fillRect",
+    "browser.animation.requestAnimationFrame",
+  ]) {
+    assert.ok(
+      slidesManifest.hostImports.some((entry) => entry.target === target),
+      `Slides canvas host import missing: ${target}`,
+    );
+  }
+
+  const noMarkedSource = join(freshDir, "NoMarkedExports.lean");
+  await writeFile(noMarkedSource, "def ordinaryValue : Nat := 1\n");
+  const generatedWithoutMarks = runVirIrpkg([
+    join(freshDir, "no-marked-exports.irpkg"),
+    join(freshDir, "no-marked-exports.report.md"),
+    "--target-marked",
+    noMarkedSource,
+  ]);
+  assert.notEqual(generatedWithoutMarks.status, 0);
+  assert.match(generatedWithoutMarks.stderr, /no declarations are marked with `@\[vir_export\]` or `@\[vir_entry\]`/);
+
+  const badEntrySource = join(freshDir, "BadMarkedEntry.lean");
+  await writeFile(badEntrySource, [
+    "import Vir",
+    "",
+    "@[vir_entry]",
+    "def badStartup (_n : Nat) : Lean.Vir.Browser.DomM Unit := pure ()",
+    "",
+  ].join("\n"));
+  const generatedBadEntry = runVirIrpkg([
+    join(freshDir, "bad-marked-entry.irpkg"),
+    join(freshDir, "bad-marked-entry.report.md"),
+    "--target-marked",
+    badEntrySource,
+  ]);
+  assert.notEqual(generatedBadEntry.status, 0);
+  assert.match(generatedBadEntry.stderr, /marked with `@\[vir_entry\]` must take no JavaScript arguments/);
+
   const runtimeSource = join(freshDir, "RuntimeEffect.lean");
   const runtimePackage = join(freshDir, "runtime-effect.irpkg");
   const runtimeReport = join(freshDir, "runtime-effect.report.md");
