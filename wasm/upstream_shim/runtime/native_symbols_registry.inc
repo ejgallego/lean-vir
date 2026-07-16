@@ -48,15 +48,9 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("Array.push", "lean_array_push", lean_array_push___boxed) \
     X("Array.toList", "lean_array_to_list", lean_array_to_list___boxed) \
     X("Array.size", "lean_array_get_size", lean_array_get_size___boxed) \
-    X("Array.uget", "lean_array_uget", lean_array_uget___boxed) \
     X("Array.ugetBorrowed", "lean_array_uget_borrowed", lean_array_uget_borrowed___boxed) \
-    X("Array.getInternal", "lean_array_fget", lean_array_fget___boxed) \
     X("Array.getInternalBorrowed", "lean_array_fget_borrowed", lean_array_fget_borrowed___boxed) \
-    X("Array.get!Internal", "lean_array_get", lean_array_get___boxed) \
     X("Array.get!InternalBorrowed", "lean_array_get_borrowed", lean_array_get_borrowed___boxed) \
-    X("Array.uset", "lean_array_uset", lean_array_uset___boxed) \
-    X("Array.set", "lean_array_fset", lean_array_fset___boxed) \
-    X("Array.set!", "lean_array_set", lean_array_set___boxed) \
     X("Array.pop", "lean_array_pop", lean_array_pop___boxed) \
     X("Array.replicate", "lean_mk_array", lean_mk_array___boxed) \
     X("Array.swapIfInBounds", "lean_array_swap", lean_array_swap___boxed) \
