@@ -225,13 +225,6 @@ extern "C" lean_object * lean_system_platform_nbits___boxed(lean_object * unit) 
     return lean_box(sizeof(void*) == 8 ? 64 : 32);
 }
 
-extern "C" lean_object * lean_panic_fn_borrowed___boxed(lean_object * type, lean_object * default_value, lean_object * msg) {
-    lean_dec(type);
-    lean_object * result = lean_panic_fn_borrowed(default_value, msg);
-    lean_dec(default_value);
-    return result;
-}
-
 extern "C" lean_object * lean_io_initializing___boxed(lean_object * world) {
     lean_dec(world);
     return lean_box(g_vir_io_initializing);
@@ -502,6 +495,9 @@ extern "C" lean_object * lean_array_to_list___boxed(lean_object * type, lean_obj
 
 VIR_DEFINE_DROP_TYPE_BORROWED_OBJECT_UNARY_WRAPPER(lean_array_get_size)
 
+// The raw function returns a borrowed element. Lean's standard boxed-wrapper
+// emission does not retain that result before releasing the borrowed array, so
+// this ownership adapter must remain explicit.
 extern "C" lean_object * lean_array_uget_borrowed___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
     lean_dec(type);
     lean_object * result = lean_array_uget_borrowed(array, lean_unbox_usize(index));
@@ -906,19 +902,6 @@ extern "C" lean_object * lean_is_reserved_name___boxed(lean_object * env, lean_o
     lean::options opts(lean_box(0));
     lean_object * args[] = { env, n };
     return lean::ir::run_boxed(ienv, opts, lean::name({ "Lean", "isReservedName" }), 2, args);
-}
-
-extern "C" lean_object * lean_eval_const___boxed(
-    lean_object * type,
-    lean_object * env,
-    lean_object * opts,
-    lean_object * const_name) {
-    lean_dec(type);
-    lean_object * result = lean_eval_const(env, opts, const_name);
-    lean_dec(env);
-    lean_dec(opts);
-    lean_dec(const_name);
-    return result;
 }
 
 extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_object * const_name) {

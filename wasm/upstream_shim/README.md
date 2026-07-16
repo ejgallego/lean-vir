@@ -75,7 +75,8 @@ Set `generateBoxedWrapper := true` on a native extern when the normal Lean
 compiler-generated boxed adapter is sufficient. `npm run probe:upstream`
 generates its C source and registry fragment under `build/upstream-probe/` and
 links the resulting object statically. Keep wrappers with extra control flow,
-runtime substitutions, or WASI policy in `runtime/native_symbols.cpp`.
+ownership adaptation, runtime substitutions, or WASI policy in
+`runtime/native_symbols.cpp`.
 
 The usual boundary validation is:
 

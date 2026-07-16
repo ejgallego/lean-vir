@@ -29,7 +29,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("Int.decLe", "lean_int_dec_le", lean_int_dec_le___boxed) \
     X("Int.natAbs", "lean_nat_abs", lean_nat_abs___boxed) \
     X("System.Platform.getNumBits", "lean_system_platform_nbits", lean_system_platform_nbits___boxed) \
-    X("panicCore", "lean_panic_fn_borrowed", lean_panic_fn_borrowed___boxed) \
     X("ptrAddrUnsafe", "lean_ptr_addr", lean_ptr_addr___boxed) \
     X("IO.initializing", "lean_io_initializing", lean_io_initializing___boxed) \
     X("ST.Prim.mkRef", "lean_st_mk_ref", lean_st_mk_ref___boxed) \
@@ -37,7 +36,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
     X("ST.Prim.Ref.set", "lean_st_ref_set", lean_st_ref_set___boxed) \
     X("ST.Prim.Ref.take", "lean_st_ref_take", lean_st_ref_take___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.isReservedName", "lean_is_reserved_name", lean_is_reserved_name___boxed) \
-    X("_private.Lean.Environment.0.Lean.Environment.evalConstCore", "lean_eval_const", lean_eval_const___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.evalCheckMeta", "lean_eval_check_meta", lean_eval_check_meta___boxed) \
     X("Task.pure", "lean_task_pure", lean_task_pure___boxed) \
     X("Task.get", "lean_task_get_own", lean_task_get_own___boxed) \

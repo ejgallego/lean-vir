@@ -14,6 +14,13 @@ const nativeExternsPath = new URL("../Vir/GeneratePackage/NativeExterns.lean", i
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
 const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols_registry.inc", import.meta.url);
 
+const intentionalDirectWrapperExceptions = new Map([
+  [
+    "lean_array_uget_borrowed___boxed",
+    "the raw element result is borrowed and must be retained before the array is released",
+  ],
+]);
+
 const args = new Set(process.argv.slice(2));
 for (const arg of args) {
   if (!["--all", "--check", "--json", "--regular-direct-shapes"].includes(arg)) {
@@ -856,9 +863,35 @@ if (args.has("--check")) {
   const failures = inventory.filter((item) =>
     ["generated-helper-mismatch", "generated-direct-mismatch", "missing", "extra"].includes(item.kind)
   );
-  if (failures.length !== 0) {
+  const directPolicyFailures = [];
+  const foundDirectExceptions = new Set();
+  for (const item of inventory) {
+    if (item.kind === "regular-direct") {
+      directPolicyFailures.push(
+        `${item.wrapper}: ordinary direct adapter must be compiler-generated or explicitly custom`,
+      );
+    } else if (item.kind === "regular-direct-retain") {
+      const reason = intentionalDirectWrapperExceptions.get(item.wrapper);
+      if (reason) {
+        foundDirectExceptions.add(item.wrapper);
+      } else {
+        directPolicyFailures.push(`${item.wrapper}: unapproved direct ownership adapter`);
+      }
+    }
+  }
+  for (const [wrapper, reason] of intentionalDirectWrapperExceptions) {
+    if (!foundDirectExceptions.has(wrapper)) {
+      directPolicyFailures.push(`${wrapper}: expected direct ownership exception is missing (${reason})`);
+    }
+  }
+  if (failures.length !== 0 || directPolicyFailures.length !== 0) {
     if (args.has("--json")) {
-      console.error(`native wrapper inventory check failed: ${failures.length} failure(s)`);
+      console.error(
+        `native wrapper inventory check failed: ${failures.length + directPolicyFailures.length} failure(s)`,
+      );
+    }
+    for (const failure of directPolicyFailures) {
+      console.error(`native wrapper policy failure: ${failure}`);
     }
     process.exit(1);
   }

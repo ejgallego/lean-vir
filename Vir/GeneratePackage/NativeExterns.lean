@@ -163,7 +163,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `panicCore,
     params := #[param 1 false .erased, param 2 true .tobject, param 3 false .object],
     resultType := .tobject,
-    symbol := "lean_panic_fn_borrowed"
+    symbol := "lean_panic_fn_borrowed",
+    generateBoxedWrapper := true
   },
   {
     name := `ptrAddrUnsafe,
@@ -238,7 +239,8 @@ def nativeExterns : Array NativeExtern := #[
       param 4 true .tobject
     ],
     resultType := .object,
-    symbol := "lean_eval_const"
+    symbol := "lean_eval_const",
+    generateBoxedWrapper := true
   },
   {
     name := privateEnvironmentName "evalCheckMeta",

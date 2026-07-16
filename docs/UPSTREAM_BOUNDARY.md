@@ -152,6 +152,13 @@ without duplicating an evolving declaration list here. Wrappers that implement
 additional behavior, unavailable runtime services, or deliberate WASI policy
 remain explicit in `runtime/native_symbols.cpp`.
 
+`npm run check:native-wrappers` rejects ordinary handwritten direct adapters.
+The intentional ownership exception is `Array.ugetBorrowed`: its raw result is
+borrowed from the array, while Lean's standard emitted boxed wrapper releases
+the array without first retaining that result. The explicit shim wrapper keeps
+the required retain visible and the inventory check fails if this exception is
+removed, reclassified, or duplicated without updating the policy.
+
 ## Real IR Declarations
 
 The upstream interpreter reads declarations through the Lean object layout
