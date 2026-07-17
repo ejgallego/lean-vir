@@ -144,7 +144,8 @@ compiler-generated native wrapper source, registry, selected stage0 source
 list, and live symbol-provider manifest live under
 `build/upstream-probe/generated`. Example iteration updates the relevant
 `web/public/*.irpkg`; it does not rebuild or relink the upstream interpreter
-artifact unless stable C++ inputs or generated native-support outputs change.
+artifact unless stable C++ inputs, generated wrapper output, or linker-selected
+stage0 support inputs change.
 
 The demo artifact uses a bounded memory configuration: 4 MiB initial linear
 memory and a 1 MiB stack by default. This is enough for the current smoke range

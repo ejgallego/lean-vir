@@ -178,10 +178,11 @@ build then recompiles those imported declarations and emits their
 compiler-generated boxed wrappers together with any selected Lean-defined raw
 body available to the generator. If an exported Lean implementation depends on
 compiler-generated imported declarations that are present only in compiled
-library output, the probe links the pinned upstream-generated support module
-instead. This is how the `String.Internal` search/position operations and
-`Substring.Raw.Internal.beq` use their normal compiler wrappers and upstream
-raw implementations without copying either into the shim. The same path lets
+library output, the probe selects the required pinned upstream-generated
+support modules from the live link. This is how the search/position operations
+in `String.Internal` and `Substring.Raw.Internal.beq` use their normal compiler
+wrappers and upstream raw implementations without copying either into the shim.
+The same path lets
 `Array.mk` and `Array.toList` call the real runtime exports backed by their
 compiler-generated list/array helpers. The native extern table remains the
 source of truth for wrapper selection;

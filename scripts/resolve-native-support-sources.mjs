@@ -33,9 +33,9 @@ async function collectCFiles(root) {
   return files.sort();
 }
 
-function definesFunction(source, symbol) {
+function functionDefinitionPattern(symbol) {
   const escaped = escapeRegExp(symbol);
-  return new RegExp(`\\b${escaped}\\s*\\([^;{}]*\\)\\s*\\{`, "m").test(source);
+  return new RegExp(`\\b${escaped}\\s*\\([^;{}]*\\)\\s*\\{`, "m");
 }
 
 const [stage0Root, symbolsFile, ...extraArgs] = process.argv.slice(2);
@@ -58,7 +58,8 @@ for (const path of await collectCFiles(stage0Root)) {
 }
 
 for (const symbol of symbols) {
-  const providers = sources.filter(({ source }) => definesFunction(source, symbol));
+  const definitionPattern = functionDefinitionPattern(symbol);
+  const providers = sources.filter(({ source }) => definitionPattern.test(source));
   if (providers.length > 1) {
     throw new Error(
       `multiple stage0 providers define ${symbol}:\n${providers.map(({ path }) => `  ${path}`).join("\n")}`,

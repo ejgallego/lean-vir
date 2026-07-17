@@ -502,10 +502,9 @@ for ((native_support_round = 1; native_support_round <= native_support_max_round
   done
 done
 if [ "$native_support_resolution_complete" != "1" ]; then
-  echo "error: stage0 native support selection did not reach a fixed point" >&2
+  echo "error: stage0 native support selection did not reach a fixed point after $native_support_max_rounds rounds" >&2
   exit 1
 fi
-audit_native_support_duplicates
 link_native_support_bundle
 
 native_support_sources_tmp="$generated_native_support_sources.tmp"
