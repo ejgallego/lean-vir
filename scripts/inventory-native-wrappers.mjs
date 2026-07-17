@@ -14,6 +14,41 @@ const nativeExternsPath = new URL("../Vir/GeneratePackage/NativeExterns.lean", i
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
 const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols_registry.inc", import.meta.url);
 
+// This is the complete handwritten boxed-wrapper exception set. Every entry
+// records why Lean's standard wrapper would violate ownership at VIR's
+// all-owned interpreter boundary.
+const intentionalHandwrittenWrapperExceptions = new Map([
+  [
+    "lean_array_uget_borrowed___boxed",
+    {
+      kind: "regular-direct-retain",
+      reason: "the raw element result is borrowed and must be retained before the array is released",
+    },
+  ],
+  [
+    "lean_array_fget_borrowed___boxed",
+    {
+      kind: "custom",
+      reason: "uses the owned-result runtime getter before releasing the borrowed array",
+    },
+  ],
+  [
+    "lean_array_get_borrowed___boxed",
+    {
+      kind: "custom",
+      reason: "uses the owned-result checked getter before releasing the default and array",
+    },
+  ],
+]);
+
+// Migration ratchet, not wrapper metadata: lower these counts whenever another
+// macro-generated family moves to Lean's compiler. The check prevents the
+// handwritten ordinary-wrapper population from growing again between batches.
+const expectedMacroGeneratedWrapperCounts = new Map([
+  ["generated-helper", 0],
+  ["generated-direct", 0],
+]);
+
 const args = new Set(process.argv.slice(2));
 for (const arg of args) {
   if (!["--all", "--check", "--json", "--regular-direct-shapes"].includes(arg)) {
@@ -793,6 +828,10 @@ const kindOrder = [
 ];
 const byKind = new Map(kindOrder.map((kind) => [kind, []]));
 for (const item of inventory) {
+  const exception = intentionalHandwrittenWrapperExceptions.get(item.wrapper);
+  if (exception?.kind === item.kind) {
+    item.reason = exception.reason;
+  }
   const group = byKind.get(item.kind) ?? [];
   group.push(item);
   byKind.set(item.kind, group);
@@ -856,9 +895,45 @@ if (args.has("--check")) {
   const failures = inventory.filter((item) =>
     ["generated-helper-mismatch", "generated-direct-mismatch", "missing", "extra"].includes(item.kind)
   );
-  if (failures.length !== 0) {
+  const directPolicyFailures = [];
+  const foundHandwrittenExceptions = new Set();
+  for (const item of inventory) {
+    if (item.kind === "regular-helper" || item.kind === "regular-direct") {
+      directPolicyFailures.push(
+        `${item.wrapper}: ordinary adapter must be compiler-generated or explicitly custom`,
+      );
+    } else if (["regular-direct-retain", "custom-alias", "custom"].includes(item.kind)) {
+      const exception = intentionalHandwrittenWrapperExceptions.get(item.wrapper);
+      if (exception?.kind === item.kind) {
+        foundHandwrittenExceptions.add(item.wrapper);
+      } else {
+        directPolicyFailures.push(`${item.wrapper}: unapproved handwritten ${item.kind} adapter`);
+      }
+    }
+  }
+  for (const [wrapper, exception] of intentionalHandwrittenWrapperExceptions) {
+    if (!foundHandwrittenExceptions.has(wrapper)) {
+      directPolicyFailures.push(
+        `${wrapper}: expected ${exception.kind} ownership exception is missing (${exception.reason})`,
+      );
+    }
+  }
+  for (const [kind, expected] of expectedMacroGeneratedWrapperCounts) {
+    const actual = (byKind.get(kind) ?? []).length;
+    if (actual !== expected) {
+      directPolicyFailures.push(
+        `${kind}: expected ${expected} handwritten wrapper(s), found ${actual}; update the migration ratchet with the intentional conversion`,
+      );
+    }
+  }
+  if (failures.length !== 0 || directPolicyFailures.length !== 0) {
     if (args.has("--json")) {
-      console.error(`native wrapper inventory check failed: ${failures.length} failure(s)`);
+      console.error(
+        `native wrapper inventory check failed: ${failures.length + directPolicyFailures.length} failure(s)`,
+      );
+    }
+    for (const failure of directPolicyFailures) {
+      console.error(`native wrapper policy failure: ${failure}`);
     }
     process.exit(1);
   }

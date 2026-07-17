@@ -45,10 +45,19 @@ The probe links these upstream runtime sources:
 - `src/runtime/mpz.cpp`
 - `src/runtime/object.cpp`
 - `src/runtime/object_ref.cpp`
+- `src/runtime/platform.cpp`
 - `src/runtime/utf8.cpp`
 
 It also links `src/util/name.cpp`, which is not runtime proper but is needed by
 the interpreter's name formatting and diagnostics.
+
+For Lean-defined native exports whose implementation closure is available in
+the pinned compiler output rather than the imported kernel environment, the
+probe also cross-compiles the corresponding stage0 sources. The current String
+support uses `Init/Prelude.c` plus
+`Init/Data/String/{Defs,Basic,Search,Substring}.c`; array/list conversion also
+uses `Init/Data/List/ToArrayImpl.c` and `Init/Data/Array/Basic.c`. The final
+generated report lists the complete set explicitly.
 
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
@@ -69,19 +78,30 @@ not a fork of Lean. It is split by responsibility:
   and name-string helpers used by current object-boundary fixtures.
 - `abi/resource_abi.cpp` owns the shared external resource class used by
   `Lean.Vir.Js α` values.
-- `runtime/native_symbols.cpp` owns native extern wrappers that still require
-  shim-specific implementation or policy.
+- `runtime/native_symbols.cpp` owns the final borrowed-result ownership
+  adapters, the native constant provider, and raw environment-policy providers.
 - `runtime/native_symbol_lookup.cpp` owns the generated native registry include,
   restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
   stubs.
-- `tools/GenerateNativeWrappers.lean` recompiles native externs marked with
-  `generateBoxedWrapper` in `Vir/GeneratePackage/NativeExterns.lean`, selects
-  their `_boxed` LCNF declarations, and emits their C definitions and registry
-  entries through Lean's standard compiler pipeline. The build cross-compiles
-  that generated C and links it statically into the WASI module.
+- `tools/GenerateNativeWrappers.lean` recompiles declarations marked with
+  `generateBoxedWrapper` in `Vir/GeneratePackage/NativeExterns.lean` and emits
+  their selected declaration bodies, `_boxed` LCNF declarations, and registry
+  entries through Lean's standard compiler pipeline. Most selected declarations
+  need only an extern prototype plus the boxed adapter; Lean-defined support such
+  as `ByteArray.extract` also contributes its compiler-generated raw body. The
+  build cross-compiles that generated C and links it statically into the WASI
+  module.
+- `scripts/build-upstream-probe.sh` prelinks local native exceptions, the
+  generated wrapper object, and pinned stage0 support into one relocatable
+  native-support object. Duplicate-symbol tolerance is confined to this
+  prelink: local exceptions take precedence over upstream support, and generated
+  adapters take precedence over duplicate stage0 adapters. An `llvm-nm` audit
+  rejects collisions outside the local provider symbols and generated object.
 - `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`,
   `runtime/runtime_value_stubs.cpp`, and `runtime/io_stubs.cpp` own the
-  WASI/platform, initializer, value-helper, and demo IO stubs.
+  WASI/platform, initializer, value-helper, and demo IO providers. Local raw
+  extern implementations belong in these focused provider files even when
+  Lean's compiler can generate their ordinary boxed adapters.
 - `runtime/lean_object_constructors.cpp` owns the temporary `Name`/`Level`/`Expr`
   constructor replacements for exported Lean-library constructors.
 - `package/package_section_directory.cpp` owns `.irpkg` envelope and section
@@ -122,18 +142,21 @@ The exported `vir_obj_*`, `vir_call_resolved_objects`, closure-root, and
 stable only within a matching `lean_vir` revision and should not be treated as
 the JavaScript application API.
 
-The WASI probe generates a local `lean/config.h` overlay with `LEAN_MIMALLOC`
-disabled. The pinned Lean source checkout contains the runtime sources but does
-not include vendored mimalloc sources for a WASI rebuild, so this selects Lean's
-ordinary allocator path while still compiling Lean's real runtime code.
+The WASI probe generates local `lean/config.h` and `githash.h` overlays. The
+config overlay leaves `LEAN_MIMALLOC` disabled because the pinned Lean source
+checkout does not include vendored mimalloc sources for a WASI rebuild; this
+selects Lean's ordinary allocator path while still compiling Lean's real
+runtime code. The git-hash overlay records the pinned source commit, and the
+probe supplies Lean's normal `LEAN_BUILD_TYPE` input for `platform.cpp`.
 
 The build compiles stable sources into cached objects under
 `build/upstream-probe/obj`. Example edits regenerate the relevant
 `web/public/*.irpkg` package without recompiling or relinking the WASM artifact.
 Compiler-generated native wrappers and their registry fragment live under
 `build/upstream-probe/generated`; they are build artifacts and are not checked
-into Git. The artifact is relinked only when stable or generated objects, link
-flags, the Lean source commit, or the runtime config overlay change.
+into Git. The relocatable native-support bundle lives in the object cache. The
+artifact is relinked only when stable or generated objects, link flags, the
+Lean source commit, or the generated runtime overlays change.
 
 ## Native Boxed Wrappers
 
@@ -145,12 +168,34 @@ inferred by the normal LCNF passes before calling the raw extern symbol.
 
 VIR keeps the final WASI module statically linked. Standard adapters can be
 marked with `generateBoxedWrapper := true` in the native extern table; the
-build then recompiles those imported extern declarations and emits only their
-compiler-generated boxed wrappers. The native extern table is the source of
-truth for the current selection; `npm run inspect:native-wrappers` reports it
-without duplicating an evolving declaration list here. Wrappers that implement
-additional behavior, unavailable runtime services, or deliberate WASI policy
-remain explicit in `runtime/native_symbols.cpp`.
+build then recompiles those imported declarations and emits their
+compiler-generated boxed wrappers together with any selected Lean-defined raw
+body available to the generator. If an exported Lean implementation depends on
+compiler-generated imported declarations that are present only in compiled
+library output, the probe links the pinned upstream-generated support module
+instead. This is how the `String.Internal` search/position operations and
+`Substring.Raw.Internal.beq` use their normal compiler wrappers and upstream
+raw implementations without copying either into the shim. The same path lets
+`Array.mk` and `Array.toList` call the real runtime exports backed by their
+compiler-generated list/array helpers. The native extern table remains the
+source of truth for wrapper selection;
+`npm run inspect:native-wrappers` reports it without duplicating the full list
+here. Local behavior and WASI policy belong in raw provider functions; their
+boxed adapters are still generated whenever the standard compiler output is
+correct. A boxed implementation remains explicit in `runtime/native_symbols.cpp`
+only when VIR's all-owned interpreter boundary needs ownership behavior that
+Lean's standard wrapper cannot express.
+
+`npm run check:native-wrappers` rejects ordinary handwritten direct adapters.
+The intentional ownership exceptions are the borrowed array getters
+`Array.ugetBorrowed`, `Array.fgetBorrowed`, and `Array.getBorrowed`: their raw
+results are borrowed from the array, while a standard emitted boxed wrapper
+would release the array without first retaining the result. The explicit shim
+wrapper for `Array.ugetBorrowed` retains the result before releasing the array;
+the other two wrappers deliberately call the corresponding owned runtime APIs.
+This is the complete handwritten boxed-wrapper exception set. The inventory
+allowlists all three with their expected classification and rejects any new,
+missing, or reclassified handwritten adapter.
 
 ## Real IR Declarations
 
@@ -354,9 +399,11 @@ and `Task.bind`, and `Lean.addDecl` can use `BaseIO.mapTask`. The current
 `pretty-printer.irpkg` intentionally stops at `Std.Format.pretty`; supporting
 `ppExpr` requires broadening the runtime boundary to Meta/Environment task and
 promise support plus the parenthesizer/formatter interpreter externs.
-`IO.initializing` is modeled as post-initialization, and `ST.Prim.mkRef`/
-`ST.Prim.Ref.get` cover single-threaded ref allocation/read semantics. Mutation,
-blocking IO, and scheduler behavior are still outside the demo boundary.
+`runtime/io_stubs.cpp` provides the local raw `IO.initializing` and
+`ST.Prim.Ref` operations, while Lean's compiler generates their boxed ABI
+adapters. `IO.initializing` is modeled as post-initialization, and the ST
+providers cover single-threaded reference allocation, read, write, and take
+semantics. Blocking IO and scheduler behavior remain outside the demo boundary.
 They are backed by a generated native registry include; a full native symbol
 loader is still out of scope. The public String search/drop fixture currently
 imports a small upstream IR closure and adds native registrations for the
@@ -475,9 +522,11 @@ module loader.
 
 The current parser support still uses a small shim boundary for opaque
 environment bridges: `evalConstCore` delegates to upstream `lean_eval_const`,
-`isReservedName` delegates back into packaged IR for `Lean.isReservedName`, and
-`evalCheckMeta` is accepted for the demo. That is the next fidelity boundary to
-remove if we want parser loading to behave exactly like a full Lean runtime.
+the raw `isReservedName` provider delegates back into packaged IR for
+`Lean.isReservedName`, and the raw `evalCheckMeta` provider accepts the check for
+the demo. Their boxed adapters are normal compiler output. The provider policy
+is the next fidelity boundary to remove if parser loading should behave exactly
+like a full Lean runtime.
 
 The runtime/platform stub files keep the remaining platform boundary explicit:
 
