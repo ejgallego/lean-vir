@@ -44,7 +44,14 @@ jobs:
       - run: npm run install:wasi
       - run: npm run check:boundary-registry
       - run: npm run build:demo:release
+      - run: npm run package:sdk-artifact
       - run: npm run test:upstream:no-build
+      - name: Upload SDK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-vir-sdk
+          path: build/artifacts/lean-vir-sdk.tar.gz
+          if-no-files-found: error
       - name: Upload demo artifacts
         uses: actions/upload-artifact@v4
         with:
