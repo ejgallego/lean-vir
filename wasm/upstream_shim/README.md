@@ -35,7 +35,7 @@ coupling. Line counts are approximate and are meant for sizing, not policy.
 | Loaded package state and declaration provider | `package/package_decl_provider.cpp`, `package/decl_provider.h` | 398 | Direct | Owns loaded package indices, declaration lookup, structural export-index call slots, direct export call summaries, interface manifest, and init globals. |
 | Package load ABI | `package/package_loader_abi.cpp` | 49 | Direct | Exposes package byte allocation, package loading, package errors, and interface manifest access to JavaScript. |
 | Host import dispatch | `package/host_import_trampolines.cpp` | 382 | Direct metadata | Uses package host-import slots, arity, erased-prefix count, and effect metadata. |
-| Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `runtime/native_symbols_registry.inc`, `tools/GenerateNativeWrappers.lean`, `scripts/build-upstream-probe.sh` | ~1400 | Declaration/native symbol coupling | Standard boxed adapters are emitted by Lean's compiler into build-local C. Pinned compiler-generated support modules supply selected Lean-defined raw exports; three ownership adapters and raw environment-policy providers remain in the shim. |
+| Native extern support | `runtime/native_symbols.cpp`, `runtime/native_symbol_lookup.cpp`, `runtime/native_symbols_registry.inc`, `tools/GenerateNativeWrappers.lean`, `scripts/build-upstream-probe.sh` | ~1400 | Declaration/native symbol coupling | Standard boxed adapters are emitted by Lean's compiler into build-local C. Linker-selected pinned support modules supply Lean-defined raw exports; three ownership adapters and raw environment-policy providers remain in the shim. |
 | JavaScript package-call ABI | `abi/call_abi.cpp` | 134 | Consumes package metadata | Thin JS-facing entry point over call slots and direct call summaries. |
 | Upstream interpreter bridge | `interpreter/interpreter_bridge.cpp/.h` | 102 | Low | Initializes the upstream interpreter and provides `lean_ir_find_env_decl` hooks. |
 | Object/resource/closure ABI | `abi/object_abi.cpp`, `abi/object_expr_abi.cpp`, `abi/resource_abi.cpp/.h`, `abi/closure_abi.cpp` | 776 | Low | Runtime object boundary used after explicit lowering; `object_expr_abi.cpp` is fixture/parser support. |
@@ -78,8 +78,10 @@ under `build/upstream-probe/`, then links the resulting object statically. This
 includes compiler-generated raw bodies for selected Lean-defined support such as
 `ByteArray.extract`. When an imported implementation closure exists only in
 compiled upstream output, the probe cross-compiles the corresponding pinned
-stage0 module; the String search/position and array/list conversion support
-follow this path. Local exceptions, generated adapters, and those upstream
+stage0 module. The module set is selected to a fixed point from live unresolved
+symbols after linker garbage collection, rather than maintained by hand;
+`build/upstream-probe/generated/native-support-{sources.txt,providers.tsv}`
+records the result. Local exceptions, generated adapters, and those upstream
 objects are prelinked in that precedence order. Duplicate tolerance is confined
 to the relocatable bundle and checked against the generated/local symbol set
 before the strict final link. Put local behavior and WASI policy in raw provider
