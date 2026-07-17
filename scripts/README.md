@@ -31,12 +31,11 @@ map lives in `docs/HARNESS.md`.
   generate one manifest-bearing `.irpkg`.
 - `npm run inspect:native-wrappers`
   Print a generated inventory of the current boxed native extern wrappers,
-  grouped by generated helper/direct wrappers, remaining direct-call candidates,
-  and custom shim behavior.
+  grouped into compiler-generated adapters and the audited handwritten
+  ownership exceptions.
 - `npm run check:native-wrappers`
-  Run the same inventory in check mode, including validation that
-  macro-generated wrappers use the helper or direct-call shape implied by
-  `Vir/GeneratePackage/NativeExterns.lean`.
+  Run the same inventory in check mode and reject any missing, extra,
+  reclassified, or unapproved handwritten boxed adapter.
 - `npm run generate:ir-codec-tags`
   Refresh generated Lean/C++ constants for IR declaration payload tag bytes
   from `scripts/ir-codec-tags.mjs`.

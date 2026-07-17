@@ -476,26 +476,12 @@ The boxed wrappers can be inventoried with:
 npm run inspect:native-wrappers
 ```
 
-This groups wrappers into compiler-generated wrappers, shim macro-generated
-helpers and direct calls, remaining regular direct calls, direct calls that
-retain a borrowed result, aliases, and custom shim behavior. The inventory
-gives wrapper-generation work a concrete target without introducing another
-handwritten ABI table. The remaining regular direct-call wrappers can be
-grouped by broad ABI and wrapper-plumbing model with:
-
-```bash
-npm run inspect:native-wrapper-shapes
-```
-
-Use that shape report to select the next compiler-generation candidates. For a
-standard ABI adapter, mark the native extern, build and exercise the generated
-wrapper, then remove its shim definition. Add another shim macro class only
-when Lean's normal compiler output cannot express the required runtime or WASI
-policy. `npm run check:native-wrappers` continues to verify that the remaining
-shim helper wrappers use the helper implied by the Lean-side ABI table and that
-shim direct-call macros match their narrow modeled ABI shape. Aliases, retained
-borrowed results, and custom behavior remain explicit until their policy is
-handled separately.
+This separates wrappers emitted by Lean's standard compiler pipeline from the
+complete handwritten ownership-exception set. `npm run check:native-wrappers`
+rejects any missing, extra, reclassified, or unapproved handwritten boxed
+adapter. The inventory therefore guards the endpoint directly instead of
+retaining the migration-only macro and shape classifications used to select
+earlier compiler-generation batches.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to

@@ -25,7 +25,6 @@
     "generate:irpkg": "bash scripts/lean-to-irpkg.sh",
     "inspect:irpkg": "node scripts/inspect-irpkg.mjs",
     "inspect:native-wrappers": "node scripts/inventory-native-wrappers.mjs",
-    "inspect:native-wrapper-shapes": "node scripts/inventory-native-wrappers.mjs --regular-direct-shapes",
     "prepare:irpkg": "node scripts/prepare-irpkg.mjs",
     "quickstart": "npm run prepare:irpkg -- examples/quickstart.virpkg.json && node scripts/quickstart-url.mjs",
     "prepare:pages": "npm run prepare:irpkg -- examples/quickstart.virpkg.json examples/fib.virpkg.json examples/mergesort.virpkg.json",
