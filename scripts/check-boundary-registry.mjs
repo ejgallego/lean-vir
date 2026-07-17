@@ -7,7 +7,6 @@ Author: Emilio J. Gallego Arias
 import { readFile, writeFile } from "node:fs/promises";
 
 import { parseNativeExterns } from "./native-externs.mjs";
-import { generatedWrapperNames } from "./native-wrapper-macros.mjs";
 
 const nativeExternsPath = new URL("../Vir/GeneratePackage/NativeExterns.lean", import.meta.url);
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
@@ -68,13 +67,9 @@ function parseNativeRegistry(source) {
 }
 
 function parseBoxedWrappers(source) {
-  const wrappers = new Set(
+  return new Set(
     [...source.matchAll(/extern "C" lean_object \* ([A-Za-z0-9_]+___boxed)\(/g)].map((match) => match[1])
   );
-  for (const wrapper of generatedWrapperNames(source)) {
-    wrappers.add(wrapper);
-  }
-  return wrappers;
 }
 
 function expectedDlsymSymbol(entry) {
