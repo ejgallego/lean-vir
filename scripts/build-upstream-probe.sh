@@ -191,7 +191,7 @@ support_sources=(
   "$src/src/util/name.cpp"
 )
 
-lean_support_root="$src/stage0/stdlib/Init"
+lean_stage0_support_root="$src/stage0/stdlib/Init"
 
 local_native_support_sources=(
   "wasm/upstream_shim/runtime/lean_object_constructors.cpp"
@@ -453,8 +453,8 @@ link_native_support_round_bundle() {
   link_native_support_object "$native_support_round_bundle"
 }
 
-lean_support_sources=()
-declare -A selected_lean_support_sources=()
+lean_stage0_support_sources=()
+declare -A selected_lean_stage0_support_sources=()
 native_support_providers_tmp="$generated_native_support_providers.tmp"
 : > "$native_support_providers_tmp"
 native_support_resolution_complete=0
@@ -471,22 +471,22 @@ for ((native_support_round = 1; native_support_round <= native_support_max_round
   "$llvm_nm" --format=posix --undefined-only "$native_support_probe_wasm" \
     | awk 'NF >= 2 { print $1 }' | sort -u > "$native_support_live_undefined"
   node scripts/resolve-native-support-sources.mjs \
-    "$lean_support_root" "$native_support_live_undefined" > "$native_support_resolution"
+    "$lean_stage0_support_root" "$native_support_live_undefined" > "$native_support_resolution"
 
-  new_lean_support_sources=()
+  new_lean_stage0_support_sources=()
   while IFS=$'\t' read -r symbol source; do
     if [ -z "$symbol" ] || [ -z "$source" ]; then
       continue
     fi
     printf '%s\t%s\n' "$symbol" "$source" >> "$native_support_providers_tmp"
-    if [[ -z "${selected_lean_support_sources[$source]+selected}" ]]; then
-      selected_lean_support_sources["$source"]=1
-      lean_support_sources+=("$source")
-      new_lean_support_sources+=("$source")
+    if [[ -z "${selected_lean_stage0_support_sources[$source]+selected}" ]]; then
+      selected_lean_stage0_support_sources["$source"]=1
+      lean_stage0_support_sources+=("$source")
+      new_lean_stage0_support_sources+=("$source")
     fi
   done < "$native_support_resolution"
 
-  if [ "${#new_lean_support_sources[@]}" = "0" ]; then
+  if [ "${#new_lean_stage0_support_sources[@]}" = "0" ]; then
     if [ -s "$native_support_resolution" ]; then
       echo "error: selected stage0 native providers left their symbols unresolved:" >&2
       sed 's/^/  /' "$native_support_resolution" >&2
@@ -495,7 +495,7 @@ for ((native_support_round = 1; native_support_round <= native_support_max_round
     native_support_resolution_complete=1
     break
   fi
-  for source in "${new_lean_support_sources[@]}"; do
+  for source in "${new_lean_stage0_support_sources[@]}"; do
     object="$(object_for_source "$source")"
     compile_one "$source" "$object"
     native_support_objects+=("$object")
@@ -509,7 +509,7 @@ link_native_support_bundle
 
 native_support_sources_tmp="$generated_native_support_sources.tmp"
 {
-  for source in "${lean_support_sources[@]}"; do
+  for source in "${lean_stage0_support_sources[@]}"; do
     printf '%s\n' "$source"
   done
 } > "$native_support_sources_tmp"
@@ -671,7 +671,7 @@ wasi_import_count="$(wc -l < "$wasi_imports" | tr -d ' ')"
 runtime_source_count="${#runtime_sources[@]}"
 support_source_count="${#support_sources[@]}"
 generated_source_count=1
-lean_stage0_support_source_count="${#lean_support_sources[@]}"
+lean_stage0_support_source_count="${#lean_stage0_support_sources[@]}"
 local_native_support_source_count="${#local_native_support_sources[@]}"
 native_support_duplicate_count="$(wc -l < "$native_support_duplicate_symbols" | tr -d ' ')"
 shim_source_count="${#shim_sources[@]}"
@@ -756,9 +756,9 @@ report_start=$SECONDS
   echo
   printf -- '- `%s`\n' "$generated_native_wrappers"
   echo
-  echo "## Linker-Selected Pinned Lean Support Sources"
+  echo "## Linker-Selected Pinned Stage0 Support Sources"
   echo
-  for path in "${lean_support_sources[@]}"; do
+  for path in "${lean_stage0_support_sources[@]}"; do
     printf -- '- `%s`\n' "$path"
   done
   echo

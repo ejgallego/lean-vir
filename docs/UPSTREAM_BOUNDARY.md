@@ -160,9 +160,9 @@ Compiler-generated native wrappers and their registry fragment live under
 `build/upstream-probe/generated`; the same directory contains the selected
 stage0 source list and live symbol-to-provider manifest. They are build
 artifacts and are not checked into Git. The relocatable native-support bundle
-lives in the object cache. The artifact is relinked only when stable or
-generated objects, link flags, the Lean source commit, or the generated runtime
-overlays change.
+lives in the object cache. The artifact is relinked only when stable C++
+objects, generated wrapper output, the linker-selected stage0 object set, link
+flags, the Lean source commit, or the generated runtime overlays change.
 
 ## Native Boxed Wrappers
 
@@ -182,10 +182,9 @@ library output, the probe selects the required pinned upstream-generated
 support modules from the live link. This is how the search/position operations
 in `String.Internal` and `Substring.Raw.Internal.beq` use their normal compiler
 wrappers and upstream raw implementations without copying either into the shim.
-The same path lets
-`Array.mk` and `Array.toList` call the real runtime exports backed by their
-compiler-generated list/array helpers. The native extern table remains the
-source of truth for wrapper selection;
+The same path lets `Array.mk` and `Array.toList` call the real runtime exports
+backed by their compiler-generated list/array helpers. The native extern table
+remains the source of truth for wrapper selection;
 `npm run inspect:native-wrappers` reports it without duplicating the full list
 here. Local behavior and WASI policy belong in raw provider functions; their
 boxed adapters are still generated whenever the standard compiler output is
