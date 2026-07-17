@@ -371,13 +371,20 @@ native_support_round_bundle="$obj_dir/native_support.round.o"
 native_support_link_stamp="$obj_dir/native-support-link.stamp"
 native_support_live_undefined="$obj_dir/native-support-live-undefined.txt"
 native_support_resolution="$obj_dir/native-support-resolution.tsv"
+native_support_max_rounds=16
+native_support_link_flags=(
+  --relocatable
+  --allow-undefined
+  --allow-multiple-definition
+)
+
+{
+  printf '%s\n' l_ByteArray_empty lean_name_mk_numeral lean_name_mk_string
+  "$llvm_nm" --format=posix --defined-only --extern-only \
+    "$(object_for_source "$generated_native_wrappers")" | awk 'NF >= 2 { print $1 }'
+} | sort -u > "$native_support_allowed_duplicates"
 
 audit_native_support_duplicates() {
-  {
-    printf '%s\n' l_ByteArray_empty lean_name_mk_numeral lean_name_mk_string
-    "$llvm_nm" --format=posix --defined-only --extern-only \
-      "$(object_for_source "$generated_native_wrappers")" | awk 'NF >= 2 { print $1 }'
-  } | sort -u > "$native_support_allowed_duplicates"
   {
     for object in "${native_support_objects[@]}"; do
       "$llvm_nm" --format=posix --defined-only --extern-only "$object"
@@ -392,11 +399,21 @@ audit_native_support_duplicates() {
   fi
 }
 
+link_native_support_object() {
+  local output="$1"
+  # Input order preserves local-provider precedence over generated wrappers,
+  # followed by selected stage0 modules that provide their raw bodies.
+  "$wasm_ld" \
+    "${native_support_link_flags[@]}" \
+    -o "$output" \
+    "${native_support_objects[@]}"
+}
+
 link_native_support_bundle() {
   local link_stamp_tmp="$native_support_link_stamp.tmp"
   {
     printf 'wasm_ld=%s\n' "$wasm_ld"
-    printf 'link_flag=%s\n' --relocatable --allow-undefined --allow-multiple-definition
+    printf 'link_flag=%s\n' "${native_support_link_flags[@]}"
     printf 'input=%s\n' "${native_support_objects[@]}"
   } > "$link_stamp_tmp"
   if ! cmp -s "$link_stamp_tmp" "$native_support_link_stamp"; then
@@ -419,14 +436,7 @@ link_native_support_bundle() {
   if [ "$needs_link" = "1" ]; then
     local bundle_tmp="$native_support_bundle.tmp"
     echo "link $native_support_bundle"
-    # Keep duplicate tolerance inside this bundle. Local exceptions come first,
-    # then generated wrappers, then selected stage0 modules that provide raw bodies.
-    "$wasm_ld" \
-      --relocatable \
-      --allow-undefined \
-      --allow-multiple-definition \
-      -o "$bundle_tmp" \
-      "${native_support_objects[@]}"
+    link_native_support_object "$bundle_tmp"
     if ! cmp -s "$bundle_tmp" "$native_support_bundle"; then
       mv "$bundle_tmp" "$native_support_bundle"
     else
@@ -440,12 +450,7 @@ link_native_support_round_bundle() {
   # stage0 providers disappear from the manifest. Keep these intermediate
   # bundles separate so a content-identical final bundle retains its timestamp.
   echo "link $native_support_round_bundle"
-  "$wasm_ld" \
-    --relocatable \
-    --allow-undefined \
-    --allow-multiple-definition \
-    -o "$native_support_round_bundle" \
-    "${native_support_objects[@]}"
+  link_native_support_object "$native_support_round_bundle"
 }
 
 lean_support_sources=()
@@ -453,7 +458,7 @@ declare -A selected_lean_support_sources=()
 native_support_providers_tmp="$generated_native_support_providers.tmp"
 : > "$native_support_providers_tmp"
 native_support_resolution_complete=0
-for ((native_support_round = 1; native_support_round <= 16; native_support_round++)); do
+for ((native_support_round = 1; native_support_round <= native_support_max_rounds; native_support_round++)); do
   audit_native_support_duplicates
   link_native_support_round_bundle
 
@@ -504,7 +509,11 @@ audit_native_support_duplicates
 link_native_support_bundle
 
 native_support_sources_tmp="$generated_native_support_sources.tmp"
-printf '%s\n' "${lean_support_sources[@]}" > "$native_support_sources_tmp"
+{
+  for source in "${lean_support_sources[@]}"; do
+    printf '%s\n' "$source"
+  done
+} > "$native_support_sources_tmp"
 if ! cmp -s "$native_support_sources_tmp" "$generated_native_support_sources"; then
   mv "$native_support_sources_tmp" "$generated_native_support_sources"
 else

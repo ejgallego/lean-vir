@@ -101,7 +101,8 @@ generated sources. Refresh them with `npm run generate:ir-codec-tags` and check
 them with `npm run check:ir-codec-tags`.
 
 Useful diagnostic reports include `build/upstream-probe/boundary.md`,
-`build/upstream-probe/link.map`, `build/generated/*.report.md`, and
+`build/upstream-probe/link.map`, the generated native-support source and
+symbol-provider manifests, `build/generated/*.report.md`, and
 `build/fixtures/summary.json`.
 
 Commands ending in `:no-build` and the pure runtime smoke tests expect
@@ -130,7 +131,11 @@ The split helpers below are the intended extension points for focused changes:
 - IR package generator setup lives in `scripts/irpkg-generator.mjs`; reuse it
   instead of shelling out through `lean --run tools/GeneratePackage.lean`.
 - Native wrapper inventory lives in `scripts/inventory-native-wrappers.mjs`;
-  keep it as an inspection aid until regular wrapper generation exists.
+  it checks compiler-generated coverage and the complete handwritten ownership
+  exception set.
+- Stage0 native-support provider resolution lives in
+  `scripts/resolve-native-support-sources.mjs`; the upstream probe supplies its
+  live unresolved symbol set and enforces the final strict link.
 - IR declaration payload tag values live in `scripts/ir-codec-tags.mjs`; run
   `npm run generate:ir-codec-tags` and `npm run check:ir-codec-tags` after
   changing them.
