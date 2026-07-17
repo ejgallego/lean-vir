@@ -50,6 +50,13 @@ lake build +MySlides.Runtime:vir
 lake build :virSdk
 ```
 
+When the dependency is pinned to an unreleased commit rather than a release
+tag, request the SDK artifact built from that same commit:
+
+```bash
+VIR_SDK_COMMIT=<same-commit> lake build :virSdk
+```
+
 The module facet writes the `.irpkg` and report under `.lake/build/vir/`; the
 package facet installs the versioned browser SDK. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after

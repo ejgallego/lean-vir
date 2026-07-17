@@ -290,12 +290,19 @@ The CI workflow keeps one job responsible for fetching the pinned Lean source,
 installing the WASI SDK, building the release-profile
 `web/public/vir-upstream.wasm` plus the optimized, unstripped
 `web/public/vir-upstream.dev.wasm`, generating browser `.irpkg` files, and
-running upstream smoke. That job uploads the demo artifacts. The pure runtime
-job downloads those artifacts and runs without installing Lean. The
+running upstream smoke. That job uploads both the demo artifacts and the
+commit-addressed `lean-vir-sdk` archive. The pure runtime job downloads the
+demo artifacts and runs without installing Lean. The
 Lean-dependent runtime job installs Lean for the Lake facet, package-generation,
 and SDK metadata smoke tests. The fixture job also downloads the demo artifacts
 and runs in parallel without re-fetching Lean source or reinstalling the WASI
 SDK.
+
+For pull requests, every job explicitly checks out the pull request's head SHA
+instead of GitHub's synthetic merge ref. GitHub indexes commit artifacts by
+that head SHA, while `package-sdk-artifact` records the checked-out Git commit
+in the SDK manifest. Using the same ref in every job keeps source, artifact
+lookup, and SDK metadata aligned.
 
 ## Browser Smoke
 
