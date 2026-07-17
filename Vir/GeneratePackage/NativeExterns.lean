@@ -257,6 +257,7 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .object, param 2 false .tobject],
     resultType := .uint8,
     symbol := "lean_is_reserved_name",
+    generateBoxedWrapper := true,
     deps := #[`Lean.isReservedName]
   },
   {
@@ -275,7 +276,8 @@ def nativeExterns : Array NativeExtern := #[
     name := privateEnvironmentName "evalCheckMeta",
     params := #[param 1 false .object, param 2 false .tobject],
     resultType := .object,
-    symbol := "lean_eval_check_meta"
+    symbol := "lean_eval_check_meta",
+    generateBoxedWrapper := true
   },
   {
     name := `Task.pure,

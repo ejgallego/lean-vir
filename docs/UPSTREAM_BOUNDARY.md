@@ -78,8 +78,8 @@ not a fork of Lean. It is split by responsibility:
   and name-string helpers used by current object-boundary fixtures.
 - `abi/resource_abi.cpp` owns the shared external resource class used by
   `Lean.Vir.Js α` values.
-- `runtime/native_symbols.cpp` owns native extern wrappers that still require
-  shim-specific implementation or policy.
+- `runtime/native_symbols.cpp` owns the final borrowed-result ownership
+  adapters, the native constant provider, and raw environment-policy providers.
 - `runtime/native_symbol_lookup.cpp` owns the generated native registry include,
   restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
   stubs.
@@ -180,11 +180,11 @@ raw implementations without copying either into the shim. The same path lets
 compiler-generated list/array helpers. The native extern table remains the
 source of truth for wrapper selection;
 `npm run inspect:native-wrappers` reports it without duplicating the full list
-here. Wrappers that implement additional behavior or deliberate ownership
-policy remain explicit in `runtime/native_symbols.cpp`. When VIR substitutes a
-local raw implementation for an unavailable runtime service or WASI policy,
-that implementation belongs in the relevant provider file and its boxed
-adapter is still generated whenever the standard compiler output is correct.
+here. Local behavior and WASI policy belong in raw provider functions; their
+boxed adapters are still generated whenever the standard compiler output is
+correct. A boxed implementation remains explicit in `runtime/native_symbols.cpp`
+only when VIR's all-owned interpreter boundary needs ownership behavior that
+Lean's standard wrapper cannot express.
 
 `npm run check:native-wrappers` rejects ordinary handwritten direct adapters.
 The intentional ownership exceptions are the borrowed array getters
@@ -193,8 +193,9 @@ results are borrowed from the array, while a standard emitted boxed wrapper
 would release the array without first retaining the result. The explicit shim
 wrapper for `Array.ugetBorrowed` retains the result before releasing the array;
 the other two wrappers deliberately call the corresponding owned runtime APIs.
-The inventory keeps `Array.ugetBorrowed` as the canonical guarded exception and
-classifies the two owned-runtime substitutions as custom wrappers.
+This is the complete handwritten boxed-wrapper exception set. The inventory
+allowlists all three with their expected classification and rejects any new,
+missing, or reclassified handwritten adapter.
 
 ## Real IR Declarations
 
@@ -521,9 +522,11 @@ module loader.
 
 The current parser support still uses a small shim boundary for opaque
 environment bridges: `evalConstCore` delegates to upstream `lean_eval_const`,
-`isReservedName` delegates back into packaged IR for `Lean.isReservedName`, and
-`evalCheckMeta` is accepted for the demo. That is the next fidelity boundary to
-remove if we want parser loading to behave exactly like a full Lean runtime.
+the raw `isReservedName` provider delegates back into packaged IR for
+`Lean.isReservedName`, and the raw `evalCheckMeta` provider accepts the check for
+the demo. Their boxed adapters are normal compiler output. The provider policy
+is the next fidelity boundary to remove if parser loading should behave exactly
+like a full Lean runtime.
 
 The runtime/platform stub files keep the remaining platform boundary explicit:
 

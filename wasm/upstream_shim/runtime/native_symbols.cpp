@@ -54,14 +54,21 @@ extern "C" lean_object * lean_array_get_borrowed___boxed(lean_object * type, lea
     return result;
 }
 
-extern "C" lean_object * lean_is_reserved_name___boxed(lean_object * env, lean_object * n) {
+// This raw provider delegates the environment policy to packaged Lean IR. Its
+// ordinary scalar-result boxed adapter is emitted by Lean's compiler.
+extern "C" uint8_t lean_is_reserved_name(lean_object * env, lean_object * n) {
     lean::elab_environment ienv(lean_box(0));
     lean::options opts(lean_box(0));
     lean_object * args[] = { env, n };
-    return lean::ir::run_boxed(ienv, opts, lean::name({ "Lean", "isReservedName" }), 2, args);
+    lean_object * result = lean::ir::run_boxed(ienv, opts, lean::name({ "Lean", "isReservedName" }), 2, args);
+    uint8_t value = lean_unbox(result);
+    lean_dec(result);
+    return value;
 }
 
-extern "C" lean_object * lean_eval_check_meta___boxed(lean_object * env, lean_object * const_name) {
+// Package execution currently accepts the meta check. Keep that policy visible
+// in the raw provider while Lean's compiler owns the ordinary boxed adapter.
+extern "C" lean_object * lean_eval_check_meta(lean_object * env, lean_object * const_name) {
     lean_dec(env);
     lean_dec(const_name);
     lean_object * result = lean_alloc_ctor(1, 1, 0);

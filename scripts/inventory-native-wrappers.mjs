@@ -14,10 +14,30 @@ const nativeExternsPath = new URL("../Vir/GeneratePackage/NativeExterns.lean", i
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
 const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols_registry.inc", import.meta.url);
 
-const intentionalDirectWrapperExceptions = new Map([
+// This is the complete handwritten boxed-wrapper exception set. Every entry
+// records why Lean's standard wrapper would violate ownership at VIR's
+// all-owned interpreter boundary.
+const intentionalHandwrittenWrapperExceptions = new Map([
   [
     "lean_array_uget_borrowed___boxed",
-    "the raw element result is borrowed and must be retained before the array is released",
+    {
+      kind: "regular-direct-retain",
+      reason: "the raw element result is borrowed and must be retained before the array is released",
+    },
+  ],
+  [
+    "lean_array_fget_borrowed___boxed",
+    {
+      kind: "custom",
+      reason: "uses the owned-result runtime getter before releasing the borrowed array",
+    },
+  ],
+  [
+    "lean_array_get_borrowed___boxed",
+    {
+      kind: "custom",
+      reason: "uses the owned-result checked getter before releasing the default and array",
+    },
   ],
 ]);
 
@@ -808,6 +828,10 @@ const kindOrder = [
 ];
 const byKind = new Map(kindOrder.map((kind) => [kind, []]));
 for (const item of inventory) {
+  const exception = intentionalHandwrittenWrapperExceptions.get(item.wrapper);
+  if (exception?.kind === item.kind) {
+    item.reason = exception.reason;
+  }
   const group = byKind.get(item.kind) ?? [];
   group.push(item);
   byKind.set(item.kind, group);
@@ -872,24 +896,26 @@ if (args.has("--check")) {
     ["generated-helper-mismatch", "generated-direct-mismatch", "missing", "extra"].includes(item.kind)
   );
   const directPolicyFailures = [];
-  const foundDirectExceptions = new Set();
+  const foundHandwrittenExceptions = new Set();
   for (const item of inventory) {
     if (item.kind === "regular-helper" || item.kind === "regular-direct") {
       directPolicyFailures.push(
         `${item.wrapper}: ordinary adapter must be compiler-generated or explicitly custom`,
       );
-    } else if (item.kind === "regular-direct-retain") {
-      const reason = intentionalDirectWrapperExceptions.get(item.wrapper);
-      if (reason) {
-        foundDirectExceptions.add(item.wrapper);
+    } else if (["regular-direct-retain", "custom-alias", "custom"].includes(item.kind)) {
+      const exception = intentionalHandwrittenWrapperExceptions.get(item.wrapper);
+      if (exception?.kind === item.kind) {
+        foundHandwrittenExceptions.add(item.wrapper);
       } else {
-        directPolicyFailures.push(`${item.wrapper}: unapproved direct ownership adapter`);
+        directPolicyFailures.push(`${item.wrapper}: unapproved handwritten ${item.kind} adapter`);
       }
     }
   }
-  for (const [wrapper, reason] of intentionalDirectWrapperExceptions) {
-    if (!foundDirectExceptions.has(wrapper)) {
-      directPolicyFailures.push(`${wrapper}: expected direct ownership exception is missing (${reason})`);
+  for (const [wrapper, exception] of intentionalHandwrittenWrapperExceptions) {
+    if (!foundHandwrittenExceptions.has(wrapper)) {
+      directPolicyFailures.push(
+        `${wrapper}: expected ${exception.kind} ownership exception is missing (${exception.reason})`,
+      );
     }
   }
   for (const [kind, expected] of expectedMacroGeneratedWrapperCounts) {
