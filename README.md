@@ -13,13 +13,14 @@ For downstream Lake packages, the preferred workflow is:
    browser SDK with `:virSdk`;
 4. load the package and call `runStartupEntries()` from the browser host.
 
-See [Lake Facets And Lean Browser Entries](#lake-facets-and-lean-browser-entries)
+See
+[Lake Facets, Exports, And Startup Hooks](#lake-facets-exports-and-startup-hooks)
 for the short form and [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) for
 the complete client workflow. The repository-local package runner remains the
 quickest way to explore one Lean file manually: it reads the embedded interface
 manifest and builds runnable controls automatically.
 
-## Lake Facets And Lean Browser Entries
+## Lake Facets, Exports, And Startup Hooks
 
 Pin `lean_vir` in the client `lakefile.lean`:
 
@@ -171,8 +172,10 @@ manifest:
 npm run build:sdk-artifact
 ```
 
-Client Lake packages can install a matching SDK archive through the package
-executable. The first complete client is
+Client Lake packages should normally install the matching SDK with
+`lake build :virSdk`, as shown above. The lower-level package executable remains
+available for explicit artifact-management workflows. The first complete
+client is
 [ejgallego/lean-vir-examples](https://github.com/ejgallego/lean-vir-examples).
 
 ```bash
@@ -195,8 +198,9 @@ Tagged releases publish the same archive as a durable
 [GitHub Releases](https://github.com/ejgallego/lean-vir/releases) asset. The
 `:virSdk` facet defaults to the release matching the installed `lean_vir`
 package version once that release has been published;
-`vir_fetch_sdk --tag <tag>` selects a different release, while unreleased or
-commit-pinned clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
+`vir_fetch_sdk --tag <tag>` can override the download source, but the artifact
+version must still match the installed package. Unreleased or commit-pinned
+clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 
 ## Where To Go Next
 

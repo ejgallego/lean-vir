@@ -163,8 +163,8 @@ vir.runStartupEntries();
 `runStartupEntries()` invokes startup hooks in manifest order and records each
 one only after it succeeds. Calling it again skips completed hooks; if a hook
 throws, a retry resumes at that hook without repeating earlier successful
-work. A successful replacement package resets the entry state; a failed
-replacement leaves the existing package and its entry state unchanged.
+work. A successful replacement package resets the startup-hook state; a failed
+replacement leaves the existing package and its startup-hook state unchanged.
 
 ## Canvas Example
 

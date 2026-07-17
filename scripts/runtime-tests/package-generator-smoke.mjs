@@ -153,22 +153,22 @@ try {
   assert.notEqual(generatedWithoutMarks.status, 0);
   assert.match(generatedWithoutMarks.stderr, /no declarations are marked with `@\[vir_export\]` or `@\[vir_startup\]`/);
 
-  const badEntrySource = join(freshDir, "BadMarkedEntry.lean");
-  await writeFile(badEntrySource, [
+  const badStartupSource = join(freshDir, "BadStartup.lean");
+  await writeFile(badStartupSource, [
     "import Vir",
     "",
     "@[vir_startup]",
     "def badStartup (_n : Nat) : Lean.Vir.Browser.DomM Unit := pure ()",
     "",
   ].join("\n"));
-  const generatedBadEntry = runVirIrpkg([
-    join(freshDir, "bad-marked-entry.irpkg"),
-    join(freshDir, "bad-marked-entry.report.md"),
+  const generatedBadStartup = runVirIrpkg([
+    join(freshDir, "bad-startup.irpkg"),
+    join(freshDir, "bad-startup.report.md"),
     "--target-marked",
-    badEntrySource,
+    badStartupSource,
   ]);
-  assert.notEqual(generatedBadEntry.status, 0);
-  assert.match(generatedBadEntry.stderr, /marked with `@\[vir_startup\]` must take no JavaScript arguments/);
+  assert.notEqual(generatedBadStartup.status, 0);
+  assert.match(generatedBadStartup.stderr, /marked with `@\[vir_startup\]` must take no JavaScript arguments/);
 
   const runtimeSource = join(freshDir, "RuntimeEffect.lean");
   const runtimePackage = join(freshDir, "runtime-effect.irpkg");
