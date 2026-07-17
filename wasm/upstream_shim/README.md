@@ -78,14 +78,15 @@ under `build/upstream-probe/`, then links the resulting object statically. This
 includes compiler-generated raw bodies for selected Lean-defined support such as
 `ByteArray.extract`. When an imported implementation closure exists only in
 compiled upstream output, the probe cross-compiles the corresponding pinned
-stage0 module; the current String search/position support follows this path.
-Local exceptions, generated adapters, and those upstream objects are prelinked
-in that precedence order. Duplicate tolerance is confined to the relocatable
-bundle and checked against the generated/local symbol set before the strict
-final link. Keep wrappers with extra control flow or ownership adaptation in
-`runtime/native_symbols.cpp`. Put local raw substitutes for unavailable runtime
-services or WASI policy in the focused runtime provider files, and continue to
-generate their boxed adapters when the normal compiler output is sufficient.
+stage0 module; the String search/position and array/list conversion support
+follow this path. Local exceptions, generated adapters, and those upstream
+objects are prelinked in that precedence order. Duplicate tolerance is confined
+to the relocatable bundle and checked against the generated/local symbol set
+before the strict final link. Keep wrappers with extra control flow or
+ownership adaptation in `runtime/native_symbols.cpp`. Put local raw substitutes
+for unavailable runtime services or WASI policy in the focused runtime provider
+files, and continue to generate their boxed adapters when the normal compiler
+output is sufficient.
 
 The usual boundary validation is:
 

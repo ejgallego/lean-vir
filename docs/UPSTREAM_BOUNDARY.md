@@ -54,8 +54,10 @@ the interpreter's name formatting and diagnostics.
 For Lean-defined native exports whose implementation closure is available in
 the pinned compiler output rather than the imported kernel environment, the
 probe also cross-compiles the corresponding stage0 sources. The current String
-support set is `Init/Prelude.c` plus `Init/Data/String/{Defs,Basic,Search,Substring}.c`.
-The final generated report lists this set explicitly.
+support uses `Init/Prelude.c` plus
+`Init/Data/String/{Defs,Basic,Search,Substring}.c`; array/list conversion also
+uses `Init/Data/List/ToArrayImpl.c` and `Init/Data/Array/Basic.c`. The final
+generated report lists the complete set explicitly.
 
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
@@ -173,8 +175,10 @@ compiler-generated imported declarations that are present only in compiled
 library output, the probe links the pinned upstream-generated support module
 instead. This is how the `String.Internal` search/position operations and
 `Substring.Raw.Internal.beq` use their normal compiler wrappers and upstream
-raw implementations without copying either into the shim. The native extern
-table remains the source of truth for wrapper selection;
+raw implementations without copying either into the shim. The same path lets
+`Array.mk` and `Array.toList` call the real runtime exports backed by their
+compiler-generated list/array helpers. The native extern table remains the
+source of truth for wrapper selection;
 `npm run inspect:native-wrappers` reports it without duplicating the full list
 here. Wrappers that implement additional behavior or deliberate ownership
 policy remain explicit in `runtime/native_symbols.cpp`. When VIR substitutes a

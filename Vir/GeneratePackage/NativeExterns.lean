@@ -323,7 +323,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.mk,
     params := #[param 1 false .erased, param 2 false .tobject],
     resultType := .object,
-    symbol := "lean_array_mk"
+    symbol := "lean_array_mk",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.push,
@@ -336,7 +337,8 @@ def nativeExterns : Array NativeExtern := #[
     name := `Array.toList,
     params := #[param 1 false .erased, param 2 false .object],
     resultType := .tobject,
-    symbol := "lean_array_to_list"
+    symbol := "lean_array_to_list",
+    generateBoxedWrapper := true
   },
   {
     name := `Array.size,

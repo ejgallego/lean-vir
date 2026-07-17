@@ -190,6 +190,8 @@ support_sources=(
 
 lean_support_sources=(
   "$src/stage0/stdlib/Init/Prelude.c"
+  "$src/stage0/stdlib/Init/Data/List/ToArrayImpl.c"
+  "$src/stage0/stdlib/Init/Data/Array/Basic.c"
   "$src/stage0/stdlib/Init/Data/String/Defs.c"
   "$src/stage0/stdlib/Init/Data/String/Basic.c"
   "$src/stage0/stdlib/Init/Data/String/Search.c"

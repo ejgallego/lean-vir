@@ -6,13 +6,6 @@ Author: Emilio J. Gallego Arias
 
 #include "package/decl_provider.h"
 
-#include <stddef.h>
-
-#include <algorithm>
-#include <initializer_list>
-#include <limits>
-#include <vector>
-
 #include "kernel/environment.h"
 #include "kernel/expr.h"
 #include "kernel/trace.h"
@@ -28,41 +21,6 @@ Author: Emilio J. Gallego Arias
 
 extern "C" {
 lean_object * l_ByteArray_empty = nullptr;
-}
-
-extern "C" lean_object * lean_array_mk___boxed(lean_object * type, lean_object * list) {
-    lean_dec(type);
-    size_t len = 0;
-    for (lean_object * it = list; !lean_is_scalar(it); it = lean_ctor_get(it, 1)) {
-        len++;
-    }
-    lean_object * array = lean_alloc_array(len, len);
-    size_t i = 0;
-    for (lean_object * it = list; !lean_is_scalar(it); it = lean_ctor_get(it, 1)) {
-        lean_object * value = lean_ctor_get(it, 0);
-        lean_inc(value);
-        lean_array_set_core(array, i, value);
-        i++;
-    }
-    lean_dec(list);
-    return array;
-}
-
-extern "C" lean_object * lean_array_to_list___boxed(lean_object * type, lean_object * array) {
-    lean_dec(type);
-    lean_object * result = lean_box(0);
-    size_t idx = lean_array_size(array);
-    while (idx > 0) {
-        idx--;
-        lean_object * value = lean_array_get_core(array, idx);
-        lean_inc(value);
-        lean_object * cons = lean_alloc_ctor(1, 2, 0);
-        lean_ctor_set(cons, 0, value);
-        lean_ctor_set(cons, 1, result);
-        result = cons;
-    }
-    lean_dec(array);
-    return result;
 }
 
 // The raw function returns a borrowed element. Lean's standard boxed-wrapper

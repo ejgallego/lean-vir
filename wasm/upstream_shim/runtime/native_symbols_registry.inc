@@ -8,8 +8,6 @@ Compiler-generated wrappers are registered by a build-local generated include.
 #define VIR_NATIVE_SYMBOLS(X, X_CONST) \
     X("_private.Lean.Environment.0.Lean.Environment.isReservedName", "lean_is_reserved_name", lean_is_reserved_name___boxed) \
     X("_private.Lean.Environment.0.Lean.Environment.evalCheckMeta", "lean_eval_check_meta", lean_eval_check_meta___boxed) \
-    X("Array.mk", "lean_array_mk", lean_array_mk___boxed) \
-    X("Array.toList", "lean_array_to_list", lean_array_to_list___boxed) \
     X("Array.ugetBorrowed", "lean_array_uget_borrowed", lean_array_uget_borrowed___boxed) \
     X("Array.getInternalBorrowed", "lean_array_fget_borrowed", lean_array_fget_borrowed___boxed) \
     X("Array.get!InternalBorrowed", "lean_array_get_borrowed", lean_array_get_borrowed___boxed) \
