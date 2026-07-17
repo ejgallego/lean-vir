@@ -28,9 +28,7 @@ described under [Install The Browser SDK](#install-the-browser-sdk).
 
 Import `Vir` and mark JavaScript-callable declarations with `@[vir_export]`.
 Use `@[vir_startup]` for startup hooks that the browser host should run after
-loading the package. A startup hook is also an export and must take no
-JavaScript arguments and return `Unit` through a supported effect such as
-`DomM`.
+loading the package.
 
 ```lean
 import Vir
@@ -169,7 +167,7 @@ replacement leaves the existing package and its startup-hook state unchanged.
 ## Canvas Example
 
 [`examples/SlidesCanvas.lean`](../examples/SlidesCanvas.lean) builds its status
-element and canvas, draws a moving rectangle, and schedules every animation
+element and canvas, draws a bouncing rectangle, and schedules every animation
 frame entirely from Lean. Build its package with the same facet used by client
 projects:
 

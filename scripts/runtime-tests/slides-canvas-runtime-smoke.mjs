@@ -154,6 +154,11 @@ try {
     assert.ok(status.classes.has("vir-slide-status"));
     assert.ok(canvas instanceof FakeCanvas);
     assert.ok(canvas.classes.has("vir-slide-canvas"));
+    assert.equal(canvas.getAttribute("role"), "img");
+    assert.equal(
+      canvas.getAttribute("aria-label"),
+      "A blue rectangle bouncing horizontally across a canvas",
+    );
     assert.equal(canvas.width, 640);
     assert.equal(canvas.height, 360);
     assert.equal(queuedFrames.size, 1);
@@ -186,8 +191,8 @@ try {
     assert.deepEqual(hostErrors, []);
     assert.deepEqual(drawCalls.slice(3), [
       ["clearRect", 0, 0, 640, 360],
-      ["fillRect", 10, 124, 72, 72],
-      ["strokeRect", 10, 124, 72, 72],
+      ["fillRect", 40, 124, 72, 72],
+      ["strokeRect", 40, 124, 72, 72],
     ]);
     assert.equal(status.textContent, "Lean animation frame: 1");
     assert.equal(queuedFrames.size, 1, "the Lean callback should keep scheduling frames");
@@ -195,6 +200,32 @@ try {
       resources.debugResourceCounts(),
       mountedResourceCounts,
       "repeated frames should not accumulate scalar host resources",
+    );
+
+    const [[thirdFrameId, thirdDrawFrame]] = queuedFrames.entries();
+    queuedFrames.delete(thirdFrameId);
+    thirdDrawFrame(22_272);
+    assert.deepEqual(drawCalls.slice(6), [
+      ["clearRect", 0, 0, 640, 360],
+      ["fillRect", 568, 124, 72, 72],
+      ["strokeRect", 568, 124, 72, 72],
+    ]);
+    assert.equal(status.textContent, "Lean animation frame: 2");
+
+    const [[fourthFrameId, fourthDrawFrame]] = queuedFrames.entries();
+    queuedFrames.delete(fourthFrameId);
+    fourthDrawFrame(22_432);
+    assert.deepEqual(drawCalls.slice(9), [
+      ["clearRect", 0, 0, 640, 360],
+      ["fillRect", 528, 124, 72, 72],
+      ["strokeRect", 528, 124, 72, 72],
+    ]);
+    assert.equal(status.textContent, "Lean animation frame: 3");
+    assert.equal(queuedFrames.size, 1, "the bouncing frame loop should keep running");
+    assert.deepEqual(
+      resources.debugResourceCounts(),
+      mountedResourceCounts,
+      "the bounce should not accumulate scalar host resources",
     );
   } finally {
     runtime.dispose();
