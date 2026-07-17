@@ -140,10 +140,11 @@ Generated artifacts live under `build/`, `web/dist/`,
 `web/public/*.report.md` reports. They should not be committed.
 
 WASI object files are cached under `build/upstream-probe/obj`, while Lean's
-compiler-generated native wrapper source and registry live under
+compiler-generated native wrapper source, registry, selected stage0 source
+list, and live symbol-provider manifest live under
 `build/upstream-probe/generated`. Example iteration updates the relevant
 `web/public/*.irpkg`; it does not rebuild or relink the upstream interpreter
-artifact unless stable C++ inputs or generated wrapper outputs change.
+artifact unless stable C++ inputs or generated native-support outputs change.
 
 The demo artifact uses a bounded memory configuration: 4 MiB initial linear
 memory and a 1 MiB stack by default. This is enough for the current smoke range
