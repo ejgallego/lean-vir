@@ -14,15 +14,32 @@ Package generation commands run that step automatically and add
 `build/lean-lib` to `LEAN_PATH`, so local `.lean` sources can import the
 modules below.
 
-## User Workflow
+## Package Markers
+
+`Vir.Attributes` provides the markers used by the Lake `:vir` module facet.
+Importing `Vir` also imports these attributes.
+
+- `@[vir_export]` selects a declaration for explicit JavaScript calls.
+- `@[vir_startup]` selects a zero-argument, `Unit`-returning startup hook. A
+  startup hook is also an export and carries `startup: true` in the interface
+  manifest.
+
+After loading the generated package, JavaScript calls ordinary exports with
+`vir.call(...)` and invokes startup hooks with `vir.runStartupEntries()`.
+See [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md) for the complete downstream Lake
+workflow.
+
+## Local One-File Workflow
 
 For the built-in browser and common host imports, the Lean code is the only
 piece users need to write. The JavaScript runtime already provides default
 bindings for `common.*` and `browser.*` targets. Browser packages that call
 `Lean.Vir.React.Root.*` or `Lean.Vir.React.Hooks.*` should also install the
 bindings from `lean-vir/react-host-bindings`; the Node wrapper provides virtual
-React bindings for tests. The JavaScript-side binding composition reference lives in
-`docs/JS_API.md`.
+React bindings for tests. The JavaScript-side binding composition reference
+lives in [JS_API.md](JS_API.md). This section documents the repository-local
+package generator; downstream Lake packages should prefer the facet workflow
+above.
 
 1. Import the Lean module that provides the host import.
 
@@ -227,10 +244,12 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 
 - `Lean.Vir.Browser.Console.log : @& String -> IO Unit`
 - object markers: `Element`, `Event`, `EventListener`, `HTMLInputElement`,
-  `Timeout`, and `AnimationFrame`
+  `HTMLCanvasElement`, `CanvasRenderingContext2D`, `Timeout`, and
+  `AnimationFrame`
 - `Lean.Vir.Browser.Document.getTitle : Lean.Vir.Browser.DomM String`
 - `Lean.Vir.Browser.Document.setTitle : @& String -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Document.querySelector : @& String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
+- `Lean.Vir.Browser.Document.createElement : @& String -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element)`
 - `Lean.Vir.Browser.Event.target : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
@@ -242,6 +261,8 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM (Option String)`
 - `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.Element.appendChild` and `remove` provide basic DOM tree mutation.
+- `Lean.Vir.Browser.Element.ClassList.add`, `remove`, and `toggle` update CSS classes; `Element.Style.setProperty` updates inline style properties.
 - `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.EventListener)`
 - `Lean.Vir.Browser.Element.removeEventListener : @& Lean.Vir.Js Lean.Vir.Browser.EventListener -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.HTMLInputElement.fromElement : @& Lean.Vir.Js Lean.Vir.Browser.Element -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`
@@ -249,6 +270,10 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.HTMLInputElement.setChecked : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Bool -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.HTMLInputElement.getValue : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> Lean.Vir.Browser.DomM String`
 - `Lean.Vir.Browser.HTMLInputElement.setValue : @& Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement -> @& String -> Lean.Vir.Browser.DomM Unit`
+- `Lean.Vir.Browser.HTMLCanvasElement.fromElement`, `getWidth`, `setWidth`, `getHeight`, `setHeight`, and `getContext2D` narrow and configure canvas elements.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.clearRect`, `fillRect`, and `strokeRect` accept ordinary Lean `Float` coordinates.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.beginPath`, `closePath`, `moveTo`, `lineTo`, `arc`, `fill`, and `stroke` provide basic path drawing.
+- `Lean.Vir.Browser.CanvasRenderingContext2D.setFillStyle`, `setStrokeStyle`, `setLineWidth`, `save`, `restore`, `translate`, and `rotate` configure drawing state and transforms.
 - `Lean.Vir.Browser.Timer.setTimeout : UInt32 -> Lean.Vir.Browser.DomM Unit -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Timeout)`
 - `Lean.Vir.Browser.Timer.clearTimeout : @& Lean.Vir.Js Lean.Vir.Browser.Timeout -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Animation.requestAnimationFrame : (Float -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame)`

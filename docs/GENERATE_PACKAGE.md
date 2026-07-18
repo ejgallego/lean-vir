@@ -13,13 +13,19 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
   `scripts/lean-to-irpkg.sh`, `scripts/generate-browser-package.mjs`, and the
   fixture runner.
 
-Targets have one of three modes:
+Targets have one of five modes:
 
 - `--target <source.lean> <root>...`: package explicit roots and export them.
 - `--package-target <source.lean> <root>...`: include roots in the package
   closure without making them JavaScript-callable exports.
 - `--target-all <source.lean>`: auto-discover public source definitions as
   roots and exports.
+- `--target-marked <source.lean>`: package declarations marked with
+  `@[vir_export]` or `@[vir_startup]` in a source file.
+- `--target-marked-module <driver.lean> <module>`: package marked declarations
+  owned by one imported module while excluding marked declarations from its
+  dependencies. The Lake `:vir` module facet uses this mode with a generated
+  `import all` driver when compiled module IR is available.
 
 ## Module Map
 
@@ -34,7 +40,8 @@ Targets have one of three modes:
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
   registrations required by packaged closures.
 - `Vir.GeneratePackage.Frontend`: unchanged source elaboration, `DeclIndex`
-  construction, and declaration-name collision diagnostics.
+  construction, marker collection and module filtering, and declaration-name
+  collision diagnostics.
 - `Vir.GeneratePackage.Closure`: root resolution and transitive IR closure
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface.Encode`: interface labels, descriptor tags,
@@ -67,9 +74,11 @@ Targets have one of three modes:
    elaboration disabled. Frontend commands such as `#eval` follow normal Lean
    semantics and may produce output during package generation.
 3. `Frontend.loadDeclIndex` records each source environment, source-local IR
-   declaration names, and a name-to-declaration index. If two different source
-   targets define the same Lean declaration name, the index records a
-   diagnostic instead of silently letting the later target overwrite the first.
+   declaration names, `@[vir_export]` and `@[vir_startup]` marker sets, and a
+   name-to-declaration index. Module-marked targets filter those sets to
+   declarations owned by the requested module. If two different source targets
+   define the same Lean declaration name, the index records a diagnostic instead
+   of silently letting the later target overwrite the first.
 4. `Closure.collectClosure` resolves explicit roots, auto-discovered roots, and
    generated boxed entrypoints, then walks the IR references needed by the
    package.

@@ -57,6 +57,8 @@ def exportCandidatesFor (index : DeclIndex) (target : Target) : Array Name :=
     #[]
   else if target.includeAll then
     publicSourceDeclsFor index target
+  else if target.includeMarked then
+    markedDeclNamesFor index target
   else
     target.roots.foldl (fun acc root =>
       let n := (boxedBaseName? root).getD root
@@ -216,8 +218,15 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
               else if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
               else
+                let startup := index.virStartups.contains name
+                if startup && (!args.isEmpty || result != .unit) then
+                  return .error {
+                    name,
+                    source,
+                    reason := "declarations marked with `@[vir_startup]` must take no JavaScript arguments and return `Unit`"
+                  }
                 let jsName := jsNameFor name
-                return .ok { id := jsName, jsName, entry := name, source, args, result, effect }
+                return .ok { id := jsName, jsName, entry := name, source, args, result, effect, startup }
           | .error reason =>
               return .error { name, source, reason }
 

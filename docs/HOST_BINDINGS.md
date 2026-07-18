@@ -74,14 +74,22 @@ the public Lean wrappers return ordinary Lean values in `RuntimeM`.
 
 `Lean.Vir.Browser.Document.getTitle` and `setTitle` map to `document.title`.
 `Document.querySelector` returns an opaque element resource, or `none`/`null`
-when there is no matching element.
+when there is no matching element. `Document.createElement` creates a browser
+element resource by tag name.
 The public Lean browser APIs continue to expose ordinary `String`, `Bool`,
 `UInt32`, and `Float` values where appropriate, but their low-level
 `browser.*` host targets use explicit `Lean.Vir.JsValue` scalar resources.
 
-`Lean.Vir.Browser.Element.*` targets read and write text content and attributes
+`Lean.Vir.Browser.Element.*` targets read and write text content and attributes,
+append and remove elements, update `classList`, and set inline style properties
 through DOM element properties/methods. Event listener targets retain Lean
 closures until the listener is removed or the runtime is disposed.
+
+`Lean.Vir.Browser.HTMLCanvasElement.*` narrows canvas elements, reads and writes
+their bitmap size, and obtains a 2D context. `browser.canvas2d.*` covers
+rectangles, paths, fill/stroke styles, line width, save/restore, translation,
+and rotation. One-shot float and string arguments use owned resources that the
+receiving canvas or text binding consumes after the synchronous DOM call.
 
 `Lean.Vir.Browser.Event.target` and `currentTarget` return element resources
 when the event target is an element. `preventDefault` and `stopPropagation`
@@ -193,6 +201,9 @@ for missing selectors. `createVirtualElementState` and
 `createVirtualEventState` construct resources for direct virtual callback
 dispatch. `findVirtualReactElementById` and `virtualReactElementById` locate
 rendered virtual React nodes by DOM-like `id` props.
+`Document.createElement`, DOM tree/class/style mutation, and canvas targets are
+browser-only today; Node tests for those calls should install browser-like
+custom bindings or use a DOM implementation.
 
 ## Custom Targets
 

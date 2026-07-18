@@ -4,16 +4,70 @@ Lean VIR runs selected [Lean 4](https://github.com/leanprover/lean4)
 declarations in the browser through Lean's real IR interpreter compiled to
 `wasm32-wasip1`.
 
-The primary workflow is:
+For downstream Lake packages, the preferred workflow is:
 
-1. write a Lean file;
-2. choose one or more declarations to export;
-3. generate a `.irpkg` package;
-4. load it in the browser package runner.
+1. add `lean_vir` as a pinned Lake dependency;
+2. mark browser exports with `@[vir_export]` and startup hooks with
+   `@[vir_startup]`;
+3. build the module's `.irpkg` with its `:vir` facet and install the matching
+   browser SDK with `:virSdk`;
+4. load the package and call `runStartupEntries()` from the browser host.
 
-The browser runner reads the embedded interface manifest and builds runnable
-controls automatically. For supported argument and result types, adding another
-browser entry point is just adding another Lean root name to the package command.
+See
+[Lake Facets, Exports, And Startup Hooks](#lake-facets-exports-and-startup-hooks)
+for the short form and [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) for
+the complete client workflow. The repository-local package runner remains the
+quickest way to explore one Lean file manually: it reads the embedded interface
+manifest and builds runnable controls automatically.
+
+## Lake Facets, Exports, And Startup Hooks
+
+Pin `lean_vir` in the client `lakefile.lean`:
+
+```lean
+require lean_vir from git
+  "https://github.com/ejgallego/lean-vir" @ "<tag-or-commit>"
+```
+
+Then mark exports directly in Lean and build the containing module:
+
+```lean
+import Vir
+
+@[vir_export]
+def answer : Nat := 42
+
+@[vir_startup]
+def mount : Lean.Vir.Browser.DomM Unit := pure ()
+```
+
+Use `@[vir_export]` for declarations that JavaScript calls explicitly. A
+`@[vir_startup]` hook is also exported, but the host normally invokes it through
+`vir.runStartupEntries()` after loading the package.
+
+```bash
+lake build +MySlides.Runtime:vir
+lake build :virSdk
+```
+
+When the dependency is pinned to an unreleased commit rather than a release
+tag, request the SDK artifact built from that same commit:
+
+```bash
+VIR_SDK_COMMIT=<same-commit> lake build :virSdk
+```
+
+The module facet writes the `.irpkg` and report under `.lake/build/vir/`; the
+package facet installs the versioned browser SDK. `vir.runStartupEntries()`
+runs `@[vir_startup]` declarations in manifest order and skips each hook after
+it succeeds. See
+[docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
+Lean-authored [canvas slide example](examples/SlidesCanvas.lean), which is a
+real Lake target in this repository:
+
+```bash
+lake build +SlidesCanvas:vir
+```
 
 ## One Lean File To Browser
 
@@ -125,8 +179,10 @@ manifest:
 npm run build:sdk-artifact
 ```
 
-Client Lake packages can install a matching SDK archive through the package
-executable. The first complete client is
+Client Lake packages should normally install the matching SDK with
+`lake build :virSdk`, as shown above. The lower-level package executable remains
+available for explicit artifact-management workflows. The first complete
+client is
 [ejgallego/lean-vir-examples](https://github.com/ejgallego/lean-vir-examples).
 
 ```bash
@@ -145,10 +201,13 @@ authentication for Actions artifact downloads, so set `GITHUB_TOKEN` or run
 [`gh auth login`](https://cli.github.com/manual/gh_auth_login) once before using
 the commit-artifact path.
 
-When durable release assets exist, the same fetcher can use
-[GitHub Releases](https://github.com/ejgallego/lean-vir/releases) through
-`vir_fetch_sdk --tag <tag>`. Until then, commit-pinned clients should use
-`--commit`.
+Tagged releases publish the same archive as a durable
+[GitHub Releases](https://github.com/ejgallego/lean-vir/releases) asset. The
+`:virSdk` facet defaults to the release matching the installed `lean_vir`
+package version once that release has been published;
+`vir_fetch_sdk --tag <tag>` can override the download source, but the artifact
+version must still match the installed package. Unreleased or commit-pinned
+clients can continue to use `--commit` or `VIR_SDK_ARCHIVE`.
 
 ## Where To Go Next
 
@@ -158,6 +217,8 @@ When durable release assets exist, the same fetcher can use
   call-flow diagrams, and object ownership.
 - [docs/LOCAL_IRPKG.md](docs/LOCAL_IRPKG.md) for the full local package
   workflow.
+- [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) for marked exports,
+  Lake facets, SDK installation, and Lean-authored Slides code.
 - [docs/CALL_LEAN_FROM_JS.md](docs/CALL_LEAN_FROM_JS.md) for calling exported
   Lean declarations from app JavaScript.
 - [docs/JS_API.md](docs/JS_API.md) for using the runtime wrapper from

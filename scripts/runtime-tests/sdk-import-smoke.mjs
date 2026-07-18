@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { spawnSync } from "node:child_process";
 import assert from "node:assert/strict";
-import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -27,6 +27,9 @@ async function extractSdk(tempDir) {
   ], { encoding: "utf8" });
   assert.equal(extracted.status, 0, extracted.stderr || extracted.stdout);
   const sdkRoot = join(tempDir, "lean-vir-sdk");
+  const readme = await readFile(join(sdkRoot, "README.txt"), "utf8");
+  assert.match(readme, /lake build :virSdk/);
+  assert.match(readme, /vir\.runStartupEntries\(\)/);
   await writeFile(join(sdkRoot, "package.json"), "{\"type\":\"module\"}\n");
   return join(sdkRoot, "js");
 }

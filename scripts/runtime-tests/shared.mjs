@@ -138,6 +138,7 @@ const validManifestShape = {
       args: [{ name: "arg1", type: { type: "Nat", interfaceTag: 0 } }],
       result: { type: "Nat", interfaceTag: 0 },
       effect: "pure",
+      startup: false,
     },
   ],
 };

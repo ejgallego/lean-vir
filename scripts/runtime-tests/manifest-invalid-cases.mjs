@@ -4,7 +4,61 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import {
+  INTERFACE_MANIFEST_VERSION,
+  MIN_INTERFACE_MANIFEST_VERSION,
+} from "../../web/src/runtime/interface-manifest.js";
+
 export const invalidManifestCases = [
+  {
+    name: "missing manifest version",
+    mutate: (manifest) => {
+      delete manifest.version;
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "string manifest version",
+    mutate: (manifest) => {
+      manifest.version = "7";
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "fractional manifest version",
+    mutate: (manifest) => {
+      manifest.version = 6.5;
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "obsolete manifest version",
+    mutate: (manifest) => {
+      manifest.version = MIN_INTERFACE_MANIFEST_VERSION - 1;
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "future manifest version",
+    mutate: (manifest) => {
+      manifest.version = INTERFACE_MANIFEST_VERSION + 1;
+    },
+    pattern: /embedded interface manifest must be/,
+  },
+  {
+    name: "missing v7 startup marker",
+    mutate: (manifest) => {
+      delete manifest.exports[0].startup;
+    },
+    pattern: /exports\[0\]\.startup must be a boolean/,
+  },
+  {
+    name: "non-boolean startup marker",
+    mutate: (manifest) => {
+      manifest.exports[0].startup = "yes";
+    },
+    pattern: /exports\[0\]\.startup must be a boolean/,
+  },
   {
     name: "unsupported export effect",
     mutate: (manifest) => {

@@ -10,6 +10,8 @@ export function createJsValueHostBindings(resources) {
     bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
     bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
   }
+  bindings["js.string.owned"] = (value) => resources.ownedResourceForValue(jsStringValue(value));
+  bindings["js.float.owned"] = (value) => resources.ownedResourceForValue(jsFloatValue(value));
   bindings["js.nullable.null"] = () => resources.resourceForValue(createNullableValue(null));
   bindings["js.nullable.of"] = (value) =>
     resources.resourceForValue(createNullableValue(resources.resolveResource(value, "Js")));

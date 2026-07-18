@@ -42,6 +42,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
+    this.completedStartupEntries = new Set();
     this.disposed = false;
     this.liveCallbacks = new Set();
     this.createReplacementRuntime = createReplacementRuntime;
@@ -57,6 +58,7 @@ export class VirRuntime extends ObjectValueRuntime {
       this.packageMetadata = this.interfaceManifest.metadata;
       this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
+      this.completedStartupEntries = new Set();
     }
   }
 
@@ -148,6 +150,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.interfaceManifest = replacement.interfaceManifest;
     this.packageMetadata = replacement.packageMetadata;
     this.boxedCallEntryNames = replacement.boxedCallEntryNames;
+    this.completedStartupEntries = replacement.completedStartupEntries;
     this.liveCallbacks = replacement.liveCallbacks;
     this.hostState?.attachRuntime(this);
     this.rebuildManifestExports();
@@ -167,6 +170,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.exportsByName = Object.create(null);
     this.entriesByName = Object.create(null);
     this.entryCallCache = new WeakMap();
+    this.completedStartupEntries = new Set();
   }
 
   hasPackageState() {
@@ -217,6 +221,19 @@ export class VirRuntime extends ObjectValueRuntime {
       throw new Error(`interface entry not found: ${name}`);
     }
     return this.callEntry(entry, args);
+  }
+
+  runStartupEntries() {
+    this.requireLiveRuntime();
+    if (this.interfaceManifest === null) {
+      throw new Error("cannot run VIR startup hooks before loading an IR package");
+    }
+    for (const entry of this.interfaceManifest.exports) {
+      if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
+        this.callEntry(entry, []);
+        this.completedStartupEntries.add(entry.entry);
+      }
+    }
   }
 
   callEntry(entry, args) {

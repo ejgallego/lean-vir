@@ -1,0 +1,52 @@
+name: Release VIR SDK
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  sdk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - name: Install Lean
+        run: |
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci
+
+      - run: npm run check:package-abi
+
+      - name: Check release version
+        run: |
+          node -e 'const p=require("./package.json"); if ("v" + p.version !== process.env.GITHUB_REF_NAME) process.exit(1)'
+
+      - run: npm run fetch:lean
+
+      - run: npm run install:wasi
+
+      - run: npm run build:sdk-artifact
+
+      - run: npm run test:runtime -- sdk-import
+
+      - name: Publish durable SDK asset
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1 || gh release create "$GITHUB_REF_NAME" --verify-tag --generate-notes
+          gh release upload "$GITHUB_REF_NAME" build/artifacts/lean-vir-sdk.tar.gz --clobber

@@ -844,6 +844,8 @@ function createJsValueHostBindings(resources) {
     bindings[target] = (value) => resources.resourceForValue(codec.toJs(value));
     bindings[`${target}.value`] = (value) => codec.fromJs(resources.resolveResource(value, "Js"));
   }
+  bindings["js.string.owned"] = (value) => resources.ownedResourceForValue(jsStringValue2(value));
+  bindings["js.float.owned"] = (value) => resources.ownedResourceForValue(jsFloatValue(value));
   bindings["js.nullable.null"] = () => resources.resourceForValue(createNullableValue(null));
   bindings["js.nullable.of"] = (value) => resources.resourceForValue(createNullableValue(resources.resolveResource(value, "Js")));
   bindings["js.nullable.isNull"] = (value) => resources.resourceForValue(nullablePayload(resources, value) === null);
@@ -998,10 +1000,16 @@ var HostResourceState = class {
     this.liveResources.add(resource);
     return resource;
   }
-  temporaryResourceForValue(value) {
+  // Creates a unique resource whose receiver is responsible for releasing it.
+  ownedResourceForValue(value) {
     if (value === null || value === void 0) return null;
     const resource = createHostResource(value);
     this.liveResources.add(resource);
+    return resource;
+  }
+  temporaryResourceForValue(value) {
+    const resource = this.ownedResourceForValue(value);
+    if (resource === null) return null;
     const scope = this.temporaryResourceScopes.at(-1);
     if (scope !== void 0) {
       scope.add(resource);
@@ -1130,11 +1138,11 @@ function createElementResourceHostBindings(resources, operations) {
   return {
     "browser.element.getTextContent": (element) => resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
     "browser.element.setTextContent": (element, text) => {
-      operations.setTextContent(
-        resources.resolveResource(element, "Element"),
-        resources.resolveResource(text, "JsString")
-      );
-      return void 0;
+      const target = resources.resolveResource(element, "Element");
+      return withConsumedResources(resources, [[text, "JsString"]], (resolvedText) => {
+        operations.setTextContent(target, resolvedText);
+        return void 0;
+      });
     },
     "browser.element.getAttribute": (element, name) => resources.resourceForValue(createNullableValue(
       operations.getAttribute(
@@ -1167,6 +1175,23 @@ function createElementResourceHostBindings(resources, operations) {
       return void 0;
     }
   };
+}
+function withConsumedResources(resources, inputs, run) {
+  const consumed = [];
+  const errors = [];
+  const attempted = collectCleanupError(errors, () => {
+    const values = inputs.map(([resource, label]) => {
+      const value = resources.resolveResource(resource, label);
+      consumed.push(resource);
+      return value;
+    });
+    return run(...values);
+  });
+  for (const resource of new Set(consumed)) {
+    collectCleanupError(errors, () => resources.releaseResource(resource));
+  }
+  throwCollectedErrors(errors, "consumed host resource cleanup failed");
+  return attempted.value;
 }
 function createHtmlInputElementResourceHostBindings(resources, { fromElement }) {
   return {
@@ -2117,7 +2142,8 @@ function createBrowserDocumentHostBindings(state = createHostResourceState()) {
       browserDocument().title = state.resolveResource(title, "JsString");
       return void 0;
     },
-    "browser.document.querySelector": (selector) => state.resourceForValue(createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString"))))
+    "browser.document.querySelector": (selector) => state.resourceForValue(createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString")))),
+    "browser.document.createElement": (tagName) => state.resourceForValue(browserDocument().createElement(state.resolveResource(tagName, "JsString")))
   };
 }
 function createBrowserEventHostBindings(state = createHostResourceState()) {
@@ -2136,15 +2162,99 @@ function createBrowserEventHostBindings(state = createHostResourceState()) {
   };
 }
 function createBrowserElementHostBindings(state = createHostResourceState()) {
-  return createElementResourceHostBindings(state, {
-    getTextContent: (target) => target.textContent ?? "",
-    setTextContent: (target, text) => {
-      target.textContent = text;
+  return {
+    ...createElementResourceHostBindings(state, {
+      getTextContent: (target) => target.textContent ?? "",
+      setTextContent: (target, text) => {
+        target.textContent = text;
+      },
+      getAttribute: (target, name) => target.getAttribute(name) ?? null,
+      setAttribute: (target, name, value) => target.setAttribute(name, value),
+      createEventListener: (target, eventName, callback) => createBrowserEventListenerResource(state, target, eventName, callback)
+    }),
+    "browser.element.appendChild": (parent, child) => {
+      state.resolveResource(parent, "Element").appendChild(state.resolveResource(child, "Element"));
+      return void 0;
     },
-    getAttribute: (target, name) => target.getAttribute(name) ?? null,
-    setAttribute: (target, name, value) => target.setAttribute(name, value),
-    createEventListener: (target, eventName, callback) => createBrowserEventListenerResource(state, target, eventName, callback)
-  });
+    "browser.element.remove": (element) => {
+      state.resolveResource(element, "Element").remove();
+      return void 0;
+    },
+    "browser.element.classList.add": (element, className) => {
+      state.resolveResource(element, "Element").classList.add(state.resolveResource(className, "JsString"));
+      return void 0;
+    },
+    "browser.element.classList.remove": (element, className) => {
+      state.resolveResource(element, "Element").classList.remove(state.resolveResource(className, "JsString"));
+      return void 0;
+    },
+    "browser.element.classList.toggle": (element, className) => state.resourceForValue(
+      state.resolveResource(element, "Element").classList.toggle(
+        state.resolveResource(className, "JsString")
+      )
+    ),
+    "browser.element.style.setProperty": (element, name, value) => {
+      state.resolveResource(element, "Element").style.setProperty(
+        state.resolveResource(name, "JsString"),
+        state.resolveResource(value, "JsString")
+      );
+      return void 0;
+    }
+  };
+}
+function createBrowserCanvasHostBindings(state = createHostResourceState()) {
+  const value = (resource, label) => state.resolveResource(resource, label);
+  return {
+    "browser.htmlCanvasElement.fromElement": (element) => {
+      const candidate = value(element, "Element");
+      const canvas = isCanvasElement(candidate) ? candidate : null;
+      return state.resourceForValue(createNullableValue(canvas));
+    },
+    "browser.htmlCanvasElement.getWidth": (canvas) => state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").width)),
+    "browser.htmlCanvasElement.setWidth": (canvas, width) => {
+      value(canvas, "HTMLCanvasElement").width = Number(value(width, "JsNat"));
+      return void 0;
+    },
+    "browser.htmlCanvasElement.getHeight": (canvas) => state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").height)),
+    "browser.htmlCanvasElement.setHeight": (canvas, height) => {
+      value(canvas, "HTMLCanvasElement").height = Number(value(height, "JsNat"));
+      return void 0;
+    },
+    "browser.htmlCanvasElement.getContext2D": (canvas) => state.resourceForValue(createNullableValue(value(canvas, "HTMLCanvasElement").getContext("2d"))),
+    "browser.canvas2d.clearRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").clearRect(...args)),
+    "browser.canvas2d.fillRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").fillRect(...args)),
+    "browser.canvas2d.strokeRect": (ctx, x, y, width, height) => withCanvasNumbers(state, [x, y, width, height], (...args) => value(ctx, "CanvasRenderingContext2D").strokeRect(...args)),
+    "browser.canvas2d.beginPath": (ctx) => value(ctx, "CanvasRenderingContext2D").beginPath(),
+    "browser.canvas2d.closePath": (ctx) => value(ctx, "CanvasRenderingContext2D").closePath(),
+    "browser.canvas2d.moveTo": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").moveTo(...args)),
+    "browser.canvas2d.lineTo": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").lineTo(...args)),
+    "browser.canvas2d.arc": (ctx, x, y, radius, startAngle, endAngle) => withCanvasNumbers(state, [x, y, radius, startAngle, endAngle], (...args) => value(ctx, "CanvasRenderingContext2D").arc(...args)),
+    "browser.canvas2d.fill": (ctx) => value(ctx, "CanvasRenderingContext2D").fill(),
+    "browser.canvas2d.stroke": (ctx) => value(ctx, "CanvasRenderingContext2D").stroke(),
+    "browser.canvas2d.setFillStyle": (ctx, style) => withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
+      value(ctx, "CanvasRenderingContext2D").fillStyle = resolvedStyle;
+      return void 0;
+    }),
+    "browser.canvas2d.setStrokeStyle": (ctx, style) => withConsumedResources(state, [[style, "JsString"]], (resolvedStyle) => {
+      value(ctx, "CanvasRenderingContext2D").strokeStyle = resolvedStyle;
+      return void 0;
+    }),
+    "browser.canvas2d.setLineWidth": (ctx, width) => withCanvasNumbers(state, [width], (resolvedWidth) => {
+      value(ctx, "CanvasRenderingContext2D").lineWidth = resolvedWidth;
+      return void 0;
+    }),
+    "browser.canvas2d.save": (ctx) => value(ctx, "CanvasRenderingContext2D").save(),
+    "browser.canvas2d.restore": (ctx) => value(ctx, "CanvasRenderingContext2D").restore(),
+    "browser.canvas2d.translate": (ctx, x, y) => withCanvasNumbers(state, [x, y], (...args) => value(ctx, "CanvasRenderingContext2D").translate(...args)),
+    "browser.canvas2d.rotate": (ctx, angle) => withCanvasNumbers(state, [angle], (resolvedAngle) => value(ctx, "CanvasRenderingContext2D").rotate(resolvedAngle))
+  };
+}
+function withCanvasNumbers(state, resources, run) {
+  return withConsumedResources(
+    state,
+    resources.map((resource) => [resource, "JsFloat"]),
+    run
+  );
 }
 function createBrowserHtmlInputElementHostBindings(state = createHostResourceState()) {
   return createHtmlInputElementResourceHostBindings(state, {
@@ -2216,6 +2326,7 @@ function createBrowserHostBindings({
     ...createBrowserEventHostBindings(state),
     ...createBrowserElementHostBindings(state),
     ...createBrowserHtmlInputElementHostBindings(state),
+    ...createBrowserCanvasHostBindings(state),
     ...createBrowserTimerHostBindings(state),
     ...createBrowserAnimationHostBindings(state),
     ...createInfoviewHostBindings({ resources: state, commandDispatcher: infoviewCommandDispatcher }),
@@ -2240,6 +2351,10 @@ function browserDocument() {
 }
 function queryDocumentElement(selector) {
   return browserDocument().querySelector(selector);
+}
+function isCanvasElement(value) {
+  const Canvas = globalThis.HTMLCanvasElement;
+  return typeof Canvas === "function" ? value instanceof Canvas : value !== null && typeof value === "object" && typeof value.getContext === "function";
 }
 function writeTextToHostClipboard(text) {
   const copiedSynchronously = copyTextWithExecCommand(text);
@@ -2547,13 +2662,14 @@ var JSON_INPUT_INTERFACE_TAGS = /* @__PURE__ */ new Set([
 
 // web/src/runtime/interface-manifest.js
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_VERSION = 6;
+var INTERFACE_MANIFEST_VERSION = 7;
+var MIN_INTERFACE_MANIFEST_VERSION = 6;
 var HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
   EXPLICIT_CONVERSION: "explicitConversion",
   OBJECT_HANDLE: "objectHandle"
 });
-var INTERFACE_MANIFEST_SHAPE_ERROR = "embedded interface manifest must be { version: 6, metadata: {...}, exports: [...] }";
+var INTERFACE_MANIFEST_SHAPE_ERROR = `embedded interface manifest must be { version: ${MIN_INTERFACE_MANIFEST_VERSION} through ${INTERFACE_MANIFEST_VERSION}, metadata: {...}, exports: [...] }`;
 function isRecord(value) {
   return value !== null && typeof value === "object" && !Array.isArray(value);
 }
@@ -2573,7 +2689,7 @@ function requireNonNegativeInteger(value, label) {
   }
 }
 function validateInterfaceManifest(manifest) {
-  if (!isRecord(manifest) || manifest.version !== INTERFACE_MANIFEST_VERSION || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
+  if (!isRecord(manifest) || !Number.isInteger(manifest.version) || (manifest.version < MIN_INTERFACE_MANIFEST_VERSION || manifest.version > INTERFACE_MANIFEST_VERSION) || !isRecord(manifest.metadata) || !Array.isArray(manifest.exports)) {
     throw new Error(INTERFACE_MANIFEST_SHAPE_ERROR);
   }
   if (manifest.artifact !== void 0 && manifest.artifact !== INTERFACE_MANIFEST_ARTIFACT) {
@@ -2585,11 +2701,11 @@ function validateInterfaceManifest(manifest) {
   if (manifest.hostImports !== void 0 && !Array.isArray(manifest.hostImports)) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
-  validateManifestExports(manifest.exports);
+  validateManifestExports(manifest.exports, manifest.version);
   validateManifestHostImports(manifest.hostImports ?? []);
   return manifest;
 }
-function validateManifestExports(exports) {
+function validateManifestExports(exports, manifestVersion) {
   const entries = /* @__PURE__ */ new Set();
   const ids = /* @__PURE__ */ new Set();
   const jsNames = /* @__PURE__ */ new Set();
@@ -2603,6 +2719,15 @@ function validateManifestExports(exports) {
     requireOptionalString(entry.jsName, `${label}.jsName`);
     requireOptionalString(entry.source, `${label}.source`);
     requireInterfaceEffect(entry.effect, `${label}.effect`);
+    if (manifestVersion >= 7 && typeof entry.startup !== "boolean") {
+      throw new Error(`${label}.startup must be a boolean`);
+    }
+    if (manifestVersion < 7) {
+      if (entry.startup !== void 0 && typeof entry.startup !== "boolean") {
+        throw new Error(`${label}.startup must be a boolean`);
+      }
+      entry.startup ??= false;
+    }
     requireUnique(entries, entry.entry, `${label}.entry`);
     if (entry.id !== void 0) requireUnique(ids, entry.id, `${label}.id`);
     if (entry.jsName !== void 0) requireUnique(jsNames, entry.jsName, `${label}.jsName`);
@@ -5259,6 +5384,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.exportsByName = /* @__PURE__ */ Object.create(null);
     this.entriesByName = /* @__PURE__ */ Object.create(null);
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
+    this.completedStartupEntries = /* @__PURE__ */ new Set();
     this.disposed = false;
     this.liveCallbacks = /* @__PURE__ */ new Set();
     this.createReplacementRuntime = createReplacementRuntime;
@@ -5272,6 +5398,7 @@ var VirRuntime = class extends ObjectValueRuntime {
       this.packageMetadata = this.interfaceManifest.metadata;
       this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
       this.rebuildManifestExports();
+      this.completedStartupEntries = /* @__PURE__ */ new Set();
     }
   }
   targetPointerBytes() {
@@ -5355,6 +5482,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.interfaceManifest = replacement.interfaceManifest;
     this.packageMetadata = replacement.packageMetadata;
     this.boxedCallEntryNames = replacement.boxedCallEntryNames;
+    this.completedStartupEntries = replacement.completedStartupEntries;
     this.liveCallbacks = replacement.liveCallbacks;
     this.hostState?.attachRuntime(this);
     this.rebuildManifestExports();
@@ -5372,6 +5500,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.exportsByName = /* @__PURE__ */ Object.create(null);
     this.entriesByName = /* @__PURE__ */ Object.create(null);
     this.entryCallCache = /* @__PURE__ */ new WeakMap();
+    this.completedStartupEntries = /* @__PURE__ */ new Set();
   }
   hasPackageState() {
     return this.packageInfo !== null || this.interfaceManifest !== null || this.packageMetadata !== null || (this.exports.vir_package_interface_manifest_size?.() ?? 0) !== 0 || (this.packageDeclCount() ?? 0) !== 0;
@@ -5412,6 +5541,18 @@ var VirRuntime = class extends ObjectValueRuntime {
       throw new Error(`interface entry not found: ${name}`);
     }
     return this.callEntry(entry, args);
+  }
+  runStartupEntries() {
+    this.requireLiveRuntime();
+    if (this.interfaceManifest === null) {
+      throw new Error("cannot run VIR startup hooks before loading an IR package");
+    }
+    for (const entry of this.interfaceManifest.exports) {
+      if (entry.startup && !this.completedStartupEntries.has(entry.entry)) {
+        this.callEntry(entry, []);
+        this.completedStartupEntries.add(entry.entry);
+      }
+    }
   }
   callEntry(entry, args) {
     this.requireLiveRuntime();

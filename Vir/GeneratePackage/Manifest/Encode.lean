@@ -27,7 +27,8 @@ def InterfaceExport.toJson (entry : InterfaceExport) : String :=
     ("source", jsonString entry.source),
     ("args", jsonArray (entry.args.map InterfaceArg.toJson)),
     ("result", entry.result.toJson),
-    ("effect", entry.effect.toJson)
+    ("effect", entry.effect.toJson),
+    ("startup", jsonBool entry.startup)
   ]
 
 def HostImport.toJson (entry : HostImport) : String :=

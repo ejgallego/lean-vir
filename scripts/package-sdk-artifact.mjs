@@ -85,7 +85,15 @@ Nested js/runtime/, js/host/, and js/react/ modules are shipped so those entry
 modules can resolve relative imports. They remain internal implementation
 modules and may change with the matching lean_vir revision.
 
-Use the matching Lean package generator to create .irpkg files, then serve:
+In a Lake client package, mark JavaScript-callable declarations with
+@[vir_export] and startup hooks with @[vir_startup], then build the module
+package and matching SDK:
+
+  lake build +MyApp.Runtime:vir
+  lake build :virSdk
+
+Use the matching Lean package generator or module facet to create .irpkg files,
+then serve:
 
   wasm/vir-upstream.wasm
   wasm/vir-upstream.dev.wasm
@@ -104,6 +112,10 @@ Minimal browser usage:
     wasmUrl: "./wasm/vir-upstream.wasm",
     irPackageUrl: "./my-app.irpkg",
   });
+
+  vir.runStartupEntries();
+
+Call vir.dispose() when the page or application is torn down.
 
 Set debugWasm: true to load ./wasm/vir-upstream.dev.wasm instead:
 

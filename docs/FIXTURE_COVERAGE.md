@@ -65,7 +65,7 @@ The current fixture surface covers:
 - package-backed `Nat` literals wider than 32 bits, `Nat.div`/`pow`/`log2`/
   `shiftLeft`/`shiftRight`, small `Int` arithmetic, `USize` `sub`/`mul`/
   `land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`, `Float.scaleB`, and
-  `Float.toUInt32`;
+  `Float.toUInt32`; the slide canvas smoke additionally covers `Float.sub`;
 - `Lean.Expr` package closure and structural JS/WASM marshaling for constants,
   applications, literals, binders, levels, variables, projections, metadata
   results, and bound-variable inputs/results;

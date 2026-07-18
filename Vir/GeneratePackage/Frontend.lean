@@ -60,6 +60,11 @@ unsafe def frontendEnv (target : Target) : IO Environment := do
   | some env => return env
   | none => throw <| IO.userError s!"Lean frontend failed for {fileName}"
 
+def labelledDecls (env : Environment) (attrName : Name) : IO (Array Name) := do
+  match (← Lean.labelExtensionMapRef.get)[attrName]? with
+  | none => return #[]
+  | some ext => return ext.getState env
+
 unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
   initSearchPath (← getBuildDir)
   let mut index : DeclIndex := {}
@@ -80,6 +85,13 @@ unsafe def loadDeclIndex (targets : Array Target) : IO DeclIndex := do
             } }
       | none =>
           index := { index with localDecls := index.localDecls.insert decl.name loaded }
+    let exports ← labelledDecls env `vir_export
+    let startups ← labelledDecls env `vir_startup
+    index := {
+      index with
+      virExports := exports.foldl (fun selected name => selected.insert name) index.virExports
+      virStartups := startups.foldl (fun selected name => selected.insert name) index.virStartups
+    }
     index := { index with sourceDecls := index.sourceDecls.push (target.source.toString, names) }
   return index
 
@@ -112,5 +124,23 @@ def DeclIndex.find? (index : DeclIndex) (name : Name) : Option LoadedDecl :=
 
 def DeclIndex.initFnNameFor? (index : DeclIndex) (name : Name) : Option Name :=
   index.envs.findSome? fun (_, env) => getInitFnNameFor? env name
+
+def markedDeclNamesFor (index : DeclIndex) (target : Target) : Array Name :=
+  match index.envs.findSome? (fun (source, env) =>
+      if source == target.source.toString then some env else none) with
+  | none => #[]
+  | some env =>
+      match target.markedModule? with
+      | some moduleName =>
+          (index.virExports ∪ index.virStartups).foldl (init := #[]) fun names name =>
+            match env.getModuleIdxFor? name with
+            | some moduleIdx =>
+                if env.header.moduleNames[moduleIdx]? == some moduleName then names.push name else names
+            | none => names
+      | none =>
+          index.sourceDecls.findSome? (fun (source, names) =>
+            if source == target.source.toString then some names else none) |>.getD #[]
+          |>.filter fun name =>
+            index.virExports.contains name || index.virStartups.contains name
 
 end Vir.GeneratePackage

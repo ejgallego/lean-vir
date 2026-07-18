@@ -10,6 +10,7 @@ import Lean.Compiler.IR.CompilerM
 import Lean.Compiler.InitAttr
 import Lean.Compiler.LCNF.Main
 import Lean.Compiler.LCNF.ToImpureType
+import Lean.LabelAttribute
 
 open Lean
 
@@ -59,6 +60,8 @@ structure Target where
   source : System.FilePath
   roots : Array Name
   includeAll : Bool := false
+  includeMarked : Bool := false
+  markedModule? : Option Name := none
   packageOnly : Bool := false
 
 structure LoadedDecl where
@@ -74,6 +77,8 @@ structure DeclIndex where
   localDecls : NameMap LoadedDecl := {}
   envs : Array (String × Environment) := #[]
   sourceDecls : Array (String × Array Name) := #[]
+  virExports : NameSet := {}
+  virStartups : NameSet := {}
   diagnostics : Array DeclIndexDiagnostic := #[]
 
 structure NativeExtern where
@@ -143,6 +148,7 @@ structure InterfaceExport where
   args : Array InterfaceArg
   result : InterfaceType
   effect : InterfaceEffect := .pure
+  startup : Bool := false
 
 inductive HostImportBoundary where
   | hostResource

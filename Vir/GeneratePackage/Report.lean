@@ -34,7 +34,8 @@ def reportFor (_targets : Array Target) (closure : Closure) (manifest : Interfac
     if manifest.exports.isEmpty then #["None."] else manifest.exports.map fun entry =>
       let args := entry.args.map (fun arg => s!"{arg.name} : {arg.type.label}")
       let effect := if entry.effect.isEffectful then s!" {entry.effect.display}" else ""
-      s!"- `{entry.entry}` as `{entry.jsName}` : ({", ".intercalate args.toList}) ->{effect} {entry.result.label}"
+      let startup := if entry.startup then " [startup]" else ""
+      s!"- `{entry.entry}` as `{entry.jsName}`{startup} : ({", ".intercalate args.toList}) ->{effect} {entry.result.label}"
   let hostImportLines :=
     if manifest.hostImports.isEmpty then #["None."] else manifest.hostImports.map fun entry =>
       let args := entry.args.map (fun arg => s!"{arg.name} : {arg.type.label}")

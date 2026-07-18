@@ -37,7 +37,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     },
   });
   const hostRuntime = await hostFactory.createRuntime({ irPackageBytes: await readFile(hostPackage) });
-  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 16);
+  assert.equal(hostRuntime.interfaceManifest.hostImports.length, 17);
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshEchoBang")?.effect, "runtime");
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshTitleRoundtrip")?.effect, "dom");
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshReactValue")?.effect, "react");
@@ -56,6 +56,11 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(commonEchoImport?.boundary, "hostResource");
   assert.equal(commonEchoImport?.args[0]?.type?.type, "Js");
   assert.equal(commonEchoImport?.result?.type, "Js");
+  const ownedStringImport = hostRuntime.interfaceManifest.hostImports.find(
+    (entry) => entry.target === "js.string.owned",
+  );
+  assert.equal(ownedStringImport?.effect, "runtime");
+  assert.equal(ownedStringImport?.boundary, "explicitConversion");
   assert.equal(hostRuntime.call("freshEchoBang", "ok"), "ok!");
   assert.equal(hostRuntime.call("freshTitleRoundtrip", "Lean.Vir"), "Lean.Vir");
   assert.equal(hostRuntime.call("freshReactValue"), "7");

@@ -11,6 +11,10 @@ open System
 
 namespace Vir.FetchSdk
 
+def sdkVersion : String := "0.1.0"
+
+def sdkRuntimeAbiVersion : Nat := 1
+
 structure Options where
   out : FilePath := "web/public/vendor/lean-vir"
   archive? : Option String := none
@@ -18,13 +22,16 @@ structure Options where
   tag? : Option String := none
   commit? : Option String := none
   expectCommit? : Option String := none
+  expectVersion : String := sdkVersion
   artifactName : String := "lean-vir-sdk"
   repo : String := "ejgallego/lean-vir"
+  verifyInstalled : Bool := false
 
 def usage : String :=
-  "usage: lake exe lean_vir/vir_fetch_sdk [--out DIR] (--archive FILE | --url URL | --tag TAG | --commit SHA [--repo OWNER/REPO])\n\n" ++
+  "usage: lake exe lean_vir/vir_fetch_sdk [--out DIR] [--archive FILE | --url URL | --tag TAG | --commit SHA [--repo OWNER/REPO]]\n" ++
+  "       lake exe lean_vir/vir_fetch_sdk --verify-installed DIR [--expect-version VERSION] [--expect-commit SHA]\n\n" ++
   "Installs a lean-vir-sdk.tar.gz archive into DIR and verifies lean-vir-artifact.json checksums.\n\n" ++
-  "Use --expect-commit SHA to reject an SDK built from a different lean-vir commit.\n\n" ++
+  s!"The default source is release v{sdkVersion}. Use --expect-version VERSION or --expect-commit SHA to reject a mismatched SDK.\n\n" ++
   "Environment fallbacks: VIR_SDK_ARCHIVE, VIR_SDK_URL, VIR_SDK_TAG, VIR_SDK_COMMIT, VIR_SDK_EXPECT_COMMIT, VIR_SDK_REPO."
 
 partial def parseArgs (args : List String) (opts : Options := {}) : Except String Options :=
@@ -36,8 +43,11 @@ partial def parseArgs (args : List String) (opts : Options := {}) : Except Strin
   | "--tag" :: value :: rest => parseArgs rest { opts with tag? := some value }
   | "--commit" :: value :: rest => parseArgs rest { opts with commit? := some value }
   | "--expect-commit" :: value :: rest => parseArgs rest { opts with expectCommit? := some value }
+  | "--expect-version" :: value :: rest => parseArgs rest { opts with expectVersion := value }
   | "--artifact-name" :: value :: rest => parseArgs rest { opts with artifactName := value }
   | "--repo" :: value :: rest => parseArgs rest { opts with repo := value }
+  | "--verify-installed" :: value :: rest =>
+      parseArgs rest { opts with out := FilePath.mk value, verifyInstalled := true }
   | "--help" :: _ => .error usage
   | "-h" :: _ => .error usage
   | arg :: _ => .error s!"unknown argument: {arg}\n\n{usage}"
@@ -47,6 +57,13 @@ inductive Source where
   | url (url : String)
   | commit (sha : String)
 
+def redactCommandArgs (args : Array String) : Array String :=
+  args.map fun arg =>
+    if arg.startsWith "Authorization:" then
+      "Authorization: <redacted>"
+    else
+      arg
+
 def run (cmd : String) (args : Array String) : IO String := do
   let out ← IO.Process.output { cmd := cmd, args := args }
   if out.exitCode != 0 then
@@ -54,7 +71,8 @@ def run (cmd : String) (args : Array String) : IO String := do
     let stdout := out.stdout.trimAscii.toString
     let detail :=
       if stderr.isEmpty then stdout else stderr
-    throw <| IO.userError s!"{cmd} {String.intercalate " " args.toList} failed ({out.exitCode}): {detail}"
+    let displayArgs := redactCommandArgs args
+    throw <| IO.userError s!"{cmd} {String.intercalate " " displayArgs.toList} failed ({out.exitCode}): {detail}"
   return out.stdout.trimAscii.toString
 
 def jsonField (json : Json) (field : String) (read : Json → Except String α) : IO α := do
@@ -101,7 +119,8 @@ def sourceFromOptions (opts : Options) : IO Source := do
                               match commit? with
                               | some commit => return .commit commit
                               | none =>
-                                  throw <| IO.userError s!"no SDK source specified\n\n{usage}"
+                                  let repo := repo.getD opts.repo
+                                  return .url s!"https://github.com/{repo}/releases/download/v{sdkVersion}/lean-vir-sdk.tar.gz"
 
 def expectedCommitFromOptions (opts : Options) : IO (Option String) := do
   match opts.expectCommit? with
@@ -128,6 +147,9 @@ def githubToken? : IO (Option String) := do
       catch _ =>
         return none
 
+def needsGitHubAuthentication (url : String) : Bool :=
+  url.startsWith "https://api.github.com/"
+
 def fetchUrl (url : String) (dest : FilePath) : IO Unit := do
   if let some parent := dest.parent then
     IO.FS.createDirAll parent
@@ -139,8 +161,9 @@ def fetchUrl (url : String) (dest : FilePath) : IO Unit := do
     "-H", "Accept: application/vnd.github+json",
     "-H", "X-GitHub-Api-Version: 2022-11-28"
   ]
-  if let some token ← githubToken? then
-    args := (args.push "-H").push s!"Authorization: Bearer {token}"
+  if needsGitHubAuthentication url then
+    if let some token ← githubToken? then
+      args := (args.push "-H").push s!"Authorization: Bearer {token}"
   args := ((args.push "--output").push dest.toString).push url
   discard <| run "curl" args
 
@@ -196,7 +219,45 @@ def fetchCommitArchive (opts : Options) (commit : String) (dest : FilePath) : IO
     catch _ =>
       pure ()
 
-def installArchive (archive : FilePath) (outDir : FilePath) (expectCommit? : Option String) : IO Unit := do
+def verifySdkFiles (sdkDir : FilePath) (manifest : Json) : IO Unit := do
+  let files ← jsonField manifest "files" Json.getArr?
+  for file in files do
+    let relPath ← jsonField file "path" Json.getStr?
+    let expected ← jsonField file "sha256" Json.getStr?
+    let filePath := sdkDir / FilePath.mk relPath
+    let hashLine ← run "sha256sum" #[filePath.toString]
+    let actual := (hashLine.splitOn " ").head?.getD ""
+    if actual != expected then
+      throw <| IO.userError s!"checksum mismatch for {relPath}: expected {expected}, got {actual}"
+
+def verifyInstalledSdk
+    (sdkDir : FilePath)
+    (expectVersion : String)
+    (expectCommit? : Option String) : IO Unit := do
+  let manifestPath := sdkDir / "lean-vir-artifact.json"
+  let manifest ← readJsonFile manifestPath
+  let name ← jsonField manifest "name" Json.getStr?
+  if name != "lean-vir-sdk" then
+    throw <| IO.userError s!"expected SDK manifest name `lean-vir-sdk`, got `{name}`"
+  let version ← jsonField manifest "version" Json.getStr?
+  if version != expectVersion then
+    throw <| IO.userError s!"SDK version mismatch: expected {expectVersion}, got {version}"
+  let abi ← jsonField manifest "runtimeAbiVersion" Json.getNat?
+  if abi != sdkRuntimeAbiVersion then
+    throw <| IO.userError s!"unsupported SDK runtime ABI version: {abi}"
+  let actualCommit ← jsonField manifest "gitCommit" Json.getStr?
+  if actualCommit.isEmpty then
+    throw <| IO.userError "SDK manifest gitCommit must not be empty"
+  if let some expectCommit := expectCommit? then
+    if actualCommit != expectCommit then
+      throw <| IO.userError s!"SDK commit mismatch: expected {expectCommit}, got {actualCommit}"
+  verifySdkFiles sdkDir manifest
+
+def installArchive
+    (archive : FilePath)
+    (outDir : FilePath)
+    (expectVersion : String)
+    (expectCommit? : Option String) : IO Unit := do
   let stamp ← IO.monoMsNow
   let tmpRoot := FilePath.mk s!"/tmp/lean-vir-sdk-fetch-{stamp}"
   let unpackDir := tmpRoot / "unpack"
@@ -204,35 +265,12 @@ def installArchive (archive : FilePath) (outDir : FilePath) (expectCommit? : Opt
   try
     IO.FS.createDirAll unpackDir
     discard <| run "tar" #["-xzf", archive.toString, "-C", unpackDir.toString]
-    let manifestPath := sdkDir / "lean-vir-artifact.json"
-    let manifest ← readJsonFile manifestPath
-    let name ← jsonField manifest "name" Json.getStr?
-    if name != "lean-vir-sdk" then
-      throw <| IO.userError s!"expected SDK manifest name `lean-vir-sdk`, got `{name}`"
-    let abi ← jsonField manifest "runtimeAbiVersion" Json.getNat?
-    if abi != 1 then
-      throw <| IO.userError s!"unsupported SDK runtime ABI version: {abi}"
-    if let some expectCommit := expectCommit? then
-      let actualCommit ← jsonField manifest "gitCommit" Json.getStr?
-      if actualCommit != expectCommit then
-        throw <| IO.userError s!"SDK commit mismatch: expected {expectCommit}, got {actualCommit}"
-    try
+    verifyInstalledSdk sdkDir expectVersion expectCommit?
+    if ← outDir.pathExists then
       IO.FS.removeDirAll outDir
-    catch _ =>
-      pure ()
     if let some parent := outDir.parent then
       IO.FS.createDirAll parent
     discard <| run "mv" #[sdkDir.toString, outDir.toString]
-    let installedManifest ← readJsonFile (outDir / "lean-vir-artifact.json")
-    let files ← jsonField installedManifest "files" Json.getArr?
-    for file in files do
-      let relPath ← jsonField file "path" Json.getStr?
-      let expected ← jsonField file "sha256" Json.getStr?
-      let filePath := outDir / FilePath.mk relPath
-      let hashLine ← run "sha256sum" #[filePath.toString]
-      let actual := (hashLine.splitOn " ").head?.getD ""
-      if actual != expected then
-        throw <| IO.userError s!"checksum mismatch for {relPath}: expected {expected}, got {actual}"
   finally
     try
       IO.FS.removeDirAll tmpRoot
@@ -249,8 +287,12 @@ def runMain (args : List String) : IO UInt32 := do
       return if err == usage then (0 : UInt32) else (2 : UInt32)
   | .ok opts => do
       try
-        let source ← sourceFromOptions opts
         let expectCommit? ← expectedCommitFromOptions opts
+        if opts.verifyInstalled then
+          verifyInstalledSdk opts.out opts.expectVersion expectCommit?
+          IO.println s!"verified {opts.out}"
+          return (0 : UInt32)
+        let source ← sourceFromOptions opts
         let (archive, cleanup?) ←
           match source with
           | .archive path => pure (FilePath.mk path, none)
@@ -267,7 +309,7 @@ def runMain (args : List String) : IO UInt32 := do
               fetchCommitArchive opts commit archive
               pure (archive, some archive)
         try
-          installArchive archive opts.out expectCommit?
+          installArchive archive opts.out opts.expectVersion expectCommit?
         finally
           if let some cleanup := cleanup? then
             try

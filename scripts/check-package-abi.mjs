@@ -9,7 +9,11 @@ import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { INTERFACE_TAG, SUPPORTED_INTERFACE_TAGS } from "../web/src/runtime/interface-tags.js";
-import { HOST_IMPORT_BOUNDARY, INTERFACE_MANIFEST_ARTIFACT } from "../web/src/runtime/interface-manifest.js";
+import {
+  HOST_IMPORT_BOUNDARY,
+  INTERFACE_MANIFEST_ARTIFACT,
+  INTERFACE_MANIFEST_VERSION as RUNTIME_INTERFACE_MANIFEST_VERSION,
+} from "../web/src/runtime/interface-manifest.js";
 import { IR_PACKAGE_MAGIC, IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
 
@@ -128,9 +132,34 @@ assertEqual(
   INTERFACE_MANIFEST_VERSION,
   "interface manifest version mismatch",
 );
+if (RUNTIME_INTERFACE_MANIFEST_VERSION !== INTERFACE_MANIFEST_VERSION) {
+  throw new Error(
+    "runtime interface manifest version mismatch: " +
+    `runtime=${RUNTIME_INTERFACE_MANIFEST_VERSION} packageVersions=${INTERFACE_MANIFEST_VERSION}`,
+  );
+}
 if (!Number.isSafeInteger(RUNTIME_ABI_VERSION) || RUNTIME_ABI_VERSION < 1) {
   throw new Error(`runtime ABI version must be a positive safe integer, got ${RUNTIME_ABI_VERSION}`);
 }
+
+const packageJson = JSON.parse(await readRepoText("package.json"));
+const sdkFetcherSource = await readRepoText("tools/VirFetchSdk.lean");
+const lakefileSource = await readRepoText("lakefile.lean");
+assertEqual(
+  leanStringConstant(sdkFetcherSource, "sdkVersion"),
+  packageJson.version,
+  "SDK fetcher version mismatch",
+);
+assertEqual(
+  leanNatConstant(sdkFetcherSource, "sdkRuntimeAbiVersion"),
+  RUNTIME_ABI_VERSION,
+  "SDK fetcher runtime ABI version mismatch",
+);
+assertEqual(
+  leanStringConstant(lakefileSource, "virSdkVersion"),
+  packageJson.version,
+  "Lake SDK facet version mismatch",
+);
 
 const emitSource = await readRepoText("Vir/GeneratePackage/Emit.lean");
 const manifestEncodeSource = await readRepoText("Vir/GeneratePackage/Manifest/Encode.lean");
@@ -234,5 +263,5 @@ for (const [key] of leanBoundaries) {
 
 console.log(
   `package ABI guardrails ok: magic, versions, ${packageSections.length} package sections, ` +
-  `${jsTags.size} interface descriptor tags, and ${jsBoundaries.size} host import boundaries agree`,
+  `${jsTags.size} interface descriptor tags, ${jsBoundaries.size} host import boundaries, and SDK ${packageJson.version} agree`,
 );

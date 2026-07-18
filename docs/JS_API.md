@@ -230,6 +230,11 @@ their cleanup hook runs once when the final runtime using the map is disposed.
   declaration name.
 - `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
   methods.
+- `vir.runStartupEntries()` invokes zero-argument exports whose manifest entry
+  has `startup: true`, in manifest order. Successful hooks run once per loaded
+  package; a failed call can be retried without repeating earlier hooks.
+- `vir.interfaceManifest.exports[].startup` distinguishes `@[vir_startup]`
+  hooks from ordinary `@[vir_export]` calls.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
 - `vir.packageInfo.hostImports` reports the number of JavaScript host imports.
 

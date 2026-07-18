@@ -63,10 +63,17 @@ export class HostResourceState {
     return resource;
   }
 
-  temporaryResourceForValue(value) {
+  // Creates a unique resource whose receiver is responsible for releasing it.
+  ownedResourceForValue(value) {
     if (value === null || value === undefined) return null;
     const resource = createHostResource(value);
     this.liveResources.add(resource);
+    return resource;
+  }
+
+  temporaryResourceForValue(value) {
+    const resource = this.ownedResourceForValue(value);
+    if (resource === null) return null;
     const scope = this.temporaryResourceScopes.at(-1);
     if (scope !== undefined) {
       scope.add(resource);
@@ -211,11 +218,11 @@ export function createElementResourceHostBindings(resources, operations) {
     "browser.element.getTextContent": (element) =>
       resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
     "browser.element.setTextContent": (element, text) => {
-      operations.setTextContent(
-        resources.resolveResource(element, "Element"),
-        resources.resolveResource(text, "JsString"),
-      );
-      return undefined;
+      const target = resources.resolveResource(element, "Element");
+      return withConsumedResources(resources, [[text, "JsString"]], (resolvedText) => {
+        operations.setTextContent(target, resolvedText);
+        return undefined;
+      });
     },
     "browser.element.getAttribute": (element, name) =>
       resources.resourceForValue(createNullableValue(
@@ -249,6 +256,24 @@ export function createElementResourceHostBindings(resources, operations) {
       return undefined;
     },
   };
+}
+
+export function withConsumedResources(resources, inputs, run) {
+  const consumed = [];
+  const errors = [];
+  const attempted = collectCleanupError(errors, () => {
+    const values = inputs.map(([resource, label]) => {
+      const value = resources.resolveResource(resource, label);
+      consumed.push(resource);
+      return value;
+    });
+    return run(...values);
+  });
+  for (const resource of new Set(consumed)) {
+    collectCleanupError(errors, () => resources.releaseResource(resource));
+  }
+  throwCollectedErrors(errors, "consumed host resource cleanup failed");
+  return attempted.value;
 }
 
 export function createHtmlInputElementResourceHostBindings(resources, { fromElement }) {

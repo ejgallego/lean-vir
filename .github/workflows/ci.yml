@@ -15,6 +15,8 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Install Lean
         run: |
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
@@ -44,7 +46,14 @@ jobs:
       - run: npm run install:wasi
       - run: npm run check:boundary-registry
       - run: npm run build:demo:release
+      - run: npm run package:sdk-artifact
       - run: npm run test:upstream:no-build
+      - name: Upload SDK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: lean-vir-sdk
+          path: build/artifacts/lean-vir-sdk.tar.gz
+          if-no-files-found: error
       - name: Upload demo artifacts
         uses: actions/upload-artifact@v4
         with:
@@ -60,6 +69,8 @@ jobs:
     needs: build-demo
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - uses: actions/setup-node@v5
         with:
           node-version: 24
@@ -77,6 +88,8 @@ jobs:
     needs: build-demo
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Install Lean
         run: |
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
@@ -87,6 +100,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run test:lake
       - name: Download demo artifacts
         uses: actions/download-artifact@v4
         with:
@@ -99,6 +113,8 @@ jobs:
     needs: build-demo
     steps:
       - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
       - name: Install Lean
         run: |
           curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
