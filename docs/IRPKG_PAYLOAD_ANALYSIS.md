@@ -4,8 +4,8 @@ This note looks past the format-10 package envelope and focuses on payload
 cost. The useful question is not only which section is large, but which section
 forces the most shim-side maintenance.
 
-The snapshot below was generated on 2026-07-15 with Lean
-`leanprover/lean4:v4.32.0-rc1` by running `npm run probe:upstream`. Treat these
+The snapshot below was generated on 2026-07-23 with Lean
+`leanprover/lean4:v4.32.0` by running `npm run probe:upstream`. Treat these
 numbers as a representative baseline, not as values that update automatically
 when the browser package set changes.
 
@@ -27,19 +27,19 @@ can be compared against the same inputs.
 
 | Package | Total bytes | Declaration bytes | Decl % | Manifest bytes | Manifest % | Export-summary bytes | Host-import bytes | Init-global bytes |
 | --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |
-| `demo-host.irpkg` | 1,132,278 | 1,027,863 | 90.8 | 90,828 | 8.0 | 2,402 | 11,086 | 4 |
-| `fixtures-basic.irpkg` | 313,420 | 235,568 | 75.2 | 70,710 | 22.6 | 7,039 | 4 | 4 |
-| `fixtures-boundary.irpkg` | 59,887 | 48,361 | 80.8 | 9,686 | 16.2 | 1,737 | 4 | 4 |
-| `fixtures-lean.irpkg` | 908,498 | 894,529 | 98.5 | 9,767 | 1.1 | 1,578 | 4 | 2,525 |
-| `pretty-printer.irpkg` | 102,536 | 90,901 | 88.7 | 11,107 | 10.8 | 425 | 4 | 4 |
+| `demo-host.irpkg` | 1,133,485 | 1,028,007 | 90.7 | 91,757 | 8.1 | 2,402 | 11,220 | 4 |
+| `fixtures-basic.irpkg` | 314,844 | 235,568 | 74.8 | 72,134 | 22.9 | 7,039 | 4 | 4 |
+| `fixtures-boundary.irpkg` | 62,258 | 50,368 | 80.9 | 10,050 | 16.1 | 1,737 | 4 | 4 |
+| `fixtures-lean.irpkg` | 908,670 | 894,529 | 98.4 | 9,939 | 1.1 | 1,578 | 4 | 2,525 |
+| `pretty-printer.irpkg` | 102,580 | 90,901 | 88.6 | 11,151 | 10.9 | 425 | 4 | 4 |
 
 The corresponding entry counts are:
 
 | Package | Declarations | Exports | Host imports |
 | --- | ---: | ---: | ---: |
-| `demo-host.irpkg` | 3,082 | 55 | 83 |
+| `demo-host.irpkg` | 3,083 | 55 | 84 |
 | `fixtures-basic.irpkg` | 730 | 106 | 0 |
-| `fixtures-boundary.irpkg` | 259 | 26 | 0 |
+| `fixtures-boundary.irpkg` | 268 | 26 | 0 |
 | `fixtures-lean.irpkg` | 1,555 | 25 | 0 |
 | `pretty-printer.irpkg` | 217 | 6 | 0 |
 
@@ -47,10 +47,10 @@ Aggregate over these five packages:
 
 | Section | Bytes | Share |
 | --- | ---: | ---: |
-| Declarations | 2,297,222 | 91.3% |
-| Interface manifest | 192,098 | 7.6% |
+| Declarations | 2,299,373 | 91.2% |
+| Interface manifest | 195,031 | 7.7% |
 | Export summaries | 13,181 | 0.5% |
-| Host imports | 11,102 | 0.4% |
+| Host imports | 11,236 | 0.4% |
 | Init globals | 2,541 | 0.1% |
 | Package headers and section directories | 475 | <0.1% |
 
