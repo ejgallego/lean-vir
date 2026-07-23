@@ -9,7 +9,14 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 mkdir -p third_party
 
-LEAN_VERSION=v4.32.0
+LEAN_TOOLCHAIN="$(< lean-toolchain)"
+case "${LEAN_TOOLCHAIN}" in
+  leanprover/lean4:v*) LEAN_VERSION="${LEAN_TOOLCHAIN#leanprover/lean4:}" ;;
+  *)
+    echo "unsupported Lean toolchain: ${LEAN_TOOLCHAIN}" >&2
+    exit 1
+    ;;
+esac
 
 if [ -d third_party/lean4-src/.git ]; then
   git -C third_party/lean4-src fetch --depth 1 origin "${LEAN_VERSION}"

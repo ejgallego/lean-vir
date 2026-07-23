@@ -13,7 +13,7 @@ npm run prepare:irpkg -- examples/fib.virpkg.json
 
 That command:
 
-1. elaborates the configured Lean source with Lean 4.32.0;
+1. elaborates the configured Lean source;
 2. extracts the requested IR declaration closure into an `.irpkg`;
 3. embeds a generated JavaScript interface manifest, JavaScript host import
    table, and package metadata in the package;

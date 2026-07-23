@@ -197,9 +197,9 @@ single-field structures.
 
 This is still the single-file declaration package path. It does not load
 `.olean`, `.ir`, or full Lean module data. The package generator elaborates the
-source with Lean 4.32.0, extracts typed `Lean.IR.Decl` values, and writes the
-current package format. The WASM side decodes that package into real Lean IR
-objects and serves them through `lean_ir_find_env_decl`.
+source, extracts typed `Lean.IR.Decl` values, and writes the current package
+format. The WASM side decodes that package into real Lean IR objects and serves
+them through `lean_ir_find_env_decl`.
 
 Replacing a package through `VirRuntime.loadIrPackageBytes` creates a fresh
 Wasm interpreter instance and loads and validates the candidate there first.

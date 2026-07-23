@@ -4,10 +4,9 @@ This note looks past the format-10 package envelope and focuses on payload
 cost. The useful question is not only which section is large, but which section
 forces the most shim-side maintenance.
 
-The snapshot below was generated on 2026-07-23 with Lean
-`leanprover/lean4:v4.32.0` by running `npm run probe:upstream`. Treat these
-numbers as a representative baseline, not as values that update automatically
-when the browser package set changes.
+The snapshot below was generated on 2026-07-23 by running
+`npm run probe:upstream`. Treat these numbers as a representative baseline, not
+as values that update automatically when the browser package set changes.
 
 To reproduce the source data, generate the packages and inspect each one:
 
