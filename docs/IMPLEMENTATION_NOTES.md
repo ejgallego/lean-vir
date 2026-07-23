@@ -7,7 +7,7 @@ shape live in `docs/HARNESS.md`; package config and manifest semantics live in
 
 The scoped POC deliberately keeps one active execution path:
 
-- compile Lean `v4.32.0-rc1`'s real `src/library/ir_interpreter.cpp`;
+- compile Lean `v4.32.0`'s real `src/library/ir_interpreter.cpp`;
 - link the viable Lean runtime sources into a `wasm32-wasip1` module;
 - provide the browser declaration closure through `lean_ir_find_env_decl`;
 - run that module from Node and the browser.
