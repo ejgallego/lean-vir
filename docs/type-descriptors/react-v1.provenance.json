@@ -1,0 +1,78 @@
+{
+  "note": "React 19.2.7 does not ship bundled TypeScript declaration files. React's official TypeScript guide directs users to @types/react and @types/react-dom; this report extracts symbols from @types/react and links back to official React documentation where possible.",
+  "packages": [
+    {
+      "name": "react",
+      "version": "19.2.7",
+      "role": "runtime package"
+    },
+    {
+      "name": "@types/react",
+      "version": "19.2.17",
+      "role": "React-recommended TypeScript declarations used for this report"
+    },
+    {
+      "name": "@types/react-dom",
+      "version": "19.2.3",
+      "role": "React-recommended DOM declaration companion"
+    }
+  ],
+  "docs": [
+    {
+      "title": "React: Using TypeScript",
+      "url": "https://react.dev/learn/typescript"
+    },
+    {
+      "title": "React DOM common components",
+      "url": "https://react.dev/reference/react-dom/components/common"
+    },
+    {
+      "title": "React: Referencing Values with Refs",
+      "url": "https://react.dev/learn/referencing-values-with-refs"
+    },
+    {
+      "title": "React DOM input component",
+      "url": "https://react.dev/reference/react-dom/components/input"
+    }
+  ],
+  "sourceMaps": [
+    {
+      "path": "node_modules/@types/react/index.d.ts",
+      "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react/index.d.ts"
+    }
+  ],
+  "symbolDocs": {
+    "React.Attributes": "https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key",
+    "React.ClassAttributes": "https://react.dev/learn/referencing-values-with-refs",
+    "React.AriaAttributes": "https://react.dev/reference/react-dom/components/common",
+    "React.DOMAttributes": "https://react.dev/reference/react-dom/components/common",
+    "React.HTMLAttributes": "https://react.dev/reference/react-dom/components/common",
+    "React.ButtonHTMLAttributes": "https://react.dev/reference/react-dom/components/common",
+    "React.InputHTMLAttributes": "https://react.dev/reference/react-dom/components/input",
+    "React.JSX.IntrinsicAttributes": "https://react.dev/learn/writing-markup-with-jsx",
+    "React.JSX.IntrinsicElements": "https://react.dev/reference/react-dom/components/common",
+    "React.CSSProperties": "https://react.dev/learn/typescript#style-props",
+    "React.Key": "https://react.dev/learn/rendering-lists#keeping-list-items-in-order-with-key",
+    "React.EventHandler": "https://react.dev/learn/typescript#dom-events",
+    "React.ChangeEventHandler": "https://react.dev/learn/typescript#dom-events",
+    "React.MouseEventHandler": "https://react.dev/learn/typescript#dom-events",
+    "React.SyntheticEvent": "https://react.dev/learn/typescript#dom-events",
+    "React.ChangeEvent": "https://react.dev/learn/typescript#dom-events",
+    "React.FocusEvent": "https://react.dev/reference/react-dom/components/common",
+    "React.KeyboardEvent": "https://react.dev/reference/react-dom/components/common",
+    "React.MouseEvent": "https://react.dev/reference/react-dom/components/common",
+    "React.PointerEvent": "https://react.dev/reference/react-dom/components/common",
+    "React.UIEvent": "https://react.dev/reference/react-dom/components/common",
+    "React.ReactNode": "https://react.dev/learn/typescript#children",
+    "React.ReactElement": "https://react.dev/learn/typescript#children",
+    "React.JSX.Element": "https://react.dev/learn/writing-markup-with-jsx",
+    "React.JSX.ElementType": "https://react.dev/learn/writing-markup-with-jsx",
+    "React.ElementType": "https://react.dev/learn/typescript#typescript-with-react-components",
+    "React.ComponentType": "https://react.dev/learn/typescript#typescript-with-react-components",
+    "React.JSXElementConstructor": "https://react.dev/learn/typescript#typescript-with-react-components",
+    "React.FunctionComponent": "https://react.dev/learn/typescript#typescript-with-react-components",
+    "React.FC": "https://react.dev/learn/typescript#typescript-with-react-components",
+    "React.Ref": "https://react.dev/learn/referencing-values-with-refs",
+    "React.RefObject": "https://react.dev/learn/referencing-values-with-refs"
+  }
+}

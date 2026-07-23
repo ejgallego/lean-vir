@@ -12,6 +12,7 @@ ownership diagrams.
 
 - Package/interface work: read [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md),
   [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md),
+  [TYPE_ANCHORS.md](TYPE_ANCHORS.md),
   `Vir/GeneratePackage/Interface/Classify/Core.lean`,
   `Vir/GeneratePackage/Interface/Encode.lean`,
   `web/src/runtime/core.js`,
@@ -68,6 +69,8 @@ ownership diagrams.
 - [ADDING_DEMOS.md](ADDING_DEMOS.md): adding browser demos and package roots.
 - [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md): package configs, manifests,
   supported types, and interface internals.
+- [TYPE_ANCHORS.md](TYPE_ANCHORS.md): generated TypeScript descriptors,
+  Lean VIR manifest comparison, and lightweight Verso anchor fragments.
 - [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md): Lean package generator module
   map, data flow, and diagnostics.
 - [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md): upstream interpreter boundary
