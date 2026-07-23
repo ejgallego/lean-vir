@@ -78,6 +78,8 @@ The most useful generated diagnostics are:
 - `build/upstream-probe/link.map`
 - `build/upstream-probe/generated/native_wrappers.cpp`
 - `build/upstream-probe/generated/native_wrappers_registry.inc`
+- `build/upstream-probe/generated/native-support-sources.txt`
+- `build/upstream-probe/generated/native-support-providers.tsv`
 - `build/generated/*.report.md`
 - `build/fixtures/summary.json`
 - `build/fixtures/*.report.md`

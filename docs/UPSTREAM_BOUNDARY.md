@@ -52,11 +52,13 @@ the interpreter's name formatting and diagnostics.
 
 For Lean-defined native exports whose implementation closure is available in
 the pinned compiler output rather than the imported kernel environment, the
-probe also cross-compiles the corresponding stage0 sources. The current String
-support uses `Init/Prelude.c` plus
-`Init/Data/String/{Defs,Basic,Search,Substring}.c`; array/list conversion also
-uses `Init/Data/List/ToArrayImpl.c` and `Init/Data/Array/Basic.c`. The final
-generated report lists the complete set explicitly.
+probe also cross-compiles the corresponding stage0 sources. It does not keep a
+handwritten module list. Instead, it links the local and compiler-generated
+native support with undefined symbols allowed, finds the live unresolved
+symbols after section garbage collection, selects their unique providers from
+the pinned `Init` stage0 output, and repeats until the link reaches a fixed
+point. The generated source and symbol-to-provider manifests, as well as the
+final boundary report, record the complete selected set.
 
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
@@ -91,11 +93,13 @@ not a fork of Lean. It is split by responsibility:
   build cross-compiles that generated C and links it statically into the WASI
   module.
 - `scripts/build-upstream-probe.sh` prelinks local native exceptions, the
-  generated wrapper object, and pinned stage0 support into one relocatable
-  native-support object. Duplicate-symbol tolerance is confined to this
-  prelink: local exceptions take precedence over upstream support, and generated
-  adapters take precedence over duplicate stage0 adapters. An `llvm-nm` audit
-  rejects collisions outside the local provider symbols and generated object.
+  generated wrapper object, and linker-selected pinned stage0 support into one
+  relocatable native-support object. `scripts/resolve-native-support-sources.mjs`
+  maps live unresolved function symbols to their unique generated-C provider.
+  Duplicate-symbol tolerance is confined to this prelink: local exceptions take
+  precedence over upstream support, and generated adapters take precedence over
+  duplicate stage0 adapters. An `llvm-nm` audit rejects collisions outside the
+  local provider symbols and generated object.
 - `runtime/runtime_environment_stubs.cpp`, `package/package_init_bridge.cpp`,
   `runtime/runtime_value_stubs.cpp`, and `runtime/io_stubs.cpp` own the
   WASI/platform, initializer, value-helper, and demo IO providers. Local raw
@@ -152,10 +156,12 @@ The build compiles stable sources into cached objects under
 `build/upstream-probe/obj`. Example edits regenerate the relevant
 `web/public/*.irpkg` package without recompiling or relinking the WASM artifact.
 Compiler-generated native wrappers and their registry fragment live under
-`build/upstream-probe/generated`; they are build artifacts and are not checked
-into Git. The relocatable native-support bundle lives in the object cache. The
-artifact is relinked only when stable or generated objects, link flags, the
-Lean source commit, or the generated runtime overlays change.
+`build/upstream-probe/generated`; the same directory contains the selected
+stage0 source list and live symbol-to-provider manifest. They are build
+artifacts and are not checked into Git. The relocatable native-support bundle
+lives in the object cache. The artifact is relinked only when stable C++
+objects, generated wrapper output, the linker-selected stage0 object set, link
+flags, the Lean source commit, or the generated runtime overlays change.
 
 ## Native Boxed Wrappers
 
@@ -171,13 +177,13 @@ build then recompiles those imported declarations and emits their
 compiler-generated boxed wrappers together with any selected Lean-defined raw
 body available to the generator. If an exported Lean implementation depends on
 compiler-generated imported declarations that are present only in compiled
-library output, the probe links the pinned upstream-generated support module
-instead. This is how the `String.Internal` search/position operations and
-`Substring.Raw.Internal.beq` use their normal compiler wrappers and upstream
-raw implementations without copying either into the shim. The same path lets
-`Array.mk` and `Array.toList` call the real runtime exports backed by their
-compiler-generated list/array helpers. The native extern table remains the
-source of truth for wrapper selection;
+library output, the probe selects the required pinned upstream-generated
+support modules from the live link. This is how the search/position operations
+in `String.Internal` and `Substring.Raw.Internal.beq` use their normal compiler
+wrappers and upstream raw implementations without copying either into the shim.
+The same path lets `Array.mk` and `Array.toList` call the real runtime exports
+backed by their compiler-generated list/array helpers. The native extern table
+remains the source of truth for wrapper selection;
 `npm run inspect:native-wrappers` reports it without duplicating the full list
 here. Local behavior and WASI policy belong in raw provider functions; their
 boxed adapters are still generated whenever the standard compiler output is
