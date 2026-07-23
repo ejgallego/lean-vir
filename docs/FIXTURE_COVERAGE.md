@@ -1,9 +1,9 @@
 # Fixture Coverage
 
 `npm run test:fixtures` runs the upstream-backed conformance fixture surface.
-Each fixture is Lean source under `fixtures/`, elaborated by Lean 4.32.0 into
-real `Lean.IR.Decl` values by the compiled `vir_irpkg` package generator, and
-then compared against Lean's host IR interpreter with
+Each fixture is Lean source under `fixtures/`, elaborated into real
+`Lean.IR.Decl` values by the compiled `vir_irpkg` package generator, and then
+compared against Lean's host IR interpreter with
 `interpreter.prefer_native=false`. The package generator is built from
 `tools/GeneratePackage.lean` and the `Vir/GeneratePackage/` library modules.
 The runner schedules fixtures in parallel using half of Node's reported

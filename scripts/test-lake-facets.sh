@@ -58,7 +58,7 @@ printf '%s\n' \
   '@[default_target]' \
   'lean_lib Smoke' > "$tmp/lakefile.lean"
 
-printf '%s\n' 'leanprover/lean4:v4.32.0' > "$tmp/lean-toolchain"
+cp lean-toolchain "$tmp/lean-toolchain"
 
 printf '%s\n' \
   'import Vir' \

@@ -86,8 +86,7 @@ a native `ReactNode` resource rather than a recursive `Html` tree; broader
 ProofWidgets compatibility must still keep callback ownership and
 renderer-specific cleanup inside a narrow audited ABI.
 
-This roadmap assumes the current `main` branch repository setup: Lean
-`v4.32.0`, the local WASI SDK from `npm run install:wasi`, and the small
+This roadmap assumes the current `main` branch repository setup and the small
 repository harness documented in `AGENTS.md`, `CONTRIBUTING.md`, and
 `docs/HARNESS.md`. For this line of work, use `npm run setup` for a fresh
 checkout and `npm run doctor` before deeper validation when the local toolchain

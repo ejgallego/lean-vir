@@ -20,7 +20,7 @@ asks for that machinery.
 
 ## Toolchain
 
-- Use Lean `leanprover/lean4:v4.32.0`.
+- Use the Lean toolchain pinned in `lean-toolchain`.
 - Use the local WASI SDK installed by `npm run install:wasi`.
 - Use Node/npm for the browser harness and smoke tests.
 
