@@ -24,10 +24,20 @@ Importing `Vir` also imports these attributes.
   startup hook is also an export and carries `startup: true` in the interface
   manifest.
 
+After Lean compiles a `@[vir_export]` declaration, the attribute diagnoses
+private or non-executable declarations, unsupported binder shapes, and
+conclusive blockers in the visible compiled closure. Dependency diagnostics
+show the path from the export to the missing IR declaration, native extern
+registration, or initializer provider.
+Opaque imported IR and postponed compilation produce an informational
+diagnostic naming the required compiled IR instead of a false rejection.
+Package generation remains authoritative for complete interface layouts,
+generated boxed boundaries, and unresolved package dependencies.
+
 After loading the generated package, JavaScript calls ordinary exports with
 `vir.call(...)` and invokes startup hooks with `vir.runStartupEntries()`.
 See [LAKE_INTEGRATION.md](LAKE_INTEGRATION.md) for the complete downstream Lake
-workflow.
+workflow, including current module-boundary limitations and remediation.
 
 ## Local One-File Workflow
 

@@ -59,6 +59,9 @@ build_module() {
   fi
 }
 
+build_module Vir/GeneratePackage/NativeExterns.lean
+build_module Vir/IRDependencies.lean
+build_module Vir/ExportValidation.lean
 build_module Vir/Attributes.lean
 build_module Vir/Host.lean
 build_module Vir/Runtime.lean
@@ -71,7 +74,6 @@ build_module Vir/Examples/Tamagotchi.lean
 build_module Vir/GeneratePackage/Basic.lean
 build_module Vir/GeneratePackage/PackageFormat.lean
 build_module Vir/GeneratePackage/PackageIRTags.lean
-build_module Vir/GeneratePackage/NativeExterns.lean
 build_module Vir/GeneratePackage/Frontend.lean
 build_module Vir/GeneratePackage/Closure.lean
 build_module Vir/GeneratePackage/Json.lean

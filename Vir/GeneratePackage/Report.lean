@@ -25,11 +25,14 @@ def reportFor (_targets : Array Target) (closure : Closure) (manifest : Interfac
     if closure.initGlobals.isEmpty then #["None."] else closure.initGlobals.map fun entry =>
       s!"- `{entry.name}` <- `{entry.initName}`"
   let missingDeclLines :=
-    if closure.missingDecls.isEmpty then #["None."] else closure.missingDecls.map fun n => s!"- `{n}`"
+    if closure.missingDecls.isEmpty then #["None."] else closure.missingDecls.map fun dependency =>
+      s!"- `{dependency.name}`{dependency.pathSuffix}"
   let missingExternLines :=
-    if closure.missingExterns.isEmpty then #["None."] else closure.missingExterns.map fun n => s!"- `{n}`"
+    if closure.missingExterns.isEmpty then #["None."] else closure.missingExterns.map fun dependency =>
+      s!"- `{dependency.name}`{dependency.pathSuffix}"
   let unsupportedInitGlobalLines :=
-    if closure.unsupportedInitGlobals.isEmpty then #["None."] else closure.unsupportedInitGlobals.map fun n => s!"- `{n}`"
+    if closure.unsupportedInitGlobals.isEmpty then #["None."] else closure.unsupportedInitGlobals.map fun dependency =>
+      s!"- `{dependency.name}`{dependency.pathSuffix}"
   let interfaceExportLines :=
     if manifest.exports.isEmpty then #["None."] else manifest.exports.map fun entry =>
       let args := entry.args.map (fun arg => s!"{arg.name} : {arg.type.label}")

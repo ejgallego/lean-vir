@@ -101,16 +101,16 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
   if !closure.missingDecls.isEmpty || !closure.missingExterns.isEmpty || !closure.unsupportedInitGlobals.isEmpty || !manifest.diagnostics.isEmpty then
     if !closure.missingDecls.isEmpty then
       IO.eprintln "missing IR declarations:"
-      for name in closure.missingDecls do
-        IO.eprintln s!"  - {name}"
+      for dependency in closure.missingDecls do
+        IO.eprintln s!"  - {dependency.name}{dependency.pathSuffix}"
     if !closure.missingExterns.isEmpty then
       IO.eprintln "missing native extern registrations:"
-      for name in closure.missingExterns do
-        IO.eprintln s!"  - {name}"
+      for dependency in closure.missingExterns do
+        IO.eprintln s!"  - {dependency.name}{dependency.pathSuffix}"
     if !closure.unsupportedInitGlobals.isEmpty then
       IO.eprintln "unsupported initializer globals:"
-      for name in closure.unsupportedInitGlobals do
-        IO.eprintln s!"  - {name}"
+      for dependency in closure.unsupportedInitGlobals do
+        IO.eprintln s!"  - {dependency.name}{dependency.pathSuffix}"
     if !manifest.diagnostics.isEmpty then
       IO.eprintln "package diagnostics:"
       for diagnostic in manifest.diagnostics do

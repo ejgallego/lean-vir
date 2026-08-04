@@ -13,35 +13,6 @@ namespace Vir.GeneratePackage
 
 open Lean.IR
 
-def refsOfExpr (expr : IR.Expr) (refs : Array Name) : Array Name :=
-  match expr with
-  | .fap f _ => refs.push f
-  | .pap f _ => refs.push f
-  | _ => refs
-
-partial def refsOfBody : FnBody -> Array Name -> Array Name
-  | .vdecl _ _ expr cont, refs => refsOfBody cont (refsOfExpr expr refs)
-  | .jdecl _ _ body cont, refs => refsOfBody cont (refsOfBody body refs)
-  | .set _ _ _ cont, refs => refsOfBody cont refs
-  | .setTag _ _ cont, refs => refsOfBody cont refs
-  | .uset _ _ _ cont, refs => refsOfBody cont refs
-  | .sset _ _ _ _ _ cont, refs => refsOfBody cont refs
-  | .inc _ _ _ _ cont, refs => refsOfBody cont refs
-  | .dec _ _ _ _ cont, refs => refsOfBody cont refs
-  | .del _ cont, refs => refsOfBody cont refs
-  | .case _ _ _ alts, refs =>
-      alts.foldl (fun refs alt =>
-        match alt with
-        | .ctor _ body => refsOfBody body refs
-        | .default body => refsOfBody body refs) refs
-  | .ret _, refs => refs
-  | .jmp _ _, refs => refs
-  | .unreachable, refs => refs
-
-def refsOfDecl : Decl -> Array Name
-  | .fdecl (body := body) .. => refsOfBody body #[]
-  | .extern .. => #[]
-
 def addInitGlobal (name initName : Name) (state : Closure) : Closure :=
   if state.initGlobalSeen.contains name then
     state
@@ -50,7 +21,11 @@ def addInitGlobal (name initName : Name) (state : Closure) : Closure :=
       initGlobalSeen := state.initGlobalSeen.insert name
       initGlobals := state.initGlobals.push { name, initName } }
 
-partial def collectName (index : DeclIndex) (name : Name) (state : Closure) : Closure :=
+partial def collectName
+    (index : DeclIndex)
+    (name : Name)
+    (path : Array Name)
+    (state : Closure) : Closure :=
   if state.seen.contains name then
     state
   else
@@ -58,28 +33,33 @@ partial def collectName (index : DeclIndex) (name : Name) (state : Closure) : Cl
     match nativeExtern? name with
     | some ext =>
         let state := { state with externs := state.externs.push ext }
-        ext.deps.foldl (fun state dep => collectName index dep state) state
+        ext.deps.foldl (fun state dep => collectName index dep (path.push dep) state) state
     | none =>
         match index.find? name with
         | none =>
+            let dependency : ClosureDependency := { name := name, path := path }
             if isNativeExternCandidate name then
-              { state with missingExterns := state.missingExterns.push name }
+              { state with missingExterns := state.missingExterns.push dependency }
             else
-              { state with missingDecls := state.missingDecls.push name }
+              { state with missingDecls := state.missingDecls.push dependency }
         | some loaded =>
             if isUnsupportedInitGlobal loaded.decl then
               match index.initFnNameFor? name with
               | some initName =>
                   let state := { state with decls := state.decls.push loaded }
-                  let state := collectName index initName state
+                  let state := collectName index initName (path.push initName) state
                   addInitGlobal name initName state
               | none =>
                   { state with
                     decls := state.decls.push loaded
-                    unsupportedInitGlobals := state.unsupportedInitGlobals.push name }
+                    unsupportedInitGlobals := state.unsupportedInitGlobals.push {
+                      name := name
+                      path := path
+                    } }
             else
               let state := { state with decls := state.decls.push loaded }
-              refsOfDecl loaded.decl |>.foldl (fun state dep => collectName index dep state) state
+              refsOfDecl loaded.decl |>.foldl
+                (fun state dep => collectName index dep (path.push dep) state) state
 
 def rootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
   if target.includeAll then
@@ -111,6 +91,7 @@ def resolvedRootsForTarget (index : DeclIndex) (target : Target) : Array Name :=
 
 def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
   targets.foldl (fun state target =>
-    (resolvedRootsForTarget index target).foldl (fun state root => collectName index root state) state) {}
+    (resolvedRootsForTarget index target).foldl
+      (fun state root => collectName index root #[root] state) state) {}
 
 end Vir.GeneratePackage

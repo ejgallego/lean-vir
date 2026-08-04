@@ -38,7 +38,14 @@ Targets have one of five modes:
   `Name` and declaration-IR wire tags. `scripts/ir-codec-tags.mjs` is the source
   of truth.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
-  registrations required by packaged closures.
+  registrations required by packaged closures and attribute-time export
+  validation.
+- `Vir.IRDependencies`: shared IR reference walking, JavaScript-extern
+  recognition, and root-to-dependency path formatting.
+- `Vir.ExportValidation`: conclusive visible compiled-closure checks for
+  `@[vir_export]`, plus explicit opaque-import deferrals. Declaration-kind,
+  signature, and postponed-compilation handling live with the attribute in
+  `Vir.Attributes`.
 - `Vir.GeneratePackage.Frontend`: unchanged source elaboration, `DeclIndex`
   construction, marker collection and module filtering, and declaration-name
   collision diagnostics.
@@ -194,15 +201,27 @@ npm run test:runtime -- package-generation
 The generated report groups the common package failures by where generation
 stopped:
 
+Many conclusive `@[vir_export]` closure failures are already reported by Lean
+at the marked declaration. Package diagnostics remain necessary for startup
+hooks, explicit package roots, opaque imported IR, postponed compilation, and
+final interface classification.
+
+The three closure-blocker sections append one first-discovered path from a
+resolved package root after `via`. The command-line diagnostic prints the same
+path.
+
 - `Missing IR Declarations`: a requested root or closure dependency was not
   present in the loaded source environments. Check the target source path,
   imports, explicit root names, and whether a package-only support target is
-  needed.
+  needed. For a module-system export, this can be the opaque imported boundary
+  named by the earlier attribute diagnostic.
 - `Missing Native Extern Registrations`: the closure reached a Lean runtime
   primitive that needs a local demo shim. Add the registration in
   `Vir.GeneratePackage.NativeExterns`, then run `npm run check:native-externs`;
   if the registry entries changed, regenerate and rerun the boundary-registry
   check.
+- `Unsupported Init Globals`: the closure reached initialization-backed state
+  for which the loaded inputs did not provide an initializer function.
 - `Package Diagnostics`: a requested export or host import could not be
   represented in the manifest. Typical causes are unsupported argument/result
   types, duplicate export ids or JavaScript names, and declaration-name
