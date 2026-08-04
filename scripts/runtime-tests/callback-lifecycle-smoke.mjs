@@ -70,7 +70,7 @@ let firstOwnedLease = null;
 let secondOwnedLease = null;
 const callbackLeaseRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       transferredLeaseCallback = callback;
@@ -107,7 +107,7 @@ let failedRetainedTransfer = null;
 let failedRetainedLease = null;
 const failedRetainRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (_input, callback) => {
       failedRetainedTransfer = callback;
@@ -349,7 +349,7 @@ const disposePhaseBindings = {
 };
 const disposePhaseRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: disposePhaseBindings,
 });
 assert.equal(disposePhaseRuntime.call("HostInterop.callbackRoundTrip", 3), "3");
