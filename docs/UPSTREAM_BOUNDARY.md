@@ -52,11 +52,10 @@ the interpreter's name formatting and diagnostics.
 
 For Lean-defined native exports whose implementation closure is available in
 the pinned compiler output rather than the imported kernel environment, the
-probe also cross-compiles the corresponding stage0 sources. The current String
-support uses `Init/Prelude.c` plus
-`Init/Data/String/{Defs,Basic,Search,Substring}.c`; array/list conversion also
-uses `Init/Data/List/ToArrayImpl.c` and `Init/Data/Array/Basic.c`. The final
-generated report lists the complete set explicitly.
+probe also cross-compiles the stage0 sources listed in
+`wasm/upstream_shim/native-support-sources.txt`. The list is intentionally
+small and reviewable; the strict final link exposes a missing provider after a
+toolchain update.
 
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:

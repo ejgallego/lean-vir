@@ -188,15 +188,20 @@ support_sources=(
   "$src/src/util/name.cpp"
 )
 
-lean_support_sources=(
-  "$src/stage0/stdlib/Init/Prelude.c"
-  "$src/stage0/stdlib/Init/Data/List/ToArrayImpl.c"
-  "$src/stage0/stdlib/Init/Data/Array/Basic.c"
-  "$src/stage0/stdlib/Init/Data/String/Defs.c"
-  "$src/stage0/stdlib/Init/Data/String/Basic.c"
-  "$src/stage0/stdlib/Init/Data/String/Search.c"
-  "$src/stage0/stdlib/Init/Data/String/Substring.c"
-)
+lean_stage0_support_root="$src/stage0/stdlib/Init"
+lean_stage0_support_manifest="wasm/upstream_shim/native-support-sources.txt"
+lean_stage0_support_sources=()
+while IFS= read -r relative_path; do
+  case "$relative_path" in
+    "" | \#*) continue ;;
+  esac
+  source="$lean_stage0_support_root/$relative_path"
+  if [ ! -f "$source" ]; then
+    echo "error: native support source not found: $source" >&2
+    exit 1
+  fi
+  lean_stage0_support_sources+=("$source")
+done < "$lean_stage0_support_manifest"
 
 local_native_support_sources=(
   "wasm/upstream_shim/runtime/lean_object_constructors.cpp"
@@ -327,7 +332,7 @@ for source in "${runtime_sources[@]}" "${support_sources[@]}" "${shim_sources[@]
 done
 
 native_support_objects=()
-for source in "${local_native_support_sources[@]}" "$generated_native_wrappers" "${lean_support_sources[@]}"; do
+for source in "${local_native_support_sources[@]}" "$generated_native_wrappers" "${lean_stage0_support_sources[@]}"; do
   object="$(object_for_source "$source")"
   if [[ "$source" == wasm/upstream_shim/* ]]; then
     compile_one "$source" "$object" "${shim_deps[@]}"
@@ -572,7 +577,7 @@ wasi_import_count="$(wc -l < "$wasi_imports" | tr -d ' ')"
 runtime_source_count="${#runtime_sources[@]}"
 support_source_count="${#support_sources[@]}"
 generated_source_count=1
-lean_generated_support_source_count="${#lean_support_sources[@]}"
+lean_stage0_support_source_count="${#lean_stage0_support_sources[@]}"
 local_native_support_source_count="${#local_native_support_sources[@]}"
 native_support_duplicate_count="$(wc -l < "$native_support_duplicate_symbols" | tr -d ' ')"
 shim_source_count="${#shim_sources[@]}"
@@ -604,7 +609,7 @@ report_start=$SECONDS
   echo "- Real Lean runtime sources linked: $runtime_source_count"
   echo "- Lean support sources linked: $support_source_count"
   echo "- Compiler-generated native wrapper sources linked: $generated_source_count"
-  echo "- Pinned compiler-generated Lean support sources linked: $lean_generated_support_source_count"
+  echo "- Pinned Lean stage0 support sources linked: $lean_stage0_support_source_count"
   echo "- Local native support sources linked: $local_native_support_source_count"
   echo "- Audited duplicate native support symbols: $native_support_duplicate_count"
   echo "- Local WASI shim sources linked: $shim_source_count"
@@ -655,9 +660,9 @@ report_start=$SECONDS
   echo
   printf -- '- `%s`\n' "$generated_native_wrappers"
   echo
-  echo "## Linked Pinned Compiler-Generated Lean Support Sources"
+  echo "## Linked Pinned Lean Stage0 Support Sources"
   echo
-  for path in "${lean_support_sources[@]}"; do
+  for path in "${lean_stage0_support_sources[@]}"; do
     printf -- '- `%s`\n' "$path"
   done
   echo

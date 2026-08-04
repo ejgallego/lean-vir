@@ -1,0 +1,9 @@
+# Lean stage0 modules that provide raw bodies needed by native wrappers.
+# Paths are relative to Lean's stage0/stdlib/Init directory.
+Prelude.c
+Data/List/ToArrayImpl.c
+Data/Array/Basic.c
+Data/String/Defs.c
+Data/String/Basic.c
+Data/String/Search.c
+Data/String/Substring.c
