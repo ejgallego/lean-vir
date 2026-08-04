@@ -1,0 +1,765 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Lean VIR Type Anchors</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f7f7f4;
+      --fg: #1f2328;
+      --muted: #636c76;
+      --panel: #ffffff;
+      --line: #d8dee4;
+      --exact: #1a7f37;
+      --compatible: #9a6700;
+      --weak: #8250df;
+      --missing: #cf222e;
+      --code: #f6f8fa;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #111315;
+        --fg: #e6edf3;
+        --muted: #8b949e;
+        --panel: #161b22;
+        --line: #30363d;
+        --code: #0d1117;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      background: var(--bg);
+      color: var(--fg);
+      font: 15px/1.5 system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+    main { max-width: 1120px; margin: 0 auto; padding: 32px 20px 56px; }
+    header { margin-bottom: 24px; }
+    h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0; }
+    h2 { margin: 0; font-size: 18px; letter-spacing: 0; }
+    p { margin: 0; }
+    a { color: #0969da; }
+    .summary {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+      margin: 18px 0 28px;
+    }
+    .provenance {
+      margin: -10px 0 24px;
+      padding: 12px 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .provenance ul { margin: 6px 0 0; padding-left: 20px; }
+    .summary-card, .anchor {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .summary-card { padding: 12px; }
+    .summary-card strong { display: block; font-size: 22px; }
+    .summary-card span { color: var(--muted); }
+    .coverage {
+      margin: 0 0 28px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .coverage h2 { margin: 0 0 10px; }
+    .coverage table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 13px;
+    }
+    .coverage th, .coverage td {
+      padding: 8px;
+      border-top: 1px solid var(--line);
+      text-align: left;
+      vertical-align: top;
+    }
+    .coverage th { color: var(--muted); font-weight: 600; }
+    .coverage td.numeric { text-align: right; white-space: nowrap; }
+    .coverage details summary { cursor: pointer; color: var(--fg); }
+    .coverage ul { margin: 6px 0 0; padding-left: 18px; }
+    .report-tools {
+      margin: 0 0 18px;
+      padding: 16px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .tool-head {
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .tool-head p { color: var(--muted); font-size: 13px; }
+    .filter-row {
+      display: grid;
+      grid-template-columns: minmax(180px, 1.6fr) minmax(140px, 1fr) minmax(140px, 1fr) minmax(220px, 1.4fr);
+      gap: 12px;
+      align-items: end;
+    }
+    .filter {
+      display: grid;
+      gap: 5px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    .filter input[type="search"], .filter select {
+      width: 100%;
+      min-height: 36px;
+      padding: 7px 9px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      background: var(--panel);
+      color: var(--fg);
+      font: inherit;
+    }
+    .status-filter {
+      margin: 0;
+      padding: 0;
+      border: 0;
+    }
+    .status-options { display: flex; flex-wrap: wrap; gap: 6px; }
+    .status-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      min-height: 36px;
+      padding: 6px 8px;
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      color: var(--fg);
+      font-weight: 500;
+    }
+    .report-body {
+      display: grid;
+      grid-template-columns: 260px minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+    .anchor-index {
+      position: sticky;
+      top: 16px;
+      max-height: calc(100vh - 32px);
+      overflow: auto;
+      padding: 14px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+    }
+    .anchor-index h2 { margin-bottom: 8px; }
+    .anchor-index details { border-top: 1px solid var(--line); padding: 8px 0; }
+    .anchor-index details:first-of-type { border-top: 0; }
+    .anchor-index summary { cursor: pointer; font-weight: 600; }
+    .index-links { display: grid; gap: 4px; margin-top: 6px; }
+    .index-link {
+      display: grid;
+      grid-template-columns: 8px minmax(0, 1fr);
+      gap: 7px;
+      align-items: center;
+      padding: 4px 0;
+      color: var(--fg);
+      text-decoration: none;
+      font-size: 13px;
+    }
+    .index-link:hover { text-decoration: underline; }
+    .status-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 999px;
+      background: currentColor;
+    }
+    .empty-state {
+      display: none;
+      padding: 18px;
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      color: var(--muted);
+    }
+    .empty-state[data-visible="true"] { display: block; }
+    .groups { display: grid; gap: 28px; }
+    .anchor-group { display: grid; gap: 12px; }
+    .anchor[hidden], .anchor-group[hidden], .index-link[hidden] { display: none; }
+    .group-title {
+      margin: 0;
+      font-size: 20px;
+      letter-spacing: 0;
+    }
+    .anchors { display: grid; gap: 14px; }
+    .anchor { padding: 16px; }
+    .anchor-head {
+      display: flex;
+      align-items: start;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 12px;
+    }
+    .name { display: grid; gap: 4px; min-width: 0; }
+    .ts-name, .lean-name { overflow-wrap: anywhere; }
+    .lean-name { color: var(--muted); font-size: 13px; }
+    .badge {
+      display: inline-block;
+      border: 1px solid currentColor;
+      border-radius: 999px;
+      padding: 2px 8px;
+      font-size: 12px;
+      line-height: 1.3;
+      white-space: nowrap;
+    }
+    .exact { color: var(--exact); }
+    .compatible { color: var(--compatible); }
+    .weak { color: var(--weak); }
+    .missing { color: var(--missing); }
+    .meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px 18px;
+      margin-bottom: 12px;
+      color: var(--muted);
+      font-size: 13px;
+    }
+    .comparison {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
+    }
+    .pane-title {
+      margin: 0 0 6px;
+      color: var(--muted);
+      font-size: 13px;
+      font-weight: 600;
+    }
+    pre {
+      margin: 0;
+      padding: 12px;
+      overflow-x: auto;
+      max-height: 420px;
+      background: var(--code);
+      border: 1px solid var(--line);
+      border-radius: 6px;
+      font-size: 13px;
+      line-height: 1.45;
+    }
+    code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; }
+    .notes { margin-top: 10px; color: var(--muted); }
+    .hover {
+      margin-top: 10px;
+      padding: 10px;
+      border-left: 3px solid var(--line);
+      color: var(--muted);
+      background: color-mix(in srgb, var(--panel) 88%, var(--line));
+    }
+    @media (max-width: 720px) {
+      main { padding: 24px 12px 40px; }
+      .summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      .coverage { overflow-x: auto; }
+      .filter-row { grid-template-columns: 1fr; }
+      .report-body { grid-template-columns: 1fr; }
+      .anchor-index { position: static; max-height: none; }
+      .anchor-head { display: grid; }
+      .comparison { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+  <main>
+    <header>
+      <h1>Lean VIR Type Anchors</h1>
+      <p>TypeScript declaration documentation enriched with Lean VIR descriptor matches.</p>
+    </header>
+<aside class="provenance" aria-label="TypeScript source provenance">
+      <strong>TypeScript source provenance</strong>
+      <p>React 19.2.7 does not ship bundled TypeScript declaration files. React's official TypeScript guide directs users to @types/react and @types/react-dom; this report extracts React DOM client symbols from @types/react-dom/client and links back to official React documentation where possible.</p>
+      <ul><li>react-dom@19.2.7 (runtime package)</li><li>@types/react-dom@19.2.3 (React-recommended DOM declaration package used for this report)</li><li>@types/react@19.2.17 (React declaration dependency referenced by React DOM client types)</li><li><a href="https://react.dev/learn/typescript">React: Using TypeScript</a></li><li><a href="https://react.dev/reference/react-dom/client">React DOM Client APIs</a></li><li><a href="https://react.dev/reference/react-dom/client/createRoot">React DOM createRoot</a></li><li><a href="https://react.dev/reference/react-dom/client/hydrateRoot">React DOM hydrateRoot</a></li></ul>
+    </aside>
+    <section class="summary" aria-label="Type anchor summary">
+      <div class="summary-card exact"><strong>0</strong><span>exact</span></div>
+      <div class="summary-card compatible"><strong>0</strong><span>compatible</span></div>
+      <div class="summary-card weak"><strong>4</strong><span>weak</span></div>
+      <div class="summary-card missing"><strong>3</strong><span>missing</span></div>
+    </section>
+    <section class="report-tools" aria-labelledby="type-anchor-browse">
+      <div class="tool-head">
+        <h2 id="type-anchor-browse">Browse</h2>
+        <p id="anchor-result-count">Showing 7 anchors</p>
+      </div>
+      <div class="filter-row">
+        <label class="filter">Search
+          <input id="anchor-search" type="search" autocomplete="off" placeholder="TypeScript or Lean symbol">
+        </label>
+        <label class="filter">Category
+          <select id="anchor-category">
+            <option value="">All categories</option>
+            <option value="React DOM roots">React DOM roots</option>
+            <option value="React DOM hydration">React DOM hydration</option>
+          </select>
+        </label>
+        <label class="filter">Relation
+          <select id="anchor-relation">
+            <option value="">All relations</option>
+            <option value="audit">Audit</option>
+            <option value="coverageGap">Coverage gap</option>
+          </select>
+        </label>
+        <fieldset class="filter status-filter">
+          <legend>Status</legend>
+          <div class="status-options">
+            <label class="status-toggle exact"><input type="checkbox" value="exact" data-status-filter checked> exact</label>
+            <label class="status-toggle compatible"><input type="checkbox" value="compatible" data-status-filter checked> compatible</label>
+            <label class="status-toggle weak"><input type="checkbox" value="weak" data-status-filter checked> weak</label>
+            <label class="status-toggle missing"><input type="checkbox" value="missing" data-status-filter checked> missing</label>
+          </div>
+        </fieldset>
+      </div>
+    </section>
+    <section class="coverage" aria-labelledby="type-anchor-coverage">
+      <h2 id="type-anchor-coverage">Coverage Matrix</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Category</th>
+            <th>TypeScript symbols</th>
+            <th>Lean VIR targets</th>
+            <th>Relation</th>
+            <th>Status</th>
+            <th>Interpretation</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td><strong>React DOM roots</strong></td>
+            <td class="numeric"><details><summary>5 symbols</summary><ul><li><code>Root</code></li><li><code>Root.render</code></li><li><code>Root.unmount</code></li><li><code>createRoot</code></li><li><code>RootOptions</code></li></ul></details></td>
+            <td class="numeric"><details><summary>5 targets</summary><ul><li><code>Lean.Vir.React.Root</code></li><li><code>Lean.Vir.TypeAnchors.reactRootRenderCall</code></li><li><code>Lean.Vir.TypeAnchors.reactRootUnmountCall</code></li><li><code>Lean.Vir.TypeAnchors.reactRootCreateCall</code></li><li><code>Lean.Vir.React.RootOptions</code></li></ul></details></td>
+            <td>4 audit, 1 gap</td>
+            <td><span class="weak">4 weak</span><br><span class="missing">1 missing</span></td>
+            <td>Mixed coverage: some anchors point to existing Lean descriptors, and some are gaps.</td>
+          </tr>
+          <tr>
+            <td><strong>React DOM hydration</strong></td>
+            <td class="numeric"><details><summary>2 symbols</summary><ul><li><code>hydrateRoot</code></li><li><code>HydrationOptions</code></li></ul></details></td>
+            <td class="numeric"><details><summary>2 targets</summary><ul><li><code>Lean.Vir.React.Root.hydrateRoot</code></li><li><code>Lean.Vir.React.HydrationOptions</code></li></ul></details></td>
+            <td>2 gap</td>
+            <td><span class="missing">2 missing</span></td>
+            <td>Coverage gap: these React surfaces have no Lean VIR descriptor yet.</td>
+          </tr>
+        </tbody>
+      </table>
+    </section>
+    <div class="report-body">
+      <aside class="anchor-index" aria-labelledby="type-anchor-index">
+        <h2 id="type-anchor-index">Index</h2>
+        <details open data-index-group data-category="React DOM roots">
+          <summary>React DOM roots</summary>
+          <div class="index-links">
+            <a class="index-link weak" href="#type-anchor-react_dom_root_resource" data-index-link data-status="weak" data-category="React DOM roots" data-relation="audit" data-search="react_dom.root.resource root lean.vir.react.root react dom roots audit anchor from reactdomclient root objects to vir's javascript-owned react root resource."><span class="status-dot" aria-hidden="true"></span><span>Root</span></a>
+            <a class="index-link weak" href="#type-anchor-react_dom_root_render" data-index-link data-status="weak" data-category="React DOM roots" data-relation="audit" data-search="react_dom.root.render root.render lean.vir.typeanchors.reactrootrendercall react dom roots audit anchor from reactdomclient root.render(children) to vir root.render."><span class="status-dot" aria-hidden="true"></span><span>Root.render</span></a>
+            <a class="index-link weak" href="#type-anchor-react_dom_root_unmount" data-index-link data-status="weak" data-category="React DOM roots" data-relation="audit" data-search="react_dom.root.unmount root.unmount lean.vir.typeanchors.reactrootunmountcall react dom roots audit anchor from reactdomclient root.unmount() to vir root.unmount."><span class="status-dot" aria-hidden="true"></span><span>Root.unmount</span></a>
+            <a class="index-link weak" href="#type-anchor-react_dom_root_create" data-index-link data-status="weak" data-category="React DOM roots" data-relation="audit" data-search="react_dom.root.create createroot lean.vir.typeanchors.reactrootcreatecall react dom roots audit anchor from reactdomclient.createroot(container, options?) to vir root.create; vir does not expose root options yet."><span class="status-dot" aria-hidden="true"></span><span>createRoot</span></a>
+            <a class="index-link missing" href="#type-anchor-react_dom_root_options" data-index-link data-status="missing" data-category="React DOM roots" data-relation="coverageGap" data-search="react_dom.root.options rootoptions lean.vir.react.rootoptions react dom roots coverage gap: react root options are not represented in the current vir root.create surface."><span class="status-dot" aria-hidden="true"></span><span>RootOptions</span></a>
+          </div>
+        </details>
+        <details open data-index-group data-category="React DOM hydration">
+          <summary>React DOM hydration</summary>
+          <div class="index-links">
+            <a class="index-link missing" href="#type-anchor-react_dom_hydration_entrypoint" data-index-link data-status="missing" data-category="React DOM hydration" data-relation="coverageGap" data-search="react_dom.hydration.entrypoint hydrateroot lean.vir.react.root.hydrateroot react dom hydration coverage gap: vir does not currently expose reactdomclient.hydrateroot."><span class="status-dot" aria-hidden="true"></span><span>hydrateRoot</span></a>
+            <a class="index-link missing" href="#type-anchor-react_dom_hydration_options" data-index-link data-status="missing" data-category="React DOM hydration" data-relation="coverageGap" data-search="react_dom.hydration.options hydrationoptions lean.vir.react.hydrationoptions react dom hydration coverage gap paired with hydrateroot: hydration options have no current vir descriptor."><span class="status-dot" aria-hidden="true"></span><span>HydrationOptions</span></a>
+          </div>
+        </details>
+      </aside>
+      <div class="groups" aria-label="Type anchors">
+      <section class="anchor-group" data-anchor-group data-category="React DOM roots" aria-labelledby="type-anchor-group-react_dom_roots">
+        <h2 class="group-title" id="type-anchor-group-react_dom_roots">React DOM roots</h2>
+        <div class="anchors">
+      <article class="anchor" id="type-anchor-react_dom_root_resource" data-anchor data-status="weak" data-category="React DOM roots" data-relation="audit" data-search="react_dom.root.resource root lean.vir.react.root react dom roots audit anchor from reactdomclient root objects to vir's javascript-owned react root resource." data-vir-type-anchor-hover="weak: Lean.Vir.React.Root -&gt; Root
+
+kind differs: Lean resource vs TypeScript record">
+        <div class="anchor-head">
+          <div class="name">
+            <h2 class="ts-name"><a href="https://react.dev/reference/react-dom/client/createRoot" title="weak: Lean.Vir.React.Root -&gt; Root
+
+kind differs: Lean resource vs TypeScript record">Root</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.Root</code></p>
+          </div>
+          <span class="badge weak" title="weak: kind differs: Lean resource vs TypeScript record">weak</span>
+        </div>
+        <div class="meta">
+          <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react-dom/client.d.ts#L61-L64">node_modules/@types/react-dom/client.d.ts:61</a></span>
+          <span>React docs: <a href="https://react.dev/reference/react-dom/client/createRoot">Root</a></span>
+          <span>Relation: audit</span>
+          <span>Category: React DOM roots</span>
+          <span>Anchor: <code>react_dom.root.resource</code></span>
+        </div>
+        <div class="comparison">
+          <section>
+            <p class="pane-title">TypeScript declaration</p>
+            <pre><code>export interface Root {
+    render(children: React.ReactNode): void;
+    unmount(): void;
+}</code></pre>
+          </section>
+          <section>
+            <p class="pane-title">Lean VIR descriptor</p>
+            <pre><code>type Lean.Vir.React.Root
+resource Lean.Vir.React.Root</code></pre>
+          </section>
+        </div>
+        <p class="notes">kind differs: Lean resource vs TypeScript record</p>
+        <p class="notes">Audit anchor from ReactDOMClient Root objects to VIR's JavaScript-owned React root resource.</p>
+      </article>
+      <article class="anchor" id="type-anchor-react_dom_root_render" data-anchor data-status="weak" data-category="React DOM roots" data-relation="audit" data-search="react_dom.root.render root.render lean.vir.typeanchors.reactrootrendercall react dom roots audit anchor from reactdomclient root.render(children) to vir root.render." data-vir-type-anchor-hover="weak: Lean.Vir.TypeAnchors.reactRootRenderCall -&gt; Root.render
+
+effect differs: Lean dom vs TypeScript pure; arity differs: Lean 2 vs TypeScript 1; unresolved TypeScript reference React.ReactNode; Lean Unit uses TypeScript void representation">
+        <div class="anchor-head">
+          <div class="name">
+            <h2 class="ts-name"><a href="https://react.dev/reference/react-dom/client/createRoot#root-render" title="weak: Lean.Vir.TypeAnchors.reactRootRenderCall -&gt; Root.render
+
+effect differs: Lean dom vs TypeScript pure; arity differs: Lean 2 vs TypeScript 1; unresolved TypeScript reference React.ReactNode; Lean Unit uses TypeScript void representation">Root.render</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.TypeAnchors.reactRootRenderCall</code></p>
+          </div>
+          <span class="badge weak" title="weak: effect differs: Lean dom vs TypeScript pure; arity differs: Lean 2 vs TypeScript 1; unresolved TypeScript reference React.ReactNode; Lean Unit uses TypeScript void representation">weak</span>
+        </div>
+        <div class="meta">
+          <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react-dom/client.d.ts#L62">node_modules/@types/react-dom/client.d.ts:62</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
+          <span>React docs: <a href="https://react.dev/reference/react-dom/client/createRoot#root-render">Root.render</a></span>
+          <span>Relation: audit</span>
+          <span>Category: React DOM roots</span>
+          <span>Anchor: <code>react_dom.root.render</code></span>
+        </div>
+        <div class="comparison">
+          <section>
+            <p class="pane-title">TypeScript declaration</p>
+            <pre><code>render(children: React.ReactNode): void;</code></pre>
+          </section>
+          <section>
+            <p class="pane-title">Lean VIR descriptor</p>
+            <pre><code>export Lean.Vir.TypeAnchors.reactRootRenderCall
+(root: resource Lean.Vir.React.Root, node: Function) -&gt; dom Unit</code></pre>
+          </section>
+        </div>
+        <p class="notes">effect differs: Lean dom vs TypeScript pure; arity differs: Lean 2 vs TypeScript 1; unresolved TypeScript reference React.ReactNode; Lean Unit uses TypeScript void representation</p>
+        <p class="notes">Audit anchor from ReactDOMClient Root.render(children) to VIR Root.render.</p>
+      </article>
+      <article class="anchor" id="type-anchor-react_dom_root_unmount" data-anchor data-status="weak" data-category="React DOM roots" data-relation="audit" data-search="react_dom.root.unmount root.unmount lean.vir.typeanchors.reactrootunmountcall react dom roots audit anchor from reactdomclient root.unmount() to vir root.unmount." data-vir-type-anchor-hover="weak: Lean.Vir.TypeAnchors.reactRootUnmountCall -&gt; Root.unmount
+
+effect differs: Lean dom vs TypeScript pure; arity differs: Lean 1 vs TypeScript 0; Lean Unit uses TypeScript void representation">
+        <div class="anchor-head">
+          <div class="name">
+            <h2 class="ts-name"><a href="https://react.dev/reference/react-dom/client/createRoot#root-unmount" title="weak: Lean.Vir.TypeAnchors.reactRootUnmountCall -&gt; Root.unmount
+
+effect differs: Lean dom vs TypeScript pure; arity differs: Lean 1 vs TypeScript 0; Lean Unit uses TypeScript void representation">Root.unmount</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.TypeAnchors.reactRootUnmountCall</code></p>
+          </div>
+          <span class="badge weak" title="weak: effect differs: Lean dom vs TypeScript pure; arity differs: Lean 1 vs TypeScript 0; Lean Unit uses TypeScript void representation">weak</span>
+        </div>
+        <div class="meta">
+          <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react-dom/client.d.ts#L63">node_modules/@types/react-dom/client.d.ts:63</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
+          <span>React docs: <a href="https://react.dev/reference/react-dom/client/createRoot#root-unmount">Root.unmount</a></span>
+          <span>Relation: audit</span>
+          <span>Category: React DOM roots</span>
+          <span>Anchor: <code>react_dom.root.unmount</code></span>
+        </div>
+        <div class="comparison">
+          <section>
+            <p class="pane-title">TypeScript declaration</p>
+            <pre><code>unmount(): void;</code></pre>
+          </section>
+          <section>
+            <p class="pane-title">Lean VIR descriptor</p>
+            <pre><code>export Lean.Vir.TypeAnchors.reactRootUnmountCall
+(root: resource Lean.Vir.React.Root) -&gt; dom Unit</code></pre>
+          </section>
+        </div>
+        <p class="notes">effect differs: Lean dom vs TypeScript pure; arity differs: Lean 1 vs TypeScript 0; Lean Unit uses TypeScript void representation</p>
+        <p class="notes">Audit anchor from ReactDOMClient Root.unmount() to VIR Root.unmount.</p>
+      </article>
+      <article class="anchor" id="type-anchor-react_dom_root_create" data-anchor data-status="weak" data-category="React DOM roots" data-relation="audit" data-search="react_dom.root.create createroot lean.vir.typeanchors.reactrootcreatecall react dom roots audit anchor from reactdomclient.createroot(container, options?) to vir root.create; vir does not expose root options yet." data-vir-type-anchor-hover="weak: Lean.Vir.TypeAnchors.reactRootCreateCall -&gt; createRoot
+
+createRoot lets you create a root to display React components inside a browser DOM node.
+
+effect differs: Lean dom vs TypeScript pure; arity differs: Lean 1 vs TypeScript 2; unresolved TypeScript reference Container; kind differs: Lean resource vs TypeScript record">
+        <div class="anchor-head">
+          <div class="name">
+            <h2 class="ts-name"><a href="https://react.dev/reference/react-dom/client/createRoot" title="weak: Lean.Vir.TypeAnchors.reactRootCreateCall -&gt; createRoot
+
+createRoot lets you create a root to display React components inside a browser DOM node.
+
+effect differs: Lean dom vs TypeScript pure; arity differs: Lean 1 vs TypeScript 2; unresolved TypeScript reference Container; kind differs: Lean resource vs TypeScript record">createRoot</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.TypeAnchors.reactRootCreateCall</code></p>
+          </div>
+          <span class="badge weak" title="weak: effect differs: Lean dom vs TypeScript pure; arity differs: Lean 1 vs TypeScript 2; unresolved TypeScript reference Container; kind differs: Lean resource vs TypeScript record">weak</span>
+        </div>
+        <div class="meta">
+          <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react-dom/client.d.ts#L86">node_modules/@types/react-dom/client.d.ts:86</a></span>
+          <span>Lean source: <a href="vir-v1.fixture.lean">docs/type-descriptors/vir-v1.fixture.lean</a></span>
+          <span>React docs: <a href="https://react.dev/reference/react-dom/client/createRoot">createRoot</a></span>
+          <span>Relation: audit</span>
+          <span>Category: React DOM roots</span>
+          <span>Anchor: <code>react_dom.root.create</code></span>
+        </div>
+        <div class="comparison">
+          <section>
+            <p class="pane-title">TypeScript declaration</p>
+            <pre><code>export function createRoot(container: Container, options?: RootOptions): Root;</code></pre>
+          </section>
+          <section>
+            <p class="pane-title">Lean VIR descriptor</p>
+            <pre><code>export Lean.Vir.TypeAnchors.reactRootCreateCall
+(container: resource Lean.Vir.Browser.Element) -&gt; dom resource Lean.Vir.React.Root</code></pre>
+          </section>
+        </div>
+        <p class="notes">effect differs: Lean dom vs TypeScript pure; arity differs: Lean 1 vs TypeScript 2; unresolved TypeScript reference Container; kind differs: Lean resource vs TypeScript record</p>
+        <p class="notes">Audit anchor from ReactDOMClient.createRoot(container, options?) to VIR Root.create; VIR does not expose root options yet.</p>
+        <p class="hover">createRoot lets you create a root to display React components inside a browser DOM node.</p>
+      </article>
+      <article class="anchor" id="type-anchor-react_dom_root_options" data-anchor data-status="missing" data-category="React DOM roots" data-relation="coverageGap" data-search="react_dom.root.options rootoptions lean.vir.react.rootoptions react dom roots coverage gap: react root options are not represented in the current vir root.create surface." data-vir-type-anchor-hover="missing: Lean.Vir.React.RootOptions -&gt; RootOptions
+
+missing Lean descriptor Lean.Vir.React.RootOptions">
+        <div class="anchor-head">
+          <div class="name">
+            <h2 class="ts-name"><a href="https://react.dev/reference/react-dom/client/createRoot" title="missing: Lean.Vir.React.RootOptions -&gt; RootOptions
+
+missing Lean descriptor Lean.Vir.React.RootOptions">RootOptions</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.RootOptions</code></p>
+          </div>
+          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.RootOptions">missing</span>
+        </div>
+        <div class="meta">
+          <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react-dom/client.d.ts#L37-L55">node_modules/@types/react-dom/client.d.ts:37</a></span>
+          <span>React docs: <a href="https://react.dev/reference/react-dom/client/createRoot">RootOptions</a></span>
+          <span>Relation: coverage gap</span>
+          <span>Category: React DOM roots</span>
+          <span>Anchor: <code>react_dom.root.options</code></span>
+        </div>
+        <div class="comparison">
+          <section>
+            <p class="pane-title">TypeScript declaration</p>
+            <pre><code>export interface RootOptions {
+    /**
+     * Prefix for `useId`.
+     */
+    identifierPrefix?: string;
+    onUncaughtError?:
+        | ((error: unknown, errorInfo: { componentStack?: string | undefined }) =&gt; void)
+        | undefined;
+    onRecoverableError?: (error: unknown, errorInfo: ErrorInfo) =&gt; void;
+    onCaughtError?:
+        | ((
+            error: unknown,
+            errorInfo: {
+                componentStack?: string | undefined;
+                errorBoundary?: React.Component&lt;unknown&gt; | undefined;
+            },
+        ) =&gt; void)
+        | undefined;
+}</code></pre>
+          </section>
+          <section>
+            <p class="pane-title">Lean VIR descriptor</p>
+            <pre><code>missing Lean descriptor</code></pre>
+          </section>
+        </div>
+        <p class="notes">missing Lean descriptor Lean.Vir.React.RootOptions</p>
+        <p class="notes">Coverage gap: React root options are not represented in the current VIR Root.create surface.</p>
+      </article>
+        </div>
+      </section>
+      <section class="anchor-group" data-anchor-group data-category="React DOM hydration" aria-labelledby="type-anchor-group-react_dom_hydration">
+        <h2 class="group-title" id="type-anchor-group-react_dom_hydration">React DOM hydration</h2>
+        <div class="anchors">
+      <article class="anchor" id="type-anchor-react_dom_hydration_entrypoint" data-anchor data-status="missing" data-category="React DOM hydration" data-relation="coverageGap" data-search="react_dom.hydration.entrypoint hydrateroot lean.vir.react.root.hydrateroot react dom hydration coverage gap: vir does not currently expose reactdomclient.hydrateroot." data-vir-type-anchor-hover="missing: Lean.Vir.React.Root.hydrateRoot -&gt; hydrateRoot
+
+Same as `createRoot()`, but is used to hydrate a container whose HTML contents were rendered by ReactDOMServer.
+
+React will attempt to attach event listeners to the existing markup.
+
+**Example Usage**
+
+```jsx
+hydrateRoot(document.querySelector('#root'), &lt;App /&gt;)
+```
+
+missing Lean descriptor Lean.Vir.React.Root.hydrateRoot">
+        <div class="anchor-head">
+          <div class="name">
+            <h2 class="ts-name"><a href="https://react.dev/reference/react-dom/client/hydrateRoot" title="missing: Lean.Vir.React.Root.hydrateRoot -&gt; hydrateRoot
+
+Same as `createRoot()`, but is used to hydrate a container whose HTML contents were rendered by ReactDOMServer.
+
+React will attempt to attach event listeners to the existing markup.
+
+**Example Usage**
+
+```jsx
+hydrateRoot(document.querySelector('#root'), &lt;App /&gt;)
+```
+
+missing Lean descriptor Lean.Vir.React.Root.hydrateRoot">hydrateRoot</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.Root.hydrateRoot</code></p>
+          </div>
+          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.Root.hydrateRoot">missing</span>
+        </div>
+        <div class="meta">
+          <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react-dom/client.d.ts#L101-L105">node_modules/@types/react-dom/client.d.ts:101</a></span>
+          <span>React docs: <a href="https://react.dev/reference/react-dom/client/hydrateRoot">hydrateRoot</a></span>
+          <span>Relation: coverage gap</span>
+          <span>Category: React DOM hydration</span>
+          <span>Anchor: <code>react_dom.hydration.entrypoint</code></span>
+        </div>
+        <div class="comparison">
+          <section>
+            <p class="pane-title">TypeScript declaration</p>
+            <pre><code>export function hydrateRoot(
+    container: Element | Document,
+    initialChildren: React.ReactNode,
+    options?: HydrationOptions,
+): Root;</code></pre>
+          </section>
+          <section>
+            <p class="pane-title">Lean VIR descriptor</p>
+            <pre><code>missing Lean descriptor</code></pre>
+          </section>
+        </div>
+        <p class="notes">missing Lean descriptor Lean.Vir.React.Root.hydrateRoot</p>
+        <p class="notes">Coverage gap: VIR does not currently expose ReactDOMClient.hydrateRoot.</p>
+        <p class="hover">Same as `createRoot()`, but is used to hydrate a container whose HTML contents were rendered by ReactDOMServer.
+
+React will attempt to attach event listeners to the existing markup.
+
+**Example Usage**
+
+```jsx
+hydrateRoot(document.querySelector('#root'), &lt;App /&gt;)
+```</p>
+      </article>
+      <article class="anchor" id="type-anchor-react_dom_hydration_options" data-anchor data-status="missing" data-category="React DOM hydration" data-relation="coverageGap" data-search="react_dom.hydration.options hydrationoptions lean.vir.react.hydrationoptions react dom hydration coverage gap paired with hydrateroot: hydration options have no current vir descriptor." data-vir-type-anchor-hover="missing: Lean.Vir.React.HydrationOptions -&gt; HydrationOptions
+
+missing Lean descriptor Lean.Vir.React.HydrationOptions">
+        <div class="anchor-head">
+          <div class="name">
+            <h2 class="ts-name"><a href="https://react.dev/reference/react-dom/client/hydrateRoot" title="missing: Lean.Vir.React.HydrationOptions -&gt; HydrationOptions
+
+missing Lean descriptor Lean.Vir.React.HydrationOptions">HydrationOptions</a></h2>
+            <p class="lean-name">Lean: <code>Lean.Vir.React.HydrationOptions</code></p>
+          </div>
+          <span class="badge missing" title="missing: missing Lean descriptor Lean.Vir.React.HydrationOptions">missing</span>
+        </div>
+        <div class="meta">
+          <span>TypeScript source: <a href="https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react-dom/client.d.ts#L16-L35">node_modules/@types/react-dom/client.d.ts:16</a></span>
+          <span>React docs: <a href="https://react.dev/reference/react-dom/client/hydrateRoot">HydrationOptions</a></span>
+          <span>Relation: coverage gap</span>
+          <span>Category: React DOM hydration</span>
+          <span>Anchor: <code>react_dom.hydration.options</code></span>
+        </div>
+        <div class="comparison">
+          <section>
+            <p class="pane-title">TypeScript declaration</p>
+            <pre><code>export interface HydrationOptions {
+    formState?: ReactFormState | null;
+    /**
+     * Prefix for `useId`.
+     */
+    identifierPrefix?: string;
+    onUncaughtError?:
+        | ((error: unknown, errorInfo: { componentStack?: string | undefined }) =&gt; void)
+        | undefined;
+    onRecoverableError?: (error: unknown, errorInfo: ErrorInfo) =&gt; void;
+    onCaughtError?:
+        | ((
+            error: unknown,
+            errorInfo: {
+                componentStack?: string | undefined;
+                errorBoundary?: React.Component&lt;unknown&gt; | undefined;
+            },
+        ) =&gt; void)
+        | undefined;
+}</code></pre>
+          </section>
+          <section>
+            <p class="pane-title">Lean VIR descriptor</p>
+            <pre><code>missing Lean descriptor</code></pre>
+          </section>
+        </div>
+        <p class="notes">missing Lean descriptor Lean.Vir.React.HydrationOptions</p>
+        <p class="notes">Coverage gap paired with hydrateRoot: hydration options have no current VIR descriptor.</p>
+      </article>
+        </div>
+      </section>
+        <p class="empty-state" id="anchor-empty-state">No anchors match the current filters.</p>
+      </div>
+    </div>
+  </main>
+  <script>
+    (() => {
+      const anchors = [...document.querySelectorAll("[data-anchor]")];
+      const links = [...document.querySelectorAll("[data-index-link]")];
+      const groups = [...document.querySelectorAll("[data-anchor-group]")];
+      const indexGroups = [...document.querySelectorAll("[data-index-group]")];
+      const search = document.getElementById("anchor-search");
+      const category = document.getElementById("anchor-category");
+      const relation = document.getElementById("anchor-relation");
+      const statuses = [...document.querySelectorAll("[data-status-filter]")];
+      const count = document.getElementById("anchor-result-count");
+      const empty = document.getElementById("anchor-empty-state");
+
+      function selectedStatuses() {
+        return new Set(statuses.filter((input) => input.checked).map((input) => input.value));
+      }
+
+      function matches(node, activeStatuses, query) {
+        if (!activeStatuses.has(node.dataset.status)) return false;
+        if (category.value && node.dataset.category !== category.value) return false;
+        if (relation.value && node.dataset.relation !== relation.value) return false;
+        return query === "" || (node.dataset.search ?? "").includes(query);
+      }
+
+      function hasVisibleChild(group, selector) {
+        return [...group.querySelectorAll(selector)].some((node) => !node.hidden);
+      }
+
+      function update() {
+        const activeStatuses = selectedStatuses();
+        const query = search.value.trim().toLowerCase();
+        let shown = 0;
+        for (const anchor of anchors) {
+          const visible = matches(anchor, activeStatuses, query);
+          anchor.hidden = !visible;
+          if (visible) shown += 1;
+        }
+        for (const link of links) {
+          link.hidden = !matches(link, activeStatuses, query);
+        }
+        for (const group of groups) {
+          group.hidden = !hasVisibleChild(group, "[data-anchor]");
+        }
+        for (const group of indexGroups) {
+          group.hidden = !hasVisibleChild(group, "[data-index-link]");
+        }
+        count.textContent = "Showing " + shown + " of " + anchors.length + " anchors";
+        empty.dataset.visible = shown === 0 ? "true" : "false";
+      }
+
+      for (const input of [search, category, relation, ...statuses]) {
+        input.addEventListener("input", update);
+        input.addEventListener("change", update);
+      }
+      update();
+    })();
+  </script>
+</body>
+</html>

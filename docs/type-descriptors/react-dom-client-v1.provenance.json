@@ -1,0 +1,53 @@
+{
+  "note": "React 19.2.7 does not ship bundled TypeScript declaration files. React's official TypeScript guide directs users to @types/react and @types/react-dom; this report extracts React DOM client symbols from @types/react-dom/client and links back to official React documentation where possible.",
+  "packages": [
+    {
+      "name": "react-dom",
+      "version": "19.2.7",
+      "role": "runtime package"
+    },
+    {
+      "name": "@types/react-dom",
+      "version": "19.2.3",
+      "role": "React-recommended DOM declaration package used for this report"
+    },
+    {
+      "name": "@types/react",
+      "version": "19.2.17",
+      "role": "React declaration dependency referenced by React DOM client types"
+    }
+  ],
+  "docs": [
+    {
+      "title": "React: Using TypeScript",
+      "url": "https://react.dev/learn/typescript"
+    },
+    {
+      "title": "React DOM Client APIs",
+      "url": "https://react.dev/reference/react-dom/client"
+    },
+    {
+      "title": "React DOM createRoot",
+      "url": "https://react.dev/reference/react-dom/client/createRoot"
+    },
+    {
+      "title": "React DOM hydrateRoot",
+      "url": "https://react.dev/reference/react-dom/client/hydrateRoot"
+    }
+  ],
+  "sourceMaps": [
+    {
+      "path": "node_modules/@types/react-dom/client.d.ts",
+      "url": "https://github.com/DefinitelyTyped/DefinitelyTyped/blob/master/types/react-dom/client.d.ts"
+    }
+  ],
+  "symbolDocs": {
+    "Root": "https://react.dev/reference/react-dom/client/createRoot",
+    "Root.render": "https://react.dev/reference/react-dom/client/createRoot#root-render",
+    "Root.unmount": "https://react.dev/reference/react-dom/client/createRoot#root-unmount",
+    "RootOptions": "https://react.dev/reference/react-dom/client/createRoot",
+    "createRoot": "https://react.dev/reference/react-dom/client/createRoot",
+    "hydrateRoot": "https://react.dev/reference/react-dom/client/hydrateRoot",
+    "HydrationOptions": "https://react.dev/reference/react-dom/client/hydrateRoot"
+  }
+}

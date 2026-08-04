@@ -1,0 +1,21 @@
+# Real Lean VIR type-anchor wrappers.
+Lean.Vir.TypeAnchors.reactStylePropertyIdentity
+Lean.Vir.TypeAnchors.reactPropValueIdentity
+Lean.Vir.TypeAnchors.reactPropertyIdentity
+Lean.Vir.TypeAnchors.reactEventHandlerIdentity
+Lean.Vir.TypeAnchors.browserEventIdentity
+Lean.Vir.TypeAnchors.reactNodeIdentity
+Lean.Vir.TypeAnchors.reactElementTypeIdentity
+Lean.Vir.TypeAnchors.reactPropsIdentity
+Lean.Vir.TypeAnchors.reactNodeChildrenIdentity
+Lean.Vir.TypeAnchors.reactDependencyListIdentity
+Lean.Vir.TypeAnchors.reactRefIdentity
+Lean.Vir.TypeAnchors.reactStateIdentity
+Lean.Vir.TypeAnchors.reactStateSetterIdentity
+Lean.Vir.TypeAnchors.reactReducerStateIdentity
+Lean.Vir.TypeAnchors.reactReducerDispatchIdentity
+Lean.Vir.TypeAnchors.reactComponentCall
+Lean.Vir.TypeAnchors.reactRootIdentity
+Lean.Vir.TypeAnchors.reactRootCreateCall
+Lean.Vir.TypeAnchors.reactRootRenderCall
+Lean.Vir.TypeAnchors.reactRootUnmountCall

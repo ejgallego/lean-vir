@@ -1,0 +1,247 @@
+{
+  "version": 1,
+  "anchors": [
+    {
+      "id": "react.props.attributes",
+      "category": "Props and attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.Attributes",
+      "note": "Audit anchor from VIR's generic key/value property representation to React's reserved component attributes."
+    },
+    {
+      "id": "react.props.html_attributes",
+      "category": "Props and attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.HTMLAttributes",
+      "note": "Audit anchor from VIR's key/value property representation to React's full HTML attribute surface."
+    },
+    {
+      "id": "react.props.dom_attributes",
+      "category": "Props and attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.DOMAttributes",
+      "note": "Audit anchor from VIR properties to React's event-bearing DOM attribute bag."
+    },
+    {
+      "id": "react.props.aria_attributes",
+      "category": "Props and attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.AriaAttributes",
+      "note": "Audit anchor for accessibility attributes represented today as ordinary VIR properties."
+    },
+    {
+      "id": "react.props.button_attributes",
+      "category": "Props and attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.ButtonHTMLAttributes",
+      "note": "Audit anchor for one concrete element-specific attribute family."
+    },
+    {
+      "id": "react.props.input_attributes",
+      "category": "Props and attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.InputHTMLAttributes",
+      "note": "Audit anchor for form input attributes, including value and change-handler surfaces."
+    },
+    {
+      "id": "react.props.jsx_intrinsic_attributes",
+      "category": "Props and attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.JSX.IntrinsicAttributes",
+      "note": "Audit anchor from generic properties to JSX's always-available intrinsic attributes."
+    },
+    {
+      "id": "react.props.jsx_intrinsic_elements",
+      "category": "Props and attributes",
+      "lean": "Lean.Vir.React.Property",
+      "ts": "React.JSX.IntrinsicElements",
+      "note": "Audit anchor for the full built-in JSX element table; this is intentionally broad."
+    },
+    {
+      "id": "react.style.css_properties_prop_value",
+      "category": "Style and prop values",
+      "lean": "Lean.Vir.React.PropValue",
+      "ts": "React.CSSProperties",
+      "note": "Audit anchor for the style branch of VIR PropValue."
+    },
+    {
+      "id": "react.style.css_properties_style_property",
+      "category": "Style and prop values",
+      "lean": "Lean.Vir.React.StyleProperty",
+      "ts": "React.CSSProperties",
+      "note": "Audit anchor from VIR's individual style-property entries to React's typed CSS property object."
+    },
+    {
+      "id": "react.style.key_scalar",
+      "category": "Style and prop values",
+      "lean": "Lean.Vir.React.PropValue",
+      "ts": "React.Key",
+      "note": "Loose scalar audit anchor: React keys are not regular props, but they exercise the same string/number value boundary."
+    },
+    {
+      "id": "react.events.event_handler",
+      "category": "Events",
+      "lean": "Lean.Vir.React.EventHandler",
+      "ts": "React.EventHandler",
+      "note": "Audit anchor from VIR retained callbacks to React's generic event handler type."
+    },
+    {
+      "id": "react.events.change_event_handler",
+      "category": "Events",
+      "lean": "Lean.Vir.React.EventHandler",
+      "ts": "React.ChangeEventHandler",
+      "note": "Audit anchor for one common form event callback specialization."
+    },
+    {
+      "id": "react.events.mouse_event_handler",
+      "category": "Events",
+      "lean": "Lean.Vir.React.EventHandler",
+      "ts": "React.MouseEventHandler",
+      "note": "Audit anchor for one common pointer callback specialization."
+    },
+    {
+      "id": "react.events.dom_attributes",
+      "category": "Events",
+      "lean": "Lean.Vir.React.EventHandler",
+      "ts": "React.DOMAttributes",
+      "note": "Audit anchor from VIR's named event handlers to React's DOM event prop bag."
+    },
+    {
+      "id": "react.events.synthetic_event",
+      "category": "Events",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "React.SyntheticEvent",
+      "note": "Audit anchor from VIR event resources to React's synthetic event base surface."
+    },
+    {
+      "id": "react.events.change_event",
+      "category": "Events",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "React.ChangeEvent",
+      "note": "Audit anchor for a form event resource specialization."
+    },
+    {
+      "id": "react.events.focus_event",
+      "category": "Events",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "React.FocusEvent",
+      "note": "Audit anchor for focus event resource specialization."
+    },
+    {
+      "id": "react.events.keyboard_event",
+      "category": "Events",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "React.KeyboardEvent",
+      "note": "Audit anchor for keyboard event resource specialization."
+    },
+    {
+      "id": "react.events.mouse_event",
+      "category": "Events",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "React.MouseEvent",
+      "note": "Audit anchor for mouse event resource specialization."
+    },
+    {
+      "id": "react.events.pointer_event",
+      "category": "Events",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "React.PointerEvent",
+      "note": "Audit anchor for pointer event resource specialization."
+    },
+    {
+      "id": "react.events.ui_event",
+      "category": "Events",
+      "lean": "Lean.Vir.Browser.Event",
+      "ts": "React.UIEvent",
+      "note": "Audit anchor for UI event resource specialization."
+    },
+    {
+      "id": "react.render.react_node",
+      "category": "Rendered values and elements",
+      "lean": "Lean.Vir.React.Node",
+      "ts": "React.ReactNode",
+      "relation": "audit",
+      "note": "Audit anchor from React's broad renderable union to VIR's JavaScript-owned React node resource."
+    },
+    {
+      "id": "react.render.react_element",
+      "category": "Rendered values and elements",
+      "lean": "Lean.Vir.React.Node",
+      "ts": "React.ReactElement",
+      "relation": "audit",
+      "note": "Audit anchor from React element objects to VIR's React node resource lane."
+    },
+    {
+      "id": "react.render.jsx_element",
+      "category": "Rendered values and elements",
+      "lean": "Lean.Vir.React.Node",
+      "ts": "React.JSX.Element",
+      "relation": "audit",
+      "note": "Audit anchor from JSX element values to VIR's React node resource lane."
+    },
+    {
+      "id": "react.render.jsx_element_type",
+      "category": "Rendered values and elements",
+      "lean": "Lean.Vir.React.ElementType",
+      "ts": "React.JSX.ElementType",
+      "relation": "audit",
+      "note": "Audit anchor from JSX element-type selection to VIR's JavaScript-owned React element-type resource."
+    },
+    {
+      "id": "react.components.element_type",
+      "category": "Components and refs",
+      "lean": "Lean.Vir.React.ElementType",
+      "ts": "React.ElementType",
+      "relation": "audit",
+      "note": "Audit anchor from React's tag-or-component element type to VIR's explicit ElementType resource."
+    },
+    {
+      "id": "react.components.component_type",
+      "category": "Components and refs",
+      "lean": "Lean.Vir.React.Component",
+      "ts": "React.ComponentType",
+      "relation": "audit",
+      "note": "Audit anchor from React component classes/functions to VIR's Lean-authored function component type."
+    },
+    {
+      "id": "react.components.jsx_element_constructor",
+      "category": "Components and refs",
+      "lean": "Lean.Vir.React.Component",
+      "ts": "React.JSXElementConstructor",
+      "relation": "audit",
+      "note": "Audit anchor from JSX component constructors to VIR's Lean-authored function component type."
+    },
+    {
+      "id": "react.components.function_component",
+      "category": "Components and refs",
+      "lean": "Lean.Vir.React.Component",
+      "ts": "React.FunctionComponent",
+      "relation": "audit",
+      "note": "Audit anchor from React function component call signatures to VIR's Lean component function."
+    },
+    {
+      "id": "react.components.fc",
+      "category": "Components and refs",
+      "lean": "Lean.Vir.React.Component",
+      "ts": "React.FC",
+      "relation": "audit",
+      "note": "Audit anchor for React.FC as a common alias for function components."
+    },
+    {
+      "id": "react.refs.ref",
+      "category": "Components and refs",
+      "lean": "Lean.Vir.React.Ref",
+      "ts": "React.Ref",
+      "relation": "audit",
+      "note": "Audit anchor from React's callback/object/null ref union to VIR's JavaScript-owned Ref resource."
+    },
+    {
+      "id": "react.refs.ref_object",
+      "category": "Components and refs",
+      "lean": "Lean.Vir.React.Ref",
+      "ts": "React.RefObject",
+      "relation": "audit",
+      "note": "Audit anchor from React's { current } object type to VIR's opaque Ref resource plus get/set helpers."
+    }
+  ]
+}
