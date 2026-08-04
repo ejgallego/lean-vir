@@ -135,11 +135,11 @@ export class VirRuntime extends ObjectValueRuntime {
     return this.finishPackageInstall({
       count: providerCount ?? count,
       byteLength,
-      packages: packageBytes.length,
+      packageCount: packageBytes.length,
     });
   }
 
-  finishPackageInstall({ count, byteLength, packages }) {
+  finishPackageInstall({ count, byteLength, packageCount }) {
     this.interfaceManifest = this.readPackageManifest();
     this.hostState?.setManifest(this.interfaceManifest);
     this.packageMetadata = this.interfaceManifest.metadata;
@@ -148,7 +148,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.packageInfo = {
       count,
       byteLength,
-      packages,
+      packageCount,
       interfaceExports: this.interfaceManifest.exports.length,
       hostImports: this.interfaceManifest.hostImports?.length ?? 0,
       metadata: this.packageMetadata,

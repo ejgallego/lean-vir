@@ -127,6 +127,12 @@ transitive import artifacts, so changing an imported
 implementation regenerates the affected set even when the root module's public
 interface and `.olean` remain unchanged. A missing root package, report, or
 descriptor-listed shard also invalidates the cached descriptor target.
+The descriptor is currently one Lake target: when it is invalidated, the facet
+regenerates the root and every reached dependency member as a complete set. It
+does not yet cache unchanged members independently. Before rebuilding, the
+facet removes the previous descriptor, root, and root-specific shard directory,
+so a failed generation cannot leave an old descriptor advertising stale or
+partially replaced members.
 
 An executable or renderer that consumes the package should declare the facet as
 a build dependency:

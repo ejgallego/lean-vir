@@ -35,21 +35,61 @@ private def virModuleOutput (mod : Module) (kind ext : String) : System.FilePath
 
 private def virSdkVersion : String := "0.1.0"
 
-private def virPackageSetComplete (descriptorPath : System.FilePath) : IO Bool := do
+private def virPackageSetFormat : String := "lean-vir-ir-package-set"
+
+private def virPackageSetVersion : Nat := 1
+
+private def virJsonStringField? (json : Lean.Json) (field : String) : Option String :=
+  match json.getObjVal? field with
+  | .ok (.str value) => some value
+  | _ => none
+
+private def virPackageSetComplete
+    (descriptorPath : System.FilePath)
+    (expectedRootModule : String) : IO Bool := do
   if !(← descriptorPath.pathExists) then
     return false
   let .ok descriptor := Lean.Json.parse (← IO.FS.readFile descriptorPath)
     | return false
+  let some format := virJsonStringField? descriptor "format"
+    | return false
+  if format != virPackageSetFormat then
+    return false
+  let .ok versionJson := descriptor.getObjVal? "version"
+    | return false
+  let .ok version := versionJson.getNat?
+    | return false
+  if version != virPackageSetVersion then
+    return false
   let .ok packagesJson := descriptor.getObjVal? "packages"
     | return false
   let .ok packages := packagesJson.getArr?
     | return false
+  if packages.isEmpty then
+    return false
   let baseDir := descriptorPath.parent.getD "."
+  let mut modules : Array String := #[]
+  let mut paths : Array String := #[]
+  let mut index := 0
   for packageJson in packages do
-    let .ok (.str path) := packageJson.getObjVal? "path"
+    let some moduleName := virJsonStringField? packageJson "module"
       | return false
+    if moduleName.trimAscii.toString.isEmpty || modules.contains moduleName then
+      return false
+    modules := modules.push moduleName
+    let some role := virJsonStringField? packageJson "role"
+      | return false
+    let expectedRole := if index + 1 == packages.size then "root" else "dependency"
+    if role != expectedRole || (role == "root" && moduleName != expectedRootModule) then
+      return false
+    let some path := virJsonStringField? packageJson "path"
+      | return false
+    if path.trimAscii.toString.isEmpty || paths.contains path then
+      return false
+    paths := paths.push path
     if !(← (baseDir / path).pathExists) then
       return false
+    index := index + 1
   return true
 
 private def buildVirPackageSetFacet
@@ -72,11 +112,14 @@ private def buildVirPackageSetFacet
         addLeanTrace
         addTrace (← computeTrace generator)
         addPureTrace moduleName "VIR module"
-        let packageSetComplete ← virPackageSetComplete descriptorPath
+        let packageSetComplete ← virPackageSetComplete descriptorPath moduleName
         if (← descriptorPath.pathExists) &&
             (!(← reportPath.pathExists) || !packageSetComplete) then
           IO.FS.removeFile descriptorPath
         buildFileUnlessUpToDate' descriptorPath do
+          removeFileIfExists descriptorPath
+          removeFileIfExists packagePath
+          removeDirAllIfExists shardDir
           createParentDirs driverPath
           createParentDirs packagePath
           createParentDirs reportPath

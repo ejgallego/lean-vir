@@ -13,7 +13,7 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
   `scripts/lean-to-irpkg.sh`, `scripts/generate-browser-package.mjs`, and the
   fixture runner.
 
-Targets have one of six modes:
+Targets have one of five modes:
 
 - `--target <source.lean> <root>...`: package explicit roots and export them.
 - `--package-target <source.lean> <root>...`: include roots in the package

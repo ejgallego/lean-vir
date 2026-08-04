@@ -251,12 +251,12 @@ but it cannot prove a complete reset of those upstream caches without changing
 replacement therefore uses a fresh `WebAssembly.Instance` while reusing the
 already-compiled `WebAssembly.Module`.
 
-`VirRuntime.loadIrPackageSetBytes` first instantiates and fully loads a candidate.
-A candidate failure disposes only that instance, leaving the active package set
-callable. A successful candidate is handed to the existing public runtime
-wrapper after the old callbacks, resources, host state, and binding leases are
-torn down. Nothing containing an old Wasm pointer or package-local slot may
-cross the handover.
+When `VirRuntime.loadIrPackageSetBytes` replaces an active package set, it first
+instantiates and fully loads a candidate. A candidate failure disposes only
+that instance, leaving the active package set callable. A successful candidate
+is handed to the existing public runtime wrapper after the old callbacks,
+resources, host state, and binding leases are torn down. Nothing containing an
+old Wasm pointer or package-local slot may cross the handover.
 
 Teardown is best-effort and terminal. Host-binding disposers, resource
 disposers, Lean object handles, and closure roots are all attempted in a stable

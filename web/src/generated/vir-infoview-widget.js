@@ -6760,10 +6760,10 @@ var VirRuntime = class extends ObjectValueRuntime {
     return this.finishPackageInstall({
       count: providerCount ?? count,
       byteLength,
-      packages: packageBytes.length
+      packageCount: packageBytes.length
     });
   }
-  finishPackageInstall({ count, byteLength, packages }) {
+  finishPackageInstall({ count, byteLength, packageCount }) {
     this.interfaceManifest = this.readPackageManifest();
     this.hostState?.setManifest(this.interfaceManifest);
     this.packageMetadata = this.interfaceManifest.metadata;
@@ -6772,7 +6772,7 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.packageInfo = {
       count,
       byteLength,
-      packages,
+      packageCount,
       interfaceExports: this.interfaceManifest.exports.length,
       hostImports: this.interfaceManifest.hostImports?.length ?? 0,
       metadata: this.packageMetadata
@@ -7431,6 +7431,8 @@ function captureCallbacksCreatedSince(liveCallbacks, callbacksBeforeArgument, li
 
 // web/src/vir-runtime.js
 var VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
+var IR_PACKAGE_SET_FORMAT = "lean-vir-ir-package-set";
+var IR_PACKAGE_SET_VERSION = 1;
 function rejectUnknownOptions(options, label) {
   const names = Object.keys(options);
   if (names.length !== 0) {
@@ -7440,7 +7442,8 @@ function rejectUnknownOptions(options, label) {
 async function fetchBytes(path, init = { cache: "no-store" }) {
   const response = await fetch(path, init);
   if (!response.ok) {
-    throw new Error(`failed to load ${path}`);
+    const status = response.statusText ? `${response.status} ${response.statusText}` : String(response.status);
+    throw new Error(`failed to load ${path}: HTTP ${status}`);
   }
   return new Uint8Array(await response.arrayBuffer());
 }
@@ -7616,19 +7619,48 @@ function parseIrPackageSetDescriptor(bytes) {
   } catch (error) {
     throw new Error(`invalid IR package-set descriptor JSON: ${error.message}`);
   }
-  if (descriptor?.format !== "lean-vir-ir-package-set" || descriptor.version !== 1) {
-    throw new Error("unsupported IR package-set descriptor");
+  if (descriptor === null || typeof descriptor !== "object" || Array.isArray(descriptor)) {
+    throw new Error("IR package-set descriptor must be a JSON object");
+  }
+  if (descriptor.format !== IR_PACKAGE_SET_FORMAT) {
+    throw new Error(
+      `unsupported IR package-set descriptor format ${JSON.stringify(descriptor.format)}; expected ${JSON.stringify(IR_PACKAGE_SET_FORMAT)}`
+    );
+  }
+  if (descriptor.version !== IR_PACKAGE_SET_VERSION) {
+    throw new Error(
+      `unsupported IR package-set descriptor version ${JSON.stringify(descriptor.version)}; expected ${IR_PACKAGE_SET_VERSION}`
+    );
   }
   if (!Array.isArray(descriptor.packages) || descriptor.packages.length === 0) {
     throw new Error("IR package-set descriptor must list at least one package");
   }
+  const modules = /* @__PURE__ */ new Set();
+  const paths = /* @__PURE__ */ new Set();
   for (const [index, entry] of descriptor.packages.entries()) {
-    if (entry === null || typeof entry !== "object" || typeof entry.path !== "string" || !entry.path) {
-      throw new Error(`IR package-set descriptor entry ${index + 1} has no path`);
+    const label = `IR package-set descriptor entry ${index + 1}`;
+    if (entry === null || typeof entry !== "object" || Array.isArray(entry)) {
+      throw new Error(`${label} must be an object`);
     }
+    if (typeof entry.module !== "string" || entry.module.trim() === "") {
+      throw new Error(`${label} has no module`);
+    }
+    if (modules.has(entry.module)) {
+      throw new Error(`${label} duplicates module ${JSON.stringify(entry.module)}`);
+    }
+    modules.add(entry.module);
+    if (typeof entry.path !== "string" || entry.path.trim() === "") {
+      throw new Error(`${label} has no path`);
+    }
+    if (paths.has(entry.path)) {
+      throw new Error(`${label} duplicates path ${JSON.stringify(entry.path)}`);
+    }
+    paths.add(entry.path);
     const expectedRole = index === descriptor.packages.length - 1 ? "root" : "dependency";
     if (entry.role !== expectedRole) {
-      throw new Error(`IR package-set descriptor entry ${index + 1} must have role ${expectedRole}`);
+      throw new Error(
+        `${label} must have role ${JSON.stringify(expectedRole)}, got ${JSON.stringify(entry.role)}`
+      );
     }
   }
   return descriptor;

@@ -56,10 +56,12 @@ def namesSummary (names : Array Name) : String :=
   else
     ", ".intercalate (names.map (fun n => n.toString)).toList
 
-structure GeneratedPackage where
+structure AnalyzedPackage where
   closure : Closure
   manifest : InterfaceManifest
   report : String
+
+structure GeneratedPackage extends AnalyzedPackage where
   bytes : ByteArray
 
 def hasBlockingDiagnostics (closure : Closure) (manifest : InterfaceManifest) : Bool :=
@@ -89,23 +91,33 @@ def printBlockingDiagnostics
     for diagnostic in manifest.diagnostics do
       IO.eprintln s!"  - {diagnostic.name}: {diagnostic.reason}"
 
-def buildPackageFromIndex
+def analyzePackage
     (generatedAt : String)
     (targets : Array Target)
-    (index : DeclIndex) : IO (Except String GeneratedPackage) := do
+    (index : DeclIndex) : IO AnalyzedPackage := do
   let closure := collectClosure targets index
   let (hostImports, hostDiagnostics) ← collectHostImports index closure
   let metadata := collectPackageMetadata generatedAt targets index
   let manifest ← collectInterfaceManifest metadata targets index hostImports hostDiagnostics
-  let report := reportFor targets closure manifest
-  if hasBlockingDiagnostics closure manifest then
-    return .error report
-  match emitPackage closure manifest with
+  return {
+    closure
+    manifest
+    report := reportFor targets closure manifest
+  }
+
+def buildPackageFromIndex
+    (generatedAt : String)
+    (targets : Array Target)
+    (index : DeclIndex) : IO (Except String GeneratedPackage) := do
+  let analysis ← analyzePackage generatedAt targets index
+  if hasBlockingDiagnostics analysis.closure analysis.manifest then
+    return .error analysis.report
+  match emitPackage analysis.closure analysis.manifest with
   | .ok bytes =>
       return .ok {
-        closure
-        manifest
-        report
+        closure := analysis.closure
+        manifest := analysis.manifest
+        report := analysis.report
         bytes
       }
   | .error err =>
@@ -113,11 +125,10 @@ def buildPackageFromIndex
 
 unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePath) : IO UInt32 := do
   let index ← resolveImportedModuleClosure targets (← loadDeclIndex targets)
-  let closure := collectClosure targets index
-  let (hostImports, hostDiagnostics) ← collectHostImports index closure
-  let metadata := collectPackageMetadata (← generatedAtUtc) targets index
-  let manifest ← collectInterfaceManifest metadata targets index hostImports hostDiagnostics
-  let report := reportFor targets closure manifest
+  let analysis ← analyzePackage (← generatedAtUtc) targets index
+  let closure := analysis.closure
+  let manifest := analysis.manifest
+  let report := analysis.report
   writeTextFile reportPath report
   if hasBlockingDiagnostics closure manifest then
     printBlockingDiagnostics closure manifest
@@ -162,11 +173,10 @@ unsafe def runModuleSet
     (rootRelativePath shardRelativeDir : String)
     (reportPath : System.FilePath) : IO UInt32 := do
   let index ← resolveImportedModuleClosure targets (← loadDeclIndex targets)
-  let closure := collectClosure targets index
-  let (hostImports, hostDiagnostics) ← collectHostImports index closure
-  let metadata := collectPackageMetadata (← generatedAtUtc) targets index
-  let manifest ← collectInterfaceManifest metadata targets index hostImports hostDiagnostics
-  let report := reportFor targets closure manifest
+  let analysis ← analyzePackage (← generatedAtUtc) targets index
+  let closure := analysis.closure
+  let manifest := analysis.manifest
+  let report := analysis.report
   writeTextFile reportPath report
   if hasBlockingDiagnostics closure manifest then
     printBlockingDiagnostics closure manifest

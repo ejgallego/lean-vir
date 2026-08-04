@@ -10,6 +10,32 @@ members first and the public root member last. Every listed member independently
 uses the format documented below; the root's embedded interface manifest is the
 public manifest for the aggregate runtime.
 
+The version-1 descriptor has this shape:
+
+```json
+{
+  "format": "lean-vir-ir-package-set",
+  "version": 1,
+  "packages": [
+    {
+      "module": "MySlides.Support",
+      "role": "dependency",
+      "path": "Runtime.parts/MySlides.Support.irpkg"
+    },
+    {
+      "module": "MySlides.Runtime",
+      "role": "root",
+      "path": "Runtime.irpkg"
+    }
+  ]
+}
+```
+
+`packages` must be non-empty. Every entry has a non-empty, unique `module` and
+`path`; every entry except the last has role `dependency`, and the last has
+role `root`. Paths are resolved relative to the descriptor URL. The loader
+validates this structure before starting any member fetch.
+
 Package format 10 has a fixed header followed by a section directory. All
 multi-byte integers are unsigned little-endian 32-bit values.
 

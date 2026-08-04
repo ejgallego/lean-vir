@@ -126,12 +126,15 @@ def Closure.forModule (closure : Closure) (moduleName rootModule : Name) : Closu
   let isRoot := moduleName == rootModule
   let owns (loaded : LoadedDecl) :=
     loaded.module? == some moduleName || (isRoot && loaded.module?.isNone)
+  let decls := closure.decls.filter owns
+  let ownedDeclNames : NameSet := decls.foldl
+    (fun names loaded => names.insert loaded.decl.name) {}
+  let allDeclNames : NameSet := closure.decls.foldl
+    (fun names loaded => names.insert loaded.decl.name) {}
   let initOwned (entry : InitGlobal) :=
-    match closure.decls.find? (fun loaded => loaded.decl.name == entry.name) with
-    | some loaded => owns loaded
-    | none => isRoot
+    ownedDeclNames.contains entry.name || (isRoot && !allDeclNames.contains entry.name)
   {
-    decls := closure.decls.filter owns
+    decls
     externs := if isRoot then closure.externs else #[]
     initGlobals := closure.initGlobals.filter initOwned
   }

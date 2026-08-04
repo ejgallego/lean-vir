@@ -22,6 +22,7 @@ const tests = [
   { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },
   { id: "object-abi", file: "scripts/runtime-tests/object-abi-smoke.mjs", group: "pure" },
   { id: "package-decoder", file: "scripts/runtime-tests/package-decoder-smoke.mjs", group: "pure" },
+  { id: "package-set-descriptor", file: "scripts/runtime-tests/package-set-descriptor-smoke.mjs", group: "pure" },
   { id: "package-generator", file: "scripts/runtime-tests/package-generator-smoke.mjs", group: "lean" },
   { id: "module-package-set", file: "scripts/runtime-tests/module-package-set-smoke.mjs", group: "lean" },
   { id: "slides-canvas", file: "scripts/runtime-tests/slides-canvas-runtime-smoke.mjs", group: "lean" },

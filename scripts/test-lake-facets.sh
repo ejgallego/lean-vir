@@ -62,6 +62,38 @@ node --input-type=module -e '
   if (descriptor.packages.at(-1)?.role !== "root") process.exit(1);
 ' "$module_set"
 
+obsolete_shard="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/Obsolete.irpkg"
+printf '%s\n' 'obsolete' > "$obsolete_shard"
+node --input-type=module -e '
+  import fs from "node:fs";
+  const path = process.argv[1];
+  const descriptor = JSON.parse(fs.readFileSync(path, "utf8"));
+  descriptor.format = "invalid-package-set";
+  fs.writeFileSync(path, `${JSON.stringify(descriptor)}\n`);
+' "$module_set"
+lake build +ModuleSetFixture.Root:vir
+test ! -e "$obsolete_shard"
+node --input-type=module -e '
+  import fs from "node:fs";
+  const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  if (descriptor.format !== "lean-vir-ir-package-set") process.exit(1);
+  if (descriptor.packages.length !== 4) process.exit(1);
+' "$module_set"
+
+node --input-type=module -e '
+  import fs from "node:fs";
+  const path = process.argv[1];
+  const descriptor = JSON.parse(fs.readFileSync(path, "utf8"));
+  descriptor.packages = [];
+  fs.writeFileSync(path, `${JSON.stringify(descriptor)}\n`);
+' "$module_set"
+lake build +ModuleSetFixture.Root:vir
+node --input-type=module -e '
+  import fs from "node:fs";
+  const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+  if (descriptor.packages.length !== 4) process.exit(1);
+' "$module_set"
+
 mv "$module_set_shared" "$tmp/missing-shard.irpkg"
 lake build +ModuleSetFixture.Root:vir
 test -f "$module_set_shared"
@@ -203,8 +235,10 @@ lake -d "$tmp" build +Smoke.Runtime:vir
 test -f "$report"
 
 module_package="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg"
+module_descriptor="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg-set.json"
 module_driver="$tmp/.lake/build/vir/drivers/Smoke/NewRuntime.lean"
 test -f "$module_package"
+test -f "$module_descriptor"
 test -f "$module_driver"
 
 node "$repo/scripts/inspect-irpkg.mjs" --json "$package" > "$tmp/package.json"
@@ -226,6 +260,24 @@ node --input-type=module -e '
   if (entries["Smoke.NewRuntime.start"]?.startup !== true) process.exit(1);
   if (entries["Smoke.Dependency.importedValue"] !== undefined) process.exit(1);
 ' "$tmp/module-package.json"
+
+printf '%s\n' \
+  'module' \
+  '' \
+  'public meta import Vir.Attributes' \
+  'public import Smoke.OpaqueDependency' \
+  '' \
+  '@[vir_export]' \
+  'public def Smoke.NewRuntime.value : IO String :=' \
+  '  Smoke.OpaqueDependency.environmentHome' > "$tmp/Smoke/NewRuntime.lean"
+
+if lake -d "$tmp" build +Smoke.NewRuntime:vir \
+    > "$tmp/rebuild-failure.stdout" 2> "$tmp/rebuild-failure.stderr"; then
+  echo "unsupported replacement unexpectedly regenerated the package set" >&2
+  exit 1
+fi
+test ! -e "$module_descriptor"
+test ! -e "$module_package"
 
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build :virSdk
 test -f "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"

@@ -44,7 +44,7 @@ const packageBytes = await Promise.all(descriptor.packages.map((entry) =>
 const wasmBytes = await readFile(wasmPath);
 
 const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: packageBytes });
-assert.equal(runtime.packageInfo.packages, 4);
+assert.equal(runtime.packageInfo.packageCount, 4);
 assert.equal(runtime.packageInfo.count, 9);
 assert.equal(runtime.packageMetadata.targets[0].mode, "markedModules");
 assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "42");

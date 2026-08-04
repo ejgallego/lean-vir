@@ -178,7 +178,7 @@ const vir = await createVirRuntime({
   irPackageSetUrl: "ModuleSetFixture/Root.irpkg-set.json",
 });
 
-console.log(vir.packageInfo.packages);
+console.log(vir.packageInfo.packageCount);
 console.log(vir.call("ModuleSetFixture.Root.answer"));
 ```
 
@@ -266,7 +266,7 @@ their cleanup hook runs once when the final runtime using the map is disposed.
   hooks from ordinary `@[vir_export]` calls.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
 - `vir.packageInfo.hostImports` reports the number of JavaScript host imports.
-- `vir.packageInfo.packages` reports the package-set member count.
+- `vir.packageInfo.packageCount` reports the package-set member count.
 
 Supported interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
