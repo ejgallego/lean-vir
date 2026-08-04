@@ -36,10 +36,11 @@ replacement point for generated module data or a real environment loader.
 For module-system clients, the `:vir` facet uses Lean's owning-module
 index to resolve opaque imported dependencies on demand. It partitions the
 reached closure into format-10 dependency shards and one root package, then
-writes a small dependency-first JSON descriptor. The JavaScript runtime stages
-the complete set in a fresh instance, rejects identity conflicts, installs the
-root manifest last, and runs initializer globals only after every member is
-available.
+filters Lean's canonical module-initialization order into a dependency-first
+JSON descriptor. Each shard retains its owning module's initializer metadata.
+The JavaScript runtime stages the complete set in a fresh instance, rejects
+identity conflicts, installs the root manifest last, and runs initializer
+globals in module order only after every member is available.
 
 The same package encoder also supports focused developer packages through
 `scripts/lean-to-irpkg.sh`. That utility accepts explicit roots or packages

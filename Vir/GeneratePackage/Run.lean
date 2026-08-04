@@ -172,6 +172,17 @@ unsafe def runModuleSet
     (packagePath descriptorPath shardDir : System.FilePath)
     (rootRelativePath shardRelativeDir : String)
     (reportPath : System.FilePath) : IO UInt32 := do
+  if targets.size != 1 then
+    IO.eprintln s!"module package-set generation requires exactly one target, got {targets.size}"
+    return 1
+  let some target := targets[0]?
+    | IO.eprintln "module package-set generation requires one target"
+      return 1
+  if let some targetModule := target.markedModule? then
+    if targetModule != rootModule then
+      IO.eprintln s!"module package-set root `{rootModule}` does not match target `{targetModule}`"
+      return 1
+
   let index ← resolveImportedModuleClosure targets (← loadDeclIndex targets)
   let analysis ← analyzePackage (← generatedAtUtc) targets index
   let closure := analysis.closure
@@ -184,10 +195,17 @@ unsafe def runModuleSet
     IO.eprintln s!"see {reportPath}"
     return 1
 
+  let moduleOrder? ← match closure.moduleInitializationOrder index target rootModule with
+    | .ok moduleOrder => pure (some moduleOrder)
+    | .error err =>
+        IO.eprintln err
+        pure none
+  let some moduleOrder := moduleOrder? | return 1
+
   let dependencyManifest : InterfaceManifest := {
     metadata := manifest.metadata
   }
-  let dependencyModules := closure.moduleNames.filter (· != rootModule)
+  let dependencyModules := moduleOrder.filter (· != rootModule)
   let mut members : Array String := #[]
   for moduleName in dependencyModules do
     let moduleClosure := closure.forModule moduleName rootModule

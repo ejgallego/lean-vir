@@ -6,9 +6,10 @@ format is internal to this repository and is versioned by
 
 A composable module build does not introduce another binary format. Its
 `lean-vir-ir-package-set` version-1 JSON descriptor lists dependency `.irpkg`
-members first and the public root member last. Every listed member independently
-uses the format documented below; the root's embedded interface manifest is the
-public manifest for the aggregate runtime.
+members in Lean's canonical module-initialization order and the public root
+member last. Every listed member independently owns its declarations and
+initializer metadata and uses the format documented below; the root's embedded
+interface manifest is the public manifest for the aggregate runtime.
 
 The version-1 descriptor has this shape:
 

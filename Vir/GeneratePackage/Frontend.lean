@@ -132,6 +132,16 @@ def DeclIndex.moduleForDecl? (index : DeclIndex) (name : Name) : Option Name :=
   | some moduleName => some moduleName
   | none => index.envs.findSome? fun (_, env) => environmentModuleForDecl? env name
 
+/--
+Return Lean's dependency-first module-initialization order for the environment
+built from `target`. Lean records a module after recursively visiting its
+imports; the caller may filter this complete order to a reached closure.
+-/
+def DeclIndex.moduleInitializationOrderForTarget?
+    (index : DeclIndex) (target : Target) : Option (Array Name) :=
+  index.envs.findSome? fun (source, env) =>
+    if source == target.source.toString then some env.header.moduleNames else none
+
 unsafe def DeclIndex.loadImportedModule (index : DeclIndex) (moduleName : Name) : IO DeclIndex := do
   if index.loadedModules.contains moduleName then
     return index

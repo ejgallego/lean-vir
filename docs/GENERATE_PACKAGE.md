@@ -103,9 +103,10 @@ Targets have one of five modes:
    diagnostics.
 8. `Emit.emitPackage` writes the binary package only when the closure and
    manifest have no diagnostics that would make the package ambiguous or
-   unsupported. `Run.runModuleSet` partitions a successful closure by module;
-   dependency members have empty public manifests and the root retains the
-   aggregate interface.
+   unsupported. `Run.runModuleSet` partitions a successful closure by module,
+   filters Lean's dependency-first module order to the reached owners, and
+   preserves initializer metadata in each owning member. Dependency members
+   have empty public manifests and the root retains the aggregate interface.
 
 ## Ownership Checklist
 

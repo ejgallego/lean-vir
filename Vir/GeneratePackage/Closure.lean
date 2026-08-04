@@ -122,6 +122,32 @@ def Closure.moduleNames (closure : Closure) : Array Name :=
         if modules.contains moduleName then modules else modules.push moduleName
     | none => modules
 
+/--
+Filter Lean's canonical dependency-first module order to the modules reached by
+the package closure. The root is appended only for the legacy source path,
+where its declarations do not carry imported-module ownership.
+-/
+def Closure.moduleInitializationOrder
+    (closure : Closure)
+    (index : DeclIndex)
+    (target : Target)
+    (rootModule : Name) : Except String (Array Name) := do
+  let ownedModules := closure.moduleNames
+  let reachedModules := ownedModules.foldl
+    (fun (modules : NameSet) moduleName => modules.insert moduleName) ({} : NameSet)
+  let reachedModules := reachedModules.insert rootModule
+  let some importedOrder := index.moduleInitializationOrderForTarget? target
+    | throw s!"no Lean module order is available for package-set target `{target.source}`"
+  let ordered := importedOrder.filter reachedModules.contains
+  let ordered := if ordered.contains rootModule then ordered else ordered.push rootModule
+  let missing := ownedModules.filter fun moduleName => !ordered.contains moduleName
+  if !missing.isEmpty then
+    let names := ", ".intercalate (missing.map (·.toString)).toList
+    throw s!"reached package modules are absent from Lean's module order: {names}"
+  if ordered.back? != some rootModule then
+    throw s!"root module `{rootModule}` is not last in Lean's module order"
+  return ordered
+
 def Closure.forModule (closure : Closure) (moduleName rootModule : Name) : Closure :=
   let isRoot := moduleName == rootModule
   let owns (loaded : LoadedDecl) :=

@@ -264,8 +264,10 @@ order; multiple failures are reported to JavaScript as an `AggregateError`
 afterward. If old-instance teardown fails during handover, the candidate is
 also disposed and the public wrapper is marked disposed.
 
-The provider can stage a complete descriptor-ordered package set in one fresh
-instance. `vir_begin_ir_package_set` clears the candidate,
+The provider can stage a complete package set in one fresh instance. Generated
+descriptors use Lean's dependency-first module-initialization order, while each
+member retains its owning initializer metadata. `vir_begin_ir_package_set`
+clears the candidate,
 `vir_append_ir_package` transactionally decodes each ordinary format-10 member,
 and `vir_finish_ir_package_set` runs the aggregate initializer table once after
 all declarations are available. The final root member supplies the interface

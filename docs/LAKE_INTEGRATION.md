@@ -116,10 +116,12 @@ For current, legacy Lean modules the generator re-elaborates the module source.
 When Lake supplies compiled module IR, the facet depends on that `.ir` and uses
 a generated `import all MySlides.Runtime` driver.
 
-Every member is an ordinary format-10 `.irpkg`. The descriptor lists dependency
-members first and the root last. Only the root owns interface exports, export
-summaries, native extern registrations, and the aggregate host-import table.
-The runtime loads all members before running initializer globals. Duplicate
+Every member is an ordinary format-10 `.irpkg` that owns its module's
+declarations and initializer metadata. The descriptor filters Lean's canonical
+dependency-first module order to the reached modules and puts the root last.
+Only the root owns interface exports, export summaries, native extern
+registrations, and the aggregate host-import table. The runtime loads all
+members before running initializer globals in that module order. Duplicate
 declaration, initializer, host-import, or export-summary identities fail the
 candidate load.
 The descriptor is the facet's returned artifact. The facet depends on Lake's

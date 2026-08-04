@@ -50,16 +50,14 @@ node --input-type=module -e '
   if (descriptor.format !== "lean-vir-ir-package-set") process.exit(1);
   if (descriptor.version !== 1) process.exit(1);
   if (descriptor.packages.length !== 4) process.exit(1);
-  const modules = descriptor.packages.map((entry) => entry.module);
-  if (new Set(modules).size !== modules.length) process.exit(1);
-  for (const entry of descriptor.packages.slice(0, -1)) {
-    if (entry.role !== "dependency") process.exit(1);
-  }
-  if (!modules.includes("ModuleSetFixture.Left")) process.exit(1);
-  if (!modules.includes("ModuleSetFixture.Right")) process.exit(1);
-  if (!modules.includes("ModuleSetFixture.Shared")) process.exit(1);
-  if (descriptor.packages.at(-1)?.module !== "ModuleSetFixture.Root") process.exit(1);
-  if (descriptor.packages.at(-1)?.role !== "root") process.exit(1);
+  const actual = descriptor.packages.map(({ module, role }) => [module, role]);
+  const expected = [
+    ["ModuleSetFixture.Shared", "dependency"],
+    ["ModuleSetFixture.Left", "dependency"],
+    ["ModuleSetFixture.Right", "dependency"],
+    ["ModuleSetFixture.Root", "root"],
+  ];
+  if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1);
 ' "$module_set"
 
 obsolete_shard="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/Obsolete.irpkg"

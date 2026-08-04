@@ -10,6 +10,6 @@ public import ModuleSetFixture.Shared
 
 namespace ModuleSetFixture.Right
 
-public def value : Nat := ModuleSetFixture.Shared.base + 1
+public initialize value : Nat ← pure (ModuleSetFixture.Shared.base + 1)
 
 end ModuleSetFixture.Right

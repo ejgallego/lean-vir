@@ -11,6 +11,10 @@ import { dirname, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import {
+  IR_PACKAGE_SECTION,
+  readIrPackageInfo,
+} from "../irpkg-format.mjs";
+import {
   createVirRuntime,
 } from "../../web/src/vir-runtime-node.js";
 
@@ -31,21 +35,29 @@ const descriptor = JSON.parse(await readFile(descriptorPath, "utf8"));
 assert.equal(descriptor.format, "lean-vir-ir-package-set");
 assert.equal(descriptor.version, 1);
 assert.deepEqual(
-  descriptor.packages.map((entry) => entry.role),
-  ["dependency", "dependency", "dependency", "root"],
-);
-assert.equal(
-  descriptor.packages.filter((entry) => entry.module === "ModuleSetFixture.Shared").length,
-  1,
+  descriptor.packages.map(({ module, role }) => [module, role]),
+  [
+    ["ModuleSetFixture.Shared", "dependency"],
+    ["ModuleSetFixture.Left", "dependency"],
+    ["ModuleSetFixture.Right", "dependency"],
+    ["ModuleSetFixture.Root", "root"],
+  ],
 );
 
 const packageBytes = await Promise.all(descriptor.packages.map((entry) =>
   readFile(resolve(dirname(descriptorPath), entry.path))));
+const packageInfoByModule = new Map(descriptor.packages.map((entry, index) => [
+  entry.module,
+  readIrPackageInfo(packageBytes[index]),
+]));
+assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Shared")) > 4);
+assert.ok(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Right")) > 4);
+assert.equal(initSectionSize(packageInfoByModule.get("ModuleSetFixture.Root")), 4);
 const wasmBytes = await readFile(wasmPath);
 
 const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: packageBytes });
 assert.equal(runtime.packageInfo.packageCount, 4);
-assert.equal(runtime.packageInfo.count, 9);
+assert.equal(runtime.packageInfo.count, 10);
 assert.equal(runtime.packageMetadata.targets[0].mode, "markedModules");
 assert.equal(runtime.call("ModuleSetFixture.Root.answer"), "42");
 assert.throws(
@@ -66,3 +78,8 @@ assert.equal(urlRuntime.call("ModuleSetFixture.Root.answer"), "42");
 urlRuntime.dispose();
 
 console.log("module package-set smoke ok");
+
+function initSectionSize(info) {
+  return info.package.sections.find((section) =>
+    section.kind === IR_PACKAGE_SECTION.INIT_GLOBALS)?.byteLength;
+}
