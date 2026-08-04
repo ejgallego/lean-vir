@@ -12,41 +12,6 @@ namespace Vir.GeneratePackage
 
 open Lean.IR
 
-def jsExternPrefix : String := "__vir_js:"
-
-def jsExplicitConversionExternPrefix : String := "__vir_js_explicit_conversion:"
-
-def externTargetWithPrefix? (pfx symbol : String) : Option String :=
-  if symbol.startsWith pfx then
-    some (symbol.drop pfx.length).toString
-  else
-    none
-
-def virJsTargetFromExternData? (data : ExternAttrData) : Option String :=
-  data.entries.findSome? fun entry =>
-    match entry with
-    | .standard _ symbol =>
-        externTargetWithPrefix? jsExternPrefix symbol <|>
-          externTargetWithPrefix? jsExplicitConversionExternPrefix symbol
-    | _ => none
-
-def virJsTargetFromDecl? : Decl → Option String
-  | .extern _ _ _ data => virJsTargetFromExternData? data
-  | _ => none
-
-def isVirJsDecl (decl : Decl) : Bool :=
-  virJsTargetFromDecl? decl |>.isSome
-
-def virJsExplicitConversionTargetFromExternData? (data : ExternAttrData) : Option String :=
-  data.entries.findSome? fun entry =>
-    match entry with
-    | .standard _ symbol => externTargetWithPrefix? jsExplicitConversionExternPrefix symbol
-    | _ => none
-
-def isVirJsExplicitConversionDecl : Decl → Bool
-  | .extern _ _ _ data => virJsExplicitConversionTargetFromExternData? data |>.isSome
-  | _ => false
-
 def moduleNameFor (path : System.FilePath) : Name :=
   .str (.str `VirIRInput (path.fileStem.getD "Input")) "Generated"
 

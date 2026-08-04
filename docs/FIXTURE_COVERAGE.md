@@ -20,6 +20,16 @@ intentionally unsupported or ambiguous interface exports and asserts that
 package generation fails loudly with package diagnostics.
 Those negative cases cover recursive inherited structures, indexed inductive
 families, mutual recursion, erased proof fields, and implicit arguments.
+The package-generator smoke separately checks that normal Lean frontend
+processing rejects unsupported `@[vir_export]` binder shapes, theorem, axiom,
+and private markers, and a local helper that reaches the unregistered
+`IO.getEnv` primitive. Positive cases cover an opaque definition plus adding
+and removing the marker with `attribute`. The smoke also checks the
+informational postponed-compilation path. The Lake facet smoke covers the safe
+stop at an opaque imported declaration, while package generation checks the
+remaining root-to-boundary path. A startup-hook case keeps direct
+package-generator coverage for root-to-native-extern paths in the matching
+report section.
 
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather

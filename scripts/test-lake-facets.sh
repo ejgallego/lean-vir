@@ -91,6 +91,24 @@ printf '%s\n' \
   '@[vir_startup]' \
   'public def Smoke.NewRuntime.start : Unit := ()' > "$tmp/Smoke/NewRuntime.lean"
 
+printf '%s\n' \
+  'module' \
+  '' \
+  'public import Init.System.IO' \
+  '' \
+  'public def Smoke.OpaqueDependency.environmentHome : IO String := do' \
+  '  return (← IO.getEnv "HOME").getD ""' > "$tmp/Smoke/OpaqueDependency.lean"
+
+printf '%s\n' \
+  'module' \
+  '' \
+  'public meta import Vir.Attributes' \
+  'public import Smoke.OpaqueDependency' \
+  '' \
+  '@[vir_export]' \
+  'public def Smoke.DeferredRuntime.home : IO String :=' \
+  '  Smoke.OpaqueDependency.environmentHome' > "$tmp/Smoke/DeferredRuntime.lean"
+
 printf '%s\n' 'export const smoke = true;' > "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js"
 sdk_hash="$(sha256sum "$tmp/sdk-source/lean-vir-sdk/js/vir-runtime.js" | cut -d' ' -f1)"
 write_sdk_manifest "$tmp/sdk-source/lean-vir-sdk" "lake-facet-smoke" "$sdk_hash"
@@ -121,6 +139,29 @@ grep -q 'SDK version mismatch' "$tmp/version-sdk.stderr"
 
 lake -d "$tmp" build +Smoke.Runtime:vir
 lake -d "$tmp" build +Smoke.NewRuntime:vir
+
+if lake -d "$tmp" build +Smoke.DeferredRuntime:vir \
+    > "$tmp/deferred-runtime.stdout" 2> "$tmp/deferred-runtime.stderr"; then
+  echo "opaque imported dependency unexpectedly generated successfully" >&2
+  exit 1
+fi
+cat "$tmp/deferred-runtime.stdout" "$tmp/deferred-runtime.stderr" > "$tmp/deferred-runtime.output"
+grep -q 'could not validate imported dependency `Smoke.OpaqueDependency.environmentHome`' \
+  "$tmp/deferred-runtime.output"
+grep -q 'because its compiled IR is opaque in this module; the `:vir` package must include compiled IR for this dependency' \
+  "$tmp/deferred-runtime.output"
+grep -q 'missing IR declarations:' "$tmp/deferred-runtime.output"
+grep -q 'Smoke.OpaqueDependency.environmentHome (via Smoke.DeferredRuntime.home' \
+  "$tmp/deferred-runtime.output"
+
+deferred_report="$tmp/.lake/build/vir/reports/Smoke/DeferredRuntime.report.md"
+test -f "$deferred_report"
+grep -q '^- `Smoke.OpaqueDependency.environmentHome` (via Smoke.DeferredRuntime.home.*Smoke.OpaqueDependency.environmentHome)' \
+  "$deferred_report"
+if grep -q '^## Blocking Dependency Paths' "$deferred_report"; then
+  echo "deprecated duplicate blocker-path report section was generated" >&2
+  exit 1
+fi
 
 package="$tmp/.lake/build/vir/modules/Smoke/Runtime.irpkg"
 report="$tmp/.lake/build/vir/reports/Smoke/Runtime.report.md"

@@ -59,6 +59,24 @@ Startup hooks must take no JavaScript arguments and return `Unit`, possibly
 through a supported effect such as `DomM`. Ordinary exports use the full
 supported argument and result surface.
 
+After Lean compiles a declaration, `@[vir_export]` rejects private or
+non-executable declarations, implicit or instance arguments, polymorphic
+entrypoints, and unavailable dependencies that Lean can see in the compiled
+closure. Closure errors include the path from the marked declaration to the
+blocker, so a local helper that reaches an unregistered primitive such as
+`IO.getEnv` fails at its declaration.
+
+Lean module imports normally expose dependency IR as opaque extern declarations.
+At such a boundary, the attribute does not guess: it identifies the dependency
+whose compiled IR package generation requires. The current `:vir` facet imports
+all IR for the requested module, but not opaque transitive dependency bodies; a
+marked export that reaches one is therefore reported as a missing IR declaration
+with its root-to-boundary path. Keep package-relevant helpers in the marked
+module, or supply the helper's source as an explicit package input. When
+`compiler.postponeCompile` is enabled, disable it for package inputs so Lean can
+produce the required IR. The facet also remains responsible for final interface
+layouts and generated boxed boundaries.
+
 Only declarations marked in the requested module are selected. Imported
 declarations are not implicitly re-exported. A marked build with no matching
 declarations fails with a diagnostic instead of silently producing an empty

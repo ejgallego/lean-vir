@@ -53,7 +53,8 @@ The example configs under `examples/*.virpkg.json` generate manifest-bearing
 
 ## Reading The Report
 
-The generated report has separate sections for the two common failure modes:
+The generated report has separate sections for common failure modes. Closure
+blockers include one first-discovered path from a package root after `via`:
 
 - `Missing IR Declarations`: a root or dependency was not found in the
   generated example declarations.

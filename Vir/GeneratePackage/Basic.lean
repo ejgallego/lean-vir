@@ -11,6 +11,8 @@ import Lean.Compiler.InitAttr
 import Lean.Compiler.LCNF.Main
 import Lean.Compiler.LCNF.ToImpureType
 import Lean.LabelAttribute
+import Vir.GeneratePackage.NativeExterns
+import Vir.IRDependencies
 
 open Lean
 
@@ -81,14 +83,6 @@ structure DeclIndex where
   virStartups : NameSet := {}
   diagnostics : Array DeclIndexDiagnostic := #[]
 
-structure NativeExtern where
-  name : Name
-  params : Array Param
-  resultType : IRType
-  symbol : String
-  generateBoxedWrapper : Bool := false
-  deps : Array Name := #[]
-
 structure InitGlobal where
   name : Name
   initName : Name
@@ -99,9 +93,9 @@ structure Closure where
   decls : Array LoadedDecl := #[]
   externs : Array NativeExtern := #[]
   initGlobals : Array InitGlobal := #[]
-  missingDecls : Array Name := #[]
-  missingExterns : Array Name := #[]
-  unsupportedInitGlobals : Array Name := #[]
+  missingDecls : Array ClosureDependency := #[]
+  missingExterns : Array ClosureDependency := #[]
+  unsupportedInitGlobals : Array ClosureDependency := #[]
 
 inductive InterfaceType where
   | unit

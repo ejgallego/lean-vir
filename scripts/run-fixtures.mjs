@@ -98,7 +98,7 @@ function parseInitGlobal(line) {
 }
 
 function parseBulletName(line) {
-  const match = line.match(/^- `([^`]+)`$/);
+  const match = line.match(/^- `([^`]+)`(?: \(via .+\))?$/);
   return match?.[1] ?? line;
 }
 

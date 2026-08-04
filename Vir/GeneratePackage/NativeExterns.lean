@@ -4,13 +4,25 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.GeneratePackage.Basic
+module
+
+public import Lean.Compiler.IR.CompilerM
+
+public section
 
 open Lean
 
 namespace Vir.GeneratePackage
 
 open Lean.IR
+
+structure NativeExtern where
+  name : Name
+  params : Array Param
+  resultType : IRType
+  symbol : String
+  generateBoxedWrapper : Bool := false
+  deps : Array Name := #[]
 
 def param (idx : Nat) (borrow : Bool) (ty : IRType) : Param :=
   { x := { idx }, borrow, ty }

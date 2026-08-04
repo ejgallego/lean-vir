@@ -25,7 +25,8 @@ partial def interfaceSignature?
         else
           return .error s!"unsupported runtime-erased type parameter `{name}` after runtime arguments"
       else if binderInfo != .default then
-        return .error s!"unsupported implicit/instance argument `{name}`"
+        return .error s!"VIR exports cannot have implicit or instance arguments (`{name}`); \
+          export a wrapper with only explicit arguments"
       else
         match ← interfaceType domain with
         | .error reason => return .error s!"unsupported argument type `{domain}`: {reason}"

@@ -198,7 +198,11 @@ def hostImportBoundary
 def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except PackageDiagnostic InterfaceExport) := do
   if isPrivateName name then
-    return .error { name, source, reason := "private declarations are not exported" }
+    return .error {
+      name,
+      source,
+      reason := "private declarations cannot be VIR exports; remove `private` or export a public wrapper"
+    }
   else
     let env ← getEnv
     match env.find? name with
@@ -213,7 +217,7 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
                 return .error {
                   name,
                   source,
-                  reason := "polymorphic exported entrypoints with erased type parameters are not supported; export a concrete wrapper"
+                  reason := "VIR exports must use concrete runtime types; erased type parameters are not supported; export a concrete wrapper instead"
                 }
               else if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
