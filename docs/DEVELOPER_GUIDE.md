@@ -16,7 +16,7 @@ objects while a call is running.
 | Host resources | `web/src/host-resource.js`, `web/src/host/vir-host-resources.js` | JavaScript-owned object handles, externref roots, disposable host objects, DOM/timer/frame/React resource cleanup. |
 | React host | `web/src/react/`, `web/src/vir-react-host-bindings.js` | React element construction, root lifetime, function-component bridge, hooks, and callback retention. |
 | Browser demos | `web/src/`, `examples/`, `fixtures/` | Local demo entry points, smoke fixtures, and generated `.irpkg` inputs. |
-| Performance | `scripts/bench-vir.mjs`, [PERFORMANCE.md](PERFORMANCE.md) | Boundary conversion rows, dispatch rows, benchmark JSON, and before/after comparison. |
+| Performance | `scripts/bench-vir.mjs`, `scripts/bench-differential.mjs`, [PERFORMANCE.md](PERFORMANCE.md) | Boundary conversion rows, differential sampling, benchmark JSON, and before/after comparison. |
 
 ## Reading Paths
 
@@ -63,8 +63,9 @@ For benchmark work, read:
 
 1. `docs/PERFORMANCE.md`
 2. `scripts/bench-vir.mjs`
-3. `scripts/bench-utils.mjs`
-4. `scripts/runtime-tests/object-abi-smoke.mjs`
+3. `scripts/bench-differential.mjs`
+4. `scripts/bench-utils.mjs`
+5. `scripts/runtime-tests/object-abi-smoke.mjs`
 
 ## Top-Level Call Flow
 
@@ -294,6 +295,7 @@ npm run test:runtime
 npm run test:upstream:no-build
 npm run test:pages
 npm run test:pages:browser
+npm run test:bench
 npm run bench -- --json /tmp/vir-bench.json
 ```
 

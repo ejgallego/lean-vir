@@ -90,9 +90,10 @@ shape, regardless of whether it is named `lower`, `wasm`, `native`, `host`,
 ```json
 {
   "label": "base-bool",
-  "iterations": 50000,
-  "medianMs": 1.07,
-  "checksum": 0
+  "iterations": 10000,
+  "checksum": 0,
+  "medianMs": 185.0,
+  "perCallMs": 0.0185
 }
 ```
 
@@ -101,29 +102,35 @@ The `base-*` conversion rows use this stable row shape:
 ```json
 {
   "name": "base-bool",
-  "title": "base Bool conversion boundary",
+  "title": "Bool -> Bool x 10000",
   "lower": {
     "label": "lower-base-bool",
-    "iterations": 50000,
+    "iterations": 20000,
+    "checksum": 20000,
     "medianMs": 8.36,
-    "checksum": 0
+    "perCallMs": 0.000418
   },
   "wasm": {
     "label": "base-bool",
-    "iterations": 50000,
+    "iterations": 10000,
+    "checksum": 0,
     "medianMs": 185.0,
-    "checksum": 0
+    "perCallMs": 0.0185
   }
 }
 ```
 
 The `branchAndSub` row calls a tiny exported fixture through
 `vir_call_resolved_objects`, comparing repeated name resolution with a cached package
-slot. It is the focused check for package-owned ABI and call-slot dispatch
-changes. Object host-import framing is more visible in the host/resource and
-React rows because those paths cross from Lean back into JavaScript. The broader
-`fib` and `sort` rows spend more time in Lean execution and should show smaller
-movement from boundary-only work.
+slot. The two fixed-size candidates run once as a warm-up, then run in seven
+interleaved measured rounds whose starting order rotates. Warm-up timings are
+excluded from the median, while warm-up checksums still participate in each
+candidate's stability check. Any per-candidate checksum instability or
+cross-candidate disagreement fails the benchmark. This row is the focused check
+for package-owned ABI and call-slot dispatch changes. Object host-import framing
+is more visible in the host/resource and React rows because those paths cross
+from Lean back into JavaScript. The broader `fib` and `sort` rows spend more time
+in Lean execution and should show smaller movement from boundary-only work.
 `npm run bench:engines` remains a WASI command-module comparison across
 available engines for the broader `fib` and `sort` rows.
 

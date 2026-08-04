@@ -9,6 +9,7 @@ import { dirname } from "node:path";
 import { performance } from "node:perf_hooks";
 
 import { ensureCachedBenchArtifacts } from "./bench-artifact-cache.mjs";
+import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
 import {
   benchmarkArtifactPaths,
   defaultPackageFile,
@@ -185,19 +186,7 @@ function createBenchmarkHostBindings() {
   };
 }
 
-function benchWasmRepeated(label, iterations, fn) {
-  const samples = [];
-  let checksum = 0;
-  for (let sample = 0; sample < 7; sample++) {
-    const start = performance.now();
-    const acc = fn();
-    samples.push(performance.now() - start);
-    checksum = acc;
-  }
-  return { label, iterations, checksum, medianMs: median(samples) };
-}
-
-function benchJsRepeated(label, iterations, fn) {
+function benchRepeated(label, iterations, fn) {
   const samples = [];
   let checksum = 0;
   for (let sample = 0; sample < 7; sample++) {
@@ -364,7 +353,7 @@ function manifestEntry(name) {
 }
 
 function benchLowerCallObjects(label, iterations, entry, args) {
-  return benchJsRepeated(label, iterations, () => {
+  return benchRepeated(label, iterations, () => {
     let acc = 0;
     for (let i = 0; i < iterations; i++) {
       const objects = [];
@@ -385,7 +374,7 @@ function benchLowerCallObjects(label, iterations, entry, args) {
 function benchBoundaryConversionCase(testCase) {
   const entry = manifestEntry(testCase.entry);
   const lower = benchLowerCallObjects(`lower-${testCase.name}`, testCase.lowerIterations ?? baseLowerIterations, entry, testCase.args);
-  const wasm = benchWasmRepeated(testCase.name, testCase.iterations, () => {
+  const wasm = benchRepeated(testCase.name, testCase.iterations, () => {
     let acc = 0;
     for (let i = 0; i < testCase.iterations; i++) {
       acc += testCase.checksum(runtime.call(testCase.entry, ...testCase.args));
@@ -443,22 +432,48 @@ function benchTopLevelDispatch(entry) {
     throw new Error(`benchmark interface entry is not part of the active manifest: ${entry.entry}`);
   }
   const callSlot = resolveRawCallSlot(entry, exportIndex);
-  const resolveEachCall = benchWasmRepeated("resolve-each-call", dispatchIterations, () => {
-    let acc = 0;
-    for (let i = 0; i < dispatchIterations; i++) {
-      const resolvedSlot = resolveRawCallSlot(entry, exportIndex);
-      acc += Number(callRawResolvedObjects(entry, resolvedSlot));
-    }
-    return acc;
+  const sampled = sampleBenchmarkCandidates({
+    candidates: [
+      {
+        id: "resolveEachCall",
+        label: "resolve-each-call",
+        run: () => {
+          let acc = 0;
+          for (let i = 0; i < dispatchIterations; i++) {
+            const resolvedSlot = resolveRawCallSlot(entry, exportIndex);
+            acc += Number(callRawResolvedObjects(entry, resolvedSlot));
+          }
+          return acc;
+        },
+      },
+      {
+        id: "cachedSlot",
+        label: "cached-slot",
+        run: () => {
+          let acc = 0;
+          for (let i = 0; i < dispatchIterations; i++) {
+            acc += Number(callRawResolvedObjects(entry, callSlot));
+          }
+          return acc;
+        },
+      },
+    ],
+    warmupRounds: 1,
+    sampleRounds: 7,
   });
-  const cachedSlot = benchWasmRepeated("cached-slot", dispatchIterations, () => {
-    let acc = 0;
-    for (let i = 0; i < dispatchIterations; i++) {
-      acc += Number(callRawResolvedObjects(entry, callSlot));
-    }
-    return acc;
-  });
-  return { resolveEachCall, cachedSlot };
+  if (!sampled.passed) {
+    const details = Object.values(sampled.candidates).map((candidate) =>
+      `${candidate.id}: checksum=${candidate.checksum}, stable=${candidate.stable}` +
+        (candidate.errors.length === 0 ? "" : `, errors=${candidate.errors.join("; ")}`),
+    );
+    throw new Error(`top-level dispatch differential checks failed (${details.join("; ")})`);
+  }
+  return Object.fromEntries(Object.entries(sampled.candidates).map(([id, candidate]) => [id, {
+    label: candidate.label,
+    iterations: dispatchIterations,
+    checksum: candidate.checksum,
+    medianMs: candidate.medianMs,
+  }]));
 }
 
 const dispatchEntry = manifestEntry("Vir.Fixtures.Basic.branchAndSub");
@@ -591,7 +606,7 @@ const baseConversionCases = [
 const dispatch = benchTopLevelDispatch(dispatchEntry);
 const baseConversionBenchmarks = baseConversionCases.map(benchBoundaryConversionCase);
 
-const wasmFib = benchWasmRepeated("fib", fibIterations, () => {
+const wasmFib = benchRepeated("fib", fibIterations, () => {
   let acc = 0;
   for (let i = 0; i < fibIterations; i++) {
     acc += Number(runtime.call("fib", fibInput));
@@ -600,7 +615,7 @@ const wasmFib = benchWasmRepeated("fib", fibIterations, () => {
 });
 const hostFib = benchHostIr("fib", fibIterations, ["fib", String(fibIterations), String(fibInput)]);
 
-const wasmSort = benchWasmRepeated("sort", sortIterations, () => {
+const wasmSort = benchRepeated("sort", sortIterations, () => {
   let acc = 0;
   for (let i = 0; i < sortIterations; i++) {
     acc += Number(runtime.call("SortDemo.demoFromArray", sortInput));
@@ -630,7 +645,7 @@ const jsLowerRecursiveValue = benchLowerCallObjects(
   [recursiveJsonInput],
 );
 
-const wasmScalarRecord = benchWasmRepeated("scalar-record", scalarRecordIterations, () => {
+const wasmScalarRecord = benchRepeated("scalar-record", scalarRecordIterations, () => {
   let acc = 0;
   for (let i = 0; i < scalarRecordIterations; i++) {
     acc += Number(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsScore", profileStatsInput));
@@ -638,7 +653,7 @@ const wasmScalarRecord = benchWasmRepeated("scalar-record", scalarRecordIteratio
   return acc;
 });
 
-const wasmNestedRecord = benchWasmRepeated("nested-record", nestedRecordIterations, () => {
+const wasmNestedRecord = benchRepeated("nested-record", nestedRecordIterations, () => {
   let acc = 0;
   for (let i = 0; i < nestedRecordIterations; i++) {
     acc += Number(runtime.call("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore", profileEnvelopeInput));
@@ -646,7 +661,7 @@ const wasmNestedRecord = benchWasmRepeated("nested-record", nestedRecordIteratio
   return acc;
 });
 
-const wasmRecursiveValue = benchWasmRepeated("recursive-value", recursiveValueIterations, () => {
+const wasmRecursiveValue = benchRepeated("recursive-value", recursiveValueIterations, () => {
   let acc = 0;
   for (let i = 0; i < recursiveValueIterations; i++) {
     acc += Number(runtime.call("Vir.Fixtures.RecursiveTypes.jsonRootScore", recursiveJsonInput));
@@ -654,7 +669,7 @@ const wasmRecursiveValue = benchWasmRepeated("recursive-value", recursiveValueIt
   return acc;
 });
 
-const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () => {
+const wasmHostScalar = benchRepeated("host-title", hostScalarIterations, () => {
   let acc = 0;
   for (let i = 0; i < hostScalarIterations; i++) {
     acc += hostRuntime.call("HostInterop.titleHandshake", "bench").length;
@@ -662,11 +677,11 @@ const wasmHostScalar = benchWasmRepeated("host-title", hostScalarIterations, () 
   return acc;
 });
 
-const wasmCallback = benchWasmRepeated("callback-roundtrip", callbackIterations, () => {
+const wasmCallback = benchRepeated("callback-roundtrip", callbackIterations, () => {
   return Number(hostRuntime.call("HostInterop.callbackRoundTripLoop", callbackIterations));
 });
 
-const wasmDomResource = benchWasmRepeated("dom-listener-resource", domResourceIterations, () => {
+const wasmDomResource = benchRepeated("dom-listener-resource", domResourceIterations, () => {
   let acc = 0;
   for (let i = 0; i < domResourceIterations; i++) {
     acc += Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEvent", "#bench-dom"));
@@ -674,11 +689,11 @@ const wasmDomResource = benchWasmRepeated("dom-listener-resource", domResourceIt
   return acc;
 });
 
-const wasmReactRoot = benchWasmRepeated("react-root-lifecycle", reactRootIterations, () => {
+const wasmReactRoot = benchRepeated("react-root-lifecycle", reactRootIterations, () => {
   return Number(hostRuntime.call("ReactCounter.mountAndUnmountLoop", "#bench-react", reactRootIterations));
 });
 
-const wasmReactTextRender = benchWasmRepeated("react-node-text-render", reactTextRenderIterations, () => {
+const wasmReactTextRender = benchRepeated("react-node-text-render", reactTextRenderIterations, () => {
   return Number(hostRuntime.call(
     "ReactCounter.renderWideTextLoop",
     "#bench-react",
@@ -687,7 +702,7 @@ const wasmReactTextRender = benchWasmRepeated("react-node-text-render", reactTex
   ));
 });
 
-const wasmReactCallbackRender = benchWasmRepeated("react-node-callback-render", reactCallbackRenderIterations, () => {
+const wasmReactCallbackRender = benchRepeated("react-node-callback-render", reactCallbackRenderIterations, () => {
   return Number(hostRuntime.call(
     "ReactCounter.renderCallbackTreeLoop",
     "#bench-react",

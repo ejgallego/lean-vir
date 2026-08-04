@@ -130,6 +130,7 @@ node scripts/run-fixtures.mjs --help
 Tests:
 
 ```bash
+npm run test:bench
 npm run test:upstream
 npm run test:upstream:no-build
 npm run test:infoview
@@ -145,15 +146,17 @@ npm run test:pages:browser
 npm test
 ```
 
-`npm test` runs the package ABI check, IR codec tag freshness check, native
-extern ABI check, boundary registry check, native wrapper check, API coverage
-docs check, and Wasm extension probes, builds the demo artifacts once, then
-reuses those artifacts for upstream smoke, infoview widget smoke, JavaScript
-runtime tests, and the fixture suite. It is the default pre-merge signal for
-code changes.
+`npm test` runs the differential benchmark sampler tests, package ABI check, IR
+codec tag freshness check, native extern ABI check, boundary registry check,
+native wrapper check, API coverage docs check, and Wasm extension probes,
+builds the demo artifacts once, then reuses those artifacts for upstream smoke,
+infoview widget smoke, JavaScript runtime tests, and the fixture suite. It is
+the default pre-merge signal for code changes.
 
 ## Smallest Useful Check
 
+- Differential benchmark sampling or dispatch comparison changes:
+  `npm run test:bench`
 - Native extern declaration changes:
   `npm run check:native-externs`
 - Shim/native extern registry changes:
@@ -334,7 +337,8 @@ logic into entry-point scripts or pages:
 
 - Runtime smoke tests: `scripts/runtime-tests/*.mjs`
 - Browser smoke cases and page suites: `scripts/browser-smoke-*.mjs`
-- Process and benchmark helpers: `scripts/process-utils.mjs` and
+- Process helpers: `scripts/process-utils.mjs`
+- Benchmark helpers: `scripts/bench-differential.mjs` and
   `scripts/bench-utils.mjs`
 - Artifact, filesystem, and executable lookup helpers: `scripts/file-utils.mjs`
 - IR package generator setup: `scripts/irpkg-generator.mjs`

@@ -46,6 +46,8 @@ map lives in `docs/HARNESS.md`.
   Build the demo and run the upstream interpreter smoke test.
 - `npm run test:upstream:no-build`
   Reuse existing demo WASM and browser packages for the upstream smoke test.
+- `npm run test:bench`
+  Run the dependency-free differential benchmark sampler contract tests.
 - `npm run test:runtime`
   Run all JavaScript runtime, host binding, callback lifecycle, manifest,
   package-generation, and SDK import smoke tests. Use
@@ -137,7 +139,8 @@ The split helpers below are the intended extension points for focused changes:
 - Object ABI linker flags come from `scripts/object-abi-linker-flags.mjs`,
   which consumes the shared runtime export-name manifest rather than keeping a
   second linker-only list.
-- Benchmark sample parsing and formatting live in `scripts/bench-utils.mjs`.
+- Differential benchmark sampling lives in `scripts/bench-differential.mjs`;
+  report parsing and formatting live in `scripts/bench-utils.mjs`.
 - Browser package metadata helpers live in `scripts/browser-package-config.mjs`
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
 
