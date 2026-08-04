@@ -67,7 +67,7 @@ const floatCases = [
   const { wasmBytes, hostPackageBytes } = await readRuntimeArtifacts();
   const runtime = await createVirRuntime({
     wasmBytes,
-    irPackageBytes: hostPackageBytes,
+    irPackageSetBytes: [hostPackageBytes],
     hostBindings: createCallbackHostBindings(),
   });
   try {

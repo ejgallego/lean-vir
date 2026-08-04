@@ -19,11 +19,11 @@ import {
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
 
-const { wasmBytes, irPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();
+const { wasmBytes, defaultPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();
 const defaultPackagePath = publicArtifactPath(defaultPackageFile);
-const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
-const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
-const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
+const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: [defaultPackageBytes] });
+const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageSetBytes: [prettyPackageBytes] });
+const leanRuntime = await createVirRuntime({ wasmBytes, irPackageSetBytes: [leanPackageBytes] });
 function makeObjectString(runtime, input) {
   const bytes = new TextEncoder().encode(input);
   const ptr = runtime.allocBytes(bytes);
@@ -211,7 +211,10 @@ assert.throws(
   () => runtime.retainLeanObjectHandleValue(leanHandleResource, "released lean object handle"),
   /released lean object handle must be a live Lean object handle resource/,
 );
-const leanHandleHostRuntime = await createVirRuntime({ wasmBytes, irPackageBytes });
+const leanHandleHostRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageSetBytes: [defaultPackageBytes],
+});
 let teardownLeanHandleResource = null;
 let teardownLeanHandleAlias = null;
 try {

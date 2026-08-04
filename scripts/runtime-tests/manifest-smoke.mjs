@@ -45,19 +45,19 @@ import {
 import { demoHostImportTargets } from "../demo-host-import-targets.mjs";
 import { invalidManifestCases } from "./manifest-invalid-cases.mjs";
 
-const { wasmBytes, irPackageBytes, hostPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();
+const { wasmBytes, defaultPackageBytes, hostPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();
 const hostlessImports = createVirImports(new WebAssembly.Module(wasmBytes));
 assert.throws(
   () => hostlessImports.env.vir_js_call_objects(0, 0, 0),
   /without an attached host state/,
 );
 
-const runtime = await createVirRuntime({ wasmBytes, irPackageBytes });
+const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: [defaultPackageBytes] });
 const callbackRecords = [];
 const virtualDocumentState = createVirtualDocumentState();
 const hostRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState,
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
@@ -73,8 +73,8 @@ const hostRuntime = await createVirRuntime({
     },
   },
 });
-const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: prettyPackageBytes });
-const leanRuntime = await createVirRuntime({ wasmBytes, irPackageBytes: leanPackageBytes });
+const prettyRuntime = await createVirRuntime({ wasmBytes, irPackageSetBytes: [prettyPackageBytes] });
+const leanRuntime = await createVirRuntime({ wasmBytes, irPackageSetBytes: [leanPackageBytes] });
 assert.equal(createExportedBrowserVirRuntime, createBrowserVirRuntime);
 assert.equal(createExportedNodeVirRuntime, createVirRuntime);
 assert.equal(typeof createExportedHostResourceState, "function");
@@ -168,7 +168,7 @@ assert.throws(() => debugWasmUrlFor("module.bin"), /debugWasm requires a \.wasm 
 assert.equal(runtime.targetPointerBytes(), 4);
 assert.ok(runtime.packageInfo.count > 0, "expected IR package to load declarations");
 assert.equal(runtime.packageDeclCount(), runtime.packageInfo.count);
-assert.equal(runtime.packageInfo.byteLength, irPackageBytes.byteLength);
+assert.equal(runtime.packageInfo.byteLength, defaultPackageBytes.byteLength);
 assert.ok(runtime.packageInfo.interfaceExports > 0, "expected embedded interface exports");
 assert.equal(runtime.packageInfo.hostImports, 0);
 assert.equal(hostRuntime.packageInfo.hostImports, demoHostImportTargets.length);
@@ -553,7 +553,10 @@ assert.equal(
   true,
 );
 virtualQueryHost["browser.element.removeEventListener"](virtualMissingEventListener);
-const browserRuntime = await createBrowserVirRuntime({ wasmBytes, irPackageBytes: hostPackageBytes });
+const browserRuntime = await createBrowserVirRuntime({
+  wasmBytes,
+  irPackageSetBytes: [hostPackageBytes],
+});
 assert.throws(
   () => browserRuntime.call("HostInterop.titleHandshake", "node"),
   /browser\.document host binding requires globalThis\.document|js\.string\.value argument value did not lift to a live host resource/,

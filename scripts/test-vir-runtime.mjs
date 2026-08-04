@@ -23,6 +23,7 @@ const tests = [
   { id: "object-abi", file: "scripts/runtime-tests/object-abi-smoke.mjs", group: "pure" },
   { id: "package-decoder", file: "scripts/runtime-tests/package-decoder-smoke.mjs", group: "pure" },
   { id: "package-generator", file: "scripts/runtime-tests/package-generator-smoke.mjs", group: "lean" },
+  { id: "module-package-set", file: "scripts/runtime-tests/module-package-set-smoke.mjs", group: "lean" },
   { id: "slides-canvas", file: "scripts/runtime-tests/slides-canvas-runtime-smoke.mjs", group: "lean" },
   { id: "package-generation", file: "scripts/runtime-tests/package-generation-smoke.mjs", group: "lean" },
   { id: "sdk-import", file: "scripts/runtime-tests/sdk-import-smoke.mjs", group: "lean" },

@@ -36,7 +36,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.runtime.value": () => freshHostDocumentState.resources.resourceForValue(9n),
     },
   });
-  const hostRuntime = await hostFactory.createRuntime({ irPackageBytes: await readFile(hostPackage) });
+  const hostRuntime = await hostFactory.createRuntime({ irPackageSetBytes: [await readFile(hostPackage)] });
   assert.equal(hostRuntime.interfaceManifest.hostImports.length, 17);
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshEchoBang")?.effect, "runtime");
   assert.equal(hostRuntime.interfaceManifest.exports.find((entry) => entry.entry === "freshTitleRoundtrip")?.effect, "dom");
@@ -84,7 +84,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
       "test.js.id": (value) => value,
       "test.js.length": (value) => jsObjectDocumentState.resources.resourceForValue(BigInt(hostResourceValue(value).length)),
     },
-  }).createRuntime({ irPackageBytes: await readFile(jsObjectPackage) });
+  }).createRuntime({ irPackageSetBytes: [await readFile(jsObjectPackage)] });
   const jsIdImport = jsObjectRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.js.id");
   assert.equal(jsIdImport?.effect, "runtime");
   assert.equal(jsIdImport?.arity, 3);
@@ -114,7 +114,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   await writeRuntimeFixture(leanRefSource, "FreshLeanRef.lean");
   generateIrPackage(leanRefSource, leanRefPackage);
   const leanRefRuntime = await createVirRuntimeFactory({ wasmBytes })
-    .createRuntime({ irPackageBytes: await readFile(leanRefPackage) });
+    .createRuntime({ irPackageSetBytes: [await readFile(leanRefPackage)] });
   const leanRefToJsImport = leanRefRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "js.leanRef");
   assert.equal(leanRefToJsImport?.boundary, "objectHandle");
   assert.equal(leanRefToJsImport?.args[0]?.type?.kind, "leanObject");
@@ -156,7 +156,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     hostBindings: {
       "test.payload": (payload) => customJsValueResources.resourceForValue({ ...payload, name: `${payload.name}!` }),
     },
-  }).createRuntime({ irPackageBytes: await readFile(customJsValuePackage) });
+  }).createRuntime({ irPackageSetBytes: [await readFile(customJsValuePackage)] });
   const customPayloadImport = customJsValueRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "test.payload");
   assert.equal(customPayloadImport?.boundary, "explicitConversion");
   assert.equal(customPayloadImport?.args[0]?.type?.kind, "structure");
@@ -179,7 +179,7 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
     hostBindings: {
       "test.react.externalBadge": () => reactExternalDocumentState.resources.resourceForValue(externalBadge),
     },
-  }).createRuntime({ irPackageBytes: await readFile(reactExternalPackage) });
+  }).createRuntime({ irPackageSetBytes: [await readFile(reactExternalPackage)] });
   const externalBadgeImport = reactExternalRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.target === "test.react.externalBadge",
   );

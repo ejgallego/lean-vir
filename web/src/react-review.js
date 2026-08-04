@@ -99,8 +99,8 @@ async function mountExamples() {
   disposeRuntime();
   clearMounts();
   try {
-    const irPackageBytes = await fetchBytes(`${import.meta.env.BASE_URL}${packageFile}`);
-    runtime = await runtimeFactory.createRuntime({ irPackageBytes });
+    const packageMemberBytes = await fetchBytes(`${import.meta.env.BASE_URL}${packageFile}`);
+    runtime = await runtimeFactory.createRuntime({ irPackageSetBytes: [packageMemberBytes] });
     renderRuntimeSummary();
     for (const example of examples) {
       const mounted = runtime.call(example.entry, example.selector, ...(example.args ?? []));

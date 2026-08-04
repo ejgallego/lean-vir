@@ -94,4 +94,46 @@ def collectClosure (targets : Array Target) (index : DeclIndex) : Closure :=
     (resolvedRootsForTarget index target).foldl
       (fun state root => collectName index root #[root] state) state) {}
 
+unsafe def resolveImportedModuleClosure
+    (targets : Array Target)
+    (index : DeclIndex) : IO DeclIndex := do
+  if !targets.any (·.resolveImportedModules) then
+    return index
+  let closure := collectClosure targets index
+  let modules := closure.missingDecls.foldl (init := #[]) fun modules dependency =>
+    match index.moduleForDecl? dependency.name with
+    | some moduleName =>
+        if index.loadedModules.contains moduleName || modules.contains moduleName then
+          modules
+        else
+          modules.push moduleName
+    | none => modules
+  if modules.isEmpty then
+    return index
+  let mut next := index
+  for moduleName in modules do
+    next ← next.loadImportedModule moduleName
+  resolveImportedModuleClosure targets next
+
+def Closure.moduleNames (closure : Closure) : Array Name :=
+  closure.decls.foldl (init := #[]) fun modules loaded =>
+    match loaded.module? with
+    | some moduleName =>
+        if modules.contains moduleName then modules else modules.push moduleName
+    | none => modules
+
+def Closure.forModule (closure : Closure) (moduleName rootModule : Name) : Closure :=
+  let isRoot := moduleName == rootModule
+  let owns (loaded : LoadedDecl) :=
+    loaded.module? == some moduleName || (isRoot && loaded.module?.isNone)
+  let initOwned (entry : InitGlobal) :=
+    match closure.decls.find? (fun loaded => loaded.decl.name == entry.name) with
+    | some loaded => owns loaded
+    | none => isRoot
+  {
+    decls := closure.decls.filter owns
+    externs := if isRoot then closure.externs else #[]
+    initGlobals := closure.initGlobals.filter initOwned
+  }
+
 end Vir.GeneratePackage

@@ -29,7 +29,9 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   assert.match(generated.stdout, /mode:\s+auto-discover public definitions/);
   assert.match(generated.stdout, /local package ready/);
 
-  const freshRuntime = await factory.createRuntime({ irPackageBytes: await readFile(freshPackage) });
+  const freshRuntime = await factory.createRuntime({
+    irPackageSetBytes: [await readFile(freshPackage)],
+  });
   const freshManifest = freshRuntime.interfaceManifest;
   assert.equal(freshManifest.metadata.packageFormatVersion, PACKAGE_FORMAT_VERSION);
   assert.equal(freshManifest.metadata.manifestVersion, INTERFACE_MANIFEST_VERSION);
@@ -117,7 +119,7 @@ export async function runFreshPackageSmoke({ freshDir, wasmBytes }) {
   ]);
   assert.equal(escapedGenerated.status, 0, escapedGenerated.stderr || escapedGenerated.stdout);
   const escapedRuntime = await factory.createRuntime({
-    irPackageBytes: await readFile(escapedPackage),
+    irPackageSetBytes: [await readFile(escapedPackage)],
   });
   const dottedEntry = manifestEntry(escapedRuntime.interfaceManifest, "«foo.bar»");
   assert.equal(dottedEntry.id, "_foo_bar_");

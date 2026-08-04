@@ -195,13 +195,15 @@ single-field structures.
 
 ## Current Scope
 
-This is still the single-file declaration package path. It does not load
-`.olean`, `.ir`, or full Lean module data. The package generator elaborates the
-source, extracts typed `Lean.IR.Decl` values, and writes the current package
-format. The WASM side decodes that package into real Lean IR objects and serves
-them through `lean_ir_find_env_decl`.
+The local source workflow emits one `.irpkg` member. Lake module-system clients
+build `:vir`: the generator uses Lean's declaration-to-module ownership data to
+materialize reached opaque imports and emits a JSON-described set of ordinary
+format-10 `.irpkg` members.
+The browser still does not load `.olean` or Lean's raw `.ir` format. The WASM
+side decodes every package member into real Lean IR objects and serves their
+aggregate declaration table through `lean_ir_find_env_decl`.
 
-Replacing a package through `VirRuntime.loadIrPackageBytes` creates a fresh
+Replacing a complete set through `VirRuntime.loadIrPackageSetBytes` creates a fresh
 Wasm interpreter instance and loads and validates the candidate there first.
 On success, the existing public `VirRuntime` object adopts the candidate and
 then exposes its manifest and call slots. The old instance's callbacks,
@@ -211,7 +213,7 @@ instance are invalid after that handover.
 
 Replacement is atomic at the public runtime boundary: if candidate loading or
 manifest validation fails, the candidate is discarded and the previous
-package remains callable. The fresh-instance rule is required because the
+package set remains callable. The fresh-instance rule is required because the
 upstream interpreter keeps native-symbol and initializer-global caches for the
 lifetime of an interpreter instance.
 If old-instance cleanup fails after candidate validation, cleanup still

@@ -5,18 +5,22 @@ Author: Emilio J. Gallego Arias
 */
 
 import { defaultPackageFile, hostPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
-import { createVirRuntime } from "./vir-runtime.js";
+import { createVirRuntime, fetchBytes } from "./vir-runtime.js";
 
 const output = document.querySelector("#runtime-example-output");
 
 try {
   const vir = await createVirRuntime({
     wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
-    irPackageUrl: `${import.meta.env.BASE_URL}${defaultPackageFile}`,
+    irPackageSetBytes: [
+      await fetchBytes(`${import.meta.env.BASE_URL}${defaultPackageFile}`),
+    ],
   });
   const hostVir = await createVirRuntime({
     wasmUrl: `${import.meta.env.BASE_URL}${wasmPublicFile}`,
-    irPackageUrl: `${import.meta.env.BASE_URL}${hostPackageFile}`,
+    irPackageSetBytes: [
+      await fetchBytes(`${import.meta.env.BASE_URL}${hostPackageFile}`),
+    ],
   });
 
   const results = {

@@ -33,7 +33,7 @@ export { assert, readFile, writeFile, spawnSync, join, validateInterfaceManifest
 export async function readRuntimeArtifacts() {
   return {
     wasmBytes: await readPublicArtifact(wasmPublicFile),
-    irPackageBytes: await readPublicArtifact(defaultPackageFile),
+    defaultPackageBytes: await readPublicArtifact(defaultPackageFile),
     hostPackageBytes: await readPublicArtifact(hostPackageFile),
     prettyPackageBytes: await readPublicArtifact(prettyPackageFile),
     leanPackageBytes: await readPublicArtifact(leanPackageFile),

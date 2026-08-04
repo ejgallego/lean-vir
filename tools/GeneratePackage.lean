@@ -51,6 +51,7 @@ partial def parseTargets : List String -> Except String (Array Vir.GeneratePacka
         roots := #[]
         includeMarked := true
         markedModule? := some (nameFromDotted moduleName)
+        resolveImportedModules := true
       }
       return (#[target] ++ (← parseTargets rest))
   | arg :: _ =>
@@ -61,11 +62,22 @@ unsafe def main (args : List String) : IO UInt32 := do
   | [packagePath, reportPath] =>
       Vir.GeneratePackage.run Vir.GeneratePackage.defaultTargets packagePath reportPath
   | packagePath :: reportPath :: targetArgs =>
-      match parseTargets targetArgs with
-      | .ok targets => Vir.GeneratePackage.run targets packagePath reportPath
-      | .error err =>
-          IO.eprintln err
-          return 2
+      match targetArgs with
+      | "--module-set-output" :: descriptorPath :: shardDir :: moduleName ::
+          rootRelativePath :: shardRelativeDir :: targetArgs =>
+          match parseTargets targetArgs with
+          | .ok targets =>
+              Vir.GeneratePackage.runModuleSet targets (nameFromDotted moduleName)
+                packagePath descriptorPath shardDir rootRelativePath shardRelativeDir reportPath
+          | .error err =>
+              IO.eprintln err
+              return 2
+      | _ =>
+          match parseTargets targetArgs with
+          | .ok targets => Vir.GeneratePackage.run targets packagePath reportPath
+          | .error err =>
+              IO.eprintln err
+              return 2
   | _ =>
-      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--target <source.lean> <root>... | --package-target <source.lean> <root>... | --target-all <source.lean> | --target-marked <source.lean> | --target-marked-module <driver.lean> <module>]"
+      IO.eprintln "usage: lean --run tools/GeneratePackage.lean <package.irpkg> <report.md> [--module-set-output <set.json> <shard-dir> <root-module> <root-relative-path> <shard-relative-dir>] [--target <source.lean> <root>... | --package-target <source.lean> <root>... | --target-all <source.lean> | --target-marked <source.lean> | --target-marked-module <driver.lean> <module>]"
       return 2

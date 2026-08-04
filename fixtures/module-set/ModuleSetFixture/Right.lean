@@ -1,0 +1,15 @@
+/-
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+-/
+
+module
+
+public import ModuleSetFixture.Shared
+
+namespace ModuleSetFixture.Right
+
+public def value : Nat := ModuleSetFixture.Shared.base + 1
+
+end ModuleSetFixture.Right

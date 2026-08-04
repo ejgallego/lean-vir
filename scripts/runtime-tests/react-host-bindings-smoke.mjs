@@ -58,7 +58,7 @@ import {
   smokeVirtualReactTamagotchi,
 } from "../virtual-react-smoke-scenarios.mjs";
 
-const { wasmBytes, hostPackageBytes, irPackageBytes } = await readRuntimeArtifacts();
+const { wasmBytes, hostPackageBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 
 const browserBindingsWithReact = createBrowserHostBindings({
   reactHostBindings: {
@@ -648,7 +648,7 @@ function callbackLease(cell, body = () => undefined) {
 const reactDocumentState = createVirtualDocumentState();
 const reactRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState: reactDocumentState,
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
@@ -689,7 +689,7 @@ assert.equal(reactRuntime.liveCallbacks.size, 0);
 const missingSelectorDocumentState = createVirtualDocumentState();
 const missingSelectorRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState: missingSelectorDocumentState,
 });
 assert.equal(missingSelectorRuntime.call("ReactCounter.mount", "#missing-react-root"), false);
@@ -1022,7 +1022,7 @@ assert.throws(() => reactRuntime.call("ReactCounter.mount", "#react-disposed"), 
 const reactReloadDocumentState = createVirtualDocumentState();
 const reactReloadRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState: reactReloadDocumentState,
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
@@ -1038,7 +1038,7 @@ const reactReloadRuntime = await createVirRuntime({
 ensureVirtualElementState(reactReloadDocumentState, "#react-reload");
 assert.equal(reactReloadRuntime.call("ReactCounter.mount", "#react-reload"), true);
 assert.equal(reactReloadRuntime.liveCallbacks.size, 2);
-reactReloadRuntime.loadIrPackageBytes(irPackageBytes);
+reactReloadRuntime.loadIrPackageSetBytes([defaultPackageBytes]);
 assert.equal(reactReloadRuntime.liveCallbacks.size, 0);
 assert.equal(reactReloadDocumentState.elements.get("#react-reload").reactRoot, undefined);
 reactReloadRuntime.dispose();

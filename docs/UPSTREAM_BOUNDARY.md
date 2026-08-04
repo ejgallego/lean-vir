@@ -106,14 +106,15 @@ not a fork of Lean. It is split by responsibility:
   directory decoding.
 - `package/package_ir_decoder.cpp` owns section payload decoding and Lean IR
   object materialization, including cleanup of partial decode graphs.
-- `package/package_decl_provider.cpp` owns loaded package state, declaration lookup,
-  host import metadata, and initializer execution.
+- `package/package_decl_provider.cpp` owns staged package-set state,
+  conflict-checked declaration lookup, host import metadata, and initializer
+  execution.
 - `Vir/GeneratePackage/Closure.lean` owns extraction of the demo declaration closures
   from typed `Lean.IR.Decl` values into the focused `build/generated/*.irpkg`
   packages; `docs/GENERATE_PACKAGE.md` maps the full split generator, and
   `tools/GeneratePackage.lean` is the CLI wrapper.
-- `package/decl_provider.h` is the replacement point for a future module-backed
-  provider.
+- `package/decl_provider.h` is the replacement point for a future provider that
+  consumes Lean's raw module artifacts.
 
 Together they supply:
 
@@ -250,8 +251,8 @@ but it cannot prove a complete reset of those upstream caches without changing
 replacement therefore uses a fresh `WebAssembly.Instance` while reusing the
 already-compiled `WebAssembly.Module`.
 
-`VirRuntime.loadIrPackageBytes` first instantiates and fully loads a candidate.
-A candidate failure disposes only that instance, leaving the active package
+`VirRuntime.loadIrPackageSetBytes` first instantiates and fully loads a candidate.
+A candidate failure disposes only that instance, leaving the active package set
 callable. A successful candidate is handed to the existing public runtime
 wrapper after the old callbacks, resources, host state, and binding leases are
 torn down. Nothing containing an old Wasm pointer or package-local slot may
@@ -263,18 +264,21 @@ order; multiple failures are reported to JavaScript as an `AggregateError`
 afterward. If old-instance teardown fails during handover, the candidate is
 also disposed and the public wrapper is marked disposed.
 
-The current runtime treats the active package set as containing exactly one
-`.irpkg`; that cardinality is not intended as a permanent boundary. Future
-modular loading should extend the same candidate-instance handover to the whole
-package set: construct a fresh instance, load and validate the complete set,
-then adopt it atomically. Adding, updating, or removing one package should not
-leave the active instance with a partially updated dependency graph.
+The provider can stage a complete descriptor-ordered package set in one fresh
+instance. `vir_begin_ir_package_set` clears the candidate,
+`vir_append_ir_package` transactionally decodes each ordinary format-10 member,
+and `vir_finish_ir_package_set` runs the aggregate initializer table once after
+all declarations are available. The final root member supplies the interface
+manifest and export summaries. Duplicate declarations, initializer globals,
+host imports, and export summaries are rejected before a member is appended.
+JavaScript adopts the candidate only after the whole set and root manifest are
+valid, so a partial dependency graph is never exposed through the public
+runtime wrapper.
 
-Manifest export indices are scoped to one package manifest and are not global
-or stable package identities. A future multi-package call ABI will need package
-context, an aggregate manifest, or an opaque handle around that index. This
-work deliberately leaves package handles, dependency and initializer ordering,
-conflict policy, and individual unload semantics undefined.
+Manifest export indices remain scoped to the root package manifest rather than
+becoming global package identities. Individual package unload, version solving,
+remote resolution, and hot replacement of one member remain outside this
+slice; replacement always installs a complete set in a fresh instance.
 
 Within one instance, the package decoder owns every object it materializes.
 The helpers in `package_ir_builders.*` consume their owned object arguments,
@@ -518,7 +522,7 @@ The runtime/platform stub files keep the remaining platform boundary explicit:
   and trace scopes) live in `runtime/runtime_environment_stubs.cpp` and are inert in
   this single-threaded demo build;
 - initializer metadata queries are package-backed, using the same init-global
-  table that `vir_load_ir_package` executes through upstream `lean_run_init`;
+  table that `vir_finish_ir_package_set` executes through upstream `lean_run_init`;
 - option registration, sorry dependency lookup, and export-name lookup remain
   demo no-ops in `runtime/runtime_environment_stubs.cpp`;
 - stderr/error printing remains a demo no-op in `runtime/io_stubs.cpp` because the
@@ -527,11 +531,11 @@ The runtime/platform stub files keep the remaining platform boundary explicit:
 
 ## Future Loading Path
 
-The current loader is intentionally demo-specific: it decodes the package format
-emitted by the `Vir/GeneratePackage/` modules. A future loading step is to make the
-package format match Lean's generated `.ir` or module data more closely, so the
-same stable `vir_load_ir_package(ptr, len)` boundary can load artifacts produced
-by Lean itself.
+The current loader remains intentionally demo-specific: it decodes the package
+format emitted by `Vir/GeneratePackage/`, including module-partitioned sets, not
+Lean's raw generated `.ir` representation. A future loading step can move closer
+to Lean module data behind the same declaration-provider boundary without
+changing the upstream interpreter.
 
 ## Future Wasm Interfaces
 

@@ -47,7 +47,7 @@ export async function runIrPackageLifecycleSmoke({ freshDir, wasmBytes, leanPack
   const hostRuntime = await createVirRuntimeFactory({
     wasmBytes,
     virtualDocumentState: documentState,
-  }).createRuntime({ irPackageBytes: await readFile(firstPackage) });
+  }).createRuntime({ irPackageSetBytes: [await readFile(firstPackage)] });
   const firstGenerationResources = documentState.resources;
   const staleFirstGenerationResource = firstGenerationResources.resourceForValue("first generation");
   const firstImport = hostRuntime.interfaceManifest.hostImports.find(
@@ -56,7 +56,7 @@ export async function runIrPackageLifecycleSmoke({ freshDir, wasmBytes, leanPack
   assert.ok(firstImport, `${sharedStringImportName} missing from first reload package`);
   assert.equal(hostRuntime.call("HostInterop.titleHandshake", "first"), "Lean VIR host: first");
 
-  hostRuntime.loadIrPackageBytes(await readFile(secondPackage));
+  hostRuntime.loadIrPackageSetBytes([await readFile(secondPackage)]);
   assert.notEqual(
     documentState.resources,
     firstGenerationResources,
@@ -83,13 +83,13 @@ export async function runIrPackageLifecycleSmoke({ freshDir, wasmBytes, leanPack
   hostRuntime.dispose();
 
   const initializerRuntime = await createVirRuntimeFactory({ wasmBytes })
-    .createRuntime({ irPackageBytes: leanPackageBytes });
+    .createRuntime({ irPackageSetBytes: [leanPackageBytes] });
   assert.equal(initializerRuntime.call(parserScoreEntry), "1123");
-  initializerRuntime.loadIrPackageBytes(leanPackageBytes);
+  initializerRuntime.loadIrPackageSetBytes([leanPackageBytes]);
   assert.equal(initializerRuntime.call(parserScoreEntry), "1123");
   const replacementPages = [];
   for (let iteration = 0; iteration < 12; iteration += 1) {
-    initializerRuntime.loadIrPackageBytes(leanPackageBytes);
+    initializerRuntime.loadIrPackageSetBytes([leanPackageBytes]);
     assert.equal(initializerRuntime.call(parserScoreEntry), "1123");
     replacementPages.push(initializerRuntime.exports.memory.buffer.byteLength / 65536);
   }

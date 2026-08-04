@@ -64,10 +64,12 @@ structure Target where
   includeAll : Bool := false
   includeMarked : Bool := false
   markedModule? : Option Name := none
+  resolveImportedModules : Bool := false
   packageOnly : Bool := false
 
 structure LoadedDecl where
   source : String
+  module? : Option Name := none
   decl : Decl
 
 structure DeclIndexDiagnostic where
@@ -81,6 +83,7 @@ structure DeclIndex where
   sourceDecls : Array (String × Array Name) := #[]
   virExports : NameSet := {}
   virStartups : NameSet := {}
+  loadedModules : NameSet := {}
   diagnostics : Array DeclIndexDiagnostic := #[]
 
 structure InitGlobal where

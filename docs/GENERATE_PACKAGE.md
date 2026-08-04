@@ -13,7 +13,7 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
   `scripts/lean-to-irpkg.sh`, `scripts/generate-browser-package.mjs`, and the
   fixture runner.
 
-Targets have one of five modes:
+Targets have one of six modes:
 
 - `--target <source.lean> <root>...`: package explicit roots and export them.
 - `--package-target <source.lean> <root>...`: include roots in the package
@@ -24,8 +24,10 @@ Targets have one of five modes:
   `@[vir_export]` or `@[vir_startup]` in a source file.
 - `--target-marked-module <driver.lean> <module>`: package marked declarations
   owned by one imported module while excluding marked declarations from its
-  dependencies. The Lake `:vir` module facet uses this mode with a generated
-  `import all` driver when compiled module IR is available.
+  dependencies, then follow opaque declaration ownership to load reached module
+  IR for composable package-set emission. The CLI's internal
+  `--module-set-output` arguments provide descriptor and shard destinations to
+  the Lake `:vir` facet.
 
 ## Module Map
 
@@ -46,9 +48,9 @@ Targets have one of five modes:
   `@[vir_export]`, plus explicit opaque-import deferrals. Declaration-kind,
   signature, and postponed-compilation handling live with the attribute in
   `Vir.Attributes`.
-- `Vir.GeneratePackage.Frontend`: unchanged source elaboration, `DeclIndex`
-  construction, marker collection and module filtering, and declaration-name
-  collision diagnostics.
+- `Vir.GeneratePackage.Frontend`: source elaboration, `DeclIndex` construction,
+  marker collection, declaration-to-module ownership, on-demand `import all`
+  environments, module filtering, and declaration-name collision diagnostics.
 - `Vir.GeneratePackage.Closure`: root resolution and transitive IR closure
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface.Encode`: interface labels, descriptor tags,
@@ -88,7 +90,9 @@ Targets have one of five modes:
    of silently letting the later target overwrite the first.
 4. `Closure.collectClosure` resolves explicit roots, auto-discovered roots, and
    generated boxed entrypoints, then walks the IR references needed by the
-   package.
+   package. Module-set generation repeats this walk while newly missing
+   declarations identify unloaded owning modules, stopping when the closure is
+   complete or no additional module IR is available.
 5. `Interface.collectHostImports` classifies `@[vir_js "..."]` externs reached
    by the closure.
 6. `Manifest.collectInterfaceManifest` classifies callable exports, folds in
@@ -99,7 +103,9 @@ Targets have one of five modes:
    diagnostics.
 8. `Emit.emitPackage` writes the binary package only when the closure and
    manifest have no diagnostics that would make the package ambiguous or
-   unsupported.
+   unsupported. `Run.runModuleSet` partitions a successful closure by module;
+   dependency members have empty public manifests and the root retains the
+   aggregate interface.
 
 ## Ownership Checklist
 

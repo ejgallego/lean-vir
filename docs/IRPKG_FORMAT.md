@@ -4,6 +4,12 @@
 format is internal to this repository and is versioned by
 `packageFormatVersion` in the embedded manifest metadata.
 
+A composable module build does not introduce another binary format. Its
+`lean-vir-ir-package-set` version-1 JSON descriptor lists dependency `.irpkg`
+members first and the public root member last. Every listed member independently
+uses the format documented below; the root's embedded interface manifest is the
+public manifest for the aggregate runtime.
+
 Package format 10 has a fixed header followed by a section directory. All
 multi-byte integers are unsigned little-endian 32-bit values.
 

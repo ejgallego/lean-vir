@@ -6659,6 +6659,12 @@ var textDecoder = new TextDecoder();
 var MAX_UINT322 = 0xffffffffn;
 var MAX_UINT643 = 0xffffffffffffffffn;
 var OBJECT_CALL_UNAVAILABLE = /* @__PURE__ */ Symbol("object-call-unavailable");
+function normalizePackageSetBytes(packages) {
+  if (!Array.isArray(packages) || packages.length === 0) {
+    throw new TypeError("IR package set must be a non-empty array ordered dependencies first, root last");
+  }
+  return packages.map((bytes, index) => asBytes(bytes, `IR package-set member ${index + 1}`));
+}
 var VirRuntime = class extends ObjectValueRuntime {
   constructor(exports, {
     module = null,
@@ -6705,57 +6711,89 @@ var VirRuntime = class extends ObjectValueRuntime {
     const len = this.exports.vir_last_package_error_size?.() ?? 0;
     return len === 0 ? "" : this.readWasmString(this.exports.vir_last_package_error(), len);
   }
-  loadIrPackageBytes(bytes) {
+  loadIrPackageSetBytes(packages) {
     this.requireLiveRuntime();
-    const packageBytes = asBytes(bytes, "IR package bytes");
+    const packageBytes = normalizePackageSetBytes(packages);
     if (this.hasPackageState() || this.liveCallbacks.size !== 0) {
       if (typeof this.createReplacementRuntime !== "function") {
-        throw new Error("IR package reload requires a factory-managed VirRuntime");
+        throw new Error("IR package-set reload requires a factory-managed VirRuntime");
       }
-      return this.replaceIrPackageBytes(packageBytes);
+      return this.replaceIrPackageSetBytes(packageBytes);
     }
-    return this.installIrPackageBytes(packageBytes);
+    return this.installIrPackageSetBytes(packageBytes);
   }
-  installIrPackageBytes(packageBytes) {
-    this.requireFunction("vir_alloc_bytes");
-    this.requireFunction("vir_load_ir_package");
-    const ptr = this.allocBytes(packageBytes);
-    try {
-      const count = this.exports.vir_load_ir_package(ptr, packageBytes.byteLength);
-      if (count === 0) {
-        const detail = this.lastPackageError();
-        throw new Error(`IR package load failed${detail ? `: ${detail}` : ""}`);
-      }
-      const providerCount = this.packageDeclCount();
-      if (providerCount !== null && providerCount !== count) {
-        throw new Error(`IR package declaration count mismatch: load returned ${count}, provider has ${providerCount}`);
-      }
-      this.interfaceManifest = this.readPackageManifest();
-      this.hostState?.setManifest(this.interfaceManifest);
-      this.packageMetadata = this.interfaceManifest.metadata;
-      this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
-      this.rebuildManifestExports();
-      this.packageInfo = {
-        count: providerCount ?? count,
-        byteLength: packageBytes.byteLength,
-        interfaceExports: this.interfaceManifest.exports.length,
-        hostImports: this.interfaceManifest.hostImports?.length ?? 0,
-        metadata: this.packageMetadata
-      };
-      return this.packageInfo;
-    } finally {
-      this.freeBytes(ptr);
+  installIrPackageSetBytes(packageBytes) {
+    this.requireFunction("vir_begin_ir_package_set");
+    this.requireFunction("vir_append_ir_package");
+    this.requireFunction("vir_finish_ir_package_set");
+    if (this.exports.vir_begin_ir_package_set() === 0) {
+      const detail = this.lastPackageError();
+      throw new Error(`IR package-set setup failed${detail ? `: ${detail}` : ""}`);
     }
+    let byteLength = 0;
+    for (let index = 0; index < packageBytes.length; index += 1) {
+      const bytes = packageBytes[index];
+      byteLength += bytes.byteLength;
+      const ptr = this.allocBytes(bytes);
+      try {
+        if (this.exports.vir_append_ir_package(ptr, bytes.byteLength) === 0) {
+          const detail = this.lastPackageError();
+          throw new Error(
+            `IR package-set member ${index + 1} load failed${detail ? `: ${detail}` : ""}`
+          );
+        }
+      } finally {
+        this.freeBytes(ptr);
+      }
+    }
+    const count = this.exports.vir_finish_ir_package_set();
+    if (count === 0) {
+      const detail = this.lastPackageError();
+      throw new Error(`IR package-set finalization failed${detail ? `: ${detail}` : ""}`);
+    }
+    const providerCount = this.packageDeclCount();
+    if (providerCount !== null && providerCount !== count) {
+      throw new Error(
+        `IR package-set declaration count mismatch: load returned ${count}, provider has ${providerCount}`
+      );
+    }
+    return this.finishPackageInstall({
+      count: providerCount ?? count,
+      byteLength,
+      packages: packageBytes.length
+    });
   }
-  replaceIrPackageBytes(packageBytes) {
+  finishPackageInstall({ count, byteLength, packages }) {
+    this.interfaceManifest = this.readPackageManifest();
+    this.hostState?.setManifest(this.interfaceManifest);
+    this.packageMetadata = this.interfaceManifest.metadata;
+    this.boxedCallEntryNames = boxedCallEntryNames(this.interfaceManifest);
+    this.rebuildManifestExports();
+    this.packageInfo = {
+      count,
+      byteLength,
+      packages,
+      interfaceExports: this.interfaceManifest.exports.length,
+      hostImports: this.interfaceManifest.hostImports?.length ?? 0,
+      metadata: this.packageMetadata
+    };
+    return this.packageInfo;
+  }
+  replaceIrPackageSetBytes(packageBytes) {
+    return this.replacePackageState(
+      (replacement) => replacement.installIrPackageSetBytes(packageBytes),
+      "IR package-set"
+    );
+  }
+  replacePackageState(install, label) {
     const replacement = this.createReplacementRuntime();
     let packageInfo;
     try {
-      packageInfo = replacement.installIrPackageBytes(packageBytes);
+      packageInfo = install(replacement);
     } catch (error) {
       const errors = [error];
       collectCleanupError(errors, () => replacement.dispose());
-      throwCollectedErrors(errors, "IR package replacement setup failed");
+      throwCollectedErrors(errors, `${label} replacement setup failed`);
     }
     try {
       this.teardownPackageResources();
@@ -6763,7 +6801,7 @@ var VirRuntime = class extends ObjectValueRuntime {
       const errors = [error];
       collectCleanupError(errors, () => replacement.dispose());
       this.markDisposed();
-      throwCollectedErrors(errors, "IR package replacement teardown failed");
+      throwCollectedErrors(errors, `${label} replacement teardown failed`);
     }
     this.adoptRuntimeState(replacement);
     return packageInfo;
@@ -7393,6 +7431,12 @@ function captureCallbacksCreatedSince(liveCallbacks, callbacksBeforeArgument, li
 
 // web/src/vir-runtime.js
 var VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
+function rejectUnknownOptions(options, label) {
+  const names = Object.keys(options);
+  if (names.length !== 0) {
+    throw new TypeError(`${label} received unknown option${names.length === 1 ? "" : "s"}: ${names.join(", ")}`);
+  }
+}
 async function fetchBytes(path, init = { cache: "no-store" }) {
   const response = await fetch(path, init);
   if (!response.ok) {
@@ -7450,22 +7494,32 @@ function createVirRuntimeFactory(options = {}) {
   return new VirRuntimeFactory(options);
 }
 async function createVirRuntime(options = {}) {
-  const { irPackageBytes, irPackageUrl, ...factoryOptions } = options;
+  const {
+    irPackageSetBytes,
+    irPackageSetUrl,
+    ...factoryOptions
+  } = options;
   const factory = createVirRuntimeFactory(factoryOptions);
-  return factory.createRuntime({ irPackageBytes, irPackageUrl });
+  return factory.createRuntime({
+    irPackageSetBytes,
+    irPackageSetUrl
+  });
 }
 var VirRuntimeFactory = class {
-  constructor({
-    wasmBytes = null,
-    wasmModule = null,
-    wasmUrl = null,
-    wasmDebugUrl = null,
-    debugWasm = false,
-    fetchBytes: loadBytes = fetchBytes,
-    imports = null,
-    hostBindings = null,
-    defaultHostBindings = null
-  } = {}) {
+  constructor(options = {}) {
+    const {
+      wasmBytes = null,
+      wasmModule = null,
+      wasmUrl = null,
+      wasmDebugUrl = null,
+      debugWasm = false,
+      fetchBytes: loadBytes = fetchBytes,
+      imports = null,
+      hostBindings = null,
+      defaultHostBindings = null,
+      ...unknownOptions
+    } = options;
+    rejectUnknownOptions(unknownOptions, "VirRuntimeFactory");
     this.wasmBytes = wasmBytes;
     this.wasmModule = wasmModule;
     this.debugWasm = debugWasm;
@@ -7523,12 +7577,23 @@ var VirRuntimeFactory = class {
       throwCollectedErrors(errors, "VirRuntime instantiation failed during cleanup");
     }
   }
-  async createRuntime({ irPackageBytes = null, irPackageUrl = null } = {}) {
+  async createRuntime(options = {}) {
+    const {
+      irPackageSetBytes = null,
+      irPackageSetUrl = null,
+      ...unknownOptions
+    } = options;
+    rejectUnknownOptions(unknownOptions, "VirRuntimeFactory.createRuntime");
     const runtime = await this.instantiate();
     try {
-      if (irPackageBytes !== null || irPackageUrl !== null) {
-        const bytes = irPackageBytes ?? await this.fetchBytes(irPackageUrl);
-        runtime.loadIrPackageBytes(bytes);
+      if (irPackageSetBytes !== null && irPackageSetUrl !== null) {
+        throw new Error("provide exactly one IR package-set input");
+      }
+      if (irPackageSetBytes !== null) {
+        runtime.loadIrPackageSetBytes(irPackageSetBytes);
+      } else if (irPackageSetUrl !== null) {
+        const packages = await this.fetchIrPackageSet(irPackageSetUrl);
+        runtime.loadIrPackageSetBytes(packages);
       }
       return runtime;
     } catch (error) {
@@ -7537,7 +7602,41 @@ var VirRuntimeFactory = class {
       throwCollectedErrors(errors, "VirRuntime creation failed during cleanup");
     }
   }
+  async fetchIrPackageSet(descriptorUrl) {
+    const descriptorBytes = await this.fetchBytes(descriptorUrl);
+    const descriptor = parseIrPackageSetDescriptor(descriptorBytes);
+    return Promise.all(descriptor.packages.map((entry) => this.fetchBytes(resolvePackageSetUrl(entry.path, descriptorUrl))));
+  }
 };
+var packageSetTextDecoder = new TextDecoder();
+function parseIrPackageSetDescriptor(bytes) {
+  let descriptor;
+  try {
+    descriptor = JSON.parse(packageSetTextDecoder.decode(asBytes(bytes, "IR package-set descriptor")));
+  } catch (error) {
+    throw new Error(`invalid IR package-set descriptor JSON: ${error.message}`);
+  }
+  if (descriptor?.format !== "lean-vir-ir-package-set" || descriptor.version !== 1) {
+    throw new Error("unsupported IR package-set descriptor");
+  }
+  if (!Array.isArray(descriptor.packages) || descriptor.packages.length === 0) {
+    throw new Error("IR package-set descriptor must list at least one package");
+  }
+  for (const [index, entry] of descriptor.packages.entries()) {
+    if (entry === null || typeof entry !== "object" || typeof entry.path !== "string" || !entry.path) {
+      throw new Error(`IR package-set descriptor entry ${index + 1} has no path`);
+    }
+    const expectedRole = index === descriptor.packages.length - 1 ? "root" : "dependency";
+    if (entry.role !== expectedRole) {
+      throw new Error(`IR package-set descriptor entry ${index + 1} must have role ${expectedRole}`);
+    }
+  }
+  return descriptor;
+}
+function resolvePackageSetUrl(path, descriptorUrl) {
+  const base = descriptorUrl instanceof URL ? descriptorUrl : new URL(String(descriptorUrl), globalThis.location?.href ?? "file:///");
+  return new URL(path, base);
+}
 var HostBindingsLease = class {
   constructor(value) {
     this.value = value;
@@ -8370,7 +8469,7 @@ async function loadRuntimeOptionsFromSources({ rpcSession, sources }) {
   if ((packageSource.revision ?? "") !== "" && irPackage.revision !== packageSource.revision) {
     throw new Error("VIR IR package changed while loading; retrying with the latest Lean snapshot");
   }
-  options.irPackageBytes = decodeBase64Bytes(irPackage.dataBase64);
+  options.irPackageSetBytes = [decodeBase64Bytes(irPackage.dataBase64)];
   return options;
 }
 async function loadWasmModule(rpcSession, source) {

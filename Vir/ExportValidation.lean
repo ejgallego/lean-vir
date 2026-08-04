@@ -68,9 +68,9 @@ def ClosureBlocker.message (blocker : ClosureBlocker) : String :=
 def ClosureDeferred.message (deferred : ClosureDeferred) : String :=
   match deferred.kind with
   | .opaqueImport =>
-      s!"could not validate imported dependency `{deferred.dependency.name}`\
+      s!"deferred validation of imported dependency `{deferred.dependency.name}`\
         {deferred.dependency.pathSuffix} because its compiled IR is opaque in this module; \
-        the `:vir` package must include compiled IR for this dependency"
+        `:vir` package generation loads and validates the owning module's compiled IR"
   | .compilerPostponed =>
       s!"could not validate `{deferred.dependency.name}` because `compiler.postponeCompile` is \
         enabled; disable it for modules built with `:vir`"

@@ -92,13 +92,12 @@ package and matching SDK:
   lake build +MyApp.Runtime:vir
   lake build :virSdk
 
-Use the matching Lean package generator or module facet to create .irpkg files,
-then serve:
+The module facet creates a descriptor plus ordinary .irpkg members. Serve:
 
   wasm/vir-upstream.wasm
   wasm/vir-upstream.dev.wasm
   js/vir-runtime.js
-  your generated .irpkg
+  your generated .irpkg-set.json and all of its .irpkg members
 
 wasm/vir-upstream.wasm is the stripped release artifact and is selected by
 default. wasm/vir-upstream.dev.wasm is an optimized, unstripped debugging
@@ -110,7 +109,7 @@ Minimal browser usage:
 
   const vir = await createVirRuntime({
     wasmUrl: "./wasm/vir-upstream.wasm",
-    irPackageUrl: "./my-app.irpkg",
+    irPackageSetUrl: "./MyApp/Runtime.irpkg-set.json",
   });
 
   vir.runStartupEntries();
@@ -122,7 +121,7 @@ Set debugWasm: true to load ./wasm/vir-upstream.dev.wasm instead:
   const debugVir = await createVirRuntime({
     wasmUrl: "./wasm/vir-upstream.wasm",
     debugWasm: true,
-    irPackageUrl: "./my-app.irpkg",
+    irPackageSetUrl: "./MyApp/Runtime.irpkg-set.json",
   });
 
 Browser React root usage:

@@ -13,6 +13,11 @@ lean_lib VirExamples where
   srcDir := "examples"
   roots := #[`SlidesCanvas]
 
+/-- Module-system fixtures for composable package-set regression tests. -/
+lean_lib VirModuleFixtures where
+  srcDir := "fixtures/module-set"
+  globs := #[.andSubmodules `ModuleSetFixture]
+
 lean_exe vir_irpkg where
   root := `tools.GeneratePackage
   supportInterpreter := true
@@ -30,48 +35,84 @@ private def virModuleOutput (mod : Module) (kind ext : String) : System.FilePath
 
 private def virSdkVersion : String := "0.1.0"
 
-/--
-Build a VIR package from the module's `@[vir_export]` and `@[vir_startup]`
-declarations.
--/
-module_facet vir (mod : Module) : System.FilePath := do
+private def virPackageSetComplete (descriptorPath : System.FilePath) : IO Bool := do
+  if !(← descriptorPath.pathExists) then
+    return false
+  let .ok descriptor := Lean.Json.parse (← IO.FS.readFile descriptorPath)
+    | return false
+  let .ok packagesJson := descriptor.getObjVal? "packages"
+    | return false
+  let .ok packages := packagesJson.getArr?
+    | return false
+  let baseDir := descriptorPath.parent.getD "."
+  for packageJson in packages do
+    let .ok (.str path) := packageJson.getObjVal? "path"
+      | return false
+    if !(← (baseDir / path).pathExists) then
+      return false
+  return true
+
+private def buildVirPackageSetFacet
+    (mod : Module) : FetchM (Job System.FilePath) := do
   let generatorJob ← vir_irpkg.fetch
   let moduleJob ← mod.leanArts.fetch
-  let packagePath := virModuleOutput mod "modules" "irpkg"
-  let reportPath := virModuleOutput mod "reports" "report.md"
+  let importsJob ← mod.transImports.fetch
+  let importArtsJob ← importsJob.bindM fun imports => do
+    let jobs ← imports.mapM fun imported => imported.leanArts.fetch
+    return Job.collectArray jobs "VIR imported module IR"
+  let packagePath := virModuleOutput mod "module-sets" "irpkg"
+  let reportPath := virModuleOutput mod "module-sets" "report.md"
+  let descriptorPath := virModuleOutput mod "module-sets" "irpkg-set.json"
+  let shardDir := virModuleOutput mod "module-sets" "parts"
   let driverPath := virModuleOutput mod "drivers" "lean"
   let moduleName := mod.name.toString
   generatorJob.bindM fun generator =>
-    moduleJob.mapM fun artifacts => do
-      addLeanTrace
-      addTrace (← computeTrace generator)
-      addPureTrace moduleName "VIR module"
-      if (← packagePath.pathExists) && !(← reportPath.pathExists) then
-        IO.FS.removeFile packagePath
-      buildFileUnlessUpToDate' packagePath do
-        createParentDirs driverPath
-        createParentDirs packagePath
-        createParentDirs reportPath
-        let sourcePath ←
-          if artifacts.ir?.isSome then
-            IO.FS.writeFile driverPath s!"module\nimport all {moduleName}\n"
-            pure driverPath
-          else
-            pure mod.leanFile
-        let targetArgs :=
-          if artifacts.ir?.isSome then
-            #["--target-marked-module", sourcePath.toString, moduleName]
-          else
-            #["--target-marked", sourcePath.toString]
-        proc {
-          cmd := generator.toString
-          args := #[
-            packagePath.toString,
-            reportPath.toString
-          ] ++ targetArgs
-          env := ← getAugmentedEnv
-        }
-      return packagePath
+    moduleJob.bindM fun artifacts =>
+      importArtsJob.mapM fun _ => do
+        addLeanTrace
+        addTrace (← computeTrace generator)
+        addPureTrace moduleName "VIR module"
+        let packageSetComplete ← virPackageSetComplete descriptorPath
+        if (← descriptorPath.pathExists) &&
+            (!(← reportPath.pathExists) || !packageSetComplete) then
+          IO.FS.removeFile descriptorPath
+        buildFileUnlessUpToDate' descriptorPath do
+          createParentDirs driverPath
+          createParentDirs packagePath
+          createParentDirs reportPath
+          createParentDirs descriptorPath
+          IO.FS.createDirAll shardDir
+          let sourcePath ←
+            if artifacts.ir?.isSome then
+              IO.FS.writeFile driverPath s!"module\nimport all {moduleName}\n"
+              pure driverPath
+            else
+              pure mod.leanFile
+          let targetArgs :=
+            if artifacts.ir?.isSome then
+              #["--target-marked-module", sourcePath.toString, moduleName]
+            else
+              #["--target-marked", sourcePath.toString]
+          proc {
+            cmd := generator.toString
+            args := #[
+              packagePath.toString,
+              reportPath.toString
+            ] ++ #[
+              "--module-set-output", descriptorPath.toString, shardDir.toString, moduleName,
+              mod.fileName "irpkg", shardDir.fileName.getD shardDir.toString
+            ] ++ targetArgs
+            env := ← getAugmentedEnv
+          }
+        return descriptorPath
+
+/--
+Build a composable VIR package set from the module's `@[vir_export]` and
+`@[vir_startup]` declarations. Reached imported module IR is emitted into
+dependency members and the root member owns the public interface manifest.
+-/
+module_facet vir (mod : Module) : System.FilePath :=
+  buildVirPackageSetFacet mod
 
 /--
 Install and verify the matching VIR browser SDK under the package build

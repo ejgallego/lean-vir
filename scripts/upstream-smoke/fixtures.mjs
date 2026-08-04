@@ -6,7 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { packageForFixture } from "./context.mjs";
-import { instantiateVirModule, loadIrPackage } from "./wasm-package.mjs";
+import { instantiateVirModule, loadIrPackageSet } from "./wasm-package.mjs";
 
 export async function smokeFixtureManifest(context) {
   const fixtures = context.fixtureManifest.fixtures ?? [];
@@ -17,7 +17,7 @@ export async function smokeFixtureManifest(context) {
     let value;
     try {
       const exports = await instantiateVirModule(context.wasmModule);
-      loadIrPackage(exports, packageForFixture(context, fixture));
+      loadIrPackageSet(exports, [packageForFixture(context, fixture)]);
       value = new VirRuntime(exports).call(fixture.entry);
     } catch (error) {
       throw new Error(`${fixture.id}: fixture evaluation failed`, { cause: error });

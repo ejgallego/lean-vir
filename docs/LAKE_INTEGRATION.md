@@ -68,14 +68,13 @@ blocker, so a local helper that reaches an unregistered primitive such as
 
 Lean module imports normally expose dependency IR as opaque extern declarations.
 At such a boundary, the attribute does not guess: it identifies the dependency
-whose compiled IR package generation requires. The current `:vir` facet imports
-all IR for the requested module, but not opaque transitive dependency bodies; a
-marked export that reaches one is therefore reported as a missing IR declaration
-with its root-to-boundary path. Keep package-relevant helpers in the marked
-module, or supply the helper's source as an explicit package input. When
-`compiler.postponeCompile` is enabled, disable it for package inputs so Lean can
-produce the required IR. The facet also remains responsible for final interface
-layouts and generated boxed boundaries.
+whose compiled IR package generation requires. The `:vir` facet follows the
+owning module recorded by Lean, imports that module's compiled IR, and emits
+only the reached declarations into a dependency member. If the dependency
+still has no compiled body, generation reports the original root-to-boundary
+path. When `compiler.postponeCompile` is enabled, disable it for package inputs
+so Lean can produce the required IR. The facet remains responsible for final
+interface layouts and generated boxed boundaries.
 
 Only declarations marked in the requested module are selected. Imported
 declarations are not implicitly re-exported. A marked build with no matching
@@ -103,19 +102,31 @@ broader browser library has not yet migrated to the module system.
 lake build +MySlides.Runtime:vir
 ```
 
-The facet writes package-local artifacts under `.lake/build/vir/`:
+The facet writes a JSON descriptor, a root package, dependency members, and a
+report under `.lake/build/vir/module-sets/`:
 
 ```text
-modules/MySlides/Runtime.irpkg
-reports/MySlides/Runtime.report.md
+MySlides/Runtime.irpkg-set.json
+MySlides/Runtime.irpkg
+MySlides/Runtime.parts/MySlides.Support.irpkg
+MySlides/Runtime.report.md
 ```
 
 For current, legacy Lean modules the generator re-elaborates the module source.
 When Lake supplies compiled module IR, the facet depends on that `.ir` and uses
-a generated `import all MySlides.Runtime` driver. In both modes, Lake tracks the
-compiled module and VIR generator as dependencies.
-The `.irpkg` is the facet's returned artifact; if its report sidecar is missing,
-the next facet build regenerates both files.
+a generated `import all MySlides.Runtime` driver.
+
+Every member is an ordinary format-10 `.irpkg`. The descriptor lists dependency
+members first and the root last. Only the root owns interface exports, export
+summaries, native extern registrations, and the aggregate host-import table.
+The runtime loads all members before running initializer globals. Duplicate
+declaration, initializer, host-import, or export-summary identities fail the
+candidate load.
+The descriptor is the facet's returned artifact. The facet depends on Lake's
+transitive import artifacts, so changing an imported
+implementation regenerates the affected set even when the root module's public
+interface and `.olean` remain unchanged. A missing root package, report, or
+descriptor-listed shard also invalidates the cached descriptor target.
 
 An executable or renderer that consumes the package should declare the facet as
 a build dependency:
@@ -171,10 +182,14 @@ import { createVirRuntime } from "./vir/sdk/js/vir-runtime.js";
 
 const vir = await createVirRuntime({
   wasmUrl: "./vir/sdk/wasm/vir-upstream.wasm",
-  irPackageUrl: "./vir/modules/MySlides/Runtime.irpkg",
+  irPackageSetUrl: "./vir/module-sets/MySlides/Runtime.irpkg-set.json",
 });
 vir.runStartupEntries();
 ```
+
+Publish the descriptor together with every referenced `.irpkg`, preserving
+their relative layout. The runtime resolves each member relative to the served
+descriptor URL.
 
 `runStartupEntries()` invokes startup hooks in manifest order and records each
 one only after it succeeds. Calling it again skips completed hooks; if a hook

@@ -207,7 +207,7 @@ ensureVirtualElementStates(virtualDocumentState, ".row", [
 
 const vir = await createVirRuntime({
   wasmBytes,
-  irPackageBytes,
+  irPackageSetBytes: [packageMemberBytes],
   virtualDocumentState,
 });
 ```
@@ -246,7 +246,7 @@ default `common.*` and `browser.*` bindings:
 const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "custom.irpkg",
+  irPackageSetBytes: [await fetchBytes("custom.irpkg")],
   defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
     "demo.bumpNat": (n) => resources.resourceForValue(resources.resolveResource(n, "JsNat") + 1n),
@@ -389,8 +389,8 @@ failures are reported directly or as an `AggregateError` in cleanup order.
 Repeated disposal is a no-op. A disposed resource store is not reused by a new
 runtime generation.
 
-Calling `vir.loadIrPackageBytes(...)` on a runtime that already has a package
-loaded performs the same package-resource cleanup during fresh-instance
+Calling `vir.loadIrPackageSetBytes(...)` on a runtime that already has a package
+set loaded performs the same package-resource cleanup during fresh-instance
 handover. If old-instance cleanup throws, the prepared candidate is discarded
 and the public runtime is left disposed rather than half-switched.
 
