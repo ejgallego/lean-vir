@@ -31,7 +31,8 @@ ownership diagrams.
   `wasm/upstream_shim/interpreter/interpreter_bridge.cpp`, and
   `wasm/upstream_shim/abi/call_abi.cpp`.
 - Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
-  `scripts/bench-vir.mjs`, and `scripts/bench-utils.mjs`.
+  `scripts/bench-vir.mjs`, `scripts/bench-differential.mjs`, and
+  `scripts/bench-utils.mjs`.
 
 ## Documentation Ownership
 

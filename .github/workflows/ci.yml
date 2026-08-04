@@ -27,6 +27,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run test:bench
       - run: npm run check:package-abi
       - run: npm run check:ir-codec-tags
       - run: npm run test:wasm-extensions
