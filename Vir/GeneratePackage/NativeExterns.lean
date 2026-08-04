@@ -85,6 +85,13 @@ def nativeExterns : Array NativeExtern := #[
     generateBoxedWrapper := true
   },
   {
+    name := `Nat.lor,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_lor",
+    generateBoxedWrapper := true
+  },
+  {
     name := `Nat.pow,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
@@ -117,6 +124,13 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .tobject],
     resultType := .tobject,
     symbol := "lean_nat_to_int",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Int.negSucc,
+    params := #[param 1 false .tobject],
+    resultType := .tobject,
+    symbol := "lean_int_neg_succ_of_nat",
     generateBoxedWrapper := true
   },
   {
@@ -1256,6 +1270,13 @@ def nativeExterns : Array NativeExtern := #[
     generateBoxedWrapper := true
   },
   {
+    name := `UInt64.ofBitVec,
+    params := #[param 1 false .tobject],
+    resultType := .uint64,
+    symbol := "lean_uint64_of_nat_mk",
+    generateBoxedWrapper := true
+  },
+  {
     name := `mixHash,
     params := #[param 1 false .uint64, param 2 false .uint64],
     resultType := .uint64,
@@ -1414,6 +1435,34 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .float, param 2 false .float],
     resultType := .float,
     symbol := "lean_float_sub",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.mul,
+    params := #[param 1 false .float, param 2 false .float],
+    resultType := .float,
+    symbol := "lean_float_mul",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.div,
+    params := #[param 1 false .float, param 2 false .float],
+    resultType := .float,
+    symbol := "lean_float_div",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.ofModel,
+    params := #[param 1 false .uint64],
+    resultType := .float,
+    symbol := "lean_float_of_bits",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.ofBits,
+    params := #[param 1 false .uint64],
+    resultType := .float,
+    symbol := "lean_float_of_bits",
     generateBoxedWrapper := true
   },
   {
