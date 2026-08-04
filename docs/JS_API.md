@@ -256,10 +256,12 @@ low-level JavaScript imports use `Unit`, `Lean.Vir.Js α` resources,
 `Lean.Vir.Js.Nullable α` resources for JavaScript `null`, callback arguments
 whose own arguments/results are `Unit` or resources, or explicit conversion targets such as
 `js.nat.value`; concrete Lean-owned values can also opt into the
-`js.leanRef`/`js.leanRef.value`/`js.leanRef.release` object-handle boundary,
-which stores the Lean object behind a `Lean.Vir.JSL α` resource instead of
-decoding it to JavaScript. `LeanRef.releaseJSL` deterministically releases a
-handle. Host imports may additionally receive Lean function values as
+`js.leanRef`/`js.leanRef.value`/`js.leanRef.retain`/`js.leanRef.release`
+object-handle boundary, which stores the Lean object behind a
+`Lean.Vir.JSL α` resource instead of decoding it to JavaScript.
+`LeanRef.retainJSL` creates an independent alias and `LeanRef.releaseJSL`
+deterministically releases only that alias; dropping the Lean wrapper releases
+its alias automatically. Host imports may additionally receive Lean function values as
 callbacks, including event handlers retained by `Lean.Vir.React.Node` resources
 created through `react.node.createElement`.
 Other raw Lean scalar, structure, array, list, option, and product imports are
@@ -445,12 +447,15 @@ result type. Resource-shaped custom bindings that interoperate with built-in
 `JsValue.to*` conversions should share the same `HostResourceState` as the
 default bindings. `Unit` returns use `undefined` or `null`. Function-valued
 Lean arguments are decoded as callable `VirCallback` objects. A host binding
-that stores a callback must eventually call `callback.release()` or rely on
-`VirRuntime.dispose()` to release any still-live callback roots. Host imports
-are synchronous; returning a `Promise` is an error. If argument conversion,
-the binding itself, the synchronous-result check, or result conversion fails,
-the runtime releases every callback newly lifted for that host call. A
-successful binding may retain those callbacks under the ownership rule above.
+receives one transferable callback lease and must eventually call
+`callback.release()` if it stores that lease. A binding with multiple
+independent owners calls `callback.retain()` once for each additional owner;
+each returned lease is a distinct callable object with an idempotent
+`release()`. Host imports are synchronous; returning a `Promise` is an error.
+If argument conversion, the binding itself, the synchronous-result check, or
+result conversion fails, the runtime revokes the callback root and every lease
+created from it during that failed call. A successful nested host call keeps
+its independently transferred callback roots.
 Object-style
 `imports` factory options are treated as overrides on top of the generated
 import table. If you provide a custom `imports` function to
@@ -474,18 +479,39 @@ hostBindings: {
 ```
 
 Callbacks are idempotently releasable through `callback.release()` or
-`callback.dispose()`. Calling a released callback throws. JavaScript-provided
-function values are not accepted as Lean arguments in this phase; function
-values flow from Lean to JavaScript as callable `VirCallback` objects backed by
-internal closure root ids. `VirCallback` objects intentionally do not expose a
-numeric root id.
+`callback.dispose()`. `callback.retain()` returns a new callable lease over the
+same rooted Lean closure. Releasing one lease does not invalidate its siblings;
+the runtime calls `vir_closure_release` only after the last lease is released.
+Calling an individually released lease throws. JavaScript-provided function
+values are not accepted as Lean arguments in this phase; function values flow
+from Lean to JavaScript as callable `VirCallback` objects backed by internal
+closure root ids. `VirCallback` objects intentionally do not expose a numeric
+root id.
+
+For example, a binding that installs two independent registrations can split
+the transferred lease explicitly:
+
+```js
+"demo.subscribeTwice": (callback) => {
+  const first = callback.retain();
+  const second = callback.retain();
+  callback.release(); // relinquish the incoming transfer lease
+  firstRegistration.install(first);
+  secondRegistration.install(second);
+}
+```
+
+Each registration releases only its own lease when removed. The built-in DOM,
+timer, animation, asynchronous RPC, and React owners use this same pattern
+internally, so Lean callers do not manage these leases themselves.
 
 Synchronous JavaScript exceptions raised by a host binding are recorded by the
 Wasm import boundary and consumed by the owning call. This applies equally to
 top-level exports and retained callbacks: the original host error is thrown
 once before any placeholder interpreter result can be treated as success.
 
-`vir.dispose()` releases any `VirCallback` objects still tracked by the runtime
+`vir.dispose()` force-revokes any callback roots still tracked by the runtime,
+marking every outstanding lease released,
 and calls host-binding cleanup hooks. Cleanup is terminal and best-effort: all
 binding hooks, resources, Lean object handles, and callbacks are attempted even
 if one throws. One cleanup failure is rethrown directly; multiple failures are

@@ -29,7 +29,10 @@ import {
   createNullableValue,
   nullablePayload,
 } from "./host/vir-js-value-bindings.js";
-import { VIR_HOST_DISPOSE } from "./host-resource.js";
+import { createJsCollectionHostBindings } from "./host/vir-js-collection-bindings.js";
+import { VIR_HOST_DISPOSE, hostResourceOwnerPhase } from "./host-resource.js";
+import { takeCallbackLease } from "./runtime/callbacks.js";
+import { collectCleanupError, throwCollectedErrors } from "./runtime/cleanup.js";
 
 export {
   hasExternrefTableSupport,
@@ -43,6 +46,7 @@ export {
   createVirtualDocumentState,
   createVirtualElementState,
   ensureVirtualElementState,
+  ensureVirtualElementStates,
   findVirtualReactElementById,
   createVirtualEventState,
   createVirtualEventHostBindings,
@@ -54,6 +58,7 @@ export {
 export function createCommonHostBindings(state = createHostResourceState()) {
   return {
     ...createJsValueHostBindings(state),
+    ...createJsCollectionHostBindings(state),
     "common.echoString": (value) => state.resourceForValue(state.resolveResource(value, "JsString")),
     "common.addNat": (lhs, rhs) =>
       state.resourceForValue(state.resolveResource(lhs, "JsNat") + state.resolveResource(rhs, "JsNat")),
@@ -77,7 +82,9 @@ export function createBrowserDocumentHostBindings(state = createHostResourceStat
       return undefined;
     },
     "browser.document.querySelector": (selector) =>
-      state.resourceForValue(createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString")))),
+      adoptResourceForValue(state, createNullableValue(queryDocumentElement(state.resolveResource(selector, "JsString")))),
+    "browser.document.querySelectorAll": (selector) =>
+      state.resourceForValue(queryDocumentElements(state.resolveResource(selector, "JsString"))),
     "browser.document.createElement": (tagName) =>
       state.resourceForValue(browserDocument().createElement(state.resolveResource(tagName, "JsString"))),
   };
@@ -86,9 +93,9 @@ export function createBrowserDocumentHostBindings(state = createHostResourceStat
 export function createBrowserEventHostBindings(state = createHostResourceState()) {
   return {
     "browser.event.target": (event) =>
-      state.resourceForValue(nullableElementTarget(state.resolveResource(event, "Event").target)),
+      adoptResourceForValue(state, nullableElementTarget(state.resolveResource(event, "Event").target)),
     "browser.event.currentTarget": (event) =>
-      state.resourceForValue(nullableElementTarget(state.resolveResource(event, "Event").currentTarget)),
+      adoptResourceForValue(state, nullableElementTarget(state.resolveResource(event, "Event").currentTarget)),
     "browser.event.preventDefault": (event) => {
       preventDefaultOnEvent(state.resolveResource(event, "Event"));
       return undefined;
@@ -98,7 +105,7 @@ export function createBrowserEventHostBindings(state = createHostResourceState()
       return undefined;
     },
     "browser.event.formValue": (event) =>
-      state.resourceForValue(createNullableValue(formControlEventValue(state.resolveResource(event, "Event")))),
+      adoptResourceForValue(state, createNullableValue(formControlEventValue(state.resolveResource(event, "Event")))),
   };
 }
 
@@ -152,7 +159,7 @@ export function createBrowserCanvasHostBindings(state = createHostResourceState(
     "browser.htmlCanvasElement.fromElement": (element) => {
       const candidate = value(element, "Element");
       const canvas = isCanvasElement(candidate) ? candidate : null;
-      return state.resourceForValue(createNullableValue(canvas));
+      return adoptResourceForValue(state, createNullableValue(canvas));
     },
     "browser.htmlCanvasElement.getWidth": (canvas) =>
       state.resourceForValue(BigInt(value(canvas, "HTMLCanvasElement").width)),
@@ -167,7 +174,7 @@ export function createBrowserCanvasHostBindings(state = createHostResourceState(
       return undefined;
     },
     "browser.htmlCanvasElement.getContext2D": (canvas) =>
-      state.resourceForValue(createNullableValue(value(canvas, "HTMLCanvasElement").getContext("2d"))),
+      adoptResourceForValue(state, createNullableValue(value(canvas, "HTMLCanvasElement").getContext("2d"))),
     "browser.canvas2d.clearRect": (ctx, x, y, width, height) =>
       withCanvasNumbers(state, [x, y, width, height], (...args) =>
         value(ctx, "CanvasRenderingContext2D").clearRect(...args)),
@@ -321,13 +328,29 @@ export function createBrowserHostBindings({
   };
 }
 
-export function createNodeHostBindings(state = createVirtualDocumentState()) {
-  state.resources ??= createHostResourceState();
-  return {
-    ...createCommonHostBindings(state.resources),
-    ...createConsoleHostBindings(state.resources),
-    ...createVirtualDocumentHostBindings(state),
+export function createNodeHostBindings(
+  state = createVirtualDocumentState(),
+  resources = state.resources ?? createHostResourceState(),
+) {
+  const previousResources = state.resources;
+  state.resources = resources;
+  const bindings = {
+    ...createCommonHostBindings(resources),
+    ...createConsoleHostBindings(resources),
+    ...createVirtualDocumentHostBindings(state, resources),
   };
+  const dispose = bindings[VIR_HOST_DISPOSE];
+  bindings[VIR_HOST_DISPOSE] = () => {
+    try {
+      return dispose?.();
+    } finally {
+      if (state.resources === resources &&
+          hostResourceOwnerPhase(previousResources?.owner) === "active") {
+        state.resources = previousResources;
+      }
+    }
+  };
+  return bindings;
 }
 
 function normalizeOptionalHostBindingMap(value, label) {
@@ -349,6 +372,10 @@ function browserDocument() {
 
 function queryDocumentElement(selector) {
   return browserDocument().querySelector(selector);
+}
+
+function queryDocumentElements(selector) {
+  return browserDocument().querySelectorAll(selector);
 }
 
 function isCanvasElement(value) {
@@ -423,12 +450,18 @@ function resolveProofWidgetsRpcRef(resources, commandDispatcher, ref, callback) 
     return false;
   }
   if (result !== null && typeof result === "object" && typeof result.then === "function") {
-    result.then((info) => {
-      callAndReleaseCallback(callback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(info)));
-    }).catch((error) => {
-      reportEventHandlerError(error);
-      releaseCallback(callback);
-    });
+    const ownedCallback = takeCallbackLease(callback, "proofwidgets.rpc.resolveRef callback");
+    try {
+      result.then((info) => {
+        callAndReleaseCallback(ownedCallback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(info)));
+      }).catch((error) => {
+        reportEventHandlerError(error);
+        releaseCallback(ownedCallback);
+      });
+    } catch (error) {
+      releaseCallback(ownedCallback);
+      throw error;
+    }
   } else {
     callAndReleaseCallback(callback, resources.resourceForValue(normalizeProofWidgetsResolvedRef(result)));
   }
@@ -541,13 +574,22 @@ function copyTextWithExecCommand(text) {
 }
 
 function createBrowserEventListenerResource(resources, target, eventName, callback) {
-  const handler = (event) => callLeanEventCallback(resources, event, callback);
-  target.addEventListener(eventName, handler);
+  const ownedCallback = takeCallbackLease(callback, "browser.element.addEventListener callback");
+  const handler = (event) => callLeanEventCallback(resources, event, ownedCallback);
+  try {
+    target.addEventListener(eventName, handler);
+  } catch (error) {
+    const errors = [error];
+    collectCleanupError(errors, () => ownedCallback.release());
+    throwCollectedErrors(errors, "browser event listener registration failed during callback cleanup");
+  }
   const listener = {
     remove: once(() => {
-      target.removeEventListener(eventName, handler);
-      callback.release();
+      const errors = [];
+      collectCleanupError(errors, () => target.removeEventListener(eventName, handler));
+      collectCleanupError(errors, () => ownedCallback.release());
       resources.removeDisposable(listener);
+      throwCollectedErrors(errors, "browser event listener removal failed");
     }),
   };
   return listener;
@@ -571,6 +613,13 @@ function isElement(value) {
 
 function nullableElementTarget(value) {
   return createNullableValue(isElement(value) ? value : null);
+}
+
+function adoptResourceForValue(state, value) {
+  if (typeof state.adoptResourceForValue === "function") {
+    return state.adoptResourceForValue(value);
+  }
+  return state.resourceForValue(value);
 }
 
 function formControlEventValue(event) {

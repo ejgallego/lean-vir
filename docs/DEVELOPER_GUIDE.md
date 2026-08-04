@@ -127,8 +127,13 @@ sequenceDiagram
     end
     Shim->>Host: env.vir_js_call_objects(slot, argv, argc)
     Host->>JS: binding(...liftedArgs)
+    opt binding installs a long-lived owner
+        JS->>Callback: callback.retain()
+        Callback-->>JS: distinct owner lease
+        JS->>Callback: transferLease.release()
+    end
     opt host calls retained callback
-        JS->>Callback: callback(...args)
+        JS->>Callback: ownerLease(...args)
         Callback->>Shim: vir_closure_call(rootId, payload)
         Shim->>IR: evaluate closure
         IR-->>Shim: closure result
@@ -137,14 +142,17 @@ sequenceDiagram
     JS-->>Host: return value
     Host-->>Shim: lowered Lean result object
     Shim-->>IR: Lean result object
-    JS->>Callback: callback.release() when done
-    Callback->>Shim: vir_closure_release(rootId)
+    JS->>Callback: ownerLease.release() when done
+    opt this was the final lease
+        Callback->>Shim: vir_closure_release(rootId)
+    end
 ```
 
-The host binding owns the lifetime of any `VirCallback` it stores. Built-in
-bindings release callbacks when listeners are removed, timers or animation
-frames fire or are cancelled, React subtrees are replaced or unmounted, the
-package is reloaded, or the runtime is disposed.
+The host binding receives one transferable `VirCallback` lease. Built-in
+registrations acquire a distinct lease with `retain()`, relinquish the transfer
+lease, and release their owned lease when listeners are removed, timers or
+animation frames fire or are cancelled, React subtrees are replaced or
+unmounted, the package is reloaded, or the runtime is disposed.
 
 ## Object Ownership
 
@@ -173,14 +181,14 @@ flowchart TD
         Finalizer["external finalizer"]
     end
 
-    Value --> Store
-    Store --> Resource
+    Value --> Resource
     Resource --> RootId
     RootId --> Handle
     Handle --> Finalizer
     Finalizer -->|"env.vir_resource_release(rootId)"| RootId
-    Disposer --> Store
-    Store -->|"releaseResource"| Resource
+    Resource -.->|"generation token (non-enumerating)"| Store
+    Store -->|"strong ownership for active registrations"| Disposer
+    Disposer -->|"invalidate active handle"| Resource
 ```
 
 Important details:
@@ -190,13 +198,15 @@ Important details:
 - The externref root id keeps the `HostResource` wrapper addressable while the
   Lean heap holds it. Releasing the root id does not by itself remove a DOM
   listener, cancel a frame, or unmount a React root.
-- API-specific cleanup is owned by `HostResourceState` and the binding that
-  created the object. Runtime disposal and package reload call that cleanup
-  path before clearing the resource roots.
+- Passive wrappers are not strongly retained by `HostResourceState`. Their
+  lifetime is ordinary JavaScript reachability plus any Lean externref root.
+- API-specific cleanup for active registrations is owned by
+  `HostResourceState` and the binding that created the object. Runtime disposal
+  and package reload call that cleanup path before clearing resource roots.
 - Stale resources are invalidated. Passing a released resource back through a
   host binding is an error instead of silently reusing the JavaScript value.
 - The canonical host-resource ownership policy, including callback-local
-  handles and deferred React scalar-state questions, is maintained in
+  handles, callback leases, and React/JSL alias ownership, is maintained in
   [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 
 Lean closure ownership is symmetric but not identical:
@@ -209,22 +219,26 @@ flowchart TD
     end
 
     subgraph JS["JavaScript runtime"]
-        Callback["VirCallback"]
+        Callback["Transferred VirCallback lease"]
+        Lease["Retained owner lease"]
         Owner["Host owner\nlistener / timer / ReactNode / user binding"]
     end
 
     Closure -->|"vir_closure_root"| ClosureRoot
     ClosureRoot -->|"root id side channel"| Callback
-    Callback --> Owner
-    Owner -->|"invoke"| Callback
-    Callback -->|"vir_closure_call(rootId)"| ClosureRoot
-    Owner -->|"release / dispose"| Callback
-    Callback -->|"vir_closure_release(rootId)"| ClosureRoot
+    Callback -->|"retain()"| Lease
+    Lease --> Owner
+    Owner -->|"invoke"| Lease
+    Lease -->|"vir_closure_call(rootId)"| ClosureRoot
+    Owner -->|"release / dispose"| Lease
+    Lease -->|"last lease: vir_closure_release(rootId)"| ClosureRoot
 ```
 
-`VirCallback.release()` is idempotent. Calling a released callback fails. The
-runtime tracks live callbacks as a last-resort cleanup path, but host bindings
-should release callbacks at their natural lifetime boundary.
+`VirCallback.release()` is idempotent for that lease. Calling a released lease
+fails, while sibling leases remain callable. The runtime tracks roots as a
+last-resort cleanup path and force-revokes every outstanding lease during
+package/runtime teardown, but host bindings should release their leases at the
+natural owner boundary.
 
 ## React Component Flow
 

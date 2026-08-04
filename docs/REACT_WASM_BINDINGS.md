@@ -87,7 +87,10 @@ that larger ABI change separate from the React resource path.
 `externref` does not replace callback rooting. Lean callbacks are still Lean
 heap objects owned by the interpreter runtime. JavaScript may retain a callback
 across React renders, event listeners, timers, or animation frames, so the
-current `VirCallback.release()` contract remains the ownership boundary.
+`VirCallback` lease contract remains the ownership boundary. Each React node,
+component, reducer, effect, or pending state updater acquires its own lease;
+replacing or disposing that owner releases only that lease. The Lean closure
+root is released after its final lease.
 
 JS Promise Integration (JSPI) should be deferred until there is a concrete
 Promise-shaped React app API. The proposal is active at Phase 4 and exposes

@@ -4,10 +4,20 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { isHostResource } from "../host-resource.js";
+import {
+  addHostResourcePayloadChild,
+  isHostResource,
+  registerHostResourcePayloadLifetime,
+  releaseHostResourcePayload,
+  removeHostResourcePayloadChild,
+  retainHostResourcePayload,
+} from "../host-resource.js";
+import { releaseCallbacks, takeCallbackLease } from "../runtime/callbacks.js";
+import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
 
 const REACT_NODE_MAX_DEPTH = 128;
 const REACT_NODE_MAX_NODES = 10000;
+const reactPropsStates = new WeakMap();
 
 export function createBrowserReactRootResource(state, root, React, hooks) {
   const createElement = requireReactCreateElement(React, "createBrowserReactRootResource");
@@ -69,9 +79,14 @@ function createReactRootResource(resources, hooks, adapter) {
   const { addDisposable, removeDisposable, once } = requireReactHostHooks(hooks);
   let currentNode = null;
   let currentComponent = null;
+  let unmounted = false;
+  const requireMounted = () => {
+    if (unmounted) throw new Error("React root has been unmounted");
+  };
   const value = {
     ...(adapter.initialState ?? {}),
     render(node) {
+      requireMounted();
       currentNode = commitReactNodeRender(resources, hooks, node, currentNode, (nextNode) => {
         adapter.commitNode(value, nextNode);
       });
@@ -79,6 +94,7 @@ function createReactRootResource(resources, hooks, adapter) {
       currentComponent = null;
     },
     renderComponent(renderCallback) {
+      requireMounted();
       const component =
         currentComponent === null
           ? adapter.createComponent(
@@ -102,10 +118,11 @@ function createReactRootResource(resources, hooks, adapter) {
       currentComponent = component;
     },
     unmount: once(() => {
+      unmounted = true;
       try {
         adapter.unmount?.(value);
       } finally {
-        releaseReactNodeResource(resources, currentNode);
+        releaseReactNodeOwner(resources, currentNode);
         currentNode = null;
         disposeReactComponent(currentComponent);
         currentComponent = null;
@@ -118,12 +135,12 @@ function createReactRootResource(resources, hooks, adapter) {
 }
 
 function commitReactNodeRender(resources, hooks, node, currentNode, commit) {
-  const sameNode = currentNode === node;
   let nextNode = null;
   let retained = false;
   try {
     nextNode = resolveReactNodeResource(resources, node);
     validateRenderableReactNode(nextNode);
+    const sameNode = currentNode === nextNode;
     if (!sameNode) {
       retainReactNodeValue(nextNode);
       retained = true;
@@ -132,15 +149,15 @@ function commitReactNodeRender(resources, hooks, node, currentNode, commit) {
   } catch (error) {
     if (retained) {
       releaseReactNodeValue(resources, nextNode);
-    } else if (!sameNode && nextNode?.refCount === 0) {
+    } else if (currentNode !== nextNode && nextNode?.refCount === 0) {
       disposeReactNode(resources, node);
     }
     throw error;
   }
-  if (!sameNode) {
+  if (currentNode !== nextNode) {
     queueReactNodeRelease(resources, currentNode, hooks);
   }
-  return node;
+  return nextNode;
 }
 
 function updateVirtualReactRoot(target, value, nextTree) {
@@ -224,7 +241,14 @@ export function createVirtualReactNodeFragmentResource(resources, props, childre
 }
 
 export function createReactPropsResource() {
-  return { kind: "ReactProps", key: null, ref: null, properties: [], handlers: [] };
+  const props = { kind: "ReactProps", key: null, ref: null, properties: [], handlers: [] };
+  const state = { live: true };
+  reactPropsStates.set(props, state);
+  registerHostResourcePayloadLifetime(props, {
+    retain: () => cloneReactPropsResource(props),
+    release: () => releaseReactPropsResource(props),
+  });
+  return props;
 }
 
 export function setReactPropsKey(resources, propsResource, keyResource) {
@@ -247,7 +271,16 @@ export function setReactPropsProperty(resources, propsResource, propertyResource
 
 export function setReactPropsEventHandler(resources, propsResource, handlerResource) {
   const props = resolveReactPropsResource(resources, propsResource);
-  props.handlers.push(resources.resolveResource(handlerResource, `React Node event handler[${props.handlers.length}]`));
+  const handler = resources.resolveResource(handlerResource, `React Node event handler[${props.handlers.length}]`);
+  const retained = retainHostResourcePayload(handler);
+  try {
+    addHostResourcePayloadChild(props, retained);
+    props.handlers.push(retained);
+  } catch (error) {
+    const errors = [error instanceof Error ? error : new Error(String(error))];
+    collectCleanupError(errors, () => releaseHostResourcePayload(retained));
+    throwCollectedErrors(errors, "React props event handler ownership failed");
+  }
   return undefined;
 }
 
@@ -308,7 +341,7 @@ export function createReactNodeResource(resources, { node, childEntries = [], ca
     callbacks,
     nodeCount,
     maxDepth,
-    refCount: 0,
+    refCount: 1,
     finalized: false,
     dispose() {
       finalizeReactNodeValue(resources, value);
@@ -318,8 +351,34 @@ export function createReactNodeResource(resources, { node, childEntries = [], ca
   for (const child of children) {
     retainReactNodeValue(child);
   }
-  resources.addDisposable(value);
-  return value;
+  let registered = false;
+  try {
+    registerHostResourcePayloadLifetime(value, {
+      children,
+      retain: () => {
+        retainReactNodeValue(value);
+        return value;
+      },
+      release: () => releaseReactNodeValue(resources, value),
+    });
+    registered = true;
+    for (const resource of new Set(childEntries.map((child) => child.resource).filter(isHostResource))) {
+      resources.releaseResource(resource);
+    }
+    return value;
+  } catch (error) {
+    const errors = [error instanceof Error ? error : new Error(String(error))];
+    if (!registered) {
+      value.finalized = true;
+      value.refCount = 0;
+      for (const child of children) {
+        collectCleanupError(errors, () => releaseReactNodeValue(resources, child));
+      }
+    } else {
+      collectCleanupError(errors, () => releaseHostResourcePayload(value));
+    }
+    throwCollectedErrors(errors, "React node ownership registration failed");
+  }
 }
 
 export function disposeReactNode(resources, node) {
@@ -368,7 +427,7 @@ export function releaseReactNodeResource(resources, resource) {
 
 export function queueReactNodeRelease(resources, node, hooks = null) {
   if (node === null || node === undefined) return;
-  const run = () => releaseReactNodeResource(resources, node);
+  const run = () => releaseReactNodeOwner(resources, node);
   if (typeof hooks?.deferReactNodeDispose === "function") {
     hooks.deferReactNodeDispose(run);
     return;
@@ -461,8 +520,16 @@ function validateRenderableReactNode(nextNode) {
 
 function resolveRenderedReactNodeValue(resources, node) {
   const nextNode = resolveRenderedReactNode(resources, node);
-  retainReactNodeValue(nextNode);
   return nextNode.node;
+}
+
+function releaseReactNodeOwner(resources, node) {
+  if (node === null || node === undefined) return;
+  if (isHostResource(node)) {
+    resources.releaseResource(node);
+    return;
+  }
+  releaseReactNodeValue(resources, node);
 }
 
 function releaseReactNodeValue(resources, value) {
@@ -478,13 +545,17 @@ function finalizeReactNodeValue(resources, value) {
   if (value?.kind !== "ReactNode" || value.finalized) return;
   value.finalized = true;
   value.refCount = 0;
-  releaseReactCallbacks(value.callbacks);
-  value.callbacks.length = 0;
-  for (const child of value.children) {
-    releaseReactNodeValue(resources, child);
-  }
-  value.children.length = 0;
+  const callbacks = value.callbacks;
+  const children = value.children;
+  value.callbacks = [];
+  value.children = [];
   resources.removeDisposable(value);
+  const errors = [];
+  collectCleanupError(errors, () => releaseReactCallbacks(callbacks));
+  for (const child of children) {
+    collectCleanupError(errors, () => releaseReactNodeValue(resources, child));
+  }
+  throwCollectedErrors(errors, "React node finalization failed");
 }
 
 function resolveReactNodeChildrenBuilder(resources, children) {
@@ -522,7 +593,14 @@ function createReactComponentResource(
     disposePreviousNode = queueReactNodeRelease) {
   requireReactComponentRenderCallback(renderCallback);
   requireReactHookRuntime(hookRuntime);
-  const componentState = hookRuntime.createComponentState(scheduleRender);
+  renderCallback = takeCallbackLease(renderCallback, "React component render callback");
+  let componentState;
+  try {
+    componentState = hookRuntime.createComponentState(scheduleRender);
+  } catch (error) {
+    renderCallback.release();
+    throw error;
+  }
   let currentNode = null;
   let disposed = false;
   const component = {
@@ -538,14 +616,22 @@ function createReactComponentResource(
         try {
           node = renderCallback(undefined);
           const next = renderNode(node);
-          disposePreviousNode(currentNode);
-          currentNode = node;
-          hookRuntime.commitComponentRender?.(componentState);
+          const commitOwnership = () => {
+            const previous = currentNode;
+            currentNode = node;
+            disposePreviousNode(previous);
+          };
+          if (typeof hookRuntime.commitComponentRender === "function") {
+            hookRuntime.commitComponentRender(componentState, commitOwnership);
+          } else {
+            commitOwnership();
+          }
           return next;
         } catch (error) {
-          hookRuntime.cancelComponentRender?.(componentState);
-          disposeReactNode(resources, node);
-          throw error;
+          const errors = [error instanceof Error ? error : new Error(String(error))];
+          collectCleanupError(errors, () => hookRuntime.cancelComponentRender?.(componentState));
+          collectCleanupError(errors, () => disposeReactNode(resources, node));
+          throwCollectedErrors(errors, "React component render failed during cleanup");
         }
       });
     },
@@ -555,15 +641,16 @@ function createReactComponentResource(
         throw new Error("React component has been disposed");
       }
       requireReactComponentRenderCallback(nextRenderCallback);
+      const ownedRenderCallback = takeCallbackLease(nextRenderCallback, "React component render callback");
       const previousRenderCallback = renderCallback;
-      renderCallback = nextRenderCallback;
+      renderCallback = ownedRenderCallback;
       previousRenderCallback.release();
       return component;
     },
     dispose() {
       if (disposed) return;
       disposed = true;
-      releaseReactNodeResource(resources, currentNode);
+      releaseReactNodeOwner(resources, currentNode);
       currentNode = null;
       hookRuntime.disposeComponent(componentState);
       renderCallback.release();
@@ -596,17 +683,24 @@ function reactPropsFromNode(state, fields, callLeanEventCallback, hooks) {
   for (const [name, value] of reactNodePropertyEntries(fields.props.properties)) {
     setReactObjectProperty(props, name, value);
   }
-  for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
-    callbacks.push(callback);
-    setReactObjectProperty(props, name, (event) => {
-      beginReactNodeEventCallback(hooks);
-      try {
-        return callLeanEventCallback(state, event, callback);
-      } finally {
-        endReactNodeEventCallback(hooks);
-        flushReactNodeDisposals(hooks);
-      }
-    });
+  try {
+    for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
+      const ownedCallback = takeCallbackLease(callback, `React Node ${name} event callback`);
+      callbacks.push(ownedCallback);
+      setReactObjectProperty(props, name, (event) => {
+        beginReactNodeEventCallback(hooks);
+        try {
+          return callLeanEventCallback(state, event, ownedCallback);
+        } finally {
+          endReactNodeEventCallback(hooks);
+          flushReactNodeDisposals(hooks);
+        }
+      });
+    }
+  } catch (error) {
+    releaseReactCallbacks(callbacks);
+    callbacks.length = 0;
+    throw error;
   }
   return { props, callbacks };
 }
@@ -639,17 +733,24 @@ function virtualReactPropsFromNode(fields) {
 function virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, hooks) {
   const handlers = {};
   const callbacks = [];
-  for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
-    callbacks.push(callback);
-    setReactObjectProperty(handlers, name, (event = {}) => {
-      beginReactNodeEventCallback(hooks);
-      try {
-        return callLeanEventCallback(resources, event, callback);
-      } finally {
-        endReactNodeEventCallback(hooks);
-        flushReactNodeDisposals(hooks);
-      }
-    });
+  try {
+    for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
+      const ownedCallback = takeCallbackLease(callback, `React Node ${name} event callback`);
+      callbacks.push(ownedCallback);
+      setReactObjectProperty(handlers, name, (event = {}) => {
+        beginReactNodeEventCallback(hooks);
+        try {
+          return callLeanEventCallback(resources, event, ownedCallback);
+        } finally {
+          endReactNodeEventCallback(hooks);
+          flushReactNodeDisposals(hooks);
+        }
+      });
+    }
+  } catch (error) {
+    releaseReactCallbacks(callbacks);
+    callbacks.length = 0;
+    throw error;
   }
   return { handlers, callbacks };
 }
@@ -700,10 +801,55 @@ function normalizeReactProps(resources, props) {
 
 function resolveReactPropsResource(resources, props) {
   const value = resources.resolveResource(props, "ReactProps");
-  if (value?.kind !== "ReactProps") {
+  if (value?.kind !== "ReactProps" || reactPropsStates.get(value)?.live !== true) {
     throw new Error("ReactProps resource has invalid value");
   }
   return value;
+}
+
+function cloneReactPropsResource(source) {
+  if (reactPropsStates.get(source)?.live !== true) {
+    throw new Error("cannot retain a released ReactProps resource");
+  }
+  const clone = createReactPropsResource();
+  clone.key = source.key;
+  clone.ref = source.ref;
+  clone.properties.push(...source.properties);
+  try {
+    for (const handler of source.handlers) {
+      const retained = retainHostResourcePayload(handler);
+      try {
+        addHostResourcePayloadChild(clone, retained);
+        clone.handlers.push(retained);
+      } catch (error) {
+        const errors = [error instanceof Error ? error : new Error(String(error))];
+        collectCleanupError(errors, () => releaseHostResourcePayload(retained));
+        throwCollectedErrors(errors, "ReactProps clone ownership failed");
+      }
+    }
+    return clone;
+  } catch (error) {
+    const errors = [error instanceof Error ? error : new Error(String(error))];
+    collectCleanupError(errors, () => releaseReactPropsResource(clone));
+    throwCollectedErrors(errors, "ReactProps clone failed during cleanup");
+  }
+}
+
+function releaseReactPropsResource(props) {
+  const state = reactPropsStates.get(props);
+  if (state?.live !== true) return false;
+  state.live = false;
+  const handlers = props.handlers.splice(0);
+  props.properties.length = 0;
+  props.key = null;
+  props.ref = null;
+  const errors = [];
+  for (const handler of handlers) {
+    removeHostResourcePayloadChild(props, handler);
+    collectCleanupError(errors, () => releaseHostResourcePayload(handler));
+  }
+  throwCollectedErrors(errors, "ReactProps event handler releases failed");
+  return true;
 }
 
 function reactNodeKey(key) {
@@ -887,11 +1033,7 @@ function reactSafeObjectKey(value, label) {
 }
 
 function releaseReactCallbacks(callbacks) {
-  for (const callback of callbacks) {
-    if (typeof callback?.release === "function") {
-      callback.release();
-    }
-  }
+  releaseCallbacks(callbacks);
 }
 
 function requireReactCreateElement(React, label) {

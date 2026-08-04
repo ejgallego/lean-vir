@@ -15,14 +15,19 @@ reentry into Lean. Event listeners use retained Lean closures directly.
 - Lean function values in host-import arguments are queued as internal closure
   root ids, not serialized into `INTERFACE_TAG.FUNCTION` payloads. JavaScript receives
   callable `VirCallback` objects, not raw numeric roots.
-- `VirCallback.release()` is idempotent and calls the WASM
-  `vir_closure_release` export to decrement the rooted Lean closure.
-- Browser listener, timeout, and animation-frame bindings retain callbacks until
-  the registration fires, is cancelled/removed, or the runtime is disposed.
+- `VirCallback.retain()` returns a distinct callable lease over the same closure
+  root. `release()` is idempotent per lease; releasing one owner does not
+  invalidate another, and the last release calls the WASM
+  `vir_closure_release` export.
+- Browser listener, timeout, interval, animation-frame, asynchronous RPC, and
+  React owners acquire their own callback lease and relinquish the incoming
+  transfer lease. They release the owned lease when the registration fires, is
+  cancelled/removed/replaced, or the runtime is disposed.
 - A host import may retain its lifted callbacks only after argument conversion,
   binding execution, synchronous-result validation, and result conversion all
-  succeed. Failure in any phase releases the callbacks created for that import;
-  callbacks retained by successful nested calls remain live.
+  succeed. Failure in any phase revokes the whole callback root, including any
+  leases the failed binding created from it; callbacks transferred by
+  successful nested calls remain live.
 - Synchronous host exceptions are relayed to the owning top-level call or
   retained callback call instead of accepting the trampoline's placeholder
   result as success.
@@ -81,6 +86,8 @@ callback from the current callback.
 - resource-shaped `RuntimeM` callback round-trip through a custom
   `test.callNatCallback` host import using explicit `Js Nat` values;
 - double release, call-after-release, and stale closure root failure;
+- independent multi-owner leases, last-lease root release, and force-revocation
+  of leases created by a failed binding;
 - nested callback argument errors while Lean is inside a host import;
 - retained-callback host-error propagation through direct, event, timer, and
   animation calls;

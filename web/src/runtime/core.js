@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { validateInterfaceManifest } from "./interface-manifest.js";
-import { releaseCallbacks } from "./callbacks.js";
+import { releaseCallbackRoots } from "./callbacks.js";
 import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import { ObjectValueRuntime } from "./object-values.js";
 import {
@@ -44,6 +44,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.entryCallCache = new WeakMap();
     this.completedStartupEntries = new Set();
     this.disposed = false;
+    this.disposing = false;
     this.liveCallbacks = new Set();
     this.createReplacementRuntime = createReplacementRuntime;
     this.hostState?.attachRuntime(this);
@@ -126,7 +127,7 @@ export class VirRuntime extends ObjectValueRuntime {
       packageInfo = replacement.installIrPackageBytes(packageBytes);
     } catch (error) {
       const errors = [error];
-      collectCleanupError(errors, () => replacement.dispose({ disposeBindings: false }));
+      collectCleanupError(errors, () => replacement.dispose());
       throwCollectedErrors(errors, "IR package replacement setup failed");
     }
 
@@ -156,6 +157,7 @@ export class VirRuntime extends ObjectValueRuntime {
     this.rebuildManifestExports();
 
     replacement.disposed = true;
+    replacement.disposing = false;
     replacement.hostState = null;
     replacement.liveCallbacks = new Set();
     replacement.exportsByName = Object.create(null);
@@ -266,7 +268,7 @@ export class VirRuntime extends ObjectValueRuntime {
         argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
       }
       return this.callResolvedObjects(entry, cache, argObjs, (resultObj) =>
-        this.liftObjectValue(plan.resultType, resultObj, `${entry.entry} result`));
+        this.liftOwnedObjectValue(plan.resultType, resultObj, `${entry.entry} result`));
     } finally {
       this.releaseOwnedObjects(argObjs);
     }
@@ -431,7 +433,7 @@ export class VirRuntime extends ObjectValueRuntime {
       if (resultObj === 0) {
         throw new Error(this.lastClosureCallError() || "closure call failed");
       }
-      return this.liftObjectValue(requireFunctionResult(type, "callback"), resultObj, "callback result");
+      return this.liftOwnedObjectValue(requireFunctionResult(type, "callback"), resultObj, "callback result");
     } finally {
       if (argvPtr !== 0) {
         this.freeBytes(argvPtr);
@@ -452,11 +454,14 @@ export class VirRuntime extends ObjectValueRuntime {
   }
 
   dispose({ disposeBindings = true } = {}) {
-    if (this.disposed) return;
-    this.disposed = true;
+    if (this.disposed || this.disposing) return;
+    this.disposing = true;
     const errors = [];
-    collectCleanupError(errors, () => this.teardownPackageResources({ disposeBindings }));
-    this.markDisposed();
+    try {
+      collectCleanupError(errors, () => this.teardownPackageResources({ disposeBindings }));
+    } finally {
+      this.markDisposed();
+    }
     throwCollectedErrors(errors, "VirRuntime disposal failed");
   }
 
@@ -470,7 +475,7 @@ export class VirRuntime extends ObjectValueRuntime {
   releaseLiveCallbacks() {
     const callbacks = Array.from(this.liveCallbacks);
     try {
-      releaseCallbacks(callbacks);
+      releaseCallbackRoots(callbacks);
     } finally {
       this.liveCallbacks.clear();
     }
@@ -478,6 +483,7 @@ export class VirRuntime extends ObjectValueRuntime {
 
   markDisposed() {
     this.disposed = true;
+    this.disposing = false;
     this.hostState = null;
     this.exportsByName = Object.create(null);
   }

@@ -55,9 +55,10 @@ object ABI on the package-call path.
 The host-import path now also supports Lean function values as callback objects.
 `Element.addEventListener`, `Timer.setTimeout`, and
 `Animation.requestAnimationFrame` root Lean closures in the WASM shim, expose
-callable `VirCallback` objects to JavaScript, and release roots when listeners
-are removed, timers or frames are cancelled, one-shot callbacks fire, or the
-runtime is disposed. Loading a new package into an existing runtime performs the
+callable `VirCallback` objects to JavaScript, and give every listener, timer,
+frame, asynchronous RPC, or React owner an independent callback lease. The
+closure root is released after its last lease, or force-revoked during runtime
+teardown. Loading a new package into an existing runtime performs the
 same host-resource teardown before the new manifest is installed. Event
 resources remain opaque callback-scoped values; the ownership contract and
 follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
@@ -77,25 +78,35 @@ Controlled text handlers use `Event.inputValue?` and checkbox handlers use
 `Event.inputChecked?`; both check `Event.currentTarget` before `target`.
 `onChange` and `onSubmit` callbacks can also forward `Event.preventDefault` and
 `Event.stopPropagation` through the same opaque event resource. The virtual
-Node document mirrors DOM `querySelector` for missing selectors; tests that
-need fixtures explicitly pre-seed them. Root rerender, unmount, package reload,
+Node document mirrors DOM `querySelector` for missing selectors and returns a
+static `NodeList` from `querySelectorAll`; tests explicitly pre-seed single or
+multiple matching fixtures. Root rerender, unmount, package reload,
 and runtime disposal reuse the existing resource and callback lifetime model.
 Current standalone React Node status is tracked in `docs/REACT_NODE.md`; full
 Lean infoview RPC compatibility remains follow-up work tracked in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
-Open React/JSL ownership research: `Lean.Vir.JSL α` handles are retained
-Lean-owned objects that JavaScript can store without decoding. The current
-primitive gives Lean code deterministic `LeanRef.releaseJSL` and runtime teardown,
-but React ownership is more subtle than a single live/dead flag. React state,
-reducers, and refs can rewrap the same JSL payload in different host-resource
-stores, and future automatic cleanup of replaced reducer state/actions must not
-invalidate aliases that are still stored elsewhere. The likely direction is an
-internal refcounted LeanRef cell plus React-hook ownership helpers: retain when
-React starts storing a JSL payload, release when that storage is replaced or the
-component unmounts, and release reducer action payloads after the reducer call.
-Keep this out of the public API until the aliasing and ownership boundaries are
-specified and covered by stress tests.
+`Lean.Vir.JSL α` handles now use explicit per-alias leases over one retained
+Lean object. `LeanRef.retainJSL` creates an independent alias and
+`LeanRef.releaseJSL` releases only that alias. An owned externref root releases
+its lease when Lean's external-object finalizer drops the wrapper, while
+runtime teardown force-revokes all aliases. `releaseJSL` therefore remains the
+deterministic early-release operation rather than the only leak-free path.
+React state, reducers, refs, and memo values acquire their own leases when
+stored and release them on replacement, action consumption, or component
+disposal. Focused virtual and browser-hook tests cover alias independence,
+replacement, callback-result transfer, dropped wrappers, and unmount cleanup.
+
+Composite resources retain their resource-bearing children and reject
+ownership cycles. Recursive result lifting is transactional: callbacks and
+owned resource aliases materialized before a later decoding failure are rolled
+back. Browser React render generations stay outside the runtime's strong owner
+registry and transfer their staged ownership only from a commit-phase layout
+effect; weak finalization is a safety net for abandoned renders. Browser state
+updaters and reducers are evaluated once by VIR and only concrete values are
+queued into React, so React development replay cannot repeat Lean effects.
+Finalizer diagnostics are bounded strings and never retain the failed resource
+payload.
 
 `Lean.Expr` is also part of the current manifest surface. JavaScript sends and
 receives structural objects for the standard expression constructors, while Lean

@@ -158,6 +158,7 @@ def isLeanObjectHandleSignature
     match target, args[0]? with
     | "js.leanRef", some arg => args.size == 1 && arg.type.isLeanObjectHandle && result.isGenericJsResource
     | "js.leanRef.value", some arg => args.size == 1 && arg.type.isGenericJsResource && result.isLeanObjectHandle
+    | "js.leanRef.retain", some arg => args.size == 1 && arg.type.isGenericJsResource && result.isGenericJsResource
     | "js.leanRef.release", some arg => args.size == 1 && arg.type.isGenericJsResource && result == .unit
     | _, _ => false
 

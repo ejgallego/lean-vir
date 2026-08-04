@@ -21,7 +21,10 @@ import {
   hostResourceValue,
   isHostResource,
   normalizeHostResource,
+  registerHostResourcePayloadLifetime,
+  releaseHostResource,
 } from "../host-resource.js";
+import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import {
   OBJECT_VALUE_EXPORTS,
   hostResourceArgumentSupported,
@@ -55,6 +58,36 @@ const textEncoder = new TextEncoder();
 const MAX_UINT64 = 0xffffffffffffffffn;
 const LEAN_OBJECT_HANDLE = Symbol("lean-vir.leanObjectHandle");
 
+class ObjectValueOwnershipScope {
+  constructor(label) {
+    this.label = label;
+    this.cleanups = [];
+    this.closed = false;
+  }
+
+  own(cleanup) {
+    if (this.closed) {
+      throw new Error(`${this.label} ownership scope is already closed`);
+    }
+    this.cleanups.push(cleanup);
+  }
+
+  commit() {
+    this.closed = true;
+    this.cleanups.length = 0;
+  }
+
+  rollback(error) {
+    this.closed = true;
+    const errors = [error instanceof Error ? error : new Error(String(error))];
+    for (let index = this.cleanups.length - 1; index >= 0; index -= 1) {
+      collectCleanupError(errors, this.cleanups[index]);
+    }
+    this.cleanups.length = 0;
+    throwCollectedErrors(errors, `${this.label} failed during ownership rollback`);
+  }
+}
+
 function normalizeObjectPointer(value, label) {
   if (!Number.isInteger(value) || value <= 0 || value > 0xffffffff) {
     throw new Error(`${label} must be a live Lean object pointer`);
@@ -72,22 +105,81 @@ function releaseLeanObjectHandleCell(cell) {
     return false;
   }
   cell.live = false;
-  cell.runtime.exports.vir_obj_dec(cell.object);
-  if (typeof onRelease === "function") onRelease();
+  for (const lease of cell.leases) {
+    lease.released = true;
+  }
+  cell.leases.clear();
+  try {
+    cell.runtime.exports.vir_obj_dec(cell.object);
+  } finally {
+    if (typeof onRelease === "function") onRelease();
+  }
   return true;
 }
 
-function requireLeanObjectHandleCell(resource, runtime, label) {
+function releaseLeanObjectHandleLease(lease) {
+  if (lease?.released !== false || lease.cell?.live !== true) return false;
+  lease.released = true;
+  lease.cell.leases.delete(lease);
+  if (lease.cell.leases.size === 0) {
+    releaseLeanObjectHandleCell(lease.cell);
+  }
+  return true;
+}
+
+function createLeanObjectHandleAlias(cell) {
+  if (cell?.live !== true) {
+    throw new Error("cannot retain a released Lean object handle");
+  }
+  const lease = {
+    cell,
+    released: false,
+  };
+  const handle = Object.freeze({
+    [LEAN_OBJECT_HANDLE]: true,
+    runtime: cell.runtime,
+    object: cell.object,
+    cell,
+    lease,
+  });
+  cell.leases.add(lease);
+  registerHostResourcePayloadLifetime(handle, {
+    retain: () => createLeanObjectHandleAlias(cell),
+    release: () => releaseLeanObjectHandleLease(lease),
+  });
+  return handle;
+}
+
+function createLeanObjectHandleResource(cell, label) {
+  const handle = createLeanObjectHandleAlias(cell);
+  try {
+    return createHostResource(handle, label, {
+      dispose: () => {
+        releaseLeanObjectHandleLease(handle.lease);
+        return undefined;
+      },
+    });
+  } catch (error) {
+    releaseLeanObjectHandleLease(handle.lease);
+    throw error;
+  }
+}
+
+function requireLeanObjectHandleLease(resource, runtime, label) {
   const handle = hostResourceValue(resource);
   const cell = handle?.cell;
+  const lease = handle?.lease;
   if (handle?.[LEAN_OBJECT_HANDLE] !== true ||
       handle.runtime !== runtime ||
       cell?.runtime !== runtime ||
-      cell.live !== true) {
+      lease?.cell !== cell ||
+      lease.released !== false ||
+      cell.live !== true ||
+      !cell.leases.has(lease)) {
     throw new Error(`${label} must be a live Lean object handle resource`);
   }
   normalizeObjectPointer(cell.object, label);
-  return cell;
+  return lease;
 }
 
 export class ObjectValueRuntime {
@@ -100,26 +192,26 @@ export class ObjectValueRuntime {
     if (!hostResourceResultSupported(type)) {
       throw new Error(`${label} has unsupported JavaScript host resource result type`);
     }
-    return this.makeObjectValue(type, value, label);
+    return this.makeObjectValue(type, value, label, null, true);
   }
 
   makeExplicitConversionObjectValue(type, value, label) {
-    return this.makeObjectValue(type, value, label);
+    return this.makeObjectValue(type, value, label, null, true);
   }
 
-  makeObjectValue(type, value, label, selfType = null) {
+  makeObjectValue(type, value, label, selfType = null, ownResources = false) {
     const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
           throw new Error(`${label} has a recursive self reference without an enclosing type`);
         }
-        return this.makeObjectValue(selfType, value, label, selfType);
+        return this.makeObjectValue(selfType, value, label, selfType, ownResources);
       case INTERFACE_TAG.UNIT:
         if (value !== undefined && value !== null) throw new Error(`${label} must be undefined or null`);
         return this.makeObjectScalar(0, label);
       case INTERFACE_TAG.RESOURCE:
-        return this.makeObjectResource(value, label);
+        return this.makeObjectResource(value, label, ownResources);
       case INTERFACE_TAG.FUNCTION:
         throw new Error(`${label} cannot be a JavaScript function at this boundary`);
       case INTERFACE_TAG.BOOL:
@@ -161,23 +253,23 @@ export class ObjectValueRuntime {
         return this.makeObjectExpr(value, label);
       case INTERFACE_TAG.ARRAY:
       case INTERFACE_TAG.LIST:
-        return this.makeObjectSequenceValue(type, value, label, selfType);
+        return this.makeObjectSequenceValue(type, value, label, selfType, ownResources);
       case INTERFACE_TAG.OPTION:
-        return this.makeObjectOptionValue(type, value, label, selfType);
+        return this.makeObjectOptionValue(type, value, label, selfType, ownResources);
       case INTERFACE_TAG.PROD:
-        return this.makeObjectProdValue(type, value, label, selfType);
+        return this.makeObjectProdValue(type, value, label, selfType, ownResources);
       case INTERFACE_TAG.STRUCTURE:
-        return this.makeObjectStructureValue(type, value, label);
+        return this.makeObjectStructureValue(type, value, label, ownResources);
       case INTERFACE_TAG.TAGGED_UNION:
-        return this.makeObjectTaggedUnionValue(type, value, label);
+        return this.makeObjectTaggedUnionValue(type, value, label, ownResources);
       case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-        return this.makeObjectCustomInductiveValue(type, value, label);
+        return this.makeObjectCustomInductiveValue(type, value, label, ownResources);
       default:
         throw new Error(`${label} has unsupported object ABI argument type`);
     }
   }
 
-  makeObjectSequenceValue(sequenceType, value, label, selfType) {
+  makeObjectSequenceValue(sequenceType, value, label, selfType, ownResources) {
     const sequenceTag = sequenceType?.interfaceTag;
     if (sequenceTag !== INTERFACE_TAG.ARRAY && sequenceTag !== INTERFACE_TAG.LIST) {
       throw new Error(`${label} has unsupported object ABI sequence type`);
@@ -191,7 +283,13 @@ export class ObjectValueRuntime {
     const elementObjs = [];
     try {
       for (let index = 0; index < values.length; index++) {
-        elementObjs.push(this.makeObjectValue(elementType, values[index], `${label}[${index}]`, selfType));
+        elementObjs.push(this.makeObjectValue(
+          elementType,
+          values[index],
+          `${label}[${index}]`,
+          selfType,
+          ownResources,
+        ));
       }
       return sequenceTag === INTERFACE_TAG.ARRAY
         ? this.makeObjectArrayFromOwnedElements(elementObjs, label)
@@ -201,13 +299,19 @@ export class ObjectValueRuntime {
     }
   }
 
-  makeObjectOptionValue(type, value, label, selfType) {
+  makeObjectOptionValue(type, value, label, selfType, ownResources) {
     const option = normalizeOption(value, label);
     if (!option.some) {
       return this.makeObjectScalar(0, label);
     }
     const fields = [
-      this.makeObjectValue(requireTypeField(type, "element", label), option.value, `${label}.value`, selfType),
+      this.makeObjectValue(
+        requireTypeField(type, "element", label),
+        option.value,
+        `${label}.value`,
+        selfType,
+        ownResources,
+      ),
     ];
     try {
       return this.makeObjectCtorFromOwnedFields(1, fields, label);
@@ -216,49 +320,64 @@ export class ObjectValueRuntime {
     }
   }
 
-  makeObjectProdValue(type, value, label, selfType) {
+  makeObjectProdValue(type, value, label, selfType, ownResources) {
     const pair = normalizePair(value, label);
     const fields = [];
     try {
-      fields.push(this.makeObjectValue(requireTypeField(type, "fst", label), pair.fst, `${label}.fst`, selfType));
-      fields.push(this.makeObjectValue(requireTypeField(type, "snd", label), pair.snd, `${label}.snd`, selfType));
+      fields.push(this.makeObjectValue(
+        requireTypeField(type, "fst", label), pair.fst, `${label}.fst`, selfType, ownResources,
+      ));
+      fields.push(this.makeObjectValue(
+        requireTypeField(type, "snd", label), pair.snd, `${label}.snd`, selfType, ownResources,
+      ));
       return this.makeObjectCtorFromOwnedFields(0, fields, label);
     } finally {
       this.releaseOwnedObjects(fields);
     }
   }
 
-  makeObjectStructureValue(type, value, label) {
+  makeObjectStructureValue(type, value, label, ownResources) {
     const fields = requireStructureFields(type, label);
     const record = normalizeStructure(value, fields, label);
     const trivial = trivialStructureField(type, fields);
     if (trivial !== null) {
-      return this.makeObjectValue(trivial.type, record[trivial.name], `${label}.${trivial.name}`, type);
+      return this.makeObjectValue(
+        trivial.type, record[trivial.name], `${label}.${trivial.name}`, type, ownResources,
+      );
     }
-    return this.makeObjectCtorFromLayout(0, type, fields, record, label, type);
+    return this.makeObjectCtorFromLayout(0, type, fields, record, label, type, ownResources);
   }
 
-  makeObjectTaggedUnionValue(type, value, label) {
+  makeObjectTaggedUnionValue(type, value, label, ownResources) {
     const { index, ctor, payload } = normalizeTaggedUnion(value, type, label);
     const field = taggedUnionField(ctor);
-    return this.makeObjectCtorFromLayout(index, ctor, [field], { [field.name]: payload }, label, type);
+    return this.makeObjectCtorFromLayout(
+      index, ctor, [field], { [field.name]: payload }, label, type, ownResources,
+    );
   }
 
-  makeObjectCustomInductiveValue(type, value, label) {
+  makeObjectCustomInductiveValue(type, value, label, ownResources) {
     const { index, ctor, fields } = normalizeCustomInductive(value, type, label);
     if (ctor.fields.length === 0) {
       return this.makeObjectScalar(index, label);
     }
-    return this.makeObjectCtorFromLayout(index, ctor, ctor.fields, fields, label, type);
+    return this.makeObjectCtorFromLayout(index, ctor, ctor.fields, fields, label, type, ownResources);
   }
 
-  makeObjectCtorFromLayout(tag, owner, fields, values, label, selfType) {
+  makeObjectCtorFromLayout(tag, owner, fields, values, label, selfType, ownResources) {
     const plan = objectLayoutPlan(owner, fields, label);
     const layout = objectLayoutSlotsFromPlan(plan);
     try {
       for (const fieldPlan of plan.fields) {
         const field = fieldPlan.field;
-        this.writeObjectLayoutField(layout, fieldPlan, values[field.name], `${label}.${field.name}`, selfType);
+        this.writeObjectLayoutField(
+          layout,
+          fieldPlan,
+          values[field.name],
+          `${label}.${field.name}`,
+          selfType,
+          ownResources,
+        );
       }
       return this.makeObjectCtorFromOwnedLayout(tag, layout, label);
     } finally {
@@ -266,11 +385,13 @@ export class ObjectValueRuntime {
     }
   }
 
-  writeObjectLayoutField(layout, fieldPlan, value, label, selfType) {
+  writeObjectLayoutField(layout, fieldPlan, value, label, selfType, ownResources) {
     const field = fieldPlan.field;
     switch (fieldPlan.kind) {
       case "object":
-        layout.objectFields[fieldPlan.index] = this.makeObjectValue(field.type, value, label, selfType);
+        layout.objectFields[fieldPlan.index] = this.makeObjectValue(
+          field.type, value, label, selfType, ownResources,
+        );
         return;
       case "usize":
         layout.usizeFields[fieldPlan.index] =
@@ -374,9 +495,9 @@ export class ObjectValueRuntime {
     return argObj;
   }
 
-  makeObjectResource(value, label) {
+  makeObjectResource(value, label, owned = false) {
     const resource = normalizeHostResource(value, label);
-    const argObj = this.exports.vir_obj_resource(resource);
+    const argObj = this.exports.vir_obj_resource(resource, owned ? 1 : 0);
     if (argObj === 0) {
       throw new Error(`${label} could not be lowered to a Lean host resource object`);
     }
@@ -390,29 +511,32 @@ export class ObjectValueRuntime {
       runtime: this,
       object,
       live: true,
+      leases: new Set(),
       onRelease: null,
     };
-    const handle = Object.freeze({
-      [LEAN_OBJECT_HANDLE]: true,
-      runtime: this,
-      object,
-      cell,
-    });
-    const resource = createHostResource(handle, label, {
-      dispose: () => {
-        releaseLeanObjectHandleCell(cell);
-        return undefined;
-      },
-    });
-    return resource;
+    try {
+      return createLeanObjectHandleResource(cell, label);
+    } catch (error) {
+      releaseLeanObjectHandleCell(cell);
+      throw error;
+    }
   }
 
   leanObjectHandleCell(resource, label) {
-    return requireLeanObjectHandleCell(resource, this, label);
+    return requireLeanObjectHandleLease(resource, this, label).cell;
   }
 
   releaseLeanObjectHandleCell(cell) {
     return releaseLeanObjectHandleCell(cell);
+  }
+
+  releaseLeanObjectHandleResource(resource, label) {
+    return releaseLeanObjectHandleLease(requireLeanObjectHandleLease(resource, this, label));
+  }
+
+  retainLeanObjectHandleResource(resource, label) {
+    const cell = requireLeanObjectHandleLease(resource, this, label).cell;
+    return createLeanObjectHandleResource(cell, label);
   }
 
   makeObjectExpr(value, label) {
@@ -1041,20 +1165,34 @@ export class ObjectValueRuntime {
     }
   }
 
-  liftObjectValue(type, obj, label, selfType = null) {
+  liftOwnedObjectValue(type, obj, label) {
+    const ownership = new ObjectValueOwnershipScope(label);
+    try {
+      const value = this.liftObjectValue(type, obj, label, null, ownership);
+      ownership.commit();
+      return value;
+    } catch (error) {
+      ownership.rollback(error);
+    }
+  }
+
+  liftObjectValue(type, obj, label, selfType = null, ownership = null) {
     const tag = type?.interfaceTag;
     switch (tag) {
       case INTERFACE_TAG.RECURSIVE_SELF:
         if (selfType === null) {
           throw new Error(`${label} has a recursive self reference without an enclosing type`);
         }
-        return this.liftObjectValue(selfType, obj, label, selfType);
+        return this.liftObjectValue(selfType, obj, label, selfType, ownership);
       case INTERFACE_TAG.UNIT:
         return undefined;
       case INTERFACE_TAG.RESOURCE:
-        return this.liftObjectResource(obj, label);
-      case INTERFACE_TAG.FUNCTION:
-        return this.liftObjectFunction(type, obj, label);
+        return this.liftOwnedObjectResource(obj, label, ownership);
+      case INTERFACE_TAG.FUNCTION: {
+        const callback = this.liftObjectFunction(type, obj, label);
+        ownership?.own(() => callback.release());
+        return callback;
+      }
       case INTERFACE_TAG.BOOL:
         return this.readObjectScalar(obj, label) !== 0;
       case INTERFACE_TAG.UINT8:
@@ -1084,19 +1222,19 @@ export class ObjectValueRuntime {
       case INTERFACE_TAG.EXPR:
         return this.liftObjectExpr(obj, label);
       case INTERFACE_TAG.ARRAY:
-        return this.liftObjectArrayValue(type, obj, label, selfType);
+        return this.liftObjectArrayValue(type, obj, label, selfType, ownership);
       case INTERFACE_TAG.LIST:
-        return this.liftObjectListValue(type, obj, label, selfType);
+        return this.liftObjectListValue(type, obj, label, selfType, ownership);
       case INTERFACE_TAG.OPTION:
-        return this.liftObjectOptionValue(type, obj, label, selfType);
+        return this.liftObjectOptionValue(type, obj, label, selfType, ownership);
       case INTERFACE_TAG.PROD:
-        return this.liftObjectProdValue(type, obj, label, selfType);
+        return this.liftObjectProdValue(type, obj, label, selfType, ownership);
       case INTERFACE_TAG.STRUCTURE:
-        return this.liftObjectStructureValue(type, obj, label);
+        return this.liftObjectStructureValue(type, obj, label, ownership);
       case INTERFACE_TAG.TAGGED_UNION:
-        return this.liftObjectTaggedUnionValue(type, obj, label);
+        return this.liftObjectTaggedUnionValue(type, obj, label, ownership);
       case INTERFACE_TAG.CUSTOM_INDUCTIVE:
-        return this.liftObjectCustomInductiveValue(type, obj, label);
+        return this.liftObjectCustomInductiveValue(type, obj, label, ownership);
       default:
         throw new Error(`${label} has unsupported object ABI result type`);
     }
@@ -1121,8 +1259,14 @@ export class ObjectValueRuntime {
     return value;
   }
 
-  liftObjectResource(obj, label) {
-    const resource = this.exports.vir_obj_resource_externref(obj);
+  liftOwnedObjectResource(obj, label, ownership) {
+    const resource = this.liftObjectResource(obj, label, ownership !== null);
+    ownership?.own(() => releaseHostResource(resource));
+    return resource;
+  }
+
+  liftObjectResource(obj, label, take = false) {
+    const resource = this.exports.vir_obj_resource_externref(obj, take ? 1 : 0);
     if (isHostResource(resource) && hostResourceValue(resource) !== null) {
       return resource;
     }
@@ -1133,7 +1277,7 @@ export class ObjectValueRuntime {
       const field = this.exports.vir_obj_field(obj, 0);
       if (field !== 0) {
         try {
-          const nested = this.exports.vir_obj_resource_externref(field);
+          const nested = this.exports.vir_obj_resource_externref(field, take ? 1 : 0);
           if (isHostResource(nested) && hostResourceValue(nested) !== null) {
             return nested;
           }
@@ -1146,7 +1290,7 @@ export class ObjectValueRuntime {
   }
 
   retainLeanObjectHandleValue(resource, label) {
-    const cell = requireLeanObjectHandleCell(resource, this, label);
+    const cell = requireLeanObjectHandleLease(resource, this, label).cell;
     const object = normalizeObjectPointer(cell.object, label);
     this.exports.vir_obj_inc(object);
     return object;
@@ -1166,7 +1310,7 @@ export class ObjectValueRuntime {
     return createVirCallback(this, rootId, type);
   }
 
-  liftObjectArrayValue(type, obj, label, selfType) {
+  liftObjectArrayValue(type, obj, label, selfType, ownership) {
     const len = this.exports.vir_obj_array_size(obj);
     const elementType = requireTypeField(type, "element", label);
     const values = [];
@@ -1176,7 +1320,13 @@ export class ObjectValueRuntime {
         throw new Error(`${label}[${index}] is unavailable`);
       }
       try {
-        values.push(this.liftObjectValue(elementType, element, `${label}[${index}]`, selfType));
+        values.push(this.liftObjectValue(
+          elementType,
+          element,
+          `${label}[${index}]`,
+          selfType,
+          ownership,
+        ));
       } finally {
         this.exports.vir_obj_dec(element);
       }
@@ -1184,10 +1334,10 @@ export class ObjectValueRuntime {
     return values;
   }
 
-  liftObjectListValue(type, obj, label, selfType) {
+  liftObjectListValue(type, obj, label, selfType, ownership) {
     const elementType = requireTypeField(type, "element", label);
     return this.liftObjectConstructorList(obj, label, (head, index) =>
-      this.liftObjectValue(elementType, head, `${label}[${index}]`, selfType));
+      this.liftObjectValue(elementType, head, `${label}[${index}]`, selfType, ownership));
   }
 
   liftObjectConstructorList(obj, label, liftElement) {
@@ -1236,7 +1386,7 @@ export class ObjectValueRuntime {
     }
   }
 
-  liftObjectOptionValue(type, obj, label, selfType) {
+  liftObjectOptionValue(type, obj, label, selfType, ownership) {
     const tag = this.exports.vir_obj_tag(obj);
     if (tag === 0) {
       return null;
@@ -1246,20 +1396,26 @@ export class ObjectValueRuntime {
     }
     const field = this.ownedObjectField(obj, 0, label);
     try {
-      return this.liftObjectValue(requireTypeField(type, "element", label), field, `${label}.value`, selfType);
+      return this.liftObjectValue(
+        requireTypeField(type, "element", label), field, `${label}.value`, selfType, ownership,
+      );
     } finally {
       this.exports.vir_obj_dec(field);
     }
   }
 
-  liftObjectProdValue(type, obj, label, selfType) {
+  liftObjectProdValue(type, obj, label, selfType, ownership) {
     const fst = this.ownedObjectField(obj, 0, label);
     try {
       const snd = this.ownedObjectField(obj, 1, label);
       try {
         return {
-          fst: this.liftObjectValue(requireTypeField(type, "fst", label), fst, `${label}.fst`, selfType),
-          snd: this.liftObjectValue(requireTypeField(type, "snd", label), snd, `${label}.snd`, selfType),
+          fst: this.liftObjectValue(
+            requireTypeField(type, "fst", label), fst, `${label}.fst`, selfType, ownership,
+          ),
+          snd: this.liftObjectValue(
+            requireTypeField(type, "snd", label), snd, `${label}.snd`, selfType, ownership,
+          ),
         };
       } finally {
         this.exports.vir_obj_dec(snd);
@@ -1269,33 +1425,41 @@ export class ObjectValueRuntime {
     }
   }
 
-  liftObjectStructureValue(type, obj, label) {
+  liftObjectStructureValue(type, obj, label, ownership) {
     const fields = requireStructureFields(type, label);
     const trivial = trivialStructureField(type, fields);
     if (trivial !== null) {
-      return { [trivial.name]: this.liftObjectValue(trivial.type, obj, `${label}.${trivial.name}`, type) };
+      return {
+        [trivial.name]: this.liftObjectValue(
+          trivial.type, obj, `${label}.${trivial.name}`, type, ownership,
+        ),
+      };
     }
     const plan = objectLayoutPlan(type, fields, label);
     const values = {};
     for (const fieldPlan of plan.fields) {
       const field = fieldPlan.field;
-      values[field.name] = this.liftObjectLayoutField(type, obj, fieldPlan, `${label}.${field.name}`);
+      values[field.name] = this.liftObjectLayoutField(
+        type, obj, fieldPlan, `${label}.${field.name}`, type, ownership,
+      );
     }
     return flattenStructureSubobjects(type, values);
   }
 
-  liftObjectTaggedUnionValue(type, obj, label) {
+  liftObjectTaggedUnionValue(type, obj, label, ownership) {
     const tag = this.exports.vir_obj_tag(obj);
     const ctor = taggedUnionConstructorAt(type, tag, label);
     const field = taggedUnionField(ctor);
     const plan = objectLayoutPlan(ctor, [field], label);
     return {
       kind: ctor.jsName,
-      value: this.liftObjectLayoutField(ctor, obj, plan.fields[0], `${label}.${ctor.jsName}`, type),
+      value: this.liftObjectLayoutField(
+        ctor, obj, plan.fields[0], `${label}.${ctor.jsName}`, type, ownership,
+      ),
     };
   }
 
-  liftObjectCustomInductiveValue(type, obj, label) {
+  liftObjectCustomInductiveValue(type, obj, label, ownership) {
     const tag = this.exports.vir_obj_tag(obj);
     const ctor = customInductiveConstructorAt(type, tag, label);
     if (ctor.fields.length === 0) {
@@ -1311,6 +1475,7 @@ export class ObjectValueRuntime {
         fieldPlan,
         `${label}.${ctor.jsName}.${field.name}`,
         type,
+        ownership,
       );
     }
     return ctor.fields.length === 1 ? {
@@ -1322,13 +1487,13 @@ export class ObjectValueRuntime {
     };
   }
 
-  liftObjectLayoutField(owner, obj, fieldPlan, label, selfType = owner) {
+  liftObjectLayoutField(owner, obj, fieldPlan, label, selfType = owner, ownership = null) {
     const field = fieldPlan.field;
     switch (fieldPlan.kind) {
       case "object": {
         const fieldObj = this.ownedObjectField(obj, fieldPlan.index, label);
         try {
-          return this.liftObjectValue(field.type, fieldObj, label, selfType);
+          return this.liftObjectValue(field.type, fieldObj, label, selfType, ownership);
         } finally {
           this.exports.vir_obj_dec(fieldObj);
         }

@@ -4,12 +4,22 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { ExternrefResourceRoots, VIR_HOST_DISPOSE, VIR_HOST_RESOLVE_BINDING } from "../host-resource.js";
+import {
+  ExternrefResourceRoots,
+  isHostResource,
+  releaseHostResource,
+  retainHostResource,
+  VIR_HOST_DISPOSE,
+  VIR_HOST_RESOLVE_BINDING,
+} from "../host-resource.js";
 import { createBrowserHostBindings } from "../vir-host-bindings.js";
-import { releaseCallbacks } from "./callbacks.js";
+import { releaseCallbackRoots } from "./callbacks.js";
 import { collectCleanupError, throwCollectedErrors, throwWithCleanup } from "./cleanup.js";
 import { HOST_IMPORT_BOUNDARY } from "./interface-manifest.js";
 import { INTERFACE_TAG } from "./interface-tags.js";
+
+const MAX_FINALIZER_ERRORS = 16;
+const MAX_FINALIZER_ERROR_MESSAGE_LENGTH = 2048;
 
 export class VirHostState {
   constructor({
@@ -29,7 +39,10 @@ export class VirHostState {
     this.resourceRoots = new ExternrefResourceRoots();
     this.leanObjectHandleCells = new Set();
     this.callError = null;
+    this.finalizerErrorMessages = [];
+    this.droppedFinalizerErrors = 0;
     this.disposed = false;
+    this.disposing = false;
   }
 
   attach(exports) {
@@ -61,16 +74,45 @@ export class VirHostState {
     return error;
   }
 
-  rootResource(value) {
-    return this.resourceRoots.root(value);
+  rootResource(value, owned = 0) {
+    return this.resourceRoots.root(value, { owned: owned !== 0 });
   }
 
-  getRootedResource(rootId) {
-    return this.resourceRoots.get(rootId);
+  getRootedResource(rootId, take = 0) {
+    return this.resourceRoots.get(rootId, { take: take !== 0 });
   }
 
   releaseRootedResource(rootId) {
     return this.resourceRoots.release(rootId);
+  }
+
+  releaseRootedResourceFromFinalizer(rootId) {
+    try {
+      return this.releaseRootedResource(rootId);
+    } catch (error) {
+      this.recordFinalizerError(error);
+      return undefined;
+    }
+  }
+
+  recordFinalizerError(error) {
+    if (this.finalizerErrorMessages.length >= MAX_FINALIZER_ERRORS) {
+      this.droppedFinalizerErrors++;
+      return;
+    }
+    const name = error instanceof Error && error.name ? error.name : "Error";
+    const message = error instanceof Error ? error.message : String(error);
+    this.finalizerErrorMessages.push(`${name}: ${message}`.slice(0, MAX_FINALIZER_ERROR_MESSAGE_LENGTH));
+  }
+
+  takeFinalizerErrors() {
+    const messages = this.finalizerErrorMessages.splice(0);
+    const dropped = this.droppedFinalizerErrors;
+    this.droppedFinalizerErrors = 0;
+    if (dropped !== 0) {
+      messages.push(`${dropped} additional finalizer error${dropped === 1 ? " was" : "s were"} discarded`);
+    }
+    return messages.map((message) => new Error(message));
   }
 
   clearResourceRoots() {
@@ -122,13 +164,27 @@ export class VirHostState {
       if (isPromiseLike(value)) {
         throw new Error(`Vir host import ${entry.target} returned a Promise; host imports must be synchronous`);
       }
-      return explicitConversionTarget
-        ? this.runtime.makeExplicitConversionObjectValue(entry.result, value, `${entry.target} result`)
-        : this.runtime.makeHostResourceObjectValue(entry.result, value, `${entry.target} result`);
+      const resultLabel = `${entry.target} result`;
+      const retainedIdentityResult = isHostResource(value) && args.includes(value)
+        ? retainHostResource(value, resultLabel)
+        : null;
+      try {
+        const resultValue = retainedIdentityResult ?? value;
+        return explicitConversionTarget
+          ? this.runtime.makeExplicitConversionObjectValue(entry.result, resultValue, resultLabel)
+          : this.runtime.makeHostResourceObjectValue(entry.result, resultValue, resultLabel);
+      } catch (error) {
+        if (retainedIdentityResult === null) throw error;
+        throwWithCleanup(
+          error,
+          () => releaseHostResource(retainedIdentityResult),
+          `Vir host import ${entry.target} failed during identity-result cleanup`,
+        );
+      }
     } catch (error) {
       throwWithCleanup(
         error,
-        () => releaseCallbacks(liftedCallbacks),
+        () => releaseCallbackRoots(liftedCallbacks),
         `Vir host import ${entry.target} failed during callback cleanup`,
       );
     }
@@ -147,7 +203,15 @@ export class VirHostState {
         this.leanObjectHandleCells.delete(cell);
       };
       this.leanObjectHandleCells.add(cell);
-      return this.runtime.makeHostResourceObjectValue(entry.result, resource, `${entry.target} result`);
+      try {
+        return this.runtime.makeHostResourceObjectValue(entry.result, resource, `${entry.target} result`);
+      } catch (error) {
+        throwWithCleanup(
+          error,
+          () => releaseHostResource(resource),
+          `${entry.target} failed during result cleanup`,
+        );
+      }
     }
     if (entry.target === "js.leanRef.value" && entry.args.length === 1 &&
         isGenericJsResourceDescriptor(entry.args[0]?.type) && isLeanObjectDescriptor(entry.result)) {
@@ -158,6 +222,27 @@ export class VirHostState {
       );
       return this.runtime.retainLeanObjectHandleValue(resource, `${entry.target} argument ${entry.args[0].name}`);
     }
+    if (entry.target === "js.leanRef.retain" && entry.args.length === 1 &&
+        isGenericJsResourceDescriptor(entry.args[0]?.type) && isGenericJsResourceDescriptor(entry.result)) {
+      const resource = this.runtime.liftHostResourceObjectValue(
+        entry.args[0].type,
+        argObjects[0],
+        `${entry.target} argument ${entry.args[0].name}`,
+      );
+      const alias = this.runtime.retainLeanObjectHandleResource(
+        resource,
+        `${entry.target} argument ${entry.args[0].name}`,
+      );
+      try {
+        return this.runtime.makeHostResourceObjectValue(entry.result, alias, `${entry.target} result`);
+      } catch (error) {
+        throwWithCleanup(
+          error,
+          () => releaseHostResource(alias),
+          `${entry.target} failed during result cleanup`,
+        );
+      }
+    }
     if (entry.target === "js.leanRef.release" && entry.args.length === 1 &&
         isGenericJsResourceDescriptor(entry.args[0]?.type) && isUnitDescriptor(entry.result)) {
       const resource = this.runtime.liftHostResourceObjectValue(
@@ -165,8 +250,8 @@ export class VirHostState {
         argObjects[0],
         `${entry.target} argument ${entry.args[0].name}`,
       );
-      const cell = this.runtime.leanObjectHandleCell(resource, `${entry.target} argument ${entry.args[0].name}`);
-      this.runtime.releaseLeanObjectHandleCell(cell);
+      this.runtime.releaseLeanObjectHandleResource(resource, `${entry.target} argument ${entry.args[0].name}`);
+      releaseHostResource(resource);
       return this.runtime.makeHostResourceObjectValue(entry.result, undefined, `${entry.target} result`);
     }
     throw new Error(`Vir host import ${entry.target} has unsupported objectHandle signature`);
@@ -181,24 +266,30 @@ export class VirHostState {
   }
 
   dispose({ disposeBindings = true } = {}) {
-    if (this.disposed) return;
-    this.disposed = true;
+    if (this.disposed || this.disposing) return;
+    this.disposing = true;
     const errors = [];
-    this.clearCallError();
-    collectCleanupError(errors, () => this.clearResourceRoots());
+    try {
+      this.clearCallError();
 
-    const userRelease = collectCleanupError(errors, () => this.releaseHostBindings?.() ?? true);
-    if (disposeBindings && userRelease.ok && userRelease.value) {
-      collectCleanupError(errors, () => disposeHostBindings(this.userBindings));
-    }
-    const defaultRelease = collectCleanupError(errors, () => this.releaseDefaultHostBindings?.() ?? true);
-    if (disposeBindings && defaultRelease.ok && defaultRelease.value) {
-      collectCleanupError(errors, () => disposeHostBindings(this.defaultBindings));
-    }
+      const userRelease = collectCleanupError(errors, () => this.releaseHostBindings?.() ?? true);
+      if (disposeBindings && userRelease.ok && userRelease.value) {
+        collectCleanupError(errors, () => disposeHostBindings(this.userBindings));
+      }
+      const defaultRelease = collectCleanupError(errors, () => this.releaseDefaultHostBindings?.() ?? true);
+      if (disposeBindings && defaultRelease.ok && defaultRelease.value) {
+        collectCleanupError(errors, () => disposeHostBindings(this.defaultBindings));
+      }
 
-    collectCleanupError(errors, () => this.releaseLeanObjectHandleCells());
-    this.runtime = null;
-    this.exports = null;
+      collectCleanupError(errors, () => this.releaseLeanObjectHandleCells());
+      collectCleanupError(errors, () => this.clearResourceRoots());
+      errors.push(...this.takeFinalizerErrors());
+    } finally {
+      this.disposed = true;
+      this.disposing = false;
+      this.runtime = null;
+      this.exports = null;
+    }
     throwCollectedErrors(errors, "Vir host state disposal failed");
   }
 

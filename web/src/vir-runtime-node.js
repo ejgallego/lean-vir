@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import { createVirRuntimeFactory as createBrowserVirRuntimeFactory } from "./vir-runtime.js";
 import {
   createNodeHostBindings,
+  createHostResourceState,
   createVirtualDocumentState,
   hasExternrefTableSupport,
   requireExternrefTableSupport,
@@ -27,6 +28,7 @@ export {
   createVirtualDocumentState,
   createVirtualElementState,
   ensureVirtualElementState,
+  ensureVirtualElementStates,
   findVirtualReactElementById,
   createVirtualEventState,
   createVirtualEventHostBindings,
@@ -37,9 +39,16 @@ export {
 
 export function createVirRuntimeFactory(options = {}) {
   const { hostBindings = null, virtualDocumentState = createVirtualDocumentState(), ...browserOptions } = options;
+  let firstGeneration = true;
   return createBrowserVirRuntimeFactory({
     ...browserOptions,
-    defaultHostBindings: () => createNodeHostBindings(virtualDocumentState),
+    defaultHostBindings: () => {
+      const resources = firstGeneration
+        ? virtualDocumentState.resources
+        : createHostResourceState();
+      firstGeneration = false;
+      return createNodeHostBindings(virtualDocumentState, resources);
+    },
     hostBindings,
   });
 }

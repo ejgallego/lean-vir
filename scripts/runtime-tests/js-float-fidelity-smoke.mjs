@@ -30,36 +30,36 @@ const floatCases = [
   const positiveZero = resources.resourceForValue(0);
   const negativeZero = resources.resourceForValue(-0);
   assert.notEqual(negativeZero, positiveZero, "signed zero must use distinct host resources");
-  assert.equal(resources.resourceForValue(0), positiveZero);
-  assert.equal(resources.resourceForValue(-0), negativeZero);
+  assert.notEqual(resources.resourceForValue(0), positiveZero);
+  assert.notEqual(resources.resourceForValue(-0), negativeZero);
   assert.ok(Object.is(resources.resolveResource(positiveZero, "Js Float"), 0));
   assert.ok(Object.is(resources.resolveResource(negativeZero, "Js Float"), -0));
 
   const nan = resources.resourceForValue(Number.NaN);
-  assert.equal(resources.resourceForValue(Number.NaN), nan);
+  assert.notEqual(resources.resourceForValue(Number.NaN), nan);
   assert.deepEqual(resources.debugResourceCounts(), {
-    live: 3,
-    primitives: 3,
+    passiveStrong: 0,
+    scoped: 0,
     temporaryScopes: 0,
-    disposables: 0,
+    owners: 0,
   });
 
-  resources.releaseValueResource(-0);
+  resources.releaseResource(negativeZero);
   assert.throws(() => resources.resolveResource(negativeZero, "Js Float"), /resource is not live/);
   assert.ok(Object.is(resources.resolveResource(positiveZero, "Js Float"), 0));
   assert.deepEqual(resources.debugResourceCounts(), {
-    live: 2,
-    primitives: 2,
+    passiveStrong: 0,
+    scoped: 0,
     temporaryScopes: 0,
-    disposables: 0,
+    owners: 0,
   });
 
   resources.dispose();
   assert.deepEqual(resources.debugResourceCounts(), {
-    live: 0,
-    primitives: 0,
+    passiveStrong: 0,
+    scoped: 0,
     temporaryScopes: 0,
-    disposables: 0,
+    owners: 0,
   });
 }
 

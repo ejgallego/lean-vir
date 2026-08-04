@@ -4,6 +4,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import {
+  hostResourceValue,
+  isRetainableHostResourcePayload,
+  registerHostResourcePayloadLifetime,
+  releaseHostResourcePayload,
+  retainHostResourcePayload,
+} from "../host-resource.js";
+
 export function createJsValueHostBindings(resources) {
   const bindings = {};
   for (const [target, codec] of Object.entries(jsValueCodecs)) {
@@ -12,9 +20,9 @@ export function createJsValueHostBindings(resources) {
   }
   bindings["js.string.owned"] = (value) => resources.ownedResourceForValue(jsStringValue(value));
   bindings["js.float.owned"] = (value) => resources.ownedResourceForValue(jsFloatValue(value));
-  bindings["js.nullable.null"] = () => resources.resourceForValue(createNullableValue(null));
+  bindings["js.nullable.null"] = () => resources.adoptResourceForValue(createNullableValue(null));
   bindings["js.nullable.of"] = (value) =>
-    resources.resourceForValue(createNullableValue(resources.resolveResource(value, "Js")));
+    resources.adoptResourceForValue(createNullableValue(composableResourcePayload(resources, value, "Js")));
   bindings["js.nullable.isNull"] = (value) =>
     resources.resourceForValue(nullablePayload(resources, value) === null);
   bindings["js.nullable.value"] = (value) => {
@@ -27,13 +35,52 @@ export function createJsValueHostBindings(resources) {
   return bindings;
 }
 
+function composableResourcePayload(resources, resource, label) {
+  try {
+    return resources.resolveResource(resource, label);
+  } catch (error) {
+    const payload = hostResourceValue(resource);
+    if (payload !== null && payload !== undefined && isRetainableHostResourcePayload(payload)) {
+      return payload;
+    }
+    throw error;
+  }
+}
+
 const nullableBrand = Symbol("lean-vir.jsNullable");
 
 export function createNullableValue(value) {
-  return Object.freeze({
+  const payload = value === undefined ? null : value;
+  if (!isRetainableHostResourcePayload(payload)) {
+    return Object.freeze({
+      [nullableBrand]: true,
+      value: payload,
+    });
+  }
+  const retained = retainHostResourcePayload(payload);
+  let live = true;
+  const nullable = Object.freeze({
     [nullableBrand]: true,
-    value: value === undefined ? null : value,
+    value: retained,
   });
+  try {
+    registerHostResourcePayloadLifetime(nullable, {
+      children: [retained],
+      retain: () => {
+        if (!live) throw new Error("cannot retain a released Js.Nullable payload");
+        return createNullableValue(retained);
+      },
+      release: () => {
+        if (!live) return false;
+        live = false;
+        return releaseHostResourcePayload(retained);
+      },
+    });
+    return nullable;
+  } catch (error) {
+    releaseHostResourcePayload(retained);
+    throw error;
+  }
 }
 
 export function nullablePayload(resources, value) {

@@ -27,8 +27,10 @@ import {
   VIR_WASM_RELEASE_FILE as NODE_VIR_WASM_RELEASE_FILE,
   createVirtualDocumentHostBindings,
   createVirtualDocumentState,
+  createVirtualElementState,
   createVirtualEventState,
   ensureVirtualElementState,
+  ensureVirtualElementStates,
 } from "../../web/src/vir-runtime-node.js";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION } from "../package-versions.mjs";
 import {
@@ -139,7 +141,7 @@ assert.throws(() => debugWasmUrlFor("module.bin"), /debugWasm requires a \.wasm 
     const resources = createExportedHostResourceState();
     const primitiveResource = resources.resourceForValue(false);
     assert.equal(resources.resolveResource(primitiveResource, "Js"), false);
-    assert.equal(resources.resourceForValue(false), primitiveResource);
+    assert.notEqual(resources.resourceForValue(false), primitiveResource);
     const commonBindings = createExportedCommonHostBindings(resources);
     const documentBindings = createExportedBrowserDocumentHostBindings(resources);
     const elementBindings = createExportedBrowserElementHostBindings(resources);
@@ -309,6 +311,16 @@ for (const entry of leanRefValueImports) {
   assert.equal(entry.boundary, "objectHandle");
   assert.equal(entry.args[0]?.type?.type, "Js");
   assert.equal(entry.result?.kind, "leanObject");
+}
+const leanRefReleaseImports = hostRuntime.interfaceManifest.hostImports.filter(
+  (entry) => entry.target === "js.leanRef.release",
+);
+assert.equal(leanRefReleaseImports.length, 1);
+for (const entry of leanRefReleaseImports) {
+  assert.equal(entry.effect, "runtime");
+  assert.equal(entry.boundary, "objectHandle");
+  assert.equal(entry.args[0]?.type?.type, "Js");
+  assert.equal(entry.result?.type, "Unit");
 }
 for (const target of [
   "react.state.modify",
@@ -553,6 +565,22 @@ assert.ok((runtime.entryCallCache.get(fibEntry)?.callSlot ?? 0) > 0, "expected f
 assert.equal(runtime.exportsByName.fib(12), "144");
 assert.equal(hostRuntime.call("HostInterop.titleHandshake", "runtime smoke"), "Lean VIR host: runtime smoke");
 assert.equal(hostRuntime.call("HostInterop.callbackRoundTrip", 5), "12");
+
+ensureVirtualElementStates(virtualDocumentState, ".query-all", [
+  createVirtualElementState({ textContent: "first match" }),
+  createVirtualElementState({ textContent: "second match" }),
+]);
+const queryRootBaseline = hostRuntime.hostState.resourceRoots.debugCounts().active;
+assert.equal(hostRuntime.call("HostInterop.querySelectorAllCount", ".query-all"), "2");
+assert.equal(hostRuntime.call("HostInterop.querySelectorAllLeanCount", ".query-all"), "2");
+assert.equal(hostRuntime.call("HostInterop.querySelectorAllArrayCount", ".query-all"), "2");
+assert.equal(hostRuntime.call("HostInterop.querySelectorAllFirstText", ".query-all"), "first match");
+assert.equal(hostRuntime.call("HostInterop.querySelectorAllCountLoop", ".query-all", 1000), "2000");
+assert.equal(
+  hostRuntime.hostState.resourceRoots.debugCounts().active,
+  queryRootBaseline,
+  "querySelectorAll should release passive selector, NodeList, array, and element roots",
+);
 assert.equal(hostRuntime.liveCallbacks.size, 0);
 hostRuntime.dispose();
 runtime.dispose();

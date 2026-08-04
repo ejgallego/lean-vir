@@ -5,12 +5,20 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
+  beginHostResourceOwnerDisposal,
   createHostResource,
+  createHostResourceOwner,
+  finishHostResourceOwnerDisposal,
   hostResourceLabel,
+  hostResourceOwner,
+  hostResourceOwnerPhase,
   hostResourceValue,
+  isRetainableHostResourcePayload,
   isHostResource,
+  releaseHostResourcePayload,
   releaseHostResource,
   requireExternrefTableSupport,
+  retainHostResourcePayload,
 } from "../host-resource.js";
 import {
   createReactElementTypeTagResource,
@@ -25,49 +33,131 @@ import {
 } from "../react/vir-react-node.js";
 import { createNullableValue } from "./vir-js-value-bindings.js";
 import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
-
-// Map uses SameValueZero; remap -0 so primitive interning follows Object.is.
-const negativeZeroPrimitiveKey = Symbol("lean-vir.negativeZero");
+import { takeCallbackLease } from "../runtime/callbacks.js";
 
 export class HostResourceState {
   constructor() {
     requireExternrefTableSupport();
-    this.resources = new WeakMap();
-    this.primitiveResources = new Map();
-    this.liveResources = new Set();
+    this.owner = createHostResourceOwner("HostResourceState");
+    this.revocableResources = new WeakMap();
+    this.ownedPayloadResources = new Set();
+    this.weakOwnedPayloadResources = new Set();
+    this.gcFinalizerErrorMessages = [];
+    this.resourceFinalizer = typeof FinalizationRegistry === "function"
+      ? new FinalizationRegistry(({ payload, reference }) => {
+          this.weakOwnedPayloadResources.delete(reference);
+          try {
+            releaseHostResourcePayload(payload);
+          } catch (error) {
+            this.recordGcFinalizerError(error);
+          }
+        })
+      : null;
     this.temporaryResourceScopes = [];
     this.disposables = new Set();
   }
 
   resourceForValue(value) {
+    this.requireUsable();
     if (value === null || value === undefined) return null;
     if (this.temporaryResourceScopes.length !== 0) {
       return this.temporaryResourceForValue(value);
     }
-    if (!isWeakMapKey(value)) {
-      const key = primitiveResourceKey(value);
-      let resource = this.primitiveResources.get(key);
-      if (!isHostResource(resource) || hostResourceValue(resource) === null) {
-        resource = createHostResource(value);
-        this.primitiveResources.set(key, resource);
+    return this.ownedResourceForValue(value);
+  }
+
+  // Takes ownership of an already-retained payload produced by a host binding.
+  adoptResourceForValue(value, { tracked = true } = {}) {
+    this.requireUsable();
+    if (value === null || value === undefined) return null;
+    let resource = null;
+    let reference = null;
+    const unregisterToken = {};
+    let released = false;
+    try {
+      resource = createHostResource(value, null, {
+        owner: this.owner,
+        dispose: isRetainableHostResourcePayload(value)
+          ? () => {
+              if (released) return false;
+              released = true;
+              this.resourceFinalizer?.unregister(unregisterToken);
+              this.ownedPayloadResources.delete(resource);
+              if (reference !== null) this.weakOwnedPayloadResources.delete(reference);
+              return releaseHostResourcePayload(value);
+            }
+          : null,
+      });
+      if (isRetainableHostResourcePayload(value)) {
+        this.requireActive();
+        if (tracked) {
+          this.ownedPayloadResources.add(resource);
+        } else {
+          if (this.resourceFinalizer === null || typeof WeakRef !== "function") {
+            throw new Error("untracked host resources require WeakRef and FinalizationRegistry support");
+          }
+          reference = new WeakRef(resource);
+          this.weakOwnedPayloadResources.add(reference);
+          this.resourceFinalizer.register(resource, { payload: value, reference }, unregisterToken);
+        }
       }
-      this.liveResources.add(resource);
+      const scope = this.temporaryResourceScopes.at(-1);
+      scope?.add(resource);
       return resource;
+    } catch (error) {
+      if (isRetainableHostResourcePayload(value)) {
+        releaseHostResourcePayload(value);
+      }
+      throw error;
     }
-    let resource = this.resources.get(value);
-    if (!isHostResource(resource) || hostResourceValue(resource) === null) {
-      resource = createHostResource(value);
-      this.resources.set(value, resource);
-    }
-    this.liveResources.add(resource);
-    return resource;
+  }
+
+  recordGcFinalizerError(error) {
+    if (this.gcFinalizerErrorMessages.length >= 16) return;
+    const name = error instanceof Error && error.name ? error.name : "Error";
+    const message = error instanceof Error ? error.message : String(error);
+    this.gcFinalizerErrorMessages.push(`${name}: ${message}`.slice(0, 2048));
   }
 
   // Creates a unique resource whose receiver is responsible for releasing it.
   ownedResourceForValue(value) {
+    this.requireUsable();
     if (value === null || value === undefined) return null;
-    const resource = createHostResource(value);
-    this.liveResources.add(resource);
+    if (!isRetainableHostResourcePayload(value)) {
+      return createHostResource(value, null, { owner: this.owner });
+    }
+    this.requireActive();
+    const retainedValue = retainHostResourcePayload(value);
+    let resource = null;
+    try {
+      resource = createHostResource(retainedValue, null, {
+        owner: this.owner,
+        dispose: () => {
+          this.ownedPayloadResources.delete(resource);
+          return releaseHostResourcePayload(retainedValue);
+        },
+      });
+      this.ownedPayloadResources.add(resource);
+      return resource;
+    } catch (error) {
+      releaseHostResourcePayload(retainedValue);
+      throw error;
+    }
+  }
+
+  // Creates a passive resource that can also be invalidated by its JS value.
+  // The reverse index contains only WeakRefs and never owns the wrapper/value.
+  revocableResourceForValue(value) {
+    const resource = this.ownedResourceForValue(value);
+    if (resource === null || !isWeakMapKey(value)) return resource;
+    let references = this.revocableResources.get(value);
+    if (references === undefined) {
+      references = new Set();
+      this.revocableResources.set(value, references);
+    } else {
+      sweepRevocableReferences(references);
+    }
+    references.add(new WeakRef(resource));
     return resource;
   }
 
@@ -101,40 +191,36 @@ export class HostResourceState {
   }
 
   releaseResource(resource) {
-    const value = hostResourceValue(resource);
-    if (isWeakMapKey(value)) {
-      if (this.resources.get(value) === resource) {
-        this.resources.delete(value);
-      }
-    } else if (value !== null && value !== undefined) {
-      const key = primitiveResourceKey(value);
-      if (this.primitiveResources.get(key) === resource) {
-        this.primitiveResources.delete(key);
-      }
-    }
-    if (isHostResource(resource)) {
-      this.liveResources.delete(resource);
+    if (!isHostResource(resource) || hostResourceOwner(resource) !== this.owner) {
+      throw new Error("host resource does not belong to this state");
     }
     releaseHostResource(resource);
     return undefined;
   }
 
   releaseValueResource(value) {
-    if (!isWeakMapKey(value)) {
-      const resource = this.primitiveResources.get(primitiveResourceKey(value));
-      if (resource !== undefined) {
-        this.releaseResource(resource);
+    if (!isWeakMapKey(value)) return undefined;
+    const references = this.revocableResources.get(value);
+    if (references === undefined) return undefined;
+    this.revocableResources.delete(value);
+    for (const reference of references) {
+      const resource = reference.deref();
+      if (resource !== undefined && hostResourceOwner(resource) === this.owner) {
+        releaseHostResource(resource);
       }
-      return undefined;
     }
-    const resource = this.resources.get(value);
-    if (resource !== undefined) {
-      this.releaseResource(resource);
-    }
+    references.clear();
     return undefined;
   }
 
   addDisposable(value) {
+    try {
+      this.requireActive();
+    } catch (error) {
+      const errors = [error];
+      collectCleanupError(errors, () => disposeHostResourceValue(value));
+      throwCollectedErrors(errors, "active host resource registration failed during rollback");
+    }
     this.disposables.add(value);
     return undefined;
   }
@@ -147,36 +233,70 @@ export class HostResourceState {
   // Debug-only lifecycle visibility for runtime tests; not a stable host API.
   debugResourceCounts() {
     return {
-      live: this.liveResources.size,
-      primitives: this.primitiveResources.size,
+      passiveStrong: 0,
+      scoped: this.temporaryResourceScopes.reduce((count, scope) => count + scope.size, 0),
       temporaryScopes: this.temporaryResourceScopes.length,
-      disposables: this.disposables.size,
+      owners: this.disposables.size + this.ownedPayloadResources.size,
     };
   }
 
   resolveResource(resource, label) {
     const value = hostResourceValue(resource);
-    if (value === null || value === undefined || !this.liveResources.has(resource)) {
+    if (value === null || value === undefined || hostResourceOwner(resource) !== this.owner) {
       throw new Error(`${hostResourceLabel(resource) ?? label} resource is not live`);
     }
     return value;
   }
 
   dispose() {
+    const phase = hostResourceOwnerPhase(this.owner);
+    if (phase === "disposed" || phase === "disposing") return undefined;
+    beginHostResourceOwnerDisposal(this.owner);
     const errors = [];
-    for (const value of Array.from(this.disposables)) {
-      collectCleanupError(errors, () => disposeHostResourceValue(value));
+    try {
+      for (const value of Array.from(this.disposables)) {
+        collectCleanupError(errors, () => disposeHostResourceValue(value));
+      }
+      this.disposables.clear();
+      for (const resource of Array.from(this.ownedPayloadResources)) {
+        collectCleanupError(errors, () => releaseHostResource(resource));
+      }
+      this.ownedPayloadResources.clear();
+      for (const reference of Array.from(this.weakOwnedPayloadResources)) {
+        const resource = reference.deref();
+        if (resource !== undefined) {
+          collectCleanupError(errors, () => releaseHostResource(resource));
+        }
+      }
+      this.weakOwnedPayloadResources.clear();
+      for (const scope of this.temporaryResourceScopes) {
+        for (const resource of Array.from(scope)) {
+          collectCleanupError(errors, () => this.releaseResource(resource));
+        }
+        scope.clear();
+      }
+      this.temporaryResourceScopes.length = 0;
+      this.revocableResources = new WeakMap();
+      for (const message of this.gcFinalizerErrorMessages.splice(0)) {
+        errors.push(new Error(message));
+      }
+    } finally {
+      finishHostResourceOwnerDisposal(this.owner);
     }
-    this.disposables.clear();
-    for (const resource of Array.from(this.liveResources)) {
-      collectCleanupError(errors, () => this.releaseResource(resource));
-    }
-    this.resources = new WeakMap();
-    this.primitiveResources.clear();
-    this.liveResources.clear();
-    this.temporaryResourceScopes.length = 0;
     throwCollectedErrors(errors, "host resource disposal failed");
     return undefined;
+  }
+
+  requireUsable() {
+    if (hostResourceOwnerPhase(this.owner) === "disposed") {
+      throw new Error("HostResourceState has been disposed");
+    }
+  }
+
+  requireActive() {
+    if (hostResourceOwnerPhase(this.owner) !== "active") {
+      throw new Error("HostResourceState cannot register active resources while disposing or disposed");
+    }
   }
 }
 
@@ -203,10 +323,13 @@ function isWeakMapKey(value) {
   return (typeof value === "object" && value !== null) || typeof value === "function";
 }
 
-function primitiveResourceKey(value) {
-  return typeof value === "number" && Object.is(value, -0)
-    ? negativeZeroPrimitiveKey
-    : value;
+function sweepRevocableReferences(references) {
+  for (const reference of references) {
+    const resource = reference.deref();
+    if (resource === undefined || hostResourceValue(resource) === null) {
+      references.delete(reference);
+    }
+  }
 }
 
 export function createHostResourceState() {
@@ -225,7 +348,7 @@ export function createElementResourceHostBindings(resources, operations) {
       });
     },
     "browser.element.getAttribute": (element, name) =>
-      resources.resourceForValue(createNullableValue(
+      resources.adoptResourceForValue(createNullableValue(
         operations.getAttribute(
           resources.resolveResource(element, "Element"),
           resources.resolveResource(name, "JsString"),
@@ -247,12 +370,12 @@ export function createElementResourceHostBindings(resources, operations) {
         callback,
       );
       resources.addDisposable(listener);
-      return resources.resourceForValue(listener);
+      return resources.revocableResourceForValue(listener);
     },
     "browser.element.removeEventListener": (listener) => {
       const value = resources.resolveResource(listener, "EventListener");
       value.remove();
-      resources.releaseResource(listener);
+      resources.releaseValueResource(value);
       return undefined;
     },
   };
@@ -279,7 +402,7 @@ export function withConsumedResources(resources, inputs, run) {
 export function createHtmlInputElementResourceHostBindings(resources, { fromElement }) {
   return {
     "browser.htmlInputElement.fromElement": (element) =>
-      resources.resourceForValue(createNullableValue(fromElement(resources.resolveResource(element, "Element")))),
+      resources.adoptResourceForValue(createNullableValue(fromElement(resources.resolveResource(element, "Element")))),
     "browser.htmlInputElement.getChecked": (input) =>
       resources.resourceForValue(resources.resolveResource(input, "HTMLInputElement").checked === true),
     "browser.htmlInputElement.setChecked": (input, checked) => {
@@ -346,8 +469,11 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
   }
 
   function releaseRootResource(root) {
-    root.unmount();
-    resources.releaseValueResource(root);
+    try {
+      root.unmount();
+    } finally {
+      resources.releaseValueResource(root);
+    }
   }
 
   function releaseLeanCallback(callback) {
@@ -377,15 +503,16 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
 
   return {
     "react.node.text": (value) =>
-      resources.resourceForValue(
-        requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue(resources, value, "React Node text value"))
+      resources.adoptResourceForValue(
+        requireReactNodeTextResourceFactory(createNodeTextResource)(jsStringValue(resources, value, "React Node text value")),
+        { tracked: false },
       ),
     "react.elementType.tag": (tag) =>
       resources.resourceForValue(createReactElementTypeTagResource(
         jsStringValue(resources, tag, "React element type tag"),
       )),
     "react.props.empty": () =>
-      resources.resourceForValue(createReactPropsResource()),
+      resources.adoptResourceForValue(createReactPropsResource()),
     "react.props.setKey": (props, key) =>
       setReactPropsKey(resources, props, key),
     "react.props.setProperty": (props, property) =>
@@ -399,34 +526,41 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
     "react.node.children.push": (children, child) =>
       pushReactNodeChild(resources, children, child),
     "react.node.createElement": (elementType, props, children) =>
-      resources.resourceForValue(
+      resources.adoptResourceForValue(
         requireReactNodeElementResourceFactory(createNodeElementResource)(
           elementType,
           props,
           children,
-        )
+        ),
+        { tracked: false },
       ),
     "react.node.fragment": (props, children) =>
-      resources.resourceForValue(
+      resources.adoptResourceForValue(
         requireReactNodeFragmentResourceFactory(createNodeFragmentResource)(
           props,
           children,
-        )
+        ),
+        { tracked: false },
       ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
-      return resources.resourceForValue(rootForContainer(target));
+      return resources.revocableResourceForValue(rootForContainer(target));
     },
     "react.root.render": (root, renderTree) => {
       const render = requireReactRenderCallback(renderTree);
-      try {
+      let node = null;
+      const errors = [];
+      collectCleanupError(errors, () => {
         const value = resources.resolveResource(root, "ReactRoot");
-        const node = render();
+        node = render();
         value.render(node);
-        return undefined;
-      } finally {
-        render.release();
+      });
+      if (isHostResource(node)) {
+        collectCleanupError(errors, () => resources.releaseResource(node));
       }
+      collectCleanupError(errors, () => render.release());
+      throwCollectedErrors(errors, "React root render failed during cleanup");
+      return undefined;
     },
     "react.root.renderComponent": (root, component) => {
       const value = resources.resolveResource(root, "ReactRoot");
@@ -457,8 +591,11 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
     },
     "react.root.unmount": (root) => {
       const value = resources.resolveResource(root, "ReactRoot");
-      value.unmount();
-      resources.releaseResource(root);
+      try {
+        value.unmount();
+      } finally {
+        resources.releaseValueResource(value);
+      }
       return undefined;
     },
     "react.root.unmountSelector": (selector) => {
@@ -503,19 +640,19 @@ function requireReactNodeFragmentResourceFactory(factory) {
 export function createTimerResourceHostBindings(resources) {
   return {
     "browser.timer.setTimeout": (delayMs, callback) =>
-      resources.resourceForValue(createTimeoutResource(resources, jsNatAsDelay(resources, delayMs), callback)),
+      resources.revocableResourceForValue(createTimeoutResource(resources, jsNatAsDelay(resources, delayMs), callback)),
     "browser.timer.clearTimeout": (timeout) => {
       const value = resources.resolveResource(timeout, "Timeout");
       value.clear();
-      resources.releaseResource(timeout);
+      resources.releaseValueResource(value);
       return undefined;
     },
     "browser.timer.setInterval": (delayMs, callback) =>
-      resources.resourceForValue(createIntervalResource(resources, jsNatAsDelay(resources, delayMs), callback)),
+      resources.revocableResourceForValue(createIntervalResource(resources, jsNatAsDelay(resources, delayMs), callback)),
     "browser.timer.clearInterval": (interval) => {
       const value = resources.resolveResource(interval, "Interval");
       value.clear();
-      resources.releaseResource(interval);
+      resources.releaseValueResource(value);
       return undefined;
     },
   };
@@ -524,11 +661,11 @@ export function createTimerResourceHostBindings(resources) {
 export function createAnimationResourceHostBindings(resources, { requestFrame, cancelFrame }) {
   return {
     "browser.animation.requestAnimationFrame": (callback) =>
-      resources.resourceForValue(createAnimationFrameResource(resources, callback, requestFrame, cancelFrame)),
+      resources.revocableResourceForValue(createAnimationFrameResource(resources, callback, requestFrame, cancelFrame)),
     "browser.animation.cancelAnimationFrame": (frame) => {
       const value = resources.resolveResource(frame, "AnimationFrame");
       value.cancel();
-      resources.releaseResource(frame);
+      resources.releaseValueResource(value);
       return undefined;
     },
   };
@@ -560,41 +697,53 @@ export function createTimeoutResource(resources, delayMs, callback) {
 }
 
 export function createIntervalResource(resources, delayMs, callback) {
+  const ownedCallback = takeCallbackLease(callback, "browser.timer.setInterval callback");
   let token = null;
   let running = 0;
   let cleared = false;
   const release = () => {
-    callback.release();
+    const errors = [];
+    collectCleanupError(errors, () => ownedCallback.release());
     resources.removeDisposable(value);
+    throwCollectedErrors(errors, "browser interval callback release failed");
   };
   const value = {
     clear() {
       if (cleared) return undefined;
       cleared = true;
+      const errors = [];
       if (token !== null) {
-        globalThis.clearInterval(token);
+        const activeToken = token;
         token = null;
+        collectCleanupError(errors, () => globalThis.clearInterval(activeToken));
       }
       if (running === 0) {
-        release();
+        collectCleanupError(errors, release);
       }
+      throwCollectedErrors(errors, "browser interval cancellation failed");
       return undefined;
     },
   };
-  token = globalThis.setInterval(() => {
-    if (cleared) return undefined;
-    running++;
-    try {
-      callback();
-    } catch (error) {
-      reportEventHandlerError(error);
-    } finally {
-      running--;
-      if (cleared && running === 0) {
-        release();
+  try {
+    token = globalThis.setInterval(() => {
+      if (cleared) return undefined;
+      running++;
+      try {
+        ownedCallback();
+      } catch (error) {
+        reportEventHandlerError(error);
+      } finally {
+        running--;
+        if (cleared && running === 0) {
+          release();
+        }
       }
-    }
-  }, delayMs);
+    }, delayMs);
+  } catch (error) {
+    const errors = [error];
+    collectCleanupError(errors, () => ownedCallback.release());
+    throwCollectedErrors(errors, "browser.timer.setInterval registration failed during callback cleanup");
+  }
   resources.addDisposable(value);
   return value;
 }
@@ -618,29 +767,45 @@ export function createAnimationFrameResource(resources, callback, requestFrame, 
 }
 
 export function createScheduledCallbackResource(resources, callback, { disposeMethod, schedule, cancel, invoke }) {
+  const ownedCallback = takeCallbackLease(callback, `scheduled ${disposeMethod} callback`);
   let token = null;
+  let completed = false;
   const value = {
     [disposeMethod]: once(() => {
+      const errors = [];
       if (token !== null) {
-        cancel(token);
+        const activeToken = token;
         token = null;
+        collectCleanupError(errors, () => cancel(activeToken));
       }
-      callback.release();
+      collectCleanupError(errors, () => ownedCallback.release());
       resources.removeDisposable(value);
+      throwCollectedErrors(errors, `scheduled ${disposeMethod} cleanup failed`);
     }),
   };
-  token = schedule((...args) => {
+  const run = (...args) => {
     token = null;
     try {
-      invoke(callback, ...args);
+      invoke(ownedCallback, ...args);
     } catch (error) {
       reportEventHandlerError(error);
     } finally {
+      completed = true;
       value[disposeMethod]();
       resources.releaseValueResource(value);
     }
-  });
-  resources.addDisposable(value);
+  };
+  try {
+    const scheduledToken = schedule(run);
+    if (!completed) {
+      token = scheduledToken;
+      resources.addDisposable(value);
+    }
+  } catch (error) {
+    const errors = [error];
+    collectCleanupError(errors, () => value[disposeMethod]());
+    throwCollectedErrors(errors, `scheduled ${disposeMethod} registration failed during callback cleanup`);
+  }
   return value;
 }
 

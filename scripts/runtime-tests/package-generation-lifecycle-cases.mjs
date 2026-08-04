@@ -48,6 +48,8 @@ export async function runIrPackageLifecycleSmoke({ freshDir, wasmBytes, leanPack
     wasmBytes,
     virtualDocumentState: documentState,
   }).createRuntime({ irPackageBytes: await readFile(firstPackage) });
+  const firstGenerationResources = documentState.resources;
+  const staleFirstGenerationResource = firstGenerationResources.resourceForValue("first generation");
   const firstImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.name === sharedStringImportName,
   );
@@ -55,6 +57,19 @@ export async function runIrPackageLifecycleSmoke({ freshDir, wasmBytes, leanPack
   assert.equal(hostRuntime.call("HostInterop.titleHandshake", "first"), "Lean VIR host: first");
 
   hostRuntime.loadIrPackageBytes(await readFile(secondPackage));
+  assert.notEqual(
+    documentState.resources,
+    firstGenerationResources,
+    "package replacement should install a fresh virtual host-resource generation",
+  );
+  assert.throws(
+    () => firstGenerationResources.resolveResource(staleFirstGenerationResource, "stale resource"),
+    /resource is not live/,
+  );
+  assert.throws(
+    () => firstGenerationResources.resourceForValue("disposed generation"),
+    /disposed/,
+  );
   const secondImport = hostRuntime.interfaceManifest.hostImports.find(
     (entry) => entry.name === sharedStringImportName,
   );

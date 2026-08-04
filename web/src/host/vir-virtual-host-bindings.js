@@ -30,6 +30,8 @@ import {
   stopPropagationOnEvent,
 } from "./vir-host-resources.js";
 import { createNullableValue, nullablePayload } from "./vir-js-value-bindings.js";
+import { createStaticNodeList } from "./vir-js-collection-bindings.js";
+import { takeCallbackLease } from "../runtime/callbacks.js";
 
 export function createVirtualDocumentState({
   title = "",
@@ -64,8 +66,25 @@ export function ensureVirtualElementState(state, selector, element = null) {
   if (value === undefined) {
     value = element ?? createVirtualElementState();
     state.elements.set(selector, value);
+  } else if (Array.isArray(value)) {
+    if (value.length === 0) {
+      value.push(element ?? createVirtualElementState());
+    }
+    value = value[0];
   }
   return normalizeVirtualElementState(value);
+}
+
+export function ensureVirtualElementStates(state, selector, elements) {
+  if (!(state?.elements instanceof Map)) {
+    throw new Error("virtual document state must have an elements Map");
+  }
+  if (!Array.isArray(elements)) {
+    throw new Error("virtual document selector elements must be an Array");
+  }
+  const values = elements.map((element) => normalizeVirtualElementState(element ?? createVirtualElementState()));
+  state.elements.set(selector, values);
+  return values;
 }
 
 export function createVirtualEventState({
@@ -93,50 +112,64 @@ export function createVirtualEventState({
   return event;
 }
 
-export function createVirtualEventHostBindings(state = createVirtualDocumentState()) {
+export function createVirtualEventHostBindings(
+  state = createVirtualDocumentState(),
+  resources = state.resources ?? createHostResourceState(),
+) {
+  state.resources = resources;
   return {
     "browser.event.target": (event) =>
-      state.resources.resourceForValue(createNullableValue(virtualEventElementValue(state, event, "target"))),
+      resources.adoptResourceForValue(createNullableValue(virtualEventElementValue(state, resources, event, "target"))),
     "browser.event.currentTarget": (event) =>
-      state.resources.resourceForValue(createNullableValue(virtualEventElementValue(state, event, "currentTarget"))),
+      resources.adoptResourceForValue(createNullableValue(virtualEventElementValue(state, resources, event, "currentTarget"))),
     "browser.event.preventDefault": (event) => {
-      preventDefaultOnEvent(state.resources.resolveResource(event, "Event"));
+      preventDefaultOnEvent(resources.resolveResource(event, "Event"));
       return undefined;
     },
     "browser.event.stopPropagation": (event) => {
-      stopPropagationOnEvent(state.resources.resolveResource(event, "Event"));
+      stopPropagationOnEvent(resources.resolveResource(event, "Event"));
       return undefined;
     },
     "browser.event.formValue": (event) =>
-      state.resources.resourceForValue(createNullableValue(formControlEventValue(state.resources.resolveResource(event, "Event")))),
+      resources.adoptResourceForValue(createNullableValue(formControlEventValue(resources.resolveResource(event, "Event")))),
   };
 }
 
-export function createVirtualDocumentHostBindings(state = createVirtualDocumentState()) {
+export function createVirtualDocumentHostBindings(
+  state = createVirtualDocumentState(),
+  resources = state.resources ?? createHostResourceState(),
+) {
   if (!(state?.elements instanceof Map)) {
     throw new Error("virtual document state must have an elements Map");
   }
-  state.resources ??= createHostResourceState();
-  const reactHookRuntime = createVirtualReactHookRuntime(state.resources);
+  state.resources = resources;
+  const reactHookRuntime = createVirtualReactHookRuntime(resources);
   const reactHooks = {
     ...createReactHostHooks(),
     hookRuntime: reactHookRuntime,
   };
   return {
-    "browser.document.getTitle": () => state.resources.resourceForValue(state.title),
+    "browser.document.getTitle": () => resources.resourceForValue(state.title),
     "browser.document.setTitle": (title) => {
-      state.title = state.resources.resolveResource(title, "JsString");
+      state.title = resources.resolveResource(title, "JsString");
       return undefined;
     },
     "browser.document.querySelector": (selector) =>
-      state.resources.resourceForValue(createNullableValue(
+      resources.adoptResourceForValue(createNullableValue(
         queryVirtualElementState(
           state,
-          state.resources.resolveResource(selector, "JsString"),
+          resources.resolveResource(selector, "JsString"),
         ),
       )),
-    ...createVirtualEventHostBindings(state),
-    ...createElementResourceHostBindings(state.resources, {
+    "browser.document.querySelectorAll": (selector) =>
+      resources.resourceForValue(createStaticNodeList(
+        queryVirtualElementStates(
+          state,
+          resources.resolveResource(selector, "JsString"),
+        ),
+      )),
+    ...createVirtualEventHostBindings(state, resources),
+    ...createElementResourceHostBindings(resources, {
       getTextContent: (target) => target.textContent,
       setTextContent: (target, text) => {
         target.textContent = text;
@@ -144,95 +177,95 @@ export function createVirtualDocumentHostBindings(state = createVirtualDocumentS
       getAttribute: (target, name) => target.attributes.get(name) ?? null,
       setAttribute: (target, name, value) => target.attributes.set(name, value),
       createEventListener: (target, eventName, callback) =>
-        createVirtualEventListenerResource(state.resources, target, eventName, callback),
+        createVirtualEventListenerResource(resources, target, eventName, callback),
     }),
-    ...createHtmlInputElementResourceHostBindings(state.resources, {
+    ...createHtmlInputElementResourceHostBindings(resources, {
       fromElement: (element) => element,
     }),
-    ...createTimerResourceHostBindings(state.resources),
-    ...createAnimationResourceHostBindings(state.resources, {
+    ...createTimerResourceHostBindings(resources),
+    ...createAnimationResourceHostBindings(resources, {
       requestFrame: (run) => globalThis.setTimeout(() => run(performanceNow()), 16),
       cancelFrame: globalThis.clearTimeout.bind(globalThis),
     }),
-    ...createReactRootResourceHostBindings(state.resources, (target) =>
-      createVirtualReactRootResource(state.resources, target, reactHooks), {
+    ...createReactRootResourceHostBindings(resources, (target) =>
+      createVirtualReactRootResource(resources, target, reactHooks), {
         querySelector: (selector) => queryVirtualElementState(state, selector),
-        createNodeTextResource: (value) => createVirtualReactNodeTextResource(state.resources, value),
+        createNodeTextResource: (value) => createVirtualReactNodeTextResource(resources, value),
         createNodeElementResource: (elementType, props, children) =>
-          createVirtualReactNodeElementResource(state.resources, reactHooks, elementType, props, children),
+          createVirtualReactNodeElementResource(resources, reactHooks, elementType, props, children),
         createNodeFragmentResource: (props, children) =>
-          createVirtualReactNodeFragmentResource(state.resources, props, children),
+          createVirtualReactNodeFragmentResource(resources, props, children),
       }),
-    ...createReactJsValueHostBindings(state.resources),
-    ...createReactStateHostBindings(state.resources, reactHookRuntime),
+    ...createReactJsValueHostBindings(resources),
+    ...createReactStateHostBindings(resources, reactHookRuntime),
     "infoview.documentPosition": (uri, fileName, line, character, label) =>
-      state.resources.resourceForValue({
-        uri: state.resources.resolveResource(uri, "JsString"),
-        fileName: state.resources.resolveResource(fileName, "JsString"),
-        line: state.resources.resolveResource(line, "JsNat"),
-        character: state.resources.resolveResource(character, "JsNat"),
-        label: state.resources.resolveResource(label, "JsString"),
+      resources.resourceForValue({
+        uri: resources.resolveResource(uri, "JsString"),
+        fileName: resources.resolveResource(fileName, "JsString"),
+        line: resources.resolveResource(line, "JsNat"),
+        character: resources.resolveResource(character, "JsNat"),
+        label: resources.resolveResource(label, "JsString"),
       }),
     "infoview.clipboard.writeText": (text) => {
-      const value = state.resources.resolveResource(text, "JsString");
+      const value = resources.resolveResource(text, "JsString");
       state.clipboardText = value;
       state.clipboardWrites ??= [];
       state.clipboardWrites.push(value);
-      return state.resources.resourceForValue(true);
+      return resources.resourceForValue(true);
     },
     "infoview.command.revealPosition": (position) => {
       const normalized = normalizeInfoviewDocumentPosition(
-        state.resources.resolveResource(position, "DocumentPosition"),
+        resources.resolveResource(position, "DocumentPosition"),
       );
       if (normalized === null) {
-        return state.resources.resourceForValue(false);
+        return resources.resourceForValue(false);
       }
       state.revealedPosition = normalized;
       state.infoviewCommands ??= [];
       state.infoviewCommands.push({ kind: "revealPosition", position: normalized });
-      return state.resources.resourceForValue(true);
+      return resources.resourceForValue(true);
     },
     "proofwidgets.rpc.ref": (id, label, typeName, summary, expression) =>
-      state.resources.resourceForValue({
-        id: state.resources.resolveResource(id, "JsString"),
-        label: state.resources.resolveResource(label, "JsString"),
-        typeName: state.resources.resolveResource(typeName, "JsString"),
-        summary: state.resources.resolveResource(summary, "JsString"),
-        expression: state.resources.resolveResource(expression, "JsString"),
+      resources.resourceForValue({
+        id: resources.resolveResource(id, "JsString"),
+        label: resources.resolveResource(label, "JsString"),
+        typeName: resources.resolveResource(typeName, "JsString"),
+        summary: resources.resolveResource(summary, "JsString"),
+        expression: resources.resolveResource(expression, "JsString"),
         typeText: "",
         context: "",
       }),
     "proofwidgets.rpc.ref.finish": (ref, typeText, context, serverRef) =>
-      state.resources.resourceForValue({
-        ...state.resources.resolveResource(ref, "RpcRef"),
-        typeText: state.resources.resolveResource(typeText, "JsString"),
-        context: state.resources.resolveResource(context, "JsString"),
-        ...nullableField(state.resources, serverRef, "serverRef"),
+      resources.resourceForValue({
+        ...resources.resolveResource(ref, "RpcRef"),
+        typeText: resources.resolveResource(typeText, "JsString"),
+        context: resources.resolveResource(context, "JsString"),
+        ...nullableField(resources, serverRef, "serverRef"),
       }),
     "js.value.proofwidgets.resolvedRef.value": (ref) =>
-      normalizeProofWidgetsResolvedRef(state.resources.resolveResource(ref, "ResolvedRef")),
+      normalizeProofWidgetsResolvedRef(resources.resolveResource(ref, "ResolvedRef")),
     "proofwidgets.rpc.inspectRef": (ref) => {
-      const normalized = normalizeProofWidgetsRpcRef(state.resources.resolveResource(ref, "RpcRef"));
+      const normalized = normalizeProofWidgetsRpcRef(resources.resolveResource(ref, "RpcRef"));
       if (normalized === null) {
-        return state.resources.resourceForValue(false);
+        return resources.resourceForValue(false);
       }
       state.infoviewCommands ??= [];
       state.infoviewCommands.push({ kind: "proofwidgetsRpcInspectRef", ref: normalized });
-      return state.resources.resourceForValue(true);
+      return resources.resourceForValue(true);
     },
     "proofwidgets.rpc.resolveRef": (ref, callback) => {
-      const normalized = normalizeProofWidgetsRpcRef(state.resources.resolveResource(ref, "RpcRef"));
+      const normalized = normalizeProofWidgetsRpcRef(resources.resolveResource(ref, "RpcRef"));
       if (normalized === null || typeof callback !== "function") {
         releaseCallback(callback);
-        return state.resources.resourceForValue(false);
+        return resources.resourceForValue(false);
       }
       const result = virtualProofWidgetsRpcRefInfo(normalized);
       state.infoviewCommands ??= [];
       state.infoviewCommands.push({ kind: "proofwidgetsRpcResolveRef", ref: normalized, result });
-      callAndReleaseCallback(callback, state.resources.resourceForValue(result));
-      return state.resources.resourceForValue(true);
+      callAndReleaseCallback(callback, resources.resourceForValue(result));
+      return resources.resourceForValue(true);
     },
-    [VIR_HOST_DISPOSE]: () => state.resources.dispose(),
+    [VIR_HOST_DISPOSE]: () => resources.dispose(),
   };
 }
 
@@ -260,8 +293,14 @@ function createVirtualReactRootResource(resources, target, hooks) {
 }
 
 function queryVirtualElementState(state, selector) {
-  const element = state.elements.get(selector);
-  return element === undefined ? null : normalizeVirtualElementState(element);
+  return queryVirtualElementStates(state, selector)[0] ?? null;
+}
+
+function queryVirtualElementStates(state, selector) {
+  const value = state.elements.get(selector);
+  if (value === undefined) return [];
+  const elements = Array.isArray(value) ? value : [value];
+  return elements.map(normalizeVirtualElementState);
 }
 
 function nullableField(resources, value, name) {
@@ -288,14 +327,14 @@ function findVirtualReactElementNodeById(node, id) {
   return null;
 }
 
-function virtualEventElementValue(state, event, field) {
-  const value = state.resources.resolveResource(event, "Event")?.[field];
+function virtualEventElementValue(state, resources, event, field) {
+  const value = resources.resolveResource(event, "Event")?.[field];
   if (value === null || value === undefined) return null;
   if (typeof value === "string") {
     return queryVirtualElementState(state, value);
   }
   if (isHostResource(value)) {
-    return state.resources.resolveResource(value, "Element");
+    return resources.resolveResource(value, "Element");
   }
   if (typeof value === "object") {
     return value;
@@ -438,6 +477,7 @@ function nonNegativeInteger(value) {
 }
 
 function virtualCallbackEventListenerState(target, eventName, callback, resources) {
+  const ownedCallback = takeCallbackLease(callback, "browser.element.addEventListener callback");
   if (!target.listeners.has(eventName)) {
     target.listeners.set(eventName, []);
   }
@@ -448,7 +488,7 @@ function virtualCallbackEventListenerState(target, eventName, callback, resource
         const dispatchEvent = event !== null && typeof event === "object" ? event : {};
         dispatchEvent.target ??= target;
         dispatchEvent.currentTarget ??= target;
-        callLeanEventCallback(resources, dispatchEvent, callback);
+        callLeanEventCallback(resources, dispatchEvent, ownedCallback);
       }
     },
     remove() {
@@ -456,7 +496,7 @@ function virtualCallbackEventListenerState(target, eventName, callback, resource
       listener.removed = true;
       const listeners = target.listeners.get(eventName) ?? [];
       target.listeners.set(eventName, listeners.filter((candidate) => candidate !== listener));
-      callback.release();
+      ownedCallback.release();
       resources.removeDisposable(listener);
     },
   };

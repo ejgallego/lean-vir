@@ -10,7 +10,7 @@ import {
   ensureVirtualElementState,
   virtualReactElementById,
 } from "../../web/src/vir-runtime-node.js";
-import { hostResourceValue } from "../../web/src/host-resource.js";
+import { hostResourceValue, releaseHostResource } from "../../web/src/host-resource.js";
 import { createHostResourceState } from "../../web/src/host/vir-host-resources.js";
 import {
   assert,
@@ -102,7 +102,11 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(jsLengthImport?.result?.type, "Js");
   const jsResources = createHostResourceState();
   const jsArray = jsResources.resourceForValue([10, 20, 30]);
-  assert.equal(jsObjectRuntime.call("freshJsIdNat", jsArray), jsArray);
+  const jsArrayAlias = jsObjectRuntime.call("freshJsIdNat", jsArray);
+  assert.notEqual(jsArrayAlias, jsArray);
+  assert.equal(hostResourceValue(jsArrayAlias), hostResourceValue(jsArray));
+  releaseHostResource(jsArrayAlias);
+  assert.deepEqual(hostResourceValue(jsArray), [10, 20, 30]);
   assert.equal(jsObjectRuntime.call("freshJsLengthNatArray", jsArray), "3");
 
   const leanRefSource = join(freshDir, "FreshLeanRef.lean");
@@ -119,15 +123,27 @@ export async function runHostPackageSmoke({ freshDir, wasmBytes }) {
   assert.equal(leanRefFromJsImport?.boundary, "objectHandle");
   assert.equal(leanRefFromJsImport?.args[0]?.type?.type, "Js");
   assert.equal(leanRefFromJsImport?.result?.kind, "leanObject");
+  const leanRefRetainImport = leanRefRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "js.leanRef.retain");
+  assert.equal(leanRefRetainImport?.boundary, "objectHandle");
+  assert.equal(leanRefRetainImport?.args[0]?.type?.type, "Js");
+  assert.equal(leanRefRetainImport?.result?.type, "Js");
   const leanRefReleaseImport = leanRefRuntime.interfaceManifest.hostImports.find((entry) => entry.target === "js.leanRef.release");
   assert.equal(leanRefReleaseImport?.boundary, "objectHandle");
   assert.equal(leanRefReleaseImport?.args[0]?.type?.type, "Js");
   assert.equal(leanRefReleaseImport?.result?.type, "Unit");
   assert.equal(leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.roundtripName", "Mochi"), "Mochi");
   assert.equal(leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.roundtripFeed"), "feed");
+  assert.equal(leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.retainedAliasSurvivesRelease"), "alias");
+  assert.equal(leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.originalSurvivesAliasRelease"), "feed");
+  assert.equal(leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.nullableAliasSurvivesSourceRelease"), "nullable");
+  assert.equal(
+    leanRefRuntime.hostState.leanObjectHandleCells.size,
+    0,
+    "dropping the nullable wrapper must release its retained JSL child",
+  );
   assert.throws(
     () => leanRefRuntime.call("Vir.Fixtures.FreshLeanRef.useReleased"),
-    /js\.leanRef\.value argument value must be a live Lean object handle resource/,
+    /js\.leanRef\.value argument value did not lift to a live host resource/,
   );
 
   const customJsValueSource = join(freshDir, "CustomJsValue.lean");

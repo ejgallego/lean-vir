@@ -111,6 +111,115 @@ def ofOption {α : Type} (value : Option (Lean.Vir.Js α)) : RuntimeM (Lean.Vir.
 
 end Nullable
 
+namespace Array
+
+/-- Phantom shape for a JavaScript `Array` whose entries have Lean view `α`. -/
+opaque Value (α : Type) : Type
+
+end Array
+
+/-- JavaScript-owned array. The parameter describes the Lean view returned by indexing. -/
+abbrev Array (α : Type) : Type :=
+  Lean.Vir.Js (Array.Value α)
+
+namespace NodeList
+
+/-- Phantom shape for a JavaScript DOM `NodeList` whose entries have Lean view `α`. -/
+opaque Value (α : Type) : Type
+
+end NodeList
+
+/-- JavaScript-owned DOM `NodeList`. The parameter describes the Lean view returned by indexing. -/
+abbrev NodeList (α : Type) : Type :=
+  Lean.Vir.Js (NodeList.Value α)
+
+private def collectResourceItems {α : Type}
+    (item : Nat → RuntimeM (Option (Lean.Vir.Js α))) :
+    (remaining index : Nat) →
+    _root_.Array (Lean.Vir.Js α) →
+    RuntimeM (_root_.Array (Lean.Vir.Js α))
+  | 0, _, values => pure values
+  | remaining + 1, index, values => do
+      let values :=
+        match ← item index with
+        | none => values
+        | some value => values.push value
+      collectResourceItems item remaining (index + 1) values
+
+namespace Array
+
+@[vir_js "js.array.length"]
+private opaque lengthJs {α : Type}
+    (array : @& Lean.Vir.Js.Array α) :
+    RuntimeM (Lean.Vir.Js Nat)
+
+/-- Returns the current JavaScript array length as a Lean `Nat`. -/
+def length {α : Type} (array : @& Lean.Vir.Js.Array α) : RuntimeM Nat := do
+  Lean.Vir.JsValue.toNat (← lengthJs array)
+
+@[vir_js "js.array.item"]
+private opaque itemNullable {α : Type}
+    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
+    (index : @& Lean.Vir.Js Nat) :
+    RuntimeM (Lean.Vir.Js.Nullable α)
+
+/-- Returns the resource at `index`, or `none` when the index is out of bounds. -/
+def item {α : Type}
+    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α))
+    (index : Nat) :
+    RuntimeM (Option (Lean.Vir.Js α)) := do
+  let jsIndex ← Lean.Vir.JsValue.ofNat index
+  Lean.Vir.Js.Nullable.toOption (← itemNullable array jsIndex)
+
+/-- Materializes independent Lean resource handles for the entries of a JavaScript array. -/
+def toLeanArray {α : Type}
+    (array : @& Lean.Vir.Js.Array (Lean.Vir.Js α)) :
+    RuntimeM (_root_.Array (Lean.Vir.Js α)) := do
+  let size ← length array
+  collectResourceItems (item array) size 0 (_root_.Array.mkEmpty size)
+
+end Array
+
+namespace NodeList
+
+@[vir_js "js.nodeList.length"]
+private opaque lengthJs {α : Type}
+    (nodes : @& Lean.Vir.Js.NodeList α) :
+    RuntimeM (Lean.Vir.Js Nat)
+
+/-- Returns the current `NodeList.length` as a Lean `Nat`. -/
+def length {α : Type} (nodes : @& Lean.Vir.Js.NodeList α) : RuntimeM Nat := do
+  Lean.Vir.JsValue.toNat (← lengthJs nodes)
+
+@[vir_js "js.nodeList.item"]
+private opaque itemNullable {α : Type}
+    (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α))
+    (index : @& Lean.Vir.Js Nat) :
+    RuntimeM (Lean.Vir.Js.Nullable α)
+
+/-- Calls `NodeList.item`, returning `none` when the index is out of bounds. -/
+def item {α : Type}
+    (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α))
+    (index : Nat) :
+    RuntimeM (Option (Lean.Vir.Js α)) := do
+  let jsIndex ← Lean.Vir.JsValue.ofNat index
+  Lean.Vir.Js.Nullable.toOption (← itemNullable nodes jsIndex)
+
+/-- Copies a `NodeList` into a JavaScript array without crossing its entries into Lean. -/
+@[vir_js "js.nodeList.toArray"]
+opaque toArray {α : Type}
+    (nodes : @& Lean.Vir.Js.NodeList α) :
+    RuntimeM (Lean.Vir.Js.Array α)
+
+/-- Materializes independent Lean resource handles for the entries of a `NodeList`. -/
+def toLeanArray {α : Type}
+    (nodes : @& Lean.Vir.Js.NodeList (Lean.Vir.Js α)) :
+    RuntimeM (_root_.Array (Lean.Vir.Js α)) := do
+  let size ← length nodes
+  collectResourceItems (item nodes) size 0 (_root_.Array.mkEmpty size)
+
+end NodeList
+
 end Js
 
 namespace LeanRef
@@ -154,11 +263,23 @@ owned Lean reference to the stored object.
 opaque fromJSL {α : Type} (value : @& JSL α) : RuntimeM α
 
 /--
-Releases a JavaScript handle created by `LeanRef.toJSL`.
+Creates an independent JavaScript handle for the same retained Lean-owned value.
+
+Each `JSL` alias owns an independent lease. `releaseJSL` can release that lease
+early; otherwise dropping the Lean wrapper releases it automatically. Releasing
+one alias does not invalidate any other live alias.
+-/
+@[vir_js "js.leanRef.retain"]
+opaque retainJSL {α : Type} (value : @& JSL α) : RuntimeM (JSL α)
+
+/--
+Releases a JavaScript handle created by `LeanRef.toJSL` early. Dropping the
+wrapper also releases it automatically.
 
 Releasing the handle does not affect Lean values already returned by
-`LeanRef.fromJSL`; those calls receive fresh owned Lean references. Using the
-released handle again is a runtime error.
+`LeanRef.fromJSL` or other aliases created by `LeanRef.retainJSL`; those calls
+receive independent ownership. Using the released handle again is a runtime
+error.
 -/
 @[vir_js "js.leanRef.release"]
 opaque releaseJSL {α : Type} (value : @& JSL α) : RuntimeM Unit

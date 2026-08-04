@@ -21,7 +21,14 @@ diagrams. The short model is:
 - `Node`, `Root`, state setters, events, and primitive JavaScript state values
   are JavaScript-owned resources that cross as `Lean.Vir.Js α`.
 - Event and updater closures are Lean-owned closures that cross to JavaScript
-  as releasable `VirCallback` objects.
+  as releasable `VirCallback` leases. React nodes, components, reducers,
+  effects, and pending state updates acquire and release their own leases;
+  Lean callers do not manage them.
+- `Lean.Vir.JSL α` values are Lean-owned objects behind per-alias leases. React
+  acquires a separate alias while state, reducer, ref, or memo storage owns the
+  value, and releases that alias on replacement or component disposal. Lean
+  wrapper drop releases its own alias automatically; `releaseJSL` is available
+  for deterministic early release.
 
 ## Current V0
 
@@ -291,20 +298,25 @@ The browser React host binding is exposed from
   cursor changes.
 - `react.useState` calls `React.useState` while rendering a component. Its ABI
   is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
-- `react.useReducer` calls `React.useReducer` while rendering a component. The
-  public Lean surface is JS-shaped: reducers receive `Js state` and
+- `react.useReducer` allocates a replay-safe `React.useState` slot while
+  rendering a component. VIR invokes the Lean reducer exactly once at dispatch
+  time and queues the concrete result, so React never replays an effectful Lean
+  reducer. The public Lean surface is JS-shaped: reducers receive `Js state` and
   `Js action`, return `Js state`, and dispatch consumes `Js action`. Structured
   Lean-owned state and actions use explicit `LeanRef.toJSL`/`fromJSL` calls so
   React stores `Lean.Vir.JSL` handles instead of decoding them or confusing
-  them with JavaScript-shaped `Js` values.
+  them with JavaScript-shaped `Js` values. The host gives React an independent
+  JSL alias and releases React's alias after state replacement, action
+  consumption, or unmount; aliases retained by Lean remain independent.
 - `react.useRef` calls `React.useRef` while rendering a component and returns a
   host-owned ref object. `react.ref.get` and `react.ref.set` read/write
   `.current`; they do not schedule a render.
 - `react.useMemo` calls `React.useMemo` while rendering a component. The
   calculate callback runs in `ReactM`, dependencies are a JavaScript-owned
   `DependencyList`, and the returned value stays in the `Js` resource lane.
-- `react.useEffect` calls `React.useEffect` while rendering a component. The
-  current ABI is resource-shaped: setup returns a host resource and cleanup
+- `react.useEffect` calls `React.useEffect` while rendering a component. Each
+  React setup/cleanup cycle gets distinct callback leases, including the extra
+  development Strict Mode cycle. The current ABI is resource-shaped: setup returns a host resource and cleanup
   receives that resource when React cleans the effect up. The base binding
   exposes React's no-dependency behavior.
 - `react.deps.empty` and `react.deps.push` build a JavaScript-owned dependency
@@ -326,8 +338,9 @@ The browser React host binding is exposed from
   infoview/proof-widget path where the shell owns the DOM mount element and
   Lean supplies the current tree or component.
 - `react.state.set` and `react.state.modify` call the retained React setter;
-  both are `RuntimeM`, and `modify` retains the Lean updater callback until
-  React invokes it or the runtime is disposed.
+  both are `RuntimeM`. `modify` runs the Lean updater once in VIR against the
+  latest committed-or-queued state and passes only its concrete result to
+  React, making it replay-safe.
 - `react.state.modify` updater-local resource lifetime is documented with the
   shared host ownership rules in
   [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
@@ -336,11 +349,11 @@ The browser React host binding is exposed from
 - `react.root.unmountSelector` unwraps an explicit `Js String` selector,
   unmounts, forgets a selector-owned root, and returns an explicit `Js Bool`
   success value.
-- Rendering a new tree into the same browser root queues callbacks retained by
-  the previous tree for microtask release after React has been given the
-  replacement tree. Event-triggered rerenders defer stale callback release
-  until the event handler returns, then flush immediately. Function-component
-  rerenders use the same policy in the browser and virtual host.
+- Browser function-component ownership swaps happen from `useLayoutEffect`
+  after React commits. Interrupted render generations never release the visible
+  committed tree and are not inserted into a strong runtime registry; weak
+  finalization is a safety net for abandoned generations. The virtual renderer
+  keeps immediate-commit behavior and explicit deferred callback cleanup.
 - Runtime dispose and package reload unmount all live React roots through the
   same disposable-resource path used for DOM listeners, timeouts, and frames.
 
@@ -388,8 +401,9 @@ helpers check `currentTarget` first, then fall back to `target`.
    component rerenders, root rerender cleanup, unmount cleanup, package reload
    cleanup, runtime dispose, malformed Node construction, depth limits, missing
    selectors, and input-event
-   target fallback. Virtual `Document.querySelector` follows DOM semantics, so
-   tests pre-seed expected fixtures with `ensureVirtualElementState`. Virtual
+   target fallback. Virtual `Document.querySelector` and `querySelectorAll`
+   follow DOM semantics, so tests pre-seed expected fixtures with
+   `ensureVirtualElementState` or `ensureVirtualElementStates`. Virtual
    React callback tests find nodes by DOM-like `id` props instead of child
    indexes.
 11. Added browser smoke coverage proving real React click, input, change,

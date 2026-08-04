@@ -30,13 +30,15 @@ extern "C" lean_object * vir_js_call_objects(uint32_t slot, lean_object ** argv,
     return nullptr;
 }
 
-extern "C" uint32_t vir_resource_root(__externref_t value) {
+extern "C" uint32_t vir_resource_root(__externref_t value, uint8_t owned) {
     (void) value;
+    (void) owned;
     return 0;
 }
 
-extern "C" __externref_t vir_resource_get(uint32_t root_id) {
+extern "C" __externref_t vir_resource_get(uint32_t root_id, uint8_t take) {
     (void) root_id;
+    (void) take;
     return __builtin_wasm_ref_null_extern();
 }
 

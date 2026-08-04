@@ -11,6 +11,7 @@ import {
   VIR_HOST_DISPOSE,
 } from "../../web/src/vir-runtime-node.js";
 import { createHostResourceState } from "../../web/src/vir-host-bindings.js";
+import { releaseHostResource, retainHostResource } from "../../web/src/host-resource.js";
 import {
   assert,
   createCallbackHostBindings,
@@ -22,11 +23,13 @@ import {
 const { wasmBytes, hostPackageBytes, irPackageBytes } = await readRuntimeArtifacts();
 
 let retainedHostCallback = null;
+let transferredHostCallback = null;
 let throwFromRetainedHostCallback = false;
 const retainedHostErrorDocumentState = createVirtualDocumentState();
 const retainedHostErrorBindings = {
   "browser.element.addEventListener": (...args) => {
-    retainedHostCallback = args[2];
+    transferredHostCallback = args[2];
+    retainedHostCallback = transferredHostCallback.retain();
     return retainedHostErrorRuntime.hostState.defaultBindings["browser.element.addEventListener"](...args);
   },
   "test.recordNat": () => {
@@ -44,6 +47,8 @@ const retainedHostErrorRuntime = await createVirRuntime({
 });
 ensureVirtualElementState(retainedHostErrorDocumentState, "#retained-host-error");
 assert.equal(retainedHostErrorRuntime.call("HostInterop.mountCallbackEvent", "#retained-host-error"), "1");
+assert.equal(transferredHostCallback.released, true);
+assert.equal(retainedHostCallback.released, false);
 const retainedHostEvent = retainedHostErrorDocumentState.resources.resourceForValue({});
 throwFromRetainedHostCallback = true;
 assert.throws(
@@ -52,9 +57,75 @@ assert.throws(
 );
 throwFromRetainedHostCallback = false;
 assert.doesNotThrow(() => retainedHostCallback(retainedHostEvent));
+retainedHostErrorDocumentState.elements.get("#retained-host-error").listeners.get("click")[0].remove();
+assert.equal(retainedHostCallback.released, false);
+assert.equal(retainedHostErrorRuntime.liveCallbacks.size, 1);
+assert.doesNotThrow(() => retainedHostCallback(retainedHostEvent));
 retainedHostErrorDocumentState.resources.releaseResource(retainedHostEvent);
 retainedHostErrorRuntime.dispose();
 assert.equal(retainedHostCallback.released, true);
+
+let transferredLeaseCallback = null;
+let firstOwnedLease = null;
+let secondOwnedLease = null;
+const callbackLeaseRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      transferredLeaseCallback = callback;
+      firstOwnedLease = callback.retain();
+      secondOwnedLease = callback.retain();
+      callback.release();
+      return input;
+    },
+    "test.recordNat": () => undefined,
+  },
+});
+assert.equal(callbackLeaseRuntime.call("HostInterop.callbackRoundTrip", 4), "4");
+assert.notEqual(firstOwnedLease, transferredLeaseCallback);
+assert.notEqual(secondOwnedLease, firstOwnedLease);
+assert.equal(transferredLeaseCallback.released, true);
+assert.equal(firstOwnedLease.released, false);
+assert.equal(secondOwnedLease.released, false);
+assert.equal(callbackLeaseRuntime.liveCallbacks.size, 1);
+const leaseJsNat = (value) => callbackLeaseRuntime.hostState.defaultBindings["js.nat"](BigInt(value));
+const leaseJsNatValue = (value) => callbackLeaseRuntime.hostState.defaultBindings["js.nat.value"](value);
+assert.equal(leaseJsNatValue(firstOwnedLease(leaseJsNat(5))), 12n);
+assert.equal(firstOwnedLease.release(), true);
+assert.equal(firstOwnedLease.release(), false);
+assert.equal(secondOwnedLease.released, false);
+assert.equal(leaseJsNatValue(secondOwnedLease(leaseJsNat(6))), 13n);
+assert.equal(callbackLeaseRuntime.liveCallbacks.size, 1);
+assert.equal(secondOwnedLease.release(), true);
+assert.equal(secondOwnedLease.released, true);
+assert.equal(callbackLeaseRuntime.liveCallbacks.size, 0);
+assert.throws(() => firstOwnedLease(leaseJsNat(1)), /released/);
+callbackLeaseRuntime.dispose();
+
+let failedRetainedTransfer = null;
+let failedRetainedLease = null;
+const failedRetainRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  hostBindings: {
+    "test.callNatCallback": (_input, callback) => {
+      failedRetainedTransfer = callback;
+      failedRetainedLease = callback.retain();
+      throw new Error("retained lease binding boom");
+    },
+    "test.recordNat": () => undefined,
+  },
+});
+assert.throws(
+  () => failedRetainRuntime.call("HostInterop.callbackRoundTrip", 1),
+  /retained lease binding boom/,
+);
+assert.equal(failedRetainedTransfer.released, true);
+assert.equal(failedRetainedLease.released, true);
+assert.equal(failedRetainRuntime.liveCallbacks.size, 0);
+assert.throws(() => failedRetainedLease(), /released/);
+failedRetainRuntime.dispose();
 
 let reentrantRuntime = null;
 let reentrantDepth = 0;
@@ -257,6 +328,35 @@ assert.equal(callbackReleaseRuntimeCallbacks.every((callback) => callback.releas
 assert.throws(() => callbackReleaseRuntime.call("HostInterop.callbackRoundTrip", 1), /disposed/);
 assert.doesNotThrow(() => callbackReleaseRuntime.dispose());
 
+let disposePhaseCallback = null;
+let disposePhaseInput = null;
+let disposePhaseResult = null;
+const disposePhaseBindings = {
+  "test.callNatCallback": (input, callback) => {
+    disposePhaseInput = retainHostResource(input, "dispose-phase callback input");
+    disposePhaseCallback = callback;
+    return input;
+  },
+  "test.recordNat": () => undefined,
+  [VIR_HOST_DISPOSE]() {
+    try {
+      disposePhaseResult = jsNatResourceValue(disposePhaseCallback(disposePhaseInput));
+    } finally {
+      disposePhaseCallback.release();
+      releaseHostResource(disposePhaseInput);
+    }
+  },
+};
+const disposePhaseRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageBytes: hostPackageBytes,
+  hostBindings: disposePhaseBindings,
+});
+assert.equal(disposePhaseRuntime.call("HostInterop.callbackRoundTrip", 3), "3");
+assert.doesNotThrow(() => disposePhaseRuntime.dispose());
+assert.equal(disposePhaseResult, 10n);
+assert.equal(disposePhaseRuntime.liveCallbacks.size, 0);
+
 const throwingResources = createHostResourceState();
 const throwingResourceCleanup = [];
 const liveThrowingResource = throwingResources.resourceForValue({ kind: "cleanup sentinel" });
@@ -278,10 +378,10 @@ assertAggregateMessages(
 );
 assert.deepEqual(throwingResourceCleanup, ["first", "second"]);
 assert.deepEqual(throwingResources.debugResourceCounts(), {
-  live: 0,
-  primitives: 0,
+  passiveStrong: 0,
+  scoped: 0,
   temporaryScopes: 0,
-  disposables: 0,
+  owners: 0,
 });
 assert.throws(() => throwingResources.resolveResource(liveThrowingResource, "cleanup sentinel"), /not live/);
 assert.doesNotThrow(() => throwingResources.dispose());

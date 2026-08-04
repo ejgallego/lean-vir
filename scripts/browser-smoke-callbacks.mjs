@@ -62,6 +62,20 @@ function inputMountedScript(inputSelector, outputSelector, expectedOutput) {
 }
 
 export async function smokeBrowserCallbacks(cdp, origin) {
+  await runDemoHostEntry(cdp, origin, "HostInterop.querySelectorAllFirstText", {
+    runInputs: [".query-all-smoke"],
+    expectedResult: "first browser match",
+    beforeRunScript: `(() => {
+      for (const text of ["first browser match", "second browser match"]) {
+        const element = document.createElement("span");
+        element.className = "query-all-smoke";
+        element.textContent = text;
+        document.body.appendChild(element);
+      }
+      return true;
+    })()`,
+  });
+
   await runDemoHostEntry(cdp, origin, "HostInterop.mountCallbackText", {
     runInputs: ["#callback-smoke-target"],
     expectedResult: "1",

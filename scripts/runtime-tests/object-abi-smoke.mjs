@@ -124,6 +124,7 @@ const leanObjectType = { type: "LeanObject", interfaceTag: INTERFACE_TAG.LEAN_OB
 const unitType = { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT };
 const stringType = { type: "String", interfaceTag: INTERFACE_TAG.STRING };
 const arrayJsResourceType = { type: "Array Js", interfaceTag: INTERFACE_TAG.ARRAY, kind: "array", element: jsResourceType };
+const arrayResourceType = { type: "Array Resource", interfaceTag: INTERFACE_TAG.ARRAY, kind: "array", element: resourceType };
 const listJsResourceType = { type: "List Js", interfaceTag: INTERFACE_TAG.LIST, kind: "list", element: jsResourceType };
 const optionResourceType = { type: "Option Resource", interfaceTag: INTERFACE_TAG.OPTION, element: resourceType };
 const prodResourceType = { type: "Prod Resource Resource", interfaceTag: INTERFACE_TAG.PROD, fst: resourceType, snd: resourceType };
@@ -143,13 +144,15 @@ try {
   runtime.exports.vir_obj_dec(resourceObj);
   resourceObj = 0;
 }
-let hostResourceObj = runtime.makeHostResourceObjectValue(resourceType, resourceArg, "resource host result");
+const hostResultResource = createHostResource({ name: "host result" });
+let hostResourceObj = runtime.makeHostResourceObjectValue(resourceType, hostResultResource, "resource host result");
 try {
-  assert.equal(runtime.liftHostResourceObjectValue(resourceType, hostResourceObj, "resource host argument"), resourceArg);
+  assert.equal(runtime.liftHostResourceObjectValue(resourceType, hostResourceObj, "resource host argument"), hostResultResource);
 } finally {
   runtime.exports.vir_obj_dec(hostResourceObj);
   hostResourceObj = 0;
 }
+assert.equal(hostResourceValue(hostResultResource), null, "an unclaimed host result must be released with its Lean root");
 assert.throws(
   () => runtime.makeHostResourceObjectValue(stringType, "raw", "raw string host result"),
   /unsupported JavaScript host resource result type/,
@@ -209,6 +212,8 @@ assert.throws(
   /released lean object handle must be a live Lean object handle resource/,
 );
 const leanHandleHostRuntime = await createVirRuntime({ wasmBytes, irPackageBytes });
+let teardownLeanHandleResource = null;
+let teardownLeanHandleAlias = null;
 try {
   leanHandleHostRuntime.hostState.setManifest({
     hostImports: [{
@@ -217,12 +222,31 @@ try {
       args: [{ name: "value", type: leanObjectType }],
       result: jsResourceType,
     }, {
+      target: "js.leanRef.retain",
+      boundary: "objectHandle",
+      args: [{ name: "value", type: jsResourceType }],
+      result: jsResourceType,
+    }, {
       target: "js.leanRef.release",
       boundary: "objectHandle",
       args: [{ name: "value", type: jsResourceType }],
       result: unitType,
     }],
   });
+  let droppedLeanHandleObj = makeObjectString(leanHandleHostRuntime, "dropped-lean-ref");
+  let droppedLeanHandleResultObj = 0;
+  try {
+    droppedLeanHandleResultObj = callHostImportObjects(leanHandleHostRuntime, 0, [droppedLeanHandleObj]);
+    assert.equal(leanHandleHostRuntime.hostState.leanObjectHandleCells.size, 1);
+  } finally {
+    if (droppedLeanHandleObj !== 0) leanHandleHostRuntime.exports.vir_obj_dec(droppedLeanHandleObj);
+    if (droppedLeanHandleResultObj !== 0) leanHandleHostRuntime.exports.vir_obj_dec(droppedLeanHandleResultObj);
+  }
+  assert.equal(
+    leanHandleHostRuntime.hostState.leanObjectHandleCells.size,
+    0,
+    "dropping an unclaimed JSL result must release its Lean object cell",
+  );
   let hostLeanHandleObj = makeObjectString(leanHandleHostRuntime, "host-state-lean-ref");
   let hostLeanHandleResultObj = 0;
   let hostLeanHandleResource = null;
@@ -230,7 +254,7 @@ try {
     hostLeanHandleResultObj = callHostImportObjects(leanHandleHostRuntime, 0, [hostLeanHandleObj]);
     leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleObj);
     hostLeanHandleObj = 0;
-    hostLeanHandleResource = leanHandleHostRuntime.liftHostResourceObjectValue(
+    hostLeanHandleResource = leanHandleHostRuntime.liftOwnedObjectValue(
       jsResourceType,
       hostLeanHandleResultObj,
       "host-state lean ref result",
@@ -258,16 +282,21 @@ try {
   const rewrappedHostLeanHandleResource = rewrappedLeanHandleResources.resourceForValue(
     hostResourceValue(hostLeanHandleResource),
   );
-  let hostLeanHandleReleaseArgObj = leanHandleHostRuntime.makeHostResourceObjectValue(
+  assert.notEqual(hostResourceValue(rewrappedHostLeanHandleResource), hostResourceValue(hostLeanHandleResource));
+  assert.equal(
+    leanHandleHostRuntime.leanObjectHandleCell(rewrappedHostLeanHandleResource, "rewrapped host-state lean ref"),
+    leanHandleHostRuntime.leanObjectHandleCell(hostLeanHandleResource, "original host-state lean ref"),
+  );
+  let hostLeanHandleReleaseArgObj = leanHandleHostRuntime.makeObjectValue(
     jsResourceType,
     rewrappedHostLeanHandleResource,
     "host-state lean ref release argument",
   );
   let hostLeanHandleReleaseResultObj = 0;
   try {
-    hostLeanHandleReleaseResultObj = callHostImportObjects(leanHandleHostRuntime, 1, [hostLeanHandleReleaseArgObj]);
-    assert.equal(leanHandleHostRuntime.hostState.leanObjectHandleCells.size, 0);
-    assert.equal(hostResourceValue(rewrappedHostLeanHandleResource), hostResourceValue(hostLeanHandleResource));
+    hostLeanHandleReleaseResultObj = callHostImportObjects(leanHandleHostRuntime, 2, [hostLeanHandleReleaseArgObj]);
+    assert.equal(leanHandleHostRuntime.hostState.leanObjectHandleCells.size, 1);
+    assert.equal(hostResourceValue(rewrappedHostLeanHandleResource), null);
   } finally {
     if (hostLeanHandleReleaseArgObj !== 0) {
       leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleReleaseArgObj);
@@ -280,11 +309,105 @@ try {
     rewrappedLeanHandleResources.dispose();
   }
   assert.throws(
-    () => leanHandleHostRuntime.retainLeanObjectHandleValue(hostLeanHandleResource, "released host-state lean ref"),
-    /released host-state lean ref must be a live Lean object handle resource/,
+    () => leanHandleHostRuntime.retainLeanObjectHandleValue(rewrappedHostLeanHandleResource, "released alias"),
+    /released alias must be a live Lean object handle resource/,
   );
+  retainedHostLeanHandleObj = leanHandleHostRuntime.retainLeanObjectHandleValue(
+    hostLeanHandleResource,
+    "live original host-state lean ref",
+  );
+  try {
+    assert.equal(leanHandleHostRuntime.readObjectString(retainedHostLeanHandleObj), "host-state-lean-ref");
+  } finally {
+    leanHandleHostRuntime.exports.vir_obj_dec(retainedHostLeanHandleObj);
+    retainedHostLeanHandleObj = 0;
+  }
+
+  let hostLeanHandleRetainArgObj = leanHandleHostRuntime.makeObjectValue(
+    jsResourceType,
+    hostLeanHandleResource,
+    "host-state lean ref retain argument",
+  );
+  let hostLeanHandleRetainResultObj = 0;
+  let retainedAliasResource = null;
+  try {
+    hostLeanHandleRetainResultObj = callHostImportObjects(leanHandleHostRuntime, 1, [hostLeanHandleRetainArgObj]);
+    retainedAliasResource = leanHandleHostRuntime.liftOwnedObjectValue(
+      jsResourceType,
+      hostLeanHandleRetainResultObj,
+      "host-state retained lean ref result",
+    );
+    assert.notEqual(hostResourceValue(retainedAliasResource), hostResourceValue(hostLeanHandleResource));
+    assert.equal(leanHandleHostRuntime.hostState.leanObjectHandleCells.size, 1);
+  } finally {
+    if (hostLeanHandleRetainArgObj !== 0) leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleRetainArgObj);
+    if (hostLeanHandleRetainResultObj !== 0) leanHandleHostRuntime.exports.vir_obj_dec(hostLeanHandleRetainResultObj);
+  }
+  leanHandleHostRuntime.releaseLeanObjectHandleResource(hostLeanHandleResource, "original host-state lean ref");
+  assert.equal(leanHandleHostRuntime.hostState.leanObjectHandleCells.size, 1);
+  retainedHostLeanHandleObj = leanHandleHostRuntime.retainLeanObjectHandleValue(
+    retainedAliasResource,
+    "retained host-state lean ref alias",
+  );
+  try {
+    assert.equal(leanHandleHostRuntime.readObjectString(retainedHostLeanHandleObj), "host-state-lean-ref");
+  } finally {
+    leanHandleHostRuntime.exports.vir_obj_dec(retainedHostLeanHandleObj);
+    retainedHostLeanHandleObj = 0;
+  }
+  leanHandleHostRuntime.releaseLeanObjectHandleResource(retainedAliasResource, "retained host-state lean ref alias");
+  assert.equal(leanHandleHostRuntime.hostState.leanObjectHandleCells.size, 0);
+
+  let teardownLeanHandleObj = makeObjectString(leanHandleHostRuntime, "teardown-lean-ref");
+  let teardownLeanHandleResultObj = 0;
+  try {
+    teardownLeanHandleResultObj = callHostImportObjects(leanHandleHostRuntime, 0, [teardownLeanHandleObj]);
+    teardownLeanHandleResource = leanHandleHostRuntime.liftOwnedObjectValue(
+      jsResourceType,
+      teardownLeanHandleResultObj,
+      "teardown lean ref result",
+    );
+    teardownLeanHandleAlias = leanHandleHostRuntime.retainLeanObjectHandleResource(
+      teardownLeanHandleResource,
+      "teardown lean ref alias",
+    );
+    assert.equal(leanHandleHostRuntime.hostState.leanObjectHandleCells.size, 1);
+  } finally {
+    if (teardownLeanHandleObj !== 0) leanHandleHostRuntime.exports.vir_obj_dec(teardownLeanHandleObj);
+    if (teardownLeanHandleResultObj !== 0) leanHandleHostRuntime.exports.vir_obj_dec(teardownLeanHandleResultObj);
+  }
 } finally {
   leanHandleHostRuntime.dispose();
+}
+assert.equal(hostResourceValue(teardownLeanHandleResource).lease.released, true);
+assert.equal(hostResourceValue(teardownLeanHandleAlias).lease.released, true);
+
+{
+  let partialLiftDisposals = 0;
+  const partialLiftResource = createHostResource({ name: "partial lift" }, "partial lift resource", {
+    dispose: () => {
+      partialLiftDisposals++;
+    },
+  });
+  const elements = [];
+  let arrayObj = 0;
+  try {
+    elements.push(runtime.makeHostResourceObjectValue(resourceType, partialLiftResource, "partial lift[0]"));
+    elements.push(runtime.makeObjectValue(unitType, undefined, "partial lift[1]"));
+    arrayObj = runtime.makeObjectArrayFromOwnedElements(elements, "partial lift");
+    assert.throws(
+      () => runtime.liftOwnedObjectValue(arrayResourceType, arrayObj, "partial lift"),
+      /partial lift\[1\].*live host resource/,
+    );
+    assert.equal(
+      partialLiftDisposals,
+      1,
+      "a later lift failure must roll back resources already transferred to JavaScript",
+    );
+  } finally {
+    runtime.releaseOwnedObjects(elements);
+    if (arrayObj !== 0) runtime.exports.vir_obj_dec(arrayObj);
+  }
 }
 const callbackWithRawStringType = {
   type: "Function",

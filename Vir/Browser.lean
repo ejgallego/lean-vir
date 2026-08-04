@@ -249,6 +249,25 @@ def querySelector (selector : @& String) : DomM (Option (Lean.Vir.Js Element)) :
   let jsSelector ← Lean.Vir.JsValue.ofString selector
   Lean.Vir.Js.Nullable.toOption (← querySelectorNullable jsSelector)
 
+/--
+Returns the static list of elements matching a CSS selector.
+
+The returned `NodeList` remains in JavaScript land. Its element parameter is
+the Lean view produced by `Lean.Vir.Js.NodeList.item`; extracted element
+handles remain valid independently of the list.
+
+Reference: [MDN `Document.querySelectorAll`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll).
+-/
+@[vir_js "browser.document.querySelectorAll"]
+private opaque querySelectorAllJs
+    (selector : @& Lean.Vir.Js String) :
+    DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element))
+
+def querySelectorAll
+    (selector : @& String) :
+    DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Element)) := do
+  querySelectorAllJs (← Lean.Vir.JsValue.ofString selector)
+
 @[vir_js "browser.document.createElement"]
 private opaque createElementJs (tagName : @& Lean.Vir.Js String) : DomM (Lean.Vir.Js Element)
 

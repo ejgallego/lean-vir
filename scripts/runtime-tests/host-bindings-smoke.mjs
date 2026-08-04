@@ -198,6 +198,7 @@ assert.equal(reloadRuntime.call("HostInterop.mountCallbackEvent", "#reload"), "1
 assert.equal(reloadRuntime.call("HostInterop.timeoutRecord", 90), "1");
 assert.equal(reloadRuntime.call("HostInterop.animationRecord", 100), "1");
 assert.equal(reloadRuntime.liveCallbacks.size, 3);
+const resourcesBeforeFailedReload = reloadDocumentState.resources;
 const badReloadPackage = Uint8Array.from(hostPackageBytes);
 badReloadPackage[4] ^= 1;
 assert.throws(
@@ -205,6 +206,11 @@ assert.throws(
   /invalid IR package magic/,
 );
 assert.equal(reloadBindingDisposals, 0);
+assert.equal(
+  reloadDocumentState.resources,
+  resourcesBeforeFailedReload,
+  "a rejected replacement should restore the active virtual resource generation",
+);
 assert.equal(reloadRuntime.liveCallbacks.size, 3);
 assert.equal(reloadRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
 reloadRuntime.loadIrPackageBytes(irPackageBytes);

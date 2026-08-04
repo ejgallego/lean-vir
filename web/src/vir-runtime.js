@@ -76,9 +76,9 @@ export function createVirImports(module, overrides = {}, hostState = null) {
         return 0;
       }
     };
-    imports.env.vir_resource_root = (value) => hostState.rootResource(value);
-    imports.env.vir_resource_get = (rootId) => hostState.getRootedResource(rootId);
-    imports.env.vir_resource_release = (rootId) => hostState.releaseRootedResource(rootId);
+    imports.env.vir_resource_root = (value, owned) => hostState.rootResource(value, owned);
+    imports.env.vir_resource_get = (rootId, take) => hostState.getRootedResource(rootId, take);
+    imports.env.vir_resource_release = (rootId) => hostState.releaseRootedResourceFromFinalizer(rootId);
   }
 
   return imports;

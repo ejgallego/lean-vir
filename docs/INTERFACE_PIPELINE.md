@@ -224,8 +224,9 @@ arguments/results are `Unit` or resources, or explicit conversion targets such a
 `js.string.value`. Raw Lean scalar, structure, array, list, option, and product
 host imports are rejected, except for declarations marked with
 `@[vir_js_explicit_conversion]` that convert between exactly one
-`Lean.Vir.Js ...` resource and one ordinary Lean value, or for the `js.leanRef`
-object-handle boundary. JavaScript
+`Lean.Vir.Js ...` resource and one ordinary Lean value, or for the
+`js.leanRef` object-handle boundary (`js.leanRef`, `.value`, `.retain`, and
+`.release`). JavaScript
 resource/runtime APIs use `Lean.Vir.RuntimeM α`; browser APIs use
 `Lean.Vir.Browser.DomM α`; React component construction uses
 `Lean.Vir.React.ReactM α`. For Lean-to-JavaScript calls, import `Vir.Host` and
@@ -263,7 +264,8 @@ Lean-to-JavaScript host imports use package-owned arity/effect metadata: the
 shim and `VirHostState` exchange borrowed/owned Lean object
 arguments and results for package-declared host imports through
 `env.vir_js_call_objects`. The `leanObject` descriptor is used by
-generic `Lean.Vir.LeanRef.toJSL` / `fromJSL` / `releaseJSL` object handles. On
+generic `Lean.Vir.LeanRef.toJSL` / `fromJSL` / `retainJSL` / `releaseJSL`
+object handles. On
 the Lean side those handles are surfaced as `Lean.Vir.JSL α`, an alias that
 remains distinct from JavaScript-shaped `Js α` resources.
 Function-valued imports are rooted with only their arity and effect bit in the

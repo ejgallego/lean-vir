@@ -52,6 +52,40 @@ def floatRoundTrip (value : Float) : Lean.Vir.RuntimeM Float := do
   let jsValue ← Lean.Vir.JsValue.ofFloat value
   Lean.Vir.JsValue.toFloat jsValue
 
+def querySelectorAllCount (selector : String) : DomM Nat := do
+  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
+  Lean.Vir.Js.NodeList.length nodes
+
+def querySelectorAllLeanCount (selector : String) : DomM Nat := do
+  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
+  let elements ← Lean.Vir.Js.NodeList.toLeanArray nodes
+  pure elements.size
+
+def querySelectorAllArrayCount (selector : String) : DomM Nat := do
+  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
+  let jsElements ← Lean.Vir.Js.NodeList.toArray nodes
+  let elements ← Lean.Vir.Js.Array.toLeanArray jsElements
+  pure elements.size
+
+def querySelectorAllFirstText (selector : String) : DomM String := do
+  let element? ← do
+    let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
+    Lean.Vir.Js.NodeList.item nodes 0
+  match element? with
+  | none => pure ""
+  | some element => Lean.Vir.Browser.Element.getTextContent element
+
+partial def querySelectorAllCountLoopAux
+    (selector : String) (remaining acc : Nat) : DomM Nat := do
+  match remaining with
+  | 0 => pure acc
+  | n + 1 => do
+      let count ← querySelectorAllCount selector
+      querySelectorAllCountLoopAux selector n (acc + count)
+
+def querySelectorAllCountLoop (selector : String) (count : Nat) : DomM Nat :=
+  querySelectorAllCountLoopAux selector count 0
+
 partial def callbackRoundTripLoopAux : Nat → Nat → Lean.Vir.RuntimeM Nat
   | 0, acc => pure acc
   | n + 1, acc => do

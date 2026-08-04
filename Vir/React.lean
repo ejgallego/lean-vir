@@ -176,7 +176,9 @@ React reducer value and dispatch function returned by `useReducer`.
 Reducer state and actions live in JavaScript-land. Use `Js` resources directly
 for JavaScript-owned state. Use `Lean.Vir.JSL α` when React should store a
 retained Lean-owned value, and call `Lean.Vir.LeanRef.toJSL` / `fromJSL`
-explicitly at the application boundary.
+explicitly at the application boundary. React retains its own alias while it
+stores a JSL value; Lean code remains responsible for releasing the independent
+aliases that it creates or receives.
 -/
 structure ReducerState (state action : Type) where
   value : Lean.Vir.Js state
@@ -827,6 +829,13 @@ opaque set {α : Type}
     (value : @& Lean.Vir.Js α) :
     Lean.Vir.RuntimeM Unit
 
+/--
+Evaluate `update` exactly once in the VIR host and enqueue its concrete result.
+
+The callback is not passed to React as a functional updater, so React render
+replay and development Strict Mode cannot invoke Lean effects more than once.
+The `previous` handle is callback-scoped and must not be retained.
+-/
 @[vir_js "react.state.modify"]
 opaque modify {α : Type}
     (setter : @& Lean.Vir.Js (StateSetter (Lean.Vir.Js α)))
@@ -852,6 +861,14 @@ end ReducerDispatch
 
 namespace Hooks
 
+/--
+Create replay-safe reducer state.
+
+VIR invokes `reducer` once when an action is dispatched and enqueues the
+concrete result through React state. The effectful Lean callback is never
+installed as a React reducer function and is therefore not subject to React
+render replay.
+-/
 @[vir_js "react.useReducer"]
 private opaque useReducerJs {state action : Type}
     (reducer : Lean.Vir.Js state → Lean.Vir.Js action → Lean.Vir.RuntimeM (Lean.Vir.Js state))
