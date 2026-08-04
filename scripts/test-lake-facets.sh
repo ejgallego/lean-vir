@@ -146,7 +146,9 @@ if lake -d "$tmp" build +Smoke.DeferredRuntime:vir \
   exit 1
 fi
 cat "$tmp/deferred-runtime.stdout" "$tmp/deferred-runtime.stderr" > "$tmp/deferred-runtime.output"
-grep -q 'compiled closure validation stopped at opaque imported declaration `Smoke.OpaqueDependency.environmentHome`' \
+grep -q 'could not validate imported dependency `Smoke.OpaqueDependency.environmentHome`' \
+  "$tmp/deferred-runtime.output"
+grep -q 'because its compiled IR is opaque in this module; the `:vir` package must include compiled IR for this dependency' \
   "$tmp/deferred-runtime.output"
 grep -q 'missing IR declarations:' "$tmp/deferred-runtime.output"
 grep -q 'Smoke.OpaqueDependency.environmentHome (via Smoke.DeferredRuntime.home' \

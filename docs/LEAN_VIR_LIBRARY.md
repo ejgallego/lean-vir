@@ -27,10 +27,12 @@ Importing `Vir` also imports these attributes.
 After Lean compiles a `@[vir_export]` declaration, the attribute diagnoses
 private or non-executable declarations, unsupported binder shapes, and
 conclusive blockers in the visible compiled closure. Dependency diagnostics
-show the path from the export to the missing IR declaration, native extern
-registration, or initializer provider.
-Opaque imported IR and postponed compilation produce an informational
-diagnostic naming the required compiled IR instead of a false rejection.
+show the path from the export to a missing IR declaration, unsupported runtime
+dependency (including a missing native extern implementation), or initializer
+provider.
+Opaque imported IR produces an informational diagnostic naming the required
+compiled dependency instead of a false rejection. Postponed compilation
+provides the option-level remedy needed to make IR available.
 Package generation remains authoritative for complete interface layouts,
 generated boxed boundaries, and unresolved package dependencies.
 

@@ -57,7 +57,9 @@ private structure ClosureState where
 private def ClosureBlocker.description (blocker : ClosureBlocker) : String :=
   match blocker.kind with
   | .missingDecl => s!"missing IR declaration `{blocker.dependency.name}`"
-  | .missingExtern => s!"missing native extern registration `{blocker.dependency.name}`"
+  | .missingExtern =>
+      s!"unsupported runtime dependency `{blocker.dependency.name}`: \
+        no native extern implementation is registered"
   | .unsupportedInitGlobal => s!"unsupported initializer global `{blocker.dependency.name}`"
 
 def ClosureBlocker.message (blocker : ClosureBlocker) : String :=
@@ -66,12 +68,12 @@ def ClosureBlocker.message (blocker : ClosureBlocker) : String :=
 def ClosureDeferred.message (deferred : ClosureDeferred) : String :=
   match deferred.kind with
   | .opaqueImport =>
-      s!"compiled closure validation stopped at opaque imported declaration \
-        `{deferred.dependency.name}`{deferred.dependency.pathSuffix}; package generation requires \
-        compiled IR for this dependency"
+      s!"could not validate imported dependency `{deferred.dependency.name}`\
+        {deferred.dependency.pathSuffix} because its compiled IR is opaque in this module; \
+        the `:vir` package must include compiled IR for this dependency"
   | .compilerPostponed =>
-      s!"compiled closure validation is unavailable because IR compilation is postponed for \
-        `{deferred.dependency.name}`; package generation requires compiled IR for this declaration"
+      s!"could not validate `{deferred.dependency.name}` because `compiler.postponeCompile` is \
+        enabled; disable it for modules built with `:vir`"
 
 private def pushBlocker
     (kind : ClosureBlockerKind) (name : Name) (path : Array Name) (state : ClosureState) : ClosureState :=

@@ -169,21 +169,24 @@ try {
     `${checkedMarkedUnsupportedSignature.stderr}${checkedMarkedUnsupportedSignature.stdout}`;
   assert.match(
     markedUnsupportedSignatureOutput,
-    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.implicitBump`: unsupported implicit\/instance argument `offset`/,
+    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.implicitBump`: VIR exports cannot have implicit or instance arguments \(`offset`\); export a wrapper with only explicit arguments/,
   );
   assert.match(
     markedUnsupportedSignatureOutput,
-    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.polymorphicIdentity`: polymorphic exported entrypoints with erased type parameters are not supported; export a concrete wrapper/,
+    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.polymorphicIdentity`: VIR exports must use concrete runtime types; type parameter `α` is erased; export a concrete wrapper instead/,
   );
   assert.match(
     markedUnsupportedSignatureOutput,
-    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.proofIsNotExecutable`: theorems do not have executable IR/,
+    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.proofIsNotExecutable`: theorems do not have executable IR; export a definition instead/,
   );
   assert.match(
     markedUnsupportedSignatureOutput,
-    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.axiomIsNotExecutable`: axioms do not have executable IR/,
+    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.axiomIsNotExecutable`: axioms do not have executable IR; export an implemented definition instead/,
   );
-  assert.match(markedUnsupportedSignatureOutput, /private declarations are not exported/);
+  assert.match(
+    markedUnsupportedSignatureOutput,
+    /private declarations cannot be VIR exports; remove `private` or export a public wrapper/,
+  );
 
   const markedUnsupportedDependencySource = join(freshDir, "MarkedUnsupportedDependency.lean");
   await writeFile(markedUnsupportedDependencySource, [
@@ -214,7 +217,7 @@ try {
     `${checkedMarkedUnsupportedDependency.stderr}${checkedMarkedUnsupportedDependency.stdout}`;
   assert.match(
     markedUnsupportedDependencyOutput,
-    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedDependency\.home`: compiled closure reaches missing native extern registration `IO\.getEnv` \(via MarkedUnsupportedDependency\.home[^\n]* -> MarkedUnsupportedDependency\.environmentHome[^\n]* -> IO\.getEnv\)/,
+    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedDependency\.home`: compiled closure reaches unsupported runtime dependency `IO\.getEnv`: no native extern implementation is registered \(via MarkedUnsupportedDependency\.home[^\n]* -> MarkedUnsupportedDependency\.environmentHome[^\n]* -> IO\.getEnv\)/,
   );
 
   const markedPostponedSource = join(freshDir, "MarkedPostponed.lean");
@@ -241,7 +244,7 @@ try {
   );
   assert.match(
     `${checkedMarkedPostponed.stderr}${checkedMarkedPostponed.stdout}`,
-    /compiled closure validation is unavailable because IR compilation is postponed for `MarkedPostponed\.value`; package generation requires compiled IR for this declaration/,
+    /could not validate `MarkedPostponed\.value` because `compiler\.postponeCompile` is enabled; disable it for modules built with `:vir`/,
   );
 
   const startupDependencySource = join(freshDir, "StartupDependency.lean");

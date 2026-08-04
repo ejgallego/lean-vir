@@ -29,11 +29,11 @@ private partial def virExportBinderDiagnostic? : Lean.Expr → Option String
   | .forallE name domain body binderInfo =>
       let domain := stripVirExportMData domain
       if domain matches .sort _ then
-        some
-          "polymorphic exported entrypoints with erased type parameters are not supported; \
-          export a concrete wrapper"
+        some s!"VIR exports must use concrete runtime types; type parameter `{name}` is erased; \
+          export a concrete wrapper instead"
       else if binderInfo != .default then
-        some s!"unsupported implicit/instance argument `{name}`"
+        some s!"VIR exports cannot have implicit or instance arguments (`{name}`); \
+          export a wrapper with only explicit arguments"
       else
         virExportBinderDiagnostic? body
   | _ => none
@@ -41,8 +41,8 @@ private partial def virExportBinderDiagnostic? : Lean.Expr → Option String
 private def virExportKindDiagnostic? (env : Lean.Environment) (declName : Lean.Name) : Option String :=
   match Lean.getOriginalConstKind? env declName with
   | some .defn | some .opaque => none
-  | some .thm => some "theorems do not have executable IR"
-  | some .axiom => some "axioms do not have executable IR"
+  | some .thm => some "theorems do not have executable IR; export a definition instead"
+  | some .axiom => some "axioms do not have executable IR; export an implemented definition instead"
   | some .quot => some "quotient declarations cannot be exported as entrypoints"
   | some .induct => some "inductive type declarations cannot be exported as entrypoints"
   | some .ctor => some "constructors cannot be exported as entrypoints"
@@ -55,7 +55,9 @@ private structure VirExportCheck where
 
 private def checkVirExport (declName : Lean.Name) : Lean.CoreM VirExportCheck := do
   if Lean.isPrivateName declName then
-    return { diagnostic? := some "private declarations are not exported" }
+    return {
+      diagnostic? := some "private declarations cannot be VIR exports; remove `private` or export a public wrapper"
+    }
   let env ← Lean.getEnv
   if let some reason := virExportKindDiagnostic? env declName then
     return { diagnostic? := some reason }
@@ -105,9 +107,9 @@ startup hook unless it is marked `@[vir_startup]`.
 After Lean compiles the declaration, the attribute rejects private and
 non-executable declarations, unsupported signatures, and compiled closures
 whose visible dependencies are known to be unavailable. When imported IR is
-opaque or compilation is postponed, it explains which compiled IR package
-generation still requires. Package generation also checks the final interface
-layout.
+opaque, it identifies the compiled dependency package generation still
+requires. When compilation is postponed, it explains how to make IR available.
+Package generation also checks the final interface layout.
 -/
 initialize vir_export : Lean.LabelExtension ← registerVirExportAttr
 
