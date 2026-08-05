@@ -11,7 +11,7 @@ import {
 } from "../irpkg-format.mjs";
 import { assert, readRuntimeArtifacts } from "./shared.mjs";
 
-const { wasmBytes, irPackageBytes } = await readRuntimeArtifacts();
+const { wasmBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 const factory = createVirRuntimeFactory({ wasmBytes });
 
 const unloaded = await factory.createRuntime();
@@ -22,8 +22,8 @@ assert.throws(
   /interface entry not found: fib/,
 );
 
-const first = await factory.createRuntime({ irPackageBytes });
-const second = await factory.createRuntime({ irPackageBytes });
+const first = await factory.createRuntime({ irPackageSetBytes: [defaultPackageBytes] });
+const second = await factory.createRuntime({ irPackageSetBytes: [defaultPackageBytes] });
 assert.equal(first.call("SortDemo.demo"), "192");
 assert.equal(second.call("fib", 8), "21");
 
@@ -32,41 +32,41 @@ const badPackage = encodeInvalidMagicPackage();
 assertFailedCleanly(badPackageRuntime, badPackage, /invalid IR package magic/);
 assertFailedCleanly(
   badPackageRuntime,
-  invalidateFirstDeclarationNameTag(irPackageBytes),
+  invalidateFirstDeclarationNameTag(defaultPackageBytes),
   /unsupported name tag 255/,
 );
 assertFailedCleanly(
   badPackageRuntime,
-  oversizeDeclarationCount(irPackageBytes),
+  oversizeDeclarationCount(defaultPackageBytes),
   /declaration count 4294967295 exceeds remaining section bytes/,
 );
 assertFailedCleanly(
   badPackageRuntime,
-  oversizeSectionDirectoryCount(irPackageBytes),
+  oversizeSectionDirectoryCount(defaultPackageBytes),
   /section directory entry count 4294967295 exceeds remaining section bytes/,
 );
 assertFailedCleanly(
   badPackageRuntime,
-  oversizeSectionEntryCount(irPackageBytes, IR_PACKAGE_SECTION.INIT_GLOBALS),
+  oversizeSectionEntryCount(defaultPackageBytes, IR_PACKAGE_SECTION.INIT_GLOBALS),
   /initializer entry count 4294967295 exceeds remaining section bytes/,
 );
 assertFailedCleanly(
   badPackageRuntime,
-  oversizeSectionEntryCount(irPackageBytes, IR_PACKAGE_SECTION.HOST_IMPORTS),
+  oversizeSectionEntryCount(defaultPackageBytes, IR_PACKAGE_SECTION.HOST_IMPORTS),
   /host import entry count 4294967295 exceeds remaining section bytes/,
 );
 assertFailedCleanly(
   badPackageRuntime,
-  oversizeSectionEntryCount(irPackageBytes, IR_PACKAGE_SECTION.EXPORT_SUMMARIES),
+  oversizeSectionEntryCount(defaultPackageBytes, IR_PACKAGE_SECTION.EXPORT_SUMMARIES),
   /export summary entry count 4294967295 exceeds remaining section bytes/,
 );
 
 const partialDecodeRuntime = await factory.createRuntime();
-const partialDeclarationPackage = truncateDeclarationSection(irPackageBytes);
+const partialDeclarationPackage = truncateDeclarationSection(defaultPackageBytes);
 const partialDecodePages = [];
 for (let iteration = 0; iteration < 30; iteration += 1) {
   assert.throws(
-    () => partialDecodeRuntime.loadIrPackageBytes(partialDeclarationPackage),
+    () => partialDecodeRuntime.loadIrPackageSetBytes([partialDeclarationPackage]),
     /invalid IR package section `declarations`:/,
   );
   partialDecodePages.push(partialDecodeRuntime.exports.memory.buffer.byteLength / 65536);
@@ -79,7 +79,7 @@ assert.ok(
 partialDecodeRuntime.dispose();
 
 assert.throws(
-  () => first.loadIrPackageBytes(badPackage),
+  () => first.loadIrPackageSetBytes([badPackage]),
   /invalid IR package magic/,
 );
 assert.notEqual(first.packageInfo, null);
@@ -95,7 +95,7 @@ unloaded.dispose();
 console.log("vir package decoder smoke ok");
 
 function assertFailedCleanly(runtime, packageBytes, expectedError) {
-  assert.throws(() => runtime.loadIrPackageBytes(packageBytes), expectedError);
+  assert.throws(() => runtime.loadIrPackageSetBytes([packageBytes]), expectedError);
   assert.equal(runtime.packageInfo, null);
   assert.equal(runtime.interfaceManifest, null);
   assert.equal(runtime.packageMetadata, null);

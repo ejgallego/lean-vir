@@ -64,8 +64,9 @@ tag, request the SDK artifact built from that same commit:
 VIR_SDK_COMMIT=<same-commit> lake build :virSdk
 ```
 
-The module facet writes the `.irpkg` and report under `.lake/build/vir/`; the
-package facet installs the versioned browser SDK. `vir.runStartupEntries()`
+The module facet writes a package-set descriptor, root member, reached
+dependency members, and report under `.lake/build/vir/module-sets/`; the package
+facet installs the versioned browser SDK. `vir.runStartupEntries()`
 runs `@[vir_startup]` declarations in manifest order and skips each hook after
 it succeeds. See
 [docs/LAKE_INTEGRATION.md](docs/LAKE_INTEGRATION.md) and the entirely
@@ -135,15 +136,15 @@ npm run inspect:irpkg -- --json web/public/local-quickstart.irpkg
 
 ## Calling Lean From JavaScript
 
-Use `/dev.html` for quick manual testing. In an app, load the same `.irpkg` with
-the runtime wrapper and call an exported declaration by its Lean name:
+Use `/dev.html` for quick manual testing. In an app, load a focused `.irpkg` as a
+one-member set and call an exported declaration by its Lean name:
 
 ```js
 import { createVirRuntimeFactory, fetchBytes } from "./src/vir-runtime.js";
 
 const factory = createVirRuntimeFactory({ wasmUrl: "/vir-upstream.wasm" });
 const bytes = await fetchBytes("/local-quickstart.irpkg");
-const runtime = await factory.createRuntime({ irPackageBytes: bytes });
+const runtime = await factory.createRuntime({ irPackageSetBytes: [bytes] });
 
 const result = runtime.call("Quickstart.double", 21);
 ```

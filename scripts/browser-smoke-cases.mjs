@@ -274,7 +274,7 @@ export const browserRunnerFailureSpecs = [
       packageName: "...",
       entryCount: 0,
       exports: "...",
-      result: /IR package load failed: invalid IR package magic `not-lean-vir`/,
+      result: /IR package-set member 1 load failed: invalid IR package magic `not-lean-vir`/,
     },
   },
   {

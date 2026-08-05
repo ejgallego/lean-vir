@@ -4,6 +4,43 @@
 format is internal to this repository and is versioned by
 `packageFormatVersion` in the embedded manifest metadata.
 
+A composable module build does not introduce another binary format. Its
+`lean-vir-ir-package-set` version-1 JSON descriptor lists dependency `.irpkg`
+members in Lean's canonical module-initialization order and the public root
+member last. Every listed member independently owns its declarations and
+initializer metadata and uses the format documented below; the root's embedded
+interface manifest is the public manifest for the aggregate runtime.
+
+The version-1 descriptor has this shape:
+
+```json
+{
+  "format": "lean-vir-ir-package-set",
+  "version": 1,
+  "packages": [
+    {
+      "module": "MySlides.Support",
+      "role": "dependency",
+      "path": "Runtime.parts/MySlides.Support.irpkg"
+    },
+    {
+      "module": "MySlides.Runtime",
+      "role": "root",
+      "path": "Runtime.irpkg"
+    }
+  ]
+}
+```
+
+`packages` must be non-empty. Every entry has a non-empty, unique `module` and
+`path`; every entry except the last has role `dependency`, and the last has
+role `root`. Paths are resolved relative to the descriptor URL. The loader
+validates this structure before starting any member fetch.
+
+See [Lake Integration](LAKE_INTEGRATION.md) for producing and publishing a
+module package set and [JavaScript Runtime API](JS_API.md#module-package-sets)
+for loading one.
+
 Package format 10 has a fixed header followed by a section directory. All
 multi-byte integers are unsigned little-endian 32-bit values.
 

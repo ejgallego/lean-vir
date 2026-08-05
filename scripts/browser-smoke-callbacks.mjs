@@ -379,13 +379,24 @@ export async function smokeBrowserCallbackCleanup(cdp, origin) {
       const runtimeModule = await import(${JSON.stringify(`${origin}${basePath}${runtimeAsset}`)});
       const createVirRuntime = runtimeModule.createVirRuntime ??
         Object.values(runtimeModule).find((value) =>
-          typeof value === "function" && String(value).includes("irPackageUrl"));
+          typeof value === "function" && String(value).includes("irPackageSetUrl"));
       if (typeof createVirRuntime !== "function") {
         throw new Error("built runtime asset does not expose createVirRuntime");
       }
+      const packageResponse = await fetch(
+        ${JSON.stringify(`${origin}${basePath}${hostPackageFile}`)},
+        { cache: "no-store" },
+      );
+      if (!packageResponse.ok) {
+        throw new Error(
+          "failed to fetch callback-disposal package: HTTP " + packageResponse.status,
+        );
+      }
       const runtime = await createVirRuntime({
         wasmUrl: ${JSON.stringify(`${origin}${basePath}${wasmPublicFile}`)},
-        irPackageUrl: ${JSON.stringify(`${origin}${basePath}${hostPackageFile}`)},
+        irPackageSetBytes: [
+          new Uint8Array(await packageResponse.arrayBuffer()),
+        ],
       });
       document.title = "dispose:sentinel";
       document.querySelector("#callback-dispose-target")?.remove();

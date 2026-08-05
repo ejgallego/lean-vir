@@ -297,9 +297,9 @@ function renderResult(value) {
   resultOutput.dataset.multiline = String(text.includes("\n"));
 }
 
-async function loadIrPackageBytes(label, bytes, packageQuery = null) {
+async function loadPackageSet(label, packageMembers, packageQuery = null) {
   currentPackageQuery = packageQuery;
-  runtime = await runtimeFactory.createRuntime({ irPackageBytes: bytes });
+  runtime = await runtimeFactory.createRuntime({ irPackageSetBytes: packageMembers });
   syncPackagePreset();
   packageName.textContent = label;
   packageSize.textContent = formatBytes(runtime.packageInfo.byteLength);
@@ -324,14 +324,14 @@ async function loadPackageUrl() {
   setReadyState(statusEl, "Loading", false);
   const label = packageUrl.value.trim() || defaultPackageFile;
   const bytes = await fetchBytes(assetPathFor(label, import.meta.env.BASE_URL));
-  await loadIrPackageBytes(label, bytes, label);
+  await loadPackageSet(label, [bytes], label);
 }
 
 async function loadPackageFile(file) {
   resetPackageState();
   setReadyState(statusEl, "Loading", false);
   const bytes = new Uint8Array(await file.arrayBuffer());
-  await loadIrPackageBytes(file.name, bytes);
+  await loadPackageSet(file.name, [bytes]);
 }
 
 function evaluateEntry(runtime, entry) {

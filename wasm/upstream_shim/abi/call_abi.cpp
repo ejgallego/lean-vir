@@ -33,7 +33,7 @@ static void cleanup_object_call_args(uint32_t argc, object ** args) {
 
 extern "C" uint32_t vir_resolve_call_export(uint32_t export_index) {
     lean::vir::g_call_error.clear();
-    if (!lean::vir::package_loaded()) {
+    if (!lean::vir::package_ready()) {
         lean::vir::g_call_error = "no IR package has been loaded";
         return 0;
     }
@@ -54,7 +54,7 @@ extern "C" lean::object * vir_call_resolved_objects(
         lean::vir::g_call_error = "object call argv pointer is null";
         return nullptr;
     }
-    if (!lean::vir::package_loaded()) {
+    if (!lean::vir::package_ready()) {
         lean::vir::cleanup_object_call_args(argc, argv);
         lean::vir::g_call_error = "no IR package has been loaded";
         return nullptr;

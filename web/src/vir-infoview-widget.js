@@ -940,7 +940,7 @@ async function loadRuntimeOptionsFromSources({ rpcSession, sources }) {
   if ((packageSource.revision ?? "") !== "" && irPackage.revision !== packageSource.revision) {
     throw new Error("VIR IR package changed while loading; retrying with the latest Lean snapshot");
   }
-  options.irPackageBytes = decodeBase64Bytes(irPackage.dataBase64);
+  options.irPackageSetBytes = [decodeBase64Bytes(irPackage.dataBase64)];
   return options;
 }
 

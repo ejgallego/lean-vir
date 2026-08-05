@@ -58,7 +58,7 @@ const {
 
 const wasmBytes = await readFile(new URL("../web/public/vir-upstream.wasm", import.meta.url));
 const packageBytes = await readFile(new URL("../web/public/demo-host.irpkg", import.meta.url));
-const runtime = await createVirRuntime({ wasmBytes, irPackageBytes: packageBytes });
+const runtime = await createVirRuntime({ wasmBytes, irPackageSetBytes: [packageBytes] });
 const repoRoot = new URL("../", import.meta.url);
 let assetReadCount = 0;
 let assetStatCount = 0;
@@ -452,7 +452,8 @@ const runtimeOptions = await loadRuntimeOptions({
   position: { line: 0, character: 0 },
 });
 assert.ok(runtimeOptions.wasmModule instanceof WebAssembly.Module);
-assert.equal(runtimeOptions.irPackageBytes.length, packageBytes.length);
+assert.equal(runtimeOptions.irPackageSetBytes.length, 1);
+assert.equal(runtimeOptions.irPackageSetBytes[0].length, packageBytes.length);
 assert.equal(
   await loadWasmModule(rpcSession, {
     kind: "path",

@@ -18,12 +18,12 @@ import {
 } from "./shared.mjs";
 import { ensureTamagotchiVirtualDom } from "../virtual-fixtures.mjs";
 
-const { wasmBytes, hostPackageBytes, irPackageBytes } = await readRuntimeArtifacts();
+const { wasmBytes, hostPackageBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 
 const virtualDocumentState = createVirtualDocumentState();
 const hostRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState,
   hostBindings: createCallbackHostBindings(),
 });
@@ -31,7 +31,7 @@ const hostRuntime = await createVirRuntime({
 let retainedCallback = null;
 const retainedCallbackRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       retainedCallback = callback;
@@ -67,7 +67,7 @@ retainedCallbackRuntime.dispose();
 
 const nestedCallbackErrorRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       try {
@@ -89,7 +89,7 @@ nestedCallbackErrorRuntime.dispose();
 let throwingCallback = null;
 const throwingBindingRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (_input, callback) => {
       throwingCallback = callback;
@@ -111,7 +111,7 @@ const lifecycleDocumentState = createVirtualDocumentState();
 const lifecycleRecords = [];
 const lifecycleRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState: lifecycleDocumentState,
   hostBindings: createCallbackHostBindings(lifecycleRecords),
 });
@@ -128,7 +128,7 @@ const lifecycleDocumentState2 = createVirtualDocumentState();
 const lifecycleRecords2 = [];
 const lifecycleRuntime2 = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState: lifecycleDocumentState2,
   hostBindings: createCallbackHostBindings(lifecycleRecords2),
 });
@@ -163,7 +163,7 @@ const pendingDocumentState = createVirtualDocumentState();
 const pendingRecords = [];
 const pendingRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState: pendingDocumentState,
   hostBindings: createCallbackHostBindings(pendingRecords),
 });
@@ -189,7 +189,7 @@ const reloadBindings = {
 };
 const reloadRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState: reloadDocumentState,
   hostBindings: reloadBindings,
 });
@@ -202,7 +202,7 @@ const resourcesBeforeFailedReload = reloadDocumentState.resources;
 const badReloadPackage = Uint8Array.from(hostPackageBytes);
 badReloadPackage[4] ^= 1;
 assert.throws(
-  () => reloadRuntime.loadIrPackageBytes(badReloadPackage),
+  () => reloadRuntime.loadIrPackageSetBytes([badReloadPackage]),
   /invalid IR package magic/,
 );
 assert.equal(reloadBindingDisposals, 0);
@@ -213,7 +213,7 @@ assert.equal(
 );
 assert.equal(reloadRuntime.liveCallbacks.size, 3);
 assert.equal(reloadRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
-reloadRuntime.loadIrPackageBytes(irPackageBytes);
+reloadRuntime.loadIrPackageSetBytes([defaultPackageBytes]);
 assert.equal(reloadBindingDisposals, 0);
 assert.equal(reloadRuntime.packageInfo.hostImports, 0);
 assert.equal(reloadRuntime.liveCallbacks.size, 0);

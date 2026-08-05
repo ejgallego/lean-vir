@@ -29,12 +29,85 @@ write_sdk_manifest() {
     '}' > "$sdk_dir/lean-vir-artifact.json"
 }
 
-lake build +SlidesCanvas:vir
+assert_module_fixture_descriptor() {
+  node --input-type=module -e '
+    import fs from "node:fs";
+    const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    if (descriptor.format !== "lean-vir-ir-package-set") process.exit(1);
+    if (descriptor.version !== 1) process.exit(1);
+    const actual = descriptor.packages.map(({ module, role, path }) => [module, role, path]);
+    const expected = [
+      ["ModuleSetFixture.Shared", "dependency", "Root.parts/ModuleSetFixture.Shared.irpkg"],
+      ["ModuleSetFixture.Left", "dependency", "Root.parts/ModuleSetFixture.Left.irpkg"],
+      ["ModuleSetFixture.Right", "dependency", "Root.parts/ModuleSetFixture.Right.irpkg"],
+      ["ModuleSetFixture.Root", "root", "Root.irpkg"],
+    ];
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1);
+  ' "$1"
+}
 
-canvas_package="$repo/.lake/build/vir/modules/SlidesCanvas.irpkg"
-canvas_report="$repo/.lake/build/vir/reports/SlidesCanvas.report.md"
+lake build +SlidesCanvas:vir
+lake build +ModuleSetFixture.Root:vir
+
+canvas_package="$repo/.lake/build/vir/module-sets/SlidesCanvas.irpkg"
+canvas_report="$repo/.lake/build/vir/module-sets/SlidesCanvas.report.md"
 test -f "$canvas_package"
 test -f "$canvas_report"
+
+module_set="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.irpkg-set.json"
+module_set_root="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.irpkg"
+module_set_shared="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/ModuleSetFixture.Shared.irpkg"
+test -f "$module_set"
+test -f "$module_set_root"
+test -f "$module_set_shared"
+
+assert_module_fixture_descriptor "$module_set"
+
+obsolete_shard="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/Obsolete.irpkg"
+printf '%s\n' 'obsolete' > "$obsolete_shard"
+node --input-type=module -e '
+  import fs from "node:fs";
+  const path = process.argv[1];
+  const descriptor = JSON.parse(fs.readFileSync(path, "utf8"));
+  descriptor.format = "invalid-package-set";
+  fs.writeFileSync(path, `${JSON.stringify(descriptor)}\n`);
+' "$module_set"
+lake build +ModuleSetFixture.Root:vir
+test ! -e "$obsolete_shard"
+assert_module_fixture_descriptor "$module_set"
+
+node --input-type=module -e '
+  import fs from "node:fs";
+  const path = process.argv[1];
+  const descriptor = JSON.parse(fs.readFileSync(path, "utf8"));
+  descriptor.packages = [];
+  fs.writeFileSync(path, `${JSON.stringify(descriptor)}\n`);
+' "$module_set"
+lake build +ModuleSetFixture.Root:vir
+assert_module_fixture_descriptor "$module_set"
+
+node --input-type=module -e '
+  import fs from "node:fs";
+  const path = process.argv[1];
+  const descriptor = JSON.parse(fs.readFileSync(path, "utf8"));
+  const dependency = descriptor.packages[0];
+  const root = descriptor.packages.at(-1);
+  [dependency.path, root.path] = [root.path, dependency.path];
+  fs.writeFileSync(path, `${JSON.stringify(descriptor)}\n`);
+' "$module_set"
+lake build +ModuleSetFixture.Root:vir
+assert_module_fixture_descriptor "$module_set"
+
+mv "$module_set_shared" "$tmp/missing-shard.irpkg"
+lake build +ModuleSetFixture.Root:vir
+test -f "$module_set_shared"
+assert_module_fixture_descriptor "$module_set"
+
+mv "$module_set_shared" "$tmp/shard-replaced-by-directory.irpkg"
+mkdir "$module_set_shared"
+lake build +ModuleSetFixture.Root:vir
+test -f "$module_set_shared"
+assert_module_fixture_descriptor "$module_set"
 
 node "$repo/scripts/inspect-irpkg.mjs" --json "$canvas_package" > "$tmp/canvas-package.json"
 node --input-type=module -e '
@@ -142,29 +215,29 @@ lake -d "$tmp" build +Smoke.NewRuntime:vir
 
 if lake -d "$tmp" build +Smoke.DeferredRuntime:vir \
     > "$tmp/deferred-runtime.stdout" 2> "$tmp/deferred-runtime.stderr"; then
-  echo "opaque imported dependency unexpectedly generated successfully" >&2
+  echo "unsupported environment dependency unexpectedly generated as a module package set" >&2
   exit 1
 fi
 cat "$tmp/deferred-runtime.stdout" "$tmp/deferred-runtime.stderr" > "$tmp/deferred-runtime.output"
-grep -q 'could not validate imported dependency `Smoke.OpaqueDependency.environmentHome`' \
+grep -q 'missing native extern registrations:' "$tmp/deferred-runtime.output"
+grep -q 'IO.getEnv (via Smoke.DeferredRuntime.home.*Smoke.OpaqueDependency.environmentHome.*IO.getEnv)' \
   "$tmp/deferred-runtime.output"
-grep -q 'because its compiled IR is opaque in this module; the `:vir` package must include compiled IR for this dependency' \
-  "$tmp/deferred-runtime.output"
-grep -q 'missing IR declarations:' "$tmp/deferred-runtime.output"
-grep -q 'Smoke.OpaqueDependency.environmentHome (via Smoke.DeferredRuntime.home' \
-  "$tmp/deferred-runtime.output"
+if grep -q 'missing IR declarations after loading imported module IR:' "$tmp/deferred-runtime.output"; then
+  echo "module package generation stopped at the opaque import instead of its unsupported dependency" >&2
+  exit 1
+fi
 
-deferred_report="$tmp/.lake/build/vir/reports/Smoke/DeferredRuntime.report.md"
+deferred_report="$tmp/.lake/build/vir/module-sets/Smoke/DeferredRuntime.report.md"
 test -f "$deferred_report"
-grep -q '^- `Smoke.OpaqueDependency.environmentHome` (via Smoke.DeferredRuntime.home.*Smoke.OpaqueDependency.environmentHome)' \
+grep -q '^- `IO.getEnv` (via Smoke.DeferredRuntime.home.*Smoke.OpaqueDependency.environmentHome.*IO.getEnv)' \
   "$deferred_report"
 if grep -q '^## Blocking Dependency Paths' "$deferred_report"; then
   echo "deprecated duplicate blocker-path report section was generated" >&2
   exit 1
 fi
 
-package="$tmp/.lake/build/vir/modules/Smoke/Runtime.irpkg"
-report="$tmp/.lake/build/vir/reports/Smoke/Runtime.report.md"
+package="$tmp/.lake/build/vir/module-sets/Smoke/Runtime.irpkg"
+report="$tmp/.lake/build/vir/module-sets/Smoke/Runtime.report.md"
 test -f "$package"
 test -f "$report"
 
@@ -172,9 +245,11 @@ rm -f "$report"
 lake -d "$tmp" build +Smoke.Runtime:vir
 test -f "$report"
 
-module_package="$tmp/.lake/build/vir/modules/Smoke/NewRuntime.irpkg"
+module_package="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg"
+module_descriptor="$tmp/.lake/build/vir/module-sets/Smoke/NewRuntime.irpkg-set.json"
 module_driver="$tmp/.lake/build/vir/drivers/Smoke/NewRuntime.lean"
 test -f "$module_package"
+test -f "$module_descriptor"
 test -f "$module_driver"
 
 node "$repo/scripts/inspect-irpkg.mjs" --json "$package" > "$tmp/package.json"
@@ -196,6 +271,24 @@ node --input-type=module -e '
   if (entries["Smoke.NewRuntime.start"]?.startup !== true) process.exit(1);
   if (entries["Smoke.Dependency.importedValue"] !== undefined) process.exit(1);
 ' "$tmp/module-package.json"
+
+printf '%s\n' \
+  'module' \
+  '' \
+  'public meta import Vir.Attributes' \
+  'public import Smoke.OpaqueDependency' \
+  '' \
+  '@[vir_export]' \
+  'public def Smoke.NewRuntime.value : IO String :=' \
+  '  Smoke.OpaqueDependency.environmentHome' > "$tmp/Smoke/NewRuntime.lean"
+
+if lake -d "$tmp" build +Smoke.NewRuntime:vir \
+    > "$tmp/rebuild-failure.stdout" 2> "$tmp/rebuild-failure.stderr"; then
+  echo "unsupported replacement unexpectedly regenerated the package set" >&2
+  exit 1
+fi
+test ! -e "$module_descriptor"
+test ! -e "$module_package"
 
 VIR_SDK_ARCHIVE="$tmp/lean-vir-sdk.tar.gz" lake -d "$tmp" build :virSdk
 test -f "$tmp/.lake/build/vir/sdk/js/vir-runtime.js"

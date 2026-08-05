@@ -138,7 +138,7 @@ try {
   const resources = createHostResourceState();
   const runtime = await createVirRuntime({
     wasmBytes,
-    irPackageBytes: await readFile(packagePath),
+    irPackageSetBytes: [await readFile(packagePath)],
     defaultHostBindings: createBrowserHostBindings({ resources }),
   });
   try {

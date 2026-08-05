@@ -159,10 +159,10 @@ async function instantiateRuntimes() {
   const virtualDocumentState = createVirtualDocumentState();
   ensureVirtualElementState(virtualDocumentState, "#bench-dom");
   ensureVirtualElementState(virtualDocumentState, "#bench-react");
-  const runtime = await createBrowserVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
+  const runtime = await createBrowserVirRuntime({ wasmBytes: wasm, irPackageSetBytes: [irPackage] });
   const hostRuntime = await createNodeVirRuntime({
     wasmBytes: wasm,
-    irPackageBytes: hostPackage,
+    irPackageSetBytes: [hostPackage],
     virtualDocumentState,
     hostBindings: createBenchmarkHostBindings(),
   });

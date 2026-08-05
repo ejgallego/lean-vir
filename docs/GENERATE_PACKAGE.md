@@ -24,8 +24,10 @@ Targets have one of five modes:
   `@[vir_export]` or `@[vir_startup]` in a source file.
 - `--target-marked-module <driver.lean> <module>`: package marked declarations
   owned by one imported module while excluding marked declarations from its
-  dependencies. The Lake `:vir` module facet uses this mode with a generated
-  `import all` driver when compiled module IR is available.
+  dependencies, then follow opaque declaration ownership to load reached module
+  IR for composable package-set emission. The CLI's internal
+  `--module-set-output` arguments provide descriptor and shard destinations to
+  the Lake `:vir` facet.
 
 ## Module Map
 
@@ -46,9 +48,9 @@ Targets have one of five modes:
   `@[vir_export]`, plus explicit opaque-import deferrals. Declaration-kind,
   signature, and postponed-compilation handling live with the attribute in
   `Vir.Attributes`.
-- `Vir.GeneratePackage.Frontend`: unchanged source elaboration, `DeclIndex`
-  construction, marker collection and module filtering, and declaration-name
-  collision diagnostics.
+- `Vir.GeneratePackage.Frontend`: source elaboration, `DeclIndex` construction,
+  marker collection, declaration-to-module ownership, on-demand `import all`
+  environments, module filtering, and declaration-name collision diagnostics.
 - `Vir.GeneratePackage.Closure`: root resolution and transitive IR closure
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface.Encode`: interface labels, descriptor tags,
@@ -88,7 +90,9 @@ Targets have one of five modes:
    of silently letting the later target overwrite the first.
 4. `Closure.collectClosure` resolves explicit roots, auto-discovered roots, and
    generated boxed entrypoints, then walks the IR references needed by the
-   package.
+   package. Module-set generation repeats this walk while newly missing
+   declarations identify unloaded owning modules, stopping when the closure is
+   complete or no additional module IR is available.
 5. `Interface.collectHostImports` classifies `@[vir_js "..."]` externs reached
    by the closure.
 6. `Manifest.collectInterfaceManifest` classifies callable exports, folds in
@@ -99,7 +103,10 @@ Targets have one of five modes:
    diagnostics.
 8. `Emit.emitPackage` writes the binary package only when the closure and
    manifest have no diagnostics that would make the package ambiguous or
-   unsupported.
+   unsupported. `Run.runModuleSet` partitions a successful closure by module,
+   filters Lean's dependency-first module order to the reached owners, and
+   preserves initializer metadata in each owning member. Dependency members
+   have empty public manifests and the root retains the aggregate interface.
 
 ## Ownership Checklist
 
@@ -160,13 +167,14 @@ effect handling while allowing simple type aliases and effect aliases to pass.
 
 Version constants are intentionally small and explicit:
 
-- `Vir.GeneratePackage.PackageFormat` owns the Lean generator's
-  `packageFormatVersion` and `manifestVersion` metadata values.
+- `Vir.GeneratePackage.PackageFormat` owns the Lean generator's binary package,
+  interface manifest, and package-set descriptor versions, plus the package-set
+  format identifier.
 - `scripts/package-versions.mjs` owns the JavaScript-side expectations for
   package format, interface manifest, and runtime ABI versions.
-- `npm run check:package-abi` verifies package magic, versions, and section
-  kinds across Lean, C++, and JavaScript, plus the Lean/JavaScript interface tag
-  and host-boundary tables.
+- `npm run check:package-abi` verifies package magic, package-set descriptor
+  identity, versions, and section kinds across Lean, Lake, C++, and JavaScript,
+  plus the Lean/JavaScript interface tag and host-boundary tables.
 - `scripts/ir-codec-tags.mjs` owns the format-10 package `Name` and
   declaration-IR tag assignments; `npm run check:ir-codec-tags` verifies that
   the tracked Lean/C++ outputs agree with it and that the emitter/decoder use
@@ -176,10 +184,15 @@ Bump `packageFormatVersion` when the binary `.irpkg` encoding or decoder
 contract changes incompatibly. Update the JavaScript package-format constant,
 runtime decoder checks, and package fixture expectations in the same PR.
 
-Bump `manifestVersion` when embedded manifest fields, descriptor shapes, or
-their semantics change incompatibly for JavaScript callers. Update the
-manifest validator, runtime smoke tests, and `docs/INTERFACE_PIPELINE.md`
+Bump `manifestVersion` when embedded manifest fields, interface type descriptor
+shapes, or their semantics change incompatibly for JavaScript callers. Update
+the manifest validator, runtime smoke tests, and `docs/INTERFACE_PIPELINE.md`
 alongside the generator change.
+
+Bump `currentPackageSetVersion` when the `.irpkg-set.json` descriptor shape or
+semantics change incompatibly. Change `packageSetFormat` only when introducing a
+different descriptor family. Update the Lake validator, JavaScript loader,
+descriptor smoke tests, and `docs/IRPKG_FORMAT.md` together.
 
 Bump `runtimeAbiVersion` when the SDK artifact compatibility changes outside
 the embedded package/manifest schema, such as a WASM host ABI or JavaScript

@@ -10,7 +10,9 @@ Author: Emilio J. Gallego Arias
 
 typedef struct lean_object lean_object;
 
-extern "C" uint32_t vir_load_ir_package(uint8_t const * data, uint32_t size);
+extern "C" uint32_t vir_begin_ir_package_set(void);
+extern "C" uint32_t vir_append_ir_package(uint8_t const * data, uint32_t size);
+extern "C" uint32_t vir_finish_ir_package_set(void);
 extern "C" uint32_t vir_last_package_error_size(void);
 extern "C" char const * vir_last_package_error(void);
 extern "C" uint32_t vir_resolve_call_export(uint32_t export_index);
@@ -191,9 +193,13 @@ static void bench_sort() {
 }
 
 int main() {
-    uint32_t loaded = vir_load_ir_package(
-        reinterpret_cast<uint8_t const *>(vir_demo_ir_package),
-        static_cast<uint32_t>(vir_demo_ir_package_len));
+    uint32_t loaded = 0;
+    if (vir_begin_ir_package_set() != 0 &&
+        vir_append_ir_package(
+            reinterpret_cast<uint8_t const *>(vir_demo_ir_package),
+            static_cast<uint32_t>(vir_demo_ir_package_len)) != 0) {
+        loaded = vir_finish_ir_package_set();
+    }
     if (loaded == 0) {
         uint32_t len = vir_last_package_error_size();
         fprintf(stderr, "IR package load failed");

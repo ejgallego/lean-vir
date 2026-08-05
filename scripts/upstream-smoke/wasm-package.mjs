@@ -9,7 +9,9 @@ import { VirRuntime } from "../../web/src/runtime/core.js";
 
 const requiredFunctionExports = [
   "vir_alloc_bytes",
-  "vir_load_ir_package",
+  "vir_begin_ir_package_set",
+  "vir_append_ir_package",
+  "vir_finish_ir_package_set",
   "vir_last_package_error",
   "vir_last_package_error_size",
   "vir_resolve_call_export",
@@ -103,28 +105,34 @@ export async function smokeWasmPackageBoundary(context) {
   const exports = await instantiateVirModule(context.wasmModule);
   assertRequiredExports(exports);
   assertInvalidPackageDiagnostic(exports);
-  loadIrPackage(exports, context.defaultPackageBytes);
+  loadIrPackageSet(exports, [context.defaultPackageBytes]);
   return {
     exports,
     runtime: new VirRuntime(exports),
   };
 }
 
-export function loadIrPackage(exports, packageBytes) {
-  const packagePtr = exports.vir_alloc_bytes(packageBytes.byteLength);
-  try {
-    new Uint8Array(exports.memory.buffer, packagePtr, packageBytes.byteLength).set(packageBytes);
-    const loadedDecls = exports.vir_load_ir_package(packagePtr, packageBytes.byteLength);
-    if (loadedDecls === 0) {
-      throw new Error("IR package load failed");
-    }
-    if (exports.vir_package_decl_count() !== loadedDecls) {
-      throw new Error("loaded declaration count does not match package provider state");
-    }
-    return loadedDecls;
-  } finally {
-    exports.vir_free_bytes?.(packagePtr);
+export function loadIrPackageSet(exports, packageMembers) {
+  if (exports.vir_begin_ir_package_set() === 0) {
+    throw new Error("IR package-set setup failed");
   }
+  for (const packageBytes of packageMembers) {
+    const packagePtr = exports.vir_alloc_bytes(packageBytes.byteLength);
+    try {
+      new Uint8Array(exports.memory.buffer, packagePtr, packageBytes.byteLength).set(packageBytes);
+      if (exports.vir_append_ir_package(packagePtr, packageBytes.byteLength) === 0) {
+        throw new Error("IR package-set member load failed");
+      }
+    } finally {
+      exports.vir_free_bytes?.(packagePtr);
+    }
+  }
+  const loadedDecls = exports.vir_finish_ir_package_set();
+  if (loadedDecls === 0) throw new Error("IR package-set finalization failed");
+  if (exports.vir_package_decl_count() !== loadedDecls) {
+    throw new Error("loaded declaration count does not match package provider state");
+  }
+  return loadedDecls;
 }
 
 function assertRequiredExports(exports) {
@@ -135,6 +143,9 @@ function assertRequiredExports(exports) {
   }
   if (exports.vir_resolve_call !== undefined) {
     throw new Error("removed vir_resolve_call export is still present");
+  }
+  if (exports.vir_load_ir_package !== undefined) {
+    throw new Error("removed vir_load_ir_package export is still present");
   }
   if (!exports.memory) {
     throw new Error("memory export is missing");
@@ -148,10 +159,13 @@ function assertRequiredExports(exports) {
 }
 
 function assertInvalidPackageDiagnostic(exports) {
+  if (exports.vir_begin_ir_package_set() === 0) {
+    throw new Error("IR package-set setup failed before invalid-package check");
+  }
   const badPackagePtr = exports.vir_alloc_bytes(invalidMagicPackage.byteLength);
   try {
     new Uint8Array(exports.memory.buffer, badPackagePtr, invalidMagicPackage.byteLength).set(invalidMagicPackage);
-    const loadedDecls = exports.vir_load_ir_package(badPackagePtr, invalidMagicPackage.byteLength);
+    const loadedDecls = exports.vir_append_ir_package(badPackagePtr, invalidMagicPackage.byteLength);
     if (loadedDecls !== 0) {
       throw new Error("invalid IR package unexpectedly loaded");
     }

@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 import "./style.css";
 import { prettyPackageFile, wasmPublicFile } from "./pages/browser-packages.js";
 import { errorMessage, setReadyState } from "./pages/page-utils.js";
-import { createVirRuntimeFactory } from "./vir-runtime.js";
+import { createVirRuntimeFactory, fetchBytes } from "./vir-runtime.js";
 
 const cases = [
   {
@@ -132,7 +132,9 @@ async function boot() {
   const width = setWidth(query.get("width") ?? "18");
   setActiveCase(activeCase);
   runtime = await runtimeFactory.createRuntime({
-    irPackageUrl: `${import.meta.env.BASE_URL}${prettyPackageFile}`,
+    irPackageSetBytes: [
+      await fetchBytes(`${import.meta.env.BASE_URL}${prettyPackageFile}`),
+    ],
   });
   exportCountEl.textContent = String(runtime.packageInfo.interfaceExports);
   setWidth(width);

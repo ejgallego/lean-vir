@@ -181,7 +181,7 @@ async function upstreamWasmBytes() {
 async function instantiateWasm(packagePath) {
   const wasm = await upstreamWasmBytes();
   const irPackage = await readFile(packagePath);
-  return createVirRuntime({ wasmBytes: wasm, irPackageBytes: irPackage });
+  return createVirRuntime({ wasmBytes: wasm, irPackageSetBytes: [irPackage] });
 }
 
 async function generatePackage(fixture) {

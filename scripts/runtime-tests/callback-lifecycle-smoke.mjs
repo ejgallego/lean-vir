@@ -20,7 +20,7 @@ import {
   wait,
 } from "./shared.mjs";
 
-const { wasmBytes, hostPackageBytes, irPackageBytes } = await readRuntimeArtifacts();
+const { wasmBytes, hostPackageBytes, defaultPackageBytes } = await readRuntimeArtifacts();
 
 let retainedHostCallback = null;
 let transferredHostCallback = null;
@@ -41,7 +41,7 @@ const retainedHostErrorBindings = {
 };
 const retainedHostErrorRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState: retainedHostErrorDocumentState,
   hostBindings: retainedHostErrorBindings,
 });
@@ -70,7 +70,7 @@ let firstOwnedLease = null;
 let secondOwnedLease = null;
 const callbackLeaseRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       transferredLeaseCallback = callback;
@@ -107,7 +107,7 @@ let failedRetainedTransfer = null;
 let failedRetainedLease = null;
 const failedRetainRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (_input, callback) => {
       failedRetainedTransfer = callback;
@@ -133,7 +133,7 @@ let failedOuterCallback = null;
 let retainedNestedCallback = null;
 reentrantRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       if (reentrantDepth !== 0) {
@@ -171,7 +171,7 @@ reentrantRuntime.dispose();
 let argumentLiftCallback = null;
 const argumentLiftRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: createCallbackHostBindings(),
 });
 const liftHostResourceObjectValue = argumentLiftRuntime.liftHostResourceObjectValue.bind(argumentLiftRuntime);
@@ -196,7 +196,7 @@ argumentLiftRuntime.dispose();
 let promiseCallback = null;
 const promiseBindingRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (_input, callback) => {
       promiseCallback = callback;
@@ -217,7 +217,7 @@ promiseBindingRuntime.dispose();
 let resultLiftCallback = null;
 const resultLiftRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (_input, callback) => {
       resultLiftCallback = callback;
@@ -238,7 +238,7 @@ resultLiftRuntime.dispose();
 let combinedFailureCallback = null;
 const combinedFailureRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (_input, callback) => {
       combinedFailureCallback = callback;
@@ -263,7 +263,7 @@ combinedFailureRuntime.dispose();
 const callbackErrorDocumentState = createVirtualDocumentState();
 const callbackErrorRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   virtualDocumentState: callbackErrorDocumentState,
   hostBindings: {
     "test.callNatCallback": createCallbackHostBindings()["test.callNatCallback"],
@@ -301,7 +301,7 @@ callbackErrorRuntime.dispose();
 const callbackReleaseRuntimeCallbacks = [];
 const callbackReleaseRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       callbackReleaseRuntimeCallbacks.push(callback);
@@ -349,7 +349,7 @@ const disposePhaseBindings = {
 };
 const disposePhaseRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: disposePhaseBindings,
 });
 assert.equal(disposePhaseRuntime.call("HostInterop.callbackRoundTrip", 3), "3");
@@ -401,7 +401,7 @@ const throwingBindingMap = {
 };
 const throwingTeardownRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: throwingBindingMap,
 });
 assert.equal(throwingTeardownRuntime.call("HostInterop.callbackRoundTrip", 3), "3");
@@ -428,7 +428,7 @@ assert.doesNotThrow(() => throwingTeardownRuntime.dispose());
 let handoverTeardownCallback = null;
 const handoverTeardownRuntime = await createVirRuntime({
   wasmBytes,
-  irPackageBytes: hostPackageBytes,
+  irPackageSetBytes: [hostPackageBytes],
   hostBindings: {
     "test.callNatCallback": (input, callback) => {
       handoverTeardownCallback = callback;
@@ -447,7 +447,7 @@ handoverTeardownRuntime.hostState.defaultBindings[VIR_HOST_DISPOSE] = function d
   }
 };
 assert.throws(
-  () => handoverTeardownRuntime.loadIrPackageBytes(irPackageBytes),
+  () => handoverTeardownRuntime.loadIrPackageSetBytes([defaultPackageBytes]),
   /old package teardown boom/,
 );
 assert.equal(handoverTeardownCallback.released, true);

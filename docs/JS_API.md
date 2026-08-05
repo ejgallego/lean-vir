@@ -1,8 +1,9 @@
 # JavaScript Runtime API
 
-`web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a manifest-bearing
-`.irpkg`, and exposes its Lean declarations through a generic JavaScript call
-API without requiring callers to manage WASM memory.
+`web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a non-empty set of
+manifest-bearing `.irpkg` members, and exposes their aggregate Lean declarations
+through a generic JavaScript call API without requiring callers to manage WASM
+memory. A focused `.irpkg` is loaded as a one-member set.
 
 For the end-to-end "my Lean function from my JavaScript code" workflow, start
 with `docs/CALL_LEAN_FROM_JS.md`.
@@ -63,7 +64,7 @@ artifact by setting `debugWasm: true`:
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
   debugWasm: true,
-  irPackageUrl: "fixtures-basic.irpkg",
+  irPackageSetBytes: [await fetchBytes("fixtures-basic.irpkg")],
 });
 ```
 
@@ -142,24 +143,17 @@ const factory = createVirRuntimeFactory({
 ## Browser Usage
 
 ```js
-import { createVirRuntime } from "./src/vir-runtime.js";
+import { createVirRuntime, fetchBytes } from "./src/vir-runtime.js";
 
-const vir = await createVirRuntime({
+const createForMember = async (path) => createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "fixtures-basic.irpkg",
+  irPackageSetBytes: [await fetchBytes(path)],
 });
-const hostVir = await createVirRuntime({
-  wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "demo-host.irpkg",
-});
-const prettyVir = await createVirRuntime({
-  wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "pretty-printer.irpkg",
-});
-const leanVir = await createVirRuntime({
-  wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "fixtures-lean.irpkg",
-});
+
+const vir = await createForMember("fixtures-basic.irpkg");
+const hostVir = await createForMember("demo-host.irpkg");
+const prettyVir = await createForMember("pretty-printer.irpkg");
+const leanVir = await createForMember("fixtures-lean.irpkg");
 
 console.log(vir.call("fib", 12));
 console.log(vir.exportsByName.SortDemo_demo());
@@ -174,6 +168,47 @@ console.log(leanVir.call("Vir.Fixtures.ExprPrinter.exprKindScore", { kind: "bvar
 There is also a minimal browser page at `/runtime-example.html` that imports the
 runtime directly and prints sample calls.
 
+## Module Package Sets
+
+Lake's `:vir` facet writes a package-set descriptor whose members are
+ordered dependencies first and public root last. Load it directly by URL:
+
+```js
+const vir = await createVirRuntime({
+  wasmUrl: "vir-upstream.wasm",
+  irPackageSetUrl: "ModuleSetFixture/Root.irpkg-set.json",
+});
+
+console.log(vir.packageInfo.packageCount);
+console.log(vir.call("ModuleSetFixture.Root.answer"));
+```
+
+Hosts that already have the bytes can pass `irPackageSetBytes`, a non-empty
+array in descriptor order. On an existing factory-managed runtime,
+`vir.loadIrPackageSetBytes(members)` validates the complete set in a fresh WASM
+instance before handover. `packageInfo.count` is the aggregate declaration count;
+`packageInfo.byteLength` is the sum of all members.
+
+To separate transport from runtime creation, use the factory fetch API:
+
+```js
+const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
+const members = await factory.fetchIrPackageSet(
+  "ModuleSetFixture/Root.irpkg-set.json",
+);
+const vir = await factory.createRuntime({ irPackageSetBytes: members });
+```
+
+`fetchIrPackageSet` validates the descriptor, resolves member paths relative to
+the descriptor URL, and fetches them in parallel while preserving descriptor
+order. A custom `fetchBytes` factory option can provide filesystem, cache, or
+authenticated transport semantics.
+
+The browser and Node runtime entry points also export
+`IR_PACKAGE_SET_FORMAT` and `IR_PACKAGE_SET_VERSION` for tooling that inspects
+or produces descriptors. Applications that only consume Lake-generated sets do
+not need to use these constants directly.
+
 ## Reusing The Compiled Module
 
 Use a factory when creating multiple fresh interpreter instances from the same
@@ -183,31 +218,31 @@ WASM module:
 import { createVirRuntimeFactory, fetchBytes } from "./src/vir-runtime.js";
 
 const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
-const irPackageBytes = await fetchBytes("fixtures-basic.irpkg");
+const packageMemberBytes = await fetchBytes("fixtures-basic.irpkg");
 
-const first = await factory.createRuntime({ irPackageBytes });
-const second = await factory.createRuntime({ irPackageBytes });
+const first = await factory.createRuntime({ irPackageSetBytes: [packageMemberBytes] });
+const second = await factory.createRuntime({ irPackageSetBytes: [packageMemberBytes] });
 ```
 
-## Replacing A Package
+## Replacing A Package Set
 
-`vir.loadIrPackageBytes(bytes)` is synchronous once the Wasm module has been
+`vir.loadIrPackageSetBytes(members)` is synchronous once the Wasm module has been
 compiled. Calling it on a loaded, factory-managed runtime preserves the public
 `vir` object but replaces its underlying Wasm instance:
 
 ```js
 const factory = createVirRuntimeFactory({ wasmUrl: "vir-upstream.wasm" });
-const vir = await factory.createRuntime({ irPackageBytes: firstPackage });
+const vir = await factory.createRuntime({ irPackageSetBytes: firstPackageMembers });
 
-vir.loadIrPackageBytes(secondPackage);
+vir.loadIrPackageSetBytes(secondPackageMembers);
 console.log(vir.call("SecondPackage.entry"));
 ```
 
-The second package is loaded, initialized, and manifest-validated in a fresh
+The second package set is loaded, initialized, and manifest-validated in a fresh
 candidate instance before handover. If that work fails, the candidate is
 disposed and the first package remains usable. After a successful handover,
 old object pointers, `VirCallback` objects, host-resource roots, and resolved
-call slots are invalid. The runtime releases the old package resources once,
+call slots are invalid. The runtime releases the old set's resources once,
 reattaches the new host state to the same public wrapper, and rebuilds its
 manifest lookup and call caches.
 
@@ -237,6 +272,7 @@ their cleanup hook runs once when the final runtime using the map is disposed.
   hooks from ordinary `@[vir_export]` calls.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
 - `vir.packageInfo.hostImports` reports the number of JavaScript host imports.
+- `vir.packageInfo.packageCount` reports the package-set member count.
 
 Supported interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
@@ -383,7 +419,7 @@ The built-in `common.*` and `browser.*` targets do not require a
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "demo-host.irpkg",
+  irPackageSetBytes: [await fetchBytes("demo-host.irpkg")],
 });
 
 console.log(vir.call("HostInterop.titleHandshake", "browser handshake"));
@@ -432,7 +468,7 @@ helpers such as `react.root.renderComponentIntoSelector`:
 const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "vir-upstream.wasm",
-  irPackageUrl: "custom.irpkg",
+  irPackageSetBytes: [await fetchBytes("custom.irpkg")],
   defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
     "demo.bumpNat": (n) => resources.resourceForValue(resources.resolveResource(n, "JsNat") + 1n),
@@ -517,10 +553,10 @@ binding hooks, resources, Lean object handles, and callbacks are attempted even
 if one throws. One cleanup failure is rethrown directly; multiple failures are
 reported as an `AggregateError` in cleanup order. The runtime remains disposed,
 and a later `dispose()` is a no-op.
-Calling `vir.loadIrPackageBytes(...)` on a
-runtime that already has a package loaded performs an atomic fresh-instance
-replacement as described above. Old package resources are cleaned up only
-after the candidate package has loaded successfully. See `docs/HOST_BINDINGS.md`
+Calling `vir.loadIrPackageSetBytes(...)` on a runtime that already has a package
+set loaded performs an atomic fresh-instance replacement as described above.
+Old package resources are cleaned up only after the candidate set has loaded
+successfully. See `docs/HOST_BINDINGS.md`
 for the built-in resource cleanup behavior.
 
 See `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed callback ownership
@@ -582,14 +618,15 @@ the two assets:
 ```js
 const vir = await createVirRuntime({
   wasmUrl: "/vir-upstream.wasm",
-  irPackageUrl: "/my-package.irpkg",
+  irPackageSetBytes: [await fetchBytes("/my-package.irpkg")],
 });
 ```
 
 ## Current Limits
 
-The runtime uses the single-file declaration package path. It does not load
-`.olean`, `.ir`, or full Lean module data in the browser. Unsupported requested
+The browser loads descriptor-ordered sets of format-10 `.irpkg` members. A
+focused package is represented as a one-member set. It does not load `.olean` or
+Lean's raw `.ir` format in the browser. Unsupported requested
 exports fail during package generation instead of being omitted silently, and a
 failed package load clears the runtime's package metadata instead of leaving
 stale declarations callable. JavaScript host imports are sync-only and limited

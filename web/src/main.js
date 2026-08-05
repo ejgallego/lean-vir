@@ -72,7 +72,8 @@ function runtimeForPackage(packageFile) {
   if (!runtimePromises.has(packageFile)) {
     runtimePromises.set(
       packageFile,
-      packageBytes(packageFile).then((irPackageBytes) => runtimeFactory.createRuntime({ irPackageBytes })),
+      packageBytes(packageFile).then((bytes) =>
+        runtimeFactory.createRuntime({ irPackageSetBytes: [bytes] })),
     );
   }
   return runtimePromises.get(packageFile);

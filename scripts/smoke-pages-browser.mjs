@@ -35,7 +35,12 @@ const debugPort = await freePort();
 const chromium = await launchChromium(debugPort);
 
 try {
-  const targets = await fetchJsonWithRetry(`http://127.0.0.1:${debugPort}/json/list`, chromium.child);
+  const targets = await fetchJsonWithRetry(
+    `http://127.0.0.1:${debugPort}/json/list`,
+    chromium.child,
+    (candidates) => Array.isArray(candidates) && candidates.some((target) =>
+      target.type === "page" && target.webSocketDebuggerUrl),
+  );
   const pageTarget = targets.find((target) => target.type === "page");
   assert.ok(pageTarget?.webSocketDebuggerUrl, "Chromium did not expose a page DevTools target");
   const cdp = await openCdp(pageTarget.webSocketDebuggerUrl);

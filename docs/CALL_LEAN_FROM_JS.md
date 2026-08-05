@@ -87,11 +87,13 @@ If the package lives outside `web/public/`, open `/dev.html` and use the
 In this repository's Vite app, import the browser runtime directly:
 
 ```js
-import { createVirRuntime } from "./src/vir-runtime.js";
+import { createVirRuntime, fetchBytes } from "./src/vir-runtime.js";
 
 const vir = await createVirRuntime({
   wasmUrl: `${import.meta.env.BASE_URL}vir-upstream.wasm`,
-  irPackageUrl: `${import.meta.env.BASE_URL}my-app.irpkg`,
+  irPackageSetBytes: [
+    await fetchBytes(`${import.meta.env.BASE_URL}my-app.irpkg`),
+  ],
 });
 
 const total = vir.call("MyApp.total", [2, 3, 5, 8]);
@@ -255,11 +257,11 @@ For a browser app, serve both files as static assets:
 Then point the runtime at their served URLs:
 
 ```js
-import { createVirRuntime } from "lean-vir";
+import { createVirRuntime, fetchBytes } from "lean-vir";
 
 const vir = await createVirRuntime({
   wasmUrl: "/assets/vir-upstream.wasm",
-  irPackageUrl: "/assets/my-app.irpkg",
+  irPackageSetBytes: [await fetchBytes("/assets/my-app.irpkg")],
 });
 ```
 
@@ -338,7 +340,7 @@ JavaScript:
 const resources = createHostResourceState();
 const vir = await createVirRuntime({
   wasmUrl: "/assets/vir-upstream.wasm",
-  irPackageUrl: "/assets/my-app.irpkg",
+  irPackageSetBytes: [await fetchBytes("/assets/my-app.irpkg")],
   defaultHostBindings: createBrowserHostBindings({ resources }),
   hostBindings: {
     "demo.bumpNat": (n) => resources.resourceForValue(resources.resolveResource(n, "JsNat") + 1n),

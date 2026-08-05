@@ -26,7 +26,7 @@ export async function smokeVirtualHostRuntime(context) {
   const hostDocumentState = createVirtualDocumentState();
   const hostRuntime = await createVirRuntime({
     wasmBytes: context.wasmBytes,
-    irPackageBytes: context.hostPackageBytes,
+    irPackageSetBytes: [context.hostPackageBytes],
     virtualDocumentState: hostDocumentState,
   });
   const actualHostImportTargets = hostRuntime.interfaceManifest.hostImports.map((entry) => entry.target).sort();
@@ -63,7 +63,7 @@ async function smokeMissingReactSelector(context) {
   const missingSelectorDocumentState = createVirtualDocumentState();
   const missingSelectorRuntime = await createVirRuntime({
     wasmBytes: context.wasmBytes,
-    irPackageBytes: context.hostPackageBytes,
+    irPackageSetBytes: [context.hostPackageBytes],
     virtualDocumentState: missingSelectorDocumentState,
   });
   const missingReactMountCount = missingSelectorRuntime.call("ReactCounter.mount", "#missing-react-root");

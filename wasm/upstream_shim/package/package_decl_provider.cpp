@@ -34,8 +34,10 @@ static std::vector<export_call_summary_entry> g_export_summaries;
 static std::vector<uint32_t> g_call_summary_indices;
 static std::string g_interface_manifest;
 static std::string g_last_error;
-static bool g_package_loaded = false;
-static uint32_t g_package_generation = 1;
+static bool g_package_set_has_members = false;
+static bool g_package_set_open = false;
+static bool g_package_ready = false;
+static bool g_initializers_ran = false;
 static uint32_t g_package_format_version = 0;
 
 static void clear_loaded_package_state() {
@@ -62,32 +64,116 @@ static void clear_loaded_package_state() {
     g_export_summaries.clear();
     g_call_summary_indices.clear();
     g_interface_manifest.clear();
-    g_package_loaded = false;
+    g_package_set_has_members = false;
+    g_package_set_open = false;
+    g_package_ready = false;
+    g_initializers_ran = false;
     g_package_format_version = 0;
-    g_package_generation++;
-    if (g_package_generation == 0) {
-        g_package_generation = 1;
-    }
 }
 
-static bool load_package_state(uint8_t const * data, size_t size) {
-    g_last_error.clear();
-    clear_loaded_package_state();
+static std::string lean_name_string(object * value) {
+    name n(value, true);
+    return n.to_string();
+}
 
+template <typename T>
+static bool validate_named_entries(
+    std::vector<T> const & existing,
+    std::vector<T> const & decoded,
+    char const * label) {
+    for (size_t i = 0; i < decoded.size(); i++) {
+        object * candidate = decoded[i].name;
+        for (T const & entry : existing) {
+            if (lean_name_eq(candidate, entry.name)) {
+                g_last_error =
+                    std::string("duplicate ") + label + " `" + lean_name_string(candidate) +
+                    "` across package-set members";
+                return false;
+            }
+        }
+        for (size_t j = 0; j < i; j++) {
+            if (lean_name_eq(candidate, decoded[j].name)) {
+                g_last_error =
+                    std::string("duplicate ") + label + " `" + lean_name_string(candidate) +
+                    "` in one package-set member";
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+static bool validate_decoded_package(decoded_ir_package const & decoded) {
+    if (g_package_set_has_members && decoded.format_version != g_package_format_version) {
+        g_last_error =
+            "IR package set mixes format versions " + std::to_string(g_package_format_version) +
+            " and " + std::to_string(decoded.format_version);
+        return false;
+    }
+
+    if (!validate_named_entries(g_entries, decoded.entries, "IR declaration") ||
+        !validate_named_entries(g_init_entries, decoded.init_entries, "initializer global") ||
+        !validate_named_entries(g_host_imports, decoded.host_imports, "JavaScript host import") ||
+        !validate_named_entries(
+            g_export_summaries, decoded.export_summaries, "interface export summary")) {
+        return false;
+    }
+
+    for (size_t i = 0; i < decoded.host_imports.size(); i++) {
+        std::string const & symbol = decoded.host_imports[i].symbol;
+        for (host_import_entry const & existing : g_host_imports) {
+            if (symbol == existing.symbol) {
+                g_last_error = "duplicate JavaScript host import symbol `" + symbol + "`";
+                return false;
+            }
+        }
+        for (size_t j = 0; j < i; j++) {
+            if (symbol == decoded.host_imports[j].symbol) {
+                g_last_error = "duplicate JavaScript host import symbol `" + symbol + "`";
+                return false;
+            }
+        }
+    }
+    return true;
+}
+
+template <typename T>
+static void append_owned_entries(std::vector<T> & target, std::vector<T> & source) {
+    target.reserve(target.size() + source.size());
+    for (T & entry : source) {
+        target.push_back(std::move(entry));
+    }
+    source.clear();
+}
+
+static bool append_decoded_package(decoded_ir_package & decoded) {
+    if (!validate_decoded_package(decoded)) {
+        return false;
+    }
+
+    uint32_t summary_offset = static_cast<uint32_t>(g_export_summaries.size());
+    append_owned_entries(g_entries, decoded.entries);
+    append_owned_entries(g_init_entries, decoded.init_entries);
+    append_owned_entries(g_host_imports, decoded.host_imports);
+    append_owned_entries(g_export_summaries, decoded.export_summaries);
+    for (uint32_t summary_index : decoded.call_summary_indices) {
+        g_call_summary_indices.push_back(
+            summary_index == UINT32_MAX ? UINT32_MAX : summary_offset + summary_index);
+    }
+    decoded.call_summary_indices.clear();
+    g_interface_manifest = std::move(decoded.interface_manifest);
+    g_package_set_has_members = true;
+    g_package_format_version = decoded.format_version;
+    return true;
+}
+
+static bool append_package_state(uint8_t const * data, size_t size) {
+    g_last_error.clear();
     decoded_ir_package decoded;
     if (!decode_ir_package(data, size, decoded, g_last_error)) {
         return false;
     }
-
-    g_entries = std::move(decoded.entries);
-    g_init_entries = std::move(decoded.init_entries);
-    g_host_imports = std::move(decoded.host_imports);
-    g_export_summaries = std::move(decoded.export_summaries);
-    g_call_summary_indices = std::move(decoded.call_summary_indices);
-    g_interface_manifest = std::move(decoded.interface_manifest);
-    g_package_loaded = true;
-    g_package_format_version = decoded.format_version;
-    return true;
+    return append_decoded_package(decoded);
 }
 
 class scoped_io_initializing {
@@ -121,7 +207,11 @@ static bool run_init_global(init_global_entry const & entry) {
 }
 
 static bool run_package_initializers_state() {
+    if (g_initializers_ran) {
+        return true;
+    }
     if (g_init_entries.empty()) {
+        g_initializers_ran = true;
         return true;
     }
 
@@ -132,6 +222,7 @@ static bool run_package_initializers_state() {
             return false;
         }
     }
+    g_initializers_ran = true;
     return true;
 }
 
@@ -175,12 +266,36 @@ void clear_loaded_package() {
     clear_loaded_package_state();
 }
 
-bool load_package(uint8_t const * data, size_t size) {
-    return load_package_state(data, size);
+bool begin_package_set() {
+    g_last_error.clear();
+    clear_loaded_package_state();
+    g_package_set_open = true;
+    return true;
 }
 
-bool run_package_initializers() {
-    return run_package_initializers_state();
+bool append_package(uint8_t const * data, size_t size) {
+    if (!g_package_set_open) {
+        g_last_error = "IR package set is not open";
+        return false;
+    }
+    return append_package_state(data, size);
+}
+
+bool finish_package_set() {
+    if (!g_package_set_open) {
+        g_last_error = "IR package set is not open";
+        return false;
+    }
+    if (!g_package_set_has_members) {
+        g_last_error = "IR package set contains no packages";
+        return false;
+    }
+    g_package_set_open = false;
+    if (!run_package_initializers_state()) {
+        return false;
+    }
+    g_package_ready = true;
+    return true;
 }
 
 object * find_package_decl(object * n) {
@@ -289,16 +404,8 @@ uint32_t package_decl_count() {
     return g_entries.size();
 }
 
-bool package_loaded() {
-    return g_package_loaded;
-}
-
-uint32_t package_generation() {
-    return g_package_generation;
-}
-
-uint32_t package_format_version() {
-    return g_package_format_version;
+bool package_ready() {
+    return g_package_ready;
 }
 
 char const * last_package_error() {

@@ -17,6 +17,7 @@ def targetMetadataFor (index : DeclIndex) (target : Target) : PackageTargetMetad
   let mode :=
     if target.packageOnly then "packageOnly"
     else if target.includeAll then "all"
+    else if target.resolveImportedModules then "markedModules"
     else if target.includeMarked then "marked"
     else "explicit"
   {

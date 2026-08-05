@@ -12,6 +12,10 @@ def currentPackageFormatVersion : Nat := 10
 
 def currentInterfaceManifestVersion : Nat := 7
 
+def packageSetFormat : String := "lean-vir-ir-package-set"
+
+def currentPackageSetVersion : Nat := 1
+
 def packageSectionDeclarations : Nat := 1
 def packageSectionInitGlobals : Nat := 2
 def packageSectionHostImports : Nat := 3
