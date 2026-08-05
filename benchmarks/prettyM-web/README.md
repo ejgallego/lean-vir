@@ -5,8 +5,8 @@ This directory is a standalone browser application for comparing five
 Verso, Reveal, Lake, or the parent VIR repository's source tree.
 
 The complete application can be moved to the root of another repository. The
-four root-level VIR npm commands are convenience pointers only and are not used
-by this package.
+root-level VIR npm commands are convenience pointers only and are not used by
+this package.
 
 ## Responsibilities
 
@@ -25,8 +25,17 @@ slide DOM state.
 
 ## Artifact contract
 
-Binary artifacts are local inputs and remain ignored by Git. Place a validated
-bundle under `_artifacts/seed/`, using this layout:
+The committed `artifact-set.lock.json` selects one immutable, compatible set.
+Binary artifacts and downloaded release archives remain ignored by Git. The
+current prototype lock has no public URL yet; assemble and consume it locally:
+
+```sh
+npm run artifacts:pack
+npm run artifacts:fetch -- \
+  --archive _artifacts/releases/<generated-archive>.tar
+```
+
+`artifacts:pack` reads a validated `_artifacts/seed/` with this layout:
 
 ```text
 lean-vir/js/vir-runtime.js
@@ -38,11 +47,27 @@ lean-llvm/{README.md,SHA256SUMS,emscripten-loader.mjs,
            prettyM.mjs,prettyM.wasm}
 ```
 
-The staging script accepts only seed directories contained by this application
-directory. This prevents builds from silently depending on a developer's other
-checkouts.
+It writes a deterministic normalized tar, member checksums, an
+`ARTIFACT_SET.json` compatibility manifest, and the lockfile. The fetcher
+verifies the outer archive before extraction, rejects unsafe tar members,
+verifies every extracted member, installs it atomically under
+`_artifacts/sets/`, and stages it. Every input, cache, set, and output path is
+restricted to this application directory.
 
-The current Lean 4.32 VIR package retains the historical
+Once the archive is uploaded as an immutable release asset, set its exact HTTPS
+URL in the lockfile and change the status from `local-prototype` to `published`.
+Clean clones can then use `npm run artifacts:fetch` without an override. See
+`docs/ARTIFACT_SETS.md` for producer, promotion, and publication details.
+
+The artifact set is generic over Lean versions. Each candidate is a complete
+bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
+workload. The browser only observes the common semantic input/output and timing
+contract. Set 0001 intentionally combines a VIR runtime and workload built with
+Lean 4.33.0-rc2 at the exact PR #104 head (`64e3078`) with native and LLVM
+bounded runtimes built with Lean 4.32. Five-backend parity is the compatibility
+gate; no cross-backend Lean heap values are exchanged.
+
+The current VIR package retains the historical
 `VersoSlides.Pretty.*ForVir` export names. They are declared in `src/config.js`
 as artifact compatibility data; the application itself does not load Verso or
 depend on slide sources. Renaming those two exports can accompany a later
@@ -52,7 +77,7 @@ artifact refresh without changing the benchmark or dashboard APIs.
 
 ```sh
 npm install
-npm run stage
+npm run artifacts:fetch
 npm run build
 npm run dev
 ```
@@ -104,7 +129,7 @@ The complete local refresh is:
 npm run refresh
 ```
 
-It stages the validated in-tree artifact seed, builds and serves the app,
+It stages the installed locked set (or the validated in-tree seed), builds and serves the app,
 collects a report, refreshes cards, and runs a three-process campaign. It never
 publishes or reads artifact directories outside this application.
 

@@ -13,6 +13,7 @@
   };
 
   window.__prettyBenchArtifactBase = artifactBase.href;
+  window.__prettyBenchArtifactSetUrl = artifact("ARTIFACT_SET.json");
   window.__prettyBenchVirConfig = {
     runtimeUrl: artifact("lean-vir/js/vir-runtime.js"),
     wasmUrl: artifact("lean-vir/wasm/vir-upstream.wasm"),

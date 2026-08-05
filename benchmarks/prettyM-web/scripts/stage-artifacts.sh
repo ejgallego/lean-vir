@@ -2,8 +2,22 @@
 set -euo pipefail
 
 app_root="$(cd "$(dirname "$0")/.." && pwd)"
-seed_dir="${1:-$app_root/_artifacts/seed}"
+seed_dir="${1:-}"
 artifact_dir="$app_root/artifacts"
+
+if [[ -z "$seed_dir" ]]; then
+  set_id="$(node -e '
+    const fs = require("node:fs");
+    const lock = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    process.stdout.write(lock.setId);
+  ' "$app_root/artifact-set.lock.json")"
+  locked_dir="$app_root/_artifacts/sets/$set_id"
+  if [[ -d "$locked_dir" ]]; then
+    seed_dir="$locked_dir"
+  else
+    seed_dir="$app_root/_artifacts/seed"
+  fi
+fi
 
 seed_dir="$(realpath "$seed_dir")"
 case "$seed_dir/" in
@@ -40,8 +54,20 @@ done
 
 (cd "$seed_dir/lean-llvm" && sha256sum -c --quiet SHA256SUMS)
 
+rm -rf "$artifact_dir"
 for path in "${required[@]}"; do
   install -D -m 0644 "$seed_dir/$path" "$artifact_dir/$path"
+done
+
+optional=(
+  ARTIFACT_SET.json
+  SHA256SUMS
+  lean-vir/COMPONENT.json
+)
+for path in "${optional[@]}"; do
+  if [[ -f "$seed_dir/$path" ]]; then
+    install -D -m 0644 "$seed_dir/$path" "$artifact_dir/$path"
+  fi
 done
 
 echo "Staged five-backend artifacts from $seed_dir"

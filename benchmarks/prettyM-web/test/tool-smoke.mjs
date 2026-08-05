@@ -6,6 +6,8 @@ import { fileURLToPath } from "node:url";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const commands = [
+  [process.execPath, ["scripts/pack-artifact-set.mjs", "--help"]],
+  [process.execPath, ["scripts/fetch-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/collect-report.mjs", "--help"]],
   ["python3", ["scripts/run-campaign.py", "--help"]],
   ["python3", ["scripts/generate-observation-cards.py", "--help"]],

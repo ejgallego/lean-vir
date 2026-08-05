@@ -92,12 +92,14 @@
           return response.arrayBuffer();
         });
       }
-      return runtimeModule.createVirRuntime({
-        wasmUrl: wasmUrl,
-        wasmDebugUrl: config.wasmDebugUrl,
-        debugWasm: config.debugWasm === true,
-        irPackageUrl: irPackageUrl,
-        fetchBytes: fetchBytes,
+      return fetchBytes(irPackageUrl).then(function (irPackageBytes) {
+        return runtimeModule.createVirRuntime({
+          wasmUrl: wasmUrl,
+          wasmDebugUrl: config.wasmDebugUrl,
+          debugWasm: config.debugWasm === true,
+          irPackageSetBytes: [irPackageBytes],
+          fetchBytes: fetchBytes,
+        });
       });
     })
     .then(function (runtime) {
