@@ -13,28 +13,27 @@ const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.
 const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols_registry.inc", import.meta.url);
 
 // This is the complete handwritten boxed-wrapper exception set. Every entry
-// records why Lean's standard wrapper would violate ownership at VIR's
-// all-owned interpreter boundary.
+// records why VIR needs an adapter instead of Lean's standard boxed wrapper.
 const intentionalHandwrittenWrapperExceptions = new Map([
   [
     "lean_array_uget_borrowed___boxed",
     {
-      kind: "regular-direct-retain",
-      reason: "the raw element result is borrowed and must be retained before the array is released",
+      kind: "regular-direct",
+      reason: "preserves the compiler-selected borrowed result while consuming the interpreter-owned boxed arguments",
     },
   ],
   [
     "lean_array_fget_borrowed___boxed",
     {
-      kind: "custom",
-      reason: "uses the owned-result runtime getter before releasing the borrowed array",
+      kind: "regular-direct",
+      reason: "preserves the compiler-selected borrowed result while consuming the interpreter-owned boxed arguments",
     },
   ],
   [
     "lean_array_get_borrowed___boxed",
     {
-      kind: "custom",
-      reason: "uses the owned-result checked getter before releasing the default and array",
+      kind: "regular-direct",
+      reason: "preserves the compiler-selected borrowed result while consuming the interpreter-owned boxed arguments",
     },
   ],
 ]);

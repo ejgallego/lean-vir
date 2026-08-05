@@ -190,17 +190,18 @@ export class VirHostState {
       const retainedIdentityResult = isHostResource(value) && args.includes(value)
         ? retainHostResource(value, resultLabel)
         : null;
+      const ownedResultResource = retainedIdentityResult ?? (isHostResource(value) ? value : null);
       try {
         const resultValue = retainedIdentityResult ?? value;
         return explicitConversionTarget
           ? this.runtime.makeExplicitConversionObjectValue(entry.result, resultValue, resultLabel)
           : this.runtime.makeHostResourceObjectValue(entry.result, resultValue, resultLabel);
       } catch (error) {
-        if (retainedIdentityResult === null) throw error;
+        if (ownedResultResource === null) throw error;
         throwWithCleanup(
           error,
-          () => releaseHostResource(retainedIdentityResult),
-          `Vir host import ${entry.target} failed during identity-result cleanup`,
+          () => releaseHostResource(ownedResultResource),
+          `Vir host import ${entry.target} failed during result ownership cleanup`,
         );
       }
     } catch (error) {

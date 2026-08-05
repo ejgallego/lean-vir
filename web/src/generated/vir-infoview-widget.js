@@ -204,36 +204,6 @@ function releaseHostResource(resource) {
   hostResourceFinalizer?.unregister(resource);
   return releaseHostResourceState(state, resource);
 }
-function relinquishHostResourceOwnership(resource) {
-  const state = hostResourceState.get(resource);
-  if (state === void 0 || state.value === null || state.value === void 0) return false;
-  const dispose = state.dispose;
-  const onRelease = state.onRelease;
-  if (typeof dispose !== "function" && typeof onRelease !== "function") return false;
-  hostResourceFinalizer?.unregister(resource);
-  state.dispose = null;
-  state.onFinalize = null;
-  state.onRelease = null;
-  state.onTake = null;
-  state.reportFinalizerError = null;
-  const errors = [];
-  if (typeof onRelease === "function") {
-    try {
-      onRelease(resource);
-    } catch (error) {
-      errors.push(asError(error));
-    }
-  }
-  if (typeof dispose === "function") {
-    try {
-      dispose(state.value);
-    } catch (error) {
-      errors.push(asError(error));
-    }
-  }
-  throwHostResourceErrors(errors, "host resource ownership relinquishment failed");
-  return true;
-}
 function transferHostResource(resource) {
   const state = hostResourceState.get(resource);
   if (state === void 0 || state.value === null || state.value === void 0) return false;
@@ -744,6 +714,7 @@ function createReactRootResource(resources, hooks, adapter) {
       collectCleanupError(errors, () => adapter.unmount?.(value));
       collectCleanupError(errors, () => releaseReactNodeOwner(resources, node));
       collectCleanupError(errors, () => releaseReactComponentOwner(resources, component));
+      collectCleanupError(errors, () => flushReactNodeDisposals(hooks, { force: true }));
       collectCleanupError(errors, () => removeDisposable(resources, value));
       throwCollectedErrors(errors, "React root unmount failed");
       return void 0;
@@ -845,7 +816,7 @@ function pushReactNodeChild(resources, childrenResource, childResource) {
   const retained = retainHostResourcePayload(child);
   try {
     addHostResourcePayloadChild(children, retained);
-    children.children.push({ resource: childResource, value: retained });
+    children.children.push({ value: retained });
   } catch (error) {
     const errors = [error instanceof Error ? error : new Error(String(error))];
     collectCleanupError(errors, () => releaseHostResourcePayload(retained));
@@ -920,9 +891,6 @@ function createReactNodeResource(resources, { node, childEntries = [], callbacks
       release: () => releaseReactNodeValue(resources, value)
     });
     registered = true;
-    for (const resource of new Set(childEntries.map((child) => child.resource).filter(isHostResource))) {
-      relinquishHostResourceOwnership(resource);
-    }
     for (const owner of new Set(childEntries.map((child) => child.owner).filter(Boolean))) {
       consumeReactNodeChildren(owner);
     }
@@ -981,9 +949,9 @@ function deferReactOwnerRelease(hooks, run) {
   const queue = typeof globalThis.queueMicrotask === "function" ? globalThis.queueMicrotask.bind(globalThis) : (callback) => Promise.resolve().then(callback);
   queue(run);
 }
-function flushReactNodeDisposals(hooks) {
+function flushReactNodeDisposals(hooks, options = void 0) {
   if (typeof hooks?.flushReactNodeDisposals === "function") {
-    hooks.flushReactNodeDisposals();
+    hooks.flushReactNodeDisposals(options);
   }
 }
 function beginReactNodeEventCallback(hooks) {
@@ -1098,7 +1066,6 @@ function resolveReactNodeChildren(resources, children) {
   const owner = resolveReactNodeChildrenBuilder(resources, children);
   return owner.children.map((entry, index) => ({
     owner,
-    resource: entry.resource,
     value: resolveReactNodeValue(entry.value, `React Node child[${index}]`)
   }));
 }
@@ -1118,7 +1085,7 @@ function cloneReactNodeChildrenResource(source) {
       const retained = retainHostResourcePayload(child.value);
       try {
         addHostResourcePayloadChild(clone, retained);
-        clone.children.push({ resource: null, value: retained });
+        clone.children.push({ value: retained });
       } catch (error) {
         const errors = [error instanceof Error ? error : new Error(String(error))];
         collectCleanupError(errors, () => releaseHostResourcePayload(retained));
@@ -2580,17 +2547,51 @@ function reportEventHandlerError(error) {
 function performanceNow() {
   return globalThis.performance?.now?.() ?? Date.now();
 }
-function createReactHostHooks({ reportError = null } = {}) {
+function createReactHostHooks({ resources = null, reportError = null } = {}) {
   let eventDepth = 0;
+  let cleanupOwnerRegistered = false;
+  let cleanupMicrotaskScheduled = false;
   const deferredReactNodeDisposals = [];
-  const flushReactNodeDisposals2 = () => {
-    if (eventDepth !== 0) return void 0;
-    const pending = deferredReactNodeDisposals.splice(0);
-    const errors = [];
-    for (const dispose of pending) {
-      collectCleanupError(errors, dispose);
+  const cleanupOwner = {
+    dispose() {
+      return flushReactNodeDisposals2({ force: true });
     }
+  };
+  const registerCleanupOwner = () => {
+    if (cleanupOwnerRegistered || resources === null) return void 0;
+    resources.addDisposable(cleanupOwner);
+    cleanupOwnerRegistered = true;
+    return void 0;
+  };
+  const unregisterCleanupOwner = () => {
+    if (!cleanupOwnerRegistered || resources === null) return void 0;
+    cleanupOwnerRegistered = false;
+    resources.removeDisposable(cleanupOwner);
+    return void 0;
+  };
+  const flushReactNodeDisposals2 = ({ force = false } = {}) => {
+    if (!force && eventDepth !== 0) return void 0;
+    const errors = [];
+    while (deferredReactNodeDisposals.length !== 0) {
+      const pending = deferredReactNodeDisposals.splice(0);
+      for (const dispose of pending) {
+        collectCleanupError(errors, dispose);
+      }
+    }
+    unregisterCleanupOwner();
     throwCollectedErrors(errors, "deferred React Node cleanup failed");
+    return void 0;
+  };
+  const scheduleReactNodeDisposals = () => {
+    if (cleanupMicrotaskScheduled) return void 0;
+    cleanupMicrotaskScheduled = true;
+    const queue = typeof globalThis.queueMicrotask === "function" ? globalThis.queueMicrotask.bind(globalThis) : (callback) => Promise.resolve().then(callback);
+    queue(() => {
+      cleanupMicrotaskScheduled = false;
+      const errors = [];
+      collectCleanupError(errors, flushReactNodeDisposals2);
+      reportDeferredReactCleanupErrors(reportError, errors);
+    });
     return void 0;
   };
   return {
@@ -2609,16 +2610,11 @@ function createReactHostHooks({ reportError = null } = {}) {
       if (typeof dispose !== "function") {
         throw new Error("React Node deferred disposal must be a function");
       }
-      if (eventDepth === 0) {
-        const queue = typeof globalThis.queueMicrotask === "function" ? globalThis.queueMicrotask.bind(globalThis) : (callback) => Promise.resolve().then(callback);
-        queue(() => {
-          const errors = [];
-          collectCleanupError(errors, dispose);
-          reportDeferredReactCleanupErrors(reportError, errors);
-        });
-        return void 0;
-      }
       deferredReactNodeDisposals.push(dispose);
+      registerCleanupOwner();
+      if (eventDepth === 0) {
+        scheduleReactNodeDisposals();
+      }
       return void 0;
     },
     flushReactNodeDisposals: flushReactNodeDisposals2,
@@ -3712,11 +3708,11 @@ function callReducerHook(resources, hook, state, action) {
     throw new Error("React reducer callback is not available");
   }
   return withReactStateResultOwnership(
-    (own) => withStateUpdaterResourceScope(resources, () => {
-      const stateResource = resources.temporaryResourceForValue(state);
-      const actionResource = resources.temporaryResourceForValue(action);
-      return own(takeReactStatePayload(resources, reducer(stateResource, actionResource)));
-    }),
+    (own) => withTemporaryReactStateInputs(
+      resources,
+      [state, action],
+      (stateResource, actionResource) => own(takeReactStatePayload(resources, reducer(stateResource, actionResource)))
+    ),
     null,
     "React reducer result ownership failed"
   );
@@ -3761,10 +3757,11 @@ function modifyStateValue(resources, setter, update) {
   resources.addDisposable(retainedUpdate);
   try {
     stateSetter.set((previous) => withReactStateResultOwnership(
-      (own) => withStateUpdaterResourceScope(resources, () => {
-        const previousResource = resources.temporaryResourceForValue(previous);
-        return own(takeReactStatePayload(resources, update(previousResource)));
-      }),
+      (own) => withTemporaryReactStateInputs(
+        resources,
+        [previous],
+        (previousResource) => own(takeReactStatePayload(resources, update(previousResource)))
+      ),
       () => retainedUpdate.remove(),
       "React state updater result ownership failed"
     ));
@@ -3785,11 +3782,27 @@ function dispatchReducerAction(resources, dispatch, action) {
   dispatcher.dispatch(retainReactStatePayload(resources, action));
   return void 0;
 }
-function withStateUpdaterResourceScope(resources, run) {
-  if (typeof resources.withTemporaryResourceScope !== "function" || typeof resources.temporaryResourceForValue !== "function") {
-    throw new Error("react.state.modify requires temporary host resource support");
+function withTemporaryReactStateInputs(resources, values, run) {
+  if (typeof resources.temporaryResourceForValue !== "function" || typeof resources.releaseResource !== "function") {
+    throw new Error("React state callbacks require temporary host resource support");
   }
-  return resources.withTemporaryResourceScope(run);
+  const inputResources = [];
+  const errors = [];
+  let result;
+  collectCleanupError(errors, () => {
+    for (const value of values) {
+      inputResources.push(resources.temporaryResourceForValue(value));
+    }
+    result = run(...inputResources);
+  });
+  for (let index = inputResources.length - 1; index >= 0; index--) {
+    const resource = inputResources[index];
+    if (resource !== null) {
+      collectCleanupError(errors, () => resources.releaseResource(resource));
+    }
+  }
+  throwCollectedErrors(errors, "temporary React state input cleanup failed");
+  return result;
 }
 function withReactStateResultOwnership(acquire, cleanup, message) {
   let hasResult = false;
@@ -4451,9 +4464,13 @@ import { createRoot } from "react-dom";
 function createBrowserReactHostBindings(state = createHostResourceState(), {
   querySelector = queryBrowserElement
 } = {}) {
+  if (!hasHostResourceFinalizationSupport()) {
+    throw new Error("browser React host bindings require FinalizationRegistry and WeakRef support");
+  }
   const hookRuntime = createBrowserReactHookRuntime(state, React);
   const hooks = {
     ...createReactHostHooks({
+      resources: state,
       reportError: (error) => state.recordGcFinalizerError(error)
     }),
     hookRuntime
@@ -8119,15 +8136,16 @@ var VirHostState = class {
       }
       const resultLabel = `${entry.target} result`;
       const retainedIdentityResult = isHostResource(value) && args.includes(value) ? retainHostResource(value, resultLabel) : null;
+      const ownedResultResource = retainedIdentityResult ?? (isHostResource(value) ? value : null);
       try {
         const resultValue = retainedIdentityResult ?? value;
         return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, resultValue, resultLabel) : this.runtime.makeHostResourceObjectValue(entry.result, resultValue, resultLabel);
       } catch (error) {
-        if (retainedIdentityResult === null) throw error;
+        if (ownedResultResource === null) throw error;
         throwWithCleanup(
           error,
-          () => releaseHostResource(retainedIdentityResult),
-          `Vir host import ${entry.target} failed during identity-result cleanup`
+          () => releaseHostResource(ownedResultResource),
+          `Vir host import ${entry.target} failed during result ownership cleanup`
         );
       }
     } catch (error) {

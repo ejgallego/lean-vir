@@ -41,6 +41,7 @@ import {
 import {
   assert,
   readRuntimeArtifacts,
+  spawnSync,
 } from "./shared.mjs";
 import {
   ensureVirtualElements,
@@ -76,6 +77,31 @@ assert.throws(
   () => createBrowserHostBindings({ reactHostBindings: "react.root.create" }),
   /reactHostBindings must be a host binding object/,
 );
+
+for (const missingCapability of ["FinalizationRegistry", "WeakRef"]) {
+  const missingFinalizationSupport = spawnSync(process.execPath, [
+    "--input-type=module",
+    "--eval",
+    `
+      globalThis[${JSON.stringify(missingCapability)}] = undefined;
+      const { createBrowserReactHostBindings } = await import("./web/src/vir-react-host-bindings.js");
+      try {
+        createBrowserReactHostBindings();
+        process.stdout.write("created");
+      } catch (error) {
+        process.stdout.write(error instanceof Error ? error.message : String(error));
+      }
+    `,
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  });
+  assert.equal(missingFinalizationSupport.status, 0, missingFinalizationSupport.stderr);
+  assert.match(
+    missingFinalizationSupport.stdout,
+    /browser React host bindings require FinalizationRegistry and WeakRef support/,
+  );
+}
 
 function createReactStateSmokeBindings() {
   const resources = createHostResourceState();
@@ -195,6 +221,41 @@ function callbackLease(cell, body = () => undefined) {
     temporaryScopes: 0,
     owners: 0,
   });
+  state.resources.dispose();
+}
+
+{
+  const state = createVirtualDocumentState();
+  const bindings = createVirtualDocumentHostBindings(state);
+  const cell = { active: 0 };
+  const childValue = createReactNodeResource(state.resources, {
+    node: { kind: "text", value: "parent-first reusable child" },
+    callbacks: [callbackLease(cell)],
+  });
+  const child = state.resources.adoptResourceForValue(childValue, { tracked: false });
+  const elementType = bindings["react.elementType.tag"](state.resources.resourceForValue("div"));
+  const props = bindings["react.props.empty"]();
+
+  const firstChildren = bindings["react.node.children.empty"]();
+  bindings["react.node.children.push"](firstChildren, child);
+  const firstParent = bindings["react.node.createElement"](elementType, props, firstChildren);
+  state.resources.releaseResource(firstParent);
+  assert.equal(childValue.finalized, false, "a parent must not consume its borrowed child wrapper");
+  assert.equal(state.resources.resolveResource(child, "ReactNode"), childValue);
+
+  const secondChildren = bindings["react.node.children.empty"]();
+  bindings["react.node.children.push"](secondChildren, child);
+  const secondParent = bindings["react.node.createElement"](elementType, props, secondChildren);
+  state.resources.releaseResource(child);
+  assert.equal(childValue.finalized, false, "the second parent must retain the child independently");
+  state.resources.releaseResource(secondParent);
+  assert.equal(childValue.finalized, true);
+  assert.equal(cell.active, 0);
+
+  state.resources.releaseResource(firstChildren);
+  state.resources.releaseResource(secondChildren);
+  state.resources.releaseResource(props);
+  state.resources.releaseResource(elementType);
   state.resources.dispose();
 }
 
@@ -406,7 +467,9 @@ function callbackLease(cell, body = () => undefined) {
 {
   const calls = [];
   const reported = [];
+  const resources = createHostResourceState();
   const hooks = createReactHostHooks({
+    resources,
     reportError: (error) => reported.push(error),
   });
   hooks.beginReactNodeEventCallback();
@@ -428,6 +491,29 @@ function callbackLease(cell, body = () => undefined) {
   assert.deepEqual(calls, ["first", "second", "microtask-first", "microtask-second"]);
   assert.equal(reported.length, 1);
   assert.match(reported[0].message, /microtask deferred cleanup boom/);
+  resources.dispose();
+}
+
+{
+  const calls = [];
+  const reported = [];
+  const resources = createHostResourceState();
+  const hooks = createReactHostHooks({
+    resources,
+    reportError: (error) => reported.push(error),
+  });
+  hooks.deferReactNodeDispose(() => {
+    calls.push("dispose-first");
+    throw new Error("dispose deferred cleanup boom");
+  });
+  hooks.deferReactNodeDispose(() => calls.push("dispose-second"));
+  assert.equal(resources.debugResourceCounts().owners, 1, "pending cleanup must be teardown-owned");
+  assert.throws(() => resources.dispose(), /dispose deferred cleanup boom/);
+  assert.deepEqual(calls, ["dispose-first", "dispose-second"]);
+  assert.equal(resources.debugResourceCounts().owners, 0);
+  await Promise.resolve();
+  assert.deepEqual(calls, ["dispose-first", "dispose-second"], "the scheduled microtask must not rerun cleanup");
+  assert.deepEqual(reported, [], "runtime disposal must aggregate cleanup errors synchronously");
 }
 
 {
@@ -458,7 +544,7 @@ function callbackLease(cell, body = () => undefined) {
   const target = {};
   const hookRuntime = createVirtualReactHookRuntime(resources);
   const root = createVirtualReactRootResource(resources, target, {
-    ...createReactHostHooks(),
+    ...createReactHostHooks({ resources }),
     hookRuntime,
   });
   const renderCell = { active: 0 };
@@ -516,7 +602,7 @@ function callbackLease(cell, body = () => undefined) {
   };
   const hookRuntime = createBrowserReactHookRuntime(resources, React);
   const root = createBrowserReactRootResource(resources, browserRoot, React, {
-    ...createReactHostHooks(),
+    ...createReactHostHooks({ resources }),
     hookRuntime,
   });
   const renderTree = (tree) => {
@@ -620,9 +706,11 @@ function callbackLease(cell, body = () => undefined) {
   let released = false;
   let previousResource = null;
   let nextResource = null;
+  let escapedResource = null;
   const updater = Object.assign((previous) => {
     previousResource = previous;
     assert.equal(jsBindings["js.nat.value"](previous), 0n);
+    escapedResource = jsBindings["js.nat"](99n);
     nextResource = jsBindings["js.nat"](1n);
     return nextResource;
   }, {
@@ -634,10 +722,17 @@ function callbackLease(cell, body = () => undefined) {
   assert.equal(stateValue, 1n);
   assert.equal(released, true);
   assertNatResourceReleased(jsBindings, previousResource);
-  assertNatResourceReleased(jsBindings, nextResource);
+  assert.equal(jsBindings["js.nat.value"](nextResource), 1n);
+  assert.equal(
+    jsBindings["js.nat.value"](escapedResource),
+    99n,
+    "an unrelated resource created by RuntimeM must outlive the updater callback",
+  );
   assert.equal(resources.resolveResource(retainedZero, "Js"), 0n);
   assert.notEqual(resources.resourceForValue(0n), retainedZero);
   assert.equal(resources.debugResourceCounts().scoped, scopedBeforeModify);
+  resources.releaseResource(nextResource);
+  resources.releaseResource(escapedResource);
   resources.releaseResource(setter);
   resources.releaseResource(retainedZero);
 }
@@ -728,8 +823,13 @@ function callbackLease(cell, body = () => undefined) {
   assert.equal(stateValue, 2n);
   assert.equal(released, true);
   assertNatResourceReleased(jsBindings, previousResource);
-  assertNatResourceReleased(jsBindings, nextResource);
+  assert.equal(
+    jsBindings["js.nat.value"](nextResource),
+    3n,
+    "an externally retained RuntimeM allocation must survive an updater failure",
+  );
   assert.equal(resources.debugResourceCounts().scoped, scopedBeforeModify);
+  resources.releaseResource(nextResource);
   resources.releaseResource(setter);
 }
 
@@ -923,13 +1023,16 @@ function callbackLease(cell, body = () => undefined) {
 
 {
   const resources = createHostResourceState();
+  const jsBindings = createReactJsValueHostBindings(resources);
   const hooks = createVirtualReactHookRuntime(resources);
   const bindings = createReactStateHostBindings(resources, hooks);
   const component = hooks.createComponentState(() => undefined);
   const initial = createTestLeanRefCell("virtual reducer initial");
   const initialResource = testLeanRefResource(initial.alias, initial.cell.label);
   let reduced = null;
+  let escapedResource = null;
   const reducer = releasableCallback(() => {
+    escapedResource = jsBindings["js.nat"](77n);
     reduced = createTestLeanRefCell("virtual reducer result");
     return testLeanRefResource(reduced.alias, reduced.cell.label);
   });
@@ -947,6 +1050,12 @@ function callbackLease(cell, body = () => undefined) {
   assert.equal(initial.cell.aliases.size, 0);
   assert.equal(action.cell.aliases.size, 1);
   assert.equal(reduced.cell.aliases.size, 1);
+  assert.equal(
+    jsBindings["js.nat.value"](escapedResource),
+    77n,
+    "an unrelated resource created by RuntimeM must outlive the reducer callback",
+  );
+  resources.releaseResource(escapedResource);
   releaseHostResource(actionResource);
   assert.equal(action.cell.aliases.size, 0);
   hooks.disposeComponent(component);
@@ -1489,7 +1598,13 @@ smokeVirtualReactCounter(reactRuntime, reactDocumentState, "#react-counter");
 smokeVirtualReactEffect(reactRuntime, reactDocumentState, "#react-effect");
 smokeVirtualReactMemo(reactRuntime, reactDocumentState, "#react-memo");
 smokeVirtualReactMemoStable(reactRuntime, reactDocumentState, "#react-memo-stable");
+const rootsBeforeBorrowedArraySmoke = reactRuntime.hostState.resourceRoots.debugCounts().active;
 smokeVirtualReactRefFragment(reactRuntime, reactDocumentState, "#react-ref-fragment");
+assert.equal(
+  reactRuntime.hostState.resourceRoots.debugCounts().active,
+  rootsBeforeBorrowedArraySmoke,
+  "dropping borrowed Array elements must restore the externref-root baseline",
+);
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
 smokeVirtualReactChangeInput(reactRuntime, reactDocumentState, "#react-change");
 smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select-textarea");

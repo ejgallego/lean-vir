@@ -154,6 +154,7 @@ export function createVirtualDocumentHostBindings(
   const reactHookRuntime = createVirtualReactHookRuntime(resources);
   const reactHooks = {
     ...createReactHostHooks({
+      resources,
       reportError: (error) => resources.recordGcFinalizerError(error),
     }),
     hookRuntime: reactHookRuntime,

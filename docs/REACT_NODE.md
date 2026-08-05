@@ -218,7 +218,8 @@ explicitly with `JsValue` helpers before crossing the React hook boundary.
 `State.set` and `State.modify` are `RuntimeM` operations because they call a
 retained JavaScript React setter resource; `modify` passes a monadic functional
 updater to React's setter. The resource ownership policy for state values,
-updater-local handles, and scalar `JsValue` wrappers is centralized in
+synthetic updater/reducer input handles, and scalar `JsValue` wrappers is
+centralized in
 [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 
 ```lean
@@ -347,8 +348,8 @@ The browser React host binding is exposed from
   latest committed-or-queued state. React receives only a pure JavaScript
   action over that concrete result, making replay safe without repeating Lean
   effects.
-- `react.state.modify` updater-local resource lifetime is documented with the
-  shared host ownership rules in
+- `react.state.modify` and reducer callback-input lifetimes are documented
+  with the shared host ownership rules in
   [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 - `react.root.unmount` calls `root.unmount()` and releases callbacks retained
   by the current render.
@@ -360,9 +361,9 @@ The browser React host binding is exposed from
   Interrupted render generations never release the visible committed tree or
   callback and are not inserted into a strong runtime registry; weak
   finalization cleans up generations React abandons without a callback. The
-  browser binding therefore requires `FinalizationRegistry`. The virtual
-  renderer keeps immediate-commit behavior and explicit deferred callback
-  cleanup.
+  browser binding therefore requires `FinalizationRegistry` and `WeakRef`.
+  The virtual renderer keeps immediate-commit behavior and explicit deferred
+  callback cleanup.
 - Runtime dispose and package reload unmount all live React roots through the
   same disposable-resource path used for DOM listeners, timeouts, and frames.
 

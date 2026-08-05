@@ -918,17 +918,54 @@ export function performanceNow() {
   return globalThis.performance?.now?.() ?? Date.now();
 }
 
-export function createReactHostHooks({ reportError = null } = {}) {
+export function createReactHostHooks({ resources = null, reportError = null } = {}) {
   let eventDepth = 0;
+  let cleanupOwnerRegistered = false;
+  let cleanupMicrotaskScheduled = false;
   const deferredReactNodeDisposals = [];
-  const flushReactNodeDisposals = () => {
-    if (eventDepth !== 0) return undefined;
-    const pending = deferredReactNodeDisposals.splice(0);
+  const cleanupOwner = {
+    dispose() {
+      return flushReactNodeDisposals({ force: true });
+    },
+  };
+  const registerCleanupOwner = () => {
+    if (cleanupOwnerRegistered || resources === null) return undefined;
+    resources.addDisposable(cleanupOwner);
+    cleanupOwnerRegistered = true;
+    return undefined;
+  };
+  const unregisterCleanupOwner = () => {
+    if (!cleanupOwnerRegistered || resources === null) return undefined;
+    cleanupOwnerRegistered = false;
+    resources.removeDisposable(cleanupOwner);
+    return undefined;
+  };
+  const flushReactNodeDisposals = ({ force = false } = {}) => {
+    if (!force && eventDepth !== 0) return undefined;
     const errors = [];
-    for (const dispose of pending) {
-      collectCleanupError(errors, dispose);
+    while (deferredReactNodeDisposals.length !== 0) {
+      const pending = deferredReactNodeDisposals.splice(0);
+      for (const dispose of pending) {
+        collectCleanupError(errors, dispose);
+      }
     }
+    unregisterCleanupOwner();
     throwCollectedErrors(errors, "deferred React Node cleanup failed");
+    return undefined;
+  };
+  const scheduleReactNodeDisposals = () => {
+    if (cleanupMicrotaskScheduled) return undefined;
+    cleanupMicrotaskScheduled = true;
+    const queue =
+      typeof globalThis.queueMicrotask === "function"
+        ? globalThis.queueMicrotask.bind(globalThis)
+        : (callback) => Promise.resolve().then(callback);
+    queue(() => {
+      cleanupMicrotaskScheduled = false;
+      const errors = [];
+      collectCleanupError(errors, flushReactNodeDisposals);
+      reportDeferredReactCleanupErrors(reportError, errors);
+    });
     return undefined;
   };
   return {
@@ -947,19 +984,11 @@ export function createReactHostHooks({ reportError = null } = {}) {
       if (typeof dispose !== "function") {
         throw new Error("React Node deferred disposal must be a function");
       }
-      if (eventDepth === 0) {
-        const queue =
-          typeof globalThis.queueMicrotask === "function"
-            ? globalThis.queueMicrotask.bind(globalThis)
-            : (callback) => Promise.resolve().then(callback);
-        queue(() => {
-          const errors = [];
-          collectCleanupError(errors, dispose);
-          reportDeferredReactCleanupErrors(reportError, errors);
-        });
-        return undefined;
-      }
       deferredReactNodeDisposals.push(dispose);
+      registerCleanupOwner();
+      if (eventDepth === 0) {
+        scheduleReactNodeDisposals();
+      }
       return undefined;
     },
     flushReactNodeDisposals,

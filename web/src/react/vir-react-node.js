@@ -9,7 +9,6 @@ import {
   createHostResource,
   isHostResource,
   registerHostResourcePayloadLifetime,
-  relinquishHostResourceOwnership,
   retainHostResource,
   releaseHostResourcePayload,
   removeHostResourcePayloadChild,
@@ -192,6 +191,7 @@ function createReactRootResource(resources, hooks, adapter) {
       collectCleanupError(errors, () => adapter.unmount?.(value));
       collectCleanupError(errors, () => releaseReactNodeOwner(resources, node));
       collectCleanupError(errors, () => releaseReactComponentOwner(resources, component));
+      collectCleanupError(errors, () => flushReactNodeDisposals(hooks, { force: true }));
       collectCleanupError(errors, () => removeDisposable(resources, value));
       throwCollectedErrors(errors, "React root unmount failed");
       return undefined;
@@ -345,7 +345,7 @@ export function pushReactNodeChild(resources, childrenResource, childResource) {
   const retained = retainHostResourcePayload(child);
   try {
     addHostResourcePayloadChild(children, retained);
-    children.children.push({ resource: childResource, value: retained });
+    children.children.push({ value: retained });
   } catch (error) {
     const errors = [error instanceof Error ? error : new Error(String(error))];
     collectCleanupError(errors, () => releaseHostResourcePayload(retained));
@@ -423,9 +423,6 @@ export function createReactNodeResource(resources, { node, childEntries = [], ca
       release: () => releaseReactNodeValue(resources, value),
     });
     registered = true;
-    for (const resource of new Set(childEntries.map((child) => child.resource).filter(isHostResource))) {
-      relinquishHostResourceOwnership(resource);
-    }
     for (const owner of new Set(childEntries.map((child) => child.owner).filter(Boolean))) {
       consumeReactNodeChildren(owner);
     }
@@ -510,9 +507,9 @@ function deferReactOwnerRelease(hooks, run) {
   queue(run);
 }
 
-export function flushReactNodeDisposals(hooks) {
+export function flushReactNodeDisposals(hooks, options = undefined) {
   if (typeof hooks?.flushReactNodeDisposals === "function") {
-    hooks.flushReactNodeDisposals();
+    hooks.flushReactNodeDisposals(options);
   }
 }
 
@@ -652,7 +649,6 @@ function resolveReactNodeChildren(resources, children) {
   const owner = resolveReactNodeChildrenBuilder(resources, children);
   return owner.children.map((entry, index) => ({
     owner,
-    resource: entry.resource,
     value: resolveReactNodeValue(entry.value, `React Node child[${index}]`),
   }));
 }
@@ -674,7 +670,7 @@ function cloneReactNodeChildrenResource(source) {
       const retained = retainHostResourcePayload(child.value);
       try {
         addHostResourcePayloadChild(clone, retained);
-        clone.children.push({ resource: null, value: retained });
+        clone.children.push({ value: retained });
       } catch (error) {
         const errors = [error instanceof Error ? error : new Error(String(error))];
         collectCleanupError(errors, () => releaseHostResourcePayload(retained));
