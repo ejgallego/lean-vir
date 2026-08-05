@@ -19,7 +19,9 @@ The Lean-dependent runtime smoke also generates temporary packages with
 intentionally unsupported or ambiguous interface exports and asserts that
 package generation fails loudly with package diagnostics.
 Those negative cases cover recursive inherited structures, indexed inductive
-families, mutual recursion, erased proof fields, and implicit arguments.
+families, mutual recursion, erased proof fields, and implicit arguments. A
+raw-label fallback case bypasses the startup attribute callback and confirms
+package generation repeats the parameter and result/effect contract checks.
 The package-generator smoke separately checks normal Lean frontend processing
 for both markers. Negative `@[vir_export]` cases cover unsupported binder
 shapes, theorem, axiom, private declarations, and a local helper that reaches

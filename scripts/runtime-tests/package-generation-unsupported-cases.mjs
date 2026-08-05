@@ -11,6 +11,7 @@ import {
   readFile,
   runVirIrpkg,
   spawnSync,
+  writeFile,
   writeRuntimeFixture,
 } from "./shared.mjs";
 
@@ -129,10 +130,27 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
 
   const leftSource = join(freshDir, "CollisionLeft.lean");
   const rightSource = join(freshDir, "CollisionRight.lean");
-  const packagePath = join(freshDir, "CollisionTargets.irpkg");
-  const reportPath = join(freshDir, "CollisionTargets.report.md");
+  const packageFallbackStartupSource = join(freshDir, "PackageFallbackStartup.lean");
+  const packagePath = join(freshDir, "PackageDiagnostics.irpkg");
+  const reportPath = join(freshDir, "PackageDiagnostics.report.md");
   await writeRuntimeFixture(leftSource, "CollisionLeft.lean");
   await writeRuntimeFixture(rightSource, "CollisionRight.lean");
+  // Bypass the attribute callback to exercise the final package-time contract guard.
+  await writeFile(packageFallbackStartupSource, [
+    "import Vir",
+    "",
+    "namespace PackageFallbackStartup",
+    "",
+    "def badArguments (_n : Nat) : Unit := ()",
+    "",
+    "def badResult : IO Nat := pure 1",
+    "",
+    "run_meta vir_startup.add `PackageFallbackStartup.badArguments",
+    "run_meta vir_startup.add `PackageFallbackStartup.badResult",
+    "",
+    "end PackageFallbackStartup",
+    "",
+  ].join("\n"));
   const generated = runVirIrpkg([
     packagePath,
     reportPath,
@@ -142,12 +160,24 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "--target",
     rightSource,
     "collisionBump",
+    "--target-marked",
+    packageFallbackStartupSource,
   ]);
-  assert.notEqual(generated.status, 0, "duplicate target declarations unexpectedly generated successfully");
+  assert.notEqual(generated.status, 0, "unsupported package targets unexpectedly generated successfully");
   assert.match(generated.stderr, /package diagnostics/);
   assert.match(generated.stderr, /collisionBump/);
   assert.match(generated.stderr, /declaration name collides/);
+  assert.match(
+    generated.stderr,
+    /PackageFallbackStartup\.badArguments: VIR startup hooks cannot declare parameters \(`_n`\); define a zero-argument wrapper instead/,
+  );
+  assert.match(
+    generated.stderr,
+    /PackageFallbackStartup\.badResult: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
+  );
   const report = await readFile(reportPath, "utf8");
   assert.match(report, /collisionBump/);
   assert.match(report, /declaration name collides/);
+  assert.match(report, /PackageFallbackStartup\.badArguments/);
+  assert.match(report, /PackageFallbackStartup\.badResult/);
 }
