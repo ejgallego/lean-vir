@@ -24,6 +24,10 @@ import {
 assert.equal(typeof globalThis.gc, "function", "host resource GC smoke requires --expose-gc");
 
 let directReleases = 0;
+let throwingPayloadCollections = 0;
+const throwingPayloadFinalizer = new FinalizationRegistry(() => {
+  throwingPayloadCollections++;
+});
 (() => {
   createHostResource({}, "direct GC resource", {
     dispose: () => {
@@ -36,6 +40,7 @@ let transferredReleases = 0;
 let throwingReleases = 0;
 let unrenderedNodeCallbacks = 0;
 const abandonedComponentCallbacks = { active: 0 };
+const abandonedRenderPayloads = { active: 0, releases: 0 };
 const resources = createHostResourceState();
 const roots = new ExternrefResourceRoots();
 (() => {
@@ -58,6 +63,7 @@ const roots = new ExternrefResourceRoots();
 })();
 (() => {
   const payload = {};
+  throwingPayloadFinalizer.register(payload, undefined);
   registerHostResourcePayloadLifetime(payload, {
     retain: () => payload,
     release: () => {
@@ -126,6 +132,41 @@ function stageAbandonedComponent() {
   reactRoot.renderComponent(callbackLease(abandonedComponentCallbacks));
 }
 stageAbandonedComponent();
+
+function stageAbandonedBrowserRenderPayload() {
+  const hooks = createBrowserReactHookRuntime(resources, {
+    useRef(initial) {
+      return { current: initial };
+    },
+    // Deliberately discard the layout effect, as React does for a render that
+    // never commits. The render generation must then be collectible without a
+    // runtime-owned orphan registry.
+    useLayoutEffect() {},
+  });
+  const component = hooks.createComponentState();
+  let released = false;
+  const payload = {};
+  abandonedRenderPayloads.active++;
+  registerHostResourcePayloadLifetime(payload, {
+    retain: () => {
+      throw new Error("the abandoned render payload must not be retained again");
+    },
+    release: () => {
+      if (released) return false;
+      released = true;
+      abandonedRenderPayloads.active--;
+      abandonedRenderPayloads.releases++;
+      return true;
+    },
+  });
+  hooks.withComponentRender(component, () => {
+    const ref = hooks.useRef(payload);
+    resources.releaseResource(ref);
+    hooks.commitComponentRender(component);
+  });
+}
+stageAbandonedBrowserRenderPayload();
+
 const replacement = resources.adoptResourceForValue(createReactNodeResource(resources, {
   node: { kind: "text", value: "replacement" },
 }), { tracked: false });
@@ -135,8 +176,10 @@ for (let attempt = 0; attempt < 200 && (
   directReleases !== 1 ||
   transferredReleases !== 1 ||
   throwingReleases !== 1 ||
+  throwingPayloadCollections !== 1 ||
   unrenderedNodeCallbacks !== 0 ||
   abandonedComponentCallbacks.active !== 0 ||
+  abandonedRenderPayloads.active !== 0 ||
   resources.gcFinalizerErrorMessages.length !== 1
 ); attempt++) {
   globalThis.gc();
@@ -150,15 +193,33 @@ assert.equal(
   "an unreachable resource taken from an owned WASM root must release its payload lease",
 );
 assert.equal(throwingReleases, 1);
+assert.equal(
+  throwingPayloadCollections,
+  1,
+  "a payload whose finalizer throws must not be retained by error reporting",
+);
 assert.equal(unrenderedNodeCallbacks, 0, "an unreachable unrendered node must release its callbacks");
 assert.equal(
   abandonedComponentCallbacks.active,
   0,
   "an abandoned component render generation must not remain rooted by the runtime",
 );
+assert.deepEqual(
+  abandonedRenderPayloads,
+  { active: 0, releases: 1 },
+  "an abandoned browser render generation must release each staged payload lease exactly once",
+);
 assert.deepEqual(resources.gcFinalizerErrorMessages, ["Error: GC payload cleanup boom"]);
 reactRoot.unmount();
 resources.releaseResource(replacement);
 assert.throws(() => resources.dispose(), /GC payload cleanup boom/);
+
+const boundedFinalizerErrors = createHostResourceState();
+for (let index = 0; index < 24; index++) {
+  boundedFinalizerErrors.recordGcFinalizerError(new Error(`${index}:${"x".repeat(4096)}`));
+}
+assert.equal(boundedFinalizerErrors.gcFinalizerErrorMessages.length, 16);
+assert.ok(boundedFinalizerErrors.gcFinalizerErrorMessages.every((message) => message.length <= 2048));
+assert.throws(() => boundedFinalizerErrors.dispose(), AggregateError);
 
 console.log("host resource GC smoke ok");
