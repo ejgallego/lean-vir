@@ -31,8 +31,9 @@ ownership diagrams.
   `wasm/upstream_shim/interpreter/interpreter_bridge.cpp`, and
   `wasm/upstream_shim/abi/call_abi.cpp`.
 - Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
-  `scripts/bench-vir.mjs`, `scripts/bench-differential.mjs`, and
-  `scripts/bench-utils.mjs`.
+  [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md),
+  `scripts/bench-vir.mjs`, `scripts/bench-env-lookup.mjs`,
+  `scripts/bench-differential.mjs`, and `scripts/bench-utils.mjs`.
 
 ## Documentation Ownership
 
@@ -79,6 +80,9 @@ ownership diagrams.
   unsupported surface.
 - [PERFORMANCE.md](PERFORMANCE.md): benchmark commands, artifact-cache
   behavior, and before/after comparisons.
+- [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md):
+  fresh-interpreter lookup evidence, provider-index design, and upstream API
+  direction.
 - [OBJECT_ABI.md](OBJECT_ABI.md): Lean object ABI construction,
   inspection, ownership, and codec-retirement roadmap.
 

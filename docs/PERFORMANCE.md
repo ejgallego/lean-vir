@@ -18,6 +18,43 @@ Pass `--json` to save a machine-readable report:
 npm run bench -- --json build/perf/current.json
 ```
 
+## Environment Lookup Workload
+
+Use the focused environment lookup benchmark when changing package declaration
+resolution or the upstream interpreter/provider boundary:
+
+```bash
+npm run bench:env-lookup -- \
+  --json build/perf/env-lookup/current.json
+```
+
+It repeatedly enters a fresh interpreter through
+`Vir.Fixtures.ExprPrinter.exprCoverageScore` in the 1,546-declaration
+`fixtures-lean.irpkg`. The headline execution row excludes package loading,
+initializer execution, and export-slot resolution. A separate package-load row
+uses a fresh Wasm instance for each load; Wasm instantiation and disposal are
+outside that row's timed window. Reports preserve both sets of raw rounds,
+artifact and source hashes, toolchain/CPU identity, package declaration count,
+and the expected result. Wasm profile, optimization, target, memory, and stack
+settings are part of the report/comparison identity and artifact-cache key.
+Output paths are never overwritten.
+Focused reports include a stable comparison identity; saved and paired
+comparisons reject mismatched run policy, diagnostics, toolchain/machine,
+package shape, harness, or fixture before reporting a delta.
+
+Capture sampled attribution in a separate diagnostic run:
+
+```bash
+npm run bench:env-lookup -- \
+  --cpu-profile build/perf/env-lookup/current.cpuprofile \
+  --json build/perf/env-lookup/current-profiled.json
+```
+
+The profiling path uses the optimized, unstripped debug Wasm companion. Its
+timings are marked diagnostic and are not before/after evidence. See
+[Environment Lookup Performance](ENVIRONMENT_LOOKUP_PERFORMANCE.md) for the
+baseline profile, proposed package index, and upstream API direction.
+
 Compare two saved reports with:
 
 ```bash
@@ -138,12 +175,29 @@ For routine before/after comparisons between two already checked-out trees, use
 the paired runner:
 
 ```bash
-npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
+npm run bench:paired -- --repeat 6 --out build/perf/general-abba \
+  ../vir-main ../vir-feature
 ```
 
-It alternates `npm run bench -- --json` in each checkout, stores the per-run
-reports under `build/perf/paired/`, and prints median per-call deltas for common
-benchmark rows. Side-only rows are reported with the same summary format as
-`bench:compare`. The compared checkouts must both support the current benchmark
-JSON interface; for older refs, first create a temporary compatible checkout or
-compare manually saved reports with `bench:compare`.
+It runs order-balanced AB/BA passes, stores every per-run report plus
+`schedule.json`, and prints both the aggregate median per-call comparison and
+the paired percentage delta for every pass.
+The output directory must not already exist. Side-only rows are reported with
+the same summary format as `bench:compare`. Select a compatible focused script
+with `--npm-script`, for example:
+
+```bash
+npm run bench:paired -- --npm-script bench:env-lookup --repeat 6 \
+  --out build/perf/env-lookup/index-abba ../vir-baseline ../vir-index
+```
+
+Use repeatable `--bench-arg` options to strengthen a focused comparison without
+changing its defaults, for example
+`--bench-arg=--iterations=500 --bench-arg=--samples=9`. The selected benchmark
+still validates those arguments through its comparison identity.
+
+Use an even pass count for an order-balanced acceptance run. One pass remains
+available for quick screening and is reported as unbalanced. The compared
+checkouts must both support the selected benchmark JSON interface; for older
+refs, first create a temporary compatible checkout or compare manually saved
+reports with `bench:compare`.

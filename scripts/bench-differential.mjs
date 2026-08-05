@@ -54,6 +54,12 @@ export function sampleBenchmarkCandidates(options) {
     if (available && typeof candidate.run !== "function") {
       throw new TypeError(`benchmark candidate ${candidate.id} requires run`);
     }
+    if (candidate.setup !== undefined && typeof candidate.setup !== "function") {
+      throw new TypeError(`benchmark candidate ${candidate.id} setup must be a function`);
+    }
+    if (candidate.teardown !== undefined && typeof candidate.teardown !== "function") {
+      throw new TypeError(`benchmark candidate ${candidate.id} teardown must be a function`);
+    }
     return {
       candidate,
       hasChecksum: false,
@@ -72,13 +78,9 @@ export function sampleBenchmarkCandidates(options) {
   const availableEntries = entries.filter(({ state }) => state.available);
 
   function invoke(entry, measured) {
-    const started = now();
-    let checksum;
+    let context;
     try {
-      checksum = entry.candidate.run();
-      if (!Number.isFinite(checksum)) {
-        throw new TypeError(`benchmark candidate ${entry.state.id} returned a non-finite checksum`);
-      }
+      context = entry.candidate.setup?.();
     } catch (error) {
       const message = errorMessage(error);
       if (!entry.state.errors.includes(message)) entry.state.errors.push(message);
@@ -86,7 +88,30 @@ export function sampleBenchmarkCandidates(options) {
       return;
     }
 
-    const elapsedMs = Math.max(0, now() - started);
+    const started = now();
+    let checksum;
+    let elapsedMs;
+    try {
+      checksum = entry.candidate.run(context);
+      if (!Number.isFinite(checksum)) {
+        throw new TypeError(`benchmark candidate ${entry.state.id} returned a non-finite checksum`);
+      }
+    } catch (error) {
+      const message = errorMessage(error);
+      if (!entry.state.errors.includes(message)) entry.state.errors.push(message);
+      entry.state.stable = false;
+    } finally {
+      elapsedMs = Math.max(0, now() - started);
+      try {
+        entry.candidate.teardown?.(context);
+      } catch (error) {
+        const message = errorMessage(error);
+        if (!entry.state.errors.includes(message)) entry.state.errors.push(message);
+        entry.state.stable = false;
+      }
+    }
+
+    if (entry.state.errors.length !== 0) return;
     if (entry.hasChecksum && entry.state.checksum !== checksum) entry.state.stable = false;
     if (!entry.hasChecksum) {
       entry.state.checksum = checksum;

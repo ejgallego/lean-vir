@@ -48,6 +48,9 @@ map lives in `docs/HARNESS.md`.
   Reuse existing demo WASM and browser packages for the upstream smoke test.
 - `npm run test:bench`
   Run the dependency-free differential benchmark sampler contract tests.
+- `npm run bench:env-lookup`
+  Measure repeated fresh interpreter entries through a large package, with an
+  optional execution-window V8 CPU profile. See `docs/PERFORMANCE.md`.
 - `npm run test:runtime`
   Run all JavaScript runtime, host binding, callback lifecycle, manifest,
   package-generation, and SDK import smoke tests. Use
@@ -145,7 +148,8 @@ The split helpers below are the intended extension points for focused changes:
   and reusable SDK payload helpers live in `scripts/sdk-payloads.mjs`.
 
 Performance comparison commands are documented in `docs/PERFORMANCE.md`.
-Use `npm run bench -- --json PATH` for report capture,
+Use `npm run bench -- --json PATH` for broad report capture,
+`npm run bench:env-lookup -- --json PATH` for declaration lookup work,
 `npm run bench:compare -- BEFORE.json AFTER.json` for saved reports, and
-`npm run bench:paired -- --repeat 5 BEFORE_CHECKOUT AFTER_CHECKOUT` for
-alternating repeated runs across two checked-out trees.
+`npm run bench:paired -- --repeat 6 --out NEW_DIR BEFORE_CHECKOUT AFTER_CHECKOUT`
+for AB/BA repeated runs across two checked-out trees.

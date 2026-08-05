@@ -157,6 +157,9 @@ the default pre-merge signal for code changes.
 
 - Differential benchmark sampling or dispatch comparison changes:
   `npm run test:bench`
+- Package declaration lookup or interpreter/provider performance changes:
+  `npm run bench:env-lookup -- --json <new-output-path>`; use a separate
+  `--cpu-profile` run for attribution
 - Native extern declaration changes:
   `npm run check:native-externs`
 - Shim/native extern registry changes:

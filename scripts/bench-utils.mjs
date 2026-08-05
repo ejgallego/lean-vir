@@ -140,6 +140,26 @@ export function benchmarkReportLabel(side) {
   return `${ref}@${commit}${dirty}`;
 }
 
+export function assertComparableBenchmarkReportIdentities(labeledReports) {
+  const identities = labeledReports.map(({ label, report }) => ({
+    label,
+    identity: report.report?.comparisonIdentity ?? null,
+  }));
+  if (identities.every(({ identity }) => identity === null)) return;
+  const missing = identities.find(({ identity }) => identity === null);
+  if (missing) {
+    throw new Error(`${missing.label} benchmark report is missing comparisonIdentity`);
+  }
+  const expected = JSON.stringify(identities[0].identity);
+  for (const current of identities.slice(1)) {
+    if (JSON.stringify(current.identity) !== expected) {
+      throw new Error(
+        `benchmark comparison identity mismatch between ${identities[0].label} and ${current.label}`,
+      );
+    }
+  }
+}
+
 export function benchmarkSamplePerCallMs(sample) {
   return sample.perCallMs ?? sample.medianMs / sample.iterations;
 }

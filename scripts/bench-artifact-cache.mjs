@@ -13,7 +13,7 @@ import { fileURLToPath } from "node:url";
 import { copyFileWithDirs } from "./file-utils.mjs";
 import { runSync } from "./process-utils.mjs";
 
-const artifactCacheVersion = 1;
+const artifactCacheVersion = 2;
 const buildInputDiffPaths = [
   "Lean",
   "Vir",
@@ -154,6 +154,13 @@ function artifactCachePayload(root, rootPath, artifactPaths) {
     wasiClang: process.env.WASI_SDK_PATH
       ? optionalCommandVersion(root, join(process.env.WASI_SDK_PATH, "bin", "clang++"), ["--version"])
       : optionalCommandVersion(root, "clang++", ["--version"]),
+    wasmBuild: {
+      profile: process.env.VIR_WASM_PROFILE ?? "dev",
+      optimization: process.env.VIR_WASM_OPT_LEVEL ?? "-O3",
+      target: process.env.WASI_TARGET ?? "wasm32-wasip1",
+      initialMemory: process.env.VIR_WASM_INITIAL_MEMORY ?? "4194304",
+      stackSize: process.env.VIR_WASM_STACK_SIZE ?? "1048576",
+    },
     sourceIdentity: Object.fromEntries(
       sourceIdentityPaths.map((path) => [path, fileDigest(rootPath, path)]),
     ),
