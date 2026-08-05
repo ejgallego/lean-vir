@@ -158,6 +158,7 @@ function createLeanObjectHandleResource(cell, label) {
         releaseLeanObjectHandleLease(handle.lease);
         return undefined;
       },
+      reportFinalizerError: (error) => cell.runtime.hostState?.recordFinalizerError(error),
     });
   } catch (error) {
     releaseLeanObjectHandleLease(handle.lease);

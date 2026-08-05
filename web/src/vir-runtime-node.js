@@ -19,6 +19,7 @@ export {
   fetchBytes,
   IR_PACKAGE_SET_FORMAT,
   IR_PACKAGE_SET_VERSION,
+  releaseHostResource,
   VIR_HOST_DISPOSE,
   VirCallback,
   VIR_WASM_DEV_FILE,

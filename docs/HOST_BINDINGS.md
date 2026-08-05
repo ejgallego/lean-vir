@@ -290,15 +290,23 @@ borrowed or owned: dropping a borrowed argument root only removes that root,
 while dropping an unclaimed owned host-result root also invokes the wrapper's
 idempotent disposer. Lifting a result to JavaScript *takes* the owned root
 before the result object is decremented, so the returned wrapper remains live
-until its JavaScript owner releases it. Passive DOM elements, strings, numeric
-values, `Js.Array`, and `Js.NodeList` have no payload disposer.
+until its JavaScript owner releases it. Returned resource wrappers provide
+idempotent `release()` and `dispose()` methods (and `Symbol.dispose` where the
+host supports explicit resource management); `releaseHostResource(resource)`
+is the equivalent public helper. Retainable payloads are also registered for
+best-effort `FinalizationRegistry` cleanup, while explicit release remains the
+deterministic path. Passive DOM elements, strings, numeric values, `Js.Array`,
+and `Js.NodeList` have no payload disposer.
 
 Retainable payloads compose through containers. `Js.Nullable`, React event
-handler values, and React props builders acquire independent child leases and
-release all children when abandoned. Ownership graphs reject cycles rather
-than relying on cyclic reference counts. A container may safely acquire a
-lease from a live runtime-created JSL wrapper even though that wrapper is not
-owned by the container's `HostResourceState`. Result lifting is transactional:
+handler values, React props builders, and React child-list builders acquire
+independent child leases and release all children when abandoned. Ownership
+graphs reject cycles rather than relying on cyclic reference counts. A
+container may safely acquire a lease from a live runtime-created JSL wrapper
+even though that wrapper is not owned by the container's `HostResourceState`.
+After a React parent acquires its child lease, the original child wrapper is a
+borrowed alias: it remains usable while the composite graph owns the child but
+does not create a second ownership cycle. Result lifting is transactional:
 arrays and structures roll back every callback/resource already lifted when a
 later field fails.
 
@@ -353,9 +361,11 @@ at their natural lifetime boundary. Package reload/runtime disposal
 force-revokes any leases that remain.
 
 Browser React render generations do not enter a strong runtime owner registry.
-Nodes are inert until commit and use weak finalization only as a safety net.
-Reducer/state/ref/node ownership swaps occur from a real `useLayoutEffect`
-commit hook. Effect setup and cleanup use fresh per-invocation callback leases,
+Nodes, component render-callback replacements, and root-level node/component
+replacements are inert until commit and use weak finalization only as a safety
+net. Reducer, state, ref, component-node, render-callback, and root ownership
+swaps occur from a real `useLayoutEffect` commit hook. Effect setup and cleanup
+use fresh per-invocation callback leases,
 so React's development setup→cleanup→setup replay does not reuse a released
 lease. The virtual renderer keeps its explicit immediate-commit behavior.
 

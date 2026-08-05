@@ -16,6 +16,12 @@ const tests = [
   { id: "js-float", file: "scripts/runtime-tests/js-float-fidelity-smoke.mjs", group: "pure" },
   { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", group: "pure" },
   { id: "host-resource-lifecycle", file: "scripts/runtime-tests/host-resource-lifecycle-smoke.mjs", group: "pure" },
+  {
+    id: "host-resource-gc",
+    file: "scripts/runtime-tests/host-resource-gc-smoke.mjs",
+    group: "pure",
+    nodeArgs: ["--expose-gc"],
+  },
   { id: "browser-canvas-bindings", file: "scripts/runtime-tests/browser-canvas-bindings-smoke.mjs", group: "pure" },
   { id: "startup-hooks", file: "scripts/runtime-tests/startup-runtime-smoke.mjs", group: "pure" },
   { id: "callback-lifecycle", file: "scripts/runtime-tests/callback-lifecycle-smoke.mjs", group: "pure" },
@@ -132,7 +138,7 @@ function runtimeJobCount(total) {
 
 async function runRuntimeTest(test) {
   const start = timerStart();
-  const result = await runAsync(process.execPath, [test.file], {
+  const result = await runAsync(process.execPath, [...(test.nodeArgs ?? []), test.file], {
     capture: true,
     cwd: root,
   });

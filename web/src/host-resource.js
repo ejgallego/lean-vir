@@ -10,6 +10,9 @@ export const VIR_HOST_RESOLVE_BINDING = Symbol.for("lean-vir.hostResolveBinding"
 const hostResourceState = new WeakMap();
 const hostResourceOwnerState = new WeakMap();
 const hostResourcePayloadLifetimes = new WeakMap();
+const hostResourceFinalizer = typeof FinalizationRegistry === "function"
+  ? new FinalizationRegistry((state) => finalizeHostResourceState(state))
+  : null;
 let externrefTableSupport = null;
 
 export function hasExternrefTableSupport() {
@@ -36,11 +39,56 @@ export function requireExternrefTableSupport() {
   }
 }
 
+export function hasHostResourceFinalizationSupport() {
+  return hostResourceFinalizer !== null && typeof WeakRef === "function";
+}
+
 class HostResource {
-  constructor(value, label, { dispose = null, owner = null } = {}) {
-    hostResourceState.set(this, { value, label, dispose, owner });
+  constructor(value, label, {
+    dispose = null,
+    owner = null,
+    onFinalize = null,
+    onRelease = null,
+    onTake = null,
+    reportFinalizerError = null,
+  } = {}) {
+    const state = {
+      value,
+      label,
+      dispose,
+      owner,
+      onFinalize,
+      onRelease,
+      onTake,
+      reportFinalizerError,
+    };
+    hostResourceState.set(this, state);
+    if (typeof dispose === "function" || typeof onFinalize === "function") {
+      hostResourceFinalizer?.register(this, state, this);
+    }
     Object.freeze(this);
   }
+
+  release() {
+    return releaseHostResource(this);
+  }
+
+  dispose() {
+    return releaseHostResource(this);
+  }
+
+  [VIR_HOST_DISPOSE]() {
+    return releaseHostResource(this);
+  }
+}
+
+if (typeof Symbol.dispose === "symbol") {
+  Object.defineProperty(HostResource.prototype, Symbol.dispose, {
+    configurable: true,
+    value() {
+      return releaseHostResource(this);
+    },
+  });
 }
 
 export function createHostResourceOwner(label = "host resource owner") {
@@ -159,24 +207,68 @@ export function retainHostResource(resource, label = null) {
     return createHostResource(retained, label ?? state.label, {
       owner: state.owner,
       dispose: () => releaseHostResourcePayload(retained),
+      reportFinalizerError: state.reportFinalizerError,
     });
   } catch (error) {
-    releaseHostResourcePayload(retained);
-    throw error;
+    const errors = [asError(error)];
+    try {
+      releaseHostResourcePayload(retained);
+    } catch (cleanupError) {
+      errors.push(asError(cleanupError));
+    }
+    throwHostResourceErrors(errors, "host resource retain failed during ownership rollback");
   }
 }
 
 export function releaseHostResource(resource) {
   const state = hostResourceState.get(resource);
-  if (state !== undefined) {
-    const value = state.value;
-    state.value = null;
-    const dispose = state.dispose;
-    state.dispose = null;
-    if (value !== null && value !== undefined && typeof dispose === "function") {
-      dispose(value);
+  if (state === undefined || state.value === null || state.value === undefined) return false;
+  hostResourceFinalizer?.unregister(resource);
+  return releaseHostResourceState(state, resource);
+}
+
+// Drops this wrapper's payload lease while preserving a non-owning alias to the
+// live value. Composite owners use this after acquiring their own lease so a
+// borrowed wrapper can still participate in the same live ownership graph
+// without creating a callback/resource cycle.
+export function relinquishHostResourceOwnership(resource) {
+  const state = hostResourceState.get(resource);
+  if (state === undefined || state.value === null || state.value === undefined) return false;
+  const dispose = state.dispose;
+  const onRelease = state.onRelease;
+  if (typeof dispose !== "function" && typeof onRelease !== "function") return false;
+  hostResourceFinalizer?.unregister(resource);
+  state.dispose = null;
+  state.onFinalize = null;
+  state.onRelease = null;
+  state.onTake = null;
+  state.reportFinalizerError = null;
+  const errors = [];
+  if (typeof onRelease === "function") {
+    try {
+      onRelease(resource);
+    } catch (error) {
+      errors.push(asError(error));
     }
   }
+  if (typeof dispose === "function") {
+    try {
+      dispose(state.value);
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  throwHostResourceErrors(errors, "host resource ownership relinquishment failed");
+  return true;
+}
+
+export function transferHostResource(resource) {
+  const state = hostResourceState.get(resource);
+  if (state === undefined || state.value === null || state.value === undefined) return false;
+  const onTake = state.onTake;
+  state.onTake = null;
+  if (typeof onTake === "function") onTake(resource);
+  return true;
 }
 
 export class ExternrefResourceRoots {
@@ -210,7 +302,8 @@ export class ExternrefResourceRoots {
       return null;
     }
     const resource = this.table.get(rootId);
-    if (resource !== null && take) {
+    if (resource !== null && take && this.ownedRootIds.has(rootId)) {
+      transferHostResource(resource);
       this.ownedRootIds.delete(rootId);
     }
     return resource;
@@ -253,6 +346,83 @@ export class ExternrefResourceRoots {
       reusable: this.freeRootIds.length,
     };
   }
+}
+
+function releaseHostResourceState(state, resource) {
+  const value = state.value;
+  const dispose = state.dispose;
+  const onRelease = state.onRelease;
+  state.value = null;
+  state.dispose = null;
+  state.onFinalize = null;
+  state.onRelease = null;
+  state.onTake = null;
+  state.reportFinalizerError = null;
+  const errors = [];
+  if (typeof onRelease === "function") {
+    try {
+      onRelease(resource);
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  if (typeof dispose === "function") {
+    try {
+      dispose(value);
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  throwHostResourceErrors(errors, "host resource release failed");
+  return true;
+}
+
+function finalizeHostResourceState(state) {
+  if (state?.value === null || state?.value === undefined) return;
+  const value = state.value;
+  const dispose = state.dispose;
+  const onFinalize = state.onFinalize;
+  const report = state.reportFinalizerError;
+  state.value = null;
+  state.dispose = null;
+  state.onFinalize = null;
+  state.onRelease = null;
+  state.onTake = null;
+  state.reportFinalizerError = null;
+  const errors = [];
+  if (typeof onFinalize === "function") {
+    try {
+      onFinalize();
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  if (typeof dispose === "function") {
+    try {
+      dispose(value);
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  if (typeof report === "function") {
+    for (const error of errors) {
+      try {
+        report(error);
+      } catch {
+        // Finalization must never surface an exception through the host job queue.
+      }
+    }
+  }
+}
+
+function throwHostResourceErrors(errors, message) {
+  if (errors.length === 0) return;
+  if (errors.length === 1) throw errors[0];
+  throw new AggregateError(errors, message);
+}
+
+function asError(error) {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 function hostResourceOwnerIsUsable(owner) {

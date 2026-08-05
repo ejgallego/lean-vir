@@ -11,7 +11,12 @@ with `docs/CALL_LEAN_FROM_JS.md`.
 The module is also exposed through the package entry point:
 
 ```js
-import { createVirRuntime, VirCallback, VIR_HOST_DISPOSE } from "lean-vir";
+import {
+  createVirRuntime,
+  releaseHostResource,
+  VirCallback,
+  VIR_HOST_DISPOSE,
+} from "lean-vir";
 ```
 
 Node tests and command-line tools that need `Lean.Vir.Browser.Document` calls

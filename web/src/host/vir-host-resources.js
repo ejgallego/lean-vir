@@ -9,6 +9,7 @@ import {
   createHostResource,
   createHostResourceOwner,
   finishHostResourceOwnerDisposal,
+  hasHostResourceFinalizationSupport,
   hostResourceLabel,
   hostResourceOwner,
   hostResourceOwnerPhase,
@@ -19,6 +20,7 @@ import {
   releaseHostResource,
   requireExternrefTableSupport,
   retainHostResourcePayload,
+  transferHostResource,
 } from "../host-resource.js";
 import {
   createReactElementTypeTagResource,
@@ -43,16 +45,6 @@ export class HostResourceState {
     this.ownedPayloadResources = new Set();
     this.weakOwnedPayloadResources = new Set();
     this.gcFinalizerErrorMessages = [];
-    this.resourceFinalizer = typeof FinalizationRegistry === "function"
-      ? new FinalizationRegistry(({ payload, reference }) => {
-          this.weakOwnedPayloadResources.delete(reference);
-          try {
-            releaseHostResourcePayload(payload);
-          } catch (error) {
-            this.recordGcFinalizerError(error);
-          }
-        })
-      : null;
     this.temporaryResourceScopes = [];
     this.disposables = new Set();
   }
@@ -71,44 +63,35 @@ export class HostResourceState {
     this.requireUsable();
     if (value === null || value === undefined) return null;
     let resource = null;
-    let reference = null;
-    const unregisterToken = {};
-    let released = false;
+    const retainable = isRetainableHostResourcePayload(value);
     try {
       resource = createHostResource(value, null, {
         owner: this.owner,
-        dispose: isRetainableHostResourcePayload(value)
-          ? () => {
-              if (released) return false;
-              released = true;
-              this.resourceFinalizer?.unregister(unregisterToken);
-              this.ownedPayloadResources.delete(resource);
-              if (reference !== null) this.weakOwnedPayloadResources.delete(reference);
-              return releaseHostResourcePayload(value);
-            }
-          : null,
+        ...(retainable ? payloadResourceLifecycle(this, value) : {}),
       });
-      if (isRetainableHostResourcePayload(value)) {
+      if (retainable) {
         this.requireActive();
-        if (tracked) {
-          this.ownedPayloadResources.add(resource);
-        } else {
-          if (this.resourceFinalizer === null || typeof WeakRef !== "function") {
+        this.ownedPayloadResources.add(resource);
+        if (!tracked) {
+          if (!hasHostResourceFinalizationSupport()) {
             throw new Error("untracked host resources require WeakRef and FinalizationRegistry support");
           }
-          reference = new WeakRef(resource);
-          this.weakOwnedPayloadResources.add(reference);
-          this.resourceFinalizer.register(resource, { payload: value, reference }, unregisterToken);
+          transferHostResource(resource);
         }
       }
       const scope = this.temporaryResourceScopes.at(-1);
       scope?.add(resource);
       return resource;
     } catch (error) {
-      if (isRetainableHostResourcePayload(value)) {
-        releaseHostResourcePayload(value);
+      const errors = [error instanceof Error ? error : new Error(String(error))];
+      if (retainable) {
+        if (resource === null) {
+          collectCleanupError(errors, () => releaseHostResourcePayload(value));
+        } else {
+          collectCleanupError(errors, () => releaseHostResource(resource));
+        }
       }
-      throw error;
+      throwCollectedErrors(errors, "host resource adoption failed during ownership rollback");
     }
   }
 
@@ -132,16 +115,18 @@ export class HostResourceState {
     try {
       resource = createHostResource(retainedValue, null, {
         owner: this.owner,
-        dispose: () => {
-          this.ownedPayloadResources.delete(resource);
-          return releaseHostResourcePayload(retainedValue);
-        },
+        ...payloadResourceLifecycle(this, retainedValue),
       });
       this.ownedPayloadResources.add(resource);
       return resource;
     } catch (error) {
-      releaseHostResourcePayload(retainedValue);
-      throw error;
+      const errors = [error instanceof Error ? error : new Error(String(error))];
+      if (resource === null) {
+        collectCleanupError(errors, () => releaseHostResourcePayload(retainedValue));
+      } else {
+        collectCleanupError(errors, () => releaseHostResource(resource));
+      }
+      throwCollectedErrors(errors, "host resource creation failed during ownership rollback");
     }
   }
 
@@ -203,13 +188,16 @@ export class HostResourceState {
     const references = this.revocableResources.get(value);
     if (references === undefined) return undefined;
     this.revocableResources.delete(value);
-    for (const reference of references) {
+    const pending = Array.from(references);
+    references.clear();
+    const errors = [];
+    for (const reference of pending) {
       const resource = reference.deref();
       if (resource !== undefined && hostResourceOwner(resource) === this.owner) {
-        releaseHostResource(resource);
+        collectCleanupError(errors, () => releaseHostResource(resource));
       }
     }
-    references.clear();
+    throwCollectedErrors(errors, "host resource alias invalidation failed");
     return undefined;
   }
 
@@ -298,6 +286,35 @@ export class HostResourceState {
       throw new Error("HostResourceState cannot register active resources while disposing or disposed");
     }
   }
+}
+
+// Keep finalizer holdings in a separate lexical environment from the wrapper
+// variable: indirectly retaining the FinalizationRegistry target prevents its
+// cleanup callback from ever running.
+function payloadResourceLifecycle(resources, payload) {
+  const tracking = { reference: null };
+  return {
+    dispose: () => releaseHostResourcePayload(payload),
+    onFinalize: () => {
+      if (tracking.reference !== null) {
+        resources.weakOwnedPayloadResources.delete(tracking.reference);
+      }
+    },
+    onRelease: (resource) => {
+      resources.ownedPayloadResources.delete(resource);
+      if (tracking.reference !== null) {
+        resources.weakOwnedPayloadResources.delete(tracking.reference);
+      }
+    },
+    onTake: (resource) => {
+      if (!hasHostResourceFinalizationSupport() || tracking.reference !== null) return false;
+      resources.ownedPayloadResources.delete(resource);
+      tracking.reference = new WeakRef(resource);
+      resources.weakOwnedPayloadResources.add(tracking.reference);
+      return true;
+    },
+    reportFinalizerError: (error) => resources.recordGcFinalizerError(error),
+  };
 }
 
 function disposeHostResourceValue(value) {
@@ -451,11 +468,12 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
     }
     const unmount = root.unmount;
     root.unmount = (...args) => {
-      try {
-        return unmount.apply(root, args);
-      } finally {
-        forgetRoot(container, root);
-      }
+      const errors = [];
+      const unmounted = collectCleanupError(errors, () => unmount.apply(root, args));
+      collectCleanupError(errors, () => forgetRoot(container, root));
+      collectCleanupError(errors, () => resources.releaseValueResource(root));
+      throwCollectedErrors(errors, "React root terminal invalidation failed");
+      return unmounted.value;
     };
     rootsByContainer.set(container, root);
     return root;
@@ -469,11 +487,10 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
   }
 
   function releaseRootResource(root) {
-    try {
-      root.unmount();
-    } finally {
-      resources.releaseValueResource(root);
-    }
+    const errors = [];
+    collectCleanupError(errors, () => root.unmount());
+    collectCleanupError(errors, () => resources.releaseValueResource(root));
+    throwCollectedErrors(errors, "React root release failed");
   }
 
   function releaseLeanCallback(callback) {
@@ -522,7 +539,7 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
     "react.props.setRef": (props, ref) =>
       setReactPropsRef(resources, props, ref),
     "react.node.children.empty": () =>
-      resources.resourceForValue(createReactNodeChildrenResource()),
+      resources.adoptResourceForValue(createReactNodeChildrenResource()),
     "react.node.children.push": (children, child) =>
       pushReactNodeChild(resources, children, child),
     "react.node.createElement": (elementType, props, children) =>
@@ -591,11 +608,10 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
     },
     "react.root.unmount": (root) => {
       const value = resources.resolveResource(root, "ReactRoot");
-      try {
-        value.unmount();
-      } finally {
-        resources.releaseValueResource(value);
-      }
+      const errors = [];
+      collectCleanupError(errors, () => value.unmount());
+      collectCleanupError(errors, () => resources.releaseValueResource(value));
+      throwCollectedErrors(errors, "React root unmount failed");
       return undefined;
     },
     "react.root.unmountSelector": (selector) => {
