@@ -16,6 +16,7 @@ Author: Emilio J. Gallego Arias
 #include <vector>
 
 #include "util/name.h"
+#include "util/name_hash_map.h"
 
 extern "C" lean::object * lean_run_init(
     lean::object * env,
@@ -28,6 +29,8 @@ namespace lean::vir {
 namespace {
 
 static std::vector<decl_entry> g_entries;
+static name_hash_map<uint32_t> * g_decl_index = nullptr;
+static name_hash_map<uint32_t> * g_boxed_decl_index = nullptr;
 static std::vector<init_global_entry> g_init_entries;
 static std::vector<host_import_entry> g_host_imports;
 static std::vector<export_call_summary_entry> g_export_summaries;
@@ -41,6 +44,10 @@ static bool g_initializers_ran = false;
 static uint32_t g_package_format_version = 0;
 
 static void clear_loaded_package_state() {
+    delete g_decl_index;
+    delete g_boxed_decl_index;
+    g_decl_index = nullptr;
+    g_boxed_decl_index = nullptr;
     for (decl_entry const & entry : g_entries) {
         lean_dec(entry.name);
         if (entry.boxed_base) {
@@ -74,6 +81,45 @@ static void clear_loaded_package_state() {
 static std::string lean_name_string(object * value) {
     name n(value, true);
     return n.to_string();
+}
+
+static bool build_decl_indices() {
+    delete g_decl_index;
+    delete g_boxed_decl_index;
+    g_decl_index = new name_hash_map<uint32_t>();
+    g_boxed_decl_index = new name_hash_map<uint32_t>();
+    g_decl_index->reserve(g_entries.size());
+    g_boxed_decl_index->reserve(g_entries.size());
+
+    for (size_t i = 0; i < g_entries.size(); i++) {
+        decl_entry const & entry = g_entries[i];
+        uint32_t index = static_cast<uint32_t>(i);
+        if (!g_decl_index->emplace(name(entry.name, true), index).second) {
+            g_last_error = "duplicate IR declaration `" + lean_name_string(entry.name) +
+                "` while building package index";
+            return false;
+        }
+        if (entry.boxed_base != nullptr &&
+            !g_boxed_decl_index->emplace(name(entry.boxed_base, true), index).second) {
+            g_last_error = "duplicate boxed IR declaration base `" +
+                lean_name_string(entry.boxed_base) + "` while building package index";
+            return false;
+        }
+    }
+    return true;
+}
+
+static decl_entry const * find_indexed_decl(
+    name_hash_map<uint32_t> const * index,
+    object * n) {
+    if (index == nullptr) {
+        return nullptr;
+    }
+    auto found = index->find(name(n, true));
+    if (found == index->end() || found->second >= g_entries.size()) {
+        return nullptr;
+    }
+    return &g_entries[found->second];
 }
 
 template <typename T>
@@ -291,6 +337,9 @@ bool finish_package_set() {
         return false;
     }
     g_package_set_open = false;
+    if (!build_decl_indices()) {
+        return false;
+    }
     if (!run_package_initializers_state()) {
         return false;
     }
@@ -299,21 +348,13 @@ bool finish_package_set() {
 }
 
 object * find_package_decl(object * n) {
-    for (decl_entry const & entry : g_entries) {
-        if (lean_name_eq(n, entry.name)) {
-            return entry.decl;
-        }
-    }
-    return nullptr;
+    decl_entry const * entry = find_indexed_decl(g_decl_index, n);
+    return entry == nullptr ? nullptr : entry->decl;
 }
 
 object * find_package_boxed_decl(object * n) {
-    for (decl_entry const & entry : g_entries) {
-        if (entry.boxed_base && lean_name_eq(n, entry.boxed_base)) {
-            return entry.decl;
-        }
-    }
-    return nullptr;
+    decl_entry const * entry = find_indexed_decl(g_boxed_decl_index, n);
+    return entry == nullptr ? nullptr : entry->decl;
 }
 
 object * find_package_init_name(object * n) {

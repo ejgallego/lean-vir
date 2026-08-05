@@ -371,13 +371,13 @@ extern "C" object * lean_expr_mk_proj(obj_arg type_name, obj_arg idx, obj_arg st
 
 extern "C" obj_res lean_name_mk_string(obj_arg prefix, obj_arg suffix) {
     object * obj = mk_ctor(static_cast<unsigned>(name_kind::STRING), { prefix, suffix }, sizeof(uint64_t));
-    set_name_hash(obj, 1729);
+    set_name_hash(obj, vir_mix_hash(lean_name_hash(prefix), lean_string_hash(suffix)));
     return obj;
 }
 
 extern "C" obj_res lean_name_mk_numeral(obj_arg prefix, obj_arg suffix) {
     object * obj = mk_ctor(static_cast<unsigned>(name_kind::NUMERAL), { prefix, suffix }, sizeof(uint64_t));
-    set_name_hash(obj, 1729);
+    set_name_hash(obj, vir_mix_hash(lean_name_hash(prefix), vir_nat_hash(suffix)));
     return obj;
 }
 

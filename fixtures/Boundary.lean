@@ -189,6 +189,8 @@ def stringParserDataScore : Nat :=
 unsafe def nameHashSubstringPtrScore : Nat :=
   let sameName := Lean.Name.beq `Lean.Parser `Lean.Parser
   let diffName := Lean.Name.beq `Lean.Parser `Lean.Elab
+  let nameHashScore :=
+    (`Lean.Parser).hash.toNat % 1009 + (`Lean.Elab).hash.toNat % 1009
   let raw1 : Substring.Raw := ⟨"abcdef", ⟨1⟩, ⟨4⟩⟩
   let raw2 : Substring.Raw := ⟨"abcdef", ⟨1⟩, ⟨4⟩⟩
   let raw3 : Substring.Raw := ⟨"abcdef", ⟨2⟩, ⟨4⟩⟩
@@ -197,6 +199,7 @@ unsafe def nameHashSubstringPtrScore : Nat :=
   let xs := [1, 2, 3]
   let samePtr := ptrAddrUnsafe xs == ptrAddrUnsafe xs
   (mixHash 17 23).toNat % 101 +
+  nameHashScore +
   (if sameName then 10 else 0) +
   (if diffName then 100 else 3) +
   (if sameSubstring then 20 else 0) +

@@ -1,186 +1,154 @@
 # Environment Lookup Performance
 
-This note defines the reproducible workload and proposed design for the
-environment/declaration lookup cost reported by Illuminate's animation player.
-It intentionally stops before implementing the lookup optimization. Land the
-measurement surface first, then use it to evaluate the provider index and any
-later upstream interpreter API.
+This note records the reproducible workload, measured experiments, accepted
+implementation, and proposed upstream boundary for VIR declaration lookup.
 
-## Current Finding
+## Outcome
 
-Illuminate reported many short asynchronous entries into interpreted Lean. Its
-profile put `lean_name_eq` first, with interpreter-local/native symbol maps and
-VIR's declaration provider accounting for most of the remaining symbolized
-work. VIR currently resolves a package declaration by linearly scanning
-`g_entries` in `package_decl_provider.cpp`.
+The reported lookup cost had two independent causes:
 
-The repository-local focused workload reproduces that shape without depending
-on Illuminate:
+1. VIR's local `lean_name_mk_string` and `lean_name_mk_numeral` providers wrote
+   the constant hash `1729` into every decoded `Lean.Name`. Consequently,
+   `lean_name_eq` could not reject unequal names by hash, and every hash table
+   collapsed into one bucket.
+2. `find_package_decl` and `find_package_boxed_decl` linearly scanned all loaded
+   declarations for every fresh interpreter cache miss.
+
+The accepted implementation computes the same name hashes as Lean and builds
+two `lean::name_hash_map<uint32_t>` indices when a package set is finished. One
+map indexes full declaration names and the other indexes boxed base names.
+Values remain stable slots in the package-owned declaration vector.
+
+No `.irpkg` format change is needed. A format-11 precomputed-index experiment
+was started when runtime sorting appeared to regress package loading, but the
+profile showed that the apparent sort cost was itself caused by constant name
+hashes. Correct hashes made index construction cheap, and the measured hash-map
+implementation does not regress package load.
+
+## Reproducible Workload
+
+The repository-local workload reproduces Illuminate's many short asynchronous
+entries without depending on Illuminate:
 
 - `fixtures-lean.irpkg` contains 1,546 declarations;
-- `Vir.Fixtures.ExprPrinter.exprCoverageScore` is a short, deterministic,
-  no-argument call that resolves many internal targets;
-- every measured operation enters a fresh upstream interpreter, matching an
-  asynchronous callback after the previous browser-to-Lean call has returned;
-- the headline execution row starts after package loading, initializer
-  execution, and export-slot resolution;
-- a secondary row times package decode, initializer execution, and manifest
-  installation in a fresh Wasm instance, with instantiation and disposal
-  excluded;
-- every call must return `1232`.
+- `Vir.Fixtures.ExprPrinter.exprCoverageScore` is deterministic and returns
+  `1232`;
+- every timed call enters a fresh upstream interpreter, matching a callback
+  after the previous browser-to-Lean call has returned;
+- the execution row excludes package loading, initializer execution, and
+  export-slot resolution;
+- the package-load row times decode, initializer execution, and manifest
+  installation in a fresh Wasm instance while excluding instantiation and
+  disposal.
 
-One unprofiled run on 2026-08-05 at commit `246493d76ded` measured a median
-400.8 microseconds per fresh entry, with seven batch medians ranging from 391.8
-to 420.2 microseconds. Later same-build screening runs measured 618.4 and 676.0
-microseconds, demonstrating substantial machine-state noise and the need for
-order-balanced comparisons. These are attribution/workload snapshots, not a
-committed threshold. The first run used Node 24.18.0 on an AMD Ryzen AI 9 HX
-370, Wasm SHA-256
-`072b7fa43acf3a7db54507df49250f13a4ad1fcb2ee88c9cfa7c74d583e75a33`, and
-package SHA-256
-`c6789f8da1a1967844923213d13be6cf10e7242d4ea3aeb281d673f909682738`.
-
-A separate V8 CPU profile at a requested 100 microsecond interval, restricted
-to the execution window, attributed self samples as follows:
-
-| Symbol or bucket | Self samples |
-| --- | ---: |
-| `lean_name_eq` | 53.4% |
-| interpreter-local symbol-map `find` | 15.0% |
-| global native-symbol-map `find` | 6.5% |
-| `lean::vir::find_package_decl` | 5.4% |
-| `interpreter::get_decl` | 1.2% |
-
-The sampled profile is attribution evidence and its timings must not be used as
-headline numbers. The focused workload selects the mechanism; Illuminate's
-callback/dashboard run remains the representative acceptance workload.
-
-## Measurement Commands
-
-Build or restore inputs, then capture an unprofiled report:
+Capture an unprofiled report with a fresh output path:
 
 ```bash
 npm run bench:env-lookup -- \
-  --json build/perf/env-lookup/baseline.json
+  --json build/perf/env-lookup/current.json
 ```
 
-Use a new output path for every run; the command refuses to overwrite reports.
-`--no-build` is an explicit local shortcut after `npm run build:demo` has
-already produced matching artifacts. The report records:
+Use `--no-build` only after matching artifacts have been built. Reports record
+the Git state, machine and toolchain, Wasm/package/harness/fixture hashes, run
+policy, raw samples, and checksum. Comparisons reject mismatched identities.
 
-- command, Git revision, dirty-status hash, and tracked-diff hash;
-- Node/V8, CPU, platform, pinned Lean toolchain, and Wasm build configuration;
-- Wasm, package, harness, and fixture hashes;
-- package/manifest versions and declaration count;
-- warmup/sample policy, exact endpoint, raw batch timings, and checksum.
-
-Reports also carry a stable comparison identity. `bench:compare` and
-`bench:paired` reject a mismatch in workload, run policy, diagnostics mode,
-toolchain/machine, package size/version, harness, or fixture before printing a
-delta.
-
-Collect attribution separately. Profiling automatically selects the optimized,
-unstripped `vir-upstream.dev.wasm` companion:
+Collect attribution separately:
 
 ```bash
 npm run bench:env-lookup -- \
-  --cpu-profile build/perf/env-lookup/baseline.cpuprofile \
-  --json build/perf/env-lookup/baseline-profiled.json
+  --cpu-profile build/perf/env-lookup/current.cpuprofile \
+  --json build/perf/env-lookup/current-profiled.json
 ```
 
-The JSON report includes a short self-sample summary and the raw profile hash.
-Load the `.cpuprofile` into Chrome DevTools for call-tree inspection. Do not
-compare its elapsed timings with diagnostics-off runs.
-
-For a candidate, use two checkouts that both contain this harness and an even
-number of AB/BA passes:
+For acceptance, use byte-identical packages and an even AB/BA schedule:
 
 ```bash
 npm run bench:paired -- \
   --npm-script bench:env-lookup \
   --repeat 6 \
-  --out build/perf/env-lookup/index-abba \
-  ../vir-baseline ../vir-index
+  --out build/perf/env-lookup/lookup-abba \
+  --bench-arg=--iterations=1000 \
+  --bench-arg=--samples=9 \
+  ../vir-baseline ../vir-candidate
 ```
 
-The paired runner refuses an existing output directory. It preserves every
-per-run report plus `schedule.json`, including pass, AB/BA sequence, position,
-and completion state. Its summary prints every paired pass delta and their
-median. One pass remains available for screening; an odd pass count is
-explicitly reported as not order-balanced.
+## Measurements
 
-## Current Lookup Path
+All decisions below use six order-balanced AB/BA passes on 2026-08-05, Node
+24.18.0, an AMD Ryzen AI 9 HX 370, the pinned Lean 4.33.0-rc2 toolchain, and
+the same format-10 package bytes within each comparison.
 
-For the first occurrence of an internal target in each fresh entry:
+| Comparison | Execution paired median | Package-load paired median | Decision |
+| --- | ---: | ---: | --- |
+| constant hashes + linear scan → correct hashes + linear scan | -56.7% | -23.8% | accept hash fix |
+| correct hashes + linear scan → correct hashes + sorted binary index | -57.9% | -3.4% | useful, but not final |
+| correct hashes + sorted binary index → correct hashes + `name_hash_map` | -15.3% | -1.6% | accept hash map |
+| original → accepted combined implementation | -84.8% | -26.2% | final focused result |
+
+For the final original-to-candidate comparison, aggregate medians moved from
+403.4 to 58.9 microseconds per fresh entry, a 6.85x speedup. All six paired
+execution deltas improved, ranging from -84.7% to -85.8%. Package loading moved
+from 12.44 to 9.07 milliseconds; all six paired passes improved. The compared
+package SHA-256 was
+`966ff81ae17f86b508e02dfcc66ba1b5ec636ef5ef9a5ac35d2cd6106270c68b`.
+
+The initial execution profile attributed 53.4% of self samples to
+`lean_name_eq`, followed by the interpreter symbol-cache lookup at 15.0%, the
+native-symbol lookup at 6.5%, and VIR declaration lookup at 5.4%. In the final
+hash-map profile, `lean_name_eq` fell to 3.6%; the VIR declaration map lookup
+was 6.6%, while interpreter execution and its symbol cache became the largest
+remaining buckets. Profiled elapsed time is diagnostic and is not used for the
+headline comparison.
+
+An identical-code AB/BA control produced execution deltas from about -31% to
++5%, so small one-off deltas are not actionable. The accepted execution
+movements are much larger, consistent across every paired pass, and accompanied
+by the predicted profile movement.
+
+## Accepted Local Design
+
+Decoded names now use Lean's real construction rules:
 
 ```text
-decoded IR target name
-  -> interpreter-local m_symbol_cache                  miss
-  -> process-wide native-symbol name_hash_map          usually hit
-  -> interpreter::get_decl
-  -> lean_ir_find_env_decl
-  -> VIR find_package_decl                             linear g_entries scan
-  -> interpreter-local cache insertion
+str hash = mixHash(prefix.hash, string.hash)
+num hash = mixHash(prefix.hash, numeral value)
 ```
 
-The process-wide native cache stores the address/boxed decision, not the
-environment-dependent IR declaration. It therefore still calls `get_decl` on a
-fresh interpreter. The local symbol cache disappears when the asynchronous
-entry returns.
-
-## Stage 1: Package Declaration Index
-
-The first optimization should remain VIR-local and use Lean's own
-`name_hash_map` representation:
+The package provider keeps two heap-allocated maps:
 
 ```cpp
-struct package_decl_indices {
-    lean::name_hash_map<uint32_t> declarations;
-    lean::name_hash_map<uint32_t> boxed_declarations;
-};
+lean::name_hash_map<uint32_t> declarations;
+lean::name_hash_map<uint32_t> boxedDeclarations;
 ```
 
-Values are indices into the existing package-owned vectors. Map keys retain
-their `Lean.Name`; values do not add declaration ownership and remain valid
-until the immutable package vectors are cleared.
+They are allocated after all package-set members have been appended and before
+initializers run. Heap allocation is required because ordinary C++ global
+constructors are not run in this Wasm build. Map keys retain their `Lean.Name`;
+map values are declaration slots and add no declaration ownership. Clearing a
+package deletes both maps before releasing vector-owned names and declarations.
 
-Build both maps in `finish_package_set` after every package-set member has been
-decoded and appended, but before initializers run. Package-set append and
-duplicate validation can remain linear because they are outside the steady
-execution window and already reject duplicates. Lookup becomes one map find
-followed by a bounds-checked vector access. A miss remains `nullptr`.
+This is close to upstream rather than a new VIR-specific hash structure:
 
-Clearing or abandoning a package load must clear the maps before releasing
-vector-owned names and declarations. A failed index build or initializer must
-use the same complete cleanup path. Initializer and host-import tables should
-remain unchanged in the first patch unless a post-index profile identifies
-them as material.
+- Lean's environment lookup uses sorted `Name.quickLt` arrays for imported
+  module entries and a persistent hash map for local entries;
+- the upstream C++ interpreter already uses `lean::name_hash_map` for its
+  initializer, native-symbol, constant, and symbol caches;
+- VIR has a flat package-set declaration namespace, for which the shared C++
+  `name_hash_map` measured faster than a sorted side index.
 
-This stage preserves the exact mapping:
-
-```text
-loaded package set x structurally equal Lean.Name -> existing declaration slot
-```
-
-It does not cache evaluated constants, interpreter state, host results, or
-mutable stacks. It also does not require a package-format or JavaScript API
-change.
+The binary-search candidate remains a valid analogue of upstream imported
+lookup, but the hash map is the measured winner for VIR's flat provider.
 
 ## Upstream API Direction
 
-VIR currently integrates by defining the exported
-`lean_ir_find_env_decl`/`lean_ir_find_env_decl_boxed` symbols and passing a dummy
-environment to `ir::run_boxed`. The local index can ship behind that boundary,
-but the desired endpoint is an explicit upstream provider API rather than link
-symbol replacement.
+VIR currently supplies the exported `lean_ir_find_env_decl` and
+`lean_ir_find_env_decl_boxed` symbols and passes a dummy environment to the
+interpreter. The local implementation can ship behind that boundary, but the
+desired upstream endpoint is an explicit provider rather than link-symbol
+replacement.
 
-Propose two separable upstream changes.
-
-### 1. Explicit declaration provider
-
-Add a `run_boxed` overload whose lookup source is an explicit callback table.
-The exact public types belong upstream, but the ownership and invalidation
-contract should be equivalent to:
+The first upstream change should add a `run_boxed` overload with a callback
+table equivalent in ownership semantics to:
 
 ```cpp
 struct decl_provider {
@@ -191,86 +159,48 @@ struct decl_provider {
 };
 ```
 
-The interpreter retains any returned declaration it caches. `state` must stay
-alive for the call. `revision` changes before a provider can return a different
-answer for the same name. The existing environment-backed lookup remains the
-default overload, so upstream behavior and callers do not change.
+The provider state remains alive for the call. The interpreter retains any
+declaration it caches. `revision` changes before the provider can return a
+different answer for the same name. Existing environment-backed entry points
+remain the default, so normal Lean callers do not change.
 
-VIR's `package_decl_provider` should be shaped around this table now: its
-callbacks consult the Stage 1 maps, and its revision advances before old
-package objects are released. Once the upstream overload exists,
-`interpreter_bridge.cpp` passes this provider directly and removes the exported
-lookup-symbol definitions.
+VIR's current map lookups can become these callbacks without moving the index
+into upstream or exposing `.irpkg`. Once the overload exists,
+`interpreter_bridge.cpp` passes the provider explicitly and removes VIR's
+replacement definitions of the exported lookup symbols.
 
-This first upstream patch is architectural and should not claim a speedup by
-itself. It makes VIR's indexed lookup a supported interpreter input.
+Only after the Illuminate acceptance workload is re-profiled should upstream
+consider an optional caller-owned symbol cache. The final focused profile still
+shows interpreter symbol-cache work, but a reusable cache needs precise
+identity over environment, relevant options, provider state, and provider
+revision. It should retain only resolved declaration/native-symbol metadata,
+not mutable interpreter stacks or evaluated constants.
 
-### 2. Optional caller-owned symbol cache
+## Rejected or Superseded Experiments
 
-Only pursue this if the indexed-provider profile still shows fresh
-interpreter-local/native map reconstruction as a material cost. Add an opaque,
-noncopyable symbol-resolution cache that an embedding may pass to `run_boxed`.
-The interpreter continues to own the resolution algorithm and the same
-`name_hash_map<symbol_cache_entry>` entries; VIR does not duplicate native
-symbol selection.
+- The first `name_hash_map` screen was rejected at 1.07 milliseconds per call,
+  but that result was invalidated: every key hashed to `1729`, so the map had
+  one bucket. With correct hashes it is the fastest measured representation.
+- A stored 64-bit-hash collision index reached 1.83 milliseconds per call for
+  the same reason: every runtime name landed in the collision range.
+- A sorted side-vector index was a robust improvement and closely mirrors
+  imported Lean environment lookup, but the corrected hash map was another
+  15.3% faster in paired testing.
+- A format-11 precomputed sorted-index section was abandoned. Compatibility
+  was not a constraint, but measurements no longer justified the format and
+  decoder complexity.
+- Decoder-wide name interning and whole-interpreter persistence remain
+  unnecessary. Application batching may still help Illuminate, but it should
+  not be required to hide provider lookup costs.
 
-Before reuse, the cache must match all resolution-sensitive identities:
+## Remaining Validation
 
-- exact environment object;
-- exact relevant options (at minimum `prefer_native`);
-- provider `state` and `revision`.
+Repository validation covers package hits/misses, boxed separation, package
+sets and duplicate rejection, failed loads, initializers, reload, and fixture
+agreement. The boundary fixture also includes actual `Name.hash` values so the
+constant-hash regression is observable against host Lean.
 
-A mismatch clears the cache. A null cache pointer preserves today's
-per-invocation behavior. Insert only after declaration and native resolution
-complete successfully.
-
-The reusable object contains only symbol metadata: retained IR declaration,
-native address, and boxed decision. Keep `m_constant_cache`, argument/join/call
-stacks, exceptions, and tracing state per interpreter invocation. Do not
-persist the entire interpreter.
-
-The cache should be single-owner and non-concurrent by contract; nested calls
-with the same environment/options/provider continue to reuse the active
-thread-local interpreter. This avoids adding a lock to every lookup. VIR's
-browser runtime is single-threaded today and clears the cache before package
-revision or instance teardown.
-
-## Validation Sequence
-
-For the Stage 1 index:
-
-1. Run package-provider correctness coverage for hits, misses, separately
-   allocated equal names, boxed/unboxed separation, package sets, failed loads,
-   initializer failure, clearing, and repeated runtime replacement.
-2. Capture a fresh diagnostics-off focused report with an even AB/BA comparison.
-3. Capture a fresh CPU profile and verify that `find_package_decl` and its
-   linear-scan `lean_name_eq` samples collapse as predicted.
-4. Rerun the Illuminate isolated callback and 16-player dashboard workloads,
-   including DOM/state differential checks.
-5. If provider scans collapse but wall time does not, reject further provider
-   tuning and investigate the remaining interpreter-local/native maps. That is
-   the gate for the optional upstream reusable cache.
-
-Do not use package-load time as the headline metric; report it separately if
-index construction becomes visible. Do not add permanent runtime counters to
-select the next target. Counters may be used later as diagnostics after sampled
-attribution has established the path.
-
-The baseline self-comparison is also part of the interpretation contract. On
-the development host, identical artifacts produced execution pass deltas from
-about -31% to +5% and package-load pass deltas from about -28% to +22% in a
-four-pass AB/BA control. The declaration index is expected to clear that broad
-noise floor. Smaller follow-up representation changes require stronger
-same-process evidence or a profile movement; a small aggregate timing delta is
-not sufficient.
-
-## Deferred Alternatives
-
-- Decoder-wide name interning may make equal names pointer-identical, but it
-  adds ownership/package-format pressure and should follow the index result.
-- Persisting the whole interpreter retains mutable stacks and evaluated
-  constants and is not needed for symbol resolution.
-- Application-level batching can help Illuminate, but callers should not need
-  to batch unrelated callbacks to avoid a linear declaration scan.
-- Moving SVG work to JavaScript is not supported by the profile; explicit DOM
-  updates were a small fraction of the reported samples.
+The representative acceptance gate remains Illuminate's isolated callback and
+16-player dashboard workloads, including DOM/state differential checks. If
+those do not move with the focused 6.85x result, the next profile—not the old
+provider hypothesis—should select the next target.

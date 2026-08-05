@@ -53,7 +53,8 @@ npm run bench:env-lookup -- \
 The profiling path uses the optimized, unstripped debug Wasm companion. Its
 timings are marked diagnostic and are not before/after evidence. See
 [Environment Lookup Performance](ENVIRONMENT_LOOKUP_PERFORMANCE.md) for the
-baseline profile, proposed package index, and upstream API direction.
+baseline and final profiles, measured representation experiments, and upstream
+API direction.
 
 Compare two saved reports with:
 
