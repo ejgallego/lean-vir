@@ -174,30 +174,45 @@ This is close to upstream rather than a new VIR-specific hash structure:
 The binary-search candidate remains a valid analogue of upstream imported
 lookup, but the hash map is the measured winner for VIR's flat provider.
 
-## Upstream API Direction
+## Upstream Integration Direction
 
 VIR currently supplies the exported `lean_ir_find_env_decl` and
 `lean_ir_find_env_decl_boxed` symbols and passes a dummy environment to the
-interpreter. The local implementation can ship behind that boundary, but the
-desired upstream endpoint is an explicit provider rather than link-symbol
-replacement.
+interpreter. The local implementation can ship behind that boundary, but an
+upstream API proposal must first explain why VIR cannot use Lean's existing
+environment-backed lookup unchanged.
 
-The first upstream change should add a `run_boxed` overload with a callback
-table equivalent in ownership semantics to:
+That API is not a plain C++ environment map lookup. Its two exported functions
+are implemented in `Lean/Compiler/IR/CompilerM.lean` and expect a valid
+`Lean.Environment` containing module ownership and `Lean.IR.declMapExt` state.
+VIR's Wasm artifact does not link those implementations, its `.irpkg` contains
+decoded `Lean.IR.Decl` values rather than an environment, and the scalar dummy
+is usable only because VIR also replaces the other environment policies reached
+by the interpreter.
+
+A closer-upstream alternative may therefore avoid a new API: create a valid
+empty environment through Lean, add decoded package declarations to
+`declMapExt` as local entries, and pass it to the existing `run_boxed`. This
+must be tested rather than assumed cheap. It may require a substantial generated
+Lean dependency and initializer closure, and it does not automatically replace
+VIR's package-backed initializer, symbol-mangling, export-name, or host-import
+policies.
+
+If that experiment shows that a real environment is disproportionate for a
+declaration-only runtime, the fallback upstream change is a `run_boxed`
+overload with a callback table equivalent in ownership semantics to:
 
 ```cpp
 struct decl_provider {
     void * state;
-    uint64_t revision;
     object * (*find_decl)(void * state, object * name);       // borrowed or null
     object * (*find_boxed_decl)(void * state, object * name); // borrowed or null
 };
 ```
 
-The provider state remains alive for the call. The interpreter retains any
-declaration it caches. `revision` changes before the provider can return a
-different answer for the same name. Existing environment-backed entry points
-remain the default, so normal Lean callers do not change.
+The provider remains stable and alive for the call, and the interpreter retains
+any declaration it caches. Existing environment-backed entry points remain the
+default, so normal Lean callers do not change.
 
 VIR's current map lookups can become these callbacks without moving the index
 into upstream or exposing `.irpkg`. Once the overload exists,
@@ -206,12 +221,16 @@ replacement definitions of the exported lookup symbols.
 
 The Illuminate acceptance profile does not justify coupling a caller-owned
 symbol cache to the first upstream API: representative callback time halved and
-the targeted lookup buckets moved substantially. Keep the first change limited
-to an explicit declaration provider. A reusable symbol cache should be
-reconsidered only if a future representative profile selects it; such a cache
-would need precise identity over environment, relevant options, provider state,
-and provider revision, and must not retain mutable interpreter stacks or
-evaluated constants.
+the targeted lookup buckets moved substantially. If the provider path wins,
+keep its first change limited to declaration lookup. A reusable symbol cache
+should be reconsidered only if a future representative profile selects it; such
+a cache would need precise identity over environment, relevant options,
+provider state, and provider revision, and must not retain mutable interpreter
+stacks or evaluated constants.
+
+[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
+owns the real-environment experiment, the provider fallback, and the evidence
+required before transferring this request upstream.
 
 ## Rejected or Superseded Experiments
 
@@ -240,6 +259,6 @@ constant-hash regression is observable against host Lean.
 The representative Illuminate acceptance gate has passed: the focused result
 reproduced, sustained callback mean and CPU were halved, the original sampled
 hotspots moved, and DOM output remained identical. The next design step is the
-provider-only upstream API described above. Any further optimization target
-should come from a new representative profile rather than extending this lookup
-patch speculatively.
+bounded real-environment experiment in ULC-0001, not an immediate upstream API
+patch. Any further optimization target should come from a new representative
+profile rather than extending this lookup patch speculatively.

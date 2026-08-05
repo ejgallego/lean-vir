@@ -81,13 +81,15 @@ ownership diagrams.
 - [PERFORMANCE.md](PERFORMANCE.md): benchmark commands, artifact-cache
   behavior, and before/after comparisons.
 - [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md):
-  fresh-interpreter lookup evidence, provider-index design, and upstream API
-  direction.
+  fresh-interpreter lookup evidence, provider-index design, and upstream
+  integration direction.
 - [OBJECT_ABI.md](OBJECT_ABI.md): Lean object ABI construction,
   inspection, ownership, and codec-retirement roadmap.
 
 ## Roadmaps
 
+- [roadmap/README.md](roadmap/README.md): scoped maintainer cards for VIR-local
+  and upstream Lean follow-up work.
 - [EVENT_CALLBACK_ROADMAP.md](EVENT_CALLBACK_ROADMAP.md): callback/resource
   ownership direction.
 - [REACT_NODE.md](REACT_NODE.md): current Lean-authored React Node surface.
