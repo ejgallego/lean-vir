@@ -521,8 +521,10 @@ try {
 
 `FinalizationRegistry` provides a best-effort backstop for dropped wrappers;
 explicit release is the deterministic cleanup path. Browser React additionally
-requires `FinalizationRegistry` to reclaim speculative work for which React
-does not provide an abandonment callback.
+requires `FinalizationRegistry` and `WeakRef` to reclaim speculative work for
+which React does not provide an abandonment callback. Its binding factory
+rejects environments without those capabilities before it acquires
+speculative ownership.
 
 `VirCallback` is the JavaScript wrapper for a rooted Lean closure:
 

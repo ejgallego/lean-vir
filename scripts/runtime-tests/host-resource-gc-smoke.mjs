@@ -108,7 +108,7 @@ const reactRoot = createBrowserReactRootResource(resources, {
     pendingReactTree = null;
   },
 }, React, {
-  ...createReactHostHooks(),
+  ...createReactHostHooks({ resources }),
   hookRuntime: createBrowserReactHookRuntime(resources, React),
 });
 function callbackLease(cell) {

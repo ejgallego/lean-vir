@@ -328,6 +328,27 @@ that live values remain usable and that deterministic disposal restores the
 expected lease count; garbage-collection tests are reserved for genuinely
 unobservable abandonment backstops.
 
+Use this bounded matrix to decide when a lifetime review is complete. Add or
+change a row only when a patch changes that ownership handoff; unrelated
+hypothetical owners do not expand the review.
+
+| Handoff | Adversarial cases | Deterministic oracle |
+| --- | --- | --- |
+| Borrowed child → builder → parent | Release parent first and child first; reuse the surviving side. | The survivor remains usable; final release restores the payload-lease count. |
+| Callback-bearing result → WASM root | Fail result lowering after the host adopts the callback. | The adopted resource and callback root are both gone. |
+| Updater/reducer inputs → callback | Succeed and throw while creating an unrelated resource. | Only synthetic input wrappers expire; unrelated allocations remain live. |
+| Deferred React owner → teardown | Dispose before the scheduled microtask; include throwing and non-throwing siblings. | Teardown drains once, attempts every sibling, and restores the owner count synchronously. |
+| Speculative browser owner → abandonment backstop | Remove `FinalizationRegistry` or `WeakRef`. | Browser binding construction fails before acquiring ownership. |
+| Borrowed Lean array element → boxed native adapter | Iterate resource elements, then drop the array. | The externref-root count returns to its prior baseline. |
+
+A direct host test is sufficient when the changed ownership transition is
+implemented entirely in JavaScript, even if the value originally came from a
+Lean callback. A change to packaged IR encoding, a boxed native adapter, or
+WASM rooting must also have an interpreted-Lean integration assertion. The
+review converges when every changed row is green, deterministic teardown
+returns all relevant counts to their baseline, and no ownership transition
+remains unnamed.
+
 `resourceForValue(value)` creates a fresh wrapper. Lean roots are classified as
 borrowed or owned: dropping a borrowed argument root only removes that root,
 while dropping an unclaimed owned host-result root also invokes the wrapper's
@@ -339,10 +360,10 @@ host supports explicit resource management); `releaseHostResource(resource)`
 is the equivalent public helper. Retainable payloads are also registered for
 best-effort `FinalizationRegistry` cleanup, while explicit release remains the
 deterministic path. Browser React is stricter: its host bindings require
-`FinalizationRegistry` because React provides no deterministic notification
-when speculative render, effect, or queued-update work is abandoned. Passive
-DOM elements, strings, numeric values, `Js.Array`, and `Js.NodeList` have no
-payload disposer.
+`FinalizationRegistry` and `WeakRef` because React provides no deterministic
+notification when speculative render, effect, or queued-update work is
+abandoned. Passive DOM elements, strings, numeric values, `Js.Array`, and
+`Js.NodeList` have no payload disposer.
 
 Retainable payloads compose through containers. `Js.Nullable`, React event
 handler values, React props builders, and React child-list builders acquire
@@ -350,11 +371,11 @@ independent child leases and release all children when abandoned. Ownership
 graphs reject cycles rather than relying on cyclic reference counts. A
 container may safely acquire a lease from a live runtime-created JSL wrapper
 even though that wrapper is not owned by the container's `HostResourceState`.
-After a React parent acquires its child lease, the original child wrapper is a
-borrowed alias: it remains usable while the composite graph owns the child but
-does not create a second ownership cycle. Releasing such an alias never
-terminally revokes the shared node payload. Selector-based render helpers also
-leave their borrowed node argument untouched when the selector is missing.
+After a React parent acquires its child lease, the original borrowed child
+wrapper keeps its independent lease. The parent and wrapper may be released in
+either order, and either surviving owner may reuse the node. These are sibling
+leases over one payload, not an ownership cycle. Selector-based render helpers
+also leave their borrowed node argument untouched when the selector is missing.
 Result lifting is transactional:
 arrays and structures roll back every callback/resource already lifted when a
 later field fails.
@@ -402,11 +423,13 @@ Some resources are callback-local rather than retained:
 - DOM and React event objects are callback-scoped. The event resource is
   released after the Lean callback returns. Event targets and current targets
   may be returned as separate element resources by the event host bindings.
-- `react.state.modify` runs its one-shot VIR updater in a temporary resource
-  scope. The `previous : Lean.Vir.Js α` handle passed to the updater is
-  callback-local. `Lean.Vir.JsValue` resources allocated while computing the
-  updater result are consumed after the host extracts the next JavaScript state
-  payload. Lean code must not retain those updater-local handles for later use.
+- `react.state.modify` gives the updater a synthetic
+  `previous : Lean.Vir.Js α` wrapper, and a reducer receives equivalent
+  synthetic state and action wrappers. Those input wrappers are callback-local
+  and must not be retained. The callback does not otherwise run in a temporary
+  resource scope: unrelated `Lean.Vir.JsValue` resources that it allocates have
+  ordinary `RuntimeM` lifetime and may escape. The returned state payload is
+  retained or transferred into React independently of those input wrappers.
 
 `VirCallback` values follow a separate ownership lane. JavaScript receives a
 callable lease around a rooted Lean closure. `callback.retain()` creates a

@@ -1625,11 +1625,12 @@ function callReducerHook(resources, hook, state, action) {
     throw new Error("React reducer callback is not available");
   }
   return withReactStateResultOwnership(
-    (own) => withStateUpdaterResourceScope(resources, () => {
-      const stateResource = resources.temporaryResourceForValue(state);
-      const actionResource = resources.temporaryResourceForValue(action);
-      return own(takeReactStatePayload(resources, reducer(stateResource, actionResource)));
-    }),
+    (own) => withTemporaryReactStateInputs(
+      resources,
+      [state, action],
+      (stateResource, actionResource) =>
+        own(takeReactStatePayload(resources, reducer(stateResource, actionResource))),
+    ),
     null,
     "React reducer result ownership failed",
   );
@@ -1679,10 +1680,11 @@ function modifyStateValue(resources, setter, update) {
   resources.addDisposable(retainedUpdate);
   try {
     stateSetter.set((previous) => withReactStateResultOwnership(
-      (own) => withStateUpdaterResourceScope(resources, () => {
-        const previousResource = resources.temporaryResourceForValue(previous);
-        return own(takeReactStatePayload(resources, update(previousResource)));
-      }),
+      (own) => withTemporaryReactStateInputs(
+        resources,
+        [previous],
+        (previousResource) => own(takeReactStatePayload(resources, update(previousResource))),
+      ),
       () => retainedUpdate.remove(),
       "React state updater result ownership failed",
     ));
@@ -1705,12 +1707,28 @@ function dispatchReducerAction(resources, dispatch, action) {
   return undefined;
 }
 
-function withStateUpdaterResourceScope(resources, run) {
-  if (typeof resources.withTemporaryResourceScope !== "function" ||
-      typeof resources.temporaryResourceForValue !== "function") {
-    throw new Error("react.state.modify requires temporary host resource support");
+function withTemporaryReactStateInputs(resources, values, run) {
+  if (typeof resources.temporaryResourceForValue !== "function" ||
+      typeof resources.releaseResource !== "function") {
+    throw new Error("React state callbacks require temporary host resource support");
   }
-  return resources.withTemporaryResourceScope(run);
+  const inputResources = [];
+  const errors = [];
+  let result;
+  collectCleanupError(errors, () => {
+    for (const value of values) {
+      inputResources.push(resources.temporaryResourceForValue(value));
+    }
+    result = run(...inputResources);
+  });
+  for (let index = inputResources.length - 1; index >= 0; index--) {
+    const resource = inputResources[index];
+    if (resource !== null) {
+      collectCleanupError(errors, () => resources.releaseResource(resource));
+    }
+  }
+  throwCollectedErrors(errors, "temporary React state input cleanup failed");
+  return result;
 }
 
 function withReactStateResultOwnership(acquire, cleanup, message) {

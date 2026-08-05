@@ -227,41 +227,6 @@ export function releaseHostResource(resource) {
   return releaseHostResourceState(state, resource);
 }
 
-// Drops this wrapper's payload lease while preserving a non-owning alias to the
-// live value. Composite owners use this after acquiring their own lease so a
-// borrowed wrapper can still participate in the same live ownership graph
-// without creating a callback/resource cycle.
-export function relinquishHostResourceOwnership(resource) {
-  const state = hostResourceState.get(resource);
-  if (state === undefined || state.value === null || state.value === undefined) return false;
-  const dispose = state.dispose;
-  const onRelease = state.onRelease;
-  if (typeof dispose !== "function" && typeof onRelease !== "function") return false;
-  hostResourceFinalizer?.unregister(resource);
-  state.dispose = null;
-  state.onFinalize = null;
-  state.onRelease = null;
-  state.onTake = null;
-  state.reportFinalizerError = null;
-  const errors = [];
-  if (typeof onRelease === "function") {
-    try {
-      onRelease(resource);
-    } catch (error) {
-      errors.push(asError(error));
-    }
-  }
-  if (typeof dispose === "function") {
-    try {
-      dispose(state.value);
-    } catch (error) {
-      errors.push(asError(error));
-    }
-  }
-  throwHostResourceErrors(errors, "host resource ownership relinquishment failed");
-  return true;
-}
-
 export function transferHostResource(resource) {
   const state = hostResourceState.get(resource);
   if (state === undefined || state.value === null || state.value === undefined) return false;

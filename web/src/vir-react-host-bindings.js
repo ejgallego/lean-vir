@@ -18,6 +18,9 @@ import {
   createBrowserReactRootResource as createBrowserReactRootResourceFromNode,
 } from "./react/vir-react-node.js";
 import {
+  hasHostResourceFinalizationSupport,
+} from "./host-resource.js";
+import {
   createHostResourceState,
   createReactHostHooks,
   createReactRootResourceHostBindings,
@@ -26,9 +29,13 @@ import {
 export function createBrowserReactHostBindings(state = createHostResourceState(), {
   querySelector = queryBrowserElement,
 } = {}) {
+  if (!hasHostResourceFinalizationSupport()) {
+    throw new Error("browser React host bindings require FinalizationRegistry and WeakRef support");
+  }
   const hookRuntime = createBrowserReactHookRuntime(state, React);
   const hooks = {
     ...createReactHostHooks({
+      resources: state,
       reportError: (error) => state.recordGcFinalizerError(error),
     }),
     hookRuntime,
