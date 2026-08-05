@@ -1,0 +1,153 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Lean prettyM benchmark</title>
+    <link rel="stylesheet" href="styles/app.css" />
+    <link rel="stylesheet" href="styles/dashboard.css" />
+    <script defer src="src/config.js"></script>
+    <script defer src="src/benchmark-core.js"></script>
+    <script defer src="src/backends/pretty-vir.js"></script>
+    <script defer src="src/backends/pretty-native.js"></script>
+    <script defer src="src/backends/pretty-llvm.js"></script>
+    <script defer src="src/dashboard.js"></script>
+    <script defer src="src/app.js"></script>
+  </head>
+  <body>
+    <main class="bench-shell">
+      <header class="bench-header">
+        <div>
+          <p class="bench-eyebrow">Lean 4.32 · browser Wasm comparison</p>
+          <h1>Std.Format.prettyM benchmark</h1>
+          <p class="bench-intro">
+            Correctness, phase timings, input scaling, and retained memory
+            across five implementations. This application runs independently of
+            the presentation deck.
+          </p>
+        </div>
+        <div class="bench-state" aria-live="polite">
+          <span id="app-state" data-state="loading">Loading backends</span>
+          <strong id="app-progress">Preparing artifacts…</strong>
+        </div>
+      </header>
+
+      <section class="bench-panel" aria-labelledby="backend-heading">
+        <div class="bench-section-heading">
+          <div>
+            <p class="bench-eyebrow">Candidates</p>
+            <h2 id="backend-heading">Backend set</h2>
+          </div>
+          <p>
+            Every selected backend receives the same compact Format value and
+            column budget.
+          </p>
+        </div>
+        <div id="backend-list" class="backend-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="bench-panel" aria-labelledby="protocol-heading">
+        <div class="bench-section-heading">
+          <div>
+            <p class="bench-eyebrow">Protocol</p>
+            <h2 id="protocol-heading">Sampling controls</h2>
+          </div>
+          <p>
+            Defaults match the consolidated browser study; quick check is
+            intentionally tiny.
+          </p>
+        </div>
+        <div class="protocol-grid">
+          <label>
+            <span>Warm-up rounds</span>
+            <input id="warmup" type="number" min="0" max="100" value="2" />
+          </label>
+          <label>
+            <span>Measured rounds</span>
+            <input id="samples" type="number" min="1" max="1000" value="9" />
+          </label>
+          <label>
+            <span>Batch target (ms)</span>
+            <input
+              id="batch-target"
+              type="number"
+              min="0"
+              max="1000"
+              step="1"
+              value="20"
+            />
+          </label>
+          <label>
+            <span>Repeat cycles</span>
+            <input
+              id="repeat-cycles"
+              type="number"
+              min="1"
+              max="10000"
+              value="32"
+            />
+          </label>
+        </div>
+      </section>
+
+      <section class="bench-panel" aria-labelledby="run-heading">
+        <div class="bench-section-heading">
+          <div>
+            <p class="bench-eyebrow">Studies</p>
+            <h2 id="run-heading">Run benchmark</h2>
+          </div>
+          <p>Execute one study or collect the complete dashboard dataset.</p>
+        </div>
+        <div class="study-actions">
+          <button type="button" data-study="smoke">Quick check</button>
+          <button type="button" data-study="differential">Corpus</button>
+          <button type="button" data-study="scaling">Scaling</button>
+          <button type="button" data-study="memory-retained">Memory</button>
+          <button type="button" data-study="interactions">Interactions</button>
+          <button type="button" data-study="repeated">Repeated calls</button>
+          <button type="button" class="primary" data-study="suite">
+            Full suite
+          </button>
+        </div>
+      </section>
+
+      <section class="bench-panel" aria-labelledby="results-heading">
+        <div class="bench-section-heading">
+          <div>
+            <p class="bench-eyebrow">Reports</p>
+            <h2 id="results-heading">Results</h2>
+          </div>
+          <div class="result-actions">
+            <button id="open-dashboard" type="button" disabled>
+              Open dashboard
+            </button>
+            <button id="download-results" type="button" disabled>
+              Download JSON
+            </button>
+            <button id="load-results" type="button">Load JSON</button>
+            <button id="clear-results" type="button" disabled>Clear</button>
+            <input
+              id="load-results-input"
+              type="file"
+              accept="application/json,.json"
+              hidden
+            />
+          </div>
+        </div>
+        <div id="report-list" class="report-grid">
+          <p class="empty-state">No benchmark has run yet.</p>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Generated reports contain artifact provenance, startup timings,
+          per-phase samples, parity results, and memory observations. Binary
+          artifacts are staged locally and are not part of the application
+          source.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

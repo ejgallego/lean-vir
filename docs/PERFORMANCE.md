@@ -91,6 +91,26 @@ Compare two saved reports with:
 npm run bench:compare -- build/perf/before.json build/perf/after.json
 ```
 
+## Browser prettyM comparison
+
+The five-backend `Std.Format.prettyM` benchmark interface is a standalone
+application under `benchmarks/prettyM-web/`. It does not initialize the VIR
+documentation site, Reveal, or Verso. The directory has its own package,
+artifact contract, build, isolated HTTP server, and browser regression so it
+can later become an independent repository by moving that directory intact.
+
+From the VIR root, use the thin convenience commands:
+
+```bash
+npm run bench:pretty:web:stage
+npm run bench:pretty:web:build
+npm run bench:pretty:web:test
+npm run bench:pretty:web:dev
+```
+
+See `benchmarks/prettyM-web/README.md` for the ignored artifact-seed layout and
+the commands that work directly from the application directory.
+
 ## Reading The Numbers
 
 Use a different comparison point depending on the question:

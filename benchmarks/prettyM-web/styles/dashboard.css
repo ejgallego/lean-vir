@@ -1,0 +1,432 @@
+.pretty-corpus-overlay button {
+  padding: 0.25rem 0.5rem;
+  color: inherit;
+  background: #30343a;
+  border: 1px solid rgba(180, 180, 180, 0.35);
+  border-radius: 0.25rem;
+  cursor: pointer;
+}
+
+.pretty-controls button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.pretty-corpus-status {
+  min-height: 1.35em;
+  margin: 0.3rem 0 0;
+  color: #aaa;
+  font-size: 0.78em;
+}
+
+.pretty-corpus-status.status-pass,
+.pretty-corpus-result.status-pass,
+.pretty-corpus-overlay tr.status-pass > .pretty-parity {
+  color: #76bd86;
+}
+
+.pretty-corpus-status.status-fail,
+.pretty-corpus-result.status-fail,
+.pretty-corpus-overlay tr.status-fail > .pretty-parity {
+  color: #df7478;
+}
+
+.pretty-corpus-overlay {
+  position: fixed;
+  inset: 4vh 4vw;
+  z-index: 1100;
+  overflow: auto;
+  box-sizing: border-box;
+  padding: 1rem 1.2rem 1.5rem;
+  color: #ddd;
+  background: rgba(24, 26, 30, 0.985);
+  border: 1px solid rgba(180, 180, 180, 0.4);
+  border-radius: 0.5rem;
+  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
+  font: 0.82rem/1.4 sans-serif;
+  text-align: left;
+}
+
+.pretty-corpus-overlay > header {
+  position: sticky;
+  top: -1rem;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  margin: -1rem -1.2rem 0.8rem;
+  padding: 0.8rem 1.2rem;
+  background: #181a1e;
+  border-bottom: 1px solid rgba(180, 180, 180, 0.25);
+}
+
+.pretty-corpus-overlay > header h2,
+.pretty-corpus-overlay h3,
+.pretty-corpus-overlay h4 {
+  margin: 0;
+  color: inherit;
+  font-family: sans-serif;
+  text-transform: none;
+}
+
+.pretty-corpus-overlay > header h2 {
+  font-size: 1.15rem;
+}
+
+.pretty-corpus-overlay > header > div {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.pretty-corpus-overlay h3 {
+  margin-top: 1.1rem;
+  font-size: 0.95rem;
+}
+
+.pretty-corpus-result {
+  margin: 0.4rem 0;
+  font-weight: 600;
+}
+
+.pretty-corpus-note {
+  margin: 0.35rem 0;
+  color: #aaa;
+  font-size: 0.78rem;
+}
+
+.pretty-corpus-overlay table {
+  width: 100%;
+  margin-top: 0.45rem;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+
+.pretty-corpus-overlay th,
+.pretty-corpus-overlay td {
+  padding: 0.28rem 0.42rem;
+  border-bottom: 1px solid rgba(180, 180, 180, 0.18);
+  text-align: right;
+  white-space: nowrap;
+}
+
+.pretty-corpus-overlay th:first-child,
+.pretty-corpus-overlay td:first-child,
+.pretty-corpus-overlay th:nth-child(2),
+.pretty-corpus-overlay td:nth-child(2) {
+  text-align: left;
+}
+
+.pretty-corpus-differences {
+  margin-top: 1rem;
+  padding: 0.6rem;
+  border: 1px solid rgba(220, 100, 105, 0.45);
+  border-radius: 0.3rem;
+}
+
+.pretty-corpus-differences summary {
+  cursor: pointer;
+  color: #df7478;
+  font-weight: 600;
+}
+
+.pretty-corpus-differences h4 {
+  margin-top: 0.8rem;
+}
+
+.pretty-corpus-differences pre {
+  overflow-x: auto;
+  padding: 0.45rem;
+  background: rgba(255, 255, 255, 0.05);
+  white-space: pre-wrap;
+}
+
+.pretty-scaling-chart {
+  display: block;
+  width: 100%;
+  min-width: 46rem;
+  max-height: 20rem;
+  margin: 0.35rem 0 0.75rem;
+  color: #bbb;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(180, 180, 180, 0.14);
+  border-radius: 0.3rem;
+}
+
+.pretty-scaling-phase-control {
+  position: sticky;
+  top: 3.2rem;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  margin: 0.4rem 0 0.2rem;
+  padding: 0.35rem 0.5rem;
+  background: #25282d;
+  border: 1px solid rgba(180, 180, 180, 0.25);
+  border-radius: 0.3rem;
+}
+
+.pretty-scaling-phase-control select {
+  min-width: 7rem;
+  color: inherit;
+  background: #30343a;
+  border: 1px solid rgba(180, 180, 180, 0.35);
+  border-radius: 0.2rem;
+}
+
+.pretty-interaction-controls {
+  position: sticky;
+  top: 3.2rem;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  width: fit-content;
+  margin: 0.4rem 0 0.2rem;
+  padding: 0.35rem 0.5rem;
+  background: #25282d;
+  border: 1px solid rgba(180, 180, 180, 0.25);
+  border-radius: 0.3rem;
+}
+
+.pretty-interaction-controls label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.pretty-interaction-controls select {
+  min-width: 7rem;
+  color: inherit;
+  background: #30343a;
+  border: 1px solid rgba(180, 180, 180, 0.35);
+  border-radius: 0.2rem;
+}
+
+.pretty-interaction-chart text {
+  fill: #ddd;
+}
+
+.pretty-scaling-chart text {
+  fill: currentColor;
+  font: 11px sans-serif;
+}
+
+.pretty-scaling-chart .axis {
+  stroke: rgba(210, 210, 210, 0.65);
+  stroke-width: 1;
+}
+
+.pretty-scaling-chart .grid {
+  stroke: rgba(180, 180, 180, 0.14);
+  stroke-width: 1;
+}
+
+.pretty-dashboard-overlay {
+  inset: 2vh 2vw;
+  padding-bottom: 2rem;
+  background: #181a1e;
+}
+
+.pretty-dashboard-source {
+  display: inline-block;
+  padding: 0.3rem 0.55rem;
+  background: rgba(109, 158, 235, 0.09);
+  border: 1px solid rgba(109, 158, 235, 0.25);
+  border-radius: 999px;
+}
+
+.pretty-dashboard-controls {
+  position: sticky;
+  top: 3.15rem;
+  z-index: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin: 0.55rem 0 0.8rem;
+  padding: 0.55rem 0.65rem;
+  background: rgba(37, 40, 45, 0.98);
+  border: 1px solid rgba(180, 180, 180, 0.25);
+  border-radius: 0.4rem;
+  box-shadow: 0 0.3rem 0.8rem rgba(0, 0, 0, 0.25);
+}
+
+.pretty-dashboard-controls > label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  white-space: nowrap;
+}
+
+.pretty-dashboard-controls select {
+  min-width: 7.5rem;
+  color: inherit;
+  background: #30343a;
+  border: 1px solid rgba(180, 180, 180, 0.35);
+  border-radius: 0.25rem;
+}
+
+.pretty-dashboard-backends {
+  display: flex;
+  flex: 1 1 24rem;
+  flex-wrap: wrap;
+  gap: 0.35rem 0.75rem;
+  min-width: 16rem;
+  margin: 0;
+  padding: 0.25rem 0.45rem 0.4rem;
+  border: 1px solid rgba(180, 180, 180, 0.2);
+  border-radius: 0.3rem;
+}
+
+.pretty-dashboard-backends legend {
+  padding: 0 0.25rem;
+  color: #bbb;
+}
+
+.pretty-dashboard-backend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.pretty-dashboard-swatch {
+  width: 0.65rem;
+  height: 0.65rem;
+  border-radius: 50%;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+
+.pretty-dashboard-cards {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(10rem, 1fr));
+  gap: 0.65rem;
+  margin: 0.45rem 0 1rem;
+}
+
+.pretty-dashboard-card {
+  min-width: 0;
+  padding: 0.75rem 0.8rem;
+  background: linear-gradient(
+    145deg,
+    rgba(109, 158, 235, 0.1),
+    rgba(255, 255, 255, 0.025)
+  );
+  border: 1px solid rgba(140, 170, 215, 0.22);
+  border-radius: 0.45rem;
+}
+
+.pretty-dashboard-card h3 {
+  margin: 0;
+  color: #aaa;
+  font-size: 0.72rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.pretty-dashboard-card strong {
+  display: block;
+  margin: 0.15rem 0;
+  color: #f0f0f0;
+  font-size: 1.45rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.pretty-dashboard-card p {
+  margin: 0;
+  color: #aaa;
+  font-size: 0.72rem;
+}
+
+.pretty-dashboard-chart {
+  display: block;
+  width: 100%;
+  color: #bbb;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(180, 180, 180, 0.14);
+  border-radius: 0.35rem;
+}
+
+.pretty-dashboard-chart text {
+  fill: currentColor;
+  font: 11px sans-serif;
+}
+
+.pretty-dashboard-chart .grid {
+  stroke: rgba(180, 180, 180, 0.14);
+  stroke-width: 1;
+}
+
+.pretty-dashboard-chart .pretty-dashboard-range {
+  stroke: rgba(245, 245, 245, 0.9);
+  stroke-width: 1.5;
+}
+
+.pretty-dashboard-overview-chart,
+.pretty-dashboard-phase-chart,
+.pretty-dashboard-overlay .pretty-repeated-memory-chart {
+  max-height: 23rem;
+  margin: 0.35rem 0 0.9rem;
+}
+
+.pretty-dashboard-scaling-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(23rem, 1fr));
+  gap: 0.7rem;
+  margin-top: 0.45rem;
+}
+
+.pretty-dashboard-scaling-grid figure {
+  min-width: 0;
+  margin: 0;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.018);
+  border: 1px solid rgba(180, 180, 180, 0.14);
+  border-radius: 0.4rem;
+}
+
+.pretty-dashboard-scaling-grid figcaption {
+  margin: 0 0 0.25rem 0.2rem;
+  color: #ddd;
+  font-weight: 600;
+}
+
+.pretty-dashboard-scaling-chart {
+  min-width: 0;
+  border: 0;
+  background: transparent;
+}
+
+.pretty-dashboard-overlay tr.pretty-dashboard-signal-neutral td:last-child {
+  color: #aaa;
+}
+
+.pretty-dashboard-overlay tr.pretty-dashboard-signal-high td:last-child {
+  color: #df7478;
+}
+
+.pretty-dashboard-overlay tr.pretty-dashboard-signal-low td:last-child {
+  color: #76bd86;
+}
+
+@media (max-width: 960px) {
+  .pretty-dashboard-cards,
+  .pretty-dashboard-scaling-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .pretty-dashboard-controls {
+    position: static;
+  }
+
+  .pretty-dashboard-chart {
+    min-width: 42rem;
+  }
+
+  .pretty-dashboard-scaling-grid {
+    overflow-x: auto;
+  }
+}
