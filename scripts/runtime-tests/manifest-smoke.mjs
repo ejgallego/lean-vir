@@ -22,6 +22,7 @@ import {
 } from "../../web/src/vir-runtime.js";
 import {
   createVirRuntime,
+  createVirRuntimeFactory as createNodeVirRuntimeFactory,
   debugWasmUrlFor as debugNodeWasmUrlFor,
   VIR_WASM_DEV_FILE as NODE_VIR_WASM_DEV_FILE,
   VIR_WASM_RELEASE_FILE as NODE_VIR_WASM_RELEASE_FILE,
@@ -581,7 +582,10 @@ assert.equal(hostRuntime.call("HostInterop.querySelectorAllFirstText", ".query-a
 assert.equal(hostRuntime.call("HostInterop.querySelectorAllCountLoop", ".query-all", 1000), "2000");
 const elementQueryRoot = ensureVirtualElementState(virtualDocumentState, "#element-query");
 elementQueryRoot.queries.set("[data-e]", [
-  createVirtualElementState({ attributes: new Map([["data-e", "0"]]) }),
+  createVirtualElementState({
+    textContent: "retained first child",
+    attributes: new Map([["data-e", "0"]]),
+  }),
   createVirtualElementState({ attributes: new Map([["data-e", "1"]]) }),
 ]);
 assert.equal(
@@ -590,28 +594,140 @@ assert.equal(
 );
 assert.equal(
   hostRuntime.call("HostInterop.elementQuerySelectorText", "#element-query", "[data-e]"),
-  "",
+  "retained first child",
 );
-elementQueryRoot.queries.get("[data-e]")[0].textContent = "first child";
 assert.equal(
-  hostRuntime.call("HostInterop.elementQuerySelectorText", "#element-query", "[data-e]"),
-  "first child",
+  hostRuntime.call(
+    "HostInterop.mountRetainedElementIndex",
+    "#element-query",
+    "[data-e]",
+    "<svg><text data-e>replacement child</text></svg>",
+  ),
+  "2",
 );
+assert.equal(
+  hostRuntime.hostState.resourceRoots.debugCounts().active,
+  queryRootBaseline + 2,
+  "RuntimeM.Ref should retain independently owned element roots",
+);
+elementQueryRoot.listeners.get("vir-check-index")[0].dispatch(createVirtualEventState());
+assert.equal(virtualDocumentState.title, "retained first child");
 assert.equal(
   hostRuntime.call("HostInterop.elementInnerHTMLRoundTrip", "#element-query", "<svg></svg>"),
   "<svg></svg>",
+);
+elementQueryRoot.listeners.get("vir-check-index")[0].dispatch(createVirtualEventState());
+assert.equal(
+  virtualDocumentState.title,
+  "retained first child",
+  "a reachable handle remains usable after its DOM node is detached",
+);
+assert.equal(
+  hostRuntime.hostState.resourceRoots.debugCounts().active,
+  queryRootBaseline + 2,
+  "detaching a node must not release a still-reachable element handle",
+);
+assert.equal(
+  hostRuntime.call("HostInterop.elementQuerySelectorAllCount", "#element-query", "[data-e]"),
+  "0",
+  "reindexing after innerHTML replacement must not rediscover stale element handles",
+);
+elementQueryRoot.listeners.get("vir-replace-index")[0].dispatch(createVirtualEventState());
+assert.equal(elementQueryRoot.innerHTML, "<svg><text data-e>replacement child</text></svg>");
+elementQueryRoot.listeners.get("vir-check-index")[0].dispatch(createVirtualEventState());
+assert.equal(virtualDocumentState.title, "index:empty");
+assert.equal(
+  hostRuntime.hostState.resourceRoots.debugCounts().active,
+  queryRootBaseline,
+  "segment replacement should release the detached element roots before reindexing",
 );
 assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), "714");
 const keyTarget = ensureVirtualElementState(virtualDocumentState, "#key-target");
 assert.equal(hostRuntime.call("HostInterop.mountKeyTitle", "#key-target"), "1");
 keyTarget.listeners.get("keydown")[0].dispatch(createVirtualEventState({ key: "Enter" }));
 assert.equal(virtualDocumentState.title, "Enter");
+keyTarget.listeners.get("keydown")[0].dispatch(createVirtualEventState());
+assert.equal(virtualDocumentState.title, "key:none");
+const frameTarget = ensureVirtualElementState(virtualDocumentState, "#frame-target");
+assert.equal(hostRuntime.call("HostInterop.mountCancelableAnimationRecord", "#frame-target", 211), "1");
+assert.equal(
+  hostRuntime.hostState.resourceRoots.debugCounts().active,
+  queryRootBaseline + 1,
+  "RuntimeM.Ref should retain a pending animation-frame handle",
+);
+frameTarget.listeners.get("vir-cancel-frame")[0].dispatch(createVirtualEventState());
+assert.equal(
+  hostRuntime.hostState.resourceRoots.debugCounts().active,
+  queryRootBaseline,
+  "cancelling a RuntimeM.Ref-held animation frame should release its external root",
+);
+await new Promise((resolve) => setTimeout(resolve, 30));
+assert.equal(callbackRecords.includes(211), false, "cancelled RuntimeM.Ref frame must not fire");
 assert.equal(
   hostRuntime.hostState.resourceRoots.debugCounts().active,
   queryRootBaseline,
   "querySelectorAll should release passive selector, NodeList, array, and element roots",
 );
-assert.equal(hostRuntime.liveCallbacks.size, 1, "keydown listener should retain its callback");
+assert.equal(hostRuntime.liveCallbacks.size, 5, "element index, key, and frame listeners should retain callbacks");
+
+const sharedDocumentState = createVirtualDocumentState();
+const sharedContainer = ensureVirtualElementState(sharedDocumentState, "#shared-runtime");
+const sharedChild = createVirtualElementState({ textContent: "shared child" });
+sharedContainer.queries.set("[data-e]", [sharedChild]);
+const sharedRuntimeFactory = createNodeVirRuntimeFactory({
+  wasmBytes,
+  virtualDocumentState: sharedDocumentState,
+  hostBindings: {
+    "test.callNatCallback": (input, callback) => {
+      try {
+        return callback(input);
+      } finally {
+        callback.release();
+      }
+    },
+    "test.recordNat": () => undefined,
+  },
+});
+const firstSharedRuntime = await sharedRuntimeFactory.createRuntime({
+  irPackageSetBytes: [hostPackageBytes],
+});
+const secondSharedRuntime = await sharedRuntimeFactory.createRuntime({
+  irPackageSetBytes: [hostPackageBytes],
+});
+assert.equal(
+  firstSharedRuntime.call(
+    "HostInterop.mountRetainedElementIndex",
+    "#shared-runtime",
+    "[data-e]",
+    "<span data-e>first replacement</span>",
+  ),
+  "1",
+);
+assert.equal(
+  secondSharedRuntime.call(
+    "HostInterop.mountRetainedElementIndex",
+    "#shared-runtime",
+    "[data-e]",
+    "<span data-e>second replacement</span>",
+  ),
+  "1",
+);
+assert.equal(firstSharedRuntime.hostState.resourceRoots.debugCounts().active, 1);
+assert.equal(secondSharedRuntime.hostState.resourceRoots.debugCounts().active, 1);
+assert.equal(sharedContainer.listeners.get("vir-check-index").length, 2);
+firstSharedRuntime.dispose();
+assert.equal(
+  secondSharedRuntime.hostState.resourceRoots.debugCounts().active,
+  1,
+  "disposing one runtime must not release another runtime's element roots",
+);
+assert.equal(sharedContainer.listeners.get("vir-check-index").length, 1);
+sharedChild.textContent = "second runtime remains live";
+sharedContainer.listeners.get("vir-check-index")[0].dispatch(createVirtualEventState());
+assert.equal(sharedDocumentState.title, "second runtime remains live");
+secondSharedRuntime.dispose();
+assert.equal(sharedContainer.listeners.get("vir-check-index")?.length ?? 0, 0);
+
 hostRuntime.dispose();
 assert.equal(hostRuntime.liveCallbacks.size, 0, "runtime disposal should release the key listener");
 runtime.dispose();

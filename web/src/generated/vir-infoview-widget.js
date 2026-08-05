@@ -3317,7 +3317,10 @@ function createBrowserEventHostBindings(state = createHostResourceState()) {
     },
     "browser.event.key": (event) => {
       const key = state.resolveResource(event, "Event")?.key;
-      return state.resourceForValue(typeof key === "string" ? key : "");
+      return adoptResourceForValue(
+        state,
+        createNullableValue(typeof key === "string" ? key : null)
+      );
     },
     "browser.event.formValue": (event) => adoptResourceForValue(state, createNullableValue(formControlEventValue(state.resolveResource(event, "Event"))))
   };

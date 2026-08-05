@@ -76,6 +76,75 @@ export async function smokeBrowserCallbacks(cdp, origin) {
     })()`,
   });
 
+  await runDemoHostEntry(cdp, origin, "HostInterop.mountRetainedElementIndex", {
+    runInputs: [
+      "#retained-index-smoke",
+      "[data-e]",
+      "<span data-e>replacement browser child</span>",
+    ],
+    expectedResult: "2",
+    target: { id: "retained-index-smoke" },
+    beforeRunScript: `(() => {
+      document.querySelector("#retained-index-smoke").innerHTML =
+        "<span data-e>first browser child</span><span data-e>second browser child</span>";
+      return true;
+    })()`,
+  });
+  await evaluate(cdp, `document.querySelector("#retained-index-smoke")
+    .dispatchEvent(new Event("vir-check-index"))`);
+  assert.equal(
+    await waitForDocumentTitle(cdp, "first browser child", "retained element snapshot was not readable"),
+    "first browser child",
+  );
+  await evaluate(cdp, `document.querySelector("#retained-index-smoke")
+    .dispatchEvent(new Event("vir-replace-index"))`);
+  const replacementIndex = await waitForBrowserState(cdp, `(() => {
+    const matches = [...document.querySelectorAll("#retained-index-smoke [data-e]")];
+    return {
+      ready: matches.length === 1 && matches[0].textContent === "replacement browser child",
+      value: matches.map((element) => element.textContent),
+    };
+  })()`, { timeoutMessage: "segment replacement did not install the new DOM index" });
+  assert.deepEqual(replacementIndex, ["replacement browser child"]);
+  await evaluate(cdp, `document.querySelector("#retained-index-smoke")
+    .dispatchEvent(new Event("vir-check-index"))`);
+  assert.equal(
+    await waitForDocumentTitle(cdp, "replacement browser child", "replacement snapshot was not retained"),
+    "replacement browser child",
+  );
+
+  await runDemoHostEntry(cdp, origin, "HostInterop.mountKeyTitle", {
+    runInputs: ["#key-smoke-target"],
+    expectedResult: "1",
+    target: { id: "key-smoke-target", tag: "input" },
+  });
+  await evaluate(cdp, `document.querySelector("#key-smoke-target")
+    .dispatchEvent(new KeyboardEvent("keydown", { key: "Enter" }))`);
+  assert.equal(
+    await waitForDocumentTitle(cdp, "Enter", "keyboard key was not decoded"),
+    "Enter",
+  );
+  await evaluate(cdp, `document.querySelector("#key-smoke-target")
+    .dispatchEvent(new Event("keydown"))`);
+  assert.equal(
+    await waitForDocumentTitle(cdp, "key:none", "non-keyboard event did not produce none"),
+    "key:none",
+  );
+
+  await runDemoHostEntry(cdp, origin, "HostInterop.mountCancelableAnimationTitle", {
+    runInputs: ["#cancel-frame-smoke", "pages-frame"],
+    expectedResult: "1",
+    target: { id: "cancel-frame-smoke", tag: "button" },
+  });
+  await evaluate(cdp, `document.querySelector("#cancel-frame-smoke")
+    .dispatchEvent(new Event("vir-cancel-frame"))`);
+  assert.equal(
+    await waitForDocumentTitle(cdp, "cancelled:pages-frame", "pending animation frame was not cancelled"),
+    "cancelled:pages-frame",
+  );
+  await waitInBrowser(cdp, 50);
+  assert.equal(await evaluate(cdp, "document.title"), "cancelled:pages-frame");
+
   await runDemoHostEntry(cdp, origin, "HostInterop.mountCallbackText", {
     runInputs: ["#callback-smoke-target"],
     expectedResult: "1",

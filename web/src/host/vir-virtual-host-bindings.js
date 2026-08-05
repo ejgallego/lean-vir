@@ -92,7 +92,7 @@ export function ensureVirtualElementStates(state, selector, elements) {
 export function createVirtualEventState({
   target = null,
   currentTarget = null,
-  key = "",
+  key = null,
   defaultPrevented = false,
   propagationStopped = false,
   onPreventDefault = null,
@@ -136,7 +136,9 @@ export function createVirtualEventHostBindings(
     },
     "browser.event.key": (event) => {
       const key = resources.resolveResource(event, "Event")?.key;
-      return resources.resourceForValue(typeof key === "string" ? key : "");
+      return resources.adoptResourceForValue(
+        createNullableValue(typeof key === "string" ? key : null),
+      );
     },
     "browser.event.formValue": (event) =>
       resources.adoptResourceForValue(createNullableValue(formControlEventValue(resources.resolveResource(event, "Event")))),

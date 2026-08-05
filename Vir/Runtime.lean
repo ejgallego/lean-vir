@@ -42,43 +42,47 @@ instance : Nonempty (RuntimeM α) :=
     unfold RuntimeM
     infer_instance
 
-end RuntimeM
-
-/-- Mutable Lean-owned state shared by VIR callbacks. -/
-@[irreducible] def RuntimeRef (α : Type) : Type :=
+/-- Mutable Lean-owned state shared by VIR runtime callbacks. -/
+@[irreducible] def Ref (α : Type) : Type :=
   IO.Ref α
 
-namespace RuntimeRef
+namespace Ref
 
 /-- Creates a mutable Lean-owned runtime reference. -/
-def new (value : α) : RuntimeM (RuntimeRef α) := by
-  unfold RuntimeM RuntimeRef
+def new (value : α) : RuntimeM (Ref α) := by
+  unfold RuntimeM Ref
   exact liftM (IO.mkRef value)
 
 /-- Reads a runtime reference. -/
-def get (ref : RuntimeRef α) : RuntimeM α := by
-  unfold RuntimeRef at ref
+def get (ref : Ref α) : RuntimeM α := by
+  unfold Ref at ref
   unfold RuntimeM
   exact ref.get
 
 /-- Replaces the contents of a runtime reference. -/
-def set (ref : RuntimeRef α) (value : α) : RuntimeM Unit := by
-  unfold RuntimeRef at ref
+def set (ref : Ref α) (value : α) : RuntimeM Unit := by
+  unfold Ref at ref
   unfold RuntimeM
   exact ref.set value
 
 /-- Modifies a runtime reference. -/
-def modify (ref : RuntimeRef α) (f : α → α) : RuntimeM Unit := by
-  unfold RuntimeRef at ref
+def modify (ref : Ref α) (f : α → α) : RuntimeM Unit := by
+  unfold Ref at ref
   unfold RuntimeM
   exact ref.modify f
 
 /-- Modifies a runtime reference and returns a value computed from its previous contents. -/
-def modifyGet (ref : RuntimeRef α) (f : α → β × α) : RuntimeM β := by
-  unfold RuntimeRef at ref
+def modifyGet (ref : Ref α) (f : α → β × α) : RuntimeM β := by
+  unfold Ref at ref
   unfold RuntimeM
   exact ref.modifyGet f
 
-end RuntimeRef
+/-- Replaces a runtime reference and returns its previous contents. -/
+def swap (ref : Ref α) (value : α) : RuntimeM α :=
+  modifyGet ref fun previous => (previous, value)
+
+end Ref
+
+end RuntimeM
 
 end Lean.Vir

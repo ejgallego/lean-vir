@@ -211,11 +211,12 @@ allocate or inspect `Lean.Vir.Js ...` resources or update runtime bookkeeping,
 but do not themselves mutate the browser DOM or enter React root APIs. It is
 narrower than raw `IO` and lifts into `DomM` and `ReactM`.
 
-It also provides `Lean.Vir.RuntimeRef α`, a Lean-owned mutable cell for state
-shared by retained callbacks. `RuntimeRef.new`, `get`, `set`, `modify`, and
-`modifyGet` run in `RuntimeM`. Values replaced in a runtime ref follow normal
-Lean reference counting, including the owned/borrowed host-resource policy for
-stored `Js` handles; callers do not manually release DOM element handles.
+It also provides `Lean.Vir.RuntimeM.Ref α`, a Lean-owned mutable cell for state
+shared by retained callbacks. `Ref.new`, `get`, `set`, `swap`, `modify`, and
+`modifyGet` run in `RuntimeM`. The reference is ordinary Lean-owned state rather
+than a host runtime registration; it remains live through the callbacks that
+capture it. Replaced values follow normal Lean reference counting, including
+the owned/borrowed host-resource policy for stored `Js` handles.
 
 `Vir.Js` provides `Lean.Vir.Js α`, an opaque resource handle for
 JavaScript-owned objects. The `α` parameter is a Lean-side phantom marker: while
@@ -298,12 +299,13 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Document.setTitle : @& String -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Document.querySelector : @& String -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Document.querySelectorAll : @& String -> Lean.Vir.Browser.DomM (Lean.Vir.Js.NodeList (Lean.Vir.Js Lean.Vir.Browser.Element))`
+- `Lean.Vir.Browser.Document.querySelectorAllSnapshot : @& String -> Lean.Vir.Browser.DomM (Array (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Document.createElement : @& String -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.Element)`
 - `Lean.Vir.Browser.Event.target : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.currentTarget : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.Element))`
 - `Lean.Vir.Browser.Event.preventDefault : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Event.stopPropagation : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Event.key : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM String`
+- `Lean.Vir.Browser.Event.key? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option String)`
 - `Lean.Vir.Browser.Event.inputElement? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option (Lean.Vir.Js Lean.Vir.Browser.HTMLInputElement))`
 - `Lean.Vir.Browser.Event.inputValue? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option String)`
 - `Lean.Vir.Browser.Event.inputChecked? : @& Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM (Option Bool)`
@@ -311,8 +313,11 @@ Use `DomM.run` only at an explicit exported `IO` boundary.
 - `Lean.Vir.Browser.Element.setTextContent : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM Unit`
 - `Lean.Vir.Browser.Element.getAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> Lean.Vir.Browser.DomM (Option String)`
 - `Lean.Vir.Browser.Element.setAttribute : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> @& String -> Lean.Vir.Browser.DomM Unit`
-- `Lean.Vir.Browser.Element.querySelector` and `querySelectorAll` search below an existing element resource.
-- `Lean.Vir.Browser.Element.getInnerHTML` and `setInnerHTML` read or replace serialized child markup.
+- `Lean.Vir.Browser.Element.querySelector` searches below an existing element;
+  `querySelectorAll` returns a static NodeList and `querySelectorAllSnapshot`
+  returns independently owned element handles.
+- `Lean.Vir.Browser.Element.getInnerHTML` reads serialized child markup;
+  `setInnerHTMLUnsafe` replaces it with trusted raw HTML or SVG markup.
 - `Lean.Vir.Browser.Element.appendChild` and `remove` provide basic DOM tree mutation.
 - `Lean.Vir.Browser.Element.ClassList.add`, `remove`, and `toggle` update CSS classes; `Element.Style.setProperty` updates inline style properties.
 - `Lean.Vir.Browser.Element.addEventListener : @& Lean.Vir.Js Lean.Vir.Browser.Element -> @& String -> (Lean.Vir.Js Lean.Vir.Browser.Event -> Lean.Vir.Browser.DomM Unit) -> Lean.Vir.Browser.DomM (Lean.Vir.Js Lean.Vir.Browser.EventListener)`
