@@ -6,6 +6,16 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+export function benchmarkWasmBuildIdentity(env = process.env) {
+  return {
+    profile: env.VIR_WASM_PROFILE ?? "dev",
+    optimization: env.VIR_WASM_OPT_LEVEL ?? "-O3",
+    target: env.WASI_TARGET ?? "wasm32-wasip1",
+    initialMemory: env.VIR_WASM_INITIAL_MEMORY ?? "4194304",
+    stackSize: env.VIR_WASM_STACK_SIZE ?? "1048576",
+  };
+}
+
 export function benchmarkCacheOptionDefaults() {
   return {
     artifactCacheEnabled: true,

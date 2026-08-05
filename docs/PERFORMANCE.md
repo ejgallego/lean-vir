@@ -7,10 +7,12 @@ in `docs/HARNESS.md`.
 `npm run bench` runs the manifest-driven JavaScript runtime benchmark against
 the host Lean IR baseline. It restores or stores built benchmark inputs under
 `.perf-artifacts/vir-bench-cache` by default, keyed by commit plus a build-key
-hash. The cache stores generated inputs, not timing samples, so benchmark
-timings are still regenerated for each run. Use `--no-artifact-cache` to
-disable the cache, `--artifact-cache DIR` to put it elsewhere, and
-`--refresh-artifact-cache` to replace the current cache entry.
+hash. The build key covers tracked diffs, relevant untracked input contents,
+tool versions, build flags, and selected source identities. The cache stores
+generated inputs, not timing samples, so benchmark timings are still regenerated
+for each run. Use `--no-artifact-cache` to disable the cache,
+`--artifact-cache DIR` to put it elsewhere, and `--refresh-artifact-cache` to
+replace the current cache entry.
 
 Pass `--json` to save a machine-readable report:
 
@@ -42,10 +44,12 @@ and artifact-cache key. Output paths are never overwritten, and `--json` and
 `--cpu-profile` must resolve to different files.
 
 Focused reports include a stable comparison identity; saved and paired
-comparisons reject mismatched run policy, diagnostics, toolchain/machine,
-package content and format, timing harness, or fixture before reporting a
-delta. Package content identity ignores only the manifest's volatile
-`generatedAt` field; the report also retains the exact package SHA-256.
+comparisons require the same workload/result, run policy, diagnostic mode,
+Node/V8 version, Lean toolchain, platform/architecture, CPU model, Wasm
+artifact/build configuration, package content and format, timing harness, and
+fixture before reporting a delta. Package content identity ignores only the
+manifest's volatile `generatedAt` field; the report also retains the exact
+package SHA-256.
 
 Capture sampled attribution in a separate diagnostic run:
 

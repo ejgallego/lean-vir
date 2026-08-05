@@ -47,8 +47,8 @@ map lives in `docs/HARNESS.md`.
 - `npm run test:upstream:no-build`
   Reuse existing demo WASM and browser packages for the upstream smoke test.
 - `npm run test:bench`
-  Run the dependency-free benchmark sampler, focused-identity, and paired-runner
-  contract tests.
+  Run the dependency-free artifact-cache, benchmark sampler, focused-identity,
+  and paired-runner contract tests.
 - `npm run bench:env-lookup`
   Measure repeated fresh interpreter entries through a large package, with an
   optional execution-window V8 CPU profile. See `docs/PERFORMANCE.md`.

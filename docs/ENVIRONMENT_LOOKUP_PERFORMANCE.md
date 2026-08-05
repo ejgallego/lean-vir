@@ -50,10 +50,12 @@ entries without depending on Illuminate:
 [Performance](PERFORMANCE.md#environment-lookup-workload) owns the report,
 profile, and paired-comparison commands. Use `--no-build` only after matching
 artifacts have been built, keep profiling separate from timing evidence, and
-use an even AB/BA schedule for acceptance. Focused comparisons reject different
-package content, harness sources, fixtures, run policies, toolchains, or
-machines. Package identity ignores only the manifest's volatile `generatedAt`
-field; reports retain the exact package SHA-256 for stricter manual acceptance.
+use an even AB/BA schedule for acceptance. Focused comparisons require the same
+workload, package content, harness sources, fixtures, run policies, diagnostic
+mode, Wasm artifact/build configuration, Node/V8 versions, Lean toolchain,
+platform/architecture, and CPU model. Package identity ignores only the
+manifest's volatile `generatedAt` field; reports retain the exact package
+SHA-256 for stricter manual acceptance.
 
 ## Measurements
 
@@ -219,8 +221,8 @@ justified.
 Repository validation covers package hits/misses, boxed separation, package
 sets and duplicate rejection, failed loads, initializers, reload, and fixture
 agreement. The boundary fixture includes string and numeric `Name.hash` values,
-including the oversized-numeral rule, so hash regressions are observable against
-host Lean.
+including the largest UInt64 numeral and the oversized-numeral rule, so hash
+regressions are observable against host Lean.
 
 The representative Illuminate acceptance gate has passed: the focused result
 reproduced, sustained callback mean and CPU were halved, the original sampled

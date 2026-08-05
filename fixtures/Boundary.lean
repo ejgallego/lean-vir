@@ -190,11 +190,13 @@ unsafe def nameHashSubstringPtrScore : Nat :=
   let sameName := Lean.Name.beq `Lean.Parser `Lean.Parser
   let diffName := Lean.Name.beq `Lean.Parser `Lean.Elab
   let smallNumeralName := Lean.Name.num `Lean.Parser 37
+  let largestUInt64NumeralName := Lean.Name.num `Lean.Parser (UInt64.size - 1)
   let oversizedNumeralName := Lean.Name.num `Lean.Parser UInt64.size
   let nameHashScore :=
     (`Lean.Parser).hash.toNat % 1009 +
     (`Lean.Elab).hash.toNat % 1009 +
     smallNumeralName.hash.toNat % 1009 +
+    largestUInt64NumeralName.hash.toNat % 1009 +
     oversizedNumeralName.hash.toNat % 1009
   let raw1 : Substring.Raw := ⟨"abcdef", ⟨1⟩, ⟨4⟩⟩
   let raw2 : Substring.Raw := ⟨"abcdef", ⟨1⟩, ⟨4⟩⟩

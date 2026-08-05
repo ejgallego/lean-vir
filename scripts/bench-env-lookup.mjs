@@ -25,6 +25,7 @@ import {
 } from "./browser-package-config.mjs";
 import {
   benchmarkCacheOptionDefaults,
+  benchmarkWasmBuildIdentity,
   formatMs,
   parseBenchmarkCacheOption,
   parsePositiveInt,
@@ -40,13 +41,7 @@ const benchmarkEntryName = "Vir.Fixtures.ExprPrinter.exprCoverageScore";
 const expectedResult = 1232;
 const args = parseArgs(process.argv.slice(2));
 const benchmarkWasmFile = args.cpuProfilePath === null ? wasmPublicFile : wasmDevPublicFile;
-const wasmBuild = {
-  profile: process.env.VIR_WASM_PROFILE ?? "dev",
-  optimization: process.env.VIR_WASM_OPT_LEVEL ?? "-O3",
-  target: process.env.WASI_TARGET ?? "wasm32-wasip1",
-  initialMemory: process.env.VIR_WASM_INITIAL_MEMORY ?? "4194304",
-  stackSize: process.env.VIR_WASM_STACK_SIZE ?? "1048576",
-};
+const wasmBuild = benchmarkWasmBuildIdentity();
 const environmentLookupArtifactPaths = [
   publicArtifactPath(benchmarkWasmFile),
   publicArtifactPath(leanPackageFile),

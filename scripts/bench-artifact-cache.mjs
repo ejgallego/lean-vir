@@ -11,9 +11,10 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { copyFileWithDirs } from "./file-utils.mjs";
+import { benchmarkWasmBuildIdentity } from "./bench-utils.mjs";
 import { runSync } from "./process-utils.mjs";
 
-const artifactCacheVersion = 2;
+const artifactCacheVersion = 3;
 const buildInputDiffPaths = [
   "Lean",
   "Vir",
@@ -144,6 +145,7 @@ function artifactCachePayload(root, rootPath, artifactPaths) {
     dirty: git.dirty,
     dirtyStatus: status.length === 0 ? null : sha256Text(status),
     dirtyBuildInputDiff: diff.length === 0 ? null : sha256Text(diff),
+    untrackedBuildInputs: untrackedBuildInputDigests(root, rootPath),
     node: process.version,
     platform: process.platform,
     arch: process.arch,
@@ -154,18 +156,22 @@ function artifactCachePayload(root, rootPath, artifactPaths) {
     wasiClang: process.env.WASI_SDK_PATH
       ? optionalCommandVersion(root, join(process.env.WASI_SDK_PATH, "bin", "clang++"), ["--version"])
       : optionalCommandVersion(root, "clang++", ["--version"]),
-    wasmBuild: {
-      profile: process.env.VIR_WASM_PROFILE ?? "dev",
-      optimization: process.env.VIR_WASM_OPT_LEVEL ?? "-O3",
-      target: process.env.WASI_TARGET ?? "wasm32-wasip1",
-      initialMemory: process.env.VIR_WASM_INITIAL_MEMORY ?? "4194304",
-      stackSize: process.env.VIR_WASM_STACK_SIZE ?? "1048576",
-    },
+    wasmBuild: benchmarkWasmBuildIdentity(),
     sourceIdentity: Object.fromEntries(
       sourceIdentityPaths.map((path) => [path, fileDigest(rootPath, path)]),
     ),
     artifacts: artifactPaths,
   };
+}
+
+export function untrackedBuildInputDigests(root, rootPath) {
+  const output = runSync(
+    "git",
+    ["ls-files", "--others", "--exclude-standard", "-z", "--", ...buildInputDiffPaths],
+    { cwd: root, capture: true, trimStdout: false },
+  );
+  const paths = output.split("\0").filter((path) => path.length !== 0);
+  return Object.fromEntries(paths.map((path) => [path, fileDigest(rootPath, path)]));
 }
 
 function gitMetadata(root) {
