@@ -25,6 +25,11 @@ profile showed that the apparent sort cost was itself caused by constant name
 hashes. Correct hashes made index construction cheap, and the measured hash-map
 implementation does not regress package load.
 
+The representative Illuminate acceptance workload confirms that the focused
+result transfers to browser use: sustained 60 Hz callback mean was halved,
+callback CPU fell from 6.6% to 3.3%, and all eight order-balanced runs preserved
+identical DOM output without browser errors.
+
 ## Reproducible Workload
 
 The repository-local workload reproduces Illuminate's many short asynchronous
@@ -105,6 +110,36 @@ An identical-code AB/BA control produced execution deltas from about -31% to
 movements are much larger, consistent across every paired pass, and accompanied
 by the predicted profile movement.
 
+### Illuminate acceptance
+
+The follow-up representative test used the same animation, package bytes,
+modular runtime, and sustained 60 Hz callback rate for control and candidate.
+Across eight order-balanced A/B runs it reported:
+
+| Workload | Control | Candidate | Improvement |
+| --- | ---: | ---: | ---: |
+| VIR fresh-entry benchmark | 371.4 µs | 56.2 µs | 6.6x |
+| Package loading | 12.35 ms | 9.21 ms | 25.4% |
+| Illuminate sustained 60 Hz mean | 1.10 ms | 0.545 ms | 2.0x |
+| Illuminate sustained p95 | 1.60 ms | 0.75 ms | 53% |
+| Illuminate callback CPU | 6.6% | 3.3% | 50% |
+
+There were zero DOM mismatches and zero browser errors. The post-change sampled
+profile also moved in the predicted direction:
+
+- `lean_name_eq` represented 32% of symbolized active time in the control and
+  was absent from the candidate's top 25;
+- sampled `get_decl` self-time fell from 14.8 to 3.3 milliseconds;
+- native-symbol lookup fell from 29.0 to 10.3 milliseconds;
+- interpreter symbol lookup fell from 21.1 to 4.2 milliseconds; and
+- the new package hash-map lookup represented about 6.5% of the remaining
+  symbolized active time.
+
+This broader movement is expected: correct `Name` hashes improve every
+interpreter hash table that sees decoded package names, not only VIR's new
+declaration index. Profile timings remain attribution evidence; the unprofiled,
+order-balanced callback measurements are the acceptance result.
+
 ## Accepted Local Design
 
 Decoded names now use Lean's real construction rules:
@@ -169,12 +204,14 @@ into upstream or exposing `.irpkg`. Once the overload exists,
 `interpreter_bridge.cpp` passes the provider explicitly and removes VIR's
 replacement definitions of the exported lookup symbols.
 
-Only after the Illuminate acceptance workload is re-profiled should upstream
-consider an optional caller-owned symbol cache. The final focused profile still
-shows interpreter symbol-cache work, but a reusable cache needs precise
-identity over environment, relevant options, provider state, and provider
-revision. It should retain only resolved declaration/native-symbol metadata,
-not mutable interpreter stacks or evaluated constants.
+The Illuminate acceptance profile does not justify coupling a caller-owned
+symbol cache to the first upstream API: representative callback time halved and
+the targeted lookup buckets moved substantially. Keep the first change limited
+to an explicit declaration provider. A reusable symbol cache should be
+reconsidered only if a future representative profile selects it; such a cache
+would need precise identity over environment, relevant options, provider state,
+and provider revision, and must not retain mutable interpreter stacks or
+evaluated constants.
 
 ## Rejected or Superseded Experiments
 
@@ -193,14 +230,16 @@ not mutable interpreter stacks or evaluated constants.
   unnecessary. Application batching may still help Illuminate, but it should
   not be required to hide provider lookup costs.
 
-## Remaining Validation
+## Validation and Follow-up
 
 Repository validation covers package hits/misses, boxed separation, package
 sets and duplicate rejection, failed loads, initializers, reload, and fixture
 agreement. The boundary fixture also includes actual `Name.hash` values so the
 constant-hash regression is observable against host Lean.
 
-The representative acceptance gate remains Illuminate's isolated callback and
-16-player dashboard workloads, including DOM/state differential checks. If
-those do not move with the focused 6.85x result, the next profile—not the old
-provider hypothesis—should select the next target.
+The representative Illuminate acceptance gate has passed: the focused result
+reproduced, sustained callback mean and CPU were halved, the original sampled
+hotspots moved, and DOM output remained identical. The next design step is the
+provider-only upstream API described above. Any further optimization target
+should come from a new representative profile rather than extending this lookup
+patch speculatively.
