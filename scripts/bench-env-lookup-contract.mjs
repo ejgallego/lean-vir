@@ -9,6 +9,47 @@ import { resolve } from "node:path";
 
 import { IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
 
+// Keep this conservative and explicit: every local module loaded by the
+// focused benchmark belongs to its comparison identity, even when a module is
+// used only by setup or by a cold runtime path.
+export const environmentLookupHarnessPaths = Object.freeze([
+  "package.json",
+  "fixtures/browser-packages.json",
+  "scripts/bench-artifact-cache.mjs",
+  "scripts/bench-differential.mjs",
+  "scripts/bench-env-lookup-contract.mjs",
+  "scripts/bench-env-lookup.mjs",
+  "scripts/bench-utils.mjs",
+  "scripts/browser-package-config.mjs",
+  "scripts/file-utils.mjs",
+  "scripts/irpkg-format.mjs",
+  "scripts/package-versions.mjs",
+  "scripts/process-utils.mjs",
+  "scripts/wasm-build-identity.mjs",
+  "web/src/host-resource.js",
+  "web/src/host/vir-host-resources.js",
+  "web/src/host/vir-js-collection-bindings.js",
+  "web/src/host/vir-js-value-bindings.js",
+  "web/src/host/vir-virtual-host-bindings.js",
+  "web/src/pages/browser-package-config.js",
+  "web/src/react/vir-react-hooks.js",
+  "web/src/react/vir-react-node.js",
+  "web/src/runtime/callbacks.js",
+  "web/src/runtime/cleanup.js",
+  "web/src/runtime/core.js",
+  "web/src/runtime/host-state.js",
+  "web/src/runtime/interface-effects.js",
+  "web/src/runtime/interface-manifest.js",
+  "web/src/runtime/interface-tags.js",
+  "web/src/runtime/object-abi-exports.js",
+  "web/src/runtime/object-abi.js",
+  "web/src/runtime/object-values.js",
+  "web/src/runtime/vir-codec.js",
+  "web/src/runtime/vir-value-normalizers.js",
+  "web/src/vir-host-bindings.js",
+  "web/src/vir-runtime.js",
+]);
+
 export function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }

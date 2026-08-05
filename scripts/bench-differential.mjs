@@ -21,9 +21,11 @@ function errorMessage(error) {
 
 /**
  * Interleave fixed-size candidate batches and compare their numeric checksums.
- * Each available candidate supplies `run()`, which must return a finite number.
- * Warm-up results participate in stability checks, but only measured timings
- * are retained in each candidate's `samples` array and `medianMs` summary.
+ * Each available candidate supplies `run(context)`, which must return a finite
+ * number. Optional `setup()` and `teardown(context)` calls run outside the
+ * timed window. Warm-up results participate in stability checks, but only
+ * measured timings are retained in each candidate's `samples` array and
+ * `medianMs` summary.
  */
 export function sampleBenchmarkCandidates(options) {
   if (options === null || typeof options !== "object") {

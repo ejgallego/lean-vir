@@ -6,13 +6,17 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+function envOrDefault(env, name, fallback) {
+  return typeof env[name] === "string" && env[name].length !== 0 ? env[name] : fallback;
+}
+
 export function benchmarkWasmBuildIdentity(env = process.env) {
   return {
-    profile: env.VIR_WASM_PROFILE ?? "dev",
-    optimization: env.VIR_WASM_OPT_LEVEL ?? "-O3",
-    target: env.WASI_TARGET ?? "wasm32-wasip1",
-    initialMemory: env.VIR_WASM_INITIAL_MEMORY ?? "4194304",
-    stackSize: env.VIR_WASM_STACK_SIZE ?? "1048576",
+    profile: envOrDefault(env, "VIR_WASM_PROFILE", "dev"),
+    optimization: envOrDefault(env, "VIR_WASM_OPT_LEVEL", "-O3"),
+    target: envOrDefault(env, "WASI_TARGET", "wasm32-wasip1"),
+    initialMemory: envOrDefault(env, "VIR_WASM_INITIAL_MEMORY", "4194304"),
+    stackSize: envOrDefault(env, "VIR_WASM_STACK_SIZE", "1048576"),
   };
 }
 
@@ -83,7 +87,11 @@ export function parsePositiveInt(value, option) {
   if (!/^[1-9]\d*$/.test(value)) {
     throw new Error(`${option} requires a positive integer`);
   }
-  return Number(value);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error(`${option} requires a safe positive integer`);
+  }
+  return parsed;
 }
 
 export function median(values) {

@@ -8,9 +8,12 @@ in `docs/HARNESS.md`.
 the host Lean IR baseline. It restores or stores built benchmark inputs under
 `.perf-artifacts/vir-bench-cache` by default, keyed by commit plus a build-key
 hash. The build key covers tracked diffs, relevant untracked input contents,
-tool versions, build flags, and selected source identities. The cache stores
-generated inputs, not timing samples, so benchmark timings are still regenerated
-for each run. Use `--no-artifact-cache` to disable the cache,
+the effective compiler/linker/tool versions, Lean source commit and dirty state,
+build flags, and selected source identities. The shell build and benchmark
+cache share the same effective-tool resolver, including the repository-local
+WASI SDK fallback. The cache stores generated inputs, not timing samples, so
+benchmark timings are still regenerated for each run. Use
+`--no-artifact-cache` to disable the cache,
 `--artifact-cache DIR` to put it elsewhere, and `--refresh-artifact-cache` to
 replace the current cache entry.
 
@@ -49,7 +52,8 @@ Node/V8 version, Lean toolchain, platform/architecture, CPU model, Wasm
 artifact/build configuration, package content and format, timing harness, and
 fixture before reporting a delta. Package content identity ignores only the
 manifest's volatile `generatedAt` field; the report also retains the exact
-package SHA-256.
+package SHA-256. Timing-harness identity covers the benchmark helpers and the
+complete local JavaScript module closure loaded by the focused runtime.
 
 Capture sampled attribution in a separate diagnostic run:
 

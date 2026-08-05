@@ -12,6 +12,7 @@ import { dirname } from "node:path";
 import { ensureCachedBenchArtifacts } from "./bench-artifact-cache.mjs";
 import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
 import {
+  environmentLookupHarnessPaths,
   environmentLookupHarnessIdentity,
   environmentLookupPackageIdentity,
   sha256,
@@ -25,7 +26,6 @@ import {
 } from "./browser-package-config.mjs";
 import {
   benchmarkCacheOptionDefaults,
-  benchmarkWasmBuildIdentity,
   formatMs,
   parseBenchmarkCacheOption,
   parsePositiveInt,
@@ -34,6 +34,7 @@ import {
 } from "./bench-utils.mjs";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 import { runSync } from "./process-utils.mjs";
+import { effectiveWasmBuildIdentity } from "./wasm-build-identity.mjs";
 import { createVirRuntimeFactory } from "../web/src/vir-runtime.js";
 
 const root = new URL("..", import.meta.url);
@@ -41,15 +42,10 @@ const benchmarkEntryName = "Vir.Fixtures.ExprPrinter.exprCoverageScore";
 const expectedResult = 1232;
 const args = parseArgs(process.argv.slice(2));
 const benchmarkWasmFile = args.cpuProfilePath === null ? wasmPublicFile : wasmDevPublicFile;
-const wasmBuild = benchmarkWasmBuildIdentity();
+const wasmBuild = effectiveWasmBuildIdentity(root);
 const environmentLookupArtifactPaths = [
   publicArtifactPath(benchmarkWasmFile),
   publicArtifactPath(leanPackageFile),
-];
-const environmentLookupHarnessPaths = [
-  "scripts/bench-env-lookup.mjs",
-  "scripts/bench-env-lookup-contract.mjs",
-  "scripts/bench-differential.mjs",
 ];
 
 function parseArgs(argv) {
@@ -525,6 +521,15 @@ const loadBenchmark = {
     samplesMs: loadSample.samples,
   },
 };
+const runtimeEnvironmentIdentity = {
+  node: process.version,
+  v8: process.versions.v8,
+  platform: process.platform,
+  arch: process.arch,
+  cpu: cpus()[0]?.model ?? null,
+  leanToolchain: toolchain.trim(),
+  wasmBuild,
+};
 const report = {
   schema: "lean-vir.bench.v1",
   generatedAt: new Date().toISOString(),
@@ -540,29 +545,17 @@ const report = {
     loadSampleRounds: args.loadSampleRounds,
     loadIterationsPerRound: args.loadIterations,
     diagnostics: profile === null ? "off" : "v8-cpu-profile",
-    node: process.version,
-    v8: process.versions.v8,
-    platform: process.platform,
-    arch: process.arch,
-    cpu: cpus()[0]?.model ?? null,
-    leanToolchain: toolchain.trim(),
+    ...runtimeEnvironmentIdentity,
     manifestVersion: packageInfo.manifest.version,
     declarationCount: packageInfo.package.declarationCount,
     package: packageIdentity,
     harnessSha256: harnessIdentity.sha256,
     fixtureSha256: sha256(fixtureBytes),
     wasmArtifact: publicArtifactPath(benchmarkWasmFile),
-    wasmBuild,
   },
   git: gitMetadata(),
   environment: {
-    node: process.version,
-    v8: process.versions.v8,
-    platform: process.platform,
-    arch: process.arch,
-    cpu: cpus()[0]?.model ?? null,
-    leanToolchain: toolchain.trim(),
-    wasmBuild,
+    ...runtimeEnvironmentIdentity,
     artifactPreparation: args.buildArtifacts ? "cache-or-build" : "existing-unverified",
   },
   workload: {

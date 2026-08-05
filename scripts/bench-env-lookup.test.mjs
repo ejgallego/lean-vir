@@ -5,9 +5,11 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
+import { readdir, readFile } from "node:fs/promises";
 import test from "node:test";
 
 import {
+  environmentLookupHarnessPaths,
   environmentLookupHarnessIdentity,
   environmentLookupPackageIdentity,
   validateEnvironmentLookupOutputPaths,
@@ -92,6 +94,43 @@ test("environment lookup harness identity covers every named source", () => {
 
   assert.deepEqual(original, reordered);
   assert.notEqual(original.sha256, changedSampler.sha256);
+});
+
+test("environment lookup harness identity covers the loaded runtime source closure", async () => {
+  const runtimeDirectories = ["web/src/host", "web/src/react", "web/src/runtime"];
+  const expectedRuntimeSources = (await Promise.all(runtimeDirectories.map(async (directory) =>
+    (await readdir(new URL(`../${directory}`, import.meta.url)))
+      .filter((path) => path.endsWith(".js"))
+      .map((path) => `${directory}/${path}`),
+  ))).flat().sort();
+  const declaredRuntimeSources = environmentLookupHarnessPaths
+    .filter((path) => runtimeDirectories.some((directory) => path.startsWith(`${directory}/`)))
+    .sort();
+  assert.deepEqual(declaredRuntimeSources, expectedRuntimeSources);
+  for (const required of [
+    "scripts/bench-utils.mjs",
+    "web/src/host-resource.js",
+    "web/src/pages/browser-package-config.js",
+    "web/src/runtime/core.js",
+    "web/src/runtime/object-values.js",
+    "web/src/vir-host-bindings.js",
+    "web/src/vir-runtime.js",
+  ]) {
+    assert.ok(environmentLookupHarnessPaths.includes(required), `missing harness source ${required}`);
+  }
+  assert.equal(new Set(environmentLookupHarnessPaths).size, environmentLookupHarnessPaths.length);
+
+  const files = await Promise.all(environmentLookupHarnessPaths.map(async (path) => ({
+    path,
+    bytes: await readFile(new URL(`../${path}`, import.meta.url)),
+  })));
+  const original = environmentLookupHarnessIdentity(files);
+  const changedRuntime = environmentLookupHarnessIdentity(files.map((file) =>
+    file.path === "web/src/runtime/core.js"
+      ? { ...file, bytes: Buffer.concat([file.bytes, Buffer.from("\n// changed")]) }
+      : file,
+  ));
+  assert.notEqual(original.sha256, changedRuntime.sha256);
 });
 
 test("environment lookup outputs must resolve to distinct paths", () => {
