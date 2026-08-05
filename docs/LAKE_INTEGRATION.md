@@ -56,9 +56,10 @@ declaration:
   `vir.runStartupEntries()` invokes it as a startup hook.
 
 Startup hooks must take no JavaScript arguments and return `Unit`, possibly
-through a supported effect such as `DomM`; the attribute reports parameter and
-result/effect violations separately at the declaration. Ordinary exports use
-the full supported argument and result surface.
+through a supported effect such as `DomM`; the attribute names unexpected
+parameters, the actual non-`Unit` result, and unsupported effect constructors
+at the declaration. Ordinary exports use the full supported argument and
+result surface.
 
 After Lean compiles a declaration, both markers reject private or non-executable
 declarations and unavailable dependencies that Lean can see in the compiled

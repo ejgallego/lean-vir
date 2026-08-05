@@ -359,6 +359,9 @@ try {
     "def badStartupResult : IO Nat := pure 1",
     "",
     "@[vir_startup]",
+    "def badPureStartupResult : Nat := 1",
+    "",
+    "@[vir_startup]",
     "def unsupportedStartupEffect : Option Unit := some ()",
     "",
     "@[vir_startup]",
@@ -377,11 +380,15 @@ try {
   );
   assert.match(
     badStartupOutput,
-    /invalid `@\[vir_startup\]` declaration `badStartupResult`: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
+    /invalid `@\[vir_startup\]` declaration `badStartupResult`: VIR startup hooks using `IO` must return `Unit`; got `Nat`/,
   );
   assert.match(
     badStartupOutput,
-    /invalid `@\[vir_startup\]` declaration `unsupportedStartupEffect`: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
+    /invalid `@\[vir_startup\]` declaration `badPureStartupResult`: VIR startup hooks must return `Unit`; got `Nat`/,
+  );
+  assert.match(
+    badStartupOutput,
+    /invalid `@\[vir_startup\]` declaration `unsupportedStartupEffect`: `Option` is not a supported VIR startup effect; use `RuntimeM`, `IO`, `DomM`, or `ReactM`, each returning `Unit`/,
   );
   assert.match(
     badStartupOutput,
