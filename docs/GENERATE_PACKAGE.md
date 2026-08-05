@@ -65,14 +65,16 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
   collection from typed `Lean.IR.Decl` values.
 - `Vir.GeneratePackage.Interface.Encode`: interface labels, descriptor tags,
   and descriptor JSON encoders. The JSON descriptor field is `interfaceTag`.
+- `Vir.GeneratePackage.Interface.Classify.Error`: typed interface-classifier
+  failures, nested classification contexts, and user-facing error rendering.
 - `Vir.GeneratePackage.Interface.Classify.Basic`: shared classifier helpers,
   host effect recognition, primitive/resource labels, layout helper utilities,
   and boxed-boundary checks.
 - `Vir.GeneratePackage.Interface.Classify.Core`: interface type classification,
   callback type classification, and runtime layout classification for structures
   and inductives.
-- `Vir.GeneratePackage.Interface.Classify.Signature`: top-level export and host
-  import signature classification.
+- `Vir.GeneratePackage.Interface.Classify.Signature`: the named classified
+  signature result plus top-level export and host-import classification.
 - `Vir.GeneratePackage.Interface.Collect`: export discovery, export call-summary
   extraction, duplicate-avoidance helpers, boxed-boundary diagnostics, and
   host-import collection for `@[vir_js "..."]` declarations.
@@ -176,6 +178,11 @@ rejects export binder shapes and validates the complete startup contract early,
 while runtime layout and JavaScript boundary types remain package-time checks.
 Both layers consume typed analysis results and render errors at their own user
 boundary instead of sharing preformatted success/failure strings.
+
+Interface classification follows the same rule: its core and signature layers
+return `InterfaceClassifierError` values, preserving nested type context as
+data. `Interface.Collect` renders those errors only when it creates package
+diagnostics, while independently enforcing host-boundary policy.
 
 That retry is deliberately conservative: the classifier first tries the source
 type as written, then unfolds only abbrev heads whose outer type shape is not

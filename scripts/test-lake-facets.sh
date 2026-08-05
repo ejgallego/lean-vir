@@ -177,8 +177,14 @@ printf '%s\n' \
   '#check Vir.InterfaceValidation.analyzeStartupSignature' \
   '#check Vir.InterfaceValidation.StartupSignatureError.message' \
   '#check Vir.InterfaceValidation.StartupSignature.effect' \
-  '#check Vir.GeneratePackage.interfaceExportSignature?' \
-  '#check Vir.GeneratePackage.interfaceSignature?' > "$tmp/Smoke/InterfaceClassifier.lean"
+  '#check Vir.GeneratePackage.InterfaceClassifierError.message' \
+  '#check Vir.GeneratePackage.ClassifiedSignature' \
+  '#check Vir.GeneratePackage.ClassifiedSignature.args' \
+  '#check Vir.GeneratePackage.ClassifiedSignature.result' \
+  '#check Vir.GeneratePackage.ClassifiedSignature.effect' \
+  '#check Vir.GeneratePackage.ClassifiedSignature.erasedPrefixArgs' \
+  '#check Vir.GeneratePackage.classifyExportSignature' \
+  '#check Vir.GeneratePackage.classifyHostImportSignature' > "$tmp/Smoke/InterfaceClassifier.lean"
 
 printf '%s\n' \
   'module' \

@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 import {
   assert,
   assertUnsupportedInterfaceFixture,
+  assertUnsupportedInterfaceSource,
   join,
   readFile,
   runVirIrpkg,
@@ -86,6 +87,21 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "freshCustomOptionValue",
     "freshCustomProdValue",
   ]);
+
+  await assertUnsupportedInterfaceSource(freshDir, "ImplicitHostImport", [
+    "import Vir.Host",
+    "import Vir.Js",
+    "",
+    "@[vir_js \"test.implicitValue\"]",
+    "opaque jsImplicitValue {value : Lean.Vir.Js Nat} : Lean.Vir.RuntimeM Unit",
+    "",
+    "def callImplicitValue (value : Lean.Vir.Js Nat) : Lean.Vir.RuntimeM Unit :=",
+    "  jsImplicitValue (value := value)",
+    "",
+  ], [
+    /jsImplicitValue/,
+    /unsupported JavaScript import signature: implicit or instance argument `value` is not supported; declare a wrapper with only explicit arguments/,
+  ], ["callImplicitValue"]);
 
   await assertUnsupportedInterfaceFixture(freshDir, "BadLeanRef.lean", [
     /actionToJs/,

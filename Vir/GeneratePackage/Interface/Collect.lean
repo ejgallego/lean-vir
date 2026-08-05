@@ -218,27 +218,40 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
           return .error { name, source, reason := "declaration is not a compiled definition" }
         else
           let startup := index.virStartups.contains name
-          let classified :
-              Except PackageDiagnostic (Array InterfaceArg × InterfaceType × InterfaceEffect) ←
+          let classified : Except PackageDiagnostic ClassifiedSignature ←
             if startup then
               match ← Vir.InterfaceValidation.analyzeStartupSignature info.type with
               | .error error => pure (.error { name, source, reason := error.message })
               | .ok signature =>
-                  pure (.ok (#[], .unit, InterfaceEffect.ofStartupEffect signature.effect))
+                  pure (.ok {
+                    args := #[]
+                    result := .unit
+                    effect := InterfaceEffect.ofStartupEffect signature.effect
+                  })
             else
               match ← Vir.InterfaceValidation.analyzeExportSignature info.type with
               | .error error => pure (.error { name, source, reason := error.message })
               | .ok signature =>
-                  match ← interfaceExportSignature? signature with
-                  | .error reason => pure (.error { name, source, reason })
+                  match ← classifyExportSignature signature with
+                  | .error error => pure (.error { name, source, reason := error.message })
                   | .ok signature => pure (.ok signature)
           match classified with
-          | .ok (args, result, effect) =>
-              if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
+          | .ok signature =>
+              if interfaceNeedsBoxedCallBoundary signature.args signature.result &&
+                  (index.find? (boxedName name)).isNone then
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
               else
                 let jsName := jsNameFor name
-                return .ok { id := jsName, jsName, entry := name, source, args, result, effect, startup }
+                return .ok {
+                  id := jsName
+                  jsName
+                  entry := name
+                  source
+                  args := signature.args
+                  result := signature.result
+                  effect := signature.effect
+                  startup
+                }
           | .error diagnostic => return .error diagnostic
 
 def DeclIndex.constInfo? (index : DeclIndex) (name : Name) : Option (String × Environment × ConstantInfo) :=
@@ -266,11 +279,16 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
   let env ← getEnv
   let some info := env.find? loaded.decl.name
     | return .error { name := loaded.decl.name, source := loaded.source, reason := "missing elaborated Lean declaration for JavaScript import" }
-  match ← interfaceSignature? info.type with
-  | .error reason =>
-      return .error { name := loaded.decl.name, source := loaded.source, reason := s!"unsupported JavaScript import signature: {reason}" }
-  | .ok (args, result, effect, erasedArgCount) =>
-    let expectedArity := erasedArgCount + args.size + if effect.isEffectful then 1 else 0
+  match ← classifyHostImportSignature info.type with
+  | .error error =>
+      return .error {
+        name := loaded.decl.name
+        source := loaded.source
+        reason := s!"unsupported JavaScript import signature: {error.message}"
+      }
+  | .ok signature =>
+    let expectedArity := signature.erasedPrefixArgs + signature.args.size +
+      if signature.effect.isEffectful then 1 else 0
     if arity != expectedArity then
       return .error {
         name := loaded.decl.name,
@@ -278,7 +296,8 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
         reason := s!"JavaScript import IR arity mismatch: expected {expectedArity}, got {arity}"
       }
     let isExplicitConversion := isVirJsExplicitConversionDecl loaded.decl
-    match hostImportBoundary isExplicitConversion target args result effect with
+    match hostImportBoundary
+        isExplicitConversion target signature.args signature.result signature.effect with
     | .error reason =>
         return .error {
           name := loaded.decl.name,
@@ -294,10 +313,10 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
           boundary,
           symbol := hostImportSymbol slot arity,
           arity,
-          erasedPrefixArgs := erasedArgCount,
-          args,
-          result,
-          effect
+          erasedPrefixArgs := signature.erasedPrefixArgs,
+          args := signature.args,
+          result := signature.result,
+          effect := signature.effect
         }
 
 def runCoreForSource (source : String) (env : Environment) (x : CoreM α) : IO α :=
