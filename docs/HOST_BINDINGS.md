@@ -338,8 +338,11 @@ idempotent `release()` and `dispose()` methods (and `Symbol.dispose` where the
 host supports explicit resource management); `releaseHostResource(resource)`
 is the equivalent public helper. Retainable payloads are also registered for
 best-effort `FinalizationRegistry` cleanup, while explicit release remains the
-deterministic path. Passive DOM elements, strings, numeric values, `Js.Array`,
-and `Js.NodeList` have no payload disposer.
+deterministic path. Browser React is stricter: its host bindings require
+`FinalizationRegistry` because React provides no deterministic notification
+when speculative render, effect, or queued-update work is abandoned. Passive
+DOM elements, strings, numeric values, `Js.Array`, and `Js.NodeList` have no
+payload disposer.
 
 Retainable payloads compose through containers. `Js.Nullable`, React event
 handler values, React props builders, and React child-list builders acquire
@@ -384,14 +387,15 @@ The built-in React state, reducer, ref, and memo bindings acquire their own JSL
 leases whenever React starts storing a payload. A queued state action owns its
 source lease and produces an independently retained result on every replay.
 The render generation stages the selected result, and commit transfers that
-exact result lease to the hook without consuming other-lane actions. Action
-collection releases unused queue leases; replacement or unmount releases the
-matching committed lease. Callback-produced state and memo results remain
-staged until post-result callback cleanup also succeeds. A JSL handle retained by Lean remains independently owned by
-Lean and can still be released deterministically with `releaseJSL`. React tracks
-each acquisition with a distinct lease record even when a payload's `retain()`
-operation returns the same object, so payload identity is never used as lease
-identity.
+exact result lease to the hook without consuming other-lane actions. After
+React drops a queued action, finalizer cleanup releases its unused queue leases;
+replacement or unmount releases the matching committed lease.
+Callback-produced state and memo results remain staged until post-result
+callback cleanup also succeeds. A JSL handle retained by Lean remains
+independently owned by Lean and can still be released deterministically with
+`releaseJSL`. React tracks each acquisition with a distinct lease record even
+when a payload's `retain()` operation returns the same object, so payload
+identity is never used as lease identity.
 
 Some resources are callback-local rather than retained:
 

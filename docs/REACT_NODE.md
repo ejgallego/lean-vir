@@ -359,8 +359,10 @@ The browser React host binding is exposed from
   node/component ownership swap from `useLayoutEffect` after React commits.
   Interrupted render generations never release the visible committed tree or
   callback and are not inserted into a strong runtime registry; weak
-  finalization is a safety net for abandoned generations. The virtual renderer
-  keeps immediate-commit behavior and explicit deferred callback cleanup.
+  finalization cleans up generations React abandons without a callback. The
+  browser binding therefore requires `FinalizationRegistry`. The virtual
+  renderer keeps immediate-commit behavior and explicit deferred callback
+  cleanup.
 - Runtime dispose and package reload unmount all live React roots through the
   same disposable-resource path used for DOM listeners, timeouts, and frames.
 
