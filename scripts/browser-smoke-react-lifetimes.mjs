@@ -12,11 +12,22 @@ import * as esbuild from "esbuild";
 import { evaluate } from "./browser-smoke-harness.mjs";
 
 const resultKey = "__leanVirReactRefLifetimeSmoke";
-let browserProbeBundle = null;
+const strictModeResultKey = "__leanVirReactStrictModeSmoke";
+const strictModeStateKey = "__leanVirReactStrictModeLifetimeState";
+const strictModeCleanupKey = "__leanVirReactStrictModeLifetimeCleanup";
+const browserProbeBundles = new Map();
 
-export async function smokeBrowserReactRefLifetime(cdp) {
-  const source = await bundledBrowserProbe();
-  await evaluate(cdp, `${source}\nvoid 0;\n//# sourceURL=lean-vir-react-ref-lifetime-smoke.js`);
+export async function smokeBrowserReactLifetimes(cdp) {
+  await smokeBrowserReactRefLifetime(cdp);
+  await smokeBrowserReactStrictModeLifetime(cdp);
+}
+
+async function smokeBrowserReactRefLifetime(cdp) {
+  const source = await bundledBrowserProbe(
+    "./browser-smoke-react-ref-lifetime-entry.js",
+    "production",
+  );
+  await evaluateBrowserProbe(cdp, source, "lean-vir-react-ref-lifetime-smoke.js");
   const result = await evaluate(cdp, `globalThis[${JSON.stringify(resultKey)}]`);
   if (result?.ok !== true) {
     throw new Error(
@@ -31,13 +42,69 @@ export async function smokeBrowserReactRefLifetime(cdp) {
   });
 }
 
-async function bundledBrowserProbe() {
-  if (browserProbeBundle !== null) return browserProbeBundle;
+async function smokeBrowserReactStrictModeLifetime(cdp) {
+  const source = await bundledBrowserProbe(
+    "./browser-smoke-react-strict-mode-entry.js",
+    "development",
+  );
+  await evaluateBrowserProbe(cdp, source, "lean-vir-react-strict-mode-smoke.js");
+  const result = await evaluate(cdp, `globalThis[${JSON.stringify(strictModeResultKey)}]`);
+  if (result?.ok !== true) {
+    throw new Error(
+      `React Strict Mode lifetime browser probe failed: ${result?.error?.message ?? JSON.stringify(result)}`,
+    );
+  }
+  assert.equal(result.value.strict.renders, 2, "Strict Mode must perform its development render replay");
+  assert.deepEqual(result.value.strict, { renders: 2, setups: 2, cleanups: 2 });
+  assert.ok(result.value.abandoned.renders >= 1, "Suspense must start at least one discarded render");
+
+  await evaluate(cdp, `delete globalThis[${JSON.stringify(strictModeResultKey)}]`);
+  let state = null;
+  try {
+    await cdp.send("HeapProfiler.enable");
+    try {
+      for (let attempt = 0; attempt < 100; attempt++) {
+        await cdp.send("HeapProfiler.collectGarbage");
+        await evaluate(cdp, "new Promise((resolve) => setTimeout(resolve, 0))");
+        state = await evaluate(cdp, `globalThis[${JSON.stringify(strictModeStateKey)}]`);
+        if (reactLifetimeStateReleased(state)) break;
+      }
+    } finally {
+      await cdp.send("HeapProfiler.disable");
+    }
+    assert.ok(state !== null, "React Strict Mode lifetime state must remain observable during GC");
+    assert.equal(state.strict.setupCallbacks.active, 0, "discarded Strict Mode setup leases must be collectible");
+    assert.equal(state.strict.cleanupCallbacks.active, 0, "discarded Strict Mode cleanup leases must be collectible");
+    assert.equal(state.strict.payloads.active, 0, "Strict Mode payload leases must all be released");
+    assert.equal(state.abandoned.payloads.active, 0, "a replaced Suspense render must release its payload leases");
+    assert.equal(state.abandoned.payloads.releases, state.abandoned.payloads.created);
+  } finally {
+    await evaluate(cdp, `globalThis[${JSON.stringify(strictModeCleanupKey)}]?.()`);
+    await evaluate(cdp, `delete globalThis[${JSON.stringify(strictModeCleanupKey)}]`);
+    await evaluate(cdp, `delete globalThis[${JSON.stringify(strictModeStateKey)}]`);
+  }
+}
+
+function reactLifetimeStateReleased(state) {
+  return state?.strict?.setupCallbacks?.active === 0 &&
+    state?.strict?.cleanupCallbacks?.active === 0 &&
+    state?.strict?.payloads?.active === 0 &&
+    state?.abandoned?.payloads?.active === 0;
+}
+
+async function evaluateBrowserProbe(cdp, source, sourceName) {
+  await evaluate(cdp, `${source}\nvoid 0;\n//# sourceURL=${sourceName}`);
+}
+
+async function bundledBrowserProbe(entry, nodeEnv) {
+  const cacheKey = `${nodeEnv}:${entry}`;
+  const cached = browserProbeBundles.get(cacheKey);
+  if (cached !== undefined) return cached;
   const result = await esbuild.build({
-    entryPoints: [fileURLToPath(new URL("./browser-smoke-react-ref-lifetime-entry.js", import.meta.url))],
+    entryPoints: [fileURLToPath(new URL(entry, import.meta.url))],
     bundle: true,
     define: {
-      "process.env.NODE_ENV": '"production"',
+      "process.env.NODE_ENV": JSON.stringify(nodeEnv),
     },
     format: "iife",
     legalComments: "none",
@@ -48,8 +115,8 @@ async function bundledBrowserProbe() {
   });
   const output = result.outputFiles?.[0];
   if (output === undefined) {
-    throw new Error("React ref lifetime browser probe did not produce a bundle");
+    throw new Error(`React lifetime browser probe did not produce a bundle for ${entry}`);
   }
-  browserProbeBundle = output.text;
-  return browserProbeBundle;
+  browserProbeBundles.set(cacheKey, output.text);
+  return output.text;
 }
