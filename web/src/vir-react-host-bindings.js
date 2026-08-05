@@ -28,7 +28,9 @@ export function createBrowserReactHostBindings(state = createHostResourceState()
 } = {}) {
   const hookRuntime = createBrowserReactHookRuntime(state, React);
   const hooks = {
-    ...createReactHostHooks(),
+    ...createReactHostHooks({
+      reportError: (error) => state.recordGcFinalizerError(error),
+    }),
     hookRuntime,
   };
   return {

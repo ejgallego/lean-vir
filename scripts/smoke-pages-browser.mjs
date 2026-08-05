@@ -24,6 +24,7 @@ import {
   smokeRunnerFailure,
 } from "./browser-smoke-dev-runner.mjs";
 import { smokeFormatWorkbench, smokeLanding, smokePackagePreset } from "./browser-smoke-page-suites.mjs";
+import { smokeBrowserReactRefLifetime } from "./browser-smoke-react-lifetimes.mjs";
 import { smokeReactReview } from "./browser-smoke-react-review.mjs";
 import { packageFiles } from "./browser-package-config.mjs";
 
@@ -51,6 +52,7 @@ try {
   await smokePackagePreset(cdp, server.origin);
   await smokeFormatWorkbench(cdp, server.origin);
   await smokeReactReview(cdp, server.origin);
+  await smokeBrowserReactRefLifetime(cdp);
   for (const packageFile of packageFiles) {
     await smokeManifestDrivenEntryList(cdp, server.origin, packageFile);
   }
@@ -70,7 +72,7 @@ try {
   }
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, React review, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
+  console.log("pages browser smoke ok: landing, React review, React DOM ref lifetime, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
 } catch (error) {
   const details = chromium.stderr();
   if (details) {

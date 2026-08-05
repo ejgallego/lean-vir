@@ -311,7 +311,9 @@ The browser React host binding is exposed from
   consumption, or unmount; aliases retained by Lean remain independent.
 - `react.useRef` calls `React.useRef` while rendering a component and returns a
   host-owned ref object. `react.ref.get` and `react.ref.set` read/write
-  `.current`; they do not schedule a render.
+  `.current`; they do not schedule a render. Retainable payload ownership is
+  recorded independently of the mutable slot, so React attaching a DOM node or
+  clearing the ref cannot hide a lease from component disposal.
 - `react.useMemo` calls `React.useMemo` while rendering a component. The
   calculate callback runs in `ReactM`, dependencies are a JavaScript-owned
   `DependencyList`, and the returned value stays in the `Js` resource lane.
@@ -337,7 +339,9 @@ The browser React host binding is exposed from
   to explicit `Js String` selector resources before the low-level host call,
   then convert the returned `Js Bool` success value back to `Bool`. This is the
   infoview/proof-widget path where the shell owns the DOM mount element and
-  Lean supplies the current tree or component.
+  Lean supplies the current tree or component. `renderIntoSelector` borrows its
+  node argument; when the selector is missing and the helper returns `false`,
+  that node wrapper and its shared payload remain live.
 - `react.state.set` and `react.state.modify` call the retained React setter;
   both are `RuntimeM`. `modify` runs the Lean updater once in VIR against the
   latest committed-or-queued state and passes only its concrete result to

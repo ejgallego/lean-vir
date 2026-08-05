@@ -139,6 +139,10 @@ component. The hook bindings `react.useState`, `react.useRef`,
 `react.useEffectWithDeps` are render-time `ReactM` operations. `useRef` returns
 a host-owned React ref object; `react.ref.get` and `react.ref.set` are
 `RuntimeM` operations over its `current` field and do not schedule renders.
+For ownership-bearing values, the browser runtime keeps the committed payload
+lease separately from mutable `.current`; React may replace the slot with a DOM
+node or `null` without orphaning the payload, and `react.ref.set` reconciles the
+explicit lease when it changes the value.
 `useMemo` receives an explicit `Lean.Vir.Js DependencyList` and returns an
 explicit `Lean.Vir.Js α` value. `useReducer` keeps the low-level React boundary
 in `Js` resources, but VIR evaluates reducers once at dispatch time and sends
@@ -306,7 +310,10 @@ container may safely acquire a lease from a live runtime-created JSL wrapper
 even though that wrapper is not owned by the container's `HostResourceState`.
 After a React parent acquires its child lease, the original child wrapper is a
 borrowed alias: it remains usable while the composite graph owns the child but
-does not create a second ownership cycle. Result lifting is transactional:
+does not create a second ownership cycle. Releasing such an alias never
+terminally revokes the shared node payload. Selector-based render helpers also
+leave their borrowed node argument untouched when the selector is missing.
+Result lifting is transactional:
 arrays and structures roll back every callback/resource already lifted when a
 later field fails.
 
@@ -339,7 +346,10 @@ leases whenever React starts storing a payload. Replacing state/ref/memo data,
 consuming a reducer action, or unmounting the component releases the matching
 React-owned lease. Callback-produced state and memo results transfer into that
 ownership lane. A JSL handle retained by Lean remains independently owned by
-Lean and can still be released deterministically with `releaseJSL`.
+Lean and can still be released deterministically with `releaseJSL`. React tracks
+each acquisition with a distinct lease record even when a payload's `retain()`
+operation returns the same object, so payload identity is never used as lease
+identity.
 
 Some resources are callback-local rather than retained:
 
@@ -372,6 +382,8 @@ lease. The virtual renderer keeps its explicit immediate-commit behavior.
 Finalizer failures cannot unwind through a WASM finalizer. Diagnostics retain
 only bounded strings, not failed payloads, and ordinary teardown still
 attempts every release before reporting one error or an `AggregateError`.
+Deferred React cleanup follows the same rule; microtask cleanup errors are
+reported out of band through the bounded runtime diagnostic recorder.
 
 `vir.dispose()` tears down runtime-side host state:
 

@@ -451,16 +451,13 @@ export function disposeReactNode(resources, node) {
     if (typeof resources?.releaseResource !== "function") {
       throw new Error("React Node disposal requires a host resource state");
     }
-    const value = resolveReactNodeResource(resources, node);
-    const errors = [];
-    collectCleanupError(errors, () => value.dispose());
-    collectCleanupError(errors, () => resources.releaseResource(node));
-    throwCollectedErrors(errors, "React Node disposal failed");
+    // Releasing a wrapper may release its lease, but a borrowed wrapper has no
+    // lease to release. Never force-finalize the shared payload through an
+    // alias: parents, sibling trees, or React itself may still own it.
+    resources.releaseResource(node);
     return;
   }
-  if (typeof node.dispose === "function") {
-    node.dispose();
-  }
+  releaseReactNodeValue(resources, node);
 }
 
 export function disposeUnownedReactNode(resources, node) {
@@ -529,6 +526,16 @@ export function endReactNodeEventCallback(hooks) {
   if (typeof hooks?.endReactNodeEventCallback === "function") {
     hooks.endReactNodeEventCallback();
   }
+}
+
+function callWithReactNodeEventLifetime(hooks, call) {
+  beginReactNodeEventCallback(hooks);
+  const errors = [];
+  const attempted = collectCleanupError(errors, call);
+  collectCleanupError(errors, () => endReactNodeEventCallback(hooks));
+  collectCleanupError(errors, () => flushReactNodeDisposals(hooks));
+  throwCollectedErrors(errors, "React Node event callback failed during cleanup");
+  return attempted.value;
 }
 
 export function validateReactNodeResourceLimits(node) {
@@ -899,15 +906,8 @@ function reactPropsFromNode(state, fields, callLeanEventCallback, hooks) {
     for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
       const ownedCallback = takeCallbackLease(callback, `React Node ${name} event callback`);
       callbacks.push(ownedCallback);
-      setReactObjectProperty(props, name, (event) => {
-        beginReactNodeEventCallback(hooks);
-        try {
-          return callLeanEventCallback(state, event, ownedCallback);
-        } finally {
-          endReactNodeEventCallback(hooks);
-          flushReactNodeDisposals(hooks);
-        }
-      });
+      setReactObjectProperty(props, name, (event) =>
+        callWithReactNodeEventLifetime(hooks, () => callLeanEventCallback(state, event, ownedCallback)));
     }
   } catch (error) {
     const errors = [error instanceof Error ? error : new Error(String(error))];
@@ -949,15 +949,8 @@ function virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, 
     for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
       const ownedCallback = takeCallbackLease(callback, `React Node ${name} event callback`);
       callbacks.push(ownedCallback);
-      setReactObjectProperty(handlers, name, (event = {}) => {
-        beginReactNodeEventCallback(hooks);
-        try {
-          return callLeanEventCallback(resources, event, ownedCallback);
-        } finally {
-          endReactNodeEventCallback(hooks);
-          flushReactNodeDisposals(hooks);
-        }
-      });
+      setReactObjectProperty(handlers, name, (event = {}) =>
+        callWithReactNodeEventLifetime(hooks, () => callLeanEventCallback(resources, event, ownedCallback)));
     }
   } catch (error) {
     const errors = [error instanceof Error ? error : new Error(String(error))];
