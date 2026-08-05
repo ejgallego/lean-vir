@@ -15,7 +15,7 @@ import {
   removeHostResourcePayloadChild,
   retainHostResourcePayload,
 } from "../host-resource.js";
-import { releaseCallbacks, takeCallbackLease } from "../runtime/callbacks.js";
+import { releaseCallbacks, retainCallbackLease, takeCallbackLease } from "../runtime/callbacks.js";
 import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
 
 const REACT_NODE_MAX_DEPTH = 128;
@@ -904,7 +904,7 @@ function reactPropsFromNode(state, fields, callLeanEventCallback, hooks) {
   }
   try {
     for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
-      const ownedCallback = takeCallbackLease(callback, `React Node ${name} event callback`);
+      const ownedCallback = retainCallbackLease(callback, `React Node ${name} event callback`);
       callbacks.push(ownedCallback);
       setReactObjectProperty(props, name, (event) =>
         callWithReactNodeEventLifetime(hooks, () => callLeanEventCallback(state, event, ownedCallback)));
@@ -947,7 +947,7 @@ function virtualReactHandlersFromNode(resources, fields, callLeanEventCallback, 
   const callbacks = [];
   try {
     for (const [name, callback] of reactNodeEventHandlerEntries(fields.props.handlers)) {
-      const ownedCallback = takeCallbackLease(callback, `React Node ${name} event callback`);
+      const ownedCallback = retainCallbackLease(callback, `React Node ${name} event callback`);
       callbacks.push(ownedCallback);
       setReactObjectProperty(handlers, name, (event = {}) =>
         callWithReactNodeEventLifetime(hooks, () => callLeanEventCallback(resources, event, ownedCallback)));

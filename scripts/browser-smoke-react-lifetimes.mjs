@@ -56,6 +56,8 @@ async function smokeBrowserReactStrictModeLifetime(cdp) {
   }
   assert.equal(result.value.strict.renders, 2, "Strict Mode must perform its development render replay");
   assert.deepEqual(result.value.strict, { renders: 2, setups: 2, cleanups: 2 });
+  assert.ok(result.value.lanes.renders.includes("urgent"), "the urgent React lane must render");
+  assert.equal(result.value.lanes.renders.at(-1), "transition", "the queued transition lane must commit last");
   assert.ok(result.value.abandoned.renders >= 1, "Suspense must start at least one discarded render");
 
   await evaluate(cdp, `delete globalThis[${JSON.stringify(strictModeResultKey)}]`);
@@ -76,6 +78,9 @@ async function smokeBrowserReactStrictModeLifetime(cdp) {
     assert.equal(state.strict.setupCallbacks.active, 0, "discarded Strict Mode setup leases must be collectible");
     assert.equal(state.strict.cleanupCallbacks.active, 0, "discarded Strict Mode cleanup leases must be collectible");
     assert.equal(state.strict.payloads.active, 0, "Strict Mode payload leases must all be released");
+    assert.equal(state.lanes.initialPayloads.active, 0, "React lane initial payload leases must all be released");
+    assert.equal(state.lanes.urgentPayloads.active, 0, "React lane urgent payload leases must all be released");
+    assert.equal(state.lanes.transitionPayloads.active, 0, "React lane transition payload leases must all be released");
     assert.equal(state.abandoned.payloads.active, 0, "a replaced Suspense render must release its payload leases");
     assert.equal(state.abandoned.payloads.releases, state.abandoned.payloads.created);
   } finally {
@@ -89,6 +94,9 @@ function reactLifetimeStateReleased(state) {
   return state?.strict?.setupCallbacks?.active === 0 &&
     state?.strict?.cleanupCallbacks?.active === 0 &&
     state?.strict?.payloads?.active === 0 &&
+    state?.lanes?.initialPayloads?.active === 0 &&
+    state?.lanes?.urgentPayloads?.active === 0 &&
+    state?.lanes?.transitionPayloads?.active === 0 &&
     state?.abandoned?.payloads?.active === 0;
 }
 

@@ -90,19 +90,32 @@ export function takeCallbackLease(callback, label = "Vir callback") {
   if (typeof callback.retain !== "function") {
     return callback;
   }
-  const lease = callback.retain();
-  if (lease === callback || typeof lease !== "function" || typeof lease.release !== "function") {
-    if (lease !== callback && typeof lease?.release === "function") {
-      lease.release();
-    }
-    throw new Error(`${label}.retain() must return a distinct releasable function`);
-  }
+  const lease = retainCallbackLease(callback, label);
   try {
     callback.release();
   } catch (error) {
     const errors = [error];
     collectCleanupError(errors, () => lease.release());
     throwCollectedErrors(errors, `${label} lease transfer failed`);
+  }
+  return lease;
+}
+
+// Borrows the supplied lease and gives another owner an independent lease.
+// Unlike takeCallbackLease, this never releases the source callback.
+export function retainCallbackLease(callback, label = "Vir callback") {
+  if (typeof callback !== "function" || typeof callback.release !== "function") {
+    throw new Error(`${label} must be a releasable function`);
+  }
+  if (typeof callback.retain !== "function") {
+    throw new Error(`${label} must support retain() for independent ownership`);
+  }
+  const lease = callback.retain();
+  if (lease === callback || typeof lease !== "function" || typeof lease.release !== "function") {
+    if (lease !== callback && typeof lease?.release === "function") {
+      lease.release();
+    }
+    throw new Error(`${label}.retain() must return a distinct releasable function`);
   }
   return lease;
 }
