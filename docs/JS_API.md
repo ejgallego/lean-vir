@@ -556,6 +556,25 @@ or otherwise install `env.vir_js_call_objects` plus the resource-root imports.
 
 ## Closure And Resource Lifetime
 
+When a JavaScript call returns a host-resource wrapper, release it explicitly
+when its useful lifetime is shorter than the runtime's. `releaseHostResource`
+is idempotent and is equivalent to the wrapper's `release()` or `dispose()`
+method:
+
+```js
+const resource = vir.call("Demo.openResource");
+try {
+  useResource(resource);
+} finally {
+  releaseHostResource(resource);
+}
+```
+
+`FinalizationRegistry` provides a best-effort backstop for dropped wrappers;
+explicit release is the deterministic cleanup path. Browser React additionally
+requires `FinalizationRegistry` to reclaim speculative work for which React
+does not provide an abandonment callback.
+
 `VirCallback` is the JavaScript wrapper for a rooted Lean closure:
 
 ```js

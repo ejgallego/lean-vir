@@ -613,7 +613,6 @@ function createBrowserRenderGeneration(resources, componentState) {
     candidates: ownership.candidates,
     refs: ownership.refs,
     setters: ownership.setters,
-    payloadLeases: ownership.payloadLeases,
   };
 }
 
@@ -1044,20 +1043,13 @@ function queueBrowserStateUpdate(resources, hook, setState, next) {
   if (previous === NO_STORED_VALUE) {
     throw new Error("React state updater has no committed state");
   }
-  let value;
-  try {
-    value = next(previous);
-  } catch (error) {
-    throw error;
-  }
+  const value = next(previous);
   return enqueueBrowserStoredValue(resources, hook, setState, value);
 }
 
 function createBrowserStoredValueHook(kind) {
   return {
     kind,
-    initialized: false,
-    candidate: NO_STORED_VALUE,
     committedValue: NO_STORED_VALUE,
     optimisticValue: NO_STORED_VALUE,
     payloadLeases: new Set(),
@@ -1069,7 +1061,6 @@ function createBrowserStoredValueHook(kind) {
 function createBrowserRefHook() {
   return {
     kind: "ref",
-    initialized: false,
     ref: null,
     payloadLeases: new Set(),
     disposed: false,
@@ -1083,7 +1074,6 @@ function disposeBrowserStoredValueHook(hook) {
   const pendingActions = Array.from(hook?.pendingActions ?? []);
   hook?.payloadLeases?.clear();
   hook?.pendingActions?.clear();
-  hook.candidate = NO_STORED_VALUE;
   hook.committedValue = NO_STORED_VALUE;
   hook.optimisticValue = NO_STORED_VALUE;
   const errors = [];
@@ -1187,8 +1177,6 @@ function nextBrowserHook(componentState, expectedKind, hookName, createHook = nu
 function createBrowserReducerHook(resources) {
   const hook = {
     kind: "reducer",
-    initialized: false,
-    candidate: NO_STORED_VALUE,
     payloadLeases: new Set(),
     pendingActions: new Set(),
     committedValue: NO_STORED_VALUE,
