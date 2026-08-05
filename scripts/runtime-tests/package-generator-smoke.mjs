@@ -87,6 +87,7 @@ try {
     "import Vir",
     "",
     "example : Lean.LabelExtension := vir_export",
+    "example : Lean.LabelExtension := vir_startup",
     "",
     "@[vir_export]",
     "def markedValue (n : Nat) : Nat := n + 1",
@@ -103,6 +104,25 @@ try {
     "",
     "@[vir_startup]",
     "def markedStartup : Lean.Vir.Browser.DomM Unit := pure ()",
+    "",
+    "abbrev StartupResult := Unit",
+    "abbrev StartupAction := IO StartupResult",
+    "",
+    "@[vir_startup]",
+    "def markedAliasStartup : StartupAction := pure ()",
+    "",
+    "@[vir_startup]",
+    "def markedRuntimeStartup : Lean.Vir.RuntimeM Unit := pure ()",
+    "",
+    "@[vir_startup]",
+    "def markedReactStartup : Lean.Vir.React.ReactM Unit := pure ()",
+    "",
+    "def markedLaterStartup : Unit := ()",
+    "attribute [vir_startup] markedLaterStartup",
+    "",
+    "def removedStartup : Unit := ()",
+    "attribute [vir_startup] removedStartup",
+    "attribute [-vir_startup] removedStartup",
     "",
     "def notMarked : Nat := 37",
     "",
@@ -123,13 +143,27 @@ try {
   const markedManifest = JSON.parse(inspectedMarked.stdout).manifest;
   assert.deepEqual(
     markedManifest.exports.map((entry) => entry.entry).sort(),
-    ["markedLater", "markedOpaque", "markedStartup", "markedValue"],
+    [
+      "markedAliasStartup",
+      "markedLater",
+      "markedLaterStartup",
+      "markedOpaque",
+      "markedReactStartup",
+      "markedRuntimeStartup",
+      "markedStartup",
+      "markedValue",
+    ],
   );
   assert.equal(markedManifest.exports.some((entry) => entry.entry === "removedMark"), false);
   assert.equal(manifestEntry(markedManifest, "markedValue").startup, false);
   assert.equal(manifestEntry(markedManifest, "markedOpaque").startup, false);
   assert.equal(manifestEntry(markedManifest, "markedLater").startup, false);
   assert.equal(manifestEntry(markedManifest, "markedStartup").startup, true);
+  assert.equal(manifestEntry(markedManifest, "markedAliasStartup").startup, true);
+  assert.equal(manifestEntry(markedManifest, "markedLaterStartup").startup, true);
+  assert.equal(manifestEntry(markedManifest, "markedRuntimeStartup").startup, true);
+  assert.equal(manifestEntry(markedManifest, "markedReactStartup").startup, true);
+  assert.equal(markedManifest.exports.some((entry) => entry.entry === "removedStartup"), false);
 
   const markedUnsupportedSignatureSource = join(freshDir, "MarkedUnsupportedSignature.lean");
   await writeFile(markedUnsupportedSignatureSource, [
@@ -248,8 +282,6 @@ try {
   );
 
   const startupDependencySource = join(freshDir, "StartupDependency.lean");
-  const startupDependencyPackage = join(freshDir, "startup-dependency.irpkg");
-  const startupDependencyReport = join(freshDir, "startup-dependency.report.md");
   await writeFile(startupDependencySource, [
     "import Vir",
     "",
@@ -263,37 +295,22 @@ try {
     "end StartupDependency",
     "",
   ].join("\n"));
-  const generatedStartupDependency = runVirIrpkg([
-    startupDependencyPackage,
-    startupDependencyReport,
-    "--target-marked",
-    startupDependencySource,
-  ]);
+  const checkedStartupDependency = spawnSync(
+    "lean",
+    [startupDependencySource],
+    { encoding: "utf8", env: virIrpkgEnv() },
+  );
   assert.notEqual(
-    generatedStartupDependency.status,
+    checkedStartupDependency.status,
     0,
-    "unsupported startup dependency unexpectedly generated successfully",
+    "unsupported startup dependency unexpectedly elaborated successfully",
   );
-  assert.match(generatedStartupDependency.stderr, /missing native extern registrations:/);
+  const startupDependencyOutput =
+    `${checkedStartupDependency.stderr}${checkedStartupDependency.stdout}`;
   assert.match(
-    generatedStartupDependency.stderr,
-    /IO\.getEnv \(via StartupDependency\.home[^\n]* -> IO\.getEnv\)/,
+    startupDependencyOutput,
+    /invalid `@\[vir_startup\]` declaration `StartupDependency\.home`: compiled closure reaches unsupported runtime dependency `IO\.getEnv`: no native extern implementation is registered \(via StartupDependency\.home[^\n]* -> IO\.getEnv\)/,
   );
-  const startupDependencyReportText = await readFile(startupDependencyReport, "utf8");
-  assert.match(
-    startupDependencyReportText,
-    /## Missing Native Extern Registrations[\s\S]*- `IO\.getEnv` \(via StartupDependency\.home[^\n]* -> IO\.getEnv\)/,
-  );
-  assert.doesNotMatch(startupDependencyReportText, /## Blocking Dependency Paths/);
-  assert.match(
-    startupDependencyReportText,
-    /## Interface Exports[\s\S]*- `StartupDependency\.home` as `StartupDependency_home` \[startup\] : \(\) -> IO Unit/,
-  );
-  assert.match(
-    startupDependencyReportText,
-    /## Package Diagnostics\n\nNone\./,
-  );
-  await assert.rejects(readFile(startupDependencyPackage), { code: "ENOENT" });
 
   const slidesPackage = join(freshDir, "slides-canvas.irpkg");
   const generatedSlides = runVirIrpkg([
@@ -340,15 +357,39 @@ try {
     "@[vir_startup]",
     "def badStartup (_n : Nat) : Lean.Vir.Browser.DomM Unit := pure ()",
     "",
+    "@[vir_startup]",
+    "def badStartupResult : IO Nat := pure 1",
+    "",
+    "@[vir_startup]",
+    "theorem startupProof : True := trivial",
+    "",
+    "@[vir_startup]",
+    "private def privateStartup : Unit := ()",
+    "",
   ].join("\n"));
-  const generatedBadStartup = runVirIrpkg([
-    join(freshDir, "bad-startup.irpkg"),
-    join(freshDir, "bad-startup.report.md"),
-    "--target-marked",
-    badStartupSource,
-  ]);
-  assert.notEqual(generatedBadStartup.status, 0);
-  assert.match(generatedBadStartup.stderr, /marked with `@\[vir_startup\]` must take no JavaScript arguments/);
+  const checkedBadStartup = spawnSync(
+    "lean",
+    [badStartupSource],
+    { encoding: "utf8", env: virIrpkgEnv() },
+  );
+  assert.notEqual(checkedBadStartup.status, 0);
+  const badStartupOutput = `${checkedBadStartup.stderr}${checkedBadStartup.stdout}`;
+  assert.match(
+    badStartupOutput,
+    /invalid `@\[vir_startup\]` declaration `badStartup`: VIR startup hooks must take no JavaScript arguments and return `Unit`/,
+  );
+  assert.match(
+    badStartupOutput,
+    /invalid `@\[vir_startup\]` declaration `badStartupResult`: VIR startup hooks must take no JavaScript arguments and return `Unit`/,
+  );
+  assert.match(
+    badStartupOutput,
+    /invalid `@\[vir_startup\]` declaration `startupProof`: theorems do not have executable IR; export a definition instead/,
+  );
+  assert.match(
+    badStartupOutput,
+    /private declarations cannot be VIR startup hooks; remove `private` or use a public wrapper/,
+  );
 
   const runtimeSource = join(freshDir, "RuntimeEffect.lean");
   const runtimePackage = join(freshDir, "runtime-effect.irpkg");

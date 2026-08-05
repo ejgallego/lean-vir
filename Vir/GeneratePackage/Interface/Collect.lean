@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import Vir.GeneratePackage.Closure
 import Vir.GeneratePackage.Interface.Classify.Signature
+import Vir.InterfaceValidation
 
 open Lean
 
@@ -228,7 +229,7 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
                   return .error {
                     name,
                     source,
-                    reason := "declarations marked with `@[vir_startup]` must take no JavaScript arguments and return `Unit`"
+                    reason := Vir.InterfaceValidation.startupSignatureDiagnostic
                   }
                 let jsName := jsNameFor name
                 return .ok { id := jsName, jsName, entry := name, source, args, result, effect, startup }
