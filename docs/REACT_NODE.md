@@ -293,9 +293,10 @@ The browser React host binding is exposed from
   component and invokes `root.render(...)` with that component.
 - Repeated `react.root.renderComponent` or
   `react.root.renderComponentIntoSelector` calls on the same root update the
-  Lean render callback while keeping the same JavaScript component identity, so
-  React hook state is preserved across prop-only rerenders such as infoview
-  cursor changes.
+  Lean render callback at layout commit while keeping the same JavaScript
+  component identity, so React hook state is preserved across prop-only
+  rerenders such as infoview cursor changes. An abandoned update retains the
+  previously committed callback.
 - `react.useState` calls `React.useState` while rendering a component. Its ABI
   is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
 - `react.useReducer` allocates a replay-safe `React.useState` slot while
@@ -349,9 +350,10 @@ The browser React host binding is exposed from
 - `react.root.unmountSelector` unwraps an explicit `Js String` selector,
   unmounts, forgets a selector-owned root, and returns an explicit `Js Bool`
   success value.
-- Browser function-component ownership swaps happen from `useLayoutEffect`
-  after React commits. Interrupted render generations never release the visible
-  committed tree and are not inserted into a strong runtime registry; weak
+- Browser function-component nodes, component render callbacks, and root-level
+  node/component ownership swap from `useLayoutEffect` after React commits.
+  Interrupted render generations never release the visible committed tree or
+  callback and are not inserted into a strong runtime registry; weak
   finalization is a safety net for abandoned generations. The virtual renderer
   keeps immediate-commit behavior and explicit deferred callback cleanup.
 - Runtime dispose and package reload unmount all live React roots through the

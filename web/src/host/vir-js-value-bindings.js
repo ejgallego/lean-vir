@@ -11,6 +11,7 @@ import {
   releaseHostResourcePayload,
   retainHostResourcePayload,
 } from "../host-resource.js";
+import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
 
 export function createJsValueHostBindings(resources) {
   const bindings = {};
@@ -78,8 +79,9 @@ export function createNullableValue(value) {
     });
     return nullable;
   } catch (error) {
-    releaseHostResourcePayload(retained);
-    throw error;
+    const errors = [error instanceof Error ? error : new Error(String(error))];
+    collectCleanupError(errors, () => releaseHostResourcePayload(retained));
+    throwCollectedErrors(errors, "Js.Nullable ownership failed during rollback");
   }
 }
 

@@ -24,6 +24,7 @@ import {
   registerHostResourcePayloadLifetime,
   releaseHostResource,
   releaseHostResourcePayload,
+  VIR_HOST_DISPOSE,
 } from "../../web/src/host-resource.js";
 
 const emptyResourceCounts = {
@@ -73,8 +74,46 @@ const emptyResourceCounts = {
     0,
     "dropping a taken Lean root must leave the transferred JavaScript resource live",
   );
-  releaseHostResource(transferred);
+  assert.equal(transferred.release(), true);
   assert.equal(transferredDisposals, 1);
+  assert.equal(transferred.dispose(), false, "HostResource disposal must be idempotent");
+  assert.equal(transferred[VIR_HOST_DISPOSE](), false);
+}
+
+{
+  const cell = { aliases: 0 };
+  const createAlias = () => {
+    let live = true;
+    const alias = {};
+    cell.aliases++;
+    registerHostResourcePayloadLifetime(alias, {
+      retain: createAlias,
+      release: () => {
+        if (!live) return false;
+        live = false;
+        cell.aliases--;
+        return true;
+      },
+    });
+    return alias;
+  };
+  const resources = createHostResourceState();
+  const roots = new ExternrefResourceRoots();
+  const result = resources.adoptResourceForValue(createAlias());
+  const root = roots.root(result, { owned: true });
+  assert.equal(resources.debugResourceCounts().owners, 1);
+  assert.equal(roots.get(root, { take: true }), result);
+  assert.equal(
+    resources.debugResourceCounts().owners,
+    0,
+    "taking an owned WASM result must stop the resource store from strongly retaining its JS wrapper",
+  );
+  roots.release(root);
+  assert.equal(cell.aliases, 1);
+  assert.equal(result.release(), true);
+  assert.equal(cell.aliases, 0, "the JavaScript result owner must be able to release its payload lease");
+  assert.equal(result.release(), false);
+  resources.dispose();
 }
 
 {

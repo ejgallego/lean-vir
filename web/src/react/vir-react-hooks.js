@@ -62,30 +62,33 @@ export function createBrowserReactHookRuntime(resources, React) {
       }
     },
     disposeComponent(componentState) {
-      for (const hook of componentState?.hooks ?? []) {
-        if (hook?.kind === "state" || hook?.kind === "memo") {
-          disposeBrowserStoredValueHook(hook);
-        } else if (hook?.kind === "reducer") {
-          disposeReducerHook(resources, hook);
-        } else if (hook?.kind === "ref") {
-          disposeReactRefHook(hook);
-        } else if (hook?.kind === "effect") {
-          releaseBrowserEffect(hook.effect);
-          hook.effect = null;
-          hook.dependencyList = null;
-        }
-      }
-      for (const ref of componentState?.refs ?? []) {
-        resources.releaseValueResource(ref);
-      }
-      for (const setter of componentState?.setters ?? []) {
-        resources.releaseValueResource(setter);
-      }
-      if (Array.isArray(componentState?.hooks)) {
-        componentState.hooks.length = 0;
-      }
+      const hooks = Array.isArray(componentState?.hooks) ? componentState.hooks.splice(0) : [];
+      const refs = Array.from(componentState?.refs ?? []);
+      const componentSetters = Array.from(componentState?.setters ?? []);
       componentState?.refs?.clear();
       componentState?.setters?.clear();
+      const errors = [];
+      for (const hook of hooks) {
+        if (hook?.kind === "state" || hook?.kind === "memo") {
+          collectCleanupError(errors, () => disposeBrowserStoredValueHook(hook));
+        } else if (hook?.kind === "reducer") {
+          collectCleanupError(errors, () => disposeReducerHook(resources, hook));
+        } else if (hook?.kind === "ref") {
+          collectCleanupError(errors, () => disposeReactRefHook(hook));
+        } else if (hook?.kind === "effect") {
+          const effect = hook.effect;
+          hook.effect = null;
+          hook.dependencyList = null;
+          collectCleanupError(errors, () => releaseBrowserEffect(effect));
+        }
+      }
+      for (const ref of refs) {
+        collectCleanupError(errors, () => resources.releaseValueResource(ref));
+      }
+      for (const setter of componentSetters) {
+        collectCleanupError(errors, () => resources.releaseValueResource(setter));
+      }
+      throwCollectedErrors(errors, "browser React component disposal failed");
     },
     cancelComponentRender(componentState) {
       if (currentRender?.componentState === componentState) {
@@ -178,7 +181,9 @@ export function createBrowserReactHookRuntime(resources, React) {
       stageBrowserRenderPayload(currentRender, initial);
       const ref = React.useRef(initial);
       if (!Object.is(ref.current, initial)) releaseBrowserRenderPayload(currentRender, initial);
-      stageBrowserRenderPayload(currentRender, ref.current);
+      if (hook.ref !== ref) {
+        stageBrowserRenderPayload(currentRender, ref.current);
+      }
       currentRender.refs.set(hook, ref);
       return resources.revocableResourceForValue(ref);
     },
@@ -295,55 +300,66 @@ export function createVirtualReactHookRuntime(resources) {
       }
     },
     disposeComponent(componentState) {
-      for (const hook of componentState?.hooks ?? []) {
+      const hooks = Array.isArray(componentState?.hooks) ? componentState.hooks.splice(0) : [];
+      if (Array.isArray(componentState?.pendingEffects)) componentState.pendingEffects.length = 0;
+      if (Array.isArray(componentState?.pendingReducers)) componentState.pendingReducers.length = 0;
+      const errors = [];
+      for (const hook of hooks) {
         if (hook?.kind === "state") {
-          releaseReactStatePayload(hook.value);
-          resources.releaseValueResource(hook.setter);
+          const value = hook.value;
+          const setter = hook.setter;
+          hook.value = null;
+          hook.setter = null;
+          collectCleanupError(errors, () => releaseReactStatePayload(value));
+          collectCleanupError(errors, () => resources.releaseValueResource(setter));
         } else if (hook?.kind === "reducer") {
-          disposeReducerHook(resources, hook);
+          collectCleanupError(errors, () => disposeReducerHook(resources, hook));
         } else if (hook?.kind === "ref") {
           const ref = hook.ref;
-          disposeReactRefHook(hook);
-          resources.releaseValueResource(ref);
+          collectCleanupError(errors, () => disposeReactRefHook(hook));
+          collectCleanupError(errors, () => resources.releaseValueResource(ref));
         } else if (hook?.kind === "memo") {
-          releaseReactStatePayload(hook.value);
+          const value = hook.value;
+          hook.value = null;
+          collectCleanupError(errors, () => releaseReactStatePayload(value));
         } else if (hook?.kind === "effect") {
-          disposeVirtualEffectHook(hook);
+          collectCleanupError(errors, () => disposeVirtualEffectHook(hook));
         }
       }
-      if (Array.isArray(componentState?.hooks)) {
-        componentState.hooks.length = 0;
-      }
-      if (Array.isArray(componentState?.pendingEffects)) {
-        componentState.pendingEffects.length = 0;
-      }
-      if (Array.isArray(componentState?.pendingReducers)) {
-        componentState.pendingReducers.length = 0;
-      }
+      throwCollectedErrors(errors, "virtual React component disposal failed");
     },
     cancelComponentRender(componentState) {
-      releasePendingReducerCallbacks(componentState);
-      for (const hook of componentState?.pendingEffects ?? []) {
-        releasePendingEffectCallbacks(hook);
+      const effects = componentState?.pendingEffects?.splice(0) ?? [];
+      const errors = [];
+      collectCleanupError(errors, () => releasePendingReducerCallbacks(componentState));
+      for (const hook of effects) {
+        collectCleanupError(errors, () => releasePendingEffectCallbacks(hook));
       }
-      if (Array.isArray(componentState?.pendingEffects)) {
-        componentState.pendingEffects.length = 0;
-      }
+      throwCollectedErrors(errors, "virtual React render cancellation failed");
     },
     commitComponentRender(componentState, commitOwnership = null) {
-      commitPendingReducerCallbacks(componentState);
       const effects = componentState?.pendingEffects?.splice(0) ?? [];
-      for (let index = 0; index < effects.length; index++) {
-        try {
-          runVirtualEffectHook(effects[index]);
-        } catch (error) {
-          for (const hook of effects.slice(index + 1)) {
-            releasePendingEffectCallbacks(hook);
+      const errors = [];
+      const reducersCommitted = collectCleanupError(errors, () => commitPendingReducerCallbacks(componentState));
+      if (!reducersCommitted.ok) {
+        for (const hook of effects) {
+          collectCleanupError(errors, () => releasePendingEffectCallbacks(hook));
+        }
+      } else {
+        for (let index = 0; index < effects.length; index++) {
+          const attempted = collectCleanupError(errors, () => runVirtualEffectHook(effects[index]));
+          if (!attempted.ok) {
+            for (const hook of effects.slice(index + 1)) {
+              collectCleanupError(errors, () => releasePendingEffectCallbacks(hook));
+            }
+            break;
           }
-          throw error;
         }
       }
-      commitOwnership?.();
+      if (errors.length === 0) {
+        collectCleanupError(errors, () => commitOwnership?.());
+      }
+      throwCollectedErrors(errors, "virtual React render commit failed");
     },
     useState(initial) {
       if (currentComponent === null) {
@@ -692,7 +708,10 @@ function releaseBrowserRenderState(state, fromFinalizer = false) {
   }
   if (errors.length !== 0) {
     if (!fromFinalizer) throwCollectedErrors(errors, "browser React render ownership cleanup failed");
-    for (const error of errors) state.resources.recordGcFinalizerError?.(error);
+    reportReactFinalizerErrors(
+      (error) => state.resources.recordGcFinalizerError?.(error),
+      errors,
+    );
   }
   return true;
 }
@@ -925,9 +944,9 @@ function disposeReactRefHook(hook) {
   const ref = hook?.ref;
   if (ref === null || ref === undefined) return;
   const value = ref.current;
+  hook.ref = null;
   ref.current = null;
   releaseReactStatePayload(value);
-  hook.ref = null;
 }
 
 function replaceReactRefValue(ref, value) {
@@ -1129,24 +1148,37 @@ function createBrowserEffect(resources, setup, cleanup) {
     const setupInvocation = retainReactEventCallback(setup);
     let cleanupInvocation = null;
     let resource = null;
-    let ready = false;
     try {
       cleanupInvocation = retainReactEventCallback(cleanup);
       resource = setupInvocation();
-      ready = true;
-    } finally {
-      setupInvocation.release();
-      if (!ready) releaseLeanCallback(cleanupInvocation);
+    } catch (error) {
+      const errors = [error instanceof Error ? error : new Error(String(error))];
+      collectCleanupError(errors, () => releaseHostResource(resource));
+      collectCleanupError(errors, () => setupInvocation.release());
+      collectCleanupError(errors, () => releaseLeanCallback(cleanupInvocation));
+      throwCollectedErrors(errors, "React effect setup failed during ownership cleanup");
+    }
+    const setupReleaseErrors = [];
+    collectCleanupError(setupReleaseErrors, () => setupInvocation.release());
+    if (setupReleaseErrors.length !== 0) {
+      collectCleanupError(setupReleaseErrors, () => releaseHostResource(resource));
+      collectCleanupError(setupReleaseErrors, () => releaseLeanCallback(cleanupInvocation));
+      throwCollectedErrors(setupReleaseErrors, "React effect setup lease release failed during ownership cleanup");
     }
     let disposed = false;
     return () => {
       if (disposed) return undefined;
       disposed = true;
-      try {
-        return cleanupInvocation(resource);
-      } finally {
-        cleanupInvocation.release();
-      }
+      const ownedCleanup = cleanupInvocation;
+      const ownedResource = resource;
+      cleanupInvocation = null;
+      resource = null;
+      const errors = [];
+      const cleaned = collectCleanupError(errors, () => ownedCleanup(ownedResource));
+      collectCleanupError(errors, () => releaseHostResource(ownedResource));
+      collectCleanupError(errors, () => ownedCleanup.release());
+      throwCollectedErrors(errors, "React effect invocation cleanup failed");
+      return cleaned.value;
     };
   };
   browserEffectStates.set(effect, state);
@@ -1168,18 +1200,31 @@ function releaseBrowserEffect(effect) {
 function releaseBrowserEffectState(state, fromFinalizer = false) {
   if (state?.released === true) return false;
   state.released = true;
-  const errors = [];
-  collectCleanupError(errors, () => releaseLeanCallback(state.setup));
-  collectCleanupError(errors, () => releaseLeanCallback(state.cleanup));
+  const setup = state.setup;
+  const cleanup = state.cleanup;
   state.setup = null;
   state.cleanup = null;
+  const errors = [];
+  collectCleanupError(errors, () => releaseLeanCallback(setup));
+  collectCleanupError(errors, () => releaseLeanCallback(cleanup));
   if (errors.length !== 0) {
     if (!fromFinalizer) {
       throwCollectedErrors(errors, "React effect base callback releases failed");
     }
-    for (const error of errors) state.report?.(error);
+    reportReactFinalizerErrors(state.report, errors);
   }
   return true;
+}
+
+function reportReactFinalizerErrors(report, errors) {
+  if (typeof report !== "function") return;
+  for (const error of errors.slice(0, 16)) {
+    try {
+      report(error);
+    } catch {
+      // Finalization must never surface an exception through the host job queue.
+    }
+  }
 }
 
 function createVirtualEffectHook() {
@@ -1209,31 +1254,32 @@ function runVirtualEffectHook(hook) {
   try {
     cleanupVirtualEffectInstance(hook);
   } catch (error) {
-    releaseEffectCallbacks(setup, cleanup);
-    throw error;
+    const errors = [error instanceof Error ? error : new Error(String(error))];
+    collectCleanupError(errors, () => releaseEffectCallbacks(setup, cleanup));
+    throwCollectedErrors(errors, "virtual React effect replacement failed during callback cleanup");
   }
   hook.setup = setup;
   hook.cleanup = cleanup;
   hook.dependencyList = dependencyList;
-  let ready = false;
   try {
     hook.resource = setup();
-    ready = true;
-  } finally {
-    if (!ready) {
-      releaseEffectCallbacks(setup, cleanup);
-      hook.setup = null;
-      hook.cleanup = null;
-      hook.resource = null;
-      hook.dependencyList = null;
-    }
+  } catch (error) {
+    hook.setup = null;
+    hook.cleanup = null;
+    hook.resource = null;
+    hook.dependencyList = null;
+    const errors = [error instanceof Error ? error : new Error(String(error))];
+    collectCleanupError(errors, () => releaseEffectCallbacks(setup, cleanup));
+    throwCollectedErrors(errors, "virtual React effect setup failed during callback cleanup");
   }
   return undefined;
 }
 
 function disposeVirtualEffectHook(hook) {
-  releasePendingEffectCallbacks(hook);
-  cleanupVirtualEffectInstance(hook);
+  const errors = [];
+  collectCleanupError(errors, () => releasePendingEffectCallbacks(hook));
+  collectCleanupError(errors, () => cleanupVirtualEffectInstance(hook));
+  throwCollectedErrors(errors, "virtual React effect disposal failed");
 }
 
 function cleanupVirtualEffectInstance(hook) {
@@ -1244,15 +1290,14 @@ function cleanupVirtualEffectInstance(hook) {
   hook.cleanup = null;
   hook.resource = null;
   hook.dependencyList = null;
-  if (typeof setup !== "function" || typeof cleanup !== "function") {
-    releaseEffectCallbacks(setup, cleanup);
-    return undefined;
-  }
-  try {
-    return cleanup(resource);
-  } finally {
-    releaseEffectCallbacks(setup, cleanup);
-  }
+  const errors = [];
+  const cleaned = typeof setup === "function" && typeof cleanup === "function"
+    ? collectCleanupError(errors, () => cleanup(resource))
+    : { value: undefined };
+  collectCleanupError(errors, () => releaseHostResource(resource));
+  collectCleanupError(errors, () => releaseEffectCallbacks(setup, cleanup));
+  throwCollectedErrors(errors, "React effect invocation cleanup failed");
+  return cleaned.value;
 }
 
 function releasePendingEffectCallbacks(hook) {
@@ -1317,16 +1362,20 @@ function stagePendingReducerCallback(componentState, hook, reducer) {
 
 function commitPendingReducerCallbacks(componentState) {
   const reducers = componentState?.pendingReducers?.splice(0) ?? [];
+  const errors = [];
   for (const hook of reducers) {
-    commitPendingReducerHook(hook);
+    collectCleanupError(errors, () => commitPendingReducerHook(hook));
   }
+  throwCollectedErrors(errors, "React reducer commit cleanup failed");
 }
 
 function releasePendingReducerCallbacks(componentState) {
   const reducers = componentState?.pendingReducers?.splice(0) ?? [];
+  const errors = [];
   for (const hook of reducers) {
-    releasePendingReducerHook(hook);
+    collectCleanupError(errors, () => releasePendingReducerHook(hook));
   }
+  throwCollectedErrors(errors, "React pending reducer callback releases failed");
 }
 
 function commitPendingReducerHook(hook) {
@@ -1343,18 +1392,26 @@ function commitPendingReducerHook(hook) {
 
 function releasePendingReducerHook(hook) {
   if (hook?.reducerPending !== true) return;
-  releaseLeanCallback(hook.nextReducer);
+  const reducer = hook.nextReducer;
   hook.nextReducer = null;
   hook.reducerPending = false;
+  releaseLeanCallback(reducer);
 }
 
 function disposeReducerHook(resources, hook) {
+  const reducer = hook?.reducer;
+  const nextReducer = hook?.nextReducer;
+  const dispatcher = hook?.dispatcher;
+  if (hook !== null && hook !== undefined) {
+    hook.reducer = null;
+    hook.nextReducer = null;
+    hook.reducerPending = false;
+    hook.dispatcher = null;
+    hook.dispatchTarget = null;
+  }
   const errors = [];
-  collectCleanupError(errors, () => releaseLeanCallback(hook?.reducer));
-  collectCleanupError(errors, () => releaseLeanCallback(hook?.nextReducer));
-  hook.reducer = null;
-  hook.nextReducer = null;
-  hook.reducerPending = false;
+  collectCleanupError(errors, () => releaseLeanCallback(reducer));
+  collectCleanupError(errors, () => releaseLeanCallback(nextReducer));
   if (hook?.ownedPayloads instanceof Set) {
     collectCleanupError(errors, () => disposeBrowserStoredValueHook(hook));
   } else if (Object.hasOwn(hook ?? {}, "value")) {
@@ -1362,8 +1419,8 @@ function disposeReducerHook(resources, hook) {
     hook.value = null;
     collectCleanupError(errors, () => releaseReactStatePayload(value));
   }
-  if (hook?.dispatcher !== null && hook?.dispatcher !== undefined) {
-    collectCleanupError(errors, () => resources.releaseValueResource(hook.dispatcher));
+  if (dispatcher !== null && dispatcher !== undefined) {
+    collectCleanupError(errors, () => resources.releaseValueResource(dispatcher));
   }
   throwCollectedErrors(errors, "React reducer disposal failed");
 }

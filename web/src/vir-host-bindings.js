@@ -36,6 +36,7 @@ import { collectCleanupError, throwCollectedErrors } from "./runtime/cleanup.js"
 
 export {
   hasExternrefTableSupport,
+  releaseHostResource,
   requireExternrefTableSupport,
 } from "./host-resource.js";
 export {

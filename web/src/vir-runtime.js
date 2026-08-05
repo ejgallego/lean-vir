@@ -15,6 +15,7 @@ export {
   requireExternrefTableSupport,
 } from "./vir-host-bindings.js";
 export {
+  releaseHostResource,
   VIR_HOST_DISPOSE,
 } from "./host-resource.js";
 export {
