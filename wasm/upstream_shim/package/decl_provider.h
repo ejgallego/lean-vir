@@ -34,8 +34,6 @@ void * host_import_trampoline(char const * symbol);
 bool host_import_is_io(uint32_t slot);
 uint32_t package_decl_count();
 bool package_ready();
-uint32_t package_generation();
-uint32_t package_format_version();
 void clear_loaded_package();
 bool begin_package_set();
 bool append_package(uint8_t const * data, size_t size);

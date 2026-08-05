@@ -167,13 +167,14 @@ effect handling while allowing simple type aliases and effect aliases to pass.
 
 Version constants are intentionally small and explicit:
 
-- `Vir.GeneratePackage.PackageFormat` owns the Lean generator's
-  `packageFormatVersion` and `manifestVersion` metadata values.
+- `Vir.GeneratePackage.PackageFormat` owns the Lean generator's binary package,
+  interface manifest, and package-set descriptor versions, plus the package-set
+  format identifier.
 - `scripts/package-versions.mjs` owns the JavaScript-side expectations for
   package format, interface manifest, and runtime ABI versions.
-- `npm run check:package-abi` verifies package magic, versions, and section
-  kinds across Lean, C++, and JavaScript, plus the Lean/JavaScript interface tag
-  and host-boundary tables.
+- `npm run check:package-abi` verifies package magic, package-set descriptor
+  identity, versions, and section kinds across Lean, Lake, C++, and JavaScript,
+  plus the Lean/JavaScript interface tag and host-boundary tables.
 - `scripts/ir-codec-tags.mjs` owns the format-10 package `Name` and
   declaration-IR tag assignments; `npm run check:ir-codec-tags` verifies that
   the tracked Lean/C++ outputs agree with it and that the emitter/decoder use
@@ -183,10 +184,15 @@ Bump `packageFormatVersion` when the binary `.irpkg` encoding or decoder
 contract changes incompatibly. Update the JavaScript package-format constant,
 runtime decoder checks, and package fixture expectations in the same PR.
 
-Bump `manifestVersion` when embedded manifest fields, descriptor shapes, or
-their semantics change incompatibly for JavaScript callers. Update the
-manifest validator, runtime smoke tests, and `docs/INTERFACE_PIPELINE.md`
+Bump `manifestVersion` when embedded manifest fields, interface type descriptor
+shapes, or their semantics change incompatibly for JavaScript callers. Update
+the manifest validator, runtime smoke tests, and `docs/INTERFACE_PIPELINE.md`
 alongside the generator change.
+
+Bump `currentPackageSetVersion` when the `.irpkg-set.json` descriptor shape or
+semantics change incompatibly. Change `packageSetFormat` only when introducing a
+different descriptor family. Update the Lake validator, JavaScript loader,
+descriptor smoke tests, and `docs/IRPKG_FORMAT.md` together.
 
 Bump `runtimeAbiVersion` when the SDK artifact compatibility changes outside
 the embedded package/manifest schema, such as a WASM host ABI or JavaScript

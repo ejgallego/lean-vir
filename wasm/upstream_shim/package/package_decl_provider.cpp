@@ -38,7 +38,6 @@ static bool g_package_set_has_members = false;
 static bool g_package_set_open = false;
 static bool g_package_ready = false;
 static bool g_initializers_ran = false;
-static uint32_t g_package_generation = 1;
 static uint32_t g_package_format_version = 0;
 
 static void clear_loaded_package_state() {
@@ -70,10 +69,6 @@ static void clear_loaded_package_state() {
     g_package_ready = false;
     g_initializers_ran = false;
     g_package_format_version = 0;
-    g_package_generation++;
-    if (g_package_generation == 0) {
-        g_package_generation = 1;
-    }
 }
 
 static std::string lean_name_string(object * value) {
@@ -411,14 +406,6 @@ uint32_t package_decl_count() {
 
 bool package_ready() {
     return g_package_ready;
-}
-
-uint32_t package_generation() {
-    return g_package_generation;
-}
-
-uint32_t package_format_version() {
-    return g_package_format_version;
 }
 
 char const * last_package_error() {

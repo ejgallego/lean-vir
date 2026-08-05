@@ -204,6 +204,11 @@ the descriptor URL, and fetches them in parallel while preserving descriptor
 order. A custom `fetchBytes` factory option can provide filesystem, cache, or
 authenticated transport semantics.
 
+The browser and Node runtime entry points also export
+`IR_PACKAGE_SET_FORMAT` and `IR_PACKAGE_SET_VERSION` for tooling that inspects
+or produces descriptors. Applications that only consume Lake-generated sets do
+not need to use these constants directly.
+
 ## Reusing The Compiled Module
 
 Use a factory when creating multiple fresh interpreter instances from the same

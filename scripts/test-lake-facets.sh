@@ -103,6 +103,12 @@ lake build +ModuleSetFixture.Root:vir
 test -f "$module_set_shared"
 assert_module_fixture_descriptor "$module_set"
 
+mv "$module_set_shared" "$tmp/shard-replaced-by-directory.irpkg"
+mkdir "$module_set_shared"
+lake build +ModuleSetFixture.Root:vir
+test -f "$module_set_shared"
+assert_module_fixture_descriptor "$module_set"
+
 node "$repo/scripts/inspect-irpkg.mjs" --json "$canvas_package" > "$tmp/canvas-package.json"
 node --input-type=module -e '
   import fs from "node:fs";

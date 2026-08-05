@@ -16,6 +16,8 @@ import {
 } from "../irpkg-format.mjs";
 import {
   createVirRuntime,
+  IR_PACKAGE_SET_FORMAT,
+  IR_PACKAGE_SET_VERSION,
 } from "../../web/src/vir-runtime-node.js";
 
 const repoRoot = fileURLToPath(new URL("../..", import.meta.url));
@@ -32,8 +34,8 @@ const generated = spawnSync("lake", ["build", "+ModuleSetFixture.Root:vir"], {
 assert.equal(generated.status, 0, generated.stderr || generated.stdout);
 
 const descriptor = JSON.parse(await readFile(descriptorPath, "utf8"));
-assert.equal(descriptor.format, "lean-vir-ir-package-set");
-assert.equal(descriptor.version, 1);
+assert.equal(descriptor.format, IR_PACKAGE_SET_FORMAT);
+assert.equal(descriptor.version, IR_PACKAGE_SET_VERSION);
 assert.deepEqual(
   descriptor.packages.map(({ module, role }) => [module, role]),
   [
