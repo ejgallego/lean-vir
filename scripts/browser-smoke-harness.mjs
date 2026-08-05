@@ -133,7 +133,7 @@ export async function serveDist() {
   };
 }
 
-export async function fetchJsonWithRetry(url, child) {
+export async function fetchJsonWithRetry(url, child, acceptJson = () => true) {
   let lastError = null;
   for (let attempt = 0; attempt < 80; attempt += 1) {
     if (child.exitCode !== null) {
@@ -145,9 +145,14 @@ export async function fetchJsonWithRetry(url, child) {
       const response = await fetch(url, { signal: controller.signal });
       clearTimeout(timeout);
       if (response.ok) {
-        return response.json();
+        const json = await response.json();
+        if (acceptJson(json)) {
+          return json;
+        }
+        lastError = new Error(`${url}: response is not ready`);
+      } else {
+        lastError = new Error(`${url}: HTTP ${response.status}`);
       }
-      lastError = new Error(`${url}: HTTP ${response.status}`);
     } catch (error) {
       lastError = error;
     }
