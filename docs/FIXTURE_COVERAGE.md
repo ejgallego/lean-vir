@@ -24,13 +24,14 @@ The package-generator smoke separately checks normal Lean frontend processing
 for both markers. Negative `@[vir_export]` cases cover unsupported binder
 shapes, theorem, axiom, private declarations, and a local helper that reaches
 the unregistered `IO.getEnv` primitive. Negative `@[vir_startup]` cases cover
-arguments, non-`Unit` results, theorem and private declarations, and the same
-unsupported runtime dependency. Positive startup cases cover every supported
-effect head, pure `Unit`, a reducible effect alias, and adding and removing the
-marker with `attribute`. The smoke also checks the informational
-postponed-compilation path. The Lake facet smoke covers the safe stop at an
-opaque imported declaration, while final package generation checks the
-remaining root-to-boundary path and interface layout.
+arguments, non-`Unit` results, an unsupported effect constructor, theorem and
+private declarations, and the same unsupported runtime dependency. Positive
+startup cases cover every supported effect head, pure `Unit`, a reducible
+effect alias, and adding and removing the marker with `attribute`; the
+generated manifest is checked for each expected effect. The smoke also checks
+the informational postponed-compilation path. The Lake facet smoke covers the
+safe stop at an opaque imported declaration, while final package generation
+checks the remaining root-to-boundary path and interface layout.
 
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather

@@ -31,6 +31,7 @@ closure. `@[vir_export]` also rejects erased, implicit, and instance binders;
 immediately. Dependency diagnostics show the path from the entrypoint to a
 missing IR declaration, unsupported runtime dependency (including a missing
 native extern implementation), or initializer provider.
+
 Opaque imported IR produces an informational diagnostic naming the required
 compiled dependency instead of a false rejection. Postponed compilation
 provides the option-level remedy needed to make IR available.

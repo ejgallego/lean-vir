@@ -38,12 +38,12 @@ private partial def virExportBinderDiagnostic? (type : Lean.Expr) : Option Strin
 private def virMarkerKindDiagnostic? (env : Lean.Environment) (declName : Lean.Name) : Option String :=
   match Lean.getOriginalConstKind? env declName with
   | some .defn | some .opaque => none
-  | some .thm => some "theorems do not have executable IR; export a definition instead"
-  | some .axiom => some "axioms do not have executable IR; export an implemented definition instead"
-  | some .quot => some "quotient declarations cannot be exported as entrypoints"
-  | some .induct => some "inductive type declarations cannot be exported as entrypoints"
-  | some .ctor => some "constructors cannot be exported as entrypoints"
-  | some .recursor => some "recursors cannot be exported as entrypoints"
+  | some .thm => some "theorems do not have executable IR; mark a definition instead"
+  | some .axiom => some "axioms do not have executable IR; mark an implemented definition instead"
+  | some .quot => some "quotient declarations cannot be used as VIR entrypoints"
+  | some .induct => some "inductive type declarations cannot be used as VIR entrypoints"
+  | some .ctor => some "constructors cannot be used as VIR entrypoints"
+  | some .recursor => some "recursors cannot be used as VIR entrypoints"
   | none => some "Lean could not determine the declaration kind"
 
 private structure VirMarkerCheck where

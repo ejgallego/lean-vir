@@ -27,7 +27,6 @@ public inductive EffectKind where
   | io
   | dom
   | react
-  deriving BEq
 
 /-- Classify a type constructor as one of VIR's supported exported effects. -/
 public def effectKind? : Lean.Name → Option EffectKind

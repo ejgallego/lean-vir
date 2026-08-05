@@ -48,9 +48,9 @@ Targets have one of five modes:
   metadata stripping, and controlled abbreviation-head reduction shared by
   marker and package-interface checks.
 - `Vir.ExportValidation`: conclusive visible compiled-closure checks for
-  marked entrypoints, plus explicit opaque-import deferrals. Declaration-kind,
-  signature, and postponed-compilation handling live with the attributes in
-  `Vir.Attributes`.
+  marked entrypoints, plus explicit opaque-import deferrals. Declaration-kind
+  checks, marker-level signature checks, and postponed-compilation handling live
+  with the attributes in `Vir.Attributes`.
 - `Vir.GeneratePackage.Frontend`: source elaboration, `DeclIndex` construction,
   marker collection, declaration-to-module ownership, on-demand `import all`
   environments, module filtering, and declaration-name collision diagnostics.
@@ -217,8 +217,8 @@ npm run test:runtime -- package-generation
 The generated report groups the common package failures by where generation
 stopped:
 
-Many conclusive closure and signature failures for both markers are already
-reported by Lean at the marked declaration. Package diagnostics remain
+Many conclusive closure failures and marker-level signature failures are
+already reported by Lean at the marked declaration. Package diagnostics remain
 necessary for explicit package roots, opaque imported IR, postponed
 compilation, generated boundaries, and final interface classification.
 

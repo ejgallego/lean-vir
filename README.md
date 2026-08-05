@@ -44,7 +44,8 @@ def mount : Lean.Vir.Browser.DomM Unit := pure ()
 Use `@[vir_export]` for declarations that JavaScript calls explicitly. A
 `@[vir_startup]` hook is also exported, but the host normally invokes it through
 `vir.runStartupEntries()` after loading the package.
-At either marker, Lean reports private or non-executable declarations and
+
+For either marker, Lean reports private or non-executable declarations and
 unavailable dependencies in the visible compiled closure, including a path to
 the blocker. `@[vir_export]` also rejects erased, implicit, and instance
 binders; `@[vir_startup]` checks its complete zero-argument, `Unit`-result

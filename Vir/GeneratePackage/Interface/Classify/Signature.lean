@@ -10,6 +10,8 @@ open Lean
 
 namespace Vir.GeneratePackage
 
+open Vir.InterfaceValidation
+
 partial def interfaceSignature?
     (type : Lean.Expr)
     (argIndex : Nat := 1)

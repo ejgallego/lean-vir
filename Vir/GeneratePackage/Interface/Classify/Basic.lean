@@ -12,6 +12,7 @@ open Lean
 namespace Vir.GeneratePackage
 
 open Lean.IR
+open Vir.InterfaceValidation
 
 partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
   | .float | .float32 | .uint64 => true
@@ -20,9 +21,6 @@ partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
       | some (_, fieldType, _, _) => fieldType.needsBoxedCallBoundary
       | none => false
   | _ => false
-
-def stripMData (e : Lean.Expr) : Lean.Expr :=
-  Vir.InterfaceValidation.stripMData e
 
 def effectHead? (name : Name) : Option InterfaceEffect :=
   match Vir.InterfaceValidation.effectKind? name with
