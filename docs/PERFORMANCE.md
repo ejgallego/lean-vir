@@ -106,10 +106,19 @@ npm run bench:pretty:web:stage
 npm run bench:pretty:web:build
 npm run bench:pretty:web:test
 npm run bench:pretty:web:dev
+npm run bench:pretty:web:report
+npm run bench:pretty:web:campaign
+npm run bench:pretty:web:cards
+npm run bench:pretty:web:refresh
 ```
 
-See `benchmarks/prettyM-web/README.md` for the ignored artifact-seed layout and
-the commands that work directly from the application directory.
+The report command collects cold-start, per-phase, scaling, interaction,
+retained and isolated memory, and repeated-call data. Campaigns launch the
+collector in fresh processes, cards render the forwardable VIR observations,
+and refresh performs the complete stage/build/serve/report/campaign/card flow
+without publishing. See `benchmarks/prettyM-web/README.md` for the ignored
+artifact and result layouts and the commands that work directly from the
+application directory.
 
 ## Reading The Numbers
 

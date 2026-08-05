@@ -49,6 +49,24 @@ try {
   const readiness = await page.evaluate(() => window.__prettyBenchApp.ready);
   assert.deepEqual(readiness, { readyCount: 5, backendCount: 5 });
   assert.equal(await page.evaluate(() => typeof window.Reveal), "undefined");
+  assert.deepEqual(
+    await page.evaluate(() => ({
+      corpus: typeof window.runPrettyDifferentialCorpus,
+      scaling: typeof window.runPrettyScalingStudy,
+      memoryPoint: typeof window.runPrettyMemoryScalingPoint,
+      interactions: typeof window.runPrettyInteractionStudy,
+      repeated: typeof window.runPrettyRepeatedCallStudy,
+      jsonRoundTrip: typeof window.runJsonRoundTripStudy,
+    })),
+    {
+      corpus: "function",
+      scaling: "function",
+      memoryPoint: "function",
+      interactions: "function",
+      repeated: "function",
+      jsonRoundTrip: "undefined",
+    },
+  );
   const backends = await page.evaluate(() =>
     window.__prettyBenchApp.getBackends(),
   );
