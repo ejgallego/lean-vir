@@ -9,13 +9,15 @@ import assert from "node:assert/strict";
 import {
   createVirRuntimeFactory,
   fetchBytes,
+  IR_PACKAGE_SET_FORMAT,
+  IR_PACKAGE_SET_VERSION,
 } from "../../web/src/vir-runtime.js";
 
 const encoder = new TextEncoder();
 const descriptorUrl = new URL("https://example.test/packages/Root.irpkg-set.json");
 const validDescriptor = {
-  format: "lean-vir-ir-package-set",
-  version: 1,
+  format: IR_PACKAGE_SET_FORMAT,
+  version: IR_PACKAGE_SET_VERSION,
   packages: [
     {
       module: "Example.Dependency",

@@ -46,7 +46,7 @@ private def virJsonStringField? (json : Lean.Json) (field : String) : Option Str
 
 private def virPackageSetComplete
     (descriptorPath : System.FilePath)
-    (expectedRootModule : String) : IO Bool := do
+    (expectedRootModule expectedRootPath expectedShardDir : String) : IO Bool := do
   if !(← descriptorPath.pathExists) then
     return false
   let .ok descriptor := Lean.Json.parse (← IO.FS.readFile descriptorPath)
@@ -86,8 +86,16 @@ private def virPackageSetComplete
       | return false
     if path.trimAscii.toString.isEmpty || paths.contains path then
       return false
+    let expectedPath :=
+      if role == "root" then
+        expectedRootPath
+      else
+        (System.FilePath.mk expectedShardDir / s!"{moduleName}.irpkg").toString
+    if path != expectedPath then
+      return false
     paths := paths.push path
-    if !(← (baseDir / path).pathExists) then
+    let memberPath := baseDir / path
+    if !(← memberPath.pathExists) || (← memberPath.isDir) then
       return false
     index := index + 1
   return true
@@ -106,6 +114,8 @@ private def buildVirPackageSetFacet
   let shardDir := virModuleOutput mod "module-sets" "parts"
   let driverPath := virModuleOutput mod "drivers" "lean"
   let moduleName := mod.name.toString
+  let rootRelativePath := mod.fileName "irpkg"
+  let shardRelativeDir := shardDir.fileName.getD shardDir.toString
   generatorJob.bindM fun generator =>
     moduleJob.bindM fun artifacts =>
       importArtsJob.mapM fun _ => do
@@ -113,6 +123,7 @@ private def buildVirPackageSetFacet
         addTrace (← computeTrace generator)
         addPureTrace moduleName "VIR module"
         let packageSetComplete ← virPackageSetComplete descriptorPath moduleName
+          rootRelativePath shardRelativeDir
         if (← descriptorPath.pathExists) &&
             (!(← reportPath.pathExists) || !packageSetComplete) then
           IO.FS.removeFile descriptorPath
@@ -143,7 +154,7 @@ private def buildVirPackageSetFacet
               reportPath.toString
             ] ++ #[
               "--module-set-output", descriptorPath.toString, shardDir.toString, moduleName,
-              mod.fileName "irpkg", shardDir.fileName.getD shardDir.toString
+              rootRelativePath, shardRelativeDir
             ] ++ targetArgs
             env := ← getAugmentedEnv
           }

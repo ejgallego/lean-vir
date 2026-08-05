@@ -124,11 +124,13 @@ registrations, and the aggregate host-import table. The runtime loads all
 members before running initializer globals in that module order. Duplicate
 declaration, initializer, host-import, or export-summary identities fail the
 candidate load.
+
 The descriptor is the facet's returned artifact. The facet depends on Lake's
 transitive import artifacts, so changing an imported
 implementation regenerates the affected set even when the root module's public
 interface and `.olean` remain unchanged. A missing root package, report, or
 descriptor-listed shard also invalidates the cached descriptor target.
+
 The descriptor is currently one Lake target: when it is invalidated, the facet
 regenerates the root and every reached dependency member as a complete set. It
 does not yet cache unchanged members independently. Before rebuilding, the

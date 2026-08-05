@@ -24,8 +24,8 @@ export {
 export const VIR_WASM_RELEASE_FILE = "vir-upstream.wasm";
 export const VIR_WASM_DEV_FILE = "vir-upstream.dev.wasm";
 
-const IR_PACKAGE_SET_FORMAT = "lean-vir-ir-package-set";
-const IR_PACKAGE_SET_VERSION = 1;
+export const IR_PACKAGE_SET_FORMAT = "lean-vir-ir-package-set";
+export const IR_PACKAGE_SET_VERSION = 1;
 
 function rejectUnknownOptions(options, label) {
   const names = Object.keys(options);

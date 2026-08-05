@@ -29,6 +29,23 @@ write_sdk_manifest() {
     '}' > "$sdk_dir/lean-vir-artifact.json"
 }
 
+assert_module_fixture_descriptor() {
+  node --input-type=module -e '
+    import fs from "node:fs";
+    const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
+    if (descriptor.format !== "lean-vir-ir-package-set") process.exit(1);
+    if (descriptor.version !== 1) process.exit(1);
+    const actual = descriptor.packages.map(({ module, role, path }) => [module, role, path]);
+    const expected = [
+      ["ModuleSetFixture.Shared", "dependency", "Root.parts/ModuleSetFixture.Shared.irpkg"],
+      ["ModuleSetFixture.Left", "dependency", "Root.parts/ModuleSetFixture.Left.irpkg"],
+      ["ModuleSetFixture.Right", "dependency", "Root.parts/ModuleSetFixture.Right.irpkg"],
+      ["ModuleSetFixture.Root", "root", "Root.irpkg"],
+    ];
+    if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1);
+  ' "$1"
+}
+
 lake build +SlidesCanvas:vir
 lake build +ModuleSetFixture.Root:vir
 
@@ -44,21 +61,7 @@ test -f "$module_set"
 test -f "$module_set_root"
 test -f "$module_set_shared"
 
-node --input-type=module -e '
-  import fs from "node:fs";
-  const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  if (descriptor.format !== "lean-vir-ir-package-set") process.exit(1);
-  if (descriptor.version !== 1) process.exit(1);
-  if (descriptor.packages.length !== 4) process.exit(1);
-  const actual = descriptor.packages.map(({ module, role }) => [module, role]);
-  const expected = [
-    ["ModuleSetFixture.Shared", "dependency"],
-    ["ModuleSetFixture.Left", "dependency"],
-    ["ModuleSetFixture.Right", "dependency"],
-    ["ModuleSetFixture.Root", "root"],
-  ];
-  if (JSON.stringify(actual) !== JSON.stringify(expected)) process.exit(1);
-' "$module_set"
+assert_module_fixture_descriptor "$module_set"
 
 obsolete_shard="$repo/.lake/build/vir/module-sets/ModuleSetFixture/Root.parts/Obsolete.irpkg"
 printf '%s\n' 'obsolete' > "$obsolete_shard"
@@ -71,12 +74,7 @@ node --input-type=module -e '
 ' "$module_set"
 lake build +ModuleSetFixture.Root:vir
 test ! -e "$obsolete_shard"
-node --input-type=module -e '
-  import fs from "node:fs";
-  const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  if (descriptor.format !== "lean-vir-ir-package-set") process.exit(1);
-  if (descriptor.packages.length !== 4) process.exit(1);
-' "$module_set"
+assert_module_fixture_descriptor "$module_set"
 
 node --input-type=module -e '
   import fs from "node:fs";
@@ -86,15 +84,24 @@ node --input-type=module -e '
   fs.writeFileSync(path, `${JSON.stringify(descriptor)}\n`);
 ' "$module_set"
 lake build +ModuleSetFixture.Root:vir
+assert_module_fixture_descriptor "$module_set"
+
 node --input-type=module -e '
   import fs from "node:fs";
-  const descriptor = JSON.parse(fs.readFileSync(process.argv[1], "utf8"));
-  if (descriptor.packages.length !== 4) process.exit(1);
+  const path = process.argv[1];
+  const descriptor = JSON.parse(fs.readFileSync(path, "utf8"));
+  const dependency = descriptor.packages[0];
+  const root = descriptor.packages.at(-1);
+  [dependency.path, root.path] = [root.path, dependency.path];
+  fs.writeFileSync(path, `${JSON.stringify(descriptor)}\n`);
 ' "$module_set"
+lake build +ModuleSetFixture.Root:vir
+assert_module_fixture_descriptor "$module_set"
 
 mv "$module_set_shared" "$tmp/missing-shard.irpkg"
 lake build +ModuleSetFixture.Root:vir
 test -f "$module_set_shared"
+assert_module_fixture_descriptor "$module_set"
 
 node "$repo/scripts/inspect-irpkg.mjs" --json "$canvas_package" > "$tmp/canvas-package.json"
 node --input-type=module -e '

@@ -383,12 +383,19 @@ export async function smokeBrowserCallbackCleanup(cdp, origin) {
       if (typeof createVirRuntime !== "function") {
         throw new Error("built runtime asset does not expose createVirRuntime");
       }
+      const packageResponse = await fetch(
+        ${JSON.stringify(`${origin}${basePath}${hostPackageFile}`)},
+        { cache: "no-store" },
+      );
+      if (!packageResponse.ok) {
+        throw new Error(
+          "failed to fetch callback-disposal package: HTTP " + packageResponse.status,
+        );
+      }
       const runtime = await createVirRuntime({
         wasmUrl: ${JSON.stringify(`${origin}${basePath}${wasmPublicFile}`)},
         irPackageSetBytes: [
-          await runtimeModule.fetchBytes(
-            ${JSON.stringify(`${origin}${basePath}${hostPackageFile}`)},
-          ),
+          new Uint8Array(await packageResponse.arrayBuffer()),
         ],
       });
       document.title = "dispose:sentinel";

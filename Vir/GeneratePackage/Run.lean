@@ -161,8 +161,8 @@ def packageSetMemberJson (moduleName role path : String) : String :=
 
 def packageSetDescriptorJson (members : Array String) : String :=
   jsonObject #[
-    ("format", jsonString "lean-vir-ir-package-set"),
-    ("version", jsonNat 1),
+    ("format", jsonString packageSetFormat),
+    ("version", jsonNat currentPackageSetVersion),
     ("packages", jsonArray members)
   ] ++ "\n"
 

@@ -37,6 +37,10 @@ The version-1 descriptor has this shape:
 role `root`. Paths are resolved relative to the descriptor URL. The loader
 validates this structure before starting any member fetch.
 
+See [Lake Integration](LAKE_INTEGRATION.md) for producing and publishing a
+module package set and [JavaScript Runtime API](JS_API.md#module-package-sets)
+for loading one.
+
 Package format 10 has a fixed header followed by a section directory. All
 multi-byte integers are unsigned little-endian 32-bit values.
 

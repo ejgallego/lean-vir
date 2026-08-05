@@ -14,6 +14,10 @@ import {
   INTERFACE_MANIFEST_ARTIFACT,
   INTERFACE_MANIFEST_VERSION as RUNTIME_INTERFACE_MANIFEST_VERSION,
 } from "../web/src/runtime/interface-manifest.js";
+import {
+  IR_PACKAGE_SET_FORMAT,
+  IR_PACKAGE_SET_VERSION,
+} from "../web/src/vir-runtime.js";
 import { IR_PACKAGE_MAGIC, IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
 import { PACKAGE_FORMAT_VERSION, INTERFACE_MANIFEST_VERSION, RUNTIME_ABI_VERSION } from "./package-versions.mjs";
 
@@ -123,6 +127,16 @@ function assertEqual(actual, expected, label) {
 
 const packageFormat = await readRepoText("Vir/GeneratePackage/PackageFormat.lean");
 assertEqual(
+  leanStringConstant(packageFormat, "packageSetFormat"),
+  IR_PACKAGE_SET_FORMAT,
+  "package-set descriptor format mismatch",
+);
+assertEqual(
+  leanNatConstant(packageFormat, "currentPackageSetVersion"),
+  IR_PACKAGE_SET_VERSION,
+  "package-set descriptor version mismatch",
+);
+assertEqual(
   leanNatConstant(packageFormat, "currentPackageFormatVersion"),
   PACKAGE_FORMAT_VERSION,
   "package format version mismatch",
@@ -159,6 +173,16 @@ assertEqual(
   leanStringConstant(lakefileSource, "virSdkVersion"),
   packageJson.version,
   "Lake SDK facet version mismatch",
+);
+assertEqual(
+  leanStringConstant(lakefileSource, "virPackageSetFormat"),
+  IR_PACKAGE_SET_FORMAT,
+  "Lake package-set descriptor format mismatch",
+);
+assertEqual(
+  leanNatConstant(lakefileSource, "virPackageSetVersion"),
+  IR_PACKAGE_SET_VERSION,
+  "Lake package-set descriptor version mismatch",
 );
 
 const emitSource = await readRepoText("Vir/GeneratePackage/Emit.lean");
@@ -262,6 +286,6 @@ for (const [key] of leanBoundaries) {
 }
 
 console.log(
-  `package ABI guardrails ok: magic, versions, ${packageSections.length} package sections, ` +
+  `package ABI guardrails ok: magic, package-set descriptor, versions, ${packageSections.length} package sections, ` +
   `${jsTags.size} interface descriptor tags, ${jsBoundaries.size} host import boundaries, and SDK ${packageJson.version} agree`,
 );

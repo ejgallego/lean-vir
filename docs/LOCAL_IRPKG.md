@@ -105,6 +105,10 @@ There are three package loading paths:
 - Load a package URL, which is relative to Vite's served assets. For example,
   `fixtures-basic.irpkg` resolves to `web/public/fixtures-basic.irpkg`.
 
+The development runner treats each selection as a focused one-member set. It
+does not load `.irpkg-set.json` descriptors; use `irPackageSetUrl` through the
+JavaScript runtime API for a Lake-generated module package set.
+
 The package runner accepts URL parameters:
 
 ```text

@@ -1,8 +1,9 @@
 # JavaScript Runtime API
 
-`web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a manifest-bearing
-`.irpkg`, and exposes its Lean declarations through a generic JavaScript call
-API without requiring callers to manage WASM memory.
+`web/src/vir-runtime.js` loads `vir-upstream.wasm`, loads a non-empty set of
+manifest-bearing `.irpkg` members, and exposes their aggregate Lean declarations
+through a generic JavaScript call API without requiring callers to manage WASM
+memory. A focused `.irpkg` is loaded as a one-member set.
 
 For the end-to-end "my Lean function from my JavaScript code" workflow, start
 with `docs/CALL_LEAN_FROM_JS.md`.
@@ -184,7 +185,7 @@ console.log(vir.call("ModuleSetFixture.Root.answer"));
 
 Hosts that already have the bytes can pass `irPackageSetBytes`, a non-empty
 array in descriptor order. On an existing factory-managed runtime,
-`vir.loadIrPackageSetBytes(bytes)` validates the complete set in a fresh WASM
+`vir.loadIrPackageSetBytes(members)` validates the complete set in a fresh WASM
 instance before handover. `packageInfo.count` is the aggregate declaration count;
 `packageInfo.byteLength` is the sum of all members.
 
