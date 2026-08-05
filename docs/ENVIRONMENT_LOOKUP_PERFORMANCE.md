@@ -1,7 +1,8 @@
 # Environment Lookup Performance
 
-This note records the reproducible workload, measured experiments, accepted
-implementation, and proposed upstream boundary for VIR declaration lookup.
+This note records the reproducible workload, measured experiments, and accepted
+local implementation for VIR declaration lookup. Follow-up API and experiment
+decisions have their own roadmap cards.
 
 ## Outcome
 
@@ -35,7 +36,7 @@ identical DOM output without browser errors.
 The repository-local workload reproduces Illuminate's many short asynchronous
 entries without depending on Illuminate:
 
-- `fixtures-lean.irpkg` contains 1,546 declarations;
+- the package used for the recorded measurements contained 1,546 declarations;
 - `Vir.Fixtures.ExprPrinter.exprCoverageScore` is deterministic and returns
   `1232`;
 - every timed call enters a fresh upstream interpreter, matching a callback
@@ -46,36 +47,13 @@ entries without depending on Illuminate:
   installation in a fresh Wasm instance while excluding instantiation and
   disposal.
 
-Capture an unprofiled report with a fresh output path:
-
-```bash
-npm run bench:env-lookup -- \
-  --json build/perf/env-lookup/current.json
-```
-
-Use `--no-build` only after matching artifacts have been built. Reports record
-the Git state, machine and toolchain, Wasm/package/harness/fixture hashes, run
-policy, raw samples, and checksum. Comparisons reject mismatched identities.
-
-Collect attribution separately:
-
-```bash
-npm run bench:env-lookup -- \
-  --cpu-profile build/perf/env-lookup/current.cpuprofile \
-  --json build/perf/env-lookup/current-profiled.json
-```
-
-For acceptance, use byte-identical packages and an even AB/BA schedule:
-
-```bash
-npm run bench:paired -- \
-  --npm-script bench:env-lookup \
-  --repeat 6 \
-  --out build/perf/env-lookup/lookup-abba \
-  --bench-arg=--iterations=1000 \
-  --bench-arg=--samples=9 \
-  ../vir-baseline ../vir-candidate
-```
+[Performance](PERFORMANCE.md#environment-lookup-workload) owns the report,
+profile, and paired-comparison commands. Use `--no-build` only after matching
+artifacts have been built, keep profiling separate from timing evidence, and
+use an even AB/BA schedule for acceptance. Focused comparisons reject different
+package content, harness sources, fixtures, run policies, toolchains, or
+machines. Package identity ignores only the manifest's volatile `generatedAt`
+field; reports retain the exact package SHA-256 for stricter manual acceptance.
 
 ## Measurements
 
@@ -140,13 +118,39 @@ interpreter hash table that sees decoded package names, not only VIR's new
 declaration index. Profile timings remain attribution evidence; the unprofiled,
 order-balanced callback measurements are the acceptance result.
 
+### Post-index attribution
+
+A later Illuminate profile examined what remained after accepting the index.
+Of symbolized attributable samples, package, native, and interpreter-local
+lookup together with `get_decl` and `lookup_symbol` accounted for 14.9%.
+Including interpreter call dispatch raised that cluster to 18.9%. The leading
+other buckets were generic IR body evaluation at 12.58%, DOM `setAttribute` at
+5.69%, and garbage collection at 3.38%. `lean_name_eq` was no longer a leading
+symbol, confirming that the accepted patch removed the original collision
+pathology.
+
+That profile is diagnostic: Chrome assigned 53.18% of its sample to
+unsymbolized program time. An accompanying eight-context unprofiled snapshot
+ran on an unusually busy host and is not numerically comparable with the
+controlled acceptance run. It measured a 2.30 millisecond median and 3.70
+millisecond p95 for the isolated VIR callback, with no callback exceeding the
+16.7 millisecond frame budget. These values establish the post-index path, not
+a replacement baseline.
+
+The repeated-resolution cluster is enough signal for one bounded experiment,
+not for an API conclusion. ULC-0002 therefore requires exact hit/miss and
+lifetime counters plus unprofiled focused and Illuminate timing before a
+caller-owned, provider-revision-scoped resolution cache is considered for
+upstream.
+
 ## Accepted Local Design
 
 Decoded names now use Lean's real construction rules:
 
 ```text
 str hash = mixHash(prefix.hash, string.hash)
-num hash = mixHash(prefix.hash, numeral value)
+num component = numeral value when numeral < 2^64, otherwise 17
+num hash = mixHash(prefix.hash, num component)
 ```
 
 The package provider keeps two heap-allocated maps:
@@ -157,10 +161,12 @@ lean::name_hash_map<uint32_t> boxedDeclarations;
 ```
 
 They are allocated after all package-set members have been appended and before
-initializers run. Heap allocation is required because ordinary C++ global
-constructors are not run in this Wasm build. Map keys retain their `Lean.Name`;
-map values are declaration slots and add no declaration ownership. Clearing a
-package deletes both maps before releasing vector-owned names and declarations.
+initializers run. Heap allocation gives the maps an explicit package-set
+lifecycle and mirrors the upstream interpreter's cache initialization; the
+JavaScript runtime calls `__wasm_call_ctors` before package loading. Map keys
+retain their `Lean.Name`; map values are declaration slots and add no
+declaration ownership. Clearing a package deletes both maps before releasing
+vector-owned names and declarations.
 
 This is close to upstream rather than a new VIR-specific hash structure:
 
@@ -174,63 +180,21 @@ This is close to upstream rather than a new VIR-specific hash structure:
 The binary-search candidate remains a valid analogue of upstream imported
 lookup, but the hash map is the measured winner for VIR's flat provider.
 
-## Upstream Integration Direction
+## Architecture Follow-up
 
-VIR currently supplies the exported `lean_ir_find_env_decl` and
-`lean_ir_find_env_decl_boxed` symbols and passes a dummy environment to the
-interpreter. The local implementation can ship behind that boundary, but an
-upstream API proposal must first explain why VIR cannot use Lean's existing
-environment-backed lookup unchanged.
-
-That API is not a plain C++ environment map lookup. Its two exported functions
-are implemented in `Lean/Compiler/IR/CompilerM.lean` and expect a valid
-`Lean.Environment` containing module ownership and `Lean.IR.declMapExt` state.
-VIR's Wasm artifact does not link those implementations, its `.irpkg` contains
-decoded `Lean.IR.Decl` values rather than an environment, and the scalar dummy
-is usable only because VIR also replaces the other environment policies reached
-by the interpreter.
-
-A closer-upstream alternative may therefore avoid a new API: create a valid
-empty environment through Lean, add decoded package declarations to
-`declMapExt` as local entries, and pass it to the existing `run_boxed`. This
-must be tested rather than assumed cheap. It may require a substantial generated
-Lean dependency and initializer closure, and it does not automatically replace
-VIR's package-backed initializer, symbol-mangling, export-name, or host-import
-policies.
-
-If that experiment shows that a real environment is disproportionate for a
-declaration-only runtime, the fallback upstream change is a `run_boxed`
-overload with a callback table equivalent in ownership semantics to:
-
-```cpp
-struct decl_provider {
-    void * state;
-    object * (*find_decl)(void * state, object * name);       // borrowed or null
-    object * (*find_boxed_decl)(void * state, object * name); // borrowed or null
-};
-```
-
-The provider remains stable and alive for the call, and the interpreter retains
-any declaration it caches. Existing environment-backed entry points remain the
-default, so normal Lean callers do not change.
-
-VIR's current map lookups can become these callbacks without moving the index
-into upstream or exposing `.irpkg`. Once the overload exists,
-`interpreter_bridge.cpp` passes the provider explicitly and removes VIR's
-replacement definitions of the exported lookup symbols.
-
-The Illuminate acceptance profile does not justify coupling a caller-owned
-symbol cache to the first upstream API: representative callback time halved and
-the targeted lookup buckets moved substantially. If the provider path wins,
-keep its first change limited to declaration lookup. A reusable symbol cache
-should be reconsidered only if a future representative profile selects it; such
-a cache would need precise identity over environment, relevant options,
-provider state, and provider revision, and must not retain mutable interpreter
-stacks or evaluated constants.
+VIR still supplies `lean_ir_find_env_decl*` and passes a dummy environment to
+the interpreter. Lean's default lookup expects a valid `Lean.Environment` with
+module ownership and `Lean.IR.declMapExt` state, whereas `.irpkg` currently
+carries decoded declarations rather than an environment.
 
 [ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
-owns the real-environment experiment, the provider fallback, and the evidence
-required before transferring this request upstream.
+owns the bounded real-environment experiment, the explicit-provider fallback,
+and the evidence required before transferring that request upstream.
+[ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
+owns the separate measured experiment for sharing immutable resolution
+metadata across fresh asynchronous interpreter entries. It explicitly does not
+persist a whole interpreter or assume that a new upstream cache API is already
+justified.
 
 ## Rejected or Superseded Experiments
 
@@ -246,19 +210,22 @@ required before transferring this request upstream.
   was not a constraint, but measurements no longer justified the format and
   decoder complexity.
 - Decoder-wide name interning and whole-interpreter persistence remain
-  unnecessary. Application batching may still help Illuminate, but it should
-  not be required to hide provider lookup costs.
+  unjustified. A revision-scoped resolution-metadata cache and application
+  batching are separate measured experiments; neither belongs in the accepted
+  declaration-index patch.
 
 ## Validation and Follow-up
 
 Repository validation covers package hits/misses, boxed separation, package
 sets and duplicate rejection, failed loads, initializers, reload, and fixture
-agreement. The boundary fixture also includes actual `Name.hash` values so the
-constant-hash regression is observable against host Lean.
+agreement. The boundary fixture includes string and numeric `Name.hash` values,
+including the oversized-numeral rule, so hash regressions are observable against
+host Lean.
 
 The representative Illuminate acceptance gate has passed: the focused result
 reproduced, sustained callback mean and CPU were halved, the original sampled
-hotspots moved, and DOM output remained identical. The next design step is the
-bounded real-environment experiment in ULC-0001, not an immediate upstream API
-patch. Any further optimization target should come from a new representative
-profile rather than extending this lookup patch speculatively.
+hotspots moved, and DOM output remained identical. The environment/provider
+decision remains the bounded ULC-0001 experiment. The new post-index profile
+selects the instrumented ULC-0002 cache experiment as the next performance
+question. Neither card calls for expanding this accepted lookup patch or
+proposing an upstream API before its measurements are available.

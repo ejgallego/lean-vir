@@ -146,16 +146,17 @@ npm run test:pages:browser
 npm test
 ```
 
-`npm test` runs the differential benchmark sampler tests, package ABI check, IR
-codec tag freshness check, native extern ABI check, boundary registry check,
-native wrapper check, API coverage docs check, and Wasm extension probes,
-builds the demo artifacts once, then reuses those artifacts for upstream smoke,
-infoview widget smoke, JavaScript runtime tests, and the fixture suite. It is
-the default pre-merge signal for code changes.
+`npm test` runs the benchmark sampler, focused-identity, and paired-runner
+contract tests, package ABI check, IR codec tag freshness check, native extern
+ABI check, boundary registry check, native wrapper check, API coverage docs
+check, and Wasm extension probes, builds the demo artifacts once, then reuses
+those artifacts for upstream smoke, infoview widget smoke, JavaScript runtime
+tests, and the fixture suite. It is the default pre-merge signal for code
+changes.
 
 ## Smallest Useful Check
 
-- Differential benchmark sampling or dispatch comparison changes:
+- Benchmark sampling, focused identity, or paired-runner changes:
   `npm run test:bench`
 - Package declaration lookup or interpreter/provider performance changes:
   `npm run bench:env-lookup -- --json <new-output-path>`; use a separate

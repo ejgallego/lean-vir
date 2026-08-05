@@ -81,8 +81,8 @@ ownership diagrams.
 - [PERFORMANCE.md](PERFORMANCE.md): benchmark commands, artifact-cache
   behavior, and before/after comparisons.
 - [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md):
-  fresh-interpreter lookup evidence, provider-index design, and upstream
-  integration direction.
+  fresh-interpreter lookup evidence, measured alternatives, and accepted local
+  provider-index design.
 - [OBJECT_ABI.md](OBJECT_ABI.md): Lean object ABI construction,
   inspection, ownership, and codec-retirement roadmap.
 

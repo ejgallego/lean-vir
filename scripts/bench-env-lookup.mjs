@@ -4,7 +4,6 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createHash } from "node:crypto";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import inspector from "node:inspector";
 import { cpus } from "node:os";
@@ -12,6 +11,12 @@ import { dirname } from "node:path";
 
 import { ensureCachedBenchArtifacts } from "./bench-artifact-cache.mjs";
 import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
+import {
+  environmentLookupHarnessIdentity,
+  environmentLookupPackageIdentity,
+  sha256,
+  validateEnvironmentLookupOutputPaths,
+} from "./bench-env-lookup-contract.mjs";
 import {
   leanPackageFile,
   publicArtifactPath,
@@ -45,6 +50,11 @@ const wasmBuild = {
 const environmentLookupArtifactPaths = [
   publicArtifactPath(benchmarkWasmFile),
   publicArtifactPath(leanPackageFile),
+];
+const environmentLookupHarnessPaths = [
+  "scripts/bench-env-lookup.mjs",
+  "scripts/bench-env-lookup-contract.mjs",
+  "scripts/bench-differential.mjs",
 ];
 
 function parseArgs(argv) {
@@ -201,10 +211,6 @@ async function requireAbsent(path, option) {
     throw error;
   }
   throw new Error(`${option} refuses to overwrite existing path: ${path}`);
-}
-
-function sha256(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function sha256Text(value) {
@@ -414,6 +420,7 @@ function benchmarkPackageLoad(factory, module, packageBytes, expectedDeclaration
   return sample;
 }
 
+validateEnvironmentLookupOutputPaths(args);
 await requireAbsent(args.jsonPath, "--json");
 await requireAbsent(args.cpuProfilePath, "--cpu-profile");
 
@@ -432,14 +439,22 @@ const artifactCache = args.buildArtifacts
 
 const wasmPath = new URL(`../${publicArtifactPath(benchmarkWasmFile)}`, import.meta.url);
 const packagePath = new URL(`../${publicArtifactPath(leanPackageFile)}`, import.meta.url);
-const [wasmBytes, packageBytes, packageInfo, toolchain, harnessBytes, fixtureBytes] = await Promise.all([
+const [wasmBytes, packageBytes, packageInfo, toolchain, harnessSourceBytes, fixtureBytes] = await Promise.all([
   readFile(wasmPath),
   readFile(packagePath),
   readIrPackageFile(packagePath),
   readFile(new URL("../lean-toolchain", import.meta.url), "utf8"),
-  readFile(new URL(import.meta.url)),
+  Promise.all(environmentLookupHarnessPaths.map((path) =>
+    readFile(new URL(`../${path}`, import.meta.url)))),
   readFile(new URL("../fixtures/ExprPrinter.lean", import.meta.url)),
 ]);
+const harnessIdentity = environmentLookupHarnessIdentity(
+  environmentLookupHarnessPaths.map((path, index) => ({ path, bytes: harnessSourceBytes[index] })),
+);
+const packageIdentity = environmentLookupPackageIdentity(
+  packageBytes,
+  packageInfo,
+);
 
 if (packageInfo.package.declarationCount < args.minimumDeclarations) {
   throw new Error(
@@ -538,7 +553,8 @@ const report = {
     leanToolchain: toolchain.trim(),
     manifestVersion: packageInfo.manifest.version,
     declarationCount: packageInfo.package.declarationCount,
-    harnessSha256: sha256(harnessBytes),
+    package: packageIdentity,
+    harnessSha256: harnessIdentity.sha256,
     fixtureSha256: sha256(fixtureBytes),
     wasmArtifact: publicArtifactPath(benchmarkWasmFile),
     wasmBuild,
@@ -596,10 +612,7 @@ const report = {
       packageFormatVersion: packageInfo.package.version,
       manifestVersion: packageInfo.manifest.version,
     },
-    harness: {
-      path: "scripts/bench-env-lookup.mjs",
-      sha256: sha256(harnessBytes),
-    },
+    harness: harnessIdentity,
     fixture: {
       path: "fixtures/ExprPrinter.lean",
       sha256: sha256(fixtureBytes),

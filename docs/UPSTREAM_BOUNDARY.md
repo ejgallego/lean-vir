@@ -489,10 +489,11 @@ earlier compiler-generation batches.
 
 The boundary between the two approaches is intentionally narrow:
 `lean_ir_find_env_decl` and `lean_ir_find_env_decl_boxed` delegate to
-`package/decl_provider.h`. Today that provider is backed by a small package decoded from
-`Lean.IR.Decl` data. Later it can be backed by generated module data or a real
-environment loader without changing `ir_interpreter.cpp` or the WASI/platform
-shim.
+`package/decl_provider.h`. Today that provider is backed by package-owned indices
+over decoded `Lean.IR.Decl` data. Later it can be backed by generated module data
+or a real environment loader without changing `ir_interpreter.cpp` or the
+WASI/platform shim. The measured integration decision is tracked in
+[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md).
 
 ## Current Boundary
 

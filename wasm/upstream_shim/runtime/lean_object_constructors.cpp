@@ -43,6 +43,17 @@ static uint64_t vir_nat_hash(object * n) {
     return lean_uint64_of_nat(n);
 }
 
+static uint64_t vir_name_numeral_hash(object * n) {
+    uint64_t value = lean_uint64_of_nat(n);
+    if (lean_is_scalar(n)) {
+        return value;
+    }
+    object * round_trip = lean_uint64_to_nat(value);
+    bool fits_uint64 = lean_nat_eq(n, round_trip);
+    lean_dec(round_trip);
+    return fits_uint64 ? value : 17;
+}
+
 static uint64_t vir_level_mk_data(uint64_t h, uint64_t depth, bool has_mvar, bool has_param) {
     uint32_t h1 = static_cast<uint32_t>(h);
     uint64_t d = std::min<uint64_t>(depth, 16777215);
@@ -377,7 +388,7 @@ extern "C" obj_res lean_name_mk_string(obj_arg prefix, obj_arg suffix) {
 
 extern "C" obj_res lean_name_mk_numeral(obj_arg prefix, obj_arg suffix) {
     object * obj = mk_ctor(static_cast<unsigned>(name_kind::NUMERAL), { prefix, suffix }, sizeof(uint64_t));
-    set_name_hash(obj, vir_mix_hash(lean_name_hash(prefix), vir_nat_hash(suffix)));
+    set_name_hash(obj, vir_mix_hash(lean_name_hash(prefix), vir_name_numeral_hash(suffix)));
     return obj;
 }
 

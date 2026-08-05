@@ -29,18 +29,23 @@ npm run bench:env-lookup -- \
 ```
 
 It repeatedly enters a fresh interpreter through
-`Vir.Fixtures.ExprPrinter.exprCoverageScore` in the 1,546-declaration
-`fixtures-lean.irpkg`. The headline execution row excludes package loading,
-initializer execution, and export-slot resolution. A separate package-load row
-uses a fresh Wasm instance for each load; Wasm instantiation and disposal are
-outside that row's timed window. Reports preserve both sets of raw rounds,
-artifact and source hashes, toolchain/CPU identity, package declaration count,
-and the expected result. Wasm profile, optimization, target, memory, and stack
-settings are part of the report/comparison identity and artifact-cache key.
-Output paths are never overwritten.
+`Vir.Fixtures.ExprPrinter.exprCoverageScore` in `fixtures-lean.irpkg`; the
+recorded 2026-08-05 measurements used 1,546 declarations, and the default
+workload rejects packages with fewer than 1,000. The headline execution row
+excludes package loading, initializer execution, and export-slot resolution. A
+separate package-load row uses a fresh Wasm instance for each load; Wasm
+instantiation and disposal are outside that row's timed window. Reports preserve
+both sets of raw rounds, artifact and source hashes, toolchain/CPU identity,
+package declaration count, and the expected result. Wasm profile, optimization,
+target, memory, and stack settings are part of the report/comparison identity
+and artifact-cache key. Output paths are never overwritten, and `--json` and
+`--cpu-profile` must resolve to different files.
+
 Focused reports include a stable comparison identity; saved and paired
 comparisons reject mismatched run policy, diagnostics, toolchain/machine,
-package shape, harness, or fixture before reporting a delta.
+package content and format, timing harness, or fixture before reporting a
+delta. Package content identity ignores only the manifest's volatile
+`generatedAt` field; the report also retains the exact package SHA-256.
 
 Capture sampled attribution in a separate diagnostic run:
 
@@ -53,8 +58,12 @@ npm run bench:env-lookup -- \
 The profiling path uses the optimized, unstripped debug Wasm companion. Its
 timings are marked diagnostic and are not before/after evidence. See
 [Environment Lookup Performance](ENVIRONMENT_LOOKUP_PERFORMANCE.md) for the
-baseline and final profiles, measured representation experiments, and upstream
-API direction.
+baseline and final profiles, measured representation experiments, and accepted
+local design.
+[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
+owns the environment/provider API decision;
+[ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
+owns the measurement-gated cross-entry resolution-cache experiment.
 
 Compare two saved reports with:
 

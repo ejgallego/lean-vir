@@ -9,6 +9,7 @@ makes it actionable, and the decision needed before implementation.
 | Card | Status | Priority |
 | --- | --- | --- |
 | [ULC-0001 IR Declaration Lookup Boundary](cards/ULC-0001-ir-declaration-lookup-boundary/README.md) | candidate | medium |
+| [ULC-0002 Cross-entry Symbol Resolution Cache](cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md) | candidate | medium |
 
 `ULC` cards describe Lean API questions discovered by VIR. They are not VIR
 release blockers and should be transferable to `leanprover/lean4` once the

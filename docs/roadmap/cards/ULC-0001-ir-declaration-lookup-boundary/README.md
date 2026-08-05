@@ -38,11 +38,11 @@ fidelity. Conversely, constructing one may pull environment, compiler-extension,
 task, initialization, and module state into a runtime that otherwise needs only
 decoded IR declarations.
 
-The local performance problem is already solved: correct `Name` hashes plus a
+The original local lookup problem is solved: correct `Name` hashes plus a
 package-owned `lean::name_hash_map` made fresh entry 6.6x faster in the
 independent acceptance run and halved sustained Illuminate callback time. This
-card is architectural cleanup, not justification for another lookup
-optimization.
+card owns architectural cleanup. The later post-index resolution-cache
+experiment is tracked separately in ULC-0002.
 
 ## Roadmap Decision
 
@@ -53,9 +53,11 @@ boundary complexity. Request an explicit provider API only if that experiment
 shows that using the default environment contract requires a materially broader
 runtime or reliance on private object representation.
 
-Do not add cross-invocation symbol-cache state or a provider revision mechanism
-as part of this decision. The representative profile does not currently justify
-either feature.
+Do not bundle cross-invocation symbol-cache state or provider revision into
+this decision. The post-index profile selects that as a separately
+instrumented experiment in
+[ULC-0002](../ULC-0002-cross-entry-symbol-resolution-cache/README.md); its
+profitability and API shape are not yet established.
 
 ## Reproduction Status
 
@@ -138,7 +140,8 @@ This card does not own:
 
 - loading `.olean` or Lean's raw `.ir` module format in the browser;
 - full kernel, elaborator, or metaprogramming environment fidelity;
-- persistent interpreter or resolved-symbol caches;
+- persistent interpreter state or resolved-symbol caches, which belong to
+  ULC-0002;
 - a package-format change without separate measured evidence; or
 - further declaration-lookup optimization after the accepted hash-map result.
 
@@ -161,9 +164,7 @@ in the focused and representative workloads.
 - [Current upstream boundary](../../../UPSTREAM_BOUNDARY.md)
 - [VIR interpreter bridge](../../../../wasm/upstream_shim/interpreter/interpreter_bridge.cpp)
 - [Package declaration provider](../../../../wasm/upstream_shim/package/package_decl_provider.cpp)
-- Benchmark infrastructure commit: `5b093fb`
-- Indexed provider commit: `8b3c1a1`
-- Illuminate acceptance record commit: `8717012`
+- [VIR PR #104: benchmark, indexed provider, and acceptance record](https://github.com/ejgallego/lean-vir/pull/104)
 
 The independent acceptance run measured 371.4 to 56.2 microseconds for fresh
 entry, 12.35 to 9.21 milliseconds for package loading, 1.10 to 0.545
