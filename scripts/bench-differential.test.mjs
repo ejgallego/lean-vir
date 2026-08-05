@@ -100,6 +100,79 @@ test("records candidate errors and cannot pass", () => {
   assert.deepEqual(result.candidates.broken.samples, []);
 });
 
+test("keeps candidate setup and teardown outside the timed window", () => {
+  const clock = fakeClock();
+  const events = [];
+  const result = sampleBenchmarkCandidates({
+    candidates: [{
+      id: "phased",
+      setup: () => {
+        events.push("setup");
+        clock.advance(100);
+        return 41;
+      },
+      run: (context) => {
+        events.push(`run:${context}`);
+        clock.advance(3);
+        return context + 1;
+      },
+      teardown: (context) => {
+        events.push(`teardown:${context}`);
+        clock.advance(200);
+      },
+    }],
+    warmupRounds: 0,
+    sampleRounds: 2,
+    now: clock.now,
+  });
+
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.candidates.phased.samples, [3, 3]);
+  assert.deepEqual(events, [
+    "setup", "run:41", "teardown:41",
+    "setup", "run:41", "teardown:41",
+  ]);
+});
+
+test("tears down failed candidates and reports setup or teardown errors", () => {
+  let teardownCalls = 0;
+  const runFailure = sampleBenchmarkCandidates({
+    candidates: [{
+      id: "run-failure",
+      setup: () => "context",
+      run: () => { throw new Error("run failed"); },
+      teardown: () => { teardownCalls += 1; },
+    }],
+    warmupRounds: 0,
+    sampleRounds: 1,
+  });
+  assert.equal(runFailure.passed, false);
+  assert.equal(teardownCalls, 1);
+  assert.deepEqual(runFailure.candidates["run-failure"].errors, ["Error: run failed"]);
+
+  const setupFailure = sampleBenchmarkCandidates({
+    candidates: [{
+      id: "setup-failure",
+      setup: () => { throw new Error("setup failed"); },
+      run: () => 1,
+    }],
+    warmupRounds: 0,
+    sampleRounds: 1,
+  });
+  assert.deepEqual(setupFailure.candidates["setup-failure"].errors, ["Error: setup failed"]);
+
+  const teardownFailure = sampleBenchmarkCandidates({
+    candidates: [{
+      id: "teardown-failure",
+      run: () => 1,
+      teardown: () => { throw new Error("teardown failed"); },
+    }],
+    warmupRounds: 0,
+    sampleRounds: 1,
+  });
+  assert.deepEqual(teardownFailure.candidates["teardown-failure"].errors, ["Error: teardown failed"]);
+});
+
 test("does not run unavailable candidates and cannot pass", () => {
   let unavailableCalls = 0;
   const result = sampleBenchmarkCandidates({
@@ -139,6 +212,14 @@ test("validates sampler configuration and finite checksums", () => {
     [
       { candidates: [{ id: "invalid", available: "yes", run: () => 1 }] },
       /benchmark candidate invalid availability must be boolean/,
+    ],
+    [
+      { candidates: [{ id: "invalid-setup", run: () => 1, setup: true }] },
+      /benchmark candidate invalid-setup setup must be a function/,
+    ],
+    [
+      { candidates: [{ id: "invalid-teardown", run: () => 1, teardown: true }] },
+      /benchmark candidate invalid-teardown teardown must be a function/,
     ],
   ];
   for (const [options, expected] of invalidCases) {

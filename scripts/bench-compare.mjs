@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
+  assertComparableBenchmarkReportIdentities,
   benchmarkReportLabel,
   benchmarkSampleNamesForReports,
   printOptionalBenchmarkSampleComparison,
@@ -15,6 +16,10 @@ import {
 const args = parseArgs(process.argv.slice(2));
 const before = await readBenchmarkReport(args.beforePath, "before");
 const after = await readBenchmarkReport(args.afterPath, "after");
+assertComparableBenchmarkReportIdentities([
+  { label: "before", report: before },
+  { label: "after", report: after },
+]);
 
 function parseArgs(argv) {
   if (argv.includes("--help") || argv.includes("-h")) {

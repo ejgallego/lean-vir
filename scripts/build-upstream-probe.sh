@@ -9,43 +9,46 @@ set -euo pipefail
 cd "$(dirname "$0")/.."
 script_start=$SECONDS
 
-src="${LEAN4_SRC:-third_party/lean4-src}"
 out="build/upstream-probe"
+mkdir -p "$out"
+
+effective_tools_tmp="$out/effective-wasm-tools.tmp"
+if ! node scripts/wasm-build-identity.mjs --print-tools0 > "$effective_tools_tmp"; then
+  rm -f "$effective_tools_tmp"
+  exit 1
+fi
+mapfile -d '' -t effective_wasm_tools < "$effective_tools_tmp"
+rm -f "$effective_tools_tmp"
+if [ "${#effective_wasm_tools[@]}" -ne 7 ]; then
+  echo "error: effective Wasm tool resolver returned ${#effective_wasm_tools[@]} fields; expected 7" >&2
+  exit 1
+fi
+
+src="${effective_wasm_tools[0]}"
+resolved_wasi_sdk="${effective_wasm_tools[1]}"
+cxx="${effective_wasm_tools[2]}"
+wasm_ld="${effective_wasm_tools[3]}"
+llvm_nm="${effective_wasm_tools[4]}"
+lean_prefix="${effective_wasm_tools[5]}"
+llvm_objcopy="${effective_wasm_tools[6]}"
+
+if [ -n "$resolved_wasi_sdk" ]; then
+  export WASI_SDK_PATH="$resolved_wasi_sdk"
+  export PATH="$WASI_SDK_PATH/bin:$PATH"
+else
+  unset WASI_SDK_PATH
+fi
+export LEAN4_SRC="$src"
+export CXX="$cxx"
+export WASM_LD="$wasm_ld"
+export LLVM_NM="$llvm_nm"
+export LEAN_PREFIX="$lean_prefix"
 
 if [ ! -f "$src/src/library/ir_interpreter.cpp" ]; then
   echo "error: Lean source not found at $src; run npm run fetch:lean first" >&2
   exit 1
 fi
 
-local_wasi_sdk="$PWD/.tools/wasi-sdk"
-
-if [ -z "${WASI_SDK_PATH:-}" ] && [ -x "$local_wasi_sdk/bin/clang++" ]; then
-  export WASI_SDK_PATH="$local_wasi_sdk"
-fi
-
-if [ -n "${WASI_SDK_PATH:-}" ] && [ -x "$WASI_SDK_PATH/bin/clang++" ]; then
-  export PATH="$WASI_SDK_PATH/bin:$PATH"
-  cxx="${CXX:-$WASI_SDK_PATH/bin/clang++}"
-elif [ -n "${CXX:-}" ]; then
-  cxx="$CXX"
-else
-  echo "error: clang++ not found. Run npm run install:wasi or set WASI_SDK_PATH." >&2
-  exit 1
-fi
-
-wasm_ld="${WASM_LD:-$(command -v wasm-ld || true)}"
-if [ -z "$wasm_ld" ]; then
-  echo "error: wasm-ld not found. Run npm run install:wasi or set WASM_LD." >&2
-  exit 1
-fi
-
-llvm_nm="${LLVM_NM:-$(command -v llvm-nm || true)}"
-if [ -z "$llvm_nm" ]; then
-  echo "error: llvm-nm not found. Run npm run install:wasi or set LLVM_NM." >&2
-  exit 1
-fi
-
-lean_prefix="${LEAN_PREFIX:-$(lean --print-prefix)}"
 target="${WASI_TARGET:-wasm32-wasip1}"
 wasm_opt_level="${VIR_WASM_OPT_LEVEL:--O3}"
 wasm_profile="${VIR_WASM_PROFILE:-dev}"
@@ -63,6 +66,14 @@ demo_wasm="web/public/vir-upstream.wasm"
 demo_dev_wasm="web/public/vir-upstream.dev.wasm"
 demo_wasm_stamp="$out/demo-wasm-profile.stamp"
 demo_dev_wasm_stamp="$out/demo-wasm-dev.stamp"
+wasm_build_identity="$out/wasm-build-identity.json"
+wasm_build_identity_tmp="$wasm_build_identity.tmp"
+node scripts/wasm-build-identity.mjs --print-identity > "$wasm_build_identity_tmp"
+if ! cmp -s "$wasm_build_identity_tmp" "$wasm_build_identity"; then
+  mv "$wasm_build_identity_tmp" "$wasm_build_identity"
+else
+  rm "$wasm_build_identity_tmp"
+fi
 strict_log="$out/strict-link.log"
 link_map="$out/link.map"
 import_section="$out/import-section.txt"
@@ -87,18 +98,6 @@ case "$wasm_profile" in
     exit 1
     ;;
 esac
-
-llvm_objcopy=
-if [ "$wasm_output_profile" = "release" ]; then
-  if command -v llvm-objcopy >/dev/null 2>&1; then
-    llvm_objcopy="$(command -v llvm-objcopy)"
-  elif [ -x "$local_wasi_sdk/bin/llvm-objcopy" ]; then
-    llvm_objcopy="$local_wasi_sdk/bin/llvm-objcopy"
-  else
-    echo "error: llvm-objcopy is required for VIR_WASM_PROFILE=$wasm_profile" >&2
-    exit 1
-  fi
-fi
 
 mkdir -p "$out"
 mkdir -p "$obj_dir"
@@ -269,6 +268,8 @@ compile_stamp_tmp="$compile_stamp.tmp"
   printf 'compiler=%s\n' "$cxx"
   printf 'lean_prefix=%s\n' "$lean_prefix"
   printf 'lean_source_commit=%s\n' "$src_commit"
+  printf 'build_identity='
+  cat "$wasm_build_identity"
   printf 'wasi_target=%s\n' "$target"
   printf 'opt_level=%s\n' "$wasm_opt_level"
   printf 'flag=%s\n' "${common_flags[@]}"
@@ -368,6 +369,8 @@ native_support_link_stamp="$obj_dir/native-support-link.stamp"
 native_support_link_stamp_tmp="$native_support_link_stamp.tmp"
 {
   printf 'wasm_ld=%s\n' "$wasm_ld"
+  printf 'build_identity='
+  cat "$wasm_build_identity"
   printf 'link_flag=%s\n' --relocatable --allow-undefined --allow-multiple-definition
   printf 'input=%s\n' "${native_support_objects[@]}"
 } > "$native_support_link_stamp_tmp"

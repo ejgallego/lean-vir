@@ -7,16 +7,71 @@ in `docs/HARNESS.md`.
 `npm run bench` runs the manifest-driven JavaScript runtime benchmark against
 the host Lean IR baseline. It restores or stores built benchmark inputs under
 `.perf-artifacts/vir-bench-cache` by default, keyed by commit plus a build-key
-hash. The cache stores generated inputs, not timing samples, so benchmark
-timings are still regenerated for each run. Use `--no-artifact-cache` to
-disable the cache, `--artifact-cache DIR` to put it elsewhere, and
-`--refresh-artifact-cache` to replace the current cache entry.
+hash. The build key covers tracked diffs, relevant untracked input contents,
+the effective compiler/linker/tool versions, Lean source commit and dirty state,
+build flags, and selected source identities. The shell build and benchmark
+cache share the same effective-tool resolver, including the repository-local
+WASI SDK fallback. The cache stores generated inputs, not timing samples, so
+benchmark timings are still regenerated for each run. Use
+`--no-artifact-cache` to disable the cache,
+`--artifact-cache DIR` to put it elsewhere, and `--refresh-artifact-cache` to
+replace the current cache entry.
 
 Pass `--json` to save a machine-readable report:
 
 ```bash
 npm run bench -- --json build/perf/current.json
 ```
+
+## Environment Lookup Workload
+
+Use the focused environment lookup benchmark when changing package declaration
+resolution or the upstream interpreter/provider boundary:
+
+```bash
+npm run bench:env-lookup -- \
+  --json build/perf/env-lookup/current.json
+```
+
+It repeatedly enters a fresh interpreter through
+`Vir.Fixtures.ExprPrinter.exprCoverageScore` in `fixtures-lean.irpkg`; the
+recorded 2026-08-05 measurements used 1,546 declarations, and the default
+workload rejects packages with fewer than 1,000. The headline execution row
+excludes package loading, initializer execution, and export-slot resolution. A
+separate package-load row uses a fresh Wasm instance for each load; Wasm
+instantiation and disposal are outside that row's timed window. Reports preserve
+both sets of raw rounds, artifact and source hashes, toolchain/CPU identity,
+package declaration count, and the expected result. Wasm profile, optimization,
+target, memory, and stack settings are part of the report/comparison identity
+and artifact-cache key. Output paths are never overwritten, and `--json` and
+`--cpu-profile` must resolve to different files.
+
+Focused reports include a stable comparison identity; saved and paired
+comparisons require the same workload/result, run policy, diagnostic mode,
+Node/V8 version, Lean toolchain, platform/architecture, CPU model, Wasm
+artifact/build configuration, package content and format, timing harness, and
+fixture before reporting a delta. Package content identity ignores only the
+manifest's volatile `generatedAt` field; the report also retains the exact
+package SHA-256. Timing-harness identity covers the benchmark helpers and the
+complete local JavaScript module closure loaded by the focused runtime.
+
+Capture sampled attribution in a separate diagnostic run:
+
+```bash
+npm run bench:env-lookup -- \
+  --cpu-profile build/perf/env-lookup/current.cpuprofile \
+  --json build/perf/env-lookup/current-profiled.json
+```
+
+The profiling path uses the optimized, unstripped debug Wasm companion. Its
+timings are marked diagnostic and are not before/after evidence. See
+[Environment Lookup Performance](ENVIRONMENT_LOOKUP_PERFORMANCE.md) for the
+baseline and final profiles, measured representation experiments, and accepted
+local design.
+[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
+owns the environment/provider API decision;
+[ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
+owns the measurement-gated cross-entry resolution-cache experiment.
 
 Compare two saved reports with:
 
@@ -138,12 +193,29 @@ For routine before/after comparisons between two already checked-out trees, use
 the paired runner:
 
 ```bash
-npm run bench:paired -- --repeat 5 ../vir-main ../vir-feature
+npm run bench:paired -- --repeat 6 --out build/perf/general-abba \
+  ../vir-main ../vir-feature
 ```
 
-It alternates `npm run bench -- --json` in each checkout, stores the per-run
-reports under `build/perf/paired/`, and prints median per-call deltas for common
-benchmark rows. Side-only rows are reported with the same summary format as
-`bench:compare`. The compared checkouts must both support the current benchmark
-JSON interface; for older refs, first create a temporary compatible checkout or
-compare manually saved reports with `bench:compare`.
+It runs order-balanced AB/BA passes, stores every per-run report plus
+`schedule.json`, and prints both the aggregate median per-call comparison and
+the paired percentage delta for every pass.
+The output directory must not already exist. Side-only rows are reported with
+the same summary format as `bench:compare`. Select a compatible focused script
+with `--npm-script`, for example:
+
+```bash
+npm run bench:paired -- --npm-script bench:env-lookup --repeat 6 \
+  --out build/perf/env-lookup/index-abba ../vir-baseline ../vir-index
+```
+
+Use repeatable `--bench-arg` options to strengthen a focused comparison without
+changing its defaults, for example
+`--bench-arg=--iterations=500 --bench-arg=--samples=9`. The selected benchmark
+still validates those arguments through its comparison identity.
+
+Use an even pass count for an order-balanced acceptance run. One pass remains
+available for quick screening and is reported as unbalanced. The compared
+checkouts must both support the selected benchmark JSON interface; for older
+refs, first create a temporary compatible checkout or compare manually saved
+reports with `bench:compare`.

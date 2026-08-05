@@ -12,8 +12,9 @@ import { fileURLToPath } from "node:url";
 
 import { copyFileWithDirs } from "./file-utils.mjs";
 import { runSync } from "./process-utils.mjs";
+import { effectiveWasmBuildIdentity } from "./wasm-build-identity.mjs";
 
-const artifactCacheVersion = 1;
+const artifactCacheVersion = 4;
 const buildInputDiffPaths = [
   "Lean",
   "Vir",
@@ -30,6 +31,7 @@ const buildInputDiffPaths = [
   "scripts/build-upstream-probe.sh",
   "scripts/generate-browser-package.mjs",
   "scripts/generate-ir-package.sh",
+  "scripts/wasm-build-identity.mjs",
 ];
 const sourceIdentityPaths = [
   "package-lock.json",
@@ -39,6 +41,7 @@ const sourceIdentityPaths = [
   "scripts/build-upstream-probe.sh",
   "scripts/generate-browser-package.mjs",
   "scripts/generate-ir-package.sh",
+  "scripts/wasm-build-identity.mjs",
   "tools/GeneratePackage.lean",
   "wasm/upstream_shim/package/decl_provider.h",
   "wasm/upstream_shim/package/package_binary_reader.h",
@@ -144,21 +147,27 @@ function artifactCachePayload(root, rootPath, artifactPaths) {
     dirty: git.dirty,
     dirtyStatus: status.length === 0 ? null : sha256Text(status),
     dirtyBuildInputDiff: diff.length === 0 ? null : sha256Text(diff),
+    untrackedBuildInputs: untrackedBuildInputDigests(root, rootPath),
     node: process.version,
     platform: process.platform,
     arch: process.arch,
-    lean: optionalCommandVersion(root, "lean", ["--version"]),
     leanToolchain: readFileSyncText(rootPath, "lean-toolchain").trim(),
-    lean4Src: process.env.LEAN4_SRC ?? null,
-    wasiSdkPath: process.env.WASI_SDK_PATH ?? null,
-    wasiClang: process.env.WASI_SDK_PATH
-      ? optionalCommandVersion(root, join(process.env.WASI_SDK_PATH, "bin", "clang++"), ["--version"])
-      : optionalCommandVersion(root, "clang++", ["--version"]),
+    wasmBuild: effectiveWasmBuildIdentity(rootPath),
     sourceIdentity: Object.fromEntries(
       sourceIdentityPaths.map((path) => [path, fileDigest(rootPath, path)]),
     ),
     artifacts: artifactPaths,
   };
+}
+
+export function untrackedBuildInputDigests(root, rootPath) {
+  const output = runSync(
+    "git",
+    ["ls-files", "--others", "--exclude-standard", "-z", "--", ...buildInputDiffPaths],
+    { cwd: root, capture: true, trimStdout: false },
+  );
+  const paths = output.split("\0").filter((path) => path.length !== 0);
+  return Object.fromEntries(paths.map((path) => [path, fileDigest(rootPath, path)]));
 }
 
 function gitMetadata(root) {
@@ -252,14 +261,6 @@ function fileDigest(rootPath, relPath) {
 
 function readFileSyncText(rootPath, relPath) {
   return readFileSync(join(rootPath, relPath), "utf8");
-}
-
-function optionalCommandVersion(root, cmd, argv) {
-  try {
-    return runSync(cmd, argv, { cwd: root, capture: true });
-  } catch {
-    return null;
-  }
 }
 
 function sha256Text(text) {

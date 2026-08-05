@@ -6,6 +6,20 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+function envOrDefault(env, name, fallback) {
+  return typeof env[name] === "string" && env[name].length !== 0 ? env[name] : fallback;
+}
+
+export function benchmarkWasmBuildIdentity(env = process.env) {
+  return {
+    profile: envOrDefault(env, "VIR_WASM_PROFILE", "dev"),
+    optimization: envOrDefault(env, "VIR_WASM_OPT_LEVEL", "-O3"),
+    target: envOrDefault(env, "WASI_TARGET", "wasm32-wasip1"),
+    initialMemory: envOrDefault(env, "VIR_WASM_INITIAL_MEMORY", "4194304"),
+    stackSize: envOrDefault(env, "VIR_WASM_STACK_SIZE", "1048576"),
+  };
+}
+
 export function benchmarkCacheOptionDefaults() {
   return {
     artifactCacheEnabled: true,
@@ -73,7 +87,11 @@ export function parsePositiveInt(value, option) {
   if (!/^[1-9]\d*$/.test(value)) {
     throw new Error(`${option} requires a positive integer`);
   }
-  return Number(value);
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error(`${option} requires a safe positive integer`);
+  }
+  return parsed;
 }
 
 export function median(values) {
@@ -138,6 +156,26 @@ export function benchmarkReportLabel(side) {
   const commit = typeof git.commit === "string" ? git.commit.slice(0, 12) : "unknown";
   const dirty = git.dirty ? " dirty" : "";
   return `${ref}@${commit}${dirty}`;
+}
+
+export function assertComparableBenchmarkReportIdentities(labeledReports) {
+  const identities = labeledReports.map(({ label, report }) => ({
+    label,
+    identity: report.report?.comparisonIdentity ?? null,
+  }));
+  if (identities.every(({ identity }) => identity === null)) return;
+  const missing = identities.find(({ identity }) => identity === null);
+  if (missing) {
+    throw new Error(`${missing.label} benchmark report is missing comparisonIdentity`);
+  }
+  const expected = JSON.stringify(identities[0].identity);
+  for (const current of identities.slice(1)) {
+    if (JSON.stringify(current.identity) !== expected) {
+      throw new Error(
+        `benchmark comparison identity mismatch between ${identities[0].label} and ${current.label}`,
+      );
+    }
+  }
 }
 
 export function benchmarkSamplePerCallMs(sample) {
