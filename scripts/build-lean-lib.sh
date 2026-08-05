@@ -62,6 +62,7 @@ build_module() {
 build_module Vir/GeneratePackage/NativeExterns.lean
 build_module Vir/IRDependencies.lean
 build_module Vir/ExportValidation.lean
+build_module Vir/InterfaceValidation.lean
 build_module Vir/Attributes.lean
 build_module Vir/Host.lean
 build_module Vir/Runtime.lean

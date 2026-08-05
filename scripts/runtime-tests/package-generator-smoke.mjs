@@ -20,6 +20,17 @@ import {
   writeRuntimeFixture,
 } from "./shared.mjs";
 
+function checkLeanSource(source) {
+  return spawnSync("lean", [source], {
+    encoding: "utf8",
+    env: virIrpkgEnv(),
+  });
+}
+
+function combinedOutput(result) {
+  return `${result.stderr}${result.stdout}`;
+}
+
 const freshDir = await mkdtemp(join(tmpdir(), "lean-vir-generator-"));
 try {
   ensureVirIrpkgBuilt();
@@ -87,6 +98,7 @@ try {
     "import Vir",
     "",
     "example : Lean.LabelExtension := vir_export",
+    "example : Lean.LabelExtension := vir_startup",
     "",
     "@[vir_export]",
     "def markedValue (n : Nat) : Nat := n + 1",
@@ -103,6 +115,25 @@ try {
     "",
     "@[vir_startup]",
     "def markedStartup : Lean.Vir.Browser.DomM Unit := pure ()",
+    "",
+    "abbrev StartupResult := Unit",
+    "abbrev StartupAction := IO StartupResult",
+    "",
+    "@[vir_startup]",
+    "def markedAliasStartup : StartupAction := pure ()",
+    "",
+    "@[vir_startup]",
+    "def markedRuntimeStartup : Lean.Vir.RuntimeM Unit := pure ()",
+    "",
+    "@[vir_startup]",
+    "def markedReactStartup : Lean.Vir.React.ReactM Unit := pure ()",
+    "",
+    "def markedLaterStartup : Unit := ()",
+    "attribute [vir_startup] markedLaterStartup",
+    "",
+    "def removedStartup : Unit := ()",
+    "attribute [vir_startup] removedStartup",
+    "attribute [-vir_startup] removedStartup",
     "",
     "def notMarked : Nat := 37",
     "",
@@ -123,13 +154,33 @@ try {
   const markedManifest = JSON.parse(inspectedMarked.stdout).manifest;
   assert.deepEqual(
     markedManifest.exports.map((entry) => entry.entry).sort(),
-    ["markedLater", "markedOpaque", "markedStartup", "markedValue"],
+    [
+      "markedAliasStartup",
+      "markedLater",
+      "markedLaterStartup",
+      "markedOpaque",
+      "markedReactStartup",
+      "markedRuntimeStartup",
+      "markedStartup",
+      "markedValue",
+    ],
   );
   assert.equal(markedManifest.exports.some((entry) => entry.entry === "removedMark"), false);
   assert.equal(manifestEntry(markedManifest, "markedValue").startup, false);
   assert.equal(manifestEntry(markedManifest, "markedOpaque").startup, false);
   assert.equal(manifestEntry(markedManifest, "markedLater").startup, false);
-  assert.equal(manifestEntry(markedManifest, "markedStartup").startup, true);
+  for (const [entryName, effect] of [
+    ["markedAliasStartup", "io"],
+    ["markedLaterStartup", "pure"],
+    ["markedReactStartup", "react"],
+    ["markedRuntimeStartup", "runtime"],
+    ["markedStartup", "dom"],
+  ]) {
+    const entry = manifestEntry(markedManifest, entryName);
+    assert.equal(entry.startup, true);
+    assert.equal(entry.effect, effect);
+  }
+  assert.equal(markedManifest.exports.some((entry) => entry.entry === "removedStartup"), false);
 
   const markedUnsupportedSignatureSource = join(freshDir, "MarkedUnsupportedSignature.lean");
   await writeFile(markedUnsupportedSignatureSource, [
@@ -155,18 +206,13 @@ try {
     "end MarkedUnsupportedSignature",
     "",
   ].join("\n"));
-  const checkedMarkedUnsupportedSignature = spawnSync(
-    "lean",
-    [markedUnsupportedSignatureSource],
-    { encoding: "utf8", env: virIrpkgEnv() },
-  );
+  const checkedMarkedUnsupportedSignature = checkLeanSource(markedUnsupportedSignatureSource);
   assert.notEqual(
     checkedMarkedUnsupportedSignature.status,
     0,
     "unsupported marked export signatures unexpectedly elaborated successfully",
   );
-  const markedUnsupportedSignatureOutput =
-    `${checkedMarkedUnsupportedSignature.stderr}${checkedMarkedUnsupportedSignature.stdout}`;
+  const markedUnsupportedSignatureOutput = combinedOutput(checkedMarkedUnsupportedSignature);
   assert.match(
     markedUnsupportedSignatureOutput,
     /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.implicitBump`: VIR exports cannot have implicit or instance arguments \(`offset`\); export a wrapper with only explicit arguments/,
@@ -177,11 +223,11 @@ try {
   );
   assert.match(
     markedUnsupportedSignatureOutput,
-    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.proofIsNotExecutable`: theorems do not have executable IR; export a definition instead/,
+    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.proofIsNotExecutable`: theorems do not have executable IR; mark a definition instead/,
   );
   assert.match(
     markedUnsupportedSignatureOutput,
-    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.axiomIsNotExecutable`: axioms do not have executable IR; export an implemented definition instead/,
+    /invalid `@\[vir_export\]` declaration `MarkedUnsupportedSignature\.axiomIsNotExecutable`: axioms do not have executable IR; mark an implemented definition instead/,
   );
   assert.match(
     markedUnsupportedSignatureOutput,
@@ -203,18 +249,13 @@ try {
     "end MarkedUnsupportedDependency",
     "",
   ].join("\n"));
-  const checkedMarkedUnsupportedDependency = spawnSync(
-    "lean",
-    [markedUnsupportedDependencySource],
-    { encoding: "utf8", env: virIrpkgEnv() },
-  );
+  const checkedMarkedUnsupportedDependency = checkLeanSource(markedUnsupportedDependencySource);
   assert.notEqual(
     checkedMarkedUnsupportedDependency.status,
     0,
     "unsupported marked export dependency unexpectedly elaborated successfully",
   );
-  const markedUnsupportedDependencyOutput =
-    `${checkedMarkedUnsupportedDependency.stderr}${checkedMarkedUnsupportedDependency.stdout}`;
+  const markedUnsupportedDependencyOutput = combinedOutput(checkedMarkedUnsupportedDependency);
   assert.match(
     markedUnsupportedDependencyOutput,
     /invalid `@\[vir_export\]` declaration `MarkedUnsupportedDependency\.home`: compiled closure reaches unsupported runtime dependency `IO\.getEnv`: no native extern implementation is registered \(via MarkedUnsupportedDependency\.home[^\n]* -> MarkedUnsupportedDependency\.environmentHome[^\n]* -> IO\.getEnv\)/,
@@ -232,24 +273,18 @@ try {
     "public def MarkedPostponed.value : Nat := 42",
     "",
   ].join("\n"));
-  const checkedMarkedPostponed = spawnSync(
-    "lean",
-    [markedPostponedSource],
-    { encoding: "utf8", env: virIrpkgEnv() },
-  );
+  const checkedMarkedPostponed = checkLeanSource(markedPostponedSource);
   assert.equal(
     checkedMarkedPostponed.status,
     0,
     checkedMarkedPostponed.stderr || checkedMarkedPostponed.stdout,
   );
   assert.match(
-    `${checkedMarkedPostponed.stderr}${checkedMarkedPostponed.stdout}`,
+    combinedOutput(checkedMarkedPostponed),
     /could not validate `MarkedPostponed\.value` because `compiler\.postponeCompile` is enabled; disable it for modules built with `:vir`/,
   );
 
   const startupDependencySource = join(freshDir, "StartupDependency.lean");
-  const startupDependencyPackage = join(freshDir, "startup-dependency.irpkg");
-  const startupDependencyReport = join(freshDir, "startup-dependency.report.md");
   await writeFile(startupDependencySource, [
     "import Vir",
     "",
@@ -263,37 +298,17 @@ try {
     "end StartupDependency",
     "",
   ].join("\n"));
-  const generatedStartupDependency = runVirIrpkg([
-    startupDependencyPackage,
-    startupDependencyReport,
-    "--target-marked",
-    startupDependencySource,
-  ]);
+  const checkedStartupDependency = checkLeanSource(startupDependencySource);
   assert.notEqual(
-    generatedStartupDependency.status,
+    checkedStartupDependency.status,
     0,
-    "unsupported startup dependency unexpectedly generated successfully",
+    "unsupported startup dependency unexpectedly elaborated successfully",
   );
-  assert.match(generatedStartupDependency.stderr, /missing native extern registrations:/);
+  const startupDependencyOutput = combinedOutput(checkedStartupDependency);
   assert.match(
-    generatedStartupDependency.stderr,
-    /IO\.getEnv \(via StartupDependency\.home[^\n]* -> IO\.getEnv\)/,
+    startupDependencyOutput,
+    /invalid `@\[vir_startup\]` declaration `StartupDependency\.home`: compiled closure reaches unsupported runtime dependency `IO\.getEnv`: no native extern implementation is registered \(via StartupDependency\.home[^\n]* -> IO\.getEnv\)/,
   );
-  const startupDependencyReportText = await readFile(startupDependencyReport, "utf8");
-  assert.match(
-    startupDependencyReportText,
-    /## Missing Native Extern Registrations[\s\S]*- `IO\.getEnv` \(via StartupDependency\.home[^\n]* -> IO\.getEnv\)/,
-  );
-  assert.doesNotMatch(startupDependencyReportText, /## Blocking Dependency Paths/);
-  assert.match(
-    startupDependencyReportText,
-    /## Interface Exports[\s\S]*- `StartupDependency\.home` as `StartupDependency_home` \[startup\] : \(\) -> IO Unit/,
-  );
-  assert.match(
-    startupDependencyReportText,
-    /## Package Diagnostics\n\nNone\./,
-  );
-  await assert.rejects(readFile(startupDependencyPackage), { code: "ENOENT" });
 
   const slidesPackage = join(freshDir, "slides-canvas.irpkg");
   const generatedSlides = runVirIrpkg([
@@ -340,15 +355,42 @@ try {
     "@[vir_startup]",
     "def badStartup (_n : Nat) : Lean.Vir.Browser.DomM Unit := pure ()",
     "",
+    "@[vir_startup]",
+    "def badStartupResult : IO Nat := pure 1",
+    "",
+    "@[vir_startup]",
+    "def unsupportedStartupEffect : Option Unit := some ()",
+    "",
+    "@[vir_startup]",
+    "theorem startupProof : True := trivial",
+    "",
+    "@[vir_startup]",
+    "private def privateStartup : Unit := ()",
+    "",
   ].join("\n"));
-  const generatedBadStartup = runVirIrpkg([
-    join(freshDir, "bad-startup.irpkg"),
-    join(freshDir, "bad-startup.report.md"),
-    "--target-marked",
-    badStartupSource,
-  ]);
-  assert.notEqual(generatedBadStartup.status, 0);
-  assert.match(generatedBadStartup.stderr, /marked with `@\[vir_startup\]` must take no JavaScript arguments/);
+  const checkedBadStartup = checkLeanSource(badStartupSource);
+  assert.notEqual(checkedBadStartup.status, 0);
+  const badStartupOutput = combinedOutput(checkedBadStartup);
+  assert.match(
+    badStartupOutput,
+    /invalid `@\[vir_startup\]` declaration `badStartup`: VIR startup hooks cannot declare parameters \(`_n`\); define a zero-argument wrapper instead/,
+  );
+  assert.match(
+    badStartupOutput,
+    /invalid `@\[vir_startup\]` declaration `badStartupResult`: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
+  );
+  assert.match(
+    badStartupOutput,
+    /invalid `@\[vir_startup\]` declaration `unsupportedStartupEffect`: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
+  );
+  assert.match(
+    badStartupOutput,
+    /invalid `@\[vir_startup\]` declaration `startupProof`: theorems do not have executable IR; mark a definition instead/,
+  );
+  assert.match(
+    badStartupOutput,
+    /private declarations cannot be VIR startup hooks; remove `private` or use a public wrapper/,
+  );
 
   const runtimeSource = join(freshDir, "RuntimeEffect.lean");
   const runtimePackage = join(freshDir, "runtime-effect.irpkg");

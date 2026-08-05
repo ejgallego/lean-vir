@@ -40,14 +40,17 @@ Targets have one of five modes:
   `Name` and declaration-IR wire tags. `scripts/ir-codec-tags.mjs` is the source
   of truth.
 - `Vir.GeneratePackage.NativeExterns`: source of truth for native extern
-  registrations required by packaged closures and attribute-time export
+  registrations required by packaged closures and attribute-time marker
   validation.
 - `Vir.IRDependencies`: shared IR reference walking, JavaScript-extern
   recognition, and root-to-dependency path formatting.
+- `Vir.InterfaceValidation`: module-safe startup-contract analysis, effect
+  recognition, diagnostics, metadata stripping, and controlled
+  abbreviation-head reduction shared by marker and package-interface checks.
 - `Vir.ExportValidation`: conclusive visible compiled-closure checks for
-  `@[vir_export]`, plus explicit opaque-import deferrals. Declaration-kind,
-  signature, and postponed-compilation handling live with the attribute in
-  `Vir.Attributes`.
+  marked entrypoints, plus explicit opaque-import deferrals. Declaration-kind
+  checks, export-binder checks, and postponed-compilation handling live with
+  the attributes in `Vir.Attributes`.
 - `Vir.GeneratePackage.Frontend`: source elaboration, `DeclIndex` construction,
   marker collection, declaration-to-module ownership, on-demand `import all`
   environments, module filtering, and declaration-name collision diagnostics.
@@ -56,8 +59,8 @@ Targets have one of five modes:
 - `Vir.GeneratePackage.Interface.Encode`: interface labels, descriptor tags,
   and descriptor JSON encoders. The JSON descriptor field is `interfaceTag`.
 - `Vir.GeneratePackage.Interface.Classify.Basic`: shared classifier helpers,
-  host effect recognition, abbrev-head unfolding, primitive/resource labels,
-  layout helper utilities, and boxed-boundary checks.
+  host effect recognition, primitive/resource labels, layout helper utilities,
+  and boxed-boundary checks.
 - `Vir.GeneratePackage.Interface.Classify.Core`: interface type classification,
   callback type classification, and runtime layout classification for structures
   and inductives.
@@ -214,10 +217,10 @@ npm run test:runtime -- package-generation
 The generated report groups the common package failures by where generation
 stopped:
 
-Many conclusive `@[vir_export]` closure failures are already reported by Lean
-at the marked declaration. Package diagnostics remain necessary for startup
-hooks, explicit package roots, opaque imported IR, postponed compilation, and
-final interface classification.
+Many conclusive closure failures and marker-level signature failures are
+already reported by Lean at the marked declaration. Package diagnostics remain
+necessary for explicit package roots, opaque imported IR, postponed
+compilation, generated boundaries, and final interface classification.
 
 The three closure-blocker sections append one first-discovered path from a
 resolved package root after `via`. The command-line diagnostic prints the same

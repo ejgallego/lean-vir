@@ -20,7 +20,7 @@ open Lean.IR
 open Vir.GeneratePackage
 
 /-!
-# Attribute-time VIR export validation
+# Attribute-time VIR entrypoint validation
 
 This check walks only IR visible after Lean compiles the marked declaration. It
 reports conclusive local blockers and records opaque import boundaries as

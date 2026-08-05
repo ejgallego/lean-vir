@@ -20,7 +20,7 @@ open Lean.IR
 # Shared VIR dependency analysis
 
 This module contains the small IR reference walker and dependency-path values
-shared by package generation and the `@[vir_export]` after-compilation check.
+shared by package generation and the marked-entrypoint after-compilation checks.
 Package collection and attribute-time validation intentionally keep separate
 closure walkers because only the latter can encounter opaque imported IR.
 -/

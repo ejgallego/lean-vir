@@ -44,13 +44,16 @@ def mount : Lean.Vir.Browser.DomM Unit := pure ()
 Use `@[vir_export]` for declarations that JavaScript calls explicitly. A
 `@[vir_startup]` hook is also exported, but the host normally invokes it through
 `vir.runStartupEntries()` after loading the package.
-Lean reports private or non-executable `@[vir_export]` declarations,
-unsupported signatures, and unavailable dependencies in the visible compiled
-closure at the declaration, including a path to the blocker. If imported IR is
-opaque, Lean identifies the compiled IR that package generation still requires.
-If IR compilation is postponed, it tells the user how to make that IR available.
-The `:vir` build checks the final interface layout and reports any unresolved
-package boundary.
+
+For either marker, Lean reports private or non-executable declarations and
+unavailable dependencies in the visible compiled closure, including a path to
+the blocker. `@[vir_export]` also rejects erased, implicit, and instance
+binders; `@[vir_startup]` checks its complete zero-argument, `Unit`-result
+contract and distinguishes unexpected parameters from result or effect errors.
+If imported IR is opaque, Lean identifies the compiled IR that package
+generation still requires. If IR compilation is postponed, it tells the user
+how to make that IR available. The `:vir` build checks all remaining interface
+types and layouts and reports any unresolved package boundary.
 
 ```bash
 lake build +MySlides.Runtime:vir

@@ -11,6 +11,7 @@ open Lean
 namespace Vir.GeneratePackage
 
 open Lean.IR
+open Vir.InterfaceValidation
 
 mutual
 

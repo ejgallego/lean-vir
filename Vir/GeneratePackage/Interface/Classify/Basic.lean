@@ -5,12 +5,14 @@ Author: Emilio J. Gallego Arias
 -/
 
 import Vir.GeneratePackage.Interface.Encode
+import Vir.InterfaceValidation
 
 open Lean
 
 namespace Vir.GeneratePackage
 
 open Lean.IR
+open Vir.InterfaceValidation
 
 partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
   | .float | .float32 | .uint64 => true
@@ -20,16 +22,13 @@ partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
       | none => false
   | _ => false
 
-partial def stripMData : Lean.Expr → Lean.Expr
-  | .mdata _ e => stripMData e
-  | e => e
-
-def effectHead? : Name → Option InterfaceEffect
-  | `Lean.Vir.RuntimeM => some .runtime
-  | `IO => some .io
-  | `Lean.Vir.Browser.DomM => some .dom
-  | `Lean.Vir.React.ReactM => some .react
-  | _ => none
+def effectHead? (name : Name) : Option InterfaceEffect :=
+  match Vir.InterfaceValidation.effectKind? name with
+  | some .runtime => some .runtime
+  | some .io => some .io
+  | some .dom => some .dom
+  | some .react => some .react
+  | none => none
 
 def preserveInterfaceHead (name : Name) : Bool :=
   if (effectHead? name).isSome then
@@ -59,30 +58,8 @@ def preserveInterfaceHead (name : Name) : Bool :=
     | `Lean.Vir.Js => true
     | _ => false
 
-def unfoldAbbrevHead? (e : Lean.Expr) : CoreM (Option Lean.Expr) := do
-  let e := stripMData e
-  let (_, args) := e.getAppFnArgs
-  match e.getAppFn with
-  | .const name levels =>
-      if preserveInterfaceHead name then
-        return none
-      else
-        let env ← getEnv
-        match env.find? name with
-        | some (.defnInfo info) =>
-            if info.hints == .abbrev then
-              let value := (ConstantInfo.defnInfo info).instantiateValueLevelParams! levels
-              let unfolded := stripMData (value.beta args)
-              if unfolded == e then return none else return some unfolded
-            else
-              return none
-        | _ => return none
-  | _ => return none
-
-partial def reduceTypeAliases (e : Lean.Expr) : CoreM Lean.Expr := do
-  match ← unfoldAbbrevHead? e with
-  | some unfolded => reduceTypeAliases unfolded
-  | none => return stripMData e
+def reduceTypeAliases (e : Lean.Expr) : CoreM Lean.Expr :=
+  Vir.InterfaceValidation.reduceTypeAliases preserveInterfaceHead e
 
 def constName? (e : Lean.Expr) : Option Name :=
   match stripMData e with

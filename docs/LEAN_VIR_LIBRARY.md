@@ -24,12 +24,14 @@ Importing `Vir` also imports these attributes.
   startup hook is also an export and carries `startup: true` in the interface
   manifest.
 
-After Lean compiles a `@[vir_export]` declaration, the attribute diagnoses
-private or non-executable declarations, unsupported binder shapes, and
-conclusive blockers in the visible compiled closure. Dependency diagnostics
-show the path from the export to a missing IR declaration, unsupported runtime
-dependency (including a missing native extern implementation), or initializer
-provider.
+After Lean compiles a marked declaration, both attributes diagnose private or
+non-executable declarations and conclusive blockers in the visible compiled
+closure. `@[vir_export]` also rejects erased, implicit, and instance binders;
+`@[vir_startup]` enforces its complete zero-argument, `Unit`-result contract
+immediately. Dependency diagnostics show the path from the entrypoint to a
+missing IR declaration, unsupported runtime dependency (including a missing
+native extern implementation), or initializer provider.
+
 Opaque imported IR produces an informational diagnostic naming the required
 compiled dependency instead of a false rejection. Postponed compilation
 provides the option-level remedy needed to make IR available.

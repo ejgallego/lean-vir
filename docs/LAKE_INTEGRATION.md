@@ -56,15 +56,17 @@ declaration:
   `vir.runStartupEntries()` invokes it as a startup hook.
 
 Startup hooks must take no JavaScript arguments and return `Unit`, possibly
-through a supported effect such as `DomM`. Ordinary exports use the full
-supported argument and result surface.
+through a supported effect such as `DomM`; the attribute reports parameter and
+result/effect violations separately at the declaration. Ordinary exports use
+the full supported argument and result surface.
 
-After Lean compiles a declaration, `@[vir_export]` rejects private or
-non-executable declarations, implicit or instance arguments, polymorphic
-entrypoints, and unavailable dependencies that Lean can see in the compiled
-closure. Closure errors include the path from the marked declaration to the
-blocker, so a local helper that reaches an unregistered primitive such as
-`IO.getEnv` fails at its declaration.
+After Lean compiles a declaration, both markers reject private or non-executable
+declarations and unavailable dependencies that Lean can see in the compiled
+closure. `@[vir_export]` additionally rejects erased, implicit, and instance
+binders; the stricter startup signature is checked as described above. Closure
+errors include the path from the marked declaration to the blocker, so a local
+helper that reaches an unregistered primitive such as `IO.getEnv` fails at its
+declaration.
 
 Lean module imports normally expose dependency IR as opaque extern declarations.
 At such a boundary, the attribute does not guess: it identifies the dependency
