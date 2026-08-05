@@ -9,7 +9,12 @@
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs && node scripts/serve.mjs",
     "serve": "node scripts/serve.mjs",
-    "test": "npm run test:browser",
+    "report": "node scripts/collect-report.mjs",
+    "campaign": "python3 scripts/run-campaign.py",
+    "cards": "python3 scripts/generate-observation-cards.py",
+    "refresh": "python3 scripts/refresh-benchmark.py",
+    "test": "npm run test:tools && npm run test:browser",
+    "test:tools": "node test/tool-smoke.mjs",
     "test:browser": "npm run build && node test/browser-smoke.mjs"
   },
   "devDependencies": {

@@ -15,6 +15,8 @@ by this package.
 - verify exact rendered-text and styling parity;
 - collect marshal, execute, decode, and total timings;
 - run corpus, scaling, interaction, retained-memory, and repeated-call studies;
+- collect cold-start and isolated-runtime observations in fresh browser contexts;
+- aggregate multiple fresh browser processes and generate forwardable cards;
 - display reports and campaigns, and import/export their JSON representation.
 
 The slide deck is not part of this application. It may link here or present a
@@ -67,6 +69,44 @@ npm test
 ```
 
 Set `CHROMIUM` to an alternate Chrome/Chromium executable when necessary.
+
+## Reproducible reports
+
+With the app server running, collect one full report from a separate browser
+process:
+
+```sh
+npm run report
+```
+
+The default output is `_results/pretty-benchmark.json`. Result paths are kept
+inside this directory and ignored by Git. The collector includes five
+fresh-context startup profiles, retained and isolated memory, and isolated
+repeated-call traces for the two VIR entry points. The earlier independent JSON
+round-trip control is intentionally no longer collected; the two VIR backends
+still preserve the useful string-ABI versus direct-Format comparison.
+
+For process-to-process variability and owner-ready summaries:
+
+```sh
+npm run campaign
+npm run cards
+```
+
+`campaign` launches the Node collector in fresh processes and writes both JSON
+and Markdown. `cards` turns the default report into VIR-001 through VIR-003.
+Both Python scripts use only the standard library; browser automation continues
+to use this package's Playwright dependency.
+
+The complete local refresh is:
+
+```sh
+npm run refresh
+```
+
+It stages the validated in-tree artifact seed, builds and serves the app,
+collects a report, refreshes cards, and runs a three-process campaign. It never
+publishes or reads artifact directories outside this application.
 
 ## Spin-off boundary
 
