@@ -26,7 +26,6 @@ import {
   createReactElementTypeTagResource,
   createReactNodeChildrenResource,
   createReactPropsResource,
-  disposeReactNode,
   pushReactNodeChild,
   setReactPropsEventHandler,
   setReactPropsKey,
@@ -520,10 +519,6 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
     }
   }
 
-  function disposeUnrenderedReactNode(node) {
-    disposeReactNode(resources, node);
-  }
-
   function selectorRoot(selector, onMissing) {
     const target = queryReactRootSelector(selector);
     if (target === null || target === undefined) {
@@ -537,6 +532,35 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
     const root = rootForContainer(target);
     rootsBySelector.set(selector, { container: target, root });
     return root;
+  }
+
+  function withComponentCallbackHandoff(component, run) {
+    // Take an explicit host-side lease before root lookup begins. Until the
+    // caller marks a successful renderComponent handoff, every failure path
+    // still belongs to this transaction and must consume the callback.
+    let ownedComponent = component;
+    let handedOff = false;
+    const errors = [];
+    const attempted = collectCleanupError(errors, () => {
+      ownedComponent = takeCallbackLease(component, "React component callback");
+      return run(ownedComponent, () => { handedOff = true; });
+    });
+    if (!handedOff) {
+      collectCleanupError(errors, () => releaseLeanCallback(ownedComponent));
+    }
+    throwCollectedErrors(errors, "React component callback handoff failed");
+    return attempted.value;
+  }
+
+  function renderComponentIntoSelector(selectorResource, component) {
+    return withComponentCallbackHandoff(component, (ownedComponent, markHandedOff) => {
+      const selector = jsStringValue(resources, selectorResource, "React root selector");
+      const root = selectorRoot(selector, () => undefined);
+      if (root === null) return false;
+      root.renderComponent(ownedComponent);
+      markHandedOff();
+      return true;
+    });
   }
 
   return {
@@ -601,14 +625,19 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       return undefined;
     },
     "react.root.renderComponent": (root, component) => {
-      const value = resources.resolveResource(root, "ReactRoot");
-      value.renderComponent(component);
+      withComponentCallbackHandoff(component, (ownedComponent, markHandedOff) => {
+        const value = resources.resolveResource(root, "ReactRoot");
+        value.renderComponent(ownedComponent);
+        markHandedOff();
+      });
       return undefined;
     },
     "react.root.renderIntoSelector": (selector, node) => {
       const root = selectorRoot(
         jsStringValue(resources, selector, "React root selector"),
-        () => disposeUnrenderedReactNode(node),
+        // The Node argument is borrowed. A missing mount point must neither
+        // invalidate its wrapper nor revoke a payload owned by another tree.
+        () => undefined,
       );
       if (root === null) {
         return resources.resourceForValue(false);
@@ -617,15 +646,7 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       return resources.resourceForValue(true);
     },
     "react.root.renderComponentIntoSelector": (selector, component) => {
-      const root = selectorRoot(
-        jsStringValue(resources, selector, "React root selector"),
-        () => releaseLeanCallback(component),
-      );
-      if (root === null) {
-        return resources.resourceForValue(false);
-      }
-      root.renderComponent(component);
-      return resources.resourceForValue(true);
+      return resources.resourceForValue(renderComponentIntoSelector(selector, component));
     },
     "react.root.unmount": (root) => {
       const value = resources.resolveResource(root, "ReactRoot");
@@ -897,15 +918,17 @@ export function performanceNow() {
   return globalThis.performance?.now?.() ?? Date.now();
 }
 
-export function createReactHostHooks() {
+export function createReactHostHooks({ reportError = null } = {}) {
   let eventDepth = 0;
   const deferredReactNodeDisposals = [];
   const flushReactNodeDisposals = () => {
     if (eventDepth !== 0) return undefined;
     const pending = deferredReactNodeDisposals.splice(0);
+    const errors = [];
     for (const dispose of pending) {
-      dispose();
+      collectCleanupError(errors, dispose);
     }
+    throwCollectedErrors(errors, "deferred React Node cleanup failed");
     return undefined;
   };
   return {
@@ -929,7 +952,11 @@ export function createReactHostHooks() {
           typeof globalThis.queueMicrotask === "function"
             ? globalThis.queueMicrotask.bind(globalThis)
             : (callback) => Promise.resolve().then(callback);
-        queue(dispose);
+        queue(() => {
+          const errors = [];
+          collectCleanupError(errors, dispose);
+          reportDeferredReactCleanupErrors(reportError, errors);
+        });
         return undefined;
       }
       deferredReactNodeDisposals.push(dispose);
@@ -938,4 +965,22 @@ export function createReactHostHooks() {
     flushReactNodeDisposals,
     once,
   };
+}
+
+function reportDeferredReactCleanupErrors(reportError, errors) {
+  if (errors.length === 0) return;
+  const error = errors.length === 1
+    ? errors[0]
+    : new AggregateError(errors, "deferred React Node cleanup failed");
+  try {
+    if (typeof reportError === "function") {
+      reportError(error);
+    } else if (typeof globalThis.reportError === "function") {
+      globalThis.reportError(error);
+    } else {
+      globalThis.console?.error?.(error);
+    }
+  } catch {
+    // Deferred cleanup reporting must never create another host-job failure.
+  }
 }
