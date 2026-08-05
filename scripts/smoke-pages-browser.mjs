@@ -9,7 +9,6 @@ import assert from "node:assert/strict";
 import {
   assertDistReady,
   fetchJsonWithRetry,
-  freePort,
   launchChromium,
   openCdp,
   serveDist,
@@ -31,12 +30,12 @@ await assertDistReady();
 await prepareNegativePackages();
 
 const server = await serveDist();
-const debugPort = await freePort();
-const chromium = await launchChromium(debugPort);
+let chromium = null;
 
 try {
+  chromium = await launchChromium();
   const targets = await fetchJsonWithRetry(
-    `http://127.0.0.1:${debugPort}/json/list`,
+    `http://127.0.0.1:${chromium.debugPort}/json/list`,
     chromium.child,
     (candidates) => Array.isArray(candidates) && candidates.some((target) =>
       target.type === "page" && target.webSocketDebuggerUrl),
@@ -72,13 +71,16 @@ try {
   cdp.close();
   console.log("pages browser smoke ok: landing, React review, format workbench, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
 } catch (error) {
-  const details = chromium.stderr();
+  const details = chromium?.stderr() ?? "";
   if (details) {
     console.error(details);
   }
-  console.error("browser smoke failed; if web/dist was not built from the current checkout, run npm run build:site first");
+  console.error("browser smoke failed");
   throw error;
 } finally {
-  await chromium.close();
-  await server.close();
+  try {
+    await chromium?.close();
+  } finally {
+    await server.close();
+  }
 }

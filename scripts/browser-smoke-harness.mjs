@@ -7,12 +7,11 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { createReadStream } from "node:fs";
-import { mkdtemp, readdir, rm, stat } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, stat } from "node:fs/promises";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
 import { basename, extname, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
-import { createServer as createNetServer } from "node:net";
 
 import { generatedPublicFiles } from "./browser-package-config.mjs";
 import { pathExists, requireChromiumExecutable } from "./file-utils.mjs";
@@ -37,6 +36,8 @@ const contentTypes = new Map([
   [".json", "application/json; charset=utf-8"],
   [".wasm", "application/wasm"],
 ]);
+const chromiumDevToolsTimeoutMs = 30000;
+const chromiumShutdownTimeoutMs = 5000;
 
 export async function assertDistReady(root = distRoot) {
   const missing = [];
@@ -77,14 +78,6 @@ export async function distAssetPath(prefix) {
   const file = files.find((candidate) => candidate.startsWith(prefix) && candidate.endsWith(".js"));
   assert.ok(file, `missing built asset matching ${prefix}*.js`);
   return `assets/${file}`;
-}
-
-export async function freePort() {
-  const server = createNetServer();
-  await new Promise((resolveReady) => server.listen(0, "127.0.0.1", resolveReady));
-  const { port } = server.address();
-  await new Promise((resolveClose) => server.close(resolveClose));
-  return port;
 }
 
 export async function serveDist() {
@@ -136,14 +129,13 @@ export async function serveDist() {
 export async function fetchJsonWithRetry(url, child, acceptJson = () => true) {
   let lastError = null;
   for (let attempt = 0; attempt < 80; attempt += 1) {
-    if (child.exitCode !== null) {
+    if (childHasExited(child)) {
       throw new Error(`Chromium exited before DevTools became available`);
     }
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 1000);
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 1000);
       const response = await fetch(url, { signal: controller.signal });
-      clearTimeout(timeout);
       if (response.ok) {
         const json = await response.json();
         if (acceptJson(json)) {
@@ -155,6 +147,8 @@ export async function fetchJsonWithRetry(url, child, acceptJson = () => true) {
       }
     } catch (error) {
       lastError = error;
+    } finally {
+      clearTimeout(timeout);
     }
     await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
   }
@@ -217,7 +211,69 @@ export async function openCdp(wsUrl) {
   };
 }
 
-export async function launchChromium(debugPort) {
+function childHasExited(child) {
+  return child.pid === undefined || child.exitCode !== null || child.signalCode !== null;
+}
+
+async function waitForChildExit(child, timeoutMs) {
+  if (childHasExited(child)) return true;
+  return new Promise((resolveExit) => {
+    let settled = false;
+    const finish = (exited) => {
+      if (settled) return;
+      settled = true;
+      clearTimeout(timeout);
+      child.off("exit", onExit);
+      resolveExit(exited);
+    };
+    const onExit = () => finish(true);
+    const timeout = setTimeout(() => finish(false), timeoutMs);
+    child.once("exit", onExit);
+    if (childHasExited(child)) finish(true);
+  });
+}
+
+function chromiumError(message, stderr, cause = null) {
+  const details = stderr().trim();
+  const error = new Error(details === "" ? message : `${message}\nChromium stderr:\n${details}`);
+  if (cause !== null) error.cause = cause;
+  return error;
+}
+
+async function waitForDevToolsPort(profileDir, child, launchError, stderr) {
+  const activePortPath = resolve(profileDir, "DevToolsActivePort");
+  const deadline = Date.now() + chromiumDevToolsTimeoutMs;
+  let lastReadError = null;
+  while (Date.now() < deadline) {
+    if (launchError() !== null) {
+      throw chromiumError("Chromium failed to start", stderr, launchError());
+    }
+    if (childHasExited(child)) {
+      throw chromiumError(
+        `Chromium exited before DevTools became available (exit=${child.exitCode}, signal=${child.signalCode})`,
+        stderr,
+      );
+    }
+    try {
+      const [portText = ""] = (await readFile(activePortPath, "utf8")).split(/\r?\n/, 1);
+      if (/^[0-9]+$/.test(portText)) {
+        const port = Number(portText);
+        if (port > 0 && port <= 65535) return port;
+      }
+      lastReadError = new Error(`invalid DevTools port ${JSON.stringify(portText)}`);
+    } catch (error) {
+      if (error?.code !== "ENOENT") lastReadError = error;
+    }
+    await new Promise((resolveDelay) => setTimeout(resolveDelay, 100));
+  }
+  const suffix = lastReadError === null ? "" : `: ${lastReadError.message}`;
+  throw chromiumError(
+    `Chromium did not publish a DevTools port within ${chromiumDevToolsTimeoutMs}ms${suffix}`,
+    stderr,
+  );
+}
+
+export async function launchChromium() {
   const executable = await requireChromiumExecutable();
   const profileDir = await mkdtemp(`${tmpdir()}/lean-vir-chromium-`);
   const child = spawn(executable, [
@@ -226,7 +282,8 @@ export async function launchChromium(debugPort) {
     "--disable-gpu",
     "--no-first-run",
     "--no-sandbox",
-    `--remote-debugging-port=${debugPort}`,
+    // Let Chromium reserve and publish its port instead of racing another process for a probed port.
+    "--remote-debugging-port=0",
     `--user-data-dir=${profileDir}`,
     "about:blank",
   ], {
@@ -234,24 +291,51 @@ export async function launchChromium(debugPort) {
   });
 
   let stderr = "";
+  let launchError = null;
+  child.once("error", (error) => {
+    launchError = error;
+  });
   child.stderr.setEncoding("utf8");
   child.stderr.on("data", (chunk) => {
     stderr = `${stderr}${chunk}`.slice(-4000);
   });
 
-  return {
+  let closePromise = null;
+  const close = () => {
+    closePromise ??= (async () => {
+      if (!childHasExited(child)) {
+        child.kill("SIGTERM");
+        if (!(await waitForChildExit(child, chromiumShutdownTimeoutMs))) {
+          child.kill("SIGKILL");
+          if (!(await waitForChildExit(child, chromiumShutdownTimeoutMs))) {
+            child.stderr.destroy();
+            child.unref();
+          }
+        }
+      }
+      await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
+    })();
+    return closePromise;
+  };
+
+  const handle = {
     child,
     profileDir,
     stderr: () => stderr,
-    close: async () => {
-      if (child.exitCode === null) {
-        const exited = new Promise((resolveExit) => child.once("exit", resolveExit));
-        child.kill("SIGTERM");
-        await exited;
-      }
-      await rm(profileDir, { recursive: true, force: true, maxRetries: 5, retryDelay: 100 });
-    },
+    close,
   };
+  try {
+    handle.debugPort = await waitForDevToolsPort(
+      profileDir,
+      child,
+      () => launchError,
+      handle.stderr,
+    );
+    return handle;
+  } catch (error) {
+    await close();
+    throw error;
+  }
 }
 
 export async function navigate(cdp, url) {
