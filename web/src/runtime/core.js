@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import { validateInterfaceManifest } from "./interface-manifest.js";
+import { RUNTIME_ABI_VERSION } from "./package-versions.js";
 import { releaseCallbackRoots } from "./callbacks.js";
 import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import { ObjectValueRuntime } from "./object-values.js";
@@ -58,6 +59,16 @@ export class VirRuntime extends ObjectValueRuntime {
 
     if (!this.exports.memory) {
       throw new Error("WASM memory export is missing");
+    }
+    if (typeof this.exports.vir_runtime_abi_version !== "function") {
+      throw new Error("WASM runtime ABI version export is missing; use a matching VIR SDK");
+    }
+    const wasmRuntimeAbiVersion = this.exports.vir_runtime_abi_version();
+    if (wasmRuntimeAbiVersion !== RUNTIME_ABI_VERSION) {
+      throw new Error(
+        `WASM runtime ABI version mismatch: loader expects ${RUNTIME_ABI_VERSION}, ` +
+        `WASM provides ${wasmRuntimeAbiVersion}`,
+      );
     }
     if (typeof this.exports.vir_package_interface_manifest_size === "function" &&
         this.exports.vir_package_interface_manifest_size() !== 0) {

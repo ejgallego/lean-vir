@@ -191,6 +191,7 @@ structure PackageMetadata where
   generator : String
   packageFormatVersion : Nat
   manifestVersion : Nat
+  runtimeAbiVersion : Nat
   leanVersion : String
   leanToolchain : String
   leanGithash : String

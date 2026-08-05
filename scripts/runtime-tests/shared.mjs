@@ -26,6 +26,10 @@ import {
   INTERFACE_MANIFEST_VERSION,
   validateInterfaceManifest,
 } from "../../web/src/runtime/interface-manifest.js";
+import {
+  PACKAGE_FORMAT_VERSION,
+  RUNTIME_ABI_VERSION,
+} from "../../web/src/runtime/package-versions.js";
 import { hostResourceValue } from "../../web/src/host-resource.js";
 
 export { assert, readFile, writeFile, spawnSync, join, validateInterfaceManifest };
@@ -128,7 +132,11 @@ export function manifestEntry(manifest, name) {
 const validManifestShape = {
   artifact: INTERFACE_MANIFEST_ARTIFACT,
   version: INTERFACE_MANIFEST_VERSION,
-  metadata: {},
+  metadata: {
+    packageFormatVersion: PACKAGE_FORMAT_VERSION,
+    manifestVersion: INTERFACE_MANIFEST_VERSION,
+    runtimeAbiVersion: RUNTIME_ABI_VERSION,
+  },
   exports: [
     {
       id: "ok",

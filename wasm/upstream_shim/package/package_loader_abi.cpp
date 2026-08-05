@@ -9,6 +9,14 @@ Author: Emilio J. Gallego Arias
 #include <stdint.h>
 #include <stdlib.h>
 
+namespace {
+constexpr uint32_t runtime_abi_version = 1;
+}
+
+extern "C" uint32_t vir_runtime_abi_version(void) {
+    return runtime_abi_version;
+}
+
 extern "C" void * vir_alloc_bytes(uint32_t size) {
     return malloc(size == 0 ? 1 : size);
 }

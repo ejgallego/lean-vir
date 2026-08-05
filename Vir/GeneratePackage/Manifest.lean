@@ -36,6 +36,7 @@ def collectPackageMetadata (generatedAt : String) (targets : Array Target) (inde
     generator := "tools/GeneratePackage.lean"
     packageFormatVersion := currentPackageFormatVersion
     manifestVersion := currentInterfaceManifestVersion
+    runtimeAbiVersion := currentRuntimeAbiVersion
     leanVersion := Lean.versionString
     leanToolchain := Lean.toolchain
     leanGithash := Lean.githash

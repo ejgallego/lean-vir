@@ -422,6 +422,7 @@ exports=(
   -Wl,--export=lean_eval_const
   -Wl,--export=lean_run_init
   -Wl,--export=lean_run_mod_init_core
+  -Wl,--export=vir_runtime_abi_version
   -Wl,--export=vir_upstream_target_pointer_bytes
   -Wl,--export=vir_alloc_bytes
   -Wl,--export=vir_free_bytes

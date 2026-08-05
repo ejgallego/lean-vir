@@ -53,25 +53,16 @@ def floatRoundTrip (value : Float) : Lean.Vir.RuntimeM Float := do
   Lean.Vir.JsValue.toFloat jsValue
 
 def querySelectorAllCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
-  Lean.Vir.Js.NodeList.length nodes
+  pure (← Lean.Vir.Browser.Document.querySelectorAll selector).size
 
 def querySelectorAllLeanCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
-  let elements ← Lean.Vir.Js.NodeList.toLeanArray nodes
-  pure elements.size
+  pure (← Lean.Vir.Browser.Document.querySelectorAll selector).size
 
 def querySelectorAllArrayCount (selector : String) : DomM Nat := do
-  let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
-  let jsElements ← Lean.Vir.Js.NodeList.toArray nodes
-  let elements ← Lean.Vir.Js.Array.toLeanArray jsElements
-  pure elements.size
+  pure (← Lean.Vir.Browser.Document.querySelectorAll selector).size
 
 def querySelectorAllFirstText (selector : String) : DomM String := do
-  let element? ← do
-    let nodes ← Lean.Vir.Browser.Document.querySelectorAll selector
-    Lean.Vir.Js.NodeList.item nodes 0
-  match element? with
+  match (← Lean.Vir.Browser.Document.querySelectorAll selector)[0]? with
   | none => pure ""
   | some element => Lean.Vir.Browser.Element.getTextContent element
 
@@ -85,6 +76,54 @@ partial def querySelectorAllCountLoopAux
 
 def querySelectorAllCountLoop (selector : String) (count : Nat) : DomM Nat :=
   querySelectorAllCountLoopAux selector count 0
+
+def elementQuerySelectorAllCount (selector childSelector : String) : DomM Nat := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure 0
+  | some element =>
+    pure (← Lean.Vir.Browser.Element.querySelectorAll element childSelector).size
+
+def elementQuerySelectorText (selector childSelector : String) : DomM String := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure ""
+  | some element =>
+    match ← Lean.Vir.Browser.Element.querySelector element childSelector with
+    | none => pure ""
+    | some child => Lean.Vir.Browser.Element.getTextContent child
+
+def elementInnerHTMLRoundTrip (selector html : String) : DomM String := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | none => pure ""
+  | some element =>
+    Lean.Vir.Browser.Element.setInnerHTML element html
+    Lean.Vir.Browser.Element.getInnerHTML element
+
+def runtimeRefRoundTrip (value : Nat) : Lean.Vir.RuntimeM Nat := do
+  let ref ← Lean.Vir.RuntimeRef.new value
+  Lean.Vir.RuntimeRef.modify ref (· + 2)
+  let previous ← Lean.Vir.RuntimeRef.modifyGet ref fun current => (current, current + 3)
+  let current ← Lean.Vir.RuntimeRef.get ref
+  Lean.Vir.RuntimeRef.set ref (current + 4)
+  pure (previous * 100 + (← Lean.Vir.RuntimeRef.get ref))
+
+def floatTimingOps (value : Float) : UInt64 :=
+  if -value ≤ 0 then
+    (Float.round value).toUInt64
+  else
+    0
+
+def mountRetainedElementIndex (selector childSelector : String) : DomM Nat := do
+  let some container ← Lean.Vir.Browser.Document.querySelector selector | pure 0
+  let targets ← Lean.Vir.Browser.Element.querySelectorAll container childSelector
+  let state ← Lean.Vir.RuntimeRef.new targets
+  let _ ← Lean.Vir.Browser.Element.addEventListener container "vir-check-index" fun _ => do
+    match (← Lean.Vir.RuntimeRef.get state)[0]? with
+    | none => Lean.Vir.Browser.Document.setTitle "index:empty"
+    | some element =>
+        Lean.Vir.Browser.Document.setTitle (← Lean.Vir.Browser.Element.getTextContent element)
+  let _ ← Lean.Vir.Browser.Element.addEventListener container "vir-drop-index" fun _ =>
+    Lean.Vir.RuntimeRef.set state #[]
+  pure targets.size
 
 partial def callbackRoundTripLoopAux : Nat → Nat → Lean.Vir.RuntimeM Nat
   | 0, acc => pure acc
@@ -136,6 +175,14 @@ def mountAndRemoveCallbackText (selector : String) : DomM Nat := do
       let listener ← Lean.Vir.Browser.Element.addEventListener element "click" fun _ => do
         Lean.Vir.Browser.Element.setTextContent element "callback:removed-fired"
       Lean.Vir.Browser.Element.removeEventListener listener
+      pure 1
+  | none => pure 0
+
+def mountKeyTitle (selector : String) : DomM Nat := do
+  match ← Lean.Vir.Browser.Document.querySelector selector with
+  | some element =>
+      let _ ← Lean.Vir.Browser.Element.addEventListener element "keydown" fun event => do
+        Lean.Vir.Browser.Document.setTitle (← Lean.Vir.Browser.Event.key event)
       pure 1
   | none => pure 0
 
@@ -197,6 +244,19 @@ def cancelAnimationRecord (value : Nat) : DomM Nat := do
   let frame ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
     recordNat (value + 20)
   Lean.Vir.Browser.Animation.cancelAnimationFrame frame
+  pure 1
+
+def mountCancelableAnimationRecord (selector : String) (value : Nat) : DomM Nat := do
+  let some element ← Lean.Vir.Browser.Document.querySelector selector | pure 0
+  let pending ← Lean.Vir.RuntimeRef.new (none : Option (Lean.Vir.Js Lean.Vir.Browser.AnimationFrame))
+  let frame ← Lean.Vir.Browser.Animation.requestAnimationFrame fun _ => do
+    Lean.Vir.RuntimeRef.set pending none
+    recordNat value
+  Lean.Vir.RuntimeRef.set pending (some frame)
+  let _ ← Lean.Vir.Browser.Element.addEventListener element "vir-cancel-frame" fun _ => do
+    let frame? ← Lean.Vir.RuntimeRef.modifyGet pending fun current => (current, none)
+    if let some frame := frame? then
+      Lean.Vir.Browser.Animation.cancelAnimationFrame frame
   pure 1
 
 def animationLoop : Nat → Float → DomM Unit

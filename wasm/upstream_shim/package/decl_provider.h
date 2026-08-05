@@ -46,6 +46,7 @@ uint32_t package_interface_manifest_size();
 }
 
 extern "C" void * vir_alloc_bytes(uint32_t size);
+extern "C" uint32_t vir_runtime_abi_version(void);
 extern "C" void vir_free_bytes(void * ptr);
 extern "C" uint32_t vir_begin_ir_package_set(void);
 extern "C" uint32_t vir_append_ir_package(uint8_t const * data, uint32_t size);

@@ -1464,6 +1464,34 @@ def nativeExterns : Array NativeExtern := #[
     generateBoxedWrapper := true
   },
   {
+    name := `Float.neg,
+    params := #[param 1 false .float],
+    resultType := .float,
+    symbol := "lean_float_negate",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.decLe,
+    params := #[param 1 false .float, param 2 false .float],
+    resultType := .uint8,
+    symbol := "lean_float_decLe",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.round,
+    params := #[param 1 false .float],
+    resultType := .float,
+    symbol := "round",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.toUInt64,
+    params := #[param 1 false .float],
+    resultType := .uint64,
+    symbol := "lean_float_to_uint64",
+    generateBoxedWrapper := true
+  },
+  {
     name := `Float.ofModel,
     params := #[param 1 false .uint64],
     resultType := .float,

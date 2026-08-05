@@ -152,6 +152,11 @@ if (RUNTIME_INTERFACE_MANIFEST_VERSION !== INTERFACE_MANIFEST_VERSION) {
     `runtime=${RUNTIME_INTERFACE_MANIFEST_VERSION} packageVersions=${INTERFACE_MANIFEST_VERSION}`,
   );
 }
+assertEqual(
+  leanNatConstant(packageFormat, "currentRuntimeAbiVersion"),
+  RUNTIME_ABI_VERSION,
+  "runtime ABI version mismatch",
+);
 if (!Number.isSafeInteger(RUNTIME_ABI_VERSION) || RUNTIME_ABI_VERSION < 1) {
   throw new Error(`runtime ABI version must be a positive safe integer, got ${RUNTIME_ABI_VERSION}`);
 }
@@ -188,6 +193,7 @@ assertEqual(
 const emitSource = await readRepoText("Vir/GeneratePackage/Emit.lean");
 const manifestEncodeSource = await readRepoText("Vir/GeneratePackage/Manifest/Encode.lean");
 const packageDecoderSource = await readRepoText("wasm/upstream_shim/package/package_ir_decoder.cpp");
+const packageLoaderSource = await readRepoText("wasm/upstream_shim/package/package_loader_abi.cpp");
 const packageSectionsSource = await readRepoText("wasm/upstream_shim/package/package_section_directory.h");
 
 assertEqual(
@@ -201,6 +207,9 @@ if (!/emitString\s+packageMagic\b/.test(emitSource)) {
 if (!/\("artifact",\s*jsonString\s+packageMagic\)/.test(manifestEncodeSource)) {
   throw new Error("Lean manifest encoder does not use packageMagic");
 }
+if (!/\("runtimeAbiVersion",\s*jsonNat\s+metadata\.runtimeAbiVersion\)/.test(manifestEncodeSource)) {
+  throw new Error("Lean manifest encoder does not emit the runtime ABI version");
+}
 assertEqual(INTERFACE_MANIFEST_ARTIFACT, IR_PACKAGE_MAGIC, "manifest artifact mismatch in JavaScript");
 assertEqual(
   matchedValue(packageDecoderSource, /magic\s*!=\s*"([^"]+)"/, "C++ IR package magic"),
@@ -211,6 +220,11 @@ assertEqual(
   Number(matchedValue(packageDecoderSource, /return\s+version\s*==\s*(\d+)/, "C++ package format version")),
   PACKAGE_FORMAT_VERSION,
   "package format version mismatch in C++ decoder",
+);
+assertEqual(
+  cppNatConstant(packageLoaderSource, "runtime_abi_version"),
+  RUNTIME_ABI_VERSION,
+  "runtime ABI version mismatch in C++ loader",
 );
 
 const packageSections = [

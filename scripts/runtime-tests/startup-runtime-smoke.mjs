@@ -8,6 +8,10 @@ import assert from "node:assert/strict";
 
 import { VirRuntime } from "../../web/src/runtime/core.js";
 import { validateInterfaceManifest } from "../../web/src/runtime/interface-manifest.js";
+import {
+  PACKAGE_FORMAT_VERSION,
+  RUNTIME_ABI_VERSION,
+} from "../../web/src/runtime/package-versions.js";
 
 function entry(name, startup) {
   return {
@@ -23,6 +27,14 @@ function entry(name, startup) {
 }
 
 const calls = [];
+assert.throws(
+  () => new VirRuntime({ memory: {}, vir_runtime_abi_version: () => RUNTIME_ABI_VERSION + 1 }),
+  /WASM runtime ABI version mismatch/,
+);
+assert.throws(
+  () => new VirRuntime({ memory: {} }),
+  /WASM runtime ABI version export is missing/,
+);
 const runtime = Object.create(VirRuntime.prototype);
 runtime.disposed = false;
 runtime.completedStartupEntries = new Set();
@@ -73,7 +85,11 @@ assert.deepEqual(calls.slice(-4), ["beforeFailure", "failsOnce", "failsOnce", "a
 
 const legacyManifest = validateInterfaceManifest({
   version: 6,
-  metadata: {},
+  metadata: {
+    packageFormatVersion: PACKAGE_FORMAT_VERSION,
+    manifestVersion: 6,
+    runtimeAbiVersion: RUNTIME_ABI_VERSION,
+  },
   exports: [{ ...entry("legacy", undefined), startup: undefined }],
 });
 assert.equal(legacyManifest.exports[0].startup, false);
