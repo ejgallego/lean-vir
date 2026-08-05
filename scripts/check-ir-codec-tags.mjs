@@ -115,6 +115,10 @@ async function validateTagUses() {
 function generateLeanTags() {
   const lines = [
     ...headerLines("lean"),
+    "module",
+    "",
+    "public section",
+    "",
     "namespace Vir.GeneratePackage",
     "",
     "namespace PackageIRTags",

@@ -4,8 +4,12 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.GeneratePackage.Frontend
-import Vir.GeneratePackage.NativeExterns
+module
+
+public import Vir.GeneratePackage.Frontend
+public import Vir.GeneratePackage.NativeExterns
+
+public section
 
 open Lean
 

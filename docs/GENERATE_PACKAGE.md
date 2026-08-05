@@ -31,6 +31,10 @@ Targets have one of five modes:
 
 ## Module Map
 
+The public shim and every library module in the package-generation pipeline use
+Lean's module system. Downstream `module` sources may import the whole pipeline
+with `public import Vir.GeneratePackage` or select a narrower module below.
+
 - `Vir.GeneratePackage.Basic`: shared data structures, package metadata
   shapes, package ABI limits, and default browser targets.
 - `Vir.GeneratePackage.PackageFormat`: package magic, package section kinds,
@@ -68,10 +72,7 @@ Targets have one of five modes:
   callback type classification, and runtime layout classification for structures
   and inductives.
 - `Vir.GeneratePackage.Interface.Classify.Signature`: top-level export and host
-  import signature classification. The classifier and its dependency cone
-  (`GeneratePackage.Basic`, `Json`, `Interface.Encode`, and
-  `Interface.Classify.Basic/Core`) use Lean's module system and can be imported
-  from downstream `module` sources.
+  import signature classification.
 - `Vir.GeneratePackage.Interface.Collect`: export discovery, export call-summary
   extraction, duplicate-avoidance helpers, boxed-boundary diagnostics, and
   host-import collection for `@[vir_js "..."]` declarations.

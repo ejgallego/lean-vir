@@ -4,9 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.GeneratePackage.Manifest.Encode
-import Vir.GeneratePackage.PackageFormat
-import Vir.GeneratePackage.PackageIRTags
+module
+
+public import Vir.GeneratePackage.Manifest.Encode
+public import Vir.GeneratePackage.PackageFormat
+public import Vir.GeneratePackage.PackageIRTags
+
+public section
 
 open Lean
 

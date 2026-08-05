@@ -4,10 +4,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
+module
+
 import Lean.Compiler.InitAttr
 import Lean.Elab.Frontend
 import Lean.LabelAttribute
-import Vir.GeneratePackage.Basic
+public import Vir.GeneratePackage.Basic
+
+public section
 
 open Lean
 
