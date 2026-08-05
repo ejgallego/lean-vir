@@ -62,27 +62,6 @@ private def VirMarkerKind.description : VirMarkerKind → String
   | .export => "Marks a declaration as a JavaScript-callable VIR package export."
   | .startup => "Marks a declaration as a VIR package startup hook."
 
-private def preserveVirStartupTypeHead (name : Lean.Name) : Bool :=
-  name == `Unit || Vir.InterfaceValidation.isEffectHead name
-
-private def isUnitType (type : Lean.Expr) : Lean.CoreM Bool := do
-  let type ← Vir.InterfaceValidation.reduceTypeAliases preserveVirStartupTypeHead type
-  return type.getAppFn.constName? == some `Unit && type.getAppArgs.isEmpty
-
-private def virStartupSignatureDiagnostic? (type : Lean.Expr) : Lean.CoreM (Option String) := do
-  let type ← Vir.InterfaceValidation.reduceTypeAliases preserveVirStartupTypeHead type
-  if let .forallE name .. := type then
-    return some (Vir.InterfaceValidation.startupArgumentsDiagnostic (some name.toString))
-  let (fn, args) := type.getAppFnArgs
-  if fn == `Unit && args.isEmpty then
-    return none
-  if !Vir.InterfaceValidation.isEffectHead fn || args.size != 1 then
-    return some Vir.InterfaceValidation.startupResultDiagnostic
-  let some result := args[0]? | return some Vir.InterfaceValidation.startupResultDiagnostic
-  if ← isUnitType result then
-    return none
-  return some Vir.InterfaceValidation.startupResultDiagnostic
-
 private def checkVirMarker
     (marker : VirMarkerKind) (declName : Lean.Name) : Lean.CoreM VirMarkerCheck := do
   if Lean.isPrivateName declName then
@@ -99,7 +78,8 @@ private def checkVirMarker
       if let some reason := virExportBinderDiagnostic? info.sig.get.type then
         return { diagnostic? := some reason }
   | .startup =>
-      if let some reason ← virStartupSignatureDiagnostic? info.sig.get.type then
+      if let some reason ←
+          Vir.InterfaceValidation.startupSignatureDiagnostic? info.sig.get.type then
         return { diagnostic? := some reason }
   if env.header.isModule && (← Lean.Compiler.compiler.postponeCompile.getM) then
     return {

@@ -36,18 +36,15 @@ public def effectKind? : Lean.Name → Option EffectKind
   | `Lean.Vir.React.ReactM => some .react
   | _ => none
 
-/-- Whether a type constructor is one of VIR's supported exported effects. -/
-public def isEffectHead (name : Lean.Name) : Bool :=
+private def isEffectHead (name : Lean.Name) : Bool :=
   (effectKind? name).isSome
 
-/-- Shared diagnostic for a startup hook that declares parameters. -/
-public def startupArgumentsDiagnostic (name? : Option String := none) : String :=
+private def startupArgumentsDiagnostic (name? : Option String := none) : String :=
   let parameter := name?.map (fun name => s!" (`{name}`)") |>.getD ""
   s!"VIR startup hooks cannot declare parameters{parameter}; \
     define a zero-argument wrapper instead"
 
-/-- Shared diagnostic for a startup hook with an unsupported result or effect. -/
-public def startupResultDiagnostic : String :=
+private def startupResultDiagnostic : String :=
   "VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, \
     `IO Unit`, `DomM Unit`, and `ReactM Unit`"
 
@@ -87,5 +84,31 @@ public partial def reduceTypeAliases
   match ← unfoldAbbrevHead? preserveHead e with
   | some unfolded => reduceTypeAliases preserveHead unfolded
   | none => return stripMData e
+
+private def preserveStartupTypeHead (name : Lean.Name) : Bool :=
+  name == `Unit || isEffectHead name
+
+private def isUnitType (type : Lean.Expr) : Lean.CoreM Bool := do
+  let type ← reduceTypeAliases preserveStartupTypeHead type
+  return type.getAppFn.constName? == some `Unit && type.getAppArgs.isEmpty
+
+/--
+Return a diagnostic when a declaration type does not satisfy the VIR startup
+contract. Startup hooks take no arguments and return either `Unit` or a
+supported effect applied to `Unit`.
+-/
+public def startupSignatureDiagnostic? (type : Lean.Expr) : Lean.CoreM (Option String) := do
+  let type ← reduceTypeAliases preserveStartupTypeHead type
+  if let .forallE name .. := type then
+    return some (startupArgumentsDiagnostic (some name.toString))
+  let (fn, args) := type.getAppFnArgs
+  if fn == `Unit && args.isEmpty then
+    return none
+  if !isEffectHead fn || args.size != 1 then
+    return some startupResultDiagnostic
+  let some result := args[0]? | return some startupResultDiagnostic
+  if ← isUnitType result then
+    return none
+  return some startupResultDiagnostic
 
 end Vir.InterfaceValidation

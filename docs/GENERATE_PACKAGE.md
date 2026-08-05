@@ -44,13 +44,13 @@ Targets have one of five modes:
   validation.
 - `Vir.IRDependencies`: shared IR reference walking, JavaScript-extern
   recognition, and root-to-dependency path formatting.
-- `Vir.InterfaceValidation`: module-safe effect recognition, diagnostics,
-  metadata stripping, and controlled abbreviation-head reduction shared by
-  marker and package-interface checks.
+- `Vir.InterfaceValidation`: module-safe startup-contract analysis, effect
+  recognition, diagnostics, metadata stripping, and controlled
+  abbreviation-head reduction shared by marker and package-interface checks.
 - `Vir.ExportValidation`: conclusive visible compiled-closure checks for
   marked entrypoints, plus explicit opaque-import deferrals. Declaration-kind
-  checks, marker-level signature checks, and postponed-compilation handling live
-  with the attributes in `Vir.Attributes`.
+  checks, export-binder checks, and postponed-compilation handling live with
+  the attributes in `Vir.Attributes`.
 - `Vir.GeneratePackage.Frontend`: source elaboration, `DeclIndex` construction,
   marker collection, declaration-to-module ownership, on-demand `import all`
   environments, module filtering, and declaration-name collision diagnostics.

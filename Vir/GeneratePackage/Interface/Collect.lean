@@ -213,6 +213,11 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
         if !isInterfaceDeclInfo info then
           return .error { name, source, reason := "declaration is not a compiled definition" }
         else
+          let startup := index.virStartups.contains name
+          if startup then
+            if let some reason ←
+                Vir.InterfaceValidation.startupSignatureDiagnostic? info.type then
+              return .error { name, source, reason }
           match ← interfaceSignature? info.type with
           | .ok (args, result, effect, erasedArgCount) =>
               if erasedArgCount != 0 then
@@ -224,19 +229,6 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
               else if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
               else
-                let startup := index.virStartups.contains name
-                if startup && !args.isEmpty then
-                  return .error {
-                    name,
-                    source,
-                    reason := Vir.InterfaceValidation.startupArgumentsDiagnostic
-                  }
-                if startup && result != .unit then
-                  return .error {
-                    name,
-                    source,
-                    reason := Vir.InterfaceValidation.startupResultDiagnostic
-                  }
                 let jsName := jsNameFor name
                 return .ok { id := jsName, jsName, entry := name, source, args, result, effect, startup }
           | .error reason =>
