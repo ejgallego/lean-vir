@@ -344,8 +344,9 @@ The browser React host binding is exposed from
   that node wrapper and its shared payload remain live.
 - `react.state.set` and `react.state.modify` call the retained React setter;
   both are `RuntimeM`. `modify` runs the Lean updater once in VIR against the
-  latest committed-or-queued state and passes only its concrete result to
-  React, making it replay-safe.
+  latest committed-or-queued state. React receives only a pure JavaScript
+  action over that concrete result, making replay safe without repeating Lean
+  effects.
 - `react.state.modify` updater-local resource lifetime is documented with the
   shared host ownership rules in
   [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).

@@ -103,8 +103,9 @@ its lease when Lean's external-object finalizer drops the wrapper, while
 runtime teardown force-revokes all aliases. `releaseJSL` therefore remains the
 deterministic early-release operation rather than the only leak-free path.
 React state, reducers, refs, and memo values acquire their own leases when
-stored and release them on replacement, action consumption, or component
-disposal. Focused virtual and browser-hook tests cover alias independence,
+stored. Queued state actions keep independent source and replay-result leases;
+commit transfers only the selected result, while action collection or component
+disposal releases the queue owner. Focused virtual and browser-hook tests cover alias independence,
 replacement, callback-result transfer, dropped wrappers, and unmount cleanup.
 
 Composite resources retain their resource-bearing children and reject
@@ -113,8 +114,9 @@ owned resource aliases materialized before a later decoding failure are rolled
 back. Browser React render generations stay outside the runtime's strong owner
 registry and transfer their staged ownership only from a commit-phase layout
 effect; weak finalization is a safety net for abandoned renders. Browser state
-updaters and reducers are evaluated once by VIR and only concrete values are
-queued into React, so React development replay cannot repeat Lean effects.
+updaters and reducers are evaluated once by VIR, and React only replays a pure
+JavaScript action over their already-computed result, so development replay
+cannot repeat Lean effects.
 Finalizer diagnostics are bounded strings and never retain the failed resource
 payload.
 

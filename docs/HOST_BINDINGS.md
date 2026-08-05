@@ -145,9 +145,9 @@ node or `null` without orphaning the payload, and `react.ref.set` reconciles the
 explicit lease when it changes the value.
 `useMemo` receives an explicit `Lean.Vir.Js DependencyList` and returns an
 explicit `Lean.Vir.Js α` value. `useReducer` keeps the low-level React boundary
-in `Js` resources, but VIR evaluates reducers once at dispatch time and sends
-a concrete state value through `React.useState`; an effectful Lean reducer is
-never installed as a React-replayable reducer function. Reducer state and actions are typed by their
+in `Js` resources, but VIR evaluates reducers once at dispatch time and queues
+the concrete result through a replay-safe JavaScript state action; an effectful
+Lean reducer is never installed as a React-replayable reducer function. Reducer state and actions are typed by their
 JavaScript resource marker, so structured Lean-owned values use
 `Lean.Vir.JSL state` and `Lean.Vir.JSL action` explicitly with
 `Lean.Vir.LeanRef.toJSL`/`fromJSL` instead of `js.value.*` conversion targets.
@@ -170,8 +170,9 @@ convenience wrapper over explicit string conversion.
 `react.state.set` and `react.state.modify` are `RuntimeM` operations over
 `Lean.Vir.Js α` resources and share the same browser and virtual host resource
 store as React roots. `modify` evaluates its Lean callback exactly once against
-VIR's latest committed-or-queued value, then gives React the concrete result;
-React never receives the Lean callback as a functional updater. The small
+VIR's latest committed-or-queued value, then gives a replay-safe JavaScript
+action the concrete result; React never receives the Lean callback as a
+functional updater. The small
 `js.string`, `js.nat`, `js.bool`, and `js.float` scalar
 helpers are runtime-level `Lean.Vir.JsValue` bindings used by both common host
 helpers and React state examples. They let examples use primitive state without
@@ -289,6 +290,44 @@ See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for diagrams of the
 
 ### Resource Ownership Policy
 
+The ownership contract is intentionally small. An *owner* holds one
+independently releasable lease; JavaScript object identity is not lease
+identity. Host code uses these five operations:
+
+| Operation | Required postcondition |
+| --- | --- |
+| Borrow | The callee may inspect the value but neither consumes nor releases the caller's lease. Success and failure leave that lease live. |
+| Retain | The destination acquires a distinct lease and the source remains live. A failed retain leaves no partial destination lease. |
+| Transfer / take | Ownership moves from a named source to a named destination. The source is relinquished only after destination acquisition succeeds; failure either restores the source or releases an already-transferred argument during rollback. |
+| Stage | A scope temporarily owns every acquisition until one explicit commit point. Any exception before commit releases every staged lease and aggregates cleanup failures. |
+| Release | The owner first detaches its leases, then attempts every release. Release is idempotent; one throwing child must not suppress sibling cleanup. |
+
+For every retainable payload, the live-lease count after an operation is the
+previous count plus successful acquisitions minus successful releases. Every
+live lease must name exactly one current owner. Mutable payload identity,
+rewrapping, or storing the same payload twice does not merge those owners.
+
+The main owners and their commit points are:
+
+| Owner | Acquires | Commits or releases |
+| --- | --- | --- |
+| WASM lift/call scope | Callbacks and resource results materialized during recursive decoding | Commits only after the complete call and result conversion; otherwise rolls back all acquisitions. |
+| Composite resource | Independent leases for nullable values, props, handlers, children, and similar fields | Releases with the composite. Reading or materializing a live composite only borrows its child leases. |
+| Active registration | Its own callback or activity lease | Releases on removal, cancellation, completion, unmount, or runtime disposal. |
+| JSL alias or owned externref root | One lease over the retained Lean object or host payload | Releases that alias/root without invalidating sibling owners. |
+| React queued update | Its own state/action payload lease | Render borrows or stages from it; queue-record collection or component disposal releases it. A commit in another React lane does not. |
+| React render generation | Candidate nodes, callbacks, and hook payload leases | A real commit-phase hook transfers selected leases; render failure or abandoned-generation cleanup releases only the staged generation. |
+| React committed hook/effect | Committed state, reducer, ref, memo, and per-setup effect leases | Replacement or unmount releases the matching owner. A callback result remains staged until callback cleanup also succeeds. |
+
+Ownership tests need not use a generic framework. Direct regression tests are
+preferred, but each changed ownership path must cover its success case, a
+failure after acquisition, throwing cleanup, and repeated cleanup. Mutable or
+React-managed paths also cover same-identity replacement, aliases, replay,
+abandoned render, interleaved-priority updates, and unmount. Tests assert both
+that live values remain usable and that deterministic disposal restores the
+expected lease count; garbage-collection tests are reserved for genuinely
+unobservable abandonment backstops.
+
 `resourceForValue(value)` creates a fresh wrapper. Lean roots are classified as
 borrowed or owned: dropping a borrowed argument root only removes that root,
 while dropping an unclaimed owned host-result root also invokes the wrapper's
@@ -342,10 +381,13 @@ another host-resource store also acquires an independent lease instead of
 sharing an alias-invalidating live/dead flag.
 
 The built-in React state, reducer, ref, and memo bindings acquire their own JSL
-leases whenever React starts storing a payload. Replacing state/ref/memo data,
-consuming a reducer action, or unmounting the component releases the matching
-React-owned lease. Callback-produced state and memo results transfer into that
-ownership lane. A JSL handle retained by Lean remains independently owned by
+leases whenever React starts storing a payload. A queued state action owns its
+source lease and produces an independently retained result on every replay.
+The render generation stages the selected result, and commit transfers that
+exact result lease to the hook without consuming other-lane actions. Action
+collection releases unused queue leases; replacement or unmount releases the
+matching committed lease. Callback-produced state and memo results remain
+staged until post-result callback cleanup also succeeds. A JSL handle retained by Lean remains independently owned by
 Lean and can still be released deterministically with `releaseJSL`. React tracks
 each acquisition with a distinct lease record even when a payload's `retain()`
 operation returns the same object, so payload identity is never used as lease

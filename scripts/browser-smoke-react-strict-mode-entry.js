@@ -30,6 +30,12 @@ const lifetimeState = {
     renders: 0,
     payloads: lifetimeCounter(),
   },
+  lanes: {
+    renders: [],
+    initialPayloads: lifetimeCounter(),
+    urgentPayloads: lifetimeCounter(),
+    transitionPayloads: lifetimeCounter(),
+  },
 };
 globalThis[stateKey] = lifetimeState;
 globalThis[cleanupKey] = () => {
@@ -58,6 +64,7 @@ globalThis[resultKey] = runReactLifetimeSmoke().then(
 async function runReactLifetimeSmoke() {
   return {
     strict: await runStrictModeEffectProbe(),
+    lanes: await runInterleavedStateLaneProbe(),
     abandoned: await runAbandonedSuspenseProbe(),
   };
 }
@@ -181,6 +188,73 @@ async function runAbandonedSuspenseProbe() {
   }
 }
 
+async function runInterleavedStateLaneProbe() {
+  const state = lifetimeState.lanes;
+  const resources = createHostResourceState();
+  const hooks = createBrowserReactHookRuntime(resources, React);
+  const component = hooks.createComponentState();
+  const container = document.createElement("div");
+  container.id = "react-state-lane-lifetime-smoke-root";
+  document.body.append(container);
+  const root = createRoot(container);
+  let setter = null;
+  let renderNumber = 0;
+  let unmounted = false;
+  let componentDisposed = false;
+  let resourcesPreserved = false;
+
+  function Probe() {
+    renderNumber++;
+    return hooks.withComponentRender(component, () => {
+      const initial = createAliasedPayloadLease(state.initialPayloads, `lane initial ${renderNumber}`);
+      const result = hooks.useState(initial);
+      setter ??= result.setter;
+      state.renders.push(result.value.label);
+      hooks.commitComponentRender(component);
+      return React.createElement("div", { id: "react-state-lane-value" }, result.value.label);
+    });
+  }
+
+  try {
+    flushSync(() => root.render(React.createElement(Probe)));
+    requireState(setter !== null, "the initial state render must expose its setter", state);
+
+    const urgent = createAliasedPayloadLease(state.urgentPayloads, "urgent");
+    const transition = createAliasedPayloadLease(state.transitionPayloads, "transition");
+    flushSync(() => {
+      setter.set(urgent);
+      React.startTransition(() => setter.set(transition));
+    });
+    requireState(state.renders.includes("urgent"), "the urgent state update must commit", state);
+    requireState(
+      state.transitionPayloads.active > 0,
+      "an urgent commit must preserve the still-queued transition payload",
+      state,
+    );
+    await waitFor(
+      () => container.querySelector("#react-state-lane-value")?.textContent === "transition",
+      "transition state commit",
+      state,
+    );
+
+    flushSync(() => root.unmount());
+    unmounted = true;
+    hooks.disposeComponent(component);
+    componentDisposed = true;
+    requireState(state.initialPayloads.active === 0, "lane initial payloads must be released", state);
+    requireState(state.urgentPayloads.active === 0, "lane urgent payloads must be released", state);
+    requireState(state.transitionPayloads.active === 0, "lane transition payloads must be released", state);
+    liveResourceStates.push(resources);
+    resourcesPreserved = true;
+    return { renders: state.renders.slice() };
+  } finally {
+    if (!unmounted) flushSync(() => root.unmount());
+    if (!componentDisposed) hooks.disposeComponent(component);
+    if (!resourcesPreserved) resources.dispose();
+    container.remove();
+  }
+}
+
 function createPayloadLease(counter, label) {
   const payload = { kind: "browser React lifetime payload", label };
   let leases = 1;
@@ -203,6 +277,35 @@ function createPayloadLease(counter, label) {
     },
   });
   return payload;
+}
+
+function createAliasedPayloadLease(counter, label) {
+  const cell = { live: true, aliases: new Set() };
+  const createAlias = () => {
+    if (!cell.live) throw new Error(`cannot retain released payload: ${label}`);
+    let live = true;
+    const alias = { kind: "browser React aliased lifetime payload", label };
+    cell.aliases.add(alias);
+    counter.created++;
+    counter.active++;
+    registerHostResourcePayloadLifetime(alias, {
+      retain() {
+        if (!live || !cell.live) throw new Error(`cannot retain released payload alias: ${label}`);
+        return createAlias();
+      },
+      release() {
+        if (!live) return false;
+        live = false;
+        cell.aliases.delete(alias);
+        if (cell.aliases.size === 0) cell.live = false;
+        counter.active--;
+        counter.releases++;
+        return true;
+      },
+    });
+    return alias;
+  };
+  return createAlias();
 }
 
 function createCallbackLease(counter, invoke) {
@@ -232,12 +335,12 @@ function lifetimeCounter() {
   return { created: 0, active: 0, releases: 0 };
 }
 
-async function waitFor(ready, label) {
+async function waitFor(ready, label, details = lifetimeState.strict) {
   for (let attempt = 0; attempt < 100; attempt++) {
     if (ready()) return;
     await new Promise((resolve) => setTimeout(resolve, 0));
   }
-  throw new Error(`${label} did not complete: ${JSON.stringify(lifetimeState.strict)}`);
+  throw new Error(`${label} did not complete: ${JSON.stringify(details)}`);
 }
 
 function requireState(condition, message, details) {

@@ -33,6 +33,9 @@ const browserRenderPayloadLeases = new WeakMap();
 const browserRenderFinalizer = typeof FinalizationRegistry === "function"
   ? new FinalizationRegistry((state) => releaseBrowserRenderState(state, true))
   : null;
+const browserQueuedStateFinalizer = typeof FinalizationRegistry === "function"
+  ? new FinalizationRegistry((record) => releaseBrowserQueuedStateRecord(record, true))
+  : null;
 
 export function createBrowserReactHookRuntime(resources, React) {
   const setters = new WeakMap();
@@ -143,9 +146,8 @@ export function createBrowserReactHookRuntime(resources, React) {
       }
       const initialLease = stageBrowserRenderPayload(currentRender, initial);
       const [value, setState] = React.useState(initial);
-      if (!Object.is(value, initial)) releaseBrowserRenderPayload(currentRender, initialLease);
-      stageBrowserStoredValueCandidate(currentRender, hook, value);
-      const setter = stateSetterFor(setters, setState, hook);
+      stageBrowserStateCandidate(currentRender, hook, initial, initialLease, value);
+      const setter = stateSetterFor(resources, setters, setState, hook);
       currentRender.setters.add(setter);
       return stateResult(value, setter);
     },
@@ -168,8 +170,7 @@ export function createBrowserReactHookRuntime(resources, React) {
       }
       const initialLease = stageBrowserRenderPayload(currentRender, initial);
       const [value, setState] = React.useState(initial);
-      if (!Object.is(value, initial)) releaseBrowserRenderPayload(currentRender, initialLease);
-      stageBrowserStoredValueCandidate(currentRender, hook, value);
+      stageBrowserStateCandidate(currentRender, hook, initial, initialLease, value);
       hook.dispatchTarget = setState;
       return reducerStateResult(value, hook.dispatcher);
     },
@@ -616,13 +617,13 @@ function createBrowserRenderGeneration(resources, componentState) {
   };
 }
 
-function stageBrowserRenderPayload(generation, value) {
-  if (!isRetainableHostResourcePayload(value)) return null;
+function stageBrowserRenderPayload(generation, ownedValue, value = ownedValue) {
+  if (!isRetainableHostResourcePayload(ownedValue)) return null;
   if (generation === null || generation === undefined || generation.ownership.closed) {
-    releaseReactStatePayload(value);
+    releaseReactStatePayload(ownedValue);
     throw new Error("browser React render ownership is unavailable");
   }
-  return createBrowserPayloadLease(generation.ownership, value);
+  return createBrowserPayloadLease(generation.ownership, value, ownedValue);
 }
 
 function releaseBrowserRenderPayload(generation, lease) {
@@ -636,35 +637,56 @@ function stageBrowserStoredValueCandidate(generation, hook, value) {
   generation.candidates.set(hook, value);
 }
 
-function createBrowserPayloadLease(owner, value) {
-  const lease = { owner, value, active: true };
+function stageBrowserStateCandidate(generation, hook, initial, initialLease, value) {
+  if (!Object.is(value, initial)) {
+    releaseBrowserRenderPayload(generation, initialLease);
+    if (isRetainableHostResourcePayload(value)) {
+      const staged = findBrowserPayloadLease(generation?.ownership, value);
+      const queued = staged === null ? takeBrowserQueuedStateResultLease(hook, value) : null;
+      if (queued !== null) {
+        transferBrowserPayloadLease(queued, generation.ownership);
+      } else if (staged === null && findBrowserPayloadLease(hook, value) === null) {
+        throw new Error("React state candidate has no matching queued or committed ownership lease");
+      }
+    }
+  }
+  stageBrowserStoredValueCandidate(generation, hook, value);
+}
+
+function createBrowserPayloadLease(owner, value, ownedValue = value) {
+  const lease = { owner, value, ownedValue, active: true };
+  attachBrowserPayloadLease(lease, owner);
+  return lease;
+}
+
+function attachBrowserPayloadLease(lease, owner) {
+  lease.owner = owner;
   owner.payloadLeases.add(lease);
   if (owner.kind === "render") {
-    let leases = browserRenderPayloadLeases.get(value);
+    let leases = browserRenderPayloadLeases.get(lease.value);
     if (leases === undefined) {
       leases = new Set();
-      browserRenderPayloadLeases.set(value, leases);
+      browserRenderPayloadLeases.set(lease.value, leases);
     }
     leases.add(lease);
   }
-  return lease;
 }
 
 function transferBrowserPayloadLease(lease, owner) {
   if (lease?.active !== true || lease.owner === null || lease.owner === undefined) return false;
   detachBrowserPayloadLease(lease);
-  lease.owner = owner;
-  owner.payloadLeases.add(lease);
+  attachBrowserPayloadLease(lease, owner);
   return true;
 }
 
 function releaseBrowserPayloadLease(lease) {
   if (lease?.active !== true || lease.owner === null || lease.owner === undefined) return false;
-  const value = lease.value;
+  const ownedValue = lease.ownedValue;
   detachBrowserPayloadLease(lease);
   lease.owner = null;
+  lease.ownedValue = NO_STORED_VALUE;
   lease.active = false;
-  return releaseReactStatePayload(value);
+  return releaseReactStatePayload(ownedValue);
 }
 
 function detachBrowserPayloadLease(lease) {
@@ -693,6 +715,118 @@ function takeBrowserRenderPayloadLease(generation, value) {
     }
   }
   return null;
+}
+
+function createBrowserQueuedStateAction(resources, hook, value) {
+  if (browserQueuedStateFinalizer === null) {
+    const error = new Error("browser React queued state ownership requires FinalizationRegistry support");
+    throwWithCleanup(
+      error,
+      () => releaseReactStatePayload(value),
+      "browser React queued state ownership failed during cleanup",
+    );
+  }
+  const record = {
+    kind: "queue",
+    value,
+    payloadLeases: new Set(),
+    active: true,
+    ownerRef: typeof WeakRef === "function" ? new WeakRef(hook) : null,
+    report: (error) => resources.recordGcFinalizerError?.(error),
+  };
+  const action = () => {
+    if (!record.active) {
+      throw new Error("React invoked a released queued state action");
+    }
+    if (!isRetainableHostResourcePayload(record.value)) return record.value;
+    const result = retainHostResourcePayload(record.value);
+    createBrowserPayloadLease(record, result);
+    return result;
+  };
+  hook.pendingActions.add(record);
+  try {
+    browserQueuedStateFinalizer.register(action, record, record);
+  } catch (error) {
+    hook.pendingActions.delete(record);
+    record.active = false;
+    record.value = NO_STORED_VALUE;
+    throwWithCleanup(
+      error,
+      () => releaseReactStatePayload(value),
+      "browser React queued state registration failed during cleanup",
+    );
+  }
+  return { action, record };
+}
+
+function releaseBrowserQueuedStateRecord(record, fromFinalizer = false) {
+  if (record?.active !== true) return false;
+  record.active = false;
+  if (!fromFinalizer) browserQueuedStateFinalizer?.unregister(record);
+  const value = record.value;
+  const payloadLeases = Array.from(record.payloadLeases);
+  const owner = record.ownerRef?.deref();
+  const report = record.report;
+  record.value = NO_STORED_VALUE;
+  record.payloadLeases.clear();
+  record.ownerRef = null;
+  record.report = null;
+  owner?.pendingActions?.delete(record);
+  const errors = [];
+  for (const lease of payloadLeases) {
+    collectCleanupError(errors, () => releaseBrowserPayloadLease(lease));
+  }
+  collectCleanupError(errors, () => releaseReactStatePayload(value));
+  if (errors.length !== 0) {
+    if (!fromFinalizer) {
+      throwCollectedErrors(errors, "browser React queued state release failed");
+    }
+    reportReactFinalizerErrors(report, errors);
+  }
+  return true;
+}
+
+function hasBrowserQueuedStateValue(hook, value) {
+  for (const record of hook?.pendingActions ?? []) {
+    if (record.active && Object.is(record.value, value)) return true;
+  }
+  return false;
+}
+
+function takeBrowserQueuedStateResultLease(hook, value) {
+  for (const record of hook?.pendingActions ?? []) {
+    if (!record.active) continue;
+    const lease = findBrowserPayloadLease(record, value);
+    if (lease !== null) return lease;
+  }
+  return null;
+}
+
+function browserStoredValueForUpdate(hook) {
+  const optimistic = hook.optimisticValue;
+  if (optimistic === NO_STORED_VALUE) return hook.committedValue;
+  if (Object.is(optimistic, hook.committedValue) || hasBrowserQueuedStateValue(hook, optimistic)) {
+    return optimistic;
+  }
+  hook.optimisticValue = NO_STORED_VALUE;
+  return hook.committedValue;
+}
+
+function enqueueBrowserStoredValue(resources, hook, setState, value) {
+  const previousOptimistic = hook.optimisticValue;
+  const { action, record } = createBrowserQueuedStateAction(resources, hook, value);
+  hook.optimisticValue = value;
+  try {
+    setState(action);
+  } catch (error) {
+    hook.optimisticValue = previousOptimistic;
+    throwWithCleanup(
+      error,
+      () => releaseBrowserQueuedStateRecord(record),
+      "browser React state enqueue failed during ownership cleanup",
+    );
+  }
+  return undefined;
 }
 
 function stageBrowserReducerCallback(generation, hook, reducer) {
@@ -885,18 +1019,18 @@ function commitBrowserRef(generation, hook, ref, errors) {
   }
 }
 
-function stateSetterFor(setters, setState, hook) {
+function stateSetterFor(resources, setters, setState, hook) {
   let setter = setters.get(setState);
   if (setter === undefined) {
     setter = {
-      set: (next) => queueBrowserStateUpdate(hook, setState, next),
+      set: (next) => queueBrowserStateUpdate(resources, hook, setState, next),
     };
     setters.set(setState, setter);
   }
   return setter;
 }
 
-function queueBrowserStateUpdate(hook, setState, next) {
+function queueBrowserStateUpdate(resources, hook, setState, next) {
   if (hook?.disposed === true) {
     if (typeof next !== "function") {
       releaseReactStatePayload(next);
@@ -904,59 +1038,19 @@ function queueBrowserStateUpdate(hook, setState, next) {
     throw new Error("React state setter belongs to a disposed component");
   }
   if (typeof next !== "function") {
-    const previous = hook.optimisticValue !== NO_STORED_VALUE
-      ? hook.optimisticValue
-      : hook.committedValue;
-    if (Object.is(previous, next)) {
-      setBrowserStateAndReleaseRedundantValue(setState, next);
-      return undefined;
-    }
-    const lease = rememberBrowserStoredValue(hook, next);
-    const previousOptimistic = hook.optimisticValue;
-    hook.optimisticValue = next;
-    try {
-      setState(next);
-    } catch (error) {
-      hook.optimisticValue = previousOptimistic;
-      forgetBrowserStoredValue(hook, lease);
-      throw error;
-    }
-    return undefined;
+    return enqueueBrowserStoredValue(resources, hook, setState, next);
   }
-  const previous = hook.optimisticValue !== NO_STORED_VALUE
-    ? hook.optimisticValue
-    : hook.committedValue;
+  const previous = browserStoredValueForUpdate(hook);
   if (previous === NO_STORED_VALUE) {
     throw new Error("React state updater has no committed state");
   }
-  let value = NO_STORED_VALUE;
+  let value;
   try {
     value = next(previous);
   } catch (error) {
-    hook.optimisticValue = previous;
     throw error;
   }
-  if (Object.is(previous, value)) {
-    setBrowserStateAndReleaseRedundantValue(setState, value);
-    return undefined;
-  }
-  const lease = rememberBrowserStoredValue(hook, value);
-  try {
-    hook.optimisticValue = value;
-    setState(value);
-  } catch (error) {
-    hook.optimisticValue = previous;
-    forgetBrowserStoredValue(hook, lease);
-    throw error;
-  }
-  return undefined;
-}
-
-function setBrowserStateAndReleaseRedundantValue(setState, value) {
-  const errors = [];
-  collectCleanupError(errors, () => setState(value));
-  collectCleanupError(errors, () => releaseReactStatePayload(value));
-  throwCollectedErrors(errors, "redundant React state update cleanup failed");
+  return enqueueBrowserStoredValue(resources, hook, setState, value);
 }
 
 function createBrowserStoredValueHook(kind) {
@@ -967,6 +1061,7 @@ function createBrowserStoredValueHook(kind) {
     committedValue: NO_STORED_VALUE,
     optimisticValue: NO_STORED_VALUE,
     payloadLeases: new Set(),
+    pendingActions: new Set(),
     disposed: false,
   };
 }
@@ -981,67 +1076,23 @@ function createBrowserRefHook() {
   };
 }
 
-function rememberBrowserStoredValue(hook, value) {
-  if (isRetainableHostResourcePayload(value)) {
-    return createBrowserPayloadLease(hook, value);
-  }
-  return null;
-}
-
-function forgetBrowserStoredValue(hook, lease) {
-  if (lease?.owner === hook) releaseBrowserPayloadLease(lease);
-}
-
-function resetBrowserStoredValueCandidates(componentState) {
-  for (const hook of componentState?.hooks ?? []) {
-    if (hook?.payloadLeases instanceof Set) {
-      hook.candidate = NO_STORED_VALUE;
-    }
-  }
-}
-
-function commitBrowserStoredValueHooks(componentState) {
-  const errors = [];
-  for (const hook of componentState?.hooks ?? []) {
-    if (!(hook?.payloadLeases instanceof Set) || hook.candidate === NO_STORED_VALUE) continue;
-    const kept = isRetainableHostResourcePayload(hook.candidate)
-      ? findBrowserPayloadLease(hook, hook.candidate)
-      : null;
-    for (const lease of Array.from(hook.payloadLeases)) {
-      if (lease !== kept) {
-        collectCleanupError(errors, () => releaseBrowserPayloadLease(lease));
-      }
-    }
-    hook.committedValue = hook.candidate;
-    if (Object.is(hook.optimisticValue, hook.candidate)) {
-      hook.optimisticValue = NO_STORED_VALUE;
-    }
-    hook.candidate = NO_STORED_VALUE;
-    if (hook.pendingActions instanceof Set) {
-      for (const record of hook.pendingActions) {
-        collectCleanupError(errors, () => releaseReactStatePayload(record.value));
-      }
-      hook.pendingActions.clear();
-    }
-  }
-  throwCollectedErrors(errors, "React stored value commit cleanup failed");
-}
-
 function disposeBrowserStoredValueHook(hook) {
   if (hook?.disposed === true) return;
   hook.disposed = true;
-  const errors = [];
-  for (const lease of hook?.payloadLeases ?? []) {
-    collectCleanupError(errors, () => releaseBrowserPayloadLease(lease));
-  }
+  const leases = Array.from(hook?.payloadLeases ?? []);
+  const pendingActions = Array.from(hook?.pendingActions ?? []);
   hook?.payloadLeases?.clear();
+  hook?.pendingActions?.clear();
   hook.candidate = NO_STORED_VALUE;
   hook.committedValue = NO_STORED_VALUE;
   hook.optimisticValue = NO_STORED_VALUE;
-  for (const record of hook?.pendingActions ?? []) {
-    collectCleanupError(errors, () => releaseReactStatePayload(record.value));
+  const errors = [];
+  for (const lease of leases) {
+    collectCleanupError(errors, () => releaseBrowserPayloadLease(lease));
   }
-  hook?.pendingActions?.clear();
+  for (const record of pendingActions) {
+    collectCleanupError(errors, () => releaseBrowserQueuedStateRecord(record));
+  }
   throwCollectedErrors(errors, "React stored value disposal failed");
 }
 
@@ -1154,33 +1205,17 @@ function createBrowserReducerHook(resources) {
         releaseReactStatePayload(action);
         throw new Error("React reducer dispatch is not available");
       }
-      const previous = hook.optimisticValue !== NO_STORED_VALUE
-        ? hook.optimisticValue
-        : hook.committedValue;
+      const previous = browserStoredValueForUpdate(hook);
       if (previous === NO_STORED_VALUE) {
         releaseReactStatePayload(action);
         throw new Error("React reducer dispatch has no committed state");
       }
-      let value = NO_STORED_VALUE;
-      let lease = null;
-      try {
-        value = callReducerHook(resources, hook, previous, action);
-        if (Object.is(previous, value)) {
-          setBrowserStateAndReleaseRedundantValue(hook.dispatchTarget, value);
-          value = NO_STORED_VALUE;
-          return undefined;
-        }
-        lease = rememberBrowserStoredValue(hook, value);
-        hook.optimisticValue = value;
-        hook.dispatchTarget(value);
-      } catch (error) {
-        hook.optimisticValue = previous;
-        if (value !== NO_STORED_VALUE) forgetBrowserStoredValue(hook, lease);
-        throw error;
-      } finally {
-        releaseReactStatePayload(action);
-      }
-      return undefined;
+      const value = withReactStateResultOwnership(
+        (own) => own(callReducerHook(resources, hook, previous, action)),
+        () => releaseReactStatePayload(action),
+        "React reducer dispatch result ownership failed",
+      );
+      return enqueueBrowserStoredValue(resources, hook, hook.dispatchTarget, value);
     },
   };
   return hook;
@@ -1301,11 +1336,11 @@ function createVirtualRefHook(initial) {
 }
 
 function callMemoCalculation(resources, calculate) {
-  try {
-    return takeReactStatePayload(resources, calculate());
-  } finally {
-    releaseLeanCallback(calculate);
-  }
+  return withReactStateResultOwnership(
+    (own) => own(takeReactStatePayload(resources, calculate())),
+    () => releaseLeanCallback(calculate),
+    "React memo result ownership failed",
+  );
 }
 
 function createBrowserEffect(resources, setup, cleanup) {
@@ -1601,11 +1636,15 @@ function callReducerHook(resources, hook, state, action) {
   if (typeof reducer !== "function") {
     throw new Error("React reducer callback is not available");
   }
-  return withStateUpdaterResourceScope(resources, () => {
-    const stateResource = resources.temporaryResourceForValue(state);
-    const actionResource = resources.temporaryResourceForValue(action);
-    return takeReactStatePayload(resources, reducer(stateResource, actionResource));
-  });
+  return withReactStateResultOwnership(
+    (own) => withStateUpdaterResourceScope(resources, () => {
+      const stateResource = resources.temporaryResourceForValue(state);
+      const actionResource = resources.temporaryResourceForValue(action);
+      return own(takeReactStatePayload(resources, reducer(stateResource, actionResource)));
+    }),
+    null,
+    "React reducer result ownership failed",
+  );
 }
 
 function releaseLeanCallback(callback) {
@@ -1645,25 +1684,26 @@ function modifyStateValue(resources, setter, update) {
     remove() {
       if (released) return;
       released = true;
-      update.release();
       resources.removeDisposable(retainedUpdate);
+      update.release();
     },
   };
   resources.addDisposable(retainedUpdate);
   try {
-    stateSetter.set((previous) => {
-      try {
-        return withStateUpdaterResourceScope(resources, () => {
-          const previousResource = resources.temporaryResourceForValue(previous);
-          return takeReactStatePayload(resources, update(previousResource));
-        });
-      } finally {
-        retainedUpdate.remove();
-      }
-    });
+    stateSetter.set((previous) => withReactStateResultOwnership(
+      (own) => withStateUpdaterResourceScope(resources, () => {
+        const previousResource = resources.temporaryResourceForValue(previous);
+        return own(takeReactStatePayload(resources, update(previousResource)));
+      }),
+      () => retainedUpdate.remove(),
+      "React state updater result ownership failed",
+    ));
   } catch (error) {
-    retainedUpdate.remove();
-    throw error;
+    throwWithCleanup(
+      error,
+      () => retainedUpdate.remove(),
+      "React state updater failed during callback cleanup",
+    );
   }
   return undefined;
 }
@@ -1683,6 +1723,31 @@ function withStateUpdaterResourceScope(resources, run) {
     throw new Error("react.state.modify requires temporary host resource support");
   }
   return resources.withTemporaryResourceScope(run);
+}
+
+function withReactStateResultOwnership(acquire, cleanup, message) {
+  let hasResult = false;
+  let result;
+  const errors = [];
+  collectCleanupError(errors, () => {
+    acquire((value) => {
+      if (hasResult) throw new Error("React state result ownership was acquired more than once");
+      hasResult = true;
+      result = value;
+      return value;
+    });
+    if (!hasResult) throw new Error("React state result ownership was not acquired");
+  });
+  if (typeof cleanup === "function") {
+    collectCleanupError(errors, cleanup);
+  }
+  if (errors.length !== 0) {
+    if (hasResult) {
+      collectCleanupError(errors, () => releaseReactStatePayload(result));
+    }
+    throwCollectedErrors(errors, message);
+  }
+  return result;
 }
 
 function borrowReactStatePayload(resources, value) {
