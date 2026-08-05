@@ -4,8 +4,14 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.GeneratePackage.Interface.Encode
-import Vir.InterfaceValidation
+module
+
+public import Lean.Compiler.LCNF.Main
+public import Lean.Compiler.LCNF.ToImpureType
+public import Vir.GeneratePackage.Interface.Encode
+public import Vir.InterfaceValidation
+
+public section
 
 open Lean
 
@@ -22,13 +28,18 @@ partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
       | none => false
   | _ => false
 
+def InterfaceEffect.ofEffectKind : Vir.InterfaceValidation.EffectKind → InterfaceEffect
+  | .runtime => .runtime
+  | .io => .io
+  | .dom => .dom
+  | .react => .react
+
+def InterfaceEffect.ofStartupEffect : Vir.InterfaceValidation.StartupEffect → InterfaceEffect
+  | .pure => .pure
+  | .effect kind => .ofEffectKind kind
+
 def effectHead? (name : Name) : Option InterfaceEffect :=
-  match Vir.InterfaceValidation.effectKind? name with
-  | some .runtime => some .runtime
-  | some .io => some .io
-  | some .dom => some .dom
-  | some .react => some .react
-  | none => none
+  Vir.InterfaceValidation.effectKind? name |>.map InterfaceEffect.ofEffectKind
 
 def preserveInterfaceHead (name : Name) : Bool :=
   if (effectHead? name).isSome then

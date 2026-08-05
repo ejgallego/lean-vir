@@ -20,8 +20,9 @@ intentionally unsupported or ambiguous interface exports and asserts that
 package generation fails loudly with package diagnostics.
 Those negative cases cover recursive inherited structures, indexed inductive
 families, mutual recursion, erased proof fields, and implicit arguments. A
-raw-label fallback case bypasses the startup attribute callback and confirms
-package generation repeats the parameter and result/effect contract checks.
+raw-label fallback case bypasses both marker callbacks and confirms package
+generation applies the same erased/implicit export-binder diagnostics and the
+same startup parameter and result/effect contract checks.
 The package-generator smoke separately checks normal Lean frontend processing
 for both markers. Negative `@[vir_export]` cases cover unsupported binder
 shapes, theorem, axiom, private declarations, and a local helper that reaches
@@ -31,9 +32,11 @@ private declarations, and the same unsupported runtime dependency. Positive
 startup cases cover every supported effect head, pure `Unit`, a reducible
 effect alias, and adding and removing the marker with `attribute`; the
 generated manifest is checked for each expected effect. The smoke also checks
-the informational postponed-compilation path. The Lake facet smoke covers the
-safe stop at an opaque imported declaration, while final package generation
-checks the remaining root-to-boundary path and interface layout.
+the informational postponed-compilation path. The Lake facet smoke also builds
+an external `module` source that imports the typed marker preflight and full
+interface classifier APIs. It covers the safe stop at an opaque imported
+declaration, while final package generation checks the remaining
+root-to-boundary path and interface layout.
 
 The browser smoke resolves dev-runner entries from each package's embedded
 manifest, so UI coverage follows generated entry ids and export counts rather

@@ -15,10 +15,9 @@ namespace Vir.InterfaceValidation
 /-!
 # Module-safe interface validation
 
-The package generator's full interface classifier is a legacy Lean module and
-cannot be imported by `Vir.Attributes`, which uses the module system. This file
-contains the small, representation-independent checks that both layers need so
-attribute-time feedback and final package validation do not drift apart.
+This file owns the representation-independent marker checks shared by
+attribute-time feedback and final package validation. It deliberately stops
+before runtime-layout and JavaScript-interface classification.
 -/
 
 /-- Module-safe identity of a supported exported effect constructor. -/
@@ -27,6 +26,52 @@ public inductive EffectKind where
   | io
   | dom
   | react
+  deriving BEq, Repr
+
+/-- A concrete, explicit export argument found by marker preflight. -/
+public structure ExportBinder where
+  name : Lean.Name
+  type : Lean.Expr
+  deriving Repr
+
+/-- The declaration shape that remains after validating export binders. -/
+public structure ExportSignature where
+  args : Array ExportBinder
+  result : Lean.Expr
+  deriving Repr
+
+/-- A binder-policy violation for a declaration marked `@[vir_export]`. -/
+public inductive ExportSignatureError where
+  | erasedTypeParameter (name : Lean.Name)
+  | implicitOrInstanceParameter (name : Lean.Name)
+  deriving BEq, Repr
+
+/-- Render an export preflight failure for users. -/
+public def ExportSignatureError.message : ExportSignatureError → String
+  | .erasedTypeParameter name =>
+      s!"VIR exports must use concrete runtime types; type parameter `{name}` is erased; \
+        export a concrete wrapper instead"
+  | .implicitOrInstanceParameter name =>
+      s!"VIR exports cannot have implicit or instance arguments (`{name}`); \
+        export a wrapper with only explicit arguments"
+
+/-- Whether a valid startup hook is pure or uses one supported effect. -/
+public inductive StartupEffect where
+  | pure
+  | effect (kind : EffectKind)
+  deriving BEq, Repr
+
+/-- The representation-independent signature of a valid startup hook. -/
+public structure StartupSignature where
+  effect : StartupEffect
+  deriving BEq, Repr
+
+/-- A startup-contract violation found by marker preflight. -/
+public inductive StartupSignatureError where
+  | parameter (name : Lean.Name)
+  | unsupportedResult
+  | unsupportedEffect (head : Lean.Name)
+  deriving BEq, Repr
 
 /-- Classify a type constructor as one of VIR's supported exported effects. -/
 public def effectKind? : Lean.Name → Option EffectKind
@@ -39,14 +84,17 @@ public def effectKind? : Lean.Name → Option EffectKind
 private def isEffectHead (name : Lean.Name) : Bool :=
   (effectKind? name).isSome
 
-private def startupArgumentsDiagnostic (name? : Option String := none) : String :=
-  let parameter := name?.map (fun name => s!" (`{name}`)") |>.getD ""
-  s!"VIR startup hooks cannot declare parameters{parameter}; \
-    define a zero-argument wrapper instead"
-
 private def startupResultDiagnostic : String :=
   "VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, \
     `IO Unit`, `DomM Unit`, and `ReactM Unit`"
+
+/-- Render a startup preflight failure for users. -/
+public def StartupSignatureError.message : StartupSignatureError → String
+  | .parameter name =>
+      s!"VIR startup hooks cannot declare parameters (`{name}`); \
+        define a zero-argument wrapper instead"
+  | .unsupportedResult
+  | .unsupportedEffect _ => startupResultDiagnostic
 
 /-- Remove metadata wrappers without reducing the underlying interface type. -/
 public partial def stripMData : Lean.Expr → Lean.Expr
@@ -85,30 +133,59 @@ public partial def reduceTypeAliases
   | some unfolded => reduceTypeAliases preserveHead unfolded
   | none => return stripMData e
 
-private def preserveStartupTypeHead (name : Lean.Name) : Bool :=
+private def preserveMarkerTypeHead (name : Lean.Name) : Bool :=
   name == `Unit || isEffectHead name
 
 private def isUnitType (type : Lean.Expr) : Lean.CoreM Bool := do
-  let type ← reduceTypeAliases preserveStartupTypeHead type
+  let type ← reduceTypeAliases preserveMarkerTypeHead type
   return type.getAppFn.constName? == some `Unit && type.getAppArgs.isEmpty
 
 /--
-Return a diagnostic when a declaration type does not satisfy the VIR startup
-contract. Startup hooks take no arguments and return either `Unit` or a
-supported effect applied to `Unit`.
+Validate the binder policy for `@[vir_export]` and retain the concrete argument
+types for package-time interface classification. Reducible aliases are unfolded
+only when they expose additional function binders; result aliases remain intact.
 -/
-public def startupSignatureDiagnostic? (type : Lean.Expr) : Lean.CoreM (Option String) := do
-  let type ← reduceTypeAliases preserveStartupTypeHead type
+public partial def analyzeExportSignature
+    (type : Lean.Expr) (args : Array ExportBinder := #[]) :
+    Lean.CoreM (Except ExportSignatureError ExportSignature) := do
+  let type := stripMData type
+  match type with
+  | .forallE name domain body binderInfo =>
+      let domain := stripMData domain
+      if domain matches .sort _ then
+        return .error (.erasedTypeParameter name)
+      else if binderInfo != .default then
+        return .error (.implicitOrInstanceParameter name)
+      else
+        analyzeExportSignature body (args.push { name, type := domain })
+  | _ =>
+      let reduced ← reduceTypeAliases preserveMarkerTypeHead type
+      match reduced with
+      | .forallE .. => analyzeExportSignature reduced args
+      | _ => return .ok { args, result := type }
+
+/--
+Analyze a VIR startup signature. Startup hooks take no arguments and return
+either `Unit` or a supported effect applied to `Unit`.
+-/
+public def analyzeStartupSignature (type : Lean.Expr) :
+    Lean.CoreM (Except StartupSignatureError StartupSignature) := do
+  let type ← reduceTypeAliases preserveMarkerTypeHead type
   if let .forallE name .. := type then
-    return some (startupArgumentsDiagnostic (some name.toString))
+    return .error (.parameter name)
   let (fn, args) := type.getAppFnArgs
   if fn == `Unit && args.isEmpty then
-    return none
-  if !isEffectHead fn || args.size != 1 then
-    return some startupResultDiagnostic
-  let some result := args[0]? | return some startupResultDiagnostic
+    return .ok { effect := .pure }
+  let some effect := effectKind? fn
+    | if args.isEmpty then
+        return .error .unsupportedResult
+      else
+        return .error (.unsupportedEffect fn)
+  if args.size != 1 then
+    return .error (.unsupportedEffect fn)
+  let some result := args[0]? | return .error (.unsupportedEffect fn)
   if ← isUnitType result then
-    return none
-  return some startupResultDiagnostic
+    return .ok { effect := .effect effect }
+  return .error .unsupportedResult
 
 end Vir.InterfaceValidation

@@ -4,13 +4,45 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Vir.GeneratePackage.Interface.Classify.Core
+module
+
+public import Vir.GeneratePackage.Interface.Classify.Core
+
+public section
 
 open Lean
 
 namespace Vir.GeneratePackage
 
 open Vir.InterfaceValidation
+
+private def interfaceResult? (result : Lean.Expr) :
+    CoreM (Except String (InterfaceType × InterfaceEffect)) := do
+  let effectResult ← effectResult? result
+  let (effect, result) := effectResult.getD (.pure, result)
+  match ← interfaceType result with
+  | .error reason => return .error s!"unsupported result type `{result}`: {reason}"
+  | .ok resultType => return .ok (resultType, effect)
+
+/--
+Classify a marker-preflighted export signature without rescanning its binders.
+Runtime layout and supported JavaScript types remain package-time concerns.
+-/
+def interfaceExportSignature? (signature : ExportSignature) :
+    CoreM (Except String (Array InterfaceArg × InterfaceType × InterfaceEffect)) := do
+  let mut args : Array InterfaceArg := #[]
+  for binder in signature.args do
+    match ← interfaceType binder.type with
+    | .error reason =>
+        return .error s!"unsupported argument type `{binder.type}`: {reason}"
+    | .ok argType =>
+        args := args.push {
+          name := binderArgName (args.size + 1) binder.name
+          type := argType
+        }
+  match ← interfaceResult? signature.result with
+  | .error reason => return .error reason
+  | .ok (result, effect) => return .ok (args, result, effect)
 
 partial def interfaceSignature?
     (type : Lean.Expr)
@@ -36,10 +68,8 @@ partial def interfaceSignature?
             let arg := { name := binderArgName argIndex name, type := argType }
             interfaceSignature? body (argIndex + 1) (args.push arg) erasedArgCount
   | result =>
-      let effectResult ← effectResult? result
-      let (effect, result) := effectResult.getD (.pure, result)
-      match ← interfaceType result with
-      | .error reason => return .error s!"unsupported result type `{result}`: {reason}"
-      | .ok resultType => return .ok (args, resultType, effect, erasedArgCount)
+      match ← interfaceResult? result with
+      | .error reason => return .error reason
+      | .ok (result, effect) => return .ok (args, result, effect, erasedArgCount)
 
 end Vir.GeneratePackage

@@ -4,15 +4,13 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 -/
 
-import Lean
-import Lean.Elab.Frontend
-import Lean.Compiler.IR.CompilerM
-import Lean.Compiler.InitAttr
-import Lean.Compiler.LCNF.Main
-import Lean.Compiler.LCNF.ToImpureType
-import Lean.LabelAttribute
-import Vir.GeneratePackage.NativeExterns
-import Vir.IRDependencies
+module
+
+public import Lean.Compiler.IR.CompilerM
+public import Vir.GeneratePackage.NativeExterns
+public import Vir.IRDependencies
+
+public section
 
 open Lean
 

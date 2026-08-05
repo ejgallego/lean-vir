@@ -21,20 +21,6 @@ These attributes select the declarations that a Lake `:vir` module facet
 exports to JavaScript. Importing `Vir` also imports this module.
 -/
 
-private partial def virExportBinderDiagnostic? (type : Lean.Expr) : Option String :=
-  match Vir.InterfaceValidation.stripMData type with
-  | .forallE name domain body binderInfo =>
-      let domain := Vir.InterfaceValidation.stripMData domain
-      if domain matches .sort _ then
-        some s!"VIR exports must use concrete runtime types; type parameter `{name}` is erased; \
-          export a concrete wrapper instead"
-      else if binderInfo != .default then
-        some s!"VIR exports cannot have implicit or instance arguments (`{name}`); \
-          export a wrapper with only explicit arguments"
-      else
-        virExportBinderDiagnostic? body
-  | _ => none
-
 private def virMarkerKindDiagnostic? (env : Lean.Environment) (declName : Lean.Name) : Option String :=
   match Lean.getOriginalConstKind? env declName with
   | some .defn | some .opaque => none
@@ -75,12 +61,13 @@ private def checkVirMarker
   let info ← Lean.getAsyncConstInfo declName
   match marker with
   | .export =>
-      if let some reason := virExportBinderDiagnostic? info.sig.get.type then
-        return { diagnostic? := some reason }
+      match ← Vir.InterfaceValidation.analyzeExportSignature info.sig.get.type with
+      | .error error => return { diagnostic? := some error.message }
+      | .ok _ => pure ()
   | .startup =>
-      if let some reason ←
-          Vir.InterfaceValidation.startupSignatureDiagnostic? info.sig.get.type then
-        return { diagnostic? := some reason }
+      match ← Vir.InterfaceValidation.analyzeStartupSignature info.sig.get.type with
+      | .error error => return { diagnostic? := some error.message }
+      | .ok _ => pure ()
   if env.header.isModule && (← Lean.Compiler.compiler.postponeCompile.getM) then
     return {
       deferred := #[{

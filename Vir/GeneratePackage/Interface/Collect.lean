@@ -214,25 +214,28 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
           return .error { name, source, reason := "declaration is not a compiled definition" }
         else
           let startup := index.virStartups.contains name
-          if startup then
-            if let some reason ←
-                Vir.InterfaceValidation.startupSignatureDiagnostic? info.type then
-              return .error { name, source, reason }
-          match ← interfaceSignature? info.type with
-          | .ok (args, result, effect, erasedArgCount) =>
-              if erasedArgCount != 0 then
-                return .error {
-                  name,
-                  source,
-                  reason := "VIR exports must use concrete runtime types; erased type parameters are not supported; export a concrete wrapper instead"
-                }
-              else if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
+          let classified :
+              Except PackageDiagnostic (Array InterfaceArg × InterfaceType × InterfaceEffect) ←
+            if startup then
+              match ← Vir.InterfaceValidation.analyzeStartupSignature info.type with
+              | .error error => pure (.error { name, source, reason := error.message })
+              | .ok signature =>
+                  pure (.ok (#[], .unit, InterfaceEffect.ofStartupEffect signature.effect))
+            else
+              match ← Vir.InterfaceValidation.analyzeExportSignature info.type with
+              | .error error => pure (.error { name, source, reason := error.message })
+              | .ok signature =>
+                  match ← interfaceExportSignature? signature with
+                  | .error reason => pure (.error { name, source, reason })
+                  | .ok signature => pure (.ok signature)
+          match classified with
+          | .ok (args, result, effect) =>
+              if interfaceNeedsBoxedCallBoundary args result && (index.find? (boxedName name)).isNone then
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
               else
                 let jsName := jsNameFor name
                 return .ok { id := jsName, jsName, entry := name, source, args, result, effect, startup }
-          | .error reason =>
-              return .error { name, source, reason }
+          | .error diagnostic => return .error diagnostic
 
 def DeclIndex.constInfo? (index : DeclIndex) (name : Name) : Option (String × Environment × ConstantInfo) :=
   index.envs.findSome? fun (source, env) =>

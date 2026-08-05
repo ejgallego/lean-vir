@@ -167,6 +167,22 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
+  'public meta import Vir.Attributes' \
+  'public import Vir.GeneratePackage.Interface.Classify.Signature' \
+  '' \
+  '#check vir_export' \
+  '#check vir_startup' \
+  '#check Vir.InterfaceValidation.analyzeExportSignature' \
+  '#check Vir.InterfaceValidation.ExportSignatureError.message' \
+  '#check Vir.InterfaceValidation.analyzeStartupSignature' \
+  '#check Vir.InterfaceValidation.StartupSignatureError.message' \
+  '#check Vir.InterfaceValidation.StartupSignature.effect' \
+  '#check Vir.GeneratePackage.interfaceExportSignature?' \
+  '#check Vir.GeneratePackage.interfaceSignature?' > "$tmp/Smoke/InterfaceClassifier.lean"
+
+printf '%s\n' \
+  'module' \
+  '' \
   'public import Init.System.IO' \
   '' \
   'public def Smoke.OpaqueDependency.environmentHome : IO String := do' \
@@ -210,6 +226,7 @@ fi
 test "$(cat "$tmp/existing-sdk/marker.txt")" = 'keep-existing-sdk'
 grep -q 'SDK version mismatch' "$tmp/version-sdk.stderr"
 
+lake -d "$tmp" build Smoke.InterfaceClassifier
 lake -d "$tmp" build +Smoke.Runtime:vir
 lake -d "$tmp" build +Smoke.NewRuntime:vir
 

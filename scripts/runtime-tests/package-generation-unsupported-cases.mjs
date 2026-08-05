@@ -22,7 +22,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     /implicitBump/,
     /VIR exports cannot have implicit or instance arguments \(`offset`\); export a wrapper with only explicit arguments/,
     /polymorphicJsIdentity/,
-    /VIR exports must use concrete runtime types; erased type parameters are not supported/,
+    /VIR exports must use concrete runtime types; type parameter `α` is erased; export a concrete wrapper instead/,
     /nakedElementIdentity/,
     /JavaScript object marker `Lean\.Vir\.Browser\.Element` must appear under `Lean\.Vir\.Js`/,
     /nakedReactRootIdentity/,
@@ -130,25 +130,31 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
 
   const leftSource = join(freshDir, "CollisionLeft.lean");
   const rightSource = join(freshDir, "CollisionRight.lean");
-  const packageFallbackStartupSource = join(freshDir, "PackageFallbackStartup.lean");
+  const packageFallbackMarkerSource = join(freshDir, "PackageFallbackMarkers.lean");
   const packagePath = join(freshDir, "PackageDiagnostics.irpkg");
   const reportPath = join(freshDir, "PackageDiagnostics.report.md");
   await writeRuntimeFixture(leftSource, "CollisionLeft.lean");
   await writeRuntimeFixture(rightSource, "CollisionRight.lean");
-  // Bypass the attribute callback to exercise the final package-time contract guard.
-  await writeFile(packageFallbackStartupSource, [
+  // Bypass the attribute callbacks to exercise the final package-time contract guards.
+  await writeFile(packageFallbackMarkerSource, [
     "import Vir",
     "",
-    "namespace PackageFallbackStartup",
+    "namespace PackageFallbackMarkers",
+    "",
+    "def badErased {α : Type} (value : α) : α := value",
+    "",
+    "def badImplicit {offset : Nat} (n : Nat) : Nat := n + offset",
     "",
     "def badArguments (_n : Nat) : Unit := ()",
     "",
     "def badResult : IO Nat := pure 1",
     "",
-    "run_meta vir_startup.add `PackageFallbackStartup.badArguments",
-    "run_meta vir_startup.add `PackageFallbackStartup.badResult",
+    "run_meta vir_export.add `PackageFallbackMarkers.badErased",
+    "run_meta vir_export.add `PackageFallbackMarkers.badImplicit",
+    "run_meta vir_startup.add `PackageFallbackMarkers.badArguments",
+    "run_meta vir_startup.add `PackageFallbackMarkers.badResult",
     "",
-    "end PackageFallbackStartup",
+    "end PackageFallbackMarkers",
     "",
   ].join("\n"));
   const generated = runVirIrpkg([
@@ -161,7 +167,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     rightSource,
     "collisionBump",
     "--target-marked",
-    packageFallbackStartupSource,
+    packageFallbackMarkerSource,
   ]);
   assert.notEqual(generated.status, 0, "unsupported package targets unexpectedly generated successfully");
   assert.match(generated.stderr, /package diagnostics/);
@@ -169,15 +175,25 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   assert.match(generated.stderr, /declaration name collides/);
   assert.match(
     generated.stderr,
-    /PackageFallbackStartup\.badArguments: VIR startup hooks cannot declare parameters \(`_n`\); define a zero-argument wrapper instead/,
+    /PackageFallbackMarkers\.badErased: VIR exports must use concrete runtime types; type parameter `α` is erased; export a concrete wrapper instead/,
   );
   assert.match(
     generated.stderr,
-    /PackageFallbackStartup\.badResult: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
+    /PackageFallbackMarkers\.badImplicit: VIR exports cannot have implicit or instance arguments \(`offset`\); export a wrapper with only explicit arguments/,
+  );
+  assert.match(
+    generated.stderr,
+    /PackageFallbackMarkers\.badArguments: VIR startup hooks cannot declare parameters \(`_n`\); define a zero-argument wrapper instead/,
+  );
+  assert.match(
+    generated.stderr,
+    /PackageFallbackMarkers\.badResult: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
   );
   const report = await readFile(reportPath, "utf8");
   assert.match(report, /collisionBump/);
   assert.match(report, /declaration name collides/);
-  assert.match(report, /PackageFallbackStartup\.badArguments/);
-  assert.match(report, /PackageFallbackStartup\.badResult/);
+  assert.match(report, /PackageFallbackMarkers\.badErased/);
+  assert.match(report, /PackageFallbackMarkers\.badImplicit/);
+  assert.match(report, /PackageFallbackMarkers\.badArguments/);
+  assert.match(report, /PackageFallbackMarkers\.badResult/);
 }

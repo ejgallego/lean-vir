@@ -44,13 +44,16 @@ Targets have one of five modes:
   validation.
 - `Vir.IRDependencies`: shared IR reference walking, JavaScript-extern
   recognition, and root-to-dependency path formatting.
-- `Vir.InterfaceValidation`: module-safe startup-contract analysis, effect
-  recognition, diagnostics, metadata stripping, and controlled
-  abbreviation-head reduction shared by marker and package-interface checks.
+- `Vir.InterfaceValidation`: module-safe, typed export-binder and startup
+  preflight, effect recognition, diagnostic rendering, metadata stripping, and
+  controlled abbreviation-head reduction shared by attributes and package
+  generation. Successful startup analysis records whether the hook is pure or
+  which supported effect it uses.
 - `Vir.ExportValidation`: conclusive visible compiled-closure checks for
   marked entrypoints, plus explicit opaque-import deferrals. Declaration-kind
-  checks, export-binder checks, and postponed-compilation handling live with
-  the attributes in `Vir.Attributes`.
+  checks and postponed-compilation handling live with the attributes in
+  `Vir.Attributes`; binder and startup policy lives in
+  `Vir.InterfaceValidation`.
 - `Vir.GeneratePackage.Frontend`: source elaboration, `DeclIndex` construction,
   marker collection, declaration-to-module ownership, on-demand `import all`
   environments, module filtering, and declaration-name collision diagnostics.
@@ -65,7 +68,10 @@ Targets have one of five modes:
   callback type classification, and runtime layout classification for structures
   and inductives.
 - `Vir.GeneratePackage.Interface.Classify.Signature`: top-level export and host
-  import signature classification.
+  import signature classification. The classifier and its dependency cone
+  (`GeneratePackage.Basic`, `Json`, `Interface.Encode`, and
+  `Interface.Classify.Basic/Core`) use Lean's module system and can be imported
+  from downstream `module` sources.
 - `Vir.GeneratePackage.Interface.Collect`: export discovery, export call-summary
   extraction, duplicate-avoidance helpers, boxed-boundary diagnostics, and
   host-import collection for `@[vir_js "..."]` declarations.
@@ -98,9 +104,12 @@ Targets have one of five modes:
    complete or no additional module IR is available.
 5. `Interface.collectHostImports` classifies `@[vir_js "..."]` externs reached
    by the closure.
-6. `Manifest.collectInterfaceManifest` classifies callable exports, folds in
+6. `Manifest.collectInterfaceManifest` runs the same typed marker preflight
+   used by `Vir.Attributes`, then classifies callable exports, folds in
    host-import and declaration-index diagnostics, and rejects duplicate export
-   ids or JavaScript names.
+   ids or JavaScript names. A valid startup preflight directly supplies its
+   zero-argument `Unit` signature and effect, so package generation does not
+   classify that signature a second time.
 7. `Report.reportFor` renders the same resolved roots recorded in manifest
    metadata, then lists closure contents, externs, host imports, exports, and
    diagnostics.
@@ -160,6 +169,12 @@ The interface classifier recognizes the supported manifest surface described in
 `docs/INTERFACE_PIPELINE.md`. It also retries unsupported type shapes after
 unfolding reducible abbrev heads, so aliases such as `abbrev UserId := Nat` can
 be used at package boundaries without changing their runtime representation.
+
+Marker preflight is intentionally narrower than interface classification. It
+rejects export binder shapes and validates the complete startup contract early,
+while runtime layout and JavaScript boundary types remain package-time checks.
+Both layers consume typed analysis results and render errors at their own user
+boundary instead of sharing preformatted success/failure strings.
 
 That retry is deliberately conservative: the classifier first tries the source
 type as written, then unfolds only abbrev heads whose outer type shape is not
