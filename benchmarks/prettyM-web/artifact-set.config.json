@@ -1,0 +1,61 @@
+{
+  "schemaVersion": 1,
+  "setId": "prettyM-bounded-set-0001",
+  "benchmarkContract": {
+    "id": "prettyM-web/artifacts/v1",
+    "input": "prettyM-compact-format/v1",
+    "output": "prettyM-text-and-complete-style-events/v1",
+    "timingPhases": [
+      "prepare",
+      "execute",
+      "decode",
+      "render"
+    ]
+  },
+  "components": {
+    "vir": {
+      "boundary": "prettyM-web/bounded-runtime/v1",
+      "lean": {
+        "version": "4.33.0-rc2",
+        "commit": "d8b18978322de05a8f3dba51ef03cf5461676c17"
+      },
+      "runtime": {
+        "pipeline": "lean-vir-ir-interpreter-wasm32-wasip1",
+        "repository": "https://github.com/ejgallego/lean-vir",
+        "sourceCommit": "64e30784da16957cca92951344d776f895b30491",
+        "pullRequest": 104,
+        "sourceDirty": false,
+        "wasiSdk": "33.0"
+      },
+      "workload": {
+        "file": "prettyM-vir.irpkg",
+        "packageFormat": 10,
+        "manifestVersion": 7,
+        "source": {
+          "repository": "https://github.com/leanprover/verso-slides",
+          "commit": "ff1dc854f00a0cdd9e90a2489166028a07ae95bb",
+          "file": "VersoSlides/Pretty.lean",
+          "dirty": false
+        },
+        "exports": [
+          "VersoSlides.Pretty.formatJsonSegmentsJsonForVir",
+          "VersoSlides.Pretty.formatSegmentsForVir"
+        ]
+      }
+    },
+    "native": {
+      "boundary": "prettyM-web/bounded-runtime/v1",
+      "lean": {
+        "version": "4.32.0",
+        "commit": "8c9756b28d64dab099da31a4c09229a9e6a2ef35"
+      }
+    },
+    "llvm": {
+      "boundary": "prettyM-web/bounded-runtime/v1",
+      "lean": {
+        "version": "4.32.0",
+        "commit": "8c9756b28d64dab099da31a4c09229a9e6a2ef35"
+      }
+    }
+  }
+}

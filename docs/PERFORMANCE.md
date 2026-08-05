@@ -124,6 +124,8 @@ From the VIR root, use the thin convenience commands:
 
 ```bash
 npm run bench:pretty:web:stage
+npm run bench:pretty:web:artifacts:pack
+npm run bench:pretty:web:artifacts:fetch
 npm run bench:pretty:web:build
 npm run bench:pretty:web:test
 npm run bench:pretty:web:dev

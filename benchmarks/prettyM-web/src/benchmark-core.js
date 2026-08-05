@@ -1853,11 +1853,16 @@ async function collectPrettyRuntimeProfile(backendIds) {
   var root = /** @type {Window & {
         __prettyBenchVir?: PrettyVirBridge,
         __prettyBenchNative?: *,
-        __prettyBenchLlvm?: *
+        __prettyBenchLlvm?: *,
+        __prettyBenchArtifactSetUrl?: string
     }} */ (window);
   var jsScript = Array.from(document.scripts).find(function (script) {
     try {
-      return new URL(script.src).pathname.endsWith("/lib/pretty.js");
+      var pathname = new URL(script.src).pathname;
+      return (
+        pathname.endsWith("/lib/pretty.js") ||
+        pathname.endsWith("/src/benchmark-core.js")
+      );
     } catch (_error) {
       return false;
     }
@@ -2050,6 +2055,26 @@ async function collectPrettyRuntimeProfile(backendIds) {
     };
   }
   var sharedAssets = await Promise.all(commonAssets.map(profileAsset));
+  var artifactSet = null;
+  if (root.__prettyBenchArtifactSetUrl) {
+    var artifactSetAsset = await profileAsset(root.__prettyBenchArtifactSetUrl);
+    var artifactSetManifest = await fetch(root.__prettyBenchArtifactSetUrl, {
+      cache: "force-cache",
+    })
+      .then(function (response) {
+        if (!response.ok) throw new Error("HTTP " + response.status);
+        return response.json();
+      })
+      .catch(function (error) {
+        return {
+          error: error instanceof Error ? error.message : String(error),
+        };
+      });
+    artifactSet = {
+      asset: artifactSetAsset,
+      manifest: artifactSetManifest,
+    };
+  }
   return {
     capturedAt: new Date().toISOString(),
     crossOriginIsolated: globalThis.crossOriginIsolated,
@@ -2060,6 +2085,7 @@ async function collectPrettyRuntimeProfile(backendIds) {
       );
     }, 0),
     sharedAssets: sharedAssets,
+    artifactSet: artifactSet,
     backends: profiles,
   };
 }

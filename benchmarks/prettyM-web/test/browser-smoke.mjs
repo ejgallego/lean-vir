@@ -84,6 +84,15 @@ try {
   assert.equal(report.passed, true);
   assert.equal(report.parityCount, 1);
   assert.equal(report.scenarioCount, 1);
+  assert.equal(
+    report.runtimeProfile.artifactSet.manifest.setId,
+    "prettyM-bounded-set-0001",
+  );
+  assert.equal(
+    report.runtimeProfile.artifactSet.manifest.components.vir.runtime.sourceCommit,
+    "64e30784da16957cca92951344d776f895b30491",
+  );
+  assert.ok(report.runtimeProfile.backends.js.assetBytes > 0);
   assert.equal(await page.locator(".report-card").count(), 1);
   assert.equal(await page.locator("#open-dashboard").isEnabled(), true);
   await page.locator("#open-dashboard").click();

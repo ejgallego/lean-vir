@@ -1,0 +1,13 @@
+{
+  "archive": {
+    "bytes": 2677760,
+    "file": "prettyM-bounded-set-0001-26f54081e15145b6.tar",
+    "format": "ustar",
+    "sha256": "26f54081e15145b69a34a24493d9f7adc347cfadc8dc962a75a0c6f7afce2097",
+    "url": null
+  },
+  "manifestSha256": "1b77363ed7c755aa88517e4568c57e394c2f0e9761b1859490010cea9393cc24",
+  "schemaVersion": 1,
+  "setId": "prettyM-bounded-set-0001",
+  "status": "local-prototype"
+}
