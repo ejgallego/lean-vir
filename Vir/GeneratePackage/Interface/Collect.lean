@@ -225,11 +225,17 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
                 return .error { name, source, reason := boxedBoundaryDiagnostic name }
               else
                 let startup := index.virStartups.contains name
-                if startup && (!args.isEmpty || result != .unit) then
+                if startup && !args.isEmpty then
                   return .error {
                     name,
                     source,
-                    reason := Vir.InterfaceValidation.startupSignatureDiagnostic
+                    reason := Vir.InterfaceValidation.startupArgumentsDiagnostic
+                  }
+                if startup && result != .unit then
+                  return .error {
+                    name,
+                    source,
+                    reason := Vir.InterfaceValidation.startupResultDiagnostic
                   }
                 let jsName := jsNameFor name
                 return .ok { id := jsName, jsName, entry := name, source, args, result, effect, startup }

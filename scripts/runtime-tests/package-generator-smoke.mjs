@@ -373,15 +373,15 @@ try {
   const badStartupOutput = combinedOutput(checkedBadStartup);
   assert.match(
     badStartupOutput,
-    /invalid `@\[vir_startup\]` declaration `badStartup`: VIR startup hooks must take no JavaScript arguments and return `Unit`/,
+    /invalid `@\[vir_startup\]` declaration `badStartup`: VIR startup hooks cannot declare parameters \(`_n`\); define a zero-argument wrapper instead/,
   );
   assert.match(
     badStartupOutput,
-    /invalid `@\[vir_startup\]` declaration `badStartupResult`: VIR startup hooks must take no JavaScript arguments and return `Unit`/,
+    /invalid `@\[vir_startup\]` declaration `badStartupResult`: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
   );
   assert.match(
     badStartupOutput,
-    /invalid `@\[vir_startup\]` declaration `unsupportedStartupEffect`: VIR startup hooks must take no JavaScript arguments and return `Unit`/,
+    /invalid `@\[vir_startup\]` declaration `unsupportedStartupEffect`: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
   );
   assert.match(
     badStartupOutput,

@@ -69,22 +69,19 @@ private def isUnitType (type : Lean.Expr) : Lean.CoreM Bool := do
   let type ← Vir.InterfaceValidation.reduceTypeAliases preserveVirStartupTypeHead type
   return type.getAppFn.constName? == some `Unit && type.getAppArgs.isEmpty
 
-private def isVirStartupSignature (type : Lean.Expr) : Lean.CoreM Bool := do
+private def virStartupSignatureDiagnostic? (type : Lean.Expr) : Lean.CoreM (Option String) := do
   let type ← Vir.InterfaceValidation.reduceTypeAliases preserveVirStartupTypeHead type
-  if type matches .forallE .. then
-    return false
+  if let .forallE name .. := type then
+    return some (Vir.InterfaceValidation.startupArgumentsDiagnostic (some name.toString))
   let (fn, args) := type.getAppFnArgs
-  if fn == `Unit then
-    return args.isEmpty
-  if !Vir.InterfaceValidation.isEffectHead fn || args.size != 1 then
-    return false
-  let some result := args[0]? | return false
-  isUnitType result
-
-private def checkVirStartupSignature (type : Lean.Expr) : Lean.CoreM (Option String) := do
-  if ← isVirStartupSignature type then
+  if fn == `Unit && args.isEmpty then
     return none
-  return some Vir.InterfaceValidation.startupSignatureDiagnostic
+  if !Vir.InterfaceValidation.isEffectHead fn || args.size != 1 then
+    return some Vir.InterfaceValidation.startupResultDiagnostic
+  let some result := args[0]? | return some Vir.InterfaceValidation.startupResultDiagnostic
+  if ← isUnitType result then
+    return none
+  return some Vir.InterfaceValidation.startupResultDiagnostic
 
 private def checkVirMarker
     (marker : VirMarkerKind) (declName : Lean.Name) : Lean.CoreM VirMarkerCheck := do
@@ -102,7 +99,7 @@ private def checkVirMarker
       if let some reason := virExportBinderDiagnostic? info.sig.get.type then
         return { diagnostic? := some reason }
   | .startup =>
-      if let some reason ← checkVirStartupSignature info.sig.get.type then
+      if let some reason ← virStartupSignatureDiagnostic? info.sig.get.type then
         return { diagnostic? := some reason }
   if env.header.isModule && (← Lean.Compiler.compiler.postponeCompile.getM) then
     return {
@@ -166,7 +163,8 @@ the package manifest. The browser host invokes them with
 performs the same entrypoint and closure checks as `@[vir_export]` and requires
 the hook to take no JavaScript arguments and return `Unit`, possibly through a
 supported effect such as `DomM`. Package generation remains the final check for
-opaque imported dependencies and interface layout.
+opaque imported dependencies and interface layout. Signature errors distinguish
+unexpected parameters from unsupported result or effect forms.
 -/
 initialize vir_startup : Lean.LabelExtension ← registerVirMarkerAttr .startup
 
