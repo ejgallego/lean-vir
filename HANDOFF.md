@@ -6,7 +6,7 @@ Last verified: 2026-08-06
 
 - Worktree: `/home/egallego/lean/vir/.worktrees/pretty-benchmark-webapp`
 - Branch: `feat/pretty-benchmark-webapp`
-- Starting commit before this handoff: `b8e53e8`
+- Starting commit before this continuation: `21e8369`
 - Application root: `benchmarks/prettyM-web/`
 
 Read `/home/egallego/lean/vir/AGENTS.md`, this file, and
@@ -53,6 +53,15 @@ summaries or refreshed bounded artifacts here.
 - The final PR #104 bounded validation report is locally available at
   `benchmarks/prettyM-web/_results/pr104-bounded-validation.json` when the
   ignored results directory has been preserved.
+- VIR-002 imports two hash-identified public-`runtime.call` sampled captures
+  from `benchmarks/prettyM-web/evidence/vir-pr104-runtime-call-profile.json`.
+  Card generation rejects reports whose Lean version, runtime JS, runtime Wasm,
+  or IR package does not match that evidence.
+- A fresh full report from set 0001 passed 45/45 corpus cases, 32/32 scaling
+  points, 36/36 interaction points, repeated calls, isolated repeats, and
+  isolated memory collection. It is locally preserved at
+  `benchmarks/prettyM-web/_results/pretty-benchmark.json` with SHA-256
+  `e3f364dc6b91c5ea2bbcff6297ea8cef38ba695a1ce5448c9d2d826ea79994ee`.
 
 The current artifact lock is `local-prototype`: its archive digest and size are
 committed, but `archive.url` is intentionally null. Public artifact publication
@@ -60,15 +69,21 @@ is unfinished rather than broken.
 
 ## Immediate status
 
-This worktree is paused while VIR-internal attribution proceeds. Do not add the
-VIR CPU profiler, internal counters, or an interpreter optimization here. The
-next change in this worktree should be one of:
+The stable public-call attribution is now imported without adding profiler code
+to this application. Across two captures of both structural targets, 75.6-79.1%
+of samples roll up to object-ABI import/result lifting and only 21.2-24.4% are
+Wasm self samples. Eager `customInductiveShape` construction is the largest
+self symbol. VIR-002 records the evidence classes, artifact hashes, caveats,
+and a narrow runtime follow-up.
+
+Do not add the VIR CPU profiler, internal counters, or an optimization here.
+The next change in this worktree should be one of:
 
 1. refresh an individual bounded runtime after its producer publishes a new
    complete package;
 2. publish and lock the existing immutable set archive; or
-3. import a stable VIR profiling conclusion into a report/card without adding
-   VIR-specific execution machinery.
+3. import an accepted/rejected producer-side optimization conclusion and
+   regenerate the report/card against its new immutable package.
 
 Do not generalize the benchmark engine to arbitrary Lean functions until a
 second real function supplies concrete requirements. The current
@@ -96,6 +111,10 @@ npm run report
 npm run campaign
 npm run cards
 ```
+
+`cards` also validates the committed VIR attribution against the report's exact
+runtime JS, Wasm, package, and Lean version. An older or unrelated report is
+rejected rather than silently receiving the imported conclusion.
 
 For a complete local refresh without publication:
 
@@ -126,3 +145,7 @@ in:
 /home/egallego/lean/vir/.worktrees/pr104-internal-counters/HANDOFF.md
 /home/egallego/lean/vir/.worktrees/pr104-internal-counters/docs/INTERPRETER_COUNTERS.md
 ```
+
+The separate producer-side MRU experiment is active in
+`/home/egallego/lean/vir/.worktrees/pr104-symbol-mru`. It currently has local
+changes; do not modify or clean that worktree from this application task.

@@ -17,6 +17,7 @@ this package.
 - run corpus, scaling, interaction, retained-memory, and repeated-call studies;
 - collect cold-start and isolated-runtime observations in fresh browser contexts;
 - aggregate multiple fresh browser processes and generate forwardable cards;
+- import a stable external attribution summary without embedding profiler code;
 - display reports and campaigns, and import/export their JSON representation.
 
 The slide deck is not part of this application. It may link here or present a
@@ -122,6 +123,13 @@ npm run cards
 and Markdown. `cards` turns the default report into VIR-001 through VIR-003.
 Both Python scripts use only the standard library; browser automation continues
 to use this package's Playwright dependency.
+
+VIR-002 also reads the committed
+`evidence/vir-pr104-runtime-call-profile.json`. This is a bounded, hash-identified
+summary of two external diagnostic captures against the locked VIR package; raw
+profiles and profiler machinery remain in the VIR producer worktree. Card
+generation rejects the attribution when its Lean version or bounded runtime JS,
+Wasm, and IR-package identities do not match the benchmark report.
 
 The complete local refresh is:
 
