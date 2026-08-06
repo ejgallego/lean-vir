@@ -7,30 +7,31 @@ structure HostCounter where
   enabled : Bool
 deriving Inhabited
 
-@[vir_js "test.bumpNat"]
+-- Bypass `@[vir_js]` so package generation still exercises its final fallback.
+@[extern "__vir_js:test.bumpNat"]
 opaque jsBumpNat (n : Nat) : Nat
 
-@[vir_js "test.bumpCounter"]
+@[extern "__vir_js:test.bumpCounter"]
 opaque jsBumpCounter (counter : HostCounter) : HostCounter
 
-@[vir_js "test.callbackResult"]
+@[extern "__vir_js:test.callbackResult"]
 opaque jsCallbackResult : Lean.Vir.RuntimeM (Unit → Lean.Vir.RuntimeM Unit)
 
-@[vir_js "test.nestedCallbackArg"]
+@[extern "__vir_js:test.nestedCallbackArg"]
 opaque jsNestedCallbackArg
     (callback : (Lean.Vir.Js Nat → Lean.Vir.RuntimeM Unit) → Lean.Vir.RuntimeM Unit) :
     Lean.Vir.RuntimeM Unit
 
-@[vir_js "test.arrayLength"]
+@[extern "__vir_js:test.arrayLength"]
 opaque jsArrayLength (arrayItems : Array (Lean.Vir.Js Nat)) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
-@[vir_js "test.listLength"]
+@[extern "__vir_js:test.listLength"]
 opaque jsListLength (listItems : List (Lean.Vir.Js Nat)) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
-@[vir_js "test.optionValue"]
+@[extern "__vir_js:test.optionValue"]
 opaque jsOptionValue (value : Option (Lean.Vir.Js Nat)) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
-@[vir_js "test.prodValue"]
+@[extern "__vir_js:test.prodValue"]
 opaque jsProdValue (value : Lean.Vir.Js Nat × Lean.Vir.Js Nat) : Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 
 def freshCustomBump (n : Nat) : Nat :=

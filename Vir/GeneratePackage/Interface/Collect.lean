@@ -7,7 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Vir.GeneratePackage.Closure
-public import Vir.GeneratePackage.Interface.Classify.Signature
+public import Vir.HostValidation
 public import Vir.InterfaceValidation
 
 public section
@@ -82,124 +82,6 @@ def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : Interf
 
 def boxedBoundaryDiagnostic (name : Name) : String :=
   s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
-
-def InterfaceType.isGenericJsResource : InterfaceType → Bool
-  | .resource name label => name == `Lean.Vir.Js && label == "Js"
-  | _ => false
-
-def InterfaceType.isLeanObjectHandle : InterfaceType → Bool
-  | .leanObject => true
-  | _ => false
-
-def InterfaceType.isExplicitConversionValue : InterfaceType → Bool
-  | .resource ..
-  | .function ..
-  | .leanObject => false
-  | _ => true
-
-def InterfaceType.hostBoundaryKind : InterfaceType → String
-  | .unit
-  | .nat
-  | .int
-  | .bool
-  | .string
-  | .float
-  | .float32
-  | .uint8
-  | .uint16
-  | .uint32
-  | .uint64
-  | .usize
-  | .byteArray
-  | .expr => "raw Lean type"
-  | .simpleEnum .. => "enum"
-  | .taggedUnion .. => "tagged union"
-  | .customInductive .. => "inductive"
-  | .structure .. => "structure"
-  | .recursiveSelf .. => "recursive type"
-  | .array .. => "array"
-  | .list .. => "list"
-  | .option .. => "option"
-  | .prod .. => "product"
-  | .resource .. => "resource"
-  | .function .. => "callback"
-  | .leanObject => "opaque Lean object"
-
-def InterfaceType.isHostResourceValueType : InterfaceType → Bool
-  | .unit => true
-  | .resource .. => true
-  | _ => false
-
-def InterfaceType.isHostResourceArgType : InterfaceType → Bool
-  | .function args result _ =>
-      args.all (fun (_, ty) => ty.isHostResourceValueType) && result.isHostResourceValueType
-  | ty => ty.isHostResourceValueType
-
-def InterfaceType.isHostResourceResultType (ty : InterfaceType) : Bool :=
-  ty.isHostResourceValueType
-
-def isJsValueConversionSignature
-    (args : Array InterfaceArg)
-    (result : InterfaceType)
-    (effect : InterfaceEffect) : Bool :=
-  if effect != .runtime then
-    false
-  else
-    match args[0]? with
-    | some arg =>
-        args.size == 1 &&
-          ((arg.type.isGenericJsResource && result.isExplicitConversionValue) ||
-            (arg.type.isExplicitConversionValue && result.isGenericJsResource))
-    | none => false
-
-def isLeanObjectHandleSignature
-    (target : String)
-    (args : Array InterfaceArg)
-    (result : InterfaceType)
-    (effect : InterfaceEffect) : Bool :=
-  if effect != .runtime then
-    false
-  else
-    match target, args[0]? with
-    | "js.leanRef", some arg => args.size == 1 && arg.type.isLeanObjectHandle && result.isGenericJsResource
-    | "js.leanRef.value", some arg => args.size == 1 && arg.type.isGenericJsResource && result.isLeanObjectHandle
-    | "js.leanRef.retain", some arg => args.size == 1 && arg.type.isGenericJsResource && result.isGenericJsResource
-    | "js.leanRef.release", some arg => args.size == 1 && arg.type.isGenericJsResource && result == .unit
-    | _, _ => false
-
-def hostBoundaryTypeDiagnostic (ty : InterfaceType) : String :=
-  s!"{ty.hostBoundaryKind} `{ty.label}` is not a JavaScript boundary type; use `Unit`, `Lean.Vir.Js ...`, `Lean.Vir.Js.Nullable ...`, top-level callback arguments, or explicit conversion calls"
-
-def hostImportArgBoundaryDiagnostic? (arg : InterfaceArg) : Option String :=
-  if arg.type.isHostResourceArgType then
-    none
-  else
-    some s!"unsupported JavaScript import argument `{arg.name}`: {hostBoundaryTypeDiagnostic arg.type}"
-
-def hostImportResultBoundaryDiagnostic? (result : InterfaceType) : Option String :=
-  if result.isHostResourceResultType then
-    none
-  else
-    some s!"unsupported JavaScript import result: {hostBoundaryTypeDiagnostic result}"
-
-def hostImportBoundary
-    (isExplicitConversion : Bool)
-    (target : String)
-    (args : Array InterfaceArg)
-    (result : InterfaceType)
-    (effect : InterfaceEffect) : Except String HostImportBoundary :=
-  if isExplicitConversion then
-    if isJsValueConversionSignature args result effect then
-      .ok .explicitConversion
-    else
-      .error s!"declaration is marked with `@[vir_js_explicit_conversion]`, but `{target}` does not convert between exactly one `Lean.Vir.Js ...` resource and one Lean value"
-  else if isLeanObjectHandleSignature target args result effect then
-    .ok .objectHandle
-  else
-    match args.findSome? hostImportArgBoundaryDiagnostic? <|>
-        hostImportResultBoundaryDiagnostic? result with
-    | some reason => .error reason
-    | none => .ok .hostResource
 
 def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except PackageDiagnostic InterfaceExport) := do
@@ -284,7 +166,7 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
       return .error {
         name := loaded.decl.name
         source := loaded.source
-        reason := s!"unsupported JavaScript import signature: {error.message}"
+        reason := Vir.HostValidation.HostImportValidationError.message (.signature error)
       }
   | .ok signature =>
     let expectedArity := signature.erasedPrefixArgs + signature.args.size +
@@ -295,14 +177,16 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
         source := loaded.source,
         reason := s!"JavaScript import IR arity mismatch: expected {expectedArity}, got {arity}"
       }
-    let isExplicitConversion := isVirJsExplicitConversionDecl loaded.decl
-    match hostImportBoundary
-        isExplicitConversion target signature.args signature.result signature.effect with
-    | .error reason =>
+    let marker := if isVirJsExplicitConversionDecl loaded.decl then
+      Vir.HostValidation.HostImportMarker.explicitConversion
+    else
+      .hostImport
+    match Vir.HostValidation.validateHostImportBoundary marker target signature with
+    | .error error =>
         return .error {
           name := loaded.decl.name,
           source := loaded.source,
-          reason
+          reason := error.message
         }
     | .ok boundary =>
         return .ok {

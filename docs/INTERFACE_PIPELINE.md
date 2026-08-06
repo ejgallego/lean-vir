@@ -237,6 +237,12 @@ its slot, Lean name, JavaScript target, host boundary mode (`hostResource`,
 `explicitConversion`, or `objectHandle`), generated WASM symbol, low-level IR arity,
 leading erased argument count, JavaScript-visible arguments, result type, and
 effect.
+
+`Vir.HostValidation` composes host-import signature classification with boundary
+policy. The host attributes run that analysis during declaration elaboration,
+while package generation reruns it for reached externs and additionally checks
+package-only IR arity and slot limits. This keeps declaration-time and
+raw-metadata fallback diagnostics on one typed path.
 The JSON manifest keeps the source-level effect classification for review and
 tooling: `pure`, `runtime`, `io`, `dom`, or `react`. The binary package
 summary stores only the runtime distinction the shim needs today: pure versus
