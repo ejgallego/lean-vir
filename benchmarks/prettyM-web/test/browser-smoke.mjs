@@ -101,8 +101,65 @@ try {
     await page.locator(".pretty-dashboard-overlay h2").textContent(),
     "Pretty-printer benchmark results",
   );
+  const dashboardFilters = page.locator(
+    ".pretty-dashboard-overlay input[data-backend-filter]",
+  );
+  assert.equal(await dashboardFilters.count(), 5);
+  for (const id of ["js", "vir", "vir-format", "llvm"]) {
+    await page
+      .locator(`.pretty-dashboard-overlay input[data-backend-filter="${id}"]`)
+      .uncheck();
+  }
+  assert.equal(
+    await page
+      .locator(".pretty-dashboard-overlay .pretty-backend-filter-summary")
+      .textContent(),
+    "1 of 5 selected",
+  );
+  assert.equal(
+    await page.locator('.pretty-dashboard-overview-chart rect[fill="#d879c6"]').count(),
+    1,
+  );
+  assert.equal(
+    await page.locator('.pretty-dashboard-overview-chart rect[fill="#74a9ff"]').count(),
+    0,
+  );
   await page
     .locator(".pretty-dashboard-overlay header button", { hasText: "Close" })
+    .click();
+  await page.locator(".report-card button", { hasText: "View report" }).click();
+  await page.locator(".pretty-corpus-overlay").waitFor({ state: "visible" });
+  assert.equal(
+    await page
+      .locator('.pretty-corpus-overlay input[data-backend-filter="native"]')
+      .isChecked(),
+    true,
+  );
+  assert.equal(
+    await page
+      .locator('.pretty-corpus-overlay input[data-backend-filter="js"]')
+      .isChecked(),
+    false,
+  );
+  assert.equal(
+    await page.locator('tr[data-pretty-backend="native"]:visible').count(),
+    2,
+  );
+  assert.equal(
+    await page.locator('tr[data-pretty-backend="js"]:visible').count(),
+    0,
+  );
+  await page
+    .locator(".pretty-corpus-overlay .pretty-backend-filter-actions button")
+    .click();
+  assert.equal(
+    await page
+      .locator(".pretty-corpus-overlay .pretty-backend-filter-summary")
+      .textContent(),
+    "5 of 5 selected",
+  );
+  await page
+    .locator(".pretty-corpus-overlay header button", { hasText: "Close" })
     .click();
   assert.deepEqual(pageErrors, []);
   await browser.close();

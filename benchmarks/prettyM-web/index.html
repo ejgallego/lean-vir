@@ -19,12 +19,12 @@
     <main class="bench-shell">
       <header class="bench-header">
         <div>
-          <p class="bench-eyebrow">Lean 4.32 · browser Wasm comparison</p>
+          <p class="bench-eyebrow">Bounded runtimes · browser Wasm</p>
           <h1>Std.Format.prettyM benchmark</h1>
           <p class="bench-intro">
-            Correctness, phase timings, input scaling, and retained memory
-            across five implementations. This application runs independently of
-            the presentation deck.
+            Compare correctness, pipeline timings, scaling, and retained memory
+            across five independently versioned implementations. Reports stay
+            tied to one verified artifact set.
           </p>
         </div>
         <div class="bench-state" aria-live="polite">
@@ -40,8 +40,8 @@
             <h2 id="backend-heading">Backend set</h2>
           </div>
           <p>
-            Every selected backend receives the same compact Format value and
-            column budget.
+            Choose which implementations participate in the next run. Report
+            views have their own non-destructive backend filter.
           </p>
         </div>
         <div id="backend-list" class="backend-grid" aria-live="polite"></div>
@@ -54,8 +54,8 @@
             <h2 id="protocol-heading">Sampling controls</h2>
           </div>
           <p>
-            Defaults match the consolidated browser study; quick check is
-            intentionally tiny.
+            Defaults match the consolidated browser study. Treat timings as
+            observations unless the host and run protocol are controlled.
           </p>
         </div>
         <div class="protocol-grid">

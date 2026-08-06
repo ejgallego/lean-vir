@@ -18,7 +18,10 @@ this package.
 - collect cold-start and isolated-runtime observations in fresh browser contexts;
 - aggregate multiple fresh browser processes and generate forwardable cards;
 - import a stable external attribution summary without embedding profiler code;
-- display reports and campaigns, and import/export their JSON representation.
+- display reports and campaigns with a shared, non-destructive backend filter;
+  and
+- import/export the complete JSON representation independently of the active
+  presentation filter.
 
 The slide deck is not part of this application. It may link here or present a
 recorded report, but benchmark execution does not initialize Reveal or use
@@ -87,6 +90,10 @@ Open <http://127.0.0.1:18334>. The included server supplies the cross-origin
 isolation headers required by threaded LLVM Wasm. `_headers` and `.htaccess`
 files are included at the root of `dist/` for static hosts; configure equivalent
 headers when the hosting platform does not consume either format.
+
+Backend selection in the report dashboard is presentation-only. The same
+selection follows the corpus, scaling, memory, repeated-call, and interaction
+views, while downloaded JSON always retains every backend in the source report.
 
 Run the browser regression with:
 

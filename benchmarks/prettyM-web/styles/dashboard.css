@@ -1,10 +1,15 @@
 .pretty-corpus-overlay button {
-  padding: 0.25rem 0.5rem;
+  min-height: 2rem;
+  padding: 0.3rem 0.6rem;
   color: inherit;
-  background: #30343a;
-  border: 1px solid rgba(180, 180, 180, 0.35);
-  border-radius: 0.25rem;
+  background: #29313d;
+  border: 1px solid #465466;
+  border-radius: 0.38rem;
   cursor: pointer;
+}
+
+body:has(.pretty-corpus-overlay) {
+  overflow: hidden;
 }
 
 .pretty-controls button:disabled {
@@ -37,13 +42,16 @@
   z-index: 1100;
   overflow: auto;
   box-sizing: border-box;
-  padding: 1rem 1.2rem 1.5rem;
-  color: #ddd;
-  background: rgba(24, 26, 30, 0.985);
-  border: 1px solid rgba(180, 180, 180, 0.4);
-  border-radius: 0.5rem;
-  box-shadow: 0 0.5rem 2rem rgba(0, 0, 0, 0.6);
-  font: 0.82rem/1.4 sans-serif;
+  padding: 1rem 1.25rem 2rem;
+  color: #e5eaf0;
+  background:
+    radial-gradient(circle at 100% 0, rgba(70, 119, 176, 0.14), transparent 28rem),
+    rgba(18, 21, 27, 0.992);
+  border: 1px solid #3e4857;
+  border-radius: 0.8rem;
+  box-shadow: 0 1rem 4rem rgba(0, 0, 0, 0.72);
+  font: 0.82rem/1.45 Inter, ui-sans-serif, system-ui, sans-serif;
+  overscroll-behavior: contain;
   text-align: left;
 }
 
@@ -55,10 +63,11 @@
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
-  margin: -1rem -1.2rem 0.8rem;
-  padding: 0.8rem 1.2rem;
-  background: #181a1e;
-  border-bottom: 1px solid rgba(180, 180, 180, 0.25);
+  margin: -1rem -1.25rem 0.9rem;
+  padding: 0.85rem 1.25rem;
+  background: rgba(18, 21, 27, 0.97);
+  border-bottom: 1px solid #343d4a;
+  backdrop-filter: blur(14px);
 }
 
 .pretty-corpus-overlay > header h2,
@@ -71,7 +80,8 @@
 }
 
 .pretty-corpus-overlay > header h2 {
-  font-size: 1.15rem;
+  font-size: 1.2rem;
+  letter-spacing: -0.015em;
 }
 
 .pretty-corpus-overlay > header > div {
@@ -80,18 +90,29 @@
 }
 
 .pretty-corpus-overlay h3 {
-  margin-top: 1.1rem;
-  font-size: 0.95rem;
+  margin-top: 1.35rem;
+  font-size: 0.98rem;
+  letter-spacing: -0.01em;
 }
 
 .pretty-corpus-result {
-  margin: 0.4rem 0;
+  margin: 0.45rem 0;
+  padding: 0.55rem 0.7rem;
+  background: rgba(118, 189, 134, 0.07);
+  border: 1px solid rgba(118, 189, 134, 0.18);
+  border-radius: 0.45rem;
   font-weight: 600;
 }
 
+.pretty-corpus-result.status-fail {
+  background: rgba(223, 116, 120, 0.07);
+  border-color: rgba(223, 116, 120, 0.22);
+}
+
 .pretty-corpus-note {
-  margin: 0.35rem 0;
-  color: #aaa;
+  max-width: 90rem;
+  margin: 0.45rem 0;
+  color: #a7b0bc;
   font-size: 0.78rem;
 }
 
@@ -104,10 +125,26 @@
 
 .pretty-corpus-overlay th,
 .pretty-corpus-overlay td {
-  padding: 0.28rem 0.42rem;
+  padding: 0.38rem 0.48rem;
   border-bottom: 1px solid rgba(180, 180, 180, 0.18);
   text-align: right;
   white-space: nowrap;
+}
+
+.pretty-corpus-overlay th {
+  color: #b9c5d2;
+  background: rgba(255, 255, 255, 0.025);
+  font-size: 0.72rem;
+  letter-spacing: 0.025em;
+  text-transform: uppercase;
+}
+
+.pretty-corpus-overlay tr:not(:first-child):hover > td {
+  background: rgba(122, 169, 220, 0.055);
+}
+
+.pretty-corpus-overlay [hidden] {
+  display: none !important;
 }
 
 .pretty-corpus-overlay th:first-child,
@@ -148,19 +185,16 @@
   max-height: 20rem;
   margin: 0.35rem 0 0.75rem;
   color: #bbb;
-  background: rgba(255, 255, 255, 0.025);
+  background: rgba(255, 255, 255, 0.018);
   border: 1px solid rgba(180, 180, 180, 0.14);
   border-radius: 0.3rem;
 }
 
 .pretty-scaling-phase-control {
-  position: sticky;
-  top: 3.2rem;
-  z-index: 1;
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  margin: 0.4rem 0 0.2rem;
+  margin: 0;
   padding: 0.35rem 0.5rem;
   background: #25282d;
   border: 1px solid rgba(180, 180, 180, 0.25);
@@ -175,25 +209,32 @@
   border-radius: 0.2rem;
 }
 
-.pretty-interaction-controls {
+.pretty-interaction-controls,
+.pretty-report-controls {
   position: sticky;
-  top: 3.2rem;
+  top: 3.4rem;
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
   gap: 0.7rem;
-  width: fit-content;
-  margin: 0.4rem 0 0.2rem;
-  padding: 0.35rem 0.5rem;
-  background: #25282d;
-  border: 1px solid rgba(180, 180, 180, 0.25);
-  border-radius: 0.3rem;
+  width: 100%;
+  margin: 0.65rem 0 0.8rem;
+  padding: 0.55rem 0.65rem;
+  background: rgba(32, 38, 47, 0.97);
+  border: 1px solid #3c4858;
+  border-radius: 0.55rem;
+  box-shadow: 0 0.4rem 1rem rgba(0, 0, 0, 0.24);
+  backdrop-filter: blur(12px);
 }
 
 .pretty-interaction-controls label {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
+}
+
+.pretty-report-controls > label {
+  flex: 0 0 auto;
 }
 
 .pretty-interaction-controls select {
@@ -239,7 +280,7 @@
 
 .pretty-dashboard-controls {
   position: sticky;
-  top: 3.15rem;
+  top: 3.4rem;
   z-index: 1;
   display: flex;
   flex-wrap: wrap;
@@ -247,9 +288,9 @@
   gap: 0.6rem;
   margin: 0.55rem 0 0.8rem;
   padding: 0.55rem 0.65rem;
-  background: rgba(37, 40, 45, 0.98);
-  border: 1px solid rgba(180, 180, 180, 0.25);
-  border-radius: 0.4rem;
+  background: rgba(32, 38, 47, 0.97);
+  border: 1px solid #3c4858;
+  border-radius: 0.55rem;
   box-shadow: 0 0.3rem 0.8rem rgba(0, 0, 0, 0.25);
 }
 
@@ -268,27 +309,85 @@
   border-radius: 0.25rem;
 }
 
-.pretty-dashboard-backends {
+.pretty-dashboard-backends,
+.pretty-backend-filter {
   display: flex;
   flex: 1 1 24rem;
   flex-wrap: wrap;
   gap: 0.35rem 0.75rem;
   min-width: 16rem;
   margin: 0;
-  padding: 0.25rem 0.45rem 0.4rem;
-  border: 1px solid rgba(180, 180, 180, 0.2);
-  border-radius: 0.3rem;
+  padding: 0.3rem 0.5rem 0.48rem;
+  border: 1px solid #475466;
+  border-radius: 0.45rem;
 }
 
-.pretty-dashboard-backends legend {
+.pretty-dashboard-backends legend,
+.pretty-backend-filter legend {
   padding: 0 0.25rem;
-  color: #bbb;
+  color: #b5c0ce;
+  font-size: 0.72rem;
+  font-weight: 650;
+  letter-spacing: 0.035em;
+  text-transform: uppercase;
 }
 
 .pretty-dashboard-backend {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
+  white-space: nowrap;
+}
+
+.pretty-backend-filter-options {
+  display: flex;
+  flex: 1 1 auto;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+
+.pretty-backend-filter-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.32rem;
+  min-height: 1.9rem;
+  padding: 0.18rem 0.48rem;
+  color: #aab4c1;
+  background: rgba(10, 13, 18, 0.38);
+  border: 1px solid #3e4855;
+  border-radius: 999px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.pretty-backend-filter-option:has(input:checked) {
+  color: #edf2f7;
+  background: rgba(100, 145, 198, 0.12);
+  border-color: #60758f;
+}
+
+.pretty-backend-filter-option input {
+  width: 0.85rem;
+  height: 0.85rem;
+  margin: 0;
+  accent-color: #8cbbea;
+}
+
+.pretty-backend-filter-actions {
+  display: flex;
+  align-items: center;
+}
+
+.pretty-backend-filter-actions button {
+  min-height: 1.9rem;
+  padding: 0.2rem 0.5rem;
+  font-size: 0.72rem;
+}
+
+.pretty-backend-filter-summary {
+  align-self: center;
+  color: #96a2b0;
+  font-size: 0.7rem;
   white-space: nowrap;
 }
 
@@ -315,7 +414,8 @@
     rgba(255, 255, 255, 0.025)
   );
   border: 1px solid rgba(140, 170, 215, 0.22);
-  border-radius: 0.45rem;
+  border-radius: 0.55rem;
+  box-shadow: 0 0.55rem 1.5rem rgba(0, 0, 0, 0.12);
 }
 
 .pretty-dashboard-card h3 {
@@ -347,7 +447,7 @@
   color: #bbb;
   background: rgba(255, 255, 255, 0.025);
   border: 1px solid rgba(180, 180, 180, 0.14);
-  border-radius: 0.35rem;
+  border-radius: 0.5rem;
 }
 
 .pretty-dashboard-chart text {
@@ -422,11 +522,43 @@
     position: static;
   }
 
+  .pretty-report-controls,
+  .pretty-interaction-controls {
+    position: static;
+  }
+
   .pretty-dashboard-chart {
     min-width: 42rem;
   }
 
   .pretty-dashboard-scaling-grid {
     overflow-x: auto;
+  }
+}
+
+@media (max-width: 680px) {
+  .pretty-corpus-overlay {
+    inset: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .pretty-corpus-overlay > header {
+    align-items: flex-start;
+  }
+
+  .pretty-corpus-overlay > header > div {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
+
+  .pretty-dashboard-controls,
+  .pretty-report-controls,
+  .pretty-interaction-controls {
+    align-items: stretch;
+  }
+
+  .pretty-backend-filter {
+    min-width: 100%;
   }
 }
