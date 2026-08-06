@@ -5,6 +5,7 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
+    "artifacts:build": "node scripts/build-artifacts.mjs",
     "artifacts:pack": "node scripts/pack-artifact-set.mjs",
     "artifacts:fetch": "node scripts/fetch-artifact-set.mjs",
     "stage": "bash scripts/stage-artifacts.sh",

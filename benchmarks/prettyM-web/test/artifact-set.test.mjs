@@ -8,12 +8,64 @@ import {
   canonicalJson,
   createTar,
   extractTar,
+  requiredArtifactFiles,
   safeArchivePath,
   verifyArtifactSet,
 } from "../scripts/artifact-set-lib.mjs";
+import {
+  artifactSetConfig,
+  checkoutSources,
+  componentOrder,
+  readBuildDatabase,
+} from "../scripts/artifact-build-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const scratch = join(appRoot, "test-results", "artifact-set-unit");
+
+test("the prettyM source build is complete and materializes pack provenance", async () => {
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
+  const build = database.builds.prettyM;
+  assert.deepEqual(componentOrder(build), ["vir", "native", "llvm"]);
+  assert.deepEqual(
+    Object.values(build.components)
+      .flatMap((component) => Object.values(component.producer.files))
+      .sort(),
+    [...requiredArtifactFiles].sort(),
+  );
+
+  const sources = checkoutSources(database, "prettyM");
+  assert.equal(
+    sources.vir.revision,
+    "64e30784da16957cca92951344d776f895b30491",
+  );
+  assert.equal(
+    sources.fir.revision,
+    "4404aba07aa90fb96dc43b5ca056ca38a32fd4bc",
+  );
+  assert.equal(
+    sources.workload.revision,
+    "ff1dc854f00a0cdd9e90a2489166028a07ae95bb",
+  );
+
+  const config = artifactSetConfig(database, "prettyM");
+  assert.equal(config.setId, "prettyM-bounded-set-0001");
+  assert.equal(
+    config.components.vir.runtime.repository,
+    "https://github.com/ejgallego/lean-vir",
+  );
+  assert.equal(
+    config.components.vir.runtime.sourceCommit,
+    sources.vir.revision,
+  );
+  assert.deepEqual(config.components.vir.workload.source, {
+    repository: "https://github.com/leanprover/verso-slides",
+    commit: sources.workload.revision,
+    file: "VersoSlides/Pretty.lean",
+    dirty: false,
+  });
+});
 
 test("creates a deterministic normalized tar and extracts only regular files", async () => {
   const source = join(scratch, "source");
@@ -31,7 +83,10 @@ test("creates a deterministic normalized tar and extracts only regular files", a
     "nested/a.txt",
     "z.txt",
   ]);
-  assert.equal(await readFile(join(extracted, "nested", "a.txt"), "utf8"), "first\n");
+  assert.equal(
+    await readFile(join(extracted, "nested", "a.txt"), "utf8"),
+    "first\n",
+  );
   assert.equal(await readFile(join(extracted, "z.txt"), "utf8"), "last\n");
 });
 
@@ -69,8 +124,5 @@ test("rejects undeclared artifact-set members", async () => {
   );
   await writeFile(join(directory, "SHA256SUMS"), "");
   await writeFile(join(directory, "surprise.txt"), "not declared\n");
-  await assert.rejects(
-    () => verifyArtifactSet(directory),
-    /unexpected member/,
-  );
+  await assert.rejects(() => verifyArtifactSet(directory), /unexpected member/);
 });
