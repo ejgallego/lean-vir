@@ -116,6 +116,7 @@ npm run check:native-externs
 npm run check:native-wrappers
 npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
 npm run render:surface -- build/vir-surface/lean-libraries.json build/vir-surface/html
+npm run compare:surface -- control.json candidate.json delta.json delta.md
 ```
 
 Package generation and inspection:

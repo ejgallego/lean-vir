@@ -92,6 +92,36 @@ Run the focused schema and closure-invariant check with:
 npm run test:surface
 ```
 
+## Comparing Runtime Experiments
+
+Compare scans from control and candidate worktrees with:
+
+```bash
+npm run compare:surface -- \
+  /path/to/control.json \
+  /path/to/candidate.json \
+  build/vir-surface/delta.json \
+  build/vir-surface/delta.md
+```
+
+The comparator requires the same report version, Lean git hash, selected module
+set, and declaration universe. A runtime experiment may change the native
+capability registry, but not the Lean library being measured. This strictness
+keeps source changes from being misreported as runtime coverage changes.
+
+The delta JSON records the exact newly runnable and regressed declarations,
+module/folder/library rollups, native-capability and extern-status transitions, and
+blocked functions whose nearest boundary changed. The Markdown companion is a
+compact review summary. In particular, a current primary-blocker count is only
+an upper bound: satisfying that boundary may reveal another one. Only the A/B
+delta's `newlyRunnable` set measures the benefit actually delivered by the
+candidate runtime.
+
+For a size experiment, pair this delta with the Wasm size report for the same
+control and candidate artifacts. Review the added native capabilities, exact
+new function set, module distribution, regressions, and byte increase together;
+none of those numbers alone is a sufficient acceptance signal.
+
 ## Interactive HTML Report
 
 Render any JSON scan as a static browser report:
