@@ -64,10 +64,10 @@ result surface.
 After Lean compiles a declaration, both markers reject private or non-executable
 declarations and unavailable dependencies that Lean can see in the compiled
 closure. `@[vir_export]` additionally rejects erased, implicit, and instance
-binders; the stricter startup signature is checked as described above. Closure
-errors include the path from the marked declaration to the blocker, so a local
-helper that reaches an unregistered primitive such as `IO.getEnv` fails at its
-declaration.
+binders and unsupported JavaScript interface types or runtime layouts; the
+stricter startup signature is checked as described above. Closure errors include
+the path from the marked declaration to the blocker, so a local helper that
+reaches an unregistered primitive such as `IO.getEnv` fails at its declaration.
 
 Lean module imports normally expose dependency IR as opaque extern declarations.
 At such a boundary, the attribute does not guess: it identifies the dependency
@@ -76,8 +76,8 @@ owning module recorded by Lean, imports that module's compiled IR, and emits
 only the reached declarations into a dependency member. If the dependency
 still has no compiled body, generation reports the original root-to-boundary
 path. When `compiler.postponeCompile` is enabled, disable it for package inputs
-so Lean can produce the required IR. The facet remains responsible for final
-interface layouts and generated boxed boundaries.
+so Lean can produce the required IR. The facet remains responsible for
+raw-marker fallback, generated boxed boundaries, and package-wide constraints.
 
 Only declarations marked in the requested module are selected. Imported
 declarations are not implicitly re-exported. A marked build with no matching

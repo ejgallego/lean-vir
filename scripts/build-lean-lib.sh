@@ -27,6 +27,7 @@ stale_layouts=(
   "$out/$stale_flat_root.olean"
   "$out/$stale_flat_root.ilean"
   "$out/$stale_namespace_root/$stale_module_root"
+  "$out/Vir/GeneratePackage/Interface/Classify"
 )
 rm -rf \
   "${stale_layouts[@]}"
@@ -60,16 +61,18 @@ build_module() {
 }
 
 build_module Vir/GeneratePackage/NativeExterns.lean
+build_module Vir/HostMetadata.lean
 build_module Vir/IRDependencies.lean
 build_module Vir/ExportValidation.lean
 build_module Vir/InterfaceValidation.lean
+build_module Vir/Interface/Model.lean
 build_module Vir/GeneratePackage/Basic.lean
 build_module Vir/GeneratePackage/Json.lean
 build_module Vir/GeneratePackage/Interface/Encode.lean
-build_module Vir/GeneratePackage/Interface/Classify/Error.lean
-build_module Vir/GeneratePackage/Interface/Classify/Basic.lean
-build_module Vir/GeneratePackage/Interface/Classify/Core.lean
-build_module Vir/GeneratePackage/Interface/Classify/Signature.lean
+build_module Vir/Interface/Classify/Error.lean
+build_module Vir/Interface/Classify/Basic.lean
+build_module Vir/Interface/Classify/Core.lean
+build_module Vir/Interface/Classify/Signature.lean
 build_module Vir/HostValidation.lean
 build_module Vir/Attributes.lean
 build_module Vir/Host.lean

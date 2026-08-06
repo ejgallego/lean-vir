@@ -94,6 +94,13 @@ Add `--json` to emit the parsed package header and full embedded manifest.
 
 ## Interface Value Codec Surface
 
+Lean declarations marked with `@[vir_export]` run the shared typed
+`Vir.Interface.analyzeExportInterface` analysis after the declaration is
+compiled, so unsupported binders, result types, and runtime layouts are reported
+at the attribute site. Package generation runs the same analysis for explicit
+roots and raw marker metadata, then adds package-only closure, boxed-boundary,
+IR arity, slot, and duplicate-name checks.
+
 The embedded manifest currently supports:
 
 - `Unit`;

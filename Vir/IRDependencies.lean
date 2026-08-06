@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 module
 
 public import Lean.Compiler.IR.CompilerM
+public import Vir.HostMetadata
 
 public section
 
@@ -15,6 +16,7 @@ open Lean
 namespace Vir.GeneratePackage
 
 open Lean.IR
+open Vir.HostMetadata
 
 /-!
 # Shared VIR dependency analysis
@@ -25,40 +27,19 @@ Package collection and attribute-time validation intentionally keep separate
 closure walkers because only the latter can encounter opaque imported IR.
 -/
 
-private def jsExternPrefix : String := "__vir_js:"
-
-private def jsExplicitConversionExternPrefix : String := "__vir_js_explicit_conversion:"
-
-private def externTargetWithPrefix? (pfx symbol : String) : Option String :=
-  if symbol.startsWith pfx then
-    some (symbol.drop pfx.length).toString
-  else
-    none
-
-private def virJsTargetFromExternData? (data : ExternAttrData) : Option String :=
+private def virJsMetadataFromExternData? (data : ExternAttrData) : Option HostImportMetadata :=
   data.entries.findSome? fun entry =>
     match entry with
-    | .standard _ symbol =>
-        externTargetWithPrefix? jsExternPrefix symbol <|>
-          externTargetWithPrefix? jsExplicitConversionExternPrefix symbol
+    | .standard _ symbol => decodeExternSymbol? symbol
     | _ => none
 
-def virJsTargetFromDecl? : Decl → Option String
-  | .extern _ _ _ data => virJsTargetFromExternData? data
+/-- Decode VIR JavaScript host metadata from a compiled declaration. -/
+def virJsMetadataFromDecl? : Decl → Option HostImportMetadata
+  | .extern _ _ _ data => virJsMetadataFromExternData? data
   | _ => none
 
 def isVirJsDecl (decl : Decl) : Bool :=
-  virJsTargetFromDecl? decl |>.isSome
-
-private def virJsExplicitConversionTargetFromExternData? (data : ExternAttrData) : Option String :=
-  data.entries.findSome? fun entry =>
-    match entry with
-    | .standard _ symbol => externTargetWithPrefix? jsExplicitConversionExternPrefix symbol
-    | _ => none
-
-def isVirJsExplicitConversionDecl : Decl → Bool
-  | .extern _ _ _ data => virJsExplicitConversionTargetFromExternData? data |>.isSome
-  | _ => false
+  (virJsMetadataFromDecl? decl).isSome
 
 def isOpaqueExternDecl : Decl → Bool
   | .extern _ _ _ { entries := [.opaque] } => true

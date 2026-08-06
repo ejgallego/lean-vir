@@ -8,26 +8,21 @@ module
 
 public import Lean.Compiler.LCNF.Main
 public import Lean.Compiler.LCNF.ToImpureType
-public import Vir.GeneratePackage.Interface.Classify.Error
-public import Vir.GeneratePackage.Interface.Encode
+public import Vir.Interface.Classify.Error
+public import Vir.Interface.Model
 public import Vir.InterfaceValidation
 
 public section
 
 open Lean
 
-namespace Vir.GeneratePackage
+namespace Vir.Interface
 
 open Lean.IR
 open Vir.InterfaceValidation
 
-partial def InterfaceType.needsBoxedCallBoundary : InterfaceType → Bool
-  | .float | .float32 | .uint64 => true
-  | .structure _ _ (some idx) _ _ _ fields =>
-      match fields[idx]? with
-      | some (_, fieldType, _, _) => fieldType.needsBoxedCallBoundary
-      | none => false
-  | _ => false
+/-- Aggregate applications already visited while classifying recursive interface types. -/
+abbrev RecursiveSeen := Array (Name × String)
 
 def InterfaceEffect.ofEffectKind : Vir.InterfaceValidation.EffectKind → InterfaceEffect
   | .runtime => .runtime
@@ -247,4 +242,4 @@ def isRuntimeErasedTypeBinder (domain : Lean.Expr) : Bool :=
   | .sort _ => true
   | _ => false
 
-end Vir.GeneratePackage
+end Vir.Interface

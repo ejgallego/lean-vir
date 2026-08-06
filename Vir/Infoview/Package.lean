@@ -227,8 +227,12 @@ end
 def declInfoHash (info : DeclInfo) : UInt64 :=
   hashOption (hash "DeclInfo") info.sorryDep? hash
 
-def externTargetHash (decl : Decl) : UInt64 :=
-  hashOption (hash "ExternTarget") (Vir.GeneratePackage.virJsTargetFromDecl? decl) hash
+private def hostImportMetadataHash (metadata : Vir.HostMetadata.HostImportMetadata) : UInt64 :=
+  mixHash (hash metadata.marker.attributeName) (hash metadata.target)
+
+private def virExternMetadataHash (decl : Decl) : UInt64 :=
+  hashOption (hash "VirExternMetadata")
+    (Vir.GeneratePackage.virJsMetadataFromDecl? decl) hostImportMetadataHash
 
 def irDeclHash : Decl → UInt64
   | .fdecl name params resultType body info =>
@@ -239,7 +243,7 @@ def irDeclHash : Decl → UInt64
       let decl := Decl.extern name params resultType ext
       mixHash
         (hashArray (mixHash (mixHash (hash "Decl.extern") (hash name)) (irTypeHash resultType)) params paramHash)
-        (externTargetHash decl)
+        (virExternMetadataHash decl)
 
 def closureIRHash (closure : Vir.GeneratePackage.Closure) : UInt64 :=
   let decls := closure.decls.qsort fun lhs rhs => lhs.decl.name.toString < rhs.decl.name.toString

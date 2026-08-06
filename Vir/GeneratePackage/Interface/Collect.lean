@@ -17,6 +17,7 @@ open Lean
 namespace Vir.GeneratePackage
 
 open Lean.IR
+open Vir.Interface
 
 def DeclIndex.envForSource? (index : DeclIndex) (source : String) : Option Environment :=
   index.envs.findSome? fun (candidate, env) =>
@@ -77,10 +78,21 @@ def jsNameFor (n : Name) : String :=
   let sanitized := text.map sanitizeJsNameChar
   if sanitized.isEmpty then "entry" else sanitized
 
-def interfaceNeedsBoxedCallBoundary (args : Array InterfaceArg) (result : InterfaceType) : Bool :=
-  args.any (fun arg => arg.type.needsBoxedCallBoundary) || result.needsBoxedCallBoundary
+private partial def interfaceTypeNeedsBoxedCallBoundary : InterfaceType → Bool
+  | .float | .float32 | .uint64 => true
+  | .structure _ _ (some idx) _ _ _ fields =>
+      match fields[idx]? with
+      | some (_, fieldType, _, _) => interfaceTypeNeedsBoxedCallBoundary fieldType
+      | none => false
+  | _ => false
 
-def boxedBoundaryDiagnostic (name : Name) : String :=
+/-- Whether a classified export needs the generated boxed interpreter boundary. -/
+def interfaceNeedsBoxedCallBoundary
+    (args : Array InterfaceArg) (result : InterfaceType) : Bool :=
+  args.any (fun arg => interfaceTypeNeedsBoxedCallBoundary arg.type) ||
+    interfaceTypeNeedsBoxedCallBoundary result
+
+private def boxedBoundaryDiagnostic (name : Name) : String :=
   s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
 
 def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
@@ -111,12 +123,9 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
                     effect := InterfaceEffect.ofStartupEffect signature.effect
                   })
             else
-              match ← Vir.InterfaceValidation.analyzeExportSignature info.type with
+              match ← analyzeExportInterface info.type with
               | .error error => pure (.error { name, source, reason := error.message })
-              | .ok signature =>
-                  match ← classifyExportSignature signature with
-                  | .error error => pure (.error { name, source, reason := error.message })
-                  | .ok signature => pure (.ok signature)
+              | .ok signature => pure (.ok signature)
           match classified with
           | .ok signature =>
               if interfaceNeedsBoxedCallBoundary signature.args signature.result &&
@@ -151,8 +160,9 @@ def declParamCount : Decl → Nat
 
 def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
     CoreM (Except PackageDiagnostic HostImport) := do
-  let some target := virJsTargetFromDecl? loaded.decl
-    | return .error { name := loaded.decl.name, source := loaded.source, reason := "declaration is not a Vir JavaScript import" }
+  let some hostMetadata := virJsMetadataFromDecl? loaded.decl
+    | return .error { name := loaded.decl.name, source := loaded.source, reason := "declaration is not a VIR JavaScript import" }
+  let target := hostMetadata.target
   if slot >= maxHostImportSlots then
     return .error { name := loaded.decl.name, source := loaded.source, reason := s!"too many JavaScript imports; current package format supports at most {maxHostImportSlots}" }
   let arity := declParamCount loaded.decl
@@ -161,14 +171,15 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
   let env ← getEnv
   let some info := env.find? loaded.decl.name
     | return .error { name := loaded.decl.name, source := loaded.source, reason := "missing elaborated Lean declaration for JavaScript import" }
-  match ← classifyHostImportSignature info.type with
+  match ← Vir.HostValidation.analyzeHostImport hostMetadata.marker target info.type with
   | .error error =>
       return .error {
         name := loaded.decl.name
         source := loaded.source
-        reason := Vir.HostValidation.HostImportValidationError.message (.signature error)
+        reason := error.message
       }
-  | .ok signature =>
+  | .ok analysis =>
+    let signature := analysis.signature
     let expectedArity := signature.erasedPrefixArgs + signature.args.size +
       if signature.effect.isEffectful then 1 else 0
     if arity != expectedArity then
@@ -177,31 +188,19 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
         source := loaded.source,
         reason := s!"JavaScript import IR arity mismatch: expected {expectedArity}, got {arity}"
       }
-    let marker := if isVirJsExplicitConversionDecl loaded.decl then
-      Vir.HostValidation.HostImportMarker.explicitConversion
-    else
-      .hostImport
-    match Vir.HostValidation.validateHostImportBoundary marker target signature with
-    | .error error =>
-        return .error {
-          name := loaded.decl.name,
-          source := loaded.source,
-          reason := error.message
-        }
-    | .ok boundary =>
-        return .ok {
-          slot,
-          name := loaded.decl.name,
-          source := loaded.source,
-          target,
-          boundary,
-          symbol := hostImportSymbol slot arity,
-          arity,
-          erasedPrefixArgs := signature.erasedPrefixArgs,
-          args := signature.args,
-          result := signature.result,
-          effect := signature.effect
-        }
+    return .ok {
+      slot,
+      name := loaded.decl.name,
+      source := loaded.source,
+      target,
+      boundary := analysis.boundary,
+      symbol := hostImportSymbol slot arity,
+      arity,
+      erasedPrefixArgs := signature.erasedPrefixArgs,
+      args := signature.args,
+      result := signature.result,
+      effect := signature.effect
+    }
 
 def runCoreForSource (source : String) (env : Environment) (x : CoreM α) : IO α :=
   x.toIO'

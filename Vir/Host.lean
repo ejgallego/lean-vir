@@ -36,12 +36,6 @@ syntax (name := vir_js_explicit_conversion) "vir_js_explicit_conversion " str : 
 
 namespace Lean.Vir
 
-/-- Prefix used internally to encode `@[vir_js]` targets in Lean extern metadata. -/
-def jsExternPrefix : String := "__vir_js:"
-
-/-- Prefix used internally to encode explicit conversion host imports. -/
-def jsExplicitConversionExternPrefix : String := "__vir_js_explicit_conversion:"
-
 /-- Metadata stored for a declaration marked with `@[vir_js]`. -/
 structure JsImport where
   /-- JavaScript host target name, such as `"browser.document.getTitle"`. -/
@@ -61,7 +55,7 @@ private def parseNonEmptyStringAttr (attrName : Name) (stx : Syntax) : AttrM Str
   return value
 
 private def validateVirJsAttr
-    (marker : Vir.HostValidation.HostImportMarker) (declName : Name)
+    (marker : Vir.HostMetadata.HostImportMarker) (declName : Name)
     (data : JsImport) (stx : Syntax) :
     AttrM Unit := do
   let env ← getEnv
@@ -75,14 +69,11 @@ private def validateVirJsAttr
   | .ok _ => pure ()
 
 private def setVirJsExtern
-    (marker : Vir.HostValidation.HostImportMarker) (declName : Name) (data : JsImport) :
+    (marker : Vir.HostMetadata.HostImportMarker) (declName : Name) (data : JsImport) :
     AttrM Unit := do
   let env ← getEnv
-  let externPrefix := match marker with
-    | .hostImport => jsExternPrefix
-    | .explicitConversion => jsExplicitConversionExternPrefix
   let externData : ExternAttrData := {
-    entries := [ExternEntry.standard `all (externPrefix ++ data.target)]
+    entries := [ExternEntry.standard `all (marker.externSymbol data.target)]
   }
   match externAttr.setParam env declName externData with
   | .ok env => setEnv env
@@ -94,7 +85,7 @@ swallows `ParametricAttribute.afterSet` exceptions, so user-facing checks and
 extern installation must happen in this propagating phase.
 -/
 private def parseVirJsAttr
-    (marker : Vir.HostValidation.HostImportMarker)
+    (marker : Vir.HostMetadata.HostImportMarker)
     (declName : Name) (stx : Syntax) : AttrM JsImport := do
   let target ← parseNonEmptyStringAttr marker.attributeName stx
   let data := { target : JsImport }

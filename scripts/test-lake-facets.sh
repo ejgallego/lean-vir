@@ -177,16 +177,33 @@ printf '%s\n' \
   '#check Vir.InterfaceValidation.analyzeStartupSignature' \
   '#check Vir.InterfaceValidation.StartupSignatureError.message' \
   '#check Vir.InterfaceValidation.StartupSignature.effect' \
-  '#check Vir.GeneratePackage.InterfaceClassifierError.message' \
-  '#check Vir.GeneratePackage.ClassifiedSignature' \
-  '#check Vir.GeneratePackage.ClassifiedSignature.args' \
-  '#check Vir.GeneratePackage.ClassifiedSignature.result' \
-  '#check Vir.GeneratePackage.ClassifiedSignature.effect' \
-  '#check Vir.GeneratePackage.ClassifiedSignature.erasedPrefixArgs' \
-  '#check Vir.GeneratePackage.classifyExportSignature' \
-  '#check Vir.GeneratePackage.classifyHostImportSignature' \
-  '#check Vir.HostValidation.HostImportMarker' \
-  '#check Vir.HostValidation.HostImportMarker.attributeName' \
+  '#check Vir.Interface.InterfaceType' \
+  '#check Vir.Interface.InterfaceEffect' \
+  '#check Vir.Interface.HostImportBoundary' \
+  '#check Vir.Interface.InterfaceClassifierError.message' \
+  '#check Vir.Interface.ExportInterfaceValidationError' \
+  '#check Vir.Interface.ExportInterfaceValidationError.message' \
+  '#check Vir.Interface.ClassifiedSignature' \
+  '#check Vir.Interface.ClassifiedSignature.args' \
+  '#check Vir.Interface.ClassifiedSignature.result' \
+  '#check Vir.Interface.ClassifiedSignature.effect' \
+  '#check Vir.Interface.ClassifiedSignature.erasedPrefixArgs' \
+  '#check Vir.Interface.analyzeExportInterface' \
+  '#check Vir.Interface.classifyExportSignature' \
+  '#check Vir.Interface.classifyHostImportSignature' \
+  '#check Vir.HostMetadata.HostImportMarker' \
+  '#check Vir.HostMetadata.HostImportMarker.attributeName' \
+  '#check Vir.HostMetadata.HostImportMarker.externSymbol' \
+  '#check Vir.HostMetadata.decodeExternSymbol?' \
+  '#guard Vir.HostMetadata.HostImportMarker.hostImport.externSymbol "demo.bump" ==' \
+  '  "__vir_js:demo.bump"' \
+  '#guard Vir.HostMetadata.decodeExternSymbol?' \
+  '    (Vir.HostMetadata.HostImportMarker.hostImport.externSymbol "demo.bump") ==' \
+  '  some { marker := .hostImport, target := "demo.bump" }' \
+  '#guard Vir.HostMetadata.decodeExternSymbol?' \
+  '    (Vir.HostMetadata.HostImportMarker.explicitConversion.externSymbol "demo.convert") ==' \
+  '  some { marker := .explicitConversion, target := "demo.convert" }' \
+  '#guard Vir.HostMetadata.decodeExternSymbol? "__other:demo.bump" == none' \
   '#check Vir.HostValidation.HostImportBoundaryError' \
   '#check Vir.HostValidation.HostImportBoundaryError.message' \
   '#check Vir.HostValidation.HostImportValidationError' \
@@ -195,11 +212,11 @@ printf '%s\n' \
   '#check Vir.HostValidation.HostImportAnalysis.signature' \
   '#check Vir.HostValidation.HostImportAnalysis.boundary' \
   '#check (Vir.HostValidation.validateHostImportBoundary :' \
-  '  Vir.HostValidation.HostImportMarker → String →' \
-  '  Vir.GeneratePackage.ClassifiedSignature →' \
-  '  Except Vir.HostValidation.HostImportBoundaryError Vir.GeneratePackage.HostImportBoundary)' \
+  '  Vir.HostMetadata.HostImportMarker → String →' \
+  '  Vir.Interface.ClassifiedSignature →' \
+  '  Except Vir.HostValidation.HostImportBoundaryError Vir.Interface.HostImportBoundary)' \
   '#check (Vir.HostValidation.analyzeHostImport :' \
-  '  Vir.HostValidation.HostImportMarker → String → Lean.Expr →' \
+  '  Vir.HostMetadata.HostImportMarker → String → Lean.Expr →' \
   '  Lean.CoreM (Except Vir.HostValidation.HostImportValidationError' \
   '    Vir.HostValidation.HostImportAnalysis))' > "$tmp/Smoke/InterfaceClassifier.lean"
 
@@ -210,6 +227,7 @@ printf '%s\n' \
   '' \
   '#check Vir.GeneratePackage.moduleNameFor' \
   '#check Vir.GeneratePackage.collectClosure' \
+  '#check Vir.GeneratePackage.virJsMetadataFromDecl?' \
   '#check Vir.GeneratePackage.collectHostImports' \
   '#check Vir.GeneratePackage.collectInterfaceManifest' \
   '#check Vir.GeneratePackage.emitPackage' \
