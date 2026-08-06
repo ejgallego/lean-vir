@@ -79,6 +79,41 @@ def bumpBVar : Expr → Expr
   | .bvar idx => .bvar (idx + 1)
   | e => e
 
+private def alphaLam (binderName : Name) (binderInfo : BinderInfo) : Expr :=
+  .lam binderName (.sort .zero) (.app (.const `Nat.succ []) (.bvar 0)) binderInfo
+
+private def nestedApp (arg : Nat) : Expr :=
+  .app (.app (.const `Nat.add []) (.lit (.natVal 1))) (.lit (.natVal arg))
+
+private def syntaxMData (atom : String) : MData :=
+  MData.empty.setSyntax `source (.atom SourceInfo.none atom)
+
+private def checkEqv (expected actual : Bool) (weight : Nat) : Nat :=
+  if actual == expected then weight else 0
+
+/--
+Exercises the upstream `Lean.Expr.eqv` boundary, including alpha equivalence,
+nested expressions, levels, literals, and metadata backed by `DataValue.ofSyntax`.
+-/
+def exprEqvScore : Nat :=
+  checkEqv true (Expr.eqv (alphaLam `x .default) (alphaLam `y .implicit)) 1
+    + checkEqv false
+      (Expr.eqv (alphaLam `x .default) (.lam `y (.sort .zero) (.bvar 1) .implicit)) 2
+    + checkEqv true (Expr.eqv (nestedApp 2) (nestedApp 2)) 4
+    + checkEqv false (Expr.eqv (nestedApp 2) (nestedApp 3)) 8
+    + checkEqv true
+      (Expr.eqv (.const `Array [Level.succ (.param `u)])
+        (.const `Array [Level.succ (.param `u)])) 16
+    + checkEqv false
+      (Expr.eqv (.const `Array [Level.succ (.param `u)])
+        (.const `Array [Level.succ (.param `v)])) 32
+    + checkEqv true
+      (Expr.eqv (.mdata (syntaxMData "token") (.bvar 0))
+        (.mdata (syntaxMData "token") (.bvar 0))) 64
+    + checkEqv false
+      (Expr.eqv (.mdata (syntaxMData "token") (.bvar 0))
+        (.mdata (syntaxMData "other") (.bvar 0))) 128
+
 private def renderName : Name -> String
   | .anonymous => "_"
   | .str .anonymous s => s

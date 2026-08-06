@@ -78,13 +78,23 @@ try {
   const eqv = report.externs.find((declaration) => declaration.name === "Lean.Expr.eqv");
   assert.ok(eqv);
   assert.equal(eqv.module, selectedModule);
-  assert.equal(eqv.status, "missing");
+  assert.equal(eqv.status, "native");
   assert.deepEqual(eqv.targets, [{
     kind: "standard",
     backend: "all",
     value: "lean_expr_eqv",
   }]);
-  assert.ok(report.externs.some((declaration) => declaration.status === "native"));
+  const dbgToString = report.externs.find(
+    (declaration) => declaration.name === "Lean.Expr.dbgToString",
+  );
+  assert.ok(dbgToString);
+  assert.equal(dbgToString.module, selectedModule);
+  assert.equal(dbgToString.status, "missing");
+  assert.deepEqual(dbgToString.targets, [{
+    kind: "standard",
+    backend: "all",
+    value: "lean_expr_dbg_to_string",
+  }]);
 
   assert.match(markdown, /^# VIR Lean Library Surface/m);
   assert.match(markdown, /## By Library/);

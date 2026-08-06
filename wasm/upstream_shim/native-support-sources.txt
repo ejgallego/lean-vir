@@ -7,3 +7,4 @@ Data/String/Defs.c
 Data/String/Basic.c
 Data/String/Search.c
 Data/String/Substring.c
+Meta/Defs.c

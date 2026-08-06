@@ -185,6 +185,11 @@ runtime_sources=(
 
 support_sources=(
   "$src/src/util/name.cpp"
+  "$src/src/util/kvmap.cpp"
+  "$src/src/kernel/level.cpp"
+  "$src/src/kernel/expr.cpp"
+  "$src/src/kernel/expr_eq_fn.cpp"
+  "$src/stage0/stdlib/Lean/Data/KVMap.c"
 )
 
 lean_stage0_support_root="$src/stage0/stdlib/Init"
@@ -250,6 +255,7 @@ common_flags=(
   -std=c++20
   -DNDEBUG
   -DLEAN_BUILD_TYPE=Release
+  -DVIR_USE_UPSTREAM_KERNEL_EXPR_DATA=1
   "$wasm_opt_level"
   -DLEAN_DEFAULT_INTERPRETER_PREFER_NATIVE=false
   "-I$overlay_include"

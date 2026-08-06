@@ -287,6 +287,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-expr-eqv",
+      "source": "fixtures/ExprPrinter.lean",
+      "entry": "Vir.Fixtures.ExprPrinter.exprEqvScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "interface-shape-score",
       "source": "fixtures/InterfaceShapes.lean",
       "entry": "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",

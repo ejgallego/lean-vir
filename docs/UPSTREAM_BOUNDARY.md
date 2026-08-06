@@ -47,15 +47,30 @@ The probe links these upstream runtime sources:
 - `src/runtime/platform.cpp`
 - `src/runtime/utf8.cpp`
 
-It also links `src/util/name.cpp`, which is not runtime proper but is needed by
-the interpreter's name formatting and diagnostics.
+It also links a narrow upstream utility and kernel slice:
+
+- `src/util/name.cpp` for interpreter name formatting and diagnostics;
+- `src/kernel/expr_eq_fn.cpp` for `Lean.Expr.eqv`;
+- `src/kernel/expr.cpp` and `src/kernel/level.cpp` for the structural expression
+  and level operations used by expression equality; and
+- `src/util/kvmap.cpp` for expression metadata equality.
+
+The expression and level sources own the canonical cached-data helper exports,
+so `VIR_USE_UPSTREAM_KERNEL_EXPR_DATA` disables the corresponding temporary
+definitions in `runtime/lean_object_constructors.cpp`. The shim still supplies
+the small `lean_level_hash` and `lean_level_depth` exports used by upstream
+`level.cpp`; they read the same cached data representation as the existing
+local constructors.
 
 For Lean-defined native exports whose implementation closure is available in
 the pinned compiler output rather than the imported kernel environment, the
 probe also cross-compiles the stage0 sources listed in
 `wasm/upstream_shim/native-support-sources.txt`. The list is intentionally
 small and reviewable; the strict final link exposes a missing provider after a
-toolchain update.
+toolchain update. `Lean.Expr.eqv` additionally needs the stage0
+`Lean/Data/KVMap.c` export for `DataValue` equality. Its syntax-valued case
+reaches `Lean.Syntax.structEq`, supplied by the listed `Lean/Meta/Defs.c`
+native-support module.
 
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:

@@ -1526,6 +1526,13 @@ def nativeExterns : Array NativeExtern := #[
     resultType := .uint64,
     symbol := "lean_expr_data",
     generateBoxedWrapper := true
+  },
+  {
+    name := `Lean.Expr.eqv,
+    params := #[param 1 true .object, param 2 true .object],
+    resultType := .uint8,
+    symbol := "lean_expr_eqv",
+    generateBoxedWrapper := true
   }
 ]
 

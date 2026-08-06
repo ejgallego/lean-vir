@@ -78,6 +78,14 @@ static uint32_t vir_level_depth(object * value) {
     return static_cast<uint32_t>(vir_level_data(value) >> 40);
 }
 
+extern "C" uint32_t lean_level_hash(obj_arg value) {
+    return static_cast<uint32_t>(vir_level_hash(value));
+}
+
+extern "C" uint32_t lean_level_depth(obj_arg value) {
+    return vir_level_depth(value);
+}
+
 static bool vir_level_has_mvar(object * value) {
     return ((vir_level_data(value) >> 32) & 1) == 1;
 }
@@ -101,9 +109,11 @@ static object * vir_mk_ctor_with_data(
     return obj;
 }
 
+#ifndef VIR_USE_UPSTREAM_KERNEL_EXPR_DATA
 extern "C" uint64_t lean_level_mk_data(uint64_t h, object * depth, uint8_t has_mvar, uint8_t has_param) {
     return vir_level_mk_data(h, lean_uint64_of_nat(depth), has_mvar != 0, has_param != 0);
 }
+#endif
 
 extern "C" object * lean_level_mk_succ(obj_arg value) {
     uint64_t value_data = vir_level_data(value);
@@ -231,6 +241,9 @@ static bool vir_level_list_has_param(object * value) {
     return false;
 }
 
+extern "C" uint64_t lean_expr_mk_app_data(uint64_t f_data, uint64_t a_data);
+
+#ifndef VIR_USE_UPSTREAM_KERNEL_EXPR_DATA
 extern "C" uint64_t lean_expr_mk_data(
     uint64_t hash,
     object * bvar_range,
@@ -259,6 +272,7 @@ extern "C" uint64_t lean_expr_mk_app_data(uint64_t f_data, uint64_t a_data) {
         | (static_cast<uint64_t>(depth) << 32)
         | (static_cast<uint64_t>(range) << 44);
 }
+#endif
 
 extern "C" object * lean_expr_mk_bvar(obj_arg idx) {
     uint64_t idx_hash = vir_nat_hash(idx);
