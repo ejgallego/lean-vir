@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>VIR Runnable Surface</title>
+    <link rel="stylesheet" href="assets/style.css">
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Lean library coverage</p>
+        <h1>VIR Runnable Surface</h1>
+        <p id="report-identity" class="report-identity"></p>
+      </div>
+      <div id="global-summary" class="global-summary" aria-label="Global report summary"></div>
+    </header>
+
+    <div class="report-layout">
+      <aside class="navigator" aria-label="Lean module navigator">
+        <div class="navigator-controls">
+          <label>
+            <span>Tree percentage</span>
+            <select id="metric-select">
+              <option value="public">Public constants</option>
+              <option value="all">All IR functions</option>
+            </select>
+          </label>
+          <label>
+            <span>Find module</span>
+            <input id="module-search" type="search" placeholder="Lean.Meta…" autocomplete="off">
+          </label>
+        </div>
+        <nav id="module-tree" class="module-tree" aria-label="Folders and modules"></nav>
+      </aside>
+
+      <main id="report-main" class="report-main" tabindex="-1">
+        <noscript>This report requires JavaScript for folder and module navigation.</noscript>
+      </main>
+    </div>
+
+    <script src="data/index.js"></script>
+    <script src="assets/app.js"></script>
+  </body>
+</html>

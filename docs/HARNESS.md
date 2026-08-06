@@ -81,6 +81,8 @@ The most useful generated diagnostics are:
 - `build/generated/*.report.md`
 - `build/fixtures/summary.json`
 - `build/fixtures/*.report.md`
+- `build/vir-surface/*.json`
+- `build/vir-surface/*.md`
 
 Reference these reports in local notes or final summaries when they explain a
 failure, but keep them out of Git unless the maintainer asks for a tracked
@@ -112,6 +114,8 @@ npm run check:api-coverage
 npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:native-wrappers
+npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
+npm run render:surface -- build/vir-surface/lean-libraries.json build/vir-surface/html
 ```
 
 Package generation and inspection:
@@ -131,6 +135,7 @@ Tests:
 
 ```bash
 npm run test:bench
+npm run test:surface
 npm run test:upstream
 npm run test:upstream:no-build
 npm run test:infoview
@@ -161,6 +166,11 @@ signal for code changes.
 - Package declaration lookup or interpreter/provider performance changes:
   `npm run bench:env-lookup -- --json <new-output-path>`; use a separate
   `--cpu-profile` run for attribution
+- Native runtime coverage or library-surface analyzer changes:
+  `npm run test:surface`; use `npm run analyze:surface -- <report.json>
+  <report.md>` for a complete installed-library report, then
+  `npm run render:surface -- <report.json> <html-directory>` for the interactive
+  folder/module/function browser
 - Native extern declaration changes:
   `npm run check:native-externs`
 - Shim/native extern registry changes:

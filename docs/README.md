@@ -38,6 +38,7 @@ ownership diagrams.
   `wasm/upstream_shim/abi/call_abi.cpp`.
 - Benchmark work: read [PERFORMANCE.md](PERFORMANCE.md),
   [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md),
+  [SURFACE_ANALYSIS.md](SURFACE_ANALYSIS.md),
   `scripts/bench-vir.mjs`, `scripts/bench-env-lookup.mjs`,
   `scripts/bench-differential.mjs`, and `scripts/bench-utils.mjs`.
 
@@ -92,6 +93,9 @@ ownership diagrams.
 - [OBJECT_CONVERSION_PERFORMANCE.md](OBJECT_CONVERSION_PERFORMANCE.md): cached
   custom-inductive normalization plans and repository-owned `Std.Format`
   measurements.
+- [SURFACE_ANALYSIS.md](SURFACE_ANALYSIS.md): static runnable-surface
+  definition, full-library scan and interactive HTML workflows, report
+  interpretation, and runtime control/candidate comparison rules.
 - [OBJECT_ABI.md](OBJECT_ABI.md): Lean object ABI construction,
   inspection, ownership, and codec-retirement roadmap.
 
