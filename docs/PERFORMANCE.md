@@ -73,6 +73,10 @@ owns the environment/provider API decision;
 [ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
 owns the measurement-gated cross-entry resolution-cache experiment.
 
+The direct `Std.Format` conversion benchmark and accepted manifest-derived
+normalization-plan cache are documented in
+[Custom Inductive Object Conversion Performance](OBJECT_CONVERSION_PERFORMANCE.md).
+
 Compare two saved reports with:
 
 ```bash
