@@ -4380,9 +4380,6 @@ function customInductiveConstructorAt(type, index, label) {
 function findTaggedUnionConstructor(type, text) {
   return findConstructor(type, text, requireTaggedUnionConstructors, "tagged union");
 }
-function findCustomInductiveConstructor(type, text) {
-  return findConstructor(type, text, requireCustomInductiveConstructors, "custom inductive");
-}
 function constructorAt(type, index, label, requireConstructors, kindLabel) {
   const constructors = requireConstructors(type, label);
   if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
@@ -4406,9 +4403,6 @@ function customInductiveShape(ctor) {
   }
   return `{ kind: ${kind}, fields: { ${fields.map((field) => field.name).join(", ")} } }`;
 }
-function customInductiveShapes(type) {
-  return requireCustomInductiveConstructors(type, "custom inductive").map((ctor) => customInductiveShape(ctor)).join(" | ");
-}
 function normalizeUint32(value, label) {
   if (!Number.isInteger(value) || value < 0 || value > 4294967295) {
     throw new Error(`${label} must be an integer in 0..4294967295`);
@@ -4417,6 +4411,7 @@ function normalizeUint32(value, label) {
 }
 
 // web/src/runtime/vir-value-normalizers.js
+var customInductiveNormalizationPlanCache = /* @__PURE__ */ new WeakMap();
 function normalizeDecimal(value, label, { signed }) {
   if (typeof value === "bigint") {
     if (!signed && value < 0n) throw new Error(`${label} must be non-negative`);
@@ -4571,41 +4566,76 @@ function normalizeTaggedUnion(value, type, label) {
   throw new Error(`${label} must specify a tagged-union constructor`);
 }
 function normalizeCustomInductive(value, type, label) {
-  const expectedShapes = customInductiveShapes(type);
+  const normalizationPlan = customInductiveNormalizationPlan(type);
+  const expectedShapes = normalizationPlan.expectedShapes;
   if (value === null || typeof value !== "object" || Array.isArray(value)) {
     throw new Error(`${label} must be a custom inductive object; expected ${expectedShapes}`);
   }
   if (typeof value.kind !== "string") {
     throw new Error(`${label} must specify custom inductive kind; expected ${expectedShapes}`);
   }
-  const match = findCustomInductiveConstructor(type, value.kind);
-  if (match === null) {
+  const constructorPlan = normalizationPlan.constructorsByName.get(value.kind);
+  if (constructorPlan === void 0) {
     throw new Error(`${label} has unknown custom inductive constructor ${value.kind}; expected ${expectedShapes}`);
   }
-  const ctorLabel = `${label}.${match.ctor.jsName}`;
-  const expectedShape = customInductiveShape(match.ctor);
-  if (match.ctor.fields.length === 0) {
-    requireOnlyKeys(value, /* @__PURE__ */ new Set(["kind"]), label, expectedShape);
-    return { ...match, fields: {} };
+  const { index, ctor, expectedShape } = constructorPlan;
+  const ctorLabel = `${label}.${ctor.jsName}`;
+  if (ctor.fields.length === 0) {
+    requireOnlyKeys(value, constructorPlan.allowedKeys, label, expectedShape);
+    return { index, ctor, fields: {} };
   }
-  if (match.ctor.fields.length === 1) {
-    requireOnlyKeys(value, /* @__PURE__ */ new Set(["kind", "value"]), label, expectedShape);
+  if (ctor.fields.length === 1) {
+    requireOnlyKeys(value, constructorPlan.allowedKeys, label, expectedShape);
     if (!hasOwn(value, "value")) {
       throw new Error(`${ctorLabel} is missing value; expected ${expectedShape}`);
     }
     return {
-      ...match,
-      fields: { [match.ctor.fields[0].name]: value.value }
+      index,
+      ctor,
+      fields: { [ctor.fields[0].name]: value.value }
     };
   }
-  requireOnlyKeys(value, /* @__PURE__ */ new Set(["kind", "fields"]), label, expectedShape);
+  requireOnlyKeys(value, constructorPlan.allowedKeys, label, expectedShape);
   if (!hasOwn(value, "fields")) {
     throw new Error(`${ctorLabel} is missing fields; expected ${expectedShape}`);
   }
   return {
-    ...match,
-    fields: normalizeCustomInductiveFields(value.fields, match.ctor, ctorLabel, expectedShape)
+    index,
+    ctor,
+    fields: normalizeCustomInductiveFields(value.fields, constructorPlan, ctorLabel)
   };
+}
+function customInductiveNormalizationPlan(type) {
+  const cached = customInductiveNormalizationPlanCache.get(type);
+  if (cached?.constructors === type?.constructors) {
+    return cached;
+  }
+  const constructors = requireCustomInductiveConstructors(type, "custom inductive");
+  const constructorPlans = constructors.map((ctor, index) => {
+    const fieldCount = ctor.fields.length;
+    return {
+      index,
+      ctor,
+      expectedShape: customInductiveShape(ctor),
+      allowedKeys: new Set(
+        fieldCount === 0 ? ["kind"] : fieldCount === 1 ? ["kind", "value"] : ["kind", "fields"]
+      ),
+      expectedFieldNames: fieldCount > 1 ? new Set(ctor.fields.map((field) => field.name)) : null
+    };
+  });
+  const constructorsByName = /* @__PURE__ */ new Map();
+  for (const constructorPlan of constructorPlans) {
+    for (const name of [constructorPlan.ctor.name, constructorPlan.ctor.jsName]) {
+      if (!constructorsByName.has(name)) constructorsByName.set(name, constructorPlan);
+    }
+  }
+  const plan = {
+    constructors,
+    constructorsByName,
+    expectedShapes: constructorPlans.map(({ expectedShape }) => expectedShape).join(" | ")
+  };
+  customInductiveNormalizationPlanCache.set(type, plan);
+  return plan;
 }
 function normalizeEnum(value, type, label) {
   const constructors = type?.constructors ?? [];
@@ -4656,13 +4686,13 @@ function requireOnlyKeys(value, allowed, label, expectedShape) {
     }
   }
 }
-function normalizeCustomInductiveFields(payload, ctor, label, expectedShape) {
+function normalizeCustomInductiveFields(payload, constructorPlan, label) {
+  const { ctor, expectedFieldNames, expectedShape } = constructorPlan;
   if (payload === null || typeof payload !== "object" || Array.isArray(payload)) {
     throw new Error(`${label} fields must be an object; expected ${expectedShape}`);
   }
-  const expectedNames = new Set(ctor.fields.map((field) => field.name));
   for (const key of Object.keys(payload)) {
-    if (!expectedNames.has(key)) {
+    if (!expectedFieldNames.has(key)) {
       throw new Error(`${label}.${key} is not a constructor field; expected ${expectedShape}`);
     }
   }
