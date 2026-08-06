@@ -29,6 +29,13 @@ slide DOM state.
 
 ## Artifact contract
 
+The committed `artifact-builds.json` is the canonical source database for
+rebuilding benchmark artifacts. It defines the exact VIR, FIR, and workload
+Git revisions, producer entry points and dependencies, expected package files,
+and artifact-set provenance. Local checkout paths are supplied on the command
+line and are never committed. See `docs/ARTIFACT_BUILDS.md` for the source-build
+contract and driver.
+
 The committed `artifact-set.lock.json` selects one immutable, compatible set.
 Binary artifacts and downloaded release archives remain ignored by Git. The
 current prototype lock has no public URL yet; assemble and consume it locally:
@@ -39,7 +46,8 @@ npm run artifacts:fetch -- \
   --archive _artifacts/releases/<generated-archive>.tar
 ```
 
-`artifacts:pack` reads a validated `_artifacts/seed/` with this layout:
+`artifacts:build` produces a validated `_artifacts/seed/`, and
+`artifacts:pack` consumes it with this layout:
 
 ```text
 lean-vir/js/vir-runtime.js
@@ -57,6 +65,8 @@ verifies the outer archive before extraction, rejects unsafe tar members,
 verifies every extracted member, installs it atomically under
 `_artifacts/sets/`, and stages it. Every input, cache, set, and output path is
 restricted to this application directory.
+Source compilation caches remain in the explicitly selected producer
+checkouts; only declared package bytes cross into this application.
 
 Once the archive is uploaded as an immutable release asset, set its exact HTTPS
 URL in the lockfile and change the status from `local-prototype` to `published`.

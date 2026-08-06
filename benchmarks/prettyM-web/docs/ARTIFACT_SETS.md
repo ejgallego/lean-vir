@@ -45,13 +45,15 @@ artifacts/               currently staged browser inputs
 ```
 
 `_artifacts/`, `artifacts/`, `dist/`, and `_results/` are ignored. The
-configuration and lockfile are committed.
+source-build database and lockfile are committed.
 
 ## Assemble a candidate
 
-1. Copy complete producer packages into `_artifacts/seed/`.
-2. Update `artifact-set.config.json` with the set ID and exact provenance.
-3. Run `npm run artifacts:pack`.
+1. Select a canonical build from `artifact-builds.json` and resolve its exact
+   sources to clean local checkouts. Run the source builder with the selected
+   `BUILD` and `--checkout NAME=PATH` arguments; see `ARTIFACT_BUILDS.md`.
+2. Review the source-build receipt and validated `_artifacts/seed/`.
+3. Run `npm run artifacts:pack -- --build BUILD`.
 4. Review the generated manifest under `_artifacts/releases/`.
 5. Import the generated tar through the same consumer path:
 

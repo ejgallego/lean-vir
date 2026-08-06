@@ -70,6 +70,15 @@ The current artifact lock is `local-prototype`: its archive digest and size are
 committed, but `archive.url` is intentionally null. Public artifact publication
 is unfinished rather than broken.
 
+Source-build preparation is now repository-owned. The canonical
+`benchmarks/prettyM-web/artifact-builds.json` record names the exact VIR, FIR,
+and workload commits, producer entry points, package mappings, dependencies,
+and pack provenance. `npm run artifacts:build` resolves that record against
+explicit clean local checkouts, validates producer packages, and assembles the
+seed without running performance measurements. Packing reads the same record;
+the former duplicate `artifact-set.config.json` was removed. See
+`benchmarks/prettyM-web/docs/ARTIFACT_BUILDS.md`.
+
 ## Immediate status
 
 The stable public-call attribution is now imported without adding profiler code
@@ -86,13 +95,16 @@ for an accepted or rejected optimization conclusion. Treat them as
 inconclusive, leave bounded set 0001 unchanged, and require measurements from a
 controlled host before importing a decision.
 
-The next change in this worktree should be one of:
+The next artifact-management step is to exercise the full `prettyM` source
+build on prepared exact checkouts, inspect its local build receipt, and then
+move the same command into CI. The plan-only checkout gate and deterministic
+repacking of the preserved seed have passed. A fresh producer build was not run
+during harness preparation, and no performance measurement was collected.
 
-1. refresh an individual bounded runtime after its producer publishes a new
-   complete package;
-2. publish and lock the existing immutable set archive; or
-3. import an accepted/rejected producer-side optimization conclusion and
-   regenerate the report/card against its new immutable package.
+The current VIR `.irpkg` generator embeds generation time and source-path
+spelling. Source identity is exact, but fresh VIR packages are not yet expected
+to reproduce an old archive digest byte-for-byte. Add deterministic package
+metadata before making CI compare a freshly built set with the current lock.
 
 The report UI consolidation was completed after the original handoff. Its
 browser regression narrows the dashboard to one backend, checks that chart

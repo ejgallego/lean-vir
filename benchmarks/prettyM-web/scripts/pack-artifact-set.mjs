@@ -7,26 +7,28 @@ import {
   createTar,
   fileRecords,
   inside,
-  readJson,
   requiredArtifactFiles,
   sha256,
   validateSeed,
   verifyArtifactSet,
 } from "./artifact-set-lib.mjs";
+import { artifactSetConfig, readBuildDatabase } from "./artifact-build-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 
 function parseArgs(argv) {
   const options = {
     seed: "_artifacts/seed",
-    config: "artifact-set.config.json",
+    database: "artifact-builds.json",
+    build: "prettyM",
     outputDir: "_artifacts/releases",
     lock: "artifact-set.lock.json",
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--seed") options.seed = argv[++index];
-    else if (argument === "--config") options.config = argv[++index];
+    else if (argument === "--database") options.database = argv[++index];
+    else if (argument === "--build") options.build = argv[++index];
     else if (argument === "--output-dir") options.outputDir = argv[++index];
     else if (argument === "--lock") options.lock = argv[++index];
     else if (argument === "--help" || argument === "-h") {
@@ -36,7 +38,8 @@ Build a deterministic release tar and prototype lock from a validated seed.
 Every input and output path must remain inside this application directory.
 
   --seed PATH          component seed (default: _artifacts/seed)
-  --config PATH        compatibility/provenance config
+  --database PATH      canonical source/build database
+  --build ID           database build to pack (default: prettyM)
   --output-dir PATH    ignored release directory
   --lock PATH          lockfile to write (default: artifact-set.lock.json)`);
       process.exit(0);
@@ -54,11 +57,19 @@ async function copyFile(sourceRoot, destinationRoot, path) {
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const seed = inside(appRoot, options.seed, "read artifact seed");
-  const configPath = inside(appRoot, options.config, "read artifact config");
+  const databasePath = inside(
+    appRoot,
+    options.database,
+    "read artifact build database",
+  );
   const outputDir = inside(appRoot, options.outputDir, "write release");
   const lockPath = inside(appRoot, options.lock, "write lockfile");
-  const config = await readJson(configPath);
-  if (config.schemaVersion !== 1 || !/^prettyM-[a-zA-Z0-9.-]+$/.test(config.setId)) {
+  const database = await readBuildDatabase(databasePath);
+  const config = artifactSetConfig(database, options.build);
+  if (
+    config.schemaVersion !== 1 ||
+    !/^prettyM-[a-zA-Z0-9.-]+$/.test(config.setId)
+  ) {
     throw new Error("unsupported artifact-set config or unsafe set ID");
   }
 
@@ -70,7 +81,9 @@ async function main() {
       (component) => component.boundary !== "prettyM-web/bounded-runtime/v1",
     )
   ) {
-    throw new Error("every component must declare the bounded-runtime boundary");
+    throw new Error(
+      "every component must declare the bounded-runtime boundary",
+    );
   }
   if (
     native.capabilities?.inputLayout?.leanVersion !==
@@ -78,7 +91,9 @@ async function main() {
     llvm.toolchain?.lean?.version !== components.llvm?.lean?.version ||
     llvm.toolchain?.lean?.commit !== components.llvm?.lean?.commit
   ) {
-    throw new Error("producer metadata does not match its component-local Lean pin");
+    throw new Error(
+      "producer metadata does not match its component-local Lean pin",
+    );
   }
 
   const assembly = inside(
@@ -88,7 +103,8 @@ async function main() {
   );
   await rm(assembly, { recursive: true, force: true });
   await mkdir(assembly, { recursive: true });
-  for (const path of requiredArtifactFiles) await copyFile(seed, assembly, path);
+  for (const path of requiredArtifactFiles)
+    await copyFile(seed, assembly, path);
 
   const virFiles = await fileRecords(assembly, [
     "lean-vir/js/vir-runtime.js",
@@ -106,10 +122,7 @@ async function main() {
     canonicalJson(virComponent),
   );
 
-  const payloadPaths = [
-    ...requiredArtifactFiles,
-    "lean-vir/COMPONENT.json",
-  ];
+  const payloadPaths = [...requiredArtifactFiles, "lean-vir/COMPONENT.json"];
   const files = await fileRecords(assembly, payloadPaths);
   const manifest = {
     schemaVersion: 1,
@@ -176,7 +189,10 @@ async function main() {
   await mkdir(outputDir, { recursive: true });
   const archivePath = resolve(outputDir, archiveName);
   await writeFile(archivePath, archive);
-  await writeFile(`${archivePath}.sha256`, `${archiveDigest}  ${archiveName}\n`);
+  await writeFile(
+    `${archivePath}.sha256`,
+    `${archiveDigest}  ${archiveName}\n`,
+  );
   await cp(
     resolve(assembly, "ARTIFACT_SET.json"),
     resolve(outputDir, `${config.setId}.manifest.json`),

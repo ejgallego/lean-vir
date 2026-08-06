@@ -6,6 +6,7 @@ import { fileURLToPath } from "node:url";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const commands = [
+  [process.execPath, ["scripts/build-artifacts.mjs", "--help"]],
   [process.execPath, ["scripts/pack-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/fetch-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/collect-report.mjs", "--help"]],
@@ -31,6 +32,14 @@ for (const [command, args] of commands) {
   assert.match(result.stdout, /usage:/i);
 }
 
+const buildList = spawnSync(
+  process.execPath,
+  ["scripts/build-artifacts.mjs", "--list"],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.equal(buildList.status, 0, buildList.stderr);
+assert.match(buildList.stdout, /^prettyM\tprettyM-bounded-set-0001$/m);
+
 const escapedOutput = spawnSync(
   process.execPath,
   ["scripts/collect-report.mjs", "--output", "/tmp/escaped-report.json"],
@@ -45,22 +54,26 @@ const collector = readFileSync(
 );
 assert.doesNotMatch(collector, /runJsonRoundTripStudy/);
 
-const attribution = JSON.parse(readFileSync(
-  join(appRoot, "evidence/vir-pr104-runtime-call-profile.json"),
-  "utf8",
-));
+const attribution = JSON.parse(
+  readFileSync(
+    join(appRoot, "evidence/vir-pr104-runtime-call-profile.json"),
+    "utf8",
+  ),
+);
 assert.equal(attribution.schemaVersion, 1);
 assert.equal(attribution.kind, "prettyM-runtime-call-profile-attribution");
 assert.equal(attribution.runs.length, 2);
 for (const run of attribution.runs) {
-  assert.deepEqual(
-    run.workloads.map(({ id }) => id).sort(),
-    ["nodes-2047", "tag-transitions-64x64"],
-  );
+  assert.deepEqual(run.workloads.map(({ id }) => id).sort(), [
+    "nodes-2047",
+    "tag-transitions-64x64",
+  ]);
   for (const workload of run.workloads) {
     assert.ok(workload.samples > 0);
     assert.match(workload.outputDigest, /^[0-9a-f]{64}$/);
   }
 }
 
-console.log("PASS standalone report, campaign, card, and refresh tool contracts");
+console.log(
+  "PASS standalone report, campaign, card, and refresh tool contracts",
+);
