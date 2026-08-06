@@ -45,4 +45,22 @@ const collector = readFileSync(
 );
 assert.doesNotMatch(collector, /runJsonRoundTripStudy/);
 
+const attribution = JSON.parse(readFileSync(
+  join(appRoot, "evidence/vir-pr104-runtime-call-profile.json"),
+  "utf8",
+));
+assert.equal(attribution.schemaVersion, 1);
+assert.equal(attribution.kind, "prettyM-runtime-call-profile-attribution");
+assert.equal(attribution.runs.length, 2);
+for (const run of attribution.runs) {
+  assert.deepEqual(
+    run.workloads.map(({ id }) => id).sort(),
+    ["nodes-2047", "tag-transitions-64x64"],
+  );
+  for (const workload of run.workloads) {
+    assert.ok(workload.samples > 0);
+    assert.match(workload.outputDigest, /^[0-9a-f]{64}$/);
+  }
+}
+
 console.log("PASS standalone report, campaign, card, and refresh tool contracts");

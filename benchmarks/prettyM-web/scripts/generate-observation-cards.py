@@ -11,6 +11,7 @@ from typing import Any
 WORKSPACE = Path(__file__).resolve().parent.parent
 DEFAULT_REPORT = Path("_results/pretty-benchmark.json")
 DEFAULT_OUTPUT = Path("_results/performance-cards")
+DEFAULT_VIR_ATTRIBUTION = Path("evidence/vir-pr104-runtime-call-profile.json")
 
 
 def parse_args() -> argparse.Namespace:
@@ -27,6 +28,15 @@ def parse_args() -> argparse.Namespace:
         type=Path,
         default=DEFAULT_OUTPUT,
         help=f"workspace-relative card directory (default: {DEFAULT_OUTPUT})",
+    )
+    parser.add_argument(
+        "--vir-attribution",
+        type=Path,
+        default=DEFAULT_VIR_ATTRIBUTION,
+        help=(
+            "workspace-relative imported VIR profile summary "
+            f"(default: {DEFAULT_VIR_ATTRIBUTION})"
+        ),
     )
     parser.add_argument(
         "--check",
@@ -59,6 +69,10 @@ def ratio(numerator: float, denominator: float) -> str:
     if denominator == 0:
         return "∞"
     return f"{numerator / denominator:.1f}×"
+
+
+def percent_range(values: list[float]) -> str:
+    return f"{min(values):.1f}–{max(values):.1f}%"
 
 
 def mebibytes(value: int | float) -> str:
@@ -314,7 +328,12 @@ def json_boundary_card(
 
 
 def direct_execution_card(
-    report: dict[str, Any], report_path: Path, report_digest: str
+    report: dict[str, Any],
+    report_path: Path,
+    report_digest: str,
+    attribution: dict[str, Any],
+    attribution_path: Path,
+    attribution_digest: str,
 ) -> str:
     scaling_rows = endpoint_rows(report["scaling"]["dimensions"])
     native_ratios = [
@@ -340,18 +359,50 @@ def direct_execution_card(
     tags_native_total = tags["backends"]["native"]["summary"]["totalMs"][
         "median"
     ]
+    profile_rows = []
+    for workload_id, label in [
+        ("tag-transitions-64x64", "64 tags × 64 chunks"),
+        ("nodes-2047", "2,047 empty-output nodes"),
+    ]:
+        workload_runs = [
+            next(
+                workload
+                for workload in run["workloads"]
+                if workload["id"] == workload_id
+            )
+            for run in attribution["runs"]
+        ]
+        profile_rows.append((label, workload_runs))
+    object_abi_range = percent_range(
+        [
+            workload["ownerPercent"]["objectAbiImportAndLift"]
+            for _label, workloads in profile_rows
+            for workload in workloads
+        ]
+    )
+    wasm_range = percent_range(
+        [
+            workload["ownerPercent"]["wasmSelf"]
+            for _label, workloads in profile_rows
+            for workload in workloads
+        ]
+    )
     lines = card_header(
         "VIR-002",
         "lean-vir compiler and runtime owners",
-        "direct Format ABI is viable, with structural execution costs to profile",
+        "direct Format ABI is viable; public-call sampling points to object import",
         (
             "The direct VIR `Std.Format` ABI removes most boundary overhead and keeps "
             f"representative-corpus median total latency at "
             f"{milliseconds(corpus_median)} ms. Its measured execute phase is "
             f"nevertheless {min(native_ratios):.1f}×–{max(native_ratios):.1f}× slower "
             "than FIR-native Wasm across the six large scaling endpoints, with the "
-            "largest interaction gap on nested tags and output transitions."
+            "largest interaction gap on nested tags and output transitions. Two "
+            f"independent sampled captures assign {object_abi_range} of the profiled "
+            f"public call path to object import/result lifting and {wasm_range} to "
+            "Wasm self samples."
         ),
+        status="profiled; boundary optimization candidate identified",
     )
     lines += [
         "## Evidence",
@@ -427,25 +478,59 @@ def direct_execution_card(
         "still a user-visible `runtime.call` measurement. It includes importing the "
         "JavaScript `Std.Format` object, executing `formatSegmentsForVir`/`prettyM`, "
         "allocating the `StateM` arrays and strings, and exporting the segment array. "
-        "The current harness cannot decide whether the gap belongs to VIR codegen, "
-        "the runtime object ABI, allocation/GC, or the formatter implementation.",
+        "The imported sampled profiles now separate the main owner classes, while "
+        "the benchmark continues to provide the diagnostics-off product timing.",
         "",
         "The 64-tag × 64-chunk endpoint is the clearest profiling target: direct VIR "
         f"takes {milliseconds(tags_vir_execute)} ms execute / "
         f"{milliseconds(tags_vir_total)} ms total, versus native at "
         f"{milliseconds(tags_native_execute)} ms execute / "
         f"{milliseconds(tags_native_total)} ms total. The total-time result also shows "
-        "why optimizing only core "
-        "execution is insufficient: output transport remains material for all backends.",
+        "why optimizing only core execution is insufficient: output transport remains "
+        "material for all backends.",
+        "",
+        "## Sampled attribution",
+        "",
+        "Two independent V8 CPU-profile captures used the normal direct-Format "
+        "`runtime.call`. The JavaScript `Std.Format` value was built once outside the "
+        "sampled loop; each call still imported a fresh Lean object graph and lifted "
+        "its result. Each capture ran both structural targets for about four seconds "
+        "and checked the known output digest after every batch.",
+        "",
+        "| Workload | Object import / result lift | Wasm self | Lookup / name maps | `eval_body` | `customInductiveShape` self |",
+        "| --- | ---: | ---: | ---: | ---: | ---: |",
+    ]
+    for label, workloads in profile_rows:
+        lines.append(
+            f"| {label} | "
+            f"{percent_range([row['ownerPercent']['objectAbiImportAndLift'] for row in workloads])} | "
+            f"{percent_range([row['ownerPercent']['wasmSelf'] for row in workloads])} | "
+            f"{percent_range([row['ownerPercent']['lookupAndNameMaps'] for row in workloads])} | "
+            f"{percent_range([row['ownerPercent']['evalBody'] for row in workloads])} | "
+            f"{percent_range([row['customInductiveShapeSelfPercent'] for row in workloads])} |"
+        )
+    lines += [
+        "",
+        "The boundary bucket is dominated by successful input import. The largest "
+        "self symbol in both captures is `customInductiveShape`, followed by "
+        "custom-inductive constructor validation and normalization. These functions "
+        "eagerly build diagnostic shape descriptions while importing valid nodes. "
+        "Lookup and name-map work remains visible, but owns only 4.6–5.9% of the "
+        "complete public call path in these captures.",
+        "",
+        "Sample shares are noisy diagnostic evidence. Artifact and harness hashes are "
+        "deterministic evidence; stable output digests are semantic evidence.",
         "",
         "## Requested follow-up",
         "",
-        "- Profile the 64-tag × 64-chunk case first, then the 2,047-node empty-output "
-        "case to separate output construction from input traversal.",
-        "- Split `runtime.call` into JS-object import, compiled-function execution, "
-        "allocation/GC, and result export timings.",
-        "- Inspect generated code and allocation behavior around `StateM`, `Array.push`, "
-        "tag-stack updates, string lengths, and recursive `Std.Format` traversal.",
+        "- Measure a narrow runtime candidate that makes diagnostic custom-inductive "
+        "shape construction lazy on successful imports while preserving malformed-input "
+        "validation and error text.",
+        "- Compare the unchanged public `runtime.call` path with order-balanced, "
+        "diagnostics-off runs, then collect a post-change profile to verify that the "
+        "shape/normalization bucket moves as predicted.",
+        "- Add explicit phase timing only if it preserves the same fresh-input "
+        "ownership path; do not retain a pre-lowered Lean object across calls.",
         "- Preserve both execute-only and total-time comparisons; improvements should "
         "not move work into an unmeasured adapter phase.",
         "",
@@ -455,7 +540,21 @@ def direct_execution_card(
         "product-level measurements rather than compiler-only measurements.",
         "- The execute phase is the fairest phase currently available, but it still "
         "includes each runtime's in-call ABI work.",
+        "- The CPU profiles use an optimized, unstripped macro-off companion Wasm, "
+        "not the exact stripped benchmark binary; profiled timings are not headline "
+        "latency measurements.",
         "- Exact styled-output parity passed at every reported point.",
+        "",
+        "## Imported profile context",
+        "",
+        f"- Evidence: `{relative_path(attribution_path)}` (`{attribution_digest}`)",
+        f"- VIR source: `{attribution['target']['runtimeSourceCommit']}`",
+        f"- Profiling harness commit: `{attribution['target']['profilingHarnessCommit']}`",
+        f"- Harness SHA-256: `{attribution['artifacts']['harness']['sha256']}`",
+        f"- Profile Wasm SHA-256: `{attribution['artifacts']['profileWasm']['sha256']}`",
+        f"- IR package SHA-256: `{attribution['artifacts']['irPackage']['sha256']}`",
+        "- Raw summary SHA-256: "
+        + ", ".join(f"`{run['summarySha256']}`" for run in attribution["runs"]),
         "",
     ]
     lines += measurement_context(report, report_path, report_digest)
@@ -631,7 +730,7 @@ def index_card(
             "| Card | Intended owner | Observation |",
             "| --- | --- | --- |",
             "| [VIR-001](VIR-001-json-boundary.md) | Runtime / browser ABI | JSON boundary dominates VIR time |",
-            "| [VIR-002](VIR-002-direct-format-execution.md) | Compiler / runtime | Direct ABI is viable; structural execution needs profiling |",
+            "| [VIR-002](VIR-002-direct-format-execution.md) | Compiler / runtime | Public-call profiles point to object import |",
             "| [VIR-003](VIR-003-shared-memory-growth.md) | Runtime / allocator / GC | Shared linear-memory high-water needs attribution |",
             "",
             "The numbers are generated, not hand-maintained. After refreshing an "
@@ -654,7 +753,12 @@ def index_card(
 
 
 def render_cards(
-    report: dict[str, Any], report_path: Path, report_digest: str
+    report: dict[str, Any],
+    report_path: Path,
+    report_digest: str,
+    attribution: dict[str, Any],
+    attribution_path: Path,
+    attribution_digest: str,
 ) -> dict[str, str]:
     return {
         "README.md": index_card(report, report_path, report_digest),
@@ -662,7 +766,12 @@ def render_cards(
             report, report_path, report_digest
         ),
         "VIR-002-direct-format-execution.md": direct_execution_card(
-            report, report_path, report_digest
+            report,
+            report_path,
+            report_digest,
+            attribution,
+            attribution_path,
+            attribution_digest,
         ),
         "VIR-003-shared-memory-growth.md": memory_card(
             report, report_path, report_digest
@@ -685,15 +794,92 @@ def validate_report(report: dict[str, Any]) -> None:
         raise SystemExit("refusing to generate cards from failed JSON round-trip study")
 
 
+def validate_attribution(
+    attribution: dict[str, Any], report: dict[str, Any]
+) -> None:
+    if attribution.get("schemaVersion") != 1 or attribution.get("kind") != (
+        "prettyM-runtime-call-profile-attribution"
+    ):
+        raise SystemExit("unsupported VIR profile attribution schema")
+    runs = attribution.get("runs")
+    if not isinstance(runs, list) or len(runs) < 2:
+        raise SystemExit("VIR profile attribution requires at least two captures")
+    required_workloads = {"tag-transitions-64x64", "nodes-2047"}
+    for run in runs:
+        workloads = run.get("workloads", [])
+        if {workload.get("id") for workload in workloads} != required_workloads:
+            raise SystemExit(f"VIR profile capture {run.get('id')} has wrong workloads")
+        for workload in workloads:
+            if workload.get("samples", 0) <= 0 or workload.get("calls", 0) <= 0:
+                raise SystemExit("VIR profile attribution contains an empty capture")
+            if len(workload.get("profileSha256", "")) != 64 or len(
+                workload.get("outputDigest", "")
+            ) != 64:
+                raise SystemExit("VIR profile attribution has an invalid output digest")
+            percentages = [
+                *workload.get("ownerPercent", {}).values(),
+                workload.get("customInductiveShapeSelfPercent", -1),
+            ]
+            if any(value < 0 or value > 100 for value in percentages):
+                raise SystemExit("VIR profile attribution has an invalid percentage")
+    for workload_id in required_workloads:
+        digests = {
+            next(
+                workload
+                for workload in run["workloads"]
+                if workload["id"] == workload_id
+            )["outputDigest"]
+            for run in runs
+        }
+        if len(digests) != 1:
+            raise SystemExit(
+                f"VIR profile output changed between captures for {workload_id}"
+            )
+    vir_assets = report["runtimeProfile"]["backends"]["vir"]["assets"]
+    expected_assets = {
+        "prettyM-vir.irpkg": attribution["artifacts"]["irPackage"],
+        "vir-runtime.js": attribution["artifacts"]["boundedRuntimeJs"],
+        "vir-upstream.wasm": attribution["artifacts"]["boundedRuntimeWasm"],
+    }
+    for filename, expected in expected_assets.items():
+        actual = next(
+            (asset for asset in vir_assets if asset["file"] == filename), None
+        )
+        if (
+            actual is None
+            or actual["byteLength"] != expected["bytes"]
+            or actual["sha256"] != expected["sha256"]
+        ):
+            raise SystemExit(
+                f"VIR profile attribution {filename} does not match the report"
+            )
+    metadata = report["coldStart"]["backends"]["vir"]["provenance"][
+        "packageMetadata"
+    ]
+    if metadata["leanVersion"] != attribution["target"]["leanVersion"]:
+        raise SystemExit(
+            "VIR profile attribution Lean version does not match the report"
+        )
+
+
 def main() -> int:
     args = parse_args()
     report_path = workspace_path(args.report, "read")
     output_dir = workspace_path(args.output_dir, "write")
+    attribution_path = workspace_path(args.vir_attribution, "read")
     report_bytes = report_path.read_bytes()
     report = json.loads(report_bytes)
+    attribution_bytes = attribution_path.read_bytes()
+    attribution = json.loads(attribution_bytes)
     validate_report(report)
+    validate_attribution(attribution, report)
     cards = render_cards(
-        report, report_path, hashlib.sha256(report_bytes).hexdigest()
+        report,
+        report_path,
+        hashlib.sha256(report_bytes).hexdigest(),
+        attribution,
+        attribution_path,
+        hashlib.sha256(attribution_bytes).hexdigest(),
     )
 
     stale: list[str] = []
