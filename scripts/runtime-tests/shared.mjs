@@ -169,6 +169,7 @@ export function generateIrPackage(source, packagePath) {
 }
 
 let cachedVirIrpkgEnv = null;
+let virJsBuilt = false;
 let virIrpkgBuilt = false;
 
 export function virIrpkgEnv() {
@@ -192,6 +193,13 @@ function skipVirIrpkgBuildEnv() {
     ...process.env,
     VIR_SKIP_IRPKG_BUILD: "1",
   };
+}
+
+export function ensureVirJsBuilt() {
+  if (virJsBuilt) return;
+  const builtVirJs = spawnSync("lake", ["build", "Vir.Js"], { encoding: "utf8" });
+  assert.equal(builtVirJs.status, 0, builtVirJs.stderr || builtVirJs.stdout);
+  virJsBuilt = true;
 }
 
 export function ensureVirIrpkgBuilt() {

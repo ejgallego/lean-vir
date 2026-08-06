@@ -33,11 +33,15 @@ in ordinary host imports. The supported boundary lanes are:
 The package manifest records each host import boundary as `hostResource`,
 `explicitConversion`, or `objectHandle`, and the runtime dispatches them through
 the corresponding path. Explicit conversion declarations use
-`@[vir_js_explicit_conversion "..."]`; package generation validates their
-generic shape, and the JavaScript runtime still requires a matching host binding
-for the declared target. The manifest also records structural descriptor tags
-for exported Lean entrypoints; those tags belong to the interface descriptors,
-not to the ordinary host-resource import boundary.
+`@[vir_js_explicit_conversion "..."]`. Both host-import attributes validate the
+complete signature and boundary policy when Lean elaborates the declaration, so
+unsupported implicit arguments, result types, effects, and conversion shapes are
+reported at the attribute. Package generation repeats the same typed analysis as
+a final guard for raw extern metadata, then checks package-only limits such as IR
+arity and import slots. The JavaScript runtime still requires a matching host
+binding for the declared target. The manifest also records structural descriptor
+tags for exported Lean entrypoints; those tags belong to the interface
+descriptors, not to the ordinary host-resource import boundary.
 
 For host imports, the relevant descriptor family is:
 

@@ -75,6 +75,8 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
   and inductives.
 - `Vir.GeneratePackage.Interface.Classify.Signature`: the named classified
   signature result plus top-level export and host-import classification.
+- `Vir.HostValidation`: typed host-import signature and boundary-policy analysis
+  shared by the `@[vir_js]` attributes and package generation.
 - `Vir.GeneratePackage.Interface.Collect`: export discovery, export call-summary
   extraction, duplicate-avoidance helpers, boxed-boundary diagnostics, and
   host-import collection for `@[vir_js "..."]` declarations.
@@ -105,8 +107,9 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
    package. Module-set generation repeats this walk while newly missing
    declarations identify unloaded owning modules, stopping when the closure is
    complete or no additional module IR is available.
-5. `Interface.collectHostImports` classifies `@[vir_js "..."]` externs reached
-   by the closure.
+5. `Interface.collectHostImports` repeats the typed `Vir.HostValidation`
+   analysis used when `@[vir_js "..."]` is applied, then performs package-only
+   IR arity and slot checks for host imports reached by the closure.
 6. `Manifest.collectInterfaceManifest` runs the same typed marker preflight
    used by `Vir.Attributes`, then classifies callable exports, folds in
    host-import and declaration-index diagnostics, and rejects duplicate export
@@ -174,15 +177,17 @@ unfolding reducible abbrev heads, so aliases such as `abbrev UserId := Nat` can
 be used at package boundaries without changing their runtime representation.
 
 Marker preflight is intentionally narrower than interface classification. It
-rejects export binder shapes and validates the complete startup contract early,
-while runtime layout and JavaScript boundary types remain package-time checks.
-Both layers consume typed analysis results and render errors at their own user
-boundary instead of sharing preformatted success/failure strings.
+rejects export binder shapes and validates the complete startup contract early.
+Host-import attributes additionally run the complete signature classifier and
+JavaScript boundary policy during elaboration; package generation repeats that
+typed analysis for raw extern metadata and adds package-only layout checks. Each
+layer renders typed errors at its own user boundary instead of sharing
+preformatted success/failure strings.
 
 Interface classification follows the same rule: its core and signature layers
 return `InterfaceClassifierError` values, preserving nested type context as
-data. `Interface.Collect` renders those errors only when it creates package
-diagnostics, while independently enforcing host-boundary policy.
+data. `Vir.HostValidation` composes those values with typed host-boundary errors,
+while `Interface.Collect` renders them only when it creates package diagnostics.
 
 That retry is deliberately conservative: the classifier first tries the source
 type as written, then unfolds only abbrev heads whose outer type shape is not

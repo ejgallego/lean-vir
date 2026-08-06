@@ -191,7 +191,10 @@ LEAN_PATH="build/lean-lib${LEAN_PATH:+:$LEAN_PATH}" lean MyDemo.lean
 
 ## Modules
 
-`Vir.Host` provides the low-level `@[vir_js "..."]` host-import attribute.
+`Vir.Host` provides the low-level `@[vir_js "..."]` host-import attribute. It
+reports unsupported signatures and host-boundary types when Lean elaborates the
+declaration; package generation repeats the same typed analysis as a final
+fallback for raw extern metadata.
 
 ```lean
 import Vir.Js

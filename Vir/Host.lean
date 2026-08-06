@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import Lean
 import Lean.Compiler.ExternAttr
+import Vir.HostValidation
 
 open Lean
 
@@ -17,13 +18,18 @@ The string parameter is the JavaScript target name that the VIR runtime resolves
 through `hostBindings`, for example:
 
 ```lean
+import Vir.Js
+
 @[vir_js "demo.bumpNat"]
-opaque jsBumpNat (n : Nat) : Nat
+opaque jsBumpNat (n : @& Lean.Vir.Js Nat) :
+  Lean.Vir.RuntimeM (Lean.Vir.Js Nat)
 ```
 
 The declaration is not implemented by Lean itself. It is callable when the
 declaration is packaged into a `.irpkg` and executed through the VIR JavaScript
-runtime.
+runtime. The attribute validates the declaration's complete interface signature
+and JavaScript host-boundary policy immediately; package generation repeats the
+same typed analysis as a final guard for raw extern metadata.
 -/
 syntax (name := vir_js) "vir_js " str : attr
 syntax (name := vir_js_explicit_conversion) "vir_js_explicit_conversion " str : attr
@@ -47,20 +53,54 @@ private partial def firstStringLiteral? (stx : Syntax) : Option String :=
   | some value => some value
   | none => stx.getArgs.findSome? firstStringLiteral?
 
-private def parseNonEmptyStringAttr (attrName : String) (stx : Syntax) : AttrM String := do
+private def parseNonEmptyStringAttr (attrName : Name) (stx : Syntax) : AttrM String := do
   let some value := firstStringLiteral? stx
     | throwError s!"invalid `[{attrName}]` attribute syntax; expected `[{attrName} \"value\"]`"
   if value.isEmpty then
     throwError s!"invalid `[{attrName}]` attribute syntax; value must not be empty"
   return value
 
-private def parseVirJsAttr (stx : Syntax) : AttrM JsImport := do
-  let target ← parseNonEmptyStringAttr "vir_js" stx
-  return { target }
+private def validateVirJsAttr
+    (marker : Vir.HostValidation.HostImportMarker) (declName : Name)
+    (data : JsImport) (stx : Syntax) :
+    AttrM Unit := do
+  let env ← getEnv
+  let some info := env.find? declName
+    | throwErrorAt stx s!"invalid `@[{marker.attributeName}]` declaration `{declName}`: \
+        Lean could not find the declaration"
+  match ← Vir.HostValidation.analyzeHostImport marker data.target info.type with
+  | .error error =>
+      throwErrorAt stx s!"invalid `@[{marker.attributeName}]` declaration `{declName}`: \
+        {error.message}"
+  | .ok _ => pure ()
 
-private def parseVirJsExplicitConversionAttr (stx : Syntax) : AttrM JsImport := do
-  let target ← parseNonEmptyStringAttr "vir_js_explicit_conversion" stx
-  return { target }
+private def setVirJsExtern
+    (marker : Vir.HostValidation.HostImportMarker) (declName : Name) (data : JsImport) :
+    AttrM Unit := do
+  let env ← getEnv
+  let externPrefix := match marker with
+    | .hostImport => jsExternPrefix
+    | .explicitConversion => jsExplicitConversionExternPrefix
+  let externData : ExternAttrData := {
+    entries := [ExternEntry.standard `all (externPrefix ++ data.target)]
+  }
+  match externAttr.setParam env declName externData with
+  | .ok env => setEnv env
+  | .error error => throwError error
+
+/--
+Parse and validate before the parametric attribute is stored. Lean intentionally
+swallows `ParametricAttribute.afterSet` exceptions, so user-facing checks and
+extern installation must happen in this propagating phase.
+-/
+private def parseVirJsAttr
+    (marker : Vir.HostValidation.HostImportMarker)
+    (declName : Name) (stx : Syntax) : AttrM JsImport := do
+  let target ← parseNonEmptyStringAttr marker.attributeName stx
+  let data := { target : JsImport }
+  validateVirJsAttr marker declName data stx
+  setVirJsExtern marker declName data
+  return data
 
 end Lean.Vir
 
@@ -68,28 +108,14 @@ initialize virJsAttr : ParametricAttribute Lean.Vir.JsImport ←
   registerParametricAttribute {
     name := `vir_js
     descr := "mark an opaque declaration as a Lean.Vir JavaScript host import"
-    getParam := fun _ stx => Lean.Vir.parseVirJsAttr stx
-    afterSet := fun declName data => do
-      let env ← getEnv
-      let externData : ExternAttrData := {
-        entries := [ExternEntry.standard `all (Lean.Vir.jsExternPrefix ++ data.target)]
-      }
-      match externAttr.setParam env declName externData with
-      | .ok env => setEnv env
-      | .error error => throwError error
+    getParam := fun declName stx =>
+      Lean.Vir.parseVirJsAttr .hostImport declName stx
   }
 
 initialize virJsExplicitConversionAttr : ParametricAttribute Lean.Vir.JsImport ←
   registerParametricAttribute {
     name := `vir_js_explicit_conversion
     descr := "mark a Lean.Vir JavaScript host import as an explicit conversion intrinsic"
-    getParam := fun _ stx => Lean.Vir.parseVirJsExplicitConversionAttr stx
-    afterSet := fun declName data => do
-      let env ← getEnv
-      let externData : ExternAttrData := {
-        entries := [ExternEntry.standard `all (Lean.Vir.jsExplicitConversionExternPrefix ++ data.target)]
-      }
-      match externAttr.setParam env declName externData with
-      | .ok env => setEnv env
-      | .error error => throwError error
+    getParam := fun declName stx =>
+      Lean.Vir.parseVirJsAttr .explicitConversion declName stx
   }

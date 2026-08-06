@@ -16,6 +16,7 @@ ownership diagrams.
   `Vir/GeneratePackage/Interface/Classify/Error.lean`,
   `Vir/GeneratePackage/Interface/Classify/Core.lean`,
   `Vir/GeneratePackage/Interface/Classify/Signature.lean`,
+  `Vir/HostValidation.lean`,
   `Vir/GeneratePackage/Interface/Encode.lean`,
   `web/src/runtime/core.js`,
   `web/src/runtime/object-values.js`,

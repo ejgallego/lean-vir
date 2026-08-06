@@ -6,7 +6,8 @@ inductive Action where
   | feed
   | rename (name : String)
 
-@[vir_js_explicit_conversion "js.value.bad.action"]
+-- Bypass `@[vir_js_explicit_conversion]` so package generation still exercises its final fallback.
+@[extern "__vir_js_explicit_conversion:js.value.bad.action"]
 opaque actionToString (action : @& Action) : Lean.Vir.RuntimeM String
 
 def roundtripFeed : Lean.Vir.RuntimeM String :=

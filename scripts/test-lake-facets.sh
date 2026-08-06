@@ -168,7 +168,7 @@ printf '%s\n' \
   'module' \
   '' \
   'public meta import Vir.Attributes' \
-  'public import Vir.GeneratePackage.Interface.Classify.Signature' \
+  'public import Vir.HostValidation' \
   '' \
   '#check vir_export' \
   '#check vir_startup' \
@@ -184,7 +184,24 @@ printf '%s\n' \
   '#check Vir.GeneratePackage.ClassifiedSignature.effect' \
   '#check Vir.GeneratePackage.ClassifiedSignature.erasedPrefixArgs' \
   '#check Vir.GeneratePackage.classifyExportSignature' \
-  '#check Vir.GeneratePackage.classifyHostImportSignature' > "$tmp/Smoke/InterfaceClassifier.lean"
+  '#check Vir.GeneratePackage.classifyHostImportSignature' \
+  '#check Vir.HostValidation.HostImportMarker' \
+  '#check Vir.HostValidation.HostImportMarker.attributeName' \
+  '#check Vir.HostValidation.HostImportBoundaryError' \
+  '#check Vir.HostValidation.HostImportBoundaryError.message' \
+  '#check Vir.HostValidation.HostImportValidationError' \
+  '#check Vir.HostValidation.HostImportValidationError.message' \
+  '#check Vir.HostValidation.HostImportAnalysis' \
+  '#check Vir.HostValidation.HostImportAnalysis.signature' \
+  '#check Vir.HostValidation.HostImportAnalysis.boundary' \
+  '#check (Vir.HostValidation.validateHostImportBoundary :' \
+  '  Vir.HostValidation.HostImportMarker → String →' \
+  '  Vir.GeneratePackage.ClassifiedSignature →' \
+  '  Except Vir.HostValidation.HostImportBoundaryError Vir.GeneratePackage.HostImportBoundary)' \
+  '#check (Vir.HostValidation.analyzeHostImport :' \
+  '  Vir.HostValidation.HostImportMarker → String → Lean.Expr →' \
+  '  Lean.CoreM (Except Vir.HostValidation.HostImportValidationError' \
+  '    Vir.HostValidation.HostImportAnalysis))' > "$tmp/Smoke/InterfaceClassifier.lean"
 
 printf '%s\n' \
   'module' \

@@ -8,6 +8,7 @@ import {
   assert,
   assertUnsupportedInterfaceFixture,
   assertUnsupportedInterfaceSource,
+  ensureVirJsBuilt,
   join,
   readFile,
   runVirIrpkg,
@@ -16,7 +17,72 @@ import {
   writeRuntimeFixture,
 } from "./shared.mjs";
 
+const implicitHostImportReason =
+  /unsupported JavaScript import signature: implicit or instance argument `value` is not supported; declare a wrapper with only explicit arguments/;
+const rawNatHostArgumentReason =
+  /unsupported JavaScript import argument `n`: raw Lean type `Nat` is not a JavaScript boundary type; use `Unit`, `Lean\.Vir\.Js \.\.\.`, `Lean\.Vir\.Js\.Nullable \.\.\.`, top-level callback arguments, or explicit conversion calls/;
+const callbackHostResultReason =
+  /unsupported JavaScript import result: callback `Function` is not a JavaScript boundary type; use `Unit`, `Lean\.Vir\.Js \.\.\.`, `Lean\.Vir\.Js\.Nullable \.\.\.`, top-level callback arguments, or explicit conversion calls/;
+const explicitConversionReason =
+  /declaration is marked with `@\[vir_js_explicit_conversion\]`, but `js\.value\.bad\.action` does not convert between exactly one `Lean\.Vir\.Js \.\.\.` resource and one Lean value/;
+
+async function assertInvalidHostAttributeSource(freshDir, stem, lines, patterns) {
+  ensureVirJsBuilt();
+  const source = join(freshDir, `${stem}.lean`);
+  await writeFile(source, lines.join("\n"));
+  const checked = spawnSync("lake", ["env", "lean", source], { encoding: "utf8" });
+  assert.notEqual(checked.status, 0, `${stem} unexpectedly elaborated successfully`);
+  const output = `${checked.stderr}${checked.stdout}`;
+  for (const pattern of patterns) assert.match(output, pattern);
+}
+
 export async function runUnsupportedInterfaceSmoke(freshDir) {
+  await assertInvalidHostAttributeSource(freshDir, "InvalidImplicitHostAttribute", [
+    "import Vir.Host",
+    "import Vir.Js",
+    "",
+    "@[vir_js \"test.implicitValue\"]",
+    "opaque jsImplicitValue {value : Lean.Vir.Js Nat} : Lean.Vir.RuntimeM Unit",
+    "",
+  ], [
+    /invalid `@\[vir_js\]` declaration `jsImplicitValue`/,
+    implicitHostImportReason,
+  ]);
+
+  await assertInvalidHostAttributeSource(freshDir, "InvalidHostBoundaryAttribute", [
+    "import Vir.Host",
+    "",
+    "@[vir_js \"test.bumpNat\"]",
+    "opaque jsBumpNat (n : Nat) : Nat",
+    "",
+  ], [
+    /invalid `@\[vir_js\]` declaration `jsBumpNat`/,
+    rawNatHostArgumentReason,
+  ]);
+
+  await assertInvalidHostAttributeSource(freshDir, "InvalidHostResultAttribute", [
+    "import Vir.Js",
+    "",
+    "@[vir_js \"test.callbackResult\"]",
+    "opaque jsCallbackResult : Lean.Vir.RuntimeM (Unit → Lean.Vir.RuntimeM Unit)",
+    "",
+  ], [
+    /invalid `@\[vir_js\]` declaration `jsCallbackResult`/,
+    callbackHostResultReason,
+  ]);
+
+  await assertInvalidHostAttributeSource(freshDir, "InvalidExplicitConversionAttribute", [
+    "import Vir.Host",
+    "import Vir.Js",
+    "",
+    "@[vir_js_explicit_conversion \"js.value.bad.action\"]",
+    "opaque actionToString (action : String) : Lean.Vir.RuntimeM String",
+    "",
+  ], [
+    /invalid `@\[vir_js_explicit_conversion\]` declaration `actionToString`/,
+    explicitConversionReason,
+  ]);
+
   await assertUnsupportedInterfaceFixture(freshDir, "UnsupportedInterfaces.lean", [
     /indexedPairIdentity/,
     /indexed inductive `IndexedPair` is not supported/,
@@ -53,15 +119,12 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
 
   await assertUnsupportedInterfaceFixture(freshDir, "FreshCustomHost.lean", [
     /jsBumpNat/,
-    /unsupported JavaScript import argument `n`/,
-    /raw Lean type `Nat` is not a JavaScript boundary type/,
-    /Lean\.Vir\.Js\.Nullable/,
+    rawNatHostArgumentReason,
     /jsBumpCounter/,
     /unsupported JavaScript import argument `counter`/,
     /structure `HostCounter` is not a JavaScript boundary type/,
     /jsCallbackResult/,
-    /unsupported JavaScript import result/,
-    /callback `Function` is not a JavaScript boundary type/,
+    callbackHostResultReason,
     /jsNestedCallbackArg/,
     /unsupported JavaScript import argument `callback`/,
     /callback `Function` is not a JavaScript boundary type/,
@@ -92,7 +155,8 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "import Vir.Host",
     "import Vir.Js",
     "",
-    "@[vir_js \"test.implicitValue\"]",
+    "-- Bypass `@[vir_js]` so package generation still exercises its final fallback.",
+    "@[extern \"__vir_js:test.implicitValue\"]",
     "opaque jsImplicitValue {value : Lean.Vir.Js Nat} : Lean.Vir.RuntimeM Unit",
     "",
     "def callImplicitValue (value : Lean.Vir.Js Nat) : Lean.Vir.RuntimeM Unit :=",
@@ -100,7 +164,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "",
   ], [
     /jsImplicitValue/,
-    /unsupported JavaScript import signature: implicit or instance argument `value` is not supported; declare a wrapper with only explicit arguments/,
+    implicitHostImportReason,
   ], ["callImplicitValue"]);
 
   await assertUnsupportedInterfaceFixture(freshDir, "BadLeanRef.lean", [
@@ -114,21 +178,12 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
 
   await assertUnsupportedInterfaceFixture(freshDir, "BadJsValue.lean", [
     /actionToString/,
-    /declaration is marked with `@\[vir_js_explicit_conversion\]`/,
-    /js\.value\.bad\.action/,
-    /does not convert between exactly one `Lean\.Vir\.Js \.\.\.` resource and one Lean value/,
+    explicitConversionReason,
   ], ["Vir.Fixtures.BadJsValue.roundtripFeed"]);
 
   const badJslStringSource = join(freshDir, "BadJSLString.lean");
   await writeRuntimeFixture(badJslStringSource, "BadJSLString.lean");
-  const builtVirJs = spawnSync("lake", ["build", "Vir.Js"], {
-    encoding: "utf8",
-  });
-  assert.equal(
-    builtVirJs.status,
-    0,
-    `failed to build Vir.Js before BadJSLString typecheck:\n${builtVirJs.stderr}${builtVirJs.stdout}`,
-  );
+  ensureVirJsBuilt();
   const checkedBadJslString = spawnSync("lake", ["env", "lean", badJslStringSource], {
     encoding: "utf8",
   });
