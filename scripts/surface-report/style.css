@@ -338,6 +338,11 @@ button:focus-visible {
   background: var(--bad-soft);
 }
 
+.status-pill.host {
+  color: var(--warning);
+  background: var(--warning-soft);
+}
+
 .kind-pill {
   color: #4f5e65;
   background: var(--panel-muted);
@@ -460,13 +465,20 @@ button:focus-visible {
 }
 
 .name-button,
-.content-link {
+.content-link,
+.boundary-link {
   padding: 0;
   color: var(--accent);
   border: 0;
   background: transparent;
   cursor: pointer;
   text-align: left;
+}
+
+.boundary-link {
+  overflow-wrap: anywhere;
+  border-bottom: 1px dotted currentcolor;
+  font: inherit;
 }
 
 .name-button {
@@ -547,6 +559,17 @@ button:focus-visible {
 
 .dependency-path li:first-child::before {
   content: "•";
+}
+
+.extern-targets {
+  margin: 0.55rem 0 0;
+  padding-left: 1.4rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.76rem;
+}
+
+.extern-targets li + li {
+  margin-top: 0.25rem;
 }
 
 .table-footer,

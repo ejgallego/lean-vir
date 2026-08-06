@@ -21,7 +21,7 @@ open Lean.IR
 
 def surfaceReportFormat : String := "lean-vir-library-surface"
 
-def currentSurfaceReportVersion : Nat := 1
+def currentSurfaceReportVersion : Nat := 2
 
 /-- Why a transitive IR closure cannot currently be executed by VIR. -/
 inductive SurfaceBlockerKind where
@@ -54,6 +54,46 @@ def SurfaceDeclKind.label : SurfaceDeclKind → String
   | .privateConstant => "privateConstant"
   | .boxed => "boxed"
   | .generated => "generated"
+
+/-- How VIR currently satisfies an imported Lean extern declaration. -/
+inductive SurfaceExternStatus where
+  | native
+  | host
+  | missing
+  deriving BEq, Repr
+
+def SurfaceExternStatus.label : SurfaceExternStatus → String
+  | .native => "native"
+  | .host => "host"
+  | .missing => "missing"
+
+/-- Shape of one backend target attached to an extern declaration. -/
+inductive SurfaceExternTargetKind where
+  | standard
+  | inline
+  | adhoc
+  | opaque
+  deriving Repr
+
+def SurfaceExternTargetKind.label : SurfaceExternTargetKind → String
+  | .standard => "standard"
+  | .inline => "inline"
+  | .adhoc => "adhoc"
+  | .opaque => "opaque"
+
+structure SurfaceExternTarget where
+  kind : SurfaceExternTargetKind
+  backend? : Option Name := none
+  value? : Option String := none
+  deriving Repr
+
+/-- Module-owned extern boundary, kept separate from function coverage counts. -/
+structure SurfaceExternResult where
+  name : Name
+  moduleName : Name
+  status : SurfaceExternStatus
+  targets : Array SurfaceExternTarget
+  deriving Repr
 
 /-- Static closure result for one Lean IR function. -/
 structure SurfaceDeclResult where
@@ -138,6 +178,7 @@ structure SurfaceReport where
   libraries : Array SurfaceLibraryResult
   modules : Array SurfaceModuleResult
   blockers : Array SurfaceBlockerSummary
+  externs : Array SurfaceExternResult
   declarations : Array SurfaceDeclResult
 
 private structure SurfaceNode where
@@ -155,6 +196,11 @@ private structure SurfaceGraph where
 private structure BlockedBy where
   blocker : SurfaceBlocker
   next? : Option Name := none
+
+private structure CatalogExtern where
+  name : Name
+  moduleName : Name
+  decl : Decl
 
 private def insertUnique (items : Array Name) (name : Name) : Array Name :=
   if items.contains name then items else items.push name
@@ -359,13 +405,34 @@ private def summarizeBlockers (results : Array SurfaceDeclResult) : Array Surfac
     lhs.roots > rhs.roots ||
       (lhs.roots == rhs.roots && lhs.blocker.name.toString < rhs.blocker.name.toString)
 
+private def externTarget : ExternEntry → SurfaceExternTarget
+  | .standard backend value => { kind := .standard, backend? := some backend, value? := some value }
+  | .inline backend value => { kind := .inline, backend? := some backend, value? := some value }
+  | .adhoc backend => { kind := .adhoc, backend? := some backend }
+  | .opaque => { kind := .opaque }
+
+private def externResult
+    (capabilities : SurfaceNameMap NativeExtern) (catalog : CatalogExtern) : SurfaceExternResult :=
+  let status :=
+    if capabilities.contains catalog.name then
+      SurfaceExternStatus.native
+    else if isVirJsDecl catalog.decl then
+      SurfaceExternStatus.host
+    else
+      SurfaceExternStatus.missing
+  let targets := match catalog.decl with
+    | .extern _ _ _ data => data.entries.toArray.map externTarget
+    | _ => #[]
+  { name := catalog.name, moduleName := catalog.moduleName, status, targets }
+
 private def catalogDecls
     (env : Environment) (selectedModules : SurfaceNameSet) :
-    SurfaceNameMap Decl × Array Name := Id.run do
+    SurfaceNameMap Decl × Array Name × Array CatalogExtern := Id.run do
   let capacity := env.header.moduleData.foldl
     (fun size data => size + data.constNames.size + data.extraConstNames.size) 0
   let mut decls : SurfaceNameMap Decl := Std.HashMap.emptyWithCapacity capacity
   let mut roots : Array Name := #[]
+  let mut externs : Array CatalogExtern := #[]
   for moduleIdx in [0:env.header.moduleData.size] do
     let data := env.header.moduleData[moduleIdx]!
     let moduleName := env.header.modules[moduleIdx]!.module
@@ -374,17 +441,22 @@ private def catalogDecls
         continue
       let some decl := findEnvDecl env name | continue
       decls := decls.insert name decl
-      if selectedModules.contains moduleName && decl matches .fdecl .. then
-        roots := roots.push name
+      if selectedModules.contains moduleName then
+        match decl with
+        | .fdecl .. => roots := roots.push name
+        | .extern .. => externs := externs.push { name, moduleName, decl }
   roots := roots.qsort fun lhs rhs => lhs.quickLt rhs
-  return (decls, roots)
+  externs := externs.qsort fun lhs rhs =>
+    lhs.moduleName.toString < rhs.moduleName.toString ||
+      (lhs.moduleName == rhs.moduleName && lhs.name.toString < rhs.name.toString)
+  return (decls, roots, externs)
 
 /-- Analyze all IR functions owned by `selectedModules` in one imported environment. -/
 def analyzeLibrarySurface
     (env : Environment) (selectedModules : Array Name) : SurfaceReport :=
   let selectedSet := selectedModules.foldl (fun names name => names.insert name)
     (Std.HashSet.emptyWithCapacity selectedModules.size : SurfaceNameSet)
-  let (decls, roots) := catalogDecls env selectedSet
+  let (decls, roots, catalogExterns) := catalogDecls env selectedSet
   let capabilities := nativeExterns.foldl (fun capabilities ext => capabilities.insert ext.name ext)
     (Std.HashMap.emptyWithCapacity nativeExterns.size : SurfaceNameMap NativeExtern)
   let graph := buildSurfaceGraph env decls capabilities roots
@@ -401,6 +473,7 @@ def analyzeLibrarySurface
     libraries := aggregateLibraries modules
     modules
     blockers := summarizeBlockers declarations
+    externs := catalogExterns.map (externResult capabilities)
     declarations
   }
 

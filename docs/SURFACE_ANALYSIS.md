@@ -33,6 +33,12 @@ it one deterministic nearest primary blocker so blocker totals do not
 double-count roots. Every declaration record includes that blocker and one
 representative path to it.
 
+The report also catalogs module-owned extern declarations as native, host, or
+missing boundaries and preserves their declared backend targets. These extern
+rows explain terminals such as `Lean.Expr.eqv`, but do not enter the function
+coverage numerator or denominator: coverage continues to answer how many IR
+functions have a complete closure, without counting a boundary twice.
+
 The headline deliberately does not require:
 
 - current `.irpkg` encodability, because VIR owns and can extend that format;
@@ -103,15 +109,18 @@ CDN dependency.
 The left navigator treats dotted Lean module names as folders and files. Both
 folders and modules show a selectable public-constant or all-IR coverage
 percentage. Selecting a folder shows its immediate subfolders/modules and
-aggregate counts. Selecting a module loads only that module's declaration data
-and provides function-name, status, and class filters. Blocked function rows
-show the primary boundary, and selecting a function reveals its representative
-dependency path.
+aggregate counts. Selecting a module loads only that module's function data,
+inserts its extern boundaries in name order, and provides declaration-name,
+status, and class filters. Blocked function rows show the primary boundary;
+linkable boundaries open their owning extern row and expose the backend target,
+blocked-root impact, and representative dependency path. Declaration links use
+the `#declaration=...` fragment and can be shared directly.
 
-The generated directory contains a small navigation index plus one compact
-JavaScript data file per module with functions. This keeps initial browser load
-independent of the complete declaration count and avoids parsing the full JSON
-report before the user selects a module.
+The generated directory contains a navigation index with the comparatively
+small extern catalog plus one compact JavaScript data file per module with
+functions. This keeps initial browser load independent of the complete
+function count and avoids parsing the full JSON report before the user selects
+a module.
 
 ## Reading And Comparing Reports
 

@@ -89,6 +89,21 @@ private def SurfaceBlockerSummary.toJson (summary : SurfaceBlockerSummary) : Str
     ("examplePath", jsonNames summary.examplePath)
   ]
 
+private def SurfaceExternTarget.toJson (target : SurfaceExternTarget) : String :=
+  jsonObject #[
+    ("kind", jsonString target.kind.label),
+    ("backend", target.backend?.map jsonName |>.getD "null"),
+    ("value", target.value?.map jsonString |>.getD "null")
+  ]
+
+private def SurfaceExternResult.toJson (result : SurfaceExternResult) : String :=
+  jsonObject #[
+    ("name", jsonName result.name),
+    ("module", jsonName result.moduleName),
+    ("status", jsonString result.status.label),
+    ("targets", jsonArray (result.targets.map SurfaceExternTarget.toJson))
+  ]
+
 private def SurfaceDeclResult.toJson (result : SurfaceDeclResult) : String :=
   jsonObject #[
     ("name", jsonName result.name),
@@ -127,6 +142,7 @@ def SurfaceReport.toJson (report : SurfaceReport) : String :=
     ("libraries", jsonArray (report.libraries.map SurfaceLibraryResult.toJson)),
     ("modules", jsonArray (report.modules.map SurfaceModuleResult.toJson)),
     ("primaryBlockers", jsonArray (report.blockers.map SurfaceBlockerSummary.toJson)),
+    ("externs", jsonArray (report.externs.map SurfaceExternResult.toJson)),
     ("declarations", jsonArray (report.declarations.map SurfaceDeclResult.toJson))
   ]
 
@@ -149,6 +165,7 @@ private def pathText (path : Array Name) : String :=
 /-- Human-readable overview; exact per-function status remains in the JSON report. -/
 def SurfaceReport.toMarkdown (report : SurfaceReport) : String :=
   let summary := report.counts
+  let missingExterns := report.externs.filter (·.status == .missing) |>.size
   let moduleRows := report.modules.map fun result =>
     s!"| `{displayName result.name}` | {ratio result.counts.publicRunnable result.counts.publicTotal} | " ++
       s!"{ratio result.counts.runnable result.counts.total} | {result.counts.blocked} |"
@@ -169,7 +186,8 @@ def SurfaceReport.toMarkdown (report : SurfaceReport) : String :=
   s!"- Native runtime capabilities: {report.nativeExterns.size}\n" ++
   s!"- Public constants with IR runnable: {ratio summary.publicRunnable summary.publicTotal}\n" ++
   s!"- All IR functions runnable: {ratio summary.runnable summary.total}\n" ++
-  s!"- Blocked IR functions: {summary.blocked}\n\n" ++
+  s!"- Blocked IR functions: {summary.blocked}\n" ++
+  s!"- Extern boundaries: {report.externs.size} ({missingExterns} missing)\n\n" ++
   "## By Library\n\n" ++
   "| Library | Modules with functions | Public constants runnable | All IR runnable | Blocked |\n" ++
   "| --- | ---: | ---: | ---: | ---: |\n" ++

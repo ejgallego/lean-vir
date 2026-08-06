@@ -18,7 +18,7 @@ const outputDir = await mkdtemp(join(tmpdir(), "vir-surface-smoke-"));
 const jsonPath = join(outputDir, "surface.json");
 const markdownPath = join(outputDir, "surface.md");
 const htmlDir = join(outputDir, "html");
-const selectedModule = "Init.Data.List.Basic";
+const selectedModule = "Lean.Expr";
 
 try {
   runSync("lake", ["build", "vir_surface"], { cwd: repoRoot, capture: true });
@@ -32,13 +32,14 @@ try {
   const markdown = await readFile(markdownPath, "utf8");
 
   assert.equal(report.format, "lean-vir-library-surface");
-  assert.equal(report.version, 1);
+  assert.equal(report.version, 2);
   assert.equal(report.definition.headline, "static transitive IR closure completeness");
   assert.equal(report.definition.encodingIsGate, false);
   assert.deepEqual(report.selectedModules, [selectedModule]);
   assert.ok(report.loadedModules >= 1);
   assert.ok(report.counts.total > 0);
   assert.equal(report.declarations.length, report.counts.total);
+  assert.ok(report.externs.length > 0);
   assert.equal(report.counts.blocked, report.counts.total - report.counts.runnable);
   assert.equal(
     report.counts.total,
@@ -74,6 +75,17 @@ try {
     }
   }
 
+  const eqv = report.externs.find((declaration) => declaration.name === "Lean.Expr.eqv");
+  assert.ok(eqv);
+  assert.equal(eqv.module, selectedModule);
+  assert.equal(eqv.status, "missing");
+  assert.deepEqual(eqv.targets, [{
+    kind: "standard",
+    backend: "all",
+    value: "lean_expr_eqv",
+  }]);
+  assert.ok(report.externs.some((declaration) => declaration.status === "native"));
+
   assert.match(markdown, /^# VIR Lean Library Surface/m);
   assert.match(markdown, /## By Library/);
   assert.match(markdown, new RegExp("\\| `" + selectedModule.replaceAll(".", "\\.") + "` \\|"));
@@ -85,9 +97,10 @@ try {
   );
   const htmlManifest = JSON.parse(await readFile(join(htmlDir, "vir-surface-html.json"), "utf8"));
   assert.equal(htmlManifest.format, "lean-vir-surface-html");
-  assert.equal(htmlManifest.version, 1);
+  assert.equal(htmlManifest.version, 2);
   assert.equal(htmlManifest.selectedModules, 1);
   assert.equal(htmlManifest.declarations, report.counts.total);
+  assert.equal(htmlManifest.externs, report.externs.length);
 
   const indexHtml = await readFile(join(htmlDir, "index.html"), "utf8");
   assert.match(indexHtml, /VIR Runnable Surface/);
@@ -100,6 +113,13 @@ try {
   assert.equal(htmlIndex.modules.length, 1);
   assert.equal(htmlIndex.modules[0].name, selectedModule);
   assert.equal(htmlIndex.modules[0].declarationCount, report.counts.total);
+  assert.equal(htmlIndex.modules[0].externCount, report.externs.length);
+  assert.deepEqual(
+    JSON.parse(JSON.stringify(
+      htmlIndex.externs.find((declaration) => declaration.name === "Lean.Expr.eqv"),
+    )),
+    eqv,
+  );
 
   const moduleFiles = await readdir(join(htmlDir, "data/modules"));
   assert.deepEqual(moduleFiles, ["000000.js"]);
@@ -121,7 +141,9 @@ try {
     assert.ok(declaration.length === 3 || declaration.length === 6);
     assert.ok(declaration[2] === 0 || declaration[2] === 1);
   }
-  console.log(`surface report smoke ok (${report.counts.total} IR functions)`);
+  console.log(
+    `surface report smoke ok (${report.counts.total} IR functions, ${report.externs.length} externs)`,
+  );
 } finally {
   await rm(outputDir, { recursive: true, force: true });
 }

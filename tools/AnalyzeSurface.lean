@@ -65,6 +65,14 @@ private def forceSurfaceReport (report : SurfaceReport) : UInt64 :=
     let state := mixHash state (hash summary.publicRoots)
     let state := mixHash state summary.exampleRoot.hash
     mixNames state summary.examplePath) state
+  let state := report.externs.foldl (fun state result =>
+    let state := mixHash state result.name.hash
+    let state := mixHash state result.moduleName.hash
+    let state := mixHash state (hash result.status.label)
+    result.targets.foldl (fun state target =>
+      let state := mixHash state (hash target.kind.label)
+      let state := target.backend?.map (mixHash state ·.hash) |>.getD state
+      target.value?.map (mixHash state ·.hash) |>.getD state) state) state
   report.declarations.foldl (fun state result =>
     let state := mixHash state result.name.hash
     let state := mixHash state result.moduleName.hash

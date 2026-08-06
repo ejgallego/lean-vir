@@ -10,7 +10,7 @@ import { fileURLToPath } from "node:url";
 
 const SURFACE_FORMAT = "lean-vir-library-surface";
 const HTML_FORMAT = "lean-vir-surface-html";
-const HTML_VERSION = 1;
+const HTML_VERSION = 2;
 const templateDir = fileURLToPath(new URL("surface-report/", import.meta.url));
 
 const [inputArg, outputArg, ...rest] = process.argv.slice(2);
@@ -25,6 +25,7 @@ const modulesDir = join(outputDir, "data", "modules");
 const assetsDir = join(outputDir, "assets");
 const report = JSON.parse(await readFile(inputPath, "utf8"));
 validateReport(report);
+const externs = report.externs ?? [];
 
 await Promise.all([
   mkdir(modulesDir, { recursive: true }),
@@ -38,11 +39,16 @@ for (const declaration of report.declarations) {
   declarations.push(declaration);
   declarationsByModule.set(declaration.module, declarations);
 }
+const externCountByModule = new Map();
+for (const declaration of externs) {
+  externCountByModule.set(declaration.module, (externCountByModule.get(declaration.module) ?? 0) + 1);
+}
 
 const moduleNames = [...new Set([
   ...report.selectedModules,
   ...report.modules.map((module) => module.name),
   ...declarationsByModule.keys(),
+  ...externCountByModule.keys(),
 ])].sort(compareText);
 
 const moduleRecords = moduleNames.map((name, id) => {
@@ -53,6 +59,7 @@ const moduleRecords = moduleNames.map((name, id) => {
     name,
     counts,
     declarationCount: declarations.length,
+    externCount: externCountByModule.get(name) ?? 0,
     dataPath: declarations.length === 0 ? null : `data/modules/${moduleFileName(id)}`,
   };
 });
@@ -87,7 +94,8 @@ const indexPayload = {
   runtimeCapabilityCount: report.runtimeCapabilities.nativeExternCount,
   counts: report.counts,
   libraries: report.libraries,
-  primaryBlockers: report.primaryBlockers.slice(0, 50),
+  primaryBlockers: report.primaryBlockers,
+  externs,
   declarationTuple: [
     "name",
     "kind",
@@ -118,13 +126,15 @@ const manifest = {
   selectedModules: report.selectedModules.length,
   modulesWithFunctions: report.modules.length,
   declarations: report.declarations.length,
+  externs: externs.length,
   moduleDataFiles: dataFileCount,
   entrypoint: "index.html",
 };
 bytesWritten += await writeOutput("vir-surface-html.json", `${JSON.stringify(manifest, null, 2)}\n`);
 
 console.log(
-  `rendered ${moduleRecords.length} modules and ${report.declarations.length} declarations `
+  `rendered ${moduleRecords.length} modules, ${report.declarations.length} functions, and `
+    + `${externs.length} extern boundaries `
     + `to ${outputDir} (${formatBytes(bytesWritten)})`,
 );
 
@@ -141,6 +151,9 @@ function validateReport(value) {
     if (!Array.isArray(value[field])) {
       throw new Error(`surface report field ${JSON.stringify(field)} must be an array`);
     }
+  }
+  if (value.externs !== undefined && !Array.isArray(value.externs)) {
+    throw new Error("surface report field \"externs\" must be an array when present");
   }
   if (!value.counts || !value.lean || !value.definition || !value.runtimeCapabilities) {
     throw new Error("surface report is missing counts, Lean identity, definition, or capabilities");

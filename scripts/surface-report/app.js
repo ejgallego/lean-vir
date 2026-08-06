@@ -15,6 +15,20 @@ Author: Emilio J. Gallego Arias
 
   const number = new Intl.NumberFormat("en-US");
   const moduleByName = new Map(report.modules.map((module) => [module.name, module]));
+  const externs = report.externs ?? [];
+  const externByName = new Map(externs.map((declaration) => [declaration.name, declaration]));
+  const externsByModule = new Map();
+  for (const declaration of externs) {
+    const declarations = externsByModule.get(declaration.module) ?? [];
+    declarations.push(declaration);
+    externsByModule.set(declaration.module, declarations);
+  }
+  for (const declarations of externsByModule.values()) {
+    declarations.sort((lhs, rhs) => compareText(lhs.name, rhs.name));
+  }
+  const blockerByName = new Map(
+    report.primaryBlockers.map((summary) => [summary.blocker.name, summary]),
+  );
   const folderByPath = new Map();
   const rootFolder = buildFolderTree(report.modules);
   const tree = document.querySelector("#module-tree");
@@ -34,6 +48,7 @@ Author: Emilio J. Gallego Arias
     functionStatus: "all",
     functionKind: "all",
     visibleFunctions: 200,
+    focusDeclaration: null,
   };
 
   globalThis.__virSurfaceAcceptModule = (payload) => {
@@ -58,7 +73,7 @@ Author: Emilio J. Gallego Arias
 
   const initial = selectionFromHash();
   if (initial?.type === "module") {
-    selectModule(initial.value, false);
+    selectModule(initial.value, false, initial.focusDeclaration);
   } else if (initial?.type === "folder") {
     selectFolder(initial.value, false);
   } else {
@@ -71,6 +86,7 @@ Author: Emilio J. Gallego Arias
     for (const module of modules) {
       addCounts(root.counts, module.counts);
       root.moduleCount += 1;
+      root.externCount += module.externCount ?? 0;
       const parts = module.name.split(".");
       let folder = root;
       let path = "";
@@ -84,6 +100,7 @@ Author: Emilio J. Gallego Arias
         }
         addCounts(child.counts, module.counts);
         child.moduleCount += 1;
+        child.externCount += module.externCount ?? 0;
         folder = child;
       }
       folder.files.push(module);
@@ -100,6 +117,7 @@ Author: Emilio J. Gallego Arias
       files: [],
       counts: emptyCounts(),
       moduleCount: 0,
+      externCount: 0,
     };
   }
 
@@ -144,6 +162,7 @@ Author: Emilio J. Gallego Arias
       shortHash(report.lean.githash),
       `${number.format(report.selectedModuleCount)} modules`,
       `${number.format(report.runtimeCapabilityCount)} native capabilities`,
+      `${number.format(externs.length)} extern boundaries`,
     ].join(" · ");
 
     const summary = document.querySelector("#global-summary");
@@ -256,15 +275,18 @@ Author: Emilio J. Gallego Arias
     renderFolder(folder);
   }
 
-  function selectModule(module, updateHash = true) {
+  function selectModule(module, updateHash = true, focusDeclaration = null) {
     state.selectedType = "module";
     state.selectedValue = module;
-    state.functionQuery = "";
+    state.functionQuery = focusDeclaration?.toLowerCase() ?? "";
     state.functionStatus = "all";
-    state.functionKind = "all";
+    state.functionKind = focusDeclaration ? "extern" : "all";
     state.visibleFunctions = 200;
+    state.focusDeclaration = focusDeclaration;
     expandFolderAncestors(parentPath(module.name));
-    if (updateHash) setHash("module", module.name);
+    if (updateHash) {
+      setHash(focusDeclaration ? "declaration" : "module", focusDeclaration ?? module.name);
+    }
     const requestVersion = ++state.requestVersion;
     renderTree();
     renderModuleLoading(module);
@@ -300,16 +322,22 @@ Author: Emilio J. Gallego Arias
   function renderFolderContents(folder) {
     const card = sectionCard("Subfolders and modules", `${folder.folders.size + folder.files.length} items`);
     const tableWrap = element("div", "data-table-wrap");
-    const table = tableElement(["Name", "Type", "Public constants", "All IR", "Functions"]);
+    const table = tableElement(["Name", "Type", "Public constants", "All IR", "Functions", "Externs"]);
     const body = table.tBodies[0];
     for (const child of folder.folders.values()) {
-      body.append(folderContentRow(child.label, "Folder", child.counts, () => {
+      body.append(folderContentRow(child.label, "Folder", child.counts, child.externCount, () => {
         state.expanded.add(child.path);
         selectFolder(child);
       }));
     }
     for (const module of folder.files) {
-      body.append(folderContentRow(moduleLabel(module.name), "Module", module.counts, () => selectModule(module)));
+      body.append(folderContentRow(
+        moduleLabel(module.name),
+        "Module",
+        module.counts,
+        module.externCount ?? 0,
+        () => selectModule(module),
+      ));
     }
     if (body.rows.length === 0) {
       tableWrap.append(element("p", "empty-state", "This folder contains no analyzed modules."));
@@ -320,7 +348,7 @@ Author: Emilio J. Gallego Arias
     return card;
   }
 
-  function folderContentRow(label, type, counts, onSelect) {
+  function folderContentRow(label, type, counts, externCount, onSelect) {
     const row = document.createElement("tr");
     const nameCell = document.createElement("td");
     const link = element("button", "content-link", label);
@@ -333,6 +361,7 @@ Author: Emilio J. Gallego Arias
       tableCell(ratioText(counts.publicRunnable, counts.publicTotal), "percentage-cell"),
       tableCell(ratioText(counts.runnable, counts.total), "percentage-cell"),
       tableCell(number.format(counts.total), "count-cell"),
+      tableCell(number.format(externCount), "count-cell"),
     );
     return row;
   }
@@ -344,8 +373,11 @@ Author: Emilio J. Gallego Arias
     const body = table.tBodies[0];
     for (const summary of report.primaryBlockers.slice(0, 25)) {
       const row = document.createElement("tr");
+      const blockerCell = document.createElement("td");
+      blockerCell.className = "blocker-name";
+      blockerCell.append(boundaryLink(summary.blocker.name));
       row.append(
-        tableCell(summary.blocker.name, "blocker-name"),
+        blockerCell,
         tableCell(summary.blocker.kind),
         tableCell(number.format(summary.publicRoots), "count-cell"),
         tableCell(number.format(summary.roots), "count-cell"),
@@ -361,8 +393,8 @@ Author: Emilio J. Gallego Arias
     main.replaceChildren(
       renderBreadcrumbs(parentPath(module.name), module.name),
       contentHeading(module.name, "Module", "Loading declaration data…"),
-      statGrid(module.counts, "Blocked", number.format(module.counts.blocked)),
-      sectionWithMessage("Functions", "Loading this module on demand…", "loading"),
+      statGrid(module.counts, "Extern boundaries", number.format(module.externCount ?? 0)),
+      sectionWithMessage("Declarations", "Loading this module on demand…", "loading"),
     );
   }
 
@@ -370,17 +402,20 @@ Author: Emilio J. Gallego Arias
     main.replaceChildren(
       renderBreadcrumbs(parentPath(module.name), module.name),
       contentHeading(module.name, "Module", "Declaration data could not be loaded."),
-      statGrid(module.counts, "Blocked", number.format(module.counts.blocked)),
-      sectionWithMessage("Functions", String(error), "error-state"),
+      statGrid(module.counts, "Extern boundaries", number.format(module.externCount ?? 0)),
+      sectionWithMessage("Declarations", String(error), "error-state"),
     );
   }
 
   function renderModule(module, payload) {
-    const card = sectionCard("Functions", `${number.format(payload.declarations.length)} declarations`);
+    const items = moduleDeclarationItems(module, payload);
+    const moduleExterns = externsByModule.get(module.name) ?? [];
+    const missingExterns = moduleExterns.filter((declaration) => declaration.status === "missing").length;
+    const card = sectionCard("Declarations", `${number.format(items.length)} entries`);
     const controls = element("div", "module-controls");
-    const search = control("Search functions", "input");
+    const search = control("Search declarations", "input");
     search.input.type = "search";
-    search.input.placeholder = "Function or blocker name…";
+    search.input.placeholder = "Function, extern, or blocker name…";
     search.input.value = state.functionQuery;
     const status = control("Status", "select", [
       ["all", "All statuses"],
@@ -394,6 +429,7 @@ Author: Emilio J. Gallego Arias
       ["privateConstant", "Private constant"],
       ["boxed", "Boxed wrapper"],
       ["generated", "Generated"],
+      ["extern", "Extern boundary"],
     ]);
     kind.input.value = state.functionKind;
     controls.append(search.label, status.label, kind.label);
@@ -401,18 +437,21 @@ Author: Emilio J. Gallego Arias
     const detail = element("div", "function-detail");
     detail.hidden = true;
     const results = element("div", "function-results");
-    const refresh = () => renderFunctionResults(payload, results, detail);
+    const refresh = () => renderDeclarationResults(items, results, detail);
     search.input.addEventListener("input", () => {
+      state.focusDeclaration = null;
       state.functionQuery = search.input.value.trim().toLowerCase();
       state.visibleFunctions = 200;
       refresh();
     });
     status.input.addEventListener("change", () => {
+      state.focusDeclaration = null;
       state.functionStatus = status.input.value;
       state.visibleFunctions = 200;
       refresh();
     });
     kind.input.addEventListener("change", () => {
+      state.focusDeclaration = null;
       state.functionKind = kind.input.value;
       state.visibleFunctions = 200;
       refresh();
@@ -424,22 +463,45 @@ Author: Emilio J. Gallego Arias
       contentHeading(
         module.name,
         "Module",
-        `${number.format(payload.declarations.length)} IR function${payload.declarations.length === 1 ? "" : "s"}.`,
+        `${number.format(payload.declarations.length)} IR function${payload.declarations.length === 1 ? "" : "s"} · `
+          + `${number.format(moduleExterns.length)} extern boundar${moduleExterns.length === 1 ? "y" : "ies"}.`,
       ),
-      statGrid(module.counts, "Blocked", number.format(module.counts.blocked)),
+      statGrid(
+        module.counts,
+        "Extern boundaries",
+        `${number.format(moduleExterns.length)} (${number.format(missingExterns)} missing)`,
+      ),
       card,
     );
     refresh();
+    if (state.focusDeclaration) {
+      const focused = items.find((item) => item.name === state.focusDeclaration);
+      if (focused) renderDeclarationDetail(focused, detail);
+      state.focusDeclaration = null;
+    }
   }
 
-  function renderFunctionResults(payload, container, detail) {
-    const filtered = payload.declarations.filter((declaration) => {
-      const runnable = declaration[2] === 1;
+  function moduleDeclarationItems(module, payload) {
+    const items = payload.declarations.map((declaration) => ({
+      type: "function",
+      name: declaration[0],
+      declaration,
+    }));
+    for (const declaration of externsByModule.get(module.name) ?? []) {
+      items.push({ type: "extern", name: declaration.name, declaration });
+    }
+    items.sort((lhs, rhs) => compareText(lhs.name, rhs.name) || compareText(lhs.type, rhs.type));
+    return items;
+  }
+
+  function renderDeclarationResults(items, container, detail) {
+    const filtered = items.filter((item) => {
+      const runnable = declarationRunnable(item);
       if (state.functionStatus === "runnable" && !runnable) return false;
       if (state.functionStatus === "blocked" && runnable) return false;
-      if (state.functionKind !== "all" && declaration[1] !== state.functionKind) return false;
+      if (state.functionKind !== "all" && declarationKind(item) !== state.functionKind) return false;
       if (state.functionQuery) {
-        const searchable = `${declaration[0]}\n${declaration[4] ?? ""}`.toLowerCase();
+        const searchable = declarationSearchText(item).toLowerCase();
         if (!searchable.includes(state.functionQuery)) return false;
       }
       return true;
@@ -447,31 +509,41 @@ Author: Emilio J. Gallego Arias
     const shown = filtered.slice(0, state.visibleFunctions);
     container.replaceChildren();
     if (filtered.length === 0) {
-      container.append(element("p", "empty-state", "No functions match these filters."));
+      container.append(element("p", "empty-state", "No declarations match these filters."));
       detail.hidden = true;
       return;
     }
 
     const wrap = element("div", "data-table-wrap");
-    const table = tableElement(["Function", "Class", "Status", "Primary blocker"]);
+    const table = tableElement(["Declaration", "Class", "Status", "Boundary / target"]);
     const body = table.tBodies[0];
-    for (const declaration of shown) {
-      const runnable = declaration[2] === 1;
+    for (const item of shown) {
+      const runnable = declarationRunnable(item);
       const row = document.createElement("tr");
       const nameCell = document.createElement("td");
-      const name = element("button", "name-button", declaration[0]);
+      const name = element("button", "name-button", item.name);
       name.type = "button";
-      name.addEventListener("click", () => renderFunctionDetail(declaration, detail));
+      name.addEventListener("click", () => renderDeclarationDetail(item, detail));
       nameCell.append(name);
       const kindCell = document.createElement("td");
-      kindCell.append(element("span", "kind-pill", kindLabel(declaration[1])));
+      kindCell.append(element("span", "kind-pill", kindLabel(declarationKind(item))));
       const statusCell = document.createElement("td");
-      statusCell.append(element("span", `status-pill ${runnable ? "good" : "bad"}`, runnable ? "VIR-able" : "Blocked"));
+      const status = declarationStatus(item);
+      statusCell.append(element("span", `status-pill ${status.className}`, status.label));
+      const boundaryCell = document.createElement("td");
+      boundaryCell.className = "blocker-name";
+      if (item.type === "extern") {
+        boundaryCell.textContent = externTargetsLabel(item.declaration);
+      } else if (runnable) {
+        boundaryCell.textContent = "—";
+      } else {
+        boundaryCell.append(boundaryLink(item.declaration[4]));
+      }
       row.append(
         nameCell,
         kindCell,
         statusCell,
-        tableCell(runnable ? "—" : declaration[4], runnable ? "" : "blocker-name"),
+        boundaryCell,
       );
       body.append(row);
     }
@@ -481,7 +553,7 @@ Author: Emilio J. Gallego Arias
     const footer = element(
       "div",
       "table-footer",
-      `Showing ${number.format(shown.length)} of ${number.format(filtered.length)} matching functions.`,
+      `Showing ${number.format(shown.length)} of ${number.format(filtered.length)} matching declarations.`,
     );
     if (shown.length < filtered.length) {
       footer.append(document.createTextNode(" "));
@@ -489,11 +561,19 @@ Author: Emilio J. Gallego Arias
       more.type = "button";
       more.addEventListener("click", () => {
         state.visibleFunctions += 200;
-        renderFunctionResults(payload, container, detail);
+        renderDeclarationResults(items, container, detail);
       });
       footer.append(more);
     }
     container.append(footer);
+  }
+
+  function renderDeclarationDetail(item, detail) {
+    if (item.type === "extern") {
+      renderExternDetail(item.declaration, detail);
+      return;
+    }
+    renderFunctionDetail(item.declaration, detail);
   }
 
   function renderFunctionDetail(declaration, detail) {
@@ -508,14 +588,44 @@ Author: Emilio J. Gallego Arias
     appendFact(facts, "Class", kindLabel(declaration[1]));
     if (!runnable) {
       appendFact(facts, "Blocker kind", declaration[3]);
-      appendFact(facts, "Boundary", declaration[4]);
+      appendFactNode(facts, "Boundary", boundaryLink(declaration[4]));
     }
     detail.append(facts);
     if (!runnable && declaration[5]?.length) {
       detail.append(element("p", "control-label", "Representative dependency path"));
-      const path = element("ol", "dependency-path");
-      for (const name of declaration[5]) path.append(element("li", "", name));
-      detail.append(path);
+      detail.append(renderDependencyPath(declaration[5]));
+    }
+    detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
+  }
+
+  function renderExternDetail(declaration, detail) {
+    const status = externStatus(declaration.status);
+    detail.hidden = false;
+    detail.replaceChildren(
+      element("h3", "", declaration.name),
+      element("span", `status-pill ${status.className}`, status.label),
+    );
+    const facts = document.createElement("dl");
+    appendFact(facts, "Class", "extern boundary");
+    appendFact(facts, "Owning module", declaration.module);
+    const impact = blockerByName.get(declaration.name);
+    if (impact) {
+      appendFact(
+        facts,
+        "Primary impact",
+        `${number.format(impact.publicRoots)} public / ${number.format(impact.roots)} all blocked roots`,
+      );
+    }
+    detail.append(facts);
+    detail.append(element("p", "control-label", "Extern targets"));
+    const targets = element("ul", "extern-targets");
+    for (const target of declaration.targets) {
+      targets.append(element("li", "", externTargetLabel(target)));
+    }
+    detail.append(targets);
+    if (impact?.examplePath?.length) {
+      detail.append(element("p", "control-label", "Representative blocked dependency path"));
+      detail.append(renderDependencyPath(impact.examplePath));
     }
     detail.scrollIntoView({ block: "nearest", behavior: "smooth" });
   }
@@ -632,6 +742,74 @@ Author: Emilio J. Gallego Arias
     list.append(element("dt", "", term), element("dd", "", description));
   }
 
+  function appendFactNode(list, term, description) {
+    const value = element("dd");
+    value.append(description);
+    list.append(element("dt", "", term), value);
+  }
+
+  function declarationRunnable(item) {
+    return item.type === "extern"
+      ? item.declaration.status !== "missing"
+      : item.declaration[2] === 1;
+  }
+
+  function declarationKind(item) {
+    return item.type === "extern" ? "extern" : item.declaration[1];
+  }
+
+  function declarationStatus(item) {
+    if (item.type === "extern") return externStatus(item.declaration.status);
+    return item.declaration[2] === 1
+      ? { label: "VIR-able", className: "good" }
+      : { label: "Blocked", className: "bad" };
+  }
+
+  function externStatus(status) {
+    return {
+      native: { label: "Native boundary", className: "good" },
+      host: { label: "Host boundary", className: "host" },
+      missing: { label: "Missing boundary", className: "bad" },
+    }[status] ?? { label: status, className: "bad" };
+  }
+
+  function declarationSearchText(item) {
+    if (item.type === "extern") {
+      return `${item.name}\n${item.declaration.status}\n${externTargetsLabel(item.declaration)}`;
+    }
+    return `${item.name}\n${item.declaration[4] ?? ""}`;
+  }
+
+  function externTargetsLabel(declaration) {
+    return declaration.targets.map((target) => target.value ?? externTargetLabel(target)).join(", ");
+  }
+
+  function externTargetLabel(target) {
+    const kind = target.backend ? `${target.kind} [${target.backend}]` : target.kind;
+    return target.value ? `${kind}: ${target.value}` : kind;
+  }
+
+  function boundaryLink(name) {
+    const declaration = externByName.get(name);
+    const module = declaration && moduleByName.get(declaration.module);
+    if (!module) return element("span", "", name);
+    const link = element("button", "boundary-link", name);
+    link.type = "button";
+    link.title = `Open ${name} in ${module.name}`;
+    link.addEventListener("click", () => selectModule(module, true, name));
+    return link;
+  }
+
+  function renderDependencyPath(names) {
+    const path = element("ol", "dependency-path");
+    for (const name of names) {
+      const item = document.createElement("li");
+      item.append(externByName.has(name) ? boundaryLink(name) : document.createTextNode(name));
+      path.append(item);
+    }
+    return path;
+  }
+
   function loadModule(module) {
     if (moduleCache.has(module.id)) return Promise.resolve(moduleCache.get(module.id));
     if (modulePromises.has(module.id)) return modulePromises.get(module.id).promise;
@@ -664,6 +842,11 @@ Author: Emilio J. Gallego Arias
     const value = decodeURIComponent(hash.slice(separator + 1));
     if (type === "module" && moduleByName.has(value)) return { type, value: moduleByName.get(value) };
     if (type === "folder" && folderByPath.has(value)) return { type, value: folderByPath.get(value) };
+    if (type === "declaration" && externByName.has(value)) {
+      const declaration = externByName.get(value);
+      const module = moduleByName.get(declaration.module);
+      if (module) return { type: "module", value: module, focusDeclaration: value };
+    }
     return null;
   }
 
