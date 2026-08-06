@@ -8,6 +8,7 @@ module
 
 public import Lean.Compiler.LCNF.Main
 public import Lean.Compiler.LCNF.ToImpureType
+public import Vir.GeneratePackage.Interface.Classify.Error
 public import Vir.GeneratePackage.Interface.Encode
 public import Vir.InterfaceValidation
 
@@ -200,17 +201,19 @@ def recursiveSeenLastMatches (seen : RecursiveSeen) (name : Name) (key : String)
 inductive RecursiveVisit where
   | selfReference
   | descend (nextSeen : RecursiveSeen)
-  | error (reason : String)
+  | error (error : InterfaceClassifierError)
 
-def recursiveVisit (seen : RecursiveSeen) (kind : String) (name : Name) (key : String) (isRec : Bool) :
+def recursiveVisit
+    (seen : RecursiveSeen) (kind : InterfaceAggregateKind) (name : Name) (key : String)
+    (isRec : Bool) :
     RecursiveVisit :=
   if recursiveSeenContains seen name key then
     if recursiveSeenLastMatches seen name key then
       .selfReference
     else
-      .error s!"mutually recursive {kind} `{name}` is not supported"
+      .error (.mutuallyRecursive kind name)
   else if isRec && recursiveSeenContainsName seen name then
-    .error s!"non-uniform recursive {kind} `{name}` is not supported"
+    .error (.nonUniformRecursive kind name)
   else
     .descend (seen.push (name, key))
 

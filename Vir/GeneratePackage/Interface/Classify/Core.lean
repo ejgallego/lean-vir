@@ -20,39 +20,40 @@ open Vir.InterfaceValidation
 mutual
 
 partial def functionType (type : Lean.Expr) (argIndex : Nat := 1) (args : Array (String × InterfaceType) := #[]) :
-    CoreM (Except String InterfaceType) := do
+    CoreM (Except InterfaceClassifierError InterfaceType) := do
   let type := stripMData type
   match type with
   | .forallE name domain body binderInfo =>
       if isRuntimeErasedTypeBinder domain then
-        return .error s!"unsupported polymorphic callback type parameter `{name}`"
+        return .error (.polymorphicCallbackParameter name)
       else if binderInfo != .default then
-        return .error s!"unsupported implicit/instance callback argument `{name}`"
+        return .error (.implicitCallbackArgument name)
       else
         match ← interfaceType domain with
-        | .error reason => return .error s!"unsupported callback argument type `{domain}`: {reason}"
+        | .error error => return .error (.inContext (.callbackArgument domain) error)
         | .ok argType =>
             functionType body (argIndex + 1) (args.push (binderArgName argIndex name, argType))
   | result =>
       let effectResult ← effectResult? result
       let (effect, result) := effectResult.getD (.pure, result)
       match ← interfaceType result with
-      | .error reason => return .error s!"unsupported callback result type `{result}`: {reason}"
+      | .error error => return .error (.inContext (.callbackResult result) error)
       | .ok resultType => return .ok (.function args resultType effect)
 
 partial def taggedUnionType (seenTypes : RecursiveSeen) (name : Name) (label : String)
-    (constructors : Array (Name × String × Lean.Expr)) : CoreM (Except String InterfaceType) := do
+    (constructors : Array (Name × String × Lean.Expr)) :
+    CoreM (Except InterfaceClassifierError InterfaceType) := do
   let mut variants := #[]
   for (ctorName, jsName, fieldExpr) in constructors do
     let layout ←
       try
         Lean.Compiler.LCNF.getCtorLayout ctorName
       catch _ =>
-        return .error s!"could not compute runtime layout for constructor `{ctorName}`"
+        return .error (.constructorLayoutUnavailable ctorName)
     if layout.fieldInfo.size != 1 then
-      return .error s!"constructor `{ctorName}` must have exactly one runtime field"
+      return .error (.constructorRuntimeFieldCount ctorName layout.fieldInfo.size)
     let some fieldLayout := structureFieldLayout? layout.fieldInfo[0]!
-      | return .error s!"constructor `{ctorName}` has erased or void runtime layout"
+      | return .error (.constructorErasedRuntimeLayout ctorName)
     match ← interfaceType fieldExpr seenTypes with
     | .ok fieldType =>
         variants := variants.push (
@@ -63,8 +64,8 @@ partial def taggedUnionType (seenTypes : RecursiveSeen) (name : Name) (label : S
           layout.ctorInfo.size,
           layout.ctorInfo.usize,
           layout.ctorInfo.ssize)
-    | .error reason =>
-        return .error s!"constructor `{ctorName}` has unsupported payload type `{fieldExpr}`: {reason}"
+    | .error error =>
+        return .error (.inContext (.constructorPayload ctorName fieldExpr) error)
   return .ok (.taggedUnion name label variants)
 
 partial def constructorFieldTypes? (type : Lean.Expr) (startIndex : Nat := 1) : Option (Array (String × Lean.Expr)) :=
@@ -78,55 +79,57 @@ partial def constructorFieldTypes? (type : Lean.Expr) (startIndex : Nat := 1) : 
     | _ => some fields
   go startIndex type #[]
 
-partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
+partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
+    CoreM (Except InterfaceClassifierError InterfaceType) := do
   let e := stripMData e
   let (name, args) := e.getAppFnArgs
   if name.isAnonymous then
-    return .error s!"unsupported type `{e}`"
+    return .error (.unsupportedType e)
   let seenKey := toString e
   let env ← getEnv
   let some (.inductInfo indInfo) := env.find? name
-    | return .error s!"unsupported type `{e}`"
-  match recursiveVisit seenTypes "inductive" name seenKey indInfo.isRec with
+    | return .error (.unsupportedType e)
+  match recursiveVisit seenTypes .inductive name seenKey indInfo.isRec with
   | .selfReference =>
       return .ok (.recursiveSelf name (exprTypeLabel e))
-  | .error reason =>
-      return .error reason
+  | .error error =>
+      return .error error
   | .descend nextSeen =>
     if indInfo.numIndices != 0 then
-      return .error s!"indexed inductive `{name}` is not supported"
+      return .error (.indexedInductive name)
     else if args.size != indInfo.numParams then
-      return .error s!"inductive `{name}` expects {indInfo.numParams} parameter(s), got {args.size}"
+      return .error (.parameterCountMismatch .inductive name indInfo.numParams args.size)
     else if indInfo.ctors.isEmpty then
-      return .error s!"inductive `{name}` has no constructors"
+      return .error (.inductiveWithoutConstructors name)
     else
       let mut constructors := #[]
       for ctorName in indInfo.ctors do
         let some (.ctorInfo ctorInfo) := env.find? ctorName
-          | return .error s!"constructor `{ctorName}` has no declaration"
+          | return .error (.constructorMissingDeclaration ctorName)
         if ctorInfo.induct != name then
-          return .error s!"constructor `{ctorName}` does not belong to `{name}`"
+          return .error (.constructorOwnerMismatch ctorName name ctorInfo.induct)
         let some instantiated := instantiateForallPrefix? ctorInfo.type args
-          | return .error s!"constructor `{ctorName}` has invalid type `{ctorInfo.type}`"
+          | return .error (.constructorInvalidType ctorName ctorInfo.type)
         let some fieldExprs := constructorFieldTypes? instantiated
-          | return .error s!"constructor `{ctorName}` has unsupported implicit/instance fields"
+          | return .error (.constructorImplicitFields ctorName)
         let layout ←
           try
             Lean.Compiler.LCNF.getCtorLayout ctorName
           catch _ =>
-            return .error s!"could not compute runtime layout for constructor `{ctorName}`"
+            return .error (.constructorLayoutUnavailable ctorName)
         if layout.fieldInfo.size != fieldExprs.size then
-          return .error s!"runtime layout for constructor `{ctorName}` does not match its field count"
+          return .error (
+            .constructorLayoutFieldCountMismatch ctorName fieldExprs.size layout.fieldInfo.size)
         let mut fields := #[]
         for h : idx in *...fieldExprs.size do
           let (fieldName, fieldExpr) := fieldExprs[idx]
           let some fieldLayout := structureFieldLayout? layout.fieldInfo[idx]!
-            | return .error s!"field `{fieldName}` of constructor `{ctorName}` has erased or void runtime layout"
+            | return .error (.constructorFieldErasedRuntimeLayout fieldName ctorName)
           match ← interfaceType fieldExpr nextSeen with
           | .ok fieldType =>
               fields := fields.push (fieldName, fieldType, fieldLayout)
-          | .error reason =>
-              return .error s!"field `{fieldName}` of constructor `{ctorName}` has unsupported type `{fieldExpr}`: {reason}"
+          | .error error =>
+              return .error (.inContext (.constructorField fieldName ctorName fieldExpr) error)
         constructors := constructors.push (
           ctorName,
           ctorShortName name ctorName,
@@ -136,64 +139,67 @@ partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (E
           fields)
       return .ok (.customInductive name (exprTypeLabel e) constructors)
 
-partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) : CoreM (Except String InterfaceType) := do
+partial def structureType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
+    CoreM (Except InterfaceClassifierError InterfaceType) := do
   let e := stripMData e
   let (name, args) := e.getAppFnArgs
   if name.isAnonymous then
-    return .error s!"unsupported type `{e}`"
+    return .error (.unsupportedType e)
   let seenKey := toString e
   let env ← getEnv
   let some (.inductInfo indInfo) := env.find? name
-    | return .error s!"unsupported type `{e}`"
+    | return .error (.unsupportedType e)
   let some structInfo := getStructureInfo? env name
-    | return .error s!"unsupported type `{e}`"
-  match recursiveVisit seenTypes "structure" name seenKey indInfo.isRec with
+    | return .error (.unsupportedType e)
+  match recursiveVisit seenTypes .structure name seenKey indInfo.isRec with
   | .selfReference =>
       return .ok (.recursiveSelf name (exprTypeLabel e))
-  | .error reason =>
-      return .error reason
+  | .error error =>
+      return .error error
   | .descend nextSeen =>
     if indInfo.numIndices != 0 then
-      return .error s!"indexed structure `{name}` is not supported"
+      return .error (.indexedStructure name)
     else if args.size != indInfo.numParams then
-      return .error s!"structure `{name}` expects {indInfo.numParams} parameter(s), got {args.size}"
+      return .error (.parameterCountMismatch .structure name indInfo.numParams args.size)
     else if indInfo.ctors.length != 1 then
-      return .error s!"structure `{name}` must have exactly one constructor"
+      return .error (.structureConstructorCount name indInfo.ctors.length)
     else if structInfo.fieldNames.isEmpty then
-      return .error s!"empty structure `{name}` is not supported"
+      return .error (.emptyStructure name)
     else if indInfo.isRec && structInfo.fieldNames.any (fun fieldName => (isSubobjectField? env name fieldName).isSome) then
-      return .error s!"recursive inherited structure `{name}` is not supported"
+      return .error (.recursiveInheritedStructure name)
     else
       let ctorName := indInfo.ctors.head!
       let layout ←
         try
           Lean.Compiler.LCNF.getCtorLayout ctorName
         catch _ =>
-          return .error s!"could not compute runtime layout for structure `{name}`"
+          return .error (.structureLayoutUnavailable name)
       let trivialField? :=
         (← Lean.Compiler.LCNF.hasTrivialImpureStructure? name).map (·.fieldIdx)
       if layout.fieldInfo.size != structInfo.fieldNames.size then
-        return .error s!"runtime layout for structure `{name}` does not match its field count"
+        return .error (
+          .structureLayoutFieldCountMismatch name structInfo.fieldNames.size layout.fieldInfo.size)
       let mut fields := #[]
       for h : idx in *...structInfo.fieldNames.size do
         let fieldName := structInfo.fieldNames[idx]
         let isSubobject := (isSubobjectField? env name fieldName).isSome
         let some fieldLayout := structureFieldLayout? layout.fieldInfo[idx]!
-          | return .error s!"field `{fieldName}` of structure `{name}` has erased or void runtime layout"
+          | return .error (.structureFieldErasedRuntimeLayout fieldName name)
         let some projName := structInfo.getProjFn? idx
-          | return .error s!"field `{fieldName}` of structure `{name}` is missing a projection function"
+          | return .error (.structureFieldMissingProjection fieldName name)
         let some info := env.find? projName
-          | return .error s!"field `{fieldName}` of structure `{name}` has no projection declaration"
+          | return .error (.structureFieldMissingProjectionDeclaration fieldName name)
         let some fieldExpr := projectionFieldType? indInfo.numParams args info.type
-          | return .error s!"field `{fieldName}` of structure `{name}` has invalid projection type `{info.type}`"
+          | return .error (.structureFieldInvalidProjectionType fieldName name info.type)
         match ← interfaceType fieldExpr nextSeen with
         | .ok fieldType =>
             fields := fields.push (fieldName.toString, fieldType, fieldLayout, isSubobject)
-        | .error reason =>
-            return .error s!"field `{fieldName}` of structure `{name}` has unsupported type `{fieldExpr}`: {reason}"
+        | .error error =>
+            return .error (.inContext (.structureField fieldName name fieldExpr) error)
       return .ok (.structure name (exprTypeLabel e) trivialField? layout.ctorInfo.size layout.ctorInfo.usize layout.ctorInfo.ssize fields)
 
-partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : CoreM (Except String InterfaceType) := do
+partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) :
+    CoreM (Except InterfaceClassifierError InterfaceType) := do
   let e := stripMData e
   if let some e := optParamType? e then
     interfaceType e seenTypes
@@ -216,21 +222,21 @@ partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : C
               | `Array, [arg] =>
                   match ← interfaceType arg seenTypes with
                   | .ok ty => return .ok (.array ty)
-                  | .error reason => return .error s!"unsupported Array element type: {reason}"
+                  | .error error => return .error (.inContext .arrayElement error)
               | `List, [arg] =>
                   match ← interfaceType arg seenTypes with
                   | .ok ty => return .ok (.list ty)
-                  | .error reason => return .error s!"unsupported List element type: {reason}"
+                  | .error error => return .error (.inContext .listElement error)
               | `Option, [arg] =>
                   match ← interfaceType arg seenTypes with
                   | .ok ty => return .ok (.option ty)
-                  | .error reason => return .error s!"unsupported Option element type: {reason}"
+                  | .error error => return .error (.inContext .optionElement error)
               | `Prod, [lhs, rhs] =>
                   match ← interfaceType lhs seenTypes with
-                  | .error reason => return .error s!"unsupported Prod fst type: {reason}"
+                  | .error error => return .error (.inContext .prodFst error)
                   | .ok lhsTy =>
                       match ← interfaceType rhs seenTypes with
-                      | .error reason => return .error s!"unsupported Prod snd type: {reason}"
+                      | .error error => return .error (.inContext .prodSnd error)
                       | .ok rhsTy => return .ok (.prod lhsTy rhsTy)
               | `Sum, [lhs, rhs] =>
                   taggedUnionType seenTypes `Sum (exprTypeLabel e) #[
@@ -247,17 +253,17 @@ partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) : C
                   | some ty => return .ok ty
                   | none =>
                       if let some (markerName, _) := jsResourceMarker? e then
-                        return .error s!"JavaScript object marker `{markerName}` must appear under `Lean.Vir.Js`; use `Lean.Vir.Js {markerName}` at the boundary"
+                        return .error (.jsMarkerOutsideResource markerName)
                       else if (getStructureInfo? env fn).isSome then
                         structureType seenTypes e
                       else
                         inductiveType seenTypes e
           match rawResult with
           | .ok ty => return .ok ty
-          | .error reason =>
+          | .error error =>
               let reduced ← reduceTypeAliases e
               if reduced == e then
-                return .error reason
+                return .error error
               else
                 interfaceType reduced seenTypes
 

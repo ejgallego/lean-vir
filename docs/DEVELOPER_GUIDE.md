@@ -24,14 +24,17 @@ For package/interface work, read:
 
 1. `docs/INTERFACE_PIPELINE.md`
 2. `docs/GENERATE_PACKAGE.md`
-3. `Vir/GeneratePackage/Interface/Classify/Core.lean`
-4. `Vir/GeneratePackage/Interface/Encode.lean`
-5. `web/src/runtime/interface-manifest.js`
-6. `web/src/runtime/core.js`
-7. `web/src/runtime/object-values.js`
-8. `web/src/runtime/vir-codec.js`
-9. `web/src/runtime/object-abi.js`
-10. `web/src/runtime/vir-value-normalizers.js`
+3. `Vir/InterfaceValidation.lean`
+4. `Vir/GeneratePackage/Interface/Classify/Error.lean`
+5. `Vir/GeneratePackage/Interface/Classify/Core.lean`
+6. `Vir/GeneratePackage/Interface/Classify/Signature.lean`
+7. `Vir/GeneratePackage/Interface/Encode.lean`
+8. `web/src/runtime/interface-manifest.js`
+9. `web/src/runtime/core.js`
+10. `web/src/runtime/object-values.js`
+11. `web/src/runtime/vir-codec.js`
+12. `web/src/runtime/object-abi.js`
+13. `web/src/runtime/vir-value-normalizers.js`
 
 For browser or React host work, read:
 

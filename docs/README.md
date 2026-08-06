@@ -12,7 +12,10 @@ ownership diagrams.
 
 - Package/interface work: read [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md),
   [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md),
+  `Vir/InterfaceValidation.lean`,
+  `Vir/GeneratePackage/Interface/Classify/Error.lean`,
   `Vir/GeneratePackage/Interface/Classify/Core.lean`,
+  `Vir/GeneratePackage/Interface/Classify/Signature.lean`,
   `Vir/GeneratePackage/Interface/Encode.lean`,
   `web/src/runtime/core.js`,
   `web/src/runtime/object-values.js`,
