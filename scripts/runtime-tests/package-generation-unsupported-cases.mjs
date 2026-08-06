@@ -149,10 +149,13 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "",
     "def badResult : IO Nat := pure 1",
     "",
+    "def badPureResult : Nat := 1",
+    "",
     "run_meta vir_export.add `PackageFallbackMarkers.badErased",
     "run_meta vir_export.add `PackageFallbackMarkers.badImplicit",
     "run_meta vir_startup.add `PackageFallbackMarkers.badArguments",
     "run_meta vir_startup.add `PackageFallbackMarkers.badResult",
+    "run_meta vir_startup.add `PackageFallbackMarkers.badPureResult",
     "",
     "end PackageFallbackMarkers",
     "",
@@ -187,7 +190,11 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   );
   assert.match(
     generated.stderr,
-    /PackageFallbackMarkers\.badResult: VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, `IO Unit`, `DomM Unit`, and `ReactM Unit`/,
+    /PackageFallbackMarkers\.badResult: VIR startup hooks using `IO` must return `Unit`; got `Nat`/,
+  );
+  assert.match(
+    generated.stderr,
+    /PackageFallbackMarkers\.badPureResult: VIR startup hooks must return `Unit`; got `Nat`/,
   );
   const report = await readFile(reportPath, "utf8");
   assert.match(report, /collisionBump/);
@@ -196,4 +203,5 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   assert.match(report, /PackageFallbackMarkers\.badImplicit/);
   assert.match(report, /PackageFallbackMarkers\.badArguments/);
   assert.match(report, /PackageFallbackMarkers\.badResult/);
+  assert.match(report, /PackageFallbackMarkers\.badPureResult/);
 }

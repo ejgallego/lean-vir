@@ -28,6 +28,13 @@ public inductive EffectKind where
   | react
   deriving BEq, Repr
 
+/-- User-facing name of a supported VIR effect. -/
+public def EffectKind.label : EffectKind → String
+  | .runtime => "RuntimeM"
+  | .io => "IO"
+  | .dom => "DomM"
+  | .react => "ReactM"
+
 /-- A concrete, explicit export argument found by marker preflight. -/
 public structure ExportBinder where
   name : Lean.Name
@@ -69,8 +76,9 @@ public structure StartupSignature where
 /-- A startup-contract violation found by marker preflight. -/
 public inductive StartupSignatureError where
   | parameter (name : Lean.Name)
-  | unsupportedResult
+  | nonUnitResult (effect? : Option EffectKind) (result : Lean.Expr)
   | unsupportedEffect (head : Lean.Name)
+  | malformedEffect (kind : EffectKind) (argumentCount : Nat)
   deriving BEq, Repr
 
 /-- Classify a type constructor as one of VIR's supported exported effects. -/
@@ -84,17 +92,20 @@ public def effectKind? : Lean.Name → Option EffectKind
 private def isEffectHead (name : Lean.Name) : Bool :=
   (effectKind? name).isSome
 
-private def startupResultDiagnostic : String :=
-  "VIR startup hooks must return `Unit`; supported effectful forms are `RuntimeM Unit`, \
-    `IO Unit`, `DomM Unit`, and `ReactM Unit`"
-
 /-- Render a startup preflight failure for users. -/
 public def StartupSignatureError.message : StartupSignatureError → String
   | .parameter name =>
       s!"VIR startup hooks cannot declare parameters (`{name}`); \
         define a zero-argument wrapper instead"
-  | .unsupportedResult
-  | .unsupportedEffect _ => startupResultDiagnostic
+  | .nonUnitResult none result =>
+      s!"VIR startup hooks must return `Unit`; got `{result}`"
+  | .nonUnitResult (some effect) result =>
+      s!"VIR startup hooks using `{effect.label}` must return `Unit`; got `{result}`"
+  | .unsupportedEffect head =>
+      s!"`{head}` is not a supported VIR startup effect; use `RuntimeM`, `IO`, `DomM`, \
+        or `ReactM`, each returning `Unit`"
+  | .malformedEffect effect argumentCount =>
+      s!"VIR startup effect `{effect.label}` expects one result type, got {argumentCount}"
 
 /-- Remove metadata wrappers without reducing the underlying interface type. -/
 public partial def stripMData : Lean.Expr → Lean.Expr
@@ -178,14 +189,14 @@ public def analyzeStartupSignature (type : Lean.Expr) :
     return .ok { effect := .pure }
   let some effect := effectKind? fn
     | if args.isEmpty then
-        return .error .unsupportedResult
+        return .error (.nonUnitResult none type)
       else
         return .error (.unsupportedEffect fn)
   if args.size != 1 then
-    return .error (.unsupportedEffect fn)
-  let some result := args[0]? | return .error (.unsupportedEffect fn)
+    return .error (.malformedEffect effect args.size)
+  let some result := args[0]? | return .error (.malformedEffect effect 0)
   if ← isUnitType result then
     return .ok { effect := .effect effect }
-  return .error .unsupportedResult
+  return .error (.nonUnitResult (some effect) result)
 
 end Vir.InterfaceValidation
