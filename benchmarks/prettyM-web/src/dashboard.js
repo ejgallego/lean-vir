@@ -126,6 +126,106 @@
     llvm: "#d7c45c",
   };
 
+  /** @type {Set<string>} */
+  var prettyDashboardSelectedBackends = new Set();
+
+  /** @param {string[]} available */
+  function prettyDashboardSelectedBackendIds(available) {
+    var selected = available.filter(function (id) {
+      return prettyDashboardSelectedBackends.has(id);
+    });
+    if (selected.length === 0) {
+      selected = available.slice();
+      prettyDashboardSelectedBackends = new Set(selected);
+    }
+    return selected;
+  }
+
+  /**
+   * @param {string[]} available
+   * @param {(id: string) => string} labelFor
+   * @param {(selected: string[]) => void} onChange
+   */
+  function createPrettyBackendFilter(available, labelFor, onChange) {
+    var selected = new Set(prettyDashboardSelectedBackendIds(available));
+    var fieldset = document.createElement("fieldset");
+    fieldset.className = "pretty-backend-filter";
+    var legend = document.createElement("legend");
+    legend.textContent = "Visible backends";
+    var summary = document.createElement("span");
+    summary.className = "pretty-backend-filter-summary";
+    summary.setAttribute("aria-live", "polite");
+    var options = document.createElement("div");
+    options.className = "pretty-backend-filter-options";
+    var actions = document.createElement("div");
+    actions.className = "pretty-backend-filter-actions";
+    var selectAll = document.createElement("button");
+    selectAll.type = "button";
+    selectAll.textContent = "Show all";
+    actions.appendChild(selectAll);
+
+    /** @type {Map<string, HTMLInputElement>} */
+    var inputs = new Map();
+
+    function publish() {
+      prettyDashboardSelectedBackends = new Set(selected);
+      summary.textContent = selected.size + " of " + available.length + " selected";
+      selectAll.disabled = selected.size === available.length;
+      onChange(
+        available.filter(function (id) {
+          return selected.has(id);
+        }),
+      );
+    }
+
+    available.forEach(function (id) {
+      var label = document.createElement("label");
+      label.className = "pretty-backend-filter-option";
+      var input = document.createElement("input");
+      input.type = "checkbox";
+      input.value = id;
+      input.checked = selected.has(id);
+      input.dataset.backendFilter = id;
+      inputs.set(id, input);
+      var swatch = document.createElement("span");
+      swatch.className = "pretty-dashboard-swatch";
+      swatch.style.backgroundColor = prettyDashboardColor(id);
+      var name = document.createElement("span");
+      name.textContent = labelFor(id);
+      label.append(input, swatch, name);
+      options.appendChild(label);
+      input.addEventListener("change", function () {
+        if (input.checked) selected.add(id);
+        else selected.delete(id);
+        if (selected.size === 0) {
+          input.checked = true;
+          selected.add(id);
+        }
+        publish();
+      });
+    });
+    selectAll.addEventListener("click", function () {
+      selected = new Set(available);
+      inputs.forEach(function (input) {
+        input.checked = true;
+      });
+      publish();
+    });
+    summary.textContent = selected.size + " of " + available.length + " selected";
+    selectAll.disabled = selected.size === available.length;
+    fieldset.append(legend, options, actions, summary);
+    return fieldset;
+  }
+
+  /** @param {HTMLElement} root @param {string[]} selected */
+  function applyPrettyBackendVisibility(root, selected) {
+    var visible = new Set(selected);
+    root.querySelectorAll("[data-pretty-backend]").forEach(function (element) {
+      var node = /** @type {HTMLElement} */ (element);
+      node.hidden = !visible.has(node.dataset.prettyBackend || "");
+    });
+  }
+
   /** @return {string[]} */
   function prettyDashboardBackendIds() {
     var sources = [
@@ -914,6 +1014,7 @@
             filteredTrace,
             "committedBytes",
             "Committed Wasm capacity",
+            Array.from(selected),
           ),
         );
       }
@@ -1130,7 +1231,6 @@
     overlay.appendChild(source);
 
     var allBackendIds = prettyDashboardBackendIds();
-    var selected = new Set(allBackendIds);
     var controls = document.createElement("div");
     controls.className = "pretty-dashboard-controls";
     var phaseControl = document.createElement("label");
@@ -1177,37 +1277,11 @@
       normalizationSelector.appendChild(option);
     });
     normalizationControl.appendChild(normalizationSelector);
-    var backendControls = document.createElement("fieldset");
-    backendControls.className = "pretty-dashboard-backends";
-    var backendLegend = document.createElement("legend");
-    backendLegend.textContent = "Backends";
-    backendControls.appendChild(backendLegend);
-    allBackendIds.forEach(function (id) {
-      var label = document.createElement("label");
-      label.className = "pretty-dashboard-backend";
-      var input = document.createElement("input");
-      input.type = "checkbox";
-      input.value = id;
-      input.checked = true;
-      var swatch = document.createElement("span");
-      swatch.className = "pretty-dashboard-swatch";
-      swatch.style.backgroundColor = prettyDashboardColor(id);
-      label.append(
-        input,
-        swatch,
-        document.createTextNode(prettyDashboardBackendLabel(id)),
-      );
-      backendControls.appendChild(label);
-      input.addEventListener("change", function () {
-        if (input.checked) selected.add(id);
-        else selected.delete(id);
-        if (selected.size === 0) {
-          input.checked = true;
-          selected.add(id);
-        }
-        renderDashboard();
-      });
-    });
+    var backendControls = createPrettyBackendFilter(
+      allBackendIds,
+      prettyDashboardBackendLabel,
+      renderDashboard,
+    );
     controls.append(
       phaseControl,
       scaleControl,
@@ -1221,9 +1295,7 @@
 
     function renderDashboard() {
       content.replaceChildren();
-      var backendIds = allBackendIds.filter(function (id) {
-        return selected.has(id);
-      });
+      var backendIds = prettyDashboardSelectedBackendIds(allBackendIds);
       var phase = phaseSelector.value;
       var phaseLabel =
         phaseSelector.options[phaseSelector.selectedIndex].textContent || phase;
@@ -1267,8 +1339,12 @@
             : "Only reports passing the campaign's core checks were aggregated.",
         ),
       );
-      var jsonStat = prettyDashboardCorpusStat("vir", phase);
-      var directStat = prettyDashboardCorpusStat("vir-format", phase);
+      var jsonStat = backendIds.includes("vir")
+        ? prettyDashboardCorpusStat("vir", phase)
+        : null;
+      var directStat = backendIds.includes("vir-format")
+        ? prettyDashboardCorpusStat("vir-format", phase)
+        : null;
       cards.appendChild(
         createPrettyDashboardCard(
           "VIR boundary",
@@ -1287,10 +1363,12 @@
       cards.appendChild(
         createPrettyDashboardCard(
           "Isolated VIR memory",
-          isolated && isolated.vir
+          isolated && isolated.vir && backendIds.includes("vir")
             ? "+" + formatCorpusBytes(isolated.vir.growthBytes.median)
             : "load campaign",
-          isolated && isolated["vir-format"]
+          isolated &&
+            isolated["vir-format"] &&
+            backendIds.includes("vir-format")
             ? "JSON versus " +
                 formatCorpusBytes(isolated["vir-format"].growthBytes.median) +
                 " direct Format committed growth."
@@ -1355,7 +1433,7 @@
         content.appendChild(grid);
       }
       appendPrettyDashboardColdStart(content, backendIds);
-      appendPrettyDashboardMemory(content, selected);
+      appendPrettyDashboardMemory(content, new Set(backendIds));
       appendPrettyDashboardBaseline(content, backendIds, phase, phaseLabel);
     }
 
@@ -1429,6 +1507,17 @@
         " s corpus wall time";
       overlay.appendChild(result);
 
+      var backendFilter = createPrettyBackendFilter(
+        report.backendIds,
+        function (id) {
+          return report.summaries[id] ? report.summaries[id].label : id;
+        },
+        function (selected) {
+          applyPrettyBackendVisibility(overlay, selected);
+        },
+      );
+      overlay.appendChild(backendFilter);
+
       var summaryHeading = document.createElement("h3");
       summaryHeading.textContent = "Aggregate formatter timings (ms)";
       overlay.appendChild(summaryHeading);
@@ -1451,6 +1540,7 @@
       report.backendIds.forEach(function (/** @type {string} */ id) {
         var summary = report.summaries[id];
         var row = document.createElement("tr");
+        row.dataset.prettyBackend = id;
         appendCorpusCell(row, summary.label);
         appendCorpusCell(row, summary.status);
         appendCorpusCell(row, String(summary.timing.totalMs.samples));
@@ -1505,6 +1595,7 @@
             report.runtimeProfileBefore &&
             report.runtimeProfileBefore.backends[id];
           var row = document.createElement("tr");
+          row.dataset.prettyBackend = id;
           appendCorpusCell(row, report.summaries[id].label);
           appendCorpusCell(
             row,
@@ -1571,7 +1662,12 @@
       appendCorpusCell(scenarioHead, "Segments", "th");
       appendCorpusCell(scenarioHead, "Parity", "th");
       report.backendIds.forEach(function (/** @type {string} */ id) {
-        appendCorpusCell(scenarioHead, report.summaries[id].label, "th");
+        var cell = appendCorpusCell(
+          scenarioHead,
+          report.summaries[id].label,
+          "th",
+        );
+        cell.dataset.prettyBackend = id;
       });
       scenarioTable.appendChild(scenarioHead);
       report.scenarios.forEach(function (/** @type {*} */ scenario) {
@@ -1595,12 +1691,13 @@
         ).classList.add("pretty-parity");
         report.backendIds.forEach(function (/** @type {string} */ id) {
           var backendResult = scenario.backends[id];
-          appendCorpusCell(
+          var cell = appendCorpusCell(
             row,
             backendResult
               ? formatCorpusTiming(backendResult.summary.totalMs.median)
               : "—",
           );
+          cell.dataset.prettyBackend = id;
         });
         scenarioTable.appendChild(row);
       });
@@ -1625,6 +1722,7 @@
           differences.appendChild(heading);
           report.backendIds.forEach(function (/** @type {string} */ id) {
             var output = document.createElement("pre");
+            output.dataset.prettyBackend = id;
             var backendResult = scenario.backends[id];
             output.textContent =
               report.summaries[id].label +
@@ -1637,6 +1735,10 @@
         });
         overlay.appendChild(differences);
       }
+      applyPrettyBackendVisibility(
+        overlay,
+        prettyDashboardSelectedBackendIds(report.backendIds),
+      );
     }
 
     document.body.appendChild(overlay);
@@ -1677,7 +1779,6 @@
     var right = 675;
     var top = 25;
     var bottom = 220;
-    var colors = ["#74a9ff", "#f0a35e", "#77c879", "#d879c6", "#d7c45c"];
     /** @type {number[]} */
     var positive = [];
     dimension.points.forEach(function (/** @type {*} */ point) {
@@ -1775,7 +1876,7 @@
           });
         },
       );
-      var color = colors[backendIndex % colors.length];
+      var color = prettyDashboardColor(id);
       element("polyline", {
         points: points
           .map(function (point) {
@@ -1901,12 +2002,25 @@
         phaseSelector.appendChild(option);
       });
       phaseControl.appendChild(phaseSelector);
-      overlay.appendChild(phaseControl);
+      var reportControls = document.createElement("div");
+      reportControls.className = "pretty-report-controls";
+      reportControls.append(
+        phaseControl,
+        createPrettyBackendFilter(
+          report.backendIds,
+          function (id) {
+            return report.summaries[id] ? report.summaries[id].label : id;
+          },
+          renderPhase,
+        ),
+      );
+      overlay.appendChild(reportControls);
       var phaseContent = document.createElement("div");
       phaseContent.className = "pretty-scaling-phase-content";
       overlay.appendChild(phaseContent);
 
       function renderPhase() {
+        var backendIds = prettyDashboardSelectedBackendIds(report.backendIds);
         var phase = phaseSelector.value;
         var phaseDefinition = timingPhases.find(
           function (/** @type {*} */ candidate) {
@@ -1922,7 +2036,7 @@
           phaseContent.appendChild(
             createPrettyScalingChart(
               dimension,
-              report.backendIds,
+              backendIds,
               report.summaries,
               phase,
               phaseLabel,
@@ -1933,7 +2047,7 @@
           var phaseTrends =
             (dimension.phaseTrends && dimension.phaseTrends[phase]) ||
             dimension.trends;
-          trends.textContent = report.backendIds
+          trends.textContent = backendIds
             .map(function (/** @type {string} */ id) {
               var trend = phaseTrends[id];
               return (
@@ -1966,7 +2080,7 @@
           ].forEach(function (column) {
             appendCorpusCell(head, column, "th");
           });
-          report.backendIds.forEach(function (/** @type {string} */ id) {
+          backendIds.forEach(function (/** @type {string} */ id) {
             appendCorpusCell(head, report.summaries[id].label + " ms", "th");
           });
           table.appendChild(head);
@@ -1995,7 +2109,7 @@
               row,
               point.parity ? "match" : "mismatch",
             ).classList.add("pretty-parity");
-            report.backendIds.forEach(function (/** @type {string} */ id) {
+            backendIds.forEach(function (/** @type {string} */ id) {
               var backend = point.backends[id];
               appendCorpusCell(
                 row,
@@ -2022,9 +2136,15 @@
    * @param {*} trace
    * @param {"committedBytes" | "residentBytes"} metric
    * @param {string} metricLabel
+   * @param {string[]} backendIds
    * @return {SVGSVGElement}
    */
-  function createPrettyRepeatedMemoryChart(trace, metric, metricLabel) {
+  function createPrettyRepeatedMemoryChart(
+    trace,
+    metric,
+    metricLabel,
+    backendIds,
+  ) {
     var namespace = "http://www.w3.org/2000/svg";
     var svg = /** @type {SVGSVGElement} */ (
       document.createElementNS(namespace, "svg")
@@ -2040,7 +2160,6 @@
     var right = 675;
     var top = 25;
     var bottom = 220;
-    var colors = ["#f0a35e", "#77c879", "#d879c6", "#74a9ff", "#d7c45c"];
     var series = trace.series
       .map(function (/** @type {*} */ item) {
         return {
@@ -2054,7 +2173,12 @@
         };
       })
       .filter(function (/** @type {*} */ item) {
-        return item.points.length > 0;
+        return (
+          item.points.length > 0 &&
+          item.item.backendIds.some(function (/** @type {string} */ id) {
+            return backendIds.includes(id);
+          })
+        );
       });
     var values = series.flatMap(function (/** @type {*} */ item) {
       return item.points.map(function (/** @type {*} */ point) {
@@ -2130,7 +2254,7 @@
 
     series.forEach(
       function (/** @type {*} */ selected, /** @type {number} */ index) {
-        var color = colors[index % colors.length];
+        var color = prettyDashboardColor(selected.item.backendIds[0]);
         var plotted = selected.points.map(function (/** @type {*} */ point) {
           return {
             point: point,
@@ -2250,6 +2374,19 @@
         "Each cycle rotates plain, line-heavy, deeply tagged, large-text, and empty-output structural inputs. Every call is checked both against the other backends and against earlier calls of the same backend. Memory is committed Wasm capacity before and after the retained-instance workload.";
       overlay.appendChild(note);
 
+      var rerenderRepeatedMemory = function () {};
+      var backendFilter = createPrettyBackendFilter(
+        report.backendIds,
+        function (id) {
+          return report.summaries[id] ? report.summaries[id].label : id;
+        },
+        function (selected) {
+          applyPrettyBackendVisibility(overlay, selected);
+          rerenderRepeatedMemory();
+        },
+      );
+      overlay.appendChild(backendFilter);
+
       var summaryHeading = document.createElement("h3");
       summaryHeading.textContent = "Repeated-call timings and committed memory";
       overlay.appendChild(summaryHeading);
@@ -2275,6 +2412,7 @@
         var summary = report.summaries[id];
         var memory = report.memoryGrowth[id];
         var row = document.createElement("tr");
+        row.dataset.prettyBackend = id;
         appendCorpusCell(row, summary.label);
         appendCorpusCell(row, String(summary.timing.totalMs.samples));
         appendCorpusCell(
@@ -2337,6 +2475,7 @@
         overlay.appendChild(memoryContent);
 
         function renderRepeatedMemory() {
+          var backendIds = prettyDashboardSelectedBackendIds(report.backendIds);
           var metric = /** @type {"committedBytes" | "residentBytes"} */ (
             metricSelector.value
           );
@@ -2350,6 +2489,7 @@
               report.memoryTrace,
               metric,
               metricLabel,
+              backendIds,
             ),
           );
           var table = document.createElement("table");
@@ -2369,6 +2509,12 @@
           });
           table.appendChild(head);
           report.memoryTrace.series.forEach(function (/** @type {*} */ series) {
+            if (
+              !series.backendIds.some(function (/** @type {string} */ id) {
+                return backendIds.includes(id);
+              })
+            )
+              return;
             var summary = series[summaryKey];
             if (!summary || summary.samples === 0) return;
             var row = document.createElement("tr");
@@ -2402,6 +2548,7 @@
           });
           memoryContent.appendChild(table);
         }
+        rerenderRepeatedMemory = renderRepeatedMemory;
         metricSelector.addEventListener("change", renderRepeatedMemory);
         renderRepeatedMemory();
       }
@@ -2464,6 +2611,10 @@
         workloadTable.appendChild(row);
       });
       overlay.appendChild(workloadTable);
+      applyPrettyBackendVisibility(
+        overlay,
+        prettyDashboardSelectedBackendIds(report.backendIds),
+      );
     }
     document.body.appendChild(overlay);
     prettyCorpusOverlay = overlay;
@@ -2490,7 +2641,6 @@
     var right = 675;
     var top = 25;
     var bottom = 220;
-    var colors = ["#74a9ff", "#f0a35e", "#77c879", "#d879c6", "#d7c45c"];
     /** @type {number[]} */
     var values = [];
     dimension.points.forEach(function (/** @type {*} */ point) {
@@ -2574,7 +2724,7 @@
         },
       );
       if (points.length === 0) return;
-      var color = colors[backendIndex % colors.length];
+      var color = prettyDashboardColor(id);
       element("polyline", {
         points: points
           .map(function (point) {
@@ -2623,6 +2773,10 @@
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
     overlay.setAttribute("aria-label", "Pretty-printer retained-memory report");
+    overlay.addEventListener("keydown", function (event) {
+      event.stopPropagation();
+      if (event.key === "Escape") overlay.remove();
+    });
     var header = document.createElement("header");
     var title = document.createElement("h2");
     title.textContent = "Pretty-printer retained-memory scaling";
@@ -2686,11 +2840,27 @@
         metricSelector.appendChild(option);
       });
       metricControl.appendChild(metricSelector);
-      overlay.appendChild(metricControl);
+      var reportControls = document.createElement("div");
+      reportControls.className = "pretty-report-controls";
+      reportControls.append(
+        metricControl,
+        createPrettyBackendFilter(
+          report.backendIds,
+          function (id) {
+            var firstDimension = report.dimensions[0];
+            var firstPoint = firstDimension && firstDimension.points[0];
+            var backend = firstPoint && firstPoint.backends[id];
+            return backend ? backend.label : id;
+          },
+          renderMetric,
+        ),
+      );
+      overlay.appendChild(reportControls);
       var content = document.createElement("div");
       overlay.appendChild(content);
 
       function renderMetric() {
+        var backendIds = prettyDashboardSelectedBackendIds(report.backendIds);
         var metric = metricSelector.value;
         var metricLabel =
           metricSelector.options[metricSelector.selectedIndex].textContent ||
@@ -2703,7 +2873,7 @@
           content.appendChild(
             createPrettyMemoryChart(
               dimension,
-              report.backendIds,
+              backendIds,
               metric,
               metricLabel,
             ),
@@ -2716,7 +2886,7 @@
               appendCorpusCell(head, column, "th");
             },
           );
-          report.backendIds.forEach(function (/** @type {string} */ id) {
+          backendIds.forEach(function (/** @type {string} */ id) {
             appendCorpusCell(
               head,
               dimension.points[0].backends[id].label,
@@ -2737,7 +2907,7 @@
               row,
               point.parity ? "match" : "mismatch",
             ).classList.add("pretty-parity");
-            report.backendIds.forEach(function (/** @type {string} */ id) {
+            backendIds.forEach(function (/** @type {string} */ id) {
               appendCorpusCell(
                 row,
                 formatCorpusBytes(point.backends[id][metric]),
@@ -2891,6 +3061,10 @@
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
     overlay.setAttribute("aria-label", "Pretty-printer interaction report");
+    overlay.addEventListener("keydown", function (event) {
+      event.stopPropagation();
+      if (event.key === "Escape") overlay.remove();
+    });
     var header = document.createElement("header");
     var title = document.createElement("h2");
     title.textContent = "Pretty-printer interaction study";
@@ -2943,13 +3117,6 @@
       backendLabel.appendChild(document.createTextNode("Backend "));
       var backendSelector = document.createElement("select");
       backendSelector.className = "pretty-interaction-backend";
-      report.backendIds.forEach(function (/** @type {string} */ id) {
-        var option = document.createElement("option");
-        option.value = id;
-        option.textContent = report.summaries[id].label;
-        option.selected = id === "native";
-        backendSelector.appendChild(option);
-      });
       backendLabel.appendChild(backendSelector);
       var phaseLabel = document.createElement("label");
       phaseLabel.appendChild(document.createTextNode("Phase "));
@@ -2963,10 +3130,37 @@
         phaseSelector.appendChild(option);
       });
       phaseLabel.appendChild(phaseSelector);
-      controls.append(backendLabel, phaseLabel);
+      var backendFilter = createPrettyBackendFilter(
+        report.backendIds,
+        function (id) {
+          return report.summaries[id] ? report.summaries[id].label : id;
+        },
+        function () {
+          syncInteractionBackendOptions();
+          renderInteraction();
+        },
+      );
+      controls.append(backendFilter, backendLabel, phaseLabel);
       overlay.appendChild(controls);
       var content = document.createElement("div");
       overlay.appendChild(content);
+
+      function syncInteractionBackendOptions() {
+        var previous = backendSelector.value;
+        var backendIds = prettyDashboardSelectedBackendIds(report.backendIds);
+        backendSelector.replaceChildren();
+        backendIds.forEach(function (id) {
+          var option = document.createElement("option");
+          option.value = id;
+          option.textContent = report.summaries[id].label;
+          backendSelector.appendChild(option);
+        });
+        backendSelector.value = backendIds.includes(previous)
+          ? previous
+          : backendIds.includes("native")
+            ? "native"
+            : backendIds[0];
+      }
 
       function renderInteraction() {
         var backendId = backendSelector.value;
@@ -2997,6 +3191,7 @@
       }
       backendSelector.addEventListener("change", renderInteraction);
       phaseSelector.addEventListener("change", renderInteraction);
+      syncInteractionBackendOptions();
       renderInteraction();
     }
     document.body.appendChild(overlay);

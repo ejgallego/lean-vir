@@ -35,6 +35,24 @@
   var reports = {};
   var running = false;
 
+  /** @type {Record<string, string>} */
+  var backendColors = {
+    js: "#74a9ff",
+    vir: "#f0a35e",
+    "vir-format": "#77c879",
+    native: "#d879c6",
+    llvm: "#d7c45c",
+  };
+
+  /** @type {Record<string, string>} */
+  var reportTitles = {
+    differential: "Corpus",
+    scaling: "Scaling",
+    "memory-retained": "Memory",
+    interactions: "Interactions",
+    repeated: "Repeated calls",
+  };
+
   function setState(label, state, detail) {
     stateEl.textContent = label;
     stateEl.dataset.state = state;
@@ -73,6 +91,11 @@
     backends.forEach(function (backend) {
       var label = document.createElement("label");
       label.className = "backend-card";
+      label.dataset.backend = backend.id;
+      label.style.setProperty(
+        "--backend-color",
+        backendColors[backend.id] || "#86b5e8",
+      );
       var input = document.createElement("input");
       input.type = "checkbox";
       input.value = backend.id;
@@ -209,7 +232,7 @@
       card.className = "report-card";
       card.dataset.passed = String(report.passed !== false);
       var heading = document.createElement("h3");
-      heading.textContent = kind;
+      heading.textContent = reportTitles[kind] || kind;
       var summary = document.createElement("strong");
       summary.textContent = reportSummary(report);
       var detail = document.createElement("p");

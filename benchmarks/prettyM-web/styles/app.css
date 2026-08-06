@@ -1,6 +1,7 @@
 :root {
   color: #e9edf1;
   background: #101217;
+  color-scheme: dark;
   font-family:
     Inter,
     ui-sans-serif,
@@ -10,6 +11,7 @@
     "Segoe UI",
     sans-serif;
   font-synthesis: none;
+  line-height: 1.45;
 }
 
 * {
@@ -24,6 +26,11 @@ body {
       circle at 85% -10%,
       rgba(73, 123, 183, 0.2),
       transparent 36rem
+    ),
+    radial-gradient(
+      circle at -10% 35%,
+      rgba(87, 171, 144, 0.08),
+      transparent 30rem
     ),
     #101217;
 }
@@ -42,11 +49,23 @@ button {
   border: 1px solid #454e5e;
   border-radius: 0.35rem;
   cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
 }
 
 button:hover:not(:disabled) {
   border-color: #79a8df;
   background: #2d3542;
+  transform: translateY(-1px);
+}
+
+button:focus-visible,
+input:focus-visible,
+select:focus-visible {
+  outline: 2px solid #9bc7f2;
+  outline-offset: 2px;
 }
 
 button.primary {
@@ -76,7 +95,7 @@ button:disabled {
 }
 
 .bench-header {
-  padding: 1.5rem 0 2rem;
+  padding: 2.25rem 0 2rem;
   border-bottom: 1px solid #2d3440;
 }
 
@@ -96,6 +115,7 @@ h1 {
   font-size: clamp(2rem, 5vw, 4rem);
   line-height: 0.95;
   letter-spacing: -0.04em;
+  text-wrap: balance;
 }
 
 h2 {
@@ -160,6 +180,7 @@ footer {
   background: rgba(24, 28, 35, 0.88);
   border: 1px solid #2e3642;
   border-radius: 0.55rem;
+  box-shadow: 0 0.8rem 2.2rem rgba(0, 0, 0, 0.12);
 }
 
 .backend-grid,
@@ -182,7 +203,24 @@ footer {
   padding: 0.75rem;
   background: #13171d;
   border: 1px solid #343d4a;
+  border-top: 0.18rem solid var(--backend-color, #86b5e8);
   border-radius: 0.4rem;
+  cursor: pointer;
+  transition:
+    background-color 140ms ease,
+    border-color 140ms ease,
+    transform 140ms ease;
+}
+
+.backend-card:hover {
+  background: #171c23;
+  border-color: color-mix(in srgb, var(--backend-color) 55%, #343d4a);
+  transform: translateY(-1px);
+}
+
+.backend-card:has(input:not(:checked)) {
+  opacity: 0.58;
+  border-top-color: #4b5563;
 }
 
 .backend-card input {
@@ -261,6 +299,7 @@ footer {
   border: 1px solid #35404d;
   border-left: 0.25rem solid #75bf87;
   border-radius: 0.4rem;
+  box-shadow: 0 0.5rem 1.4rem rgba(0, 0, 0, 0.12);
 }
 
 .report-card[data-passed="false"] {

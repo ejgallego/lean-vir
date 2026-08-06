@@ -40,6 +40,9 @@ summaries or refreshed bounded artifacts here.
 - Five-backend output and styling-event parity is the compatibility gate.
 - The app has standalone build, serve, browser-test, report, campaign, card,
   and refresh commands.
+- Dashboard, corpus, scaling, memory, repeated-call, and interaction views share
+  one backend selection. The selection follows the user between report views,
+  filters both charts and tables, and never changes complete JSON exports.
 - Artifact paths are confined to the application directory and archives are
   normalized, checksummed, verified, and installed atomically.
 - The artifact boundary is generic over Lean versions:
@@ -77,6 +80,12 @@ self symbol. VIR-002 records the evidence classes, artifact hashes, caveats,
 and a narrow runtime follow-up.
 
 Do not add the VIR CPU profiler, internal counters, or an optimization here.
+The producer-side one-entry symbol-MRU prototype has local AB/BA screens, but
+this machine is frequently loaded and the observed deltas are not stable enough
+for an accepted or rejected optimization conclusion. Treat them as
+inconclusive, leave bounded set 0001 unchanged, and require measurements from a
+controlled host before importing a decision.
+
 The next change in this worktree should be one of:
 
 1. refresh an individual bounded runtime after its producer publishes a new
@@ -84,6 +93,12 @@ The next change in this worktree should be one of:
 2. publish and lock the existing immutable set archive; or
 3. import an accepted/rejected producer-side optimization conclusion and
    regenerate the report/card against its new immutable package.
+
+The report UI consolidation was completed after the original handoff. Its
+browser regression narrows the dashboard to one backend, checks that chart
+series are filtered, opens the corpus report, and verifies that the selection
+persists. A full preserved report was also used to exercise scaling, memory,
+repeated-call, and interaction filters without changing the report data.
 
 Do not generalize the benchmark engine to arbitrary Lean functions until a
 second real function supplies concrete requirements. The current
