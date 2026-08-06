@@ -183,6 +183,19 @@ printf '%s\n' \
 printf '%s\n' \
   'module' \
   '' \
+  'public import Vir.GeneratePackage' \
+  '' \
+  '#check Vir.GeneratePackage.moduleNameFor' \
+  '#check Vir.GeneratePackage.collectClosure' \
+  '#check Vir.GeneratePackage.collectHostImports' \
+  '#check Vir.GeneratePackage.collectInterfaceManifest' \
+  '#check Vir.GeneratePackage.emitPackage' \
+  '#check Vir.GeneratePackage.reportFor' \
+  '#check Vir.GeneratePackage.analyzePackage' > "$tmp/Smoke/PackagePipeline.lean"
+
+printf '%s\n' \
+  'module' \
+  '' \
   'public import Init.System.IO' \
   '' \
   'public def Smoke.OpaqueDependency.environmentHome : IO String := do' \
@@ -227,6 +240,7 @@ test "$(cat "$tmp/existing-sdk/marker.txt")" = 'keep-existing-sdk'
 grep -q 'SDK version mismatch' "$tmp/version-sdk.stderr"
 
 lake -d "$tmp" build Smoke.InterfaceClassifier
+lake -d "$tmp" build Smoke.PackagePipeline
 lake -d "$tmp" build +Smoke.Runtime:vir
 lake -d "$tmp" build +Smoke.NewRuntime:vir
 
