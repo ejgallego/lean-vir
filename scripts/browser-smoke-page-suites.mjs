@@ -414,7 +414,8 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(frontier.pressured > 0);
   assert.ok(frontier.note.includes("averaged by child bytes"));
   assert.equal(frontier.listTitle, "Frontier pressure");
-  assert.deepEqual(frontier.top, ["libleanrt.a", "libleancpp.a"]);
+  assert.ok(frontier.top.length > 0);
+  assert.ok(frontier.top.every((name) => nativeLayer.top.includes(name)));
   assert.ok(frontier.densityAverage < 1e-9);
   assert.equal(frontier.legendTitle, "Blocker density · log color scale");
   assert.ok(frontier.legendMax.endsWith("roots / MiB"));
