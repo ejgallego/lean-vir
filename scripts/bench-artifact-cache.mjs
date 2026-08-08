@@ -75,12 +75,19 @@ const sourceIdentityPaths = [
   "wasm/upstream_shim/abi/resource_abi.h",
 ];
 
-export async function ensureCachedBenchArtifacts({
+export async function prepareBenchArtifacts({
   root,
   artifactPaths,
   options,
   build,
 }) {
+  if (!options.buildArtifacts) {
+    return {
+      enabled: false,
+      restore: { status: "not-requested" },
+      store: { status: "not-requested" },
+    };
+  }
   if (!options.artifactCacheEnabled) {
     build();
     return {

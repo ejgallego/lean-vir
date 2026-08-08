@@ -8,7 +8,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 import { performance } from "node:perf_hooks";
 
-import { ensureCachedBenchArtifacts } from "./bench-artifact-cache.mjs";
+import { prepareBenchArtifacts } from "./bench-artifact-cache.mjs";
 import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
 import {
   benchmarkArtifactPaths,
@@ -25,7 +25,7 @@ import {
   parseBenchmarkCacheOption,
   requireBenchmarkSample,
   requireOptionValue,
-  validateBenchmarkCacheOptions,
+  validateBenchmarkBuildOptions,
 } from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
 import {
@@ -127,11 +127,14 @@ const args = parseArgs(process.argv.slice(2));
 function parseArgs(argv) {
   const parsed = {
     ...benchmarkCacheOptionDefaults(),
+    buildArtifacts: true,
     jsonPath: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--json") {
+    if (arg === "--no-build") {
+      parsed.buildArtifacts = false;
+    } else if (arg === "--json") {
       parsed.jsonPath = requireOptionValue(argv, ++index, "--json");
     } else if (arg.startsWith("--json=")) {
       parsed.jsonPath = arg.slice("--json=".length);
@@ -150,7 +153,7 @@ function parseArgs(argv) {
   if (parsed.jsonPath === "") {
     throw new Error("--json requires a path");
   }
-  validateBenchmarkCacheOptions(parsed);
+  validateBenchmarkBuildOptions(parsed);
   return parsed;
 }
 
@@ -160,6 +163,7 @@ function printUsage() {
     "",
     "options:",
     "  --json PATH                    write a machine-readable benchmark report",
+    "  --no-build                     require and reuse existing generated benchmark inputs",
     "  --artifact-cache DIR           cache built benchmark inputs in DIR",
     "  --no-artifact-cache            rebuild inputs without cache restore/store",
     "  --refresh-artifact-cache       rebuild and replace the current cache entry",
@@ -358,7 +362,7 @@ async function writeJsonReport(path, benchmarks) {
   console.log(`wrote benchmark report: ${path}`);
 }
 
-const artifactCache = await ensureCachedBenchArtifacts({
+const artifactCache = await prepareBenchArtifacts({
   root,
   artifactPaths: benchmarkArtifactPaths,
   options: args,

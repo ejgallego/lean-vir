@@ -61,6 +61,15 @@ export function validateBenchmarkCacheOptions(options) {
   }
 }
 
+export function validateBenchmarkBuildOptions(options) {
+  if (!options.buildArtifacts && (
+    !options.artifactCacheEnabled || options.artifactCachePath !== null || options.refreshArtifactCache
+  )) {
+    throw new Error("--no-build cannot be combined with artifact-cache options");
+  }
+  validateBenchmarkCacheOptions(options);
+}
+
 export function benchmarkCacheArgs(options) {
   const result = [];
   if (!options.artifactCacheEnabled) {
