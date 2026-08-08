@@ -13,6 +13,7 @@ export const SDK_PAYLOADS = [
   ["js/vir-react-host-bindings.js", "web/src/vir-react-host-bindings.js"],
   ["js/vir-react-dom-client.js", "web/src/vir-react-dom-client.js"],
   ["js/host-resource.js", "web/src/host-resource.js"],
+  ["js/runtime/call-timing.js", "web/src/runtime/call-timing.js"],
   ["js/runtime/callbacks.js", "web/src/runtime/callbacks.js"],
   ["js/runtime/cleanup.js", "web/src/runtime/cleanup.js"],
   ["js/runtime/core.js", "web/src/runtime/core.js"],

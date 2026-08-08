@@ -34,6 +34,7 @@ export const environmentLookupHarnessPaths = Object.freeze([
   "web/src/pages/browser-package-config.js",
   "web/src/react/vir-react-hooks.js",
   "web/src/react/vir-react-node.js",
+  "web/src/runtime/call-timing.js",
   "web/src/runtime/callbacks.js",
   "web/src/runtime/cleanup.js",
   "web/src/runtime/core.js",

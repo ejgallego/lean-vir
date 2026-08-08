@@ -39,6 +39,7 @@ export class VirHostState {
     this.resourceRoots = new ExternrefResourceRoots();
     this.leanObjectHandleCells = new Set();
     this.callError = null;
+    this.callTimings = [];
     this.finalizerErrorMessages = [];
     this.droppedFinalizerErrors = 0;
     this.disposed = false;
@@ -60,6 +61,16 @@ export class VirHostState {
 
   clearCallError() {
     this.callError = null;
+  }
+
+  beginCallTiming(timing) {
+    this.callTimings.push(timing);
+  }
+
+  endCallTiming(timing) {
+    if (this.callTimings.pop() !== timing) {
+      throw new Error("Vir host call timing stack is inconsistent");
+    }
   }
 
   recordCallError(error) {
@@ -120,6 +131,17 @@ export class VirHostState {
   }
 
   callObjects(slot, argvPtr, argc) {
+    const timing = this.callTimings[this.callTimings.length - 1] ?? null;
+    if (timing === null) return this.callObjectsImpl(slot, argvPtr, argc);
+    const started = timing.beginHost();
+    try {
+      return this.callObjectsImpl(slot, argvPtr, argc);
+    } finally {
+      timing.endHost(started);
+    }
+  }
+
+  callObjectsImpl(slot, argvPtr, argc) {
     if (this.disposed) {
       throw new Error("Vir host state has been disposed");
     }

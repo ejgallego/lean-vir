@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { validateInterfaceManifest } from "./interface-manifest.js";
 import { releaseCallbackRoots } from "./callbacks.js";
+import { RuntimeCallTiming } from "./call-timing.js";
 import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 import { ObjectValueRuntime } from "./object-values.js";
 import {
@@ -268,6 +269,16 @@ export class VirRuntime extends ObjectValueRuntime {
     return this.callEntry(entry, args);
   }
 
+  callTimed(name, ...args) {
+    const timing = new RuntimeCallTiming();
+    const entry = this.findManifestEntry(name);
+    if (entry === null) {
+      throw new Error(`interface entry not found: ${name}`);
+    }
+    const value = this.callEntry(entry, args, timing);
+    return { value, timings: timing.finish() };
+  }
+
   runStartupEntries() {
     this.requireLiveRuntime();
     if (this.interfaceManifest === null) {
@@ -281,7 +292,7 @@ export class VirRuntime extends ObjectValueRuntime {
     }
   }
 
-  callEntry(entry, args) {
+  callEntry(entry, args, timing = null) {
     this.requireLiveRuntime();
     this.requireFunction("vir_resolve_call_export");
     if (args.length !== entry.args.length) {
@@ -289,14 +300,14 @@ export class VirRuntime extends ObjectValueRuntime {
     }
 
     const cache = this.callCacheFor(entry);
-    const objectResult = this.tryObjectResolvedCall(entry, args, cache);
+    const objectResult = this.tryObjectResolvedCall(entry, args, cache, timing);
     if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
       return objectResult;
     }
     throw new Error(`object ABI does not support interface entry ${entry.entry}`);
   }
 
-  tryObjectResolvedCall(entry, args, cache) {
+  tryObjectResolvedCall(entry, args, cache, timing = null) {
     const plan = this.objectCallPlanFor(entry, cache);
     if (plan === null) {
       return OBJECT_CALL_UNAVAILABLE;
@@ -306,12 +317,17 @@ export class VirRuntime extends ObjectValueRuntime {
     }
     const argObjs = [];
     try {
-      for (let index = 0; index < plan.args.length; index++) {
-        const arg = plan.args[index];
-        argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
+      const marshalStarted = timing?.beginPhase();
+      try {
+        for (let index = 0; index < plan.args.length; index++) {
+          const arg = plan.args[index];
+          argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
+        }
+      } finally {
+        if (timing !== null) timing.endMarshal(marshalStarted);
       }
       return this.callResolvedObjects(entry, cache, argObjs, (resultObj) =>
-        this.liftOwnedObjectValue(plan.resultType, resultObj, `${entry.entry} result`));
+        this.liftOwnedObjectValue(plan.resultType, resultObj, `${entry.entry} result`), timing);
     } finally {
       this.releaseOwnedObjects(argObjs);
     }

@@ -13,6 +13,7 @@ const root = new URL("..", import.meta.url).pathname;
 
 const tests = [
   { id: "manifest", file: "scripts/runtime-tests/manifest-smoke.mjs", group: "pure" },
+  { id: "call-timing", file: "scripts/runtime-tests/call-timing-smoke.mjs", group: "pure" },
   { id: "js-float", file: "scripts/runtime-tests/js-float-fidelity-smoke.mjs", group: "pure" },
   { id: "host-bindings", file: "scripts/runtime-tests/host-bindings-smoke.mjs", group: "pure" },
   { id: "host-resource-lifecycle", file: "scripts/runtime-tests/host-resource-lifecycle-smoke.mjs", group: "pure" },

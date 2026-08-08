@@ -80,6 +80,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | --- | --- |
 | `vir-runtime.js` | Public runtime facade, WASM instantiation, package loading helpers, and host import wiring. |
 | `vir-runtime-node.js` | Node wrapper that installs virtual browser and React host bindings for tests/tools. |
+| `runtime/call-timing.js` | Internal accumulator for opt-in synchronous runtime call phase attribution. |
 | `runtime/callbacks.js` | JavaScript callable Lean closure wrappers, callback state tracking, release, and disposal helpers. |
 | `runtime/cleanup.js` | Cleanup error collection with deterministic single-error and aggregate reporting. |
 | `runtime/core.js` | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
@@ -265,6 +266,8 @@ their cleanup hook runs once when the final runtime using the map is disposed.
   resolved roots.
 - `vir.call(name, ...args)` accepts a manifest `id`, `jsName`, or Lean
   declaration name.
+- `vir.callTimed(name, ...args)` performs the same call and returns
+  `{ value, timings }` for opt-in phase attribution.
 - `vir.exportsByName.<jsName>(...args)` exposes valid generated JS names as
   methods.
 - `vir.runStartupEntries()` invokes zero-argument exports whose manifest entry
@@ -275,6 +278,52 @@ their cleanup hook runs once when the final runtime using the map is disposed.
 - `vir.packageInfo.interfaceExports` reports the number of generated exports.
 - `vir.packageInfo.hostImports` reports the number of JavaScript host imports.
 - `vir.packageInfo.packageCount` reports the package-set member count.
+
+`callTimed` reports successful synchronous calls with this stable timing shape:
+
+```js
+const { value, timings } = vir.callTimed("MyPackage.render", input);
+
+console.log(value);
+console.log(timings);
+// {
+//   marshalMs: 0.12,
+//   executeMs: 1.84,
+//   decodeMs: 0.31,
+//   hostMs: 0.27,
+//   totalMs: 2.34,
+// }
+```
+
+The phase boundaries are runtime-internal:
+
+- `marshalMs` measures descriptor-guided argument lowering plus construction of
+  the object-pointer `argv` array in Wasm memory.
+- `executeMs` measures precisely the synchronous
+  `vir_call_resolved_objects(...)` export invocation. JavaScript host imports
+  reached by the interpreter therefore remain inside this phase.
+- `decodeMs` begins after that export returns and includes host/runtime error
+  checks, result lifting and copying, temporary `argv` release, and result
+  object release.
+- `hostMs` is nested attribution for synchronous application host imports
+  handled by `vir_js_call_objects`. It is part of `executeMs`, not a fourth
+  sequential phase, and does not include later asynchronous work or rendering.
+- `totalMs` is measured independently around the complete public call, from
+  name lookup through cleanup. Manifest checks, cached-plan lookup, call-slot
+  resolution, and instrumentation overhead can therefore appear only in the
+  difference between `totalMs` and the sequential phases.
+
+The timing fields are not generally additive. `hostMs` overlaps `executeMs`,
+and `totalMs` is an independent wall measurement rather than the sum of the
+other fields. Across repeated samples, each phase median is also computed
+independently, so phase medians need not sum to the median `totalMs`.
+
+The method throws the same errors as `call`; failed calls do not return a
+partial timing report. Ordinary `call` and generated `exportsByName` methods do
+not read the clock. Application projection, JSON conversion, DOM/render work,
+and reporting UI remain consumer-owned and should be timed outside this API.
+This is a JavaScript runtime API addition; it requires no Wasm ABI, `.irpkg`
+package-format, or Lean toolchain version change.
 
 Supported interface types are `Unit`, `Nat`, `Int`, `Bool`, `String`, `Float`,
 `Float32`, `UInt8`, `UInt16`, `UInt32`, `UInt64`, `USize`, `ByteArray`,
