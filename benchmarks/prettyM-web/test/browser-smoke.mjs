@@ -18,6 +18,34 @@ const server = spawn(
 );
 
 async function waitForServer() {
+  let startupOutput = "";
+  await new Promise((resolve, reject) => {
+    const timeout = setTimeout(
+      () => reject(new Error("benchmark server did not announce readiness")),
+      5_000,
+    );
+    const finish = (callback) => {
+      clearTimeout(timeout);
+      callback();
+    };
+    server.stdout.on("data", (chunk) => {
+      startupOutput += chunk;
+      if (startupOutput.includes(`at ${url}`)) finish(resolve);
+    });
+    server.stderr.on("data", (chunk) => {
+      startupOutput += chunk;
+    });
+    server.once("exit", (code) =>
+      finish(() =>
+        reject(
+          new Error(
+            `benchmark server exited with ${code} before readiness\n${startupOutput}`,
+          ),
+        ),
+      ),
+    );
+  });
+
   let lastError;
   for (let attempt = 0; attempt < 100; attempt += 1) {
     if (server.exitCode !== null)

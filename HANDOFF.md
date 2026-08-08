@@ -1,6 +1,6 @@
 # Handoff: standalone prettyM benchmark webapp
 
-Last verified: 2026-08-06
+Last verified: 2026-08-08
 
 ## Resume here
 
@@ -95,24 +95,25 @@ for an accepted or rejected optimization conclusion. Treat them as
 inconclusive, leave bounded set 0001 unchanged, and require measurements from a
 controlled host before importing a decision.
 
-The full `prettyM` source build has now passed on the prepared exact checkouts.
-VIR, FIR native, and FIR LLVM produced complete packages; the producer-local
-checks passed, native and LLVM agreed on exact traces, all source checkouts
-remained clean, and the assembled candidate passed the application's tool,
-artifact-set, and five-backend browser smoke tests. The most recent rehearsal
-materialized all three sources below the application-local `_sources/`
-directory, exactly as CI will. Its receipt is
+The full `prettyM` source build has now passed with merged FIR `main` at
+`298682a766d80e90053d3e76ee2f3e4af78a52aa`, including the native marshaling
+change. VIR, FIR native, and FIR LLVM produced complete packages; the
+producer-local checks passed, native and LLVM agreed on exact traces, and the
+assembled candidate passed the application's tool, artifact-set, and
+five-backend browser smoke tests. The latest rehearsal materialized all three
+sources below the application-local `_sources/` directory, exactly as CI will.
+Its receipt is
 `benchmarks/prettyM-web/_artifacts/builds/prettyM/BUILD.json`, and its candidate
 archive has SHA-256
-`0de25bce79cb119ba59e4f4750ef98d5221ae14b6bd96a8ef337d23ae65b2811`.
-No performance measurement was collected.
+`531ac9af7a6ae48e07384edae6f86fb174d0a2c66e0184f2f3116d2df1fca1f6`
+and size 2,680,320 bytes. No performance measurement was collected.
 
-The committed lock and its `26f54081e15145b6...` archive were deliberately
-left unchanged and restored as the staged application set after validation.
-The FIR-native package reproduced byte-for-byte. Fresh VIR Wasm and `.irpkg`
-bytes and fresh LLVM Wasm bytes differed from set 0001 despite matching source
-and toolchain identities; semantic validation passed. Treat the source-built
-archive as a candidate, not a silent lock refresh.
+The committed lock and its `26f54081e15145b6...` archive remain deliberately
+unchanged. The application-local ignored `artifacts/` tree and `dist/` are
+currently staged from the merged-FIR candidate so the development server
+exercises it. Fresh source-built archives can differ from set 0001 despite
+matching source and toolchain identities; semantic validation passed. Treat
+the source-built archive as a candidate, not a silent lock refresh.
 
 Keep producer worktrees in controlled, ignored locations rather than `/tmp`.
 The validated candidate layout is the self-contained

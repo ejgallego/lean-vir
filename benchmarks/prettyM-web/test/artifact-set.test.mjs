@@ -42,7 +42,7 @@ test("the prettyM source build is complete and materializes pack provenance", as
   );
   assert.equal(
     sources.fir.revision,
-    "4404aba07aa90fb96dc43b5ca056ca38a32fd4bc",
+    "298682a766d80e90053d3e76ee2f3e4af78a52aa",
   );
   assert.equal(
     sources.workload.revision,
