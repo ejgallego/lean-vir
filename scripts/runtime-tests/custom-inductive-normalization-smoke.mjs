@@ -6,9 +6,22 @@ Author: Emilio J. Gallego Arias
 
 import assert from "node:assert/strict";
 
+import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
 import { normalizeCustomInductive } from "../../web/src/runtime/vir-value-normalizers.js";
 
-const scalarType = { type: "Unit", interfaceTag: 0 };
+const scalarType = { type: "Unit", interfaceTag: INTERFACE_TAG.UNIT };
+let layoutReads = 0;
+function objectField(name, index) {
+  const layout = { kind: "object", index };
+  return {
+    name,
+    type: scalarType,
+    get layout() {
+      layoutReads += 1;
+      return layout;
+    },
+  };
+}
 const nilCtor = {
   name: "Example.nil",
   jsName: "nil",
@@ -23,7 +36,7 @@ const unaryCtor = {
   objectFieldCount: 1,
   usizeFieldCount: 0,
   scalarByteSize: 0,
-  fields: [{ name: "arg1", type: scalarType, layout: { kind: "object", index: 0 } }],
+  fields: [objectField("arg1", 0)],
 };
 const pairCtor = {
   name: "Example.pair",
@@ -32,8 +45,8 @@ const pairCtor = {
   usizeFieldCount: 0,
   scalarByteSize: 0,
   fields: [
-    { name: "left", type: scalarType, layout: { kind: "object", index: 0 } },
-    { name: "right", type: scalarType, layout: { kind: "object", index: 1 } },
+    objectField("left", 0),
+    objectField("right", 1),
   ],
 };
 const type = { constructors: [nilCtor, unaryCtor, pairCtor] };
@@ -45,6 +58,8 @@ assert.deepEqual(normalizeCustomInductive({ kind: "nil" }, type, "value"), {
   ctor: nilCtor,
   fields: {},
 });
+const layoutReadsAfterPlanConstruction = layoutReads;
+assert.equal(layoutReadsAfterPlanConstruction, 3);
 assert.deepEqual(normalizeCustomInductive({ kind: "Example.unary", value: 1 }, type, "value"), {
   index: 1,
   ctor: unaryCtor,
@@ -55,12 +70,14 @@ assert.deepEqual(
   { index: 2, ctor: pairCtor, fields: { left: 1, right: 2 } },
 );
 
-// Exercise the cached path independently of the first plan construction.
+// Exercise the cached path independently of the first plan construction and
+// prove that constructor layout validation is not repeated.
 assert.deepEqual(normalizeCustomInductive({ kind: "unary", value: 3 }, type, "repeat"), {
   index: 1,
   ctor: unaryCtor,
   fields: { arg1: 3 },
 });
+assert.equal(layoutReads, layoutReadsAfterPlanConstruction);
 
 assert.throws(
   () => normalizeCustomInductive(null, type, "value"),

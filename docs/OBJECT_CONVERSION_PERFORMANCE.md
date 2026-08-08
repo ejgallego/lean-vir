@@ -9,7 +9,7 @@ the direct `Std.Format.prettyM` boundary, the accepted candidate reduced the
 representative 64-by-64 tag-transition workload by 43.65% and the focused
 2,047-node empty-output workload by 64.01% in an eight-pass AB/BA comparison.
 Every structural paired pass improved. The small text call and fresh-runtime
-guardrails showed no regression.
+guardrails showed no aggregate regression.
 
 The manifest is validated when a package is installed, but the old lowering
 path repeated the following work for every recursive custom-inductive node:
@@ -21,9 +21,11 @@ path repeated the following work for every recursive custom-inductive node:
 
 `normalizeCustomInductive` now stores a `WeakMap` plan keyed by the manifest
 type object. The plan retains the constructor-array identity, constructor name
-map, diagnostic shapes, and validation sets. Replacing `type.constructors`
-invalidates the entry. Per-value kind, key, field-presence, and payload checks
-remain on every call, with the same diagnostics.
+map, diagnostic shapes, and validation sets. Installed manifest descriptors are
+read-only runtime metadata; replacing `type.constructors` defensively
+invalidates the entry, but arbitrary in-place descriptor mutation is not
+supported. Per-value kind, key, field-presence, and payload checks remain on
+every call, with the same diagnostics.
 
 ## Comparison
 
@@ -49,9 +51,11 @@ npm run bench:pretty-object-conversion -- \
 | fresh runtime/package/first text call | 20.829150 ms | 20.135926 ms | -2.73% | -6.75%, -11.46%, -0.19%, +2.09%, -6.02%, -3.50%, -2.73%, -1.79% |
 
 Every warmup and measured batch checked the exact output digest. The control
-source is clean PR #104 commit
-`64e30784da16957cca92951344d776f895b30491`; the measured candidate is clean
-commit `76a9629ea03d59883f4c4705151d611ddb414621`.
+source is clean PR #104
+[commit `64e30784`](https://github.com/ejgallego/lean-vir/commit/64e30784da16957cca92951344d776f895b30491).
+The measured candidate runtime and benchmark harness were replayed without
+content changes as public PR implementation
+[commit `a3c0fdb`](https://github.com/ejgallego/lean-vir/commit/a3c0fdb94fdd100fe11ac775236d87cbfab35800).
 
 The ignored report is 22,725 bytes with SHA-256
 `ae176df76855dfb8ffc92ebd12445504af2c4be899aef70132ee0095c41c1222`.
@@ -72,11 +76,6 @@ empty nodes, it fell from 74.0% to 37.1%, while calls rose from 126 to 298.
 of control empty-node samples. None remained among the candidate's top self
 symbols. `normalizeCustomInductive` itself fell from 9.0% to 3.3% for tags and
 from 11.6% to 4.5% for empty nodes. This is the predicted profile movement.
-
-Raw profiles and summaries are ignored artifacts in the profiling worktree:
-
-- `build/internal-counters/profiles/object-conversion-control-final-20260806/`
-- `build/internal-counters/profiles/object-conversion-candidate-final-20260806/`
 
 Sample shares and profiled throughput are diagnostic. The order-balanced,
 uninstrumented comparison is the acceptance evidence.
