@@ -321,7 +321,11 @@ SDK.
 The Pages workflow runs the same `npm run build:site` entry point. Its static
 artifact includes a fresh complete Lean-library surface scan under
 `web/dist/surface/` and a linker-map-derived release/debug Wasm size explorer under
-`web/dist/size/`. They are deployed at
+`web/dist/size/`. The reports cross-link exact extern backend symbols. The size
+explorer separates the retained-Wasm map from a wider installed-Lean runtime
+context: the former measures linked Wasm bytes, while the latter measures native
+archive-member bytes from `libleanrt.a`, `libleancpp.a`, and `libLeanIR.a` and
+highlights members with a direct VIR object counterpart. They are deployed at
 `https://ejgallego.github.io/lean-vir/surface/` and
 `https://ejgallego.github.io/lean-vir/size/` alongside the demo.
 

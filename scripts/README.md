@@ -29,6 +29,9 @@ map lives in `docs/HARNESS.md`.
 - `npm run build:size-site`
   Render the release/debug Wasm artifacts and strict linker map as the static
   interactive section/subsystem/object/symbol treemap deployed under `/size/`.
+  It also maps the current boundary into the installed Lean native runtime
+  archives. `npm run build:site` supplies the surface-report symbol bridge;
+  the standalone command remains usable without that optional cross-link data.
 - `npm run generate:irpkg`
   Build the local Lean library and `vir_irpkg` generator executable, then
   generate one manifest-bearing `.irpkg`.

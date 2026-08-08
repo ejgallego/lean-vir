@@ -219,6 +219,29 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   })`);
   assert.equal(search.visible, true);
   assert.ok(search.results.some((name) => name.includes("package_decl_provider")));
+
+  await setInputValueAndDispatch(cdp, "#node-search", "lean_mk_array", "input");
+  await clickSelector(cdp, "#search-results button");
+  const surfaceBridge = await evaluate(cdp, `({
+    entry: document.querySelector("#selection-details .detail-actions a")?.textContent,
+    href: document.querySelector("#selection-details .detail-actions a")?.getAttribute("href"),
+  })`);
+  assert.equal(surfaceBridge.entry, "Array.replicate");
+  assert.ok(surfaceBridge.href.includes("../surface/#declaration=Array.replicate"));
+
+  await clickSelector(cdp, "#scope-switch button[data-scope='context']");
+  const context = await evaluate(cdp, `({
+    selectedScope: document.querySelector("#scope-switch button.selected")?.dataset.scope,
+    root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
+    note: document.querySelector("#view-note")?.textContent,
+    inside: document.querySelectorAll("#treemap .in-boundary").length,
+    outside: document.querySelectorAll("#treemap .outside-boundary").length,
+  })`);
+  assert.equal(context.selectedScope, "context");
+  assert.equal(context.root, "Installed Lean runtime context");
+  assert.ok(context.note.includes("native runtime archive members"));
+  assert.ok(context.inside > 0);
+  assert.ok(context.outside > 0);
 }
 
 function landingPetStateScript(condition) {

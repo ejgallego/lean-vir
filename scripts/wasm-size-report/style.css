@@ -74,6 +74,19 @@ h1 {
   font-size: 0.86rem;
 }
 
+.report-links {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 0.65rem;
+}
+
+.report-links a {
+  color: #f8ffff;
+  font-size: 0.78rem;
+  font-weight: 680;
+  text-underline-offset: 0.18em;
+}
+
 .global-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(7.5rem, 1fr));
@@ -129,6 +142,10 @@ h1 {
   padding: 0.9rem 1rem;
   border-bottom: 1px solid var(--border);
   background: #fafcfc;
+}
+
+.toolbar > div {
+  flex: 0 1 auto;
 }
 
 .control-label,
@@ -277,6 +294,29 @@ input:focus {
   box-shadow: inset 0 0 0 4px #df4c2f, 0 0 0 2px #ffffff;
 }
 
+.map-block.in-boundary {
+  color: #10382f;
+  background: #86d2b7;
+}
+
+.map-block.in-boundary.depth-1 {
+  background: #a9e1cd;
+}
+
+.map-block.outside-boundary {
+  color: #354248;
+  background: #d7dde0;
+}
+
+.map-block.outside-boundary.depth-1 {
+  background: #e3e7e9;
+}
+
+.map-block.mixed-boundary {
+  color: #173b35;
+  background: #b9d6cd;
+}
+
 .block-label {
   position: relative;
   z-index: 3;
@@ -377,6 +417,44 @@ input:focus {
   line-height: 1.35;
 }
 
+.detail-actions {
+  margin-top: 0.85rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border);
+  font-size: 0.76rem;
+}
+
+.detail-actions > strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.detail-actions button {
+  width: 100%;
+  margin-bottom: 0.65rem;
+  padding: 0.5rem 0.65rem;
+  color: #f8ffff;
+  border: 0;
+  border-radius: 0.42rem;
+  background: var(--accent);
+  cursor: pointer;
+}
+
+.detail-actions ul {
+  margin: 0;
+  padding-left: 1.15rem;
+  color: var(--muted);
+}
+
+.detail-actions li + li {
+  margin-top: 0.25rem;
+}
+
+.detail-actions a {
+  color: var(--accent);
+  font-weight: 680;
+}
+
 .section-heading {
   display: flex;
   align-items: baseline;
@@ -458,7 +536,7 @@ input:focus {
 
 .method-grid {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 1.2rem;
 }
 

@@ -620,7 +620,14 @@ Author: Emilio J. Gallego Arias
     detail.append(element("p", "control-label", "Extern targets"));
     const targets = element("ul", "extern-targets");
     for (const target of declaration.targets) {
-      targets.append(element("li", "", externTargetLabel(target)));
+      const item = element("li", "", externTargetLabel(target));
+      if (target.value) {
+        const link = element("a", "cross-report-link", "Search Wasm size");
+        link.href = `../size/#view=ownership&query=${encodeURIComponent(target.value)}`;
+        link.title = `Search the Wasm size explorer for ${target.value}`;
+        item.append(document.createTextNode(" "), link);
+      }
+      targets.append(item);
     }
     detail.append(targets);
     if (impact?.examplePath?.length) {

@@ -81,6 +81,19 @@ h1 {
   font-size: 0.9rem;
 }
 
+.report-links {
+  display: flex;
+  gap: 0.8rem;
+  margin-top: 0.65rem;
+}
+
+.report-links a {
+  color: #f8ffff;
+  font-size: 0.78rem;
+  font-weight: 680;
+  text-underline-offset: 0.18em;
+}
+
 .global-summary {
   display: grid;
   grid-template-columns: repeat(3, minmax(7rem, 1fr));
@@ -570,6 +583,15 @@ button:focus-visible {
 
 .extern-targets li + li {
   margin-top: 0.25rem;
+}
+
+.cross-report-link {
+  margin-left: 0.35rem;
+  color: var(--accent);
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+  font-size: 0.74rem;
+  font-weight: 680;
+  white-space: nowrap;
 }
 
 .table-footer,

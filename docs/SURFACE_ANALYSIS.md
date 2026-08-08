@@ -366,7 +366,9 @@ inserts its extern boundaries in name order, and provides declaration-name,
 status, and class filters. Blocked function rows show the primary boundary;
 linkable boundaries open their owning extern row and expose the backend target,
 blocked-root impact, and representative dependency path. Declaration links use
-the `#declaration=...` fragment and can be shared directly.
+the `#declaration=...` fragment and can be shared directly. Extern targets also
+open the matching backend-symbol search in the deployed Wasm size explorer;
+retained symbols link back to these declaration fragments.
 
 The generated directory contains a navigation index with the comparatively
 small extern catalog plus one compact JavaScript data file per module with

@@ -13,13 +13,15 @@ import { fileURLToPath } from "node:url";
 import { parseLinkMap, parseWasm } from "./wasm-size-report.mjs";
 
 const HTML_FORMAT = "lean-vir-wasm-size-html";
-const HTML_VERSION = 1;
+const HTML_VERSION = 2;
 const templateDir = fileURLToPath(new URL("wasm-size-report/", import.meta.url));
 
 const [releaseWasmArg, debugWasmArg, mapArg, outputArg, ...rest] = process.argv.slice(2);
-if (!releaseWasmArg || !debugWasmArg || !mapArg || !outputArg || rest.length !== 0) {
+let surfaceLinksArg = null;
+if (rest.length === 2 && rest[0] === "--surface-links") surfaceLinksArg = rest[1];
+if (!releaseWasmArg || !debugWasmArg || !mapArg || !outputArg || (rest.length !== 0 && !surfaceLinksArg)) {
   console.error(
-    "usage: render-wasm-size-report.mjs <release-wasm> <debug-wasm> <link.map> <output-directory>",
+    "usage: render-wasm-size-report.mjs <release-wasm> <debug-wasm> <link.map> <output-directory> [--surface-links <links.json>]",
   );
   process.exit(2);
 }
@@ -37,6 +39,9 @@ const attribution = parseLinkMap(mapPath, releaseBinary);
 const identity = await readBuildIdentity(join(dirname(mapPath), "wasm-build-identity.json"));
 const revision = process.env.GITHUB_SHA ?? gitRevision();
 const ownershipTree = buildOwnershipTree(attribution);
+const surfaceLinks = surfaceLinksArg ? await readSurfaceLinks(resolve(surfaceLinksArg)) : null;
+const connectedSymbols = connectSurfaceLinks(ownershipTree, surfaceLinks);
+const runtimeContext = await buildRuntimeContext(ownershipTree);
 const attributedBytes = attribution.symbols.reduce((sum, symbol) => sum + symbol.rawBytes, 0);
 
 const payload = {
@@ -56,11 +61,14 @@ const payload = {
     areas: ownershipTree.children.length,
     objects: countKind(ownershipTree, "object"),
     symbols: countKind(ownershipTree, "symbol"),
+    connectedSymbols,
   },
+  runtimeContext: runtimeContext.summary,
   trees: {
     ownership: ownershipTree,
     releaseSections: buildSectionTree(releaseBinary, "release"),
     debugSections: buildSectionTree(debugBinary, "debug"),
+    runtimeContext: runtimeContext.tree,
   },
 };
 
@@ -84,6 +92,7 @@ const manifest = {
   build: payload.build,
   revision,
   attribution: payload.attribution,
+  runtimeContext: payload.runtimeContext,
 };
 await writeFile(join(outputDir, "vir-wasm-size-html.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -211,6 +220,185 @@ function buildOwnershipTree(report) {
     bytes: report.codeDataBytes,
     children,
   };
+}
+
+function connectSurfaceLinks(root, links) {
+  if (!links) return 0;
+  const externsByTarget = new Map();
+  for (const declaration of links.externs) {
+    for (const target of declaration.targets) {
+      const declarations = externsByTarget.get(target) ?? [];
+      declarations.push({
+        name: declaration.name,
+        module: declaration.module,
+        status: declaration.status,
+      });
+      externsByTarget.set(target, declarations);
+    }
+  }
+  let connected = 0;
+  visitTree(root, (node) => {
+    if (node.kind !== "symbol") return;
+    const declarations = externsByTarget.get(node.meta?.rawName)
+      ?? externsByTarget.get(node.name);
+    if (!declarations) return;
+    node.meta.surfaceDeclarations = declarations;
+    connected += 1;
+  });
+  return connected;
+}
+
+async function buildRuntimeContext(ownershipTree) {
+  const lean = spawnSync("lean", ["--print-prefix"], { encoding: "utf8" });
+  if (lean.status !== 0) {
+    throw new Error(`unable to locate the Lean toolchain: ${lean.stderr || lean.stdout}`);
+  }
+  const prefix = lean.stdout.trim();
+  const boundaryObjects = runtimeBoundaryObjects(ownershipTree);
+  const archiveSpecs = [
+    ["libleanrt.a", "Lean runtime"],
+    ["libleancpp.a", "Lean C++ support"],
+    ["libLeanIR.a", "Lean IR module"],
+  ];
+  let nextId = 0;
+  let memberCount = 0;
+  let boundaryMemberCount = 0;
+  let boundaryNativeBytes = 0;
+  let boundaryWasmBytes = 0;
+  const children = [];
+
+  for (const [file, label] of archiveSpecs) {
+    const path = join(prefix, "lib", "lean", file);
+    const members = parseArArchive(await readFile(path));
+    const duplicateCount = new Map();
+    const memberNodes = members.map((member) => {
+      const occurrence = (duplicateCount.get(member.name) ?? 0) + 1;
+      duplicateCount.set(member.name, occurrence);
+      const boundary = boundaryObjects.get(`${file}/${member.name}`);
+      memberCount += 1;
+      if (boundary) {
+        boundaryMemberCount += 1;
+        boundaryNativeBytes += member.bytes;
+        boundaryWasmBytes += boundary.bytes;
+      }
+      return {
+        id: `runtime-member-${nextId++}`,
+        name: occurrence === 1 ? member.name : `${member.name} (${occurrence})`,
+        kind: "runtimeMember",
+        bytes: member.bytes,
+        meta: {
+          archive: file,
+          inVirBoundary: Boolean(boundary),
+          retainedWasmBytes: boundary?.bytes ?? null,
+          wasmNodeId: boundary?.id ?? null,
+          wasmObject: boundary?.name ?? null,
+        },
+      };
+    }).sort(compareBytesThenName);
+    const boundaryMembers = memberNodes.filter((member) => member.meta.inVirBoundary).length;
+    children.push({
+      id: `runtime-archive-${nextId++}`,
+      name: `${label} (${file})`,
+      kind: "archive",
+      bytes: sumChildren(memberNodes),
+      meta: {
+        archive: file,
+        boundaryMembers,
+        memberCount: memberNodes.length,
+      },
+      children: memberNodes,
+    });
+  }
+  children.sort(compareBytesThenName);
+  const bytes = sumChildren(children);
+  return {
+    summary: {
+      source: "installed Lean native archives",
+      archives: archiveSpecs.length,
+      memberBytes: bytes,
+      members: memberCount,
+      boundaryMembers: boundaryMemberCount,
+      boundaryNativeBytes,
+      boundaryWasmBytes,
+    },
+    tree: {
+      id: "runtime-context-root",
+      name: "Installed Lean runtime context",
+      kind: "root",
+      bytes,
+      children,
+    },
+  };
+}
+
+function runtimeBoundaryObjects(root) {
+  const result = new Map();
+  visitTree(root, (node) => {
+    if (node.kind !== "object") return;
+    let key = null;
+    if (node.name.startsWith("Lean/runtime/")) {
+      key = `libleanrt.a/${basename(node.name)}.o`;
+    } else if (node.name.startsWith("Lean/kernel/") || node.name.startsWith("Lean/util/")) {
+      key = `libleancpp.a/${basename(node.name)}.o`;
+    } else if (node.name === "ir_interpreter.o") {
+      key = "libleancpp.a/ir_interpreter.cpp.o";
+    }
+    if (key) result.set(key, node);
+  });
+  return result;
+}
+
+function parseArArchive(buffer) {
+  if (buffer.subarray(0, 8).toString("ascii") !== "!<arch>\n") {
+    throw new Error("expected a Unix archive");
+  }
+  let offset = 8;
+  let stringTable = null;
+  const members = [];
+  while (offset + 60 <= buffer.length) {
+    const header = buffer.subarray(offset, offset + 60);
+    if (header.subarray(58, 60).toString("ascii") !== "`\n") {
+      throw new Error(`invalid archive member header at byte ${offset}`);
+    }
+    let name = header.subarray(0, 16).toString("utf8").trim();
+    const storedBytes = Number.parseInt(header.subarray(48, 58).toString("ascii").trim(), 10);
+    if (!Number.isSafeInteger(storedBytes) || storedBytes < 0) {
+      throw new Error(`invalid archive member size at byte ${offset}`);
+    }
+    const dataOffset = offset + 60;
+    let payloadBytes = storedBytes;
+    if (name === "//") {
+      stringTable = buffer.subarray(dataOffset, dataOffset + storedBytes);
+    } else if (/^\/\d+$/.test(name)) {
+      if (!stringTable) throw new Error("archive uses a long name before its string table");
+      const nameOffset = Number.parseInt(name.slice(1), 10);
+      const tail = stringTable.subarray(nameOffset).toString("utf8");
+      name = tail.slice(0, tail.search(/\/?\n/)).replace(/\/$/, "");
+      members.push({ name, bytes: payloadBytes });
+    } else if (name.startsWith("#1/")) {
+      const nameBytes = Number.parseInt(name.slice(3), 10);
+      name = buffer.subarray(dataOffset, dataOffset + nameBytes).toString("utf8").replace(/\0+$/, "");
+      payloadBytes -= nameBytes;
+      members.push({ name, bytes: payloadBytes });
+    } else if (!["/", "/SYM64/", "__.SYMDEF", "__.SYMDEF SORTED"].includes(name)) {
+      members.push({ name: name.replace(/\/$/, ""), bytes: payloadBytes });
+    }
+    offset = dataOffset + storedBytes + (storedBytes % 2);
+  }
+  return members;
+}
+
+async function readSurfaceLinks(path) {
+  const links = JSON.parse(await readFile(path, "utf8"));
+  if (links?.format !== "lean-vir-surface-size-links" || links.version !== 1 || !Array.isArray(links.externs)) {
+    throw new Error(`invalid runnable-surface links file ${path}`);
+  }
+  return links;
+}
+
+function visitTree(node, visit) {
+  visit(node);
+  for (const child of node.children ?? []) visitTree(child, visit);
 }
 
 function cleanObjectName(name) {

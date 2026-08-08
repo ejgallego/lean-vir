@@ -108,6 +108,19 @@ const indexPayload = {
 };
 const indexSource = `globalThis.__virSurfaceIndex=${scriptSafeJson(indexPayload)};\n`;
 bytesWritten += await writeOutput("data/index.js", indexSource);
+const sizeLinks = {
+  format: "lean-vir-surface-size-links",
+  version: 1,
+  externs: externs.map((declaration) => ({
+    name: declaration.name,
+    module: declaration.module,
+    status: declaration.status,
+    targets: declaration.targets
+      .map((target) => target.value)
+      .filter((target) => typeof target === "string" && target.length > 0),
+  })),
+};
+bytesWritten += await writeOutput("data/size-links.json", `${JSON.stringify(sizeLinks)}\n`);
 
 for (const asset of ["app.js", "style.css"]) {
   bytesWritten += await writeOutput(`assets/${asset}`, await readFile(join(templateDir, asset), "utf8"));
@@ -127,6 +140,7 @@ const manifest = {
   modulesWithFunctions: report.modules.length,
   declarations: report.declarations.length,
   externs: externs.length,
+  sizeLinks: sizeLinks.externs.length,
   moduleDataFiles: dataFileCount,
   entrypoint: "index.html",
 };

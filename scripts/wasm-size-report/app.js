@@ -16,6 +16,8 @@ Author: Emilio J. Gallego Arias
   const elements = {
     identity: document.querySelector("#report-identity"),
     summary: document.querySelector("#global-summary"),
+    scopeSwitch: document.querySelector("#scope-switch"),
+    boundaryViewControl: document.querySelector("#boundary-view-control"),
     viewSwitch: document.querySelector("#view-switch"),
     search: document.querySelector("#node-search"),
     breadcrumbs: document.querySelector("#breadcrumbs"),
@@ -67,6 +69,11 @@ Author: Emilio J. Gallego Arias
   }
 
   function bindControls() {
+    elements.scopeSwitch.addEventListener("click", (event) => {
+      const button = event.target.closest("button[data-scope]");
+      if (!button || button.dataset.scope === scopeForView(view)) return;
+      setView(button.dataset.scope === "context" ? "runtimeContext" : "ownership");
+    });
     elements.viewSwitch.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-view]");
       if (!button || button.dataset.view === view) return;
@@ -91,20 +98,29 @@ Author: Emilio J. Gallego Arias
   }
 
   function render() {
+    const scope = scopeForView(view);
+    for (const button of elements.scopeSwitch.querySelectorAll("button[data-scope]")) {
+      button.classList.toggle("selected", button.dataset.scope === scope);
+    }
+    elements.boundaryViewControl.hidden = scope === "context";
     for (const button of elements.viewSwitch.querySelectorAll("button[data-view]")) {
       button.classList.toggle("selected", button.dataset.view === view);
     }
-    elements.search.disabled = view !== "ownership";
+    elements.search.disabled = !searchAvailable(view);
     elements.search.placeholder = view === "ownership"
       ? "package_decl_provider…"
-      : "Search is available in ownership view";
+      : view === "runtimeContext"
+        ? "environment.cpp.o…"
+        : "Search is available in ownership and runtime-context views";
     elements.note.textContent = view === "ownership"
       ? `${formatBytes(report.attribution.attributedBytes)} of ${formatBytes(report.attribution.codeDataBytes)} retained Code+Data bytes have a linker-map owner.`
       : view === "releaseSections"
         ? report.binaries.release.rawBytes < report.binaries.debug.rawBytes
           ? "The stripped release file is the binary shipped by the hosted demo and SDK."
           : "This local build has not produced a distinct stripped release file; run npm run build:site for the deployed profile."
-        : "The optimized debug companion retains names and DWARF sections for diagnosis.";
+        : view === "debugSections"
+          ? "The optimized debug companion retains names and DWARF sections for diagnosis."
+          : `${report.runtimeContext.boundaryMembers} of ${report.runtimeContext.members} native runtime archive members have a direct object counterpart in VIR. Green is inside the boundary; gray is outside.`;
     renderBreadcrumbs();
     renderTreemap();
     renderDetails(selected);
@@ -151,6 +167,15 @@ Author: Emilio J. Gallego Arias
   function makeBlock(node, rect, depth, hue) {
     const block = document.createElement("div");
     block.className = `map-block depth-${depth}`;
+    if (view === "runtimeContext") {
+      block.classList.add(
+        node.meta?.inVirBoundary
+          ? "in-boundary"
+          : node.meta?.boundaryMembers > 0
+            ? "mixed-boundary"
+            : "outside-boundary",
+      );
+    }
     if (node.id === highlightedId) block.classList.add("highlighted");
     block.dataset.nodeId = node.id;
     block.style.left = `${rect.x}%`;
@@ -218,7 +243,7 @@ Author: Emilio J. Gallego Arias
   }
 
   function renderDetails(node) {
-    const binaryShare = node.bytes / binaryForView(view).rawBytes;
+    const reportShare = node.bytes / reportDenominator(view);
     const currentShare = node.bytes / current.bytes;
     const title = document.createElement("h2");
     title.textContent = node.name;
@@ -227,12 +252,16 @@ Author: Emilio J. Gallego Arias
     kind.textContent = labelKind(node.kind);
     const stats = document.createElement("dl");
     stats.className = "detail-stats";
-    appendDetail(stats, "Retained raw", formatBytes(node.bytes));
-    appendDetail(stats, "Share of binary", formatPercent(binaryShare));
+    appendDetail(stats, view === "runtimeContext" ? "Native archive bytes" : "Retained raw", formatBytes(node.bytes));
+    appendDetail(stats, view === "runtimeContext" ? "Share of runtime context" : "Share of binary", formatPercent(reportShare));
     appendDetail(stats, "Share of current", formatPercent(currentShare));
     if (node.gzipBytes != null) appendDetail(stats, "Independent gzip", formatBytes(node.gzipBytes));
     if (node.children) appendDetail(stats, "Children", node.children.length.toLocaleString("en-US"));
     if (node.meta?.section) appendDetail(stats, "Section", node.meta.section);
+    if (node.meta?.memberCount) appendDetail(stats, "Archive members", node.meta.memberCount.toLocaleString("en-US"));
+    if (node.meta?.boundaryMembers != null) appendDetail(stats, "Inside VIR", node.meta.boundaryMembers.toLocaleString("en-US"));
+    if (node.meta?.inVirBoundary != null) appendDetail(stats, "VIR boundary", node.meta.inVirBoundary ? "inside" : "outside");
+    if (node.meta?.retainedWasmBytes != null) appendDetail(stats, "Retained in VIR Wasm", formatBytes(node.meta.retainedWasmBytes));
     const source = node.meta?.input;
     const sourceText = source ? document.createElement("p") : null;
     if (sourceText) {
@@ -244,7 +273,60 @@ Author: Emilio J. Gallego Arias
       note.className = "detail-note";
       note.textContent = node.meta.note;
     }
-    elements.details.replaceChildren(title, kind, stats, ...(sourceText ? [sourceText] : []), ...(note ? [note] : []));
+    const actions = renderDetailActions(node);
+    elements.details.replaceChildren(
+      title,
+      kind,
+      stats,
+      ...(sourceText ? [sourceText] : []),
+      ...(note ? [note] : []),
+      ...(actions ? [actions] : []),
+    );
+  }
+
+  function renderDetailActions(node) {
+    const declarations = node.meta?.surfaceDeclarations ?? [];
+    const wasmNodeId = node.meta?.wasmNodeId;
+    if (declarations.length === 0 && !wasmNodeId) return null;
+    const actions = document.createElement("div");
+    actions.className = "detail-actions";
+    if (wasmNodeId) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.textContent = "Open retained Wasm object";
+      button.addEventListener("click", () => selectTreeNode("ownership", wasmNodeId));
+      actions.append(button);
+    }
+    if (declarations.length > 0) {
+      const heading = document.createElement("strong");
+      heading.textContent = "Runnable-surface entries";
+      actions.append(heading);
+      const list = document.createElement("ul");
+      for (const declaration of declarations) {
+        const item = document.createElement("li");
+        const link = document.createElement("a");
+        link.href = `../surface/#declaration=${encodeURIComponent(declaration.name)}`;
+        link.textContent = declaration.name;
+        link.title = `${declaration.status} extern in ${declaration.module}`;
+        item.append(link, document.createTextNode(` · ${declaration.status}`));
+        list.append(item);
+      }
+      actions.append(list);
+    }
+    return actions;
+  }
+
+  function selectTreeNode(nextView, nodeId) {
+    const index = indexes.get(nextView);
+    const node = index?.nodeById.get(nodeId);
+    if (!node) return;
+    view = nextView;
+    current = node;
+    selected = node;
+    highlightedId = null;
+    elements.search.value = "";
+    writeHash();
+    render();
   }
 
   function renderTopChildren() {
@@ -255,7 +337,7 @@ Author: Emilio J. Gallego Arias
 
   function renderSearch() {
     const query = elements.search.value.trim().toLocaleLowerCase();
-    if (view !== "ownership" || query === "") {
+    if (!searchAvailable(view) || query === "") {
       elements.searchSection.hidden = true;
       elements.searchResults.replaceChildren();
       return;
@@ -266,7 +348,7 @@ Author: Emilio J. Gallego Arias
       .slice(0, 40);
     elements.searchSection.hidden = false;
     elements.searchCount.textContent = matches.length === 40 ? "40+" : String(matches.length);
-    elements.searchResults.replaceChildren(...matches.map((node) => resultRow(node, report.attribution.codeDataBytes, true)));
+    elements.searchResults.replaceChildren(...matches.map((node) => resultRow(node, reportDenominator(view), true)));
   }
 
   function resultRow(node, denominator, searchResult = false) {
@@ -296,6 +378,8 @@ Author: Emilio J. Gallego Arias
 
   function writeHash() {
     const params = new URLSearchParams({ view, node: current.id });
+    const query = elements.search.value.trim();
+    if (query) params.set("query", query);
     const next = `#${params}`;
     if (window.location.hash !== next) history.replaceState(null, "", next);
   }
@@ -308,6 +392,7 @@ Author: Emilio J. Gallego Arias
     current = index.nodeById.get(params.get("node")) ?? report.trees[view];
     selected = current;
     highlightedId = null;
+    elements.search.value = params.get("query") ?? "";
   }
 
   function indexTree(root) {
@@ -382,15 +467,40 @@ Author: Emilio J. Gallego Arias
   }
 
   function searchableText(node) {
-    return [node.name, node.meta?.rawName, node.meta?.input].filter(Boolean).join(" ").toLocaleLowerCase();
+    return [
+      node.name,
+      node.meta?.rawName,
+      node.meta?.input,
+      node.meta?.archive,
+      ...(node.meta?.surfaceDeclarations ?? []).map((declaration) => declaration.name),
+    ].filter(Boolean).join(" ").toLocaleLowerCase();
   }
 
   function labelKind(kind) {
-    return ({ root: "report root", area: "ownership area", object: "object or archive member", symbol: "retained linker range", section: "Wasm section" })[kind] ?? kind;
+    return ({
+      root: "report root",
+      area: "ownership area",
+      object: "linked object",
+      symbol: "retained linker range",
+      section: "Wasm section",
+      archive: "installed Lean native archive",
+      runtimeMember: "native archive member",
+    })[kind] ?? kind;
   }
 
-  function binaryForView(activeView) {
-    return activeView === "debugSections" ? report.binaries.debug : report.binaries.release;
+  function scopeForView(activeView) {
+    return activeView === "runtimeContext" ? "context" : "boundary";
+  }
+
+  function searchAvailable(activeView) {
+    return activeView === "ownership" || activeView === "runtimeContext";
+  }
+
+  function reportDenominator(activeView) {
+    if (activeView === "runtimeContext") return report.runtimeContext.memberBytes;
+    return activeView === "debugSections"
+      ? report.binaries.debug.rawBytes
+      : report.binaries.release.rawBytes;
   }
 
   function hueFor(index) {

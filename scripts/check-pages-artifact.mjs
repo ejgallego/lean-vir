@@ -111,6 +111,10 @@ async function assertSurfaceReport() {
   await assertFile("surface/assets/app.js", 1024);
   await assertFile("surface/assets/style.css", 1024);
   await assertFile("surface/data/index.js", 1024);
+  const sizeLinks = JSON.parse(await assertFile("surface/data/size-links.json", 100));
+  assert.equal(sizeLinks.format, "lean-vir-surface-size-links");
+  assert.ok(sizeLinks.externs.some((declaration) => declaration.targets.length > 0),
+    "surface report should export backend targets for the size-report bridge");
 
   const manifest = JSON.parse(await assertFile("surface/vir-surface-html.json", 100));
   assert.equal(manifest.format, "lean-vir-surface-html");
@@ -139,6 +143,13 @@ async function assertWasmSizeReport() {
   assert.ok(manifest.attribution.coverage > 0.99, "Wasm size report should attribute nearly all Code+Data bytes");
   assert.ok(manifest.attribution.objects > 0, "Wasm size report should contain retained objects");
   assert.ok(manifest.attribution.symbols > 0, "Wasm size report should contain retained symbols");
+  assert.ok(manifest.attribution.connectedSymbols > 0,
+    "Wasm size report should connect retained symbols to runnable-surface declarations");
+  assert.equal(manifest.runtimeContext.archives, 3);
+  assert.ok(manifest.runtimeContext.members > manifest.runtimeContext.boundaryMembers,
+    "runtime context should contain both inside- and outside-boundary archive members");
+  assert.ok(manifest.runtimeContext.boundaryMembers > 0,
+    "runtime context should identify current VIR boundary members");
 }
 
 const indexHtml = await assertHtmlAssetLinks("index.html");
