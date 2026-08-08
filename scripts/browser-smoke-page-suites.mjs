@@ -175,6 +175,52 @@ export async function smokePackagePreset(cdp, origin) {
   });
 }
 
+export async function smokeWasmSizeExplorer(cdp, origin) {
+  await navigate(cdp, `${origin}${basePath}size/index.html`);
+  await waitForBrowserState(cdp, `(() => {
+    const blocks = document.querySelectorAll("#treemap .map-block");
+    return {
+      ready: blocks.length > 0,
+      value: blocks.length,
+    };
+  })()`, {
+    timeoutMessage: "Wasm size explorer did not render its ownership treemap",
+  });
+
+  const ownership = await evaluate(cdp, `({
+    selectedView: document.querySelector("#view-switch button.selected")?.dataset.view,
+    blocks: document.querySelectorAll("#treemap .map-block").length,
+    root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
+    summary: document.querySelector("#global-summary")?.textContent,
+    top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
+  })`);
+  assert.equal(ownership.selectedView, "ownership");
+  assert.ok(ownership.blocks > 0);
+  assert.equal(ownership.root, "Retained Code+Data");
+  assert.ok(ownership.summary.includes("Code+Data attributed"));
+  assert.ok(ownership.top.includes("Lean C runtime"));
+
+  await clickSelector(cdp, "#view-switch button[data-view='debugSections']");
+  const debugSections = await evaluate(cdp, `({
+    selectedView: document.querySelector("#view-switch button.selected")?.dataset.view,
+    root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
+    top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
+  })`);
+  assert.equal(debugSections.selectedView, "debugSections");
+  assert.equal(debugSections.root, "Debug Wasm binary");
+  assert.ok(debugSections.top.includes("Code"));
+  assert.ok(debugSections.top.some((name) => name.startsWith("Custom:.debug")));
+
+  await clickSelector(cdp, "#view-switch button[data-view='ownership']");
+  await setInputValueAndDispatch(cdp, "#node-search", "package_decl_provider", "input");
+  const search = await evaluate(cdp, `({
+    visible: !document.querySelector("#search-results-section")?.hidden,
+    results: Array.from(document.querySelectorAll("#search-results button span:first-child"), (node) => node.textContent),
+  })`);
+  assert.equal(search.visible, true);
+  assert.ok(search.results.some((name) => name.includes("package_decl_provider")));
+}
+
 function landingPetStateScript(condition) {
   return `(() => {
     const state = {

@@ -119,6 +119,28 @@ async function assertSurfaceReport() {
   assert.ok(manifest.moduleDataFiles > 0, "surface report should contain per-module data files");
 }
 
+async function assertWasmSizeReport() {
+  const html = (await assertFile("size/index.html", 100)).toString("utf8");
+  assert.ok(html.includes("assets/app.js"), "Wasm size report should load its application asset");
+  assert.ok(html.includes("data/index.js"), "Wasm size report should load its size index");
+  await assertFile("size/assets/app.js", 1024);
+  await assertFile("size/assets/style.css", 1024);
+  await assertFile("size/data/index.js", 1024);
+
+  const manifest = JSON.parse(await assertFile("size/vir-wasm-size-html.json", 100));
+  assert.equal(manifest.format, "lean-vir-wasm-size-html");
+  assert.ok(manifest.binaries.release.rawBytes > 0, "Wasm size report should describe a non-empty release binary");
+  assert.ok(manifest.binaries.debug.rawBytes >= manifest.binaries.release.rawBytes,
+    "Wasm size report debug companion should be at least as large as the stripped release binary");
+  if (manifest.build?.profile === "release") {
+    assert.ok(manifest.binaries.debug.rawBytes > manifest.binaries.release.rawBytes,
+      "release Pages builds should strip the public Wasm while retaining a larger debug companion");
+  }
+  assert.ok(manifest.attribution.coverage > 0.99, "Wasm size report should attribute nearly all Code+Data bytes");
+  assert.ok(manifest.attribution.objects > 0, "Wasm size report should contain retained objects");
+  assert.ok(manifest.attribution.symbols > 0, "Wasm size report should contain retained symbols");
+}
+
 const indexHtml = await assertHtmlAssetLinks("index.html");
 const devHtml = await assertHtmlAssetLinks("dev.html");
 const formatHtml = await assertHtmlAssetLinks("format.html");
@@ -128,6 +150,8 @@ assertLink(indexHtml, "dev.html");
 assertLink(indexHtml, "react.html");
 assertLink(indexHtml, "downloads/lean-vir-local.tar.gz");
 assertLink(indexHtml, "downloads/lean-vir-sdk.tar.gz");
+assertLink(indexHtml, "https://ejgallego.github.io/lean-vir/surface/");
+assertLink(indexHtml, "https://ejgallego.github.io/lean-vir/size/");
 assertLink(indexHtml, "format.html?case=list&amp;width=12");
 assertLink(indexHtml, "dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total");
 assertLink(indexHtml, `dev.html?package=${defaultPackageFile}&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`);
@@ -151,8 +175,9 @@ await assertStalePackageRejectedBeforeBrowser();
 await assertLocalBundle("downloads/lean-vir-local.tar.gz");
 await assertSdkBundle("downloads/lean-vir-sdk.tar.gz");
 await assertSurfaceReport();
+await assertWasmSizeReport();
 
-console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, React review, format workbench, runnable-surface report, wasm, focused manifest packages, local bundle, and SDK bundle`);
+console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, React review, format workbench, runnable-surface and Wasm-size reports, wasm, focused manifest packages, local bundle, and SDK bundle`);
 
 function minGeneratedPublicFileSize(file) {
   return localPackageFileSet.has(file) ? 128 : 1024;

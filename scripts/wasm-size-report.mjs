@@ -7,6 +7,7 @@ Author: Emilio J. Gallego Arias
 
 import { existsSync, readFileSync } from "node:fs";
 import { spawnSync } from "node:child_process";
+import { pathToFileURL } from "node:url";
 import { gzipSync } from "node:zlib";
 
 const DEFAULT_WASM_PATHS = [
@@ -110,7 +111,7 @@ function readU32(buffer, offset) {
   throw new Error("unexpected EOF while reading varuint32");
 }
 
-function parseWasm(path) {
+export function parseWasm(path) {
   const buffer = readFileSync(path);
   if (buffer.length < 8 || buffer.readUInt32LE(0) !== 0x6d736100) {
     throw new Error(`${path} is not a WebAssembly binary`);
@@ -195,7 +196,7 @@ function printSectionReport(report) {
   console.log();
 }
 
-function mapAreaFor(input) {
+export function mapAreaFor(input) {
   if (input === "<internal>") return "Linker/internal glue";
   if (input.includes("libc++.a(") || input.includes("libc++abi.a(")) return "WASI SDK C++ runtime";
   if (input.includes("libc.a(") || input.includes("crt1-")) return "WASI libc / startup";
@@ -205,7 +206,12 @@ function mapAreaFor(input) {
     return "Lean upstream IR interpreter";
   }
   if (input.includes("third_party_lean4-src_src_runtime_")) return "Lean C runtime";
-  if (input.includes("third_party_lean4-src_src_util_name.cpp.o")) return "Lean name support";
+  if (input.endsWith("/native_support.o") || input === "build/upstream-probe/obj/native_support.o") {
+    return "Lean compiled native support";
+  }
+  if (input.includes("third_party_lean4-src_src_kernel_")) return "Lean kernel support";
+  if (input.includes("third_party_lean4-src_src_util_")) return "Lean utility support";
+  if (input.includes("third_party_lean4-src_stage0_stdlib_Lean_")) return "Lean generated library support";
   if (input.includes("wasm_upstream_shim_runtime_native_symbols.cpp.o")) return "VIR native extern wrappers";
   if (input.includes("wasm_upstream_shim_runtime_native_symbol_lookup.cpp.o")) return "VIR native extern registry";
   if (input.includes("wasm_upstream_shim_package_")) return "VIR package loader and metadata";
@@ -216,7 +222,7 @@ function mapAreaFor(input) {
   return "Other";
 }
 
-function mapDetailFor(input) {
+export function mapDetailFor(input) {
   if (input === "<internal>") return "<internal>";
   const archiveMember = input.match(/([^/]+\.a)\(([^)]+)\)$/);
   if (archiveMember) return `${archiveMember[1]}(${archiveMember[2]})`;
@@ -231,11 +237,13 @@ function isMapInput(input) {
     input.includes("crt1-");
 }
 
-function parseLinkMap(path, wasmReport) {
+export function parseLinkMap(path, wasmReport) {
   const groups = new Map();
   const details = new Map();
   const sectionTotals = new Map();
+  const symbols = [];
   let currentSection = null;
+  let previousSymbol = null;
 
   for (const line of readFileSync(path, "utf8").split(/\r?\n/)) {
     const match = line.match(/^\s*(\S+)\s+([0-9a-fA-F]+)\s+([0-9a-fA-F]+)(?:\s+(.*?))?\s*$/);
@@ -246,18 +254,40 @@ function parseLinkMap(path, wasmReport) {
     const rest = match[4] ?? "";
     if (/^[A-Z][A-Z0-9_]*$/.test(rest)) {
       currentSection = rest;
+      previousSymbol = null;
       sectionTotals.set(rest, (sectionTotals.get(rest) ?? 0) + size);
       continue;
     }
 
-    if (currentSection !== "CODE" && currentSection !== "DATA") continue;
+    if (currentSection !== "CODE" && currentSection !== "DATA") {
+      previousSymbol = null;
+      continue;
+    }
     if (currentSection === "DATA" && offset === 0) continue; // .bss is memory footprint, not file bytes.
 
-    const inputMatch = rest.match(/^(.+?):\(/);
-    if (!inputMatch || !isMapInput(inputMatch[1])) continue;
+    const inputMatch = rest.match(/^(.+?):\((.*)\)$/);
+    if (!inputMatch || !isMapInput(inputMatch[1])) {
+      if (previousSymbol && previousSymbol.offset === offset && previousSymbol.rawBytes === size && rest !== "") {
+        previousSymbol.displayName = rest;
+      } else {
+        previousSymbol = null;
+      }
+      continue;
+    }
     const input = inputMatch[1];
     const area = mapAreaFor(input);
     const range = [offset, size];
+    previousSymbol = {
+      area,
+      input,
+      object: mapDetailFor(input),
+      section: currentSection,
+      name: inputMatch[2] || "(anonymous)",
+      displayName: inputMatch[2] || "(anonymous)",
+      offset,
+      rawBytes: size,
+    };
+    symbols.push(previousSymbol);
 
     const group = groups.get(area) ?? { rawBytes: 0, ranges: [], count: 0 };
     group.rawBytes += size;
@@ -304,6 +334,7 @@ function parseLinkMap(path, wasmReport) {
     details: [...details.values()]
       .map(withGzip)
       .sort((a, b) => b.rawBytes - a.rawBytes),
+    symbols: symbols.sort((a, b) => b.rawBytes - a.rawBytes),
   };
 }
 
@@ -343,11 +374,11 @@ function printAttribution(report, mapReport, detailLimit) {
   }
 }
 
-try {
+function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help) {
     usage();
-    process.exit(0);
+    return;
   }
 
   const reports = args.wasmPaths.map(parseWasm);
@@ -365,8 +396,14 @@ try {
     }
     printAttribution(reports[0], parseLinkMap(args.mapPath, reports[0]), args.detailLimit);
   }
-} catch (error) {
-  console.error(error instanceof Error ? error.message : String(error));
-  console.error("Run node scripts/wasm-size-report.mjs --help for usage.");
-  process.exit(1);
+}
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
+  try {
+    main();
+  } catch (error) {
+    console.error(error instanceof Error ? error.message : String(error));
+    console.error("Run node scripts/wasm-size-report.mjs --help for usage.");
+    process.exit(1);
+  }
 }

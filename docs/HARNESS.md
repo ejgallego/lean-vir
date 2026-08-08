@@ -109,6 +109,7 @@ npm run check:infoview-bundle
 npm run build:demo
 npm run build:demo:release
 npm run build:demo-package
+npm run build:size-site
 npm run build:surface-site
 npm run build:site
 npm run check:api-coverage
@@ -319,8 +320,10 @@ SDK.
 
 The Pages workflow runs the same `npm run build:site` entry point. Its static
 artifact includes a fresh complete Lean-library surface scan under
-`web/dist/surface/`, deployed at
-`https://ejgallego.github.io/lean-vir/surface/` alongside the demo.
+`web/dist/surface/` and a linker-map-derived release/debug Wasm size explorer under
+`web/dist/size/`. They are deployed at
+`https://ejgallego.github.io/lean-vir/surface/` and
+`https://ejgallego.github.io/lean-vir/size/` alongside the demo.
 
 For pull requests, every job explicitly checks out the pull request's head SHA
 instead of GitHub's synthetic merge ref. GitHub indexes commit artifacts by

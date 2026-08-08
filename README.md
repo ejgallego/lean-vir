@@ -178,6 +178,11 @@ in Lean's installed libraries have a complete VIR-runnable dependency closure:
 
 [VIR runnable-surface report](https://ejgallego.github.io/lean-vir/surface/)
 
+The release and debug Wasm artifacts also have an interactive retained-size
+breakdown by section, subsystem, object/module, and linker symbol:
+
+[VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
+
 A downloadable static bundle is published with the hosted demo:
 
 [lean-vir-local.tar.gz](https://ejgallego.github.io/lean-vir/downloads/lean-vir-local.tar.gz)
