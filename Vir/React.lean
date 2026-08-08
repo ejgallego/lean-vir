@@ -867,7 +867,9 @@ Create replay-safe reducer state.
 VIR invokes `reducer` once when an action is dispatched and enqueues the
 concrete result through React state. The effectful Lean callback is never
 installed as a React reducer function and is therefore not subject to React
-render replay.
+render replay. The synthetic state and action handles are callback-scoped and
+must not be retained; other resources allocated by the callback have their
+ordinary `RuntimeM` lifetime.
 -/
 @[vir_js "react.useReducer"]
 private opaque useReducerJs {state action : Type}

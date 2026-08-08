@@ -23,13 +23,13 @@ extern "C" {
 lean_object * l_ByteArray_empty = nullptr;
 }
 
-// The raw function returns a borrowed element. Lean's standard boxed-wrapper
-// emission does not retain that result before releasing the borrowed array, so
-// this ownership adapter must remain explicit.
+// The interpreter retains borrowed parameters before entering a boxed native
+// wrapper. Consume that temporary array reference while preserving the raw
+// getter's borrowed result; retaining the result here would leak one reference
+// because the calling IR also treats it as borrowed.
 extern "C" lean_object * lean_array_uget_borrowed___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
     lean_dec(type);
     lean_object * result = lean_array_uget_borrowed(array, lean_unbox_usize(index));
-    lean_inc(result);
     lean_dec(array);
     lean_dec(index);
     lean_dec(proof);
@@ -38,7 +38,7 @@ extern "C" lean_object * lean_array_uget_borrowed___boxed(lean_object * type, le
 
 extern "C" lean_object * lean_array_fget_borrowed___boxed(lean_object * type, lean_object * array, lean_object * index, lean_object * proof) {
     lean_dec(type);
-    lean_object * result = lean_array_fget(array, index);
+    lean_object * result = lean_array_fget_borrowed(array, index);
     lean_dec(array);
     lean_dec(index);
     lean_dec(proof);
@@ -47,7 +47,7 @@ extern "C" lean_object * lean_array_fget_borrowed___boxed(lean_object * type, le
 
 extern "C" lean_object * lean_array_get_borrowed___boxed(lean_object * type, lean_object * default_value, lean_object * array, lean_object * index) {
     lean_dec(type);
-    lean_object * result = lean_array_get(default_value, array, index);
+    lean_object * result = lean_array_get_borrowed(default_value, array, index);
     lean_dec(default_value);
     lean_dec(array);
     lean_dec(index);

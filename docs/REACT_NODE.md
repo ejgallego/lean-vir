@@ -218,7 +218,8 @@ explicitly with `JsValue` helpers before crossing the React hook boundary.
 `State.set` and `State.modify` are `RuntimeM` operations because they call a
 retained JavaScript React setter resource; `modify` passes a monadic functional
 updater to React's setter. The resource ownership policy for state values,
-updater-local handles, and scalar `JsValue` wrappers is centralized in
+synthetic updater/reducer input handles, and scalar `JsValue` wrappers is
+centralized in
 [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 
 ```lean
@@ -293,9 +294,10 @@ The browser React host binding is exposed from
   component and invokes `root.render(...)` with that component.
 - Repeated `react.root.renderComponent` or
   `react.root.renderComponentIntoSelector` calls on the same root update the
-  Lean render callback while keeping the same JavaScript component identity, so
-  React hook state is preserved across prop-only rerenders such as infoview
-  cursor changes.
+  Lean render callback at layout commit while keeping the same JavaScript
+  component identity, so React hook state is preserved across prop-only
+  rerenders such as infoview cursor changes. An abandoned update retains the
+  previously committed callback.
 - `react.useState` calls `React.useState` while rendering a component. Its ABI
   is resource-typed: `(initial : Js) -> ReactM (State (Js α))`.
 - `react.useReducer` allocates a replay-safe `React.useState` slot while
@@ -310,7 +312,9 @@ The browser React host binding is exposed from
   consumption, or unmount; aliases retained by Lean remain independent.
 - `react.useRef` calls `React.useRef` while rendering a component and returns a
   host-owned ref object. `react.ref.get` and `react.ref.set` read/write
-  `.current`; they do not schedule a render.
+  `.current`; they do not schedule a render. Retainable payload ownership is
+  recorded independently of the mutable slot, so React attaching a DOM node or
+  clearing the ref cannot hide a lease from component disposal.
 - `react.useMemo` calls `React.useMemo` while rendering a component. The
   calculate callback runs in `ReactM`, dependencies are a JavaScript-owned
   `DependencyList`, and the returned value stays in the `Js` resource lane.
@@ -336,24 +340,30 @@ The browser React host binding is exposed from
   to explicit `Js String` selector resources before the low-level host call,
   then convert the returned `Js Bool` success value back to `Bool`. This is the
   infoview/proof-widget path where the shell owns the DOM mount element and
-  Lean supplies the current tree or component.
+  Lean supplies the current tree or component. `renderIntoSelector` borrows its
+  node argument; when the selector is missing and the helper returns `false`,
+  that node wrapper and its shared payload remain live.
 - `react.state.set` and `react.state.modify` call the retained React setter;
   both are `RuntimeM`. `modify` runs the Lean updater once in VIR against the
-  latest committed-or-queued state and passes only its concrete result to
-  React, making it replay-safe.
-- `react.state.modify` updater-local resource lifetime is documented with the
-  shared host ownership rules in
+  latest committed-or-queued state. React receives only a pure JavaScript
+  action over that concrete result, making replay safe without repeating Lean
+  effects.
+- `react.state.modify` and reducer callback-input lifetimes are documented
+  with the shared host ownership rules in
   [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
 - `react.root.unmount` calls `root.unmount()` and releases callbacks retained
   by the current render.
 - `react.root.unmountSelector` unwraps an explicit `Js String` selector,
   unmounts, forgets a selector-owned root, and returns an explicit `Js Bool`
   success value.
-- Browser function-component ownership swaps happen from `useLayoutEffect`
-  after React commits. Interrupted render generations never release the visible
-  committed tree and are not inserted into a strong runtime registry; weak
-  finalization is a safety net for abandoned generations. The virtual renderer
-  keeps immediate-commit behavior and explicit deferred callback cleanup.
+- Browser function-component nodes, component render callbacks, and root-level
+  node/component ownership swap from `useLayoutEffect` after React commits.
+  Interrupted render generations never release the visible committed tree or
+  callback and are not inserted into a strong runtime registry; weak
+  finalization cleans up generations React abandons without a callback. The
+  browser binding therefore requires `FinalizationRegistry` and `WeakRef`.
+  The virtual renderer keeps immediate-commit behavior and explicit deferred
+  callback cleanup.
 - Runtime dispose and package reload unmount all live React roots through the
   same disposable-resource path used for DOM listeners, timeouts, and frames.
 

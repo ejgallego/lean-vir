@@ -12,9 +12,12 @@ import {
 } from "../../web/src/vir-runtime-node.js";
 import {
   createHostResourceState,
+  createReactHostHooks,
+  createReactRootResourceHostBindings,
 } from "../../web/src/host/vir-host-resources.js";
 import {
   createHostResource,
+  hostResourceValue,
   registerHostResourcePayloadLifetime,
   releaseHostResource,
   releaseHostResourcePayload,
@@ -30,12 +33,15 @@ import {
   createVirtualReactHookRuntime,
 } from "../../web/src/react/vir-react-hooks.js";
 import {
+  createBrowserReactRootResource,
   createReactNodeResource,
+  createVirtualReactRootResource,
   disposeReactNode,
 } from "../../web/src/react/vir-react-node.js";
 import {
   assert,
   readRuntimeArtifacts,
+  spawnSync,
 } from "./shared.mjs";
 import {
   ensureVirtualElements,
@@ -71,6 +77,31 @@ assert.throws(
   () => createBrowserHostBindings({ reactHostBindings: "react.root.create" }),
   /reactHostBindings must be a host binding object/,
 );
+
+for (const missingCapability of ["FinalizationRegistry", "WeakRef"]) {
+  const missingFinalizationSupport = spawnSync(process.execPath, [
+    "--input-type=module",
+    "--eval",
+    `
+      globalThis[${JSON.stringify(missingCapability)}] = undefined;
+      const { createBrowserReactHostBindings } = await import("./web/src/vir-react-host-bindings.js");
+      try {
+        createBrowserReactHostBindings();
+        process.stdout.write("created");
+      } catch (error) {
+        process.stdout.write(error instanceof Error ? error.message : String(error));
+      }
+    `,
+  ], {
+    cwd: process.cwd(),
+    encoding: "utf8",
+  });
+  assert.equal(missingFinalizationSupport.status, 0, missingFinalizationSupport.stderr);
+  assert.match(
+    missingFinalizationSupport.stdout,
+    /browser React host bindings require FinalizationRegistry and WeakRef support/,
+  );
+}
 
 function createReactStateSmokeBindings() {
   const resources = createHostResourceState();
@@ -194,6 +225,119 @@ function callbackLease(cell, body = () => undefined) {
 }
 
 {
+  const state = createVirtualDocumentState();
+  const bindings = createVirtualDocumentHostBindings(state);
+  const cell = { active: 0 };
+  const childValue = createReactNodeResource(state.resources, {
+    node: { kind: "text", value: "parent-first reusable child" },
+    callbacks: [callbackLease(cell)],
+  });
+  const child = state.resources.adoptResourceForValue(childValue, { tracked: false });
+  const elementType = bindings["react.elementType.tag"](state.resources.resourceForValue("div"));
+  const props = bindings["react.props.empty"]();
+
+  const firstChildren = bindings["react.node.children.empty"]();
+  bindings["react.node.children.push"](firstChildren, child);
+  const firstParent = bindings["react.node.createElement"](elementType, props, firstChildren);
+  state.resources.releaseResource(firstParent);
+  assert.equal(childValue.finalized, false, "a parent must not consume its borrowed child wrapper");
+  assert.equal(state.resources.resolveResource(child, "ReactNode"), childValue);
+
+  const secondChildren = bindings["react.node.children.empty"]();
+  bindings["react.node.children.push"](secondChildren, child);
+  const secondParent = bindings["react.node.createElement"](elementType, props, secondChildren);
+  state.resources.releaseResource(child);
+  assert.equal(childValue.finalized, false, "the second parent must retain the child independently");
+  state.resources.releaseResource(secondParent);
+  assert.equal(childValue.finalized, true);
+  assert.equal(cell.active, 0);
+
+  state.resources.releaseResource(firstChildren);
+  state.resources.releaseResource(secondChildren);
+  state.resources.releaseResource(props);
+  state.resources.releaseResource(elementType);
+  state.resources.dispose();
+}
+
+{
+  const state = createVirtualDocumentState();
+  const bindings = createVirtualDocumentHostBindings(state);
+  const callbackCell = { active: 0 };
+  const handler = bindings["js.value.react.eventHandler"]({
+    name: "onClick",
+    callback: callbackLease(callbackCell),
+  });
+  const props = bindings["react.props.empty"]();
+  bindings["react.props.setEventHandler"](props, handler);
+  state.resources.releaseResource(handler);
+  assert.equal(callbackCell.active, 1, "the reusable props builder must own one callback lease");
+
+  const elementType = bindings["react.elementType.tag"](state.resources.resourceForValue("button"));
+  const firstChildren = bindings["react.node.children.empty"]();
+  const secondChildren = bindings["react.node.children.empty"]();
+  const first = bindings["react.node.createElement"](elementType, props, firstChildren);
+  const second = bindings["react.node.createElement"](elementType, props, secondChildren);
+  assert.equal(callbackCell.active, 3, "two nodes and their reusable props must own independent callback leases");
+
+  state.resources.releaseResource(props);
+  assert.equal(callbackCell.active, 2, "releasing props must preserve both node callback leases");
+  state.resources.releaseResource(second);
+  assert.equal(callbackCell.active, 1, "releasing one node must preserve its sibling callback lease");
+  state.resources.releaseResource(first);
+  assert.equal(callbackCell.active, 0);
+  state.resources.releaseResource(firstChildren);
+  state.resources.releaseResource(secondChildren);
+  state.resources.releaseResource(elementType);
+  state.resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const selector = resources.resourceForValue("[invalid");
+  const selectorCell = { active: 0 };
+  const throwingSelectorBindings = createReactRootResourceHostBindings(
+    resources,
+    () => { throw new Error("root factory must not run"); },
+    { querySelector: () => { throw new Error("selector parse boom"); } },
+  );
+  assert.throws(
+    () => throwingSelectorBindings["react.root.renderComponentIntoSelector"](
+      selector,
+      callbackLease(selectorCell),
+    ),
+    /selector parse boom/,
+  );
+  assert.equal(selectorCell.active, 0, "selector parsing failure must release the transferred component callback");
+
+  const creationCell = { active: 0 };
+  const throwingRootBindings = createReactRootResourceHostBindings(
+    resources,
+    () => { throw new Error("root creation boom"); },
+    { querySelector: () => ({}) },
+  );
+  assert.throws(
+    () => throwingRootBindings["react.root.renderComponentIntoSelector"](
+      selector,
+      callbackLease(creationCell),
+    ),
+    /root creation boom/,
+  );
+  assert.equal(creationCell.active, 0, "root creation failure must release the transferred component callback");
+
+  const staleRootCell = { active: 0 };
+  assert.throws(
+    () => throwingSelectorBindings["react.root.renderComponent"](
+      {},
+      callbackLease(staleRootCell),
+    ),
+    /ReactRoot resource is not live/,
+  );
+  assert.equal(staleRootCell.active, 0, "stale direct roots must release the transferred component callback");
+  resources.releaseResource(selector);
+  resources.dispose();
+}
+
+{
   const resources = createHostResourceState();
   const cell = { active: 0 };
   const nodeValue = createReactNodeResource(resources, {
@@ -207,6 +351,85 @@ function callbackLease(cell, body = () => undefined) {
   assert.equal(cell.active, 0, "dropping an unrendered node wrapper must release its callbacks");
   assert.equal(nodeValue.finalized, true);
   resources.dispose();
+}
+
+{
+  const state = createVirtualDocumentState();
+  const bindings = createVirtualDocumentHostBindings(state);
+  const cell = { active: 0 };
+  const childValue = createReactNodeResource(state.resources, {
+    node: { kind: "text", value: "retained child" },
+    callbacks: [callbackLease(cell)],
+  });
+  const child = state.resources.adoptResourceForValue(childValue, { tracked: false });
+  const children = bindings["react.node.children.empty"]();
+  bindings["react.node.children.push"](children, child);
+  state.resources.releaseResource(child);
+  assert.equal(childValue.finalized, false);
+  assert.equal(cell.active, 1, "a child builder must retain a pushed node independently of its wrapper");
+
+  const elementType = bindings["react.elementType.tag"](state.resources.resourceForValue("div"));
+  const props = bindings["react.props.empty"]();
+  const parent = bindings["react.node.createElement"](elementType, props, children);
+  state.resources.releaseResource(parent);
+  assert.equal(childValue.finalized, true);
+  assert.equal(cell.active, 0, "successful node creation must transfer and eventually release builder-owned children");
+  state.resources.releaseResource(children);
+  state.resources.releaseResource(props);
+  state.resources.releaseResource(elementType);
+  state.resources.dispose();
+}
+
+{
+  const state = createVirtualDocumentState();
+  const bindings = createVirtualDocumentHostBindings(state);
+  const cell = { active: 0 };
+  const childValue = createReactNodeResource(state.resources, {
+    node: { kind: "text", value: "reusable child" },
+    callbacks: [callbackLease(cell)],
+  });
+  const child = state.resources.adoptResourceForValue(childValue, { tracked: false });
+  const elementType = bindings["react.elementType.tag"](state.resources.resourceForValue("div"));
+  const props = bindings["react.props.empty"]();
+
+  const firstChildren = bindings["react.node.children.empty"]();
+  bindings["react.node.children.push"](firstChildren, child);
+  const firstParent = bindings["react.node.createElement"](elementType, props, firstChildren);
+  assert.equal(
+    state.resources.resolveResource(child, "ReactNode"),
+    childValue,
+    "successful parent creation must preserve the borrowed child wrapper",
+  );
+
+  const secondChildren = bindings["react.node.children.empty"]();
+  bindings["react.node.children.push"](secondChildren, child);
+  const secondParent = bindings["react.node.createElement"](elementType, props, secondChildren);
+
+  const missingSelector = state.resources.resourceForValue("#missing-reusable-child-root");
+  const rendered = bindings["react.root.renderIntoSelector"](missingSelector, child);
+  assert.equal(state.resources.resolveResource(rendered, "JsBool"), false);
+  assert.equal(
+    state.resources.resolveResource(child, "ReactNode"),
+    childValue,
+    "a missing selector must not consume its borrowed node argument",
+  );
+  state.resources.releaseResource(rendered);
+  state.resources.releaseResource(missingSelector);
+
+  disposeReactNode(state.resources, child);
+  assert.throws(() => state.resources.resolveResource(child, "ReactNode"), /resource is not live/);
+  assert.equal(childValue.finalized, false, "releasing a borrowed alias must not revoke parent-owned payloads");
+  state.resources.releaseResource(firstParent);
+  assert.equal(childValue.finalized, false, "a sibling parent must retain its shared child");
+  state.resources.releaseResource(secondParent);
+  assert.equal(childValue.finalized, true);
+  assert.equal(cell.active, 0);
+
+  state.resources.releaseResource(firstChildren);
+  state.resources.releaseResource(secondChildren);
+  state.resources.releaseResource(props);
+  state.resources.releaseResource(elementType);
+  state.resources.dispose();
 }
 
 {
@@ -242,6 +465,58 @@ function callbackLease(cell, body = () => undefined) {
 }
 
 {
+  const calls = [];
+  const reported = [];
+  const resources = createHostResourceState();
+  const hooks = createReactHostHooks({
+    resources,
+    reportError: (error) => reported.push(error),
+  });
+  hooks.beginReactNodeEventCallback();
+  hooks.deferReactNodeDispose(() => {
+    calls.push("first");
+    throw new Error("first deferred cleanup boom");
+  });
+  hooks.deferReactNodeDispose(() => calls.push("second"));
+  hooks.endReactNodeEventCallback();
+  assert.throws(() => hooks.flushReactNodeDisposals(), /first deferred cleanup boom/);
+  assert.deepEqual(calls, ["first", "second"], "a throwing disposer must not skip its siblings");
+
+  hooks.deferReactNodeDispose(() => {
+    calls.push("microtask-first");
+    throw new Error("microtask deferred cleanup boom");
+  });
+  hooks.deferReactNodeDispose(() => calls.push("microtask-second"));
+  await Promise.resolve();
+  assert.deepEqual(calls, ["first", "second", "microtask-first", "microtask-second"]);
+  assert.equal(reported.length, 1);
+  assert.match(reported[0].message, /microtask deferred cleanup boom/);
+  resources.dispose();
+}
+
+{
+  const calls = [];
+  const reported = [];
+  const resources = createHostResourceState();
+  const hooks = createReactHostHooks({
+    resources,
+    reportError: (error) => reported.push(error),
+  });
+  hooks.deferReactNodeDispose(() => {
+    calls.push("dispose-first");
+    throw new Error("dispose deferred cleanup boom");
+  });
+  hooks.deferReactNodeDispose(() => calls.push("dispose-second"));
+  assert.equal(resources.debugResourceCounts().owners, 1, "pending cleanup must be teardown-owned");
+  assert.throws(() => resources.dispose(), /dispose deferred cleanup boom/);
+  assert.deepEqual(calls, ["dispose-first", "dispose-second"]);
+  assert.equal(resources.debugResourceCounts().owners, 0);
+  await Promise.resolve();
+  assert.deepEqual(calls, ["dispose-first", "dispose-second"], "the scheduled microtask must not rerun cleanup");
+  assert.deepEqual(reported, [], "runtime disposal must aggregate cleanup errors synchronously");
+}
+
+{
   const state = createVirtualDocumentState();
   const bindings = createVirtualDocumentHostBindings(state);
   const container = state.resources.resourceForValue({ kind: "root alias container" });
@@ -253,8 +528,169 @@ function callbackLease(cell, body = () => undefined) {
   assert.throws(() => state.resources.resolveResource(first, "ReactRoot"), /resource is not live/);
   assert.throws(() => state.resources.resolveResource(second, "ReactRoot"), /resource is not live/);
   assert.throws(() => rootValue.render(null), /React root has been unmounted/);
+
+  const third = bindings["react.root.create"](container);
+  const fourth = bindings["react.root.create"](container);
+  const directRootValue = state.resources.resolveResource(third, "ReactRoot");
+  directRootValue.unmount();
+  assert.throws(() => state.resources.resolveResource(third, "ReactRoot"), /resource is not live/);
+  assert.throws(() => state.resources.resolveResource(fourth, "ReactRoot"), /resource is not live/);
   state.resources.releaseResource(container);
   state.resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const target = {};
+  const hookRuntime = createVirtualReactHookRuntime(resources);
+  const root = createVirtualReactRootResource(resources, target, {
+    ...createReactHostHooks({ resources }),
+    hookRuntime,
+  });
+  const renderCell = { active: 0 };
+  const nodeReleases = [];
+  const render = callbackLease(renderCell, () => resources.adoptResourceForValue(
+    createReactNodeResource(resources, {
+      node: { kind: "text", value: "throwing cleanup" },
+      callbacks: [Object.assign(() => undefined, {
+        release() {
+          nodeReleases.push("node");
+          throw new Error("node cleanup boom");
+        },
+      })],
+    }),
+    { tracked: false },
+  ));
+  root.renderComponent(render);
+  assert.equal(renderCell.active, 1);
+  assert.throws(() => root.unmount(), /node cleanup boom/);
+  assert.deepEqual(nodeReleases, ["node"]);
+  assert.equal(renderCell.active, 0, "component teardown must release its render callback after a node cleanup throws");
+  assert.equal(target.reactRoot, undefined);
+  assert.throws(() => root.render(null), /React root has been unmounted/);
+  assert.doesNotThrow(() => root.unmount());
+  assert.deepEqual(resources.debugResourceCounts(), {
+    passiveStrong: 0,
+    scoped: 0,
+    temporaryScopes: 0,
+    owners: 0,
+  });
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const layoutEffects = [];
+  let pendingTree = null;
+  let visibleTree = null;
+  const React = {
+    createElement(type, props = null, ...children) {
+      return { type, props: { ...(props ?? {}), children } };
+    },
+    useLayoutEffect(effect) {
+      layoutEffects.push(effect);
+    },
+  };
+  const browserRoot = {
+    render(tree) {
+      pendingTree = tree;
+    },
+    unmount() {
+      pendingTree = null;
+      visibleTree = null;
+    },
+  };
+  const hookRuntime = createBrowserReactHookRuntime(resources, React);
+  const root = createBrowserReactRootResource(resources, browserRoot, React, {
+    ...createReactHostHooks({ resources }),
+    hookRuntime,
+  });
+  const renderTree = (tree) => {
+    while (typeof tree?.type === "function") {
+      tree = tree.type(tree.props ?? {});
+    }
+    return tree;
+  };
+  const flushLayoutEffects = () => {
+    for (const setup of layoutEffects.splice(0).reverse()) {
+      setup();
+      setup();
+    }
+  };
+
+  const renderCell = { active: 0 };
+  const eventCell = { active: 0 };
+  const render = callbackLease(renderCell, () => resources.adoptResourceForValue(
+    createReactNodeResource(resources, {
+      node: { kind: "text", value: "committed browser component" },
+      callbacks: [callbackLease(eventCell)],
+    }),
+    { tracked: false },
+  ));
+  root.renderComponent(render);
+  visibleTree = renderTree(pendingTree);
+  pendingTree = null;
+  flushLayoutEffects();
+  assert.equal(visibleTree.value, "committed browser component");
+  assert.equal(renderCell.active, 1);
+  assert.equal(eventCell.active, 1);
+
+  const nextRenderCell = { active: 0 };
+  const nextEventCell = { active: 0 };
+  const nextRender = callbackLease(nextRenderCell, () => resources.adoptResourceForValue(
+    createReactNodeResource(resources, {
+      node: { kind: "text", value: "updated browser component" },
+      callbacks: [callbackLease(nextEventCell)],
+    }),
+    { tracked: false },
+  ));
+  root.renderComponent(nextRender);
+  assert.equal(renderCell.active, 1, "a proposed component callback must not replace the committed callback");
+  const committedComponentTree = pendingTree;
+  const updatedTree = renderTree(committedComponentTree);
+  assert.equal(renderCell.active, 1, "rendering a component update must remain speculative");
+  assert.equal(eventCell.active, 1, "the visible component node must remain owned until layout commit");
+  assert.equal(nextRenderCell.active, 1);
+  assert.equal(nextEventCell.active, 1);
+  visibleTree = updatedTree;
+  pendingTree = null;
+  flushLayoutEffects();
+  await Promise.resolve();
+  assert.equal(visibleTree.value, "updated browser component");
+  assert.equal(renderCell.active, 0, "the previous render callback must be released at component commit");
+  assert.equal(eventCell.active, 0, "the previous component node must be released at component commit");
+  assert.equal(nextRenderCell.active, 1);
+  assert.equal(nextEventCell.active, 1);
+
+  const stateRerenderedTree = renderTree(committedComponentTree);
+  assert.equal(stateRerenderedTree.value, "updated browser component");
+  assert.equal(nextRenderCell.active, 1, "the committed callback owner must survive later component renders");
+  assert.equal(nextEventCell.active, 2);
+  visibleTree = stateRerenderedTree;
+  flushLayoutEffects();
+  await Promise.resolve();
+  assert.equal(nextEventCell.active, 1, "a later component commit must retire its previous node");
+
+  const replacement = resources.adoptResourceForValue(createReactNodeResource(resources, {
+    node: { kind: "text", value: "pending browser node" },
+  }), { tracked: false });
+  root.render(replacement);
+  assert.equal(visibleTree.value, "updated browser component");
+  assert.equal(nextRenderCell.active, 1, "a pending root render must retain the committed component");
+  assert.equal(nextEventCell.active, 1, "a pending root render must retain visible node callbacks");
+  const nextTree = renderTree(pendingTree);
+  assert.equal(nextEventCell.active, 1, "rendering the ownership boundary must remain speculative");
+  visibleTree = nextTree;
+  pendingTree = null;
+  flushLayoutEffects();
+  await Promise.resolve();
+  assert.equal(visibleTree.value, "pending browser node");
+  assert.equal(nextRenderCell.active, 0, "the previous component may be released after root commit");
+  assert.equal(nextEventCell.active, 0, "the previous node callbacks may be released after root commit");
+
+  root.unmount();
+  resources.releaseResource(replacement);
+  resources.dispose();
 }
 
 {
@@ -270,9 +706,11 @@ function callbackLease(cell, body = () => undefined) {
   let released = false;
   let previousResource = null;
   let nextResource = null;
+  let escapedResource = null;
   const updater = Object.assign((previous) => {
     previousResource = previous;
     assert.equal(jsBindings["js.nat.value"](previous), 0n);
+    escapedResource = jsBindings["js.nat"](99n);
     nextResource = jsBindings["js.nat"](1n);
     return nextResource;
   }, {
@@ -284,12 +722,62 @@ function callbackLease(cell, body = () => undefined) {
   assert.equal(stateValue, 1n);
   assert.equal(released, true);
   assertNatResourceReleased(jsBindings, previousResource);
-  assertNatResourceReleased(jsBindings, nextResource);
+  assert.equal(jsBindings["js.nat.value"](nextResource), 1n);
+  assert.equal(
+    jsBindings["js.nat.value"](escapedResource),
+    99n,
+    "an unrelated resource created by RuntimeM must outlive the updater callback",
+  );
   assert.equal(resources.resolveResource(retainedZero, "Js"), 0n);
   assert.notEqual(resources.resourceForValue(0n), retainedZero);
   assert.equal(resources.debugResourceCounts().scoped, scopedBeforeModify);
+  resources.releaseResource(nextResource);
+  resources.releaseResource(escapedResource);
   resources.releaseResource(setter);
   resources.releaseResource(retainedZero);
+}
+
+{
+  const { resources, stateBindings } = createReactStateSmokeBindings();
+  let stateValue = "old";
+  const setter = resources.resourceForValue({
+    set(next) {
+      stateValue = typeof next === "function" ? next(stateValue) : next;
+    },
+  });
+  const next = createTestLeanRefCell("throwing updater result");
+  let incomingReleases = 0;
+  let ownedReleases = 0;
+  const ownedUpdate = Object.assign(
+    () => testLeanRefResource(next.alias, next.cell.label),
+    {
+      release() {
+        ownedReleases++;
+        throw new Error("updater release boom");
+      },
+    },
+  );
+  const update = Object.assign(() => undefined, {
+    retain() {
+      return ownedUpdate;
+    },
+    release() {
+      incomingReleases++;
+      return true;
+    },
+  });
+
+  assert.throws(
+    () => stateBindings["react.state.modify"](setter, update),
+    /updater release boom/,
+  );
+  assert.equal(stateValue, "old");
+  assert.equal(incomingReleases, 1);
+  assert.equal(ownedReleases, 1);
+  assert.equal(next.cell.aliases.size, 0, "throwing updater cleanup must roll back its acquired result");
+  assert.equal(resources.debugResourceCounts().owners, 0, "throwing callback release must detach its disposable owner");
+  resources.releaseResource(setter);
+  resources.dispose();
 }
 
 {
@@ -335,8 +823,13 @@ function callbackLease(cell, body = () => undefined) {
   assert.equal(stateValue, 2n);
   assert.equal(released, true);
   assertNatResourceReleased(jsBindings, previousResource);
-  assertNatResourceReleased(jsBindings, nextResource);
+  assert.equal(
+    jsBindings["js.nat.value"](nextResource),
+    3n,
+    "an externally retained RuntimeM allocation must survive an updater failure",
+  );
   assert.equal(resources.debugResourceCounts().scoped, scopedBeforeModify);
+  resources.releaseResource(nextResource);
   resources.releaseResource(setter);
 }
 
@@ -371,6 +864,34 @@ function callbackLease(cell, body = () => undefined) {
   assert.equal(replacement.cell.aliases.size, 1);
   hooks.disposeComponent(component);
   assert.equal(replacement.cell.aliases.size, 0);
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const hooks = createVirtualReactHookRuntime(resources);
+  const bindings = createReactStateHostBindings(resources, hooks);
+  const component = hooks.createComponentState(() => undefined);
+  const nodeValue = createReactNodeResource(resources, {
+    node: { kind: "text", value: "virtual same-identity payload" },
+  });
+  const node = resources.adoptResourceForValue(nodeValue, { tracked: false });
+  let state;
+  let ref;
+  hooks.withComponentRender(component, () => {
+    state = bindings["react.useState"](node);
+    ref = bindings["react.useRef"](node);
+  });
+  hooks.commitComponentRender(component);
+  assert.equal(nodeValue.refCount, 3);
+  const setter = bindings["react.state.setter"](state);
+  bindings["react.state.set"](setter, node);
+  bindings["react.ref.set"](ref, node);
+  assert.equal(nodeValue.refCount, 3, "virtual same-identity writes must release redundant leases");
+  resources.releaseResource(node);
+  hooks.disposeComponent(component);
+  assert.equal(nodeValue.refCount, 0);
+  assert.equal(nodeValue.finalized, true);
   resources.dispose();
 }
 
@@ -429,10 +950,89 @@ function callbackLease(cell, body = () => undefined) {
   const hooks = createVirtualReactHookRuntime(resources);
   const bindings = createReactStateHostBindings(resources, hooks);
   const component = hooks.createComponentState(() => undefined);
+  const deps = bindings["react.deps.empty"]();
+  const memo = createTestLeanRefCell("throwing memo callback result");
+  let releaseCalls = 0;
+  const calculate = Object.assign(
+    () => testLeanRefResource(memo.alias, memo.cell.label),
+    {
+      release() {
+        releaseCalls++;
+        throw new Error("memo callback release boom");
+      },
+    },
+  );
+
+  assert.throws(
+    () => hooks.withComponentRender(component, () => bindings["react.useMemo"](calculate, deps)),
+    /memo callback release boom/,
+  );
+  assert.equal(releaseCalls, 1);
+  assert.equal(memo.cell.aliases.size, 0, "throwing memo callback cleanup must roll back its acquired result");
+  assert.equal(resources.debugResourceCounts().owners, 0);
+  hooks.disposeComponent(component);
+  resources.releaseResource(deps);
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const hooks = createVirtualReactHookRuntime(resources);
+  const bindings = createReactStateHostBindings(resources, hooks);
+  const component = hooks.createComponentState(() => undefined);
+  const deps = bindings["react.deps.empty"]();
+  const payload = {};
+  let live = true;
+  let releases = 0;
+  registerHostResourcePayloadLifetime(payload, {
+    retain() {
+      throw new Error("state result retain boom");
+    },
+    release() {
+      if (!live) return false;
+      live = false;
+      releases++;
+      return true;
+    },
+  });
+  const transferredResult = resources.adoptResourceForValue(payload);
+  let calculateReleased = false;
+  const calculate = Object.assign(() => transferredResult, {
+    release() {
+      if (calculateReleased) return false;
+      calculateReleased = true;
+      return true;
+    },
+  });
+  assert.throws(
+    () => hooks.withComponentRender(component, () => bindings["react.useMemo"](calculate, deps)),
+    /state result retain boom/,
+  );
+  assert.equal(calculateReleased, true);
+  assert.equal(releases, 1, "retain failure must consume the transferred callback-result wrapper");
+  assert.equal(resources.debugResourceCounts().owners, 0);
+  assert.throws(
+    () => resources.resolveResource(transferredResult, "Js"),
+    /resource is not live/,
+  );
+  hooks.disposeComponent(component);
+  resources.releaseResource(deps);
+  resources.dispose();
+  assert.equal(releases, 1);
+}
+
+{
+  const resources = createHostResourceState();
+  const jsBindings = createReactJsValueHostBindings(resources);
+  const hooks = createVirtualReactHookRuntime(resources);
+  const bindings = createReactStateHostBindings(resources, hooks);
+  const component = hooks.createComponentState(() => undefined);
   const initial = createTestLeanRefCell("virtual reducer initial");
   const initialResource = testLeanRefResource(initial.alias, initial.cell.label);
   let reduced = null;
+  let escapedResource = null;
   const reducer = releasableCallback(() => {
+    escapedResource = jsBindings["js.nat"](77n);
     reduced = createTestLeanRefCell("virtual reducer result");
     return testLeanRefResource(reduced.alias, reduced.cell.label);
   });
@@ -450,6 +1050,12 @@ function callbackLease(cell, body = () => undefined) {
   assert.equal(initial.cell.aliases.size, 0);
   assert.equal(action.cell.aliases.size, 1);
   assert.equal(reduced.cell.aliases.size, 1);
+  assert.equal(
+    jsBindings["js.nat.value"](escapedResource),
+    77n,
+    "an unrelated resource created by RuntimeM must outlive the reducer callback",
+  );
+  resources.releaseResource(escapedResource);
   releaseHostResource(actionResource);
   assert.equal(action.cell.aliases.size, 0);
   hooks.disposeComponent(component);
@@ -493,7 +1099,7 @@ function callbackLease(cell, body = () => undefined) {
   bindings["react.state.set"](setter, replacementResource);
   releaseHostResource(replacementResource);
   assert.equal(initial.cell.aliases.size, 1);
-  assert.equal(replacement.cell.aliases.size, 1);
+  assert.equal(replacement.cell.aliases.size, 2, "the queued action must own its source and eager result separately");
 
   const ignoredInitial = createTestLeanRefCell("browser ignored initial");
   const ignoredInitialResource = testLeanRefResource(ignoredInitial.alias, ignoredInitial.cell.label);
@@ -504,9 +1110,290 @@ function callbackLease(cell, body = () => undefined) {
   releaseHostResource(ignoredInitialResource);
   assert.equal(ignoredInitial.cell.aliases.size, 0);
   assert.equal(initial.cell.aliases.size, 0);
-  assert.equal(replacement.cell.aliases.size, 1);
+  assert.equal(replacement.cell.aliases.size, 2, "the committed state and queued action must own distinct leases");
   hooks.disposeComponent(component);
   assert.equal(replacement.cell.aliases.size, 0);
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const refs = [];
+  let refIndex = 0;
+  const hooks = createBrowserReactHookRuntime(resources, {
+    useState(initial) {
+      return [initial, () => undefined];
+    },
+    useRef(initial) {
+      const index = refIndex++;
+      refs[index] ??= { current: initial };
+      return refs[index];
+    },
+    useMemo(calculate) {
+      return calculate();
+    },
+    useLayoutEffect(effect) {
+      effect();
+    },
+  });
+  const bindings = createReactStateHostBindings(resources, hooks);
+  const component = hooks.createComponentState();
+  const callbackCell = { active: 0 };
+  const nodeValue = createReactNodeResource(resources, {
+    node: { kind: "text", value: "same-identity React payload" },
+    callbacks: [callbackLease(callbackCell)],
+  });
+  const node = resources.adoptResourceForValue(nodeValue, { tracked: false });
+  const deps = bindings["react.deps.empty"]();
+  let stateSetter = null;
+  let refHandle = null;
+
+  const render = () => {
+    refIndex = 0;
+    const results = [];
+    hooks.withComponentRender(component, () => {
+      results.push(bindings["react.useState"](node));
+      results.push(bindings["react.useState"](node));
+      results.push(bindings["react.useRef"](node));
+      results.push(bindings["react.useRef"](node));
+      results.push(bindings["react.useMemo"](
+        releasableCallback(() => resources.ownedResourceForValue(nodeValue)),
+        deps,
+      ));
+      hooks.commitComponentRender(component);
+    });
+    stateSetter ??= bindings["react.state.setter"](results[0]);
+    refHandle ??= results[2];
+    for (const result of results) {
+      if (result !== refHandle) resources.releaseResource(result);
+    }
+  };
+
+  render();
+  assert.equal(nodeValue.refCount, 6, "five React hooks must retain five independent leases");
+  bindings["react.state.set"](stateSetter, node);
+  bindings["react.state.set"](stateSetter, node);
+  bindings["react.ref.set"](refHandle, node);
+  bindings["react.ref.set"](refHandle, node);
+  assert.equal(nodeValue.refCount, 8, "same-identity queued writes must keep distinct action leases");
+  render();
+  assert.equal(
+    nodeValue.refCount,
+    8,
+    "rerendering the same payload must preserve queued actions without collapsing hook owners",
+  );
+  resources.releaseResource(node);
+  assert.equal(nodeValue.refCount, 7);
+  hooks.disposeComponent(component);
+  assert.equal(nodeValue.refCount, 0);
+  assert.equal(nodeValue.finalized, true);
+  assert.equal(callbackCell.active, 0);
+  resources.releaseResource(deps);
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const layoutEffects = [];
+  const hooks = createBrowserReactHookRuntime(resources, {
+    useState(initial) {
+      return [initial, () => undefined];
+    },
+    useLayoutEffect(effect) {
+      layoutEffects.push(effect);
+    },
+  });
+  const bindings = createReactStateHostBindings(resources, hooks);
+  const component = hooks.createComponentState();
+  const nodeValue = createReactNodeResource(resources, {
+    node: { kind: "text", value: "overlapping same-identity generations" },
+  });
+  const node = resources.adoptResourceForValue(nodeValue, { tracked: false });
+  const render = () => {
+    const results = [];
+    hooks.withComponentRender(component, () => {
+      results.push(bindings["react.useState"](node));
+      results.push(bindings["react.useState"](node));
+      hooks.commitComponentRender(component);
+    });
+    for (const result of results) resources.releaseResource(result);
+  };
+
+  render();
+  render();
+  assert.equal(nodeValue.refCount, 5);
+  layoutEffects[1]();
+  assert.equal(nodeValue.refCount, 5, "committing one generation must not steal sibling leases");
+  layoutEffects[0]();
+  assert.equal(nodeValue.refCount, 3, "the superseded generation must release both of its leases");
+  resources.releaseResource(node);
+  hooks.disposeComponent(component);
+  assert.equal(nodeValue.refCount, 0);
+  assert.equal(nodeValue.finalized, true);
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  let reactRef = null;
+  const hooks = createBrowserReactHookRuntime(resources, {
+    useRef(initial) {
+      reactRef ??= { current: initial };
+      return reactRef;
+    },
+    useLayoutEffect(effect) {
+      effect();
+    },
+  });
+  const bindings = createReactStateHostBindings(resources, hooks);
+  const component = hooks.createComponentState();
+  const initial = createTestLeanRefCell("browser ref committed value");
+  const initialResource = testLeanRefResource(initial.alias, initial.cell.label);
+  let ref;
+  hooks.withComponentRender(component, () => {
+    ref = bindings["react.useRef"](initialResource);
+    hooks.commitComponentRender(component);
+  });
+  releaseHostResource(initialResource);
+  assert.equal(initial.cell.aliases.size, 1);
+
+  const ignored = createTestLeanRefCell("browser ref ignored initial");
+  const ignoredResource = testLeanRefResource(ignored.alias, ignored.cell.label);
+  assert.throws(
+    () => hooks.withComponentRender(component, () => {
+      bindings["react.useRef"](ignoredResource);
+      throw new Error("abandon browser ref render");
+    }),
+    /abandon browser ref render/,
+  );
+  releaseHostResource(ignoredResource);
+  assert.equal(ignored.cell.aliases.size, 0);
+  assert.equal(
+    initial.cell.aliases.size,
+    1,
+    "rolling back a speculative render must not release the committed ref payload",
+  );
+  const exposed = bindings["react.ref.get"](ref);
+  releaseHostResource(exposed);
+  assert.equal(initial.cell.aliases.size, 1);
+  hooks.disposeComponent(component);
+  assert.equal(initial.cell.aliases.size, 0);
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  let reactRef = null;
+  const hooks = createBrowserReactHookRuntime(resources, {
+    useRef(initial) {
+      reactRef ??= { current: initial };
+      return reactRef;
+    },
+    useLayoutEffect(effect) {
+      effect();
+    },
+  });
+  const bindings = createReactStateHostBindings(resources, hooks);
+  const component = hooks.createComponentState();
+  const nodeValue = createReactNodeResource(resources, {
+    node: { kind: "text", value: "React-overwritten ref payload" },
+  });
+  const node = resources.adoptResourceForValue(nodeValue, { tracked: false });
+  hooks.withComponentRender(component, () => {
+    bindings["react.useRef"](node);
+    hooks.commitComponentRender(component);
+  });
+  resources.releaseResource(node);
+  assert.equal(nodeValue.refCount, 1);
+  reactRef.current = { nodeType: 1 };
+  hooks.disposeComponent(component);
+  assert.equal(nodeValue.refCount, 0, "React overwriting ref.current must not orphan the committed payload lease");
+  assert.equal(nodeValue.finalized, true);
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const hooks = createVirtualReactHookRuntime(resources);
+  const component = hooks.createComponentState(() => undefined);
+  const setupCell = { active: 0 };
+  const cleanupCell = { active: 0 };
+  let effectResult = null;
+  let cleanupCalls = 0;
+  hooks.withComponentRender(component, () => {
+    hooks.useEffect(
+      callbackLease(setupCell, () => {
+        effectResult = createTestLeanRefCell("virtual effect result");
+        return testLeanRefResource(effectResult.alias, effectResult.cell.label);
+      }),
+      callbackLease(cleanupCell, (resource) => {
+        assert.equal(hostResourceValue(resource), effectResult.alias);
+        cleanupCalls++;
+      }),
+    );
+  });
+  hooks.commitComponentRender(component);
+  assert.equal(effectResult.cell.aliases.size, 1);
+  hooks.disposeComponent(component);
+  assert.equal(cleanupCalls, 1);
+  assert.equal(effectResult.cell.aliases.size, 0, "virtual effect cleanup must release its setup result");
+  assert.equal(setupCell.active, 0);
+  assert.equal(cleanupCell.active, 0);
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const hooks = createVirtualReactHookRuntime(resources);
+  const component = hooks.createComponentState(() => undefined);
+  let reducerReleased = false;
+  const oldReducer = Object.assign((_state, _action) => 0, {
+    release() {
+      if (reducerReleased) return false;
+      reducerReleased = true;
+      throw new Error("old reducer release boom");
+    },
+  });
+  const oldSetupCell = { active: 0 };
+  const oldCleanupCell = { active: 0 };
+  let oldCleanups = 0;
+  hooks.withComponentRender(component, () => {
+    hooks.useReducer(oldReducer, 0);
+    hooks.useEffect(
+      callbackLease(oldSetupCell, () => null),
+      callbackLease(oldCleanupCell, () => { oldCleanups++; }),
+    );
+  });
+  hooks.commitComponentRender(component);
+
+  const nextReducerCell = { active: 0 };
+  const nextSetupCell = { active: 0 };
+  const nextCleanupCell = { active: 0 };
+  let nextSetups = 0;
+  let nodeCommits = 0;
+  hooks.withComponentRender(component, () => {
+    hooks.useReducer(callbackLease(nextReducerCell, (_state, _action) => 1), 0);
+    hooks.useEffect(
+      callbackLease(nextSetupCell, () => { nextSetups++; return null; }),
+      callbackLease(nextCleanupCell),
+    );
+  });
+  assert.throws(
+    () => hooks.commitComponentRender(component, () => { nodeCommits++; }),
+    /old reducer release boom/,
+  );
+  assert.equal(oldCleanups, 0, "a failed reducer commit must not tear down the committed effect");
+  assert.equal(nextSetups, 0, "a failed reducer commit must not activate speculative effects");
+  assert.equal(nodeCommits, 0);
+  assert.equal(nextSetupCell.active, 0);
+  assert.equal(nextCleanupCell.active, 0);
+  assert.equal(oldSetupCell.active, 1);
+  assert.equal(oldCleanupCell.active, 1);
+  hooks.disposeComponent(component);
+  assert.equal(oldCleanups, 1);
+  assert.equal(oldSetupCell.active, 0);
+  assert.equal(oldCleanupCell.active, 0);
+  assert.equal(nextReducerCell.active, 0);
   resources.dispose();
 }
 
@@ -525,13 +1412,21 @@ function callbackLease(cell, body = () => undefined) {
   const component = hooks.createComponentState();
   const setupCell = { active: 0 };
   const cleanupCell = { active: 0 };
+  const effectResources = [];
   let setups = 0;
   let cleanups = 0;
   hooks.withComponentRender(component, () => {
     hooks.useEffect(
-      callbackLease(setupCell, () => ({ generation: ++setups })),
-      callbackLease(cleanupCell, () => {
+      callbackLease(setupCell, () => {
+        const owned = createTestLeanRefCell(`browser effect result ${++setups}`);
+        const resource = testLeanRefResource(owned.alias, owned.cell.label);
+        effectResources.push(owned);
+        return resource;
+      }),
+      callbackLease(cleanupCell, (resource) => {
+        assert.equal(hostResourceValue(resource), effectResources.at(-1).alias);
         cleanups++;
+        if (cleanups === 2) throw new Error("browser effect cleanup boom");
       }),
     );
     hooks.commitComponentRender(component);
@@ -541,9 +1436,13 @@ function callbackLease(cell, body = () => undefined) {
   layoutEffects[0]();
   assert.equal(passiveEffects.length, 1);
   const firstCleanup = passiveEffects[0]();
+  assert.equal(effectResources[0].cell.aliases.size, 1);
   firstCleanup();
+  assert.equal(effectResources[0].cell.aliases.size, 0);
   const secondCleanup = passiveEffects[0]();
-  secondCleanup();
+  assert.equal(effectResources[1].cell.aliases.size, 1);
+  assert.throws(() => secondCleanup(), /browser effect cleanup boom/);
+  assert.equal(effectResources[1].cell.aliases.size, 0);
   assert.equal(setups, 2, "Strict Mode effect setup replay must use a fresh callback lease");
   assert.equal(cleanups, 2);
   assert.equal(setupCell.active, 1);
@@ -558,10 +1457,10 @@ function callbackLease(cell, body = () => undefined) {
   const resources = createHostResourceState();
   const jsBindings = createReactJsValueHostBindings(resources);
   let stateValue = 0n;
-  let functionalUpdaterPassedToReact = false;
+  let pureStateActionPassedToReact = false;
   const setState = (next) => {
-    if (typeof next === "function") functionalUpdaterPassedToReact = true;
-    stateValue = next;
+    if (typeof next === "function") pureStateActionPassedToReact = true;
+    stateValue = typeof next === "function" ? next(stateValue) : next;
   };
   const hooks = createBrowserReactHookRuntime(resources, {
     useState(initial) {
@@ -588,7 +1487,7 @@ function callbackLease(cell, body = () => undefined) {
   });
   bindings["react.state.modify"](setter, updater);
   assert.equal(updaterCalls, 1);
-  assert.equal(functionalUpdaterPassedToReact, false);
+  assert.equal(pureStateActionPassedToReact, true);
   assert.equal(stateValue, 1n);
   assert.equal(updaterCell.active, 0);
   hooks.disposeComponent(component);
@@ -600,12 +1499,12 @@ function callbackLease(cell, body = () => undefined) {
   const jsBindings = createReactJsValueHostBindings(resources);
   const layoutEffects = [];
   let stateValue = 2n;
-  let functionalUpdaterPassedToReact = false;
+  let pureStateActionPassedToReact = false;
   const hooks = createBrowserReactHookRuntime(resources, {
     useState() {
       return [stateValue, (next) => {
-        if (typeof next === "function") functionalUpdaterPassedToReact = true;
-        stateValue = next;
+        if (typeof next === "function") pureStateActionPassedToReact = true;
+        stateValue = typeof next === "function" ? next(stateValue) : next;
       }];
     },
     useLayoutEffect(effect) {
@@ -638,7 +1537,7 @@ function callbackLease(cell, body = () => undefined) {
   layoutEffects[0]();
   bindings["react.reducer.dispatch"](dispatch, resources.resourceForValue(3n));
   assert.equal(reducerCalls, 1);
-  assert.equal(functionalUpdaterPassedToReact, false);
+  assert.equal(pureStateActionPassedToReact, true);
   assert.equal(stateValue, 5n);
   hooks.disposeComponent(component);
   assert.equal(reducerCell.active, 0);
@@ -699,7 +1598,13 @@ smokeVirtualReactCounter(reactRuntime, reactDocumentState, "#react-counter");
 smokeVirtualReactEffect(reactRuntime, reactDocumentState, "#react-effect");
 smokeVirtualReactMemo(reactRuntime, reactDocumentState, "#react-memo");
 smokeVirtualReactMemoStable(reactRuntime, reactDocumentState, "#react-memo-stable");
+const rootsBeforeBorrowedArraySmoke = reactRuntime.hostState.resourceRoots.debugCounts().active;
 smokeVirtualReactRefFragment(reactRuntime, reactDocumentState, "#react-ref-fragment");
+assert.equal(
+  reactRuntime.hostState.resourceRoots.debugCounts().active,
+  rootsBeforeBorrowedArraySmoke,
+  "dropping borrowed Array elements must restore the externref-root baseline",
+);
 smokeVirtualReactInput(reactRuntime, reactDocumentState, "#react-input");
 smokeVirtualReactChangeInput(reactRuntime, reactDocumentState, "#react-change");
 smokeVirtualReactSelectTextarea(reactRuntime, reactDocumentState, "#react-select-textarea");

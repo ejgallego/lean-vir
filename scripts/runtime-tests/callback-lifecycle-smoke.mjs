@@ -235,6 +235,50 @@ assert.equal(resultLiftCallback.released, true);
 assert.equal(resultLiftRuntime.liveCallbacks.size, 0);
 resultLiftRuntime.dispose();
 
+let adoptedResultCallback = null;
+let adoptedResultResource = null;
+const adoptedResultDocumentState = createVirtualDocumentState();
+const adoptedResultRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageSetBytes: [hostPackageBytes],
+  virtualDocumentState: adoptedResultDocumentState,
+  hostBindings: {
+    "test.callNatCallback": (_input, callback) => {
+      adoptedResultCallback = callback;
+      adoptedResultResource = adoptedResultRuntime.hostState.defaultBindings["js.value.react.eventHandler"]({
+        name: "onClick",
+        callback,
+      });
+      return adoptedResultResource;
+    },
+    "test.recordNat": () => undefined,
+  },
+});
+const lowerAdoptedResult = adoptedResultRuntime.makeHostResourceObjectValue.bind(adoptedResultRuntime);
+adoptedResultRuntime.makeHostResourceObjectValue = (type, value, label) => {
+  if (value === adoptedResultResource) {
+    throw new Error("adopted host result lowering boom");
+  }
+  return lowerAdoptedResult(type, value, label);
+};
+assert.throws(
+  () => adoptedResultRuntime.call("HostInterop.callbackRoundTrip", 1),
+  /adopted host result lowering boom/,
+);
+assert.equal(adoptedResultCallback.released, true);
+assert.equal(adoptedResultRuntime.liveCallbacks.size, 0);
+assert.equal(
+  adoptedResultDocumentState.resources.debugResourceCounts().owners,
+  0,
+  "failed result lowering must release a resource that adopted the callback",
+);
+assert.throws(
+  () => adoptedResultDocumentState.resources.resolveResource(adoptedResultResource, "React event handler"),
+  /resource is not live/,
+);
+adoptedResultRuntime.makeHostResourceObjectValue = lowerAdoptedResult;
+adoptedResultRuntime.dispose();
+
 let combinedFailureCallback = null;
 const combinedFailureRuntime = await createVirRuntime({
   wasmBytes,
