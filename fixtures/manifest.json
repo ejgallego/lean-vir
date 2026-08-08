@@ -293,6 +293,13 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-small-runtime-frontier",
+      "source": "fixtures/ExprPrinter.lean",
+      "entry": "Vir.Fixtures.ExprPrinter.smallRuntimeFrontierScore",
+      "result": { "type": "Nat" },
+      "unsafe": true
+    },
+    {
       "id": "interface-shape-score",
       "source": "fixtures/InterfaceShapes.lean",
       "entry": "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",

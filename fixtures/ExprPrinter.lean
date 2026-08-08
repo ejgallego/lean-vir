@@ -114,6 +114,20 @@ def exprEqvScore : Nat :=
       (Expr.eqv (.mdata (syntaxMData "token") (.bvar 0))
         (.mdata (syntaxMData "other") (.bvar 0))) 128
 
+/-- Exercises four small native boundaries selected by the runtime surface report. -/
+unsafe def smallRuntimeFrontierScore : Nat :=
+  let usizeOk := (USize.ofNat 513).toUInt64.toNat == 513
+  let boolOk := (Bool.toUInt64 true).toNat == 1 && (Bool.toUInt64 false).toNat == 0
+  let voidValue : Unit := unsafeCast (Void.mk ())
+  let voidOk := match voidValue with | () => true
+  let levelOk :=
+    Level.beq (.succ (.param `u)) (.succ (.param `u)) &&
+      !Level.beq (.succ (.param `u)) (.succ (.param `v))
+  (if usizeOk then 1 else 0) +
+    (if boolOk then 2 else 0) +
+    (if voidOk then 4 else 0) +
+    (if levelOk then 8 else 0)
+
 private def renderName : Name -> String
   | .anonymous => "_"
   | .str .anonymous s => s

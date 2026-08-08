@@ -62,6 +62,13 @@ the small `lean_level_hash` and `lean_level_depth` exports used by upstream
 `level.cpp`; they read the same cached data representation as the existing
 local constructors.
 
+The small `USize.toUInt64`, `Bool.toUInt64`, and `Void.mk` boundaries use the
+canonical inline implementations from Lean's runtime headers. Their generated
+boxed adapters materialize those operations without adding a shim provider or
+another upstream source file. `Lean.Level.beq` uses `lean_level_eq` from the
+already linked `level.cpp`; registering it retains that function and its
+generated boxed adapter in the final module.
+
 For Lean-defined native exports whose implementation closure is available in
 the pinned compiler output rather than the imported kernel environment, the
 probe also cross-compiles the stage0 sources listed in

@@ -122,7 +122,9 @@ control and candidate artifacts. Review the added native capabilities, exact
 new function set, module distribution, regressions, and byte increase together;
 none of those numbers alone is a sufficient acceptance signal.
 
-## Reference Experiment: `Lean.Expr.eqv`
+## Reference Experiments
+
+### `Lean.Expr.eqv`
 
 The first end-to-end runtime frontier experiment used Lean 4.33.0-rc2 at
 `d8b18978322de05a8f3dba51ef03cf5461676c17`. The control and candidate scanned
@@ -154,6 +156,51 @@ The candidate links upstream `expr_eq_fn.cpp` and its narrow kernel support
 closure. A host-versus-Wasm fixture covers alpha-equivalent binders, mismatches,
 nested applications, levels, literals, and syntax-bearing expression metadata.
 The complete 83-fixture differential suite and the upstream smoke pass with the
+candidate runtime.
+
+### Four Small Native Boundaries
+
+The next experiment added `USize.toUInt64`, `Bool.toUInt64`, `Void.mk`, and
+`Lean.Level.beq` on top of the `Lean.Expr.eqv` candidate. It used the same Lean
+build, selected modules, and 398,519-function declaration universe.
+
+| Measurement | `Lean.Expr.eqv` checkpoint | Four-boundary candidate | Delta |
+| --- | ---: | ---: | ---: |
+| Stripped release Wasm | 643,016 B | 643,756 B | +740 B |
+| Gzip-compressed Wasm | 147,113 B | 147,317 B | +204 B |
+| Runnable public constants | 26,547 / 36,887 | 26,804 / 36,887 | +257 |
+| Runnable all-IR functions | 306,491 / 398,519 | 309,411 / 398,519 | +2,920 |
+| Regressions | - | - | 0 |
+
+The 740-byte raw increase is 0.72 KiB: about 4,040 newly runnable IR functions
+and 356 public constants per added KiB. The exact unlocks grouped by their
+previous primary blocker are:
+
+| Boundary | Newly runnable all-IR | Newly runnable public |
+| --- | ---: | ---: |
+| `USize.toUInt64` | 2,132 | 149 |
+| `Lean.Level.beq` | 514 | 71 |
+| `Bool.toUInt64` | 268 | 35 |
+| `Void.mk` | 6 | 2 |
+
+`Void.mk` illustrates why the upper-bound warning matters: it had 2,704
+primary-blocked roots at the checkpoint, but only six became runnable. Most of
+the rest advanced to another boundary, led by `Lean.instantiateExprMVarsImp`.
+Across all four additions, another 5,066 roots reached a newly exposed blocker.
+
+The gain is concentrated in `Lean.Meta` (+2,070 all-IR, +141 public), including
+`Lean.Meta.Tactic.Grind` (+1,094, +66) and `Lean.Meta.Sym` (+590, +35).
+`Lean.Compiler` gains another 205 all-IR functions and 36 public constants.
+The combined two-step experiment moves the original control from 302,887 to
+309,411 runnable IR functions and from 26,307 to 26,804 runnable public
+constants for a cumulative 7,457-byte raw increase.
+
+All four raw operations were already available in the selected upstream
+runtime closure: three are inline runtime operations and level equality lives
+in the already linked `level.cpp`. The size increase is therefore generated
+boxed adapters, retained level-equality code, and registry data rather than a
+new support module. A host-versus-Wasm fixture checks all four operations; the
+complete 84-fixture differential suite and upstream smoke pass with the
 candidate runtime.
 
 ## Interactive HTML Report

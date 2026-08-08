@@ -533,6 +533,20 @@ def nativeExterns : Array NativeExtern := #[
     generateBoxedWrapper := true
   },
   {
+    name := `Bool.toUInt64,
+    params := #[param 1 false .uint8],
+    resultType := .uint64,
+    symbol := "lean_bool_to_uint64",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Void.mk,
+    params := #[param 1 false .erased, param 2 false .tobject],
+    resultType := .void,
+    symbol := "lean_void_mk",
+    generateBoxedWrapper := true
+  },
+  {
     name := `USize.ofNat,
     params := #[param 1 true .tobject],
     resultType := .usize,
@@ -593,6 +607,13 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .usize],
     resultType := .tobject,
     symbol := "lean_usize_to_nat",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `USize.toUInt64,
+    params := #[param 1 false .usize],
+    resultType := .uint64,
+    symbol := "lean_usize_to_uint64",
     generateBoxedWrapper := true
   },
   {
@@ -1489,6 +1510,13 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .float],
     resultType := .uint32,
     symbol := "lean_float_to_uint32",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Lean.Level.beq,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .uint8,
+    symbol := "lean_level_eq",
     generateBoxedWrapper := true
   },
   {
