@@ -128,11 +128,16 @@ function parseArgs(argv) {
   const parsed = {
     ...benchmarkCacheOptionDefaults(),
     buildArtifacts: true,
+    filters: [],
     jsonPath: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
-    if (arg === "--no-build") {
+    if (arg === "--filter") {
+      parsed.filters.push(requireOptionValue(argv, ++index, "--filter"));
+    } else if (arg.startsWith("--filter=")) {
+      parsed.filters.push(arg.slice("--filter=".length));
+    } else if (arg === "--no-build") {
       parsed.buildArtifacts = false;
     } else if (arg === "--json") {
       parsed.jsonPath = requireOptionValue(argv, ++index, "--json");
@@ -153,6 +158,9 @@ function parseArgs(argv) {
   if (parsed.jsonPath === "") {
     throw new Error("--json requires a path");
   }
+  if (parsed.filters.some((filter) => filter === "")) {
+    throw new Error("--filter requires nonempty text");
+  }
   validateBenchmarkBuildOptions(parsed);
   return parsed;
 }
@@ -163,6 +171,7 @@ function printUsage() {
     "",
     "options:",
     "  --json PATH                    write a machine-readable benchmark report",
+    "  --filter TEXT                  run benchmark names containing TEXT (repeatable)",
     "  --no-build                     require and reuse existing generated benchmark inputs",
     "  --artifact-cache DIR           cache built benchmark inputs in DIR",
     "  --no-artifact-cache            rebuild inputs without cache restore/store",
@@ -354,6 +363,10 @@ async function writeJsonReport(path, benchmarks) {
       arch: process.arch,
     },
     artifactCache,
+    selection: {
+      filters: args.filters,
+      benchmarkNames: benchmarks.map((benchmark) => benchmark.name),
+    },
     benchmarks,
   };
   await mkdir(dirname(path), { recursive: true });
@@ -361,14 +374,6 @@ async function writeJsonReport(path, benchmarks) {
   console.log();
   console.log(`wrote benchmark report: ${path}`);
 }
-
-const artifactCache = await prepareBenchArtifacts({
-  root,
-  artifactPaths: benchmarkArtifactPaths,
-  options: args,
-  build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
-});
-const { runtime, hostRuntime, prettyRuntime } = await instantiateRuntimes();
 
 function manifestEntry(benchmarkRuntime, name) {
   const entry = benchmarkRuntime.findManifestEntry(name);
@@ -521,10 +526,6 @@ function benchTopLevelDispatch(entry) {
   }]));
 }
 
-const dispatchEntry = manifestEntry(runtime, "Vir.Fixtures.Basic.branchAndSub");
-const scalarRecordEntry = manifestEntry(runtime, "Vir.Fixtures.InterfaceShapes.profileStatsScore");
-const nestedRecordEntry = manifestEntry(runtime, "Vir.Fixtures.InterfaceShapes.profileEnvelopeScore");
-const recursiveValueEntry = manifestEntry(runtime, "Vir.Fixtures.RecursiveTypes.jsonRootScore");
 const baseConversionCases = [
   {
     name: "base-unit",
@@ -671,262 +672,284 @@ const formatConversionCases = [
   },
 ];
 
-const dispatch = benchTopLevelDispatch(dispatchEntry);
-const baseConversionBenchmarks = baseConversionCases.map((testCase) =>
-  benchBoundaryConversionCase(runtime, testCase));
-const formatConversionBenchmarks = formatConversionCases.map((testCase) =>
-  benchBoundaryConversionCase(prettyRuntime, testCase));
-
-const wasmFib = benchRepeated("fib", fibIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < fibIterations; i++) {
-    acc += Number(runtime.call("fib", fibInput));
-  }
-  return acc;
+const artifactCache = await prepareBenchArtifacts({
+  root,
+  artifactPaths: benchmarkArtifactPaths,
+  options: args,
+  build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
 });
-const hostFib = benchHostIr("fib", fibIterations, ["fib", String(fibIterations), String(fibInput)]);
+const { runtime, hostRuntime, prettyRuntime } = await instantiateRuntimes();
+const benchmarkReports = [];
+const outputSections = new Map();
 
-const wasmSort = benchRepeated("sort", sortIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < sortIterations; i++) {
-    acc += Number(runtime.call("SortDemo.demoFromArray", sortInput));
-  }
-  return acc;
+function benchmarkSelected(name) {
+  return args.filters.length === 0 || args.filters.some((filter) => name.includes(filter));
+}
+
+function addBenchmark({ section, name, measure, report, print }) {
+  if (!benchmarkSelected(name)) return;
+  const measurement = measure();
+  benchmarkReports.push(report(measurement));
+  const outputs = outputSections.get(section) ?? [];
+  outputs.push(() => print(measurement));
+  outputSections.set(section, outputs);
+}
+
+function addWasmBenchmark(section, name, title, measure) {
+  addBenchmark({
+    section,
+    name,
+    measure,
+    report: (sample) => benchmarkReportRow(name, title, sample),
+    print: (sample) => printWasmRow(title, sample),
+  });
+}
+
+function addJsBenchmark(section, name, title, measure) {
+  addBenchmark({
+    section,
+    name,
+    measure,
+    report: (sample) => benchmarkJsReportRow(name, title, sample),
+    print: (sample) => printJsRow(title, sample),
+  });
+}
+
+function addConversionBenchmark(section, benchmarkRuntime, testCase) {
+  addBenchmark({
+    section,
+    name: testCase.name,
+    measure: () => benchBoundaryConversionCase(benchmarkRuntime, testCase),
+    report: (measurement) => benchmarkConversionReportRow(
+      testCase.name,
+      testCase.title,
+      measurement.lower,
+      measurement.wasm,
+      testCase.class ?? null,
+    ),
+    print: (measurement) => printConversionRow(testCase.title, measurement.lower, measurement.wasm),
+  });
+}
+
+addBenchmark({
+  section: "Pure runtime controls",
+  name: "top-level-dispatch",
+  measure: () => benchTopLevelDispatch(manifestEntry(runtime, "Vir.Fixtures.Basic.branchAndSub")),
+  report: (measurement) => benchmarkDispatchReportRow(
+    "top-level-dispatch",
+    `top-level dispatch branchAndSub x ${dispatchIterations}`,
+    measurement.resolveEachCall,
+    measurement.cachedSlot,
+  ),
+  print: (measurement) => printDispatchRow(
+    `top-level dispatch branchAndSub x ${dispatchIterations}`,
+    measurement.resolveEachCall,
+    measurement.cachedSlot,
+  ),
 });
-const hostSort = benchHostIr("sort", sortIterations, ["sort", String(sortIterations), sortInput.join(",")]);
 
-const jsLowerScalarRecord = benchLowerCallObjects(
-  runtime,
+addBenchmark({
+  section: "Pure runtime controls",
+  name: "fib",
+  measure: () => ({
+    wasm: benchRepeated("fib", fibIterations, () => {
+      let acc = 0;
+      for (let i = 0; i < fibIterations; i++) acc += Number(runtime.call("fib", fibInput));
+      return acc;
+    }),
+    host: benchHostIr("fib", fibIterations, ["fib", String(fibIterations), String(fibInput)]),
+  }),
+  report: ({ wasm, host }) => benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasm, host),
+  print: ({ wasm, host }) => printRow(`fib(${fibInput}) x ${fibIterations}`, wasm, host),
+});
+
+addBenchmark({
+  section: "Pure runtime controls",
+  name: "sort",
+  measure: () => ({
+    wasm: benchRepeated("sort", sortIterations, () => {
+      let acc = 0;
+      for (let i = 0; i < sortIterations; i++) {
+        acc += Number(runtime.call("SortDemo.demoFromArray", sortInput));
+      }
+      return acc;
+    }),
+    host: benchHostIr("sort", sortIterations, ["sort", String(sortIterations), sortInput.join(",")]),
+  }),
+  report: ({ wasm, host }) => benchmarkReportRow(
+    "sort",
+    `sort/checksum ${sortInput.length} items x ${sortIterations}`,
+    wasm,
+    host,
+  ),
+  print: ({ wasm, host }) => printRow(
+    `sort/checksum ${sortInput.length} items x ${sortIterations}`,
+    wasm,
+    host,
+  ),
+});
+
+for (const testCase of baseConversionCases) {
+  addConversionBenchmark("Base value conversion paths", runtime, testCase);
+}
+for (const testCase of formatConversionCases) {
+  addConversionBenchmark("Std.Format conversion paths", prettyRuntime, testCase);
+}
+
+addJsBenchmark(
+  "Object conversion paths",
   "lower-scalar-record",
-  lowerScalarRecordIterations,
-  scalarRecordEntry,
-  [profileStatsInput],
+  `JS object scalar record/enums lower x ${lowerScalarRecordIterations}`,
+  () => benchLowerCallObjects(
+    runtime,
+    "lower-scalar-record",
+    lowerScalarRecordIterations,
+    manifestEntry(runtime, "Vir.Fixtures.InterfaceShapes.profileStatsScore"),
+    [profileStatsInput],
+  ),
 );
-
-const jsLowerNestedRecord = benchLowerCallObjects(
-  runtime,
+addJsBenchmark(
+  "Object conversion paths",
   "lower-nested-record",
-  lowerNestedRecordIterations,
-  nestedRecordEntry,
-  [profileEnvelopeInput],
+  `JS object nested record/list/option lower x ${lowerNestedRecordIterations}`,
+  () => benchLowerCallObjects(
+    runtime,
+    "lower-nested-record",
+    lowerNestedRecordIterations,
+    manifestEntry(runtime, "Vir.Fixtures.InterfaceShapes.profileEnvelopeScore"),
+    [profileEnvelopeInput],
+  ),
 );
-
-const jsLowerRecursiveValue = benchLowerCallObjects(
-  runtime,
+addJsBenchmark(
+  "Object conversion paths",
   "lower-recursive-value",
-  lowerRecursiveValueIterations,
-  recursiveValueEntry,
-  [recursiveJsonInput],
+  `JS object recursive custom-inductive lower x ${lowerRecursiveValueIterations}`,
+  () => benchLowerCallObjects(
+    runtime,
+    "lower-recursive-value",
+    lowerRecursiveValueIterations,
+    manifestEntry(runtime, "Vir.Fixtures.RecursiveTypes.jsonRootScore"),
+    [recursiveJsonInput],
+  ),
 );
 
-const wasmScalarRecord = benchRepeated("scalar-record", scalarRecordIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < scalarRecordIterations; i++) {
-    acc += Number(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsScore", profileStatsInput));
-  }
-  return acc;
-});
+addWasmBenchmark(
+  "Object conversion paths",
+  "scalar-record",
+  `scalar record/enums x ${scalarRecordIterations}`,
+  () => benchRepeated("scalar-record", scalarRecordIterations, () => {
+    let acc = 0;
+    for (let i = 0; i < scalarRecordIterations; i++) {
+      acc += Number(runtime.call("Vir.Fixtures.InterfaceShapes.profileStatsScore", profileStatsInput));
+    }
+    return acc;
+  }),
+);
+addWasmBenchmark(
+  "Object conversion paths",
+  "nested-record",
+  `nested record/list/option x ${nestedRecordIterations}`,
+  () => benchRepeated("nested-record", nestedRecordIterations, () => {
+    let acc = 0;
+    for (let i = 0; i < nestedRecordIterations; i++) {
+      acc += Number(runtime.call("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore", profileEnvelopeInput));
+    }
+    return acc;
+  }),
+);
+addWasmBenchmark(
+  "Object conversion paths",
+  "recursive-value",
+  `recursive custom-inductive value x ${recursiveValueIterations}`,
+  () => benchRepeated("recursive-value", recursiveValueIterations, () => {
+    let acc = 0;
+    for (let i = 0; i < recursiveValueIterations; i++) {
+      acc += Number(runtime.call("Vir.Fixtures.RecursiveTypes.jsonRootScore", recursiveJsonInput));
+    }
+    return acc;
+  }),
+);
 
-const wasmNestedRecord = benchRepeated("nested-record", nestedRecordIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < nestedRecordIterations; i++) {
-    acc += Number(runtime.call("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore", profileEnvelopeInput));
-  }
-  return acc;
-});
-
-const wasmRecursiveValue = benchRepeated("recursive-value", recursiveValueIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < recursiveValueIterations; i++) {
-    acc += Number(runtime.call("Vir.Fixtures.RecursiveTypes.jsonRootScore", recursiveJsonInput));
-  }
-  return acc;
-});
-
-const wasmHostScalar = benchRepeated("host-title", hostScalarIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < hostScalarIterations; i++) {
-    acc += hostRuntime.call("HostInterop.titleHandshake", "bench").length;
-  }
-  return acc;
-});
-
-const wasmCallback = benchRepeated("callback-roundtrip", callbackIterations, () => {
-  return Number(hostRuntime.call("HostInterop.callbackRoundTripLoop", callbackIterations));
-});
-
-const wasmDomResource = benchRepeated("dom-listener-resource", domResourceIterations, () => {
-  let acc = 0;
-  for (let i = 0; i < domResourceIterations; i++) {
-    acc += Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEvent", "#bench-dom"));
-  }
-  return acc;
-});
-
-const wasmReactRoot = benchRepeated("react-root-lifecycle", reactRootIterations, () => {
-  return Number(hostRuntime.call("ReactCounter.mountAndUnmountLoop", "#bench-react", reactRootIterations));
-});
-
-const wasmReactTextRender = benchRepeated("react-node-text-render", reactTextRenderIterations, () => {
-  return Number(hostRuntime.call(
+addWasmBenchmark(
+  "Host/resource paths",
+  "host-title",
+  `host scalar title handshake x ${hostScalarIterations}`,
+  () => benchRepeated("host-title", hostScalarIterations, () => {
+    let acc = 0;
+    for (let i = 0; i < hostScalarIterations; i++) {
+      acc += hostRuntime.call("HostInterop.titleHandshake", "bench").length;
+    }
+    return acc;
+  }),
+);
+addWasmBenchmark(
+  "Host/resource paths",
+  "callback-roundtrip",
+  `callback root round trip x ${callbackIterations}`,
+  () => benchRepeated("callback-roundtrip", callbackIterations, () =>
+    Number(hostRuntime.call("HostInterop.callbackRoundTripLoop", callbackIterations))),
+);
+addWasmBenchmark(
+  "Host/resource paths",
+  "dom-listener-resource",
+  `DOM listener resource create/remove x ${domResourceIterations}`,
+  () => benchRepeated("dom-listener-resource", domResourceIterations, () => {
+    let acc = 0;
+    for (let i = 0; i < domResourceIterations; i++) {
+      acc += Number(hostRuntime.call("HostInterop.mountAndRemoveCallbackEvent", "#bench-dom"));
+    }
+    return acc;
+  }),
+);
+addWasmBenchmark(
+  "Host/resource paths",
+  "react-root-lifecycle",
+  `React root mount/render/unmount x ${reactRootIterations}`,
+  () => benchRepeated("react-root-lifecycle", reactRootIterations, () =>
+    Number(hostRuntime.call("ReactCounter.mountAndUnmountLoop", "#bench-react", reactRootIterations))),
+);
+addWasmBenchmark(
+  "React Node resource paths",
+  "react-node-text-render",
+  `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
+  () => benchRepeated("react-node-text-render", reactTextRenderIterations, () => Number(hostRuntime.call(
     "ReactCounter.renderWideTextLoop",
     "#bench-react",
     reactTextRenderWidth,
     reactTextRenderIterations,
-  ));
-});
-
-const wasmReactCallbackRender = benchRepeated("react-node-callback-render", reactCallbackRenderIterations, () => {
-  return Number(hostRuntime.call(
+  ))),
+);
+addWasmBenchmark(
+  "React Node resource paths",
+  "react-node-callback-render",
+  `React callback tree render ${reactCallbackRenderWidth} handlers x ${reactCallbackRenderIterations}`,
+  () => benchRepeated("react-node-callback-render", reactCallbackRenderIterations, () => Number(hostRuntime.call(
     "ReactCounter.renderCallbackTreeLoop",
     "#bench-react",
     reactCallbackRenderWidth,
     reactCallbackRenderIterations,
-  ));
-});
+  ))),
+);
+
+if (benchmarkReports.length === 0) {
+  throw new Error(`no benchmark names contain: ${args.filters.join(", ")}`);
+}
 
 console.log("# Lean VIR benchmark");
 console.log("Host baseline is `lean --run` with `interpreter.prefer_native=false`.");
 console.log("WASM timings use the manifest-driven JavaScript runtime API.");
 console.log("Host timings exclude Lean frontend startup.");
-console.log();
-console.log("Pure runtime controls");
-console.log();
-printDispatchRow(`top-level dispatch branchAndSub x ${dispatchIterations}`, dispatch.resolveEachCall, dispatch.cachedSlot);
-console.log();
-printRow(`fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib);
-console.log();
-printRow(`sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort);
-console.log();
-console.log("Top-level value conversion paths");
-console.log();
-console.log("Base value conversion paths");
-console.log();
-for (const testCase of baseConversionBenchmarks) {
-  printConversionRow(testCase.title, testCase.lower, testCase.wasm);
+for (const [section, outputs] of outputSections) {
   console.log();
+  console.log(section);
+  for (const output of outputs) {
+    console.log();
+    output();
+  }
 }
-console.log("Std.Format conversion paths");
-console.log();
-for (const testCase of formatConversionBenchmarks) {
-  printConversionRow(testCase.title, testCase.lower, testCase.wasm);
-  console.log();
-}
-printJsRow(`JS object scalar record/enums lower x ${lowerScalarRecordIterations}`, jsLowerScalarRecord);
-console.log();
-printJsRow(`JS object nested record/list/option lower x ${lowerNestedRecordIterations}`, jsLowerNestedRecord);
-console.log();
-printJsRow(`JS object recursive custom-inductive lower x ${lowerRecursiveValueIterations}`, jsLowerRecursiveValue);
-console.log();
-printWasmRow(`scalar record/enums x ${scalarRecordIterations}`, wasmScalarRecord);
-console.log();
-printWasmRow(`nested record/list/option x ${nestedRecordIterations}`, wasmNestedRecord);
-console.log();
-printWasmRow(`recursive custom-inductive value x ${recursiveValueIterations}`, wasmRecursiveValue);
-console.log();
-console.log("Host/resource paths");
-console.log();
-printWasmRow(`host scalar title handshake x ${hostScalarIterations}`, wasmHostScalar);
-console.log();
-printWasmRow(`callback root round trip x ${callbackIterations}`, wasmCallback);
-console.log();
-printWasmRow(`DOM listener resource create/remove x ${domResourceIterations}`, wasmDomResource);
-console.log();
-printWasmRow(`React root mount/render/unmount x ${reactRootIterations}`, wasmReactRoot);
-console.log();
-console.log("React Node resource paths");
-console.log();
-printWasmRow(
-  `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
-  wasmReactTextRender,
-);
-console.log();
-printWasmRow(
-  `React callback tree render ${reactCallbackRenderWidth} handlers x ${reactCallbackRenderIterations}`,
-  wasmReactCallbackRender,
-);
 
 if (args.jsonPath !== null) {
-  await writeJsonReport(args.jsonPath, [
-    benchmarkDispatchReportRow(
-      "top-level-dispatch",
-      `top-level dispatch branchAndSub x ${dispatchIterations}`,
-      dispatch.resolveEachCall,
-      dispatch.cachedSlot,
-    ),
-    benchmarkReportRow("fib", `fib(${fibInput}) x ${fibIterations}`, wasmFib, hostFib),
-    benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
-    ...baseConversionBenchmarks.map((testCase) =>
-      benchmarkConversionReportRow(testCase.name, testCase.title, testCase.lower, testCase.wasm)),
-    ...formatConversionBenchmarks.map((testCase) =>
-      benchmarkConversionReportRow(
-        testCase.name,
-        testCase.title,
-        testCase.lower,
-        testCase.wasm,
-        testCase.class,
-      )),
-    benchmarkJsReportRow(
-      "lower-scalar-record",
-      `JS object scalar record/enums lower x ${lowerScalarRecordIterations}`,
-      jsLowerScalarRecord,
-    ),
-    benchmarkJsReportRow(
-      "lower-nested-record",
-      `JS object nested record/list/option lower x ${lowerNestedRecordIterations}`,
-      jsLowerNestedRecord,
-    ),
-    benchmarkJsReportRow(
-      "lower-recursive-value",
-      `JS object recursive custom-inductive lower x ${lowerRecursiveValueIterations}`,
-      jsLowerRecursiveValue,
-    ),
-    benchmarkReportRow(
-      "scalar-record",
-      `scalar record/enums x ${scalarRecordIterations}`,
-      wasmScalarRecord,
-    ),
-    benchmarkReportRow(
-      "nested-record",
-      `nested record/list/option x ${nestedRecordIterations}`,
-      wasmNestedRecord,
-    ),
-    benchmarkReportRow(
-      "recursive-value",
-      `recursive custom-inductive value x ${recursiveValueIterations}`,
-      wasmRecursiveValue,
-    ),
-    benchmarkReportRow(
-      "host-title",
-      `host scalar title handshake x ${hostScalarIterations}`,
-      wasmHostScalar,
-    ),
-    benchmarkReportRow(
-      "callback-roundtrip",
-      `callback root round trip x ${callbackIterations}`,
-      wasmCallback,
-    ),
-    benchmarkReportRow(
-      "dom-listener-resource",
-      `DOM listener resource create/remove x ${domResourceIterations}`,
-      wasmDomResource,
-    ),
-    benchmarkReportRow(
-      "react-root-lifecycle",
-      `React root mount/render/unmount x ${reactRootIterations}`,
-      wasmReactRoot,
-    ),
-    benchmarkReportRow(
-      "react-node-text-render",
-      `React text tree render ${reactTextRenderWidth} children x ${reactTextRenderIterations}`,
-      wasmReactTextRender,
-    ),
-    benchmarkReportRow(
-      "react-node-callback-render",
-      `React callback tree render ${reactCallbackRenderWidth} handlers x ${reactCallbackRenderIterations}`,
-      wasmReactCallbackRender,
-    ),
-  ]);
+  await writeJsonReport(args.jsonPath, benchmarkReports);
 }
 
 runtime.dispose();
