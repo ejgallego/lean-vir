@@ -19,6 +19,20 @@ npm run artifacts:build -- prettyM \
   --plan
 ```
 
+For maintained local builds, keep external producer worktrees below the
+ignored `_sources/` directory instead of an ephemeral system directory. In
+this checkout the controlled layout is:
+
+```text
+_sources/fir/       lean-fir at the catalogued commit
+_sources/workload/  verso-slides at the catalogued commit
+```
+
+The pinned VIR worktree remains alongside this application worktree under the
+parent repository's `.worktrees/` directory. These locations hold source
+checkouts and producer caches only; `_artifacts/` remains the builder-owned
+output area.
+
 The driver never fetches, switches, or edits source revisions. Each path must
 be the root of a clean Git checkout whose `HEAD` is the database's full commit.
 This keeps local worktree policy outside the portable build description.

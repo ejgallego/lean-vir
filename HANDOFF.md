@@ -101,6 +101,11 @@ move the same command into CI. The plan-only checkout gate and deterministic
 repacking of the preserved seed have passed. A fresh producer build was not run
 during harness preparation, and no performance measurement was collected.
 
+Keep producer worktrees in controlled, ignored locations rather than `/tmp`.
+The current FIR and workload checkouts live under
+`benchmarks/prettyM-web/_sources/{fir,workload}`; the exact VIR checkout is the
+sibling repository worktree `.worktrees/pr104-conversion-control`.
+
 The current VIR `.irpkg` generator embeds generation time and source-path
 spelling. Source identity is exact, but fresh VIR packages are not yet expected
 to reproduce an old archive digest byte-for-byte. Add deterministic package
