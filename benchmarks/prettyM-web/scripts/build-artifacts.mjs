@@ -30,6 +30,11 @@ import {
 } from "./artifact-set-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const buildEnvironment = {
+  ...process.env,
+  NPM_CONFIG_CACHE:
+    process.env.NPM_CONFIG_CACHE ?? join(appRoot, "_artifacts/npm-cache"),
+};
 
 function usage() {
   console.log(`Usage: node scripts/build-artifacts.mjs [options] BUILD
@@ -82,7 +87,11 @@ function parseArgs(argv) {
   return options;
 }
 
-function run(command, args, { cwd, env = process.env, capture = false } = {}) {
+function run(
+  command,
+  args,
+  { cwd, env = buildEnvironment, capture = false } = {},
+) {
   const result = spawnSync(command, args, {
     cwd,
     env,
@@ -214,7 +223,7 @@ async function buildFirLlvm(component, output, resolvedCheckouts, packages) {
   run("bash", [component.producer.entrypoint, output], {
     cwd: fir,
     env: {
-      ...process.env,
+      ...buildEnvironment,
       FIR_PRETTY_M_NATIVE_PACKAGE: packages.native,
     },
   });
