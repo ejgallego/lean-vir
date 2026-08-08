@@ -22,6 +22,29 @@ private def InterfaceAggregateKind.label : InterfaceAggregateKind → String
   | .inductive => "inductive"
   | .structure => "structure"
 
+private def forceInlineFormat : Lean.Format → Lean.Format
+  | .nil => .nil
+  | .line => .text " "
+  | .align _ => .nil
+  | .text value => .text value
+  | .nest _ format => forceInlineFormat format
+  | .append left right => .append (forceInlineFormat left) (forceInlineFormat right)
+  | .group format _ => forceInlineFormat format
+  | .tag tag format => .tag tag (forceInlineFormat format)
+
+/-- Pretty-print an expression as an inline diagnostic fragment while retaining term info. -/
+private def inlineExprMessage (type : Lean.Expr) : Lean.MessageData :=
+  Lean.MessageData.lazy
+    (fun context => do
+      let formatted ← Lean.ppExprWithInfos context type
+      return .ofFormatWithInfos { formatted with fmt := forceInlineFormat formatted.fmt })
+    (hasSyntheticSorry := fun mctx =>
+      (Lean.instantiateMVarsCore mctx type).1.hasSyntheticSorry)
+    (onMissingContext := fun _ => pure (.ofFormat (.text (toString type))))
+
+private def quotedExpr (type : Lean.Expr) : Lean.MessageData :=
+  m!"`{inlineExprMessage type}`"
+
 /-- A nested type-classification site that adds user-facing error context. -/
 public inductive InterfaceClassifierContext where
   | callbackArgument (type : Lean.Expr)
@@ -76,84 +99,84 @@ public inductive InterfaceClassifierError where
   deriving BEq, Repr
 
 private def InterfaceClassifierContext.wrap
-    (context : InterfaceClassifierContext) (reason : String) : String :=
+    (context : InterfaceClassifierContext) (reason : Lean.MessageData) : Lean.MessageData :=
   match context with
   | .callbackArgument type =>
-      s!"unsupported callback argument type `{type}`: {reason}"
+      m!"unsupported callback argument type {quotedExpr type}: {reason}"
   | .callbackResult type =>
-      s!"unsupported callback result type `{type}`: {reason}"
+      m!"unsupported callback result type {quotedExpr type}: {reason}"
   | .constructorPayload constructor type =>
-      s!"constructor `{constructor}` has unsupported payload type `{type}`: {reason}"
+      m!"constructor `{constructor}` has unsupported payload type {quotedExpr type}: {reason}"
   | .constructorField field constructor type =>
-      s!"field `{field}` of constructor `{constructor}` has unsupported type `{type}`: {reason}"
+      m!"field `{field}` of constructor `{constructor}` has unsupported type {quotedExpr type}: {reason}"
   | .structureField field structureName type =>
-      s!"field `{field}` of structure `{structureName}` has unsupported type `{type}`: {reason}"
-  | .arrayElement => s!"unsupported Array element type: {reason}"
-  | .listElement => s!"unsupported List element type: {reason}"
-  | .optionElement => s!"unsupported Option element type: {reason}"
-  | .prodFst => s!"unsupported Prod fst type: {reason}"
-  | .prodSnd => s!"unsupported Prod snd type: {reason}"
-  | .signatureArgument type => s!"unsupported argument type `{type}`: {reason}"
-  | .signatureResult type => s!"unsupported result type `{type}`: {reason}"
+      m!"field `{field}` of structure `{structureName}` has unsupported type {quotedExpr type}: {reason}"
+  | .arrayElement => m!"unsupported Array element type: {reason}"
+  | .listElement => m!"unsupported List element type: {reason}"
+  | .optionElement => m!"unsupported Option element type: {reason}"
+  | .prodFst => m!"unsupported Prod fst type: {reason}"
+  | .prodSnd => m!"unsupported Prod snd type: {reason}"
+  | .signatureArgument type => m!"unsupported argument type {quotedExpr type}: {reason}"
+  | .signatureResult type => m!"unsupported result type {quotedExpr type}: {reason}"
 
-/-- Render a typed classifier failure at a user-facing package boundary. -/
-public def InterfaceClassifierError.message : InterfaceClassifierError → String
-  | .unsupportedType type => s!"unsupported type `{type}`"
-  | .inContext context cause => context.wrap cause.message
+/-- Preserve a typed classifier failure for Lean's user-facing pretty printer. -/
+public def InterfaceClassifierError.toMessageData : InterfaceClassifierError → Lean.MessageData
+  | .unsupportedType type => m!"unsupported type {quotedExpr type}"
+  | .inContext context cause => context.wrap cause.toMessageData
   | .polymorphicCallbackParameter name =>
-      s!"unsupported polymorphic callback type parameter `{name}`"
+      m!"unsupported polymorphic callback type parameter `{name}`"
   | .implicitCallbackArgument name =>
-      s!"unsupported implicit/instance callback argument `{name}`"
+      m!"unsupported implicit/instance callback argument `{name}`"
   | .mutuallyRecursive kind name =>
-      s!"mutually recursive {kind.label} `{name}` is not supported"
+      m!"mutually recursive {kind.label} `{name}` is not supported"
   | .nonUniformRecursive kind name =>
-      s!"non-uniform recursive {kind.label} `{name}` is not supported"
-  | .indexedInductive name => s!"indexed inductive `{name}` is not supported"
-  | .indexedStructure name => s!"indexed structure `{name}` is not supported"
+      m!"non-uniform recursive {kind.label} `{name}` is not supported"
+  | .indexedInductive name => m!"indexed inductive `{name}` is not supported"
+  | .indexedStructure name => m!"indexed structure `{name}` is not supported"
   | .parameterCountMismatch kind name expected actual =>
-      s!"{kind.label} `{name}` expects {expected} parameter(s), got {actual}"
-  | .inductiveWithoutConstructors name => s!"inductive `{name}` has no constructors"
+      m!"{kind.label} `{name}` expects {expected} parameter(s), got {actual}"
+  | .inductiveWithoutConstructors name => m!"inductive `{name}` has no constructors"
   | .constructorMissingDeclaration constructor =>
-      s!"constructor `{constructor}` has no declaration"
+      m!"constructor `{constructor}` has no declaration"
   | .constructorOwnerMismatch constructor expectedOwner _ =>
-      s!"constructor `{constructor}` does not belong to `{expectedOwner}`"
+      m!"constructor `{constructor}` does not belong to `{expectedOwner}`"
   | .constructorInvalidType constructor type =>
-      s!"constructor `{constructor}` has invalid type `{type}`"
+      m!"constructor `{constructor}` has invalid type {quotedExpr type}"
   | .constructorImplicitFields constructor =>
-      s!"constructor `{constructor}` has unsupported implicit/instance fields"
+      m!"constructor `{constructor}` has unsupported implicit/instance fields"
   | .constructorLayoutUnavailable constructor =>
-      s!"could not compute runtime layout for constructor `{constructor}`"
+      m!"could not compute runtime layout for constructor `{constructor}`"
   | .constructorRuntimeFieldCount constructor _ =>
-      s!"constructor `{constructor}` must have exactly one runtime field"
+      m!"constructor `{constructor}` must have exactly one runtime field"
   | .constructorLayoutFieldCountMismatch constructor _ _ =>
-      s!"runtime layout for constructor `{constructor}` does not match its field count"
+      m!"runtime layout for constructor `{constructor}` does not match its field count"
   | .constructorErasedRuntimeLayout constructor =>
-      s!"constructor `{constructor}` has erased or void runtime layout"
+      m!"constructor `{constructor}` has erased or void runtime layout"
   | .constructorFieldErasedRuntimeLayout field constructor =>
-      s!"field `{field}` of constructor `{constructor}` has erased or void runtime layout"
+      m!"field `{field}` of constructor `{constructor}` has erased or void runtime layout"
   | .structureConstructorCount name _ =>
-      s!"structure `{name}` must have exactly one constructor"
-  | .emptyStructure name => s!"empty structure `{name}` is not supported"
+      m!"structure `{name}` must have exactly one constructor"
+  | .emptyStructure name => m!"empty structure `{name}` is not supported"
   | .recursiveInheritedStructure name =>
-      s!"recursive inherited structure `{name}` is not supported"
+      m!"recursive inherited structure `{name}` is not supported"
   | .structureLayoutUnavailable name =>
-      s!"could not compute runtime layout for structure `{name}`"
+      m!"could not compute runtime layout for structure `{name}`"
   | .structureLayoutFieldCountMismatch name _ _ =>
-      s!"runtime layout for structure `{name}` does not match its field count"
+      m!"runtime layout for structure `{name}` does not match its field count"
   | .structureFieldErasedRuntimeLayout field structureName =>
-      s!"field `{field}` of structure `{structureName}` has erased or void runtime layout"
+      m!"field `{field}` of structure `{structureName}` has erased or void runtime layout"
   | .structureFieldMissingProjection field structureName =>
-      s!"field `{field}` of structure `{structureName}` is missing a projection function"
+      m!"field `{field}` of structure `{structureName}` is missing a projection function"
   | .structureFieldMissingProjectionDeclaration field structureName =>
-      s!"field `{field}` of structure `{structureName}` has no projection declaration"
+      m!"field `{field}` of structure `{structureName}` has no projection declaration"
   | .structureFieldInvalidProjectionType field structureName type =>
-      s!"field `{field}` of structure `{structureName}` has invalid projection type `{type}`"
+      m!"field `{field}` of structure `{structureName}` has invalid projection type {quotedExpr type}"
   | .jsMarkerOutsideResource marker =>
-      s!"JavaScript object marker `{marker}` must appear under `Lean.Vir.Js`; use `Lean.Vir.Js {marker}` at the boundary"
+      m!"JavaScript object marker `{marker}` must appear under `Lean.Vir.Js`; use `Lean.Vir.Js {marker}` at the boundary"
   | .runtimeErasedParameterAfterArguments name =>
-      s!"unsupported runtime-erased type parameter `{name}` after runtime arguments"
+      m!"unsupported runtime-erased type parameter `{name}` after runtime arguments"
   | .implicitOrInstanceArgument name =>
-      s!"implicit or instance argument `{name}` is not supported; \
+      m!"implicit or instance argument `{name}` is not supported; \
         declare a wrapper with only explicit arguments"
 
 end Vir.Interface

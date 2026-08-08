@@ -58,14 +58,14 @@ private def hostBoundaryTypeDiagnostic (type : InterfaceType) : String :=
     use `Unit`, `Lean.Vir.Js ...`, `Lean.Vir.Js.Nullable ...`, top-level callback arguments, \
     or explicit conversion calls"
 
-/-- Render a host-boundary policy failure at an attribute or package boundary. -/
-public def HostImportBoundaryError.message : HostImportBoundaryError → String
+/-- Preserve a host-boundary policy failure for user-facing diagnostics. -/
+public def HostImportBoundaryError.toMessageData : HostImportBoundaryError → Lean.MessageData
   | .unsupportedArgument name type =>
-      s!"unsupported JavaScript import argument `{name}`: {hostBoundaryTypeDiagnostic type}"
+      m!"unsupported JavaScript import argument `{name}`: {hostBoundaryTypeDiagnostic type}"
   | .unsupportedResult type =>
-      s!"unsupported JavaScript import result: {hostBoundaryTypeDiagnostic type}"
+      m!"unsupported JavaScript import result: {hostBoundaryTypeDiagnostic type}"
   | .invalidExplicitConversion target =>
-      s!"declaration is marked with `@[vir_js_explicit_conversion]`, but `{target}` does not \
+      m!"declaration is marked with `@[vir_js_explicit_conversion]`, but `{target}` does not \
         convert between exactly one `Lean.Vir.Js ...` resource and one Lean value"
 
 /-- A semantic failure from host-import signature analysis or boundary policy. -/
@@ -74,10 +74,10 @@ public inductive HostImportValidationError where
   | boundary (error : HostImportBoundaryError)
   deriving BEq, Repr
 
-/-- Render a host-import validation failure for a user-facing diagnostic. -/
-public def HostImportValidationError.message : HostImportValidationError → String
-  | .signature error => s!"unsupported JavaScript import signature: {error.message}"
-  | .boundary error => error.message
+/-- Preserve a host-import validation failure for Lean's user-facing diagnostics. -/
+public def HostImportValidationError.toMessageData : HostImportValidationError → Lean.MessageData
+  | .signature error => m!"unsupported JavaScript import signature: {error.toMessageData}"
+  | .boundary error => error.toMessageData
 
 /-- A host-import signature together with its validated runtime boundary. -/
 public structure HostImportAnalysis where

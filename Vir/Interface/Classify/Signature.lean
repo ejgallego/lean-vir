@@ -29,10 +29,11 @@ public inductive ExportInterfaceValidationError where
   | classification (error : InterfaceClassifierError)
   deriving BEq, Repr
 
-/-- Render a complete export-interface failure at an attribute or package boundary. -/
-public def ExportInterfaceValidationError.message : ExportInterfaceValidationError → String
-  | .signature error => error.message
-  | .classification error => error.message
+/-- Preserve a complete export-interface failure for Lean's user-facing diagnostics. -/
+public def ExportInterfaceValidationError.toMessageData :
+    ExportInterfaceValidationError → Lean.MessageData
+  | .signature error => error.toMessageData
+  | .classification error => error.toMessageData
 
 private def classifyResult (result : Lean.Expr) :
     CoreM (Except InterfaceClassifierError (InterfaceType × InterfaceEffect)) := do

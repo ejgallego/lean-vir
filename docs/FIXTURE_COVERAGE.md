@@ -24,7 +24,9 @@ raw-marker fallback case bypasses both marker callbacks and confirms package
 generation applies the same indexed-inductive, naked-resource, erased/implicit
 export, and startup parameter/result diagnostics. Direct attribute cases assert
 that indexed inductives and naked JavaScript resource markers instead fail at
-the marked declaration after compilation.
+the marked declaration after compilation. The indexed cases also require a
+source-like nested type such as `Array (IndexedPair 0 × Option (IndexedPair 1))`
+without exposing synthesized numeric-literal evidence in either diagnostic path.
 The package-generator smoke separately checks normal Lean frontend processing
 for both markers. Negative `@[vir_export]` cases cover unsupported binder
 shapes, theorem, axiom, private declarations, and a local helper that reaches

@@ -95,6 +95,9 @@ def interfaceNeedsBoxedCallBoundary
 private def boxedBoundaryDiagnostic (name : Name) : String :=
   s!"top-level Float, Float32, UInt64, and trivial wrappers over them require generated boxed declaration `{boxedName name}` at the wasm32 interpreter boundary"
 
+private def renderPackageMessage (message : MessageData) : CoreM String := do
+  return ← (← addMessageContext message).toString
+
 def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
     CoreM (Except PackageDiagnostic InterfaceExport) := do
   if isPrivateName name then
@@ -115,7 +118,9 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
           let classified : Except PackageDiagnostic ClassifiedSignature ←
             if startup then
               match ← Vir.InterfaceValidation.analyzeStartupSignature info.type with
-              | .error error => pure (.error { name, source, reason := error.message })
+              | .error error =>
+                  let reason ← renderPackageMessage error.toMessageData
+                  pure (.error { name, source, reason })
               | .ok signature =>
                   pure (.ok {
                     args := #[]
@@ -124,7 +129,9 @@ def interfaceExportFor (index : DeclIndex) (source : String) (name : Name) :
                   })
             else
               match ← analyzeExportInterface info.type with
-              | .error error => pure (.error { name, source, reason := error.message })
+              | .error error =>
+                  let reason ← renderPackageMessage error.toMessageData
+                  pure (.error { name, source, reason })
               | .ok signature => pure (.ok signature)
           match classified with
           | .ok signature =>
@@ -173,10 +180,11 @@ def hostImportFor (slot : Nat) (loaded : LoadedDecl) :
     | return .error { name := loaded.decl.name, source := loaded.source, reason := "missing elaborated Lean declaration for JavaScript import" }
   match ← Vir.HostValidation.analyzeHostImport hostMetadata.marker target info.type with
   | .error error =>
+      let reason ← renderPackageMessage error.toMessageData
       return .error {
         name := loaded.decl.name
         source := loaded.source
-        reason := error.message
+        reason
       }
   | .ok analysis =>
     let signature := analysis.signature

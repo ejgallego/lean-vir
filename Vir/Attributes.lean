@@ -34,7 +34,7 @@ private def virMarkerKindDiagnostic? (env : Lean.Environment) (declName : Lean.N
   | none => some "Lean could not determine the declaration kind"
 
 private structure VirMarkerCheck where
-  diagnostic? : Option String := none
+  diagnostic? : Option Lean.MessageData := none
   deferred : Array Vir.ExportValidation.ClosureDeferred := #[]
 
 private inductive VirMarkerKind where
@@ -63,11 +63,11 @@ private def checkVirMarker
   match marker with
   | .export =>
       match ← Vir.Interface.analyzeExportInterface info.sig.get.type with
-      | .error error => return { diagnostic? := some error.message }
+      | .error error => return { diagnostic? := some error.toMessageData }
       | .ok _ => pure ()
   | .startup =>
       match ← Vir.InterfaceValidation.analyzeStartupSignature info.sig.get.type with
-      | .error error => return { diagnostic? := some error.message }
+      | .error error => return { diagnostic? := some error.toMessageData }
       | .ok _ => pure ()
   if env.header.isModule && (← Lean.Compiler.compiler.postponeCompile.getM) then
     return {
@@ -92,7 +92,7 @@ private def registerVirMarkerAttr (marker : VirMarkerKind) : IO Lean.LabelExtens
     add := fun declName stx kind => do
       let check ← checkVirMarker marker declName
       if let some reason := check.diagnostic? then
-        let message := s!"invalid `@[{attrName}]` declaration `{declName}`: {reason}"
+        let message := m!"invalid `@[{attrName}]` declaration `{declName}`: {reason}"
         Lean.throwErrorAt stx message
       if let some deferred := check.deferred[0]? then
         Lean.logInfoAt stx deferred.message

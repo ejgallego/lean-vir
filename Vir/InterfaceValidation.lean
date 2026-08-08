@@ -53,13 +53,13 @@ public inductive ExportSignatureError where
   | implicitOrInstanceParameter (name : Lean.Name)
   deriving BEq, Repr
 
-/-- Render an export preflight failure for users. -/
-public def ExportSignatureError.message : ExportSignatureError → String
+/-- Preserve an export preflight failure for Lean's user-facing diagnostics. -/
+public def ExportSignatureError.toMessageData : ExportSignatureError → Lean.MessageData
   | .erasedTypeParameter name =>
-      s!"VIR exports must use concrete runtime types; type parameter `{name}` is erased; \
+      m!"VIR exports must use concrete runtime types; type parameter `{name}` is erased; \
         export a concrete wrapper instead"
   | .implicitOrInstanceParameter name =>
-      s!"VIR exports cannot have implicit or instance arguments (`{name}`); \
+      m!"VIR exports cannot have implicit or instance arguments (`{name}`); \
         export a wrapper with only explicit arguments"
 
 /-- Whether a valid startup hook is pure or uses one supported effect. -/
@@ -92,20 +92,20 @@ public def effectKind? : Lean.Name → Option EffectKind
 private def isEffectHead (name : Lean.Name) : Bool :=
   (effectKind? name).isSome
 
-/-- Render a startup preflight failure for users. -/
-public def StartupSignatureError.message : StartupSignatureError → String
+/-- Preserve a startup preflight failure for Lean's user-facing pretty printer. -/
+public def StartupSignatureError.toMessageData : StartupSignatureError → Lean.MessageData
   | .parameter name =>
-      s!"VIR startup hooks cannot declare parameters (`{name}`); \
+      m!"VIR startup hooks cannot declare parameters (`{name}`); \
         define a zero-argument wrapper instead"
   | .nonUnitResult none result =>
-      s!"VIR startup hooks must return `Unit`; got `{result}`"
+      m!"VIR startup hooks must return `Unit`; got `{result}`"
   | .nonUnitResult (some effect) result =>
-      s!"VIR startup hooks using `{effect.label}` must return `Unit`; got `{result}`"
+      m!"VIR startup hooks using `{effect.label}` must return `Unit`; got `{result}`"
   | .unsupportedEffect head =>
-      s!"`{head}` is not a supported VIR startup effect; use `RuntimeM`, `IO`, `DomM`, \
+      m!"`{head}` is not a supported VIR startup effect; use `RuntimeM`, `IO`, `DomM`, \
         or `ReactM`, each returning `Unit`"
   | .malformedEffect effect argumentCount =>
-      s!"VIR startup effect `{effect.label}` expects one result type, got {argumentCount}"
+      m!"VIR startup effect `{effect.label}` expects one result type, got {argumentCount}"
 
 /-- Remove metadata wrappers without reducing the underlying interface type. -/
 public partial def stripMData : Lean.Expr → Lean.Expr
