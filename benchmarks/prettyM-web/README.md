@@ -36,6 +36,15 @@ and artifact-set provenance. Local checkout paths are supplied on the command
 line and are never committed. See `docs/ARTIFACT_BUILDS.md` for the source-build
 contract and driver.
 
+Producer source remains in its owning Git repository. CI and self-contained
+local builds materialize the exact catalogued commits under the ignored
+`_sources/{vir,fir,workload}` directory; no producer source is copied into this
+application or an artifact archive:
+
+```sh
+npm run artifacts:sources -- prettyM
+```
+
 The committed `artifact-set.lock.json` selects one immutable, compatible set.
 Binary artifacts and downloaded release archives remain ignored by Git. The
 current prototype lock has no public URL yet; assemble and consume it locally:
@@ -72,6 +81,12 @@ Once the archive is uploaded as an immutable release asset, set its exact HTTPS
 URL in the lockfile and change the status from `local-prototype` to `published`.
 Clean clones can then use `npm run artifacts:fetch` without an override. See
 `docs/ARTIFACT_SETS.md` for producer, promotion, and publication details.
+
+The candidate workflow stops before that publication boundary. It builds from
+the catalogued sources, packs to a separate candidate lock, re-imports the
+archive, runs the application tests, and uploads the archive, checksums,
+manifest, source receipt, and `CANDIDATE.json` as a short-lived CI artifact.
+It never edits `artifact-set.lock.json` or publishes a release asset.
 
 The artifact set is generic over Lean versions. Each candidate is a complete
 bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`

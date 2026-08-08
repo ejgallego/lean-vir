@@ -99,10 +99,12 @@ The full `prettyM` source build has now passed on the prepared exact checkouts.
 VIR, FIR native, and FIR LLVM produced complete packages; the producer-local
 checks passed, native and LLVM agreed on exact traces, all source checkouts
 remained clean, and the assembled candidate passed the application's tool,
-artifact-set, and five-backend browser smoke tests. The local receipt is
-`benchmarks/prettyM-web/_artifacts/builds/prettyM/BUILD.json`. The separately
-packed candidate archive has SHA-256
-`61dd988efd7df5f7291c4d53ca58a331a425e242111296395578f30ea67c4c15`.
+artifact-set, and five-backend browser smoke tests. The most recent rehearsal
+materialized all three sources below the application-local `_sources/`
+directory, exactly as CI will. Its receipt is
+`benchmarks/prettyM-web/_artifacts/builds/prettyM/BUILD.json`, and its candidate
+archive has SHA-256
+`0de25bce79cb119ba59e4f4750ef98d5221ae14b6bd96a8ef337d23ae65b2811`.
 No performance measurement was collected.
 
 The committed lock and its `26f54081e15145b6...` archive were deliberately
@@ -113,16 +115,21 @@ and toolchain identities; semantic validation passed. Treat the source-built
 archive as a candidate, not a silent lock refresh.
 
 Keep producer worktrees in controlled, ignored locations rather than `/tmp`.
-The current FIR and workload checkouts live under
-`benchmarks/prettyM-web/_sources/{fir,workload}`; the exact VIR checkout is the
-sibling repository worktree `.worktrees/pr104-conversion-control`.
+The validated candidate layout is the self-contained
+`benchmarks/prettyM-web/_sources/{vir,fir,workload}` tree populated from the
+catalog. Existing clean linked worktrees may still be passed explicitly to the
+lower-level source builder, but they are not part of the CI contract.
 
 The current VIR `.irpkg` generator embeds generation time and source-path
 spelling. Source identity is exact, but fresh VIR packages are not yet expected
-to reproduce an old archive digest byte-for-byte. The next artifact-management
-step is a CI candidate-build job that runs this source build, packs the result,
-tests the assembled archive, and uploads the archive plus build receipt. It
-should not compare fresh bytes with the current lock or publish/promote them.
+to reproduce an old archive digest byte-for-byte. The CI candidate-build path
+is now prepared in `.github/workflows/prettyM-candidate.yml`. It materializes
+each exact catalogued source below `benchmarks/prettyM-web/_sources/`, runs the
+source build, packs to a separate candidate lock, re-imports and tests the
+archive, and uploads the archive plus checksums, manifests, and source receipt.
+It does not compare fresh bytes with the current lock or publish/promote them.
+The workflow still needs to run on GitHub before its hosted-runner setup and
+uploaded payload can be accepted as the validation record.
 Deterministic VIR package metadata and the remaining Wasm byte differences are
 separate consolidation work before lock replacement becomes automatic.
 

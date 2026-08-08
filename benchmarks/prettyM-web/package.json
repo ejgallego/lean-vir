@@ -5,7 +5,9 @@
   "type": "module",
   "license": "Apache-2.0",
   "scripts": {
+    "artifacts:sources": "node scripts/checkout-artifact-sources.mjs",
     "artifacts:build": "node scripts/build-artifacts.mjs",
+    "artifacts:candidate": "node scripts/build-artifact-candidate.mjs",
     "artifacts:pack": "node scripts/pack-artifact-set.mjs",
     "artifacts:fetch": "node scripts/fetch-artifact-set.mjs",
     "stage": "bash scripts/stage-artifacts.sh",
@@ -19,7 +21,8 @@
     "test": "npm run test:tools && npm run test:artifact-set && npm run test:browser",
     "test:artifact-set": "node --test test/artifact-set.test.mjs",
     "test:tools": "node test/tool-smoke.mjs",
-    "test:browser": "npm run build && node test/browser-smoke.mjs"
+    "test:browser": "npm run build && node test/browser-smoke.mjs",
+    "playwright:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
     "playwright": "^1.58.0"

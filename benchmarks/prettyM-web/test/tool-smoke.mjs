@@ -6,7 +6,9 @@ import { fileURLToPath } from "node:url";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const commands = [
+  [process.execPath, ["scripts/checkout-artifact-sources.mjs", "--help"]],
   [process.execPath, ["scripts/build-artifacts.mjs", "--help"]],
+  [process.execPath, ["scripts/build-artifact-candidate.mjs", "--help"]],
   [process.execPath, ["scripts/pack-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/fetch-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/collect-report.mjs", "--help"]],
@@ -39,6 +41,27 @@ const buildList = spawnSync(
 );
 assert.equal(buildList.status, 0, buildList.stderr);
 assert.match(buildList.stdout, /^prettyM\tprettyM-bounded-set-0001$/m);
+
+const sourcePlan = spawnSync(
+  process.execPath,
+  ["scripts/checkout-artifact-sources.mjs", "prettyM", "--plan"],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.equal(sourcePlan.status, 0, sourcePlan.stderr);
+assert.match(sourcePlan.stdout, /fir: https:\/\/github\.com\/ejgallego\/lean-fir/);
+assert.match(sourcePlan.stdout, /vir: https:\/\/github\.com\/ejgallego\/lean-vir/);
+assert.match(sourcePlan.stdout, /workload: https:\/\/github\.com\/leanprover\/verso-slides/);
+
+const candidatePlan = spawnSync(
+  process.execPath,
+  ["scripts/build-artifact-candidate.mjs", "prettyM", "--plan"],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.equal(candidatePlan.status, 0, candidatePlan.stderr);
+assert.match(
+  candidatePlan.stdout,
+  /candidate output: _artifacts\/candidates\/prettyM\/upload/,
+);
 
 const escapedOutput = spawnSync(
   process.execPath,

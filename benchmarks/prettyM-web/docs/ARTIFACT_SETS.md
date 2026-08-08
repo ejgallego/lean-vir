@@ -65,6 +65,11 @@ source-build database and lockfile are committed.
 6. Run at least one real differential report. Performance campaigns remain a
    controlled-machine operation rather than a hosted-runner gate.
 
+CI implements steps 1–5 as a candidate build and uploads the resulting archive
+and source receipt as a short-lived Actions artifact. It deliberately omits
+step 6: hosted runners establish correctness and package integrity, not a
+performance conclusion.
+
 Packing is deterministic: members are sorted, regular-file-only, mode 0644,
 UID/GID zero, and timestamp zero. Repacking unchanged inputs must reproduce the
 same archive digest.
@@ -92,6 +97,8 @@ URL. After upload:
 
 The first pass is intentionally manual. Producer-owned releases, attestations,
 and automated promotion can be added after this path has been exercised.
+The CI candidate workflow does not enter this section: Actions artifact upload
+is evidence transport, not publication or promotion.
 
 ## Verification boundary
 
