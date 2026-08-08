@@ -338,6 +338,27 @@ export function createHostResourceState() {
 
 export function createElementResourceHostBindings(resources, operations) {
   return {
+    "browser.element.querySelector": (element, selector) =>
+      resources.adoptResourceForValue(createNullableValue(
+        operations.querySelector(
+          resources.resolveResource(element, "Element"),
+          resources.resolveResource(selector, "JsString"),
+        ),
+      )),
+    "browser.element.querySelectorAll": (element, selector) =>
+      resources.resourceForValue(operations.querySelectorAll(
+        resources.resolveResource(element, "Element"),
+        resources.resolveResource(selector, "JsString"),
+      )),
+    "browser.element.getInnerHTML": (element) =>
+      resources.resourceForValue(operations.getInnerHTML(resources.resolveResource(element, "Element"))),
+    "browser.element.setInnerHTML": (element, html) => {
+      const target = resources.resolveResource(element, "Element");
+      return withConsumedResources(resources, [[html, "JsString"]], (resolvedHtml) => {
+        operations.setInnerHTML(target, resolvedHtml);
+        return undefined;
+      });
+    },
     "browser.element.getTextContent": (element) =>
       resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
     "browser.element.setTextContent": (element, text) => {

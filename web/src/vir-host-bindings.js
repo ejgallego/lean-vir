@@ -104,6 +104,10 @@ export function createBrowserEventHostBindings(state = createHostResourceState()
       stopPropagationOnEvent(state.resolveResource(event, "Event"));
       return undefined;
     },
+    "browser.event.key": (event) => {
+      const key = state.resolveResource(event, "Event")?.key;
+      return state.resourceForValue(typeof key === "string" ? key : "");
+    },
     "browser.event.formValue": (event) =>
       adoptResourceForValue(state, createNullableValue(formControlEventValue(state.resolveResource(event, "Event")))),
   };
@@ -112,6 +116,12 @@ export function createBrowserEventHostBindings(state = createHostResourceState()
 export function createBrowserElementHostBindings(state = createHostResourceState()) {
   return {
     ...createElementResourceHostBindings(state, {
+      querySelector: (target, selector) => target.querySelector(selector),
+      querySelectorAll: (target, selector) => target.querySelectorAll(selector),
+      getInnerHTML: (target) => target.innerHTML ?? "",
+      setInnerHTML: (target, html) => {
+        target.innerHTML = html;
+      },
       getTextContent: (target) => target.textContent ?? "",
       setTextContent: (target, text) => {
         target.textContent = text;

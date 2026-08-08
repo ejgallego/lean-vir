@@ -1701,6 +1701,24 @@ function createHostResourceState() {
 }
 function createElementResourceHostBindings(resources, operations) {
   return {
+    "browser.element.querySelector": (element, selector) => resources.adoptResourceForValue(createNullableValue(
+      operations.querySelector(
+        resources.resolveResource(element, "Element"),
+        resources.resolveResource(selector, "JsString")
+      )
+    )),
+    "browser.element.querySelectorAll": (element, selector) => resources.resourceForValue(operations.querySelectorAll(
+      resources.resolveResource(element, "Element"),
+      resources.resolveResource(selector, "JsString")
+    )),
+    "browser.element.getInnerHTML": (element) => resources.resourceForValue(operations.getInnerHTML(resources.resolveResource(element, "Element"))),
+    "browser.element.setInnerHTML": (element, html) => {
+      const target = resources.resolveResource(element, "Element");
+      return withConsumedResources(resources, [[html, "JsString"]], (resolvedHtml) => {
+        operations.setInnerHTML(target, resolvedHtml);
+        return void 0;
+      });
+    },
     "browser.element.getTextContent": (element) => resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
     "browser.element.setTextContent": (element, text) => {
       const target = resources.resolveResource(element, "Element");
@@ -3297,12 +3315,22 @@ function createBrowserEventHostBindings(state = createHostResourceState()) {
       stopPropagationOnEvent(state.resolveResource(event, "Event"));
       return void 0;
     },
+    "browser.event.key": (event) => {
+      const key = state.resolveResource(event, "Event")?.key;
+      return state.resourceForValue(typeof key === "string" ? key : "");
+    },
     "browser.event.formValue": (event) => adoptResourceForValue(state, createNullableValue(formControlEventValue(state.resolveResource(event, "Event"))))
   };
 }
 function createBrowserElementHostBindings(state = createHostResourceState()) {
   return {
     ...createElementResourceHostBindings(state, {
+      querySelector: (target, selector) => target.querySelector(selector),
+      querySelectorAll: (target, selector) => target.querySelectorAll(selector),
+      getInnerHTML: (target) => target.innerHTML ?? "",
+      setInnerHTML: (target, html) => {
+        target.innerHTML = html;
+      },
       getTextContent: (target) => target.textContent ?? "",
       setTextContent: (target, text) => {
         target.textContent = text;

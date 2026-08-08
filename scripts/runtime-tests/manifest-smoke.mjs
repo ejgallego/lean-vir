@@ -579,13 +579,41 @@ assert.equal(hostRuntime.call("HostInterop.querySelectorAllLeanCount", ".query-a
 assert.equal(hostRuntime.call("HostInterop.querySelectorAllArrayCount", ".query-all"), "2");
 assert.equal(hostRuntime.call("HostInterop.querySelectorAllFirstText", ".query-all"), "first match");
 assert.equal(hostRuntime.call("HostInterop.querySelectorAllCountLoop", ".query-all", 1000), "2000");
+const elementQueryRoot = ensureVirtualElementState(virtualDocumentState, "#element-query");
+elementQueryRoot.queries.set("[data-e]", [
+  createVirtualElementState({ attributes: new Map([["data-e", "0"]]) }),
+  createVirtualElementState({ attributes: new Map([["data-e", "1"]]) }),
+]);
+assert.equal(
+  hostRuntime.call("HostInterop.elementQuerySelectorAllCount", "#element-query", "[data-e]"),
+  "2",
+);
+assert.equal(
+  hostRuntime.call("HostInterop.elementQuerySelectorText", "#element-query", "[data-e]"),
+  "",
+);
+elementQueryRoot.queries.get("[data-e]")[0].textContent = "first child";
+assert.equal(
+  hostRuntime.call("HostInterop.elementQuerySelectorText", "#element-query", "[data-e]"),
+  "first child",
+);
+assert.equal(
+  hostRuntime.call("HostInterop.elementInnerHTMLRoundTrip", "#element-query", "<svg></svg>"),
+  "<svg></svg>",
+);
+assert.equal(hostRuntime.call("HostInterop.runtimeRefRoundTrip", 5), "714");
+const keyTarget = ensureVirtualElementState(virtualDocumentState, "#key-target");
+assert.equal(hostRuntime.call("HostInterop.mountKeyTitle", "#key-target"), "1");
+keyTarget.listeners.get("keydown")[0].dispatch(createVirtualEventState({ key: "Enter" }));
+assert.equal(virtualDocumentState.title, "Enter");
 assert.equal(
   hostRuntime.hostState.resourceRoots.debugCounts().active,
   queryRootBaseline,
   "querySelectorAll should release passive selector, NodeList, array, and element roots",
 );
-assert.equal(hostRuntime.liveCallbacks.size, 0);
+assert.equal(hostRuntime.liveCallbacks.size, 1, "keydown listener should retain its callback");
 hostRuntime.dispose();
+assert.equal(hostRuntime.liveCallbacks.size, 0, "runtime disposal should release the key listener");
 runtime.dispose();
 prettyRuntime.dispose();
 leanRuntime.dispose();
