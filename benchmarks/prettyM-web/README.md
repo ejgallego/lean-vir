@@ -1,8 +1,10 @@
 # Lean prettyM benchmark webapp
 
 This directory is a standalone browser application for comparing five
-`Std.Format.prettyM` implementations. It intentionally has no dependency on
-Verso, Reveal, Lake, or the parent VIR repository's source tree.
+`Std.Format.prettyM` implementations. It also contains a local rehearsal of
+the Illuminate player as the first real second workload. The application has
+no runtime dependency on Verso, Reveal, Lake, or the parent VIR repository's
+source tree.
 
 The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by
@@ -128,6 +130,25 @@ npm test
 
 Set `CHROMIUM` to an alternate Chrome/Chromium executable when necessary.
 
+### Illuminate rehearsal
+
+`illuminate.html` reuses the plotting report and backend filter for the legacy
+JavaScript, typed VIR, and FIR-native Illuminate player implementations. Until
+the workload and all producers have clean source revisions, stage it only as a
+local rehearsal:
+
+```sh
+npm run stage:illuminate -- \
+  --source /path/to/illuminate \
+  --native-package /path/to/illuminate-player-package
+npm run test:illuminate
+```
+
+The page and downloaded report display the exact staged build identities and
+mark all timings as non-authoritative. See
+`docs/ILLUMINATE_REHEARSAL.md` for refreshed build hashes, correctness status,
+and the remaining semantic stop condition.
+
 ## Reproducible reports
 
 With the app server running, collect one full report from a separate browser
@@ -180,6 +201,6 @@ serve scripts, browser tests, package metadata, licensing files, documentation,
 and the artifact input contract are all contained here. The app uses only
 browser APIs and its own npm development dependency.
 
-The benchmark engine is still deliberately `prettyM`-specific. Generalizing
-the sampler for unrelated Lean functions should happen only after a second
-function supplies concrete requirements.
+The main benchmark engine remains deliberately `prettyM`-specific. Illuminate
+supplies the concrete second-client requirements; only presentation metadata,
+backend filtering, and shared report phases have been generalized so far.

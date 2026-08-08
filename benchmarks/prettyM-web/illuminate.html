@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <title>Illuminate player benchmark</title>
+    <link rel="stylesheet" href="styles/app.css" />
+    <link rel="stylesheet" href="styles/dashboard.css" />
+    <link rel="stylesheet" href="styles/illuminate.css" />
+    <script defer src="artifacts/illuminate/workload/anim_core.js"></script>
+    <script defer src="src/dashboard.js"></script>
+    <script type="module" src="src/illuminate-app.js"></script>
+  </head>
+  <body>
+    <main class="bench-shell">
+      <header class="bench-header">
+        <div>
+          <p class="bench-eyebrow">Second client · browser Wasm</p>
+          <h1>Illuminate player trace benchmark</h1>
+          <p class="bench-intro">
+            Compare the real JavaScript player oracle with the typed VIR and
+            FIR-native implementations over identical animations and event
+            traces. Correctness is checked before a point reaches the plots.
+          </p>
+          <nav class="workload-nav" aria-label="Benchmark workload">
+            <a href="index.html">Std.Format.prettyM</a>
+            <a href="illuminate.html" aria-current="page">Illuminate player</a>
+          </nav>
+        </div>
+        <div class="bench-state" aria-live="polite">
+          <span id="app-state" data-state="loading">Loading backends</span>
+          <strong id="app-progress">Preparing rehearsal artifacts…</strong>
+        </div>
+      </header>
+
+      <aside class="rehearsal-notice">
+        <strong>Local rehearsal.</strong>
+        The Illuminate and FIR checkpoints are not pinned yet. Use this view to
+        validate integration and inspect graphs, not as an accepted performance
+        record for this loaded machine.
+        <ul id="build-notes" class="build-notes" aria-label="Staged builds">
+          <li>Loading staged build identities…</li>
+        </ul>
+      </aside>
+
+      <section class="bench-panel" aria-labelledby="backend-heading">
+        <div class="bench-section-heading">
+          <div>
+            <p class="bench-eyebrow">Candidates</p>
+            <h2 id="backend-heading">Backend set</h2>
+          </div>
+          <p>
+            JavaScript is the semantic oracle. VIR and FIR run the same typed
+            replay contract and return normalized frame actions.
+          </p>
+        </div>
+        <div id="backend-list" class="backend-grid" aria-live="polite"></div>
+      </section>
+
+      <section class="bench-panel" aria-labelledby="protocol-heading">
+        <div class="bench-section-heading">
+          <div>
+            <p class="bench-eyebrow">Protocol</p>
+            <h2 id="protocol-heading">Sampling controls</h2>
+          </div>
+          <p>
+            Runs are interleaved and starting order rotates. No adaptive
+            batching is used because both Wasm runtimes retain allocations.
+          </p>
+        </div>
+        <div class="protocol-grid illuminate-protocol-grid">
+          <label>
+            <span>Warm-up rounds</span>
+            <input id="warmup" type="number" min="0" max="20" value="1" />
+          </label>
+          <label>
+            <span>Measured rounds</span>
+            <input id="samples" type="number" min="1" max="100" value="5" />
+          </label>
+        </div>
+      </section>
+
+      <section class="bench-panel" aria-labelledby="run-heading">
+        <div class="bench-section-heading">
+          <div>
+            <p class="bench-eyebrow">Studies</p>
+            <h2 id="run-heading">Run comparison</h2>
+          </div>
+          <p>
+            Quick check uses three trace lengths. Trace scaling adds longer
+            event sequences and opens the shared plotting report.
+          </p>
+        </div>
+        <div class="study-actions">
+          <button type="button" data-study="quick">Quick parity</button>
+          <button type="button" class="primary" data-study="scaling">
+            Trace scaling
+          </button>
+        </div>
+      </section>
+
+      <section class="bench-panel" aria-labelledby="results-heading">
+        <div class="bench-section-heading">
+          <div>
+            <p class="bench-eyebrow">Report</p>
+            <h2 id="results-heading">Latest result</h2>
+          </div>
+          <div class="result-actions">
+            <button id="open-dashboard" type="button" disabled>
+              Open plots
+            </button>
+            <button id="download-results" type="button" disabled>
+              Download JSON
+            </button>
+          </div>
+        </div>
+        <div id="report-list" class="report-grid">
+          <p class="empty-state">No Illuminate comparison has run yet.</p>
+        </div>
+      </section>
+
+      <footer>
+        <p>
+          Common plotted phases are prepare, execute, decode, and total.
+          Backend-specific raw timing fields remain in the downloaded report.
+        </p>
+      </footer>
+    </main>
+  </body>
+</html>

@@ -7,6 +7,7 @@
     <title>Lean prettyM benchmark</title>
     <link rel="stylesheet" href="styles/app.css" />
     <link rel="stylesheet" href="styles/dashboard.css" />
+    <link rel="stylesheet" href="styles/illuminate.css" />
     <script defer src="src/config.js"></script>
     <script defer src="src/benchmark-core.js"></script>
     <script defer src="src/backends/pretty-vir.js"></script>
@@ -26,6 +27,10 @@
             across five independently versioned implementations. Reports stay
             tied to one verified artifact set.
           </p>
+          <nav class="workload-nav" aria-label="Benchmark workload">
+            <a href="index.html" aria-current="page">Std.Format.prettyM</a>
+            <a href="illuminate.html">Illuminate player</a>
+          </nav>
         </div>
         <div class="bench-state" aria-live="polite">
           <span id="app-state" data-state="loading">Loading backends</span>

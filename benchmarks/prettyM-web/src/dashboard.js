@@ -169,7 +169,8 @@
 
     function publish() {
       prettyDashboardSelectedBackends = new Set(selected);
-      summary.textContent = selected.size + " of " + available.length + " selected";
+      summary.textContent =
+        selected.size + " of " + available.length + " selected";
       selectAll.disabled = selected.size === available.length;
       onChange(
         available.filter(function (id) {
@@ -211,7 +212,8 @@
       });
       publish();
     });
-    summary.textContent = selected.size + " of " + available.length + " selected";
+    summary.textContent =
+      selected.size + " of " + available.length + " selected";
     selectAll.disabled = selected.size === available.length;
     fieldset.append(legend, options, actions, summary);
     return fieldset;
@@ -1923,18 +1925,23 @@
   /** @param {*} report */
   function showPrettyScalingReport(report) {
     if (prettyCorpusOverlay) prettyCorpusOverlay.remove();
+    var presentation = report.presentation || {};
     var overlay = document.createElement("section");
     overlay.className = "pretty-corpus-overlay pretty-scaling-overlay";
     overlay.setAttribute("role", "dialog");
     overlay.setAttribute("aria-modal", "true");
-    overlay.setAttribute("aria-label", "Pretty-printer input scaling report");
+    overlay.setAttribute(
+      "aria-label",
+      presentation.ariaLabel || "Pretty-printer input scaling report",
+    );
     overlay.addEventListener("keydown", function (event) {
       event.stopPropagation();
       if (event.key === "Escape") overlay.remove();
     });
     var header = document.createElement("header");
     var title = document.createElement("h2");
-    title.textContent = "Pretty-printer input scaling report";
+    title.textContent =
+      presentation.title || "Pretty-printer input scaling report";
     var actions = document.createElement("div");
     var exportButton = document.createElement("button");
     exportButton.type = "button";
@@ -1966,7 +1973,9 @@
         report.parityCount +
         "/" +
         report.scenarioCount +
-        " scaling points agree · " +
+        " " +
+        (presentation.pointNoun || "scaling points") +
+        " agree · " +
         report.dimensions.length +
         " dimensions · " +
         report.samples +
@@ -1976,12 +1985,13 @@
       overlay.appendChild(result);
       var note = document.createElement("p");
       note.className = "pretty-corpus-note";
-      note.textContent =
-        "Charts show warmed phase medians on a logarithmic time axis. Execute is the default because it best isolates the generated formatter; marshal, decode, and end-to-end total remain selectable. Adaptive batches target " +
-        report.batchTargetMs +
-        " ms, with allocation-heavy resident arenas capped by a " +
-        formatCorpusBytes(report.batchMemoryBudgetBytes) +
-        " study budget.";
+      note.textContent = presentation.note
+        ? presentation.note
+        : "Charts show warmed phase medians on a logarithmic time axis. Execute is the default because it best isolates the generated formatter; marshal, decode, and end-to-end total remain selectable. Adaptive batches target " +
+          report.batchTargetMs +
+          " ms, with allocation-heavy resident arenas capped by a " +
+          formatCorpusBytes(report.batchMemoryBudgetBytes) +
+          " study budget.";
       overlay.appendChild(note);
       var phaseControl = document.createElement("label");
       phaseControl.className = "pretty-scaling-phase-control";
@@ -1998,7 +2008,8 @@
         var option = document.createElement("option");
         option.value = phase.id;
         option.textContent = phase.label;
-        option.selected = phase.id === "executeMs";
+        option.selected =
+          phase.id === (presentation.defaultPhase || "executeMs");
         phaseSelector.appendChild(option);
       });
       phaseControl.appendChild(phaseSelector);
@@ -2066,20 +2077,28 @@
           var table = document.createElement("table");
           table.className = "pretty-scaling-table";
           var head = document.createElement("tr");
-          [
-            "Size",
-            "Nodes",
-            "Input bytes",
-            "Depth",
-            "Tags",
-            "Breaks",
-            "Output bytes",
-            "Segments",
-            "Output lines",
-            "Parity",
-          ].forEach(function (column) {
+          var pointColumns = Array.isArray(presentation.pointColumns)
+            ? presentation.pointColumns
+            : null;
+          (pointColumns
+            ? pointColumns.map(function (/** @type {*} */ column) {
+                return column.label;
+              })
+            : [
+                "Size",
+                "Nodes",
+                "Input bytes",
+                "Depth",
+                "Tags",
+                "Breaks",
+                "Output bytes",
+                "Segments",
+                "Output lines",
+              ]
+          ).forEach(function (column) {
             appendCorpusCell(head, column, "th");
           });
+          appendCorpusCell(head, "Parity", "th");
           backendIds.forEach(function (/** @type {string} */ id) {
             appendCorpusCell(head, report.summaries[id].label + " ms", "th");
           });
@@ -2087,24 +2106,34 @@
           dimension.points.forEach(function (/** @type {*} */ point) {
             var row = document.createElement("tr");
             row.className = point.parity ? "status-pass" : "status-fail";
-            appendCorpusCell(row, point.sizeLabel || String(point.size));
-            appendCorpusCell(row, String(point.input.formatNodes));
-            appendCorpusCell(row, String(point.input.textBytes));
-            appendCorpusCell(row, String(point.input.maxDepth));
-            appendCorpusCell(row, String(point.input.maxTagDepth));
-            appendCorpusCell(row, String(point.input.lineNodes));
-            appendCorpusCell(
-              row,
-              point.output ? String(point.output.textBytes) : "—",
-            );
-            appendCorpusCell(
-              row,
-              point.output ? String(point.output.segments) : "—",
-            );
-            appendCorpusCell(
-              row,
-              point.output ? String(point.output.lines) : "—",
-            );
+            if (pointColumns) {
+              pointColumns.forEach(function (/** @type {*} */ column) {
+                var value = point.table && point.table[column.key];
+                appendCorpusCell(
+                  row,
+                  value === null || value === undefined ? "—" : String(value),
+                );
+              });
+            } else {
+              appendCorpusCell(row, point.sizeLabel || String(point.size));
+              appendCorpusCell(row, String(point.input.formatNodes));
+              appendCorpusCell(row, String(point.input.textBytes));
+              appendCorpusCell(row, String(point.input.maxDepth));
+              appendCorpusCell(row, String(point.input.maxTagDepth));
+              appendCorpusCell(row, String(point.input.lineNodes));
+              appendCorpusCell(
+                row,
+                point.output ? String(point.output.textBytes) : "—",
+              );
+              appendCorpusCell(
+                row,
+                point.output ? String(point.output.segments) : "—",
+              );
+              appendCorpusCell(
+                row,
+                point.output ? String(point.output.lines) : "—",
+              );
+            }
             appendCorpusCell(
               row,
               point.parity ? "match" : "mismatch",
@@ -2871,12 +2900,7 @@
           heading.textContent = dimension.label + " — " + metricLabel;
           content.appendChild(heading);
           content.appendChild(
-            createPrettyMemoryChart(
-              dimension,
-              backendIds,
-              metric,
-              metricLabel,
-            ),
+            createPrettyMemoryChart(dimension, backendIds, metric, metricLabel),
           );
           var table = document.createElement("table");
           table.className = "pretty-memory-table";

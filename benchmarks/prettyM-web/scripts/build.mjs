@@ -15,7 +15,13 @@ try {
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
-for (const path of ["index.html", "LICENSE", "NOTICE", "README.md"]) {
+for (const path of [
+  "index.html",
+  "illuminate.html",
+  "LICENSE",
+  "NOTICE",
+  "README.md",
+]) {
   await cp(join(appRoot, path), join(output, path));
 }
 for (const path of ["src", "styles", "artifacts"]) {
