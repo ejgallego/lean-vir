@@ -173,6 +173,23 @@ The hosted demo is deployed from `main`:
 
 [Lean VIR hosted demo](https://ejgallego.github.io/lean-vir/)
 
+The same deployment publishes the current static analysis of which functions
+in Lean's installed libraries have a complete VIR-runnable dependency closure:
+
+[VIR runnable-surface report](https://ejgallego.github.io/lean-vir/surface/)
+
+The release and debug Wasm artifacts also have an interactive retained-size
+breakdown by section, subsystem, object/module, and linker symbol. A second map
+places the current VIR boundary inside Lean's installed native runtime archives;
+it follows Lean's source hierarchy, separates the compiled `LeanIR.lean` program
+layer, exposes up to seven local hierarchy levels with a sticky depth slider,
+drills from source files into their sized native functions, and can color byte
+area by either exact retained-function coverage or measured primary-blocker
+density. Extern symbols link back to their coverage entries in the
+runnable-surface report:
+
+[VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
+
 A downloadable static bundle is published with the hosted demo:
 
 [lean-vir-local.tar.gz](https://ejgallego.github.io/lean-vir/downloads/lean-vir-local.tar.gz)

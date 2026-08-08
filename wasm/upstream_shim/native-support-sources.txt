@@ -3,7 +3,13 @@
 Prelude.c
 Data/List/ToArrayImpl.c
 Data/Array/Basic.c
+Data/String/Decode.c
 Data/String/Defs.c
 Data/String/Basic.c
+Data/String/FindPos.c
+Data/String/Iterate.c
 Data/String/Search.c
+Data/String/Slice.c
 Data/String/Substring.c
+Data/String/TakeDrop.c
+Meta/Defs.c

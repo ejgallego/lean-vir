@@ -47,15 +47,95 @@ The probe links these upstream runtime sources:
 - `src/runtime/platform.cpp`
 - `src/runtime/utf8.cpp`
 
-It also links `src/util/name.cpp`, which is not runtime proper but is needed by
-the interpreter's name formatting and diagnostics.
+It also links a narrow upstream utility and kernel slice:
+
+- `src/util/name.cpp` for interpreter name formatting and diagnostics;
+- `src/kernel/expr_eq_fn.cpp` for `Lean.Expr.eqv`;
+- `src/kernel/expr.cpp` and `src/kernel/level.cpp` for the structural expression
+  and level operations used by expression equality; and
+- `src/util/kvmap.cpp` for expression metadata equality.
+
+The expression and level sources own the canonical cached-data helper exports,
+so `VIR_USE_UPSTREAM_KERNEL_EXPR_DATA` disables the corresponding temporary
+definitions in `runtime/lean_object_constructors.cpp`. The shim still supplies
+the small `lean_level_hash` and `lean_level_depth` exports used by upstream
+`level.cpp`; they read the same cached data representation as the existing
+local constructors.
+
+The small `USize.toUInt64`, `Bool.toUInt64`, and `Void.mk` boundaries use the
+canonical inline implementations from Lean's runtime headers. Their generated
+boxed adapters materialize those operations without adding a shim provider or
+another upstream source file. `Lean.Level.beq` uses `lean_level_eq` from the
+already linked `level.cpp`; registering it retains that function and its
+generated boxed adapter in the final module.
+
+`Nat.land`, `Int.emod`, and `Int.tmod` similarly use canonical inline runtime
+implementations. `String.Internal.get` resolves to `lean_string_utf8_get` in
+the already linked `object.cpp`, `System.Platform.getIsWindows` to
+`lean_system_platform_windows` in `platform.cpp`, and `Lean.Expr.equal` to the
+binder-sensitive equality implementation in the already linked
+`expr_eq_fn.cpp`. That last path asks upstream `expr.cpp` for
+`lean_expr_binder_info`; the shim supplies the same constant-time exported
+operation as Lean's `Expr.binderInfoEx`, reading the scalar field populated by
+the local expression constructors and returning `.default` for non-binders.
+This keeps the boundary faithful without pulling the complete generated
+`Lean/Expr.c` module into the runtime.
+
+The string frontier registers `String.Internal.trim`,
+`String.Internal.isPrefixOf`, `String.Internal.foldl`, and
+`String.Internal.isEmpty`. The first two exports live in generated
+`Init/Data/String/TakeDrop.c`; retaining `trim` also reaches `Slice.c`,
+`FindPos.c`, and `Decode.c`. `foldl` is supplied by `Iterate.c`, while
+`isEmpty` resolves to `lean_string_isempty` in the already linked `Defs.c`.
+All five generated providers are listed explicitly in
+`native-support-sources.txt`, and section-level dead-code elimination keeps
+only the implementation closure reached by the registered symbols.
+
+## Native Extern Metadata Ownership
+
+`Vir/GeneratePackage/NativeExterns.lean` currently combines two different
+responsibilities:
+
+- VIR policy: which native declarations the Wasm runtime promises to provide,
+  which declarations need generated boxed wrappers, and any additional runtime
+  dependency declarations; and
+- compiler metadata copied from Lean: parameter ownership and IR types, result
+  IR type, and the C backend symbol.
+
+The second part should not remain hand-maintained. The current 223-entry table
+already contains 11 backend symbols shared by 23 Lean declaration names, such
+as `String.append` / `String.Internal.append` and `Nat.decLe` / `Nat.ble`.
+The rejected string-alias experiment made the maintenance problem especially
+clear: adding an internal spelling required copying an existing signature and
+symbol even when it added almost no runnable surface.
+
+The pinned Lean API already exposes both inputs needed for a VIR-side
+prototype. `Lean.IR.findEnvDecl` returns the compiler IR declaration, including
+parameter ownership and IR types, and `Lean.getExternNameFor` with backend `c`
+returns the selected C backend symbol. The next consolidation should therefore
+replace the copied fields with a small VIR selection record and resolve the
+full native extern description from the imported environment. Provider
+availability and support-source selection remain explicit VIR policy; they must
+not be inferred from the presence of an `@[extern]` declaration.
+
+No Lean upstream API change is justified yet. First implement the local
+resolver, keep the existing ABI check as an invariant, and use the generated
+description for package validation, wrapper generation, surface analysis, and
+the restricted native registry. If that prototype exposes a stability or
+enumeration gap in the two existing Lean APIs, the upstream request should be a
+narrow compiler-metadata query returning declaration name, C symbol, ABI, and
+boxed-wrapper information. It should not contain VIR's allowlist, Wasm provider
+policy, support-source closure, or `.irpkg` details.
 
 For Lean-defined native exports whose implementation closure is available in
 the pinned compiler output rather than the imported kernel environment, the
 probe also cross-compiles the stage0 sources listed in
 `wasm/upstream_shim/native-support-sources.txt`. The list is intentionally
 small and reviewable; the strict final link exposes a missing provider after a
-toolchain update.
+toolchain update. `Lean.Expr.eqv` additionally needs the stage0
+`Lean/Data/KVMap.c` export for `DataValue` equality. Its syntax-valued case
+reaches `Lean.Syntax.structEq`, supplied by the listed `Lean/Meta/Defs.c`
+native-support module.
 
 The probe additionally links `wasm/upstream_shim/`. This is local demo code,
 not a fork of Lean. It is split by responsibility:
@@ -81,8 +161,9 @@ not a fork of Lean. It is split by responsibility:
 - `runtime/native_symbol_lookup.cpp` owns the generated native registry include,
   restricted `dlsym` lookup, native symbol stem lookup, and C++ exception
   stubs.
-- `tools/GenerateNativeWrappers.lean` recompiles declarations marked with
-  `generateBoxedWrapper` in `Vir/GeneratePackage/NativeExterns.lean` and emits
+- `tools/GenerateNativeWrappers.lean` resolves the policy entries in
+  `Vir/GeneratePackage/NativeExterns.lean`, recompiles declarations marked with
+  `generateBoxedWrapper`, and emits
   their selected declaration bodies, `_boxed` LCNF declarations, and registry
   entries through Lean's standard compiler pipeline. Most selected declarations
   need only an extern prototype plus the boxed adapter; Lean-defined support such
@@ -166,8 +247,8 @@ That wrapper performs scalar unboxing/boxing and the reference-count updates
 inferred by the normal LCNF passes before calling the raw extern symbol.
 
 VIR keeps the final WASI module statically linked. Standard adapters can be
-marked with `generateBoxedWrapper := true` in the native extern table; the
-build then recompiles those imported declarations and emits their
+marked with `generateBoxedWrapper := true` in the native extern specification
+table; the build then recompiles those imported declarations and emits their
 compiler-generated boxed wrappers together with any selected Lean-defined raw
 body available to the generator. If an exported Lean implementation depends on
 compiler-generated imported declarations that are present only in compiled
@@ -176,8 +257,8 @@ instead. This is how the `String.Internal` search/position operations and
 `Substring.Raw.Internal.beq` use their normal compiler wrappers and upstream
 raw implementations without copying either into the shim. The same path lets
 `Array.mk` and `Array.toList` call the real runtime exports backed by their
-compiler-generated list/array helpers. The native extern table remains the
-source of truth for wrapper selection;
+compiler-generated list/array helpers. The native extern specification table
+remains the source of truth for wrapper selection;
 `npm run inspect:native-wrappers` reports it without duplicating the full list
 here. Local behavior and WASI policy belong in raw provider functions; their
 boxed adapters are still generated whenever the standard compiler output is
@@ -185,9 +266,48 @@ correct. A boxed implementation remains explicit in `runtime/native_symbols.cpp`
 only when VIR's all-owned interpreter boundary needs ownership behavior that
 Lean's standard wrapper cannot express.
 
+## Native Extern Metadata
+
+`Vir/GeneratePackage/NativeExterns.lean` records only VIR policy: the Lean
+declaration name, wrapper-selection bit, explicit closure dependencies, and an
+exceptional symbol override when VIR deliberately selects a different provider.
+The declaration parameter ABI, borrow bits, and result ABI come directly from
+`Lean.IR.findEnvDecl`. The native symbol comes from `Lean.getExternNameFor`
+unless the policy entry supplies an override.
+
+The consolidation experiment covered all 223 registered declarations. Every
+ABI was available from Lean's imported environment; 213 native symbols also
+matched Lean's standard C-extern resolution. The ten deliberate overrides are
+`Array.mkEmpty`, `Array.emptyWithCapacity`, `ByteArray.empty`,
+`ByteArray.extract`, `String.Pos.Raw.set`, `String.Pos.set`, `String.set`,
+`UInt32.ofNatLT`, `UInt64.ofNatLT`, and `USize.ofNatLT`. They select existing
+VIR/runtime aliases or compiler-generated Lean bodies, so they are provider
+policy rather than copied ABI metadata. `npm run check:native-externs` resolves
+the full catalog, rejects missing declarations or symbols, rejects duplicate
+registrations, and flags overrides that have become redundant upstream.
+
+The wrapper generator exposes the same resolved metadata as a versioned JSON
+catalog with `vir_native_wrappers --catalog`. The boundary-registry and wrapper
+inventory checks consume that catalog instead of parsing Lean source syntax.
+Thus package closure extraction, surface analysis, wrapper generation, and
+validation all share one resolver. Against the pre-consolidation checkpoint,
+the resolved 223-entry catalog and generated wrapper C were identical. The
+release Wasm was also byte-identical: 657,138 bytes raw, 150,091 bytes with
+deterministic gzip, and the same SHA-256.
+
+This result does not justify a new upstream API for catalog generation: Lean's
+existing environment and extern-name APIs provide the required information at
+generation time. It does not change the runtime declaration-provider boundary.
+The browser Wasm does not load a normal Lean `Environment`; it reconstructs the
+selected declarations from `.irpkg` packages behind `package/decl_provider.h`,
+so the upstream interpreter's ordinary environment lookup cannot replace that
+provider without shipping and initializing a substantially larger runtime
+environment.
+
 `npm run check:native-wrappers` rejects ordinary handwritten direct adapters.
 The intentional ownership exceptions are the borrowed array getters
-`Array.ugetBorrowed`, `Array.fgetBorrowed`, and `Array.getBorrowed`: their raw
+`Array.ugetBorrowed`, `Array.getInternalBorrowed`, and
+`Array.get!InternalBorrowed`: their raw
 results are borrowed from the array, while a standard emitted boxed wrapper
 would release the array without first retaining the result. The explicit shim
 wrapper for `Array.ugetBorrowed` retains the result before releasing the array;
@@ -371,7 +491,8 @@ String raw-position iteration and slicing through `String.push`/
 `String.Pos.Raw.prev`/`String.Internal.atEnd` plus string ordering, public
 `String.contains`/`startsWith`/`drop`/`dropEnd`/`trimAscii`/`splitOn`/
 `intercalate`/`any`/`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/
-`String.find`/`String.Pos.Raw.offsetOfPos`, plus parser-data primitives
+`String.find`/`String.Pos.Raw.offsetOfPos`, direct internal
+`trim`/`isPrefixOf`/`foldl`/`isEmpty`, plus parser-data primitives
 `String.hash`/`String.Internal.contains`/`String.Pos.Raw.isValid`, backed by
 imported upstream IR, plus UTF-8 conversion through `String.toUTF8`, `String.fromUTF8?`,
 `String.ofByteArray`, and `ByteArray.validateUTF8`, case conversion and string
@@ -461,9 +582,9 @@ This keeps the Lean heap reference count explicit while avoiding any change to
 the upstream interpreter file.
 
 `Vir/GeneratePackage/NativeExterns.lean` is the source of truth for native extern
-registrations. Run `npm run check:native-externs` after changing its
-`nativeExterns` table; this verifies that the table's parameter, borrow, and
-result ABI matches Lean's imported IR declarations. Run
+policy. Run `npm run check:native-externs` after changing its
+`nativeExternSpecs` table; this verifies that every entry resolves through
+Lean's imported IR declarations and extern metadata. Run
 `node scripts/check-boundary-registry.mjs --write` after adding, removing, or
 renaming native extern entries; this regenerates
 `wasm/upstream_shim/runtime/native_symbols_registry.inc`. The regular

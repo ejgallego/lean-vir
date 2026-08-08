@@ -48,14 +48,15 @@ coupling. Line counts are approximate and are meant for sizing, not policy.
 - Keep the vanilla Lean interpreter source unmodified.
 - Put demo-only WASI stubs and fixture providers in this directory.
 - Keep static declaration lookup behind `package/decl_provider.h`.
-- Keep native lookup restricted to symbols declared by the native extern table
+- Keep native lookup restricted to symbols declared by the native extern policy
+  table
   and generated registries; do not expose general dynamic lookup without a
   concrete runtime case.
 - Prefer fail-fast stubs over fabricated kernel metadata when the package does
   not provide enough information.
 
-When editing native extern declarations or wrappers, first check that the
-Lean-side table matches Lean's imported IR signatures:
+When editing native extern policy or wrappers, first check that every entry
+resolves through Lean's imported IR and extern metadata:
 
 ```bash
 npm run check:native-externs
@@ -71,10 +72,18 @@ node scripts/check-boundary-registry.mjs
 npm run check:native-wrappers
 ```
 
-Set `generateBoxedWrapper := true` on a native extern when the normal Lean
-compiler-generated boxed adapter is sufficient. `npm run probe:upstream`
-generates the selected declaration bodies, boxed adapters, and registry fragment
-under `build/upstream-probe/`, then links the resulting object statically. This
+`NativeExternSpec` stores VIR policy only. Lean supplies each declaration's
+parameter/borrow/result ABI and, for 213 of the current 223 entries, its native
+symbol. Keep `symbolOverride?` for the ten intentional provider aliases; the
+metadata check rejects an override once it becomes redundant. The JavaScript
+registry and inventory checks consume `vir_native_wrappers --catalog`, not the
+Lean source text.
+
+Set `generateBoxedWrapper := true` on a native extern specification when the
+normal Lean compiler-generated boxed adapter is sufficient.
+`npm run probe:upstream` generates the selected declaration bodies, boxed
+adapters, and registry fragment under `build/upstream-probe/`, then links the
+resulting object statically. This
 includes compiler-generated raw bodies for selected Lean-defined support such as
 `ByteArray.extract`. When an imported implementation closure exists only in
 compiled upstream output, the probe cross-compiles the corresponding pinned

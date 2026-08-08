@@ -48,6 +48,8 @@ browser smoke tests.
 
 The Lean toolchain is pinned by `lean-toolchain`. The upstream source fetcher
 pins the matching Lean source checkout under `third_party/lean4-src/`.
+Generating the Wasm size site also uses GNU `objdump` and `c++filt` from
+binutils to enumerate sized functions in the installed Lean archives.
 
 ## Generated Artifacts
 
@@ -81,6 +83,8 @@ The most useful generated diagnostics are:
 - `build/generated/*.report.md`
 - `build/fixtures/summary.json`
 - `build/fixtures/*.report.md`
+- `build/vir-surface/*.json`
+- `build/vir-surface/*.md`
 
 Reference these reports in local notes or final summaries when they explain a
 failure, but keep them out of Git unless the maintainer asks for a tracked
@@ -107,11 +111,16 @@ npm run check:infoview-bundle
 npm run build:demo
 npm run build:demo:release
 npm run build:demo-package
+npm run build:size-site
+npm run build:surface-site
 npm run build:site
 npm run check:api-coverage
 npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:native-wrappers
+npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
+npm run render:surface -- build/vir-surface/lean-libraries.json build/vir-surface/html
+npm run compare:surface -- control.json candidate.json delta.json delta.md
 ```
 
 Package generation and inspection:
@@ -131,6 +140,7 @@ Tests:
 
 ```bash
 npm run test:bench
+npm run test:surface
 npm run test:upstream
 npm run test:upstream:no-build
 npm run test:infoview
@@ -148,7 +158,7 @@ npm test
 
 `npm test` runs the artifact-cache, benchmark sampler, focused-identity, and
 paired-runner contract tests, package ABI check, IR codec tag freshness check,
-native extern ABI check, boundary registry check, native wrapper check, API
+native extern metadata check, boundary registry check, native wrapper check, API
 coverage docs check, and Wasm extension probes, builds the demo artifacts once,
 then reuses those artifacts for upstream smoke, infoview widget smoke,
 JavaScript runtime tests, and the fixture suite. It is the default pre-merge
@@ -161,6 +171,11 @@ signal for code changes.
 - Package declaration lookup or interpreter/provider performance changes:
   `npm run bench:env-lookup -- --json <new-output-path>`; use a separate
   `--cpu-profile` run for attribution
+- Native runtime coverage or library-surface analyzer changes:
+  `npm run test:surface`; use `npm run analyze:surface -- <report.json>
+  <report.md>` for a complete installed-library report, then
+  `npm run render:surface -- <report.json> <html-directory>` for the interactive
+  folder/module/function browser
 - Native extern declaration changes:
   `npm run check:native-externs`
 - Shim/native extern registry changes:
@@ -304,6 +319,32 @@ Lean-dependent runtime job installs Lean for the Lake facet, package-generation,
 and SDK metadata smoke tests. The fixture job also downloads the demo artifacts
 and runs in parallel without re-fetching Lean source or reinstalling the WASI
 SDK.
+
+The Pages workflow runs the same `npm run build:site` entry point. Its static
+artifact includes a fresh complete Lean-library surface scan under
+`web/dist/surface/` and a linker-map-derived release/debug Wasm size explorer under
+`web/dist/size/`. The reports cross-link exact extern backend symbols. The size
+explorer separates the retained-Wasm map from a wider installed-Lean runtime
+context: the former measures linked Wasm bytes, while the latter measures native
+archive-member bytes from `libleanrt.a` and `libleancpp.a`, organized by archive
+and exact Lean source path. A generally available, per-view depth slider shows
+the requested number of local levels below the current breadcrumb and stays at
+that setting while zooming. The runtime context has up to seven levels—execution
+layer, archive, source-root directory, nested source directories, member, and
+sized native function. Archive-member bytes not assigned to a sized function
+remain explicit as non-function data and object overhead, so child areas add up
+exactly. The generated `libLeanIR.a` member is shown separately as compiled
+`LeanIR.lean` program code and is excluded from the native-support denominator.
+Boundary coloring matches native function aliases to exact retained Wasm linker
+symbols, then shows matched native-function bytes per archive byte; parent
+colors are byte-weighted averages of their children. Frontier-pressure coloring
+shows deterministic primary blocked-root density per MiB for missing extern
+backend symbols that are already retained. Parent colors are byte-weighted
+averages of their children. This is not a predicted unlock count because
+satisfying one boundary may reveal another.
+They are deployed at
+`https://ejgallego.github.io/lean-vir/surface/` and
+`https://ejgallego.github.io/lean-vir/size/` alongside the demo.
 
 For pull requests, every job explicitly checks out the pull request's head SHA
 instead of GitHub's synthetic merge ref. GitHub indexes commit artifacts by

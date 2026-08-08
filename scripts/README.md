@@ -26,6 +26,14 @@ map lives in `docs/HARNESS.md`.
 - `npm run size:wasm`
   Print Markdown section-size tables for the generated WASM artifacts, including
   compressed sizes and link-map code-area attribution when available.
+- `npm run build:size-site`
+  Render the release/debug Wasm artifacts and strict linker map as the static
+  interactive section/subsystem/object/symbol treemap deployed under `/size/`.
+  It also maps the current boundary into the installed Lean native runtime
+  archives using exact source provenance, separates compiled Lean program code,
+  and exposes a primary-blocker-pressure color overlay. `npm run build:site`
+  supplies the surface-report symbol bridge; the standalone command remains
+  usable without that optional cross-link data.
 - `npm run generate:irpkg`
   Build the local Lean library and `vir_irpkg` generator executable, then
   generate one manifest-bearing `.irpkg`.
@@ -70,16 +78,17 @@ map lives in `docs/HARNESS.md`.
   Missing `externref` support fails because the experimental React resource
   prototype requires it; unsupported JSPI is reported as skipped.
 - `npm run check:native-externs`
-  Verify that `Vir/GeneratePackage/NativeExterns.lean` matches Lean's imported
-  IR parameter, borrow, and result ABI for every registered native extern.
+  Resolve every native extern specification from Lean's imported IR and extern
+  metadata, reject duplicates and stale symbol overrides, and report the split
+  between Lean-derived symbols and VIR provider overrides.
 - `npm run test:fixtures`
   Run the fixture host-oracle suite. Use `VIR_FIXTURE_FILTER=<substring>` to
   narrow it.
 - `npm run test:fixtures:no-build`
   Reuse an existing `web/public/vir-upstream.wasm` for faster fixture iteration.
 - `npm run test:site`
-  Build the Vite site, local archive, SDK archive, and check the generated
-  `web/dist` artifact shape.
+  Build the Vite site, runnable-surface and Wasm-size reports, local archive,
+  SDK archive, and check the generated `web/dist` artifact shape.
 - `npm run test:pages:browser`
   Run the generated site in headless Chromium. Set `CHROMIUM=/path/to/chromium`
   if the browser is outside the usual discovery paths.

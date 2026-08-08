@@ -30,6 +30,10 @@ lean_exe vir_native_wrappers where
   root := `tools.GenerateNativeWrappers
   supportInterpreter := true
 
+lean_exe vir_surface where
+  root := `tools.AnalyzeSurface
+  supportInterpreter := true
+
 private def virModuleOutput (mod : Module) (kind ext : String) : System.FilePath :=
   mod.filePath (mod.pkg.buildDir / "vir" / kind) ext
 

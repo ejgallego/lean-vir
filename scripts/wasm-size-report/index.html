@@ -1,0 +1,119 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="color-scheme" content="light dark">
+    <title>VIR Wasm Size Explorer</title>
+    <link rel="stylesheet" href="assets/style.css">
+  </head>
+  <body>
+    <header class="page-header">
+      <div>
+        <p class="eyebrow">Retained binary composition</p>
+        <h1>VIR Wasm Size Explorer</h1>
+        <p id="report-identity" class="report-identity"></p>
+        <nav class="report-links" aria-label="Related VIR reports">
+          <a href="../surface/">Runnable surface</a>
+          <a href="../">Hosted demo</a>
+        </nav>
+      </div>
+      <div id="global-summary" class="global-summary" aria-label="Binary summary"></div>
+    </header>
+
+    <main class="page-main">
+      <section class="explorer-panel" aria-labelledby="view-title">
+        <div class="toolbar">
+          <div>
+            <span class="control-label">Map scope</span>
+            <div id="scope-switch" class="segmented" role="group" aria-label="Treemap scope">
+              <button type="button" data-scope="boundary" class="selected">VIR Wasm boundary</button>
+              <button type="button" data-scope="context">Lean runtime context</button>
+            </div>
+          </div>
+          <div id="boundary-view-control">
+            <span class="control-label">Boundary detail</span>
+            <div id="view-switch" class="segmented" role="group" aria-label="Boundary treemap view">
+              <button type="button" data-view="ownership" class="selected">Code + Data ownership</button>
+              <button type="button" data-view="releaseSections">Release sections</button>
+              <button type="button" data-view="debugSections">Debug sections</button>
+            </div>
+          </div>
+          <div id="context-color-control" hidden>
+            <span class="control-label">Context color</span>
+            <div id="context-color-switch" class="segmented" role="group" aria-label="Runtime-context color metric">
+              <button type="button" data-context-color="boundary" class="selected">Boundary</button>
+              <button type="button" data-context-color="frontier">Frontier pressure</button>
+            </div>
+          </div>
+          <label id="map-depth-control" class="depth-control">
+            <span class="control-label">
+              Local zoom levels
+              <output id="map-depth-value" for="map-depth">2 / 3</output>
+            </span>
+            <input id="map-depth" type="range" min="1" max="3" step="1" value="2">
+            <span class="depth-scale" aria-hidden="true">
+              <span>less</span><span>more</span>
+            </span>
+          </label>
+          <label class="search-control">
+            <span>Find object or symbol</span>
+            <input id="node-search" type="search" placeholder="package_decl_provider…" autocomplete="off">
+          </label>
+        </div>
+
+        <div class="context-bar">
+          <nav id="breadcrumbs" class="breadcrumbs" aria-label="Treemap breadcrumbs"></nav>
+          <p id="view-note" class="view-note"></p>
+        </div>
+        <div id="color-legend" class="color-legend" hidden>
+          <strong id="color-legend-title"></strong>
+          <span id="color-legend-min" class="color-legend-value"></span>
+          <span id="color-legend-gradient" class="color-legend-gradient"></span>
+          <span id="color-legend-max" class="color-legend-value"></span>
+        </div>
+
+        <div class="explorer-layout">
+          <div>
+            <h2 id="view-title" class="sr-only">Interactive size treemap</h2>
+            <div id="treemap" class="treemap" aria-label="Interactive size treemap"></div>
+          </div>
+          <aside class="details-panel" aria-label="Selected block details">
+            <section id="selection-details" class="selection-details"></section>
+            <section>
+              <div class="section-heading">
+                <h2 id="child-list-title">Largest children</h2>
+                <span id="child-count"></span>
+              </div>
+              <ol id="top-children" class="top-children"></ol>
+            </section>
+            <section id="search-results-section" hidden>
+              <div class="section-heading">
+                <h2>Search results</h2>
+                <span id="search-count"></span>
+              </div>
+              <ol id="search-results" class="search-results"></ol>
+            </section>
+          </aside>
+        </div>
+      </section>
+
+      <section class="method-panel">
+        <h2>How to read this report</h2>
+        <div class="method-grid">
+          <p><strong>Area means raw retained bytes.</strong> A block twice as large owns twice as many bytes in the linked binary.</p>
+          <p><strong>Ownership comes from <code>wasm-ld --Map</code>.</strong> Drill from a subsystem into an object/module and then a retained symbol.</p>
+          <p><strong>Gzip is intentionally not apportioned.</strong> Compression depends on neighboring bytes, so per-symbol gzip estimates are not additive.</p>
+          <p><strong>Runtime context uses a different unit.</strong> It measures installed native archive-member bytes and follows Lean's source hierarchy; archive provenance remains on every leaf.</p>
+          <p><strong>Files expand into native functions.</strong> Sized function symbols come from the installed archive objects; data, relocations, debug sections, framing, and unsized bytes remain explicit as object overhead.</p>
+          <p><strong>Boundary color is computed.</strong> Green intensity is the share of archive bytes belonging to exact native-function matches retained in VIR; directory, archive, and layer colors are byte-weighted child averages.</p>
+          <p><strong>Zoom depth is local and sticky.</strong> The slider controls how many descendant levels are drawn below the current breadcrumb and keeps its setting while you drill in.</p>
+          <p><strong>Frontier pressure is measured, not predicted.</strong> Color is blocker-root density per MiB; parent density is the byte-weighted average of its children. A repaired boundary may reveal another blocker.</p>
+        </div>
+      </section>
+    </main>
+
+    <script src="data/index.js"></script>
+    <script src="assets/app.js"></script>
+  </body>
+</html>

@@ -104,6 +104,95 @@ async function assertSdkBundle(path) {
   assert.ok(Array.isArray(manifest.files));
 }
 
+async function assertSurfaceReport() {
+  const html = (await assertFile("surface/index.html", 100)).toString("utf8");
+  assert.ok(html.includes("assets/app.js"), "surface report should load its application asset");
+  assert.ok(html.includes("data/index.js"), "surface report should load its navigation index");
+  await assertFile("surface/assets/app.js", 1024);
+  await assertFile("surface/assets/style.css", 1024);
+  await assertFile("surface/data/index.js", 1024);
+  const sizeLinks = JSON.parse(await assertFile("surface/data/size-links.json", 100));
+  assert.equal(sizeLinks.format, "lean-vir-surface-size-links");
+  assert.equal(sizeLinks.version, 2);
+  assert.ok(sizeLinks.externs.some((declaration) => declaration.targets.length > 0),
+    "surface report should export backend targets for the size-report bridge");
+  assert.ok(sizeLinks.externs.some((declaration) => declaration.primaryRoots > 0),
+    "surface report should export measured primary-blocker pressure");
+
+  const manifest = JSON.parse(await assertFile("surface/vir-surface-html.json", 100));
+  assert.equal(manifest.format, "lean-vir-surface-html");
+  assert.ok(manifest.selectedModules > 0, "surface report should select Lean library modules");
+  assert.ok(manifest.declarations > 0, "surface report should contain Lean IR declarations");
+  assert.ok(manifest.moduleDataFiles > 0, "surface report should contain per-module data files");
+}
+
+async function assertWasmSizeReport() {
+  const html = (await assertFile("size/index.html", 100)).toString("utf8");
+  assert.ok(html.includes("assets/app.js"), "Wasm size report should load its application asset");
+  assert.ok(html.includes("data/index.js"), "Wasm size report should load its size index");
+  await assertFile("size/assets/app.js", 1024);
+  await assertFile("size/assets/style.css", 1024);
+  await assertFile("size/data/index.js", 1024);
+
+  const manifest = JSON.parse(await assertFile("size/vir-wasm-size-html.json", 100));
+  assert.equal(manifest.format, "lean-vir-wasm-size-html");
+  assert.ok(manifest.binaries.release.rawBytes > 0, "Wasm size report should describe a non-empty release binary");
+  assert.ok(manifest.binaries.debug.rawBytes >= manifest.binaries.release.rawBytes,
+    "Wasm size report debug companion should be at least as large as the stripped release binary");
+  if (manifest.build?.profile === "release") {
+    assert.ok(manifest.binaries.debug.rawBytes > manifest.binaries.release.rawBytes,
+      "release Pages builds should strip the public Wasm while retaining a larger debug companion");
+  }
+  assert.ok(manifest.attribution.coverage > 0.99, "Wasm size report should attribute nearly all Code+Data bytes");
+  assert.ok(manifest.attribution.objects > 0, "Wasm size report should contain retained objects");
+  assert.ok(manifest.attribution.symbols > 0, "Wasm size report should contain retained symbols");
+  assert.ok(manifest.attribution.connectedSymbols > 0,
+    "Wasm size report should connect retained symbols to runnable-surface declarations");
+  assert.equal(manifest.runtimeContext.archives, 3);
+  assert.equal(manifest.runtimeContext.sourceMembers, manifest.runtimeContext.members,
+    "every runtime-context member should have exact Lean source provenance");
+  assert.equal(
+    manifest.runtimeContext.nativeMembers + manifest.runtimeContext.programMembers,
+    manifest.runtimeContext.members,
+    "runtime context should separate native support from compiled Lean program members",
+  );
+  assert.ok(manifest.runtimeContext.members > manifest.runtimeContext.boundaryMembers,
+    "runtime context should contain both inside- and outside-boundary archive members");
+  assert.ok(manifest.runtimeContext.boundaryMembers > 0,
+    "runtime context should identify current VIR boundary members");
+  assert.ok(
+    manifest.runtimeContext.boundaryDensity > 0
+      && manifest.runtimeContext.boundaryDensity < 1,
+    "runtime context should compute partial inside-boundary byte density",
+  );
+  assert.ok(manifest.runtimeContext.missingSurfaceEntries > 0,
+    "runtime context should identify already-retained missing extern entries");
+  assert.ok(manifest.runtimeContext.primaryRoots > 0,
+    "runtime context should quantify measured primary-blocker pressure");
+  assert.ok(manifest.runtimeContext.maxFrontierDensity > 0,
+    "runtime context should normalize measured primary-blocker density");
+  assert.ok(manifest.runtimeContext.sizedFunctions > 0,
+    "runtime context should expose native functions below archive members");
+  assert.ok(manifest.runtimeContext.sizedFunctionBytes > 0,
+    "runtime context should measure native function bytes");
+  assert.equal(
+    manifest.runtimeContext.sizedFunctionBytes + manifest.runtimeContext.nonFunctionBytes,
+    manifest.runtimeContext.memberBytes,
+    "native function and explicit overhead bytes should cover every archive member byte",
+  );
+  assert.ok(manifest.runtimeContext.retainedFunctions > 0,
+    "runtime context should match native functions to retained Wasm symbols");
+  assert.ok(manifest.runtimeContext.retainedFunctions < manifest.runtimeContext.boundarySizedFunctions,
+    "exact retained-function matching should refine whole-object boundary membership");
+  assert.ok(
+    manifest.runtimeContext.retainedNativeFunctionBytes
+      <= manifest.runtimeContext.boundarySizedFunctionBytes,
+    "matched native function bytes should fit within boundary-object function bytes",
+  );
+  assert.ok(manifest.runtimeContext.retainedWasmFunctionBytes > 0,
+    "matched native functions should expose retained Wasm bytes");
+}
+
 const indexHtml = await assertHtmlAssetLinks("index.html");
 const devHtml = await assertHtmlAssetLinks("dev.html");
 const formatHtml = await assertHtmlAssetLinks("format.html");
@@ -113,6 +202,8 @@ assertLink(indexHtml, "dev.html");
 assertLink(indexHtml, "react.html");
 assertLink(indexHtml, "downloads/lean-vir-local.tar.gz");
 assertLink(indexHtml, "downloads/lean-vir-sdk.tar.gz");
+assertLink(indexHtml, "https://ejgallego.github.io/lean-vir/surface/");
+assertLink(indexHtml, "https://ejgallego.github.io/lean-vir/size/");
 assertLink(indexHtml, "format.html?case=list&amp;width=12");
 assertLink(indexHtml, "dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total");
 assertLink(indexHtml, `dev.html?package=${defaultPackageFile}&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`);
@@ -135,8 +226,10 @@ await assertDistReady(fileURLToPath(distDir));
 await assertStalePackageRejectedBeforeBrowser();
 await assertLocalBundle("downloads/lean-vir-local.tar.gz");
 await assertSdkBundle("downloads/lean-vir-sdk.tar.gz");
+await assertSurfaceReport();
+await assertWasmSizeReport();
 
-console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, React review, format workbench, wasm, focused manifest packages, local bundle, and SDK bundle`);
+console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, React review, format workbench, runnable-surface and Wasm-size reports, wasm, focused manifest packages, local bundle, and SDK bundle`);
 
 function minGeneratedPublicFileSize(file) {
   return localPackageFileSet.has(file) ? 128 : 1024;

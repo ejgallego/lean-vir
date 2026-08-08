@@ -8,6 +8,10 @@ interface type details stay in `docs/INTERFACE_PIPELINE.md`.
 
 - `tools/GeneratePackage.lean` parses CLI target arguments and calls
   `Vir.GeneratePackage.run`.
+- `tools/AnalyzeSurface.lean` scans installed Lean library IR against VIR's
+  runtime capabilities; it does not generate a package.
+- `scripts/render-surface-report.mjs` turns a surface JSON report into a static,
+  lazily loaded HTML module browser.
 - `Vir/GeneratePackage.lean` is the public import shim for the split library.
 - `.lake/build/bin/vir_irpkg` is the Lake executable used by
   `scripts/lean-to-irpkg.sh`, `scripts/generate-browser-package.mjs`, and the
@@ -93,6 +97,11 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
 - `Vir.GeneratePackage.Manifest.Encode`: interface manifest JSON encoders.
 - `Vir.GeneratePackage.Emit`: binary `.irpkg` encoding.
 - `Vir.GeneratePackage.Report`: human-readable generation report.
+- `Vir.GeneratePackage.Surface`: installed-library discovery, declaration
+  cataloging, and static runtime-closure analysis independent of package
+  encoding.
+- `Vir.GeneratePackage.Surface.Report`: versioned JSON and Markdown runnable
+  surface reports.
 - `Vir.GeneratePackage.Run`: top-level orchestration, filesystem writes, and
   command-line diagnostics.
 

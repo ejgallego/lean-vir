@@ -239,6 +239,24 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-string-takedrop-frontier",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.stringTakeDropFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-foldl-frontier",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.stringFoldlFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-internal-isempty-frontier",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.stringInternalIsEmptyFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-bytearray-push-get",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayPushGetScore",
@@ -284,6 +302,25 @@
         "Vir.Fixtures.ExprPrinter.exprKindScore",
         "Vir.Fixtures.ExprPrinter.bumpBVar"
       ],
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-expr-eqv",
+      "source": "fixtures/ExprPrinter.lean",
+      "entry": "Vir.Fixtures.ExprPrinter.exprEqvScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-small-runtime-frontier",
+      "source": "fixtures/ExprPrinter.lean",
+      "entry": "Vir.Fixtures.ExprPrinter.smallRuntimeFrontierScore",
+      "result": { "type": "Nat" },
+      "unsafe": true
+    },
+    {
+      "id": "upstream-linked-primitives-frontier",
+      "source": "fixtures/ExprPrinter.lean",
+      "entry": "Vir.Fixtures.ExprPrinter.linkedPrimitiveFrontierScore",
       "result": { "type": "Nat" }
     },
     {
