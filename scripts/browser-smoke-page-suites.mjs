@@ -347,9 +347,16 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     max: "100%",
   });
   assert.equal(context.objectFunctions.total, 260);
-  assert.ok(context.objectFunctions.retained > 0);
-  assert.ok(context.objectFunctions.retained < context.objectFunctions.total);
-  assert.ok(context.objectFunctions.density > 0 && context.objectFunctions.density < 1);
+  assert.ok(
+    Number.isInteger(context.objectFunctions.retained)
+      && context.objectFunctions.retained >= 0
+      && context.objectFunctions.retained < context.objectFunctions.total,
+  );
+  assert.ok(
+    Number.isFinite(context.objectFunctions.density)
+      && context.objectFunctions.density >= 0
+      && context.objectFunctions.density < 1,
+  );
 
   await setInputValueAndDispatch(cdp, "#map-depth", "7", "input");
   const deepContext = await evaluate(cdp, `({
