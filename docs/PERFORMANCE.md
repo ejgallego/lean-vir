@@ -15,13 +15,21 @@ WASI SDK fallback. The cache stores generated inputs, not timing samples, so
 benchmark timings are still regenerated for each run. Use
 `--no-artifact-cache` to disable the cache,
 `--artifact-cache DIR` to put it elsewhere, and `--refresh-artifact-cache` to
-replace the current cache entry.
+replace the current cache entry. Use `--no-build` to require existing generated
+inputs without cache restore or build activity. Repeat `--filter TEXT` to run
+only benchmark names containing one of the supplied strings; an unfiltered run
+retains the complete default matrix.
 
 Pass `--json` to save a machine-readable report:
 
 ```bash
 npm run bench -- --json build/perf/current.json
 ```
+
+General reports include a comparison identity covering the selected row names
+and titles, Node/V8/platform details, and the SHA-256 of every loaded Wasm and
+package artifact. Saved and paired comparisons reject different identities
+before reporting timing deltas.
 
 ## Environment Lookup Workload
 
@@ -73,8 +81,8 @@ owns the environment/provider API decision;
 [ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
 owns the measurement-gated cross-entry resolution-cache experiment.
 
-The direct `Std.Format` conversion benchmark and accepted manifest-derived
-normalization-plan cache are documented in
+The repository-owned `Std.Format` conversion rows and accepted
+manifest-derived normalization-plan cache are documented in
 [Custom Inductive Object Conversion Performance](OBJECT_CONVERSION_PERFORMANCE.md).
 
 Compare two saved reports with:
@@ -117,6 +125,9 @@ conversion rows for WIT-like scalar records, nested records/lists/options, and
 recursive custom inductives. It also includes host/resource rows for scalar host
 imports, callback root round trips, DOM listener resource churn, React root
 lifecycle work, and focused React `Node` render conversion.
+The `format-tag-transitions` representative row and `format-empty-nodes`
+focused row use the generated `pretty-printer.irpkg` to exercise recursive
+`Std.Format` custom-inductive lowering through the same public runtime path.
 
 The `base-*` JSON rows are intended as the first regression surface for direct
 base-type conversion work. Each row has a `lower` sample for JavaScript object
@@ -217,6 +228,17 @@ Use repeatable `--bench-arg` options to strengthen a focused comparison without
 changing its defaults, for example
 `--bench-arg=--iterations=500 --bench-arg=--samples=9`. The selected benchmark
 still validates those arguments through its comparison identity.
+The general benchmark accepts the same forwarding mechanism for row selection
+and exact prebuilt inputs, for example:
+
+```bash
+npm run bench:paired -- --repeat 6 \
+  --bench-arg=--no-build --bench-arg=--filter=format- \
+  --out build/perf/format-abba ../vir-main ../vir-feature
+```
+
+Both checkouts must contain the same generated inputs for this `--no-build`
+form; their artifact hashes are part of the comparison identity.
 
 Use an even pass count for an order-balanced acceptance run. One pass remains
 available for quick screening and is reported as unbalanced. The compared
