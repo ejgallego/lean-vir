@@ -20,6 +20,7 @@ const tests = [
   { id: "startup-hooks", file: "scripts/runtime-tests/startup-runtime-smoke.mjs", group: "pure" },
   { id: "callback-lifecycle", file: "scripts/runtime-tests/callback-lifecycle-smoke.mjs", group: "pure" },
   { id: "react-host-bindings", file: "scripts/runtime-tests/react-host-bindings-smoke.mjs", group: "pure" },
+  { id: "custom-inductive-normalization", file: "scripts/runtime-tests/custom-inductive-normalization-smoke.mjs", group: "pure" },
   { id: "object-abi", file: "scripts/runtime-tests/object-abi-smoke.mjs", group: "pure" },
   { id: "package-decoder", file: "scripts/runtime-tests/package-decoder-smoke.mjs", group: "pure" },
   { id: "package-set-descriptor", file: "scripts/runtime-tests/package-set-descriptor-smoke.mjs", group: "pure" },

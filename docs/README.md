@@ -89,6 +89,9 @@ ownership diagrams.
 - [ENVIRONMENT_LOOKUP_PERFORMANCE.md](ENVIRONMENT_LOOKUP_PERFORMANCE.md):
   fresh-interpreter lookup evidence, measured alternatives, and accepted local
   provider-index design.
+- [OBJECT_CONVERSION_PERFORMANCE.md](OBJECT_CONVERSION_PERFORMANCE.md): cached
+  custom-inductive normalization plans and repository-owned `Std.Format`
+  measurements.
 - [OBJECT_ABI.md](OBJECT_ABI.md): Lean object ABI construction,
   inspection, ownership, and codec-retirement roadmap.
 

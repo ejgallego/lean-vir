@@ -257,7 +257,9 @@ their cleanup hook runs once when the final runtime using the map is disposed.
 
 ## Calls And Manifest
 
-- `vir.interfaceManifest` is the embedded package manifest.
+- `vir.interfaceManifest` is the embedded package manifest. Treat it and its
+  nested type descriptors as read-only after installation: the runtime caches
+  derived export, layout, and normalization plans for the loaded package.
 - `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
   package format version, Lean toolchain, generation time, source targets, and
   resolved roots.

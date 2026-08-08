@@ -17,6 +17,7 @@ import {
   createHostResourceState,
 } from "../../web/src/host/vir-host-resources.js";
 import { INTERFACE_TAG } from "../../web/src/runtime/interface-tags.js";
+import { stdFormat as fmt } from "../std-format-values.mjs";
 import { assert, manifestEntry, readRuntimeArtifacts, spawnSync } from "./shared.mjs";
 
 const { wasmBytes, defaultPackageBytes, prettyPackageBytes, leanPackageBytes } = await readRuntimeArtifacts();
@@ -713,16 +714,6 @@ assert.equal(objectCounters.objectCalls, 36);
 assert.equal(objectCounters.bytePayloadCalls, 0);
 
 const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
-  const fmt = {
-    nil: () => ({ kind: "nil" }),
-    line: () => ({ kind: "line" }),
-    align: (force) => ({ kind: "align", value: force }),
-    text: (value) => ({ kind: "text", value }),
-    nest: (indent, f) => ({ kind: "nest", fields: { indent, f } }),
-    append: (arg1, arg2) => ({ kind: "append", fields: { arg1, arg2 } }),
-    group: (arg1, behavior = "fill") => ({ kind: "group", fields: { arg1, behavior } }),
-    tag: (arg1, arg2) => ({ kind: "tag", fields: { arg1, arg2 } }),
-  };
   const formatGroupDoc = fmt.group(
     fmt.append(fmt.text("hello"), fmt.append(fmt.line(), fmt.text("world"))),
   );

@@ -505,10 +505,6 @@ export function findTaggedUnionConstructor(type, text) {
   return findConstructor(type, text, requireTaggedUnionConstructors, "tagged union");
 }
 
-export function findCustomInductiveConstructor(type, text) {
-  return findConstructor(type, text, requireCustomInductiveConstructors, "custom inductive");
-}
-
 function constructorAt(type, index, label, requireConstructors, kindLabel) {
   const constructors = requireConstructors(type, label);
   if (!Number.isInteger(index) || index < 0 || index >= constructors.length) {
@@ -533,12 +529,6 @@ export function customInductiveShape(ctor) {
     return `{ kind: ${kind}, value }`;
   }
   return `{ kind: ${kind}, fields: { ${fields.map((field) => field.name).join(", ")} } }`;
-}
-
-export function customInductiveShapes(type) {
-  return requireCustomInductiveConstructors(type, "custom inductive")
-    .map((ctor) => customInductiveShape(ctor))
-    .join(" | ");
 }
 
 export function normalizeUint32(value, label) {

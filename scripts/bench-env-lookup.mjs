@@ -9,7 +9,7 @@ import inspector from "node:inspector";
 import { cpus } from "node:os";
 import { dirname } from "node:path";
 
-import { ensureCachedBenchArtifacts } from "./bench-artifact-cache.mjs";
+import { prepareBenchArtifacts } from "./bench-artifact-cache.mjs";
 import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
 import {
   environmentLookupHarnessPaths,
@@ -30,7 +30,7 @@ import {
   parseBenchmarkCacheOption,
   parsePositiveInt,
   requireOptionValue,
-  validateBenchmarkCacheOptions,
+  validateBenchmarkBuildOptions,
 } from "./bench-utils.mjs";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 import { runSync } from "./process-utils.mjs";
@@ -154,12 +154,7 @@ function parseArgs(argv) {
   }
   if (parsed.jsonPath === "") throw new Error("--json requires a path");
   if (parsed.cpuProfilePath === "") throw new Error("--cpu-profile requires a path");
-  if (!parsed.buildArtifacts && (
-    !parsed.artifactCacheEnabled || parsed.artifactCachePath !== null || parsed.refreshArtifactCache
-  )) {
-    throw new Error("--no-build cannot be combined with artifact-cache options");
-  }
-  validateBenchmarkCacheOptions(parsed);
+  validateBenchmarkBuildOptions(parsed);
   return parsed;
 }
 
@@ -415,18 +410,12 @@ validateEnvironmentLookupOutputPaths(args);
 await requireAbsent(args.jsonPath, "--json");
 await requireAbsent(args.cpuProfilePath, "--cpu-profile");
 
-const artifactCache = args.buildArtifacts
-  ? await ensureCachedBenchArtifacts({
-      root,
-      artifactPaths: environmentLookupArtifactPaths,
-      options: args,
-      build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
-    })
-  : {
-      enabled: false,
-      restore: { status: "not-requested" },
-      store: { status: "not-requested" },
-    };
+const artifactCache = await prepareBenchArtifacts({
+  root,
+  artifactPaths: environmentLookupArtifactPaths,
+  options: args,
+  build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
+});
 
 const wasmPath = new URL(`../${publicArtifactPath(benchmarkWasmFile)}`, import.meta.url);
 const packagePath = new URL(`../${publicArtifactPath(leanPackageFile)}`, import.meta.url);

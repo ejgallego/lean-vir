@@ -6,6 +6,12 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+import { createHash } from "node:crypto";
+
+export function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
 function envOrDefault(env, name, fallback) {
   return typeof env[name] === "string" && env[name].length !== 0 ? env[name] : fallback;
 }
@@ -59,6 +65,15 @@ export function validateBenchmarkCacheOptions(options) {
   if (!options.artifactCacheEnabled && options.refreshArtifactCache) {
     throw new Error("--refresh-artifact-cache cannot be combined with --no-artifact-cache");
   }
+}
+
+export function validateBenchmarkBuildOptions(options) {
+  if (!options.buildArtifacts && (
+    !options.artifactCacheEnabled || options.artifactCachePath !== null || options.refreshArtifactCache
+  )) {
+    throw new Error("--no-build cannot be combined with artifact-cache options");
+  }
+  validateBenchmarkCacheOptions(options);
 }
 
 export function benchmarkCacheArgs(options) {
