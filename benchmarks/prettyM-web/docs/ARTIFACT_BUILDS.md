@@ -33,6 +33,10 @@ parent repository's `.worktrees/` directory. These locations hold source
 checkouts and producer caches only; `_artifacts/` remains the builder-owned
 output area.
 
+The driver defaults npm's cache to `_artifacts/npm-cache`, keeping setup writes
+inside the application checkout. Set `NPM_CONFIG_CACHE` explicitly only when a
+different controlled cache is desired.
+
 The driver never fetches, switches, or edits source revisions. Each path must
 be the root of a clean Git checkout whose `HEAD` is the database's full commit.
 This keeps local worktree policy outside the portable build description.

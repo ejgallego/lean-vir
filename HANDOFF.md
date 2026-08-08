@@ -95,11 +95,22 @@ for an accepted or rejected optimization conclusion. Treat them as
 inconclusive, leave bounded set 0001 unchanged, and require measurements from a
 controlled host before importing a decision.
 
-The next artifact-management step is to exercise the full `prettyM` source
-build on prepared exact checkouts, inspect its local build receipt, and then
-move the same command into CI. The plan-only checkout gate and deterministic
-repacking of the preserved seed have passed. A fresh producer build was not run
-during harness preparation, and no performance measurement was collected.
+The full `prettyM` source build has now passed on the prepared exact checkouts.
+VIR, FIR native, and FIR LLVM produced complete packages; the producer-local
+checks passed, native and LLVM agreed on exact traces, all source checkouts
+remained clean, and the assembled candidate passed the application's tool,
+artifact-set, and five-backend browser smoke tests. The local receipt is
+`benchmarks/prettyM-web/_artifacts/builds/prettyM/BUILD.json`. The separately
+packed candidate archive has SHA-256
+`61dd988efd7df5f7291c4d53ca58a331a425e242111296395578f30ea67c4c15`.
+No performance measurement was collected.
+
+The committed lock and its `26f54081e15145b6...` archive were deliberately
+left unchanged and restored as the staged application set after validation.
+The FIR-native package reproduced byte-for-byte. Fresh VIR Wasm and `.irpkg`
+bytes and fresh LLVM Wasm bytes differed from set 0001 despite matching source
+and toolchain identities; semantic validation passed. Treat the source-built
+archive as a candidate, not a silent lock refresh.
 
 Keep producer worktrees in controlled, ignored locations rather than `/tmp`.
 The current FIR and workload checkouts live under
@@ -108,8 +119,12 @@ sibling repository worktree `.worktrees/pr104-conversion-control`.
 
 The current VIR `.irpkg` generator embeds generation time and source-path
 spelling. Source identity is exact, but fresh VIR packages are not yet expected
-to reproduce an old archive digest byte-for-byte. Add deterministic package
-metadata before making CI compare a freshly built set with the current lock.
+to reproduce an old archive digest byte-for-byte. The next artifact-management
+step is a CI candidate-build job that runs this source build, packs the result,
+tests the assembled archive, and uploads the archive plus build receipt. It
+should not compare fresh bytes with the current lock or publish/promote them.
+Deterministic VIR package metadata and the remaining Wasm byte differences are
+separate consolidation work before lock replacement becomes automatic.
 
 The report UI consolidation was completed after the original handoff. Its
 browser regression narrows the dashboard to one backend, checks that chart
