@@ -252,9 +252,52 @@ The resulting frontier also strengthens the next string experiments:
 `String.Internal.trim` is the primary blocker for 6,928 functions (947
 public), `String.Internal.foldl` for 6,008 (662 public), and
 `String.Internal.isPrefixOf` for 1,374 (181 public). `trim` and `isPrefixOf`
-share the generated `Init/Data/String/TakeDrop.c` provider, while `foldl` uses
-`Init/Data/String/Iterate.c`; each support-module addition should be measured
-as a separate stage.
+share the generated `Init/Data/String/TakeDrop.c` export provider, while
+`foldl` uses `Init/Data/String/Iterate.c`; each support-module addition should
+be measured as a separate stage.
+
+### String Frontier Chain
+
+The next experiment followed those string boundaries in three measured stages.
+The first stage registered `String.Internal.trim` and
+`String.Internal.isPrefixOf`; strict linking showed that the complete upstream
+implementation closure is `TakeDrop.c`, `Slice.c`, `FindPos.c`, and `Decode.c`.
+The second stage registered `String.Internal.foldl` and added `Iterate.c`.
+The scan then exposed `String.Internal.isEmpty` as the shared next boundary for
+11,756 roots, so a third registry-only stage retained its implementation from
+the already linked `Defs.c`.
+
+| Measurement | Linked-primitives control | `trim` + prefix | + `foldl` | + `isEmpty` |
+| --- | ---: | ---: | ---: | ---: |
+| Stripped release Wasm | 650,910 B | 655,810 B | 656,951 B | 657,138 B |
+| Incremental raw cost | - | +4,900 B | +1,141 B | +187 B |
+| Gzip-compressed Wasm | 148,103 B | 149,621 B | 150,104 B | 150,091 B |
+| Incremental gzip cost | - | +1,518 B | +483 B | -13 B |
+| Runnable public constants | 27,329 | 27,333 | 27,333 | 27,636 |
+| Incremental public gain | - | +4 | 0 | +303 |
+| Runnable all-IR functions | 312,344 | 312,365 | 312,366 | 314,956 |
+| Incremental all-IR gain | - | +21 | +1 | +2,590 |
+| Regressions | - | 0 | 0 | 0 |
+
+The small negative gzip delta in the final stage is a deterministic compression
+interaction; the raw module grows by 187 bytes. Combined, the string frontier
+costs 6,228 raw bytes (6.08 KiB) and 1,988 gzip bytes for 2,612 newly runnable
+IR functions and 307 public constants: about 429 all-IR functions and 50 public
+constants per raw KiB.
+
+The combined exact gain is 1,949 Lean, 345 Std, 241 Lake, and 77 Init
+functions. Its public gain is 156 Lean, 95 Std, 35 Lake, and 21 Init constants.
+Grouped by each root's original primary blocker, `trim` accounts for 1,413
+all-IR functions, `foldl` for 1,127, `isEmpty` for 69, and `isPrefixOf` for 3.
+The incremental scans explain the apparent difference: `trim` and `foldl`
+mostly advance roots through a chain, and the cheap `isEmpty` boundary closes
+enough of that chain to realize the combined payoff.
+
+The next string-shaped frontier is `String.Internal.getUTF8Byte`, now the
+primary blocker for 1,885 functions and 293 public constants. Its raw symbol is
+already used by the registered public `String.getUTF8Byte` boundary, so it is a
+good registry-only follow-up experiment rather than a reason to add another
+generated support module.
 
 ## Interactive HTML Report
 

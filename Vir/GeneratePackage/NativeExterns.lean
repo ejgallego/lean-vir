@@ -750,6 +750,13 @@ def nativeExterns : Array NativeExtern := #[
     generateBoxedWrapper := true
   },
   {
+    name := `String.Internal.isEmpty,
+    params := #[param 1 false .object],
+    resultType := .uint8,
+    symbol := "lean_string_isempty",
+    generateBoxedWrapper := true
+  },
+  {
     name := `String.getUTF8Byte,
     params := #[param 1 true .object, param 2 false .tobject, param 3 false .erased],
     resultType := .uint8,
@@ -894,6 +901,27 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint32,
     symbol := "lean_string_utf8_get",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `String.Internal.trim,
+    params := #[param 1 false .object],
+    resultType := .object,
+    symbol := "lean_string_trim",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `String.Internal.foldl,
+    params := #[param 1 false .object, param 2 false .object, param 3 false .object],
+    resultType := .object,
+    symbol := "lean_string_foldl",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `String.Internal.isPrefixOf,
+    params := #[param 1 false .object, param 2 false .object],
+    resultType := .uint8,
+    symbol := "lean_string_isprefixof",
     generateBoxedWrapper := true
   },
   {

@@ -81,6 +81,16 @@ the local expression constructors and returning `.default` for non-binders.
 This keeps the boundary faithful without pulling the complete generated
 `Lean/Expr.c` module into the runtime.
 
+The string frontier registers `String.Internal.trim`,
+`String.Internal.isPrefixOf`, `String.Internal.foldl`, and
+`String.Internal.isEmpty`. The first two exports live in generated
+`Init/Data/String/TakeDrop.c`; retaining `trim` also reaches `Slice.c`,
+`FindPos.c`, and `Decode.c`. `foldl` is supplied by `Iterate.c`, while
+`isEmpty` resolves to `lean_string_isempty` in the already linked `Defs.c`.
+All five generated providers are listed explicitly in
+`native-support-sources.txt`, and section-level dead-code elimination keeps
+only the implementation closure reached by the registered symbols.
+
 For Lean-defined native exports whose implementation closure is available in
 the pinned compiler output rather than the imported kernel environment, the
 probe also cross-compiles the stage0 sources listed in
@@ -405,7 +415,8 @@ String raw-position iteration and slicing through `String.push`/
 `String.Pos.Raw.prev`/`String.Internal.atEnd` plus string ordering, public
 `String.contains`/`startsWith`/`drop`/`dropEnd`/`trimAscii`/`splitOn`/
 `intercalate`/`any`/`front`/`pushn`/`isEmpty`/`String.Pos.Raw.nextWhile`/
-`String.find`/`String.Pos.Raw.offsetOfPos`, plus parser-data primitives
+`String.find`/`String.Pos.Raw.offsetOfPos`, direct internal
+`trim`/`isPrefixOf`/`foldl`/`isEmpty`, plus parser-data primitives
 `String.hash`/`String.Internal.contains`/`String.Pos.Raw.isValid`, backed by
 imported upstream IR, plus UTF-8 conversion through `String.toUTF8`, `String.fromUTF8?`,
 `String.ofByteArray`, and `ByteArray.validateUTF8`, case conversion and string

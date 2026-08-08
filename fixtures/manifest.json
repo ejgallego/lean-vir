@@ -239,6 +239,24 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "upstream-string-takedrop-frontier",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.stringTakeDropFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-foldl-frontier",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.stringFoldlFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "upstream-string-internal-isempty-frontier",
+      "source": "fixtures/Basic.lean",
+      "entry": "Vir.Fixtures.Basic.stringInternalIsEmptyFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "upstream-bytearray-push-get",
       "source": "fixtures/Basic.lean",
       "entry": "Vir.Fixtures.Basic.upstreamByteArrayPushGetScore",

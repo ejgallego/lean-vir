@@ -326,4 +326,21 @@ def upstreamByteArrayInputScore : Nat :=
   let bs := bs.push 67
   byteArrayInputScore bs
 
+def stringTakeDropFrontierScore : Nat :=
+  let trimmed := String.Internal.trim " \tλean\n "
+  let exactOk := trimmed == "λean"
+  let prefixOk := String.Internal.isPrefixOf "λe" trimmed
+  let negativeOk := !String.Internal.isPrefixOf "lean" trimmed
+  (if exactOk then 1 else 0) +
+    (if prefixOk then 2 else 0) +
+    (if negativeOk then 4 else 0)
+
+def stringFoldlFrontierScore : Nat :=
+  let folded := String.Internal.foldl (fun acc c => acc.push c) "" "Aé∀"
+  if folded == "Aé∀" then folded.utf8ByteSize else 0
+
+def stringInternalIsEmptyFrontierScore : Nat :=
+  (if String.Internal.isEmpty "" then 1 else 0) +
+    (if !String.Internal.isEmpty "λ" then 2 else 0)
+
 end Vir.Fixtures.Basic
