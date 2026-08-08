@@ -48,13 +48,15 @@ Use `@[vir_export]` for declarations that JavaScript calls explicitly. A
 For either marker, Lean reports private or non-executable declarations and
 unavailable dependencies in the visible compiled closure, including a path to
 the blocker. `@[vir_export]` also rejects erased, implicit, and instance
-binders; `@[vir_startup]` checks its complete zero-argument, `Unit`-result
-contract and names unexpected parameters, the actual non-`Unit` result, or an
-unsupported effect constructor.
+binders and classifies every argument and result against the supported
+JavaScript interface, including its compiled runtime layout. `@[vir_startup]`
+checks its complete zero-argument, `Unit`-result contract and names unexpected
+parameters, the actual non-`Unit` result, or an unsupported effect constructor.
 If imported IR is opaque, Lean identifies the compiled IR that package
 generation still requires. If IR compilation is postponed, it tells the user
-how to make that IR available. The `:vir` build checks all remaining interface
-types and layouts and reports any unresolved package boundary.
+how to make that IR available. The `:vir` build repeats marker checks for raw
+metadata and reports generated boxed-boundary, package-wide, or unresolved
+dependency problems.
 
 ```bash
 lake build +MySlides.Runtime:vir

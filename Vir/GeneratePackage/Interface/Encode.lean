@@ -12,35 +12,9 @@ public section
 
 open Lean
 
-namespace Vir.GeneratePackage
+namespace Vir.Interface
 
-def InterfaceType.label : InterfaceType → String
-  | .unit => "Unit"
-  | .nat => "Nat"
-  | .int => "Int"
-  | .bool => "Bool"
-  | .string => "String"
-  | .float => "Float"
-  | .float32 => "Float32"
-  | .uint8 => "UInt8"
-  | .uint16 => "UInt16"
-  | .uint32 => "UInt32"
-  | .uint64 => "UInt64"
-  | .usize => "USize"
-  | .byteArray => "ByteArray"
-  | .array element => s!"Array {element.label}"
-  | .list element => s!"List {element.label}"
-  | .option element => s!"Option {element.label}"
-  | .prod fst snd => s!"{fst.label} × {snd.label}"
-  | .simpleEnum name _ => name.toString
-  | .taggedUnion _ label _ => label
-  | .recursiveSelf _ label => label
-  | .customInductive _ label _ => label
-  | .structure _ label .. => label
-  | .resource _ label => label
-  | .function .. => "Function"
-  | .expr => "Lean.Expr"
-  | .leanObject => "LeanObject"
+open Vir.GeneratePackage
 
 def InterfaceType.interfaceTag : InterfaceType → Nat
   | .unit => 22
@@ -69,14 +43,6 @@ def InterfaceType.interfaceTag : InterfaceType → Nat
   | .function .. => 24
   | .expr => 15
   | .leanObject => 27
-
-def ctorShortName (inductiveName ctorName : Name) : String :=
-  let prefixText := inductiveName.toString ++ "."
-  let text := ctorName.toString
-  if text.startsWith prefixText then
-    (text.drop prefixText.length).toString
-  else
-    text
 
 def StructureFieldLayout.toJson : StructureFieldLayout → String
   | .object index =>
@@ -131,7 +97,7 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
       let ctorJson := constructors.mapIdx fun idx ctor =>
         jsonObject #[
           ("name", jsonName ctor),
-          ("jsName", jsonString (ctorShortName name ctor)),
+          ("jsName", jsonString (constructorLabel name ctor)),
           ("tag", jsonNat idx)
         ]
       jsonObject #[
@@ -247,4 +213,4 @@ partial def InterfaceType.toJson (ty : InterfaceType) : String :=
         ("interfaceTag", jsonNat ty.interfaceTag)
       ]
 
-end Vir.GeneratePackage
+end Vir.Interface

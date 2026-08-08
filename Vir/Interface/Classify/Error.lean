@@ -10,7 +10,7 @@ public import Lean
 
 public section
 
-namespace Vir.GeneratePackage
+namespace Vir.Interface
 
 /-- The declaration family involved in recursive and parameter-shape errors. -/
 public inductive InterfaceAggregateKind where
@@ -156,4 +156,4 @@ public def InterfaceClassifierError.message : InterfaceClassifierError → Strin
       s!"implicit or instance argument `{name}` is not supported; \
         declare a wrapper with only explicit arguments"
 
-end Vir.GeneratePackage
+end Vir.Interface

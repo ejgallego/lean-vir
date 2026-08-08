@@ -74,6 +74,11 @@ def smokeDecl (value : String) : Lean.IR.Decl :=
     (.vdecl smokeVar .object (.lit (.str value)) (.ret (.var smokeVar)))
     {}
 
+def smokeHostDecl (marker : Vir.HostMetadata.HostImportMarker) : Lean.IR.Decl :=
+  .extern `SmokeInfoviewLean.host #[] .object {
+    entries := [.standard `all (marker.externSymbol "smoke.sameTarget")]
+  }
+
 def importedHelperTargetSource : System.FilePath :=
   "scripts/smoke-infoview-imported-helper-target.lean"
 
@@ -140,6 +145,9 @@ def expectImportedDecl
   expect "IR decl hash tracks body literals" <|
     Lean.Vir.Infoview.irDeclHash (smokeDecl "before") !=
       Lean.Vir.Infoview.irDeclHash (smokeDecl "after")
+  expect "IR decl hash tracks host import markers" <|
+    Lean.Vir.Infoview.irDeclHash (smokeHostDecl .hostImport) !=
+      Lean.Vir.Infoview.irDeclHash (smokeHostDecl .explicitConversion)
   let beforeClosure ← importedHelperClosure `SmokeInfoviewImportedHelperTarget.before
   let afterClosure ← importedHelperClosure `SmokeInfoviewImportedHelperTarget.after
   let beforeDecl ←

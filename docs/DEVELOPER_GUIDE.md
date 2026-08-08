@@ -25,17 +25,19 @@ For package/interface work, read:
 1. `docs/INTERFACE_PIPELINE.md`
 2. `docs/GENERATE_PACKAGE.md`
 3. `Vir/InterfaceValidation.lean`
-4. `Vir/GeneratePackage/Interface/Classify/Error.lean`
-5. `Vir/GeneratePackage/Interface/Classify/Core.lean`
-6. `Vir/GeneratePackage/Interface/Classify/Signature.lean`
-7. `Vir/HostValidation.lean`
-8. `Vir/GeneratePackage/Interface/Encode.lean`
-9. `web/src/runtime/interface-manifest.js`
-10. `web/src/runtime/core.js`
-11. `web/src/runtime/object-values.js`
-12. `web/src/runtime/vir-codec.js`
-13. `web/src/runtime/object-abi.js`
-14. `web/src/runtime/vir-value-normalizers.js`
+4. `Vir/Interface/Model.lean`
+5. `Vir/Interface/Classify/Error.lean`
+6. `Vir/Interface/Classify/Core.lean`
+7. `Vir/Interface/Classify/Signature.lean`
+8. `Vir/HostMetadata.lean`
+9. `Vir/HostValidation.lean`
+10. `Vir/GeneratePackage/Interface/Encode.lean`
+11. `web/src/runtime/interface-manifest.js`
+12. `web/src/runtime/core.js`
+13. `web/src/runtime/object-values.js`
+14. `web/src/runtime/vir-codec.js`
+15. `web/src/runtime/object-abi.js`
+16. `web/src/runtime/vir-value-normalizers.js`
 
 For browser or React host work, read:
 
@@ -293,9 +295,9 @@ Use this checklist when adding a new host-backed primitive:
 2. Make JavaScript-owned objects appear as `Lean.Vir.Js α`, not as naked marker
    types.
 3. Run or update package-generation tests so
-   `Vir/GeneratePackage/Interface/Classify/Core.lean` and
-   `Vir/GeneratePackage/Interface/Classify/Signature.lean` validate the
-   argument and result types.
+   `Vir/Interface/Classify/Core.lean` and
+   `Vir/Interface/Classify/Signature.lean` validate the argument and result
+   types.
 4. Add the JavaScript binding in the relevant host module.
 5. If the binding retains a callback or host object, connect its cleanup to
    `HostResourceState` or an equivalent disposer.

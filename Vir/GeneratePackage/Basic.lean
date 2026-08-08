@@ -8,6 +8,7 @@ module
 
 public import Lean.Compiler.IR.CompilerM
 public import Vir.GeneratePackage.NativeExterns
+public import Vir.Interface.Model
 public import Vir.IRDependencies
 
 public section
@@ -17,40 +18,7 @@ open Lean
 namespace Vir.GeneratePackage
 
 open Lean.IR
-
-inductive StructureFieldLayout where
-  | object (index : Nat)
-  | usize (index : Nat)
-  | scalar (size offset : Nat)
-  deriving BEq, Repr
-
-abbrev RecursiveSeen := Array (Name × String)
-
-inductive InterfaceEffect where
-  | pure
-  | runtime
-  | io
-  | dom
-  | react
-  deriving BEq, Repr
-
-def InterfaceEffect.label : InterfaceEffect → String
-  | .pure => "pure"
-  | .runtime => "runtime"
-  | .io => "io"
-  | .dom => "dom"
-  | .react => "react"
-
-def InterfaceEffect.isEffectful : InterfaceEffect → Bool
-  | .pure => false
-  | _ => true
-
-def InterfaceEffect.display : InterfaceEffect → String
-  | .pure => ""
-  | .runtime => "RuntimeM"
-  | .io => "IO"
-  | .dom => "DomM"
-  | .react => "ReactM"
+open Vir.Interface
 
 def maxHostImportSlots : Nat := 128
 
@@ -98,43 +66,6 @@ structure Closure where
   missingExterns : Array ClosureDependency := #[]
   unsupportedInitGlobals : Array ClosureDependency := #[]
 
-inductive InterfaceType where
-  | unit
-  | nat
-  | int
-  | bool
-  | string
-  | float
-  | float32
-  | uint8
-  | uint16
-  | uint32
-  | uint64
-  | usize
-  | byteArray
-  | array (element : InterfaceType)
-  | list (element : InterfaceType)
-  | option (element : InterfaceType)
-  | prod (fst snd : InterfaceType)
-  | simpleEnum (name : Name) (constructors : Array Name)
-  | taggedUnion (name : Name) (label : String)
-      (constructors : Array (Name × String × InterfaceType × StructureFieldLayout × Nat × Nat × Nat))
-  | recursiveSelf (name : Name) (label : String)
-  | customInductive (name : Name) (label : String)
-      (constructors : Array (Name × String × Nat × Nat × Nat × Array (String × InterfaceType × StructureFieldLayout)))
-  | structure (name : Name) (label : String) (trivialField? : Option Nat)
-      (objectFields usizeFields scalarBytes : Nat)
-      (fields : Array (String × InterfaceType × StructureFieldLayout × Bool))
-  | resource (name : Name) (label : String)
-  | function (args : Array (String × InterfaceType)) (result : InterfaceType) (effect : InterfaceEffect)
-  | expr
-  | leanObject
-  deriving BEq, Repr
-
-structure InterfaceArg where
-  name : String
-  type : InterfaceType
-
 structure InterfaceExport where
   id : String
   jsName : String
@@ -144,17 +75,6 @@ structure InterfaceExport where
   result : InterfaceType
   effect : InterfaceEffect := .pure
   startup : Bool := false
-
-inductive HostImportBoundary where
-  | hostResource
-  | explicitConversion
-  | objectHandle
-  deriving BEq, Inhabited
-
-def HostImportBoundary.label : HostImportBoundary → String
-  | .hostResource => "hostResource"
-  | .explicitConversion => "explicitConversion"
-  | .objectHandle => "objectHandle"
 
 structure HostImport where
   slot : Nat

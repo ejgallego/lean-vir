@@ -10,6 +10,7 @@ public import Lean.LabelAttribute
 import Lean.Compiler.Options
 import Lean.OriginalConstKind
 import Vir.ExportValidation
+import Vir.Interface.Classify.Signature
 import Vir.InterfaceValidation
 
 public section
@@ -61,7 +62,7 @@ private def checkVirMarker
   let info ← Lean.getAsyncConstInfo declName
   match marker with
   | .export =>
-      match ← Vir.InterfaceValidation.analyzeExportSignature info.sig.get.type with
+      match ← Vir.Interface.analyzeExportInterface info.sig.get.type with
       | .error error => return { diagnostic? := some error.message }
       | .ok _ => pure ()
   | .startup =>
@@ -110,11 +111,12 @@ The declaration is available through `vir.call(...)`. It is not selected as a
 startup hook unless it is marked `@[vir_startup]`.
 
 After Lean compiles the declaration, the attribute rejects private and
-non-executable declarations, unsupported binder shapes, and compiled closures
-whose visible dependencies are known to be unavailable. When imported IR is
-opaque, it identifies the compiled dependency package generation still
-requires. When compilation is postponed, it explains how to make IR available.
-Package generation also checks the final interface layout.
+non-executable declarations, unsupported signatures and interface layouts, and
+compiled closures whose visible dependencies are known to be unavailable. When
+imported IR is opaque, it identifies the compiled dependency package generation
+still requires. When compilation is postponed, it explains how to make IR
+available. Package generation repeats these checks for raw marker metadata and
+also validates package-wide constraints.
 -/
 initialize vir_export : Lean.LabelExtension ← registerVirMarkerAttr .export
 

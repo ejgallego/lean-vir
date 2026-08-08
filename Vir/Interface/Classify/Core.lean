@@ -6,13 +6,13 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Interface.Classify.Basic
+public import Vir.Interface.Classify.Basic
 
 public section
 
 open Lean
 
-namespace Vir.GeneratePackage
+namespace Vir.Interface
 
 open Lean.IR
 open Vir.InterfaceValidation
@@ -132,7 +132,7 @@ partial def inductiveType (seenTypes : RecursiveSeen) (e : Lean.Expr) :
               return .error (.inContext (.constructorField fieldName ctorName fieldExpr) error)
         constructors := constructors.push (
           ctorName,
-          ctorShortName name ctorName,
+          constructorLabel name ctorName,
           layout.ctorInfo.size,
           layout.ctorInfo.usize,
           layout.ctorInfo.ssize,
@@ -269,4 +269,4 @@ partial def interfaceType (e : Lean.Expr) (seenTypes : RecursiveSeen := #[]) :
 
 end
 
-end Vir.GeneratePackage
+end Vir.Interface

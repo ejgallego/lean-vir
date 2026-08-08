@@ -263,8 +263,8 @@ if (SUPPORTED_INTERFACE_TAGS.size !== jsTags.size) {
   throw new Error(`SUPPORTED_INTERFACE_TAGS has ${SUPPORTED_INTERFACE_TAGS.size} entries; INTERFACE_TAG has ${jsTags.size}`);
 }
 
-const interfaceBasicSource = await readRepoText("Vir/GeneratePackage/Basic.lean");
-const leanBoundaries = leanHostImportBoundaries(interfaceBasicSource);
+const interfaceModelSource = await readRepoText("Vir/Interface/Model.lean");
+const leanBoundaries = leanHostImportBoundaries(interfaceModelSource);
 const jsBoundaries = new Map(Object.entries(HOST_IMPORT_BOUNDARY));
 
 duplicateValues(leanBoundaries, "Lean HostImportBoundary.label");

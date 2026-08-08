@@ -6,7 +6,8 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Interface.Classify.Signature
+public import Vir.HostMetadata
+public import Vir.Interface.Classify.Signature
 
 public section
 
@@ -14,18 +15,8 @@ open Lean
 
 namespace Vir.HostValidation
 
-open Vir.GeneratePackage
-
-/-- The VIR attribute that selected a JavaScript host-import boundary. -/
-public inductive HostImportMarker where
-  | hostImport
-  | explicitConversion
-  deriving BEq, Repr
-
-/-- The attribute name used to select a host-import boundary. -/
-public def HostImportMarker.attributeName : HostImportMarker → Lean.Name
-  | .hostImport => `vir_js
-  | .explicitConversion => `vir_js_explicit_conversion
+open Vir.HostMetadata
+open Vir.Interface
 
 /-- A semantic failure from JavaScript host-boundary policy. -/
 public inductive HostImportBoundaryError where

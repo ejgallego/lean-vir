@@ -35,8 +35,10 @@ The public shim and every library module in the package-generation pipeline use
 Lean's module system. Downstream `module` sources may import the whole pipeline
 with `public import Vir.GeneratePackage` or select a narrower module below.
 
-- `Vir.GeneratePackage.Basic`: shared data structures, package metadata
-  shapes, package ABI limits, and default browser targets.
+- `Vir.Interface.Model`: package-independent interface types, effects, runtime
+  field layouts, host boundary kinds, and their user-facing labels.
+- `Vir.GeneratePackage.Basic`: package targets, collected declarations,
+  manifests, package ABI limits, and default browser targets.
 - `Vir.GeneratePackage.PackageFormat`: package magic, package section kinds,
   and current package/interface-manifest version constants used by generated
   bytes and metadata.
@@ -48,6 +50,8 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
   validation.
 - `Vir.IRDependencies`: shared IR reference walking, JavaScript-extern
   recognition, and root-to-dependency path formatting.
+- `Vir.HostMetadata`: host-import marker identity and the single encoder/decoder
+  for VIR targets stored in Lean extern symbols.
 - `Vir.InterfaceValidation`: module-safe, typed export-binder and startup
   preflight, effect recognition, diagnostic rendering, metadata stripping, and
   controlled abbreviation-head reduction shared by attributes and package
@@ -63,23 +67,25 @@ with `public import Vir.GeneratePackage` or select a narrower module below.
   environments, module filtering, and declaration-name collision diagnostics.
 - `Vir.GeneratePackage.Closure`: root resolution and transitive IR closure
   collection from typed `Lean.IR.Decl` values.
-- `Vir.GeneratePackage.Interface.Encode`: interface labels, descriptor tags,
-  and descriptor JSON encoders. The JSON descriptor field is `interfaceTag`.
-- `Vir.GeneratePackage.Interface.Classify.Error`: typed interface-classifier
+- `Vir.GeneratePackage.Interface.Encode`: descriptor tags and descriptor JSON
+  encoders. The JSON descriptor field is `interfaceTag`.
+- `Vir.Interface.Classify.Error`: typed interface-classifier
   failures, nested classification contexts, and user-facing error rendering.
-- `Vir.GeneratePackage.Interface.Classify.Basic`: shared classifier helpers,
+- `Vir.Interface.Classify.Basic`: shared classifier helpers,
   host effect recognition, primitive/resource labels, layout helper utilities,
-  and boxed-boundary checks.
-- `Vir.GeneratePackage.Interface.Classify.Core`: interface type classification,
+  and recursive-classification traversal state.
+- `Vir.Interface.Classify.Core`: interface type classification,
   callback type classification, and runtime layout classification for structures
   and inductives.
-- `Vir.GeneratePackage.Interface.Classify.Signature`: the named classified
-  signature result plus top-level export and host-import classification.
+- `Vir.Interface.Classify.Signature`: the named classified signature result,
+  combined export preflight and classification, and host-import signature
+  classification.
 - `Vir.HostValidation`: typed host-import signature and boundary-policy analysis
   shared by the `@[vir_js]` attributes and package generation.
 - `Vir.GeneratePackage.Interface.Collect`: export discovery, export call-summary
-  extraction, duplicate-avoidance helpers, boxed-boundary diagnostics, and
-  host-import collection for `@[vir_js "..."]` declarations.
+  extraction, package-owned boxed-boundary policy and diagnostics,
+  duplicate-avoidance helpers, and host-import collection for `@[vir_js "..."]`
+  declarations.
 - `Vir.GeneratePackage.Json`: small JSON string, array, object, and primitive
   encoders shared by interface and manifest serialization.
 - `Vir.GeneratePackage.Manifest`: package metadata, interface manifest
@@ -176,13 +182,17 @@ The interface classifier recognizes the supported manifest surface described in
 unfolding reducible abbrev heads, so aliases such as `abbrev UserId := Nat` can
 be used at package boundaries without changing their runtime representation.
 
-Marker preflight is intentionally narrower than interface classification. It
-rejects export binder shapes and validates the complete startup contract early.
-Host-import attributes additionally run the complete signature classifier and
-JavaScript boundary policy during elaboration; package generation repeats that
-typed analysis for raw extern metadata and adds package-only layout checks. Each
-layer renders typed errors at its own user boundary instead of sharing
-preformatted success/failure strings.
+`Vir.InterfaceValidation` performs representation-independent export-binder
+and startup checks. `Vir.Interface.analyzeExportInterface` composes export
+preflight with the complete classifier; both `Vir.Attributes` and package
+generation call it, so unsupported `@[vir_export]` types and runtime layouts
+are reported consistently. Host-import attributes likewise run the complete
+signature classifier and JavaScript boundary policy. Package generation runs
+the export analysis for explicit roots and raw marker metadata, reruns host
+analysis for raw extern metadata, then adds package-only boxed-boundary, IR
+arity, slot, duplicate, and dependency checks. Each layer renders typed errors
+at its own user boundary instead of sharing preformatted success/failure
+strings.
 
 Interface classification follows the same rule: its core and signature layers
 return `InterfaceClassifierError` values, preserving nested type context as
@@ -248,7 +258,8 @@ stopped:
 Many conclusive closure failures and marker-level signature failures are
 already reported by Lean at the marked declaration. Package diagnostics remain
 necessary for explicit package roots, opaque imported IR, postponed
-compilation, generated boundaries, and final interface classification.
+compilation, generated boundaries, raw marker metadata, and package-wide
+constraints.
 
 The three closure-blocker sections append one first-discovered path from a
 resolved package root after `via`. The command-line diagnostic prints the same

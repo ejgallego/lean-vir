@@ -25,8 +25,12 @@ const callbackHostResultReason =
   /unsupported JavaScript import result: callback `Function` is not a JavaScript boundary type; use `Unit`, `Lean\.Vir\.Js \.\.\.`, `Lean\.Vir\.Js\.Nullable \.\.\.`, top-level callback arguments, or explicit conversion calls/;
 const explicitConversionReason =
   /declaration is marked with `@\[vir_js_explicit_conversion\]`, but `js\.value\.bad\.action` does not convert between exactly one `Lean\.Vir\.Js \.\.\.` resource and one Lean value/;
+const indexedPairReason =
+  /unsupported argument type `[^`]*IndexedPair [^`]+`: indexed inductive `[^`]*IndexedPair` is not supported/;
+const nakedElementReason =
+  /unsupported argument type `Lean\.Vir\.Browser\.Element`: JavaScript object marker `Lean\.Vir\.Browser\.Element` must appear under `Lean\.Vir\.Js`/;
 
-async function assertInvalidHostAttributeSource(freshDir, stem, lines, patterns) {
+async function assertInvalidAttributeSource(freshDir, stem, lines, patterns) {
   ensureVirJsBuilt();
   const source = join(freshDir, `${stem}.lean`);
   await writeFile(source, lines.join("\n"));
@@ -37,7 +41,33 @@ async function assertInvalidHostAttributeSource(freshDir, stem, lines, patterns)
 }
 
 export async function runUnsupportedInterfaceSmoke(freshDir) {
-  await assertInvalidHostAttributeSource(freshDir, "InvalidImplicitHostAttribute", [
+  await assertInvalidAttributeSource(freshDir, "InvalidIndexedExportAttribute", [
+    "import Vir.Attributes",
+    "",
+    "inductive IndexedPair : Nat → Type where",
+    "  | mk (left right : Nat) : IndexedPair 0",
+    "",
+    "@[vir_export]",
+    "def indexedPairIdentity (box : IndexedPair 0) : IndexedPair 0 := box",
+    "",
+  ], [
+    /invalid `@\[vir_export\]` declaration `indexedPairIdentity`/,
+    indexedPairReason,
+  ]);
+
+  await assertInvalidAttributeSource(freshDir, "InvalidNakedResourceExportAttribute", [
+    "import Vir.Attributes",
+    "import Vir.Browser",
+    "",
+    "@[vir_export]",
+    "def nakedElementIdentity (element : Lean.Vir.Browser.Element) : Lean.Vir.Browser.Element := element",
+    "",
+  ], [
+    /invalid `@\[vir_export\]` declaration `nakedElementIdentity`/,
+    nakedElementReason,
+  ]);
+
+  await assertInvalidAttributeSource(freshDir, "InvalidImplicitHostAttribute", [
     "import Vir.Host",
     "import Vir.Js",
     "",
@@ -49,7 +79,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     implicitHostImportReason,
   ]);
 
-  await assertInvalidHostAttributeSource(freshDir, "InvalidHostBoundaryAttribute", [
+  await assertInvalidAttributeSource(freshDir, "InvalidHostBoundaryAttribute", [
     "import Vir.Host",
     "",
     "@[vir_js \"test.bumpNat\"]",
@@ -60,7 +90,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     rawNatHostArgumentReason,
   ]);
 
-  await assertInvalidHostAttributeSource(freshDir, "InvalidHostResultAttribute", [
+  await assertInvalidAttributeSource(freshDir, "InvalidHostResultAttribute", [
     "import Vir.Js",
     "",
     "@[vir_js \"test.callbackResult\"]",
@@ -71,7 +101,7 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     callbackHostResultReason,
   ]);
 
-  await assertInvalidHostAttributeSource(freshDir, "InvalidExplicitConversionAttribute", [
+  await assertInvalidAttributeSource(freshDir, "InvalidExplicitConversionAttribute", [
     "import Vir.Host",
     "import Vir.Js",
     "",
@@ -208,9 +238,17 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   await writeRuntimeFixture(rightSource, "CollisionRight.lean");
   // Bypass the attribute callbacks to exercise the final package-time contract guards.
   await writeFile(packageFallbackMarkerSource, [
-    "import Vir",
+    "import Vir.Attributes",
+    "import Vir.Browser",
     "",
     "namespace PackageFallbackMarkers",
+    "",
+    "inductive IndexedPair : Nat → Type where",
+    "  | mk (left right : Nat) : IndexedPair 0",
+    "",
+    "def badIndexed (box : IndexedPair 0) : IndexedPair 0 := box",
+    "",
+    "def badNakedElement (element : Lean.Vir.Browser.Element) : Lean.Vir.Browser.Element := element",
     "",
     "def badErased {α : Type} (value : α) : α := value",
     "",
@@ -222,6 +260,8 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "",
     "def badPureResult : Nat := 1",
     "",
+    "run_meta vir_export.add `PackageFallbackMarkers.badIndexed",
+    "run_meta vir_export.add `PackageFallbackMarkers.badNakedElement",
     "run_meta vir_export.add `PackageFallbackMarkers.badErased",
     "run_meta vir_export.add `PackageFallbackMarkers.badImplicit",
     "run_meta vir_startup.add `PackageFallbackMarkers.badArguments",
@@ -249,6 +289,14 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   assert.match(generated.stderr, /declaration name collides/);
   assert.match(
     generated.stderr,
+    /PackageFallbackMarkers\.badIndexed: unsupported argument type `[^`]*IndexedPair [^`]+`: indexed inductive `[^`]*IndexedPair` is not supported/,
+  );
+  assert.match(
+    generated.stderr,
+    /PackageFallbackMarkers\.badNakedElement: unsupported argument type `Lean\.Vir\.Browser\.Element`: JavaScript object marker `Lean\.Vir\.Browser\.Element` must appear under `Lean\.Vir\.Js`/,
+  );
+  assert.match(
+    generated.stderr,
     /PackageFallbackMarkers\.badErased: VIR exports must use concrete runtime types; type parameter `α` is erased; export a concrete wrapper instead/,
   );
   assert.match(
@@ -270,6 +318,8 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   const report = await readFile(reportPath, "utf8");
   assert.match(report, /collisionBump/);
   assert.match(report, /declaration name collides/);
+  assert.match(report, /PackageFallbackMarkers\.badIndexed/);
+  assert.match(report, /PackageFallbackMarkers\.badNakedElement/);
   assert.match(report, /PackageFallbackMarkers\.badErased/);
   assert.match(report, /PackageFallbackMarkers\.badImplicit/);
   assert.match(report, /PackageFallbackMarkers\.badArguments/);

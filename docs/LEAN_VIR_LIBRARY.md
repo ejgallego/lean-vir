@@ -26,17 +26,19 @@ Importing `Vir` also imports these attributes.
 
 After Lean compiles a marked declaration, both attributes diagnose private or
 non-executable declarations and conclusive blockers in the visible compiled
-closure. `@[vir_export]` also rejects erased, implicit, and instance binders;
-`@[vir_startup]` enforces its complete zero-argument, `Unit`-result contract
-immediately. Dependency diagnostics show the path from the entrypoint to a
-missing IR declaration, unsupported runtime dependency (including a missing
-native extern implementation), or initializer provider.
+closure. `@[vir_export]` also rejects erased, implicit, and instance binders and
+classifies its complete JavaScript interface, including compiled structure and
+inductive layouts. `@[vir_startup]` enforces its complete zero-argument,
+`Unit`-result contract immediately. Dependency diagnostics show the path from
+the entrypoint to a missing IR declaration, unsupported runtime dependency
+(including a missing native extern implementation), or initializer provider.
 
 Opaque imported IR produces an informational diagnostic naming the required
 compiled dependency instead of a false rejection. Postponed compilation
 provides the option-level remedy needed to make IR available.
-Package generation remains authoritative for complete interface layouts,
-generated boxed boundaries, and unresolved package dependencies.
+Package generation repeats the checks for raw marker metadata and remains
+authoritative for generated boxed boundaries, package-wide conflicts, and
+unresolved package dependencies.
 
 After loading the generated package, JavaScript calls ordinary exports with
 `vir.call(...)` and invokes startup hooks with `vir.runStartupEntries()`.

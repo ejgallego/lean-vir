@@ -6,13 +6,16 @@ Author: Emilio J. Gallego Arias
 
 module
 
+public import Vir.GeneratePackage.Interface.Encode
 public import Vir.GeneratePackage.Manifest
 
 public section
 
 open Lean
 
-namespace Vir.GeneratePackage
+namespace Vir.Interface
+
+open Vir.GeneratePackage
 
 def InterfaceArg.toJson (arg : InterfaceArg) : String :=
   jsonObject #[
@@ -22,6 +25,12 @@ def InterfaceArg.toJson (arg : InterfaceArg) : String :=
 
 def InterfaceEffect.toJson (effect : InterfaceEffect) : String :=
   jsonString effect.label
+
+end Vir.Interface
+
+namespace Vir.GeneratePackage
+
+open Vir.Interface
 
 def InterfaceExport.toJson (entry : InterfaceExport) : String :=
   jsonObject #[

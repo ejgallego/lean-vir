@@ -6,13 +6,13 @@ Author: Emilio J. Gallego Arias
 
 module
 
-public import Vir.GeneratePackage.Interface.Classify.Core
+public import Vir.Interface.Classify.Core
 
 public section
 
 open Lean
 
-namespace Vir.GeneratePackage
+namespace Vir.Interface
 
 open Vir.InterfaceValidation
 
@@ -22,6 +22,17 @@ public structure ClassifiedSignature where
   result : InterfaceType
   effect : InterfaceEffect
   erasedPrefixArgs : Nat := 0
+
+/-- A failure while validating or classifying a complete export interface. -/
+public inductive ExportInterfaceValidationError where
+  | signature (error : ExportSignatureError)
+  | classification (error : InterfaceClassifierError)
+  deriving BEq, Repr
+
+/-- Render a complete export-interface failure at an attribute or package boundary. -/
+public def ExportInterfaceValidationError.message : ExportInterfaceValidationError → String
+  | .signature error => error.message
+  | .classification error => error.message
 
 private def classifyResult (result : Lean.Expr) :
     CoreM (Except InterfaceClassifierError (InterfaceType × InterfaceEffect)) := do
@@ -33,7 +44,6 @@ private def classifyResult (result : Lean.Expr) :
 
 /--
 Classify a marker-preflighted export signature without rescanning its binders.
-Runtime layout and supported JavaScript types remain package-time concerns.
 -/
 def classifyExportSignature (signature : ExportSignature) :
     CoreM (Except InterfaceClassifierError ClassifiedSignature) := do
@@ -50,6 +60,16 @@ def classifyExportSignature (signature : ExportSignature) :
   match ← classifyResult signature.result with
   | .error error => return .error error
   | .ok (result, effect) => return .ok { args, result, effect }
+
+/-- Validate and classify a declaration's complete JavaScript export interface. -/
+public def analyzeExportInterface (type : Lean.Expr) :
+    CoreM (Except ExportInterfaceValidationError ClassifiedSignature) := do
+  match ← analyzeExportSignature type with
+  | .error error => return .error (.signature error)
+  | .ok signature =>
+      match ← classifyExportSignature signature with
+      | .error error => return .error (.classification error)
+      | .ok signature => return .ok signature
 
 private partial def classifyHostImportSignatureLoop
     (type : Lean.Expr)
@@ -83,4 +103,4 @@ def classifyHostImportSignature (type : Lean.Expr) :
     CoreM (Except InterfaceClassifierError ClassifiedSignature) :=
   classifyHostImportSignatureLoop type 1 #[] 0
 
-end Vir.GeneratePackage
+end Vir.Interface

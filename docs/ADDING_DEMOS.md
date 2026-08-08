@@ -89,15 +89,16 @@ the package-backed imported closure or the explicit native boundary.
 Prefer the manifest-driven `vir.call(name, ...args)` API in
 `web/src/vir-runtime.js`. If a demo needs another browser-supplied input or
 result shape, extend the manifest type classifier in
-`Vir/GeneratePackage/Interface/Classify/Core.lean`, descriptor JSON support in
+`Vir/Interface/Classify/Core.lean`, descriptor JSON support in
 `Vir/GeneratePackage/Interface/Encode.lean`, and the JavaScript object ABI
 helpers in `web/src/runtime/object-abi.js`,
 `web/src/runtime/object-values.js`, and the relevant runtime support module.
-Keep
-the Lean declaration itself in `examples/` and include it as an exported root.
+Keep the Lean declaration itself in `examples/` and include it as an exported
+root.
 Do not add per-function or per-shape WASM exports for manifest-supported
-declarations; unsupported entries should fail during package generation until
-their interface type is implemented.
+declarations. Marked unsupported entries fail at their attribute site after Lean
+compiles the declaration; ad-hoc unmarked roots fail during package generation
+until their interface type is implemented.
 
 The current generic interface covers `Unit`, primitive scalars, byte arrays,
 recursive `Array`/`List`/`Option`/`Prod`/`Sum`/`Except` shapes, non-indexed
