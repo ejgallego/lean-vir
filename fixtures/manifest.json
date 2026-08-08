@@ -300,6 +300,12 @@
       "unsafe": true
     },
     {
+      "id": "upstream-linked-primitives-frontier",
+      "source": "fixtures/ExprPrinter.lean",
+      "entry": "Vir.Fixtures.ExprPrinter.linkedPrimitiveFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "interface-shape-score",
       "source": "fixtures/InterfaceShapes.lean",
       "entry": "Vir.Fixtures.InterfaceShapes.interfaceShapeScore",

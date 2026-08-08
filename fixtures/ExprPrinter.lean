@@ -128,6 +128,23 @@ unsafe def smallRuntimeFrontierScore : Nat :=
     (if voidOk then 4 else 0) +
     (if levelOk then 8 else 0)
 
+/-- Exercises six primitives whose implementations are already linked into the VIR runtime. -/
+def linkedPrimitiveFrontierScore : Nat :=
+  let exprA := Expr.forallE `x (.sort .zero) (.bvar 0) .default
+  let exprB := Expr.forallE `y (.sort .zero) (.bvar 0) .default
+  let exprOk := Expr.equal exprA exprA && !Expr.equal exprA exprB
+  let stringOk := String.Internal.get "é" ⟨0⟩ == 'é'
+  let emodOk := (-12 : Int).emod 7 == 2
+  let tmodOk := (-12 : Int).tmod 7 == -5
+  let landOk := Nat.land 13 11 == 9
+  let platformOk := System.Platform.getIsWindows () == false
+  (if exprOk then 1 else 0) +
+    (if stringOk then 2 else 0) +
+    (if emodOk then 4 else 0) +
+    (if tmodOk then 8 else 0) +
+    (if landOk then 16 else 0) +
+    (if platformOk then 32 else 0)
+
 private def renderName : Name -> String
   | .anonymous => "_"
   | .str .anonymous s => s

@@ -177,6 +177,15 @@ static uint64_t vir_expr_data(object * value) {
     return lean_ctor_get_uint64(value, lean_ctor_num_objs(value) * sizeof(void *));
 }
 
+extern "C" uint8_t lean_expr_binder_info(object * value) {
+    unsigned tag = lean_obj_tag(value);
+    if (tag != static_cast<unsigned>(expr_kind::Lambda)
+        && tag != static_cast<unsigned>(expr_kind::Pi)) {
+        return static_cast<uint8_t>(binder_info::Default);
+    }
+    return lean_ctor_get_uint8(value, 3 * sizeof(void *) + sizeof(uint64_t));
+}
+
 static uint64_t vir_expr_hash(object * value) {
     return static_cast<uint32_t>(vir_expr_data(value));
 }

@@ -203,6 +203,59 @@ new support module. A host-versus-Wasm fixture checks all four operations; the
 complete 84-fixture differential suite and upstream smoke pass with the
 candidate runtime.
 
+### Six Already-Linked Primitives
+
+The third experiment added `Lean.Expr.equal`, `String.Internal.get`,
+`Int.emod`, `Int.tmod`, `Nat.land`, and `System.Platform.getIsWindows` on top of
+the four-boundary candidate. It again used the same Lean build, selected
+modules, and 398,519-function declaration universe.
+
+| Measurement | Four-boundary checkpoint | Six-primitive candidate | Delta |
+| --- | ---: | ---: | ---: |
+| Stripped release Wasm | 643,756 B | 650,910 B | +7,154 B |
+| Gzip-compressed Wasm | 147,317 B | 148,103 B | +786 B |
+| Runnable public constants | 26,804 / 36,887 | 27,329 / 36,887 | +525 |
+| Runnable all-IR functions | 309,411 / 398,519 | 312,344 / 398,519 | +2,933 |
+| Regressions | - | - | 0 |
+
+The 7,154-byte raw increase is 6.99 KiB: about 420 newly runnable IR
+functions and 75 public constants per added KiB. The exact unlocks grouped by
+their previous primary blocker are:
+
+| Boundary | Newly runnable all-IR | Newly runnable public |
+| --- | ---: | ---: |
+| `Lean.Expr.equal` | 958 | 9 |
+| `Nat.land` | 625 | 113 |
+| `System.Platform.getIsWindows` | 556 | 183 |
+| `Int.emod` | 504 | 129 |
+| `String.Internal.get` | 252 | 70 |
+| `Int.tmod` | 38 | 21 |
+
+The candidate makes 1,200 Lean, 907 Std, 525 Lake, and 301 Init functions
+runnable. The public gain is spread differently: 176 Std, 159 Lake, 122 Init,
+and 68 Lean constants. Another 3,062 roots advance to a newly exposed blocker.
+The cumulative three-step experiment moves the original control from 302,887
+to 312,344 runnable IR functions and from 26,307 to 27,329 runnable public
+constants for a cumulative 14,611-byte raw increase.
+
+All six primary implementations are already materialized by the selected
+runtime source closure. Five require no further runtime dependency;
+`Lean.Expr.equal` additionally activates binder-sensitive upstream equality
+code whose narrow `lean_expr_binder_info` dependency is implemented by a
+constant-time shim accessor over the same expression representation used by
+VIR's constructors. This avoids linking the complete generated `Lean/Expr.c`
+module. A host-versus-Wasm fixture checks all six operations.
+The complete 85-fixture differential suite and upstream smoke pass with the
+candidate runtime.
+
+The resulting frontier also strengthens the next string experiments:
+`String.Internal.trim` is the primary blocker for 6,928 functions (947
+public), `String.Internal.foldl` for 6,008 (662 public), and
+`String.Internal.isPrefixOf` for 1,374 (181 public). `trim` and `isPrefixOf`
+share the generated `Init/Data/String/TakeDrop.c` provider, while `foldl` uses
+`Init/Data/String/Iterate.c`; each support-module addition should be measured
+as a separate stage.
+
 ## Interactive HTML Report
 
 Render any JSON scan as a static browser report:

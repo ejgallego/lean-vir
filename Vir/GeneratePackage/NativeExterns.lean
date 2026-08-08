@@ -97,6 +97,13 @@ def nativeExterns : Array NativeExtern := #[
     generateBoxedWrapper := true
   },
   {
+    name := `Nat.land,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_nat_land",
+    generateBoxedWrapper := true
+  },
+  {
     name := `Nat.lor,
     params := #[param 1 true .tobject, param 2 true .tobject],
     resultType := .tobject,
@@ -167,6 +174,20 @@ def nativeExterns : Array NativeExtern := #[
     generateBoxedWrapper := true
   },
   {
+    name := `Int.emod,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_int_emod",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Int.tmod,
+    params := #[param 1 true .tobject, param 2 true .tobject],
+    resultType := .tobject,
+    symbol := "lean_int_mod",
+    generateBoxedWrapper := true
+  },
+  {
     name := `Int.neg,
     params := #[param 1 true .tobject],
     resultType := .tobject,
@@ -206,6 +227,13 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 false .tagged],
     resultType := .tobject,
     symbol := "lean_system_platform_nbits",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `System.Platform.getIsWindows,
+    params := #[param 1 false .tagged],
+    resultType := .uint8,
+    symbol := "lean_system_platform_windows",
     generateBoxedWrapper := true
   },
   {
@@ -859,6 +887,13 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .tobject],
     resultType := .uint8,
     symbol := "lean_string_is_valid_pos",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `String.Internal.get,
+    params := #[param 1 true .object, param 2 true .tobject],
+    resultType := .uint32,
+    symbol := "lean_string_utf8_get",
     generateBoxedWrapper := true
   },
   {
@@ -1560,6 +1595,13 @@ def nativeExterns : Array NativeExtern := #[
     params := #[param 1 true .object, param 2 true .object],
     resultType := .uint8,
     symbol := "lean_expr_eqv",
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Lean.Expr.equal,
+    params := #[param 1 true .object, param 2 true .object],
+    resultType := .uint8,
+    symbol := "lean_expr_equal",
     generateBoxedWrapper := true
   }
 ]

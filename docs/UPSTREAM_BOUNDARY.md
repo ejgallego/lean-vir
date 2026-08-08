@@ -69,6 +69,18 @@ another upstream source file. `Lean.Level.beq` uses `lean_level_eq` from the
 already linked `level.cpp`; registering it retains that function and its
 generated boxed adapter in the final module.
 
+`Nat.land`, `Int.emod`, and `Int.tmod` similarly use canonical inline runtime
+implementations. `String.Internal.get` resolves to `lean_string_utf8_get` in
+the already linked `object.cpp`, `System.Platform.getIsWindows` to
+`lean_system_platform_windows` in `platform.cpp`, and `Lean.Expr.equal` to the
+binder-sensitive equality implementation in the already linked
+`expr_eq_fn.cpp`. That last path asks upstream `expr.cpp` for
+`lean_expr_binder_info`; the shim supplies the same constant-time exported
+operation as Lean's `Expr.binderInfoEx`, reading the scalar field populated by
+the local expression constructors and returning `.default` for non-binders.
+This keeps the boundary faithful without pulling the complete generated
+`Lean/Expr.c` module into the runtime.
+
 For Lean-defined native exports whose implementation closure is available in
 the pinned compiler output rather than the imported kernel environment, the
 probe also cross-compiles the stage0 sources listed in
