@@ -24,6 +24,8 @@ unrelated responsibilities.
 
 ## Runtime Internals
 
+- `runtime/call-timing.js`: opt-in synchronous runtime call phase
+  attribution.
 - `runtime/vir-codec.js`: binary reader/writer and interface type descriptor
   codec.
 - `runtime/callbacks.js`: JavaScript callable Lean closure wrappers,

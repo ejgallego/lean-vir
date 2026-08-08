@@ -40,7 +40,11 @@ const retainedCallbackRuntime = await createVirRuntime({
     "test.recordNat": () => undefined,
   },
 });
-assert.equal(retainedCallbackRuntime.call("HostInterop.callbackRoundTrip", 3), "10");
+const timedCallbackRoundTrip = retainedCallbackRuntime.callTimed("HostInterop.callbackRoundTrip", 3);
+assert.equal(timedCallbackRoundTrip.value, "10");
+assert.equal(timedCallbackRoundTrip.timings.hostMs >= 0, true);
+assert.equal(timedCallbackRoundTrip.timings.hostMs <= timedCallbackRoundTrip.timings.executeMs, true);
+assert.deepEqual(retainedCallbackRuntime.hostState.callTimings, []);
 assert.equal(retainedCallbackRuntime.liveCallbacks.size, 1);
 const retainedJsNat = (value) => retainedCallbackRuntime.hostState.defaultBindings["js.nat"](BigInt(value));
 const retainedJsNatValue = (value) => retainedCallbackRuntime.hostState.defaultBindings["js.nat.value"](value);
@@ -99,9 +103,10 @@ const throwingBindingRuntime = await createVirRuntime({
   },
 });
 assert.throws(
-  () => throwingBindingRuntime.call("HostInterop.callbackRoundTrip", 1),
+  () => throwingBindingRuntime.callTimed("HostInterop.callbackRoundTrip", 1),
   /host binding boom/,
 );
+assert.deepEqual(throwingBindingRuntime.hostState.callTimings, []);
 assert.ok(throwingCallback);
 assert.equal(throwingCallback.released, true);
 assert.equal(throwingBindingRuntime.liveCallbacks.size, 0);

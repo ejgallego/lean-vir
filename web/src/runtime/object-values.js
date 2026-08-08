@@ -924,17 +924,40 @@ export class ObjectValueRuntime {
     objects.length = 0;
   }
 
-  callResolvedObjects(entry, cache, argObjs, liftResult) {
+  callResolvedObjects(entry, cache, argObjs, liftResult, timing = null) {
     const callSlot = this.resolveCallSlot(entry, cache);
     let argvPtr = 0;
     let resultObj = 0;
+    let decodeStarted;
     try {
       this.hostState?.clearCallError();
       if (argObjs.length !== 0) {
-        argvPtr = this.allocByteLength(argObjs.length * 4, `${entry.entry} argv pointer array`);
-        this.writePointerArray(argvPtr, argObjs);
+        const marshalStarted = timing?.beginPhase();
+        try {
+          argvPtr = this.allocByteLength(argObjs.length * 4, `${entry.entry} argv pointer array`);
+          this.writePointerArray(argvPtr, argObjs);
+        } finally {
+          if (timing !== null) timing.endMarshal(marshalStarted);
+        }
       }
-      resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+
+      if (timing === null) {
+        resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+      } else {
+        this.hostState?.beginCallTiming(timing);
+        const executeStarted = timing.beginPhase();
+        try {
+          resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+        } finally {
+          try {
+            timing.endExecute(executeStarted);
+          } finally {
+            this.hostState?.endCallTiming(timing);
+          }
+        }
+      }
+
+      decodeStarted = timing?.beginPhase();
       argObjs.length = 0;
       const hostError = this.hostState?.takeCallError();
       if (hostError) {
@@ -954,6 +977,9 @@ export class ObjectValueRuntime {
       }
       if (resultObj !== 0) {
         this.exports.vir_obj_dec(resultObj);
+      }
+      if (timing !== null && decodeStarted !== undefined) {
+        timing.endDecode(decodeStarted);
       }
     }
   }

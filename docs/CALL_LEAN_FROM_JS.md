@@ -110,6 +110,11 @@ console.log(validated);  // { kind: "ok", value: "Hello, Lean" }
 `vir.call(name, ...args)` accepts the Lean declaration name, manifest `id`, or
 generated JavaScript name.
 
+For diagnostic phase attribution, `vir.callTimed(name, ...args)` performs the
+same synchronous call and returns `{ value, timings }`. See
+[JavaScript API](JS_API.md#calls-and-manifest) for the exact runtime phase
+boundaries; ordinary application code should continue to use `call`.
+
 The release WASM is selected by default. To load the optimized, unstripped
 companion artifact while debugging, serve `vir-upstream.dev.wasm` next to
 `vir-upstream.wasm` and set `debugWasm: true` in the same options object.

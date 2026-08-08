@@ -119,6 +119,67 @@ function withCallLaneCounters(runtime, body) {
   }
 }
 
+function withPerformanceNow(now, body) {
+  const originalPerformance = globalThis.performance;
+  globalThis.performance = { now };
+  try {
+    return body();
+  } finally {
+    globalThis.performance = originalPerformance;
+  }
+}
+
+function withDeterministicCallTiming(runtime, body) {
+  const originalExports = runtime.exports;
+  const originalMakeObjectValue = runtime.makeObjectValue;
+  const originalWritePointerArray = runtime.writePointerArray;
+  const originalLiftOwnedObjectValue = runtime.liftOwnedObjectValue;
+  const originalFreeBytes = runtime.freeBytes;
+  let current = 0;
+  const events = [];
+  const advance = (event, milliseconds) => {
+    events.push(event);
+    current += milliseconds;
+  };
+
+  runtime.exports = Object.fromEntries(
+    Reflect.ownKeys(originalExports).map((key) => [key, originalExports[key]]),
+  );
+  runtime.makeObjectValue = (...args) => {
+    advance("lower", 2);
+    return originalMakeObjectValue.call(runtime, ...args);
+  };
+  runtime.writePointerArray = (...args) => {
+    advance("argv", 3);
+    return originalWritePointerArray.call(runtime, ...args);
+  };
+  runtime.exports.vir_call_resolved_objects = (...args) => {
+    advance("execute", 5);
+    return originalExports.vir_call_resolved_objects(...args);
+  };
+  runtime.liftOwnedObjectValue = (...args) => {
+    advance("lift", 7);
+    return originalLiftOwnedObjectValue.call(runtime, ...args);
+  };
+  runtime.freeBytes = (...args) => {
+    advance("free", 11);
+    return originalFreeBytes.call(runtime, ...args);
+  };
+  runtime.exports.vir_obj_dec = (...args) => {
+    advance("release", 13);
+    return originalExports.vir_obj_dec(...args);
+  };
+  try {
+    return withPerformanceNow(() => current, () => body(events));
+  } finally {
+    runtime.exports = originalExports;
+    delete runtime.makeObjectValue;
+    delete runtime.writePointerArray;
+    delete runtime.liftOwnedObjectValue;
+    delete runtime.freeBytes;
+  }
+}
+
 const resourceType = { type: "Resource", interfaceTag: INTERFACE_TAG.RESOURCE };
 const jsResourceType = { type: "Js", interfaceTag: INTERFACE_TAG.RESOURCE, kind: "resource", name: "Lean.Vir.Js" };
 const leanObjectType = { type: "LeanObject", interfaceTag: INTERFACE_TAG.LEAN_OBJECT, kind: "leanObject" };
@@ -713,25 +774,25 @@ const objectCounters = withCallLaneCounters(runtime, () => {
 assert.equal(objectCounters.objectCalls, 36);
 assert.equal(objectCounters.bytePayloadCalls, 0);
 
-const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
-  const formatGroupDoc = fmt.group(
-    fmt.append(fmt.text("hello"), fmt.append(fmt.line(), fmt.text("world"))),
-  );
-  const formatConstructorSweepDoc = fmt.group(
-    fmt.append(
-      fmt.nil(),
-      fmt.nest(
-        "2",
-        fmt.append(
-          fmt.tag(
-            "7",
-            fmt.append(fmt.text("."), fmt.append(fmt.align(false), fmt.text("alpha"))),
-          ),
-          fmt.append(fmt.line(), fmt.text("beta")),
+const formatGroupDoc = fmt.group(
+  fmt.append(fmt.text("hello"), fmt.append(fmt.line(), fmt.text("world"))),
+);
+const formatConstructorSweepDoc = fmt.group(
+  fmt.append(
+    fmt.nil(),
+    fmt.nest(
+      "2",
+      fmt.append(
+        fmt.tag(
+          "7",
+          fmt.append(fmt.text("."), fmt.append(fmt.align(false), fmt.text("alpha"))),
         ),
+        fmt.append(fmt.line(), fmt.text("beta")),
       ),
     ),
-  );
+  ),
+);
+const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
   assert.match(
     prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyPreview"),
     /^wide group:\nhello world/,
@@ -759,6 +820,28 @@ const prettyCounters = withCallLaneCounters(prettyRuntime, () => {
 });
 assert.equal(prettyCounters.objectCalls, 6);
 assert.equal(prettyCounters.bytePayloadCalls, 0);
+const untimedFormatResult = prettyRuntime.call(
+  "Vir.Fixtures.FormatPretty.formatBoundaryPretty",
+  formatConstructorSweepDoc,
+  4,
+);
+const timedFormatResult = prettyRuntime.callTimed(
+  "Vir.Fixtures.FormatPretty.formatBoundaryPretty",
+  formatConstructorSweepDoc,
+  4,
+);
+assert.equal(timedFormatResult.value, untimedFormatResult);
+assert.deepEqual(Object.keys(timedFormatResult.timings), [
+  "marshalMs",
+  "executeMs",
+  "decodeMs",
+  "hostMs",
+  "totalMs",
+]);
+for (const value of Object.values(timedFormatResult.timings)) {
+  assert.equal(Number.isFinite(value) && value >= 0, true);
+}
+assert.equal(timedFormatResult.timings.hostMs, 0);
 const formatBoundaryEntry = manifestEntry(
   prettyRuntime.interfaceManifest,
   "Vir.Fixtures.FormatPretty.formatBoundaryPretty",
@@ -785,6 +868,23 @@ assert.equal(runtime.call("SortDemo.demoFromArray", [4, 1, 3, 2]), "30");
 assert.equal(runtime.call("Vir.Fixtures.Basic.stringUtf8RoundtripScore", "Aé∀Z"), "1381");
 assert.equal(runtime.call("Vir.Fixtures.Basic.byteArrayInputScore", [65, 66, 67]), "136");
 assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseStringRoundtrip", "Aé∀Z"), "Aé∀Z");
+withPerformanceNow(() => {
+  throw new Error("ordinary runtime.call read the timing clock");
+}, () => {
+  assert.equal(runtime.call("Vir.Fixtures.InterfaceShapes.baseBoolFlip", true), false);
+});
+withDeterministicCallTiming(runtime, (events) => {
+  const timed = runtime.callTimed("Vir.Fixtures.InterfaceShapes.baseBoolFlip", true);
+  assert.equal(timed.value, false);
+  assert.deepEqual(events, ["lower", "argv", "execute", "lift", "free", "release"]);
+  assert.deepEqual(timed.timings, {
+    marshalMs: 5,
+    executeMs: 5,
+    decodeMs: 31,
+    hostMs: 0,
+    totalMs: 41,
+  });
+});
 assert.equal(prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "list", 12), "[alpha,\n beta,\n gamma]");
 assert.equal(
   prettyRuntime.call("Vir.Fixtures.FormatPretty.formatPrettyCaseAtWidth", "fill", 28),

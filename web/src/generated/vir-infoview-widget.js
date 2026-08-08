@@ -4254,6 +4254,65 @@ function requireUniqueStructureField(seen, value, label) {
   seen.add(value);
 }
 
+// web/src/runtime/call-timing.js
+function defaultNow() {
+  return globalThis.performance?.now?.() ?? Date.now();
+}
+function elapsed(now, started) {
+  return Math.max(0, now() - started);
+}
+var RuntimeCallTiming = class {
+  constructor(now = defaultNow) {
+    if (typeof now !== "function") throw new TypeError("runtime call clock must be a function");
+    this.now = now;
+    this.started = now();
+    this.marshalMs = 0;
+    this.executeMs = 0;
+    this.decodeMs = 0;
+    this.hostMs = 0;
+    this.hostDepth = 0;
+    this.finished = false;
+  }
+  beginPhase() {
+    if (this.finished) throw new Error("runtime call timing is already finished");
+    return this.now();
+  }
+  endMarshal(started) {
+    this.endPhase("marshalMs", started);
+  }
+  endExecute(started) {
+    this.endPhase("executeMs", started);
+  }
+  endDecode(started) {
+    this.endPhase("decodeMs", started);
+  }
+  beginHost() {
+    const started = this.hostDepth === 0 ? this.now() : null;
+    this.hostDepth++;
+    return started;
+  }
+  endHost(started) {
+    if (this.hostDepth === 0) throw new Error("runtime host call timing is inconsistent");
+    this.hostDepth--;
+    if (started !== null) this.hostMs += elapsed(this.now, started);
+  }
+  endPhase(name, started) {
+    this[name] += elapsed(this.now, started);
+  }
+  finish() {
+    if (this.finished) throw new Error("runtime call timing is already finished");
+    if (this.hostDepth !== 0) throw new Error("runtime call timing has an active host import");
+    this.finished = true;
+    return {
+      marshalMs: this.marshalMs,
+      executeMs: this.executeMs,
+      decodeMs: this.decodeMs,
+      hostMs: this.hostMs,
+      totalMs: elapsed(this.now, this.started)
+    };
+  }
+};
+
 // web/src/runtime/vir-codec.js
 function asBytes(bytes, label) {
   if (bytes instanceof Uint8Array) {
@@ -6066,17 +6125,38 @@ var ObjectValueRuntime = class {
     }
     objects.length = 0;
   }
-  callResolvedObjects(entry, cache, argObjs, liftResult) {
+  callResolvedObjects(entry, cache, argObjs, liftResult, timing = null) {
     const callSlot = this.resolveCallSlot(entry, cache);
     let argvPtr = 0;
     let resultObj = 0;
+    let decodeStarted;
     try {
       this.hostState?.clearCallError();
       if (argObjs.length !== 0) {
-        argvPtr = this.allocByteLength(argObjs.length * 4, `${entry.entry} argv pointer array`);
-        this.writePointerArray(argvPtr, argObjs);
+        const marshalStarted = timing?.beginPhase();
+        try {
+          argvPtr = this.allocByteLength(argObjs.length * 4, `${entry.entry} argv pointer array`);
+          this.writePointerArray(argvPtr, argObjs);
+        } finally {
+          if (timing !== null) timing.endMarshal(marshalStarted);
+        }
       }
-      resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+      if (timing === null) {
+        resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+      } else {
+        this.hostState?.beginCallTiming(timing);
+        const executeStarted = timing.beginPhase();
+        try {
+          resultObj = this.exports.vir_call_resolved_objects(callSlot, argvPtr, argObjs.length);
+        } finally {
+          try {
+            timing.endExecute(executeStarted);
+          } finally {
+            this.hostState?.endCallTiming(timing);
+          }
+        }
+      }
+      decodeStarted = timing?.beginPhase();
       argObjs.length = 0;
       const hostError = this.hostState?.takeCallError();
       if (hostError) {
@@ -6096,6 +6176,9 @@ var ObjectValueRuntime = class {
       }
       if (resultObj !== 0) {
         this.exports.vir_obj_dec(resultObj);
+      }
+      if (timing !== null && decodeStarted !== void 0) {
+        timing.endDecode(decodeStarted);
       }
     }
   }
@@ -6905,6 +6988,15 @@ var VirRuntime = class extends ObjectValueRuntime {
     }
     return this.callEntry(entry, args);
   }
+  callTimed(name, ...args) {
+    const timing = new RuntimeCallTiming();
+    const entry = this.findManifestEntry(name);
+    if (entry === null) {
+      throw new Error(`interface entry not found: ${name}`);
+    }
+    const value = this.callEntry(entry, args, timing);
+    return { value, timings: timing.finish() };
+  }
   runStartupEntries() {
     this.requireLiveRuntime();
     if (this.interfaceManifest === null) {
@@ -6917,20 +7009,20 @@ var VirRuntime = class extends ObjectValueRuntime {
       }
     }
   }
-  callEntry(entry, args) {
+  callEntry(entry, args, timing = null) {
     this.requireLiveRuntime();
     this.requireFunction("vir_resolve_call_export");
     if (args.length !== entry.args.length) {
       throw new Error(`${entry.entry} expects ${entry.args.length} arguments, got ${args.length}`);
     }
     const cache = this.callCacheFor(entry);
-    const objectResult = this.tryObjectResolvedCall(entry, args, cache);
+    const objectResult = this.tryObjectResolvedCall(entry, args, cache, timing);
     if (objectResult !== OBJECT_CALL_UNAVAILABLE) {
       return objectResult;
     }
     throw new Error(`object ABI does not support interface entry ${entry.entry}`);
   }
-  tryObjectResolvedCall(entry, args, cache) {
+  tryObjectResolvedCall(entry, args, cache, timing = null) {
     const plan = this.objectCallPlanFor(entry, cache);
     if (plan === null) {
       return OBJECT_CALL_UNAVAILABLE;
@@ -6940,11 +7032,16 @@ var VirRuntime = class extends ObjectValueRuntime {
     }
     const argObjs = [];
     try {
-      for (let index = 0; index < plan.args.length; index++) {
-        const arg = plan.args[index];
-        argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
+      const marshalStarted = timing?.beginPhase();
+      try {
+        for (let index = 0; index < plan.args.length; index++) {
+          const arg = plan.args[index];
+          argObjs.push(this.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`));
+        }
+      } finally {
+        if (timing !== null) timing.endMarshal(marshalStarted);
       }
-      return this.callResolvedObjects(entry, cache, argObjs, (resultObj) => this.liftOwnedObjectValue(plan.resultType, resultObj, `${entry.entry} result`));
+      return this.callResolvedObjects(entry, cache, argObjs, (resultObj) => this.liftOwnedObjectValue(plan.resultType, resultObj, `${entry.entry} result`), timing);
     } finally {
       this.releaseOwnedObjects(argObjs);
     }
@@ -7177,6 +7274,7 @@ var VirHostState = class {
     this.resourceRoots = new ExternrefResourceRoots();
     this.leanObjectHandleCells = /* @__PURE__ */ new Set();
     this.callError = null;
+    this.callTimings = [];
     this.finalizerErrorMessages = [];
     this.droppedFinalizerErrors = 0;
     this.disposed = false;
@@ -7194,6 +7292,14 @@ var VirHostState = class {
   }
   clearCallError() {
     this.callError = null;
+  }
+  beginCallTiming(timing) {
+    this.callTimings.push(timing);
+  }
+  endCallTiming(timing) {
+    if (this.callTimings.pop() !== timing) {
+      throw new Error("Vir host call timing stack is inconsistent");
+    }
   }
   recordCallError(error) {
     if (this.callError === null) {
@@ -7244,6 +7350,16 @@ var VirHostState = class {
     this.resourceRoots.clear();
   }
   callObjects(slot, argvPtr, argc) {
+    const timing = this.callTimings[this.callTimings.length - 1] ?? null;
+    if (timing === null) return this.callObjectsImpl(slot, argvPtr, argc);
+    const started = timing.beginHost();
+    try {
+      return this.callObjectsImpl(slot, argvPtr, argc);
+    } finally {
+      timing.endHost(started);
+    }
+  }
+  callObjectsImpl(slot, argvPtr, argc) {
     if (this.disposed) {
       throw new Error("Vir host state has been disposed");
     }
