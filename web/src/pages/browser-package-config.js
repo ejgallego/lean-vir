@@ -34,7 +34,7 @@ export function deriveBrowserPackageConfig(browserPackageConfig) {
   const prettyPackageFile = packageFileById.get("pretty-printer") ?? "pretty-printer.irpkg";
   const leanPackageFile = packageFileById.get("fixtures-lean") ?? "fixtures-lean.irpkg";
   const boundaryPackageFile = packageFileById.get("fixtures-boundary") ?? "fixtures-boundary.irpkg";
-  const benchmarkPublicFiles = [wasmPublicFile, defaultPackageFile, hostPackageFile];
+  const benchmarkPublicFiles = [wasmPublicFile, defaultPackageFile, hostPackageFile, prettyPackageFile];
   const generatedPublicFiles = [
     wasmPublicFile,
     wasmDevPublicFile,

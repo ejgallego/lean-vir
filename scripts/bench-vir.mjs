@@ -14,6 +14,7 @@ import {
   benchmarkArtifactPaths,
   defaultPackageFile,
   hostPackageFile,
+  prettyPackageFile,
   publicArtifactPath,
   wasmPublicFile,
 } from "./browser-package-config.mjs";
@@ -33,6 +34,11 @@ import {
   ensureVirtualElementState,
 } from "../web/src/vir-runtime-node.js";
 import { runSync } from "./process-utils.mjs";
+import {
+  balancedStdFormatAppend,
+  stdFormat,
+  taggedStdFormatChunks,
+} from "./std-format-values.mjs";
 
 const root = new URL("..", import.meta.url);
 
@@ -55,6 +61,10 @@ const baseLowerIterations = 20000;
 const lowerScalarRecordIterations = 20000;
 const lowerNestedRecordIterations = 20000;
 const lowerRecursiveValueIterations = 20000;
+const formatTagIterations = 4;
+const formatTagLowerIterations = 8;
+const formatEmptyIterations = 12;
+const formatEmptyLowerIterations = 20;
 const reactTextRenderIterations = 300;
 const reactTextRenderWidth = 40;
 const reactCallbackRenderIterations = 200;
@@ -108,6 +118,10 @@ const baseStringInput = "Lean IR boundary Aé∀Z ".repeat(8);
 const baseByteArrayInput = Uint8Array.from(Array.from({ length: 128 }, (_, index) => (index * 17) & 0xff));
 const baseArrayNatInput = Array.from({ length: 64 }, (_, index) => index + 1);
 const baseArrayStringInput = Array.from({ length: 32 }, (_, index) => `s${index}`);
+const formatTagInput = taggedStdFormatChunks(64, 64);
+const formatEmptyInput = balancedStdFormatAppend(
+  Array.from({ length: 1024 }, () => stdFormat.nil()),
+);
 const args = parseArgs(process.argv.slice(2));
 
 function parseArgs(argv) {
@@ -153,20 +167,27 @@ function printUsage() {
 }
 
 async function instantiateRuntimes() {
-  const wasm = await readPublicArtifact(wasmPublicFile);
-  const irPackage = await readPublicArtifact(defaultPackageFile);
-  const hostPackage = await readPublicArtifact(hostPackageFile);
+  const [wasm, irPackage, hostPackage, prettyPackage] = await Promise.all([
+    readPublicArtifact(wasmPublicFile),
+    readPublicArtifact(defaultPackageFile),
+    readPublicArtifact(hostPackageFile),
+    readPublicArtifact(prettyPackageFile),
+  ]);
   const virtualDocumentState = createVirtualDocumentState();
   ensureVirtualElementState(virtualDocumentState, "#bench-dom");
   ensureVirtualElementState(virtualDocumentState, "#bench-react");
   const runtime = await createBrowserVirRuntime({ wasmBytes: wasm, irPackageSetBytes: [irPackage] });
+  const prettyRuntime = await createBrowserVirRuntime({
+    wasmBytes: wasm,
+    irPackageSetBytes: [prettyPackage],
+  });
   const hostRuntime = await createNodeVirRuntime({
     wasmBytes: wasm,
     irPackageSetBytes: [hostPackage],
     virtualDocumentState,
     hostBindings: createBenchmarkHostBindings(),
   });
-  return { runtime, hostRuntime };
+  return { runtime, hostRuntime, prettyRuntime };
 }
 
 function readPublicArtifact(file) {
@@ -288,10 +309,11 @@ function benchmarkJsReportRow(name, title, js) {
   };
 }
 
-function benchmarkConversionReportRow(name, title, lower, wasm) {
+function benchmarkConversionReportRow(name, title, lower, wasm, benchmarkClass = null) {
   return {
     name,
     title,
+    ...(benchmarkClass === null ? {} : { class: benchmarkClass }),
     lower: benchmarkSampleReport(lower),
     wasm: benchmarkSampleReport(wasm),
   };
@@ -342,42 +364,52 @@ const artifactCache = await ensureCachedBenchArtifacts({
   options: args,
   build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
 });
-const { runtime, hostRuntime } = await instantiateRuntimes();
+const { runtime, hostRuntime, prettyRuntime } = await instantiateRuntimes();
 
-function manifestEntry(name) {
-  const entry = runtime.findManifestEntry(name);
+function manifestEntry(benchmarkRuntime, name) {
+  const entry = benchmarkRuntime.findManifestEntry(name);
   if (entry === null) {
     throw new Error(`benchmark interface entry not found: ${name}`);
   }
   return entry;
 }
 
-function benchLowerCallObjects(label, iterations, entry, args) {
+function benchLowerCallObjects(benchmarkRuntime, label, iterations, entry, args) {
   return benchRepeated(label, iterations, () => {
     let acc = 0;
     for (let i = 0; i < iterations; i++) {
       const objects = [];
       try {
         entry.args.forEach((arg, index) => {
-          const obj = runtime.makeObjectValue(arg.type, args[index], `${entry.entry} argument ${arg.name}`);
+          const obj = benchmarkRuntime.makeObjectValue(
+            arg.type,
+            args[index],
+            `${entry.entry} argument ${arg.name}`,
+          );
           objects.push(obj);
           acc += obj === 0 ? 0 : 1;
         });
       } finally {
-        runtime.releaseOwnedObjects(objects);
+        benchmarkRuntime.releaseOwnedObjects(objects);
       }
     }
     return acc;
   });
 }
 
-function benchBoundaryConversionCase(testCase) {
-  const entry = manifestEntry(testCase.entry);
-  const lower = benchLowerCallObjects(`lower-${testCase.name}`, testCase.lowerIterations ?? baseLowerIterations, entry, testCase.args);
+function benchBoundaryConversionCase(benchmarkRuntime, testCase) {
+  const entry = manifestEntry(benchmarkRuntime, testCase.entry);
+  const lower = benchLowerCallObjects(
+    benchmarkRuntime,
+    `lower-${testCase.name}`,
+    testCase.lowerIterations ?? baseLowerIterations,
+    entry,
+    testCase.args,
+  );
   const wasm = benchRepeated(testCase.name, testCase.iterations, () => {
     let acc = 0;
     for (let i = 0; i < testCase.iterations; i++) {
-      acc += testCase.checksum(runtime.call(testCase.entry, ...testCase.args));
+      acc += testCase.checksum(benchmarkRuntime.call(testCase.entry, ...testCase.args));
     }
     return acc;
   });
@@ -397,6 +429,15 @@ function checksumString(value) {
     throw new Error(`expected benchmark string result, got ${typeof value}`);
   }
   return value.length;
+}
+
+function checksumExactString(expected) {
+  return (value) => {
+    if (value !== expected) {
+      throw new Error(`expected benchmark output ${JSON.stringify(expected)}, got ${JSON.stringify(value)}`);
+    }
+    return value.length;
+  };
 }
 
 function checksumByteArray(value) {
@@ -476,10 +517,10 @@ function benchTopLevelDispatch(entry) {
   }]));
 }
 
-const dispatchEntry = manifestEntry("Vir.Fixtures.Basic.branchAndSub");
-const scalarRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileStatsScore");
-const nestedRecordEntry = manifestEntry("Vir.Fixtures.InterfaceShapes.profileEnvelopeScore");
-const recursiveValueEntry = manifestEntry("Vir.Fixtures.RecursiveTypes.jsonRootScore");
+const dispatchEntry = manifestEntry(runtime, "Vir.Fixtures.Basic.branchAndSub");
+const scalarRecordEntry = manifestEntry(runtime, "Vir.Fixtures.InterfaceShapes.profileStatsScore");
+const nestedRecordEntry = manifestEntry(runtime, "Vir.Fixtures.InterfaceShapes.profileEnvelopeScore");
+const recursiveValueEntry = manifestEntry(runtime, "Vir.Fixtures.RecursiveTypes.jsonRootScore");
 const baseConversionCases = [
   {
     name: "base-unit",
@@ -603,8 +644,34 @@ const baseConversionCases = [
   },
 ];
 
+const formatConversionCases = [
+  {
+    name: "format-tag-transitions",
+    title: `Std.Format tag transitions (64 x 64, 4,223 nodes) x ${formatTagIterations}`,
+    class: "representative",
+    entry: "Vir.Fixtures.FormatPretty.formatBoundaryPretty",
+    args: [formatTagInput, 80],
+    iterations: formatTagIterations,
+    lowerIterations: formatTagLowerIterations,
+    checksum: checksumExactString("x".repeat(64)),
+  },
+  {
+    name: "format-empty-nodes",
+    title: `Std.Format empty append tree (2,047 nodes) x ${formatEmptyIterations}`,
+    class: "focused",
+    entry: "Vir.Fixtures.FormatPretty.formatBoundaryPretty",
+    args: [formatEmptyInput, 80],
+    iterations: formatEmptyIterations,
+    lowerIterations: formatEmptyLowerIterations,
+    checksum: checksumExactString(""),
+  },
+];
+
 const dispatch = benchTopLevelDispatch(dispatchEntry);
-const baseConversionBenchmarks = baseConversionCases.map(benchBoundaryConversionCase);
+const baseConversionBenchmarks = baseConversionCases.map((testCase) =>
+  benchBoundaryConversionCase(runtime, testCase));
+const formatConversionBenchmarks = formatConversionCases.map((testCase) =>
+  benchBoundaryConversionCase(prettyRuntime, testCase));
 
 const wasmFib = benchRepeated("fib", fibIterations, () => {
   let acc = 0;
@@ -625,6 +692,7 @@ const wasmSort = benchRepeated("sort", sortIterations, () => {
 const hostSort = benchHostIr("sort", sortIterations, ["sort", String(sortIterations), sortInput.join(",")]);
 
 const jsLowerScalarRecord = benchLowerCallObjects(
+  runtime,
   "lower-scalar-record",
   lowerScalarRecordIterations,
   scalarRecordEntry,
@@ -632,6 +700,7 @@ const jsLowerScalarRecord = benchLowerCallObjects(
 );
 
 const jsLowerNestedRecord = benchLowerCallObjects(
+  runtime,
   "lower-nested-record",
   lowerNestedRecordIterations,
   nestedRecordEntry,
@@ -639,6 +708,7 @@ const jsLowerNestedRecord = benchLowerCallObjects(
 );
 
 const jsLowerRecursiveValue = benchLowerCallObjects(
+  runtime,
   "lower-recursive-value",
   lowerRecursiveValueIterations,
   recursiveValueEntry,
@@ -732,6 +802,12 @@ for (const testCase of baseConversionBenchmarks) {
   printConversionRow(testCase.title, testCase.lower, testCase.wasm);
   console.log();
 }
+console.log("Std.Format conversion paths");
+console.log();
+for (const testCase of formatConversionBenchmarks) {
+  printConversionRow(testCase.title, testCase.lower, testCase.wasm);
+  console.log();
+}
 printJsRow(`JS object scalar record/enums lower x ${lowerScalarRecordIterations}`, jsLowerScalarRecord);
 console.log();
 printJsRow(`JS object nested record/list/option lower x ${lowerNestedRecordIterations}`, jsLowerNestedRecord);
@@ -778,6 +854,14 @@ if (args.jsonPath !== null) {
     benchmarkReportRow("sort", `sort/checksum ${sortInput.length} items x ${sortIterations}`, wasmSort, hostSort),
     ...baseConversionBenchmarks.map((testCase) =>
       benchmarkConversionReportRow(testCase.name, testCase.title, testCase.lower, testCase.wasm)),
+    ...formatConversionBenchmarks.map((testCase) =>
+      benchmarkConversionReportRow(
+        testCase.name,
+        testCase.title,
+        testCase.lower,
+        testCase.wasm,
+        testCase.class,
+      )),
     benchmarkJsReportRow(
       "lower-scalar-record",
       `JS object scalar record/enums lower x ${lowerScalarRecordIterations}`,
@@ -843,3 +927,4 @@ if (args.jsonPath !== null) {
 
 runtime.dispose();
 hostRuntime.dispose();
+prettyRuntime.dispose();
