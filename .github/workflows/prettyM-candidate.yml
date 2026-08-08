@@ -1,0 +1,88 @@
+name: prettyM candidate artifact
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - ".github/workflows/prettyM-candidate.yml"
+      - "benchmarks/prettyM-web/artifact-builds.json"
+      - "benchmarks/prettyM-web/package-lock.json"
+      - "benchmarks/prettyM-web/package.json"
+      - "benchmarks/prettyM-web/index.html"
+      - "benchmarks/prettyM-web/scripts/**"
+      - "benchmarks/prettyM-web/src/**"
+      - "benchmarks/prettyM-web/static/**"
+      - "benchmarks/prettyM-web/styles/**"
+      - "benchmarks/prettyM-web/test/**"
+  pull_request:
+    paths:
+      - ".github/workflows/prettyM-candidate.yml"
+      - "benchmarks/prettyM-web/artifact-builds.json"
+      - "benchmarks/prettyM-web/package-lock.json"
+      - "benchmarks/prettyM-web/package.json"
+      - "benchmarks/prettyM-web/index.html"
+      - "benchmarks/prettyM-web/scripts/**"
+      - "benchmarks/prettyM-web/src/**"
+      - "benchmarks/prettyM-web/static/**"
+      - "benchmarks/prettyM-web/styles/**"
+      - "benchmarks/prettyM-web/test/**"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.head_ref || github.ref_name }}
+  cancel-in-progress: true
+
+jobs:
+  build-candidate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+          cache: npm
+          cache-dependency-path: benchmarks/prettyM-web/package-lock.json
+
+      - name: Install Lean toolchain manager
+        run: |
+          curl -sSf https://raw.githubusercontent.com/leanprover/elan/master/elan-init.sh \
+            | sh -s -- -y --default-toolchain "$(cat lean-toolchain)"
+          echo "$HOME/.elan/bin" >> "$GITHUB_PATH"
+
+      - name: Install benchmark dependencies
+        run: npm --prefix benchmarks/prettyM-web ci
+
+      - name: Materialize catalogued sources
+        run: npm --prefix benchmarks/prettyM-web run artifacts:sources -- prettyM
+
+      - name: Cache producer toolchains
+        uses: actions/cache@v4
+        with:
+          path: |
+            benchmarks/prettyM-web/_artifacts/npm-cache
+            benchmarks/prettyM-web/_sources/vir/.tools/cache
+            benchmarks/prettyM-web/_sources/vir/third_party/lean4-src
+            benchmarks/prettyM-web/_sources/fir/.deps/lcnf-c-wasm
+          key: ${{ runner.os }}-${{ runner.arch }}-prettyM-producers-${{ hashFiles('benchmarks/prettyM-web/artifact-builds.json') }}
+
+      - name: Install Chromium
+        run: npm --prefix benchmarks/prettyM-web run playwright:install
+
+      - name: Build and validate candidate
+        run: npm --prefix benchmarks/prettyM-web run artifacts:candidate -- prettyM --prepare
+
+      - name: Upload candidate archive and receipt
+        uses: actions/upload-artifact@v4
+        with:
+          name: prettyM-candidate-${{ github.event.pull_request.head.sha || github.sha }}
+          path: benchmarks/prettyM-web/_artifacts/candidates/prettyM/upload
+          if-no-files-found: error
+          retention-days: 14

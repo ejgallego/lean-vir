@@ -1,0 +1,128 @@
+import assert from "node:assert/strict";
+import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
+import { fileURLToPath } from "node:url";
+import test from "node:test";
+
+import {
+  canonicalJson,
+  createTar,
+  extractTar,
+  requiredArtifactFiles,
+  safeArchivePath,
+  verifyArtifactSet,
+} from "../scripts/artifact-set-lib.mjs";
+import {
+  artifactSetConfig,
+  checkoutSources,
+  componentOrder,
+  readBuildDatabase,
+} from "../scripts/artifact-build-lib.mjs";
+
+const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
+const scratch = join(appRoot, "test-results", "artifact-set-unit");
+
+test("the prettyM source build is complete and materializes pack provenance", async () => {
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
+  const build = database.builds.prettyM;
+  assert.deepEqual(componentOrder(build), ["vir", "native", "llvm"]);
+  assert.deepEqual(
+    Object.values(build.components)
+      .flatMap((component) => Object.values(component.producer.files))
+      .sort(),
+    [...requiredArtifactFiles].sort(),
+  );
+
+  const sources = checkoutSources(database, "prettyM");
+  assert.equal(
+    sources.vir.revision,
+    "64e30784da16957cca92951344d776f895b30491",
+  );
+  assert.equal(
+    sources.fir.revision,
+    "298682a766d80e90053d3e76ee2f3e4af78a52aa",
+  );
+  assert.equal(
+    sources.workload.revision,
+    "ff1dc854f00a0cdd9e90a2489166028a07ae95bb",
+  );
+
+  const config = artifactSetConfig(database, "prettyM");
+  assert.equal(config.setId, "prettyM-bounded-set-0001");
+  assert.equal(
+    config.components.vir.runtime.repository,
+    "https://github.com/ejgallego/lean-vir",
+  );
+  assert.equal(
+    config.components.vir.runtime.sourceCommit,
+    sources.vir.revision,
+  );
+  assert.deepEqual(config.components.vir.workload.source, {
+    repository: "https://github.com/leanprover/verso-slides",
+    commit: sources.workload.revision,
+    file: "VersoSlides/Pretty.lean",
+    dirty: false,
+  });
+});
+
+test("creates a deterministic normalized tar and extracts only regular files", async () => {
+  const source = join(scratch, "source");
+  const extracted = join(scratch, "extracted");
+  await rm(scratch, { recursive: true, force: true });
+  await mkdir(join(source, "nested"), { recursive: true });
+  await writeFile(join(source, "z.txt"), "last\n");
+  await writeFile(join(source, "nested", "a.txt"), "first\n");
+
+  const paths = ["z.txt", "nested/a.txt"];
+  const first = await createTar(source, paths);
+  const second = await createTar(source, paths.toReversed());
+  assert.deepEqual(first, second);
+  assert.deepEqual(await extractTar(first, extracted), [
+    "nested/a.txt",
+    "z.txt",
+  ]);
+  assert.equal(
+    await readFile(join(extracted, "nested", "a.txt"), "utf8"),
+    "first\n",
+  );
+  assert.equal(await readFile(join(extracted, "z.txt"), "utf8"), "last\n");
+});
+
+test("rejects unsafe paths and corrupted headers", async () => {
+  for (const path of ["/absolute", "../escape", "a/../escape", "a\\b"])
+    assert.throws(() => safeArchivePath(path), /unsafe archive path/);
+
+  const source = join(scratch, "corrupt-source");
+  const extracted = join(scratch, "corrupt-extracted");
+  await mkdir(source, { recursive: true });
+  await writeFile(join(source, "safe.txt"), "safe\n");
+  const archive = await createTar(source, ["safe.txt"]);
+  archive[0] ^= 1;
+  await assert.rejects(() => extractTar(archive, extracted), /tar checksum/);
+});
+
+test("canonical JSON is independent of object insertion order", () => {
+  assert.equal(
+    canonicalJson({ z: 1, a: { y: 2, b: 3 } }),
+    canonicalJson({ a: { b: 3, y: 2 }, z: 1 }),
+  );
+});
+
+test("rejects undeclared artifact-set members", async () => {
+  const directory = join(scratch, "unexpected-member");
+  await mkdir(directory, { recursive: true });
+  await writeFile(
+    join(directory, "ARTIFACT_SET.json"),
+    canonicalJson({
+      schemaVersion: 1,
+      kind: "prettyM-artifact-set",
+      setId: "prettyM-test",
+      files: {},
+    }),
+  );
+  await writeFile(join(directory, "SHA256SUMS"), "");
+  await writeFile(join(directory, "surprise.txt"), "not declared\n");
+  await assert.rejects(() => verifyArtifactSet(directory), /unexpected member/);
+});

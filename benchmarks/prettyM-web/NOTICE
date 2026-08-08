@@ -1,0 +1,14 @@
+Lean VIR
+Copyright (c) 2026 Lean FRO LLC. All rights reserved.
+Released under Apache 2.0 license as described in the file LICENSE.
+Author: Emilio J. Gallego Arias
+
+This project downloads, compiles, links against, and documents behavior of
+Lean 4. Lean 4 is licensed under the Apache License, Version 2.0 and carries
+its own upstream copyright notices, including notices in source files such as
+`src/library/ir_interpreter.cpp`.
+
+The Lean source checkout is fetched into `third_party/lean4-src` by
+`scripts/fetch-lean-source.sh` and is not committed to this repository.
+Generated WASM artifacts may include object code compiled from Lean 4 source;
+retain Lean's license and upstream notices when distributing those artifacts.
