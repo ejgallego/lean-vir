@@ -359,16 +359,30 @@ after the Vite build, so the existing Pages workflow publishes the report and
 the demo as one atomic artifact from `main`.
 
 The left navigator treats dotted Lean module names as folders and files. Both
-folders and modules show a selectable public-constant or all-IR coverage
-percentage. Selecting a folder shows its immediate subfolders/modules and
-aggregate counts. Selecting a module loads only that module's function data,
+folders and modules show a compact progress bar and exact percentage for the
+selected public-constant or all-IR metric. A four-band color scale distinguishes
+low, developing, strong, and broad coverage; folder tables use the same visual
+language alongside exact ratios. The first-class **Top blockers** view ranks
+every primary boundary and has a stable `#view=blockers` link. Selecting a
+folder shows its immediate subfolders/modules and aggregate counts. Selecting a
+module loads only that module's function data,
 inserts its extern boundaries in name order, and provides declaration-name,
-status, and class filters. Blocked function rows show the primary boundary;
+status, and class filters. The status filter remains selected while navigating
+between module pages. Blocked function rows show the primary boundary;
 linkable boundaries open their owning extern row and expose the backend target,
 blocked-root impact, and representative dependency path. Declaration links use
 the `#declaration=...` fragment and can be shared directly. Extern targets also
 open the matching backend-symbol search in the deployed Wasm size explorer;
 retained symbols link back to these declaration fragments.
+
+The size bridge also carries each extern's deterministic primary-blocker counts.
+The size explorer uses those counts only as current frontier pressure. They are
+additive across primary blockers, but they remain an upper bound rather than an
+unlock forecast; use an A/B surface comparison to measure the exact benefit of
+a runtime change. Its wider Lean context also matches installed native function
+aliases to exact retained Wasm linker symbols. This refines whole-object
+membership into function-level retained coverage without treating native and
+Wasm byte sizes as interchangeable.
 
 The generated directory contains a navigation index with the comparatively
 small extern catalog plus one compact JavaScript data file per module with

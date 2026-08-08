@@ -136,6 +136,7 @@ h1 {
 
 .toolbar {
   display: flex;
+  flex-wrap: wrap;
   align-items: end;
   justify-content: space-between;
   gap: 1rem;
@@ -184,6 +185,35 @@ h1 {
 
 .search-control {
   width: min(100%, 28rem);
+}
+
+.depth-control {
+  width: 10.5rem;
+}
+
+.depth-control .control-label {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.5rem;
+}
+
+.depth-control output {
+  color: var(--accent);
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.depth-control input {
+  width: 100%;
+  accent-color: var(--accent);
+}
+
+.depth-scale {
+  display: flex;
+  justify-content: space-between;
+  color: var(--muted);
+  font-size: 0.62rem;
+  font-variant-numeric: tabular-nums;
 }
 
 .search-control input {
@@ -252,6 +282,48 @@ input:focus {
   text-align: right;
 }
 
+.color-legend {
+  display: grid;
+  grid-template-columns: auto auto minmax(12rem, 28rem) auto;
+  align-items: center;
+  justify-content: end;
+  gap: 0.55rem;
+  min-height: 2.2rem;
+  padding: 0.35rem 1rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  background: #fafcfc;
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.color-legend[hidden] {
+  display: none;
+}
+
+.color-legend strong {
+  color: var(--text);
+  font-size: 0.7rem;
+}
+
+.color-legend-gradient {
+  height: 0.55rem;
+  border: 1px solid rgb(65 81 89 / 20%);
+  border-radius: 999px;
+}
+
+.color-legend.boundary .color-legend-gradient {
+  background: linear-gradient(90deg, #d7dde0, #78cfad);
+}
+
+.color-legend.frontier .color-legend-gradient {
+  background: linear-gradient(90deg, #dfe4e6, hsl(14 76% 51%));
+}
+
+.color-legend-value {
+  white-space: nowrap;
+}
+
 .explorer-layout {
   display: grid;
   grid-template-columns: minmax(0, 1fr) minmax(18rem, 23rem);
@@ -281,6 +353,23 @@ input:focus {
   background: hsl(var(--block-hue) 56% 86%);
 }
 
+.map-block.depth-2 {
+  border-width: 1px;
+  background: hsl(var(--block-hue) 48% 91%);
+}
+
+.map-block.depth-3 {
+  border-width: 1px;
+  background: hsl(var(--block-hue) 42% 94%);
+}
+
+.map-block.depth-4,
+.map-block.depth-5,
+.map-block.depth-6 {
+  border-width: 1px;
+  background: hsl(var(--block-hue) 36% 96%);
+}
+
 .map-block:hover,
 .map-block:focus-visible {
   z-index: 4;
@@ -294,27 +383,34 @@ input:focus {
   box-shadow: inset 0 0 0 4px #df4c2f, 0 0 0 2px #ffffff;
 }
 
-.map-block.in-boundary {
-  color: #10382f;
-  background: #86d2b7;
-}
-
-.map-block.in-boundary.depth-1 {
-  background: #a9e1cd;
-}
-
-.map-block.outside-boundary {
-  color: #354248;
-  background: #d7dde0;
-}
-
-.map-block.outside-boundary.depth-1 {
-  background: #e3e7e9;
-}
-
+.map-block.in-boundary,
+.map-block.outside-boundary,
 .map-block.mixed-boundary {
   color: #173b35;
-  background: #b9d6cd;
+  background: color-mix(
+    in srgb,
+    #78cfad var(--boundary-percent),
+    #d7dde0
+  );
+}
+
+.map-block.frontier-pressure {
+  color: #421d16;
+  background: hsl(14 76% calc(var(--frontier-lightness) * 1%));
+}
+
+.map-block.no-frontier-pressure {
+  color: #354248;
+  background: #dfe4e6;
+}
+
+.map-block.frontier-pressure.depth-1,
+.map-block.frontier-pressure.depth-2,
+.map-block.frontier-pressure.depth-3,
+.map-block.frontier-pressure.depth-4,
+.map-block.frontier-pressure.depth-5,
+.map-block.frontier-pressure.depth-6 {
+  filter: saturate(0.92) brightness(1.05);
 }
 
 .block-label {
@@ -355,8 +451,12 @@ input:focus {
   overflow: hidden;
 }
 
-.map-block.depth-1 .nested-map {
-  display: none;
+.map-block.depth-1 > .nested-map,
+.map-block.depth-2 > .nested-map,
+.map-block.depth-3 > .nested-map,
+.map-block.depth-4 > .nested-map,
+.map-block.depth-5 > .nested-map {
+  inset: 1.8rem 0.12rem 0.12rem;
 }
 
 .details-panel {
@@ -398,6 +498,8 @@ input:focus {
 }
 
 .detail-stats dd {
+  max-width: 13rem;
+  overflow-wrap: anywhere;
   margin: 0;
   font-variant-numeric: tabular-nums;
   font-weight: 680;
@@ -448,6 +550,12 @@ input:focus {
 
 .detail-actions li + li {
   margin-top: 0.25rem;
+}
+
+.detail-actions-remainder {
+  margin: 0.55rem 0 0;
+  color: var(--muted);
+  font-size: 0.7rem;
 }
 
 .detail-actions a {
@@ -536,7 +644,7 @@ input:focus {
 
 .method-grid {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(14rem, 1fr));
   gap: 1.2rem;
 }
 
@@ -618,6 +726,15 @@ input:focus {
 
   .view-note {
     text-align: left;
+  }
+
+  .color-legend {
+    grid-template-columns: auto 1fr auto;
+    justify-content: stretch;
+  }
+
+  .color-legend strong {
+    grid-column: 1 / -1;
   }
 
   .treemap {

@@ -35,6 +35,8 @@ Author: Emilio J. Gallego Arias
   const main = document.querySelector("#report-main");
   const metricSelect = document.querySelector("#metric-select");
   const moduleSearch = document.querySelector("#module-search");
+  const librariesView = document.querySelector("#libraries-view");
+  const blockersView = document.querySelector("#top-blockers-view");
   const moduleCache = new Map();
   const modulePromises = new Map();
   const state = {
@@ -62,6 +64,8 @@ Author: Emilio J. Gallego Arias
   };
 
   renderReportIdentity();
+  librariesView.addEventListener("click", () => selectFolder(rootFolder));
+  blockersView.addEventListener("click", () => selectTopBlockers());
   metricSelect.addEventListener("change", () => {
     state.metric = metricSelect.value;
     renderTree();
@@ -72,7 +76,9 @@ Author: Emilio J. Gallego Arias
   });
 
   const initial = selectionFromHash();
-  if (initial?.type === "module") {
+  if (initial?.type === "blockers") {
+    selectTopBlockers(false);
+  } else if (initial?.type === "module") {
     selectModule(initial.value, false, initial.focusDeclaration);
   } else if (initial?.type === "folder") {
     selectFolder(initial.value, false);
@@ -171,6 +177,10 @@ Author: Emilio J. Gallego Arias
       headerStat(percentage(report.counts.runnable, report.counts.total), "All IR functions"),
       headerStat(number.format(report.counts.blocked), "Blocked functions"),
     );
+    document.querySelector("#libraries-view-count").textContent =
+      number.format(report.selectedModuleCount);
+    document.querySelector("#top-blockers-view-count").textContent =
+      number.format(report.primaryBlockers.length);
   }
 
   function headerStat(value, label) {
@@ -235,7 +245,7 @@ Author: Emilio J. Gallego Arias
       state.expanded.add(folder.path);
       selectFolder(folder);
     });
-    row.append(toggle, label, treePercentage(folder.counts));
+    row.append(toggle, label, treeCoverage(folder.counts));
     wrapper.append(row);
     if (expanded) {
       const children = element("div", "tree-children");
@@ -254,15 +264,18 @@ Author: Emilio J. Gallego Arias
     label.type = "button";
     label.title = module.name;
     label.addEventListener("click", () => selectModule(module));
-    row.append(spacer, label, treePercentage(module.counts));
+    row.append(spacer, label, treeCoverage(module.counts));
     return row;
   }
 
-  function treePercentage(counts) {
+  function treeCoverage(counts) {
     const [runnable, total] = metricValues(counts, state.metric);
+    const coverage = element("span", "tree-coverage");
+    coverage.append(progressBar(runnable, total, "tree-progress"));
     const badge = element("span", "tree-percent", percentage(runnable, total));
     badge.title = `${number.format(runnable)} / ${number.format(total)}`;
-    return badge;
+    coverage.append(badge);
+    return coverage;
   }
 
   function selectFolder(folder, updateHash = true) {
@@ -271,6 +284,7 @@ Author: Emilio J. Gallego Arias
     state.requestVersion += 1;
     expandFolderAncestors(folder.path);
     if (updateHash) setHash("folder", folder.path);
+    renderViewNavigation();
     renderTree();
     renderFolder(folder);
   }
@@ -279,7 +293,7 @@ Author: Emilio J. Gallego Arias
     state.selectedType = "module";
     state.selectedValue = module;
     state.functionQuery = focusDeclaration?.toLowerCase() ?? "";
-    state.functionStatus = "all";
+    if (focusDeclaration) state.functionStatus = "all";
     state.functionKind = focusDeclaration ? "extern" : "all";
     state.visibleFunctions = 200;
     state.focusDeclaration = focusDeclaration;
@@ -288,6 +302,7 @@ Author: Emilio J. Gallego Arias
       setHash(focusDeclaration ? "declaration" : "module", focusDeclaration ?? module.name);
     }
     const requestVersion = ++state.requestVersion;
+    renderViewNavigation();
     renderTree();
     renderModuleLoading(module);
     if (module.dataPath === null) {
@@ -301,6 +316,24 @@ Author: Emilio J. Gallego Arias
     });
   }
 
+  function selectTopBlockers(updateHash = true) {
+    state.selectedType = "blockers";
+    state.selectedValue = null;
+    state.requestVersion += 1;
+    if (updateHash) setHash("view", "blockers");
+    renderViewNavigation();
+    renderTree();
+    renderTopBlockersView();
+  }
+
+  function renderViewNavigation() {
+    const blockersSelected = state.selectedType === "blockers";
+    blockersView.classList.toggle("selected", blockersSelected);
+    blockersView.setAttribute("aria-current", blockersSelected ? "page" : "false");
+    librariesView.classList.toggle("selected", !blockersSelected);
+    librariesView.setAttribute("aria-current", blockersSelected ? "false" : "page");
+  }
+
   function renderFolder(folder) {
     main.replaceChildren(
       renderBreadcrumbs(folder.path, null),
@@ -309,8 +342,27 @@ Author: Emilio J. Gallego Arias
       renderFolderContents(folder),
     );
     if (folder === rootFolder && report.primaryBlockers.length > 0) {
-      main.append(renderTopBlockers());
+      main.append(renderTopBlockers(25));
     }
+  }
+
+  function renderTopBlockersView() {
+    const publicBlocked = report.counts.publicTotal - report.counts.publicRunnable;
+    const stats = element("div", "stat-grid");
+    stats.append(
+      valueCard("Primary boundaries", number.format(report.primaryBlockers.length)),
+      valueCard("Blocked public constants", number.format(publicBlocked)),
+      valueCard("Blocked all IR functions", number.format(report.counts.blocked)),
+    );
+    main.replaceChildren(
+      contentHeading(
+        "Top blockers",
+        "Report view",
+        "Primary boundaries ranked by blocked IR roots. Each root is counted once at its nearest deterministic boundary.",
+      ),
+      stats,
+      renderTopBlockers(),
+    );
   }
 
   function folderDescription(folder) {
@@ -358,30 +410,41 @@ Author: Emilio J. Gallego Arias
     row.append(
       nameCell,
       tableCell(type),
-      tableCell(ratioText(counts.publicRunnable, counts.publicTotal), "percentage-cell"),
-      tableCell(ratioText(counts.runnable, counts.total), "percentage-cell"),
+      coverageTableCell(counts.publicRunnable, counts.publicTotal),
+      coverageTableCell(counts.runnable, counts.total),
       tableCell(number.format(counts.total), "count-cell"),
       tableCell(number.format(externCount), "count-cell"),
     );
     return row;
   }
 
-  function renderTopBlockers() {
-    const card = sectionCard("Top primary blockers", "Deterministic nearest boundary");
+  function renderTopBlockers(limit = null) {
+    const summaries = limit === null ? report.primaryBlockers : report.primaryBlockers.slice(0, limit);
+    const card = sectionCard(
+      "Top primary blockers",
+      limit === null
+        ? `${number.format(summaries.length)} ranked boundaries`
+        : `${number.format(summaries.length)} of ${number.format(report.primaryBlockers.length)}`,
+    );
     const wrap = element("div", "data-table-wrap");
-    const table = tableElement(["Boundary", "Kind", "Public roots", "All roots"]);
+    const headings = ["Boundary", "Kind", "Public roots", "All roots", "Share of blocked IR"];
+    if (limit === null) headings.push("Example blocked root");
+    const table = tableElement(headings);
     const body = table.tBodies[0];
-    for (const summary of report.primaryBlockers.slice(0, 25)) {
+    for (const summary of summaries) {
       const row = document.createElement("tr");
       const blockerCell = document.createElement("td");
       blockerCell.className = "blocker-name";
       blockerCell.append(boundaryLink(summary.blocker.name));
-      row.append(
+      const cells = [
         blockerCell,
         tableCell(summary.blocker.kind),
         tableCell(number.format(summary.publicRoots), "count-cell"),
         tableCell(number.format(summary.roots), "count-cell"),
-      );
+        tableCell(percentage(summary.roots, report.counts.blocked), "percentage-cell"),
+      ];
+      if (limit === null) cells.push(tableCell(summary.examplePath?.[0] ?? "—", "example-root"));
+      row.append(...cells);
       body.append(row);
     }
     wrap.append(table);
@@ -415,6 +478,7 @@ Author: Emilio J. Gallego Arias
     const controls = element("div", "module-controls");
     const search = control("Search declarations", "input");
     search.input.type = "search";
+    search.input.id = "function-search";
     search.input.placeholder = "Function, extern, or blocker name…";
     search.input.value = state.functionQuery;
     const status = control("Status", "select", [
@@ -423,6 +487,7 @@ Author: Emilio J. Gallego Arias
       ["blocked", "Blocked"],
     ]);
     status.input.value = state.functionStatus;
+    status.input.id = "function-status";
     const kind = control("Class", "select", [
       ["all", "All classes"],
       ["publicConstant", "Public constant"],
@@ -432,6 +497,7 @@ Author: Emilio J. Gallego Arias
       ["extern", "Extern boundary"],
     ]);
     kind.input.value = state.functionKind;
+    kind.input.id = "function-kind";
     controls.append(search.label, status.label, kind.label);
 
     const detail = element("div", "function-detail");
@@ -689,6 +755,7 @@ Author: Emilio J. Gallego Arias
       element("strong", "value", ratioText(runnable, total)),
     );
     const track = element("div", "coverage-track");
+    track.classList.add(progressTone(runnable, total));
     const fill = element("div", "coverage-fill");
     fill.style.width = total === 0 ? "0%" : `${Math.min(100, (runnable * 100) / total)}%`;
     track.append(fill);
@@ -727,6 +794,39 @@ Author: Emilio J. Gallego Arias
 
   function tableCell(text, className = "") {
     return element("td", className, text ?? "—");
+  }
+
+  function coverageTableCell(runnable, total) {
+    const cell = element("td", "percentage-cell coverage-table-cell");
+    cell.append(
+      element("span", "coverage-ratio", ratioText(runnable, total)),
+      progressBar(runnable, total, "table-progress"),
+    );
+    return cell;
+  }
+
+  function progressBar(runnable, total, className) {
+    const percent = total === 0 ? 0 : Math.min(100, (runnable * 100) / total);
+    const track = element("span", `mini-progress ${className}`);
+    track.classList.add(progressTone(runnable, total));
+    track.setAttribute("role", "progressbar");
+    track.setAttribute("aria-label", `${number.format(runnable)} of ${number.format(total)} VIR-able`);
+    track.setAttribute("aria-valuemin", "0");
+    track.setAttribute("aria-valuemax", "100");
+    track.setAttribute("aria-valuenow", percent.toFixed(1));
+    const fill = element("span", "mini-progress-fill");
+    fill.style.width = `${percent}%`;
+    track.append(fill);
+    return track;
+  }
+
+  function progressTone(runnable, total) {
+    if (total === 0) return "progress-empty";
+    const percent = (runnable * 100) / total;
+    if (percent < 40) return "progress-low";
+    if (percent < 70) return "progress-developing";
+    if (percent < 90) return "progress-strong";
+    return "progress-broad";
   }
 
   function control(labelText, kind, options = []) {
@@ -847,6 +947,7 @@ Author: Emilio J. Gallego Arias
     if (separator < 0) return null;
     const type = hash.slice(0, separator);
     const value = decodeURIComponent(hash.slice(separator + 1));
+    if (type === "view" && value === "blockers") return { type: "blockers" };
     if (type === "module" && moduleByName.has(value)) return { type, value: moduleByName.get(value) };
     if (type === "folder" && folderByPath.has(value)) return { type, value: folderByPath.get(value) };
     if (type === "declaration" && externByName.has(value)) {

@@ -175,6 +175,61 @@ export async function smokePackagePreset(cdp, origin) {
   });
 }
 
+export async function smokeSurfaceExplorer(cdp, origin) {
+  await navigate(cdp, `${origin}${basePath}surface/index.html#module=Lean.Expr`);
+  await waitForBrowserState(cdp, `(() => {
+    const status = document.querySelector("#function-status");
+    return { ready: status instanceof HTMLSelectElement, value: status?.value };
+  })()`, {
+    timeoutMessage: "runnable-surface module did not load",
+    timeoutMs: 20000,
+  });
+  const progress = await evaluate(cdp, `({
+    treeBars: document.querySelectorAll("#module-tree .tree-progress").length,
+    tones: document.querySelectorAll("#module-tree .tree-progress[class*='progress-']").length,
+    legendBands: document.querySelectorAll(".coverage-legend .coverage-swatch").length,
+  })`);
+  assert.ok(progress.treeBars > 0);
+  assert.equal(progress.tones, progress.treeBars);
+  assert.equal(progress.legendBands, 4);
+  await evaluate(cdp, `(() => {
+    const status = document.querySelector("#function-status");
+    if (!(status instanceof HTMLSelectElement)) throw new Error("surface status selector is missing");
+    status.value = "blocked";
+    status.dispatchEvent(new Event("change", { bubbles: true }));
+  })()`);
+  const previousHash = await evaluate(cdp, "location.hash");
+  await evaluate(cdp, `(() => {
+    const next = Array.from(document.querySelectorAll("#module-tree .tree-label.file"))
+      .find((button) => !button.closest(".tree-row")?.classList.contains("selected"));
+    if (!(next instanceof HTMLButtonElement)) throw new Error("no second surface module is visible");
+    next.click();
+  })()`);
+  const sticky = await waitForBrowserState(cdp, `(() => {
+    const status = document.querySelector("#function-status");
+    const state = { hash: location.hash, status: status?.value };
+    return {
+      ready: state.hash !== ${JSON.stringify(previousHash)} && state.status === "blocked",
+      value: state,
+      ...state,
+    };
+  })()`, {
+    timeoutMessage: "runnable-surface status filter did not survive module navigation",
+    timeoutMs: 20000,
+  });
+  assert.equal(sticky.status, "blocked");
+
+  await clickSelector(cdp, "#top-blockers-view");
+  const blockers = await evaluate(cdp, `({
+    hash: location.hash,
+    selected: document.querySelector("#top-blockers-view")?.classList.contains("selected"),
+    title: document.querySelector("#report-main .content-heading h2")?.textContent,
+  })`);
+  assert.equal(blockers.hash, "#view=blockers");
+  assert.equal(blockers.selected, true);
+  assert.equal(blockers.title, "Top blockers");
+}
+
 export async function smokeWasmSizeExplorer(cdp, origin) {
   await navigate(cdp, `${origin}${basePath}size/index.html`);
   await waitForBrowserState(cdp, `(() => {
@@ -193,12 +248,18 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
     summary: document.querySelector("#global-summary")?.textContent,
     top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
+    depth: document.querySelector("#map-depth")?.value,
+    depthMax: document.querySelector("#map-depth")?.max,
   })`);
   assert.equal(ownership.selectedView, "ownership");
   assert.ok(ownership.blocks > 0);
   assert.equal(ownership.root, "Retained Code+Data");
   assert.ok(ownership.summary.includes("Code+Data attributed"));
   assert.ok(ownership.top.includes("Lean C runtime"));
+  assert.equal(ownership.depth, "2");
+  assert.equal(ownership.depthMax, "3");
+
+  await setInputValueAndDispatch(cdp, "#map-depth", "3", "input");
 
   await clickSelector(cdp, "#view-switch button[data-view='debugSections']");
   const debugSections = await evaluate(cdp, `({
@@ -210,8 +271,10 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.equal(debugSections.root, "Debug Wasm binary");
   assert.ok(debugSections.top.includes("Code"));
   assert.ok(debugSections.top.some((name) => name.startsWith("Custom:.debug")));
+  assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.max"), "1");
 
   await clickSelector(cdp, "#view-switch button[data-view='ownership']");
+  assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.value"), "3");
   await setInputValueAndDispatch(cdp, "#node-search", "package_decl_provider", "input");
   const search = await evaluate(cdp, `({
     visible: !document.querySelector("#search-results-section")?.hidden,
@@ -234,14 +297,124 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     selectedScope: document.querySelector("#scope-switch button.selected")?.dataset.scope,
     root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
     note: document.querySelector("#view-note")?.textContent,
-    inside: document.querySelectorAll("#treemap .in-boundary").length,
+    mixed: document.querySelectorAll("#treemap .mixed-boundary").length,
     outside: document.querySelectorAll("#treemap .outside-boundary").length,
+    depth: document.querySelector("#map-depth")?.value,
+    depthMax: document.querySelector("#map-depth")?.max,
+    depthTwo: document.querySelectorAll("#treemap .depth-2").length,
+    depthTwoLabels: Array.from(document.querySelectorAll("#treemap .depth-2 .block-label strong"), (node) => node.textContent),
+    depthThree: document.querySelectorAll("#treemap .depth-3").length,
+    archiveColors: Array.from(document.querySelectorAll("#treemap .depth-1"), (node) => ({
+      name: node.querySelector(":scope > .block-label strong")?.textContent,
+      color: getComputedStyle(node).backgroundColor,
+    })).filter((entry) => entry.name?.endsWith(".a")),
+    legend: {
+      hidden: document.querySelector("#color-legend")?.hidden,
+      title: document.querySelector("#color-legend-title")?.textContent,
+      min: document.querySelector("#color-legend-min")?.textContent,
+      max: document.querySelector("#color-legend-max")?.textContent,
+    },
+    objectFunctions: (() => {
+      let object = null;
+      const visit = (node) => {
+        if (node.kind === "runtimeMember" && node.name === "object.cpp") object = node;
+        for (const child of node.children ?? []) visit(child);
+      };
+      visit(globalThis.__virWasmSize.trees.runtimeContext);
+      return {
+        total: object.meta.functionCount,
+        retained: object.meta.retainedFunctionCount,
+        density: object.meta.boundaryDensity,
+      };
+    })(),
   })`);
   assert.equal(context.selectedScope, "context");
-  assert.equal(context.root, "Installed Lean runtime context");
-  assert.ok(context.note.includes("native runtime archive members"));
-  assert.ok(context.inside > 0);
+  assert.equal(context.root, "Installed Lean execution context");
+  assert.ok(context.note.includes("exact retained Wasm symbols"));
+  assert.ok(context.mixed > 0);
   assert.ok(context.outside > 0);
+  assert.equal(context.depth, "4");
+  assert.equal(context.depthMax, "7");
+  assert.ok(context.depthTwo > 0);
+  assert.ok(context.depthTwoLabels.includes("src/"));
+  assert.ok(context.depthThree > 0);
+  assert.ok(context.archiveColors.length >= 2);
+  assert.ok(new Set(context.archiveColors.map((entry) => entry.color)).size >= 2);
+  assert.deepEqual(context.legend, {
+    hidden: false,
+    title: "Exact retained-function byte density",
+    min: "0%",
+    max: "100%",
+  });
+  assert.equal(context.objectFunctions.total, 260);
+  assert.ok(context.objectFunctions.retained > 0);
+  assert.ok(context.objectFunctions.retained < context.objectFunctions.total);
+  assert.ok(context.objectFunctions.density > 0 && context.objectFunctions.density < 1);
+
+  await setInputValueAndDispatch(cdp, "#map-depth", "7", "input");
+  const deepContext = await evaluate(cdp, `({
+    depth: document.querySelector("#map-depth")?.value,
+    output: document.querySelector("#map-depth-value")?.value,
+    hash: location.hash,
+    depthSix: document.querySelectorAll("#treemap .depth-6").length,
+    depthFourLabels: Array.from(document.querySelectorAll("#treemap .depth-4 .block-label strong"), (node) => node.textContent),
+    depthFiveLabels: Array.from(document.querySelectorAll("#treemap .depth-5 .block-label strong"), (node) => node.textContent),
+    depthSixLabels: Array.from(document.querySelectorAll("#treemap .depth-6 .block-label strong"), (node) => node.textContent),
+  })`);
+  assert.equal(deepContext.depth, "7");
+  assert.equal(deepContext.output, "7 / 7");
+  assert.ok(deepContext.hash.includes("depth=7"));
+  assert.ok(deepContext.depthSix > 0);
+  assert.ok(deepContext.depthFourLabels.includes("object.cpp"));
+  assert.ok(deepContext.depthFiveLabels.includes("tcp.cpp"));
+  assert.ok(deepContext.depthFiveLabels.includes("lean_mark_mt"));
+  assert.ok(deepContext.depthSixLabels.includes("lean_uv_tcp_send"));
+
+  await clickSelector(cdp, "#top-children button");
+  const nativeLayer = await evaluate(cdp, `({
+    root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
+    top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
+    inside: document.querySelectorAll("#treemap .in-boundary").length,
+  })`);
+  assert.equal(nativeLayer.root, "Lean native support");
+  assert.ok(nativeLayer.top.includes("libleanrt.a"));
+  assert.ok(nativeLayer.top.includes("libleancpp.a"));
+  assert.ok(nativeLayer.inside > 0);
+  assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.value"), "6");
+  assert.equal(await evaluate(cdp, "document.querySelector('#map-depth-value')?.value"), "6 / 6");
+
+  await clickSelector(cdp, "#context-color-switch button[data-context-color='frontier']");
+  const frontier = await evaluate(cdp, `({
+    selectedColor: document.querySelector("#context-color-switch button.selected")?.dataset.contextColor,
+    note: document.querySelector("#view-note")?.textContent,
+    pressured: document.querySelectorAll("#treemap .frontier-pressure").length,
+    listTitle: document.querySelector("#child-list-title")?.textContent,
+    top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
+    densityAverage: (() => {
+      const native = globalThis.__virWasmSize.trees.runtimeContext.children
+        .find((node) => node.name === "Lean native support");
+      const weighted = native.children.reduce(
+        (sum, child) => sum + child.meta.frontierDensity * child.bytes,
+        0,
+      ) / native.bytes;
+      return Math.abs(weighted - native.meta.frontierDensity);
+    })(),
+    legendTitle: document.querySelector("#color-legend-title")?.textContent,
+    legendMax: document.querySelector("#color-legend-max")?.textContent,
+  })`);
+  assert.equal(frontier.selectedColor, "frontier");
+  assert.ok(frontier.note.includes("not predicted unlock"));
+  assert.ok(frontier.pressured > 0);
+  assert.ok(frontier.note.includes("averaged by child bytes"));
+  assert.equal(frontier.listTitle, "Frontier pressure");
+  assert.deepEqual(frontier.top, ["libleanrt.a", "libleancpp.a"]);
+  assert.ok(frontier.densityAverage < 1e-9);
+  assert.equal(frontier.legendTitle, "Blocker density · log color scale");
+  assert.ok(frontier.legendMax.endsWith("roots / MiB"));
+
+  await clickSelector(cdp, "#breadcrumbs button:first-child");
+  assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.value"), "7");
+  assert.equal(await evaluate(cdp, "document.querySelector('#map-depth-value')?.value"), "7 / 7");
 }
 
 function landingPetStateScript(condition) {

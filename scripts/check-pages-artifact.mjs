@@ -113,8 +113,11 @@ async function assertSurfaceReport() {
   await assertFile("surface/data/index.js", 1024);
   const sizeLinks = JSON.parse(await assertFile("surface/data/size-links.json", 100));
   assert.equal(sizeLinks.format, "lean-vir-surface-size-links");
+  assert.equal(sizeLinks.version, 2);
   assert.ok(sizeLinks.externs.some((declaration) => declaration.targets.length > 0),
     "surface report should export backend targets for the size-report bridge");
+  assert.ok(sizeLinks.externs.some((declaration) => declaration.primaryRoots > 0),
+    "surface report should export measured primary-blocker pressure");
 
   const manifest = JSON.parse(await assertFile("surface/vir-surface-html.json", 100));
   assert.equal(manifest.format, "lean-vir-surface-html");
@@ -146,10 +149,48 @@ async function assertWasmSizeReport() {
   assert.ok(manifest.attribution.connectedSymbols > 0,
     "Wasm size report should connect retained symbols to runnable-surface declarations");
   assert.equal(manifest.runtimeContext.archives, 3);
+  assert.equal(manifest.runtimeContext.sourceMembers, manifest.runtimeContext.members,
+    "every runtime-context member should have exact Lean source provenance");
+  assert.equal(
+    manifest.runtimeContext.nativeMembers + manifest.runtimeContext.programMembers,
+    manifest.runtimeContext.members,
+    "runtime context should separate native support from compiled Lean program members",
+  );
   assert.ok(manifest.runtimeContext.members > manifest.runtimeContext.boundaryMembers,
     "runtime context should contain both inside- and outside-boundary archive members");
   assert.ok(manifest.runtimeContext.boundaryMembers > 0,
     "runtime context should identify current VIR boundary members");
+  assert.ok(
+    manifest.runtimeContext.boundaryDensity > 0
+      && manifest.runtimeContext.boundaryDensity < 1,
+    "runtime context should compute partial inside-boundary byte density",
+  );
+  assert.ok(manifest.runtimeContext.missingSurfaceEntries > 0,
+    "runtime context should identify already-retained missing extern entries");
+  assert.ok(manifest.runtimeContext.primaryRoots > 0,
+    "runtime context should quantify measured primary-blocker pressure");
+  assert.ok(manifest.runtimeContext.maxFrontierDensity > 0,
+    "runtime context should normalize measured primary-blocker density");
+  assert.ok(manifest.runtimeContext.sizedFunctions > 0,
+    "runtime context should expose native functions below archive members");
+  assert.ok(manifest.runtimeContext.sizedFunctionBytes > 0,
+    "runtime context should measure native function bytes");
+  assert.equal(
+    manifest.runtimeContext.sizedFunctionBytes + manifest.runtimeContext.nonFunctionBytes,
+    manifest.runtimeContext.memberBytes,
+    "native function and explicit overhead bytes should cover every archive member byte",
+  );
+  assert.ok(manifest.runtimeContext.retainedFunctions > 0,
+    "runtime context should match native functions to retained Wasm symbols");
+  assert.ok(manifest.runtimeContext.retainedFunctions < manifest.runtimeContext.boundarySizedFunctions,
+    "exact retained-function matching should refine whole-object boundary membership");
+  assert.ok(
+    manifest.runtimeContext.retainedNativeFunctionBytes
+      <= manifest.runtimeContext.boundarySizedFunctionBytes,
+    "matched native function bytes should fit within boundary-object function bytes",
+  );
+  assert.ok(manifest.runtimeContext.retainedWasmFunctionBytes > 0,
+    "matched native functions should expose retained Wasm bytes");
 }
 
 const indexHtml = await assertHtmlAssetLinks("index.html");

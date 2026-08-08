@@ -39,6 +39,23 @@
               <button type="button" data-view="debugSections">Debug sections</button>
             </div>
           </div>
+          <div id="context-color-control" hidden>
+            <span class="control-label">Context color</span>
+            <div id="context-color-switch" class="segmented" role="group" aria-label="Runtime-context color metric">
+              <button type="button" data-context-color="boundary" class="selected">Boundary</button>
+              <button type="button" data-context-color="frontier">Frontier pressure</button>
+            </div>
+          </div>
+          <label id="map-depth-control" class="depth-control">
+            <span class="control-label">
+              Local zoom levels
+              <output id="map-depth-value" for="map-depth">2 / 3</output>
+            </span>
+            <input id="map-depth" type="range" min="1" max="3" step="1" value="2">
+            <span class="depth-scale" aria-hidden="true">
+              <span>less</span><span>more</span>
+            </span>
+          </label>
           <label class="search-control">
             <span>Find object or symbol</span>
             <input id="node-search" type="search" placeholder="package_decl_provider…" autocomplete="off">
@@ -48,6 +65,12 @@
         <div class="context-bar">
           <nav id="breadcrumbs" class="breadcrumbs" aria-label="Treemap breadcrumbs"></nav>
           <p id="view-note" class="view-note"></p>
+        </div>
+        <div id="color-legend" class="color-legend" hidden>
+          <strong id="color-legend-title"></strong>
+          <span id="color-legend-min" class="color-legend-value"></span>
+          <span id="color-legend-gradient" class="color-legend-gradient"></span>
+          <span id="color-legend-max" class="color-legend-value"></span>
         </div>
 
         <div class="explorer-layout">
@@ -59,7 +82,7 @@
             <section id="selection-details" class="selection-details"></section>
             <section>
               <div class="section-heading">
-                <h2>Largest children</h2>
+                <h2 id="child-list-title">Largest children</h2>
                 <span id="child-count"></span>
               </div>
               <ol id="top-children" class="top-children"></ol>
@@ -81,7 +104,11 @@
           <p><strong>Area means raw retained bytes.</strong> A block twice as large owns twice as many bytes in the linked binary.</p>
           <p><strong>Ownership comes from <code>wasm-ld --Map</code>.</strong> Drill from a subsystem into an object/module and then a retained symbol.</p>
           <p><strong>Gzip is intentionally not apportioned.</strong> Compression depends on neighboring bytes, so per-symbol gzip estimates are not additive.</p>
-          <p><strong>Runtime context uses a different unit.</strong> It measures installed native archive-member bytes; green members have a direct object counterpart in VIR, while gray members are outside its current boundary.</p>
+          <p><strong>Runtime context uses a different unit.</strong> It measures installed native archive-member bytes and follows Lean's source hierarchy; archive provenance remains on every leaf.</p>
+          <p><strong>Files expand into native functions.</strong> Sized function symbols come from the installed archive objects; data, relocations, debug sections, framing, and unsized bytes remain explicit as object overhead.</p>
+          <p><strong>Boundary color is computed.</strong> Green intensity is the share of archive bytes belonging to exact native-function matches retained in VIR; directory, archive, and layer colors are byte-weighted child averages.</p>
+          <p><strong>Zoom depth is local and sticky.</strong> The slider controls how many descendant levels are drawn below the current breadcrumb and keeps its setting while you drill in.</p>
+          <p><strong>Frontier pressure is measured, not predicted.</strong> Color is blocker-root density per MiB; parent density is the byte-weighted average of its children. A repaired boundary may reveal another blocker.</p>
         </div>
       </section>
     </main>

@@ -155,6 +155,68 @@ h1 {
   backdrop-filter: blur(10px);
 }
 
+.coverage-legend {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.25rem;
+  color: var(--muted);
+  font-size: 0.61rem;
+  font-variant-numeric: tabular-nums;
+}
+
+.coverage-legend > span {
+  display: flex;
+  align-items: center;
+  gap: 0.22rem;
+  white-space: nowrap;
+}
+
+.coverage-swatch {
+  width: 0.65rem;
+  height: 0.65rem;
+  flex: 0 0 auto;
+  border-radius: 999px;
+  background: linear-gradient(135deg, var(--progress-start), var(--progress-end));
+}
+
+.report-views {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--border);
+  background: var(--panel);
+}
+
+.report-view {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  min-width: 0;
+  padding: 0.5rem 0.6rem;
+  color: var(--muted);
+  border: 1px solid var(--border);
+  border-radius: 0.45rem;
+  background: var(--panel-muted);
+  cursor: pointer;
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-align: left;
+}
+
+.report-view:hover,
+.report-view.selected {
+  color: var(--accent);
+  border-color: #9bc7c1;
+  background: var(--accent-soft);
+}
+
+.report-view-count {
+  font-size: 0.68rem;
+  font-variant-numeric: tabular-nums;
+}
+
 label > span,
 .control-label {
   display: block;
@@ -191,10 +253,18 @@ button:focus-visible {
 
 .tree-row {
   display: grid;
-  grid-template-columns: 1.4rem minmax(0, 1fr) auto;
+  grid-template-columns: 1.4rem minmax(0, 1fr) 6.4rem;
   align-items: center;
   min-height: 2rem;
   border-radius: 0.4rem;
+}
+
+.tree-coverage {
+  display: grid;
+  grid-template-columns: minmax(2.5rem, 1fr) 3.1rem;
+  align-items: center;
+  gap: 0.3rem;
+  min-width: 0;
 }
 
 .tree-row:hover,
@@ -246,13 +316,57 @@ button:focus-visible {
 }
 
 .tree-percent {
-  margin-right: 0.35rem;
+  margin-right: 0.25rem;
   padding: 0.18rem 0.38rem;
   color: var(--muted);
   border-radius: 999px;
   background: var(--panel-muted);
   font-variant-numeric: tabular-nums;
   font-size: 0.68rem;
+}
+
+.mini-progress {
+  display: block;
+  height: 0.34rem;
+  overflow: hidden;
+  border-radius: 999px;
+  background: #e2e8ea;
+}
+
+.mini-progress-fill {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: linear-gradient(90deg, var(--progress-start), var(--progress-end));
+}
+
+.progress-empty {
+  --progress-start: #aeb8bc;
+  --progress-end: #7e8b91;
+}
+
+.progress-low {
+  --progress-start: #ed8b75;
+  --progress-end: #bc493c;
+}
+
+.progress-developing {
+  --progress-start: #e7bb54;
+  --progress-end: #ad7317;
+}
+
+.progress-strong {
+  --progress-start: #53bbaa;
+  --progress-end: #247f75;
+}
+
+.progress-broad {
+  --progress-start: #50b97b;
+  --progress-end: #197249;
+}
+
+.tree-progress {
+  width: 100%;
 }
 
 .tree-children {
@@ -407,7 +521,7 @@ button:focus-visible {
 .coverage-fill {
   height: 100%;
   border-radius: inherit;
-  background: linear-gradient(90deg, #1b836d, #41ad91);
+  background: linear-gradient(90deg, var(--progress-start), var(--progress-end));
 }
 
 .section-card {
@@ -505,6 +619,26 @@ button:focus-visible {
 .percentage-cell {
   font-variant-numeric: tabular-nums;
   white-space: nowrap;
+}
+
+.coverage-table-cell {
+  min-width: 11rem;
+}
+
+.coverage-ratio {
+  display: block;
+}
+
+.table-progress {
+  width: min(100%, 8.5rem);
+  margin-top: 0.35rem;
+}
+
+.example-root {
+  max-width: 28rem;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.76rem;
 }
 
 .module-controls {
@@ -693,6 +827,10 @@ button:focus-visible {
   }
 
   .coverage-track {
+    background: #2e3a3f;
+  }
+
+  .mini-progress {
     background: #2e3a3f;
   }
 

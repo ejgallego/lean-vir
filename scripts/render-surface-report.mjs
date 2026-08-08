@@ -108,17 +108,25 @@ const indexPayload = {
 };
 const indexSource = `globalThis.__virSurfaceIndex=${scriptSafeJson(indexPayload)};\n`;
 bytesWritten += await writeOutput("data/index.js", indexSource);
+const blockerByName = new Map(
+  report.primaryBlockers.map((summary) => [summary.blocker.name, summary]),
+);
 const sizeLinks = {
   format: "lean-vir-surface-size-links",
-  version: 1,
-  externs: externs.map((declaration) => ({
-    name: declaration.name,
-    module: declaration.module,
-    status: declaration.status,
-    targets: declaration.targets
-      .map((target) => target.value)
-      .filter((target) => typeof target === "string" && target.length > 0),
-  })),
+  version: 2,
+  externs: externs.map((declaration) => {
+    const blocker = blockerByName.get(declaration.name);
+    return {
+      name: declaration.name,
+      module: declaration.module,
+      status: declaration.status,
+      primaryRoots: blocker?.roots ?? 0,
+      primaryPublicRoots: blocker?.publicRoots ?? 0,
+      targets: declaration.targets
+        .map((target) => target.value)
+        .filter((target) => typeof target === "string" && target.length > 0),
+    };
+  }),
 };
 bytesWritten += await writeOutput("data/size-links.json", `${JSON.stringify(sizeLinks)}\n`);
 

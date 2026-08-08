@@ -31,11 +31,27 @@
               <option value="all">All IR functions</option>
             </select>
           </label>
+          <div class="coverage-legend" aria-label="Coverage color scale">
+            <span><i class="coverage-swatch progress-low"></i>&lt;40%</span>
+            <span><i class="coverage-swatch progress-developing"></i>40–69%</span>
+            <span><i class="coverage-swatch progress-strong"></i>70–89%</span>
+            <span><i class="coverage-swatch progress-broad"></i>≥90%</span>
+          </div>
           <label>
             <span>Find module</span>
             <input id="module-search" type="search" placeholder="Lean.Meta…" autocomplete="off">
           </label>
         </div>
+        <nav class="report-views" aria-label="Report views">
+          <button id="libraries-view" class="report-view" type="button">
+            <span>All libraries</span>
+            <span id="libraries-view-count" class="report-view-count"></span>
+          </button>
+          <button id="top-blockers-view" class="report-view" type="button">
+            <span>Top blockers</span>
+            <span id="top-blockers-view-count" class="report-view-count"></span>
+          </button>
+        </nav>
         <nav id="module-tree" class="module-tree" aria-label="Folders and modules"></nav>
       </aside>
 

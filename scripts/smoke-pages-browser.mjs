@@ -26,6 +26,7 @@ import {
   smokeFormatWorkbench,
   smokeLanding,
   smokePackagePreset,
+  smokeSurfaceExplorer,
   smokeWasmSizeExplorer,
 } from "./browser-smoke-page-suites.mjs";
 import { smokeReactReview } from "./browser-smoke-react-review.mjs";
@@ -54,6 +55,7 @@ try {
   await smokeLanding(cdp, server.origin);
   await smokePackagePreset(cdp, server.origin);
   await smokeFormatWorkbench(cdp, server.origin);
+  await smokeSurfaceExplorer(cdp, server.origin);
   await smokeWasmSizeExplorer(cdp, server.origin);
   await smokeReactReview(cdp, server.origin);
   for (const packageFile of packageFiles) {
@@ -75,7 +77,7 @@ try {
   }
 
   cdp.close();
-  console.log("pages browser smoke ok: landing, React review, format workbench, Wasm size explorer, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
+  console.log("pages browser smoke ok: landing, React review, format workbench, runnable-surface navigation, Wasm size explorer, package presets, manifest-driven entry list, browser callbacks, browser callback cleanup, React rerender cleanup, React input callback, React change callback, React checkbox callback, local runners, host-call runner, manifest enum runner, manifest Expr runner, manifest JSON runner, recursive inductive runner, recursive structure runner, mixed inductive runner, and failure paths");
 } catch (error) {
   const details = chromium?.stderr() ?? "";
   if (details) {

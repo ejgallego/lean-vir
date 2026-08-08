@@ -112,10 +112,31 @@ try {
   assert.equal(htmlManifest.declarations, report.counts.total);
   assert.equal(htmlManifest.externs, report.externs.length);
 
+  const sizeLinks = JSON.parse(await readFile(join(htmlDir, "data/size-links.json"), "utf8"));
+  assert.equal(sizeLinks.format, "lean-vir-surface-size-links");
+  assert.equal(sizeLinks.version, 2);
+  assert.equal(sizeLinks.externs.length, report.externs.length);
+  const dbgSizeLink = sizeLinks.externs.find(
+    (declaration) => declaration.name === "Lean.Expr.dbgToString",
+  );
+  assert.ok(dbgSizeLink.primaryRoots > 0);
+  assert.ok(Number.isInteger(dbgSizeLink.primaryPublicRoots));
+  assert.deepEqual(dbgSizeLink.targets, ["lean_expr_dbg_to_string"]);
+
   const indexHtml = await readFile(join(htmlDir, "index.html"), "utf8");
   assert.match(indexHtml, /VIR Runnable Surface/);
   assert.match(indexHtml, /data\/index\.js/);
   assert.match(indexHtml, /assets\/app\.js/);
+  assert.match(indexHtml, /id="top-blockers-view"/);
+  assert.match(indexHtml, /class="coverage-legend"/);
+
+  const appSource = await readFile(join(htmlDir, "assets/app.js"), "utf8");
+  const styleSource = await readFile(join(htmlDir, "assets/style.css"), "utf8");
+  assert.match(appSource, /renderTopBlockersView/);
+  assert.match(appSource, /coverageTableCell/);
+  assert.match(appSource, /progressTone/);
+  assert.match(styleSource, /\.tree-progress/);
+  assert.match(styleSource, /\.table-progress/);
 
   const indexContext = { globalThis: {} };
   runInNewContext(await readFile(join(htmlDir, "data/index.js"), "utf8"), indexContext);

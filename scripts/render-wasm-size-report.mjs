@@ -6,14 +6,14 @@ Author: Emilio J. Gallego Arias
 */
 
 import { spawnSync } from "node:child_process";
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { parseLinkMap, parseWasm } from "./wasm-size-report.mjs";
 
 const HTML_FORMAT = "lean-vir-wasm-size-html";
-const HTML_VERSION = 2;
+const HTML_VERSION = 7;
 const templateDir = fileURLToPath(new URL("wasm-size-report/", import.meta.url));
 
 const [releaseWasmArg, debugWasmArg, mapArg, outputArg, ...rest] = process.argv.slice(2);
@@ -41,7 +41,8 @@ const revision = process.env.GITHUB_SHA ?? gitRevision();
 const ownershipTree = buildOwnershipTree(attribution);
 const surfaceLinks = surfaceLinksArg ? await readSurfaceLinks(resolve(surfaceLinksArg)) : null;
 const connectedSymbols = connectSurfaceLinks(ownershipTree, surfaceLinks);
-const runtimeContext = await buildRuntimeContext(ownershipTree);
+annotateSurfaceSummaries(ownershipTree);
+const runtimeContext = await buildRuntimeContext(ownershipTree, identity);
 const attributedBytes = attribution.symbols.reduce((sum, symbol) => sum + symbol.rawBytes, 0);
 
 const payload = {
@@ -232,6 +233,9 @@ function connectSurfaceLinks(root, links) {
         name: declaration.name,
         module: declaration.module,
         status: declaration.status,
+        target,
+        primaryRoots: declaration.primaryRoots ?? 0,
+        primaryPublicRoots: declaration.primaryPublicRoots ?? 0,
       });
       externsByTarget.set(target, declarations);
     }
@@ -248,87 +252,489 @@ function connectSurfaceLinks(root, links) {
   return connected;
 }
 
-async function buildRuntimeContext(ownershipTree) {
+async function buildRuntimeContext(ownershipTree, identity) {
   const lean = spawnSync("lean", ["--print-prefix"], { encoding: "utf8" });
   if (lean.status !== 0) {
     throw new Error(`unable to locate the Lean toolchain: ${lean.stderr || lean.stdout}`);
   }
   const prefix = lean.stdout.trim();
+  const sourceRoot = resolve(identity?.leanSource?.path ?? "third_party/lean4-src");
+  const sourceCandidates = await runtimeSourceCandidates(sourceRoot);
   const boundaryObjects = runtimeBoundaryObjects(ownershipTree);
-  const archiveSpecs = [
-    ["libleanrt.a", "Lean runtime"],
-    ["libleancpp.a", "Lean C++ support"],
-    ["libLeanIR.a", "Lean IR module"],
-  ];
+  const archiveFiles = ["libleanrt.a", "libleancpp.a", "libLeanIR.a"];
   let nextId = 0;
   let memberCount = 0;
+  let nativeMemberCount = 0;
+  let programMemberCount = 0;
+  let sourceMemberCount = 0;
   let boundaryMemberCount = 0;
   let boundaryNativeBytes = 0;
   let boundaryWasmBytes = 0;
-  const children = [];
+  let sizedFunctionCount = 0;
+  let sizedFunctionBytes = 0;
+  let boundarySizedFunctions = 0;
+  let boundarySizedFunctionBytes = 0;
+  let retainedFunctions = 0;
+  let retainedNativeFunctionBytes = 0;
+  let retainedWasmFunctionBytes = 0;
+  const membersByArchive = new Map();
 
-  for (const [file, label] of archiveSpecs) {
+  for (const file of archiveFiles) {
     const path = join(prefix, "lib", "lean", file);
     const members = parseArArchive(await readFile(path));
+    const functionsByMember = archiveFunctionCatalog(path);
     const duplicateCount = new Map();
-    const memberNodes = members.map((member) => {
+    for (const [archiveIndex, member] of members.entries()) {
       const occurrence = (duplicateCount.get(member.name) ?? 0) + 1;
       duplicateCount.set(member.name, occurrence);
+      const candidates = sourceCandidates.get(`${file}/${member.name}`) ?? [];
+      const source = candidates[occurrence - 1];
+      if (!source) {
+        throw new Error(
+          `no Lean source provenance for ${file} member ${member.name} occurrence ${occurrence}`,
+        );
+      }
       const boundary = boundaryObjects.get(`${file}/${member.name}`);
       memberCount += 1;
+      sourceMemberCount += 1;
+      if (source.layer === "native") nativeMemberCount += 1;
+      else programMemberCount += 1;
       if (boundary) {
         boundaryMemberCount += 1;
         boundaryNativeBytes += member.bytes;
         boundaryWasmBytes += boundary.bytes;
       }
-      return {
+      const functions = functionsByMember.get(member.name)?.[occurrence - 1] ?? [];
+      sizedFunctionCount += functions.length;
+      sizedFunctionBytes += functions.reduce((sum, fn) => sum + fn.bytes, 0);
+      if (boundary) {
+        boundarySizedFunctions += functions.length;
+        boundarySizedFunctionBytes += functions.reduce((sum, fn) => sum + fn.bytes, 0);
+      }
+      const surfaceDeclarations = boundary?.meta?.surfaceDeclarations ?? [];
+      const memberChildren = runtimeMemberChildren({
+        archive: file,
+        archiveIndex: archiveIndex + 1,
+        member,
+        functions,
+        retainedSymbols: boundary?.children ?? [],
+        surfaceDeclarations,
+        nextId: () => nextId++,
+      });
+      for (const child of memberChildren) {
+        if (child.kind !== "runtimeFunction" || !child.meta.inVirBoundary) continue;
+        retainedFunctions += 1;
+        retainedNativeFunctionBytes += child.bytes;
+        retainedWasmFunctionBytes += child.meta.retainedWasmBytes;
+      }
+      const node = {
         id: `runtime-member-${nextId++}`,
-        name: occurrence === 1 ? member.name : `${member.name} (${occurrence})`,
+        name: basename(source.path),
         kind: "runtimeMember",
         bytes: member.bytes,
         meta: {
           archive: file,
+          archiveIndex: archiveIndex + 1,
+          memberName: member.name,
+          source: source.path,
+          sourceGroup: source.subsystem,
+          sourceLabel: source.label,
+          layer: source.layer,
+          generated: source.generated ?? false,
           inVirBoundary: Boolean(boundary),
           retainedWasmBytes: boundary?.bytes ?? null,
           wasmNodeId: boundary?.id ?? null,
           wasmObject: boundary?.name ?? null,
+          functionCount: functions.length,
+          functionBytes: functions.reduce((sum, fn) => sum + fn.bytes, 0),
+          overheadBytes: memberChildren
+            .find((child) => child.kind === "runtimeOverhead")?.bytes ?? 0,
+          surfaceDeclarations,
         },
+        children: memberChildren,
       };
-    }).sort(compareBytesThenName);
-    const boundaryMembers = memberNodes.filter((member) => member.meta.inVirBoundary).length;
-    children.push({
-      id: `runtime-archive-${nextId++}`,
-      name: `${label} (${file})`,
-      kind: "archive",
-      bytes: sumChildren(memberNodes),
-      meta: {
-        archive: file,
-        boundaryMembers,
-        memberCount: memberNodes.length,
-      },
-      children: memberNodes,
-    });
+      const archiveMembers = membersByArchive.get(file) ?? [];
+      archiveMembers.push(node);
+      membersByArchive.set(file, archiveMembers);
+    }
   }
-  children.sort(compareBytesThenName);
-  const bytes = sumChildren(children);
+
+  const archiveNodes = archiveFiles.map((archive) => {
+    const members = membersByArchive.get(archive) ?? [];
+    const layer = members[0]?.meta.layer;
+    const sourceTree = buildSourceDirectoryTree(members, archive, layer, () => nextId++);
+    return {
+      id: `runtime-archive-${nextId++}`,
+      name: archive,
+      kind: "archive",
+      bytes: sumChildren(sourceTree),
+      meta: {
+        archive,
+        layer,
+        memberCount: members.length,
+        boundaryMembers: members.filter((member) => member.meta.inVirBoundary).length,
+      },
+      children: sourceTree,
+    };
+  }).filter((archive) => archive.bytes > 0);
+  const nativeArchives = archiveNodes
+    .filter((archive) => archive.meta.layer === "native")
+    .sort(compareBytesThenName);
+  const programArchives = archiveNodes
+    .filter((archive) => archive.meta.layer === "program")
+    .sort(compareBytesThenName);
+  const nativeNode = {
+    id: `runtime-layer-${nextId++}`,
+    name: "Lean native support",
+    kind: "runtimeLayer",
+    bytes: sumChildren(nativeArchives),
+    meta: {
+      layer: "native",
+      memberCount: nativeMemberCount,
+      boundaryMembers: boundaryMemberCount,
+    },
+    children: nativeArchives,
+  };
+  const programNode = {
+    id: `runtime-layer-${nextId++}`,
+    name: "Nearby compiled Lean program",
+    kind: "runtimeLayer",
+    bytes: sumChildren(programArchives),
+    meta: {
+      layer: "program",
+      memberCount: programMemberCount,
+      boundaryMembers: 0,
+      note: "LeanIR.lean is compiled Lean program code, not part of the native runtime denominator.",
+    },
+    children: programArchives,
+  };
+  const children = [nativeNode, programNode].filter((node) => node.bytes > 0);
+  const tree = {
+    id: "runtime-context-root",
+    name: "Installed Lean execution context",
+    kind: "root",
+    bytes: sumChildren(children),
+    children,
+  };
+  annotateNativeFunctionSummaries(tree);
+  annotateSurfaceSummaries(tree);
+  annotateBoundaryDensities(tree);
+  annotateFrontierDensities(tree);
+  let maxFrontierDensity = 0;
+  visitTree(tree, (node) => {
+    maxFrontierDensity = Math.max(maxFrontierDensity, node.meta?.frontierDensity ?? 0);
+  });
+  const surfaceSummary = tree.meta?.surfaceSummary ?? emptySurfaceSummary();
   return {
     summary: {
-      source: "installed Lean native archives",
-      archives: archiveSpecs.length,
-      memberBytes: bytes,
+      source: "installed Lean archives",
+      archives: archiveFiles.length,
+      memberBytes: tree.bytes,
       members: memberCount,
+      sourceMembers: sourceMemberCount,
+      nativeMemberBytes: nativeNode.bytes,
+      nativeMembers: nativeMemberCount,
+      programMemberBytes: programNode.bytes,
+      programMembers: programMemberCount,
       boundaryMembers: boundaryMemberCount,
       boundaryNativeBytes,
       boundaryWasmBytes,
+      boundaryDensity: nativeNode.meta.boundaryDensity,
+      sizedFunctions: sizedFunctionCount,
+      sizedFunctionBytes,
+      nonFunctionBytes: tree.bytes - sizedFunctionBytes,
+      boundarySizedFunctions,
+      boundarySizedFunctionBytes,
+      retainedFunctions,
+      retainedNativeFunctionBytes,
+      retainedWasmFunctionBytes,
+      connectedSurfaceEntries: surfaceSummary.entries,
+      nativeSurfaceEntries: surfaceSummary.nativeEntries,
+      missingSurfaceEntries: surfaceSummary.missingEntries,
+      primaryRoots: surfaceSummary.primaryRoots,
+      primaryPublicRoots: surfaceSummary.primaryPublicRoots,
+      maxFrontierDensity,
     },
-    tree: {
-      id: "runtime-context-root",
-      name: "Installed Lean runtime context",
-      kind: "root",
-      bytes,
-      children,
-    },
+    tree,
   };
+}
+
+function buildSourceDirectoryTree(members, archive, layer, nextId) {
+  const root = { directories: new Map(), members: [], descendants: [] };
+  for (const member of members) {
+    root.descendants.push(member);
+    const parts = member.meta.source.split("/").slice(0, -1);
+    let directory = root;
+    for (const part of parts) {
+      let child = directory.directories.get(part);
+      if (!child) {
+        child = { directories: new Map(), members: [], descendants: [] };
+        directory.directories.set(part, child);
+      }
+      child.descendants.push(member);
+      directory = child;
+    }
+    directory.members.push(member);
+  }
+
+  const convert = (directory, name, path) => {
+    const children = [
+      ...[...directory.directories.entries()].map(([childName, child]) =>
+        convert(child, childName, path ? `${path}/${childName}` : childName)),
+      ...directory.members,
+    ].sort(compareBytesThenName);
+    const sourceGroups = [...new Set(
+      directory.descendants.map((member) => member.meta.sourceGroup),
+    )].sort();
+    return {
+      id: `runtime-source-directory-${nextId()}`,
+      name: `${name}/`,
+      kind: "sourceDirectory",
+      bytes: sumChildren(children),
+      meta: {
+        archive,
+        layer,
+        source: `${path}/`,
+        sourceGroups,
+        memberCount: directory.descendants.length,
+        boundaryMembers: directory.descendants
+          .filter((member) => member.meta.inVirBoundary).length,
+      },
+      children,
+    };
+  };
+
+  return [
+    ...[...root.directories.entries()].map(([name, directory]) =>
+      convert(directory, name, name)),
+    ...root.members,
+  ].sort(compareBytesThenName);
+}
+
+function archiveFunctionCatalog(archivePath) {
+  const result = spawnSync("objdump", ["-t", "--wide", archivePath], {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `unable to inspect native functions in ${archivePath}: ${result.stderr || result.stdout}`,
+    );
+  }
+
+  const occurrences = new Map();
+  let memberName = null;
+  let ranges = new Map();
+  const flush = () => {
+    if (memberName === null) return;
+    const members = occurrences.get(memberName) ?? [];
+    members.push([...ranges.values()]);
+    occurrences.set(memberName, members);
+  };
+
+  for (const line of result.stdout.split(/\r?\n/)) {
+    const heading = /^(.+):\s+file format \S+\s*$/.exec(line);
+    if (heading) {
+      flush();
+      memberName = heading[1];
+      ranges = new Map();
+      continue;
+    }
+    if (memberName === null) continue;
+    const symbol = /^([0-9a-fA-F]+)\s+(.+?)\s+(\S+)\s+([0-9a-fA-F]+)\s+(.+)$/.exec(line);
+    if (!symbol || !symbol[2].split(/\s+/).includes("F")) continue;
+    const bytes = Number.parseInt(symbol[4], 16);
+    if (!Number.isSafeInteger(bytes) || bytes <= 0 || symbol[3] === "*UND*") continue;
+    const key = `${symbol[3]}/${symbol[1]}/${symbol[4]}`;
+    const range = ranges.get(key) ?? {
+      address: symbol[1],
+      section: symbol[3],
+      bytes,
+      aliases: [],
+    };
+    const rawName = symbol[5].replace(/^\.(?:hidden|internal|protected)\s+/, "");
+    range.aliases.push({ rawName, flags: symbol[2].trim() });
+    ranges.set(key, range);
+  }
+  flush();
+
+  const rawNames = [...new Set(
+    [...occurrences.values()].flat(2).flatMap((fn) =>
+      fn.aliases.map((alias) => alias.rawName)),
+  )];
+  const demangled = demangleNames(rawNames);
+  for (const memberOccurrences of occurrences.values()) {
+    for (const functions of memberOccurrences) {
+      for (const fn of functions) {
+        fn.aliases.sort((lhs, rhs) =>
+          symbolVisibilityRank(lhs.flags) - symbolVisibilityRank(rhs.flags)
+            || lhs.rawName.localeCompare(rhs.rawName));
+        fn.rawName = fn.aliases[0].rawName;
+        fn.name = demangled.get(fn.rawName) ?? fn.rawName;
+        fn.rawAliases = fn.aliases.map((alias) => alias.rawName);
+        fn.demangledAliases = fn.rawAliases.map((name) => demangled.get(name) ?? name);
+        delete fn.aliases;
+      }
+      functions.sort(compareBytesThenName);
+    }
+  }
+  return occurrences;
+}
+
+function demangleNames(names) {
+  if (names.length === 0) return new Map();
+  const result = spawnSync("c++filt", [], {
+    input: `${names.join("\n")}\n`,
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (result.status !== 0) return new Map(names.map((name) => [name, name]));
+  const values = result.stdout.trimEnd().split(/\r?\n/);
+  return new Map(names.map((name, index) => [name, values[index] ?? name]));
+}
+
+function symbolVisibilityRank(flags) {
+  const words = flags.split(/\s+/);
+  if (words.includes("g")) return 0;
+  if (words.includes("w")) return 1;
+  return 2;
+}
+
+function runtimeMemberChildren({
+  archive,
+  archiveIndex,
+  member,
+  functions,
+  retainedSymbols,
+  surfaceDeclarations,
+  nextId,
+}) {
+  const assignedDeclarations = new Set();
+  const retainedByName = new Map();
+  for (const symbol of retainedSymbols.filter((node) => node.kind === "symbol")) {
+    const name = symbol.meta?.rawName ?? symbol.name;
+    const matches = retainedByName.get(name) ?? [];
+    matches.push(symbol);
+    retainedByName.set(name, matches);
+  }
+  const children = functions.map((fn) => {
+    const aliases = new Set(fn.rawAliases);
+    const matches = [...new Map(fn.rawAliases.flatMap((name) =>
+      (retainedByName.get(name) ?? []).map((symbol) => [symbol.id, symbol]))).values()]
+      .sort(compareBytesThenName);
+    const declarationsByName = new Map();
+    for (const declaration of surfaceDeclarations.filter((declaration) => {
+      if (!aliases.has(declaration.target)) return false;
+      assignedDeclarations.add(declaration.name);
+      return true;
+    })) declarationsByName.set(declaration.name, declaration);
+    for (const symbol of matches) {
+      for (const declaration of symbol.meta?.surfaceDeclarations ?? []) {
+        assignedDeclarations.add(declaration.name);
+        declarationsByName.set(declaration.name, declaration);
+      }
+    }
+    const declarations = [...declarationsByName.values()]
+      .sort((lhs, rhs) => lhs.name.localeCompare(rhs.name));
+    const retainedWasmBytes = sumChildren(matches);
+    return {
+      id: `runtime-function-${nextId()}`,
+      name: fn.name,
+      kind: "runtimeFunction",
+      bytes: fn.bytes,
+      meta: {
+        archive,
+        archiveIndex,
+        memberName: member.name,
+        rawName: fn.rawName,
+        rawAliases: fn.rawAliases,
+        demangledAliases: fn.demangledAliases,
+        section: fn.section,
+        address: fn.address,
+        inVirBoundary: matches.length > 0,
+        retainedWasmBytes,
+        wasmNodeId: matches[0]?.id ?? null,
+        surfaceDeclarations: declarations,
+      },
+    };
+  });
+  const functionBytes = sumChildren(children);
+  if (functionBytes > member.bytes) {
+    throw new Error(
+      `${archive} member ${member.name} has ${functionBytes} function bytes but only ${member.bytes} archive bytes`,
+    );
+  }
+  const overheadBytes = member.bytes - functionBytes;
+  if (overheadBytes > 0) {
+    children.push({
+      id: `runtime-overhead-${nextId()}`,
+      name: "Non-function data and object overhead",
+      kind: "runtimeOverhead",
+      bytes: overheadBytes,
+      meta: {
+        archive,
+        archiveIndex,
+        memberName: member.name,
+        inVirBoundary: false,
+        note: "Archive-member bytes not assigned to a sized native function symbol, including data, relocations, debug information, section framing, and object metadata.",
+        surfaceDeclarations: surfaceDeclarations
+          .filter((declaration) => !assignedDeclarations.has(declaration.name)),
+      },
+    });
+  }
+  return children.sort(compareBytesThenName);
+}
+
+async function runtimeSourceCandidates(sourceRoot) {
+  const result = new Map();
+  const groups = [
+    ["libleanrt.a", "native", "runtime", "Runtime core (src/runtime)", "src/runtime"],
+    ["libleanrt.a", "native", "runtime/uv", "UV integration (src/runtime/uv)", "src/runtime/uv"],
+    ["libleancpp.a", "native", "util", "Utilities (src/util)", "src/util"],
+    ["libleancpp.a", "native", "kernel", "Kernel (src/kernel)", "src/kernel"],
+    ["libleancpp.a", "native", "library", "C++ library support (src/library)", "src/library"],
+    [
+      "libleancpp.a",
+      "native",
+      "library/constructions",
+      "Kernel constructions (src/library/constructions)",
+      "src/library/constructions",
+    ],
+    ["libleancpp.a", "native", "initialize", "Initialization (src/initialize)", "src/initialize"],
+  ];
+  for (const [archive, layer, subsystem, label, directory] of groups) {
+    const entries = await readdir(join(sourceRoot, directory), { withFileTypes: true });
+    for (const entry of entries.sort((lhs, rhs) => lhs.name.localeCompare(rhs.name))) {
+      if (!entry.isFile() || !/\.(?:cpp|c)$/.test(entry.name)) continue;
+      addSourceCandidate(result, archive, `${entry.name}.o`, {
+        layer,
+        subsystem,
+        label,
+        path: `${directory}/${entry.name}`,
+      });
+    }
+  }
+  addSourceCandidate(result, "libleanrt.a", "static.c.o", {
+    layer: "native",
+    subsystem: "runtime/mimalloc",
+    label: "Allocator implementation (mimalloc)",
+    path: "mimalloc/src/static.c",
+  });
+  addSourceCandidate(result, "libLeanIR.a", "LeanIR.c.o.export", {
+    layer: "program",
+    subsystem: "LeanIR",
+    label: "LeanIR program (src/LeanIR.lean)",
+    path: "src/LeanIR.lean",
+    generated: true,
+  });
+  return result;
+}
+
+function addSourceCandidate(result, archive, member, source) {
+  const key = `${archive}/${member}`;
+  const candidates = result.get(key) ?? [];
+  candidates.push(source);
+  result.set(key, candidates);
 }
 
 function runtimeBoundaryObjects(root) {
@@ -346,6 +752,127 @@ function runtimeBoundaryObjects(root) {
     if (key) result.set(key, node);
   });
   return result;
+}
+
+function annotateSurfaceSummaries(node) {
+  const declarations = new Map();
+  for (const declaration of node.meta?.surfaceDeclarations ?? []) {
+    declarations.set(declaration.name, declaration);
+  }
+  for (const child of node.children ?? []) {
+    for (const [name, declaration] of annotateSurfaceSummaries(child)) {
+      declarations.set(name, declaration);
+    }
+  }
+  if (declarations.size > 0) {
+    const values = [...declarations.values()].sort((lhs, rhs) => lhs.name.localeCompare(rhs.name));
+    node.meta = {
+      ...node.meta,
+      surfaceDeclarations: values,
+      surfaceSummary: summarizeSurfaceDeclarations(values),
+    };
+  }
+  return declarations;
+}
+
+function annotateBoundaryDensities(node) {
+  const children = node.children ?? [];
+  let density;
+  if (children.length > 0) {
+    for (const child of children) annotateBoundaryDensities(child);
+    density = node.bytes > 0
+      ? children.reduce(
+        (sum, child) => sum + (child.meta?.boundaryDensity ?? 0) * child.bytes,
+        0,
+      ) / node.bytes
+      : 0;
+  } else {
+    density = node.meta?.inVirBoundary ? 1 : 0;
+  }
+  node.meta = { ...node.meta, boundaryDensity: density };
+  return density;
+}
+
+function annotateNativeFunctionSummaries(node) {
+  const children = node.children ?? [];
+  if (children.length === 0) {
+    return {
+      functionCount: node.kind === "runtimeFunction" ? 1 : 0,
+      functionBytes: node.kind === "runtimeFunction" ? node.bytes : 0,
+      overheadBytes: node.kind === "runtimeOverhead" ? node.bytes : 0,
+      retainedFunctionCount: node.kind === "runtimeFunction" && node.meta.inVirBoundary ? 1 : 0,
+      retainedNativeFunctionBytes: node.kind === "runtimeFunction" && node.meta.inVirBoundary
+        ? node.bytes
+        : 0,
+      retainedWasmFunctionBytes: node.kind === "runtimeFunction"
+        ? node.meta.retainedWasmBytes ?? 0
+        : 0,
+    };
+  }
+  const summary = children.map(annotateNativeFunctionSummaries).reduce(
+    (total, child) => ({
+      functionCount: total.functionCount + child.functionCount,
+      functionBytes: total.functionBytes + child.functionBytes,
+      overheadBytes: total.overheadBytes + child.overheadBytes,
+      retainedFunctionCount: total.retainedFunctionCount + child.retainedFunctionCount,
+      retainedNativeFunctionBytes:
+        total.retainedNativeFunctionBytes + child.retainedNativeFunctionBytes,
+      retainedWasmFunctionBytes:
+        total.retainedWasmFunctionBytes + child.retainedWasmFunctionBytes,
+    }),
+    {
+      functionCount: 0,
+      functionBytes: 0,
+      overheadBytes: 0,
+      retainedFunctionCount: 0,
+      retainedNativeFunctionBytes: 0,
+      retainedWasmFunctionBytes: 0,
+    },
+  );
+  node.meta = { ...node.meta, ...summary };
+  return summary;
+}
+
+function annotateFrontierDensities(node) {
+  const children = node.children ?? [];
+  let density;
+  if (children.length > 0) {
+    for (const child of children) annotateFrontierDensities(child);
+    density = node.bytes > 0
+      ? children.reduce(
+        (sum, child) => sum + (child.meta?.frontierDensity ?? 0) * child.bytes,
+        0,
+      ) / node.bytes
+      : 0;
+  } else {
+    const pressure = node.meta?.surfaceSummary?.primaryRoots ?? 0;
+    density = node.bytes > 0 ? pressure * (1024 ** 2) / node.bytes : 0;
+  }
+  node.meta = { ...node.meta, frontierDensity: density };
+  return density;
+}
+
+function summarizeSurfaceDeclarations(declarations) {
+  return {
+    entries: declarations.length,
+    nativeEntries: declarations.filter((declaration) => declaration.status === "native").length,
+    missingEntries: declarations.filter((declaration) => declaration.status === "missing").length,
+    primaryRoots: declarations.reduce((sum, declaration) => sum + declaration.primaryRoots, 0),
+    primaryPublicRoots: declarations.reduce(
+      (sum, declaration) => sum + declaration.primaryPublicRoots,
+      0,
+    ),
+  };
+}
+
+function emptySurfaceSummary() {
+  return {
+    entries: 0,
+    nativeEntries: 0,
+    missingEntries: 0,
+    primaryRoots: 0,
+    primaryPublicRoots: 0,
+  };
 }
 
 function parseArArchive(buffer) {
@@ -390,7 +917,7 @@ function parseArArchive(buffer) {
 
 async function readSurfaceLinks(path) {
   const links = JSON.parse(await readFile(path, "utf8"));
-  if (links?.format !== "lean-vir-surface-size-links" || links.version !== 1 || !Array.isArray(links.externs)) {
+  if (links?.format !== "lean-vir-surface-size-links" || links.version !== 2 || !Array.isArray(links.externs)) {
     throw new Error(`invalid runnable-surface links file ${path}`);
   }
   return links;

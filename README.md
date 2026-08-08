@@ -181,7 +181,12 @@ in Lean's installed libraries have a complete VIR-runnable dependency closure:
 The release and debug Wasm artifacts also have an interactive retained-size
 breakdown by section, subsystem, object/module, and linker symbol. A second map
 places the current VIR boundary inside Lean's installed native runtime archives;
-extern symbols link back to their coverage impact in the runnable-surface report:
+it follows Lean's source hierarchy, separates the compiled `LeanIR.lean` program
+layer, exposes up to seven local hierarchy levels with a sticky depth slider,
+drills from source files into their sized native functions, and can color byte
+area by either exact retained-function coverage or measured primary-blocker
+density. Extern symbols link back to their coverage entries in the
+runnable-surface report:
 
 [VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
 

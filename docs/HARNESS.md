@@ -48,6 +48,8 @@ browser smoke tests.
 
 The Lean toolchain is pinned by `lean-toolchain`. The upstream source fetcher
 pins the matching Lean source checkout under `third_party/lean4-src/`.
+Generating the Wasm size site also uses GNU `objdump` and `c++filt` from
+binutils to enumerate sized functions in the installed Lean archives.
 
 ## Generated Artifacts
 
@@ -324,8 +326,23 @@ artifact includes a fresh complete Lean-library surface scan under
 `web/dist/size/`. The reports cross-link exact extern backend symbols. The size
 explorer separates the retained-Wasm map from a wider installed-Lean runtime
 context: the former measures linked Wasm bytes, while the latter measures native
-archive-member bytes from `libleanrt.a`, `libleancpp.a`, and `libLeanIR.a` and
-highlights members with a direct VIR object counterpart. They are deployed at
+archive-member bytes from `libleanrt.a` and `libleancpp.a`, organized by archive
+and exact Lean source path. A generally available, per-view depth slider shows
+the requested number of local levels below the current breadcrumb and stays at
+that setting while zooming. The runtime context has up to seven levels—execution
+layer, archive, source-root directory, nested source directories, member, and
+sized native function. Archive-member bytes not assigned to a sized function
+remain explicit as non-function data and object overhead, so child areas add up
+exactly. The generated `libLeanIR.a` member is shown separately as compiled
+`LeanIR.lean` program code and is excluded from the native-support denominator.
+Boundary coloring matches native function aliases to exact retained Wasm linker
+symbols, then shows matched native-function bytes per archive byte; parent
+colors are byte-weighted averages of their children. Frontier-pressure coloring
+shows deterministic primary blocked-root density per MiB for missing extern
+backend symbols that are already retained. Parent colors are byte-weighted
+averages of their children. This is not a predicted unlock count because
+satisfying one boundary may reveal another.
+They are deployed at
 `https://ejgallego.github.io/lean-vir/surface/` and
 `https://ejgallego.github.io/lean-vir/size/` alongside the demo.
 
