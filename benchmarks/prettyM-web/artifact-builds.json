@@ -5,7 +5,7 @@
     "fir-prettyM": {
       "kind": "git",
       "repository": "https://github.com/ejgallego/lean-fir",
-      "revision": "4404aba07aa90fb96dc43b5ca056ca38a32fd4bc"
+      "revision": "298682a766d80e90053d3e76ee2f3e4af78a52aa"
     },
     "prettyM-workload": {
       "kind": "git",
