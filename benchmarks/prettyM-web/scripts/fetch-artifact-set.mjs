@@ -25,12 +25,14 @@ function parseArgs(argv) {
   const options = {
     lock: "artifact-set.lock.json",
     archive: null,
+    setsDir: "_artifacts/sets",
     stage: true,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--lock") options.lock = argv[++index];
     else if (argument === "--archive") options.archive = argv[++index];
+    else if (argument === "--sets-dir") options.setsDir = argv[++index];
     else if (argument === "--no-stage") options.stage = false;
     else if (argument === "--help" || argument === "-h") {
       console.log(`Usage: node scripts/fetch-artifact-set.mjs [options]
@@ -41,6 +43,7 @@ overrides must remain inside this application directory.
 
   --lock PATH       lockfile (default: artifact-set.lock.json)
   --archive PATH    workspace-local release archive instead of lock URL
+  --sets-dir PATH   verified installation root (default: _artifacts/sets)
   --no-stage        verify and install the set without staging artifacts`);
       process.exit(0);
     } else throw new Error(`unknown argument: ${argument}`);
@@ -111,7 +114,7 @@ async function main() {
     : await downloadArchive(lock);
   verifyArchive(bytes, lock);
 
-  const sets = inside(appRoot, "_artifacts/sets", "install artifact set");
+  const sets = inside(appRoot, options.setsDir, "install artifact set");
   const destination = resolve(sets, lock.setId);
   if (existsSync(destination)) {
     await verifyArtifactSet(destination, lock);

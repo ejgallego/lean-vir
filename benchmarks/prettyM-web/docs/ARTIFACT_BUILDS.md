@@ -19,19 +19,32 @@ npm run artifacts:build -- prettyM \
   --plan
 ```
 
-For maintained local builds, keep external producer worktrees below the
-ignored `_sources/` directory instead of an ephemeral system directory. In
-this checkout the controlled layout is:
+Producer source remains in its owning repository at the immutable catalogued
+commit. The artifact application contains only the source URL, commit, package
+contract, and output mapping. It never vendors producer source.
+
+CI and self-contained local builds materialize the exact sources into the
+ignored application-local directory with:
+
+```sh
+npm run artifacts:sources -- prettyM
+```
+
+The command initializes detached Git checkouts by fetching each exact commit.
+It refuses to switch, clean, or reuse a checkout whose origin, revision, or
+working tree does not match the database. The controlled layout is:
 
 ```text
+_sources/vir/       lean-vir at the catalogued commit
 _sources/fir/       lean-fir at the catalogued commit
 _sources/workload/  verso-slides at the catalogued commit
 ```
 
-The pinned VIR worktree remains alongside this application worktree under the
-parent repository's `.worktrees/` directory. These locations hold source
-checkouts and producer caches only; `_artifacts/` remains the builder-owned
-output area.
+Maintainers may still pass a different clean checkout explicitly to
+`artifacts:build`; this is useful when an existing linked worktree already has
+the selected commit. `_sources/` holds source checkouts and producer caches
+only. `_artifacts/` remains the builder-owned output area, and only declared
+package files cross between the two.
 
 The driver defaults npm's cache to `_artifacts/npm-cache`, keeping setup writes
 inside the application checkout. Set `NPM_CONFIG_CACHE` explicitly only when a
@@ -99,3 +112,25 @@ particular, the current VIR package manifest embeds its generation time and the
 spelling of the workload source path. Until VIR exposes deterministic metadata,
 CI should generate and test a candidate archive rather than expect a fresh
 `.irpkg` to reproduce the committed archive digest.
+
+## CI candidate build
+
+The complete non-publishing path is available locally as:
+
+```sh
+npm run artifacts:sources -- prettyM
+npm run artifacts:candidate -- prettyM --prepare
+```
+
+The candidate command runs the source builder, packs with a separate ignored
+lock, imports the generated archive through `artifacts:fetch`, runs `npm test`,
+and collects the upload payload under
+`_artifacts/candidates/prettyM/upload/`. The payload contains the immutable tar,
+its checksum, the artifact-set manifest, the source `BUILD.json` receipt, the
+candidate-only lock, and a `CANDIDATE.json` validation statement.
+
+`.github/workflows/prettyM-candidate.yml` runs the same commands on relevant
+pull requests and `main` updates and supports explicit dispatch. The workflow
+has read-only repository permission and uploads only a short-lived Actions
+artifact. It neither compares the candidate bytes with the committed lock nor
+publishes or promotes them.
