@@ -26,7 +26,15 @@ const callbackHostResultReason =
 const explicitConversionReason =
   /declaration is marked with `@\[vir_js_explicit_conversion\]`, but `js\.value\.bad\.action` does not convert between exactly one `Lean\.Vir\.Js \.\.\.` resource and one Lean value/;
 const indexedPairReason =
-  /unsupported argument type `[^`]*IndexedPair [^`]+`: indexed inductive `[^`]*IndexedPair` is not supported/;
+  /unsupported argument type `Array \((?:[^`]*\.)?IndexedPair 0 × Option \((?:[^`]*\.)?IndexedPair 1\)\)`: unsupported Array element type: unsupported Prod fst type: indexed inductive `(?:[^`]*\.)?IndexedPair` is not supported/;
+const indexedPairElaborationEvidence =
+  /unsupported argument type `[^`]*(?:OfNat|ofNat)[^`]*`/;
+const indexedPairPackageReason = new RegExp(
+  `PackageFallbackMarkers\\.badIndexed: ${indexedPairReason.source}`,
+);
+const indexedPairPackageElaborationEvidence = new RegExp(
+  `PackageFallbackMarkers\\.badIndexed: ${indexedPairElaborationEvidence.source}`,
+);
 const nakedElementReason =
   /unsupported argument type `Lean\.Vir\.Browser\.Element`: JavaScript object marker `Lean\.Vir\.Browser\.Element` must appear under `Lean\.Vir\.Js`/;
 
@@ -38,22 +46,31 @@ async function assertInvalidAttributeSource(freshDir, stem, lines, patterns) {
   assert.notEqual(checked.status, 0, `${stem} unexpectedly elaborated successfully`);
   const output = `${checked.stderr}${checked.stdout}`;
   for (const pattern of patterns) assert.match(output, pattern);
+  return output;
 }
 
 export async function runUnsupportedInterfaceSmoke(freshDir) {
-  await assertInvalidAttributeSource(freshDir, "InvalidIndexedExportAttribute", [
-    "import Vir.Attributes",
-    "",
-    "inductive IndexedPair : Nat → Type where",
-    "  | mk (left right : Nat) : IndexedPair 0",
-    "",
-    "@[vir_export]",
-    "def indexedPairIdentity (box : IndexedPair 0) : IndexedPair 0 := box",
-    "",
-  ], [
-    /invalid `@\[vir_export\]` declaration `indexedPairIdentity`/,
-    indexedPairReason,
-  ]);
+  const indexedAttributeOutput = await assertInvalidAttributeSource(
+    freshDir,
+    "InvalidIndexedExportAttribute",
+    [
+      "import Vir.Attributes",
+      "",
+      "inductive IndexedPair : Nat → Type where",
+      "  | mk (left right : Nat) : IndexedPair 0",
+      "",
+      "@[vir_export]",
+      "def indexedPairIdentity",
+      "    (boxes : Array (IndexedPair 0 × Option (IndexedPair 1))) :",
+      "    Array (IndexedPair 0 × Option (IndexedPair 1)) := boxes",
+      "",
+    ],
+    [
+      /invalid `@\[vir_export\]` declaration `indexedPairIdentity`/,
+      indexedPairReason,
+    ],
+  );
+  assert.doesNotMatch(indexedAttributeOutput, indexedPairElaborationEvidence);
 
   await assertInvalidAttributeSource(freshDir, "InvalidNakedResourceExportAttribute", [
     "import Vir.Attributes",
@@ -246,7 +263,9 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
     "inductive IndexedPair : Nat → Type where",
     "  | mk (left right : Nat) : IndexedPair 0",
     "",
-    "def badIndexed (box : IndexedPair 0) : IndexedPair 0 := box",
+    "def badIndexed",
+    "    (boxes : Array (IndexedPair 0 × Option (IndexedPair 1))) :",
+    "    Array (IndexedPair 0 × Option (IndexedPair 1)) := boxes",
     "",
     "def badNakedElement (element : Lean.Vir.Browser.Element) : Lean.Vir.Browser.Element := element",
     "",
@@ -289,8 +308,9 @@ export async function runUnsupportedInterfaceSmoke(freshDir) {
   assert.match(generated.stderr, /declaration name collides/);
   assert.match(
     generated.stderr,
-    /PackageFallbackMarkers\.badIndexed: unsupported argument type `[^`]*IndexedPair [^`]+`: indexed inductive `[^`]*IndexedPair` is not supported/,
+    indexedPairPackageReason,
   );
+  assert.doesNotMatch(generated.stderr, indexedPairPackageElaborationEvidence);
   assert.match(
     generated.stderr,
     /PackageFallbackMarkers\.badNakedElement: unsupported argument type `Lean\.Vir\.Browser\.Element`: JavaScript object marker `Lean\.Vir\.Browser\.Element` must appear under `Lean\.Vir\.Js`/,

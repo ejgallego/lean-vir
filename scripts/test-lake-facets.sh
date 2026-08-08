@@ -173,16 +173,16 @@ printf '%s\n' \
   '#check vir_export' \
   '#check vir_startup' \
   '#check Vir.InterfaceValidation.analyzeExportSignature' \
-  '#check Vir.InterfaceValidation.ExportSignatureError.message' \
+  '#check Vir.InterfaceValidation.ExportSignatureError.toMessageData' \
   '#check Vir.InterfaceValidation.analyzeStartupSignature' \
-  '#check Vir.InterfaceValidation.StartupSignatureError.message' \
+  '#check Vir.InterfaceValidation.StartupSignatureError.toMessageData' \
   '#check Vir.InterfaceValidation.StartupSignature.effect' \
   '#check Vir.Interface.InterfaceType' \
   '#check Vir.Interface.InterfaceEffect' \
   '#check Vir.Interface.HostImportBoundary' \
-  '#check Vir.Interface.InterfaceClassifierError.message' \
+  '#check Vir.Interface.InterfaceClassifierError.toMessageData' \
   '#check Vir.Interface.ExportInterfaceValidationError' \
-  '#check Vir.Interface.ExportInterfaceValidationError.message' \
+  '#check Vir.Interface.ExportInterfaceValidationError.toMessageData' \
   '#check Vir.Interface.ClassifiedSignature' \
   '#check Vir.Interface.ClassifiedSignature.args' \
   '#check Vir.Interface.ClassifiedSignature.result' \
@@ -205,9 +205,9 @@ printf '%s\n' \
   '  some { marker := .explicitConversion, target := "demo.convert" }' \
   '#guard Vir.HostMetadata.decodeExternSymbol? "__other:demo.bump" == none' \
   '#check Vir.HostValidation.HostImportBoundaryError' \
-  '#check Vir.HostValidation.HostImportBoundaryError.message' \
+  '#check Vir.HostValidation.HostImportBoundaryError.toMessageData' \
   '#check Vir.HostValidation.HostImportValidationError' \
-  '#check Vir.HostValidation.HostImportValidationError.message' \
+  '#check Vir.HostValidation.HostImportValidationError.toMessageData' \
   '#check Vir.HostValidation.HostImportAnalysis' \
   '#check Vir.HostValidation.HostImportAnalysis.signature' \
   '#check Vir.HostValidation.HostImportAnalysis.boundary' \

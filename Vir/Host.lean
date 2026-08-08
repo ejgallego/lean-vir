@@ -64,8 +64,8 @@ private def validateVirJsAttr
         Lean could not find the declaration"
   match ← Vir.HostValidation.analyzeHostImport marker data.target info.type with
   | .error error =>
-      throwErrorAt stx s!"invalid `@[{marker.attributeName}]` declaration `{declName}`: \
-        {error.message}"
+      throwErrorAt stx m!"invalid `@[{marker.attributeName}]` declaration `{declName}`: \
+        {error.toMessageData}"
   | .ok _ => pure ()
 
 private def setVirJsExtern
