@@ -154,7 +154,7 @@ npm test
 
 `npm test` runs the artifact-cache, benchmark sampler, focused-identity, and
 paired-runner contract tests, package ABI check, IR codec tag freshness check,
-native extern ABI check, boundary registry check, native wrapper check, API
+native extern metadata check, boundary registry check, native wrapper check, API
 coverage docs check, and Wasm extension probes, builds the demo artifacts once,
 then reuses those artifacts for upstream smoke, infoview widget smoke,
 JavaScript runtime tests, and the fixture suite. It is the default pre-merge

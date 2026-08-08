@@ -19,22 +19,6 @@ open Lean.IR
 private def jsonNames (names : Array Name) : String :=
   jsonArray (names.map jsonName)
 
-private def surfaceIRTypeLabel : IRType → String
-  | .float => "float"
-  | .uint8 => "uint8"
-  | .uint16 => "uint16"
-  | .uint32 => "uint32"
-  | .uint64 => "uint64"
-  | .usize => "usize"
-  | .erased => "erased"
-  | .object => "object"
-  | .tobject => "tobject"
-  | .float32 => "float32"
-  | .struct name _ => s!"struct:{name}"
-  | .union name _ => s!"union:{name}"
-  | .tagged => "tagged"
-  | .void => "void"
-
 private def NativeExtern.surfaceJson (ext : NativeExtern) : String :=
   jsonObject #[
     ("name", jsonName ext.name),
@@ -43,9 +27,9 @@ private def NativeExtern.surfaceJson (ext : NativeExtern) : String :=
     ("params", jsonArray (ext.params.map fun param => jsonObject #[
       ("index", jsonNat param.x.idx),
       ("borrow", jsonBool param.borrow),
-      ("type", jsonString (surfaceIRTypeLabel param.ty))
+      ("type", jsonString (nativeIRTypeLabel param.ty))
     ])),
-    ("resultType", jsonString (surfaceIRTypeLabel ext.resultType)),
+    ("resultType", jsonString (nativeIRTypeLabel ext.resultType)),
     ("deps", jsonNames ext.deps)
   ]
 

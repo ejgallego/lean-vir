@@ -25,6 +25,9 @@ def addInitGlobal (name initName : Name) (state : Closure) : Closure :=
       initGlobalSeen := state.initGlobalSeen.insert name
       initGlobals := state.initGlobals.push { name, initName } }
 
+def DeclIndex.resolveNativeExtern? (index : DeclIndex) (spec : NativeExternSpec) : Option NativeExtern :=
+  index.envs.findSome? fun (_, env) => spec.resolve env |>.toOption
+
 partial def collectName
     (index : DeclIndex)
     (name : Name)
@@ -34,10 +37,14 @@ partial def collectName
     state
   else
     let state := { state with seen := state.seen.insert name }
-    match nativeExtern? name with
-    | some ext =>
-        let state := { state with externs := state.externs.push ext }
-        ext.deps.foldl (fun state dep => collectName index dep (path.push dep) state) state
+    match nativeExternSpec? name with
+    | some spec =>
+        match index.resolveNativeExtern? spec with
+        | some ext =>
+            let state := { state with externs := state.externs.push ext }
+            spec.deps.foldl (fun state dep => collectName index dep (path.push dep) state) state
+        | none =>
+            { state with missingExterns := state.missingExterns.push { name, path } }
     | none =>
         match index.find? name with
         | none =>

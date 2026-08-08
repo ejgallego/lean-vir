@@ -70,8 +70,9 @@ map lives in `docs/HARNESS.md`.
   Missing `externref` support fails because the experimental React resource
   prototype requires it; unsupported JSPI is reported as skipped.
 - `npm run check:native-externs`
-  Verify that `Vir/GeneratePackage/NativeExterns.lean` matches Lean's imported
-  IR parameter, borrow, and result ABI for every registered native extern.
+  Resolve every native extern specification from Lean's imported IR and extern
+  metadata, reject duplicates and stale symbol overrides, and report the split
+  between Lean-derived symbols and VIR provider overrides.
 - `npm run test:fixtures`
   Run the fixture host-oracle suite. Use `VIR_FIXTURE_FILTER=<substring>` to
   narrow it.

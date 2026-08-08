@@ -453,7 +453,8 @@ private def catalogDecls
 
 /-- Analyze all IR functions owned by `selectedModules` in one imported environment. -/
 def analyzeLibrarySurface
-    (env : Environment) (selectedModules : Array Name) : SurfaceReport :=
+    (env : Environment) (selectedModules : Array Name)
+    (nativeExterns : Array NativeExtern) : SurfaceReport :=
   let selectedSet := selectedModules.foldl (fun names name => names.insert name)
     (Std.HashSet.emptyWithCapacity selectedModules.size : SurfaceNameSet)
   let (decls, roots, catalogExterns) := catalogDecls env selectedSet

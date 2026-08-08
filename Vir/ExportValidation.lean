@@ -92,9 +92,9 @@ private partial def collectVisibleClosure
     state
   else
     let state := { state with seen := state.seen.insert name }
-    match nativeExtern? name with
-    | some ext =>
-        ext.deps.foldl
+    match nativeExternSpec? name with
+    | some spec =>
+        spec.deps.foldl
           (fun state dep => collectVisibleClosure env dep (path.push dep) state) state
     | none =>
         match Lean.IR.findEnvDecl env name with

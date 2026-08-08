@@ -49,6 +49,17 @@ private def mixCounts (state : UInt64) (counts : SurfaceCounts) : UInt64 :=
 private def mixNames (state : UInt64) (names : Array Name) : UInt64 :=
   names.foldl (fun state name => mixHash state name.hash) state
 
+private unsafe def resolveSurfaceNativeExterns (env : Environment) : IO (Array NativeExtern) := do
+  match resolveNativeExterns env with
+  | .ok externs => return externs
+  | .error _ =>
+      -- A module-scoped scan need not import every declaration in the runtime
+      -- catalog. Resolve policy against Lean's umbrella module in that case.
+      let catalogEnv ← loadLibrarySurfaceEnvironment #[`Lean]
+      match resolveNativeExterns catalogEnv with
+      | .ok externs => return externs
+      | .error error => throw <| IO.userError s!"native extern catalog: {error}"
+
 /-- Force the complete in-memory analysis before measuring report rendering. -/
 private def forceSurfaceReport (report : SurfaceReport) : UInt64 :=
   let state := mixNames (hash report.loadedModules) report.selectedModules
@@ -98,9 +109,10 @@ unsafe def run (options : Options) : IO UInt32 := do
     return 2
   IO.eprintln s!"surface scan: importing complete IR for {modules.size} selected module(s)"
   let env ← loadLibrarySurfaceEnvironment modules
+  let nativeExterns ← resolveSurfaceNativeExterns env
   let imported ← IO.monoNanosNow
   IO.eprintln s!"surface scan: loaded {env.header.moduleNames.size} module(s) in {(imported - started) / 1000000} ms"
-  let report := analyzeLibrarySurface env modules
+  let report := analyzeLibrarySurface env modules nativeExterns
   let fingerprint := forceSurfaceReport report
   IO.eprintln s!"surface scan: analysis checksum {fingerprint}"
   let analyzed ← IO.monoNanosNow

@@ -7,9 +7,8 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
-import { parseNativeExterns } from "./native-externs.mjs";
+import { loadNativeExterns } from "./native-externs.mjs";
 
-const nativeExternsPath = new URL("../Vir/GeneratePackage/NativeExterns.lean", import.meta.url);
 const nativeSymbolsPath = new URL("../wasm/upstream_shim/runtime/native_symbols.cpp", import.meta.url);
 const nativeRegistryPath = new URL("../wasm/upstream_shim/runtime/native_symbols_registry.inc", import.meta.url);
 
@@ -132,13 +131,12 @@ function formatSymbols(entries) {
   return symbols.map((symbol) => `\`${symbol}\``).join(", ");
 }
 
-const [nativeExternsSource, nativeSymbols, nativeRegistry] = await Promise.all([
-  readFile(nativeExternsPath, "utf8"),
+const [nativeExterns, nativeSymbols, nativeRegistry] = await Promise.all([
+  loadNativeExterns(),
   readFile(nativeSymbolsPath, "utf8"),
   readFile(nativeRegistryPath, "utf8"),
 ]);
 
-const nativeExterns = parseNativeExterns(nativeExternsSource);
 const compilerGeneratedExterns = nativeExterns.filter((nativeExtern) => nativeExtern.generateBoxedWrapper);
 const { entries, constants } = parseRegistry(nativeRegistry);
 const wrappers = parseWrappers(nativeSymbols);
