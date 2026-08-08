@@ -144,6 +144,7 @@ unsafe def run (targets : Array Target) (packagePath reportPath : System.FilePat
       IO.println s!"wrote {packagePath}"
       IO.println s!"wrote {reportPath}"
       IO.println s!"package format: {manifest.metadata.packageFormatVersion}"
+      IO.println s!"runtime ABI: {manifest.metadata.runtimeAbiVersion}"
       IO.println s!"toolchain: {manifest.metadata.leanToolchain}"
       IO.println s!"generated at: {manifest.metadata.generatedAt}"
       IO.println s!"declarations: {closure.decls.size + closure.externs.size} ({closure.decls.size} Lean IR, {closure.externs.size} native externs)"
@@ -241,6 +242,7 @@ unsafe def runModuleSet
       IO.println s!"wrote {reportPath}"
       IO.println s!"package set members: {members.size}"
       IO.println s!"package format: {manifest.metadata.packageFormatVersion}"
+      IO.println s!"runtime ABI: {manifest.metadata.runtimeAbiVersion}"
       IO.println s!"declarations: {closure.decls.size + closure.externs.size} ({closure.decls.size} Lean IR, {closure.externs.size} native externs)"
       IO.println s!"interface exports: {manifest.exports.size}"
       return 0

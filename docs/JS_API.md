@@ -84,6 +84,7 @@ The browser app, Node wrapper, and SDK artifact share these JavaScript modules:
 | `runtime/callbacks.js` | JavaScript callable Lean closure wrappers, callback state tracking, release, and disposal helpers. |
 | `runtime/cleanup.js` | Cleanup error collection with deterministic single-error and aggregate reporting. |
 | `runtime/core.js` | Package loading, manifest export tables, call resolution, memory helpers, and runtime/callback lifecycle. |
+| `runtime/package-versions.js` | Canonical package, manifest, and runtime ABI versions used for compatibility checks. |
 | `runtime/object-values.js` | Object ABI lowering and lifting between JavaScript values and owned Lean objects. |
 | `runtime/vir-codec.js` | Binary reader/writer and interface type descriptor codec. |
 | `runtime/host-state.js` | Host import dispatch state, externref roots, host-binding lookup, and disposal. |
@@ -262,8 +263,9 @@ their cleanup hook runs once when the final runtime using the map is disposed.
   nested type descriptors as read-only after installation: the runtime caches
   derived export, layout, and normalization plans for the loaded package.
 - `vir.packageMetadata` is `vir.interfaceManifest.metadata`, including the
-  package format version, Lean toolchain, generation time, source targets, and
-  resolved roots.
+  package format, manifest, and runtime ABI versions, Lean toolchain,
+  generation time, source targets, and resolved roots. Package, JavaScript
+  loader, and WASM runtime ABI versions are checked before calls are exposed.
 - `vir.call(name, ...args)` accepts a manifest `id`, `jsName`, or Lean
   declaration name.
 - `vir.callTimed(name, ...args)` performs the same call and returns

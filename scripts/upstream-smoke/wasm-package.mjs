@@ -6,6 +6,7 @@ Author: Emilio J. Gallego Arias
 
 import { createVirImports } from "../../web/src/vir-runtime.js";
 import { VirRuntime } from "../../web/src/runtime/core.js";
+import { RUNTIME_ABI_VERSION } from "../../web/src/runtime/package-versions.js";
 
 const requiredFunctionExports = [
   "vir_alloc_bytes",
@@ -25,6 +26,7 @@ const requiredFunctionExports = [
   "vir_package_interface_manifest",
   "vir_package_interface_manifest_size",
   "vir_package_decl_count",
+  "vir_runtime_abi_version",
   "vir_upstream_target_pointer_bytes",
   "vir_obj_string",
   "vir_obj_string_data",
@@ -104,6 +106,9 @@ export async function instantiateVirModule(wasmModule) {
 export async function smokeWasmPackageBoundary(context) {
   const exports = await instantiateVirModule(context.wasmModule);
   assertRequiredExports(exports);
+  if (exports.vir_runtime_abi_version() !== RUNTIME_ABI_VERSION) {
+    throw new Error(`unexpected VIR runtime ABI version ${exports.vir_runtime_abi_version()}`);
+  }
   assertInvalidPackageDiagnostic(exports);
   loadIrPackageSet(exports, [context.defaultPackageBytes]);
   return {

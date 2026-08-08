@@ -22,7 +22,9 @@ That command:
 The generated `.irpkg` is the only browser artifact needed by `/dev.html`.
 After the package is loaded, the runner reads the embedded manifest and creates
 the UI entries automatically. The manifest metadata records the package format,
-Lean toolchain, generation time, source targets, and resolved roots.
+manifest and runtime ABI versions, Lean toolchain, generation time, source
+targets, and resolved roots. The loader rejects a package whose ABI fingerprint
+does not match the JavaScript and WASM runtime before exposing any entries.
 
 `web/public/*.irpkg` files are generated local assets and are ignored by git.
 Pass multiple config files to reuse the same prepared `vir_irpkg` generator:

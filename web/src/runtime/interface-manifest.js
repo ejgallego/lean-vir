@@ -6,9 +6,14 @@ Author: Emilio J. Gallego Arias
 
 import { formatInterfaceEffectPrefix, requireInterfaceEffect } from "./interface-effects.js";
 import { SUPPORTED_INTERFACE_TAGS, INTERFACE_TAG } from "./interface-tags.js";
+import {
+  PACKAGE_FORMAT_VERSION,
+  INTERFACE_MANIFEST_VERSION,
+  RUNTIME_ABI_VERSION,
+} from "./package-versions.js";
 
 export const INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-export const INTERFACE_MANIFEST_VERSION = 7;
+export { INTERFACE_MANIFEST_VERSION };
 export const MIN_INTERFACE_MANIFEST_VERSION = 6;
 export const HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
@@ -60,9 +65,37 @@ export function validateInterfaceManifest(manifest) {
   if (manifest.hostImports !== undefined && !Array.isArray(manifest.hostImports)) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
+  validateManifestMetadata(manifest.metadata, manifest.version);
   validateManifestExports(manifest.exports, manifest.version);
   validateManifestHostImports(manifest.hostImports ?? []);
   return manifest;
+}
+
+function validateManifestMetadata(metadata, manifestVersion) {
+  requireVersion(
+    metadata.packageFormatVersion,
+    PACKAGE_FORMAT_VERSION,
+    "embedded interface manifest metadata.packageFormatVersion",
+  );
+  requireVersion(
+    metadata.manifestVersion,
+    manifestVersion,
+    "embedded interface manifest metadata.manifestVersion",
+  );
+  requireVersion(
+    metadata.runtimeAbiVersion,
+    RUNTIME_ABI_VERSION,
+    "embedded interface manifest metadata.runtimeAbiVersion",
+  );
+}
+
+function requireVersion(value, expected, label) {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error(`${label} must be a positive safe integer`);
+  }
+  if (value !== expected) {
+    throw new Error(`${label} mismatch: expected ${expected}, got ${value}`);
+  }
 }
 
 function validateManifestExports(exports, manifestVersion) {

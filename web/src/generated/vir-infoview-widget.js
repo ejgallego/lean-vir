@@ -1701,6 +1701,24 @@ function createHostResourceState() {
 }
 function createElementResourceHostBindings(resources, operations) {
   return {
+    "browser.element.querySelector": (element, selector) => resources.adoptResourceForValue(createNullableValue(
+      operations.querySelector(
+        resources.resolveResource(element, "Element"),
+        resources.resolveResource(selector, "JsString")
+      )
+    )),
+    "browser.element.querySelectorAll": (element, selector) => resources.resourceForValue(operations.querySelectorAll(
+      resources.resolveResource(element, "Element"),
+      resources.resolveResource(selector, "JsString")
+    )),
+    "browser.element.getInnerHTML": (element) => resources.resourceForValue(operations.getInnerHTML(resources.resolveResource(element, "Element"))),
+    "browser.element.setInnerHTML": (element, html) => {
+      const target = resources.resolveResource(element, "Element");
+      return withConsumedResources(resources, [[html, "JsString"]], (resolvedHtml) => {
+        operations.setInnerHTML(target, resolvedHtml);
+        return void 0;
+      });
+    },
     "browser.element.getTextContent": (element) => resources.resourceForValue(operations.getTextContent(resources.resolveResource(element, "Element"))),
     "browser.element.setTextContent": (element, text) => {
       const target = resources.resolveResource(element, "Element");
@@ -3297,12 +3315,22 @@ function createBrowserEventHostBindings(state = createHostResourceState()) {
       stopPropagationOnEvent(state.resolveResource(event, "Event"));
       return void 0;
     },
+    "browser.event.key": (event) => {
+      const key = state.resolveResource(event, "Event")?.key;
+      return state.resourceForValue(typeof key === "string" ? key : "");
+    },
     "browser.event.formValue": (event) => adoptResourceForValue(state, createNullableValue(formControlEventValue(state.resolveResource(event, "Event"))))
   };
 }
 function createBrowserElementHostBindings(state = createHostResourceState()) {
   return {
     ...createElementResourceHostBindings(state, {
+      querySelector: (target, selector) => target.querySelector(selector),
+      querySelectorAll: (target, selector) => target.querySelectorAll(selector),
+      getInnerHTML: (target) => target.innerHTML ?? "",
+      setInnerHTML: (target, html) => {
+        target.innerHTML = html;
+      },
       getTextContent: (target) => target.textContent ?? "",
       setTextContent: (target, text) => {
         target.textContent = text;
@@ -3823,9 +3851,13 @@ var JSON_INPUT_INTERFACE_TAGS = /* @__PURE__ */ new Set([
   INTERFACE_TAG.CUSTOM_INDUCTIVE
 ]);
 
+// web/src/runtime/package-versions.js
+var PACKAGE_FORMAT_VERSION = 10;
+var INTERFACE_MANIFEST_VERSION = 8;
+var RUNTIME_ABI_VERSION = 1;
+
 // web/src/runtime/interface-manifest.js
 var INTERFACE_MANIFEST_ARTIFACT = "lean-vir-ir-package";
-var INTERFACE_MANIFEST_VERSION = 7;
 var MIN_INTERFACE_MANIFEST_VERSION = 6;
 var HOST_IMPORT_BOUNDARY = Object.freeze({
   HOST_RESOURCE: "hostResource",
@@ -3864,9 +3896,35 @@ function validateInterfaceManifest(manifest) {
   if (manifest.hostImports !== void 0 && !Array.isArray(manifest.hostImports)) {
     throw new Error("embedded interface manifest hostImports must be an array");
   }
+  validateManifestMetadata(manifest.metadata, manifest.version);
   validateManifestExports(manifest.exports, manifest.version);
   validateManifestHostImports(manifest.hostImports ?? []);
   return manifest;
+}
+function validateManifestMetadata(metadata, manifestVersion) {
+  requireVersion(
+    metadata.packageFormatVersion,
+    PACKAGE_FORMAT_VERSION,
+    "embedded interface manifest metadata.packageFormatVersion"
+  );
+  requireVersion(
+    metadata.manifestVersion,
+    manifestVersion,
+    "embedded interface manifest metadata.manifestVersion"
+  );
+  requireVersion(
+    metadata.runtimeAbiVersion,
+    RUNTIME_ABI_VERSION,
+    "embedded interface manifest metadata.runtimeAbiVersion"
+  );
+}
+function requireVersion(value, expected, label) {
+  if (!Number.isSafeInteger(value) || value < 1) {
+    throw new Error(`${label} must be a positive safe integer`);
+  }
+  if (value !== expected) {
+    throw new Error(`${label} mismatch: expected ${expected}, got ${value}`);
+  }
 }
 function validateManifestExports(exports, manifestVersion) {
   const entries = /* @__PURE__ */ new Set();
@@ -6804,6 +6862,15 @@ var VirRuntime = class extends ObjectValueRuntime {
     this.hostState?.attachRuntime(this);
     if (!this.exports.memory) {
       throw new Error("WASM memory export is missing");
+    }
+    if (typeof this.exports.vir_runtime_abi_version !== "function") {
+      throw new Error("WASM runtime ABI version export is missing; use a matching VIR SDK");
+    }
+    const wasmRuntimeAbiVersion = this.exports.vir_runtime_abi_version();
+    if (wasmRuntimeAbiVersion !== RUNTIME_ABI_VERSION) {
+      throw new Error(
+        `WASM runtime ABI version mismatch: loader expects ${RUNTIME_ABI_VERSION}, WASM provides ${wasmRuntimeAbiVersion}`
+      );
     }
     if (typeof this.exports.vir_package_interface_manifest_size === "function" && this.exports.vir_package_interface_manifest_size() !== 0) {
       this.interfaceManifest = this.readPackageManifest();

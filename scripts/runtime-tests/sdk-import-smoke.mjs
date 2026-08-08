@@ -12,6 +12,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 
 import { SDK_JS_MODULES } from "../sdk-payloads.mjs";
+import { RUNTIME_ABI_VERSION } from "../package-versions.mjs";
 
 const packaged = spawnSync(process.execPath, ["scripts/package-sdk-artifact.mjs"], {
   encoding: "utf8",
@@ -49,6 +50,7 @@ try {
   const reactNode = modules["react/vir-react-node.js"];
   const interfaceManifest = modules["runtime/interface-manifest.js"];
   const interfaceTags = modules["runtime/interface-tags.js"];
+  const packageVersions = modules["runtime/package-versions.js"];
 
   assert.equal(typeof runtime.createVirRuntime, "function");
   assert.equal(typeof runtime.createVirRuntimeFactory, "function");
@@ -73,6 +75,7 @@ try {
   assert.equal(typeof codec.roundTripInterfaceTypeDescriptor, "function");
   assert.equal(typeof reactNode.virtualReactTextContent, "function");
   assert.equal(typeof interfaceManifest.validateInterfaceManifest, "function");
+  assert.equal(packageVersions.RUNTIME_ABI_VERSION, RUNTIME_ABI_VERSION);
   assert.equal(typeof codec.sameInterfaceTypeDescriptor, "function");
   assert.equal(interfaceTags.INTERFACE_TAG.NAT, 0);
   assert.equal(interfaceTags.SUPPORTED_INTERFACE_TAGS.has(interfaceTags.INTERFACE_TAG.NAT), true);

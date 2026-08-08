@@ -46,6 +46,27 @@ export const invalidManifestCases = [
     pattern: /embedded interface manifest must be/,
   },
   {
+    name: "missing runtime ABI version",
+    mutate: (manifest) => {
+      delete manifest.metadata.runtimeAbiVersion;
+    },
+    pattern: /metadata\.runtimeAbiVersion must be a positive safe integer/,
+  },
+  {
+    name: "incompatible runtime ABI version",
+    mutate: (manifest) => {
+      manifest.metadata.runtimeAbiVersion += 1;
+    },
+    pattern: /metadata\.runtimeAbiVersion mismatch/,
+  },
+  {
+    name: "inconsistent metadata manifest version",
+    mutate: (manifest) => {
+      manifest.metadata.manifestVersion -= 1;
+    },
+    pattern: /metadata\.manifestVersion mismatch/,
+  },
+  {
     name: "missing v7 startup marker",
     mutate: (manifest) => {
       delete manifest.exports[0].startup;

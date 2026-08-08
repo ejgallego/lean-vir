@@ -4,9 +4,17 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-export const PACKAGE_FORMAT_VERSION = 10;
-export const INTERFACE_MANIFEST_VERSION = 7;
-export const RUNTIME_ABI_VERSION = 1;
+import {
+  PACKAGE_FORMAT_VERSION,
+  INTERFACE_MANIFEST_VERSION,
+  RUNTIME_ABI_VERSION,
+} from "../web/src/runtime/package-versions.js";
+
+export {
+  PACKAGE_FORMAT_VERSION,
+  INTERFACE_MANIFEST_VERSION,
+  RUNTIME_ABI_VERSION,
+};
 
 export const PACKAGE_VERSIONS = {
   packageFormatVersion: PACKAGE_FORMAT_VERSION,

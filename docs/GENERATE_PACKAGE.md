@@ -209,10 +209,12 @@ effect handling while allowing simple type aliases and effect aliases to pass.
 Version constants are intentionally small and explicit:
 
 - `Vir.GeneratePackage.PackageFormat` owns the Lean generator's binary package,
-  interface manifest, and package-set descriptor versions, plus the package-set
-  format identifier.
-- `scripts/package-versions.mjs` owns the JavaScript-side expectations for
-  package format, interface manifest, and runtime ABI versions.
+  interface manifest, runtime ABI, and package-set descriptor versions, plus
+  the package-set format identifier.
+- `web/src/runtime/package-versions.js` owns the JavaScript runtime's matching
+  package, manifest, and runtime ABI expectations; repository scripts re-export
+  those constants. `web/src/vir-runtime.js` owns the JavaScript package-set
+  descriptor expectations.
 - `npm run check:package-abi` verifies package magic, package-set descriptor
   identity, versions, and section kinds across Lean, Lake, C++, and JavaScript,
   plus the Lean/JavaScript interface tag and host-boundary tables.
@@ -237,8 +239,9 @@ descriptor smoke tests, and `docs/IRPKG_FORMAT.md` together.
 
 Bump `runtimeAbiVersion` when the SDK artifact compatibility changes outside
 the embedded package/manifest schema, such as a WASM host ABI or JavaScript
-runtime contract change. That value is currently recorded in the SDK artifact
-metadata, not in generated `.irpkg` manifests.
+runtime contract change. Generated `.irpkg` metadata, the JavaScript loader,
+the WASM export, and SDK artifact metadata must all agree so incompatible
+artifacts fail before package execution.
 
 After any version bump, run at least:
 

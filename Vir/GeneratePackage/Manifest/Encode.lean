@@ -79,6 +79,7 @@ def PackageMetadata.toJson (metadata : PackageMetadata) : String :=
     ("generator", jsonString metadata.generator),
     ("packageFormatVersion", jsonNat metadata.packageFormatVersion),
     ("manifestVersion", jsonNat metadata.manifestVersion),
+    ("runtimeAbiVersion", jsonNat metadata.runtimeAbiVersion),
     ("leanVersion", jsonString metadata.leanVersion),
     ("leanToolchain", jsonString metadata.leanToolchain),
     ("leanGithash", jsonString metadata.leanGithash),
