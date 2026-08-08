@@ -19,13 +19,46 @@ function errorMessage(error) {
   return error instanceof Error ? `${error.name}: ${error.message}` : String(error);
 }
 
+function normalizeCandidateResult(result, candidateId) {
+  if (Number.isFinite(result)) {
+    return { checksum: result, phases: {} };
+  }
+  if (result === null || typeof result !== "object" || Array.isArray(result) ||
+      !Number.isFinite(result.checksum)) {
+    throw new TypeError(`benchmark candidate ${candidateId} returned a non-finite checksum`);
+  }
+  if (result.phases === undefined) {
+    return { checksum: result.checksum, phases: {} };
+  }
+  if (result.phases === null || typeof result.phases !== "object" ||
+      Array.isArray(result.phases)) {
+    throw new TypeError(`benchmark candidate ${candidateId} phases must be an object`);
+  }
+  const phases = {};
+  for (const [name, value] of Object.entries(result.phases)) {
+    if (name === "") {
+      throw new TypeError(`benchmark candidate ${candidateId} phase names must be nonempty`);
+    }
+    if (!Number.isFinite(value) || value < 0) {
+      throw new TypeError(
+        `benchmark candidate ${candidateId} phase ${name} must be finite and nonnegative`,
+      );
+    }
+    phases[name] = value;
+  }
+  return { checksum: result.checksum, phases };
+}
+
 /**
  * Interleave fixed-size candidate batches and compare their numeric checksums.
- * Each available candidate supplies `run(context)`, which must return a finite
- * number. Optional `setup()` and `teardown(context)` calls run outside the
- * timed window. Warm-up results participate in stability checks, but only
- * measured timings are retained in each candidate's `samples` array and
- * `medianMs` summary.
+ * Each available candidate supplies `run(context)`, which returns either a
+ * finite numeric checksum or `{ checksum, phases }`, where every named phase
+ * is finite and nonnegative. The sampler adds its independently measured wall
+ * time as `totalMs` when the candidate omits that phase. Optional `setup()` and
+ * `teardown(context)` calls run outside the timed window. Warm-up results
+ * participate in checksum and phase-schema stability checks, but only measured
+ * timings are retained. The legacy wall timings remain in `samples` and
+ * `medianMs`; named timings are in `phaseSamples` and `phaseMedians`.
  */
 export function sampleBenchmarkCandidates(options) {
   if (options === null || typeof options !== "object") {
@@ -65,6 +98,7 @@ export function sampleBenchmarkCandidates(options) {
     return {
       candidate,
       hasChecksum: false,
+      phaseNames: null,
       state: {
         id: candidate.id,
         label: candidate.label ?? candidate.id,
@@ -73,6 +107,8 @@ export function sampleBenchmarkCandidates(options) {
         checksum: null,
         samples: [],
         medianMs: null,
+        phaseSamples: [],
+        phaseMedians: {},
         errors: [],
       },
     };
@@ -91,13 +127,10 @@ export function sampleBenchmarkCandidates(options) {
     }
 
     const started = now();
-    let checksum;
+    let observation;
     let elapsedMs;
     try {
-      checksum = entry.candidate.run(context);
-      if (!Number.isFinite(checksum)) {
-        throw new TypeError(`benchmark candidate ${entry.state.id} returned a non-finite checksum`);
-      }
+      observation = normalizeCandidateResult(entry.candidate.run(context), entry.state.id);
     } catch (error) {
       const message = errorMessage(error);
       if (!entry.state.errors.includes(message)) entry.state.errors.push(message);
@@ -114,12 +147,29 @@ export function sampleBenchmarkCandidates(options) {
     }
 
     if (entry.state.errors.length !== 0) return;
+    const phases = { ...observation.phases };
+    phases.totalMs ??= elapsedMs;
+    const phaseNames = Object.keys(phases).sort();
+    if (entry.phaseNames !== null &&
+        (phaseNames.length !== entry.phaseNames.length ||
+          phaseNames.some((name, index) => name !== entry.phaseNames[index]))) {
+      const message = `benchmark candidate ${entry.state.id} changed phase names from ` +
+        `${entry.phaseNames.join(", ")} to ${phaseNames.join(", ")}`;
+      if (!entry.state.errors.includes(message)) entry.state.errors.push(message);
+      entry.state.stable = false;
+      return;
+    }
+    entry.phaseNames ??= phaseNames;
+    const checksum = observation.checksum;
     if (entry.hasChecksum && entry.state.checksum !== checksum) entry.state.stable = false;
     if (!entry.hasChecksum) {
       entry.state.checksum = checksum;
       entry.hasChecksum = true;
     }
-    if (measured) entry.state.samples.push(elapsedMs);
+    if (measured) {
+      entry.state.samples.push(elapsedMs);
+      entry.state.phaseSamples.push(phases);
+    }
   }
 
   for (let round = -warmupRounds; round < sampleRounds; round += 1) {
@@ -131,7 +181,13 @@ export function sampleBenchmarkCandidates(options) {
   }
 
   for (const entry of entries) {
-    if (entry.state.samples.length > 0) entry.state.medianMs = median(entry.state.samples);
+    if (entry.state.samples.length > 0) {
+      entry.state.medianMs = median(entry.state.samples);
+      entry.state.phaseMedians = Object.fromEntries(entry.phaseNames.map((name) => [
+        name,
+        median(entry.state.phaseSamples.map((sample) => sample[name])),
+      ]));
+    }
   }
 
   const complete = entries.every((entry) =>

@@ -31,6 +31,27 @@ and titles, Node/V8/platform details, and the SHA-256 of every loaded Wasm and
 package artifact. Saved and paired comparisons reject different identities
 before reporting timing deltas.
 
+The order-balanced differential sampler also accepts a structured candidate
+result, `{ checksum, phases }`. It retains the independently measured candidate
+wall time in `samples`/`medianMs` and records named timings in
+`phaseSamples`/`phaseMedians`; an omitted `totalMs` phase defaults to the wall
+sample. Phase names must remain stable across warm-up and measured rounds.
+This lets runtime consumers feed `callTimed(...).timings` into the shared
+sampler without moving application conversion, rendering, or UI-specific
+phases into VIR.
+
+```js
+run: () => {
+  const { value, timings } = runtime.callTimed("MyPackage.entry", input);
+  return { checksum: Number(value), phases: timings };
+}
+```
+
+Named phase values and summaries are not necessarily additive. In particular,
+`hostMs` overlaps `executeMs`, `totalMs` is measured independently, and each
+entry in `phaseMedians` is computed independently; the phase medians therefore
+need not sum to the median `totalMs`.
+
 ## Environment Lookup Workload
 
 Use the focused environment lookup benchmark when changing package declaration

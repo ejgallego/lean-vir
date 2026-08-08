@@ -128,9 +128,87 @@ test("keeps candidate setup and teardown outside the timed window", () => {
 
   assert.equal(result.passed, true);
   assert.deepEqual(result.candidates.phased.samples, [3, 3]);
+  assert.deepEqual(result.candidates.phased.phaseSamples, [{ totalMs: 3 }, { totalMs: 3 }]);
+  assert.deepEqual(result.candidates.phased.phaseMedians, { totalMs: 3 });
   assert.deepEqual(events, [
     "setup", "run:41", "teardown:41",
     "setup", "run:41", "teardown:41",
+  ]);
+});
+
+test("retains named candidate phases alongside independent wall samples", () => {
+  const clock = fakeClock();
+  let calls = 0;
+  const result = sampleBenchmarkCandidates({
+    candidates: [{
+      id: "timed",
+      run: () => {
+        calls++;
+        clock.advance(calls === 1 ? 100 : 8);
+        return {
+          checksum: 42,
+          phases: {
+            marshalMs: calls === 1 ? 50 : 1,
+            executeMs: calls === 1 ? 40 : 4,
+            decodeMs: calls === 1 ? 5 : 2,
+            totalMs: calls === 1 ? 98 : 7,
+          },
+        };
+      },
+    }],
+    warmupRounds: 1,
+    sampleRounds: 2,
+    now: clock.now,
+  });
+
+  assert.equal(result.passed, true);
+  assert.deepEqual(result.candidates.timed.samples, [8, 8]);
+  assert.deepEqual(result.candidates.timed.phaseSamples, [{
+    marshalMs: 1,
+    executeMs: 4,
+    decodeMs: 2,
+    totalMs: 7,
+  }, {
+    marshalMs: 1,
+    executeMs: 4,
+    decodeMs: 2,
+    totalMs: 7,
+  }]);
+  assert.deepEqual(result.candidates.timed.phaseMedians, {
+    decodeMs: 2,
+    executeMs: 4,
+    marshalMs: 1,
+    totalMs: 7,
+  });
+});
+
+test("rejects invalid or unstable candidate phase schemas", () => {
+  let calls = 0;
+  const unstable = sampleBenchmarkCandidates({
+    candidates: [{
+      id: "unstable-phases",
+      run: () => ({
+        checksum: 1,
+        phases: calls++ === 0 ? { executeMs: 1 } : { decodeMs: 1 },
+      }),
+    }],
+    warmupRounds: 1,
+    sampleRounds: 1,
+  });
+  assert.equal(unstable.passed, false);
+  assert.match(unstable.candidates["unstable-phases"].errors[0], /changed phase names/);
+
+  const invalid = sampleBenchmarkCandidates({
+    candidates: [{
+      id: "invalid-phase",
+      run: () => ({ checksum: 1, phases: { executeMs: -1 } }),
+    }],
+    warmupRounds: 0,
+    sampleRounds: 1,
+  });
+  assert.equal(invalid.passed, false);
+  assert.deepEqual(invalid.candidates["invalid-phase"].errors, [
+    "TypeError: benchmark candidate invalid-phase phase executeMs must be finite and nonnegative",
   ]);
 });
 
