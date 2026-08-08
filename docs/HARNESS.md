@@ -109,6 +109,7 @@ npm run check:infoview-bundle
 npm run build:demo
 npm run build:demo:release
 npm run build:demo-package
+npm run build:surface-site
 npm run build:site
 npm run check:api-coverage
 npm run check:ir-codec-tags
@@ -315,6 +316,11 @@ Lean-dependent runtime job installs Lean for the Lake facet, package-generation,
 and SDK metadata smoke tests. The fixture job also downloads the demo artifacts
 and runs in parallel without re-fetching Lean source or reinstalling the WASI
 SDK.
+
+The Pages workflow runs the same `npm run build:site` entry point. Its static
+artifact includes a fresh complete Lean-library surface scan under
+`web/dist/surface/`, deployed at
+`https://ejgallego.github.io/lean-vir/surface/` alongside the demo.
 
 For pull requests, every job explicitly checks out the pull request's head SHA
 instead of GitHub's synthetic merge ref. GitHub indexes commit artifacts by

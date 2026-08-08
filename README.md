@@ -173,6 +173,11 @@ The hosted demo is deployed from `main`:
 
 [Lean VIR hosted demo](https://ejgallego.github.io/lean-vir/)
 
+The same deployment publishes the current static analysis of which functions
+in Lean's installed libraries have a complete VIR-runnable dependency closure:
+
+[VIR runnable-surface report](https://ejgallego.github.io/lean-vir/surface/)
+
 A downloadable static bundle is published with the hosted demo:
 
 [lean-vir-local.tar.gz](https://ejgallego.github.io/lean-vir/downloads/lean-vir-local.tar.gz)

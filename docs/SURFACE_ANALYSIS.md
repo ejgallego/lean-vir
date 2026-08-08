@@ -337,6 +337,10 @@ frontier when it merely advances a long dependency chain.
 
 ## Interactive HTML Report
 
+The report generated from `main` is published with the hosted demo:
+
+[VIR runnable-surface report](https://ejgallego.github.io/lean-vir/surface/)
+
 Render any JSON scan as a static browser report:
 
 ```bash
@@ -348,6 +352,11 @@ npm run render:surface -- \
 Open `build/vir-surface/html/index.html` directly. The artifact supports both
 `file://` browsing and an ordinary static HTTP server; it has no runtime npm or
 CDN dependency.
+
+`npm run build:surface-site` performs a fresh complete scan and writes the
+deployable report to `web/dist/surface/`. `npm run build:site` runs that step
+after the Vite build, so the existing Pages workflow publishes the report and
+the demo as one atomic artifact from `main`.
 
 The left navigator treats dotted Lean module names as folders and files. Both
 folders and modules show a selectable public-constant or all-IR coverage

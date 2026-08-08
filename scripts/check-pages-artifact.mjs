@@ -104,6 +104,21 @@ async function assertSdkBundle(path) {
   assert.ok(Array.isArray(manifest.files));
 }
 
+async function assertSurfaceReport() {
+  const html = (await assertFile("surface/index.html", 100)).toString("utf8");
+  assert.ok(html.includes("assets/app.js"), "surface report should load its application asset");
+  assert.ok(html.includes("data/index.js"), "surface report should load its navigation index");
+  await assertFile("surface/assets/app.js", 1024);
+  await assertFile("surface/assets/style.css", 1024);
+  await assertFile("surface/data/index.js", 1024);
+
+  const manifest = JSON.parse(await assertFile("surface/vir-surface-html.json", 100));
+  assert.equal(manifest.format, "lean-vir-surface-html");
+  assert.ok(manifest.selectedModules > 0, "surface report should select Lean library modules");
+  assert.ok(manifest.declarations > 0, "surface report should contain Lean IR declarations");
+  assert.ok(manifest.moduleDataFiles > 0, "surface report should contain per-module data files");
+}
+
 const indexHtml = await assertHtmlAssetLinks("index.html");
 const devHtml = await assertHtmlAssetLinks("dev.html");
 const formatHtml = await assertHtmlAssetLinks("format.html");
@@ -135,8 +150,9 @@ await assertDistReady(fileURLToPath(distDir));
 await assertStalePackageRejectedBeforeBrowser();
 await assertLocalBundle("downloads/lean-vir-local.tar.gz");
 await assertSdkBundle("downloads/lean-vir-sdk.tar.gz");
+await assertSurfaceReport();
 
-console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, React review, format workbench, wasm, focused manifest packages, local bundle, and SDK bundle`);
+console.log(`pages artifact ok: ${join("web", "dist")} contains landing, runner, React review, format workbench, runnable-surface report, wasm, focused manifest packages, local bundle, and SDK bundle`);
 
 function minGeneratedPublicFileSize(file) {
   return localPackageFileSet.has(file) ? 128 : 1024;

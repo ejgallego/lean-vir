@@ -79,8 +79,8 @@ map lives in `docs/HARNESS.md`.
 - `npm run test:fixtures:no-build`
   Reuse an existing `web/public/vir-upstream.wasm` for faster fixture iteration.
 - `npm run test:site`
-  Build the Vite site, local archive, SDK archive, and check the generated
-  `web/dist` artifact shape.
+  Build the Vite site, runnable-surface report, local archive, SDK archive, and
+  check the generated `web/dist` artifact shape.
 - `npm run test:pages:browser`
   Run the generated site in headless Chromium. Set `CHROMIUM=/path/to/chromium`
   if the browser is outside the usual discovery paths.
