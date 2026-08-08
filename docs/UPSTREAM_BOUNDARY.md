@@ -91,6 +91,42 @@ All five generated providers are listed explicitly in
 `native-support-sources.txt`, and section-level dead-code elimination keeps
 only the implementation closure reached by the registered symbols.
 
+## Native Extern Metadata Ownership
+
+`Vir/GeneratePackage/NativeExterns.lean` currently combines two different
+responsibilities:
+
+- VIR policy: which native declarations the Wasm runtime promises to provide,
+  which declarations need generated boxed wrappers, and any additional runtime
+  dependency declarations; and
+- compiler metadata copied from Lean: parameter ownership and IR types, result
+  IR type, and the C backend symbol.
+
+The second part should not remain hand-maintained. The current 223-entry table
+already contains 11 backend symbols shared by 23 Lean declaration names, such
+as `String.append` / `String.Internal.append` and `Nat.decLe` / `Nat.ble`.
+The rejected string-alias experiment made the maintenance problem especially
+clear: adding an internal spelling required copying an existing signature and
+symbol even when it added almost no runnable surface.
+
+The pinned Lean API already exposes both inputs needed for a VIR-side
+prototype. `Lean.IR.findEnvDecl` returns the compiler IR declaration, including
+parameter ownership and IR types, and `Lean.getExternNameFor` with backend `c`
+returns the selected C backend symbol. The next consolidation should therefore
+replace the copied fields with a small VIR selection record and resolve the
+full native extern description from the imported environment. Provider
+availability and support-source selection remain explicit VIR policy; they must
+not be inferred from the presence of an `@[extern]` declaration.
+
+No Lean upstream API change is justified yet. First implement the local
+resolver, keep the existing ABI check as an invariant, and use the generated
+description for package validation, wrapper generation, surface analysis, and
+the restricted native registry. If that prototype exposes a stability or
+enumeration gap in the two existing Lean APIs, the upstream request should be a
+narrow compiler-metadata query returning declaration name, C symbol, ABI, and
+boxed-wrapper information. It should not contain VIR's allowlist, Wasm provider
+policy, support-source closure, or `.irpkg` details.
+
 For Lean-defined native exports whose implementation closure is available in
 the pinned compiler output rather than the imported kernel environment, the
 probe also cross-compiles the stage0 sources listed in

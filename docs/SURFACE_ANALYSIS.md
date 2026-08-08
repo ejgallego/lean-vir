@@ -299,6 +299,42 @@ already used by the registered public `String.getUTF8Byte` boundary, so it is a
 good registry-only follow-up experiment rather than a reason to add another
 generated support module.
 
+### Rejected String Alias Cluster
+
+The follow-up measured `String.Internal.getUTF8Byte` first, then followed its
+nearest-boundary chain through `Substring.Raw.Internal.drop`,
+`Substring.Raw.Internal.all`, and `Substring.Raw.Internal.extract`. The first
+two stages reused providers already present in the runtime. The final stage
+needed the canonical `Init/Util.c` panic-message provider and its
+`Init/Data/Repr.c` dependency because `Substring.Raw.Internal.all` validates
+raw substring positions before traversing them.
+
+| Measurement | String-frontier control | + `getUTF8Byte` | + `drop` | + `all` and `extract` |
+| --- | ---: | ---: | ---: | ---: |
+| Stripped release Wasm | 657,138 B | 657,258 B | 658,712 B | 665,872 B |
+| Incremental raw cost | - | +120 B | +1,454 B | +7,160 B |
+| Gzip-compressed Wasm | 150,091 B | 150,106 B | 150,422 B | 152,245 B |
+| Incremental gzip cost | - | +15 B | +316 B | +1,823 B |
+| Runnable public constants | 27,636 | 27,636 | 27,636 | 27,636 |
+| Incremental public gain | - | 0 | 0 | 0 |
+| Runnable all-IR functions | 314,956 | 314,963 | 314,964 | 314,970 |
+| Incremental all-IR gain | - | +7 | +1 | +6 |
+| Regressions | - | 0 | 0 | 0 |
+
+The primary-blocker count substantially overstated the delivered value. The
+first alias moved 1,878 roots to `Substring.Raw.Internal.drop`. Satisfying
+`drop` moved 1,878 roots to `Substring.Raw.Internal.all` and another 21 to
+`Substring.Raw.Internal.extract`, while making only one function runnable.
+Closing that substring cluster moved the largest chains again, chiefly to
+`String.Internal.any` (1,812 roots) and
+`Substring.Raw.Internal.front` (1,002 roots).
+
+The complete candidate therefore cost 8,734 raw bytes and 2,154 gzip bytes for
+14 newly runnable compiler-generated or private IR functions and no public
+constants. The runtime additions were rejected and are not retained. This is a
+useful negative result: a cheap alias registration is not automatically a good
+frontier when it merely advances a long dependency chain.
+
 ## Interactive HTML Report
 
 Render any JSON scan as a static browser report:
