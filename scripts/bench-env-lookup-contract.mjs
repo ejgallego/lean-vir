@@ -4,9 +4,9 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createHash } from "node:crypto";
 import { resolve } from "node:path";
 
+import { sha256 } from "./bench-utils.mjs";
 import { IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
 
 // Keep this conservative and explicit: every local module loaded by the
@@ -50,9 +50,7 @@ export const environmentLookupHarnessPaths = Object.freeze([
   "web/src/vir-runtime.js",
 ]);
 
-export function sha256(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
-}
+export { sha256 };
 
 export function environmentLookupPackageIdentity(packageBytes, packageInfo) {
   const { generatedAt: _generatedAt, ...stableMetadata } = packageInfo.manifest.metadata ?? {};

@@ -6,6 +6,12 @@ Author: Emilio J. Gallego Arias
 
 import { readFile } from "node:fs/promises";
 
+import { createHash } from "node:crypto";
+
+export function sha256(bytes) {
+  return createHash("sha256").update(bytes).digest("hex");
+}
+
 function envOrDefault(env, name, fallback) {
   return typeof env[name] === "string" && env[name].length !== 0 ? env[name] : fallback;
 }

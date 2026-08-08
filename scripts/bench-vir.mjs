@@ -25,6 +25,7 @@ import {
   parseBenchmarkCacheOption,
   requireBenchmarkSample,
   requireOptionValue,
+  sha256,
   validateBenchmarkBuildOptions,
 } from "./bench-utils.mjs";
 import { createVirRuntime as createBrowserVirRuntime } from "../web/src/vir-runtime.js";
@@ -200,7 +201,17 @@ async function instantiateRuntimes() {
     virtualDocumentState,
     hostBindings: createBenchmarkHostBindings(),
   });
-  return { runtime, hostRuntime, prettyRuntime };
+  return {
+    runtime,
+    hostRuntime,
+    prettyRuntime,
+    artifacts: [
+      { path: publicArtifactPath(wasmPublicFile), sha256: sha256(wasm) },
+      { path: publicArtifactPath(defaultPackageFile), sha256: sha256(irPackage) },
+      { path: publicArtifactPath(hostPackageFile), sha256: sha256(hostPackage) },
+      { path: publicArtifactPath(prettyPackageFile), sha256: sha256(prettyPackage) },
+    ],
+  };
 }
 
 function readPublicArtifact(file) {
@@ -351,17 +362,28 @@ function gitMetadata() {
 }
 
 async function writeJsonReport(path, benchmarks) {
+  const environment = {
+    node: process.version,
+    v8: process.versions.v8,
+    platform: process.platform,
+    arch: process.arch,
+  };
   const report = {
     schema: "lean-vir.bench.v1",
     generatedAt: new Date().toISOString(),
     command: "npm run bench",
     git: gitMetadata(),
-    environment: {
-      node: process.version,
-      v8: process.versions.v8,
-      platform: process.platform,
-      arch: process.arch,
+    comparisonIdentity: {
+      workload: "vir-general-benchmark-v1",
+      benchmarks: benchmarks.map(({ name, title, class: benchmarkClass = null }) => ({
+        name,
+        title,
+        class: benchmarkClass,
+      })),
+      ...environment,
+      artifacts: artifactIdentities,
     },
+    environment,
     artifactCache,
     selection: {
       filters: args.filters,
@@ -678,7 +700,7 @@ const artifactCache = await prepareBenchArtifacts({
   options: args,
   build: () => runSync("npm", ["run", "--silent", "build:demo"], { cwd: root }),
 });
-const { runtime, hostRuntime, prettyRuntime } = await instantiateRuntimes();
+const { runtime, hostRuntime, prettyRuntime, artifacts: artifactIdentities } = await instantiateRuntimes();
 const benchmarkReports = [];
 const outputSections = new Map();
 
