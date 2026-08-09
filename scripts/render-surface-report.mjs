@@ -168,6 +168,7 @@ const manifest = {
   frontierCosts: frontierCosts ? {
     baseline: frontierCosts.baseline,
     candidates: frontierCosts.candidates.length,
+    failedCandidates: frontierCosts.candidates.filter((candidate) => candidate.error).length,
   } : null,
   moduleDataFiles: dataFileCount,
   entrypoint: "index.html",

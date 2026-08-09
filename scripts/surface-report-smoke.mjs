@@ -131,6 +131,7 @@ try {
   assert.equal(htmlManifest.declarations, report.counts.total);
   assert.equal(htmlManifest.externs, report.externs.length);
   assert.equal(htmlManifest.frontierCosts.candidates, 1);
+  assert.equal(htmlManifest.frontierCosts.failedCandidates, 0);
 
   const sizeLinks = JSON.parse(await readFile(join(htmlDir, "data/size-links.json"), "utf8"));
   assert.equal(sizeLinks.format, "lean-vir-surface-size-links");

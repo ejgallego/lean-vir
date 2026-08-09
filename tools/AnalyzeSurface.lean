@@ -18,23 +18,15 @@ structure Options where
   modules : Array Name := #[]
   extraNativeExterns : Array Name := #[]
 
-def nameFromDotted (text : String) : Name :=
-  text.splitOn "." |>.foldl (fun name part =>
-    if part.isEmpty then name else .str name part) .anonymous
-
 partial def parseOptions
     (args : List String) (options : Options) : Except String Options := do
   match args with
   | [] => return options
   | "--module" :: moduleName :: rest =>
-      let name := nameFromDotted moduleName
-      if name.isAnonymous then
-        throw "--module requires a non-empty dotted Lean module name"
+      let name ← parseDottedName moduleName
       parseOptions rest { options with modules := options.modules.push name }
   | "--native-extern" :: externName :: rest =>
-      let name := nameFromDotted externName
-      if name.isAnonymous then
-        throw "--native-extern requires a non-empty dotted Lean declaration name"
+      let name ← parseDottedName externName
       if options.extraNativeExterns.contains name then
         throw s!"duplicate --native-extern `{name}`"
       parseOptions rest { options with extraNativeExterns := options.extraNativeExterns.push name }

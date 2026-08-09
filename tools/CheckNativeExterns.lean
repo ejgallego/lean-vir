@@ -35,8 +35,21 @@ def duplicateNativeExternNames : Array String := Id.run do
       seen := seen.insert spec.name
   return duplicates
 
+def dottedNameParserFailures : Array String :=
+  let valid := match parseDottedName "Lean.Expr.eqv" with
+    | .ok name => if name == `Lean.Expr.eqv then #[] else #["dotted-name parser changed a valid name"]
+    | .error error => #[s!"dotted-name parser rejected a valid name: {error}"]
+  let empty := match parseDottedName "" with
+    | .error _ => #[]
+    | .ok _ => #["dotted-name parser accepted an empty name"]
+  let emptyComponent := match parseDottedName "Lean..Expr" with
+    | .error _ => #[]
+    | .ok _ => #["dotted-name parser accepted an empty component"]
+  valid ++ empty ++ emptyComponent
+
 def runNativeExternCheck : CoreM Unit := do
-  let failures := duplicateNativeExternNames ++ checkNativeExternSpecs (← getEnv)
+  let failures := dottedNameParserFailures ++ duplicateNativeExternNames ++
+    checkNativeExternSpecs (← getEnv)
   if failures.isEmpty then
     let overrides := nativeExternSpecs.filter (·.symbolOverride?.isSome) |>.size
     logInfo s!"native extern metadata ok: {nativeExternSpecs.size} unique entries; \

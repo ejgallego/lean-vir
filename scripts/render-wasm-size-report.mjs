@@ -126,6 +126,7 @@ const manifest = {
   frontierCosts: frontierCosts ? {
     baseline: frontierCosts.baseline,
     candidates: frontierCosts.candidates.length,
+    failedCandidates: frontierCosts.candidates.filter((candidate) => candidate.error).length,
   } : null,
 };
 await writeFile(join(outputDir, "vir-wasm-size-html.json"), `${JSON.stringify(manifest, null, 2)}\n`);

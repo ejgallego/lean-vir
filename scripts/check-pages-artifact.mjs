@@ -128,6 +128,8 @@ async function assertSurfaceReport() {
   assert.ok(manifest.moduleDataFiles > 0, "surface report should contain per-module data files");
   assert.ok(manifest.frontierCosts?.candidates > 0,
     "surface report should contain current exact frontier measurements");
+  assert.equal(manifest.frontierCosts.failedCandidates, 0,
+    "surface report should not publish failed frontier measurements");
 }
 
 async function assertWasmSizeReport() {
@@ -154,6 +156,8 @@ async function assertWasmSizeReport() {
     "Wasm size report should connect retained symbols to runnable-surface declarations");
   assert.ok(manifest.frontierCosts?.candidates > 0,
     "Wasm size report should contain current exact frontier measurements");
+  assert.equal(manifest.frontierCosts.failedCandidates, 0,
+    "Wasm size report should not publish failed frontier measurements");
   assert.equal(manifest.runtimeContext.archives, 3);
   assert.equal(manifest.runtimeContext.sourceMembers, manifest.runtimeContext.members,
     "every runtime-context member should have exact Lean source provenance");

@@ -73,11 +73,11 @@ npm run check:native-wrappers
 ```
 
 `NativeExternSpec` stores VIR policy only. Lean supplies each declaration's
-parameter/borrow/result ABI and, for 451 of the current 461 entries, its native
-symbol. Keep `symbolOverride?` for the ten intentional provider aliases; the
-metadata check rejects an override once it becomes redundant. The JavaScript
-registry and inventory checks consume `vir_native_wrappers --catalog`, not the
-Lean source text.
+parameter/borrow/result ABI and native symbol except for the ten intentional
+provider aliases. Keep those aliases in `symbolOverride?`; the metadata check
+rejects an override once it becomes redundant. The JavaScript registry and
+inventory checks consume `vir_native_wrappers --catalog`, not the Lean source
+text.
 
 Set `generateBoxedWrapper := true` on a native extern specification when the
 normal Lean compiler-generated boxed adapter is sufficient.

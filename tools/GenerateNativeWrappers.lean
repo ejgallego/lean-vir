@@ -22,21 +22,13 @@ def wrapperExterns (externs : Array NativeExtern) : Array NativeExtern :=
 def wrapperDecls (externs : Array NativeExtern) : Array Name :=
   wrapperExterns externs |>.map (·.name)
 
-def nameFromDotted (text : String) : Except String Name := do
-  if text.isEmpty then
-    throw "native extern name must be non-empty"
-  let parts := text.splitOn "."
-  if parts.any (·.isEmpty) then
-    throw s!"native extern name `{text}` must not contain empty components"
-  return parts.foldl (fun name part => .str name part) .anonymous
-
 def readExtraNames (path : System.FilePath) : IO (Array Name) := do
   let mut names := #[]
   for line in (← IO.FS.readFile path).splitOn "\n" do
     let line := line.trimAscii.toString
     if line.isEmpty || line.startsWith "#" then
       continue
-    let name ← IO.ofExcept (nameFromDotted line)
+    let name ← IO.ofExcept (parseDottedName line)
     if names.contains name then
       throw <| IO.userError s!"duplicate extra native extern `{name}`"
     names := names.push name

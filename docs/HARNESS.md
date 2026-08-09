@@ -346,41 +346,13 @@ remain explicit as non-function data and object overhead, so child areas add up
 exactly. The generated `libLeanIR.a` member is shown separately as compiled
 `LeanIR.lean` program code and is excluded from the native-support denominator.
 Retained-code coloring matches native function aliases to exact retained Wasm
-linker symbols, then shows matched native-function bytes per archive byte;
-parent colors are byte-weighted averages of their children. Frontier-pressure
-coloring independently joins every missing extern to exact provider functions
-in the displayed archives and shows deterministic primary blocked-root density
-per MiB. The explanation reports mapped versus total missing externs because a
-provider outside this archive slice has no byte area here. Parent colors are
-byte-weighted averages of their children. This is not a predicted unlock count
-because satisfying one boundary may reveal another. Its focused log color scale
-keeps sparse parent averages pale so concentrated leaves remain visible. A
-combined mode shows retained code in green, frontier pressure in orange,
-overlap in purple, and neither signal in gray. The overlap is intentional
-evidence: a native function may already be linked into the Wasm for another
-caller while its Lean declaration remains absent from the native-extern
-catalog. Combined mode lists those overlap functions directly and opens their
-cross-linked details. Scope
-changes promote up to 28 of the largest visible exact member/object and
-function/symbol correspondences into shared transition elements, with the map
-crossfade as a fallback when a match is below the current render depth. The
-animation honors the browser's reduced-motion preference. Runtime-member
-details add clickable largest-function, highest-pressure, and retained-Wasm
-summaries, so dense files such as `expr.cpp` remain explorable even when
-non-function object overhead dominates their area. A context-wide coverage
-strip reports retained native-function bytes against all installed native-support
-archive bytes, plus sized-function byte and function-count coverage. The shipped
-Wasm byte size is shown separately because Wasm and native archive bytes are not
-an interchangeable denominator. Hovering a runtime-context block temporarily
-updates the compact strip with that subtree's ratios. Deep slider input is
-animation-frame coalesced, subtree depths are cached, and the treemap uses one
-delegated event surface rather than per-block handlers. Nested rendering keeps
-the relative-share threshold needed for deep signal pixels and also accepts
-blocks with sufficient on-screen pixel geometry; this lets files such as
-`expr.cpp` expose their proportional overhead/function children from the
-`src/` view even when they occupy a modest fraction of a large directory. The
-browser smoke guards that case and the complete level-seven render against
-regression.
+linker symbols. Frontier-pressure coloring independently joins missing externs
+to provider functions in the displayed archives. The combined mode shows both
+signals and their overlap. Parent colors remain byte-weighted, and blocker
+pressure is a prioritization hint rather than a predicted unlock count. Runtime
+member details and the compact coverage strip expose the underlying function,
+byte, and blocker measurements. See `docs/SURFACE_ANALYSIS.md` for the report's
+accounting rules, cross-report joins, and interaction design.
 The Pages build also runs the tracked native-frontier plan against the current
 release artifact. Both reports display exact isolated and directly measured
 cluster raw/gzip deltas, while keeping those costs distinct from blocker
