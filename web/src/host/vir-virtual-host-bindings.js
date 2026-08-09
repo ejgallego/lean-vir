@@ -49,13 +49,15 @@ export function createVirtualDocumentState({
 }
 
 export function createVirtualElementState({
+  innerHTML = "",
   textContent = "",
   attributes = new Map(),
+  queries = new Map(),
   checked = false,
   value = "",
   listeners = new Map(),
 } = {}) {
-  return { textContent, attributes, checked, value, listeners };
+  return { innerHTML, textContent, attributes, queries, checked, value, listeners };
 }
 
 export function ensureVirtualElementState(state, selector, element = null) {
@@ -90,6 +92,7 @@ export function ensureVirtualElementStates(state, selector, elements) {
 export function createVirtualEventState({
   target = null,
   currentTarget = null,
+  key = "",
   defaultPrevented = false,
   propagationStopped = false,
   onPreventDefault = null,
@@ -98,6 +101,7 @@ export function createVirtualEventState({
   const event = {
     target,
     currentTarget,
+    key,
     defaultPrevented,
     propagationStopped,
     preventDefault: () => {
@@ -129,6 +133,10 @@ export function createVirtualEventHostBindings(
     "browser.event.stopPropagation": (event) => {
       stopPropagationOnEvent(resources.resolveResource(event, "Event"));
       return undefined;
+    },
+    "browser.event.key": (event) => {
+      const key = resources.resolveResource(event, "Event")?.key;
+      return resources.resourceForValue(typeof key === "string" ? key : "");
     },
     "browser.event.formValue": (event) =>
       resources.adoptResourceForValue(createNullableValue(formControlEventValue(resources.resolveResource(event, "Event")))),
@@ -170,6 +178,15 @@ export function createVirtualDocumentHostBindings(
       )),
     ...createVirtualEventHostBindings(state, resources),
     ...createElementResourceHostBindings(resources, {
+      querySelector: (target, selector) =>
+        queryVirtualDescendantStates(target, selector)[0] ?? null,
+      querySelectorAll: (target, selector) =>
+        createStaticNodeList(queryVirtualDescendantStates(target, selector)),
+      getInnerHTML: (target) => target.innerHTML,
+      setInnerHTML: (target, html) => {
+        target.innerHTML = html;
+        target.queries.clear();
+      },
       getTextContent: (target) => target.textContent,
       setTextContent: (target, text) => {
         target.textContent = text;
@@ -309,12 +326,21 @@ function nullableField(resources, value, name) {
 }
 
 function normalizeVirtualElementState(element) {
+  element.innerHTML ??= "";
   element.textContent ??= "";
   element.attributes ??= new Map();
+  element.queries ??= new Map();
   element.checked ??= false;
   element.value ??= "";
   element.listeners ??= new Map();
   return element;
+}
+
+function queryVirtualDescendantStates(element, selector) {
+  const value = element.queries.get(selector);
+  if (value === undefined) return [];
+  const elements = Array.isArray(value) ? value : [value];
+  return elements.map(normalizeVirtualElementState);
 }
 
 function findVirtualReactElementNodeById(node, id) {

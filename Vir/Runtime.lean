@@ -44,4 +44,41 @@ instance : Nonempty (RuntimeM α) :=
 
 end RuntimeM
 
+/-- Mutable Lean-owned state shared by VIR callbacks. -/
+@[irreducible] def RuntimeRef (α : Type) : Type :=
+  IO.Ref α
+
+namespace RuntimeRef
+
+/-- Creates a mutable Lean-owned runtime reference. -/
+def new (value : α) : RuntimeM (RuntimeRef α) := by
+  unfold RuntimeM RuntimeRef
+  exact liftM (IO.mkRef value)
+
+/-- Reads a runtime reference. -/
+def get (ref : RuntimeRef α) : RuntimeM α := by
+  unfold RuntimeRef at ref
+  unfold RuntimeM
+  exact ref.get
+
+/-- Replaces the contents of a runtime reference. -/
+def set (ref : RuntimeRef α) (value : α) : RuntimeM Unit := by
+  unfold RuntimeRef at ref
+  unfold RuntimeM
+  exact ref.set value
+
+/-- Modifies a runtime reference. -/
+def modify (ref : RuntimeRef α) (f : α → α) : RuntimeM Unit := by
+  unfold RuntimeRef at ref
+  unfold RuntimeM
+  exact ref.modify f
+
+/-- Modifies a runtime reference and returns a value computed from its previous contents. -/
+def modifyGet (ref : RuntimeRef α) (f : α → β × α) : RuntimeM β := by
+  unfold RuntimeRef at ref
+  unfold RuntimeM
+  exact ref.modifyGet f
+
+end RuntimeRef
+
 end Lean.Vir

@@ -917,6 +917,22 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     generateBoxedWrapper := true
   },
   {
+    name := `Float.neg,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.decLe,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.round,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Float.toUInt64,
+    generateBoxedWrapper := true
+  },
+  {
     name := `Float.ofModel,
     generateBoxedWrapper := true
   },

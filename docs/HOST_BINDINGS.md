@@ -90,10 +90,13 @@ The public Lean browser APIs continue to expose ordinary `String`, `Bool`,
 `UInt32`, and `Float` values where appropriate, but their low-level
 `browser.*` host targets use explicit `Lean.Vir.JsValue` scalar resources.
 
-`Lean.Vir.Browser.Element.*` targets read and write text content and attributes,
-append and remove elements, update `classList`, and set inline style properties
-through DOM element properties/methods. Event listener targets retain Lean
-closures until the listener is removed or the runtime is disposed.
+`Lean.Vir.Browser.Element.*` targets query descendants, read and write text
+content, attributes, and `innerHTML`, append and remove elements, update
+`classList`, and set inline style properties through DOM element
+properties/methods. Replacing `innerHTML` detaches the old descendant DOM nodes;
+Lean callers should first replace any runtime state that holds handles to those
+descendants. Event listener targets retain Lean closures until the listener is
+removed or the runtime is disposed.
 
 `Lean.Vir.Browser.HTMLCanvasElement.*` narrows canvas elements, reads and writes
 their bitmap size, and obtains a 2D context. `browser.canvas2d.*` covers
@@ -102,8 +105,9 @@ and rotation. One-shot float and string arguments use owned resources that the
 receiving canvas or text binding consumes after the synchronous DOM call.
 
 `Lean.Vir.Browser.Event.target` and `currentTarget` return element resources
-when the event target is an element. `preventDefault` and `stopPropagation`
-forward to the browser event object.
+when the event target is an element. `Event.key` returns the string-valued
+keyboard key when present. `preventDefault` and `stopPropagation` forward to
+the browser event object.
 
 `Lean.Vir.Browser.HTMLInputElement.fromElement` narrows an element resource
 before reading or writing `checked` and `value`.
@@ -219,6 +223,10 @@ const vir = await createVirRuntime({
 Virtual `Document.querySelector` follows DOM semantics and returns `none`/`null`
 for missing selectors. `Document.querySelectorAll` returns a static NodeList;
 use `ensureVirtualElementStates` to seed every match for a selector.
+Virtual elements accept a `queries` map for descendant
+`Element.querySelector` and `querySelectorAll` results, plus an `innerHTML`
+string. Setting inner HTML clears the descendant query map, mirroring
+replacement of the old child tree.
 `createVirtualElementState` and
 `createVirtualEventState` construct resources for direct virtual callback
 dispatch. `findVirtualReactElementById` and `virtualReactElementById` locate
@@ -404,6 +412,9 @@ and the public runtime is left disposed rather than half-switched.
 - [MDN `Document.title`](https://developer.mozilla.org/en-US/docs/Web/API/Document/title)
 - [MDN `Document.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelector)
 - [MDN `Document.querySelectorAll`](https://developer.mozilla.org/en-US/docs/Web/API/Document/querySelectorAll)
+- [MDN `Element.querySelector`](https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelector)
+- [MDN `Element.querySelectorAll`](https://developer.mozilla.org/en-US/docs/Web/API/Element/querySelectorAll)
+- [MDN `Element.innerHTML`](https://developer.mozilla.org/en-US/docs/Web/API/Element/innerHTML)
 - [MDN `Node.textContent`](https://developer.mozilla.org/en-US/docs/Web/API/Node/textContent)
 - [MDN `Element.getAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/getAttribute)
 - [MDN `Element.setAttribute`](https://developer.mozilla.org/en-US/docs/Web/API/Element/setAttribute)
@@ -412,6 +423,7 @@ and the public runtime is left disposed rather than half-switched.
 - [MDN `Event.currentTarget`](https://developer.mozilla.org/en-US/docs/Web/API/Event/currentTarget)
 - [MDN `Event.preventDefault`](https://developer.mozilla.org/en-US/docs/Web/API/Event/preventDefault)
 - [MDN `Event.stopPropagation`](https://developer.mozilla.org/en-US/docs/Web/API/Event/stopPropagation)
+- [MDN `KeyboardEvent.key`](https://developer.mozilla.org/en-US/docs/Web/API/KeyboardEvent/key)
 - [MDN `EventTarget.addEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/addEventListener)
 - [MDN `EventTarget.removeEventListener`](https://developer.mozilla.org/en-US/docs/Web/API/EventTarget/removeEventListener)
 - [MDN `HTMLInputElement.checked`](https://developer.mozilla.org/en-US/docs/Web/API/HTMLInputElement/checked)
