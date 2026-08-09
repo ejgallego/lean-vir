@@ -208,7 +208,7 @@ export function markdownReport(report) {
     "# VIR Frontier Size Costs",
     "",
     `- Baseline: ${report.baseline.rawBytes.toLocaleString("en-US")} B raw, ` +
-      `${report.baseline.gzipBytes.toLocaleString("en-US")} B gzip -9 -n`,
+      `${report.baseline.gzipBytes.toLocaleString("en-US")} B gzip`,
     `- Candidates: ${report.candidates.length}`,
     "- Cost model: isolated exact link unless a row explicitly contains multiple names",
     "",

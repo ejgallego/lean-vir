@@ -60,6 +60,7 @@ test("frontier size markdown reports exact bytes and pressure density", () => {
       primaryRootsPerRawKiB: 236,
     }],
   });
+  assert.match(markdown, /Baseline: 1,000 B raw, 500 B gzip\n/);
   assert.match(markdown, /`Float\.add` \| 1 \| 256 B \| 32 B/);
   assert.match(markdown, /Primary-root density is a prioritization hint/);
   assert.match(markdown, /`lean_float_add`/);

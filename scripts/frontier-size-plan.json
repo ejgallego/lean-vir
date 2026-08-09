@@ -1,6 +1,14 @@
 {
   "version": 1,
   "candidates": [
+    {
+      "id": "String.Internal.getUTF8Byte",
+      "names": ["String.Internal.getUTF8Byte"]
+    },
+    {
+      "id": "ByteArray.copySlice",
+      "names": ["ByteArray.copySlice"]
+    },
     { "id": "Float.pow", "names": ["Float.pow"] },
     { "id": "Float32.pow", "names": ["Float32.pow"] },
     {

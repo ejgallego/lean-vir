@@ -535,6 +535,8 @@ The deployed measurement plan is now rebased on the 723,103-byte checkpoint:
 
 | Remaining candidate | Names | Raw cost | Gzip cost | Exact surface gain | Current primary pressure |
 | --- | ---: | ---: | ---: | ---: | ---: |
+| `String.Internal.getUTF8Byte` | 1 | +120 B | +186 B | 1,802 all / 292 public | 2,535 all / 374 public |
+| `ByteArray.copySlice` | 1 | +175 B | +22 B | 46 all / 9 public | 123 all / 25 public |
 | `pow` | 2 | +9,773 B | +6,654 B | 8 all / 3 public | 8 all / 3 public |
 
 The current artifact is 723,103 raw and 163,333 deterministic gzip bytes, with
@@ -545,6 +547,16 @@ remaining `pow` pair has no cascade: its eight current primary roots are exactly
 the eight functions it makes runnable, and no blocked root moves to a new
 boundary. It should therefore be accepted only for a concrete `pow` capability
 need, not as a frontier-density optimization.
+
+Two post-checkpoint experiments establish the next order. Registering
+`String.Internal.getUTF8Byte` materializes its inline runtime helper for only
+120 raw and 186 gzip bytes, while an exact A/B scan makes 1,802 all-IR functions
+and 292 public constants runnable with no regressions. The gain spans `Init`,
+`Lean`, `Lake`, and `Std`, including 1,097 Lean functions. `ByteArray.copySlice`
+is already retained for another caller, so catalog exposure costs 175 raw and
+22 gzip bytes; it makes 46 all-IR functions and 9 public constants runnable with
+no regressions, notably in `Init.System.IO` and `Std.Http`. These measurements
+put the string byte accessor first and the byte-array catalog gap second.
 
 ## Interactive HTML Report
 
