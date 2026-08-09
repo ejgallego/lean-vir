@@ -335,6 +335,35 @@ constants. The runtime additions were rejected and are not retained. This is a
 useful negative result: a cheap alias registration is not automatically a good
 frontier when it merely advances a long dependency chain.
 
+### Integer Division Frontier
+
+The next accepted experiment registered the canonical `Int.ediv` and
+`Int.tdiv` externs. Both implementations are inline Lean runtime operations:
+`Int.ediv` maps to `lean_int_ediv`, while `Int.tdiv` maps to `lean_int_div`.
+The candidate therefore keeps the same 51-object source closure as its control;
+the linker retains the generated boxed adapters, registry data, and the
+previously dead scalar and big-integer division paths from those runtime
+objects.
+
+| Measurement | Current `main` control | Integer-division candidate | Delta |
+| --- | ---: | ---: | ---: |
+| Stripped release Wasm | 657,998 B | 660,433 B | +2,435 B |
+| Gzip-compressed Wasm | 150,294 B | 150,929 B | +635 B |
+| Runnable public constants | 27,657 / 36,887 | 28,037 / 36,887 | +380 |
+| Runnable all-IR functions | 315,063 / 398,519 | 315,915 / 398,519 | +852 |
+| Regressions | - | - | 0 |
+
+The 2,435-byte raw increase is 2.38 KiB: about 358 newly runnable IR functions
+and 160 public constants per added KiB. `Int.tdiv` accounts for 538 all-IR and
+247 public unlocks; `Int.ediv` accounts for 314 and 133. Most of the exact gain
+is in `Std` (715 all-IR, 329 public), especially `Std.Time`; `Init` gains 92 and
+40, while `Lean` gains 45 and 11. Another 275 roots advance to a different
+nearest blocker, led by the `Nat.gcd` boundary.
+
+A host-versus-Wasm fixture covers positive and negative divisors, division by
+zero, and both scalar and heap-allocated big integers. The focused differential
+fixture and upstream smoke pass with the candidate runtime.
+
 ## Interactive HTML Report
 
 The report generated from `main` is published with the hosted demo:

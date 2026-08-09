@@ -69,9 +69,12 @@ another upstream source file. `Lean.Level.beq` uses `lean_level_eq` from the
 already linked `level.cpp`; registering it retains that function and its
 generated boxed adapter in the final module.
 
-`Nat.land`, `Int.emod`, and `Int.tmod` similarly use canonical inline runtime
-implementations. `String.Internal.get` resolves to `lean_string_utf8_get` in
-the already linked `object.cpp`, `System.Platform.getIsWindows` to
+`Nat.land`, `Int.ediv`, `Int.tdiv`, `Int.emod`, and `Int.tmod` similarly use
+canonical inline runtime implementations. The division registrations retain
+the scalar and big-integer paths already supplied by the selected runtime
+objects without adding another provider source. `String.Internal.get` resolves
+to `lean_string_utf8_get` in the already linked `object.cpp`,
+`System.Platform.getIsWindows` to
 `lean_system_platform_windows` in `platform.cpp`, and `Lean.Expr.equal` to the
 binder-sensitive equality implementation in the already linked
 `expr_eq_fn.cpp`. That last path asks upstream `expr.cpp` for

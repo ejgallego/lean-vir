@@ -472,6 +472,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-int-division",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.intDivisionScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-int-compare",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.intCompareScore",

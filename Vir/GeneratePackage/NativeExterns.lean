@@ -142,6 +142,14 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     generateBoxedWrapper := true
   },
   {
+    name := `Int.ediv,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Int.tdiv,
+    generateBoxedWrapper := true
+  },
+  {
     name := `Int.emod,
     generateBoxedWrapper := true
   },

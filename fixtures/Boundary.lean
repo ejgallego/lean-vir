@@ -26,6 +26,24 @@ def intArithmeticScore : Nat :=
   let x : Int := ((10 : Int) + (-3 : Int)) * (2 : Int) - (5 : Int)
   x.toNat
 
+@[noinline]
+private def intDivisionCaseScore
+    (a b expectedEdiv expectedTdiv : Int) (weight : Nat) : Nat :=
+  (if a.ediv b == expectedEdiv then weight else 0) +
+    (if a.tdiv b == expectedTdiv then weight * 2 else 0)
+
+/-- Exercises Euclidean and truncating division for scalar and big integers. -/
+def intDivisionScore : Nat :=
+  let big : Int := 123456789012345678901234567891
+  intDivisionCaseScore (-12) 7 (-2) (-1) 1 +
+    intDivisionCaseScore 12 (-7) (-1) (-1) 4 +
+    intDivisionCaseScore (-12) (-7) 2 1 16 +
+    intDivisionCaseScore 12 0 0 0 64 +
+    intDivisionCaseScore (-big) 10 (-12345678901234567890123456790)
+      (-12345678901234567890123456789) 256 +
+    intDivisionCaseScore (-big) (-10) 12345678901234567890123456790
+      12345678901234567890123456789 1024
+
 def intCompareScore : Nat :=
   let a : Int := -12
   let b : Int := 5
