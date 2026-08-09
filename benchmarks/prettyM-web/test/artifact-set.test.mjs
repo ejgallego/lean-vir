@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
+import { spawnSync } from "node:child_process";
 import { mkdir, readFile, rm, writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, relative } from "node:path";
 import { fileURLToPath } from "node:url";
 import test from "node:test";
 
@@ -165,14 +166,93 @@ test("verifies an example-neutral artifact-set manifest", async () => {
     join(directory, "SHA256SUMS"),
     `${(
       await Promise.all(
-        checksummedPaths.map(async (path) =>
-          `${await sha256File(join(directory, path))}  ${path}`,
+        checksummedPaths.map(
+          async (path) => `${await sha256File(join(directory, path))}  ${path}`,
         ),
       )
     ).join("\n")}\n`,
   );
   const manifest = await verifyArtifactSet(directory);
   assert.equal(manifest.example.id, "illuminate");
+});
+
+test("stages a verified Illuminate artifact namespace atomically", async () => {
+  const directory = join(scratch, "illuminate-set");
+  const destination = join(scratch, "illuminate-staged");
+  await rm(directory, { recursive: true, force: true });
+  await rm(destination, { recursive: true, force: true });
+  const paths = [
+    "illuminate/workload/anim_core.js",
+    "illuminate/workload/vir-player-trace.mjs",
+    "illuminate/workload/examples.json",
+    "illuminate/vir/sdk/js/vir-runtime.js",
+    "illuminate/vir/sdk/wasm/vir-upstream.wasm",
+    "illuminate/vir/module-sets/Illuminate/Animation/Vir.irpkg-set.json",
+    "illuminate/vir/module-sets/Illuminate/Animation/Vir.parts/Player.irpkg",
+    "illuminate/native/BUILD.json",
+    "illuminate/native/illuminate-player-browser-adapter.mjs",
+    "illuminate/native/illuminate-player.wasm",
+    "illuminate/native/illuminate-player.wasm.json",
+    "illuminate/selection/BUILD.json",
+    "illuminate/selection/illuminate-selection-player-browser-adapter.mjs",
+    "illuminate/selection/illuminate-selection-player.wasm",
+    "illuminate/selection/illuminate-selection-player.wasm.json",
+  ];
+  for (const path of paths) {
+    await mkdir(dirname(join(directory, path)), { recursive: true });
+    await writeFile(join(directory, path), `${path}\n`);
+  }
+  const files = Object.fromEntries(
+    await Promise.all(
+      paths.map(async (path) => [
+        path,
+        await fileRecord(join(directory, path)),
+      ]),
+    ),
+  );
+  await writeFile(
+    join(directory, "ARTIFACT_SET.json"),
+    canonicalJson({
+      schemaVersion: 2,
+      kind: "browser-benchmarks/artifact-set",
+      example: { id: "illuminate", stageAdapter: "illuminate" },
+      setId: "illuminate-test-set",
+      components: {},
+      files,
+    }),
+  );
+  const checksummedPaths = ["ARTIFACT_SET.json", ...paths].sort();
+  await writeFile(
+    join(directory, "SHA256SUMS"),
+    `${(
+      await Promise.all(
+        checksummedPaths.map(
+          async (path) => `${await sha256File(join(directory, path))}  ${path}`,
+        ),
+      )
+    ).join("\n")}\n`,
+  );
+
+  const result = spawnSync(
+    process.execPath,
+    [
+      "scripts/stage-illuminate-artifacts.mjs",
+      relative(appRoot, directory),
+      "--destination",
+      relative(appRoot, destination),
+    ],
+    { cwd: appRoot, encoding: "utf8" },
+  );
+  assert.equal(result.status, 0, result.stderr);
+  assert.equal(
+    await readFile(join(destination, "workload", "examples.json"), "utf8"),
+    "illuminate/workload/examples.json\n",
+  );
+  assert.equal(
+    JSON.parse(await readFile(join(destination, "ARTIFACT_SET.json"), "utf8"))
+      .setId,
+    "illuminate-test-set",
+  );
 });
 
 test("rejects undeclared artifact-set members", async () => {

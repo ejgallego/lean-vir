@@ -147,18 +147,29 @@ local rehearsal:
 npm run stage:illuminate -- \
   --source /path/to/illuminate \
   --native-package /path/to/illuminate-player-package \
+  --selection-package /path/to/illuminate-selection-player-package \
   --vir-sdk /path/to/extracted/lean-vir-sdk
 npm run test:illuminate
 ```
 
 `--vir-sdk` can point directly at an extracted `lean-vir-sdk` CI artifact; when
 omitted, it defaults to the SDK under the Illuminate checkout. The stager
-verifies its manifest and file digests before copying it.
+verifies its manifest and file digests before copying it. The selection package
+is optional for older rehearsals; when present, the application prefers FIR's
+selection-v4 API, uses its bit-exact scalar tick entry, and materializes patch
+rows from the original host-owned animation. The full-action v3 package remains
+the producer-side semantic oracle.
 
-The application and downloaded report display the exact staged build identities and
-mark all timings as non-authoritative. See
+The canonical consumer-side adapter requires both accepted FIR packages. Once
+an Illuminate catalog record can be built, `artifacts:fetch` selects it from
+the artifact-set manifest and atomically stages only verified `illuminate/`
+members. The app uses selection v4 and loads that set manifest as provenance,
+while retaining `REHEARSAL.json` and v3-only compatibility for local rehearsals.
+
+The application and downloaded report display the exact staged build
+identities and mark all timings as non-authoritative. See
 `docs/ILLUMINATE_REHEARSAL.md` for refreshed build hashes, correctness status,
-and the remaining semantic stop condition.
+and the remaining producer integration.
 
 ## Reproducible reports
 

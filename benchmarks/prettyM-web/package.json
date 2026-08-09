@@ -12,6 +12,7 @@
     "artifacts:fetch": "node scripts/fetch-artifact-set.mjs",
     "stage": "bash scripts/stage-artifacts.sh",
     "stage:illuminate": "node scripts/stage-illuminate-rehearsal.mjs",
+    "stage:illuminate:set": "node scripts/stage-illuminate-artifacts.mjs",
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs && node scripts/serve.mjs",
     "serve": "node scripts/serve.mjs",
