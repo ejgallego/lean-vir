@@ -140,9 +140,14 @@ local rehearsal:
 ```sh
 npm run stage:illuminate -- \
   --source /path/to/illuminate \
-  --native-package /path/to/illuminate-player-package
+  --native-package /path/to/illuminate-player-package \
+  --vir-sdk /path/to/extracted/lean-vir-sdk
 npm run test:illuminate
 ```
+
+`--vir-sdk` can point directly at an extracted `lean-vir-sdk` CI artifact; when
+omitted, it defaults to the SDK under the Illuminate checkout. The stager
+verifies its manifest and file digests before copying it.
 
 The page and downloaded report display the exact staged build identities and
 mark all timings as non-authoritative. See

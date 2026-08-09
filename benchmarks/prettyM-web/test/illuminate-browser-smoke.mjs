@@ -31,9 +31,10 @@ try {
     ],
   );
   const buildNotes = await page.locator("#build-notes").textContent();
+  assert.match(buildNotes, /Illuminate 22f0cc61 \+ local changes/);
+  assert.match(buildNotes, /VIR c3953b24/);
   assert.match(buildNotes, /FIR b72f2bfa/);
   assert.match(buildNotes, /fir\.illuminate-player\.browser\/v3/);
-  assert.match(buildNotes, /Illuminate 006dc1d1 \+ local changes/);
   await page.locator("#warmup").fill("0");
   await page.locator("#samples").fill("1");
   const report = await page.evaluate(() =>

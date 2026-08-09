@@ -23,16 +23,19 @@ Stage an explicitly local, non-publishable Illuminate benchmark rehearsal.
 PATH must be the root of a prepared Illuminate checkout containing test_output.
 The staged files remain inside this application's ignored artifacts directory.
 
-  --native-package PATH  tested FIR package (default: PATH/test_output/native)`);
+  --native-package PATH  tested FIR package (default: PATH/test_output/native)
+  --vir-sdk PATH         tested VIR SDK (default: PATH/test_output/vir/sdk)`);
 }
 
 function parseArgs(argv) {
   let source = null;
   let nativePackage = null;
+  let virSdk = null;
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
     if (argument === "--source") source = argv[++index];
     else if (argument === "--native-package") nativePackage = argv[++index];
+    else if (argument === "--vir-sdk") virSdk = argv[++index];
     else if (argument === "--help" || argument === "-h") {
       usage();
       process.exit(0);
@@ -45,6 +48,7 @@ function parseArgs(argv) {
     nativePackage: resolve(
       nativePackage || join(sourceRoot, "test_output/native"),
     ),
+    virSdk: resolve(virSdk || join(sourceRoot, "test_output/vir/sdk")),
   };
 }
 
@@ -70,20 +74,63 @@ async function copyFile(source, destination) {
   await cp(source, destination);
 }
 
+async function verifyVirSdk(virSdk) {
+  const artifactPath = join(virSdk, "lean-vir-artifact.json");
+  await requireFile(artifactPath);
+  const artifactBytes = await readFile(artifactPath);
+  const artifact = JSON.parse(artifactBytes);
+  if (artifact.name !== "lean-vir-sdk" || !Array.isArray(artifact.files)) {
+    throw new Error("unsupported VIR SDK artifact manifest");
+  }
+  const seen = new Set();
+  for (const file of artifact.files) {
+    if (
+      file === null ||
+      typeof file !== "object" ||
+      typeof file.path !== "string" ||
+      typeof file.sha256 !== "string" ||
+      !/^[0-9a-f]{64}$/.test(file.sha256) ||
+      file.path.startsWith("/") ||
+      file.path
+        .split("/")
+        .some((part) => part === "" || part === "." || part === "..")
+    ) {
+      throw new Error("unsafe VIR SDK artifact manifest entry");
+    }
+    if (seen.has(file.path)) {
+      throw new Error(
+        `duplicate VIR SDK artifact manifest entry: ${file.path}`,
+      );
+    }
+    seen.add(file.path);
+    const path = join(virSdk, file.path);
+    await requireFile(path);
+    if (sha256(await readFile(path)) !== file.sha256) {
+      throw new Error(`VIR SDK artifact checksum mismatch: ${file.path}`);
+    }
+  }
+  for (const path of ["js/vir-runtime.js", "wasm/vir-upstream.wasm"]) {
+    if (!seen.has(path)) {
+      throw new Error(`VIR SDK artifact manifest is missing: ${path}`);
+    }
+  }
+  return { artifact, artifactBytes };
+}
+
 async function main() {
   const options = parseArgs(process.argv.slice(2));
   const source = options.source;
   const nativePackage = options.nativePackage;
+  const virSdk = options.virSdk;
   const expected = [
     "player_js/anim_core.js",
     "scripts/lib/vir-player-trace.mjs",
     "test_output/anim-comparison.html",
-    "test_output/vir/sdk/js/vir-runtime.js",
-    "test_output/vir/sdk/wasm/vir-upstream.wasm",
-    "test_output/vir/sdk/lean-vir-artifact.json",
     "test_output/vir/module-sets/Illuminate/Animation/Vir.irpkg-set.json",
   ];
   await Promise.all(expected.map((path) => requireFile(join(source, path))));
+  const { artifact: virArtifact, artifactBytes: virArtifactBytes } =
+    await verifyVirSdk(virSdk);
   await Promise.all(
     [
       "BUILD.json",
@@ -115,7 +162,7 @@ async function main() {
   await cp(nativePackage, join(next, "native"), {
     recursive: true,
   });
-  await cp(join(source, "test_output/vir/sdk"), join(next, "vir/sdk"), {
+  await cp(virSdk, join(next, "vir/sdk"), {
     recursive: true,
   });
   await cp(
@@ -142,11 +189,7 @@ async function main() {
   );
 
   const nativeBuildBytes = await readFile(join(nativePackage, "BUILD.json"));
-  const virArtifactBytes = await readFile(
-    join(source, "test_output/vir/sdk/lean-vir-artifact.json"),
-  );
   const nativeBuild = JSON.parse(nativeBuildBytes);
-  const virArtifact = JSON.parse(virArtifactBytes);
   const receipt = {
     schemaVersion: 1,
     kind: "illuminate-player/local-rehearsal",
