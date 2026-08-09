@@ -50,12 +50,16 @@
       "portIntent": {
         "disposition": "bind",
         "effect": "dom",
-        "container": "borrowed",
+        "container": {
+          "ownership": "borrowed",
+          "acceptedTypes": ["Element"],
+          "coverage": "subset"
+        },
         "resultOwnership": "hostOwned",
         "resultRepresentation": "hostResource",
         "omittedOptionalParameters": ["options"]
       },
-      "note": "VIR binds root creation but does not yet expose the optional RootOptions argument."
+      "note": "VIR binds root creation for Element containers, but not the other Container union arms or optional RootOptions argument."
     },
     {
       "id": "react_dom.root.options",

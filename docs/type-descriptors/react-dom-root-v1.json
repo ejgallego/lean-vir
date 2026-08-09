@@ -6,6 +6,45 @@
   ],
   "symbols": [
     {
+      "id": "Container",
+      "kind": "type",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 73,
+        "startColumn": 1,
+        "endLine": 79,
+        "endColumn": 7,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "export type Container =\n    | Element\n    | DocumentFragment\n    | Document\n    | DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_CREATE_ROOT_CONTAINERS[\n        keyof DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_CREATE_ROOT_CONTAINERS\n    ];",
+      "hover": "",
+      "shape": {
+        "kind": "union",
+        "options": [
+          {
+            "kind": "ref",
+            "id": "Element"
+          },
+          {
+            "kind": "ref",
+            "id": "DocumentFragment"
+          },
+          {
+            "kind": "ref",
+            "id": "Document"
+          },
+          {
+            "kind": "opaque",
+            "name": "DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_CREATE_ROOT_CONTAINERS[\n        keyof DO_NOT_USE_OR_YOU_WILL_BE_FIRED_EXPERIMENTAL_CREATE_ROOT_CONTAINERS\n    ]"
+          }
+        ]
+      },
+      "dependency": {
+        "kind": "declaration",
+        "depth": 1
+      }
+    },
+    {
       "id": "createRoot",
       "kind": "function",
       "source": {
@@ -42,6 +81,78 @@
           "kind": "ref",
           "id": "Root"
         }
+      }
+    },
+    {
+      "id": "Document",
+      "kind": "policy",
+      "display": "reviewed dependency policy: Document",
+      "hover": "DOM documents cross the VIR boundary as host-owned resources.",
+      "shape": {
+        "kind": "resource",
+        "name": "Document"
+      },
+      "dependency": {
+        "kind": "policy",
+        "depth": 1,
+        "reason": "DOM documents cross the VIR boundary as host-owned resources."
+      }
+    },
+    {
+      "id": "DocumentFragment",
+      "kind": "policy",
+      "display": "reviewed dependency policy: DocumentFragment",
+      "hover": "DOM document fragments cross the VIR boundary as host-owned resources.",
+      "shape": {
+        "kind": "resource",
+        "name": "DocumentFragment"
+      },
+      "dependency": {
+        "kind": "policy",
+        "depth": 2,
+        "reason": "DOM document fragments cross the VIR boundary as host-owned resources."
+      }
+    },
+    {
+      "id": "Element",
+      "kind": "policy",
+      "display": "reviewed dependency policy: Element",
+      "hover": "DOM elements cross the VIR boundary as host-owned resources.",
+      "shape": {
+        "kind": "resource",
+        "name": "Element"
+      },
+      "dependency": {
+        "kind": "policy",
+        "depth": 1,
+        "reason": "DOM elements cross the VIR boundary as host-owned resources."
+      }
+    },
+    {
+      "id": "ErrorInfo",
+      "kind": "interface",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 57,
+        "startColumn": 1,
+        "endLine": 59,
+        "endColumn": 2,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "export interface ErrorInfo {\n    componentStack?: string;\n}",
+      "hover": "",
+      "shape": {
+        "kind": "record",
+        "fields": {
+          "componentStack": {
+            "kind": "primitive",
+            "name": "string"
+          }
+        }
+      },
+      "dependency": {
+        "kind": "declaration",
+        "depth": 1
       }
     },
     {
@@ -234,6 +345,78 @@
             }
           }
         }
+      }
+    },
+    {
+      "id": "React.Component",
+      "kind": "policy",
+      "source": {
+        "path": "node_modules/@types/react/index.d.ts",
+        "startLine": 909,
+        "startColumn": 5,
+        "endLine": 1034,
+        "endColumn": 6,
+        "url": "https://unpkg.com/@types/react@19.2.18/index.d.ts"
+      },
+      "display": "reviewed dependency policy: React.Component",
+      "hover": "React component instances are outside the root-surface seed.",
+      "shape": {
+        "kind": "opaque",
+        "name": "React.Component",
+        "abstract": true,
+        "reason": "component instance surface excluded from this seed"
+      },
+      "dependency": {
+        "kind": "policy",
+        "depth": 1,
+        "reason": "React component instances are outside the root-surface seed."
+      }
+    },
+    {
+      "id": "React.ReactNode",
+      "kind": "policy",
+      "source": {
+        "path": "node_modules/@types/react/index.d.ts",
+        "startLine": 436,
+        "startColumn": 5,
+        "endLine": 447,
+        "endColumn": 38,
+        "url": "https://unpkg.com/@types/react@19.2.18/index.d.ts"
+      },
+      "display": "reviewed dependency policy: React.ReactNode",
+      "hover": "The recursive ReactNode union is intentionally abstract in the root-surface seed; VIR reviews its ReactM (Js Node) builder representation separately.",
+      "shape": {
+        "kind": "opaque",
+        "name": "React.ReactNode",
+        "abstract": true,
+        "reason": "recursive ReactNode union deferred by reviewed dependency policy"
+      },
+      "dependency": {
+        "kind": "policy",
+        "depth": 1,
+        "reason": "The recursive ReactNode union is intentionally abstract in the root-surface seed; VIR reviews its ReactM (Js Node) builder representation separately."
+      }
+    },
+    {
+      "id": "ReactFormState",
+      "kind": "interface",
+      "source": {
+        "path": "node_modules/@types/react-dom/client.d.ts",
+        "startLine": 12,
+        "startColumn": 1,
+        "endLine": 14,
+        "endColumn": 2,
+        "url": "https://unpkg.com/@types/react-dom@19.2.4/client.d.ts"
+      },
+      "display": "export interface ReactFormState {\n    [REACT_FORM_STATE_SIGIL]: never;\n}",
+      "hover": "",
+      "shape": {
+        "kind": "record",
+        "fields": {}
+      },
+      "dependency": {
+        "kind": "declaration",
+        "depth": 1
       }
     },
     {
@@ -516,14 +699,20 @@
       "portIntent": {
         "disposition": "bind",
         "effect": "dom",
-        "container": "borrowed",
+        "container": {
+          "ownership": "borrowed",
+          "acceptedTypes": [
+            "Element"
+          ],
+          "coverage": "subset"
+        },
         "resultOwnership": "hostOwned",
         "resultRepresentation": "hostResource",
         "omittedOptionalParameters": [
           "options"
         ]
       },
-      "note": "VIR binds root creation but does not yet expose the optional RootOptions argument."
+      "note": "VIR binds root creation for Element containers, but not the other Container union arms or optional RootOptions argument."
     },
     {
       "id": "react_dom.root.options",
@@ -558,5 +747,65 @@
       },
       "note": "Hydration options are paired with the unsupported hydration entry point."
     }
-  ]
+  ],
+  "dependencies": {
+    "depth": 2,
+    "roots": [
+      "HydrationOptions",
+      "Root",
+      "Root.render",
+      "Root.unmount",
+      "RootOptions",
+      "createRoot",
+      "hydrateRoot"
+    ],
+    "included": [
+      {
+        "id": "Container",
+        "kind": "declaration",
+        "depth": 1
+      },
+      {
+        "id": "Document",
+        "kind": "policy",
+        "depth": 1,
+        "reason": "DOM documents cross the VIR boundary as host-owned resources."
+      },
+      {
+        "id": "DocumentFragment",
+        "kind": "policy",
+        "depth": 2,
+        "reason": "DOM document fragments cross the VIR boundary as host-owned resources."
+      },
+      {
+        "id": "Element",
+        "kind": "policy",
+        "depth": 1,
+        "reason": "DOM elements cross the VIR boundary as host-owned resources."
+      },
+      {
+        "id": "ErrorInfo",
+        "kind": "declaration",
+        "depth": 1
+      },
+      {
+        "id": "React.Component",
+        "kind": "policy",
+        "depth": 1,
+        "reason": "React component instances are outside the root-surface seed."
+      },
+      {
+        "id": "React.ReactNode",
+        "kind": "policy",
+        "depth": 1,
+        "reason": "The recursive ReactNode union is intentionally abstract in the root-surface seed; VIR reviews its ReactM (Js Node) builder representation separately."
+      },
+      {
+        "id": "ReactFormState",
+        "kind": "declaration",
+        "depth": 1
+      }
+    ],
+    "unresolved": []
+  }
 }
