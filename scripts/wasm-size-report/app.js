@@ -53,6 +53,9 @@ Author: Emilio J. Gallego Arias
   const indexes = new Map();
   const visibleDepthCache = new WeakMap();
   for (const [view, root] of Object.entries(report.trees)) indexes.set(view, indexTree(root));
+  const runtimeWasmNodeIds = new Set(indexes.get("runtimeContext")?.nodes
+    .map((node) => node.meta?.wasmNodeId)
+    .filter(Boolean) ?? []);
   const contextOverlapLeaves = indexes.get("runtimeContext")?.nodes.filter((node) =>
     !node.children?.length
       && (node.meta?.boundaryDensity ?? 0) > 0
@@ -76,6 +79,7 @@ Author: Emilio J. Gallego Arias
   let highlightedId = null;
   let contextColor = "boundary";
   let scheduledTreemapFrame = null;
+  let scopeTransitionBlocks = [];
 
   renderIdentity();
   renderSummary();
@@ -219,8 +223,38 @@ Author: Emilio J. Gallego Arias
       setView(nextView);
       return;
     }
-    const transition = document.startViewTransition(() => setView(nextView));
-    transition.finished.catch(() => {});
+    const sharedWasmNodeIds = applyScopeTransitionNames();
+    const transition = document.startViewTransition(() => {
+      setView(nextView);
+      applyScopeTransitionNames(sharedWasmNodeIds);
+    });
+    transition.finished.then(clearScopeTransitionNames, clearScopeTransitionNames);
+  }
+
+  function applyScopeTransitionNames(allowedWasmNodeIds = null) {
+    clearScopeTransitionNames();
+    const candidates = Array.from(elements.treemap.querySelectorAll(".map-block[data-wasm-node-id]"))
+      .map((block) => {
+        const rect = block.getBoundingClientRect();
+        return { block, wasmNodeId: block.dataset.wasmNodeId, area: rect.width * rect.height };
+      })
+      .filter((entry) => entry.area >= 64
+        && (allowedWasmNodeIds === null || allowedWasmNodeIds.has(entry.wasmNodeId)))
+      .sort((lhs, rhs) => rhs.area - lhs.area);
+    const selectedWasmNodeIds = new Set();
+    for (const entry of candidates) {
+      if (selectedWasmNodeIds.has(entry.wasmNodeId)) continue;
+      entry.block.style.viewTransitionName = `vir-shared-${entry.wasmNodeId}`;
+      scopeTransitionBlocks.push(entry.block);
+      selectedWasmNodeIds.add(entry.wasmNodeId);
+      if (allowedWasmNodeIds === null && selectedWasmNodeIds.size >= 28) break;
+    }
+    return selectedWasmNodeIds;
+  }
+
+  function clearScopeTransitionNames() {
+    for (const block of scopeTransitionBlocks) block.style.removeProperty("view-transition-name");
+    scopeTransitionBlocks = [];
   }
 
   function render() {
@@ -477,7 +511,15 @@ Author: Emilio J. Gallego Arias
       contents.push(`<div class="nested-map">${nested.join("")}</div>`);
     }
     const title = `${node.name}\n${formatBytes(node.bytes)} (${formatPercent(node.bytes / current.bytes)} of current view)`;
-    return `<div class="${classes.join(" ")}" data-node-id="${escapeAttribute(node.id)}"`
+    const wasmNodeId = view === "runtimeContext"
+      ? node.meta?.wasmNodeId
+      : runtimeWasmNodeIds.has(node.id)
+        ? node.id
+        : null;
+    const wasmNodeAttribute = wasmNodeId
+      ? ` data-wasm-node-id="${escapeAttribute(wasmNodeId)}"`
+      : "";
+    return `<div class="${classes.join(" ")}" data-node-id="${escapeAttribute(node.id)}"${wasmNodeAttribute}`
       + ` style="${properties.join(";")}" role="button" tabindex="0"`
       + ` aria-label="${escapeAttribute(`${node.name}, ${formatBytes(node.bytes)}`)}"`
       + ` title="${escapeAttribute(title)}">${contents.join("")}</div>`;
@@ -637,6 +679,14 @@ Author: Emilio J. Gallego Arias
     if (node.meta?.rawAliases?.length > 1) {
       appendDetail(stats, "Symbol aliases", node.meta.rawAliases.length.toLocaleString("en-US"));
     }
+    if (node.kind === "runtimeMember") {
+      const functions = node.children?.filter((child) => child.kind === "runtimeFunction") ?? [];
+      const pressured = functions.filter((child) =>
+        (child.meta?.surfaceSummary?.primaryRoots ?? 0) > 0);
+      const overlap = pressured.filter((child) => child.meta.inVirBoundary);
+      appendDetail(stats, "Functions with blocker pressure", pressured.length.toLocaleString("en-US"));
+      appendDetail(stats, "Retained + blocker overlap", overlap.length.toLocaleString("en-US"));
+    }
     const surface = node.meta?.surfaceSummary;
     if (surface) {
       appendDetail(stats, "Surface entries", surface.entries.toLocaleString("en-US"));
@@ -669,14 +719,83 @@ Author: Emilio J. Gallego Arias
       note.textContent = node.meta.note;
     }
     const actions = renderDetailActions(node);
+    const highlights = node.kind === "runtimeMember"
+      ? renderRuntimeMemberHighlights(node)
+      : null;
     elements.details.replaceChildren(
       title,
       kind,
       stats,
       ...(sourceText ? [sourceText] : []),
       ...(note ? [note] : []),
+      ...(highlights ? [highlights] : []),
       ...(actions ? [actions] : []),
     );
+  }
+
+  function renderRuntimeMemberHighlights(node) {
+    const functions = node.children?.filter((child) => child.kind === "runtimeFunction") ?? [];
+    if (functions.length === 0) return null;
+    const groups = [
+      {
+        title: "Largest native functions",
+        entries: [...functions].sort((lhs, rhs) => rhs.bytes - lhs.bytes).slice(0, 5),
+        value: (entry) => formatBytes(entry.bytes),
+      },
+      {
+        title: "Highest frontier pressure",
+        entries: functions
+          .filter((entry) => (entry.meta?.surfaceSummary?.primaryRoots ?? 0) > 0)
+          .sort((lhs, rhs) =>
+            rhs.meta.surfaceSummary.primaryPublicRoots - lhs.meta.surfaceSummary.primaryPublicRoots
+              || rhs.meta.surfaceSummary.primaryRoots - lhs.meta.surfaceSummary.primaryRoots
+              || rhs.bytes - lhs.bytes)
+          .slice(0, 5),
+        value: (entry) => {
+          const summary = entry.meta.surfaceSummary;
+          return `${summary.primaryPublicRoots} public · ${summary.primaryRoots} all`;
+        },
+      },
+      {
+        title: "Retained in VIR Wasm",
+        entries: functions
+          .filter((entry) => entry.meta.inVirBoundary)
+          .sort((lhs, rhs) => rhs.meta.retainedWasmBytes - lhs.meta.retainedWasmBytes)
+          .slice(0, 5),
+        value: (entry) =>
+          `${formatBytes(entry.bytes)} native · ${formatBytes(entry.meta.retainedWasmBytes)} Wasm`,
+      },
+    ].filter((group) => group.entries.length > 0);
+    if (groups.length === 0) return null;
+    const highlights = document.createElement("div");
+    highlights.className = "detail-highlights";
+    for (const group of groups) {
+      const section = document.createElement("section");
+      const heading = document.createElement("h3");
+      heading.textContent = group.title;
+      const list = document.createElement("ul");
+      for (const entry of group.entries) {
+        const item = document.createElement("li");
+        const button = document.createElement("button");
+        button.type = "button";
+        const label = document.createElement("span");
+        label.textContent = entry.name;
+        const value = document.createElement("span");
+        value.textContent = group.value(entry);
+        button.append(label, value);
+        button.addEventListener("click", () => {
+          selected = entry;
+          highlightedId = entry.id;
+          renderDetails(entry);
+          renderTreemap();
+        });
+        item.append(button);
+        list.append(item);
+      }
+      section.append(heading, list);
+      highlights.append(section);
+    }
+    return highlights;
   }
 
   function renderDetailActions(node) {

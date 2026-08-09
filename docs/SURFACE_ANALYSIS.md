@@ -643,8 +643,12 @@ ratios. The shipped Wasm size remains a separate fact because native and Wasm
 bytes are different targets. Hovering a context block updates the compact
 coverage strip with the corresponding archive, directory, member, or function
 metrics. Switching between the Wasm-boundary and installed-context scopes uses
-a short snapshot crossfade and spatial scale transition, disabled when the
-browser requests reduced motion.
+exact object/member and symbol/function IDs to morph up to 28 of the largest
+visible shared areas; the snapshot crossfade remains the fallback for matches
+below the current rendering depth. Runtime-member details provide clickable
+largest-function, highest-pressure, and retained-Wasm lists for dense sources
+such as `expr.cpp`. All scope animation is disabled when the browser requests
+reduced motion.
 
 The generated directory contains a navigation index with the comparatively
 small extern catalog plus one compact JavaScript data file per module with

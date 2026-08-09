@@ -412,6 +412,33 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
       && context.objectFunctions.density >= 0
       && context.objectFunctions.density < 1,
   );
+  await setInputValueAndDispatch(cdp, "#node-search", "expr.cpp", "input");
+  await clickSelector(cdp, "#search-results button");
+  const runtimeMemberDetails = await evaluate(cdp, `({
+    title: document.querySelector("#selection-details h2")?.textContent,
+    statLabels: Array.from(document.querySelectorAll("#selection-details .detail-stats dt"),
+      (node) => node.textContent),
+    highlightTitles: Array.from(document.querySelectorAll("#selection-details .detail-highlights h3"),
+      (node) => node.textContent),
+    pressureFunctions: Array.from(document.querySelectorAll(
+      "#selection-details .detail-highlights section:nth-child(2) button span:first-child",
+    ), (node) => node.textContent),
+    retainedRows: document.querySelectorAll(
+      "#selection-details .detail-highlights section:nth-child(3) li",
+    ).length,
+  })`);
+  assert.equal(runtimeMemberDetails.title, "expr.cpp");
+  assert.ok(runtimeMemberDetails.statLabels.includes("Functions with blocker pressure"));
+  assert.ok(runtimeMemberDetails.statLabels.includes("Retained + blocker overlap"));
+  assert.deepEqual(runtimeMemberDetails.highlightTitles, [
+    "Largest native functions",
+    "Highest frontier pressure",
+    "Retained in VIR Wasm",
+  ]);
+  assert.ok(runtimeMemberDetails.pressureFunctions.includes("lean_expr_has_loose_bvar"));
+  assert.ok(runtimeMemberDetails.retainedRows > 0);
+  await clickSelector(cdp, "#breadcrumbs button:first-child");
+  await setInputValueAndDispatch(cdp, "#node-search", "", "input");
 
   const hoverCoverage = await evaluate(cdp, `(() => {
     const native = globalThis.__virWasmSize.trees.runtimeContext.children
@@ -459,6 +486,9 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
       output: document.querySelector("#map-depth-value")?.value,
       hash: location.hash,
       renderMs: performance.now() - started,
+      sharedAreas: document.querySelectorAll("#treemap [data-wasm-node-id]").length,
+      sharedWasmIds: Array.from(document.querySelectorAll("#treemap [data-wasm-node-id]"),
+        (node) => node.dataset.wasmNodeId),
       depthSix: document.querySelectorAll("#treemap .depth-6").length,
       depthFourNames: Array.from(document.querySelectorAll("#treemap .depth-4"), (node) => node.getAttribute("aria-label")),
       depthFiveNames: Array.from(document.querySelectorAll("#treemap .depth-5"), (node) => node.getAttribute("aria-label")),
@@ -469,11 +499,28 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.equal(deepContext.output, "7 / 7");
   assert.ok(deepContext.hash.includes("depth=7"));
   assert.ok(deepContext.renderMs < 1500, `level-7 treemap render took ${deepContext.renderMs} ms`);
+  assert.ok(deepContext.sharedAreas > 0);
   assert.ok(deepContext.depthSix > 0);
   assert.ok(deepContext.depthFourNames.some((name) => name?.startsWith("object.cpp,")));
   assert.ok(deepContext.depthFiveNames.some((name) => name?.startsWith("tcp.cpp,")));
   assert.ok(deepContext.depthFiveNames.some((name) => name?.startsWith("lean_mark_mt,")));
   assert.ok(deepContext.depthSixNames.some((name) => name?.startsWith("lean_uv_tcp_send,")));
+
+  await clickSelector(cdp, "#scope-switch button[data-scope='boundary']");
+  await waitForBrowserState(cdp, `(() => {
+    const selected = document.querySelector("#scope-switch button.selected")?.dataset.scope;
+    return { ready: selected === "boundary", value: selected };
+  })()`, { timeoutMessage: "Wasm size explorer shared transition did not reach boundary scope" });
+  const boundarySharedWasmIds = await evaluate(cdp,
+    "Array.from(document.querySelectorAll('#treemap [data-wasm-node-id]'), "
+      + "(node) => node.dataset.wasmNodeId)");
+  assert.ok(deepContext.sharedWasmIds.some((id) => boundarySharedWasmIds.includes(id)));
+  await clickSelector(cdp, "#scope-switch button[data-scope='context']");
+  await waitForBrowserState(cdp, `(() => {
+    const selected = document.querySelector("#scope-switch button.selected")?.dataset.scope;
+    return { ready: selected === "context", value: selected };
+  })()`, { timeoutMessage: "Wasm size explorer shared transition did not return to context" });
+  assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.value"), "7");
 
   await clickSelector(cdp, "#top-children button");
   const nativeLayer = await evaluate(cdp, `({

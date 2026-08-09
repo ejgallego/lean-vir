@@ -42,8 +42,9 @@ map lives in `docs/HARNESS.md`.
   function catalog rather than only to objects retained in Wasm; the report
   states how many of the total boundaries have providers in the displayed
   slice. It reports total native-support coverage, makes overlap functions
-  directly explorable, and animates scope changes unless reduced motion is
-  requested. `npm run build:site`
+  directly explorable, morphs the largest visible exact correspondences during
+  scope changes, and adds function-level highlights to runtime-member details.
+  Animation is skipped when reduced motion is requested. `npm run build:site`
   supplies the surface-report symbol bridge; the standalone command remains
   usable without that optional cross-link data.
 - `npm run build:analysis-site`

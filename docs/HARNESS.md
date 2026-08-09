@@ -359,8 +359,13 @@ neither signal in gray. The overlap is intentional evidence: a native function
 may already be linked into the Wasm for another caller while its Lean
 declaration remains absent from the native-extern catalog. Combined mode lists
 those overlap functions directly and opens their cross-linked details. Scope
-changes use a short snapshot crossfade and scale transition, while honoring the
-browser's reduced-motion preference. A context-wide coverage
+changes promote up to 28 of the largest visible exact member/object and
+function/symbol correspondences into shared transition elements, with the map
+crossfade as a fallback when a match is below the current render depth. The
+animation honors the browser's reduced-motion preference. Runtime-member
+details add clickable largest-function, highest-pressure, and retained-Wasm
+summaries, so dense files such as `expr.cpp` remain explorable even when
+non-function object overhead dominates their area. A context-wide coverage
 strip reports retained native-function bytes against all installed native-support
 archive bytes, plus sized-function byte and function-count coverage. The shipped
 Wasm byte size is shown separately because Wasm and native archive bytes are not
