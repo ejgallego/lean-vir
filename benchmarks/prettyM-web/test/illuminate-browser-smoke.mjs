@@ -31,8 +31,8 @@ try {
     ],
   );
   const buildNotes = await page.locator("#build-notes").textContent();
-  assert.match(buildNotes, /Illuminate 22f0cc61 \+ local changes/);
-  assert.match(buildNotes, /VIR c3953b24/);
+  assert.match(buildNotes, /Illuminate fd98ba93/);
+  assert.match(buildNotes, /VIR 84146bbe/);
   assert.match(buildNotes, /FIR b72f2bfa/);
   assert.match(buildNotes, /fir\.illuminate-player\.browser\/v3/);
   await page.locator("#warmup").fill("0");

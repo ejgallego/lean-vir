@@ -58,6 +58,14 @@ function git(source, args) {
   }).trim();
 }
 
+function gitOptional(source, args) {
+  try {
+    return git(source, args) || null;
+  } catch {
+    return null;
+  }
+}
+
 function sha256(bytes) {
   return createHash("sha256").update(bytes).digest("hex");
 }
@@ -190,12 +198,26 @@ async function main() {
 
   const nativeBuildBytes = await readFile(join(nativePackage, "BUILD.json"));
   const nativeBuild = JSON.parse(nativeBuildBytes);
+  const sourceBranch = gitOptional(source, ["symbolic-ref", "--short", "HEAD"]);
+  const configuredRemote = sourceBranch
+    ? gitOptional(source, ["config", `branch.${sourceBranch}.remote`])
+    : null;
+  const sourceRemote =
+    configuredRemote && configuredRemote !== "." ? configuredRemote : "origin";
   const receipt = {
     schemaVersion: 1,
     kind: "illuminate-player/local-rehearsal",
     publishable: false,
     source: {
-      repository: git(source, ["remote", "get-url", "origin"]),
+      repository: git(source, ["remote", "get-url", sourceRemote]),
+      remote: sourceRemote,
+      branch: sourceBranch,
+      upstream: gitOptional(source, [
+        "rev-parse",
+        "--abbrev-ref",
+        "--symbolic-full-name",
+        "@{upstream}",
+      ]),
       commit: git(source, ["rev-parse", "HEAD"]),
       dirty: git(source, ["status", "--porcelain"]) !== "",
     },
