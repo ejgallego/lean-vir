@@ -119,6 +119,7 @@ npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:native-wrappers
 npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
+npm run analyze:frontier-size -- --plan /tmp/frontier-plan.json
 npm run render:surface -- build/vir-surface/lean-libraries.json build/vir-surface/html
 npm run compare:surface -- control.json candidate.json delta.json delta.md
 ```

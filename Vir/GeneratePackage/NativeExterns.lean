@@ -1051,6 +1051,16 @@ def nativeExternSpecs : Array NativeExternSpec := #[
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)
 
+def resolveNativeExternsWithExtras
+    (env : Environment) (extraNames : Array Name) : Except String (Array NativeExtern) := do
+  let mut externs ← resolveNativeExterns env
+  for name in extraNames do
+    if externs.any (·.name == name) then
+      throw s!"extra native extern `{name}` is already registered"
+    let spec : NativeExternSpec := { name, generateBoxedWrapper := true }
+    externs := externs.push (← spec.resolve env)
+  return externs
+
 def nativeExternSpec? (n : Name) : Option NativeExternSpec :=
   nativeExternSpecs.find? fun spec => spec.name == n
 

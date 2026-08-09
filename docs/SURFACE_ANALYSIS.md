@@ -122,6 +122,66 @@ control and candidate artifacts. Review the added native capabilities, exact
 new function set, module distribution, regressions, and byte increase together;
 none of those numbers alone is a sufficient acceptance signal.
 
+## Pricing A Native Frontier
+
+Missing native externs can be priced before changing the checked-in runtime
+catalog. The size-cost runner temporarily adds compiler-generated boxed wrappers
+and native-registry entries, links the ordinary stripped release Wasm, and skips
+only browser package generation:
+
+```bash
+npm run analyze:frontier-size -- \
+  --surface-links web/dist/surface/data/size-links.json \
+  --output-prefix build/frontier-size-costs/float \
+  Float.add Float.beq
+```
+
+Every command first builds a control, measures each positional name in
+isolation, and finally rebuilds the control. It rejects the run if the restored
+artifact's SHA-256 differs from the original control. The JSON and Markdown
+outputs record exact stripped raw and deterministic gzip deltas. The optional
+surface link data adds current primary-blocker pressure as a ranking hint; it
+does not turn that upper bound into an unlock count.
+
+Use a version 1 plan to measure interactions or shared retained code directly:
+
+```json
+{
+  "version": 1,
+  "candidates": [
+    { "id": "float-core", "names": ["Float.decLt", "Float.add", "Float.beq"] },
+    { "id": "float-format", "names": ["Float.toString", "Float32.toString"] }
+  ]
+}
+```
+
+```bash
+npm run analyze:frontier-size -- --plan /tmp/frontier-plan.json
+```
+
+Costs are not generally additive: linker garbage collection and compression can
+make a cluster cheaper or more expensive than the sum of isolated rows. Always
+price the proposed cluster itself. These overlays are intended for ordinary
+externs whose normal compiler-generated boxed wrapper is the right ABI. A
+boundary that needs a handwritten ownership adapter or an erased-proof alias
+must first get that separate runtime design.
+
+Measure the matching exact library-surface benefit without editing runtime
+policy by repeating `--native-extern` on an otherwise identical scan:
+
+```bash
+npm run analyze:surface -- \
+  build/vir-surface/float-core.json \
+  build/vir-surface/float-core.md \
+  --native-extern Float.decLt \
+  --native-extern Float.add \
+  --native-extern Float.beq
+```
+
+Compare that report to the control as described above. This separates the two
+questions deliberately: the size runner determines what the boundary retains;
+the surface comparator determines what its complete IR closure actually unlocks.
+
 ## Reference Experiments
 
 ### `Lean.Expr.eqv`
@@ -414,6 +474,36 @@ found a callable-arity mismatch between erased interpreted calls and their
 ordinary compiler-generated boxed wrappers. They remain visible as blockers
 rather than being counted as supported. Supporting them should be a distinct
 boxed-alias feature, not another allowlist entry.
+
+### Float Frontier Cost Triage
+
+The first pre-policy size scan split that broad Float tail into directly priced
+clusters on top of the scalar/string checkpoint. The exact A/B surface reports
+use the same Lean revision and 398,519-function universe.
+
+| Candidate | Names | Raw cost | Gzip cost | New all-IR | New public | All-IR / raw KiB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Arithmetic/model core | 7 | +1,542 B | +320 B | +402 | +21 | 267.0 |
+| Broader basic Float set | 15 | +3,310 B | +576 B | +422 | +27 | 130.6 |
+| Formatting | 2 | +1,975 B | +404 B | +30 | +7 | 15.6 |
+| Core plus formatting | 17 | +5,285 B | +887 B | +468 | +38 | 90.7 |
+| `pow` | 2 | +9,789 B | +6,130 B | +6 | +2 | 0.6 |
+
+The seven-name core is `Float.decLt`, `Float.add`, `Float.beq`,
+`Float.toModel`, `Float32.ofBits`, `Float32.decLe`, and `Float32.toModel`.
+It captures 402 of the broader basic set's 422 all-IR unlocks at less than half
+the raw cost. `Float.decLt` accounts for 280 of those exact unlocks; the other
+six contribute smaller but still cheap complete closures. The remaining eight
+basic operations add only 20 all-IR and 6 public functions for another 1,768
+raw bytes, so they should follow only when a concrete runtime workload values
+them.
+
+Formatting is a plausible separate stage, but substantially less dense. The
+`pow` pair is rejected at this frontier: it retains a comparatively large libm
+closure for six functions. This scan also demonstrates why primary pressure
+cannot price benefit by itself. `Float.isInf` was the primary blocker for 45
+roots (17 public), yet adding it within the broad basic cluster made only one
+root runnable because the others immediately reached another missing boundary.
 
 ## Interactive HTML Report
 

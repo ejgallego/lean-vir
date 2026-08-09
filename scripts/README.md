@@ -26,6 +26,12 @@ map lives in `docs/HARNESS.md`.
 - `npm run size:wasm`
   Print Markdown section-size tables for the generated WASM artifacts, including
   compressed sizes and link-map code-area attribution when available.
+- `npm run analyze:frontier-size`
+  Measure exact stripped release-Wasm raw and gzip costs for temporary native
+  extern additions without changing the checked-in catalog. Positional names
+  are measured in isolation; use `--plan` for directly priced clusters and
+  `--surface-links` to attach primary-blocker pressure hints. The runner skips
+  browser package generation and restores the byte-identical baseline artifact.
 - `npm run build:size-site`
   Render the release/debug Wasm artifacts and strict linker map as the static
   interactive section/subsystem/object/symbol treemap deployed under `/size/`.

@@ -16,6 +16,7 @@ structure Options where
   jsonPath : System.FilePath
   markdownPath : System.FilePath
   modules : Array Name := #[]
+  extraNativeExterns : Array Name := #[]
 
 def nameFromDotted (text : String) : Name :=
   text.splitOn "." |>.foldl (fun name part =>
@@ -30,6 +31,13 @@ partial def parseOptions
       if name.isAnonymous then
         throw "--module requires a non-empty dotted Lean module name"
       parseOptions rest { options with modules := options.modules.push name }
+  | "--native-extern" :: externName :: rest =>
+      let name := nameFromDotted externName
+      if name.isAnonymous then
+        throw "--native-extern requires a non-empty dotted Lean declaration name"
+      if options.extraNativeExterns.contains name then
+        throw s!"duplicate --native-extern `{name}`"
+      parseOptions rest { options with extraNativeExterns := options.extraNativeExterns.push name }
   | arg :: _ => throw s!"unknown argument `{arg}`"
 
 def writeTextFile (path : System.FilePath) (contents : String) : IO Unit := do
@@ -49,14 +57,15 @@ private def mixCounts (state : UInt64) (counts : SurfaceCounts) : UInt64 :=
 private def mixNames (state : UInt64) (names : Array Name) : UInt64 :=
   names.foldl (fun state name => mixHash state name.hash) state
 
-private unsafe def resolveSurfaceNativeExterns (env : Environment) : IO (Array NativeExtern) := do
-  match resolveNativeExterns env with
+private unsafe def resolveSurfaceNativeExterns
+    (env : Environment) (extraNames : Array Name) : IO (Array NativeExtern) := do
+  match resolveNativeExternsWithExtras env extraNames with
   | .ok externs => return externs
   | .error _ =>
       -- A module-scoped scan need not import every declaration in the runtime
       -- catalog. Resolve policy against Lean's umbrella module in that case.
       let catalogEnv ← loadLibrarySurfaceEnvironment #[`Lean]
-      match resolveNativeExterns catalogEnv with
+      match resolveNativeExternsWithExtras catalogEnv extraNames with
       | .ok externs => return externs
       | .error error => throw <| IO.userError s!"native extern catalog: {error}"
 
@@ -109,7 +118,7 @@ unsafe def run (options : Options) : IO UInt32 := do
     return 2
   IO.eprintln s!"surface scan: importing complete IR for {modules.size} selected module(s)"
   let env ← loadLibrarySurfaceEnvironment modules
-  let nativeExterns ← resolveSurfaceNativeExterns env
+  let nativeExterns ← resolveSurfaceNativeExterns env options.extraNativeExterns
   let imported ← IO.monoNanosNow
   IO.eprintln s!"surface scan: loaded {env.header.moduleNames.size} module(s) in {(imported - started) / 1000000} ms"
   let report := analyzeLibrarySurface env modules nativeExterns
@@ -142,8 +151,12 @@ unsafe def main (args : List String) : IO UInt32 := do
             return 1
       | .error error =>
           IO.eprintln error
-          IO.eprintln "usage: vir_surface <report.json> <report.md> [--module <Lean.Module>]..."
+          IO.eprintln <|
+            "usage: vir_surface <report.json> <report.md> " ++
+            "[--module <Lean.Module>]... [--native-extern <Lean.Name>]..."
           return 2
   | _ =>
-      IO.eprintln "usage: vir_surface <report.json> <report.md> [--module <Lean.Module>]..."
+      IO.eprintln <|
+        "usage: vir_surface <report.json> <report.md> " ++
+        "[--module <Lean.Module>]... [--native-extern <Lean.Name>]..."
       return 2
