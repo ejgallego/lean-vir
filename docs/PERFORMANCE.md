@@ -102,6 +102,23 @@ owns the environment/provider API decision;
 [ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
 owns the measurement-gated cross-entry resolution-cache experiment.
 
+When the intervention is a Wasm build mode rather than a source-checkout
+change, compare two frozen artifacts in one process:
+
+```bash
+npm run bench:env-lookup:wasm-pair -- \
+  --json build/perf/env-lookup/wasm-pair.json \
+  build/control/vir-upstream.wasm build/candidate/vir-upstream.wasm
+```
+
+This path compiles both modules once, alternates control/candidate order inside
+every round, forces V8 collection outside each timed window, and records raw
+paired samples plus the exact Wasm and package hashes. It is useful when the
+standard saved-report comparator must reject an intentional build-identity
+difference. Use the median of the per-round candidate/control ratios as the
+headline; the report retains the more outlier-sensitive geometric mean and the
+slower/equal/faster round counts as diagnostics.
+
 The repository-owned `Std.Format` conversion rows and accepted
 manifest-derived normalization-plan cache are documented in
 [Custom Inductive Object Conversion Performance](OBJECT_CONVERSION_PERFORMANCE.md).
