@@ -48,8 +48,9 @@ browser smoke tests.
 
 The Lean toolchain is pinned by `lean-toolchain`. The upstream source fetcher
 pins the matching Lean source checkout under `third_party/lean4-src/`.
-Generating the Wasm size site also uses GNU `objdump` and `c++filt` from
-binutils to enumerate sized functions in the installed Lean archives.
+Generating the Wasm size site also uses GNU `objdump`, `readelf`, and `c++filt`
+from binutils to enumerate sized functions and exact ELF byte classes in the
+installed Lean archives.
 
 ## Generated Artifacts
 
@@ -341,9 +342,11 @@ and exact Lean source path. A generally available, per-view depth slider shows
 the requested number of local levels below the current breadcrumb and stays at
 that setting while zooming. The runtime context has up to seven levels—execution
 layer, archive, source-root directory, nested source directories, member, and
-sized native function. Archive-member bytes not assigned to a sized function
-remain explicit as non-function data and object overhead, so child areas add up
-exactly. The generated `libLeanIR.a` member is shown separately as compiled
+sized native function. Remaining archive bytes are divided into other
+executable code, runtime data, exception tables, relocations, symbol/name
+tables, debug information, and ELF metadata/alignment, so child areas add up
+exactly. Zero-fill memory is reported separately because it has no archive-byte
+area. The generated `libLeanIR.a` member is shown separately as compiled
 `LeanIR.lean` program code and is excluded from the native-support denominator.
 Retained-code coloring matches native function aliases to exact retained Wasm
 linker symbols. Frontier-pressure coloring independently joins missing externs

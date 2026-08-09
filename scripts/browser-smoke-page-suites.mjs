@@ -426,10 +426,26 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     retainedRows: document.querySelectorAll(
       "#selection-details .detail-highlights section:nth-child(3) li",
     ).length,
+    archiveBreakdown: (() => {
+      let result = null;
+      const visit = (node) => {
+        if (node.kind === "runtimeMember" && node.name === "expr.cpp") result = {
+          bytes: node.bytes,
+          childBytes: node.children.reduce((sum, child) => sum + child.bytes, 0),
+          categories: node.children
+            .filter((child) => child.kind === "runtimeOverhead")
+            .map((child) => child.name),
+        };
+        for (const child of node.children ?? []) visit(child);
+      };
+      visit(globalThis.__virWasmSize.trees.runtimeContext);
+      return result;
+    })(),
   })`);
   assert.equal(runtimeMemberDetails.title, "expr.cpp");
   assert.ok(runtimeMemberDetails.statLabels.includes("Functions with blocker pressure"));
   assert.ok(runtimeMemberDetails.statLabels.includes("Retained + blocker overlap"));
+  assert.ok(runtimeMemberDetails.statLabels.includes("Zero-fill memory (not archive bytes)"));
   assert.deepEqual(runtimeMemberDetails.highlightTitles, [
     "Largest native functions",
     "Highest frontier pressure",
@@ -437,6 +453,13 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   ]);
   assert.ok(runtimeMemberDetails.pressureFunctions.includes("lean_expr_has_loose_bvar"));
   assert.ok(runtimeMemberDetails.retainedRows > 0);
+  assert.equal(
+    runtimeMemberDetails.archiveBreakdown.childBytes,
+    runtimeMemberDetails.archiveBreakdown.bytes,
+  );
+  assert.ok(runtimeMemberDetails.archiveBreakdown.categories.includes("Relocation records"));
+  assert.ok(runtimeMemberDetails.archiveBreakdown.categories.includes("Symbol and string tables"));
+  assert.ok(runtimeMemberDetails.archiveBreakdown.categories.includes("ELF metadata and alignment"));
   await clickSelector(cdp, "#breadcrumbs button:first-child");
 
   await setInputValueAndDispatch(cdp, "#node-search", "src/", "input");

@@ -14,7 +14,7 @@ import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
 import { parseLinkMap, parseWasm } from "./wasm-size-report.mjs";
 
 const HTML_FORMAT = "lean-vir-wasm-size-html";
-const HTML_VERSION = 8;
+const HTML_VERSION = 9;
 const templateDir = fileURLToPath(new URL("wasm-size-report/", import.meta.url));
 
 const [releaseWasmArg, debugWasmArg, mapArg, outputArg, ...rest] = process.argv.slice(2);
@@ -327,6 +327,7 @@ async function buildRuntimeContext(
     const path = join(prefix, "lib", "lean", file);
     const members = parseArArchive(await readFile(path));
     const functionsByMember = archiveFunctionCatalog(path);
+    const sectionsByMember = archiveSectionCatalog(path);
     const duplicateCount = new Map();
     for (const [archiveIndex, member] of members.entries()) {
       const occurrence = (duplicateCount.get(member.name) ?? 0) + 1;
@@ -349,6 +350,12 @@ async function buildRuntimeContext(
         boundaryWasmBytes += boundary.bytes;
       }
       const functions = functionsByMember.get(member.name)?.[occurrence - 1] ?? [];
+      const sections = sectionsByMember.get(member.name)?.[occurrence - 1];
+      if (!sections) {
+        throw new Error(
+          `no ELF section inventory for ${file} member ${member.name} occurrence ${occurrence}`,
+        );
+      }
       sizedFunctionCount += functions.length;
       sizedFunctionBytes += functions.reduce((sum, fn) => sum + fn.bytes, 0);
       if (boundary) {
@@ -365,6 +372,7 @@ async function buildRuntimeContext(
         archiveIndex: archiveIndex + 1,
         member,
         functions,
+        sections,
         retainedSymbols: boundary?.children ?? [],
         surfaceDeclarations,
         nextId: () => nextId++,
@@ -396,7 +404,9 @@ async function buildRuntimeContext(
           functionCount: functions.length,
           functionBytes: functions.reduce((sum, fn) => sum + fn.bytes, 0),
           overheadBytes: memberChildren
-            .find((child) => child.kind === "runtimeOverhead")?.bytes ?? 0,
+            .filter((child) => child.kind === "runtimeOverhead")
+            .reduce((sum, child) => sum + child.bytes, 0),
+          zeroFillBytes: sections.zeroFillBytes,
           surfaceDeclarations,
         },
         children: memberChildren,
@@ -650,6 +660,73 @@ function archiveFunctionCatalog(archivePath) {
   return occurrences;
 }
 
+function archiveSectionCatalog(archivePath) {
+  const result = spawnSync("readelf", ["-SW", archivePath], {
+    encoding: "utf8",
+    maxBuffer: 64 * 1024 * 1024,
+  });
+  if (result.status !== 0) {
+    throw new Error(
+      `unable to inspect native sections in ${archivePath}: ${result.stderr || result.stdout}`,
+    );
+  }
+
+  const occurrences = new Map();
+  let memberName = null;
+  let summary = null;
+  const flush = () => {
+    if (memberName === null) return;
+    const members = occurrences.get(memberName) ?? [];
+    members.push(summary);
+    occurrences.set(memberName, members);
+  };
+  for (const line of result.stdout.split(/\r?\n/)) {
+    const heading = /^File: .+\((.+)\)$/.exec(line);
+    if (heading) {
+      flush();
+      memberName = heading[1];
+      summary = {
+        executableBytes: 0,
+        readOnlyDataBytes: 0,
+        writableDataBytes: 0,
+        exceptionBytes: 0,
+        relocationBytes: 0,
+        symbolNameBytes: 0,
+        debugBytes: 0,
+        zeroFillBytes: 0,
+      };
+      continue;
+    }
+    if (memberName === null) continue;
+    const section = /^\s*\[\s*\d+\]\s+(\S+)\s+(\S+)\s+\S+\s+[0-9a-fA-F]+\s+([0-9a-fA-F]+)\s+\S+\s*([A-Z]*)/.exec(line);
+    if (!section) continue;
+    const [, name, type, sizeText, flags] = section;
+    const bytes = Number.parseInt(sizeText, 16);
+    if (!Number.isSafeInteger(bytes) || bytes < 0) {
+      throw new Error(`invalid ELF section size in ${archivePath}: ${line}`);
+    }
+    if (type === "NOBITS") {
+      if (flags.includes("A")) summary.zeroFillBytes += bytes;
+    } else if (type === "REL" || type === "RELA") {
+      summary.relocationBytes += bytes;
+    } else if (type === "SYMTAB" || type === "STRTAB") {
+      summary.symbolNameBytes += bytes;
+    } else if (flags.includes("X")) {
+      summary.executableBytes += bytes;
+    } else if (name.startsWith(".eh_frame") || name.startsWith(".gcc_except_table")) {
+      summary.exceptionBytes += bytes;
+    } else if (name.startsWith(".debug_") || name.startsWith(".zdebug_")) {
+      summary.debugBytes += bytes;
+    } else if (flags.includes("A") && flags.includes("W")) {
+      summary.writableDataBytes += bytes;
+    } else if (flags.includes("A")) {
+      summary.readOnlyDataBytes += bytes;
+    }
+  }
+  flush();
+  return occurrences;
+}
+
 function demangleNames(names) {
   if (names.length === 0) return new Map();
   const result = spawnSync("c++filt", [], {
@@ -674,11 +751,11 @@ function runtimeMemberChildren({
   archiveIndex,
   member,
   functions,
+  sections,
   retainedSymbols,
   surfaceDeclarations,
   nextId,
 }) {
-  const assignedDeclarations = new Set();
   const retainedByName = new Map();
   for (const symbol of retainedSymbols.filter((node) => node.kind === "symbol")) {
     const name = symbol.meta?.rawName ?? symbol.name;
@@ -694,12 +771,10 @@ function runtimeMemberChildren({
     const declarationsByName = new Map();
     for (const declaration of surfaceDeclarations.filter((declaration) => {
       if (!aliases.has(declaration.target)) return false;
-      assignedDeclarations.add(declaration.name);
       return true;
     })) declarationsByName.set(declaration.name, declaration);
     for (const symbol of matches) {
       for (const declaration of symbol.meta?.surfaceDeclarations ?? []) {
-        assignedDeclarations.add(declaration.name);
         declarationsByName.set(declaration.name, declaration);
       }
     }
@@ -728,26 +803,87 @@ function runtimeMemberChildren({
     };
   });
   const functionBytes = sumChildren(children);
-  if (functionBytes > member.bytes) {
+  const otherExecutableBytes = sections.executableBytes - functionBytes;
+  if (otherExecutableBytes < 0 || functionBytes > member.bytes) {
     throw new Error(
-      `${archive} member ${member.name} has ${functionBytes} function bytes but only ${member.bytes} archive bytes`,
+      `${archive} member ${member.name} has ${functionBytes} function bytes but only ` +
+        `${sections.executableBytes} executable section bytes and ${member.bytes} archive bytes`,
     );
   }
-  const overheadBytes = member.bytes - functionBytes;
-  if (overheadBytes > 0) {
+  const measuredCategories = [
+    {
+      category: "otherExecutable",
+      name: "Other executable code",
+      bytes: otherExecutableBytes,
+      note: "Executable section bytes not assigned to a positive-sized function symbol.",
+    },
+    {
+      category: "readOnlyData",
+      name: "Read-only runtime data",
+      bytes: sections.readOnlyDataBytes,
+      note: "Allocated read-only constants and tables, excluding exception metadata.",
+    },
+    {
+      category: "writableData",
+      name: "Initialized writable data",
+      bytes: sections.writableDataBytes,
+      note: "Writable section payload stored in the archive member; zero-fill memory is reported separately.",
+    },
+    {
+      category: "exceptions",
+      name: "Exception and unwind tables",
+      bytes: sections.exceptionBytes,
+      note: "ELF exception tables and stack-unwind frame data.",
+    },
+    {
+      category: "relocations",
+      name: "Relocation records",
+      bytes: sections.relocationBytes,
+      note: "Link-time relocation entries; these are not retained as runtime data.",
+    },
+    {
+      category: "symbolNames",
+      name: "Symbol and string tables",
+      bytes: sections.symbolNameBytes,
+      note: "ELF symbol and name tables used by archive and linker tooling.",
+    },
+    {
+      category: "debug",
+      name: "Debug information",
+      bytes: sections.debugBytes,
+      note: "Debug sections stored in the installed archive member.",
+    },
+  ];
+  const measuredBytes = measuredCategories.reduce((sum, category) => sum + category.bytes, 0);
+  const metadataBytes = member.bytes - functionBytes - measuredBytes;
+  if (metadataBytes < 0) {
+    throw new Error(
+      `${archive} member ${member.name} section categories exceed its ${member.bytes} archive bytes`,
+    );
+  }
+  measuredCategories.push({
+    category: "objectMetadata",
+    name: "ELF metadata and alignment",
+    bytes: metadataBytes,
+    note: "ELF headers, section headers, groups, compiler metadata, and file alignment not represented by another category.",
+  });
+  const visibleCategories = measuredCategories.filter((entry) => entry.bytes > 0);
+  // Preserve the previous one-ID-per-member overhead allocation so adding
+  // detail categories does not invalidate stable directory/member deep links.
+  const overheadId = visibleCategories.length > 0 ? nextId() : null;
+  for (const category of visibleCategories) {
     children.push({
-      id: `runtime-overhead-${nextId()}`,
-      name: "Non-function data and object overhead",
+      id: `runtime-overhead-${overheadId}-${category.category}`,
+      name: category.name,
       kind: "runtimeOverhead",
-      bytes: overheadBytes,
+      bytes: category.bytes,
       meta: {
         archive,
         archiveIndex,
         memberName: member.name,
+        category: category.category,
         inVirBoundary: false,
-        note: "Archive-member bytes not assigned to a sized native function symbol, including data, relocations, debug information, section framing, and object metadata.",
-        surfaceDeclarations: surfaceDeclarations
-          .filter((declaration) => !assignedDeclarations.has(declaration.name)),
+        note: category.note,
       },
     });
   }
@@ -876,6 +1012,7 @@ function annotateNativeFunctionSummaries(node) {
       retainedWasmFunctionBytes: node.kind === "runtimeFunction"
         ? node.meta.retainedWasmBytes ?? 0
         : 0,
+      zeroFillBytes: node.meta?.zeroFillBytes ?? 0,
     };
   }
   const summary = children.map(annotateNativeFunctionSummaries).reduce(
@@ -888,6 +1025,7 @@ function annotateNativeFunctionSummaries(node) {
         total.retainedNativeFunctionBytes + child.retainedNativeFunctionBytes,
       retainedWasmFunctionBytes:
         total.retainedWasmFunctionBytes + child.retainedWasmFunctionBytes,
+      zeroFillBytes: total.zeroFillBytes + child.zeroFillBytes,
     }),
     {
       functionCount: 0,
@@ -896,8 +1034,10 @@ function annotateNativeFunctionSummaries(node) {
       retainedFunctionCount: 0,
       retainedNativeFunctionBytes: 0,
       retainedWasmFunctionBytes: 0,
+      zeroFillBytes: 0,
     },
   );
+  summary.zeroFillBytes += node.meta?.zeroFillBytes ?? 0;
   node.meta = { ...node.meta, ...summary };
   return summary;
 }

@@ -363,7 +363,7 @@ Author: Emilio J. Gallego Arias
           `${formatBytes(retainedBytes)} / ${formatBytes(functionBytes)}`,
           `function bytes · ${formatPercent(retainedBytes / functionBytes)}`,
         )
-        : coverageFact(formatBytes(node.bytes), "non-function / overhead"),
+        : coverageFact(formatBytes(node.bytes), "non-function archive bytes"),
     );
   }
 
@@ -631,7 +631,7 @@ Author: Emilio J. Gallego Arias
     const byteLabel = node.kind === "runtimeFunction"
       ? "Sized function bytes"
       : node.kind === "runtimeOverhead"
-        ? "Non-function / overhead bytes"
+        ? "Archive bytes"
         : view === "runtimeContext"
           ? "Native archive bytes"
           : "Retained raw";
@@ -649,7 +649,14 @@ Author: Emilio J. Gallego Arias
       appendDetail(stats, "Function bytes", formatBytes(node.meta.functionBytes));
     }
     if (node.meta?.overheadBytes != null) {
-      appendDetail(stats, "Non-function / overhead", formatBytes(node.meta.overheadBytes));
+      appendDetail(stats, "Other archive bytes", formatBytes(node.meta.overheadBytes));
+    }
+    if (node.meta?.zeroFillBytes > 0) {
+      appendDetail(
+        stats,
+        "Zero-fill memory (not archive bytes)",
+        formatBytes(node.meta.zeroFillBytes),
+      );
     }
     if (node.meta?.retainedFunctionCount != null) {
       appendDetail(
@@ -1149,7 +1156,7 @@ Author: Emilio J. Gallego Arias
       sourceDirectory: "Lean source directory",
       runtimeMember: "native archive member",
       runtimeFunction: "sized native function",
-      runtimeOverhead: "non-function data and object overhead",
+      runtimeOverhead: "archive section or object overhead",
     })[kind] ?? kind;
   }
 

@@ -650,6 +650,15 @@ largest-function, highest-pressure, and retained-Wasm lists for dense sources
 such as `expr.cpp`. All scope animation is disabled when the browser requests
 reduced motion.
 
+Archive-member area is an exact on-disk partition, not a runtime-memory model.
+Positive-sized function symbols are separated from other executable section
+bytes, read-only and initialized writable data, exception/unwind tables,
+relocations, symbol/name tables, debug information, and remaining ELF
+metadata/alignment. Zero-fill sections are shown as a detail fact but occupy no
+treemap area because their bytes are not stored in the archive. In particular,
+large relocation and symbol-table blocks describe link-time object cost rather
+than code or data retained in a final executable.
+
 The generated directory contains a navigation index with the comparatively
 small extern catalog plus one compact JavaScript data file per module with
 functions. This keeps initial browser load independent of the complete
