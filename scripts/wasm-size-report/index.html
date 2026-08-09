@@ -153,7 +153,7 @@
           <p><strong>Files expand into native functions.</strong> Sized function symbols come from the installed archive objects; data, relocations, debug sections, framing, and unsized bytes remain explicit as object overhead.</p>
           <p><strong>Retained-code color is computed.</strong> Green intensity is the share of archive bytes belonging to exact native-function matches retained in VIR; directory, archive, and layer colors are byte-weighted child averages.</p>
           <p><strong>Zoom depth is local and sticky.</strong> The slider controls how many descendant levels are drawn below the current breadcrumb and keeps its setting while you drill in.</p>
-          <p><strong>Frontier pressure is measured, not predicted.</strong> Color is blocker-root density per MiB; parent density is the byte-weighted average of its children. A repaired boundary may reveal another blocker.</p>
+          <p><strong>Frontier pressure is measured, not predicted.</strong> Color is blocker-root density per MiB; parent density is the byte-weighted average of its children. The focused log scale keeps sparse parent averages pale so concentrated leaves stand out. A repaired boundary may reveal another blocker.</p>
           <p><strong>The combined view exposes overlap.</strong> Green is retained code, orange is frontier pressure, purple has both signals, and gray has neither. A retained native function can still be unavailable through the extern catalog.</p>
         </div>
       </section>

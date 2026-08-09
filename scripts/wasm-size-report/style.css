@@ -574,7 +574,11 @@ input:focus {
 
 .map-block.frontier-pressure {
   color: #421d16;
-  background: hsl(14 76% calc(var(--frontier-lightness) * 1%));
+  background: hsl(
+    14
+    calc(var(--frontier-saturation) * 1%)
+    calc(var(--frontier-lightness) * 1%)
+  );
 }
 
 .map-block.no-frontier-pressure {

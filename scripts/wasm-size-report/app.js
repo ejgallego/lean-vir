@@ -545,6 +545,7 @@ Author: Emilio J. Gallego Arias
     );
     block.style.removeProperty("--boundary-percent");
     block.style.removeProperty("--frontier-lightness");
+    block.style.removeProperty("--frontier-saturation");
     block.style.removeProperty("--combined-color");
     const presentation = contextColorPresentation(node);
     block.classList.add(...presentation.classes);
@@ -556,11 +557,14 @@ Author: Emilio J. Gallego Arias
 
   function contextColorPresentation(node) {
     const boundaryDensity = clampUnit(node.meta?.boundaryDensity ?? 0);
-    const frontierIntensity = normalizedFrontierDensity(node.meta?.frontierDensity ?? 0);
+    const frontierIntensity = frontierColorIntensity(node.meta?.frontierDensity ?? 0);
     if (contextColor === "frontier") {
       return {
         classes: [frontierIntensity > 0 ? "frontier-pressure" : "no-frontier-pressure"],
-        properties: [`--frontier-lightness:${89 - frontierIntensity * 38}`],
+        properties: [
+          `--frontier-lightness:${94 - frontierIntensity * 49}`,
+          `--frontier-saturation:${34 + frontierIntensity * 48}`,
+        ],
       };
     }
     if (contextColor === "combined") {
@@ -1169,9 +1173,12 @@ Author: Emilio J. Gallego Arias
     return hues[index % hues.length];
   }
 
-  function normalizedFrontierDensity(density) {
+  function frontierColorIntensity(density) {
     const maximum = report.runtimeContext.maxFrontierDensity;
-    return maximum > 0 ? clampUnit(Math.log1p(density) / Math.log1p(maximum)) : 0;
+    if (maximum <= 0 || density <= 0) return 0;
+    const logarithmic = clampUnit(Math.log1p(density) / Math.log1p(maximum));
+    // Keep sparse parent averages quiet while preserving strong leaf signals.
+    return logarithmic ** 1.8;
   }
 
   function combinedContextColor(boundary, frontier) {

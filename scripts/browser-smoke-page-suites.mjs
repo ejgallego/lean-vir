@@ -565,6 +565,19 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     selectedColor: document.querySelector("#context-color-switch button.selected")?.dataset.contextColor,
     note: document.querySelector("#view-note")?.textContent,
     pressured: document.querySelectorAll("#treemap .frontier-pressure").length,
+    colorRange: (() => {
+      const blocks = Array.from(document.querySelectorAll("#treemap .frontier-pressure"));
+      const lightness = blocks.map((block) => Number.parseFloat(
+        block.style.getPropertyValue("--frontier-lightness"),
+      ));
+      const saturation = blocks.map((block) => Number.parseFloat(
+        block.style.getPropertyValue("--frontier-saturation"),
+      ));
+      return {
+        lightness: Math.max(...lightness) - Math.min(...lightness),
+        saturation: Math.max(...saturation) - Math.min(...saturation),
+      };
+    })(),
     listTitle: document.querySelector("#child-list-title")?.textContent,
     top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
     densityAverage: (() => {
@@ -582,6 +595,8 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.equal(frontier.selectedColor, "frontier");
   assert.ok(frontier.note.includes("not predicted unlock"));
   assert.ok(frontier.pressured > 0);
+  assert.ok(frontier.colorRange.lightness > 8);
+  assert.ok(frontier.colorRange.saturation > 8);
   assert.ok(frontier.note.includes("averaged by child bytes"));
   assert.equal(frontier.listTitle, "Frontier pressure");
   assert.ok(frontier.top.length > 0);

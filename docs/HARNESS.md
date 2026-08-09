@@ -353,12 +353,14 @@ in the displayed archives and shows deterministic primary blocked-root density
 per MiB. The explanation reports mapped versus total missing externs because a
 provider outside this archive slice has no byte area here. Parent colors are
 byte-weighted averages of their children. This is not a predicted unlock count
-because satisfying one boundary may reveal another. A combined mode shows
-retained code in green, frontier pressure in orange, overlap in purple, and
-neither signal in gray. The overlap is intentional evidence: a native function
-may already be linked into the Wasm for another caller while its Lean
-declaration remains absent from the native-extern catalog. Combined mode lists
-those overlap functions directly and opens their cross-linked details. Scope
+because satisfying one boundary may reveal another. Its focused log color scale
+keeps sparse parent averages pale so concentrated leaves remain visible. A
+combined mode shows retained code in green, frontier pressure in orange,
+overlap in purple, and neither signal in gray. The overlap is intentional
+evidence: a native function may already be linked into the Wasm for another
+caller while its Lean declaration remains absent from the native-extern
+catalog. Combined mode lists those overlap functions directly and opens their
+cross-linked details. Scope
 changes promote up to 28 of the largest visible exact member/object and
 function/symbol correspondences into shared transition elements, with the map
 crossfade as a fallback when a match is below the current render depth. The
