@@ -11,7 +11,9 @@ import {
   createHostResource,
   ExternrefResourceRoots,
   hostResourceValue,
+  registerHostResourcePayloadLifetime,
   releaseHostResource,
+  retainHostResource,
 } from "../../web/src/host-resource.js";
 import {
   createHostResourceState,
@@ -518,6 +520,65 @@ assert.equal(hostResourceValue(teardownLeanHandleAlias).lease.released, true);
     releaseHostResource(borrowedPartialLiftResource);
   }
   assert.equal(borrowedPartialLiftDisposals, 1);
+}
+{
+  const payloadCell = { active: 0, releases: 0 };
+  const makePayloadAlias = () => {
+    const payload = {};
+    let live = true;
+    payloadCell.active++;
+    registerHostResourcePayloadLifetime(payload, {
+      retain: makePayloadAlias,
+      release: () => {
+        if (!live) return false;
+        live = false;
+        payloadCell.active--;
+        payloadCell.releases++;
+        return true;
+      },
+    });
+    return payload;
+  };
+  const resources = createHostResourceState();
+  const source = resources.adoptResourceForValue(makePayloadAlias());
+  const retainedResult = retainHostResource(source, "retained identity result");
+  let resultObj = 0;
+  let published = null;
+  try {
+    resultObj = runtime.makeHostResourceObjectValue(
+      resourceType,
+      retainedResult,
+      "retained identity result",
+    );
+    published = runtime.liftOwnedObjectValue(
+      resourceType,
+      resultObj,
+      "retained identity result",
+    );
+    resources.releaseResource(source);
+    assert.equal(payloadCell.active, 1);
+    assert.equal(
+      resources.debugResourceCounts().owners,
+      1,
+      "a taken identity clone must keep exactly one deterministic teardown ticket",
+    );
+    resources.dispose();
+    assert.equal(
+      payloadCell.active,
+      0,
+      "a retained identity result taken into JavaScript must remain visible to deterministic teardown",
+    );
+    assert.equal(payloadCell.releases, 2);
+    assert.equal(
+      hostResourceValue(published),
+      null,
+      "runtime teardown must invalidate the published retained identity result",
+    );
+  } finally {
+    if (resultObj !== 0) runtime.exports.vir_obj_dec(resultObj);
+    if (resources.debugResourceCounts().owners !== 0) resources.dispose();
+    releaseHostResource(published);
+  }
 }
 const callbackWithRawStringType = {
   type: "Function",

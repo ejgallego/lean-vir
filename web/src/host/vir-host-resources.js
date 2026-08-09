@@ -106,6 +106,7 @@ export class HostResourceState {
 
   // Creates a unique resource whose receiver is responsible for releasing it.
   ownedResourceForValue(value, {
+    label = null,
     onAbandon = null,
     retentionPolicy = null,
     revocationGroup = null,
@@ -113,7 +114,7 @@ export class HostResourceState {
     this.requireUsable();
     if (value === null || value === undefined) return null;
     if (!isRetainableHostResourcePayload(value)) {
-      return createHostResource(value, null, {
+      return createHostResource(value, label, {
         owner: this.owner,
         onAbandon,
         retentionPolicy,
@@ -124,7 +125,7 @@ export class HostResourceState {
     const retainedValue = retainHostResourcePayload(value);
     let resource = null;
     try {
-      resource = createHostResource(retainedValue, null, {
+      resource = createHostResource(retainedValue, label, {
         owner: this.owner,
         ...payloadResourceLifecycle(this, retainedValue),
         onAbandon,
@@ -332,6 +333,11 @@ function payloadResourceLifecycle(resources, payload) {
   const tracking = { ticket: null };
   return {
     dispose: () => releaseHostResourcePayload(payload),
+    // Generic identity-result retention must create its clone through the
+    // owning HostResourceState. That gives the new payload lease the same
+    // deterministic owned-wrapper/taken-ticket lifecycle as every other
+    // retainable resource created by this state.
+    retainResource: (value, label) => resources.ownedResourceForValue(value, { label }),
     onFinalize: () => {
       if (tracking.ticket !== null) {
         resources.transferredPayloadTickets.delete(tracking.ticket);
@@ -615,16 +621,40 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
     return withComponentCallbackHandoff(component, (ownedComponent, markHandedOff) => {
       const selector = jsStringValue(resources, selectorResource, "React root selector");
       const selected = selectorRoot(selector, () => undefined);
-      if (selected === null) return false;
-      const errors = [];
-      const rendered = collectCleanupError(errors, () => selected.root.renderComponent(ownedComponent));
-      if (!rendered.ok && selected.created) {
+      if (selected === null) return resources.resourceForValue(false);
+      const publication = publishSelectorRender(
+        selected,
+        () => selected.root.renderComponent(ownedComponent),
+        "React selector component render failed during root rollback",
+      );
+      markHandedOff();
+      return publication;
+    });
+  }
+
+  function selectorPublication(root) {
+    return resources.ownedResourceForValue(true, {
+      onAbandon: () => releaseRootResource(root),
+    });
+  }
+
+  function publishSelectorRender(selected, render, failureMessage) {
+    const errors = [];
+    const rendered = collectCleanupError(errors, render);
+    if (!rendered.ok) {
+      if (selected.created) {
         collectCleanupError(errors, () => releaseRootResource(selected.root));
       }
-      throwCollectedErrors(errors, "React selector component render failed during root rollback");
-      markHandedOff();
-      return true;
-    });
+      throwCollectedErrors(errors, failureMessage);
+    }
+    const published = collectCleanupError(errors, () => selectorPublication(selected.root));
+    if (!published.ok) {
+      // Publication failure rolls the whole side effect back. This also
+      // terminates an existing root whose committed tree was just replaced.
+      collectCleanupError(errors, () => releaseRootResource(selected.root));
+    }
+    throwCollectedErrors(errors, failureMessage);
+    return published.value;
   }
 
   return {
@@ -710,16 +740,14 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       if (selected === null) {
         return resources.resourceForValue(false);
       }
-      const errors = [];
-      const rendered = collectCleanupError(errors, () => selected.root.render(node));
-      if (!rendered.ok && selected.created) {
-        collectCleanupError(errors, () => releaseRootResource(selected.root));
-      }
-      throwCollectedErrors(errors, "React selector render failed during root rollback");
-      return resources.resourceForValue(true);
+      return publishSelectorRender(
+        selected,
+        () => selected.root.render(node),
+        "React selector render failed during root rollback",
+      );
     },
     "react.root.renderComponentIntoSelector": (selector, component) => {
-      return resources.resourceForValue(renderComponentIntoSelector(selector, component));
+      return renderComponentIntoSelector(selector, component);
     },
     "react.root.unmount": (root) => {
       const value = resources.resolveResource(root, "ReactRoot");

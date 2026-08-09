@@ -317,6 +317,57 @@ assert.equal(abandonedListenerRuntime.liveCallbacks.size, 0);
 abandonedListenerRuntime.makeHostResourceObjectValue = lowerAbandonedListenerResult;
 abandonedListenerRuntime.dispose();
 
+for (const existingRoot of [false, true]) {
+  const selector = existingRoot
+    ? "#selector-result-existing-root"
+    : "#selector-result-new-root";
+  const documentState = createVirtualDocumentState();
+  const target = ensureVirtualElementState(documentState, selector);
+  const selectorResultRuntime = await createVirRuntime({
+    wasmBytes,
+    irPackageSetBytes: [hostPackageBytes],
+    virtualDocumentState: documentState,
+    hostBindings: { "test.recordNat": () => undefined },
+  });
+  if (existingRoot) {
+    assert.equal(
+      selectorResultRuntime.call("ReactCounter.renderStaticIntoSelector", selector),
+      true,
+    );
+    assert.ok(target.reactRoot, "the setup render must create the existing selector root");
+  }
+  const lowerSelectorResult = selectorResultRuntime.makeHostResourceObjectValue.bind(
+    selectorResultRuntime,
+  );
+  selectorResultRuntime.makeHostResourceObjectValue = (type, value, label) => {
+    if (label === "react.root.renderComponentIntoSelector result") {
+      throw new Error("selector result lowering boom");
+    }
+    return lowerSelectorResult(type, value, label);
+  };
+  assert.throws(
+    () => selectorResultRuntime.call("ReactCounter.renderStaticIntoSelector", selector),
+    /selector result lowering boom/,
+  );
+  assert.equal(
+    target.reactRoot ?? null,
+    null,
+    "failed selector result publication must terminate the affected root",
+  );
+  assert.equal(
+    documentState.resources.debugResourceCounts().owners,
+    0,
+    "failed selector result publication must release every root owner",
+  );
+  assert.equal(
+    selectorResultRuntime.liveCallbacks.size,
+    0,
+    "failed selector result publication must not leave a mounted dead callback",
+  );
+  selectorResultRuntime.makeHostResourceObjectValue = lowerSelectorResult;
+  selectorResultRuntime.dispose();
+}
+
 let combinedFailureCallback = null;
 const combinedFailureRuntime = await createVirRuntime({
   wasmBytes,

@@ -58,6 +58,7 @@ class HostResource {
     onRelease = null,
     onTake = null,
     reportFinalizerError = null,
+    retainResource = null,
     retentionPolicy = null,
     revocationGroup = null,
   } = {}) {
@@ -70,6 +71,7 @@ class HostResource {
         onRelease,
         onTake,
       }),
+      retainResource,
       revocationGroup,
     });
     const state = {
@@ -231,6 +233,9 @@ export function retainHostResource(resource, label = null) {
       owner: state.owner,
       retentionPolicy: HOST_RESOURCE_RETENTION.PASSIVE,
     });
+  }
+  if (typeof state.metadata.retainResource === "function") {
+    return state.metadata.retainResource(value, label ?? state.label);
   }
   const retained = retainHostResourcePayload(value);
   try {
