@@ -55,6 +55,7 @@
     "compare:surface": "node scripts/compare-surface-reports.mjs",
     "bench": "node scripts/bench-vir.mjs",
     "bench:env-lookup": "node scripts/bench-env-lookup.mjs",
+    "bench:env-lookup:wasm-pair": "node --expose-gc scripts/bench-env-lookup-wasm-pair.mjs",
     "bench:compare": "node scripts/bench-compare.mjs",
     "bench:paired": "node scripts/bench-paired.mjs",
     "bench:engines": "node scripts/bench-engines.mjs",
