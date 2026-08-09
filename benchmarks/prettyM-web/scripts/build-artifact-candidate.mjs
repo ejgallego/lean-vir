@@ -186,7 +186,7 @@ async function main() {
   ]);
   const candidate = {
     schemaVersion: 1,
-    kind: "prettyM-web/artifact-candidate",
+    kind: "browser-benchmarks/artifact-candidate",
     build: options.buildId,
     artifactSet: lock.setId,
     orchestrator: {

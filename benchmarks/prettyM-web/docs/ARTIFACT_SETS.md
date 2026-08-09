@@ -1,14 +1,15 @@
 # Artifact sets
 
-An artifact set is the immutable compatibility unit used by a benchmark report.
-Producer packages retain their own metadata and checksums; this application
-asserts that one VIR bounded runtime, one native FIR bounded runtime, and one
-LLVM bounded runtime implement the same browser-visible contract.
+An artifact set is the immutable compatibility unit used by one example's
+benchmark report. Producer packages retain their own metadata and checksums;
+the catalog record declares which components jointly implement that example's
+browser-visible contract. The current `prettyM` set has VIR, native FIR, and
+LLVM components, but the set format does not require those names or count.
 
 Conceptually, a component is a dependent pair:
 
 ```text
-Σ (leanVersion), boundedRuntime leanVersion × prettyMWorkload leanVersion
+Σ (leanVersion), boundedRuntime leanVersion × exampleWorkload leanVersion
 ```
 
 The Lean version lives inside the component. The set does not require all
@@ -16,7 +17,7 @@ components to share it. Nothing at the browser boundary passes Lean heap values
 between candidates; it passes the common compact Format model and compares
 rendered text plus complete styling events.
 
-## Roles
+## Current prettyM roles
 
 - VIR produces one matching unit: release interpreter Wasm, bundled browser
   runtime, and the `prettyM` IR package compiled with that runtime's Lean
@@ -45,20 +46,23 @@ artifacts/               currently staged browser inputs
 ```
 
 `_artifacts/`, `artifacts/`, `dist/`, and `_results/` are ignored. The
-source-build database and lockfile are committed.
+source-build catalog and its selected lockfiles are committed.
 
 ## Assemble a candidate
 
-1. Select a canonical build from `artifact-builds.json` and resolve its exact
-   sources to clean local checkouts. Run the source builder with the selected
-   `BUILD` and `--checkout NAME=PATH` arguments; see `ARTIFACT_BUILDS.md`.
+1. Select a canonical example build from `artifact-builds.json` and resolve
+   its exact sources to clean local checkouts. Run the source builder with the
+   selected `BUILD` and `--checkout NAME=PATH` arguments; see
+   `ARTIFACT_BUILDS.md`.
 2. Review the source-build receipt and validated `_artifacts/seed/`.
 3. Run `npm run artifacts:pack -- --build BUILD`.
 4. Review the generated manifest under `_artifacts/releases/`.
 5. Import the generated tar through the same consumer path:
 
    ```sh
-   npm run artifacts:fetch -- --archive _artifacts/releases/<archive>.tar
+   npm run artifacts:fetch -- \
+     --lock LOCK \
+     --archive _artifacts/releases/<archive>.tar
    npm test
    ```
 
@@ -87,8 +91,8 @@ Upload these three files to a prerelease owned by the benchmark project:
 Never replace those assets and never point the lockfile at a mutable `latest`
 URL. After upload:
 
-1. Set `archive.url` in `artifact-set.lock.json` to the exact HTTPS release
-   asset URL.
+1. Set `archive.url` in the build's catalogued lockfile to the exact HTTPS
+   release asset URL.
 2. Change `status` to `published`; do not change any digest or byte count.
 3. Open a lockfile PR. CI runs `npm run artifacts:fetch` and `npm test` from a
    clean clone.

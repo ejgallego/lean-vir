@@ -7,7 +7,6 @@ import {
   createTar,
   fileRecords,
   inside,
-  requiredArtifactFiles,
   sha256,
   validateSeed,
   verifyArtifactSet,
@@ -20,9 +19,9 @@ function parseArgs(argv) {
   const options = {
     seed: "_artifacts/seed",
     database: "artifact-builds.json",
-    build: "prettyM",
+    build: null,
     outputDir: "_artifacts/releases",
-    lock: "artifact-set.lock.json",
+    lock: null,
   };
   for (let index = 0; index < argv.length; index += 1) {
     const argument = argv[index];
@@ -39,9 +38,9 @@ Every input and output path must remain inside this application directory.
 
   --seed PATH          component seed (default: _artifacts/seed)
   --database PATH      canonical source/build database
-  --build ID           database build to pack (default: prettyM)
+  --build ID           database build to pack (required)
   --output-dir PATH    ignored release directory
-  --lock PATH          lockfile to write (default: artifact-set.lock.json)`);
+  --lock PATH          lockfile to write (default: catalogued build lock)`);
       process.exit(0);
     } else throw new Error(`unknown argument: ${argument}`);
   }
@@ -56,6 +55,7 @@ async function copyFile(sourceRoot, destinationRoot, path) {
 
 async function main() {
   const options = parseArgs(process.argv.slice(2));
+  if (!options.build) throw new Error("select a build with --build ID");
   const seed = inside(appRoot, options.seed, "read artifact seed");
   const databasePath = inside(
     appRoot,
@@ -63,37 +63,73 @@ async function main() {
     "read artifact build database",
   );
   const outputDir = inside(appRoot, options.outputDir, "write release");
-  const lockPath = inside(appRoot, options.lock, "write lockfile");
   const database = await readBuildDatabase(databasePath);
   const config = artifactSetConfig(database, options.build);
-  if (
-    config.schemaVersion !== 1 ||
-    !/^prettyM-[a-zA-Z0-9.-]+$/.test(config.setId)
-  ) {
+  const lockPath = inside(
+    appRoot,
+    options.lock ?? config.lock,
+    "write lockfile",
+  );
+  if (config.schemaVersion !== 2) {
     throw new Error("unsupported artifact-set config or unsafe set ID");
   }
 
-  const { native, llvm } = await validateSeed(seed);
+  const metadata = await validateSeed(seed, config);
   const components = config.components;
-  if (
-    !components ||
-    Object.values(components).some(
-      (component) => component.boundary !== "prettyM-web/bounded-runtime/v1",
-    )
-  ) {
-    throw new Error(
-      "every component must declare the bounded-runtime boundary",
-    );
-  }
-  if (
-    native.capabilities?.inputLayout?.leanVersion !==
-      components.native?.lean?.version ||
-    llvm.toolchain?.lean?.version !== components.llvm?.lean?.version ||
-    llvm.toolchain?.lean?.commit !== components.llvm?.lean?.commit
-  ) {
-    throw new Error(
-      "producer metadata does not match its component-local Lean pin",
-    );
+  const packedComponents = {};
+  for (const [componentId, component] of Object.entries(components)) {
+    const producer = metadata[componentId];
+    if (
+      component.adapter === "fir-native" &&
+      producer.capabilities?.inputLayout?.leanVersion !== component.lean?.version
+    ) {
+      throw new Error(`${componentId} metadata does not match its Lean pin`);
+    }
+    if (
+      component.adapter === "fir-llvm" &&
+      (producer.toolchain?.lean?.version !== component.lean?.version ||
+        producer.toolchain?.lean?.commit !== component.lean?.commit)
+    ) {
+      throw new Error(`${componentId} metadata does not match its Lean pin`);
+    }
+    const {
+      files: _files,
+      producerManifest,
+      adapter,
+      ...packed
+    } = component;
+    if (adapter === "fir-native") {
+      packed.runtime = {
+        pipeline: "lean-lcnf-to-fir-native-wasm",
+        sourceCommit: producer.sourceCommit,
+        sourceDirty: producer.sourceDirty,
+        functionImports: producer.functionImports,
+        memoryOwner: producer.capabilities?.memoryOwner,
+      };
+      packed.workload = {
+        entry: producer.entry,
+        inputAbi: producer.capabilities?.inputLayout?.version,
+        adapterApi: producer.capabilities?.browserAdapter?.apiVersion,
+        output: producer.capabilities?.output,
+      };
+    } else if (adapter === "fir-llvm") {
+      packed.runtime = {
+        pipeline: producer.pipeline,
+        emscripten: producer.toolchain?.emscripten,
+        capabilities: producer.runtime,
+      };
+      packed.workload = {
+        entry: producer.sources?.entry,
+        abi: producer.abi,
+      };
+    }
+    packedComponents[componentId] = {
+      ...packed,
+      adapter,
+      producerManifest: producerManifest
+        ? component.files[producerManifest]
+        : null,
+    };
   }
 
   const assembly = inside(
@@ -103,73 +139,43 @@ async function main() {
   );
   await rm(assembly, { recursive: true, force: true });
   await mkdir(assembly, { recursive: true });
-  for (const path of requiredArtifactFiles)
+  const artifactPaths = Object.values(components)
+    .flatMap((component) => Object.values(component.files))
+    .sort();
+  for (const path of artifactPaths)
     await copyFile(seed, assembly, path);
 
-  const virFiles = await fileRecords(assembly, [
-    "lean-vir/js/vir-runtime.js",
-    "lean-vir/wasm/vir-upstream.wasm",
-  ]);
-  const virComponent = {
-    schemaVersion: 1,
-    kind: "prettyM-artifact-component",
-    id: "vir",
-    ...components.vir,
-    files: virFiles,
-  };
-  await writeFile(
-    resolve(assembly, "lean-vir/COMPONENT.json"),
-    canonicalJson(virComponent),
-  );
+  const componentManifestPaths = [];
+  for (const [componentId, component] of Object.entries(components)) {
+    const path = `components/${componentId}.json`;
+    const componentFiles = await fileRecords(
+      assembly,
+      Object.values(component.files),
+    );
+    await mkdir(dirname(resolve(assembly, path)), { recursive: true });
+    await writeFile(
+      resolve(assembly, path),
+      canonicalJson({
+        schemaVersion: 1,
+        kind: "browser-benchmarks/artifact-component",
+        id: componentId,
+        ...packedComponents[componentId],
+        files: componentFiles,
+      }),
+    );
+    packedComponents[componentId].manifest = path;
+    componentManifestPaths.push(path);
+  }
 
-  const payloadPaths = [...requiredArtifactFiles, "lean-vir/COMPONENT.json"];
+  const payloadPaths = [...artifactPaths, ...componentManifestPaths];
   const files = await fileRecords(assembly, payloadPaths);
   const manifest = {
-    schemaVersion: 1,
-    kind: "prettyM-artifact-set",
+    schemaVersion: 2,
+    kind: "browser-benchmarks/artifact-set",
+    example: config.example,
     setId: config.setId,
     benchmarkContract: config.benchmarkContract,
-    components: {
-      vir: {
-        boundary: components.vir.boundary,
-        manifest: "lean-vir/COMPONENT.json",
-        lean: components.vir.lean,
-        runtime: components.vir.runtime,
-        workload: components.vir.workload,
-      },
-      native: {
-        boundary: components.native.boundary,
-        manifest: "lean-native/BUILD.json",
-        lean: components.native.lean,
-        runtime: {
-          pipeline: "lean-lcnf-to-fir-native-wasm",
-          sourceCommit: native.sourceCommit,
-          sourceDirty: native.sourceDirty,
-          functionImports: native.functionImports,
-          memoryOwner: native.capabilities?.memoryOwner,
-        },
-        workload: {
-          entry: native.entry,
-          inputAbi: native.capabilities?.inputLayout?.version,
-          adapterApi: native.capabilities?.browserAdapter?.apiVersion,
-          output: native.capabilities?.output,
-        },
-      },
-      llvm: {
-        boundary: components.llvm.boundary,
-        manifest: "lean-llvm/prettyM.manifest.json",
-        lean: components.llvm.lean,
-        runtime: {
-          pipeline: llvm.pipeline,
-          emscripten: llvm.toolchain?.emscripten,
-          capabilities: llvm.runtime,
-        },
-        workload: {
-          entry: llvm.sources?.entry,
-          abi: llvm.abi,
-        },
-      },
-    },
+    components: packedComponents,
     files,
   };
   const manifestBody = canonicalJson(manifest);
@@ -199,7 +205,7 @@ async function main() {
   );
 
   const lock = {
-    schemaVersion: 1,
+    schemaVersion: 2,
     status: "local-prototype",
     setId: config.setId,
     archive: {

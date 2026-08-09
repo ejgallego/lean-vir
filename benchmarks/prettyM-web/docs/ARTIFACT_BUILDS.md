@@ -1,12 +1,13 @@
 # Source artifact builds
 
-`artifact-builds.json` is the canonical database of buildable benchmark
-artifacts. A build record names exact Git sources, the local checkout roles
-needed to resolve them, the producer entry points, the expected package files,
-component dependencies, and the artifact-set provenance consumed by the
-packer. `prettyM` is the first record.
+`artifact-builds.json` is the canonical catalog of buildable benchmark
+examples. A build record names its example and staging adapter, exact Git
+sources, the local checkout roles needed to resolve them, the producer entry
+points, the expected package files, component dependencies, artifact-set lock,
+and the provenance consumed by the packer. `prettyM` is the first record; it is
+not a default baked into the catalog tools.
 
-Machine-specific paths are deliberately absent from the database. Resolve each
+Machine-specific paths are deliberately absent from the catalog. Resolve each
 source to an existing checkout when invoking the driver:
 
 ```sh
@@ -32,7 +33,7 @@ npm run artifacts:sources -- prettyM
 
 The command initializes detached Git checkouts by fetching each exact commit.
 It refuses to switch, clean, or reuse a checkout whose origin, revision, or
-working tree does not match the database. The controlled layout is:
+working tree does not match the catalog. The controlled layout is:
 
 ```text
 _sources/vir/       lean-vir at the catalogued commit
@@ -51,19 +52,19 @@ inside the application checkout. Set `NPM_CONFIG_CACHE` explicitly only when a
 different controlled cache is desired.
 
 The driver never fetches, switches, or edits source revisions. Each path must
-be the root of a clean Git checkout whose `HEAD` is the database's full commit.
+be the root of a clean Git checkout whose `HEAD` is the catalog's full commit.
 This keeps local worktree policy outside the portable build description.
 
 Remove `--plan` to build all components and atomically replace
 `_artifacts/seed`. Prepared checkouts can build directly. Add `--prepare` for a
-fresh checkout; the database then runs the VIR npm setup and the FIR
+fresh checkout; the catalog then runs the VIR npm setup and the FIR
 Emscripten/Lean-runtime setup before their respective builds. These setup steps
 may download toolchains and are intentionally explicit.
 
 ## Producer package contract
 
-Every component declares `prettyM-web/source-package/v1`. The builder supplies
-verified checkout roots and a fresh output path. A producer must:
+Every component declares `browser-benchmarks/source-package/v1`. The builder
+supplies verified checkout roots and a fresh output path. A producer must:
 
 1. build only from those checkout revisions and its pinned toolchain;
 2. write a complete package below the supplied output path;
@@ -80,24 +81,26 @@ The initial adapters use the producer entry points that already exist:
 - FIR LLVM: `integration/lcnf-c-wasm/package-prettyM-emscripten.sh OUTPUT`, with
   the just-built native package supplied for its differential check.
 
-The builder validates package metadata against the database, verifies producer
+The builder validates package metadata against the catalog, verifies producer
 checksums, and copies only the declared regular files into the seed. It does not
 rewrite producer bytes. FIR LLVM depends on FIR native because its producer
 validates exact output equivalence against that package.
 
-The generated `_artifacts/builds/prettyM/BUILD.json` is a local receipt. It
-records the database digest, resolved checkout commits, adapters, and staged
+The generated `_artifacts/builds/<build-id>/BUILD.json` is a local receipt. It
+records the catalog digest, resolved checkout commits, adapters, and staged
 file hashes. It is evidence about one invocation, not a second source of build
 configuration and not part of the published artifact set.
 
 ## Assemble the immutable set
 
-The packer reads the same database record, so source provenance is no longer
+The packer reads the same catalog record, so source provenance is no longer
 duplicated in a separate artifact-set config:
 
 ```sh
 npm run artifacts:pack -- --build prettyM
-npm run artifacts:fetch -- --archive _artifacts/releases/<archive>.tar
+npm run artifacts:fetch -- \
+  --lock artifact-set.lock.json \
+  --archive _artifacts/releases/<archive>.tar
 npm test
 ```
 
@@ -106,9 +109,9 @@ the archive digest; it must be reviewed and validated before replacing a lock
 or benchmark report. Performance measurement is never part of this source
 build command.
 
-The v1 contract guarantees exact source identity and validated package output;
-it does not yet promise byte-for-byte reproducibility of every producer. In
-particular, the current VIR package manifest embeds its generation time and the
+The source-package v1 contract guarantees exact source identity and validated
+package output; it does not yet promise byte-for-byte reproducibility of every
+producer. In particular, the current VIR package manifest embeds its generation time and the
 spelling of the workload source path. Until VIR exposes deterministic metadata,
 CI should generate and test a candidate archive rather than expect a fresh
 `.irpkg` to reproduce the committed archive digest.

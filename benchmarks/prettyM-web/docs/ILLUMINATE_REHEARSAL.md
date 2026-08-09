@@ -7,7 +7,7 @@ and execution contract. It compares the production JavaScript state machine
 with typed VIR and FIR-native implementations of the same player trace. All
 three inputs now come from clean immutable revisions. The staging remains a
 local, non-publishable rehearsal until the package is built through the
-canonical artifact database.
+canonical artifact catalog.
 
 ## Refreshed builds
 
@@ -71,6 +71,10 @@ under the ignored `artifacts/illuminate/` directory, and writes
 `REHEARSAL.json` with the exact dirty/source/build identities. It does not
 update the canonical artifact lock or publish anything.
 
-The remaining consolidation step is to move this workload into
-`artifact-builds.json`, build it through controlled `_sources/` checkouts, and
-replace the local rehearsal receipt with an immutable artifact-set manifest.
+The catalog and artifact-set formats can now describe this workload without
+`prettyM`-specific paths or component names. The remaining producer work is to
+give the Illuminate/VIR module-set build and FIR player build explicit package
+entry points that accept controlled checkout roots plus a fresh output path.
+After those entry points land, add the `illuminate` record to
+`artifact-builds.json`, build it through `_sources/`, and replace this local
+receipt with an immutable artifact-set manifest.

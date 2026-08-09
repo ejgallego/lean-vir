@@ -70,4 +70,10 @@ for path in "${optional[@]}"; do
   fi
 done
 
+shopt -s nullglob
+for source in "$seed_dir"/components/*.json; do
+  path="${source#"$seed_dir/"}"
+  install -D -m 0644 "$source" "$artifact_dir/$path"
+done
+
 echo "Staged five-backend artifacts from $seed_dir"

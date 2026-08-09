@@ -8,15 +8,19 @@ import {
   canonicalJson,
   createTar,
   extractTar,
-  requiredArtifactFiles,
+  fileRecord,
+  legacyPrettyMArtifactFiles,
   safeArchivePath,
+  sha256File,
   verifyArtifactSet,
 } from "../scripts/artifact-set-lib.mjs";
 import {
+  artifactFiles,
   artifactSetConfig,
   checkoutSources,
   componentOrder,
   readBuildDatabase,
+  validateBuildDatabase,
 } from "../scripts/artifact-build-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
@@ -29,10 +33,8 @@ test("the prettyM source build is complete and materializes pack provenance", as
   const build = database.builds.prettyM;
   assert.deepEqual(componentOrder(build), ["vir", "native", "llvm"]);
   assert.deepEqual(
-    Object.values(build.components)
-      .flatMap((component) => Object.values(component.producer.files))
-      .sort(),
-    [...requiredArtifactFiles].sort(),
+    artifactFiles(build),
+    [...legacyPrettyMArtifactFiles].sort(),
   );
 
   const sources = checkoutSources(database, "prettyM");
@@ -50,6 +52,11 @@ test("the prettyM source build is complete and materializes pack provenance", as
   );
 
   const config = artifactSetConfig(database, "prettyM");
+  assert.equal(config.schemaVersion, 2);
+  assert.deepEqual(config.example, {
+    id: "prettyM",
+    stageAdapter: "prettyM",
+  });
   assert.equal(config.setId, "prettyM-bounded-set-0001");
   assert.equal(
     config.components.vir.runtime.repository,
@@ -65,6 +72,28 @@ test("the prettyM source build is complete and materializes pack provenance", as
     file: "VersoSlides/Pretty.lean",
     dirty: false,
   });
+});
+
+test("catalog build identity and artifact paths are example-neutral", async () => {
+  const database = await readBuildDatabase(
+    join(appRoot, "artifact-builds.json"),
+  );
+  const alternate = structuredClone(database.builds.prettyM);
+  alternate.example = { id: "illuminate", stageAdapter: "illuminate" };
+  alternate.artifactSet.setId = "illuminate-player-set-0001";
+  alternate.artifactSet.lock = "illuminate-artifact-set.lock.json";
+  alternate.components.vir.artifact.workload.file = "player.irpkg";
+  alternate.components.vir.producer.files["player.irpkg"] =
+    "illuminate/player.irpkg";
+  delete alternate.components.vir.producer.files["prettyM-vir.irpkg"];
+  const catalog = structuredClone(database);
+  catalog.builds = { illuminate: alternate };
+  assert.doesNotThrow(() => validateBuildDatabase(catalog));
+  assert.ok(artifactFiles(alternate).includes("illuminate/player.irpkg"));
+  assert.equal(
+    artifactSetConfig(catalog, "illuminate").setId,
+    "illuminate-player-set-0001",
+  );
 });
 
 test("creates a deterministic normalized tar and extracts only regular files", async () => {
@@ -108,6 +137,42 @@ test("canonical JSON is independent of object insertion order", () => {
     canonicalJson({ z: 1, a: { y: 2, b: 3 } }),
     canonicalJson({ a: { b: 3, y: 2 }, z: 1 }),
   );
+});
+
+test("verifies an example-neutral artifact-set manifest", async () => {
+  const directory = join(scratch, "generic-manifest");
+  await rm(directory, { recursive: true, force: true });
+  await mkdir(join(directory, "payload"), { recursive: true });
+  await writeFile(join(directory, "payload", "player.wasm"), "wasm\n");
+  const files = {
+    "payload/player.wasm": await fileRecord(
+      join(directory, "payload", "player.wasm"),
+    ),
+  };
+  await writeFile(
+    join(directory, "ARTIFACT_SET.json"),
+    canonicalJson({
+      schemaVersion: 2,
+      kind: "browser-benchmarks/artifact-set",
+      example: { id: "illuminate", stageAdapter: "illuminate" },
+      setId: "illuminate-player-set-0001",
+      components: {},
+      files,
+    }),
+  );
+  const checksummedPaths = ["ARTIFACT_SET.json", ...Object.keys(files)].sort();
+  await writeFile(
+    join(directory, "SHA256SUMS"),
+    `${(
+      await Promise.all(
+        checksummedPaths.map(async (path) =>
+          `${await sha256File(join(directory, path))}  ${path}`,
+        ),
+      )
+    ).join("\n")}\n`,
+  );
+  const manifest = await verifyArtifactSet(directory);
+  assert.equal(manifest.example.id, "illuminate");
 });
 
 test("rejects undeclared artifact-set members", async () => {

@@ -33,12 +33,12 @@ slide DOM state.
 
 ## Artifact contract
 
-The committed `artifact-builds.json` is the canonical source database for
-rebuilding benchmark artifacts. It defines the exact VIR, FIR, and workload
-Git revisions, producer entry points and dependencies, expected package files,
-and artifact-set provenance. Local checkout paths are supplied on the command
-line and are never committed. See `docs/ARTIFACT_BUILDS.md` for the source-build
-contract and driver.
+The committed `artifact-builds.json` is the canonical catalog for rebuilding
+example artifacts. Each build defines its example and staging adapter, exact
+producer and workload Git revisions, producer entry points and dependencies,
+expected package files, lock path, and artifact-set provenance. Local checkout
+paths are supplied on the command line and are never committed. See
+`docs/ARTIFACT_BUILDS.md` for the source-build contract and driver.
 
 Producer source remains in its owning Git repository. CI and self-contained
 local builds materialize the exact catalogued commits under the ignored
@@ -54,7 +54,7 @@ Binary artifacts and downloaded release archives remain ignored by Git. The
 current prototype lock has no public URL yet; assemble and consume it locally:
 
 ```sh
-npm run artifacts:pack
+npm run artifacts:pack -- --build prettyM
 npm run artifacts:fetch -- \
   --archive _artifacts/releases/<generated-archive>.tar
 ```
@@ -140,7 +140,7 @@ Set `CHROMIUM` to an alternate Chrome/Chromium executable when necessary.
 The `Illuminate player` example in the common application compares the legacy
 JavaScript, typed VIR, and FIR-native implementations. It has the same
 artifact-status, backend, protocol, study, and result sections as `prettyM`.
-Until it moves into the canonical artifact database, stage its inputs as a
+Until it gets its own canonical artifact-catalog record, stage its inputs as a
 local rehearsal:
 
 ```sh

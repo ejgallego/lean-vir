@@ -1,10 +1,11 @@
 import { readFile } from "node:fs/promises";
 
-import { requiredArtifactFiles, safeArchivePath } from "./artifact-set-lib.mjs";
+import { safeArchivePath } from "./artifact-set-lib.mjs";
 
 const idPattern = /^[a-zA-Z0-9][a-zA-Z0-9._-]*$/;
 const revisionPattern = /^[0-9a-f]{40}$/;
-const producerProtocol = "prettyM-web/source-package/v1";
+const producerProtocol = "browser-benchmarks/source-package/v1";
+const artifactBoundary = "browser-benchmarks/bounded-runtime/v1";
 const adapters = new Set(["vir", "fir-native", "fir-llvm"]);
 
 function object(value, label) {
@@ -45,9 +46,9 @@ function materializeSource(database, value, label) {
   };
 }
 
-function materializeComponent(database, component, componentId) {
+function materializeComponent(database, component) {
   const artifact = structuredClone(component.artifact);
-  if (componentId !== "vir") return artifact;
+  if (component.producer.adapter !== "vir") return artifact;
   const runtimeSource = source(
     database,
     identifier(artifact.runtime.sourceRef, "vir runtime sourceRef"),
@@ -76,8 +77,8 @@ export async function readBuildDatabase(path) {
 export function validateBuildDatabase(database) {
   object(database, "artifact build database");
   if (
-    database.schemaVersion !== 1 ||
-    database.kind !== "prettyM-web/artifact-build-database"
+    database.schemaVersion !== 2 ||
+    database.kind !== "browser-benchmarks/artifact-build-catalog"
   ) {
     throw new Error("unsupported artifact build database");
   }
@@ -104,9 +105,14 @@ export function validateBuildDatabase(database) {
   for (const [buildId, build] of Object.entries(database.builds)) {
     identifier(buildId, "build ID");
     object(build, `build ${buildId}`);
+    const example = object(build.example, `build ${buildId} example`);
+    identifier(example.id, `build ${buildId} example ID`);
+    identifier(example.stageAdapter, `build ${buildId} stage adapter`);
     object(build.artifactSet, `build ${buildId} artifactSet`);
-    if (!/^prettyM-[a-zA-Z0-9.-]+$/.test(build.artifactSet.setId ?? "")) {
-      throw new Error(`build ${buildId} has an unsafe artifact set ID`);
+    identifier(build.artifactSet.setId, `build ${buildId} artifact set ID`);
+    safeArchivePath(build.artifactSet.lock);
+    if (!build.artifactSet.lock.endsWith(".json")) {
+      throw new Error(`build ${buildId} has an unsafe artifact lock path`);
     }
     object(
       build.artifactSet.benchmarkContract,
@@ -128,7 +134,7 @@ export function validateBuildDatabase(database) {
     for (const [componentId, component] of Object.entries(build.components)) {
       identifier(componentId, `build ${buildId} component ID`);
       object(component.artifact, `component ${componentId} artifact`);
-      if (component.artifact.boundary !== "prettyM-web/bounded-runtime/v1") {
+      if (component.artifact.boundary !== artifactBoundary) {
         throw new Error(
           `component ${componentId} has an unsupported artifact boundary`,
         );
@@ -153,6 +159,9 @@ export function validateBuildDatabase(database) {
         }
       }
       object(producer.files, `component ${componentId} producer files`);
+      if (Object.keys(producer.files).length === 0) {
+        throw new Error(`component ${componentId} does not produce any files`);
+      }
       for (const [packagePath, destination] of Object.entries(producer.files)) {
         safeArchivePath(packagePath);
         safeArchivePath(destination);
@@ -195,8 +204,19 @@ export function validateBuildDatabase(database) {
           safeArchivePath(inputs[name]);
         }
         safeArchivePath(component.artifact.workload.source.file);
+        if (!Object.hasOwn(producer.files, component.artifact.workload.file)) {
+          throw new Error(
+            `component ${componentId} workload is not a declared package file`,
+          );
+        }
       } else {
         safeArchivePath(producer.entrypoint);
+        safeArchivePath(producer.manifest);
+        if (!Object.hasOwn(producer.files, producer.manifest)) {
+          throw new Error(
+            `component ${componentId} manifest is not a declared package file`,
+          );
+        }
       }
       for (const dependency of component.dependencies ?? []) {
         if (!build.components[dependency]) {
@@ -224,13 +244,6 @@ export function validateBuildDatabase(database) {
       }
     }
 
-    const expected = [...requiredArtifactFiles].sort();
-    const actual = [...destinations].sort();
-    if (JSON.stringify(actual) !== JSON.stringify(expected)) {
-      throw new Error(
-        `build ${buildId} does not produce the complete artifact seed`,
-      );
-    }
     componentOrder(build);
     artifactSetConfig(database, buildId);
   }
@@ -247,16 +260,29 @@ export function selectBuild(database, buildId) {
 export function artifactSetConfig(database, buildId) {
   const build = selectBuild(database, buildId);
   return {
-    schemaVersion: 1,
+    schemaVersion: 2,
+    example: structuredClone(build.example),
     setId: build.artifactSet.setId,
+    lock: build.artifactSet.lock,
     benchmarkContract: structuredClone(build.artifactSet.benchmarkContract),
     components: Object.fromEntries(
       Object.entries(build.components).map(([componentId, component]) => [
         componentId,
-        materializeComponent(database, component, componentId),
+        {
+          ...materializeComponent(database, component),
+          adapter: component.producer.adapter,
+          files: structuredClone(component.producer.files),
+          producerManifest: component.producer.manifest ?? null,
+        },
       ]),
     ),
   };
+}
+
+export function artifactFiles(build) {
+  return Object.values(build.components)
+    .flatMap((component) => Object.values(component.producer.files))
+    .sort();
 }
 
 export function checkoutSources(database, buildId) {

@@ -11,7 +11,7 @@ import {
 } from "node:fs/promises";
 import { dirname, isAbsolute, relative, resolve, sep } from "node:path";
 
-export const requiredArtifactFiles = [
+export const legacyPrettyMArtifactFiles = [
   "lean-vir/js/vir-runtime.js",
   "lean-vir/wasm/vir-upstream.wasm",
   "prettyM-vir.irpkg",
@@ -94,8 +94,11 @@ export async function fileRecords(root, paths) {
   return records;
 }
 
-export async function validateSeed(seed) {
-  for (const path of requiredArtifactFiles) {
+export async function validateSeed(seed, config) {
+  const paths = Object.values(config.components).flatMap((component) =>
+    Object.values(component.files),
+  );
+  for (const path of paths) {
     const target = resolve(seed, path);
     const info = await lstat(target).catch(() => null);
     if (!info?.isFile() || info.isSymbolicLink()) {
@@ -103,29 +106,48 @@ export async function validateSeed(seed) {
     }
   }
 
-  const native = await readJson(resolve(seed, "lean-native/BUILD.json"));
-  const nativeArtifact = resolve(seed, "lean-native", native.artifact?.file ?? "");
-  const nativeRecord = await fileRecord(nativeArtifact);
-  if (
-    nativeRecord.bytes !== native.artifact?.bytes ||
-    nativeRecord.sha256 !== native.artifact?.sha256
-  ) {
-    throw new Error("native artifact does not match BUILD.json");
-  }
-
-  const llvm = await readJson(
-    resolve(seed, "lean-llvm/prettyM.manifest.json"),
-  );
-  for (const artifact of Object.values(llvm.artifacts ?? {})) {
-    const record = await fileRecord(resolve(seed, "lean-llvm", artifact.file));
-    if (
-      record.bytes !== artifact.byteLength ||
-      record.sha256 !== artifact.sha256
-    ) {
-      throw new Error(`LLVM artifact does not match its manifest: ${artifact.file}`);
+  const metadata = {};
+  for (const [componentId, component] of Object.entries(config.components)) {
+    if (!component.producerManifest) continue;
+    const manifestPath = component.files[component.producerManifest];
+    const manifest = await readJson(resolve(seed, manifestPath));
+    metadata[componentId] = manifest;
+    const manifestRoot = dirname(resolve(seed, manifestPath));
+    if (component.adapter === "fir-native") {
+      const record = await fileRecord(
+        inside(
+          manifestRoot,
+          safeArchivePath(manifest.artifact?.file),
+          `verify ${componentId} artifact`,
+        ),
+      );
+      if (
+        record.bytes !== manifest.artifact?.bytes ||
+        record.sha256 !== manifest.artifact?.sha256
+      ) {
+        throw new Error(`${componentId} artifact does not match its manifest`);
+      }
+    } else if (component.adapter === "fir-llvm") {
+      for (const artifact of Object.values(manifest.artifacts ?? {})) {
+        const record = await fileRecord(
+          inside(
+            manifestRoot,
+            safeArchivePath(artifact.file),
+            `verify ${componentId} artifact`,
+          ),
+        );
+        if (
+          record.bytes !== artifact.byteLength ||
+          record.sha256 !== artifact.sha256
+        ) {
+          throw new Error(
+            `${componentId} artifact does not match its manifest: ${artifact.file}`,
+          );
+        }
+      }
     }
   }
-  return { native, llvm };
+  return metadata;
 }
 
 function writeOctal(header, offset, length, value) {
@@ -216,7 +238,12 @@ export async function verifyArtifactSet(directory, lock = null) {
   const manifestPath = resolve(directory, "ARTIFACT_SET.json");
   const manifestBytes = await readFile(manifestPath);
   const manifest = JSON.parse(manifestBytes);
-  if (manifest.schemaVersion !== 1 || manifest.kind !== "prettyM-artifact-set") {
+  const legacy =
+    manifest.schemaVersion === 1 && manifest.kind === "prettyM-artifact-set";
+  const current =
+    manifest.schemaVersion === 2 &&
+    manifest.kind === "browser-benchmarks/artifact-set";
+  if (!legacy && !current) {
     throw new Error("unsupported artifact-set manifest");
   }
   if (lock && manifest.setId !== lock.setId) {
@@ -264,8 +291,17 @@ export async function verifyArtifactSet(directory, lock = null) {
       throw new Error(`artifact-set member digest mismatch: ${path}`);
     }
   }
-  for (const path of requiredArtifactFiles) {
-    if (!manifest.files?.[path]) throw new Error(`manifest omits required file: ${path}`);
+  if (legacy) {
+    for (const path of legacyPrettyMArtifactFiles) {
+      if (!manifest.files?.[path])
+        throw new Error(`manifest omits required file: ${path}`);
+    }
+  } else if (
+    !manifest.example?.id ||
+    !manifest.example?.stageAdapter ||
+    Object.keys(manifest.files ?? {}).length === 0
+  ) {
+    throw new Error("artifact-set manifest omits its example or files");
   }
 
   const checksummedPaths = [

@@ -102,9 +102,9 @@ async function main() {
   const lockPath = inside(appRoot, options.lock, "read lockfile");
   const lock = await readJson(lockPath);
   if (
-    lock.schemaVersion !== 1 ||
+    ![1, 2].includes(lock.schemaVersion) ||
     typeof lock.setId !== "string" ||
-    !/^prettyM-[a-zA-Z0-9.-]+$/.test(lock.setId)
+    !/^[a-zA-Z0-9][a-zA-Z0-9._-]*$/.test(lock.setId)
   ) {
     throw new Error("unsupported artifact-set lockfile");
   }
@@ -116,8 +116,9 @@ async function main() {
 
   const sets = inside(appRoot, options.setsDir, "install artifact set");
   const destination = resolve(sets, lock.setId);
+  let manifest;
   if (existsSync(destination)) {
-    await verifyArtifactSet(destination, lock);
+    manifest = await verifyArtifactSet(destination, lock);
     console.log(`verified cached artifact set: ${relative(appRoot, destination)}`);
   } else {
     const temporary = resolve(sets, `.${lock.setId}.partial-${process.pid}`);
@@ -125,7 +126,7 @@ async function main() {
     await mkdir(temporary, { recursive: true });
     try {
       await extractTar(bytes, temporary);
-      await verifyArtifactSet(temporary, lock);
+      manifest = await verifyArtifactSet(temporary, lock);
       await replaceDirectoryAtomically(temporary, destination);
     } catch (error) {
       await rm(temporary, { recursive: true, force: true });
@@ -135,9 +136,20 @@ async function main() {
   }
 
   if (options.stage) {
+    const stageAdapter =
+      manifest.kind === "prettyM-artifact-set"
+        ? "prettyM"
+        : manifest.example?.stageAdapter;
+    const stageScripts = new Map([
+      ["prettyM", resolve(appRoot, "scripts/stage-artifacts.sh")],
+    ]);
+    const stageScript = stageScripts.get(stageAdapter);
+    if (!stageScript) {
+      throw new Error(`unsupported artifact staging adapter: ${stageAdapter}`);
+    }
     const result = spawnSync(
       "bash",
-      [resolve(appRoot, "scripts/stage-artifacts.sh"), destination],
+      [stageScript, destination],
       { cwd: appRoot, stdio: "inherit" },
     );
     if (result.status !== 0) {

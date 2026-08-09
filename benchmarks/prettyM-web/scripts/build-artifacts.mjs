@@ -14,6 +14,8 @@ import { dirname, isAbsolute, join, relative, resolve, sep } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import {
+  artifactFiles,
+  artifactSetConfig,
   checkoutSources,
   componentOrder,
   readBuildDatabase,
@@ -24,7 +26,6 @@ import {
   fileRecord,
   fileRecords,
   inside,
-  requiredArtifactFiles,
   sha256,
   validateSeed,
 } from "./artifact-set-lib.mjs";
@@ -224,7 +225,7 @@ async function buildFirLlvm(component, output, resolvedCheckouts, packages) {
     cwd: fir,
     env: {
       ...buildEnvironment,
-      FIR_PRETTY_M_NATIVE_PACKAGE: packages.native,
+      FIR_PRETTY_M_NATIVE_PACKAGE: packages[component.dependencies?.[0]],
     },
   });
 }
@@ -293,7 +294,9 @@ async function validateVir(component, output, resolvedCheckouts) {
 }
 
 async function validateNative(component, output, resolvedCheckouts) {
-  const build = JSON.parse(await readFile(join(output, "BUILD.json"), "utf8"));
+  const build = JSON.parse(
+    await readFile(join(output, component.producer.manifest), "utf8"),
+  );
   const sourceId = component.producer.checkouts.producer;
   if (
     build.sourceCommit !== resolvedCheckouts[sourceId].revision ||
@@ -317,7 +320,7 @@ async function validateNative(component, output, resolvedCheckouts) {
 
 async function validateLlvm(component, output) {
   const manifest = JSON.parse(
-    await readFile(join(output, "prettyM.manifest.json"), "utf8"),
+    await readFile(join(output, component.producer.manifest), "utf8"),
   );
   if (
     manifest.toolchain?.lean?.version !== component.artifact.lean.version ||
@@ -451,14 +454,14 @@ async function main() {
       await cp(join(packages[componentId], packagePath), target);
     }
   }
-  await validateSeed(nextSeed);
-  const records = await fileRecords(nextSeed, requiredArtifactFiles);
+  await validateSeed(nextSeed, artifactSetConfig(database, options.buildId));
+  const records = await fileRecords(nextSeed, artifactFiles(build));
   const seed = inside(appRoot, "_artifacts/seed", "replace artifact seed");
   await replaceSeed(nextSeed, seed);
 
   const receipt = {
     schemaVersion: 1,
-    kind: "prettyM-web/source-build-receipt",
+    kind: "browser-benchmarks/source-build-receipt",
     build: options.buildId,
     artifactSet: build.artifactSet.setId,
     database: {
