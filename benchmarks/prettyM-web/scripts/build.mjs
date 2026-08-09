@@ -24,4 +24,4 @@ for (const path of ["src", "styles", "artifacts"]) {
 for (const path of ["_headers", ".htaccess"]) {
   await cp(join(appRoot, "static", path), join(output, path));
 }
-console.log(`Built standalone prettyM benchmark at ${output}`);
+console.log(`Built standalone Lean benchmark app at ${output}`);

@@ -4,28 +4,29 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <title>Lean prettyM benchmark</title>
+    <title>Lean browser benchmarks</title>
     <link rel="stylesheet" href="styles/app.css" />
     <link rel="stylesheet" href="styles/dashboard.css" />
-    <script defer src="src/config.js"></script>
-    <script defer src="src/benchmark-core.js"></script>
-    <script defer src="src/backends/pretty-vir.js"></script>
-    <script defer src="src/backends/pretty-native.js"></script>
-    <script defer src="src/backends/pretty-llvm.js"></script>
-    <script defer src="src/dashboard.js"></script>
-    <script defer src="src/app.js"></script>
+    <script type="module" src="src/app-shell.js"></script>
   </head>
   <body>
     <main class="bench-shell">
       <header class="bench-header">
         <div>
-          <p class="bench-eyebrow">Bounded runtimes · browser Wasm</p>
-          <h1>Std.Format.prettyM benchmark</h1>
-          <p class="bench-intro">
-            Compare correctness, pipeline timings, scaling, and retained memory
-            across five independently versioned implementations. Reports stay
-            tied to one verified artifact set.
+          <p id="example-eyebrow" class="bench-eyebrow">Browser Wasm</p>
+          <h1 id="example-title">Lean browser benchmarks</h1>
+          <p id="example-intro" class="bench-intro">
+            Loading the selected benchmark example…
           </p>
+
+          <div class="example-picker">
+            <p class="bench-eyebrow">Examples</p>
+            <nav
+              id="example-nav"
+              class="example-nav"
+              aria-label="Benchmark example"
+            ></nav>
+          </div>
         </div>
         <div class="bench-state" aria-live="polite">
           <span id="app-state" data-state="loading">Loading backends</span>
@@ -33,86 +34,76 @@
         </div>
       </header>
 
-      <section class="bench-panel" aria-labelledby="backend-heading">
+      <section
+        id="artifact-status"
+        class="artifact-status"
+        aria-labelledby="artifact-status-heading"
+        data-example-content
+      >
+        <div>
+          <p class="bench-eyebrow">Artifact status</p>
+          <h2 id="artifact-status-heading">Loading provenance</h2>
+        </div>
+        <div>
+          <p id="artifact-status-copy"></p>
+          <ul
+            id="build-notes"
+            class="build-notes"
+            aria-label="Staged builds"
+          ></ul>
+        </div>
+      </section>
+
+      <section
+        class="bench-panel"
+        aria-labelledby="backend-heading"
+        data-example-content
+      >
         <div class="bench-section-heading">
           <div>
             <p class="bench-eyebrow">Candidates</p>
             <h2 id="backend-heading">Backend set</h2>
           </div>
-          <p>
-            Choose which implementations participate in the next run. Report
-            views have their own non-destructive backend filter.
-          </p>
+          <p id="backend-description"></p>
         </div>
         <div id="backend-list" class="backend-grid" aria-live="polite"></div>
       </section>
 
-      <section class="bench-panel" aria-labelledby="protocol-heading">
+      <section
+        class="bench-panel"
+        aria-labelledby="protocol-heading"
+        data-example-content
+      >
         <div class="bench-section-heading">
           <div>
             <p class="bench-eyebrow">Protocol</p>
             <h2 id="protocol-heading">Sampling controls</h2>
           </div>
-          <p>
-            Defaults match the consolidated browser study. Treat timings as
-            observations unless the host and run protocol are controlled.
-          </p>
+          <p id="protocol-description"></p>
         </div>
-        <div class="protocol-grid">
-          <label>
-            <span>Warm-up rounds</span>
-            <input id="warmup" type="number" min="0" max="100" value="2" />
-          </label>
-          <label>
-            <span>Measured rounds</span>
-            <input id="samples" type="number" min="1" max="1000" value="9" />
-          </label>
-          <label>
-            <span>Batch target (ms)</span>
-            <input
-              id="batch-target"
-              type="number"
-              min="0"
-              max="1000"
-              step="1"
-              value="20"
-            />
-          </label>
-          <label>
-            <span>Repeat cycles</span>
-            <input
-              id="repeat-cycles"
-              type="number"
-              min="1"
-              max="10000"
-              value="32"
-            />
-          </label>
-        </div>
+        <div id="protocol-controls" class="protocol-grid"></div>
       </section>
 
-      <section class="bench-panel" aria-labelledby="run-heading">
+      <section
+        class="bench-panel"
+        aria-labelledby="run-heading"
+        data-example-content
+      >
         <div class="bench-section-heading">
           <div>
             <p class="bench-eyebrow">Studies</p>
             <h2 id="run-heading">Run benchmark</h2>
           </div>
-          <p>Execute one study or collect the complete dashboard dataset.</p>
+          <p id="study-description"></p>
         </div>
-        <div class="study-actions">
-          <button type="button" data-study="smoke">Quick check</button>
-          <button type="button" data-study="differential">Corpus</button>
-          <button type="button" data-study="scaling">Scaling</button>
-          <button type="button" data-study="memory-retained">Memory</button>
-          <button type="button" data-study="interactions">Interactions</button>
-          <button type="button" data-study="repeated">Repeated calls</button>
-          <button type="button" class="primary" data-study="suite">
-            Full suite
-          </button>
-        </div>
+        <div id="study-actions" class="study-actions"></div>
       </section>
 
-      <section class="bench-panel" aria-labelledby="results-heading">
+      <section
+        class="bench-panel"
+        aria-labelledby="results-heading"
+        data-example-content
+      >
         <div class="bench-section-heading">
           <div>
             <p class="bench-eyebrow">Reports</p>
@@ -136,17 +127,14 @@
           </div>
         </div>
         <div id="report-list" class="report-grid">
-          <p class="empty-state">No benchmark has run yet.</p>
+          <p id="empty-results" class="empty-state">
+            No benchmark has run yet.
+          </p>
         </div>
       </section>
 
-      <footer>
-        <p>
-          Generated reports contain artifact provenance, startup timings,
-          per-phase samples, parity results, and memory observations. Binary
-          artifacts are staged locally and are not part of the application
-          source.
-        </p>
+      <footer data-example-content>
+        <p id="example-footer"></p>
       </footer>
     </main>
   </body>

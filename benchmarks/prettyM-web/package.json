@@ -1,5 +1,5 @@
 {
-  "name": "@leanprover/prettym-benchmark-web",
+  "name": "@leanprover/browser-benchmarks",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -11,6 +11,7 @@
     "artifacts:pack": "node scripts/pack-artifact-set.mjs",
     "artifacts:fetch": "node scripts/fetch-artifact-set.mjs",
     "stage": "bash scripts/stage-artifacts.sh",
+    "stage:illuminate": "node scripts/stage-illuminate-rehearsal.mjs",
     "build": "node scripts/build.mjs",
     "dev": "node scripts/build.mjs && node scripts/serve.mjs",
     "serve": "node scripts/serve.mjs",
@@ -22,6 +23,7 @@
     "test:artifact-set": "node --test test/artifact-set.test.mjs",
     "test:tools": "node test/tool-smoke.mjs",
     "test:browser": "npm run build && node test/browser-smoke.mjs",
+    "test:illuminate": "npm run build && node test/illuminate-browser-smoke.mjs",
     "playwright:install": "playwright install --with-deps chromium"
   },
   "devDependencies": {
