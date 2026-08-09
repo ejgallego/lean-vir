@@ -149,6 +149,14 @@ private def floatBasicCompletionExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `Float #["isInf"] ++
   boxedExternSpecs `Float32 #["add", "beq", "decLt", "div", "mul", "neg", "sub"]
 
+/--
+The remeasured internal raw-byte accessor. The expanded scalar and string
+runtime turns this formerly shallow alias into a broad library-surface gain,
+while Lean's ordinary compiler-generated wrapper remains the ABI provider.
+-/
+private def stringByteAccessorExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `String.Internal #["getUTF8Byte"]
+
 def nativeExternSpecs : Array NativeExternSpec := #[
   {
     name := `Nat.add,
@@ -1074,7 +1082,8 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     generateBoxedWrapper := true
   }
 ] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs ++
-  floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs
+  floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs ++
+  stringByteAccessorExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)

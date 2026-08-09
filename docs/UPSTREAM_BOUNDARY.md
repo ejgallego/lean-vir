@@ -86,7 +86,10 @@ This keeps the boundary faithful without pulling the complete generated
 
 The string frontier registers `String.Internal.trim`,
 `String.Internal.isPrefixOf`, `String.Internal.foldl`, and
-`String.Internal.isEmpty`. The first two exports live in generated
+`String.Internal.isEmpty`. A later reassessment also registers
+`String.Internal.getUTF8Byte`; its inline runtime implementation and ordinary
+compiler-generated boxed wrapper add no generated provider module. The first
+two exports live in generated
 `Init/Data/String/TakeDrop.c`; retaining `trim` also reaches `Slice.c`,
 `FindPos.c`, and `Decode.c`. `foldl` is supplied by `Iterate.c`, while
 `isEmpty` resolves to `lean_string_isempty` in the already linked `Defs.c`.
@@ -277,17 +280,16 @@ correct. A boxed implementation remains explicit in `runtime/native_symbols.cpp`
 only when VIR's all-owned interpreter boundary needs ownership behavior that
 Lean's standard wrapper cannot express.
 
-Proof erasure creates a second exception class that is not yet implemented. It
-affects `Char.ofNatAux`, `Int.divExact`, `Nat.divExact`,
-`String.Internal.getUTF8Byte`, `String.Internal.ugetUTF8Byte`, `String.get'`,
-`String.getUtf8Byte`, `String.next'`, `UInt16.ofNatLT`, `UInt8.ofNatLT`, and
-`USize.ofNat32`. The interpreter calls the erased IR signature while the
-ordinary compiler-generated boxed wrapper preserves proof-shaped parameters.
-Registering that wrapper directly causes a Wasm callable-arity mismatch. The
-ABI-completion sweep therefore leaves these declarations unsupported. A future
-explicit boxed-alias field may map each proof-bearing name to a proven
-proof-free adapter; the registry must not infer that alias from a coincidentally
-shared raw symbol.
+Proof-erased call shapes still require dynamic validation rather than inference
+from a shared raw symbol. Current `.irpkg` call expressions preserve irrelevant
+arguments, so the interpreter and Lean's ordinary three-argument boxed wrapper
+agree for `String.Internal.getUTF8Byte`; a mixed-width UTF-8 differential fixture
+checks all seven raw byte positions. Other proof-bearing declarations such as
+`Char.ofNatAux`, `Int.divExact`, `Nat.divExact`,
+`String.Internal.ugetUTF8Byte`, `String.get'`, `String.getUtf8Byte`,
+`String.next'`, `UInt16.ofNatLT`, `UInt8.ofNatLT`, and `USize.ofNat32` remain
+unsupported until independently checked. Native lookup must not infer an alias
+from a coincidentally shared raw symbol.
 
 ## Native Extern Metadata
 

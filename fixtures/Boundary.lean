@@ -253,6 +253,17 @@ def stringParserDataScore : Nat :=
   let containsScore := if String.Internal.contains s '∀' then 20 else 0
   hashScore + validScore + containsScore
 
+/-- Reads every raw byte of a mixed-width UTF-8 string; success scores 3944. -/
+def stringInternalGetUTF8ByteFrontierScore : Nat :=
+  let s := "Aé∀Z"
+  (String.Internal.getUTF8Byte s 0 (by decide)).toNat +
+    2 * (String.Internal.getUTF8Byte s 1 (by decide)).toNat +
+    3 * (String.Internal.getUTF8Byte s 2 (by decide)).toNat +
+    4 * (String.Internal.getUTF8Byte s 3 (by decide)).toNat +
+    5 * (String.Internal.getUTF8Byte s 4 (by decide)).toNat +
+    6 * (String.Internal.getUTF8Byte s 5 (by decide)).toNat +
+    7 * (String.Internal.getUTF8Byte s 6 (by decide)).toNat
+
 unsafe def nameHashSubstringPtrScore : Nat :=
   let sameName := Lean.Name.beq `Lean.Parser `Lean.Parser
   let diffName := Lean.Name.beq `Lean.Parser `Lean.Elab

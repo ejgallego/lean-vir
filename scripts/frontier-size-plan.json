@@ -2,10 +2,6 @@
   "version": 1,
   "candidates": [
     {
-      "id": "String.Internal.getUTF8Byte",
-      "names": ["String.Internal.getUTF8Byte"]
-    },
-    {
       "id": "ByteArray.copySlice",
       "names": ["ByteArray.copySlice"]
     },

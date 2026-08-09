@@ -353,13 +353,13 @@ The incremental scans explain the apparent difference: `trim` and `foldl`
 mostly advance roots through a chain, and the cheap `isEmpty` boundary closes
 enough of that chain to realize the combined payoff.
 
-The next string-shaped frontier is `String.Internal.getUTF8Byte`, now the
-primary blocker for 1,885 functions and 293 public constants. Its raw symbol is
-already used by the registered public `String.getUTF8Byte` boundary, so it is a
-good registry-only follow-up experiment rather than a reason to add another
-generated support module.
+At this checkpoint, the next string-shaped frontier was
+`String.Internal.getUTF8Byte`, then the primary blocker for 1,885 functions and
+293 public constants. Its raw symbol was already used by the registered public
+`String.getUTF8Byte` boundary, so it was measured as a registry-only follow-up
+rather than by adding another generated support module.
 
-### Rejected String Alias Cluster
+### Historical String Alias Experiment
 
 The follow-up measured `String.Internal.getUTF8Byte` first, then followed its
 nearest-boundary chain through `Substring.Raw.Internal.drop`,
@@ -394,6 +394,12 @@ The complete candidate therefore cost 8,734 raw bytes and 2,154 gzip bytes for
 constants. The runtime additions were rejected and are not retained. This is a
 useful negative result: a cheap alias registration is not automatically a good
 frontier when it merely advances a long dependency chain.
+
+That rejection was correct for this earlier runtime boundary. Later scalar,
+string, and Float completion closed enough of the downstream chain that a fresh
+measurement made the first accessor highly productive. The current checkpoint
+below therefore accepts `String.Internal.getUTF8Byte` alone; the larger
+substring alias cluster from this historical experiment remains rejected.
 
 ### Integer Division Frontier
 
@@ -469,11 +475,14 @@ grew to 782,433 raw bytes after pulling additional math/runtime code. That
 tail is therefore not retained; it needs a narrower basic-arithmetic versus
 libm split before another size experiment.
 
-Eleven proof-bearing declarations were also excluded after dynamic fixtures
-found a callable-arity mismatch between erased interpreted calls and their
-ordinary compiler-generated boxed wrappers. They remain visible as blockers
-rather than being counted as supported. Supporting them should be a distinct
-boxed-alias feature, not another allowlist entry.
+Eleven proof-bearing declarations were also excluded after the contemporary
+dynamic fixtures found a callable-arity mismatch between erased interpreted
+calls and their ordinary compiler-generated boxed wrappers. A later
+reassessment found that current package IR preserves the irrelevant argument
+for `String.Internal.getUTF8Byte`, and its ordinary wrapper passes a
+host-versus-Wasm fixture. The other ten remain visible as blockers until they
+are independently revalidated; native lookup must not infer support merely
+from a shared raw symbol.
 
 ### Float Frontier Cost Triage
 
@@ -531,32 +540,32 @@ capabilities, and makes another 24 all-IR functions and 8 public constants
 runnable with no regressions. The semantic fixture exercises all eight members
 and returns its complete 255-point score.
 
-The deployed measurement plan is now rebased on the 723,103-byte checkpoint:
+The deployed measurement plan is now rebased on the 723,223-byte checkpoint:
 
 | Remaining candidate | Names | Raw cost | Gzip cost | Exact surface gain | Current primary pressure |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `String.Internal.getUTF8Byte` | 1 | +120 B | +186 B | 1,802 all / 292 public | 2,535 all / 374 public |
-| `ByteArray.copySlice` | 1 | +175 B | +22 B | 46 all / 9 public | 123 all / 25 public |
-| `pow` | 2 | +9,773 B | +6,654 B | 8 all / 3 public | 8 all / 3 public |
+| `ByteArray.copySlice` | 1 | +175 B | +74 B | 46 all / 9 public | 123 all / 25 public |
+| `pow` | 2 | +9,773 B | +6,508 B | 8 all / 3 public | 8 all / 3 public |
 
-The current artifact is 723,103 raw and 163,333 deterministic gzip bytes, with
-320,179 of 398,519 all-IR functions and 28,916 of 36,887 public constants
-runnable. Relative to the scalar/string checkpoint, the three accepted Float
-stages cost 5,285 raw and 893 gzip bytes for 468 all-IR and 38 public gains. The
-remaining `pow` pair has no cascade: its eight current primary roots are exactly
-the eight functions it makes runnable, and no blocked root moves to a new
-boundary. It should therefore be accepted only for a concrete `pow` capability
-need, not as a frontier-density optimization.
+The current artifact is 723,223 raw and 163,519 deterministic gzip bytes, with
+321,981 of 398,519 all-IR functions and 29,208 of 36,887 public constants
+runnable. It exposes 460 native capabilities. The accepted
+`String.Internal.getUTF8Byte` stage accounts for the final 120 raw and 186 gzip
+bytes and for 1,802 all-IR and 292 public gains, with no regressions. Its gain
+spans `Init`, `Lean`, `Lake`, and `Std`, including 1,097 Lean functions. A
+host-versus-Wasm fixture reads all seven bytes of a mixed-width UTF-8 string and
+returns the exact weighted score 3,944 through Lean's ordinary generated boxed
+wrapper.
 
-Two post-checkpoint experiments establish the next order. Registering
-`String.Internal.getUTF8Byte` materializes its inline runtime helper for only
-120 raw and 186 gzip bytes, while an exact A/B scan makes 1,802 all-IR functions
-and 292 public constants runnable with no regressions. The gain spans `Init`,
-`Lean`, `Lake`, and `Std`, including 1,097 Lean functions. `ByteArray.copySlice`
-is already retained for another caller, so catalog exposure costs 175 raw and
-22 gzip bytes; it makes 46 all-IR functions and 9 public constants runnable with
-no regressions, notably in `Init.System.IO` and `Std.Http`. These measurements
-put the string byte accessor first and the byte-array catalog gap second.
+`ByteArray.copySlice` is the next measured target. Its implementation is
+already retained for another caller, so exposing its generated wrapper costs
+175 raw and 74 gzip bytes on the current baseline. A fresh exact A/B scan makes
+46 all-IR functions and 9 public constants runnable with no regressions,
+notably in `Init.System.IO` and `Std.Http`. The remaining `pow` pair has no
+cascade: its eight current primary roots are exactly the eight functions it
+makes runnable, and no blocked root moves to a new boundary. It should therefore
+be accepted only for a concrete `pow` capability need, not as a
+frontier-density optimization.
 
 ## Interactive HTML Report
 

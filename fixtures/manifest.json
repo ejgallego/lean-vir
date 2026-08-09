@@ -610,6 +610,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-string-internal-get-utf8-byte-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.stringInternalGetUTF8ByteFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-name-hash-substring-ptr",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.nameHashSubstringPtrScore",
