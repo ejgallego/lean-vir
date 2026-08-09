@@ -5,7 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import assert from "node:assert/strict";
-import { mkdtemp, readFile, readdir, rm } from "node:fs/promises";
+import { mkdtemp, readFile, readdir, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -18,6 +18,7 @@ const outputDir = await mkdtemp(join(tmpdir(), "vir-surface-smoke-"));
 const jsonPath = join(outputDir, "surface.json");
 const markdownPath = join(outputDir, "surface.md");
 const htmlDir = join(outputDir, "html");
+const frontierCostsPath = join(outputDir, "frontier-costs.json");
 const selectedModule = "Lean.Expr";
 
 try {
@@ -100,9 +101,27 @@ try {
   assert.match(markdown, /## By Library/);
   assert.match(markdown, new RegExp("\\| `" + selectedModule.replaceAll(".", "\\.") + "` \\|"));
 
+  await writeFile(frontierCostsPath, `${JSON.stringify({
+    format: "lean-vir-frontier-size-costs",
+    version: 1,
+    generatedAt: "2026-08-09T00:00:00.000Z",
+    baseline: { rawBytes: 1000, gzipBytes: 500, sha256: "baseline" },
+    candidates: [{
+      id: "Lean.Expr.dbgToString",
+      names: ["Lean.Expr.dbgToString"],
+      rawDeltaBytes: 256,
+      gzipDeltaBytes: 32,
+      primaryRoots: 1,
+      primaryPublicRoots: 1,
+    }],
+  })}\n`);
+
   runSync(
     process.execPath,
-    ["scripts/render-surface-report.mjs", jsonPath, htmlDir],
+    [
+      "scripts/render-surface-report.mjs", jsonPath, htmlDir,
+      "--frontier-costs", frontierCostsPath,
+    ],
     { cwd: repoRoot, capture: true },
   );
   const htmlManifest = JSON.parse(await readFile(join(htmlDir, "vir-surface-html.json"), "utf8"));
@@ -111,6 +130,7 @@ try {
   assert.equal(htmlManifest.selectedModules, 1);
   assert.equal(htmlManifest.declarations, report.counts.total);
   assert.equal(htmlManifest.externs, report.externs.length);
+  assert.equal(htmlManifest.frontierCosts.candidates, 1);
 
   const sizeLinks = JSON.parse(await readFile(join(htmlDir, "data/size-links.json"), "utf8"));
   assert.equal(sizeLinks.format, "lean-vir-surface-size-links");
@@ -122,6 +142,7 @@ try {
   assert.ok(dbgSizeLink.primaryRoots > 0);
   assert.ok(Number.isInteger(dbgSizeLink.primaryPublicRoots));
   assert.deepEqual(dbgSizeLink.targets, ["lean_expr_dbg_to_string"]);
+  assert.equal(dbgSizeLink.frontierCosts[0].rawDeltaBytes, 256);
 
   const indexHtml = await readFile(join(htmlDir, "index.html"), "utf8");
   assert.match(indexHtml, /VIR Runnable Surface/);
@@ -145,6 +166,7 @@ try {
   assert.equal(htmlIndex.modules[0].name, selectedModule);
   assert.equal(htmlIndex.modules[0].declarationCount, report.counts.total);
   assert.equal(htmlIndex.modules[0].externCount, report.externs.length);
+  assert.equal(htmlIndex.frontierCosts.candidates[0].gzipDeltaBytes, 32);
   assert.deepEqual(
     JSON.parse(JSON.stringify(
       htmlIndex.externs.find((declaration) => declaration.name === "Lean.Expr.eqv"),

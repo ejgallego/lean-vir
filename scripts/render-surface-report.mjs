@@ -8,14 +8,21 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { basename, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
+
 const SURFACE_FORMAT = "lean-vir-library-surface";
 const HTML_FORMAT = "lean-vir-surface-html";
 const HTML_VERSION = 2;
 const templateDir = fileURLToPath(new URL("surface-report/", import.meta.url));
 
 const [inputArg, outputArg, ...rest] = process.argv.slice(2);
-if (!inputArg || !outputArg || rest.length !== 0) {
-  console.error("usage: render-surface-report.mjs <surface.json> <output-directory>");
+let frontierCostsArg = null;
+if (rest.length === 2 && rest[0] === "--frontier-costs") frontierCostsArg = rest[1];
+if (!inputArg || !outputArg || (rest.length !== 0 && !frontierCostsArg)) {
+  console.error(
+    "usage: render-surface-report.mjs <surface.json> <output-directory> " +
+      "[--frontier-costs <costs.json>]",
+  );
   process.exit(2);
 }
 
@@ -25,7 +32,14 @@ const modulesDir = join(outputDir, "data", "modules");
 const assetsDir = join(outputDir, "assets");
 const report = JSON.parse(await readFile(inputPath, "utf8"));
 validateReport(report);
+const frontierCosts = frontierCostsArg
+  ? compactFrontierCostReport(
+    JSON.parse(await readFile(resolve(frontierCostsArg), "utf8")),
+    resolve(frontierCostsArg),
+  )
+  : null;
 const externs = report.externs ?? [];
+const costsByName = frontierCostsByName(frontierCosts);
 
 await Promise.all([
   mkdir(modulesDir, { recursive: true }),
@@ -95,6 +109,7 @@ const indexPayload = {
   counts: report.counts,
   libraries: report.libraries,
   primaryBlockers: report.primaryBlockers,
+  frontierCosts,
   externs,
   declarationTuple: [
     "name",
@@ -122,6 +137,7 @@ const sizeLinks = {
       status: declaration.status,
       primaryRoots: blocker?.roots ?? 0,
       primaryPublicRoots: blocker?.publicRoots ?? 0,
+      frontierCosts: costsByName.get(declaration.name) ?? [],
       targets: declaration.targets
         .map((target) => target.value)
         .filter((target) => typeof target === "string" && target.length > 0),
@@ -149,6 +165,10 @@ const manifest = {
   declarations: report.declarations.length,
   externs: externs.length,
   sizeLinks: sizeLinks.externs.length,
+  frontierCosts: frontierCosts ? {
+    baseline: frontierCosts.baseline,
+    candidates: frontierCosts.candidates.length,
+  } : null,
   moduleDataFiles: dataFileCount,
   entrypoint: "index.html",
 };
@@ -212,6 +232,18 @@ function declarationTuple(declaration) {
     declaration.blocker?.name ?? "(unknown)",
     declaration.blockerPath,
   ];
+}
+
+function frontierCostsByName(report) {
+  const result = new Map();
+  for (const candidate of report?.candidates ?? []) {
+    for (const name of candidate.names) {
+      const costs = result.get(name) ?? [];
+      costs.push(candidate);
+      result.set(name, costs);
+    }
+  }
+  return result;
 }
 
 function moduleFileName(id) {

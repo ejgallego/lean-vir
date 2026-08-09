@@ -554,6 +554,22 @@ button:focus-visible {
   font-size: 0.78rem;
 }
 
+.section-description {
+  margin: 0;
+  padding: 0.75rem 1rem;
+  color: var(--muted);
+  border-bottom: 1px solid var(--border);
+  font-size: 0.8rem;
+  line-height: 1.45;
+}
+
+.candidate-names {
+  max-width: 36rem;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.75rem;
+}
+
 .data-table-wrap {
   overflow: auto;
 }

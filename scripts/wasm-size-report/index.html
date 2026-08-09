@@ -98,6 +98,34 @@
         </div>
       </section>
 
+      <section id="frontier-cost-panel" class="method-panel frontier-cost-panel" hidden>
+        <div class="frontier-cost-heading">
+          <div>
+            <p class="eyebrow">Measured what-if links</p>
+            <h2>Native frontier costs</h2>
+          </div>
+          <p id="frontier-cost-baseline" class="frontier-cost-baseline"></p>
+        </div>
+        <p class="frontier-cost-note">
+          Raw and gzip deltas come from exact stripped release links. Cluster rows are measured
+          directly because linker garbage collection and compression make costs non-additive.
+        </p>
+        <div class="frontier-cost-table-wrap">
+          <table class="frontier-cost-table">
+            <thead>
+              <tr>
+                <th>Candidate</th>
+                <th>Native externs</th>
+                <th>Raw delta</th>
+                <th>Gzip delta</th>
+                <th>Primary pressure</th>
+              </tr>
+            </thead>
+            <tbody id="frontier-cost-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="method-panel">
         <h2>How to read this report</h2>
         <div class="method-grid">

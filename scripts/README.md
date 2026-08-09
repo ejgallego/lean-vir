@@ -40,6 +40,11 @@ map lives in `docs/HARNESS.md`.
   and exposes a primary-blocker-pressure color overlay. `npm run build:site`
   supplies the surface-report symbol bridge; the standalone command remains
   usable without that optional cross-link data.
+- `npm run build:analysis-site`
+  Build the complete runnable-surface report, price the tracked candidates in
+  `scripts/frontier-size-plan.json`, rerender the surface UI with those costs,
+  and build the cross-linked Wasm size explorer. `npm run build:site` uses this
+  entry point for the analysis portion of the Pages artifact.
 - `npm run generate:irpkg`
   Build the local Lean library and `vir_irpkg` generator executable, then
   generate one manifest-bearing `.irpkg`.

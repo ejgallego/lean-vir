@@ -659,6 +659,81 @@ input:focus {
   color: var(--text);
 }
 
+.frontier-cost-heading {
+  display: flex;
+  align-items: end;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.frontier-cost-heading h2,
+.frontier-cost-heading .eyebrow {
+  margin: 0;
+}
+
+.frontier-cost-baseline,
+.frontier-cost-note {
+  color: var(--muted);
+  font-size: 0.78rem;
+}
+
+.frontier-cost-baseline {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+
+.frontier-cost-note {
+  margin: 0.55rem 0 0.8rem;
+}
+
+.frontier-cost-table-wrap {
+  overflow: auto;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+}
+
+.frontier-cost-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.78rem;
+}
+
+.frontier-cost-table th,
+.frontier-cost-table td {
+  padding: 0.55rem 0.65rem;
+  border-bottom: 1px solid var(--border);
+  text-align: left;
+  vertical-align: top;
+}
+
+.frontier-cost-table th {
+  color: var(--muted);
+  font-size: 0.66rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+.frontier-cost-table tbody tr:last-child td {
+  border-bottom: 0;
+}
+
+.frontier-cost-table .numeric {
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+
+.frontier-cost-names {
+  min-width: 18rem;
+  max-width: 44rem;
+  overflow-wrap: anywhere;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  font-size: 0.72rem;
+}
+
+.frontier-cost-names a {
+  color: var(--accent);
+}
+
 .sr-only {
   position: absolute;
   width: 1px;

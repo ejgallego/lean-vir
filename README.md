@@ -186,7 +186,9 @@ layer, exposes up to seven local hierarchy levels with a sticky depth slider,
 drills from source files into their sized native functions, and can color byte
 area by either exact retained-function coverage or measured primary-blocker
 density. Extern symbols link back to their coverage entries in the
-runnable-surface report:
+runnable-surface report. Both reports also display exact raw and gzip deltas
+from directly linked native-frontier experiments, keeping those costs separate
+from current blocker pressure:
 
 [VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
 

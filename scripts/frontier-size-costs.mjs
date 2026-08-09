@@ -107,6 +107,50 @@ function readSurfaceLinks(path) {
   return new Map(report.externs.map((entry) => [entry.name, entry]));
 }
 
+export function validateFrontierCostReport(report, label = "frontier size report") {
+  if (report?.format !== "lean-vir-frontier-size-costs" || report.version !== 1 ||
+      !report.baseline || !Array.isArray(report.candidates)) {
+    throw new Error(`${label}: expected lean-vir-frontier-size-costs version 1`);
+  }
+  if (!Number.isSafeInteger(report.baseline.rawBytes) ||
+      !Number.isSafeInteger(report.baseline.gzipBytes) ||
+      typeof report.baseline.sha256 !== "string") {
+    throw new Error(`${label}: invalid baseline sizes or SHA-256`);
+  }
+  for (const [index, candidate] of report.candidates.entries()) {
+    normalizeCandidate(candidate, `${label} candidate ${index}`);
+    if (!candidate.error &&
+        (!Number.isSafeInteger(candidate.rawDeltaBytes) ||
+         !Number.isSafeInteger(candidate.gzipDeltaBytes))) {
+      throw new Error(`${label} candidate ${index}: missing exact raw or gzip delta`);
+    }
+  }
+  return report;
+}
+
+export function compactFrontierCostReport(report, label) {
+  validateFrontierCostReport(report, label);
+  return {
+    format: report.format,
+    version: report.version,
+    generatedAt: report.generatedAt,
+    baseline: {
+      rawBytes: report.baseline.rawBytes,
+      gzipBytes: report.baseline.gzipBytes,
+      sha256: report.baseline.sha256,
+    },
+    candidates: report.candidates.map((candidate) => ({
+      id: candidate.id,
+      names: candidate.names,
+      rawDeltaBytes: candidate.rawDeltaBytes,
+      gzipDeltaBytes: candidate.gzipDeltaBytes,
+      primaryRoots: candidate.primaryRoots ?? 0,
+      primaryPublicRoots: candidate.primaryPublicRoots ?? 0,
+      error: candidate.error,
+    })),
+  };
+}
+
 export function candidatePressure(candidate, surfaceLinks) {
   let primaryRoots = 0;
   let primaryPublicRoots = 0;

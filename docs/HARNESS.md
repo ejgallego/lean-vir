@@ -113,6 +113,8 @@ npm run build:demo:release
 npm run build:demo-package
 npm run build:size-site
 npm run build:surface-site
+npm run build:frontier-size-site
+npm run build:analysis-site
 npm run build:site
 npm run check:api-coverage
 npm run check:ir-codec-tags
@@ -350,6 +352,10 @@ shows deterministic primary blocked-root density per MiB for missing extern
 backend symbols that are already retained. Parent colors are byte-weighted
 averages of their children. This is not a predicted unlock count because
 satisfying one boundary may reveal another.
+The Pages build also runs the tracked native-frontier plan against the current
+release artifact. Both reports display exact isolated and directly measured
+cluster raw/gzip deltas, while keeping those costs distinct from blocker
+pressure and exact A/B runnable-surface gains.
 They are deployed at
 `https://ejgallego.github.io/lean-vir/surface/` and
 `https://ejgallego.github.io/lean-vir/size/` alongside the demo.

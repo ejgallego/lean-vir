@@ -39,6 +39,9 @@ Author: Emilio J. Gallego Arias
     searchSection: document.querySelector("#search-results-section"),
     searchCount: document.querySelector("#search-count"),
     searchResults: document.querySelector("#search-results"),
+    frontierCostPanel: document.querySelector("#frontier-cost-panel"),
+    frontierCostBaseline: document.querySelector("#frontier-cost-baseline"),
+    frontierCostRows: document.querySelector("#frontier-cost-rows"),
   };
 
   const indexes = new Map();
@@ -62,6 +65,7 @@ Author: Emilio J. Gallego Arias
 
   renderIdentity();
   renderSummary();
+  renderFrontierCosts();
   bindControls();
   restoreHash();
   render();
@@ -87,6 +91,42 @@ Author: Emilio J. Gallego Arias
       stat(formatPercent(report.attribution.coverage, 2), "Code+Data attributed"),
       stat(report.attribution.symbols.toLocaleString("en-US"), "retained ranges"),
     );
+  }
+
+  function renderFrontierCosts() {
+    const costs = report.frontierCosts;
+    if (!costs || costs.candidates.length === 0) return;
+    elements.frontierCostPanel.hidden = false;
+    elements.frontierCostBaseline.textContent =
+      `${formatBytes(costs.baseline.rawBytes)} raw / ${formatBytes(costs.baseline.gzipBytes)} gzip baseline`;
+    const rows = costs.candidates.map((candidate) => {
+      const row = document.createElement("tr");
+      const id = document.createElement("td");
+      id.textContent = candidate.id;
+      const names = document.createElement("td");
+      names.className = "frontier-cost-names";
+      candidate.names.forEach((name, index) => {
+        if (index > 0) names.append(document.createTextNode(", "));
+        const link = document.createElement("a");
+        link.href = `../surface/#declaration=${encodeURIComponent(name)}`;
+        link.textContent = name;
+        names.append(link);
+      });
+      const raw = document.createElement("td");
+      raw.className = "numeric";
+      raw.textContent = candidate.error ? "error" : formatBytes(candidate.rawDeltaBytes);
+      const gzip = document.createElement("td");
+      gzip.className = "numeric";
+      gzip.textContent = candidate.error ? "error" : formatBytes(candidate.gzipDeltaBytes);
+      const pressure = document.createElement("td");
+      pressure.className = "numeric";
+      pressure.textContent =
+        `${candidate.primaryPublicRoots.toLocaleString("en-US")} public / ` +
+        `${candidate.primaryRoots.toLocaleString("en-US")} all`;
+      row.append(id, names, raw, gzip, pressure);
+      return row;
+    });
+    elements.frontierCostRows.replaceChildren(...rows);
   }
 
   function bindControls() {
@@ -488,6 +528,13 @@ Author: Emilio J. Gallego Arias
         link.textContent = declaration.name;
         link.title = `${declaration.status} extern in ${declaration.module}`;
         item.append(link, document.createTextNode(` · ${declaration.status}`));
+        const isolated = declaration.frontierCosts?.find((candidate) =>
+          candidate.names.length === 1 && !candidate.error);
+        if (isolated) {
+          item.append(document.createTextNode(
+            ` · +${formatBytes(isolated.rawDeltaBytes)} raw / +${formatBytes(isolated.gzipDeltaBytes)} gzip`,
+          ));
+        }
         list.append(item);
       }
       actions.append(list);

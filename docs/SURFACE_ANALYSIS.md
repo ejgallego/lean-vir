@@ -499,11 +499,37 @@ raw bytes, so they should follow only when a concrete runtime workload values
 them.
 
 Formatting is a plausible separate stage, but substantially less dense. The
-`pow` pair is rejected at this frontier: it retains a comparatively large libm
-closure for six functions. This scan also demonstrates why primary pressure
+`pow` pair is deferred from the first stage: its roughly 10 KiB libm closure is
+manageable in absolute terms but unlocks only six functions. This scan also
+demonstrates why primary pressure
 cannot price benefit by itself. `Float.isInf` was the primary blocker for 45
 roots (17 public), yet adding it within the broad basic cluster made only one
 root runnable because the others immediately reached another missing boundary.
+
+The core was subsequently promoted to runtime policy. The final catalog build
+is 719,360 raw bytes and 162,763 deterministic gzip bytes: +1,542 raw and +323
+gzip over the scalar/string checkpoint. It raises native capabilities from 442
+to 449 and exact coverage from 319,711 to 320,113 all-IR functions and from
+28,878 to 28,899 public constants, with no regressions. A host-versus-Wasm
+fixture dynamically covers addition, equality, strict comparison, 64-bit model
+extraction, 32-bit construction from bits, non-strict comparison, and 32-bit
+model extraction.
+
+The deployed measurement plan is now rebased on that 719,360-byte checkpoint:
+
+| Remaining candidate | Names | Raw cost | Gzip cost | Current primary pressure |
+| --- | ---: | ---: | ---: | ---: |
+| Basic arithmetic remainder | 8 | +1,768 B | +256 B | 36 public / 120 all |
+| Float formatting | 2 | +1,975 B | +463 B | 58 public / 391 all |
+| `pow` | 2 | +9,789 B | +6,115 B | 3 public / 8 all |
+| All twelve measured names | 12 | +13,516 B | +7,221 B | 97 public / 519 all |
+
+The nested basic A/B comparison says the eight-name arithmetic remainder adds
+20 all-IR and 6 public functions after the core. A fresh post-core formatting
+scan adds 42 all-IR and 9 public functions for its 1,975 raw bytes, so formatting
+is the next denser Float stage. The `pow` pair remains inexpensive in absolute
+terms but sparse by library-surface gain; it should be accepted for capability
+rather than coverage density if selected.
 
 ## Interactive HTML Report
 
@@ -527,6 +553,16 @@ CDN dependency.
 deployable report to `web/dist/surface/`. `npm run build:site` runs that step
 after the Vite build, so the existing Pages workflow publishes the report and
 the demo as one atomic artifact from `main`.
+
+The Pages build then prices the tracked candidates in
+`scripts/frontier-size-plan.json`, rerenders the surface report with exact
+isolated raw/gzip columns and a directly measured cluster table, and supplies
+the same cost artifact to the Wasm size explorer. An extern detail shows every
+measured candidate containing that boundary. The size explorer has a dedicated
+native-frontier table whose declaration links return to the corresponding
+surface entry. These figures are exact for the report's displayed baseline;
+they are regenerated after accepted runtime changes rather than carried forward
+as stale historical estimates.
 
 The left navigator treats dotted Lean module names as folders and files. Both
 folders and modules show a compact progress bar and exact percentage for the

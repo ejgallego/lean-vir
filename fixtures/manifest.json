@@ -641,6 +641,12 @@
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.floatToUInt32Score",
       "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-float-core-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.floatCoreFrontierScore",
+      "result": { "type": "Nat" }
     }
   ]
 }

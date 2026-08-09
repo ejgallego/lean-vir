@@ -9,8 +9,10 @@ import test from "node:test";
 
 import {
   candidatePressure,
+  compactFrontierCostReport,
   markdownReport,
   normalizeCandidate,
+  validateFrontierCostReport,
 } from "./frontier-size-costs.mjs";
 
 test("frontier size candidates reject duplicate names", () => {
@@ -61,4 +63,38 @@ test("frontier size markdown reports exact bytes and pressure density", () => {
   assert.match(markdown, /`Float\.add` \| 1 \| 256 B \| 32 B/);
   assert.match(markdown, /Primary-root density is a prioritization hint/);
   assert.match(markdown, /`lean_float_add`/);
+});
+
+test("frontier size report compaction keeps only deployable measurements", () => {
+  const report = {
+    format: "lean-vir-frontier-size-costs",
+    version: 1,
+    generatedAt: "2026-08-09T00:00:00.000Z",
+    baseline: { rawBytes: 1000, gzipBytes: 500, sha256: "baseline", path: "/tmp/private" },
+    candidates: [{
+      id: "Float.add",
+      names: ["Float.add"],
+      rawDeltaBytes: 256,
+      gzipDeltaBytes: 32,
+      primaryRoots: 59,
+      primaryPublicRoots: 8,
+      artifact: { path: "/tmp/private-candidate", sha256: "candidate" },
+    }],
+  };
+  assert.equal(validateFrontierCostReport(report), report);
+  assert.deepEqual(compactFrontierCostReport(report), {
+    format: report.format,
+    version: report.version,
+    generatedAt: report.generatedAt,
+    baseline: { rawBytes: 1000, gzipBytes: 500, sha256: "baseline" },
+    candidates: [{
+      id: "Float.add",
+      names: ["Float.add"],
+      rawDeltaBytes: 256,
+      gzipDeltaBytes: 32,
+      primaryRoots: 59,
+      primaryPublicRoots: 8,
+      error: undefined,
+    }],
+  });
 });

@@ -10,6 +10,7 @@ import { mkdir, readFile, readdir, writeFile } from "node:fs/promises";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
 import { parseLinkMap, parseWasm } from "./wasm-size-report.mjs";
 
 const HTML_FORMAT = "lean-vir-wasm-size-html";
@@ -18,10 +19,25 @@ const templateDir = fileURLToPath(new URL("wasm-size-report/", import.meta.url))
 
 const [releaseWasmArg, debugWasmArg, mapArg, outputArg, ...rest] = process.argv.slice(2);
 let surfaceLinksArg = null;
-if (rest.length === 2 && rest[0] === "--surface-links") surfaceLinksArg = rest[1];
-if (!releaseWasmArg || !debugWasmArg || !mapArg || !outputArg || (rest.length !== 0 && !surfaceLinksArg)) {
+let frontierCostsArg = null;
+let optionsValid = rest.length % 2 === 0;
+for (let index = 0; optionsValid && index < rest.length; index += 2) {
+  const option = rest[index];
+  const value = rest[index + 1];
+  if (!value || !["--surface-links", "--frontier-costs"].includes(option)) {
+    optionsValid = false;
+  } else if (option === "--surface-links" && surfaceLinksArg === null) {
+    surfaceLinksArg = value;
+  } else if (option === "--frontier-costs" && frontierCostsArg === null) {
+    frontierCostsArg = value;
+  } else {
+    optionsValid = false;
+  }
+}
+if (!releaseWasmArg || !debugWasmArg || !mapArg || !outputArg || !optionsValid) {
   console.error(
-    "usage: render-wasm-size-report.mjs <release-wasm> <debug-wasm> <link.map> <output-directory> [--surface-links <links.json>]",
+    "usage: render-wasm-size-report.mjs <release-wasm> <debug-wasm> <link.map> " +
+      "<output-directory> [--surface-links <links.json>] [--frontier-costs <costs.json>]",
   );
   process.exit(2);
 }
@@ -40,6 +56,12 @@ const identity = await readBuildIdentity(join(dirname(mapPath), "wasm-build-iden
 const revision = process.env.GITHUB_SHA ?? gitRevision();
 const ownershipTree = buildOwnershipTree(attribution);
 const surfaceLinks = surfaceLinksArg ? await readSurfaceLinks(resolve(surfaceLinksArg)) : null;
+const frontierCosts = frontierCostsArg
+  ? compactFrontierCostReport(
+    JSON.parse(await readFile(resolve(frontierCostsArg), "utf8")),
+    resolve(frontierCostsArg),
+  )
+  : null;
 const connectedSymbols = connectSurfaceLinks(ownershipTree, surfaceLinks);
 annotateSurfaceSummaries(ownershipTree);
 const runtimeContext = await buildRuntimeContext(ownershipTree, identity);
@@ -65,6 +87,7 @@ const payload = {
     connectedSymbols,
   },
   runtimeContext: runtimeContext.summary,
+  frontierCosts,
   trees: {
     ownership: ownershipTree,
     releaseSections: buildSectionTree(releaseBinary, "release"),
@@ -94,6 +117,10 @@ const manifest = {
   revision,
   attribution: payload.attribution,
   runtimeContext: payload.runtimeContext,
+  frontierCosts: frontierCosts ? {
+    baseline: frontierCosts.baseline,
+    candidates: frontierCosts.candidates.length,
+  } : null,
 };
 await writeFile(join(outputDir, "vir-wasm-size-html.json"), `${JSON.stringify(manifest, null, 2)}\n`);
 
@@ -236,6 +263,7 @@ function connectSurfaceLinks(root, links) {
         target,
         primaryRoots: declaration.primaryRoots ?? 0,
         primaryPublicRoots: declaration.primaryPublicRoots ?? 0,
+        frontierCosts: declaration.frontierCosts ?? [],
       });
       externsByTarget.set(target, declarations);
     }

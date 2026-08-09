@@ -122,6 +122,15 @@ private def primitiveCompletionExternSpecs : Array NativeExternSpec :=
     "toFloat", "toFloat32", "toUInt16", "toUInt32", "toUInt8", "xor"
   ]
 
+/--
+The measured low-cost Float frontier. This deliberately stays separate from
+the broad scalar completion list: its seven members were priced as one strict
+Wasm link and dynamically checked before becoming runtime policy.
+-/
+private def floatCoreExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Float #["add", "beq", "decLt", "toModel"] ++
+  boxedExternSpecs `Float32 #["decLe", "ofBits", "toModel"]
+
 def nativeExternSpecs : Array NativeExternSpec := #[
   {
     name := `Nat.add,
@@ -1046,7 +1055,7 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     name := `Lean.Expr.equal,
     generateBoxedWrapper := true
   }
-] ++ primitiveCompletionExternSpecs
+] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)
