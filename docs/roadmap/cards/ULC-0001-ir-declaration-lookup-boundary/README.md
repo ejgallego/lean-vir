@@ -130,9 +130,11 @@ The checkpointed prototype uses `Lean.mkEmptyEnvironment`, inserts decoded
 declarations with `Lean.IR.declMapExt.addEntry`, mirrors initializer metadata
 with `Lean.regularInitAttr.setParam`, passes the resulting environment to
 unmodified `lean::ir::run_boxed`, and links upstream
-`lean_ir_find_env_decl*` and `lean_decl_get_sorry_dep`. It is retained on the
-separate `feat/real-environment-experiment` branch and is not part of the
-recommended production change.
+`lean_ir_find_env_decl*` and `lean_decl_get_sorry_dep`. The prototype was
+checkpointed only while collecting the experiment; it is intentionally absent
+from the production branch. This card retains the construction, artifact
+identities, results, and reproduction shape needed to justify the decision
+without depending on an unpublished implementation branch.
 
 Both artifacts use Lean `d8b18978322de05a8f3dba51ef03cf5461676c17`, the
 `wasm32-wasip1` target, `-O3`, and the same package bytes. The complete upstream
@@ -238,21 +240,14 @@ This card does not own:
 - a package-format change without separate measured evidence; or
 - further declaration-lookup optimization after the accepted hash-map result.
 
-## Expected Outcome
+## Outcome
 
-Resolve the card with one of two evidence-backed outcomes:
-
-- VIR adopts a valid environment and the existing upstream declaration API,
-  with the added code/initialization cost and deleted shims recorded; or
-- the card is transferred upstream as an explicit-provider request, carrying a
-  concrete account of why constructing an environment is disproportionate for
-  a declaration-only runtime.
-
-The measured outcome is the second: transfer the card upstream as an
-explicit-provider request. The checkpointed prototype remains a reproducible
-experiment, but it is not a proposed production architecture. The provider
-design must preserve package semantics and leave the environment-backed API
-unchanged.
+Transfer the card upstream as an explicit-provider request, carrying the
+measured account of why constructing an environment is disproportionate for a
+declaration-only runtime. VIR keeps its indexed package provider; the
+real-environment prototype is evidence, not a proposed production architecture.
+The upstream provider design must preserve package semantics and leave the
+environment-backed API unchanged.
 
 ## Evidence
 

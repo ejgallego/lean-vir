@@ -63,6 +63,10 @@ map lives in `docs/HARNESS.md`.
 - `npm run bench:env-lookup:wasm-pair -- CONTROL_WASM CANDIDATE_WASM`
   Compare two frozen Wasm build modes in one process with alternating order,
   collection outside timing, checksum parity, and raw paired samples.
+- `npm run test:env-lookup:wasm-pair`
+  Run a post-build control/control correctness smoke of the paired Wasm runner.
+- `npm run test:package-ir-builders`
+  Check erased IR metadata object layouts at the C++ package boundary.
 - `npm run test:runtime`
   Run all JavaScript runtime, host binding, callback lifecycle, manifest,
   package-generation, and SDK import smoke tests. Use

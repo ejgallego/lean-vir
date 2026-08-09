@@ -5,18 +5,31 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
-import { createHash } from "node:crypto";
 import { access, mkdir, readFile, writeFile } from "node:fs/promises";
 import { cpus } from "node:os";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
+import {
+  environmentLookupGitIdentity,
+  environmentLookupHarnessIdentity,
+  environmentLookupPackageIdentity,
+  environmentLookupPairHarnessPaths,
+  sha256,
+} from "./bench-env-lookup-contract.mjs";
+import {
+  parseNonnegativeInt,
+  parsePositiveInt,
+  requireOptionValue,
+  summarizePairedSamples,
+} from "./bench-utils.mjs";
 import { leanPackageFile, publicArtifactPath } from "./browser-package-config.mjs";
 import { readIrPackageFile } from "./irpkg-format.mjs";
 import { createVirRuntimeFactory } from "../web/src/vir-runtime.js";
 
-const root = fileURLToPath(new URL("..", import.meta.url));
+const root = new URL("..", import.meta.url);
+const rootPath = fileURLToPath(root);
 const entryName = "Vir.Fixtures.ExprPrinter.exprCoverageScore";
 const expectedResult = 1232;
 const args = parseArgs(process.argv.slice(2));
@@ -30,12 +43,23 @@ if (typeof globalThis.gc !== "function") {
 }
 
 await requireAbsent(args.jsonPath);
-const packagePath = resolve(root, publicArtifactPath(leanPackageFile));
-const packageBytes = await readFile(packagePath);
-const packageInfo = await readIrPackageFile(packagePath);
+const packagePath = resolve(rootPath, publicArtifactPath(leanPackageFile));
+const [packageBytes, packageInfo, harnessSourceBytes] = await Promise.all([
+  readFile(packagePath),
+  readIrPackageFile(packagePath),
+  Promise.all(environmentLookupPairHarnessPaths.map((path) =>
+    readFile(new URL(`../${path}`, import.meta.url)))),
+]);
+const packageIdentity = environmentLookupPackageIdentity(packageBytes, packageInfo);
+const harnessIdentity = environmentLookupHarnessIdentity(
+  environmentLookupPairHarnessPaths.map((path, index) => ({
+    path,
+    bytes: harnessSourceBytes[index],
+  })),
+);
 const specs = [
-  { id: "control", path: resolve(root, args.controlPath) },
-  { id: "candidate", path: resolve(root, args.candidatePath) },
+  { id: "control", path: resolve(rootPath, args.controlPath) },
+  { id: "candidate", path: resolve(rootPath, args.candidatePath) },
 ];
 
 const states = [];
@@ -78,6 +102,18 @@ const report = {
   schema: "lean-vir.env-lookup-wasm-pair.v1",
   generatedAt: new Date().toISOString(),
   command: [process.execPath, ...process.execArgv, ...process.argv.slice(1)],
+  comparisonIdentity: {
+    workload: "environment-lookup-wasm-pair-v1",
+    entry: entryName,
+    expectedResult,
+    warmupRounds: args.warmupRounds,
+    sampleRounds: args.sampleRounds,
+    executionIterationsPerRound: args.iterations,
+    loadIterationsPerRound: args.loadIterations,
+    package: packageIdentity,
+    harnessSha256: harnessIdentity.sha256,
+  },
+  git: environmentLookupGitIdentity(root),
   environment: {
     node: process.version,
     v8: process.versions.v8,
@@ -93,19 +129,50 @@ const report = {
     collection: "forced before each timed candidate window",
     order: "rotated inside every measured round",
   },
+  workload: {
+    class: "focused",
+    entry: entryName,
+    expectedResult,
+    correctness: "both artifacts must return the expected result and identical stable checksums",
+    execution: {
+      phase: "resolved interpreter calls; package loading and call-slot resolution excluded",
+      endpoint: "vir_call_resolved_objects",
+      iterationsPerRound: args.iterations,
+    },
+    packageLoad: {
+      phase: "package decode, initializer execution, and manifest installation; Wasm instantiation excluded",
+      endpoint: "installIrPackageSetBytes",
+      iterationsPerRound: args.loadIterations,
+    },
+  },
+  aggregation: {
+    pairedRatio: "candidate per-iteration milliseconds / control per-iteration milliseconds",
+    headline: "median of paired ratios; even samples use the mean of the two middle ratios",
+    diagnostic: "geometric mean of paired ratios and slower/equal/faster round counts",
+  },
+  harness: harnessIdentity,
   package: {
     path: packagePath,
     declarations: packageInfo.package.declarationCount,
-    bytes: packageBytes.byteLength,
+    byteLength: packageBytes.byteLength,
     sha256: sha256(packageBytes),
+    contentIdentity: packageIdentity,
   },
   artifacts: Object.fromEntries(states.map((state) => [state.id, {
     path: state.path,
-    bytes: state.wasmBytes.byteLength,
+    byteLength: state.wasmBytes.byteLength,
     sha256: sha256(state.wasmBytes),
   }])),
-  execution: pairedSummary(execution, args.iterations),
-  packageLoad: pairedSummary(packageLoad, args.loadIterations),
+  execution: summarizePairedSamples(
+    execution.candidates.control.samples,
+    execution.candidates.candidate.samples,
+    args.iterations,
+  ),
+  packageLoad: summarizePairedSamples(
+    packageLoad.candidates.control.samples,
+    packageLoad.candidates.candidate.samples,
+    args.loadIterations,
+  ),
 };
 
 if (args.jsonPath !== null) {
@@ -113,15 +180,23 @@ if (args.jsonPath !== null) {
   await writeFile(args.jsonPath, `${JSON.stringify(report, null, 2)}\n`);
 }
 
-console.log("# Lean VIR paired environment lookup benchmark");
-console.log(`package: ${leanPackageFile} (${packageInfo.package.declarationCount} declarations)`);
-printSummary("fresh entry", report.execution);
-printSummary("package load", report.packageLoad);
+if (args.check) {
+  console.log(
+    `paired environment lookup smoke ok: ${packageInfo.package.declarationCount} declarations, ` +
+    `${entryName} = ${expectedResult}`,
+  );
+} else {
+  console.log("# Lean VIR paired environment lookup benchmark");
+  console.log(`package: ${leanPackageFile} (${packageInfo.package.declarationCount} declarations)`);
+  printSummary("fresh entry", report.execution);
+  printSummary("package load", report.packageLoad);
+}
 if (args.jsonPath !== null) console.log(`wrote benchmark report: ${args.jsonPath}`);
 
 function parseArgs(argv) {
   const parsed = {
     candidatePath: null,
+    check: false,
     controlPath: null,
     help: false,
     iterations: 5000,
@@ -135,22 +210,50 @@ function parseArgs(argv) {
     const arg = argv[index];
     if (arg === "--help" || arg === "-h") {
       parsed.help = true;
+    } else if (arg === "--check") {
+      parsed.check = true;
     } else if (arg === "--iterations") {
-      parsed.iterations = positiveInt(argv[++index], "--iterations");
+      parsed.iterations = parsePositiveInt(
+        requireOptionValue(argv, ++index, "--iterations"),
+        "--iterations",
+      );
+    } else if (arg.startsWith("--iterations=")) {
+      parsed.iterations = parsePositiveInt(arg.slice("--iterations=".length), "--iterations");
     } else if (arg === "--load-iterations") {
-      parsed.loadIterations = positiveInt(argv[++index], "--load-iterations");
+      parsed.loadIterations = parsePositiveInt(
+        requireOptionValue(argv, ++index, "--load-iterations"),
+        "--load-iterations",
+      );
+    } else if (arg.startsWith("--load-iterations=")) {
+      parsed.loadIterations = parsePositiveInt(
+        arg.slice("--load-iterations=".length),
+        "--load-iterations",
+      );
     } else if (arg === "--samples") {
-      parsed.sampleRounds = positiveInt(argv[++index], "--samples");
+      parsed.sampleRounds = parsePositiveInt(
+        requireOptionValue(argv, ++index, "--samples"),
+        "--samples",
+      );
+    } else if (arg.startsWith("--samples=")) {
+      parsed.sampleRounds = parsePositiveInt(arg.slice("--samples=".length), "--samples");
     } else if (arg === "--warmups") {
-      parsed.warmupRounds = nonnegativeInt(argv[++index], "--warmups");
+      parsed.warmupRounds = parseNonnegativeInt(
+        requireOptionValue(argv, ++index, "--warmups"),
+        "--warmups",
+      );
+    } else if (arg.startsWith("--warmups=")) {
+      parsed.warmupRounds = parseNonnegativeInt(arg.slice("--warmups=".length), "--warmups");
     } else if (arg === "--json") {
-      parsed.jsonPath = requiredValue(argv[++index], "--json");
+      parsed.jsonPath = requireOptionValue(argv, ++index, "--json");
+    } else if (arg.startsWith("--json=")) {
+      parsed.jsonPath = arg.slice("--json=".length);
     } else if (arg.startsWith("--")) {
       throw new Error(`unknown paired environment lookup argument: ${arg}`);
     } else {
       positional.push(arg);
     }
   }
+  if (parsed.jsonPath === "") throw new Error("--json requires a path");
   if (!parsed.help && positional.length !== 2) {
     throw new Error("paired environment lookup benchmark requires CONTROL_WASM CANDIDATE_WASM");
   }
@@ -162,32 +265,13 @@ function printUsage() {
   console.log(`usage: npm run bench:env-lookup:wasm-pair -- [options] CONTROL_WASM CANDIDATE_WASM
 
 options:
+  --check              print correctness-only smoke output, not timing summaries
   --iterations N       calls per execution observation (default: 5000)
   --load-iterations N  fresh package loads per load observation (default: 20)
-  --warmups N          unreported alternating warmup rounds (default: 4)
+  --warmups N          unreported warmup rounds (default: 4)
   --samples N          measured alternating rounds (default: 30)
   --json PATH          write raw paired samples and artifact identities
   -h, --help           show this help`);
-}
-
-function requiredValue(value, option) {
-  if (value === undefined || value.startsWith("--")) throw new Error(`${option} requires a value`);
-  return value;
-}
-
-function positiveInt(value, option) {
-  const parsed = nonnegativeInt(value, option);
-  if (parsed === 0) throw new Error(`${option} requires a positive integer`);
-  return parsed;
-}
-
-function nonnegativeInt(value, option) {
-  if (value === undefined || !/^\d+$/.test(value)) {
-    throw new Error(`${option} requires a nonnegative integer`);
-  }
-  const parsed = Number(value);
-  if (!Number.isSafeInteger(parsed)) throw new Error(`${option} is too large`);
-  return parsed;
 }
 
 async function requireAbsent(path) {
@@ -199,10 +283,6 @@ async function requireAbsent(path) {
     throw error;
   }
   throw new Error(`--json refuses to overwrite existing path: ${path}`);
-}
-
-function sha256(bytes) {
-  return createHash("sha256").update(bytes).digest("hex");
 }
 
 function resolveSlot(runtime, entry) {
@@ -263,30 +343,6 @@ function loadCandidate(state) {
     teardown(runtimes) {
       for (const runtime of runtimes) runtime.dispose();
     },
-  };
-}
-
-function pairedSummary(sample, iterations) {
-  const controlMs = sample.candidates.control.samples.map((ms) => ms / iterations);
-  const candidateMs = sample.candidates.candidate.samples.map((ms) => ms / iterations);
-  const ratios = candidateMs.map((value, index) => value / controlMs[index]);
-  const sorted = [...ratios].sort((left, right) => left - right);
-  const middle = sorted.length / 2;
-  const medianRatio = sorted.length % 2 === 0
-    ? (sorted[middle - 1] + sorted[middle]) / 2
-    : sorted[Math.floor(middle)];
-  const geometricMeanRatio = Math.exp(
-    ratios.reduce((sum, ratio) => sum + Math.log(ratio), 0) / ratios.length,
-  );
-  return {
-    controlMs,
-    candidateMs,
-    ratios,
-    medianRatio,
-    geometricMeanRatio,
-    slowerRounds: ratios.filter((ratio) => ratio > 1).length,
-    equalRounds: ratios.filter((ratio) => ratio === 1).length,
-    fasterRounds: ratios.filter((ratio) => ratio < 1).length,
   };
 }
 

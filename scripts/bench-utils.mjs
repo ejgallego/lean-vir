@@ -109,6 +109,59 @@ export function parsePositiveInt(value, option) {
   return parsed;
 }
 
+export function parseNonnegativeInt(value, option) {
+  if (!/^\d+$/.test(value)) {
+    throw new Error(`${option} requires a nonnegative integer`);
+  }
+  const parsed = Number(value);
+  if (!Number.isSafeInteger(parsed)) {
+    throw new Error(`${option} requires a safe nonnegative integer`);
+  }
+  return parsed;
+}
+
+export function summarizePairedSamples(controlSamples, candidateSamples, iterations) {
+  if (!Array.isArray(controlSamples) || controlSamples.length === 0 ||
+      !Array.isArray(candidateSamples) || candidateSamples.length !== controlSamples.length) {
+    throw new TypeError("paired samples require equally sized nonempty arrays");
+  }
+  if (!Number.isSafeInteger(iterations) || iterations <= 0) {
+    throw new TypeError("paired sample iterations must be a positive integer");
+  }
+  const rounds = controlSamples.map((controlTotalMs, index) => {
+    const candidateTotalMs = candidateSamples[index];
+    if (!Number.isFinite(controlTotalMs) || controlTotalMs <= 0 ||
+        !Number.isFinite(candidateTotalMs) || candidateTotalMs < 0) {
+      throw new TypeError("paired sample timings must be finite with a positive control");
+    }
+    const controlMs = controlTotalMs / iterations;
+    const candidateMs = candidateTotalMs / iterations;
+    return {
+      round: index + 1,
+      sequence: index % 2 === 0 ? "control-candidate" : "candidate-control",
+      controlMs,
+      candidateMs,
+      ratio: candidateMs / controlMs,
+    };
+  });
+  const ratios = rounds.map(({ ratio }) => ratio);
+  const sorted = [...ratios].sort((left, right) => left - right);
+  const middle = sorted.length / 2;
+  const medianRatio = sorted.length % 2 === 0
+    ? (sorted[middle - 1] + sorted[middle]) / 2
+    : sorted[Math.floor(middle)];
+  return {
+    rounds,
+    medianRatio,
+    geometricMeanRatio: Math.exp(
+      ratios.reduce((sum, ratio) => sum + Math.log(ratio), 0) / ratios.length,
+    ),
+    slowerRounds: ratios.filter((ratio) => ratio > 1).length,
+    equalRounds: ratios.filter((ratio) => ratio === 1).length,
+    fasterRounds: ratios.filter((ratio) => ratio < 1).length,
+  };
+}
+
 export function median(values) {
   const sorted = [...values].sort((a, b) => a - b);
   return sorted[Math.floor(sorted.length / 2)];

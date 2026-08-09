@@ -190,8 +190,10 @@ module ownership and `Lean.IR.declMapExt` state, whereas `.irpkg` currently
 carries decoded declarations rather than an environment.
 
 [ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md)
-owns the bounded real-environment experiment, the explicit-provider fallback,
-and the evidence required before transferring that request upstream.
+records the completed real-environment experiment and the resulting
+explicit-provider request to transfer upstream. The experiment found that a
+valid environment pulls in a disproportionate compiler-initialization closure
+for VIR's declaration-only runtime.
 [ULC-0002](roadmap/cards/ULC-0002-cross-entry-symbol-resolution-cache/README.md)
 owns the separate measured experiment for sharing immutable resolution
 metadata across fresh asynchronous interpreter entries. It explicitly does not
@@ -227,7 +229,8 @@ regressions are observable against host Lean.
 The representative Illuminate acceptance gate has passed: the focused result
 reproduced, sustained callback mean and CPU were halved, the original sampled
 hotspots moved, and DOM output remained identical. The environment/provider
-decision remains the bounded ULC-0001 experiment. The new post-index profile
-selects the instrumented ULC-0002 cache experiment as the next performance
-question. Neither card calls for expanding this accepted lookup patch or
-proposing an upstream API before its measurements are available.
+decision is recorded by the completed ULC-0001 experiment: keep VIR's indexed
+provider and propose a narrow upstream declaration-provider API. The new
+post-index profile selects the instrumented ULC-0002 cache experiment as the
+next performance question; it does not call for expanding this accepted lookup
+patch.

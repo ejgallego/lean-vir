@@ -141,8 +141,10 @@ Tests:
 ```bash
 npm run test:bench
 npm run test:surface
+npm run test:package-ir-builders
 npm run test:upstream
 npm run test:upstream:no-build
+npm run test:env-lookup:wasm-pair
 npm run test:infoview
 npm run test:runtime
 npm run test:runtime:pure
@@ -157,12 +159,13 @@ npm test
 ```
 
 `npm test` runs the artifact-cache, benchmark sampler, focused-identity, and
-paired-runner contract tests, package ABI check, IR codec tag freshness check,
-native extern metadata check, boundary registry check, native wrapper check, API
-coverage docs check, and Wasm extension probes, builds the demo artifacts once,
-then reuses those artifacts for upstream smoke, infoview widget smoke,
-JavaScript runtime tests, and the fixture suite. It is the default pre-merge
-signal for code changes.
+paired-runner contract tests, package ABI and IR object-layout checks, IR codec
+tag freshness check, native extern metadata check, boundary registry check,
+native wrapper check, API coverage docs check, and Wasm extension probes. It
+then builds the demo artifacts once and reuses them for a paired-runner
+control/control smoke, upstream smoke, infoview widget smoke, JavaScript runtime
+tests, and the fixture suite. It is the default pre-merge signal for code
+changes.
 
 ## Smallest Useful Check
 
@@ -171,6 +174,10 @@ signal for code changes.
 - Package declaration lookup or interpreter/provider performance changes:
   `npm run bench:env-lookup -- --json <new-output-path>`; use a separate
   `--cpu-profile` run for attribution
+- Package IR object-builder layout changes: `npm run test:package-ir-builders`
+- Paired Wasm runner integration changes: build the demo, then run
+  `npm run test:env-lookup:wasm-pair`; this is a correctness smoke, not timing
+  evidence
 - Native runtime coverage or library-surface analyzer changes:
   `npm run test:surface`; use `npm run analyze:surface -- <report.json>
   <report.md>` for a complete installed-library report, then

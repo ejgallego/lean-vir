@@ -10,6 +10,7 @@ import test from "node:test";
 
 import {
   environmentLookupHarnessPaths,
+  environmentLookupPairHarnessPaths,
   environmentLookupHarnessIdentity,
   environmentLookupPackageIdentity,
   validateEnvironmentLookupOutputPaths,
@@ -119,6 +120,11 @@ test("environment lookup harness identity covers the loaded runtime source closu
     assert.ok(environmentLookupHarnessPaths.includes(required), `missing harness source ${required}`);
   }
   assert.equal(new Set(environmentLookupHarnessPaths).size, environmentLookupHarnessPaths.length);
+  assert.ok(environmentLookupPairHarnessPaths.includes("scripts/bench-env-lookup-wasm-pair.mjs"));
+  assert.equal(
+    new Set(environmentLookupPairHarnessPaths).size,
+    environmentLookupPairHarnessPaths.length,
+  );
 
   const files = await Promise.all(environmentLookupHarnessPaths.map(async (path) => ({
     path,

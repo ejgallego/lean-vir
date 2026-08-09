@@ -8,24 +8,21 @@ import { resolve } from "node:path";
 
 import { sha256 } from "./bench-utils.mjs";
 import { IR_PACKAGE_SECTION } from "./irpkg-format.mjs";
+import { runSync } from "./process-utils.mjs";
 
-// Keep this conservative and explicit: every local module loaded by the
-// focused benchmark belongs to its comparison identity, even when a module is
-// used only by setup or by a cold runtime path.
-export const environmentLookupHarnessPaths = Object.freeze([
+// Keep this conservative and explicit: every shared local module loaded by an
+// environment-lookup runner belongs to its comparison identity, even when a
+// module is used only by setup or by a cold runtime path.
+const environmentLookupSharedHarnessPaths = [
   "package.json",
   "fixtures/browser-packages.json",
-  "scripts/bench-artifact-cache.mjs",
   "scripts/bench-differential.mjs",
   "scripts/bench-env-lookup-contract.mjs",
-  "scripts/bench-env-lookup.mjs",
   "scripts/bench-utils.mjs",
   "scripts/browser-package-config.mjs",
-  "scripts/file-utils.mjs",
   "scripts/irpkg-format.mjs",
   "scripts/package-versions.mjs",
   "scripts/process-utils.mjs",
-  "scripts/wasm-build-identity.mjs",
   "web/src/host-resource.js",
   "web/src/host/vir-host-resources.js",
   "web/src/host/vir-js-collection-bindings.js",
@@ -49,7 +46,20 @@ export const environmentLookupHarnessPaths = Object.freeze([
   "web/src/runtime/vir-value-normalizers.js",
   "web/src/vir-host-bindings.js",
   "web/src/vir-runtime.js",
-]);
+];
+
+export const environmentLookupHarnessPaths = Object.freeze([
+  ...environmentLookupSharedHarnessPaths,
+  "scripts/bench-artifact-cache.mjs",
+  "scripts/bench-env-lookup.mjs",
+  "scripts/file-utils.mjs",
+  "scripts/wasm-build-identity.mjs",
+].sort());
+
+export const environmentLookupPairHarnessPaths = Object.freeze([
+  ...environmentLookupSharedHarnessPaths,
+  "scripts/bench-env-lookup-wasm-pair.mjs",
+].sort());
 
 export { sha256 };
 
@@ -91,6 +101,26 @@ export function environmentLookupHarnessIdentity(files) {
   return {
     sources,
     sha256: sha256(Buffer.from(JSON.stringify(sources))),
+  };
+}
+
+export function environmentLookupGitIdentity(root) {
+  const status = runSync("git", ["status", "--short", "--untracked-files=all"], {
+    cwd: root,
+    capture: true,
+    trimStdout: false,
+  });
+  const diff = runSync("git", ["diff", "--binary", "--full-index", "HEAD"], {
+    cwd: root,
+    capture: true,
+    trimStdout: false,
+  });
+  return {
+    commit: runSync("git", ["rev-parse", "HEAD"], { cwd: root, capture: true }),
+    ref: runSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: root, capture: true }),
+    dirty: status.length !== 0,
+    statusSha256: status.length === 0 ? null : sha256(Buffer.from(status)),
+    trackedDiffSha256: diff.length === 0 ? null : sha256(Buffer.from(diff)),
   };
 }
 
