@@ -10,7 +10,7 @@
     "prettyM-workload": {
       "kind": "git",
       "repository": "https://github.com/leanprover/verso-slides",
-      "revision": "ff1dc854f00a0cdd9e90a2489166028a07ae95bb"
+      "revision": "c16a6f83b622dd8ebc2f4975d93b856b08dde444"
     },
     "vir-pr104": {
       "kind": "git",

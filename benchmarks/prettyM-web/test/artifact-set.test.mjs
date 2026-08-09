@@ -46,7 +46,7 @@ test("the prettyM source build is complete and materializes pack provenance", as
   );
   assert.equal(
     sources.workload.revision,
-    "ff1dc854f00a0cdd9e90a2489166028a07ae95bb",
+    "c16a6f83b622dd8ebc2f4975d93b856b08dde444",
   );
 
   const config = artifactSetConfig(database, "prettyM");
