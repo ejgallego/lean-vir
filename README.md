@@ -186,8 +186,12 @@ layer, exposes up to seven local hierarchy levels with a sticky depth slider,
 drills from source files into their sized native functions, and can color byte
 area by exact retained-function coverage, measured primary-blocker density, or
 a combined view where purple exposes code that is retained but not registered
-as a native extern. Deep zoom rendering is coalesced while dragging the slider,
-so only the newest requested level is drawn. Extern symbols link back to their coverage entries in the
+as a native extern. The context view reports total retained native-support
+coverage by archive bytes, sized-function bytes, and function count, while
+showing the cross-target Wasm size separately. Its combined-mode sidebar lists
+the overlap functions directly for one-click inspection. Deep zoom rendering
+is coalesced while dragging the slider, so only the newest requested level is
+drawn. Extern symbols link back to their coverage entries in the
 runnable-surface report. Both reports also display exact raw and gzip deltas
 from directly linked native-frontier experiments, keeping those costs separate
 from current blocker pressure:

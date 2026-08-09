@@ -27,6 +27,11 @@ Author: Emilio J. Gallego Arias
     search: document.querySelector("#node-search"),
     breadcrumbs: document.querySelector("#breadcrumbs"),
     note: document.querySelector("#view-note"),
+    runtimeCoverage: document.querySelector("#runtime-coverage"),
+    runtimeCoverageDescription: document.querySelector("#runtime-coverage-description"),
+    runtimeCoveragePercent: document.querySelector("#runtime-coverage-percent"),
+    runtimeCoverageFill: document.querySelector("#runtime-coverage-fill"),
+    runtimeCoverageFacts: document.querySelector("#runtime-coverage-facts"),
     colorLegend: document.querySelector("#color-legend"),
     colorLegendTitle: document.querySelector("#color-legend-title"),
     colorLegendMin: document.querySelector("#color-legend-min"),
@@ -51,6 +56,8 @@ Author: Emilio J. Gallego Arias
     !node.children?.length
       && (node.meta?.boundaryDensity ?? 0) > 0
       && (node.meta?.frontierDensity ?? 0) > 0).length ?? 0;
+  const nativeContextNode = report.trees.runtimeContext.children?.find((node) =>
+    node.meta?.layer === "native") ?? null;
   const defaultVisibleDepth = {
     ownership: 2,
     releaseSections: 1,
@@ -71,6 +78,7 @@ Author: Emilio J. Gallego Arias
 
   renderIdentity();
   renderSummary();
+  renderRuntimeCoverage();
   renderFrontierCosts();
   bindControls();
   restoreHash();
@@ -201,6 +209,7 @@ Author: Emilio J. Gallego Arias
       button.classList.toggle("selected", button.dataset.scope === scope);
     }
     elements.boundaryViewControl.hidden = scope === "context";
+    elements.runtimeCoverage.hidden = scope !== "context" || nativeContextNode == null;
     renderDepthControl();
     elements.contextColorControl.hidden = scope !== "context"
       || report.runtimeContext.connectedSurfaceEntries === 0;
@@ -265,6 +274,37 @@ Author: Emilio J. Gallego Arias
       : frontier
         ? formatDensity(report.runtimeContext.maxFrontierDensity)
         : "100%";
+  }
+
+  function renderRuntimeCoverage() {
+    if (!nativeContextNode) return;
+    const meta = nativeContextNode.meta ?? {};
+    const retainedBytes = meta.retainedNativeFunctionBytes ?? 0;
+    const archiveBytes = nativeContextNode.bytes;
+    const archiveRatio = archiveBytes > 0 ? retainedBytes / archiveBytes : 0;
+    elements.runtimeCoveragePercent.value = formatPercent(archiveRatio);
+    elements.runtimeCoverageFill.style.width = `${clampUnit(archiveRatio) * 100}%`;
+    elements.runtimeCoverageDescription.textContent =
+      `${formatBytes(retainedBytes)} of ${formatBytes(archiveBytes)} installed Lean native-support bytes have exact function counterparts retained in the VIR Wasm.`;
+    elements.runtimeCoverageFacts.replaceChildren(
+      coverageFact(
+        `${(meta.retainedFunctionCount ?? 0).toLocaleString("en-US")} / `
+          + `${(meta.functionCount ?? 0).toLocaleString("en-US")}`,
+        `sized functions · ${formatPercent(
+          (meta.retainedFunctionCount ?? 0) / (meta.functionCount ?? 1),
+        )}`,
+      ),
+      coverageFact(
+        `${formatBytes(retainedBytes)} / ${formatBytes(meta.functionBytes ?? 0)}`,
+        `sized function bytes · ${formatPercent(
+          retainedBytes / (meta.functionBytes || 1),
+        )}`,
+      ),
+      coverageFact(
+        formatBytes(report.binaries.release.rawBytes),
+        "shipped Wasm · different target, not used as the ratio",
+      ),
+    );
   }
 
   function renderContextColor() {
@@ -686,7 +726,33 @@ Author: Emilio J. Gallego Arias
 
   function renderTopChildren() {
     const children = current.children ?? [];
-    if (view === "runtimeContext" && contextColor !== "boundary") {
+    if (view === "runtimeContext" && contextColor === "combined") {
+      const overlaps = descendantLeaves(current)
+        .filter((node) =>
+          (node.meta?.boundaryDensity ?? 0) > 0
+            && (node.meta?.frontierDensity ?? 0) > 0)
+        .sort((lhs, rhs) => {
+          const left = lhs.meta?.surfaceSummary;
+          const right = rhs.meta?.surfaceSummary;
+          return (right?.primaryPublicRoots ?? 0) - (left?.primaryPublicRoots ?? 0)
+            || (right?.primaryRoots ?? 0) - (left?.primaryRoots ?? 0)
+            || rhs.bytes - lhs.bytes
+            || lhs.name.localeCompare(rhs.name);
+        });
+      elements.childListTitle.textContent = "Retained but unregistered";
+      elements.childCount.textContent = overlaps.length.toLocaleString("en-US");
+      elements.topChildren.replaceChildren(...overlaps.slice(0, 18).map((node) => {
+        const summary = node.meta?.surfaceSummary ?? {};
+        return resultRow(
+          node,
+          current.bytes,
+          true,
+          `${summary.primaryPublicRoots ?? 0} public · ${summary.primaryRoots ?? 0} all`,
+        );
+      }));
+      return;
+    }
+    if (view === "runtimeContext" && contextColor === "frontier") {
       const pressured = children
         .filter((node) => (node.meta?.surfaceSummary?.primaryRoots ?? 0) > 0)
         .sort((lhs, rhs) =>
@@ -753,6 +819,20 @@ Author: Emilio J. Gallego Arias
     });
     row.append(button);
     return row;
+  }
+
+  function descendantLeaves(root) {
+    const leaves = [];
+    const visit = (node) => {
+      const children = node.children ?? [];
+      if (children.length === 0) {
+        leaves.push(node);
+        return;
+      }
+      for (const child of children) visit(child);
+    };
+    visit(root);
+    return leaves;
   }
 
   function writeHash() {
@@ -856,6 +936,16 @@ Author: Emilio J. Gallego Arias
   function stat(value, label) {
     const wrapper = document.createElement("div");
     wrapper.className = "header-stat";
+    const strong = document.createElement("strong");
+    strong.textContent = value;
+    const span = document.createElement("span");
+    span.textContent = label;
+    wrapper.append(strong, span);
+    return wrapper;
+  }
+
+  function coverageFact(value, label) {
+    const wrapper = document.createElement("div");
     const strong = document.createElement("strong");
     strong.textContent = value;
     const span = document.createElement("span");

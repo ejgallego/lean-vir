@@ -345,9 +345,9 @@ sized native function. Archive-member bytes not assigned to a sized function
 remain explicit as non-function data and object overhead, so child areas add up
 exactly. The generated `libLeanIR.a` member is shown separately as compiled
 `LeanIR.lean` program code and is excluded from the native-support denominator.
-Boundary coloring matches native function aliases to exact retained Wasm linker
-symbols, then shows matched native-function bytes per archive byte; parent
-colors are byte-weighted averages of their children. Frontier-pressure coloring
+Retained-code coloring matches native function aliases to exact retained Wasm
+linker symbols, then shows matched native-function bytes per archive byte;
+parent colors are byte-weighted averages of their children. Frontier-pressure coloring
 shows deterministic primary blocked-root density per MiB for missing extern
 backend symbols that are already retained. Parent colors are byte-weighted
 averages of their children. This is not a predicted unlock count because
@@ -355,7 +355,12 @@ satisfying one boundary may reveal another. A combined mode shows retained code
 in green, frontier pressure in orange, overlap in purple, and neither signal in
 gray. The overlap is intentional evidence: a native function may already be
 linked into the Wasm for another caller while its Lean declaration remains
-absent from the native-extern catalog. Deep slider input is animation-frame
+absent from the native-extern catalog. Combined mode lists those overlap
+functions directly and opens their cross-linked details. A context-wide coverage
+strip reports retained native-function bytes against all installed native-support
+archive bytes, plus sized-function byte and function-count coverage. The shipped
+Wasm byte size is shown separately because Wasm and native archive bytes are not
+an interchangeable denominator. Deep slider input is animation-frame
 coalesced, subtree depths are cached, and the treemap uses one delegated event
 surface rather than per-block handlers; the browser smoke guards the complete
 level-seven render against regression.

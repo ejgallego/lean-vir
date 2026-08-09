@@ -608,7 +608,12 @@ both facts at once: green is retained code, orange is frontier pressure, purple
 is overlap, and gray is neither. Overlap does not violate the accounting: it
 means the native implementation is retained for some other path but the
 corresponding Lean declaration is still unavailable through VIR's extern
-catalog.
+catalog. The combined-mode sidebar lists these overlap functions directly and
+opens their symbol and declaration links. Above the map, total coverage reports
+matched native-function bytes against the complete installed native-support
+archives, together with sized-function byte and function-count ratios. The
+shipped Wasm size remains a separate fact because native and Wasm bytes are
+different targets.
 
 The generated directory contains a navigation index with the comparatively
 small extern catalog plus one compact JavaScript data file per module with

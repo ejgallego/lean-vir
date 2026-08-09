@@ -250,6 +250,7 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
     depth: document.querySelector("#map-depth")?.value,
     depthMax: document.querySelector("#map-depth")?.max,
+    runtimeCoverageHidden: document.querySelector("#runtime-coverage")?.hidden,
   })`);
   assert.equal(ownership.selectedView, "ownership");
   assert.ok(ownership.blocks > 0);
@@ -258,6 +259,7 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(ownership.top.includes("Lean C runtime"));
   assert.equal(ownership.depth, "2");
   assert.equal(ownership.depthMax, "3");
+  assert.equal(ownership.runtimeCoverageHidden, true);
 
   await setInputValueAndDispatch(cdp, "#map-depth", "3", "input");
 
@@ -314,6 +316,23 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
       min: document.querySelector("#color-legend-min")?.textContent,
       max: document.querySelector("#color-legend-max")?.textContent,
     },
+    retainedCodeLabel: document.querySelector("#context-color-switch button[data-context-color='boundary']")?.textContent,
+    coverage: (() => {
+      const native = globalThis.__virWasmSize.trees.runtimeContext.children
+        .find((node) => node.meta?.layer === "native");
+      const ratio = native.meta.retainedNativeFunctionBytes / native.bytes;
+      return {
+        hidden: document.querySelector("#runtime-coverage")?.hidden,
+        percent: document.querySelector("#runtime-coverage-percent")?.value,
+        expectedPercent: (ratio * 100).toFixed(1) + "%",
+        expectedFill: ratio * 100,
+        fill: Number.parseFloat(document.querySelector("#runtime-coverage-fill")?.style.width),
+        description: document.querySelector("#runtime-coverage-description")?.textContent,
+        facts: Array.from(document.querySelectorAll("#runtime-coverage-facts > div"), (node) => node.textContent),
+        retainedFunctions: native.meta.retainedFunctionCount.toLocaleString("en-US"),
+        totalFunctions: native.meta.functionCount.toLocaleString("en-US"),
+      };
+    })(),
     objectFunctions: (() => {
       let object = null;
       const visit = (node) => {
@@ -346,6 +365,16 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     min: "0%",
     max: "100%",
   });
+  assert.equal(context.retainedCodeLabel, "Retained code");
+  assert.equal(context.coverage.hidden, false);
+  assert.equal(context.coverage.percent, context.coverage.expectedPercent);
+  assert.ok(Math.abs(context.coverage.fill - context.coverage.expectedFill) < 0.01);
+  assert.ok(context.coverage.description.includes("installed Lean native-support bytes"));
+  assert.equal(context.coverage.facts.length, 3);
+  assert.ok(context.coverage.facts[0].includes(
+    `${context.coverage.retainedFunctions} / ${context.coverage.totalFunctions}`,
+  ));
+  assert.ok(context.coverage.facts[2].includes("different target"));
   assert.equal(context.objectFunctions.total, 260);
   assert.ok(
     Number.isInteger(context.objectFunctions.retained)
@@ -440,6 +469,7 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     legendMin: document.querySelector("#color-legend-min")?.textContent,
     legendMax: document.querySelector("#color-legend-max")?.textContent,
     hash: location.hash,
+    top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
     overlapLeaves: (() => {
       let count = 0;
       const visit = (node) => {
@@ -459,11 +489,22 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(combined.overlap > 0);
   assert.ok(combined.boundary > 0);
   assert.ok(combined.neither > 0);
-  assert.equal(combined.listTitle, "Frontier pressure");
+  assert.equal(combined.listTitle, "Retained but unregistered");
+  assert.equal(combined.top.length, combined.overlapLeaves);
   assert.equal(combined.legendTitle, "Green retained · orange pressure · purple overlap");
   assert.equal(combined.legendMin, "neither");
   assert.equal(combined.legendMax, "both");
   assert.ok(combined.hash.includes("color=combined"));
+
+  await clickSelector(cdp, "#top-children button");
+  const overlapDetail = await evaluate(cdp, `({
+    title: document.querySelector("#selection-details h2")?.textContent,
+    surfaceEntry: document.querySelector("#selection-details .detail-actions a")?.textContent,
+    surfaceHref: document.querySelector("#selection-details .detail-actions a")?.getAttribute("href"),
+  })`);
+  assert.ok(combined.top.includes(overlapDetail.title));
+  assert.ok(overlapDetail.surfaceEntry);
+  assert.ok(overlapDetail.surfaceHref.includes("../surface/#declaration="));
 
   await clickSelector(cdp, "#breadcrumbs button:first-child");
   assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.value"), "7");

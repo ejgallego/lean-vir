@@ -42,7 +42,7 @@
           <div id="context-color-control" hidden>
             <span class="control-label">Context color</span>
             <div id="context-color-switch" class="segmented" role="group" aria-label="Runtime-context color metric">
-              <button type="button" data-context-color="boundary" class="selected">Boundary</button>
+              <button type="button" data-context-color="boundary" class="selected">Retained code</button>
               <button type="button" data-context-color="frontier">Frontier pressure</button>
               <button type="button" data-context-color="combined">Both</button>
             </div>
@@ -67,6 +67,19 @@
           <nav id="breadcrumbs" class="breadcrumbs" aria-label="Treemap breadcrumbs"></nav>
           <p id="view-note" class="view-note"></p>
         </div>
+        <section id="runtime-coverage" class="runtime-coverage" aria-label="Lean runtime coverage" hidden>
+          <div class="runtime-coverage-heading">
+            <div>
+              <strong>Lean runtime retained in VIR Wasm</strong>
+              <span id="runtime-coverage-description"></span>
+            </div>
+            <output id="runtime-coverage-percent"></output>
+          </div>
+          <div class="runtime-coverage-track" aria-hidden="true">
+            <span id="runtime-coverage-fill"></span>
+          </div>
+          <div id="runtime-coverage-facts" class="runtime-coverage-facts"></div>
+        </section>
         <div id="color-legend" class="color-legend" hidden>
           <strong id="color-legend-title"></strong>
           <span id="color-legend-min" class="color-legend-value"></span>
@@ -135,7 +148,7 @@
           <p><strong>Gzip is intentionally not apportioned.</strong> Compression depends on neighboring bytes, so per-symbol gzip estimates are not additive.</p>
           <p><strong>Runtime context uses a different unit.</strong> It measures installed native archive-member bytes and follows Lean's source hierarchy; archive provenance remains on every leaf.</p>
           <p><strong>Files expand into native functions.</strong> Sized function symbols come from the installed archive objects; data, relocations, debug sections, framing, and unsized bytes remain explicit as object overhead.</p>
-          <p><strong>Boundary color is computed.</strong> Green intensity is the share of archive bytes belonging to exact native-function matches retained in VIR; directory, archive, and layer colors are byte-weighted child averages.</p>
+          <p><strong>Retained-code color is computed.</strong> Green intensity is the share of archive bytes belonging to exact native-function matches retained in VIR; directory, archive, and layer colors are byte-weighted child averages.</p>
           <p><strong>Zoom depth is local and sticky.</strong> The slider controls how many descendant levels are drawn below the current breadcrumb and keeps its setting while you drill in.</p>
           <p><strong>Frontier pressure is measured, not predicted.</strong> Color is blocker-root density per MiB; parent density is the byte-weighted average of its children. A repaired boundary may reveal another blocker.</p>
           <p><strong>The combined view exposes overlap.</strong> Green is retained code, orange is frontier pressure, purple has both signals, and gray has neither. A retained native function can still be unavailable through the extern catalog.</p>
