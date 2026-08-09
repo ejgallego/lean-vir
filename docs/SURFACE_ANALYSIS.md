@@ -122,6 +122,66 @@ control and candidate artifacts. Review the added native capabilities, exact
 new function set, module distribution, regressions, and byte increase together;
 none of those numbers alone is a sufficient acceptance signal.
 
+## Pricing A Native Frontier
+
+Missing native externs can be priced before changing the checked-in runtime
+catalog. The size-cost runner temporarily adds compiler-generated boxed wrappers
+and native-registry entries, links the ordinary stripped release Wasm, and skips
+only browser package generation:
+
+```bash
+npm run analyze:frontier-size -- \
+  --surface-links web/dist/surface/data/size-links.json \
+  --output-prefix build/frontier-size-costs/float \
+  Float.add Float.beq
+```
+
+Every command first builds a control, measures each positional name in
+isolation, and finally rebuilds the control. It rejects the run if the restored
+artifact's SHA-256 differs from the original control. The JSON and Markdown
+outputs record exact stripped raw and deterministic gzip deltas. The optional
+surface link data adds current primary-blocker pressure as a ranking hint; it
+does not turn that upper bound into an unlock count.
+
+Use a version 1 plan to measure interactions or shared retained code directly:
+
+```json
+{
+  "version": 1,
+  "candidates": [
+    { "id": "float-core", "names": ["Float.decLt", "Float.add", "Float.beq"] },
+    { "id": "float-format", "names": ["Float.toString", "Float32.toString"] }
+  ]
+}
+```
+
+```bash
+npm run analyze:frontier-size -- --plan /tmp/frontier-plan.json
+```
+
+Costs are not generally additive: linker garbage collection and compression can
+make a cluster cheaper or more expensive than the sum of isolated rows. Always
+price the proposed cluster itself. These overlays are intended for ordinary
+externs whose normal compiler-generated boxed wrapper is the right ABI. A
+boundary that needs a handwritten ownership adapter or an erased-proof alias
+must first get that separate runtime design.
+
+Measure the matching exact library-surface benefit without editing runtime
+policy by repeating `--native-extern` on an otherwise identical scan:
+
+```bash
+npm run analyze:surface -- \
+  build/vir-surface/float-core.json \
+  build/vir-surface/float-core.md \
+  --native-extern Float.decLt \
+  --native-extern Float.add \
+  --native-extern Float.beq
+```
+
+Compare that report to the control as described above. This separates the two
+questions deliberately: the size runner determines what the boundary retains;
+the surface comparator determines what its complete IR closure actually unlocks.
+
 ## Reference Experiments
 
 ### `Lean.Expr.eqv`
@@ -293,13 +353,13 @@ The incremental scans explain the apparent difference: `trim` and `foldl`
 mostly advance roots through a chain, and the cheap `isEmpty` boundary closes
 enough of that chain to realize the combined payoff.
 
-The next string-shaped frontier is `String.Internal.getUTF8Byte`, now the
-primary blocker for 1,885 functions and 293 public constants. Its raw symbol is
-already used by the registered public `String.getUTF8Byte` boundary, so it is a
-good registry-only follow-up experiment rather than a reason to add another
-generated support module.
+At this checkpoint, the next string-shaped frontier was
+`String.Internal.getUTF8Byte`, then the primary blocker for 1,885 functions and
+293 public constants. Its raw symbol was already used by the registered public
+`String.getUTF8Byte` boundary, so it was measured as a registry-only follow-up
+rather than by adding another generated support module.
 
-### Rejected String Alias Cluster
+### Historical String Alias Experiment
 
 The follow-up measured `String.Internal.getUTF8Byte` first, then followed its
 nearest-boundary chain through `Substring.Raw.Internal.drop`,
@@ -335,6 +395,180 @@ constants. The runtime additions were rejected and are not retained. This is a
 useful negative result: a cheap alias registration is not automatically a good
 frontier when it merely advances a long dependency chain.
 
+That rejection was correct for this earlier runtime boundary. Later scalar,
+string, and Float completion closed enough of the downstream chain that a fresh
+measurement made the first accessor highly productive. The current checkpoint
+below therefore accepts `String.Internal.getUTF8Byte` alone; the larger
+substring alias cluster from this historical experiment remains rejected.
+
+### Integer Division Frontier
+
+The next accepted experiment registered the canonical `Int.ediv` and
+`Int.tdiv` externs. Both implementations are inline Lean runtime operations:
+`Int.ediv` maps to `lean_int_ediv`, while `Int.tdiv` maps to `lean_int_div`.
+The candidate therefore keeps the same 51-object source closure as its control;
+the linker retains the generated boxed adapters, registry data, and the
+previously dead scalar and big-integer division paths from those runtime
+objects.
+
+| Measurement | Current `main` control | Integer-division candidate | Delta |
+| --- | ---: | ---: | ---: |
+| Stripped release Wasm | 657,998 B | 660,433 B | +2,435 B |
+| Gzip-compressed Wasm | 150,294 B | 150,929 B | +635 B |
+| Runnable public constants | 27,657 / 36,887 | 28,037 / 36,887 | +380 |
+| Runnable all-IR functions | 315,063 / 398,519 | 315,915 / 398,519 | +852 |
+| Regressions | - | - | 0 |
+
+The 2,435-byte raw increase is 2.38 KiB: about 358 newly runnable IR functions
+and 160 public constants per added KiB. `Int.tdiv` accounts for 538 all-IR and
+247 public unlocks; `Int.ediv` accounts for 314 and 133. Most of the exact gain
+is in `Std` (715 all-IR, 329 public), especially `Std.Time`; `Init` gains 92 and
+40, while `Lean` gains 45 and 11. Another 275 roots advance to a different
+nearest blocker, led by the `Nat.gcd` boundary.
+
+A host-versus-Wasm fixture covers positive and negative divisors, division by
+zero, and both scalar and heap-allocated big integers. The focused differential
+fixture and upstream smoke pass with the candidate runtime.
+
+### Scalar And String ABI Completion
+
+The next accepted experiment audited the remaining ordinary fixed-width scalar,
+`Nat`, `String`, and `Substring` externs as one provider class, then measured
+the numeric and string groups separately. It adds 213 native capabilities on
+top of the integer-division checkpoint: 181 scalar and conversion operations,
+followed by 32 string and raw-substring operations.
+
+| Measurement | Integer-division control | Scalar/Nat stage | + String/Substring |
+| --- | ---: | ---: | ---: |
+| Native capabilities | 229 | 410 | 442 |
+| Stripped release Wasm | 660,433 B | 694,295 B | 717,818 B |
+| Incremental raw cost | - | +33,862 B | +23,523 B |
+| Gzip-compressed Wasm | 150,929 B | 157,076 B | 162,440 B |
+| Incremental gzip cost | - | +6,147 B | +5,364 B |
+| Runnable public constants | 28,037 | 28,562 | 28,878 |
+| Incremental public gain | - | +525 | +316 |
+| Runnable all-IR functions | 315,915 | 318,033 | 319,711 |
+| Incremental all-IR gain | - | +2,118 | +1,678 |
+| Regressions | - | 0 | 0 |
+
+Combined, the accepted sweep costs 57,385 raw bytes and 11,511 gzip bytes for
+3,796 newly runnable IR functions and 841 public constants. This is about 68
+IR functions and 15 public constants per added raw KiB. The string stage alone
+is similarly productive: its 32 registrations deliver about 73 IR functions
+and 14 public constants per raw KiB. Representative differential fixtures cover
+signed fixed-width multiplication and conversion, `Nat.gcd`/`Nat.xor`, Unicode
+`String.toList`, capitalization, intercalation, predicates, and raw-substring
+extraction. The complete 93-fixture suite and upstream smoke pass.
+
+Most scalar operations use inline implementations or runtime objects already
+in the source closure. String completion additionally retains the canonical
+`Init/Data/String/Modify.c` and `Init/Data/String/PosRaw.c` providers. Checked
+raw-substring operations reach `Init/Util.c` panic construction and its
+`Init/Data/Repr.c` dependency. All four providers remain explicit in the
+native-support manifest and are subject to final section-level dead stripping.
+
+A broader reconnaissance candidate also registered 101 missing `Float` and
+`Float32` operations. The safe surface increment beyond this accepted sweep
+was only 620 all-IR functions and 65 public constants, while the survey artifact
+(which still contained the eleven proof-bearing registrations discussed below)
+grew to 782,433 raw bytes after pulling additional math/runtime code. That
+tail is therefore not retained; it needs a narrower basic-arithmetic versus
+libm split before another size experiment.
+
+Eleven proof-bearing declarations were also excluded after the contemporary
+dynamic fixtures found a callable-arity mismatch between erased interpreted
+calls and their ordinary compiler-generated boxed wrappers. A later
+reassessment found that current package IR preserves the irrelevant argument
+for `String.Internal.getUTF8Byte`, and its ordinary wrapper passes a
+host-versus-Wasm fixture. The other ten remain visible as blockers until they
+are independently revalidated; native lookup must not infer support merely
+from a shared raw symbol.
+
+### Float Frontier Cost Triage
+
+The first pre-policy size scan split that broad Float tail into directly priced
+clusters on top of the scalar/string checkpoint. The exact A/B surface reports
+use the same Lean revision and 398,519-function universe.
+
+| Candidate | Names | Raw cost | Gzip cost | New all-IR | New public | All-IR / raw KiB |
+| --- | ---: | ---: | ---: | ---: | ---: | ---: |
+| Arithmetic/model core | 7 | +1,542 B | +320 B | +402 | +21 | 267.0 |
+| Broader basic Float set | 15 | +3,310 B | +576 B | +422 | +27 | 130.6 |
+| Formatting | 2 | +1,975 B | +404 B | +30 | +7 | 15.6 |
+| Broader basic plus formatting | 17 | +5,285 B | +887 B | +468 | +38 | 90.7 |
+| `pow` | 2 | +9,789 B | +6,130 B | +6 | +2 | 0.6 |
+
+The seven-name core is `Float.decLt`, `Float.add`, `Float.beq`,
+`Float.toModel`, `Float32.ofBits`, `Float32.decLe`, and `Float32.toModel`.
+It captures 402 of the broader basic set's 422 all-IR unlocks at less than half
+the raw cost. `Float.decLt` accounts for 280 of those exact unlocks; the other
+six contribute smaller but still cheap complete closures. The remaining eight
+basic operations add only 20 all-IR and 6 public functions for another 1,768
+raw bytes, so they should follow only when a concrete runtime workload values
+them.
+
+Formatting was retained as a separate stage because it pulls string-formatting
+support rather than ordinary arithmetic. The `pow` pair was deferred from the
+first stage: its roughly 10 KiB libm closure is manageable in absolute terms but
+has a very small library-surface gain. This scan also demonstrates why primary
+pressure cannot price benefit by itself. `Float.isInf` was the primary blocker
+for 45 roots (17 public), yet adding it within the broad basic cluster made only
+one root runnable because the others immediately reached another missing boundary.
+
+The core was subsequently promoted to runtime policy. The final catalog build
+is 719,360 raw bytes and 162,763 deterministic gzip bytes: +1,542 raw and +323
+gzip over the scalar/string checkpoint. It raises native capabilities from 442
+to 449 and exact coverage from 319,711 to 320,113 all-IR functions and from
+28,878 to 28,899 public constants, with no regressions. A host-versus-Wasm
+fixture dynamically covers addition, equality, strict comparison, 64-bit model
+extraction, 32-bit construction from bits, non-strict comparison, and 32-bit
+model extraction.
+
+Formatting was then promoted on top of that core. Its directly measured pair
+costs 1,975 raw and 463 gzip bytes and raises the catalog from 449 to 451
+capabilities. Exact coverage rises by 42 all-IR functions and 9 public constants
+to 320,155 and 28,908, with zero regressions; 349 blocked roots move to their
+next boundary. The resulting artifact is 721,335 raw and 163,226 gzip bytes. A
+host-versus-Wasm fixture hashes the exact concatenated output for positive and
+negative `Float` values and a `Float32` constructed from bits.
+
+The final low-cost basic remainder was accepted as one coherent stage after a
+fresh post-formatting A/B. The eight names are `Float.isInf`, `Float32.add`,
+`Float32.beq`, `Float32.decLt`, `Float32.div`, `Float32.mul`, `Float32.neg`, and
+`Float32.sub`. The final catalog adds 1,768 raw and 107 gzip bytes, reaches 459
+capabilities, and makes another 24 all-IR functions and 8 public constants
+runnable with no regressions. The semantic fixture exercises all eight members
+and returns its complete 255-point score.
+
+The deployed measurement plan is now rebased on the 723,398-byte checkpoint:
+
+| Remaining candidate | Names | Raw cost | Gzip cost | Exact surface gain | Current primary pressure |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `pow` | 2 | +9,773 B | +6,480 B | 8 all / 3 public | 8 all / 3 public |
+
+The current artifact is 723,398 raw and 163,593 deterministic gzip bytes, with
+322,027 of 398,519 all-IR functions and 29,217 of 36,887 public constants
+runnable. It exposes 461 native capabilities. The accepted
+`String.Internal.getUTF8Byte` stage accounts for the final 120 raw and 186 gzip
+bytes and for 1,802 all-IR and 292 public gains, with no regressions. Its gain
+spans `Init`, `Lean`, `Lake`, and `Std`, including 1,097 Lean functions. A
+host-versus-Wasm fixture reads all seven bytes of a mixed-width UTF-8 string and
+returns the exact weighted score 3,944 through Lean's ordinary generated boxed
+wrapper.
+
+`ByteArray.copySlice` was accepted as the next measured target. Its
+implementation is already retained for another caller, so exposing its
+generated wrapper costs 175 raw and 74 gzip bytes on the current baseline. A
+fresh exact A/B scan makes 46 all-IR functions and 9 public constants runnable
+with no regressions,
+notably in `Init.System.IO` and `Std.Http`. Its host-versus-Wasm fixture covers
+both destination growth and an overlapping source/destination copy, returning
+the exact weighted score 5,795. The remaining `pow` pair has no cascade: its
+eight current primary roots are exactly the eight functions it makes runnable,
+and no blocked root moves to a new boundary. It should therefore be accepted
+only for a concrete `pow` capability need, not as a frontier-density
+optimization.
+
 ## Interactive HTML Report
 
 The report generated from `main` is published with the hosted demo:
@@ -358,6 +592,16 @@ deployable report to `web/dist/surface/`. `npm run build:site` runs that step
 after the Vite build, so the existing Pages workflow publishes the report and
 the demo as one atomic artifact from `main`.
 
+The Pages build then prices the tracked candidates in
+`scripts/frontier-size-plan.json`, rerenders the surface report with exact
+isolated raw/gzip columns and a directly measured cluster table, and supplies
+the same cost artifact to the Wasm size explorer. An extern detail shows every
+measured candidate containing that boundary. The size explorer has a dedicated
+native-frontier table whose declaration links return to the corresponding
+surface entry. These figures are exact for the report's displayed baseline;
+they are regenerated after accepted runtime changes rather than carried forward
+as stale historical estimates.
+
 The left navigator treats dotted Lean module names as folders and files. Both
 folders and modules show a compact progress bar and exact percentage for the
 selected public-constant or all-IR metric. A four-band color scale distinguishes
@@ -376,13 +620,44 @@ open the matching backend-symbol search in the deployed Wasm size explorer;
 retained symbols link back to these declaration fragments.
 
 The size bridge also carries each extern's deterministic primary-blocker counts.
-The size explorer uses those counts only as current frontier pressure. They are
-additive across primary blockers, but they remain an upper bound rather than an
-unlock forecast; use an A/B surface comparison to measure the exact benefit of
-a runtime change. Its wider Lean context also matches installed native function
-aliases to exact retained Wasm linker symbols. This refines whole-object
-membership into function-level retained coverage without treating native and
-Wasm byte sizes as interchangeable.
+The size explorer joins those declarations directly to the complete sized
+function catalog of its displayed installed archives, independently of whether
+the provider is already retained in Wasm. The explanation reports both the
+mapped and total missing-extern counts; boundaries whose providers are outside
+this archive slice have no invented byte area. Pressure counts are additive
+across primary blockers, but remain an upper bound rather than an unlock
+forecast; use an A/B surface comparison to measure the exact benefit of a
+runtime change. The same context independently matches installed native
+function aliases to exact retained Wasm linker symbols. This refines
+whole-object membership into function-level retained coverage without treating
+native and Wasm byte sizes as interchangeable. The combined context-color mode
+displays both facts at once: green is retained code, orange is frontier
+pressure, purple is overlap, and gray is neither. Overlap does not violate the
+accounting: it means the native implementation is retained for some other path
+but the corresponding Lean declaration is still unavailable through VIR's
+extern catalog. The combined-mode sidebar lists these overlap functions
+directly and opens their symbol and declaration links. Above the map, total
+coverage reports matched native-function bytes against the complete installed
+native-support archives, together with sized-function byte and function-count
+ratios. The shipped Wasm size remains a separate fact because native and Wasm
+bytes are different targets. Hovering a context block updates the compact
+coverage strip with the corresponding archive, directory, member, or function
+metrics. Switching between the Wasm-boundary and installed-context scopes uses
+exact object/member and symbol/function IDs to morph up to 28 of the largest
+visible shared areas; the snapshot crossfade remains the fallback for matches
+below the current rendering depth. Runtime-member details provide clickable
+largest-function, highest-pressure, and retained-Wasm lists for dense sources
+such as `expr.cpp`. All scope animation is disabled when the browser requests
+reduced motion.
+
+Archive-member area is an exact on-disk partition, not a runtime-memory model.
+Positive-sized function symbols are separated from other executable section
+bytes, read-only and initialized writable data, exception/unwind tables,
+relocations, symbol/name tables, debug information, and remaining ELF
+metadata/alignment. Zero-fill sections are shown as a detail fact but occupy no
+treemap area because their bytes are not stored in the archive. In particular,
+large relocation and symbol-table blocks describe link-time object cost rather
+than code or data retained in a final executable.
 
 The generated directory contains a navigation index with the comparatively
 small extern catalog plus one compact JavaScript data file per module with

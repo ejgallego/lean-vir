@@ -42,8 +42,9 @@
           <div id="context-color-control" hidden>
             <span class="control-label">Context color</span>
             <div id="context-color-switch" class="segmented" role="group" aria-label="Runtime-context color metric">
-              <button type="button" data-context-color="boundary" class="selected">Boundary</button>
+              <button type="button" data-context-color="boundary" class="selected">Retained code</button>
               <button type="button" data-context-color="frontier">Frontier pressure</button>
+              <button type="button" data-context-color="combined">Both</button>
             </div>
           </div>
           <label id="map-depth-control" class="depth-control">
@@ -64,8 +65,24 @@
 
         <div class="context-bar">
           <nav id="breadcrumbs" class="breadcrumbs" aria-label="Treemap breadcrumbs"></nav>
-          <p id="view-note" class="view-note"></p>
+          <details class="view-explanation">
+            <summary>About this map</summary>
+            <p id="view-note" class="view-note"></p>
+          </details>
         </div>
+        <section id="runtime-coverage" class="runtime-coverage" aria-label="Lean runtime coverage" hidden>
+          <div class="runtime-coverage-heading">
+            <strong id="runtime-coverage-title">Full Lean native support</strong>
+            <span id="runtime-coverage-description"></span>
+          </div>
+          <div class="runtime-coverage-meter">
+            <output id="runtime-coverage-percent"></output>
+            <div class="runtime-coverage-track" aria-hidden="true">
+              <span id="runtime-coverage-fill"></span>
+            </div>
+          </div>
+          <div id="runtime-coverage-facts" class="runtime-coverage-facts"></div>
+        </section>
         <div id="color-legend" class="color-legend" hidden>
           <strong id="color-legend-title"></strong>
           <span id="color-legend-min" class="color-legend-value"></span>
@@ -98,6 +115,34 @@
         </div>
       </section>
 
+      <section id="frontier-cost-panel" class="method-panel frontier-cost-panel" hidden>
+        <div class="frontier-cost-heading">
+          <div>
+            <p class="eyebrow">Measured what-if links</p>
+            <h2>Native frontier costs</h2>
+          </div>
+          <p id="frontier-cost-baseline" class="frontier-cost-baseline"></p>
+        </div>
+        <p class="frontier-cost-note">
+          Raw and gzip deltas come from exact stripped release links. Cluster rows are measured
+          directly because linker garbage collection and compression make costs non-additive.
+        </p>
+        <div class="frontier-cost-table-wrap">
+          <table class="frontier-cost-table">
+            <thead>
+              <tr>
+                <th>Candidate</th>
+                <th>Native externs</th>
+                <th>Raw delta</th>
+                <th>Gzip delta</th>
+                <th>Primary pressure</th>
+              </tr>
+            </thead>
+            <tbody id="frontier-cost-rows"></tbody>
+          </table>
+        </div>
+      </section>
+
       <section class="method-panel">
         <h2>How to read this report</h2>
         <div class="method-grid">
@@ -105,10 +150,11 @@
           <p><strong>Ownership comes from <code>wasm-ld --Map</code>.</strong> Drill from a subsystem into an object/module and then a retained symbol.</p>
           <p><strong>Gzip is intentionally not apportioned.</strong> Compression depends on neighboring bytes, so per-symbol gzip estimates are not additive.</p>
           <p><strong>Runtime context uses a different unit.</strong> It measures installed native archive-member bytes and follows Lean's source hierarchy; archive provenance remains on every leaf.</p>
-          <p><strong>Files expand into native functions.</strong> Sized function symbols come from the installed archive objects; data, relocations, debug sections, framing, and unsized bytes remain explicit as object overhead.</p>
-          <p><strong>Boundary color is computed.</strong> Green intensity is the share of archive bytes belonging to exact native-function matches retained in VIR; directory, archive, and layer colors are byte-weighted child averages.</p>
+          <p><strong>Files expand into native functions and exact ELF byte classes.</strong> Positive-sized function symbols are separated from other executable code, runtime data, exception tables, relocations, symbol/name tables, debug information, and ELF metadata/alignment. Zero-fill memory is reported in details but has no archive-byte area.</p>
+          <p><strong>Retained-code color is computed.</strong> Green intensity is the share of archive bytes belonging to exact native-function matches retained in VIR; directory, archive, and layer colors are byte-weighted child averages.</p>
           <p><strong>Zoom depth is local and sticky.</strong> The slider controls how many descendant levels are drawn below the current breadcrumb and keeps its setting while you drill in.</p>
-          <p><strong>Frontier pressure is measured, not predicted.</strong> Color is blocker-root density per MiB; parent density is the byte-weighted average of its children. A repaired boundary may reveal another blocker.</p>
+          <p><strong>Frontier pressure is measured, not predicted.</strong> Color is blocker-root density per MiB; parent density is the byte-weighted average of its children. The focused log scale keeps sparse parent averages pale so concentrated leaves stand out. A repaired boundary may reveal another blocker.</p>
+          <p><strong>The combined view exposes overlap.</strong> Green is retained code, orange is frontier pressure, purple has both signals, and gray has neither. A retained native function can still be unavailable through the extern catalog.</p>
         </div>
       </section>
     </main>

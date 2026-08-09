@@ -22,6 +22,20 @@ def wrapperExterns (externs : Array NativeExtern) : Array NativeExtern :=
 def wrapperDecls (externs : Array NativeExtern) : Array Name :=
   wrapperExterns externs |>.map (·.name)
 
+def readExtraNames (path : System.FilePath) : IO (Array Name) := do
+  let mut names := #[]
+  for line in (← IO.FS.readFile path).splitOn "\n" do
+    let line := line.trimAscii.toString
+    if line.isEmpty || line.startsWith "#" then
+      continue
+    let name ← IO.ofExcept (parseDottedName line)
+    if names.contains name then
+      throw <| IO.userError s!"duplicate extra native extern `{name}`"
+    names := names.push name
+  if names.isEmpty then
+    throw <| IO.userError s!"extra native extern file `{path}` is empty"
+  return names
+
 def nativeExternCatalogJson (externs : Array NativeExtern) : String :=
   jsonObject #[
     ("format", jsonString "lean-vir-native-extern-catalog"),
@@ -72,8 +86,9 @@ unsafe def loadEnvironment : IO Environment := do
   | some env => return env
   | none => throw <| IO.userError "failed to load the Lean environment for native wrapper generation"
 
-def resolveNativeExternsIO (env : Environment) : IO (Array NativeExtern) :=
-  match resolveNativeExterns env with
+def resolveNativeExternsIO
+    (env : Environment) (extraNames : Array Name := #[]) : IO (Array NativeExtern) := do
+  match resolveNativeExternsWithExtras env extraNames with
   | .ok externs => pure externs
   | .error error => throw <| IO.userError error
 
@@ -81,9 +96,9 @@ unsafe def generateCatalog : IO String := do
   let env ← loadEnvironment
   return nativeExternCatalogJson (← resolveNativeExternsIO env) ++ "\n"
 
-unsafe def generate : IO (String × String) := do
+unsafe def generate (extraNames : Array Name := #[]) : IO (String × String) := do
   let env ← loadEnvironment
-  let externs ← resolveNativeExternsIO env
+  let externs ← resolveNativeExternsIO env extraNames
   let opts := maxHeartbeats.set ({} : Options) 0
   let action : CoreM (String × String) := do
     let wrapperDecls := wrapperDecls externs
@@ -119,6 +134,14 @@ unsafe def main (args : List String) : IO UInt32 := do
       Vir.GenerateNativeWrappers.writeFileIfChanged sourceOutput source
       Vir.GenerateNativeWrappers.writeFileIfChanged registryOutput registry
       return 0
+  | ["--extras", extrasPath, sourceOutput, registryOutput] =>
+      let names ← Vir.GenerateNativeWrappers.readExtraNames extrasPath
+      let (source, registry) ← Vir.GenerateNativeWrappers.generate names
+      Vir.GenerateNativeWrappers.writeFileIfChanged sourceOutput source
+      Vir.GenerateNativeWrappers.writeFileIfChanged registryOutput registry
+      return 0
   | _ =>
-      IO.eprintln "usage: vir_native_wrappers --catalog | <output.cpp> <registry.inc>"
+      IO.eprintln <|
+        "usage: vir_native_wrappers --catalog | <output.cpp> <registry.inc> | " ++
+        "--extras <names.txt> <output.cpp> <registry.inc>"
       return 2

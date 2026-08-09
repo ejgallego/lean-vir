@@ -118,12 +118,18 @@ async function assertSurfaceReport() {
     "surface report should export backend targets for the size-report bridge");
   assert.ok(sizeLinks.externs.some((declaration) => declaration.primaryRoots > 0),
     "surface report should export measured primary-blocker pressure");
+  assert.ok(sizeLinks.externs.some((declaration) => declaration.frontierCosts?.length > 0),
+    "surface report should export exact frontier costs for the size-report bridge");
 
   const manifest = JSON.parse(await assertFile("surface/vir-surface-html.json", 100));
   assert.equal(manifest.format, "lean-vir-surface-html");
   assert.ok(manifest.selectedModules > 0, "surface report should select Lean library modules");
   assert.ok(manifest.declarations > 0, "surface report should contain Lean IR declarations");
   assert.ok(manifest.moduleDataFiles > 0, "surface report should contain per-module data files");
+  assert.ok(manifest.frontierCosts?.candidates > 0,
+    "surface report should contain current exact frontier measurements");
+  assert.equal(manifest.frontierCosts.failedCandidates, 0,
+    "surface report should not publish failed frontier measurements");
 }
 
 async function assertWasmSizeReport() {
@@ -148,6 +154,10 @@ async function assertWasmSizeReport() {
   assert.ok(manifest.attribution.symbols > 0, "Wasm size report should contain retained symbols");
   assert.ok(manifest.attribution.connectedSymbols > 0,
     "Wasm size report should connect retained symbols to runnable-surface declarations");
+  assert.ok(manifest.frontierCosts?.candidates > 0,
+    "Wasm size report should contain current exact frontier measurements");
+  assert.equal(manifest.frontierCosts.failedCandidates, 0,
+    "Wasm size report should not publish failed frontier measurements");
   assert.equal(manifest.runtimeContext.archives, 3);
   assert.equal(manifest.runtimeContext.sourceMembers, manifest.runtimeContext.members,
     "every runtime-context member should have exact Lean source provenance");

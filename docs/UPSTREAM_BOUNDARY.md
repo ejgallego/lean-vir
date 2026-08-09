@@ -69,9 +69,12 @@ another upstream source file. `Lean.Level.beq` uses `lean_level_eq` from the
 already linked `level.cpp`; registering it retains that function and its
 generated boxed adapter in the final module.
 
-`Nat.land`, `Int.emod`, and `Int.tmod` similarly use canonical inline runtime
-implementations. `String.Internal.get` resolves to `lean_string_utf8_get` in
-the already linked `object.cpp`, `System.Platform.getIsWindows` to
+`Nat.land`, `Int.ediv`, `Int.tdiv`, `Int.emod`, and `Int.tmod` similarly use
+canonical inline runtime implementations. The division registrations retain
+the scalar and big-integer paths already supplied by the selected runtime
+objects without adding another provider source. `String.Internal.get` resolves
+to `lean_string_utf8_get` in the already linked `object.cpp`,
+`System.Platform.getIsWindows` to
 `lean_system_platform_windows` in `platform.cpp`, and `Lean.Expr.equal` to the
 binder-sensitive equality implementation in the already linked
 `expr_eq_fn.cpp`. That last path asks upstream `expr.cpp` for
@@ -83,13 +86,24 @@ This keeps the boundary faithful without pulling the complete generated
 
 The string frontier registers `String.Internal.trim`,
 `String.Internal.isPrefixOf`, `String.Internal.foldl`, and
-`String.Internal.isEmpty`. The first two exports live in generated
+`String.Internal.isEmpty`. A later reassessment also registers
+`String.Internal.getUTF8Byte`; its inline runtime implementation and ordinary
+compiler-generated boxed wrapper add no generated provider module. The first
+two exports live in generated
 `Init/Data/String/TakeDrop.c`; retaining `trim` also reaches `Slice.c`,
 `FindPos.c`, and `Decode.c`. `foldl` is supplied by `Iterate.c`, while
 `isEmpty` resolves to `lean_string_isempty` in the already linked `Defs.c`.
 All five generated providers are listed explicitly in
 `native-support-sources.txt`, and section-level dead-code elimination keeps
 only the implementation closure reached by the registered symbols.
+
+The scalar and string ABI-completion sweep extends that same policy to ordinary
+`Bool`, `ISize`, `Int8`/`Int16`/`Int32`/`Int64`, `Nat`, fixed-width unsigned,
+`USize`, `String`, and `Substring` operations. Most scalar providers are inline
+runtime operations. String completion additionally selects the canonical
+`Data/String/Modify.c` and `Data/String/PosRaw.c` stage0 providers; checked raw
+substring operations retain `Util.c` and `Data/Repr.c` for panic construction.
+The runtime registry contains 442 audited native capabilities after this sweep.
 
 ## Native Extern Metadata Ownership
 
@@ -102,9 +116,9 @@ responsibilities:
 - compiler metadata copied from Lean: parameter ownership and IR types, result
   IR type, and the C backend symbol.
 
-The second part should not remain hand-maintained. The current 223-entry table
-already contains 11 backend symbols shared by 23 Lean declaration names, such
-as `String.append` / `String.Internal.append` and `Nat.decLe` / `Nat.ble`.
+The second part should not remain hand-maintained. The table contains backend
+symbols shared by several Lean declaration names, such as `String.append` /
+`String.Internal.append` and `Nat.decLe` / `Nat.ble`.
 The rejected string-alias experiment made the maintenance problem especially
 clear: adding an internal spelling required copying an existing signature and
 symbol even when it added almost no runnable surface.
@@ -266,6 +280,17 @@ correct. A boxed implementation remains explicit in `runtime/native_symbols.cpp`
 only when VIR's all-owned interpreter boundary needs ownership behavior that
 Lean's standard wrapper cannot express.
 
+Proof-erased call shapes still require dynamic validation rather than inference
+from a shared raw symbol. Current `.irpkg` call expressions preserve irrelevant
+arguments, so the interpreter and Lean's ordinary three-argument boxed wrapper
+agree for `String.Internal.getUTF8Byte`; a mixed-width UTF-8 differential fixture
+checks all seven raw byte positions. Other proof-bearing declarations such as
+`Char.ofNatAux`, `Int.divExact`, `Nat.divExact`,
+`String.Internal.ugetUTF8Byte`, `String.get'`, `String.getUtf8Byte`,
+`String.next'`, `UInt16.ofNatLT`, `UInt8.ofNatLT`, and `USize.ofNat32` remain
+unsupported until independently checked. Native lookup must not infer an alias
+from a coincidentally shared raw symbol.
+
 ## Native Extern Metadata
 
 `Vir/GeneratePackage/NativeExterns.lean` records only VIR policy: the Lean
@@ -275,9 +300,10 @@ The declaration parameter ABI, borrow bits, and result ABI come directly from
 `Lean.IR.findEnvDecl`. The native symbol comes from `Lean.getExternNameFor`
 unless the policy entry supplies an override.
 
-The consolidation experiment covered all 223 registered declarations. Every
-ABI was available from Lean's imported environment; 213 native symbols also
-matched Lean's standard C-extern resolution. The ten deliberate overrides are
+The consolidation experiment covered the then-current 223 registered
+declarations. Every ABI was available from Lean's imported environment; 213
+native symbols also matched Lean's standard C-extern resolution. The ten
+deliberate overrides are
 `Array.mkEmpty`, `Array.emptyWithCapacity`, `ByteArray.empty`,
 `ByteArray.extract`, `String.Pos.Raw.set`, `String.Pos.set`, `String.set`,
 `UInt32.ofNatLT`, `UInt64.ofNatLT`, and `USize.ofNatLT`. They select existing
@@ -479,10 +505,11 @@ fields.
 `vir_obj_ctor` consumes owned object-field references. See
 [OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and ownership rules.
 
-The current explicit native externs cover the small fixture/demo surface for
-`Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
-`Float`, `String`, and the helper externs reached by `Lean.Expr`/`Lean.Level`
-data computation. This includes the arithmetic and comparison operations
+The current explicit native externs cover the fixture/demo surface and measured
+runtime-frontier additions for `Nat`, `Int`, `ISize`, the signed and unsigned
+fixed-width integers, `Array`, `ByteArray`, `USize`, `Float`, `String`,
+`Substring`, and the helper externs reached by `Lean.Expr`/`Lean.Level` data
+computation. This includes the arithmetic and comparison operations
 needed by the demos, List/Array/String/ByteArray fixtures, array mutation
 through `Array.emptyWithCapacity`/`Array.getInternal`/`Array.replicate`/
 `Array.set`/`Array.set!`/`Array.swap`/`Array.swapIfInBounds`/`Array.pop`,
@@ -544,7 +571,10 @@ symbol address. `ByteArray.extract` is exposed as Lean's compiled symbol stem
 (`l_ByteArray_extract`) and delegates to the linked runtime
 `lean_byte_array_copy_slice` path. Its registered IR parameters mirror the real
 compiled declaration: the source byte array and stop index are borrowed, while
-the start index is consumed.
+the start index is consumed. `ByteArray.copySlice` now exposes that already
+retained raw provider through Lean's ordinary generated boxed wrapper. A
+differential fixture covers both destination growth and overlapping source and
+destination values, so this catalog addition needs no custom ownership adapter.
 `String.Pos.set`, `String.Pos.Raw.set`, and the legacy `String.set` each use a
 distinct native stem in the shim because their boxed arities differ, but all
 three wrappers delegate to the same linked runtime helper,

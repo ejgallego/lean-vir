@@ -113,21 +113,41 @@ vir_resource_root
 EOF
 
 package_start=$SECONDS
-npm run --silent generate:package
-for package in "${browser_packages[@]}"; do
-  generated_package="build/generated/$package"
-  demo_package="web/public/$package"
-  if ! cmp -s "$generated_package" "$demo_package"; then
-    cp "$generated_package" "$demo_package"
-  fi
-done
+skip_packages="${VIR_SKIP_PACKAGES:-0}"
+case "$skip_packages" in
+  0)
+    npm run --silent generate:package
+    for package in "${browser_packages[@]}"; do
+      generated_package="build/generated/$package"
+      demo_package="web/public/$package"
+      if ! cmp -s "$generated_package" "$demo_package"; then
+        cp "$generated_package" "$demo_package"
+      fi
+    done
+    ;;
+  1)
+    echo "skip browser package generation (VIR_SKIP_PACKAGES=1)"
+    ;;
+  *)
+    echo "error: VIR_SKIP_PACKAGES must be 0 or 1, got '$skip_packages'" >&2
+    exit 1
+    ;;
+esac
 package_seconds=$((SECONDS - package_start))
 
 wrapper_generation_start=$SECONDS
 lake build vir_native_wrappers
-lake env .lake/build/bin/vir_native_wrappers \
-  "$generated_native_wrappers" \
-  "$generated_native_registry"
+native_extern_extras_file="${VIR_NATIVE_EXTERN_EXTRAS_FILE:-}"
+if [ -n "$native_extern_extras_file" ]; then
+  lake env .lake/build/bin/vir_native_wrappers \
+    --extras "$native_extern_extras_file" \
+    "$generated_native_wrappers" \
+    "$generated_native_registry"
+else
+  lake env .lake/build/bin/vir_native_wrappers \
+    "$generated_native_wrappers" \
+    "$generated_native_registry"
+fi
 wrapper_generation_seconds=$((SECONDS - wrapper_generation_start))
 
 src_commit="unknown"
@@ -617,6 +637,12 @@ report_start=$SECONDS
   echo "- Wasm stack size: $wasm_stack_size bytes"
   echo "- Generated config overlay: \`$overlay_include/lean/config.h\`"
   echo "- Object cache: \`$obj_dir\`"
+  echo "- Browser package generation skipped: $([ "$skip_packages" = "1" ] && echo "yes" || echo "no")"
+  if [ -n "$native_extern_extras_file" ]; then
+    echo "- Extra native extern names: \`$native_extern_extras_file\`"
+  else
+    echo "- Extra native extern names: none"
+  fi
   echo "- Real Lean runtime sources linked: $runtime_source_count"
   echo "- Lean support sources linked: $support_source_count"
   echo "- Compiler-generated native wrapper sources linked: $generated_source_count"
@@ -777,7 +803,7 @@ report_start=$SECONDS
   echo "host/platform stubs. \`package/package_loader_abi.cpp\` supplies the package-load"
   echo "WASM exports. \`package/package_section_directory.cpp\` reads the v10"
   echo "package section directory. \`package/package_ir_decoder.cpp\` decodes"
-  echo "\`$generated_package\`, a single-file declaration package emitted from typed"
+  echo "the \`build/generated/*.irpkg\` packages emitted from typed"
   echo "\`Lean.IR.Decl\` values by \`tools/GeneratePackage.lean\`; \`package/package_ir_builders.cpp\`"
   echo "materializes the decoded IR as Lean objects. \`package/package_decl_provider.cpp\` owns the loaded package state and"
   echo "declaration lookup facade. The browser demos run through the real upstream"

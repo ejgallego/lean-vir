@@ -27,6 +27,14 @@ structure NativeExtern extends NativeExternSpec where
   resultType : IRType
   symbol : String
 
+def parseDottedName (text : String) : Except String Name := do
+  if text.isEmpty then
+    throw "dotted Lean name must be non-empty"
+  let parts := text.splitOn "."
+  if parts.any (·.isEmpty) then
+    throw s!"dotted Lean name `{text}` must not contain empty components"
+  return parts.foldl (fun name part => .str name part) .anonymous
+
 def nativeIRTypeLabel : IRType → String
   | .float => "float"
   | .uint8 => "uint8"
@@ -59,6 +67,111 @@ def privateEnvironmentName (part : String) : Name :=
   let root := .str (.str (.str .anonymous "_private") "Lean") "Environment"
   let pre := .str (.str (.num root 0) "Lean") "Environment"
   .str pre part
+
+private def boxedExternSpecs (baseName : Name) (members : Array String) : Array NativeExternSpec :=
+  members.map fun member => {
+    name := .str baseName member
+    generateBoxedWrapper := true
+  }
+
+private def stringCompletionExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `String.Internal #[
+    "any", "capitalize", "drop", "dropRight", "front", "intercalate", "nextWhile"
+  ] ++ boxedExternSpecs `String.Pos.Raw.Internal #["min", "sub"] ++
+  boxedExternSpecs `String.Pos.Raw #["get!", "get?"] ++
+  boxedExternSpecs `String.Slice #["hash", "instDecidableLt"] ++ boxedExternSpecs `String #[
+    "atEnd", "data", "get", "get!", "get?", "mk", "next", "prev", "toByteArray", "toList"
+  ] ++ boxedExternSpecs `Substring.Raw.Internal #[
+    "all", "drop", "extract", "front", "get", "isEmpty", "prev", "takeWhile", "toString"
+  ]
+
+/--
+Complete the ordinary scalar and string runtime ABI without repeating a full
+`NativeExternSpec` record for every operation. These declarations all carry
+their canonical C extern names in Lean's environment; strict Wasm linking is
+the provider audit for this intentionally broad frontier experiment.
+-/
+private def primitiveCompletionExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Bool #[
+    "toISize", "toInt16", "toInt32", "toInt64", "toInt8", "toUInt16", "toUInt32",
+    "toUInt8", "toUSize"
+  ] ++ boxedExternSpecs `ISize #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toInt", "toInt16", "toInt32", "toInt64", "toInt8", "xor"
+  ] ++ boxedExternSpecs `Int #["decNonneg"] ++ boxedExternSpecs `Int16 #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toISize", "toInt", "toInt32", "toInt64", "toInt8", "xor"
+  ] ++ boxedExternSpecs `Int32 #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toISize", "toInt", "toInt16", "toInt64", "toInt8", "xor"
+  ] ++ boxedExternSpecs `Int64 #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toISize", "toInt", "toInt16", "toInt32", "toInt8", "xor"
+  ] ++ boxedExternSpecs `Int8 #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toISize", "toInt", "toInt16", "toInt32", "toInt64", "xor"
+  ] ++ boxedExternSpecs `Nat #["beq", "gcd", "pred", "xor"] ++
+  stringCompletionExternSpecs ++ boxedExternSpecs `UInt16 #[
+    "log2", "ofBitVec", "ofNat", "toBitVec", "toFloat", "toFloat32", "toUInt64",
+    "toUInt8", "toUSize"
+  ] ++ boxedExternSpecs `UInt32 #[
+    "log2", "ofBitVec", "toBitVec", "toFloat", "toFloat32", "toUSize"
+  ] ++ boxedExternSpecs `UInt64 #["log2", "toBitVec", "toFloat32", "toUInt16"] ++
+  boxedExternSpecs `UInt8 #[
+    "log2", "ofBitVec", "ofNat", "toBitVec", "toFloat", "toFloat32", "toUInt16",
+    "toUInt64", "toUSize"
+  ] ++ boxedExternSpecs `USize #[
+    "complement", "div", "log2", "lor", "mod", "neg", "ofBitVec", "toBitVec",
+    "toFloat", "toFloat32", "toUInt16", "toUInt32", "toUInt8", "xor"
+  ]
+
+/--
+The measured low-cost Float frontier. This deliberately stays separate from
+the broad scalar completion list: its seven members were priced as one strict
+Wasm link and dynamically checked before becoming runtime policy.
+-/
+private def floatCoreExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Float #["add", "beq", "decLt", "toModel"] ++
+  boxedExternSpecs `Float32 #["decLe", "ofBits", "toModel"]
+
+/--
+The separately measured Float formatting frontier. Keeping it distinct from
+the arithmetic/model core records that these two wrappers retain string-format
+support and were accepted using their own size and surface A/B measurements.
+-/
+private def floatFormattingExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Float #["toString"] ++
+  boxedExternSpecs `Float32 #["toString"]
+
+/--
+The measured basic Float remainder: infinity classification plus the ordinary
+Float32 arithmetic, equality, and strict-order operations. This closes the
+low-cost non-libm frontier while leaving `pow` and the broad math surface out.
+-/
+private def floatBasicCompletionExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Float #["isInf"] ++
+  boxedExternSpecs `Float32 #["add", "beq", "decLt", "div", "mul", "neg", "sub"]
+
+/--
+The remeasured internal raw-byte accessor. The expanded scalar and string
+runtime turns this formerly shallow alias into a broad library-surface gain,
+while Lean's ordinary compiler-generated wrapper remains the ABI provider.
+-/
+private def stringByteAccessorExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `String.Internal #["getUTF8Byte"]
+
+/--
+The measured byte-array catalog gap. Its raw copy implementation is already
+retained by `ByteArray.extract`, so this stage adds only Lean's ordinary boxed
+wrapper and exposes the primitive to interpreted library closures.
+-/
+private def byteArrayCopySliceExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `ByteArray #["copySlice"]
 
 def nativeExternSpecs : Array NativeExternSpec := #[
   {
@@ -139,6 +252,14 @@ def nativeExternSpecs : Array NativeExternSpec := #[
   },
   {
     name := `Int.mul,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Int.ediv,
+    generateBoxedWrapper := true
+  },
+  {
+    name := `Int.tdiv,
     generateBoxedWrapper := true
   },
   {
@@ -976,10 +1097,22 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     name := `Lean.Expr.equal,
     generateBoxedWrapper := true
   }
-]
+] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs ++
+  floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs ++
+  stringByteAccessorExternSpecs ++ byteArrayCopySliceExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)
+
+def resolveNativeExternsWithExtras
+    (env : Environment) (extraNames : Array Name) : Except String (Array NativeExtern) := do
+  let mut externs ← resolveNativeExterns env
+  for name in extraNames do
+    if externs.any (·.name == name) then
+      throw s!"extra native extern `{name}` is already registered"
+    let spec : NativeExternSpec := { name, generateBoxedWrapper := true }
+    externs := externs.push (← spec.resolve env)
+  return externs
 
 def nativeExternSpec? (n : Name) : Option NativeExternSpec :=
   nativeExternSpecs.find? fun spec => spec.name == n
@@ -990,9 +1123,9 @@ def isUnsupportedInitGlobal : Decl -> Bool
 
 def primitiveNamespaces : List String :=
   [
-    "Array", "Bool", "ByteArray", "Char", "Float", "Float32", "IO", "Int", "Lean",
-    "Nat", "Ptr", "ST", "String", "UInt8", "UInt16", "UInt32", "UInt64",
-    "USize"
+    "Array", "Bool", "ByteArray", "Char", "Float", "Float32", "IO", "ISize", "Int",
+    "Int8", "Int16", "Int32", "Int64", "Lean", "Nat", "Ptr", "ST", "String",
+    "Substring", "UInt8", "UInt16", "UInt32", "UInt64", "USize"
   ]
 
 partial def nameHead? : Name -> Option String

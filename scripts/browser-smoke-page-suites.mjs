@@ -250,6 +250,7 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
     depth: document.querySelector("#map-depth")?.value,
     depthMax: document.querySelector("#map-depth")?.max,
+    runtimeCoverageHidden: document.querySelector("#runtime-coverage")?.hidden,
   })`);
   assert.equal(ownership.selectedView, "ownership");
   assert.ok(ownership.blocks > 0);
@@ -258,6 +259,7 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(ownership.top.includes("Lean C runtime"));
   assert.equal(ownership.depth, "2");
   assert.equal(ownership.depthMax, "3");
+  assert.equal(ownership.runtimeCoverageHidden, true);
 
   await setInputValueAndDispatch(cdp, "#map-depth", "3", "input");
 
@@ -293,10 +295,19 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(surfaceBridge.href.includes("../surface/#declaration=Array.replicate"));
 
   await clickSelector(cdp, "#scope-switch button[data-scope='context']");
+  await waitForBrowserState(cdp, `(() => {
+    const selected = document.querySelector("#scope-switch button.selected")?.dataset.scope;
+    return { ready: selected === "context", value: selected };
+  })()`, { timeoutMessage: "Wasm size explorer scope transition did not finish" });
   const context = await evaluate(cdp, `({
     selectedScope: document.querySelector("#scope-switch button.selected")?.dataset.scope,
+    scopeTransition: {
+      supported: typeof document.startViewTransition === "function",
+      name: getComputedStyle(document.querySelector("#treemap")).viewTransitionName,
+    },
     root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
     note: document.querySelector("#view-note")?.textContent,
+    explanationOpen: document.querySelector(".view-explanation")?.open,
     mixed: document.querySelectorAll("#treemap .mixed-boundary").length,
     outside: document.querySelectorAll("#treemap .outside-boundary").length,
     depth: document.querySelector("#map-depth")?.value,
@@ -314,6 +325,24 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
       min: document.querySelector("#color-legend-min")?.textContent,
       max: document.querySelector("#color-legend-max")?.textContent,
     },
+    retainedCodeLabel: document.querySelector("#context-color-switch button[data-context-color='boundary']")?.textContent,
+    coverage: (() => {
+      const native = globalThis.__virWasmSize.trees.runtimeContext.children
+        .find((node) => node.meta?.layer === "native");
+      const ratio = native.meta.retainedNativeFunctionBytes / native.bytes;
+      return {
+        hidden: document.querySelector("#runtime-coverage")?.hidden,
+        title: document.querySelector("#runtime-coverage-title")?.textContent,
+        percent: document.querySelector("#runtime-coverage-percent")?.value,
+        expectedPercent: (ratio * 100).toFixed(1) + "%",
+        expectedFill: ratio * 100,
+        fill: Number.parseFloat(document.querySelector("#runtime-coverage-fill")?.style.width),
+        description: document.querySelector("#runtime-coverage-description")?.textContent,
+        facts: Array.from(document.querySelectorAll("#runtime-coverage-facts > div"), (node) => node.textContent),
+        retainedFunctions: native.meta.retainedFunctionCount.toLocaleString("en-US"),
+        totalFunctions: native.meta.functionCount.toLocaleString("en-US"),
+      };
+    })(),
     objectFunctions: (() => {
       let object = null;
       const visit = (node) => {
@@ -327,10 +356,26 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
         density: object.meta.boundaryDensity,
       };
     })(),
+    surfaceMapping: {
+      mappedMissing: globalThis.__virWasmSize.runtimeContext.missingSurfaceEntries,
+      totalMissing: globalThis.__virWasmSize.runtimeContext.totalMissingSurfaceEntries,
+      unmappedMissing: globalThis.__virWasmSize.runtimeContext.unmappedMissingSurfaceEntries,
+      primaryRoots: globalThis.__virWasmSize.runtimeContext.primaryRoots,
+    },
   })`);
   assert.equal(context.selectedScope, "context");
+  assert.equal(context.scopeTransition.supported, true);
+  assert.equal(context.scopeTransition.name, "vir-map-scope");
   assert.equal(context.root, "Installed Lean execution context");
+  assert.equal(context.explanationOpen, false);
   assert.ok(context.note.includes("exact retained Wasm symbols"));
+  assert.ok(context.surfaceMapping.mappedMissing > 300);
+  assert.ok(context.surfaceMapping.totalMissing > context.surfaceMapping.mappedMissing);
+  assert.equal(
+    context.surfaceMapping.unmappedMissing,
+    context.surfaceMapping.totalMissing - context.surfaceMapping.mappedMissing,
+  );
+  assert.ok(context.surfaceMapping.primaryRoots > 40_000);
   assert.ok(context.mixed > 0);
   assert.ok(context.outside > 0);
   assert.equal(context.depth, "4");
@@ -346,6 +391,16 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     min: "0%",
     max: "100%",
   });
+  assert.equal(context.retainedCodeLabel, "Retained code");
+  assert.equal(context.coverage.hidden, false);
+  assert.equal(context.coverage.title, "Full Lean native support");
+  assert.equal(context.coverage.percent, context.coverage.expectedPercent);
+  assert.ok(Math.abs(context.coverage.fill - context.coverage.expectedFill) < 0.01);
+  assert.ok(context.coverage.description.includes("exact retained Wasm counterparts"));
+  assert.equal(context.coverage.facts.length, 2);
+  assert.ok(context.coverage.facts[0].includes(
+    `${context.coverage.retainedFunctions} / ${context.coverage.totalFunctions}`,
+  ));
   assert.equal(context.objectFunctions.total, 260);
   assert.ok(
     Number.isInteger(context.objectFunctions.retained)
@@ -357,25 +412,177 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
       && context.objectFunctions.density >= 0
       && context.objectFunctions.density < 1,
   );
-
-  await setInputValueAndDispatch(cdp, "#map-depth", "7", "input");
-  const deepContext = await evaluate(cdp, `({
-    depth: document.querySelector("#map-depth")?.value,
-    output: document.querySelector("#map-depth-value")?.value,
-    hash: location.hash,
-    depthSix: document.querySelectorAll("#treemap .depth-6").length,
-    depthFourLabels: Array.from(document.querySelectorAll("#treemap .depth-4 .block-label strong"), (node) => node.textContent),
-    depthFiveLabels: Array.from(document.querySelectorAll("#treemap .depth-5 .block-label strong"), (node) => node.textContent),
-    depthSixLabels: Array.from(document.querySelectorAll("#treemap .depth-6 .block-label strong"), (node) => node.textContent),
+  await setInputValueAndDispatch(cdp, "#node-search", "expr.cpp", "input");
+  await clickSelector(cdp, "#search-results button");
+  const runtimeMemberDetails = await evaluate(cdp, `({
+    title: document.querySelector("#selection-details h2")?.textContent,
+    statLabels: Array.from(document.querySelectorAll("#selection-details .detail-stats dt"),
+      (node) => node.textContent),
+    highlightTitles: Array.from(document.querySelectorAll("#selection-details .detail-highlights h3"),
+      (node) => node.textContent),
+    pressureFunctions: Array.from(document.querySelectorAll(
+      "#selection-details .detail-highlights section:nth-child(2) button span:first-child",
+    ), (node) => node.textContent),
+    retainedRows: document.querySelectorAll(
+      "#selection-details .detail-highlights section:nth-child(3) li",
+    ).length,
+    expectedRetainedRows: (() => {
+      let result = 0;
+      const visit = (node) => {
+        if (node.kind === "runtimeMember" && node.name === "expr.cpp") {
+          result = node.children
+            .filter((child) => child.kind === "runtimeFunction" && child.meta.inVirBoundary)
+            .slice(0, 5)
+            .length;
+        }
+        for (const child of node.children ?? []) visit(child);
+      };
+      visit(globalThis.__virWasmSize.trees.runtimeContext);
+      return result;
+    })(),
+    archiveBreakdown: (() => {
+      let result = null;
+      const visit = (node) => {
+        if (node.kind === "runtimeMember" && node.name === "expr.cpp") result = {
+          bytes: node.bytes,
+          childBytes: node.children.reduce((sum, child) => sum + child.bytes, 0),
+          categories: node.children
+            .filter((child) => child.kind === "runtimeOverhead")
+            .map((child) => child.name),
+        };
+        for (const child of node.children ?? []) visit(child);
+      };
+      visit(globalThis.__virWasmSize.trees.runtimeContext);
+      return result;
+    })(),
   })`);
+  assert.equal(runtimeMemberDetails.title, "expr.cpp");
+  assert.ok(runtimeMemberDetails.statLabels.includes("Functions with blocker pressure"));
+  assert.ok(runtimeMemberDetails.statLabels.includes("Retained + blocker overlap"));
+  assert.ok(runtimeMemberDetails.statLabels.includes("Zero-fill memory (not archive bytes)"));
+  assert.deepEqual(runtimeMemberDetails.highlightTitles, [
+    "Largest native functions",
+    "Highest frontier pressure",
+    ...(runtimeMemberDetails.expectedRetainedRows > 0 ? ["Retained in VIR Wasm"] : []),
+  ]);
+  assert.ok(runtimeMemberDetails.pressureFunctions.includes("lean_expr_has_loose_bvar"));
+  assert.equal(runtimeMemberDetails.retainedRows, runtimeMemberDetails.expectedRetainedRows);
+  assert.equal(
+    runtimeMemberDetails.archiveBreakdown.childBytes,
+    runtimeMemberDetails.archiveBreakdown.bytes,
+  );
+  assert.ok(runtimeMemberDetails.archiveBreakdown.categories.includes("Relocation records"));
+  assert.ok(runtimeMemberDetails.archiveBreakdown.categories.includes("Symbol and string tables"));
+  assert.ok(runtimeMemberDetails.archiveBreakdown.categories.includes("ELF metadata and alignment"));
+  await clickSelector(cdp, "#breadcrumbs button:first-child");
+
+  await setInputValueAndDispatch(cdp, "#node-search", "src/", "input");
+  await clickSelector(cdp, "#search-results button");
+  const sourceDirectoryDetail = await evaluate(cdp, `(() => {
+    const exprBlock = Array.from(document.querySelectorAll("#treemap .map-block"))
+      .find((block) => block.getAttribute("aria-label")?.startsWith("expr.cpp,"));
+    return {
+      root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
+      breadcrumbs: Array.from(document.querySelectorAll("#breadcrumbs button"),
+        (button) => button.textContent),
+      exprWidth: exprBlock?.getBoundingClientRect().width ?? 0,
+      exprHeight: exprBlock?.getBoundingClientRect().height ?? 0,
+      exprChildren: exprBlock?.querySelectorAll(":scope > .nested-map > .map-block").length ?? 0,
+      exprLooseBVar: exprBlock?.querySelectorAll(
+        ":scope > .nested-map > [aria-label^='lean_expr_has_loose_bvar,']",
+      ).length ?? 0,
+    };
+  })()`);
+  assert.equal(sourceDirectoryDetail.root, "src/");
+  assert.ok(sourceDirectoryDetail.breadcrumbs.includes("libleancpp.a"));
+  assert.ok(sourceDirectoryDetail.exprWidth >= 36);
+  assert.ok(sourceDirectoryDetail.exprHeight >= 40);
+  assert.ok(sourceDirectoryDetail.exprChildren > 0);
+  assert.ok(sourceDirectoryDetail.exprLooseBVar > 0);
+  await clickSelector(cdp, "#breadcrumbs button:first-child");
+  await setInputValueAndDispatch(cdp, "#node-search", "", "input");
+
+  const hoverCoverage = await evaluate(cdp, `(() => {
+    const native = globalThis.__virWasmSize.trees.runtimeContext.children
+      .find((node) => node.meta?.layer === "native");
+    const archive = native.children.find((node) => node.name === "libleanrt.a");
+    const block = Array.from(document.querySelectorAll("#treemap .map-block"))
+      .find((node) => node.dataset.nodeId === archive.id);
+    block.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    const hovered = {
+      title: document.querySelector("#runtime-coverage-title")?.textContent,
+      percent: document.querySelector("#runtime-coverage-percent")?.value,
+      expectedPercent: (archive.meta.retainedNativeFunctionBytes / archive.bytes * 100).toFixed(1) + "%",
+      facts: Array.from(document.querySelectorAll("#runtime-coverage-facts > div"), (node) => node.textContent),
+    };
+    document.querySelector("#treemap").dispatchEvent(new PointerEvent("pointerleave"));
+    return {
+      hovered,
+      resetTitle: document.querySelector("#runtime-coverage-title")?.textContent,
+    };
+  })()`);
+  assert.equal(hoverCoverage.hovered.title, "libleanrt.a");
+  assert.equal(hoverCoverage.hovered.percent, hoverCoverage.hovered.expectedPercent);
+  assert.equal(hoverCoverage.hovered.facts.length, 2);
+  assert.equal(hoverCoverage.resetTitle, "Full Lean native support");
+
+  await clickSelector(cdp, ".view-explanation summary");
+  const explanation = await evaluate(cdp, `({
+    open: document.querySelector(".view-explanation")?.open,
+    noteWidth: document.querySelector("#view-note")?.getBoundingClientRect().width,
+    breadcrumbWidth: document.querySelector("#breadcrumbs")?.getBoundingClientRect().width,
+  })`);
+  assert.equal(explanation.open, true);
+  assert.ok(explanation.noteWidth > 300);
+  assert.ok(explanation.breadcrumbWidth > 300);
+  await clickSelector(cdp, ".view-explanation summary");
+
+  const deepContext = await evaluate(cdp, `(async () => {
+    const input = document.querySelector("#map-depth");
+    input.value = "7";
+    const started = performance.now();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(requestAnimationFrame);
+    return {
+      depth: input.value,
+      output: document.querySelector("#map-depth-value")?.value,
+      hash: location.hash,
+      renderMs: performance.now() - started,
+      sharedAreas: document.querySelectorAll("#treemap [data-wasm-node-id]").length,
+      sharedWasmIds: Array.from(document.querySelectorAll("#treemap [data-wasm-node-id]"),
+        (node) => node.dataset.wasmNodeId),
+      depthSix: document.querySelectorAll("#treemap .depth-6").length,
+      depthFourNames: Array.from(document.querySelectorAll("#treemap .depth-4"), (node) => node.getAttribute("aria-label")),
+      depthFiveNames: Array.from(document.querySelectorAll("#treemap .depth-5"), (node) => node.getAttribute("aria-label")),
+      depthSixNames: Array.from(document.querySelectorAll("#treemap .depth-6"), (node) => node.getAttribute("aria-label")),
+    };
+  })()`);
   assert.equal(deepContext.depth, "7");
   assert.equal(deepContext.output, "7 / 7");
   assert.ok(deepContext.hash.includes("depth=7"));
+  assert.ok(deepContext.renderMs < 1500, `level-7 treemap render took ${deepContext.renderMs} ms`);
+  assert.ok(deepContext.sharedAreas > 0);
   assert.ok(deepContext.depthSix > 0);
-  assert.ok(deepContext.depthFourLabels.includes("object.cpp"));
-  assert.ok(deepContext.depthFiveLabels.includes("tcp.cpp"));
-  assert.ok(deepContext.depthFiveLabels.includes("lean_mark_mt"));
-  assert.ok(deepContext.depthSixLabels.includes("lean_uv_tcp_send"));
+  assert.ok(deepContext.depthFourNames.some((name) => name?.startsWith("object.cpp,")));
+  assert.ok(deepContext.depthFiveNames.some((name) => name?.startsWith("tcp.cpp,")));
+  assert.ok(deepContext.depthFiveNames.some((name) => name?.startsWith("lean_mark_mt,")));
+  assert.ok(deepContext.depthSixNames.some((name) => name?.startsWith("lean_uv_tcp_send,")));
+
+  await clickSelector(cdp, "#scope-switch button[data-scope='boundary']");
+  await waitForBrowserState(cdp, `(() => {
+    const selected = document.querySelector("#scope-switch button.selected")?.dataset.scope;
+    return { ready: selected === "boundary", value: selected };
+  })()`, { timeoutMessage: "Wasm size explorer shared transition did not reach boundary scope" });
+  const boundarySharedWasmIds = await evaluate(cdp,
+    "Array.from(document.querySelectorAll('#treemap [data-wasm-node-id]'), "
+      + "(node) => node.dataset.wasmNodeId)");
+  assert.ok(deepContext.sharedWasmIds.some((id) => boundarySharedWasmIds.includes(id)));
+  await clickSelector(cdp, "#scope-switch button[data-scope='context']");
+  await waitForBrowserState(cdp, `(() => {
+    const selected = document.querySelector("#scope-switch button.selected")?.dataset.scope;
+    return { ready: selected === "context", value: selected };
+  })()`, { timeoutMessage: "Wasm size explorer shared transition did not return to context" });
+  assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.value"), "7");
 
   await clickSelector(cdp, "#top-children button");
   const nativeLayer = await evaluate(cdp, `({
@@ -395,6 +602,19 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     selectedColor: document.querySelector("#context-color-switch button.selected")?.dataset.contextColor,
     note: document.querySelector("#view-note")?.textContent,
     pressured: document.querySelectorAll("#treemap .frontier-pressure").length,
+    colorRange: (() => {
+      const blocks = Array.from(document.querySelectorAll("#treemap .frontier-pressure"));
+      const lightness = blocks.map((block) => Number.parseFloat(
+        block.style.getPropertyValue("--frontier-lightness"),
+      ));
+      const saturation = blocks.map((block) => Number.parseFloat(
+        block.style.getPropertyValue("--frontier-saturation"),
+      ));
+      return {
+        lightness: Math.max(...lightness) - Math.min(...lightness),
+        saturation: Math.max(...saturation) - Math.min(...saturation),
+      };
+    })(),
     listTitle: document.querySelector("#child-list-title")?.textContent,
     top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
     densityAverage: (() => {
@@ -412,6 +632,8 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.equal(frontier.selectedColor, "frontier");
   assert.ok(frontier.note.includes("not predicted unlock"));
   assert.ok(frontier.pressured > 0);
+  assert.ok(frontier.colorRange.lightness > 8);
+  assert.ok(frontier.colorRange.saturation > 8);
   assert.ok(frontier.note.includes("averaged by child bytes"));
   assert.equal(frontier.listTitle, "Frontier pressure");
   assert.ok(frontier.top.length > 0);
@@ -419,6 +641,55 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(frontier.densityAverage < 1e-9);
   assert.equal(frontier.legendTitle, "Blocker density · log color scale");
   assert.ok(frontier.legendMax.endsWith("roots / MiB"));
+
+  await clickSelector(cdp, "#context-color-switch button[data-context-color='combined']");
+  const combined = await evaluate(cdp, `({
+    selectedColor: document.querySelector("#context-color-switch button.selected")?.dataset.contextColor,
+    note: document.querySelector("#view-note")?.textContent,
+    overlap: document.querySelectorAll("#treemap .combined-overlap").length,
+    boundary: document.querySelectorAll("#treemap .combined-boundary").length,
+    neither: document.querySelectorAll("#treemap .combined-neither").length,
+    listTitle: document.querySelector("#child-list-title")?.textContent,
+    legendTitle: document.querySelector("#color-legend-title")?.textContent,
+    legendMin: document.querySelector("#color-legend-min")?.textContent,
+    legendMax: document.querySelector("#color-legend-max")?.textContent,
+    hash: location.hash,
+    top: Array.from(document.querySelectorAll("#top-children button span:first-child"), (node) => node.textContent),
+    overlapLeaves: (() => {
+      let count = 0;
+      const visit = (node) => {
+        if (!(node.children?.length)
+            && (node.meta?.boundaryDensity ?? 0) > 0
+            && (node.meta?.frontierDensity ?? 0) > 0) count += 1;
+        for (const child of node.children ?? []) visit(child);
+      };
+      visit(globalThis.__virWasmSize.trees.runtimeContext);
+      return count;
+    })(),
+  })`);
+  assert.equal(combined.selectedColor, "combined");
+  assert.ok(combined.overlapLeaves > 0);
+  assert.ok(combined.note.includes(`${combined.overlapLeaves} leaf functions currently have both signals`));
+  assert.ok(combined.note.includes("separate boundaries"));
+  assert.ok(combined.overlap > 0);
+  assert.ok(combined.boundary > 0);
+  assert.ok(combined.neither > 0);
+  assert.equal(combined.listTitle, "Retained + blocker overlap");
+  assert.equal(combined.top.length, combined.overlapLeaves);
+  assert.equal(combined.legendTitle, "Green retained · orange pressure · purple overlap");
+  assert.equal(combined.legendMin, "neither");
+  assert.equal(combined.legendMax, "both");
+  assert.ok(combined.hash.includes("color=combined"));
+
+  await clickSelector(cdp, "#top-children button");
+  const overlapDetail = await evaluate(cdp, `({
+    title: document.querySelector("#selection-details h2")?.textContent,
+    surfaceEntry: document.querySelector("#selection-details .detail-actions a")?.textContent,
+    surfaceHref: document.querySelector("#selection-details .detail-actions a")?.getAttribute("href"),
+  })`);
+  assert.ok(combined.top.includes(overlapDetail.title));
+  assert.ok(overlapDetail.surfaceEntry);
+  assert.ok(overlapDetail.surfaceHref.includes("../surface/#declaration="));
 
   await clickSelector(cdp, "#breadcrumbs button:first-child");
   assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.value"), "7");

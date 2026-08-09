@@ -184,9 +184,19 @@ places the current VIR boundary inside Lean's installed native runtime archives;
 it follows Lean's source hierarchy, separates the compiled `LeanIR.lean` program
 layer, exposes up to seven local hierarchy levels with a sticky depth slider,
 drills from source files into their sized native functions, and can color byte
-area by either exact retained-function coverage or measured primary-blocker
-density. Extern symbols link back to their coverage entries in the
-runnable-surface report:
+area by exact retained-function coverage, measured primary-blocker density, or
+a combined view where purple exposes code that is retained but not registered
+as a native extern. The context view reports total retained native-support
+coverage by archive bytes, sized-function bytes, and function count, while
+showing the cross-target Wasm size separately. Its combined-mode sidebar lists
+the overlap functions directly for one-click inspection. The compact coverage
+strip follows treemap hover so each archive, source subtree, file, and function
+can be compared without leaving the map. Deep zoom rendering
+is coalesced while dragging the slider, so only the newest requested level is
+drawn. Extern symbols link back to their coverage entries in the
+runnable-surface report. Both reports also display exact raw and gzip deltas
+from directly linked native-frontier experiments, keeping those costs separate
+from current blocker pressure:
 
 [VIR Wasm size explorer](https://ejgallego.github.io/lean-vir/size/)
 

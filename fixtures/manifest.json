@@ -472,6 +472,36 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-int-division",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.intDivisionScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-primitive-abi-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.primitiveAbiFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-primitive-scalar-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.scalarPrimitiveFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-primitive-string-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.stringPrimitiveFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-primitive-nat-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.natPrimitiveFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-int-compare",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.intCompareScore",
@@ -574,9 +604,21 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-bytearray-copy-slice-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.byteArrayCopySliceFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-string-parser-data",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.stringParserDataScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-string-internal-get-utf8-byte-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.stringInternalGetUTF8ByteFrontierScore",
       "result": { "type": "Nat" }
     },
     {
@@ -610,6 +652,24 @@
       "id": "boundary-float-to-uint32",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.floatToUInt32Score",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-float-core-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.floatCoreFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-float-formatting-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.floatFormattingFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-float-basic-completion-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.floatBasicCompletionFrontierScore",
       "result": { "type": "Nat" }
     }
   ]

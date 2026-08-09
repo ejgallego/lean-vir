@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "candidates": [
+    { "id": "Float.pow", "names": ["Float.pow"] },
+    { "id": "Float32.pow", "names": ["Float32.pow"] },
+    {
+      "id": "float-pow",
+      "names": ["Float.pow", "Float32.pow"]
+    }
+  ]
+}

@@ -8,7 +8,12 @@ import Init.Data.Nat.Bitwise.Basic
 import Init.Data.Nat.Log2
 import Init.Data.Array.Set
 import Init.Data.ByteArray.Basic
+import Init.Data.Float.Float32
+import Init.Data.SInt.Basic
 import Init.Data.String.Basic
+import Init.Data.String.Modify
+import Init.Data.String.Search
+import Init.Data.String.Substring
 import Init.System.IO
 
 namespace Vir.Fixtures.Boundary
@@ -25,6 +30,68 @@ def natShiftPowDivScore : Nat :=
 def intArithmeticScore : Nat :=
   let x : Int := ((10 : Int) + (-3 : Int)) * (2 : Int) - (5 : Int)
   x.toNat
+
+@[noinline]
+private def intDivisionCaseScore
+    (a b expectedEdiv expectedTdiv : Int) (weight : Nat) : Nat :=
+  (if a.ediv b == expectedEdiv then weight else 0) +
+    (if a.tdiv b == expectedTdiv then weight * 2 else 0)
+
+/-- Exercises Euclidean and truncating division for scalar and big integers. -/
+def intDivisionScore : Nat :=
+  let big : Int := 123456789012345678901234567891
+  intDivisionCaseScore (-12) 7 (-2) (-1) 1 +
+    intDivisionCaseScore 12 (-7) (-1) (-1) 4 +
+    intDivisionCaseScore (-12) (-7) 2 1 16 +
+    intDivisionCaseScore 12 0 0 0 64 +
+    intDivisionCaseScore (-big) 10 (-12345678901234567890123456790)
+      (-12345678901234567890123456789) 256 +
+    intDivisionCaseScore (-big) (-10) 12345678901234567890123456790
+      12345678901234567890123456789 1024
+
+@[noinline]
+private def scalarPrimitiveScore (a b : Int) : Nat :=
+  let int8Ok := Int8.toInt (Int8.mul (Int8.ofInt a) (Int8.ofInt b)) == -42
+  let int16Ok := Int16.toInt (Int16.mul (Int16.ofInt a) (Int16.ofInt b)) == -42
+  let int32Ok := Int32.toInt (Int32.mul (Int32.ofInt a) (Int32.ofInt b)) == -42
+  let int64Ok := Int64.toInt (Int64.mul (Int64.ofInt a) (Int64.ofInt b)) == -42
+  let isizeOk := ISize.toInt (ISize.mul (ISize.ofInt a) (ISize.ofInt b)) == -42
+  (if int8Ok then 1 else 0) +
+    (if int16Ok then 2 else 0) +
+    (if int32Ok then 4 else 0) +
+    (if int64Ok then 8 else 0) +
+    (if isizeOk then 16 else 0)
+
+@[noinline]
+private def stringPrimitiveScore (s : String) : Nat :=
+  let listOk := s.toList == ['A', 'é', '∀', 'Z']
+  let capitalizeOk := String.Internal.capitalize "lean" == "Lean"
+  let intercalateOk := String.Internal.intercalate "|" ["a", "β", "c"] == "a|β|c"
+  let anyOk := String.Internal.any s (· == '∀')
+  let raw := s.toRawSubstring
+  let extracted := Substring.Raw.Internal.extract raw raw.startPos raw.stopPos
+  let substringOk := Substring.Raw.Internal.toString extracted == s
+  (if listOk then 1 else 0) +
+    (if capitalizeOk then 2 else 0) +
+    (if intercalateOk then 4 else 0) +
+    (if anyOk then 8 else 0) +
+    (if substringOk then 16 else 0)
+
+def scalarPrimitiveFrontierScore : Nat :=
+  scalarPrimitiveScore (-7) 6
+
+def stringPrimitiveFrontierScore : Nat :=
+  stringPrimitiveScore "Aé∀Z"
+
+def natPrimitiveFrontierScore : Nat :=
+  (if Nat.gcd 84 30 == 6 then 1 else 0) +
+    (if Nat.xor 13 11 == 6 then 2 else 0)
+
+/-- Exercises representative scalar, Nat, String, and Substring primitive families. -/
+def primitiveAbiFrontierScore : Nat :=
+  scalarPrimitiveFrontierScore +
+    32 * stringPrimitiveFrontierScore +
+    1024 * natPrimitiveFrontierScore
 
 def intCompareScore : Nat :=
   let a : Int := -12
@@ -177,6 +244,20 @@ def byteArrayMkGetScore : Nat :=
   let bytes : ByteArray := ByteArray.mk #[65, 66, 67]
   (bytes.get 1 (by decide)).toNat + (bytes.get 2 (by decide)).toNat + bytes.size
 
+/-- Exercises growing and overlapping byte-array copies; success scores 5795. -/
+def byteArrayCopySliceFrontierScore : Nat :=
+  let src : ByteArray := ByteArray.mk #[10, 20, 30, 40, 50]
+  let dest : ByteArray := ByteArray.mk #[1, 2, 3]
+  let grown := src.copySlice 1 dest 2 3
+  let overlap := src.copySlice 0 src 1 4 false
+  1000 * grown.size +
+    (grown.get! 0).toNat + 2 * (grown.get! 1).toNat +
+    3 * (grown.get! 2).toNat + 4 * (grown.get! 3).toNat +
+    5 * (grown.get! 4).toNat +
+    (overlap.get! 0).toNat + 2 * (overlap.get! 1).toNat +
+    3 * (overlap.get! 2).toNat + 4 * (overlap.get! 3).toNat +
+    5 * (overlap.get! 4).toNat
+
 def stringParserDataScore : Nat :=
   let s := "Aé∀Z"
   let hashScore := s.hash.toNat % 97
@@ -185,6 +266,17 @@ def stringParserDataScore : Nat :=
     (if String.Pos.Raw.isValid s ⟨2⟩ then 100 else 3)
   let containsScore := if String.Internal.contains s '∀' then 20 else 0
   hashScore + validScore + containsScore
+
+/-- Reads every raw byte of a mixed-width UTF-8 string; success scores 3944. -/
+def stringInternalGetUTF8ByteFrontierScore : Nat :=
+  let s := "Aé∀Z"
+  (String.Internal.getUTF8Byte s 0 (by decide)).toNat +
+    2 * (String.Internal.getUTF8Byte s 1 (by decide)).toNat +
+    3 * (String.Internal.getUTF8Byte s 2 (by decide)).toNat +
+    4 * (String.Internal.getUTF8Byte s 3 (by decide)).toNat +
+    5 * (String.Internal.getUTF8Byte s 4 (by decide)).toNat +
+    6 * (String.Internal.getUTF8Byte s 5 (by decide)).toNat +
+    7 * (String.Internal.getUTF8Byte s 6 (by decide)).toNat
 
 unsafe def nameHashSubstringPtrScore : Nat :=
   let sameName := Lean.Name.beq `Lean.Parser `Lean.Parser
@@ -238,5 +330,63 @@ def floatScaleScore : Nat :=
 def floatToUInt32Score : Nat :=
   let x : Float := 3.0
   x.toUInt32.toNat
+
+@[noinline]
+private def floatCorePrimitiveScore (a b : Float) (float32Bits : UInt32) : Nat :=
+  let sum := Float.add a b
+  let sumOk := Float.beq sum 3.75
+  let orderOk := decide (a < b)
+  let sumModelOk := (Float.toModel sum).toBits == 0x400e000000000000
+  let value32 := Float32.ofBits float32Bits
+  let order32Ok := decide (value32 ≤ value32)
+  let model32Ok := (Float32.toModel value32).toBits == float32Bits
+  (if sumOk then 1 else 0) +
+    (if orderOk then 2 else 0) +
+    (if sumModelOk then 4 else 0) +
+    (if order32Ok then 8 else 0) +
+    (if model32Ok then 16 else 0)
+
+/-- Exercises the seven-member, size-priced Float/Float32 runtime frontier. -/
+def floatCoreFrontierScore : Nat :=
+  floatCorePrimitiveScore 1.5 2.25 0x3fc00000
+
+@[noinline]
+private def floatFormattingPrimitiveScore
+    (positive negative : Float) (float32Bits : UInt32) : Nat :=
+  let output :=
+    Float.toString positive ++ "|" ++
+    Float.toString negative ++ "|" ++
+    Float32.toString (Float32.ofBits float32Bits)
+  output.hash.toNat
+
+/-- Exercises exact Float and Float32 formatting against the native oracle. -/
+def floatFormattingFrontierScore : Nat :=
+  floatFormattingPrimitiveScore 3.75 (-0.125) 0x3fc00000
+
+@[noinline]
+private def floatBasicCompletionPrimitiveScore
+    (aBits bBits : UInt32) (infinityBits : UInt64) : Nat :=
+  let a := Float32.ofBits aBits
+  let b := Float32.ofBits bBits
+  let addOk := Float32.beq (Float32.add a b) (Float32.ofBits 0x40600000)
+  let mulOk := Float32.beq (Float32.mul a b) (Float32.ofBits 0x40400000)
+  let divOk := Float32.beq (Float32.div b b) (Float32.ofBits 0x3f800000)
+  let subOk := Float32.beq (Float32.sub b a) (Float32.ofBits 0x3f000000)
+  let negOk := Float32.beq (Float32.neg a) (Float32.ofBits 0xbfc00000)
+  let eqOk := Float32.beq a a
+  let orderOk := decide (a < b)
+  let infinityOk := Float.isInf (Float.ofBits infinityBits)
+  (if addOk then 1 else 0) +
+    (if mulOk then 2 else 0) +
+    (if divOk then 4 else 0) +
+    (if subOk then 8 else 0) +
+    (if negOk then 16 else 0) +
+    (if eqOk then 32 else 0) +
+    (if orderOk then 64 else 0) +
+    (if infinityOk then 128 else 0)
+
+/-- Exercises the eight-member basic Float completion; success scores 255. -/
+def floatBasicCompletionFrontierScore : Nat :=
+  floatBasicCompletionPrimitiveScore 0x3fc00000 0x40000000 0x7ff0000000000000
 
 end Vir.Fixtures.Boundary

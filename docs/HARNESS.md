@@ -48,8 +48,9 @@ browser smoke tests.
 
 The Lean toolchain is pinned by `lean-toolchain`. The upstream source fetcher
 pins the matching Lean source checkout under `third_party/lean4-src/`.
-Generating the Wasm size site also uses GNU `objdump` and `c++filt` from
-binutils to enumerate sized functions in the installed Lean archives.
+Generating the Wasm size site also uses GNU `objdump`, `readelf`, and `c++filt`
+from binutils to enumerate sized functions and exact ELF byte classes in the
+installed Lean archives.
 
 ## Generated Artifacts
 
@@ -113,12 +114,15 @@ npm run build:demo:release
 npm run build:demo-package
 npm run build:size-site
 npm run build:surface-site
+npm run build:frontier-size-site
+npm run build:analysis-site
 npm run build:site
 npm run check:api-coverage
 npm run check:ir-codec-tags
 npm run check:native-externs
 npm run check:native-wrappers
 npm run analyze:surface -- build/vir-surface/lean-libraries.json build/vir-surface/lean-libraries.md
+npm run analyze:frontier-size -- --plan /tmp/frontier-plan.json
 npm run render:surface -- build/vir-surface/lean-libraries.json build/vir-surface/html
 npm run compare:surface -- control.json candidate.json delta.json delta.md
 ```
@@ -338,17 +342,24 @@ and exact Lean source path. A generally available, per-view depth slider shows
 the requested number of local levels below the current breadcrumb and stays at
 that setting while zooming. The runtime context has up to seven levels—execution
 layer, archive, source-root directory, nested source directories, member, and
-sized native function. Archive-member bytes not assigned to a sized function
-remain explicit as non-function data and object overhead, so child areas add up
-exactly. The generated `libLeanIR.a` member is shown separately as compiled
+sized native function. Remaining archive bytes are divided into other
+executable code, runtime data, exception tables, relocations, symbol/name
+tables, debug information, and ELF metadata/alignment, so child areas add up
+exactly. Zero-fill memory is reported separately because it has no archive-byte
+area. The generated `libLeanIR.a` member is shown separately as compiled
 `LeanIR.lean` program code and is excluded from the native-support denominator.
-Boundary coloring matches native function aliases to exact retained Wasm linker
-symbols, then shows matched native-function bytes per archive byte; parent
-colors are byte-weighted averages of their children. Frontier-pressure coloring
-shows deterministic primary blocked-root density per MiB for missing extern
-backend symbols that are already retained. Parent colors are byte-weighted
-averages of their children. This is not a predicted unlock count because
-satisfying one boundary may reveal another.
+Retained-code coloring matches native function aliases to exact retained Wasm
+linker symbols. Frontier-pressure coloring independently joins missing externs
+to provider functions in the displayed archives. The combined mode shows both
+signals and their overlap. Parent colors remain byte-weighted, and blocker
+pressure is a prioritization hint rather than a predicted unlock count. Runtime
+member details and the compact coverage strip expose the underlying function,
+byte, and blocker measurements. See `docs/SURFACE_ANALYSIS.md` for the report's
+accounting rules, cross-report joins, and interaction design.
+The Pages build also runs the tracked native-frontier plan against the current
+release artifact. Both reports display exact isolated and directly measured
+cluster raw/gzip deltas, while keeping those costs distinct from blocker
+pressure and exact A/B runnable-surface gains.
 They are deployed at
 `https://ejgallego.github.io/lean-vir/surface/` and
 `https://ejgallego.github.io/lean-vir/size/` alongside the demo.

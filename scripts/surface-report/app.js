@@ -29,6 +29,19 @@ Author: Emilio J. Gallego Arias
   const blockerByName = new Map(
     report.primaryBlockers.map((summary) => [summary.blocker.name, summary]),
   );
+  const frontierCosts = report.frontierCosts?.candidates ?? [];
+  const frontierCostsByName = new Map();
+  for (const candidate of frontierCosts) {
+    for (const name of candidate.names) {
+      const costs = frontierCostsByName.get(name) ?? [];
+      costs.push(candidate);
+      frontierCostsByName.set(name, costs);
+    }
+  }
+  const isolatedCostByName = new Map(
+    frontierCosts.filter((candidate) => candidate.names.length === 1)
+      .map((candidate) => [candidate.names[0], candidate]),
+  );
   const folderByPath = new Map();
   const rootFolder = buildFolderTree(report.modules);
   const tree = document.querySelector("#module-tree");
@@ -354,15 +367,17 @@ Author: Emilio J. Gallego Arias
       valueCard("Blocked public constants", number.format(publicBlocked)),
       valueCard("Blocked all IR functions", number.format(report.counts.blocked)),
     );
-    main.replaceChildren(
+    const sections = [
       contentHeading(
         "Top blockers",
         "Report view",
         "Primary boundaries ranked by blocked IR roots. Each root is counted once at its nearest deterministic boundary.",
       ),
       stats,
-      renderTopBlockers(),
-    );
+    ];
+    if (frontierCosts.length > 0) sections.push(renderFrontierCosts());
+    sections.push(renderTopBlockers());
+    main.replaceChildren(...sections);
   }
 
   function folderDescription(folder) {
@@ -428,6 +443,7 @@ Author: Emilio J. Gallego Arias
     );
     const wrap = element("div", "data-table-wrap");
     const headings = ["Boundary", "Kind", "Public roots", "All roots", "Share of blocked IR"];
+    if (frontierCosts.length > 0) headings.push("Exact raw cost", "Exact gzip cost");
     if (limit === null) headings.push("Example blocked root");
     const table = tableElement(headings);
     const body = table.tBodies[0];
@@ -443,8 +459,54 @@ Author: Emilio J. Gallego Arias
         tableCell(number.format(summary.roots), "count-cell"),
         tableCell(percentage(summary.roots, report.counts.blocked), "percentage-cell"),
       ];
+      if (frontierCosts.length > 0) {
+        const cost = isolatedCostByName.get(summary.blocker.name);
+        cells.push(
+          tableCell(cost && !cost.error ? formatBytes(cost.rawDeltaBytes) : "—", "count-cell"),
+          tableCell(cost && !cost.error ? formatBytes(cost.gzipDeltaBytes) : "—", "count-cell"),
+        );
+      }
       if (limit === null) cells.push(tableCell(summary.examplePath?.[0] ?? "—", "example-root"));
       row.append(...cells);
+      body.append(row);
+    }
+    wrap.append(table);
+    card.append(wrap);
+    return card;
+  }
+
+  function renderFrontierCosts() {
+    const card = sectionCard(
+      "Measured frontier candidates",
+      `${number.format(frontierCosts.length)} exact link${frontierCosts.length === 1 ? "" : "s"}`,
+    );
+    card.append(element(
+      "p",
+      "section-description",
+      `Costs are measured against a ${formatBytes(report.frontierCosts.baseline.rawBytes)} ` +
+        "stripped baseline. Cluster rows are measured directly because costs are not additive.",
+    ));
+    const wrap = element("div", "data-table-wrap");
+    const table = tableElement([
+      "Candidate", "Native externs", "Raw delta", "Gzip delta", "Primary public", "Primary all",
+    ]);
+    const body = table.tBodies[0];
+    for (const candidate of frontierCosts) {
+      const row = document.createElement("tr");
+      const names = document.createElement("td");
+      names.className = "candidate-names";
+      candidate.names.forEach((name, index) => {
+        if (index > 0) names.append(document.createTextNode(", "));
+        names.append(boundaryLink(name));
+      });
+      row.append(
+        tableCell(candidate.id),
+        names,
+        tableCell(candidate.error ? "error" : formatBytes(candidate.rawDeltaBytes), "count-cell"),
+        tableCell(candidate.error ? "error" : formatBytes(candidate.gzipDeltaBytes), "count-cell"),
+        tableCell(number.format(candidate.primaryPublicRoots), "count-cell"),
+        tableCell(number.format(candidate.primaryRoots), "count-cell"),
+      );
       body.append(row);
     }
     wrap.append(table);
@@ -682,7 +744,31 @@ Author: Emilio J. Gallego Arias
         `${number.format(impact.publicRoots)} public / ${number.format(impact.roots)} all blocked roots`,
       );
     }
+    const costs = frontierCostsByName.get(declaration.name) ?? [];
+    const isolated = costs.find((candidate) => candidate.names.length === 1 && !candidate.error);
+    if (isolated) {
+      appendFact(
+        facts,
+        "Exact isolated cost",
+        `${formatBytes(isolated.rawDeltaBytes)} raw / ${formatBytes(isolated.gzipDeltaBytes)} gzip`,
+      );
+    }
     detail.append(facts);
+    if (costs.length > 0) {
+      detail.append(element("p", "control-label", "Measured frontier candidates"));
+      const list = element("ul", "extern-targets");
+      for (const candidate of costs) {
+        list.append(element(
+          "li",
+          "",
+          candidate.error
+            ? `${candidate.id}: measurement error`
+            : `${candidate.id}: ${formatBytes(candidate.rawDeltaBytes)} raw / ` +
+              `${formatBytes(candidate.gzipDeltaBytes)} gzip (${candidate.names.length} externs)`,
+        ));
+      }
+      detail.append(list);
+    }
     detail.append(element("p", "control-label", "Extern targets"));
     const targets = element("ul", "extern-targets");
     for (const target of declaration.targets) {
@@ -794,6 +880,12 @@ Author: Emilio J. Gallego Arias
 
   function tableCell(text, className = "") {
     return element("td", className, text ?? "—");
+  }
+
+  function formatBytes(value) {
+    if (!Number.isFinite(value)) return "—";
+    if (Math.abs(value) < 1024) return `${number.format(value)} B`;
+    return `${(value / 1024).toFixed(2)} KiB`;
   }
 
   function coverageTableCell(runnable, total) {

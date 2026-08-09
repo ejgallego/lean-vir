@@ -26,14 +26,32 @@ map lives in `docs/HARNESS.md`.
 - `npm run size:wasm`
   Print Markdown section-size tables for the generated WASM artifacts, including
   compressed sizes and link-map code-area attribution when available.
+- `npm run analyze:frontier-size`
+  Measure exact stripped release-Wasm raw and gzip costs for temporary native
+  extern additions without changing the checked-in catalog. Positional names
+  are measured in isolation; use `--plan` for directly priced clusters and
+  `--surface-links` to attach primary-blocker pressure hints. The runner skips
+  browser package generation and restores the byte-identical baseline artifact.
 - `npm run build:size-site`
   Render the release/debug Wasm artifacts and strict linker map as the static
   interactive section/subsystem/object/symbol treemap deployed under `/size/`.
   It also maps the current boundary into the installed Lean native runtime
   archives using exact source provenance, separates compiled Lean program code,
-  and exposes a primary-blocker-pressure color overlay. `npm run build:site`
+  and exposes retained-code, primary-blocker-pressure, and combined overlap
+  color modes. Missing externs are joined to the complete installed-archive
+  function catalog rather than only to objects retained in Wasm; the report
+  states how many of the total boundaries have providers in the displayed
+  slice. It reports total native-support coverage, makes overlap functions
+  directly explorable, morphs the largest visible exact correspondences during
+  scope changes, and adds function-level highlights to runtime-member details.
+  Animation is skipped when reduced motion is requested. `npm run build:site`
   supplies the surface-report symbol bridge; the standalone command remains
   usable without that optional cross-link data.
+- `npm run build:analysis-site`
+  Build the complete runnable-surface report, price the tracked candidates in
+  `scripts/frontier-size-plan.json`, rerender the surface UI with those costs,
+  and build the cross-linked Wasm size explorer. `npm run build:site` uses this
+  entry point for the analysis portion of the Pages artifact.
 - `npm run generate:irpkg`
   Build the local Lean library and `vir_irpkg` generator executable, then
   generate one manifest-bearing `.irpkg`.
