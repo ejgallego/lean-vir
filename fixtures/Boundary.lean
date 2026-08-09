@@ -8,7 +8,11 @@ import Init.Data.Nat.Bitwise.Basic
 import Init.Data.Nat.Log2
 import Init.Data.Array.Set
 import Init.Data.ByteArray.Basic
+import Init.Data.SInt.Basic
 import Init.Data.String.Basic
+import Init.Data.String.Modify
+import Init.Data.String.Search
+import Init.Data.String.Substring
 import Init.System.IO
 
 namespace Vir.Fixtures.Boundary
@@ -43,6 +47,50 @@ def intDivisionScore : Nat :=
       (-12345678901234567890123456789) 256 +
     intDivisionCaseScore (-big) (-10) 12345678901234567890123456790
       12345678901234567890123456789 1024
+
+@[noinline]
+private def scalarPrimitiveScore (a b : Int) : Nat :=
+  let int8Ok := Int8.toInt (Int8.mul (Int8.ofInt a) (Int8.ofInt b)) == -42
+  let int16Ok := Int16.toInt (Int16.mul (Int16.ofInt a) (Int16.ofInt b)) == -42
+  let int32Ok := Int32.toInt (Int32.mul (Int32.ofInt a) (Int32.ofInt b)) == -42
+  let int64Ok := Int64.toInt (Int64.mul (Int64.ofInt a) (Int64.ofInt b)) == -42
+  let isizeOk := ISize.toInt (ISize.mul (ISize.ofInt a) (ISize.ofInt b)) == -42
+  (if int8Ok then 1 else 0) +
+    (if int16Ok then 2 else 0) +
+    (if int32Ok then 4 else 0) +
+    (if int64Ok then 8 else 0) +
+    (if isizeOk then 16 else 0)
+
+@[noinline]
+private def stringPrimitiveScore (s : String) : Nat :=
+  let listOk := s.toList == ['A', 'é', '∀', 'Z']
+  let capitalizeOk := String.Internal.capitalize "lean" == "Lean"
+  let intercalateOk := String.Internal.intercalate "|" ["a", "β", "c"] == "a|β|c"
+  let anyOk := String.Internal.any s (· == '∀')
+  let raw := s.toRawSubstring
+  let extracted := Substring.Raw.Internal.extract raw raw.startPos raw.stopPos
+  let substringOk := Substring.Raw.Internal.toString extracted == s
+  (if listOk then 1 else 0) +
+    (if capitalizeOk then 2 else 0) +
+    (if intercalateOk then 4 else 0) +
+    (if anyOk then 8 else 0) +
+    (if substringOk then 16 else 0)
+
+def scalarPrimitiveFrontierScore : Nat :=
+  scalarPrimitiveScore (-7) 6
+
+def stringPrimitiveFrontierScore : Nat :=
+  stringPrimitiveScore "Aé∀Z"
+
+def natPrimitiveFrontierScore : Nat :=
+  (if Nat.gcd 84 30 == 6 then 1 else 0) +
+    (if Nat.xor 13 11 == 6 then 2 else 0)
+
+/-- Exercises representative scalar, Nat, String, and Substring primitive families. -/
+def primitiveAbiFrontierScore : Nat :=
+  scalarPrimitiveFrontierScore +
+    32 * stringPrimitiveFrontierScore +
+    1024 * natPrimitiveFrontierScore
 
 def intCompareScore : Nat :=
   let a : Int := -12

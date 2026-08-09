@@ -94,6 +94,14 @@ All five generated providers are listed explicitly in
 `native-support-sources.txt`, and section-level dead-code elimination keeps
 only the implementation closure reached by the registered symbols.
 
+The scalar and string ABI-completion sweep extends that same policy to ordinary
+`Bool`, `ISize`, `Int8`/`Int16`/`Int32`/`Int64`, `Nat`, fixed-width unsigned,
+`USize`, `String`, and `Substring` operations. Most scalar providers are inline
+runtime operations. String completion additionally selects the canonical
+`Data/String/Modify.c` and `Data/String/PosRaw.c` stage0 providers; checked raw
+substring operations retain `Util.c` and `Data/Repr.c` for panic construction.
+The runtime registry contains 442 audited native capabilities after this sweep.
+
 ## Native Extern Metadata Ownership
 
 `Vir/GeneratePackage/NativeExterns.lean` currently combines two different
@@ -105,9 +113,9 @@ responsibilities:
 - compiler metadata copied from Lean: parameter ownership and IR types, result
   IR type, and the C backend symbol.
 
-The second part should not remain hand-maintained. The current 223-entry table
-already contains 11 backend symbols shared by 23 Lean declaration names, such
-as `String.append` / `String.Internal.append` and `Nat.decLe` / `Nat.ble`.
+The second part should not remain hand-maintained. The table contains backend
+symbols shared by several Lean declaration names, such as `String.append` /
+`String.Internal.append` and `Nat.decLe` / `Nat.ble`.
 The rejected string-alias experiment made the maintenance problem especially
 clear: adding an internal spelling required copying an existing signature and
 symbol even when it added almost no runnable surface.
@@ -269,6 +277,18 @@ correct. A boxed implementation remains explicit in `runtime/native_symbols.cpp`
 only when VIR's all-owned interpreter boundary needs ownership behavior that
 Lean's standard wrapper cannot express.
 
+Proof erasure creates a second exception class that is not yet implemented. It
+affects `Char.ofNatAux`, `Int.divExact`, `Nat.divExact`,
+`String.Internal.getUTF8Byte`, `String.Internal.ugetUTF8Byte`, `String.get'`,
+`String.getUtf8Byte`, `String.next'`, `UInt16.ofNatLT`, `UInt8.ofNatLT`, and
+`USize.ofNat32`. The interpreter calls the erased IR signature while the
+ordinary compiler-generated boxed wrapper preserves proof-shaped parameters.
+Registering that wrapper directly causes a Wasm callable-arity mismatch. The
+ABI-completion sweep therefore leaves these declarations unsupported. A future
+explicit boxed-alias field may map each proof-bearing name to a proven
+proof-free adapter; the registry must not infer that alias from a coincidentally
+shared raw symbol.
+
 ## Native Extern Metadata
 
 `Vir/GeneratePackage/NativeExterns.lean` records only VIR policy: the Lean
@@ -278,9 +298,10 @@ The declaration parameter ABI, borrow bits, and result ABI come directly from
 `Lean.IR.findEnvDecl`. The native symbol comes from `Lean.getExternNameFor`
 unless the policy entry supplies an override.
 
-The consolidation experiment covered all 223 registered declarations. Every
-ABI was available from Lean's imported environment; 213 native symbols also
-matched Lean's standard C-extern resolution. The ten deliberate overrides are
+The consolidation experiment covered the then-current 223 registered
+declarations. Every ABI was available from Lean's imported environment; 213
+native symbols also matched Lean's standard C-extern resolution. The ten
+deliberate overrides are
 `Array.mkEmpty`, `Array.emptyWithCapacity`, `ByteArray.empty`,
 `ByteArray.extract`, `String.Pos.Raw.set`, `String.Pos.set`, `String.set`,
 `UInt32.ofNatLT`, `UInt64.ofNatLT`, and `USize.ofNatLT`. They select existing
@@ -482,10 +503,11 @@ fields.
 `vir_obj_ctor` consumes owned object-field references. See
 [OBJECT_ABI.md](OBJECT_ABI.md) for the staged plan and ownership rules.
 
-The current explicit native externs cover the small fixture/demo surface for
-`Nat`, `Int`, `Array`, `ByteArray`, `USize`, `UInt8`, `UInt32`, `UInt64`,
-`Float`, `String`, and the helper externs reached by `Lean.Expr`/`Lean.Level`
-data computation. This includes the arithmetic and comparison operations
+The current explicit native externs cover the fixture/demo surface and measured
+runtime-frontier additions for `Nat`, `Int`, `ISize`, the signed and unsigned
+fixed-width integers, `Array`, `ByteArray`, `USize`, `Float`, `String`,
+`Substring`, and the helper externs reached by `Lean.Expr`/`Lean.Level` data
+computation. This includes the arithmetic and comparison operations
 needed by the demos, List/Array/String/ByteArray fixtures, array mutation
 through `Array.emptyWithCapacity`/`Array.getInternal`/`Array.replicate`/
 `Array.set`/`Array.set!`/`Array.swap`/`Array.swapIfInBounds`/`Array.pop`,

@@ -60,6 +60,68 @@ def privateEnvironmentName (part : String) : Name :=
   let pre := .str (.str (.num root 0) "Lean") "Environment"
   .str pre part
 
+private def boxedExternSpecs (baseName : Name) (members : Array String) : Array NativeExternSpec :=
+  members.map fun member => {
+    name := .str baseName member
+    generateBoxedWrapper := true
+  }
+
+private def stringCompletionExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `String.Internal #[
+    "any", "capitalize", "drop", "dropRight", "front", "intercalate", "nextWhile"
+  ] ++ boxedExternSpecs `String.Pos.Raw.Internal #["min", "sub"] ++
+  boxedExternSpecs `String.Pos.Raw #["get!", "get?"] ++
+  boxedExternSpecs `String.Slice #["hash", "instDecidableLt"] ++ boxedExternSpecs `String #[
+    "atEnd", "data", "get", "get!", "get?", "mk", "next", "prev", "toByteArray", "toList"
+  ] ++ boxedExternSpecs `Substring.Raw.Internal #[
+    "all", "drop", "extract", "front", "get", "isEmpty", "prev", "takeWhile", "toString"
+  ]
+
+/--
+Complete the ordinary scalar and string runtime ABI without repeating a full
+`NativeExternSpec` record for every operation. These declarations all carry
+their canonical C extern names in Lean's environment; strict Wasm linking is
+the provider audit for this intentionally broad frontier experiment.
+-/
+private def primitiveCompletionExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Bool #[
+    "toISize", "toInt16", "toInt32", "toInt64", "toInt8", "toUInt16", "toUInt32",
+    "toUInt8", "toUSize"
+  ] ++ boxedExternSpecs `ISize #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toInt", "toInt16", "toInt32", "toInt64", "toInt8", "xor"
+  ] ++ boxedExternSpecs `Int #["decNonneg"] ++ boxedExternSpecs `Int16 #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toISize", "toInt", "toInt32", "toInt64", "toInt8", "xor"
+  ] ++ boxedExternSpecs `Int32 #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toISize", "toInt", "toInt16", "toInt64", "toInt8", "xor"
+  ] ++ boxedExternSpecs `Int64 #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toISize", "toInt", "toInt16", "toInt32", "toInt8", "xor"
+  ] ++ boxedExternSpecs `Int8 #[
+    "abs", "add", "complement", "decEq", "decLe", "decLt", "div", "land", "lor", "mod",
+    "mul", "neg", "ofInt", "ofNat", "shiftLeft", "shiftRight", "sub", "toFloat",
+    "toFloat32", "toISize", "toInt", "toInt16", "toInt32", "toInt64", "xor"
+  ] ++ boxedExternSpecs `Nat #["beq", "gcd", "pred", "xor"] ++
+  stringCompletionExternSpecs ++ boxedExternSpecs `UInt16 #[
+    "log2", "ofBitVec", "ofNat", "toBitVec", "toFloat", "toFloat32", "toUInt64",
+    "toUInt8", "toUSize"
+  ] ++ boxedExternSpecs `UInt32 #[
+    "log2", "ofBitVec", "toBitVec", "toFloat", "toFloat32", "toUSize"
+  ] ++ boxedExternSpecs `UInt64 #["log2", "toBitVec", "toFloat32", "toUInt16"] ++
+  boxedExternSpecs `UInt8 #[
+    "log2", "ofBitVec", "ofNat", "toBitVec", "toFloat", "toFloat32", "toUInt16",
+    "toUInt64", "toUSize"
+  ] ++ boxedExternSpecs `USize #[
+    "complement", "div", "log2", "lor", "mod", "neg", "ofBitVec", "toBitVec",
+    "toFloat", "toFloat32", "toUInt16", "toUInt32", "toUInt8", "xor"
+  ]
+
 def nativeExternSpecs : Array NativeExternSpec := #[
   {
     name := `Nat.add,
@@ -984,7 +1046,7 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     name := `Lean.Expr.equal,
     generateBoxedWrapper := true
   }
-]
+] ++ primitiveCompletionExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)
@@ -998,9 +1060,9 @@ def isUnsupportedInitGlobal : Decl -> Bool
 
 def primitiveNamespaces : List String :=
   [
-    "Array", "Bool", "ByteArray", "Char", "Float", "Float32", "IO", "Int", "Lean",
-    "Nat", "Ptr", "ST", "String", "UInt8", "UInt16", "UInt32", "UInt64",
-    "USize"
+    "Array", "Bool", "ByteArray", "Char", "Float", "Float32", "IO", "ISize", "Int",
+    "Int8", "Int16", "Int32", "Int64", "Lean", "Nat", "Ptr", "ST", "String",
+    "Substring", "UInt8", "UInt16", "UInt32", "UInt64", "USize"
   ]
 
 partial def nameHead? : Name -> Option String

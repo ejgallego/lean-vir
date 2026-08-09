@@ -364,6 +364,57 @@ A host-versus-Wasm fixture covers positive and negative divisors, division by
 zero, and both scalar and heap-allocated big integers. The focused differential
 fixture and upstream smoke pass with the candidate runtime.
 
+### Scalar And String ABI Completion
+
+The next accepted experiment audited the remaining ordinary fixed-width scalar,
+`Nat`, `String`, and `Substring` externs as one provider class, then measured
+the numeric and string groups separately. It adds 213 native capabilities on
+top of the integer-division checkpoint: 181 scalar and conversion operations,
+followed by 32 string and raw-substring operations.
+
+| Measurement | Integer-division control | Scalar/Nat stage | + String/Substring |
+| --- | ---: | ---: | ---: |
+| Native capabilities | 229 | 410 | 442 |
+| Stripped release Wasm | 660,433 B | 694,295 B | 717,818 B |
+| Incremental raw cost | - | +33,862 B | +23,523 B |
+| Gzip-compressed Wasm | 150,929 B | 157,076 B | 162,440 B |
+| Incremental gzip cost | - | +6,147 B | +5,364 B |
+| Runnable public constants | 28,037 | 28,562 | 28,878 |
+| Incremental public gain | - | +525 | +316 |
+| Runnable all-IR functions | 315,915 | 318,033 | 319,711 |
+| Incremental all-IR gain | - | +2,118 | +1,678 |
+| Regressions | - | 0 | 0 |
+
+Combined, the accepted sweep costs 57,385 raw bytes and 11,511 gzip bytes for
+3,796 newly runnable IR functions and 841 public constants. This is about 68
+IR functions and 15 public constants per added raw KiB. The string stage alone
+is similarly productive: its 32 registrations deliver about 73 IR functions
+and 14 public constants per raw KiB. Representative differential fixtures cover
+signed fixed-width multiplication and conversion, `Nat.gcd`/`Nat.xor`, Unicode
+`String.toList`, capitalization, intercalation, predicates, and raw-substring
+extraction. The complete 93-fixture suite and upstream smoke pass.
+
+Most scalar operations use inline implementations or runtime objects already
+in the source closure. String completion additionally retains the canonical
+`Init/Data/String/Modify.c` and `Init/Data/String/PosRaw.c` providers. Checked
+raw-substring operations reach `Init/Util.c` panic construction and its
+`Init/Data/Repr.c` dependency. All four providers remain explicit in the
+native-support manifest and are subject to final section-level dead stripping.
+
+A broader reconnaissance candidate also registered 101 missing `Float` and
+`Float32` operations. The safe surface increment beyond this accepted sweep
+was only 620 all-IR functions and 65 public constants, while the survey artifact
+(which still contained the eleven proof-bearing registrations discussed below)
+grew to 782,433 raw bytes after pulling additional math/runtime code. That
+tail is therefore not retained; it needs a narrower basic-arithmetic versus
+libm split before another size experiment.
+
+Eleven proof-bearing declarations were also excluded after dynamic fixtures
+found a callable-arity mismatch between erased interpreted calls and their
+ordinary compiler-generated boxed wrappers. They remain visible as blockers
+rather than being counted as supported. Supporting them should be a distinct
+boxed-alias feature, not another allowlist entry.
+
 ## Interactive HTML Report
 
 The report generated from `main` is published with the hosted demo:
