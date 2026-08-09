@@ -232,7 +232,12 @@ h1 {
 }
 
 .runtime-coverage {
-  padding: 0.8rem 1rem 0.9rem;
+  display: grid;
+  grid-template-columns: minmax(15rem, 1.25fr) minmax(10rem, 0.8fr) minmax(20rem, 1.5fr);
+  align-items: center;
+  gap: 1rem;
+  min-height: 3.7rem;
+  padding: 0.55rem 1rem;
   border-bottom: 1px solid var(--border);
   background: #f8fbfa;
 }
@@ -242,10 +247,7 @@ h1 {
 }
 
 .runtime-coverage-heading {
-  display: flex;
-  align-items: end;
-  justify-content: space-between;
-  gap: 1rem;
+  min-width: 0;
 }
 
 .runtime-coverage-heading strong,
@@ -263,16 +265,23 @@ h1 {
   font-size: 0.72rem;
 }
 
-.runtime-coverage-heading output {
+.runtime-coverage-meter {
+  display: grid;
+  grid-template-columns: 3.4rem minmax(4rem, 1fr);
+  align-items: center;
+  gap: 0.55rem;
+}
+
+.runtime-coverage-meter output {
   color: var(--accent);
-  font-size: 1.25rem;
+  font-size: 1rem;
   font-weight: 780;
   font-variant-numeric: tabular-nums;
+  text-align: right;
 }
 
 .runtime-coverage-track {
-  height: 0.62rem;
-  margin-top: 0.55rem;
+  height: 0.5rem;
   overflow: hidden;
   border: 1px solid rgb(23 107 103 / 18%);
   border-radius: 999px;
@@ -285,21 +294,20 @@ h1 {
   min-width: 2px;
   border-radius: inherit;
   background: linear-gradient(90deg, #36a985, #78cfad);
+  transition: width 90ms ease-out;
 }
 
 .runtime-coverage-facts {
-  display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 0.65rem;
-  margin-top: 0.65rem;
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+  min-width: 0;
 }
 
 .runtime-coverage-facts div {
   min-width: 0;
-  padding: 0.45rem 0.55rem;
-  border: 1px solid var(--border);
-  border-radius: 0.5rem;
-  background: #ffffff;
+  padding-left: 1rem;
+  border-left: 1px solid var(--border);
 }
 
 .runtime-coverage-facts strong,
@@ -311,7 +319,7 @@ h1 {
 }
 
 .runtime-coverage-facts strong {
-  font-size: 0.78rem;
+  font-size: 0.74rem;
   font-variant-numeric: tabular-nums;
 }
 
@@ -864,6 +872,15 @@ input:focus {
     grid-template-columns: 1fr;
     gap: 0.65rem;
   }
+
+  .runtime-coverage {
+    grid-template-columns: minmax(15rem, 1fr) minmax(10rem, 0.8fr);
+  }
+
+  .runtime-coverage-facts {
+    grid-column: 1 / -1;
+    justify-content: flex-start;
+  }
 }
 
 @media (max-width: 680px) {
@@ -895,12 +912,19 @@ input:focus {
     width: 100%;
   }
 
-  .runtime-coverage-heading {
-    align-items: start;
+  .runtime-coverage {
+    grid-template-columns: 1fr;
   }
 
   .runtime-coverage-facts {
-    grid-template-columns: 1fr;
+    grid-column: auto;
+    flex-direction: column;
+    gap: 0.4rem;
+  }
+
+  .runtime-coverage-facts div {
+    padding-left: 0;
+    border-left: 0;
   }
 
   .view-note {

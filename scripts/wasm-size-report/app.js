@@ -28,6 +28,7 @@ Author: Emilio J. Gallego Arias
     breadcrumbs: document.querySelector("#breadcrumbs"),
     note: document.querySelector("#view-note"),
     runtimeCoverage: document.querySelector("#runtime-coverage"),
+    runtimeCoverageTitle: document.querySelector("#runtime-coverage-title"),
     runtimeCoverageDescription: document.querySelector("#runtime-coverage-description"),
     runtimeCoveragePercent: document.querySelector("#runtime-coverage-percent"),
     runtimeCoverageFill: document.querySelector("#runtime-coverage-fill"),
@@ -78,7 +79,6 @@ Author: Emilio J. Gallego Arias
 
   renderIdentity();
   renderSummary();
-  renderRuntimeCoverage();
   renderFrontierCosts();
   bindControls();
   restoreHash();
@@ -163,9 +163,19 @@ Author: Emilio J. Gallego Arias
     });
     elements.treemap.addEventListener("pointerover", (event) => {
       const node = treemapNodeForEvent(event);
-      if (!node || node === selected) return;
+      if (!node) return;
+      if (view === "runtimeContext") renderRuntimeCoverage(node);
+      if (node === selected) return;
       selected = node;
       renderDetails(node);
+    });
+    elements.treemap.addEventListener("pointerleave", () => renderRuntimeCoverage());
+    elements.treemap.addEventListener("focusin", (event) => {
+      const node = treemapNodeForEvent(event);
+      if (view === "runtimeContext" && node) renderRuntimeCoverage(node);
+    });
+    elements.treemap.addEventListener("focusout", (event) => {
+      if (!elements.treemap.contains(event.relatedTarget)) renderRuntimeCoverage();
     });
     elements.treemap.addEventListener("click", (event) => {
       const node = treemapNodeForEvent(event);
@@ -226,6 +236,7 @@ Author: Emilio J. Gallego Arias
         ? "environment.cpp.o…"
         : "Search is available in ownership and runtime-context views";
     elements.note.textContent = viewNote();
+    renderRuntimeCoverage();
     renderColorLegend();
     renderBreadcrumbs();
     renderTreemap();
@@ -276,34 +287,39 @@ Author: Emilio J. Gallego Arias
         : "100%";
   }
 
-  function renderRuntimeCoverage() {
+  function renderRuntimeCoverage(node = nativeContextNode) {
     if (!nativeContextNode) return;
-    const meta = nativeContextNode.meta ?? {};
-    const retainedBytes = meta.retainedNativeFunctionBytes ?? 0;
-    const archiveBytes = nativeContextNode.bytes;
-    const archiveRatio = archiveBytes > 0 ? retainedBytes / archiveBytes : 0;
+    if (view !== "runtimeContext" || !node) node = nativeContextNode;
+    const meta = node.meta ?? {};
+    const isFunction = node.kind === "runtimeFunction";
+    const functionCount = meta.functionCount ?? (isFunction ? 1 : 0);
+    const functionBytes = meta.functionBytes ?? (isFunction ? node.bytes : 0);
+    const retainedFunctionCount = meta.retainedFunctionCount
+      ?? (isFunction && meta.inVirBoundary ? 1 : 0);
+    const retainedBytes = meta.retainedNativeFunctionBytes
+      ?? (isFunction && meta.inVirBoundary ? node.bytes : 0);
+    const nodeBytes = node.bytes;
+    const archiveRatio = nodeBytes > 0 ? retainedBytes / nodeBytes : 0;
+    elements.runtimeCoverageTitle.textContent = node === nativeContextNode
+      ? "Full Lean native support"
+      : node.name;
     elements.runtimeCoveragePercent.value = formatPercent(archiveRatio);
     elements.runtimeCoverageFill.style.width = `${clampUnit(archiveRatio) * 100}%`;
     elements.runtimeCoverageDescription.textContent =
-      `${formatBytes(retainedBytes)} of ${formatBytes(archiveBytes)} installed Lean native-support bytes have exact function counterparts retained in the VIR Wasm.`;
+      `${formatBytes(retainedBytes)} / ${formatBytes(nodeBytes)} have exact retained Wasm counterparts`;
     elements.runtimeCoverageFacts.replaceChildren(
-      coverageFact(
-        `${(meta.retainedFunctionCount ?? 0).toLocaleString("en-US")} / `
-          + `${(meta.functionCount ?? 0).toLocaleString("en-US")}`,
-        `sized functions · ${formatPercent(
-          (meta.retainedFunctionCount ?? 0) / (meta.functionCount ?? 1),
-        )}`,
-      ),
-      coverageFact(
-        `${formatBytes(retainedBytes)} / ${formatBytes(meta.functionBytes ?? 0)}`,
-        `sized function bytes · ${formatPercent(
-          retainedBytes / (meta.functionBytes || 1),
-        )}`,
-      ),
-      coverageFact(
-        formatBytes(report.binaries.release.rawBytes),
-        "shipped Wasm · different target, not used as the ratio",
-      ),
+      functionCount > 0
+        ? coverageFact(
+          `${retainedFunctionCount.toLocaleString("en-US")} / ${functionCount.toLocaleString("en-US")}`,
+          `functions · ${formatPercent(retainedFunctionCount / functionCount)}`,
+        )
+        : coverageFact("No sized functions", "non-function archive bytes"),
+      functionBytes > 0
+        ? coverageFact(
+          `${formatBytes(retainedBytes)} / ${formatBytes(functionBytes)}`,
+          `function bytes · ${formatPercent(retainedBytes / functionBytes)}`,
+        )
+        : coverageFact(formatBytes(node.bytes), "non-function / overhead"),
     );
   }
 

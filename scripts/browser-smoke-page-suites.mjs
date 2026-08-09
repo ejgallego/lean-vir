@@ -323,6 +323,7 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
       const ratio = native.meta.retainedNativeFunctionBytes / native.bytes;
       return {
         hidden: document.querySelector("#runtime-coverage")?.hidden,
+        title: document.querySelector("#runtime-coverage-title")?.textContent,
         percent: document.querySelector("#runtime-coverage-percent")?.value,
         expectedPercent: (ratio * 100).toFixed(1) + "%",
         expectedFill: ratio * 100,
@@ -367,14 +368,14 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   });
   assert.equal(context.retainedCodeLabel, "Retained code");
   assert.equal(context.coverage.hidden, false);
+  assert.equal(context.coverage.title, "Full Lean native support");
   assert.equal(context.coverage.percent, context.coverage.expectedPercent);
   assert.ok(Math.abs(context.coverage.fill - context.coverage.expectedFill) < 0.01);
-  assert.ok(context.coverage.description.includes("installed Lean native-support bytes"));
-  assert.equal(context.coverage.facts.length, 3);
+  assert.ok(context.coverage.description.includes("exact retained Wasm counterparts"));
+  assert.equal(context.coverage.facts.length, 2);
   assert.ok(context.coverage.facts[0].includes(
     `${context.coverage.retainedFunctions} / ${context.coverage.totalFunctions}`,
   ));
-  assert.ok(context.coverage.facts[2].includes("different target"));
   assert.equal(context.objectFunctions.total, 260);
   assert.ok(
     Number.isInteger(context.objectFunctions.retained)
@@ -386,6 +387,30 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
       && context.objectFunctions.density >= 0
       && context.objectFunctions.density < 1,
   );
+
+  const hoverCoverage = await evaluate(cdp, `(() => {
+    const native = globalThis.__virWasmSize.trees.runtimeContext.children
+      .find((node) => node.meta?.layer === "native");
+    const archive = native.children.find((node) => node.name === "libleanrt.a");
+    const block = Array.from(document.querySelectorAll("#treemap .map-block"))
+      .find((node) => node.dataset.nodeId === archive.id);
+    block.dispatchEvent(new PointerEvent("pointerover", { bubbles: true }));
+    const hovered = {
+      title: document.querySelector("#runtime-coverage-title")?.textContent,
+      percent: document.querySelector("#runtime-coverage-percent")?.value,
+      expectedPercent: (archive.meta.retainedNativeFunctionBytes / archive.bytes * 100).toFixed(1) + "%",
+      facts: Array.from(document.querySelectorAll("#runtime-coverage-facts > div"), (node) => node.textContent),
+    };
+    document.querySelector("#treemap").dispatchEvent(new PointerEvent("pointerleave"));
+    return {
+      hovered,
+      resetTitle: document.querySelector("#runtime-coverage-title")?.textContent,
+    };
+  })()`);
+  assert.equal(hoverCoverage.hovered.title, "libleanrt.a");
+  assert.equal(hoverCoverage.hovered.percent, hoverCoverage.hovered.expectedPercent);
+  assert.equal(hoverCoverage.hovered.facts.length, 2);
+  assert.equal(hoverCoverage.resetTitle, "Full Lean native support");
 
   const deepContext = await evaluate(cdp, `(async () => {
     const input = document.querySelector("#map-depth");

@@ -360,9 +360,10 @@ functions directly and opens their cross-linked details. A context-wide coverage
 strip reports retained native-function bytes against all installed native-support
 archive bytes, plus sized-function byte and function-count coverage. The shipped
 Wasm byte size is shown separately because Wasm and native archive bytes are not
-an interchangeable denominator. Deep slider input is animation-frame
-coalesced, subtree depths are cached, and the treemap uses one delegated event
-surface rather than per-block handlers; the browser smoke guards the complete
+an interchangeable denominator. Hovering a runtime-context block temporarily
+updates the compact strip with that subtree's ratios. Deep slider input is
+animation-frame coalesced, subtree depths are cached, and the treemap uses one
+delegated event surface rather than per-block handlers; the browser smoke guards the complete
 level-seven render against regression.
 The Pages build also runs the tracked native-frontier plan against the current
 release artifact. Both reports display exact isolated and directly measured

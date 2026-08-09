@@ -613,7 +613,8 @@ opens their symbol and declaration links. Above the map, total coverage reports
 matched native-function bytes against the complete installed native-support
 archives, together with sized-function byte and function-count ratios. The
 shipped Wasm size remains a separate fact because native and Wasm bytes are
-different targets.
+different targets. Hovering a context block updates the compact coverage strip
+with the corresponding archive, directory, member, or function metrics.
 
 The generated directory contains a navigation index with the comparatively
 small extern catalog plus one compact JavaScript data file per module with
