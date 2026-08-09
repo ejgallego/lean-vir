@@ -1,10 +1,14 @@
 # Event Callback And Closure Roadmap
 
+The authoritative current resource and callback ownership contract is
+[Resource Ownership Policy](HOST_BINDINGS.md#resource-ownership-policy). This
+document keeps callback-specific context, test history, and future directions.
+
 `Lean.Vir.Browser.Element.addEventListener`, `Timer.setTimeout`, and
 `Animation.requestAnimationFrame` are the callback APIs for browser-driven
 reentry into Lean. Event listeners use retained Lean closures directly.
 
-## Current Contract
+## Callback Surface Snapshot
 
 - Opaque browser resources are represented in Lean as `Lean.Vir.Js` handles
   over abstract marker classes such as `Element`, `Event`, `EventListener`,

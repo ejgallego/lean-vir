@@ -594,9 +594,11 @@ phase.
 `Animation.requestAnimationFrame`, and raw React Node rendering use the callback ABI.
 Event resources are valid only during the callback. Listener, timeout, frame,
 and React root resources own their retained callbacks until removal,
-cancellation, firing, rerender, unmount, package reload, or runtime disposal. See
-`docs/EVENT_CALLBACK_ROADMAP.md` for the detailed ownership contract and
-follow-up work.
+cancellation, firing, rerender, unmount, package reload, or runtime disposal.
+See the current
+[resource ownership policy](HOST_BINDINGS.md#resource-ownership-policy) for the
+contract and the [event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for
+callback-specific follow-up work.
 
 ## Current Surface
 

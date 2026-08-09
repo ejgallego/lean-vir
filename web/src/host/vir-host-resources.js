@@ -244,7 +244,6 @@ export class HostResourceState {
   // Debug-only lifecycle visibility for runtime tests; not a stable host API.
   debugResourceCounts() {
     return {
-      passiveStrong: 0,
       scoped: this.temporaryResourceScopes.reduce((count, scope) => count + scope.size, 0),
       temporaryScopes: this.temporaryResourceScopes.length,
       owners: this.disposables.size + this.ownedPayloadResources.size + this.transferredPayloadTickets.size,

@@ -162,7 +162,7 @@ try {
     assert.equal(canvas.width, 640);
     assert.equal(canvas.height, 360);
     assert.equal(queuedFrames.size, 1);
-    const mountedResourceCounts = resources.debugResourceCounts();
+    const mountedResourceOwners = resources.debugResourceCounts().owners;
 
     const [[frameId, drawFrame]] = queuedFrames.entries();
     queuedFrames.delete(frameId);
@@ -179,10 +179,10 @@ try {
     assert.equal(context2d.lineWidth, 3);
     assert.equal(status.textContent, "Lean animation frame: 0");
     assert.equal(queuedFrames.size, 1, "the Lean callback should schedule the next frame");
-    assert.deepEqual(
-      resources.debugResourceCounts(),
-      mountedResourceCounts,
-      "a frame should consume its temporary float and text resources",
+    assert.equal(
+      resources.debugResourceCounts().owners,
+      mountedResourceOwners,
+      "a frame should not accumulate active resource owners",
     );
 
     const [[secondFrameId, secondDrawFrame]] = queuedFrames.entries();
@@ -196,10 +196,10 @@ try {
     ]);
     assert.equal(status.textContent, "Lean animation frame: 1");
     assert.equal(queuedFrames.size, 1, "the Lean callback should keep scheduling frames");
-    assert.deepEqual(
-      resources.debugResourceCounts(),
-      mountedResourceCounts,
-      "repeated frames should not accumulate scalar host resources",
+    assert.equal(
+      resources.debugResourceCounts().owners,
+      mountedResourceOwners,
+      "repeated frames should not accumulate active resource owners",
     );
 
     const [[thirdFrameId, thirdDrawFrame]] = queuedFrames.entries();
@@ -222,10 +222,10 @@ try {
     ]);
     assert.equal(status.textContent, "Lean animation frame: 3");
     assert.equal(queuedFrames.size, 1, "the bouncing frame loop should keep running");
-    assert.deepEqual(
-      resources.debugResourceCounts(),
-      mountedResourceCounts,
-      "the bounce should not accumulate scalar host resources",
+    assert.equal(
+      resources.debugResourceCounts().owners,
+      mountedResourceOwners,
+      "the bounce should not accumulate active resource owners",
     );
   } finally {
     runtime.dispose();

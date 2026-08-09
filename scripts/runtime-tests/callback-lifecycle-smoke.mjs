@@ -460,7 +460,6 @@ assertAggregateMessages(
 );
 assert.deepEqual(throwingResourceCleanup, ["first", "second"]);
 assert.deepEqual(throwingResources.debugResourceCounts(), {
-  passiveStrong: 0,
   scoped: 0,
   temporaryScopes: 0,
   owners: 0,

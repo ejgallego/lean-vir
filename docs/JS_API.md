@@ -647,11 +647,11 @@ and a later `dispose()` is a no-op.
 Calling `vir.loadIrPackageSetBytes(...)` on a runtime that already has a package
 set loaded performs an atomic fresh-instance replacement as described above.
 Old package resources are cleaned up only after the candidate set has loaded
-successfully. See `docs/HOST_BINDINGS.md`
-for the built-in resource cleanup behavior.
-
-See `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed callback ownership
-contract and follow-up work.
+successfully. See the current
+[resource ownership policy](HOST_BINDINGS.md#resource-ownership-policy) for the
+built-in cleanup contract and the
+[event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for callback-specific
+follow-up work.
 
 ## Trust Boundary
 

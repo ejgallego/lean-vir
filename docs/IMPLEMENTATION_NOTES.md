@@ -75,8 +75,10 @@ lease, or force-revoked during runtime teardown. Callback finalization is a
 best-effort backstop; runtime teardown remains the deterministic upper bound.
 Loading a new package into an existing runtime performs the
 same host-resource teardown before the new manifest is installed. Event
-resources remain opaque callback-scoped values; the ownership contract and
-follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
+resources remain opaque callback-scoped values. The current contract is in the
+[resource ownership policy](HOST_BINDINGS.md#resource-ownership-policy), while
+callback-specific follow-up work remains in the
+[event callback roadmap](EVENT_CALLBACK_ROADMAP.md).
 
 The browser-facing direction now includes a standalone React rendering slice.
 Lean code can create a React root from a browser element, construct native

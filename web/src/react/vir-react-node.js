@@ -463,14 +463,6 @@ export function disposeReactNode(resources, node) {
   releaseReactNodeValue(resources, node);
 }
 
-export function disposeUnownedReactNode(resources, node) {
-  if (node === null || node === undefined || !isHostResource(node)) return;
-  const value = resolveReactNodeResource(resources, node);
-  if (value.refCount === 0) {
-    disposeReactNode(resources, node);
-  }
-}
-
 export function resolveReactNodeResource(resources, resource, label = "ReactNode") {
   const value = resources.resolveResource(resource, label);
   if (value?.kind !== "ReactNode" || value.finalized) {
@@ -484,11 +476,6 @@ export function retainReactNodeValue(value) {
     throw new Error("ReactNode resource has invalid value");
   }
   value.refCount++;
-}
-
-export function releaseReactNodeResource(resources, resource) {
-  if (resource === null || resource === undefined) return;
-  releaseReactNodeValue(resources, resolveReactNodeResource(resources, resource));
 }
 
 export function queueReactNodeRelease(resources, node, hooks = null) {

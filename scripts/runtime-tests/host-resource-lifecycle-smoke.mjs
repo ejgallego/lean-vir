@@ -31,7 +31,6 @@ import {
 } from "../../web/src/host-resource.js";
 
 const emptyResourceCounts = {
-  passiveStrong: 0,
   scoped: 0,
   temporaryScopes: 0,
   owners: 0,

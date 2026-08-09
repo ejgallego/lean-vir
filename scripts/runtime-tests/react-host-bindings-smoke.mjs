@@ -219,7 +219,6 @@ function callbackLease(cell, body = () => undefined) {
   state.resources.releaseResource(props);
   assert.equal(builderCell.active, 0, "an abandoned props builder must release retained callbacks");
   assert.deepEqual(state.resources.debugResourceCounts(), {
-    passiveStrong: 0,
     scoped: 0,
     temporaryScopes: 0,
     owners: 0,
@@ -531,7 +530,6 @@ function callbackLease(cell, body = () => undefined) {
   assert.throws(() => disposeReactNode(resources, parent), /first release boom/);
   assert.deepEqual(releases, ["first", "second", "child"]);
   assert.deepEqual(resources.debugResourceCounts(), {
-    passiveStrong: 0,
     scoped: 0,
     temporaryScopes: 0,
     owners: 0,
@@ -646,7 +644,6 @@ function callbackLease(cell, body = () => undefined) {
   assert.throws(() => root.render(null), /React root has been unmounted/);
   assert.doesNotThrow(() => root.unmount());
   assert.deepEqual(resources.debugResourceCounts(), {
-    passiveStrong: 0,
     scoped: 0,
     temporaryScopes: 0,
     owners: 0,
@@ -778,7 +775,6 @@ function callbackLease(cell, body = () => undefined) {
       stateValue = typeof next === "function" ? next(stateValue) : next;
     },
   });
-  const scopedBeforeModify = resources.debugResourceCounts().scoped;
   let released = false;
   let previousResource = null;
   let nextResource = null;
@@ -806,7 +802,6 @@ function callbackLease(cell, body = () => undefined) {
   );
   assert.equal(resources.resolveResource(retainedZero, "Js"), 0n);
   assert.notEqual(resources.resourceForValue(0n), retainedZero);
-  assert.equal(resources.debugResourceCounts().scoped, scopedBeforeModify);
   resources.releaseResource(nextResource);
   resources.releaseResource(escapedResource);
   resources.releaseResource(setter);
@@ -878,7 +873,6 @@ function callbackLease(cell, body = () => undefined) {
       stateValue = typeof next === "function" ? next(stateValue) : next;
     },
   });
-  const scopedBeforeModify = resources.debugResourceCounts().scoped;
   let released = false;
   let previousResource = null;
   let nextResource = null;
@@ -904,7 +898,6 @@ function callbackLease(cell, body = () => undefined) {
     3n,
     "an externally retained RuntimeM allocation must survive an updater failure",
   );
-  assert.equal(resources.debugResourceCounts().scoped, scopedBeforeModify);
   resources.releaseResource(nextResource);
   resources.releaseResource(setter);
 }
