@@ -325,4 +325,43 @@ private def floatCorePrimitiveScore (a b : Float) (float32Bits : UInt32) : Nat :
 def floatCoreFrontierScore : Nat :=
   floatCorePrimitiveScore 1.5 2.25 0x3fc00000
 
+@[noinline]
+private def floatFormattingPrimitiveScore
+    (positive negative : Float) (float32Bits : UInt32) : Nat :=
+  let output :=
+    Float.toString positive ++ "|" ++
+    Float.toString negative ++ "|" ++
+    Float32.toString (Float32.ofBits float32Bits)
+  output.hash.toNat
+
+/-- Exercises exact Float and Float32 formatting against the native oracle. -/
+def floatFormattingFrontierScore : Nat :=
+  floatFormattingPrimitiveScore 3.75 (-0.125) 0x3fc00000
+
+@[noinline]
+private def floatBasicCompletionPrimitiveScore
+    (aBits bBits : UInt32) (infinityBits : UInt64) : Nat :=
+  let a := Float32.ofBits aBits
+  let b := Float32.ofBits bBits
+  let addOk := Float32.beq (Float32.add a b) (Float32.ofBits 0x40600000)
+  let mulOk := Float32.beq (Float32.mul a b) (Float32.ofBits 0x40400000)
+  let divOk := Float32.beq (Float32.div b b) (Float32.ofBits 0x3f800000)
+  let subOk := Float32.beq (Float32.sub b a) (Float32.ofBits 0x3f000000)
+  let negOk := Float32.beq (Float32.neg a) (Float32.ofBits 0xbfc00000)
+  let eqOk := Float32.beq a a
+  let orderOk := decide (a < b)
+  let infinityOk := Float.isInf (Float.ofBits infinityBits)
+  (if addOk then 1 else 0) +
+    (if mulOk then 2 else 0) +
+    (if divOk then 4 else 0) +
+    (if subOk then 8 else 0) +
+    (if negOk then 16 else 0) +
+    (if eqOk then 32 else 0) +
+    (if orderOk then 64 else 0) +
+    (if infinityOk then 128 else 0)
+
+/-- Exercises the eight-member basic Float completion; success scores 255. -/
+def floatBasicCompletionFrontierScore : Nat :=
+  floatBasicCompletionPrimitiveScore 0x3fc00000 0x40000000 0x7ff0000000000000
+
 end Vir.Fixtures.Boundary

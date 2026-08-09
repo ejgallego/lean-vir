@@ -440,9 +440,21 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     legendMin: document.querySelector("#color-legend-min")?.textContent,
     legendMax: document.querySelector("#color-legend-max")?.textContent,
     hash: location.hash,
+    overlapLeaves: (() => {
+      let count = 0;
+      const visit = (node) => {
+        if (!(node.children?.length)
+            && (node.meta?.boundaryDensity ?? 0) > 0
+            && (node.meta?.frontierDensity ?? 0) > 0) count += 1;
+        for (const child of node.children ?? []) visit(child);
+      };
+      visit(globalThis.__virWasmSize.trees.runtimeContext);
+      return count;
+    })(),
   })`);
   assert.equal(combined.selectedColor, "combined");
-  assert.ok(combined.note.includes("6 leaf functions currently have both signals"));
+  assert.ok(combined.overlapLeaves > 0);
+  assert.ok(combined.note.includes(`${combined.overlapLeaves} leaf functions currently have both signals`));
   assert.ok(combined.note.includes("separate boundaries"));
   assert.ok(combined.overlap > 0);
   assert.ok(combined.boundary > 0);

@@ -647,6 +647,18 @@
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.floatCoreFrontierScore",
       "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-float-formatting-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.floatFormattingFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-float-basic-completion-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.floatBasicCompletionFrontierScore",
+      "result": { "type": "Nat" }
     }
   ]
 }

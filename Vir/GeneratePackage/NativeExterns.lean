@@ -131,6 +131,24 @@ private def floatCoreExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `Float #["add", "beq", "decLt", "toModel"] ++
   boxedExternSpecs `Float32 #["decLe", "ofBits", "toModel"]
 
+/--
+The separately measured Float formatting frontier. Keeping it distinct from
+the arithmetic/model core records that these two wrappers retain string-format
+support and were accepted using their own size and surface A/B measurements.
+-/
+private def floatFormattingExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Float #["toString"] ++
+  boxedExternSpecs `Float32 #["toString"]
+
+/--
+The measured basic Float remainder: infinity classification plus the ordinary
+Float32 arithmetic, equality, and strict-order operations. This closes the
+low-cost non-libm frontier while leaving `pow` and the broad math surface out.
+-/
+private def floatBasicCompletionExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Float #["isInf"] ++
+  boxedExternSpecs `Float32 #["add", "beq", "decLt", "div", "mul", "neg", "sub"]
+
 def nativeExternSpecs : Array NativeExternSpec := #[
   {
     name := `Nat.add,
@@ -1055,7 +1073,8 @@ def nativeExternSpecs : Array NativeExternSpec := #[
     name := `Lean.Expr.equal,
     generateBoxedWrapper := true
   }
-] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs
+] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs ++
+  floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)

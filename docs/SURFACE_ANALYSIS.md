@@ -486,7 +486,7 @@ use the same Lean revision and 398,519-function universe.
 | Arithmetic/model core | 7 | +1,542 B | +320 B | +402 | +21 | 267.0 |
 | Broader basic Float set | 15 | +3,310 B | +576 B | +422 | +27 | 130.6 |
 | Formatting | 2 | +1,975 B | +404 B | +30 | +7 | 15.6 |
-| Core plus formatting | 17 | +5,285 B | +887 B | +468 | +38 | 90.7 |
+| Broader basic plus formatting | 17 | +5,285 B | +887 B | +468 | +38 | 90.7 |
 | `pow` | 2 | +9,789 B | +6,130 B | +6 | +2 | 0.6 |
 
 The seven-name core is `Float.decLt`, `Float.add`, `Float.beq`,
@@ -498,13 +498,13 @@ basic operations add only 20 all-IR and 6 public functions for another 1,768
 raw bytes, so they should follow only when a concrete runtime workload values
 them.
 
-Formatting is a plausible separate stage, but substantially less dense. The
-`pow` pair is deferred from the first stage: its roughly 10 KiB libm closure is
-manageable in absolute terms but unlocks only six functions. This scan also
-demonstrates why primary pressure
-cannot price benefit by itself. `Float.isInf` was the primary blocker for 45
-roots (17 public), yet adding it within the broad basic cluster made only one
-root runnable because the others immediately reached another missing boundary.
+Formatting was retained as a separate stage because it pulls string-formatting
+support rather than ordinary arithmetic. The `pow` pair was deferred from the
+first stage: its roughly 10 KiB libm closure is manageable in absolute terms but
+has a very small library-surface gain. This scan also demonstrates why primary
+pressure cannot price benefit by itself. `Float.isInf` was the primary blocker
+for 45 roots (17 public), yet adding it within the broad basic cluster made only
+one root runnable because the others immediately reached another missing boundary.
 
 The core was subsequently promoted to runtime policy. The final catalog build
 is 719,360 raw bytes and 162,763 deterministic gzip bytes: +1,542 raw and +323
@@ -515,21 +515,36 @@ fixture dynamically covers addition, equality, strict comparison, 64-bit model
 extraction, 32-bit construction from bits, non-strict comparison, and 32-bit
 model extraction.
 
-The deployed measurement plan is now rebased on that 719,360-byte checkpoint:
+Formatting was then promoted on top of that core. Its directly measured pair
+costs 1,975 raw and 463 gzip bytes and raises the catalog from 449 to 451
+capabilities. Exact coverage rises by 42 all-IR functions and 9 public constants
+to 320,155 and 28,908, with zero regressions; 349 blocked roots move to their
+next boundary. The resulting artifact is 721,335 raw and 163,226 gzip bytes. A
+host-versus-Wasm fixture hashes the exact concatenated output for positive and
+negative `Float` values and a `Float32` constructed from bits.
 
-| Remaining candidate | Names | Raw cost | Gzip cost | Current primary pressure |
-| --- | ---: | ---: | ---: | ---: |
-| Basic arithmetic remainder | 8 | +1,768 B | +256 B | 36 public / 120 all |
-| Float formatting | 2 | +1,975 B | +463 B | 58 public / 391 all |
-| `pow` | 2 | +9,789 B | +6,115 B | 3 public / 8 all |
-| All twelve measured names | 12 | +13,516 B | +7,221 B | 97 public / 519 all |
+The final low-cost basic remainder was accepted as one coherent stage after a
+fresh post-formatting A/B. The eight names are `Float.isInf`, `Float32.add`,
+`Float32.beq`, `Float32.decLt`, `Float32.div`, `Float32.mul`, `Float32.neg`, and
+`Float32.sub`. The final catalog adds 1,768 raw and 107 gzip bytes, reaches 459
+capabilities, and makes another 24 all-IR functions and 8 public constants
+runnable with no regressions. The semantic fixture exercises all eight members
+and returns its complete 255-point score.
 
-The nested basic A/B comparison says the eight-name arithmetic remainder adds
-20 all-IR and 6 public functions after the core. A fresh post-core formatting
-scan adds 42 all-IR and 9 public functions for its 1,975 raw bytes, so formatting
-is the next denser Float stage. The `pow` pair remains inexpensive in absolute
-terms but sparse by library-surface gain; it should be accepted for capability
-rather than coverage density if selected.
+The deployed measurement plan is now rebased on the 723,103-byte checkpoint:
+
+| Remaining candidate | Names | Raw cost | Gzip cost | Exact surface gain | Current primary pressure |
+| --- | ---: | ---: | ---: | ---: | ---: |
+| `pow` | 2 | +9,773 B | +6,654 B | 8 all / 3 public | 8 all / 3 public |
+
+The current artifact is 723,103 raw and 163,333 deterministic gzip bytes, with
+320,179 of 398,519 all-IR functions and 28,916 of 36,887 public constants
+runnable. Relative to the scalar/string checkpoint, the three accepted Float
+stages cost 5,285 raw and 893 gzip bytes for 468 all-IR and 38 public gains. The
+remaining `pow` pair has no cascade: its eight current primary roots are exactly
+the eight functions it makes runnable, and no blocked root moves to a new
+boundary. It should therefore be accepted only for a concrete `pow` capability
+need, not as a frontier-density optimization.
 
 ## Interactive HTML Report
 

@@ -1,55 +1,11 @@
 {
   "version": 1,
   "candidates": [
-    { "id": "Float.isInf", "names": ["Float.isInf"] },
-    { "id": "Float32.mul", "names": ["Float32.mul"] },
-    { "id": "Float32.decLt", "names": ["Float32.decLt"] },
-    { "id": "Float32.neg", "names": ["Float32.neg"] },
-    { "id": "Float32.add", "names": ["Float32.add"] },
-    { "id": "Float32.beq", "names": ["Float32.beq"] },
-    { "id": "Float32.div", "names": ["Float32.div"] },
-    { "id": "Float32.sub", "names": ["Float32.sub"] },
-    { "id": "Float.toString", "names": ["Float.toString"] },
-    { "id": "Float32.toString", "names": ["Float32.toString"] },
     { "id": "Float.pow", "names": ["Float.pow"] },
     { "id": "Float32.pow", "names": ["Float32.pow"] },
     {
-      "id": "float-basic-remainder",
-      "names": [
-        "Float.isInf",
-        "Float32.mul",
-        "Float32.decLt",
-        "Float32.neg",
-        "Float32.add",
-        "Float32.beq",
-        "Float32.div",
-        "Float32.sub"
-      ]
-    },
-    {
-      "id": "float-format",
-      "names": ["Float.toString", "Float32.toString"]
-    },
-    {
       "id": "float-pow",
       "names": ["Float.pow", "Float32.pow"]
-    },
-    {
-      "id": "float-all-measured-remainder",
-      "names": [
-        "Float.isInf",
-        "Float32.mul",
-        "Float32.decLt",
-        "Float32.neg",
-        "Float32.add",
-        "Float32.beq",
-        "Float32.div",
-        "Float32.sub",
-        "Float.toString",
-        "Float32.toString",
-        "Float.pow",
-        "Float32.pow"
-      ]
     }
   ]
 }
