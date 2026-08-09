@@ -486,13 +486,18 @@ Author: Emilio J. Gallego Arias
           + `<span>${escapeHtml(formatBytes(node.bytes))}</span></span>`,
       );
     }
-    const minimumNestedWidth = depth === 0 ? 13 : 17;
-    const minimumNestedHeight = depth === 0 ? 15 : 19;
+    const minimumNestedPixelWidth = depth === 0 ? 44 : 36;
+    const minimumNestedPixelHeight = depth === 0 ? 54 : 40;
+    const minimumNestedShareWidth = depth === 0 ? 13 : 17;
+    const minimumNestedShareHeight = depth === 0 ? 15 : 19;
+    const hasNestedPixels = pixelWidth >= minimumNestedPixelWidth
+      && pixelHeight >= minimumNestedPixelHeight;
+    const hasNestedShare = rect.width >= minimumNestedShareWidth
+      && rect.height >= minimumNestedShareHeight;
     if (
       depth <= maximumNestedDepth
       && node.children?.length
-      && rect.width >= minimumNestedWidth
-      && rect.height >= minimumNestedHeight
+      && (hasNestedPixels || hasNestedShare)
     ) {
       const nestedWidth = Math.max(0, pixelWidth - (depth === 0 ? 6 : 4));
       const nestedHeight = Math.max(0, pixelHeight - (depth === 0 ? 41 : 31));

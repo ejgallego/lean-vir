@@ -372,8 +372,13 @@ Wasm byte size is shown separately because Wasm and native archive bytes are not
 an interchangeable denominator. Hovering a runtime-context block temporarily
 updates the compact strip with that subtree's ratios. Deep slider input is
 animation-frame coalesced, subtree depths are cached, and the treemap uses one
-delegated event surface rather than per-block handlers; the browser smoke guards the complete
-level-seven render against regression.
+delegated event surface rather than per-block handlers. Nested rendering keeps
+the relative-share threshold needed for deep signal pixels and also accepts
+blocks with sufficient on-screen pixel geometry; this lets files such as
+`expr.cpp` expose their proportional overhead/function children from the
+`src/` view even when they occupy a modest fraction of a large directory. The
+browser smoke guards that case and the complete level-seven render against
+regression.
 The Pages build also runs the tracked native-frontier plan against the current
 release artifact. Both reports display exact isolated and directly measured
 cluster raw/gzip deltas, while keeping those costs distinct from blocker

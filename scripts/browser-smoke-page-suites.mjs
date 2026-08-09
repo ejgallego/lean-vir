@@ -438,6 +438,31 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(runtimeMemberDetails.pressureFunctions.includes("lean_expr_has_loose_bvar"));
   assert.ok(runtimeMemberDetails.retainedRows > 0);
   await clickSelector(cdp, "#breadcrumbs button:first-child");
+
+  await setInputValueAndDispatch(cdp, "#node-search", "src/", "input");
+  await clickSelector(cdp, "#search-results button");
+  const sourceDirectoryDetail = await evaluate(cdp, `(() => {
+    const exprBlock = Array.from(document.querySelectorAll("#treemap .map-block"))
+      .find((block) => block.getAttribute("aria-label")?.startsWith("expr.cpp,"));
+    return {
+      root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
+      breadcrumbs: Array.from(document.querySelectorAll("#breadcrumbs button"),
+        (button) => button.textContent),
+      exprWidth: exprBlock?.getBoundingClientRect().width ?? 0,
+      exprHeight: exprBlock?.getBoundingClientRect().height ?? 0,
+      exprChildren: exprBlock?.querySelectorAll(":scope > .nested-map > .map-block").length ?? 0,
+      exprLooseBVar: exprBlock?.querySelectorAll(
+        ":scope > .nested-map > [aria-label^='lean_expr_has_loose_bvar,']",
+      ).length ?? 0,
+    };
+  })()`);
+  assert.equal(sourceDirectoryDetail.root, "src/");
+  assert.ok(sourceDirectoryDetail.breadcrumbs.includes("libleancpp.a"));
+  assert.ok(sourceDirectoryDetail.exprWidth >= 36);
+  assert.ok(sourceDirectoryDetail.exprHeight >= 40);
+  assert.ok(sourceDirectoryDetail.exprChildren > 0);
+  assert.ok(sourceDirectoryDetail.exprLooseBVar > 0);
+  await clickSelector(cdp, "#breadcrumbs button:first-child");
   await setInputValueAndDispatch(cdp, "#node-search", "", "input");
 
   const hoverCoverage = await evaluate(cdp, `(() => {
