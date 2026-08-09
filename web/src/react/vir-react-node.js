@@ -227,10 +227,16 @@ export function createBrowserReactNodeElementResource(resources, createElement, 
   const { callLeanEventCallback } = requireReactHostHooks(hooks);
   return createReactNodeElementResource(resources, elementType, props, children, (fields, childEntries) => {
     const { props: reactProps, callbacks } = reactPropsFromNode(resources, fields, callLeanEventCallback, hooks);
-    return {
-      node: createElement(fields.elementType, reactProps, ...childEntries.map((child) => child.value.node)),
-      callbacks,
-    };
+    try {
+      return {
+        node: createElement(fields.elementType, reactProps, ...childEntries.map((child) => child.value.node)),
+        callbacks,
+      };
+    } catch (error) {
+      const errors = [error instanceof Error ? error : new Error(String(error))];
+      collectCleanupError(errors, () => releaseReactCallbacks(callbacks));
+      throwCollectedErrors(errors, "React.createElement failed during callback cleanup");
+    }
   });
 }
 

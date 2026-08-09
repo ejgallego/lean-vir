@@ -216,8 +216,9 @@ The public state surface is resource-typed: `Hooks.useState`, `State.set`, and
 `String`, `Nat`, or `Bool` `useState` overloads; scalar values must be converted
 explicitly with `JsValue` helpers before crossing the React hook boundary.
 `State.set` and `State.modify` are `RuntimeM` operations because they call a
-retained JavaScript React setter resource; `modify` passes a monadic functional
-updater to React's setter. The resource ownership policy for state values,
+retained JavaScript React setter resource. VIR evaluates `modify` once against
+the latest committed-or-queued state and gives React a pure action over the
+concrete result. The resource ownership policy for state values,
 synthetic updater/reducer input handles, and scalar `JsValue` wrappers is
 centralized in
 [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
@@ -376,7 +377,10 @@ Event handlers use DOM-like names such as `onClick`, `onChange`, `onInput`, and
 `onSubmit`, and receive the same opaque
 `Lean.Vir.Js Lean.Vir.Browser.Event` resource that `Element.addEventListener`
 uses. React synthetic events should not be stored by Lean; they are
-callback-scoped resources.
+callback-scoped resources. The current `Js` type does not statically enforce
+that scope: an escaped event or synthetic updater/reducer input is invalidated
+after its callback and fails if used later. A scoped/generative borrow type is
+follow-up work.
 
 Input callbacks can read `Event.currentTarget` or `Event.target`, narrow the
 returned element with `HTMLInputElement.fromElement`, or use

@@ -15,9 +15,10 @@ var EXTERNREF_TABLE_INITIAL_LENGTH = 1;
 var VIR_HOST_DISPOSE = /* @__PURE__ */ Symbol.for("lean-vir.hostDispose");
 var VIR_HOST_RESOLVE_BINDING = /* @__PURE__ */ Symbol.for("lean-vir.hostResolveBinding");
 var hostResourceState = /* @__PURE__ */ new WeakMap();
+var hostResourceTicketState = /* @__PURE__ */ new WeakMap();
 var hostResourceOwnerState = /* @__PURE__ */ new WeakMap();
 var hostResourcePayloadLifetimes = /* @__PURE__ */ new WeakMap();
-var hostResourceFinalizer = typeof FinalizationRegistry === "function" ? new FinalizationRegistry((state) => finalizeHostResourceState(state)) : null;
+var hostResourceFinalizer = typeof FinalizationRegistry === "function" ? new FinalizationRegistry((ticket) => finalizeHostResourceTicket(ticket)) : null;
 var externrefTableSupport = null;
 function hasExternrefTableSupport() {
   if (externrefTableSupport !== null) {
@@ -48,24 +49,29 @@ var HostResource = class {
   constructor(value, label, {
     dispose = null,
     owner = null,
+    onAbandon = null,
     onFinalize = null,
     onRelease = null,
     onTake = null,
     reportFinalizerError = null
   } = {}) {
+    const ticket = Object.freeze({});
     const state = {
       value,
       label,
       dispose,
       owner,
+      onAbandon,
       onFinalize,
       onRelease,
       onTake,
-      reportFinalizerError
+      reportFinalizerError,
+      ticket
     };
     hostResourceState.set(this, state);
+    hostResourceTicketState.set(ticket, state);
     if (typeof dispose === "function" || typeof onFinalize === "function") {
-      hostResourceFinalizer?.register(this, state, this);
+      hostResourceFinalizer?.register(this, ticket, ticket);
     }
     Object.freeze(this);
   }
@@ -179,6 +185,9 @@ function retainHostResource(resource, label = null) {
   const state = hostResourceState.get(source);
   const value = state.value;
   if (!isRetainableHostResourcePayload(value)) {
+    if (hostResourceHasOwnedLifecycle(state)) {
+      throw new Error(`${label ?? state.label ?? "host resource"} does not support independent retain()`);
+    }
     return createHostResource(value, label ?? state.label, { owner: state.owner });
   }
   const retained = retainHostResourcePayload(value);
@@ -201,43 +210,87 @@ function retainHostResource(resource, label = null) {
 function releaseHostResource(resource) {
   const state = hostResourceState.get(resource);
   if (state === void 0 || state.value === null || state.value === void 0) return false;
-  hostResourceFinalizer?.unregister(resource);
+  hostResourceFinalizer?.unregister(state.ticket);
   return releaseHostResourceState(state, resource);
+}
+function abandonHostResource(resource) {
+  const state = hostResourceState.get(resource);
+  if (state === void 0 || state.value === null || state.value === void 0) return false;
+  const onAbandon = state.onAbandon;
+  state.onAbandon = null;
+  const errors = [];
+  if (typeof onAbandon === "function") {
+    try {
+      onAbandon(state.value);
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  try {
+    releaseHostResource(resource);
+  } catch (error) {
+    errors.push(asError(error));
+  }
+  throwHostResourceErrors(errors, "host resource abandonment failed");
+  return true;
+}
+function commitHostResource(resource) {
+  const state = hostResourceState.get(resource);
+  if (state === void 0 || state.value === null || state.value === void 0) return false;
+  state.onAbandon = null;
+  return true;
+}
+function hostResourceReleaseTicket(resource) {
+  const state = hostResourceState.get(resource);
+  if (state === void 0 || state.value === null || state.value === void 0) return null;
+  return state.ticket;
+}
+function releaseHostResourceTicket(ticket) {
+  const state = hostResourceTicketState.get(ticket);
+  if (state === void 0 || state.value === null || state.value === void 0) return false;
+  hostResourceFinalizer?.unregister(ticket);
+  return releaseHostResourceState(state, null);
 }
 function transferHostResource(resource) {
   const state = hostResourceState.get(resource);
   if (state === void 0 || state.value === null || state.value === void 0) return false;
   const onTake = state.onTake;
-  state.onTake = null;
   if (typeof onTake === "function") onTake(resource);
+  state.onTake = null;
   return true;
 }
 var ExternrefResourceRoots = class {
   constructor({ initial = EXTERNREF_TABLE_INITIAL_LENGTH } = {}) {
     requireExternrefTableSupport();
-    this.table = new WebAssembly.Table({ element: "externref", initial });
+    if (!Number.isInteger(initial) || initial < 1) {
+      throw new Error("externref resource root table initial length must reserve root id 0");
+    }
+    this.table = new WebAssembly.Table({ element: "externref", initial }, null);
     this.freeRootIds = [];
+    for (let rootId = initial - 1; rootId >= 1; rootId -= 1) {
+      this.freeRootIds.push(rootId);
+    }
+    this.liveRootIds = /* @__PURE__ */ new Set();
     this.ownedRootIds = /* @__PURE__ */ new Set();
-    this.activeRoots = 0;
   }
   root(value, { owned = false } = {}) {
     const resource = hostResourceExternref(value);
     if (resource === null) {
       return 0;
     }
-    const rootId = this.freeRootIds.pop() ?? this.table.grow(1);
+    const rootId = this.freeRootIds.pop() ?? this.table.grow(1, null);
     if (rootId <= 0 || rootId > 4294967295) {
       throw new Error("Lean VIR externref resource root table exceeded the 32-bit root id range");
     }
     this.table.set(rootId, resource);
+    this.liveRootIds.add(rootId);
     if (owned) {
       this.ownedRootIds.add(rootId);
     }
-    this.activeRoots++;
     return rootId;
   }
   get(rootId, { take = false } = {}) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
+    if (!Number.isInteger(rootId) || !this.liveRootIds.has(rootId)) {
       return null;
     }
     const resource = this.table.get(rootId);
@@ -248,36 +301,31 @@ var ExternrefResourceRoots = class {
     return resource;
   }
   release(rootId) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
+    if (!Number.isInteger(rootId) || !this.liveRootIds.delete(rootId)) {
       return void 0;
     }
     const resource = this.table.get(rootId);
-    if (resource === null) return void 0;
     const owned = this.ownedRootIds.delete(rootId);
     this.table.set(rootId, null);
     this.freeRootIds.push(rootId);
-    this.activeRoots--;
     if (owned) releaseHostResource(resource);
     return void 0;
   }
   clear() {
     const errors = [];
-    for (let rootId = 1; rootId < this.table.length; rootId += 1) {
+    for (const rootId of Array.from(this.liveRootIds)) {
       try {
         this.release(rootId);
       } catch (error) {
         errors.push(error instanceof Error ? error : new Error(String(error)));
       }
     }
-    this.freeRootIds.length = 0;
-    this.ownedRootIds.clear();
-    this.activeRoots = 0;
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) throw new AggregateError(errors, "externref resource root cleanup failed");
   }
   debugCounts() {
     return {
-      active: this.activeRoots,
+      active: this.liveRootIds.size,
       capacity: this.table.length - 1,
       reusable: this.freeRootIds.length
     };
@@ -287,16 +335,21 @@ function releaseHostResourceState(state, resource) {
   const value = state.value;
   const dispose = state.dispose;
   const onRelease = state.onRelease;
+  const onFinalize = state.onFinalize;
+  const ticket = state.ticket;
   state.value = null;
   state.dispose = null;
+  state.onAbandon = null;
   state.onFinalize = null;
   state.onRelease = null;
   state.onTake = null;
   state.reportFinalizerError = null;
+  hostResourceTicketState.delete(ticket);
   const errors = [];
-  if (typeof onRelease === "function") {
+  const transition = resource === null ? onFinalize : onRelease;
+  if (typeof transition === "function") {
     try {
-      onRelease(resource);
+      transition(resource);
     } catch (error) {
       errors.push(asError(error));
     }
@@ -311,7 +364,8 @@ function releaseHostResourceState(state, resource) {
   throwHostResourceErrors(errors, "host resource release failed");
   return true;
 }
-function finalizeHostResourceState(state) {
+function finalizeHostResourceTicket(ticket) {
+  const state = hostResourceTicketState.get(ticket);
   if (state?.value === null || state?.value === void 0) return;
   const value = state.value;
   const dispose = state.dispose;
@@ -319,10 +373,12 @@ function finalizeHostResourceState(state) {
   const report = state.reportFinalizerError;
   state.value = null;
   state.dispose = null;
+  state.onAbandon = null;
   state.onFinalize = null;
   state.onRelease = null;
   state.onTake = null;
   state.reportFinalizerError = null;
+  hostResourceTicketState.delete(ticket);
   const errors = [];
   if (typeof onFinalize === "function") {
     try {
@@ -346,6 +402,9 @@ function finalizeHostResourceState(state) {
       }
     }
   }
+}
+function hostResourceHasOwnedLifecycle(state) {
+  return typeof state.dispose === "function" || typeof state.onAbandon === "function" || typeof state.onFinalize === "function" || typeof state.onRelease === "function" || typeof state.onTake === "function";
 }
 function throwHostResourceErrors(errors, message) {
   if (errors.length === 0) return;
@@ -427,6 +486,8 @@ function asError2(error) {
 
 // web/src/runtime/callbacks.js
 var virCallbackStates = /* @__PURE__ */ new WeakMap();
+var virCallbackRootTrackers = /* @__PURE__ */ new WeakMap();
+var virCallbackFinalizer = typeof FinalizationRegistry === "function" ? new FinalizationRegistry((lease) => finalizeVirCallbackLease(lease)) : null;
 var VirCallback = class {
   call(...args) {
     const state = requireVirCallbackState(this);
@@ -443,14 +504,7 @@ var VirCallback = class {
     return createVirCallbackLease(state.root);
   }
   release() {
-    const state = requireVirCallbackState(this);
-    if (state.released || state.root.released) return false;
-    state.released = true;
-    state.root.leases.delete(this);
-    if (state.root.leases.size === 0) {
-      releaseVirCallbackRoot(state.root);
-    }
-    return true;
+    return releaseVirCallbackLease(requireVirCallbackState(this));
   }
   dispose() {
     return this.release();
@@ -473,22 +527,46 @@ function createVirCallback(runtime, rootId, type) {
     tracker: null,
     released: false
   };
+  const tracker = Object.freeze({});
+  root.tracker = tracker;
+  virCallbackRootTrackers.set(tracker, root);
   const callback = createVirCallbackLease(root);
-  root.tracker = callback;
-  runtime.trackCallback(callback);
+  runtime.trackCallback(tracker);
   return callback;
 }
 function createVirCallbackLease(root) {
+  const lease = {
+    root,
+    released: false
+  };
   const callback = function virCallback(...args) {
     return callback.call(...args);
   };
   Object.setPrototypeOf(callback, VirCallback.prototype);
-  virCallbackStates.set(callback, {
-    root,
-    released: false
-  });
-  root.leases.add(callback);
+  virCallbackStates.set(callback, lease);
+  root.leases.add(lease);
+  virCallbackFinalizer?.register(callback, lease, lease);
   return callback;
+}
+function releaseVirCallbackLease(lease, { unregister = true } = {}) {
+  if (lease.released || lease.root.released) return false;
+  lease.released = true;
+  if (unregister) virCallbackFinalizer?.unregister(lease);
+  lease.root.leases.delete(lease);
+  if (lease.root.leases.size === 0) {
+    releaseVirCallbackRoot(lease.root);
+  }
+  return true;
+}
+function finalizeVirCallbackLease(lease) {
+  try {
+    releaseVirCallbackLease(lease, { unregister: false });
+  } catch (error) {
+    try {
+      lease.root.runtime.hostState?.recordFinalizerError(error);
+    } catch {
+    }
+  }
 }
 function takeCallbackLease(callback, label = "Vir callback") {
   if (typeof callback !== "function" || typeof callback.release !== "function") {
@@ -534,8 +612,8 @@ function releaseCallbacks(callbacks) {
 function releaseCallbackRoots(callbacks) {
   const pending = takeCallbacks(callbacks);
   const roots = /* @__PURE__ */ new Set();
-  for (const callback of pending) {
-    roots.add(requireVirCallbackState(callback).root);
+  for (const callbackOrTracker of pending) {
+    roots.add(requireVirCallbackRoot(callbackOrTracker));
   }
   const errors = [];
   for (const root of roots) {
@@ -546,11 +624,9 @@ function releaseCallbackRoots(callbacks) {
 function releaseVirCallbackRoot(root) {
   if (root.released) return false;
   root.released = true;
-  for (const callback of root.leases) {
-    const state = virCallbackStates.get(callback);
-    if (state !== void 0) {
-      state.released = true;
-    }
+  for (const lease of root.leases) {
+    lease.released = true;
+    virCallbackFinalizer?.unregister(lease);
   }
   root.leases.clear();
   const errors = [];
@@ -558,6 +634,11 @@ function releaseVirCallbackRoot(root) {
   collectCleanupError(errors, () => root.runtime.untrackCallback(root.tracker));
   throwCollectedErrors(errors, "Vir callback root release failed");
   return true;
+}
+function requireVirCallbackRoot(callbackOrTracker) {
+  const trackedRoot = virCallbackRootTrackers.get(callbackOrTracker);
+  if (trackedRoot !== void 0) return trackedRoot;
+  return requireVirCallbackState(callbackOrTracker).root;
 }
 function takeCallbacks(callbacks) {
   const pending = Array.from(callbacks);
@@ -741,10 +822,16 @@ function createBrowserReactNodeElementResource(resources, createElement3, hooks,
   const { callLeanEventCallback: callLeanEventCallback2 } = requireReactHostHooks(hooks);
   return createReactNodeElementResource(resources, elementType, props, children, (fields, childEntries) => {
     const { props: reactProps, callbacks } = reactPropsFromNode(resources, fields, callLeanEventCallback2, hooks);
-    return {
-      node: createElement3(fields.elementType, reactProps, ...childEntries.map((child) => child.value.node)),
-      callbacks
-    };
+    try {
+      return {
+        node: createElement3(fields.elementType, reactProps, ...childEntries.map((child) => child.value.node)),
+        callbacks
+      };
+    } catch (error) {
+      const errors = [error instanceof Error ? error : new Error(String(error))];
+      collectCleanupError(errors, () => releaseReactCallbacks(callbacks));
+      throwCollectedErrors(errors, "React.createElement failed during callback cleanup");
+    }
   });
 }
 function createBrowserReactNodeFragmentResource(resources, createElement3, Fragment2, props, children) {
@@ -1752,7 +1839,7 @@ var HostResourceState = class {
     this.owner = createHostResourceOwner("HostResourceState");
     this.revocableResources = /* @__PURE__ */ new WeakMap();
     this.ownedPayloadResources = /* @__PURE__ */ new Set();
-    this.weakOwnedPayloadResources = /* @__PURE__ */ new Set();
+    this.transferredPayloadTickets = /* @__PURE__ */ new Set();
     this.gcFinalizerErrorMessages = [];
     this.temporaryResourceScopes = [];
     this.disposables = /* @__PURE__ */ new Set();
@@ -1808,11 +1895,11 @@ var HostResourceState = class {
     this.gcFinalizerErrorMessages.push(`${name}: ${message}`.slice(0, 2048));
   }
   // Creates a unique resource whose receiver is responsible for releasing it.
-  ownedResourceForValue(value) {
+  ownedResourceForValue(value, { onAbandon = null } = {}) {
     this.requireUsable();
     if (value === null || value === void 0) return null;
     if (!isRetainableHostResourcePayload(value)) {
-      return createHostResource(value, null, { owner: this.owner });
+      return createHostResource(value, null, { owner: this.owner, onAbandon });
     }
     this.requireActive();
     const retainedValue = retainHostResourcePayload(value);
@@ -1820,7 +1907,8 @@ var HostResourceState = class {
     try {
       resource = createHostResource(retainedValue, null, {
         owner: this.owner,
-        ...payloadResourceLifecycle(this, retainedValue)
+        ...payloadResourceLifecycle(this, retainedValue),
+        onAbandon
       });
       this.ownedPayloadResources.add(resource);
       return resource;
@@ -1836,18 +1924,37 @@ var HostResourceState = class {
   }
   // Creates a passive resource that can also be invalidated by its JS value.
   // The reverse index contains only WeakRefs and never owns the wrapper/value.
-  revocableResourceForValue(value) {
-    const resource = this.ownedResourceForValue(value);
-    if (resource === null || !isWeakMapKey2(value)) return resource;
-    let references = this.revocableResources.get(value);
-    if (references === void 0) {
-      references = /* @__PURE__ */ new Set();
-      this.revocableResources.set(value, references);
-    } else {
-      sweepRevocableReferences(references);
+  revocableResourceForValue(value, { onAbandon = null } = {}) {
+    this.requireRevocableResourceSupport();
+    let resource = null;
+    try {
+      resource = this.ownedResourceForValue(value, { onAbandon });
+      if (resource === null || !isWeakMapKey2(value)) return resource;
+      let references = this.revocableResources.get(value);
+      if (references === void 0) {
+        references = /* @__PURE__ */ new Set();
+        this.revocableResources.set(value, references);
+      } else {
+        sweepRevocableReferences(references);
+      }
+      references.add(new WeakRef(resource));
+      return resource;
+    } catch (error) {
+      const errors = [error instanceof Error ? error : new Error(String(error))];
+      if (resource === null) {
+        if (typeof onAbandon === "function") {
+          collectCleanupError(errors, () => onAbandon(value));
+        }
+      } else {
+        collectCleanupError(errors, () => abandonHostResource(resource));
+      }
+      throwCollectedErrors(errors, "revocable host resource creation failed during rollback");
     }
-    references.add(new WeakRef(resource));
-    return resource;
+  }
+  requireRevocableResourceSupport() {
+    if (typeof WeakRef !== "function") {
+      throw new Error("revocable host resources require WeakRef support");
+    }
   }
   temporaryResourceForValue(value) {
     const resource = this.ownedResourceForValue(value);
@@ -1921,7 +2028,7 @@ var HostResourceState = class {
       passiveStrong: 0,
       scoped: this.temporaryResourceScopes.reduce((count, scope) => count + scope.size, 0),
       temporaryScopes: this.temporaryResourceScopes.length,
-      owners: this.disposables.size + this.ownedPayloadResources.size
+      owners: this.disposables.size + this.ownedPayloadResources.size + this.transferredPayloadTickets.size
     };
   }
   resolveResource(resource, label) {
@@ -1945,13 +2052,10 @@ var HostResourceState = class {
         collectCleanupError(errors, () => releaseHostResource(resource));
       }
       this.ownedPayloadResources.clear();
-      for (const reference of Array.from(this.weakOwnedPayloadResources)) {
-        const resource = reference.deref();
-        if (resource !== void 0) {
-          collectCleanupError(errors, () => releaseHostResource(resource));
-        }
+      for (const ticket of Array.from(this.transferredPayloadTickets)) {
+        collectCleanupError(errors, () => releaseHostResourceTicket(ticket));
       }
-      this.weakOwnedPayloadResources.clear();
+      this.transferredPayloadTickets.clear();
       for (const scope of this.temporaryResourceScopes) {
         for (const resource of Array.from(scope)) {
           collectCleanupError(errors, () => this.releaseResource(resource));
@@ -1981,25 +2085,27 @@ var HostResourceState = class {
   }
 };
 function payloadResourceLifecycle(resources, payload) {
-  const tracking = { reference: null };
+  const tracking = { ticket: null };
   return {
     dispose: () => releaseHostResourcePayload(payload),
     onFinalize: () => {
-      if (tracking.reference !== null) {
-        resources.weakOwnedPayloadResources.delete(tracking.reference);
+      if (tracking.ticket !== null) {
+        resources.transferredPayloadTickets.delete(tracking.ticket);
       }
     },
     onRelease: (resource) => {
       resources.ownedPayloadResources.delete(resource);
-      if (tracking.reference !== null) {
-        resources.weakOwnedPayloadResources.delete(tracking.reference);
+      if (tracking.ticket !== null) {
+        resources.transferredPayloadTickets.delete(tracking.ticket);
       }
     },
     onTake: (resource) => {
-      if (!hasHostResourceFinalizationSupport() || tracking.reference !== null) return false;
+      if (!hasHostResourceFinalizationSupport() || tracking.ticket !== null) return false;
+      const ticket = hostResourceReleaseTicket(resource);
+      if (ticket === null) return false;
+      resources.transferredPayloadTickets.add(ticket);
       resources.ownedPayloadResources.delete(resource);
-      tracking.reference = new WeakRef(resource);
-      resources.weakOwnedPayloadResources.add(tracking.reference);
+      tracking.ticket = ticket;
       return true;
     },
     reportFinalizerError: (error) => resources.recordGcFinalizerError(error)
@@ -2081,13 +2187,17 @@ function createElementResourceHostBindings(resources, operations) {
     },
     "browser.element.addEventListener": (element, eventName, callback) => {
       const target = resources.resolveResource(element, "Element");
+      const name = resources.resolveResource(eventName, "JsString");
+      resources.requireRevocableResourceSupport();
       const listener = operations.createEventListener(
         target,
-        resources.resolveResource(eventName, "JsString"),
+        name,
         callback
       );
       resources.addDisposable(listener);
-      return resources.revocableResourceForValue(listener);
+      return resources.revocableResourceForValue(listener, {
+        onAbandon: () => disposeHostResourceValue(listener)
+      });
     },
     "browser.element.removeEventListener": (listener) => {
       const value = resources.resolveResource(listener, "EventListener");
@@ -2150,7 +2260,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
   function rootForContainer(container) {
     let root = rootsByContainer.get(container);
     if (root !== void 0) {
-      return root;
+      return { root, created: false };
     }
     root = createRootResource(container);
     if (typeof root?.unmount !== "function") {
@@ -2166,7 +2276,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
       return unmounted.value;
     };
     rootsByContainer.set(container, root);
-    return root;
+    return { root, created: true };
   }
   function queryReactRootSelector(selector) {
     if (typeof querySelector !== "function") {
@@ -2195,7 +2305,7 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     if (existing !== void 0 && existing.container !== target) {
       releaseRootResource(existing.root);
     }
-    const root = rootForContainer(target);
+    const { root } = rootForContainer(target);
     rootsBySelector.set(selector, { container: target, root });
     return root;
   }
@@ -2257,7 +2367,11 @@ function createReactRootResourceHostBindings(resources, createRootResource, {
     ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
-      return resources.revocableResourceForValue(rootForContainer(target));
+      resources.requireRevocableResourceSupport();
+      const { root, created } = rootForContainer(target);
+      return resources.revocableResourceForValue(root, {
+        onAbandon: created ? () => root.unmount() : null
+      });
     },
     "react.root.render": (root, renderTree) => {
       const render = requireReactRenderCallback(renderTree);
@@ -2343,14 +2457,28 @@ function requireReactNodeFragmentResourceFactory(factory) {
 }
 function createTimerResourceHostBindings(resources) {
   return {
-    "browser.timer.setTimeout": (delayMs, callback) => resources.revocableResourceForValue(createTimeoutResource(resources, jsNatAsDelay(resources, delayMs), callback)),
+    "browser.timer.setTimeout": (delayMs, callback) => {
+      const delay = jsNatAsDelay(resources, delayMs);
+      resources.requireRevocableResourceSupport();
+      const timeout = createTimeoutResource(resources, delay, callback);
+      return resources.revocableResourceForValue(timeout, {
+        onAbandon: () => disposeHostResourceValue(timeout)
+      });
+    },
     "browser.timer.clearTimeout": (timeout) => {
       const value = resources.resolveResource(timeout, "Timeout");
       value.clear();
       resources.releaseValueResource(value);
       return void 0;
     },
-    "browser.timer.setInterval": (delayMs, callback) => resources.revocableResourceForValue(createIntervalResource(resources, jsNatAsDelay(resources, delayMs), callback)),
+    "browser.timer.setInterval": (delayMs, callback) => {
+      const delay = jsNatAsDelay(resources, delayMs);
+      resources.requireRevocableResourceSupport();
+      const interval = createIntervalResource(resources, delay, callback);
+      return resources.revocableResourceForValue(interval, {
+        onAbandon: () => disposeHostResourceValue(interval)
+      });
+    },
     "browser.timer.clearInterval": (interval) => {
       const value = resources.resolveResource(interval, "Interval");
       value.clear();
@@ -2361,7 +2489,13 @@ function createTimerResourceHostBindings(resources) {
 }
 function createAnimationResourceHostBindings(resources, { requestFrame, cancelFrame }) {
   return {
-    "browser.animation.requestAnimationFrame": (callback) => resources.revocableResourceForValue(createAnimationFrameResource(resources, callback, requestFrame, cancelFrame)),
+    "browser.animation.requestAnimationFrame": (callback) => {
+      resources.requireRevocableResourceSupport();
+      const frame = createAnimationFrameResource(resources, callback, requestFrame, cancelFrame);
+      return resources.revocableResourceForValue(frame, {
+        onAbandon: () => disposeHostResourceValue(frame)
+      });
+    },
     "browser.animation.cancelAnimationFrame": (frame) => {
       const value = resources.resolveResource(frame, "AnimationFrame");
       value.cancel();
@@ -8139,12 +8273,16 @@ var VirHostState = class {
       const ownedResultResource = retainedIdentityResult ?? (isHostResource(value) ? value : null);
       try {
         const resultValue = retainedIdentityResult ?? value;
-        return explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, resultValue, resultLabel) : this.runtime.makeHostResourceObjectValue(entry.result, resultValue, resultLabel);
+        const resultObject = explicitConversionTarget ? this.runtime.makeExplicitConversionObjectValue(entry.result, resultValue, resultLabel) : this.runtime.makeHostResourceObjectValue(entry.result, resultValue, resultLabel);
+        if (ownedResultResource !== null) {
+          commitHostResource(ownedResultResource);
+        }
+        return resultObject;
       } catch (error) {
         if (ownedResultResource === null) throw error;
         throwWithCleanup(
           error,
-          () => releaseHostResource(ownedResultResource),
+          () => abandonHostResource(ownedResultResource),
           `Vir host import ${entry.target} failed during result ownership cleanup`
         );
       }

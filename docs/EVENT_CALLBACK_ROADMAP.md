@@ -114,11 +114,14 @@ callback from the current callback.
 
 ## Remaining Work
 
-1. Add more focused helpers for common events while keeping `Event` opaque.
-2. Keep the closure-root table simple. If release overhead becomes visible,
+1. Replace the dynamic callback-local `Js Event` contract with a scoped or
+   generative borrow API that makes safe-Lean escape unrepresentable. Today an
+   escaped wrapper is invalidated after dispatch and fails on later use.
+2. Add more focused helpers for common events while keeping `Event` opaque.
+3. Keep the closure-root table simple. If release overhead becomes visible,
    optimize root-id allocation/release in a second phase, after leak tests make
    the ownership contract hard to regress.
-3. Keep async host imports out of the current synchronous boundary.
+4. Keep async host imports out of the current synchronous boundary.
    Promise-returning host bindings need a later JSPI or task-queue design that
    can report rejection without leaving the interpreter state ambiguous.
 

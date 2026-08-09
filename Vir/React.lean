@@ -834,7 +834,9 @@ Evaluate `update` exactly once in the VIR host and enqueue its concrete result.
 
 The callback is not passed to React as a functional updater, so React render
 replay and development Strict Mode cannot invoke Lean effects more than once.
-The `previous` handle is callback-scoped and must not be retained.
+The `previous` handle is callback-scoped and must not escape. The current `Js`
+type does not enforce this statically; an escaped handle is invalidated after
+the callback and fails on later use.
 -/
 @[vir_js "react.state.modify"]
 opaque modify {α : Type}
@@ -868,8 +870,9 @@ VIR invokes `reducer` once when an action is dispatched and enqueues the
 concrete result through React state. The effectful Lean callback is never
 installed as a React reducer function and is therefore not subject to React
 render replay. The synthetic state and action handles are callback-scoped and
-must not be retained; other resources allocated by the callback have their
-ordinary `RuntimeM` lifetime.
+must not escape; other resources allocated by the callback have their ordinary
+`RuntimeM` lifetime. The current `Js` type enforces this scope dynamically, not
+statically: escaped synthetic inputs are invalidated after the callback.
 -/
 @[vir_js "react.useReducer"]
 private opaque useReducerJs {state action : Type}

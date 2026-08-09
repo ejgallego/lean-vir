@@ -279,6 +279,44 @@ assert.throws(
 adoptedResultRuntime.makeHostResourceObjectValue = lowerAdoptedResult;
 adoptedResultRuntime.dispose();
 
+const abandonedListenerDocumentState = createVirtualDocumentState();
+ensureVirtualElementState(abandonedListenerDocumentState, "#abandoned-listener-result");
+const abandonedListenerRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageSetBytes: [hostPackageBytes],
+  virtualDocumentState: abandonedListenerDocumentState,
+  hostBindings: {
+    "test.recordNat": () => undefined,
+  },
+});
+const lowerAbandonedListenerResult = abandonedListenerRuntime.makeHostResourceObjectValue.bind(
+  abandonedListenerRuntime,
+);
+abandonedListenerRuntime.makeHostResourceObjectValue = (type, value, label) => {
+  if (label === "browser.element.addEventListener result") {
+    throw new Error("active listener result lowering boom");
+  }
+  return lowerAbandonedListenerResult(type, value, label);
+};
+assert.throws(
+  () => abandonedListenerRuntime.call("HostInterop.mountCallbackEvent", "#abandoned-listener-result"),
+  /active listener result lowering boom/,
+);
+const abandonedListenerTarget = abandonedListenerDocumentState.elements.get("#abandoned-listener-result");
+assert.equal(
+  abandonedListenerTarget.listeners.get("click")?.length ?? 0,
+  0,
+  "failed result lowering must remove the listener installed by that call",
+);
+assert.equal(
+  abandonedListenerDocumentState.resources.debugResourceCounts().owners,
+  0,
+  "failed result lowering must release the active registration owner",
+);
+assert.equal(abandonedListenerRuntime.liveCallbacks.size, 0);
+abandonedListenerRuntime.makeHostResourceObjectValue = lowerAbandonedListenerResult;
+abandonedListenerRuntime.dispose();
+
 let combinedFailureCallback = null;
 const combinedFailureRuntime = await createVirRuntime({
   wasmBytes,

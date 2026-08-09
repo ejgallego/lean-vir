@@ -5,6 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
+  abandonHostResource,
+  commitHostResource,
   ExternrefResourceRoots,
   isHostResource,
   releaseHostResource,
@@ -193,14 +195,18 @@ export class VirHostState {
       const ownedResultResource = retainedIdentityResult ?? (isHostResource(value) ? value : null);
       try {
         const resultValue = retainedIdentityResult ?? value;
-        return explicitConversionTarget
+        const resultObject = explicitConversionTarget
           ? this.runtime.makeExplicitConversionObjectValue(entry.result, resultValue, resultLabel)
           : this.runtime.makeHostResourceObjectValue(entry.result, resultValue, resultLabel);
+        if (ownedResultResource !== null) {
+          commitHostResource(ownedResultResource);
+        }
+        return resultObject;
       } catch (error) {
         if (ownedResultResource === null) throw error;
         throwWithCleanup(
           error,
-          () => releaseHostResource(ownedResultResource),
+          () => abandonHostResource(ownedResultResource),
           `Vir host import ${entry.target} failed during result ownership cleanup`,
         );
       }

@@ -245,8 +245,10 @@ decoding. They are backed by the intrinsic `js.leanRef`, `js.leanRef.value`,
 JavaScript host retains the Lean object pointer behind a `Lean.Vir.JSL α`
 resource and returns a fresh owned Lean pointer when the value is unwrapped.
 `retainJSL` creates a distinct alias; each alias is released independently,
-and the final release drops the retained object. Runtime teardown force-revokes
-all remaining aliases.
+and the final release drops the retained object. Ordinary Lean copies of one
+`JSL` value share a handle lease and become invalid together; use `retainJSL`
+for an independently releasable owner. Runtime teardown force-revokes all
+remaining aliases.
 `JSL α` is an alias for `Js (LeanRef.Handle α)`, so `JSL String` is distinct
 from a true JavaScript `Js String`. This avoids named structured `js.value.*`
 conversion targets for state/action values that are only coordinated through
@@ -419,6 +421,10 @@ Lean.Vir.React.State.modify count fun previous => do
 State value, synthetic updater/reducer input, and scalar `JsValue` resource
 ownership is documented in
 [HOST_BINDINGS.md](HOST_BINDINGS.md#resource-ownership-policy).
+Synthetic callback inputs must not escape their callback. This remains a
+dynamic contract because `Lean.Vir.Js` has no scope parameter; an escaped
+wrapper is invalidated and fails on later use. Static enforcement is deferred
+to a scoped/generative borrow API.
 
 The intended v0 authoring surface is a DOM-like helper set over that `Js Node`
 resource ABI: named property helpers, named event-handler helpers, and keyed

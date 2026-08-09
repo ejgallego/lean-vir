@@ -5,6 +5,7 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
+  abandonHostResource,
   beginHostResourceOwnerDisposal,
   createHostResource,
   createHostResourceOwner,
@@ -13,11 +14,13 @@ import {
   hostResourceLabel,
   hostResourceOwner,
   hostResourceOwnerPhase,
+  hostResourceReleaseTicket,
   hostResourceValue,
   isRetainableHostResourcePayload,
   isHostResource,
   releaseHostResourcePayload,
   releaseHostResource,
+  releaseHostResourceTicket,
   requireExternrefTableSupport,
   retainHostResourcePayload,
   transferHostResource,
@@ -42,7 +45,7 @@ export class HostResourceState {
     this.owner = createHostResourceOwner("HostResourceState");
     this.revocableResources = new WeakMap();
     this.ownedPayloadResources = new Set();
-    this.weakOwnedPayloadResources = new Set();
+    this.transferredPayloadTickets = new Set();
     this.gcFinalizerErrorMessages = [];
     this.temporaryResourceScopes = [];
     this.disposables = new Set();
@@ -102,11 +105,11 @@ export class HostResourceState {
   }
 
   // Creates a unique resource whose receiver is responsible for releasing it.
-  ownedResourceForValue(value) {
+  ownedResourceForValue(value, { onAbandon = null } = {}) {
     this.requireUsable();
     if (value === null || value === undefined) return null;
     if (!isRetainableHostResourcePayload(value)) {
-      return createHostResource(value, null, { owner: this.owner });
+      return createHostResource(value, null, { owner: this.owner, onAbandon });
     }
     this.requireActive();
     const retainedValue = retainHostResourcePayload(value);
@@ -115,6 +118,7 @@ export class HostResourceState {
       resource = createHostResource(retainedValue, null, {
         owner: this.owner,
         ...payloadResourceLifecycle(this, retainedValue),
+        onAbandon,
       });
       this.ownedPayloadResources.add(resource);
       return resource;
@@ -131,18 +135,38 @@ export class HostResourceState {
 
   // Creates a passive resource that can also be invalidated by its JS value.
   // The reverse index contains only WeakRefs and never owns the wrapper/value.
-  revocableResourceForValue(value) {
-    const resource = this.ownedResourceForValue(value);
-    if (resource === null || !isWeakMapKey(value)) return resource;
-    let references = this.revocableResources.get(value);
-    if (references === undefined) {
-      references = new Set();
-      this.revocableResources.set(value, references);
-    } else {
-      sweepRevocableReferences(references);
+  revocableResourceForValue(value, { onAbandon = null } = {}) {
+    this.requireRevocableResourceSupport();
+    let resource = null;
+    try {
+      resource = this.ownedResourceForValue(value, { onAbandon });
+      if (resource === null || !isWeakMapKey(value)) return resource;
+      let references = this.revocableResources.get(value);
+      if (references === undefined) {
+        references = new Set();
+        this.revocableResources.set(value, references);
+      } else {
+        sweepRevocableReferences(references);
+      }
+      references.add(new WeakRef(resource));
+      return resource;
+    } catch (error) {
+      const errors = [error instanceof Error ? error : new Error(String(error))];
+      if (resource === null) {
+        if (typeof onAbandon === "function") {
+          collectCleanupError(errors, () => onAbandon(value));
+        }
+      } else {
+        collectCleanupError(errors, () => abandonHostResource(resource));
+      }
+      throwCollectedErrors(errors, "revocable host resource creation failed during rollback");
     }
-    references.add(new WeakRef(resource));
-    return resource;
+  }
+
+  requireRevocableResourceSupport() {
+    if (typeof WeakRef !== "function") {
+      throw new Error("revocable host resources require WeakRef support");
+    }
   }
 
   temporaryResourceForValue(value) {
@@ -223,7 +247,7 @@ export class HostResourceState {
       passiveStrong: 0,
       scoped: this.temporaryResourceScopes.reduce((count, scope) => count + scope.size, 0),
       temporaryScopes: this.temporaryResourceScopes.length,
-      owners: this.disposables.size + this.ownedPayloadResources.size,
+      owners: this.disposables.size + this.ownedPayloadResources.size + this.transferredPayloadTickets.size,
     };
   }
 
@@ -249,13 +273,10 @@ export class HostResourceState {
         collectCleanupError(errors, () => releaseHostResource(resource));
       }
       this.ownedPayloadResources.clear();
-      for (const reference of Array.from(this.weakOwnedPayloadResources)) {
-        const resource = reference.deref();
-        if (resource !== undefined) {
-          collectCleanupError(errors, () => releaseHostResource(resource));
-        }
+      for (const ticket of Array.from(this.transferredPayloadTickets)) {
+        collectCleanupError(errors, () => releaseHostResourceTicket(ticket));
       }
-      this.weakOwnedPayloadResources.clear();
+      this.transferredPayloadTickets.clear();
       for (const scope of this.temporaryResourceScopes) {
         for (const resource of Array.from(scope)) {
           collectCleanupError(errors, () => this.releaseResource(resource));
@@ -291,25 +312,29 @@ export class HostResourceState {
 // variable: indirectly retaining the FinalizationRegistry target prevents its
 // cleanup callback from ever running.
 function payloadResourceLifecycle(resources, payload) {
-  const tracking = { reference: null };
+  const tracking = { ticket: null };
   return {
     dispose: () => releaseHostResourcePayload(payload),
     onFinalize: () => {
-      if (tracking.reference !== null) {
-        resources.weakOwnedPayloadResources.delete(tracking.reference);
+      if (tracking.ticket !== null) {
+        resources.transferredPayloadTickets.delete(tracking.ticket);
       }
     },
     onRelease: (resource) => {
       resources.ownedPayloadResources.delete(resource);
-      if (tracking.reference !== null) {
-        resources.weakOwnedPayloadResources.delete(tracking.reference);
+      if (tracking.ticket !== null) {
+        resources.transferredPayloadTickets.delete(tracking.ticket);
       }
     },
     onTake: (resource) => {
-      if (!hasHostResourceFinalizationSupport() || tracking.reference !== null) return false;
+      if (!hasHostResourceFinalizationSupport() || tracking.ticket !== null) return false;
+      const ticket = hostResourceReleaseTicket(resource);
+      if (ticket === null) return false;
+      // Register the destination before detaching the source owner. Everything
+      // after Set.add is non-throwing, so a failed take leaves the source intact.
+      resources.transferredPayloadTickets.add(ticket);
       resources.ownedPayloadResources.delete(resource);
-      tracking.reference = new WeakRef(resource);
-      resources.weakOwnedPayloadResources.add(tracking.reference);
+      tracking.ticket = ticket;
       return true;
     },
     reportFinalizerError: (error) => resources.recordGcFinalizerError(error),
@@ -401,13 +426,17 @@ export function createElementResourceHostBindings(resources, operations) {
     },
     "browser.element.addEventListener": (element, eventName, callback) => {
       const target = resources.resolveResource(element, "Element");
+      const name = resources.resolveResource(eventName, "JsString");
+      resources.requireRevocableResourceSupport();
       const listener = operations.createEventListener(
         target,
-        resources.resolveResource(eventName, "JsString"),
+        name,
         callback,
       );
       resources.addDisposable(listener);
-      return resources.revocableResourceForValue(listener);
+      return resources.revocableResourceForValue(listener, {
+        onAbandon: () => disposeHostResourceValue(listener),
+      });
     },
     "browser.element.removeEventListener": (listener) => {
       const value = resources.resolveResource(listener, "EventListener");
@@ -480,7 +509,7 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
   function rootForContainer(container) {
     let root = rootsByContainer.get(container);
     if (root !== undefined) {
-      return root;
+      return { root, created: false };
     }
     root = createRootResource(container);
     if (typeof root?.unmount !== "function") {
@@ -496,7 +525,7 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       return unmounted.value;
     };
     rootsByContainer.set(container, root);
-    return root;
+    return { root, created: true };
   }
 
   function queryReactRootSelector(selector) {
@@ -529,7 +558,7 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
     if (existing !== undefined && existing.container !== target) {
       releaseRootResource(existing.root);
     }
-    const root = rootForContainer(target);
+    const { root } = rootForContainer(target);
     rootsBySelector.set(selector, { container: target, root });
     return root;
   }
@@ -606,7 +635,11 @@ export function createReactRootResourceHostBindings(resources, createRootResourc
       ),
     "react.root.create": (container) => {
       const target = resources.resolveResource(container, "Element");
-      return resources.revocableResourceForValue(rootForContainer(target));
+      resources.requireRevocableResourceSupport();
+      const { root, created } = rootForContainer(target);
+      return resources.revocableResourceForValue(root, {
+        onAbandon: created ? () => root.unmount() : null,
+      });
     },
     "react.root.render": (root, renderTree) => {
       const render = requireReactRenderCallback(renderTree);
@@ -697,16 +730,28 @@ function requireReactNodeFragmentResourceFactory(factory) {
 
 export function createTimerResourceHostBindings(resources) {
   return {
-    "browser.timer.setTimeout": (delayMs, callback) =>
-      resources.revocableResourceForValue(createTimeoutResource(resources, jsNatAsDelay(resources, delayMs), callback)),
+    "browser.timer.setTimeout": (delayMs, callback) => {
+      const delay = jsNatAsDelay(resources, delayMs);
+      resources.requireRevocableResourceSupport();
+      const timeout = createTimeoutResource(resources, delay, callback);
+      return resources.revocableResourceForValue(timeout, {
+        onAbandon: () => disposeHostResourceValue(timeout),
+      });
+    },
     "browser.timer.clearTimeout": (timeout) => {
       const value = resources.resolveResource(timeout, "Timeout");
       value.clear();
       resources.releaseValueResource(value);
       return undefined;
     },
-    "browser.timer.setInterval": (delayMs, callback) =>
-      resources.revocableResourceForValue(createIntervalResource(resources, jsNatAsDelay(resources, delayMs), callback)),
+    "browser.timer.setInterval": (delayMs, callback) => {
+      const delay = jsNatAsDelay(resources, delayMs);
+      resources.requireRevocableResourceSupport();
+      const interval = createIntervalResource(resources, delay, callback);
+      return resources.revocableResourceForValue(interval, {
+        onAbandon: () => disposeHostResourceValue(interval),
+      });
+    },
     "browser.timer.clearInterval": (interval) => {
       const value = resources.resolveResource(interval, "Interval");
       value.clear();
@@ -718,8 +763,13 @@ export function createTimerResourceHostBindings(resources) {
 
 export function createAnimationResourceHostBindings(resources, { requestFrame, cancelFrame }) {
   return {
-    "browser.animation.requestAnimationFrame": (callback) =>
-      resources.revocableResourceForValue(createAnimationFrameResource(resources, callback, requestFrame, cancelFrame)),
+    "browser.animation.requestAnimationFrame": (callback) => {
+      resources.requireRevocableResourceSupport();
+      const frame = createAnimationFrameResource(resources, callback, requestFrame, cancelFrame);
+      return resources.revocableResourceForValue(frame, {
+        onAbandon: () => disposeHostResourceValue(frame),
+      });
+    },
     "browser.animation.cancelAnimationFrame": (frame) => {
       const value = resources.resolveResource(frame, "AnimationFrame");
       value.cancel();

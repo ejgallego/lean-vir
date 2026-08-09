@@ -70,8 +70,10 @@ The host-import path now also supports Lean function values as callback objects.
 `Animation.requestAnimationFrame` root Lean closures in the WASM shim, expose
 callable `VirCallback` objects to JavaScript, and give every listener, timer,
 frame, asynchronous RPC, or React owner an independent callback lease. The
-closure root is released after its last lease, or force-revoked during runtime
-teardown. Loading a new package into an existing runtime performs the
+closure root is released after its last explicitly released or finalized
+lease, or force-revoked during runtime teardown. Callback finalization is a
+best-effort backstop; runtime teardown remains the deterministic upper bound.
+Loading a new package into an existing runtime performs the
 same host-resource teardown before the new manifest is installed. Event
 resources remain opaque callback-scoped values; the ownership contract and
 follow-up work are tracked in `docs/EVENT_CALLBACK_ROADMAP.md`.
@@ -99,9 +101,10 @@ Current standalone React Node status is tracked in `docs/REACT_NODE.md`; full
 Lean infoview RPC compatibility remains follow-up work tracked in
 `docs/REACT_PROOFWIDGETS_ROADMAP.md`.
 
-`Lean.Vir.JSL α` handles now use explicit per-alias leases over one retained
-Lean object. `LeanRef.retainJSL` creates an independent alias and
-`LeanRef.releaseJSL` releases only that alias. An owned externref root releases
+`Lean.Vir.JSL α` handles now use explicit per-handle leases over one retained
+Lean object. Ordinary Lean copies share one handle lease;
+`LeanRef.retainJSL` creates an independent handle and `LeanRef.releaseJSL`
+releases only that handle. An owned externref root releases
 its lease when Lean's external-object finalizer drops the wrapper, while
 runtime teardown force-revokes all aliases. `releaseJSL` therefore remains the
 deterministic early-release operation rather than the only leak-free path.
@@ -111,17 +114,28 @@ commit transfers only the selected result, while action collection or component
 disposal releases the queue owner. Focused virtual and browser-hook tests cover alias independence,
 replacement, callback-result transfer, dropped wrappers, and unmount cleanup.
 
-Composite resources retain their resource-bearing children and reject
-ownership cycles. Recursive result lifting is transactional: callbacks and
-owned resource aliases materialized before a later decoding failure are rolled
-back. Browser React render generations stay outside the runtime's strong owner
-registry and transfer their staged ownership only from a commit-phase layout
-effect; weak finalization is a safety net for abandoned renders. Browser state
+Composite resources retain their resource-bearing children and reject cycles
+in the explicitly registered payload-child graph. Arbitrary strong cycles
+through JavaScript properties, closures, framework state, or Lean fields are
+outside that detector and require a weak edge or explicit teardown. Recursive
+result lifting is transactional: callbacks and owned resource aliases
+materialized before a later decoding failure are rolled back. Active listener,
+timer, frame, and newly created root results also remain provisional until
+result lowering succeeds, so a failed host call reverses the registration
+instead of leaving it runtime-owned. Browser React render generations stay
+outside the runtime's strong owner registry and transfer their staged ownership
+only from a commit-phase layout effect; weak finalization is a safety net for
+abandoned renders. Browser state
 updaters and reducers are evaluated once by VIR, and React only replays a pure
 JavaScript action over their already-computed result, so development replay
 cannot repeat Lean effects.
 Finalizer diagnostics are bounded strings and never retain the failed resource
 payload.
+
+Callback-local event and synthetic updater/reducer inputs still use the
+unscoped `Lean.Vir.Js` type. Their wrappers are invalidated deterministically,
+but Lean does not yet reject programs that let one escape; a scoped/generative
+borrow API remains separate follow-up work.
 
 `Lean.Expr` is also part of the current manifest surface. JavaScript sends and
 receives structural objects for the standard expression constructors, while Lean

@@ -20,6 +20,7 @@ import {
   createBrowserReactRootResource,
   createReactNodeResource,
 } from "../../web/src/react/vir-react-node.js";
+import { createVirCallback } from "../../web/src/runtime/callbacks.js";
 
 assert.equal(typeof globalThis.gc, "function", "host resource GC smoke requires --expose-gc");
 
@@ -34,6 +35,25 @@ const throwingPayloadFinalizer = new FinalizationRegistry(() => {
       directReleases++;
     },
   });
+})();
+
+let droppedCallbackReleases = 0;
+const droppedCallbackRoots = new Set();
+const droppedCallbackRuntime = {
+  hostState: null,
+  trackCallback(root) {
+    droppedCallbackRoots.add(root);
+  },
+  untrackCallback(root) {
+    droppedCallbackRoots.delete(root);
+  },
+  releaseClosure(rootId) {
+    assert.equal(rootId, 1);
+    droppedCallbackReleases++;
+  },
+};
+(() => {
+  createVirCallback(droppedCallbackRuntime, 1, { args: [], result: { type: "Unit" } });
 })();
 
 let transferredReleases = 0;
@@ -58,7 +78,7 @@ const roots = new ExternrefResourceRoots();
   const result = resources.adoptResourceForValue(payload);
   const root = roots.root(result, { owned: true });
   assert.equal(roots.get(root, { take: true }), result);
-  assert.equal(resources.debugResourceCounts().owners, 0);
+  assert.equal(resources.debugResourceCounts().owners, 1);
   roots.release(root);
 })();
 (() => {
@@ -174,6 +194,7 @@ reactRoot.render(replacement);
 
 for (let attempt = 0; attempt < 200 && (
   directReleases !== 1 ||
+  droppedCallbackReleases !== 1 ||
   transferredReleases !== 1 ||
   throwingReleases !== 1 ||
   throwingPayloadCollections !== 1 ||
@@ -187,6 +208,8 @@ for (let attempt = 0; attempt < 200 && (
 }
 
 assert.equal(directReleases, 1, "an unreachable disposable HostResource must be finalized exactly once");
+assert.equal(droppedCallbackReleases, 1, "an unreachable VirCallback lease must release its closure root");
+assert.equal(droppedCallbackRoots.size, 0);
 assert.equal(
   transferredReleases,
   1,

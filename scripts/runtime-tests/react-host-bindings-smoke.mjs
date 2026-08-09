@@ -16,6 +16,8 @@ import {
   createReactRootResourceHostBindings,
 } from "../../web/src/host/vir-host-resources.js";
 import {
+  abandonHostResource,
+  commitHostResource,
   createHostResource,
   hostResourceValue,
   registerHostResourcePayloadLifetime,
@@ -33,6 +35,7 @@ import {
   createVirtualReactHookRuntime,
 } from "../../web/src/react/vir-react-hooks.js";
 import {
+  createBrowserReactNodeElementResource,
   createBrowserReactRootResource,
   createReactNodeResource,
   createVirtualReactRootResource,
@@ -225,6 +228,48 @@ function callbackLease(cell, body = () => undefined) {
 }
 
 {
+  const resources = createHostResourceState();
+  const hooks = createReactHostHooks({ resources });
+  const bindings = {
+    ...createReactJsValueHostBindings(resources),
+    ...createReactRootResourceHostBindings(resources, () => {
+      throw new Error("React root creation must not run");
+    }, {
+      createNodeElementResource: (elementType, props, children) =>
+        createBrowserReactNodeElementResource(
+          resources,
+          () => { throw new Error("React.createElement boom"); },
+          hooks,
+          elementType,
+          props,
+          children,
+        ),
+    }),
+  };
+  const cell = { active: 0 };
+  const handler = bindings["js.value.react.eventHandler"]({
+    name: "onClick",
+    callback: callbackLease(cell),
+  });
+  const props = bindings["react.props.empty"]();
+  bindings["react.props.setEventHandler"](props, handler);
+  resources.releaseResource(handler);
+  assert.equal(cell.active, 1);
+  const elementType = bindings["react.elementType.tag"](resources.resourceForValue("button"));
+  const children = bindings["react.node.children.empty"]();
+  assert.throws(
+    () => bindings["react.node.createElement"](elementType, props, children),
+    /React\.createElement boom/,
+  );
+  assert.equal(cell.active, 1, "React.createElement failure must release its newly acquired callback lease");
+  resources.releaseResource(props);
+  assert.equal(cell.active, 0);
+  resources.releaseResource(elementType);
+  resources.releaseResource(children);
+  resources.dispose();
+}
+
+{
   const state = createVirtualDocumentState();
   const bindings = createVirtualDocumentHostBindings(state);
   const cell = { active: 0 };
@@ -257,6 +302,32 @@ function callbackLease(cell, body = () => undefined) {
   state.resources.releaseResource(props);
   state.resources.releaseResource(elementType);
   state.resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  let unmounts = 0;
+  const bindings = createReactRootResourceHostBindings(resources, () => ({
+    unmount() {
+      unmounts++;
+    },
+  }));
+  const container = resources.resourceForValue({ kind: "staged root alias container" });
+  const committedRoot = bindings["react.root.create"](container);
+  commitHostResource(committedRoot);
+  const stagedAlias = bindings["react.root.create"](container);
+  abandonHostResource(stagedAlias);
+  assert.equal(unmounts, 0, "abandoning a new alias must not unmount an existing committed root");
+  assert.doesNotThrow(() => resources.resolveResource(committedRoot, "ReactRoot"));
+  bindings["react.root.unmount"](committedRoot);
+  assert.equal(unmounts, 1);
+
+  const stagedRoot = bindings["react.root.create"](container);
+  abandonHostResource(stagedRoot);
+  assert.equal(unmounts, 2, "abandoning a newly created root must roll back that root");
+  assert.throws(() => resources.resolveResource(stagedRoot, "ReactRoot"), /resource is not live/);
+  resources.releaseResource(container);
+  resources.dispose();
 }
 
 {
@@ -346,10 +417,15 @@ function callbackLease(cell, body = () => undefined) {
   });
   const node = resources.adoptResourceForValue(nodeValue, { tracked: false });
   assert.equal(cell.active, 1);
-  assert.equal(resources.debugResourceCounts().owners, 0);
+  assert.equal(
+    resources.debugResourceCounts().owners,
+    1,
+    "an untracked wrapper must leave one wrapper-independent release ticket",
+  );
   resources.releaseResource(node);
   assert.equal(cell.active, 0, "dropping an unrendered node wrapper must release its callbacks");
   assert.equal(nodeValue.finalized, true);
+  assert.equal(resources.debugResourceCounts().owners, 0);
   resources.dispose();
 }
 

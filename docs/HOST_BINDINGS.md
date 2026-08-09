@@ -296,7 +296,10 @@ root, including leases the failed binding created from it.
 composing browser, React, timer, animation, and virtual binding groups. The
 store stamps opaque `HostResource` wrappers with one runtime-generation owner,
 validates them on every resolution, and owns active disposable host objects.
-It does not strongly retain ordinary resource wrappers.
+It does not strongly retain ordinary resource wrappers. For every transferred
+retainable payload it retains an opaque, wrapper-independent release ticket,
+so `HostResourceState.dispose()` can enumerate and discharge the lease even if
+the wrapper is already unreachable and its finalizer has not run.
 See [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for diagrams of the
 `Lean.Vir.Js α` resource path and the separate `VirCallback` closure-root path.
 
@@ -318,6 +321,16 @@ For every retainable payload, the live-lease count after an operation is the
 previous count plus successful acquisitions minus successful releases. Every
 live lease must name exactly one current owner. Mutable payload identity,
 rewrapping, or storing the same payload twice does not merge those owners.
+Generic retain is legal only when the payload lifetime can create a real
+independent lease. A wrapper-level disposable without such a payload lifetime
+is move-only and `retainHostResource` rejects it.
+
+These are temporal-safety and failure-atomicity guarantees, not a promise that
+JavaScript will eventually collect every unreachable wrapper. Explicit release
+and runtime teardown are deterministic when invoked. `FinalizationRegistry`
+is only an abandonment backstop: the platform may delay or omit it. VIR owns
+root capabilities and semantic cleanup obligations, not JavaScript heap memory
+or the collector's schedule.
 
 The main owners and their commit points are:
 
@@ -325,7 +338,7 @@ The main owners and their commit points are:
 | --- | --- | --- |
 | WASM lift/call scope | Callbacks and resource results materialized during recursive decoding | Commits only after the complete call and result conversion; otherwise rolls back all acquisitions. |
 | Composite resource | Independent leases for nullable values, props, handlers, children, and similar fields | Releases with the composite. Reading or materializing a live composite only borrows its child leases. |
-| Active registration | Its own callback or activity lease | Releases on removal, cancellation, completion, unmount, or runtime disposal. |
+| Active registration | Its own callback or activity lease | Creation remains provisional until its returned handle is completely lowered. Failed result conversion rolls back a newly installed registration; committed registrations release on removal, cancellation, completion, unmount, or runtime disposal. |
 | JSL alias or owned externref root | One lease over the retained Lean object or host payload | Releases that alias/root without invalidating sibling owners. |
 | React queued update | Its own state/action payload lease | Render borrows or stages from it; queue-record collection or component disposal releases it. A commit in another React lane does not. |
 | React render generation | Candidate nodes, callbacks, and hook payload leases | A real commit-phase hook transfers selected leases; render failure or abandoned-generation cleanup releases only the staged generation. |
@@ -348,6 +361,7 @@ hypothetical owners do not expand the review.
 | --- | --- | --- |
 | Borrowed child → builder → parent | Release parent first and child first; reuse the surviving side. | The survivor remains usable; final release restores the payload-lease count. |
 | Callback-bearing result → WASM root | Fail result lowering after the host adopts the callback. | The adopted resource and callback root are both gone. |
+| Active registration → WASM result | Fail result lowering after listener/timer/frame/root creation; repeat with an alias of an existing root. | A registration created by the failed call is cancelled, while a pre-existing aliased root remains mounted. |
 | Updater/reducer inputs → callback | Succeed and throw while creating an unrelated resource. | Only synthetic input wrappers expire; unrelated allocations remain live. |
 | Deferred React owner → teardown | Dispose before the scheduled microtask; include throwing and non-throwing siblings. | Teardown drains once, attempts every sibling, and restores the owner count synchronously. |
 | Speculative browser owner → abandonment backstop | Remove `FinalizationRegistry` or `WeakRef`. | Browser binding construction fails before acquiring ownership. |
@@ -379,8 +393,13 @@ abandoned. Passive DOM elements, strings, numeric values, `Js.Array`, and
 
 Retainable payloads compose through containers. `Js.Nullable`, React event
 handler values, React props builders, and React child-list builders acquire
-independent child leases and release all children when abandoned. Ownership
-graphs reject cycles rather than relying on cyclic reference counts. A
+independent child leases and release all children when abandoned. The
+explicitly registered payload-child graph rejects cycles rather than relying
+on cyclic reference counts. VIR cannot inspect ordinary JavaScript properties,
+closure environments, framework internals, or Lean fields, so arbitrary mixed
+Lean-to-JavaScript-to-Lean cycles are unsupported. Such a graph needs a weak
+edge or an explicit lifecycle boundary whose release or runtime teardown
+breaks it. A
 container may safely acquire a lease from a live runtime-created JSL wrapper
 even though that wrapper is not owned by the container's `HostResourceState`.
 After a React parent acquires its child lease, the original borrowed child
@@ -403,12 +422,19 @@ set until listener removal, timer/frame cancellation, root unmounting, or
 runtime teardown. A returned Lean handle names the registration but is not
 what keeps its activity alive. Selected active values use a weak reverse index
 so explicit cancellation can invalidate every still-reachable wrapper without
-making the index an owner.
+making the index an owner. Creation bindings check for `WeakRef` before they
+install an activity that needs this index. The returned wrapper carries a
+provisional rollback until complete host-result conversion commits it; failed
+conversion removes a newly installed listener, cancels a new timer/frame, or
+unmounts a newly created root. Creating another handle for an existing root
+does not attach that rollback, so failure cannot unmount a committed sibling.
 
 Lean-owned object handles created by `js.leanRef` use the same `Js` resource
 transport, but their payload is a lease over one retained Lean object pointer.
 `Lean.Vir.LeanRef.retainJSL` creates a distinct lease over the same object;
-`releaseJSL` invalidates only the supplied lease. Dropping an unclaimed Lean
+`releaseJSL` invalidates only the supplied handle's lease. Ordinary Lean copies
+of one `JSL` value share that same handle and become invalid together; only
+`retainJSL` creates an independently releasable owner. Dropping an unclaimed Lean
 external wrapper now releases that lease automatically; `releaseJSL` remains
 the deterministic early-release API. The final lease release
 decrements the Lean object, while package/runtime teardown force-invalidates
@@ -438,10 +464,17 @@ Some resources are callback-local rather than retained:
 - `react.state.modify` gives the updater a synthetic
   `previous : Lean.Vir.Js α` wrapper, and a reducer receives equivalent
   synthetic state and action wrappers. Those input wrappers are callback-local
-  and must not be retained. The callback does not otherwise run in a temporary
+  and must not escape. The callback does not otherwise run in a temporary
   resource scope: unrelated `Lean.Vir.JsValue` resources that it allocates have
   ordinary `RuntimeM` lifetime and may escape. The returned state payload is
   retained or transferred into React independently of those input wrappers.
+
+This callback-local rule is currently dynamic, not enforced by Lean's type
+system: `Lean.Vir.Js α` itself carries no scope parameter. Safe Lean can store
+or return one of these input wrappers, but the host invalidates it at callback
+exit and a later use fails resource-liveness validation. This work guarantees
+bounded ownership and cleanup; making callback-input escape unrepresentable is
+deferred to a scoped or generative borrow API.
 
 `VirCallback` values follow a separate ownership lane. JavaScript receives a
 callable lease around a rooted Lean closure. `callback.retain()` creates a
