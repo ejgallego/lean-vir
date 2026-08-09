@@ -3,6 +3,18 @@
 This directory contains the maintainer and integration notes for Lean VIR. The
 top-level `README.md` remains the user-facing quickstart.
 
+## Project Direction
+
+- [PRODUCT.md](PRODUCT.md): product thesis, users, usage path, supported pilot
+  boundary, and first pilot.
+- [ALTERNATIVES.md](ALTERNATIVES.md): when to use VIR, TypeScript, server-side
+  Lean, direct Wasm compilation, or another evaluator approach.
+- [UPSTREAMING.md](UPSTREAMING.md): component-by-component upstream strategy,
+  evidence gates, and risks.
+- [MAINTENANCE.md](MAINTENANCE.md): ownership, release discipline, support
+  boundary, risk register, and execution model.
+- [DECISIONS.md](DECISIONS.md): durable product and architecture decisions.
+
 ## Developer Reading Paths
 
 Start with [DEVELOPER_GUIDE.md](DEVELOPER_GUIDE.md) for implementation work.
@@ -129,3 +141,13 @@ ownership diagrams.
   direction.
 - [OBJECT_ABI.md](OBJECT_ABI.md): staged plan for JS-driven Lean object
   lowering/lifting.
+
+## Project Review
+
+- [project-review/README.md](project-review/README.md): 2026 internal review
+  pack, including the technical assessment, user-needs workbook, six-month
+  roadmap, and 20-minute all-hands runbook.
+- [project-review/cards/README.md](project-review/cards/README.md): active
+  `Deliver`, `Learn`, and `Coordinate` cards plus their archive contract.
+- [project-review/ALL_HANDS_NOTES.md](project-review/ALL_HANDS_NOTES.md): raw
+  meeting feedback and post-meeting promotion checklist.
