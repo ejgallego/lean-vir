@@ -15,13 +15,7 @@ try {
 
 await rm(output, { recursive: true, force: true });
 await mkdir(output, { recursive: true });
-for (const path of [
-  "index.html",
-  "illuminate.html",
-  "LICENSE",
-  "NOTICE",
-  "README.md",
-]) {
+for (const path of ["index.html", "LICENSE", "NOTICE", "README.md"]) {
   await cp(join(appRoot, path), join(output, path));
 }
 for (const path of ["src", "styles", "artifacts"]) {
@@ -30,4 +24,4 @@ for (const path of ["src", "styles", "artifacts"]) {
 for (const path of ["_headers", ".htaccess"]) {
   await cp(join(appRoot, "static", path), join(output, path));
 }
-console.log(`Built standalone prettyM benchmark at ${output}`);
+console.log(`Built standalone Lean benchmark app at ${output}`);

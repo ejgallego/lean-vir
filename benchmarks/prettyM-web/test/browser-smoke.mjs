@@ -74,6 +74,38 @@ try {
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(String(error)));
   await page.goto(url, { waitUntil: "networkidle" });
+  assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.ready), {
+    example: null,
+    readyCount: 0,
+    backendCount: 0,
+  });
+  assert.equal(
+    await page.evaluate(() => window.__benchmarkApp.activeExample),
+    null,
+  );
+  assert.equal(await page.locator("[data-example-content]:visible").count(), 0);
+  assert.equal(await page.locator("#example-nav a").count(), 2);
+  assert.equal(
+    await page.locator('#example-nav [aria-current="page"]').count(),
+    0,
+  );
+  await page.locator('#example-nav [data-example="prettyM"]').click();
+  await page.waitForLoadState("networkidle");
+  assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.ready), {
+    example: "prettyM",
+    readyCount: 5,
+    backendCount: 5,
+  });
+  assert.deepEqual(await page.evaluate(() => window.__benchmarkApp.examples), [
+    { id: "prettyM", label: "Std.Format.prettyM" },
+    { id: "illuminate", label: "Illuminate player" },
+  ]);
+  assert.equal(
+    await page
+      .locator('#example-nav [data-example="prettyM"]')
+      .getAttribute("aria-current"),
+    "page",
+  );
   const readiness = await page.evaluate(() => window.__prettyBenchApp.ready);
   assert.deepEqual(readiness, { readyCount: 5, backendCount: 5 });
   assert.equal(await page.evaluate(() => typeof window.Reveal), "undefined");
@@ -117,7 +149,8 @@ try {
     "prettyM-bounded-set-0001",
   );
   assert.equal(
-    report.runtimeProfile.artifactSet.manifest.components.vir.runtime.sourceCommit,
+    report.runtimeProfile.artifactSet.manifest.components.vir.runtime
+      .sourceCommit,
     "64e30784da16957cca92951344d776f895b30491",
   );
   assert.ok(report.runtimeProfile.backends.js.assetBytes > 0);
@@ -145,11 +178,15 @@ try {
     "1 of 5 selected",
   );
   assert.equal(
-    await page.locator('.pretty-dashboard-overview-chart rect[fill="#d879c6"]').count(),
+    await page
+      .locator('.pretty-dashboard-overview-chart rect[fill="#d879c6"]')
+      .count(),
     1,
   );
   assert.equal(
-    await page.locator('.pretty-dashboard-overview-chart rect[fill="#74a9ff"]').count(),
+    await page
+      .locator('.pretty-dashboard-overview-chart rect[fill="#74a9ff"]')
+      .count(),
     0,
   );
   await page

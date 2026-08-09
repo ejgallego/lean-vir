@@ -33,6 +33,15 @@ const openDashboard = /** @type {HTMLButtonElement} */ (
 const downloadResults = /** @type {HTMLButtonElement} */ (
   document.querySelector("#download-results")
 );
+const loadResults = /** @type {HTMLButtonElement} */ (
+  document.querySelector("#load-results")
+);
+const loadInput = /** @type {HTMLInputElement} */ (
+  document.querySelector("#load-results-input")
+);
+const clearResults = /** @type {HTMLButtonElement} */ (
+  document.querySelector("#clear-results")
+);
 
 /** @type {{ id: string, label: string, status: string, invoke?: (animation: *, events: *[]) => * }[]} */
 const backends = [
@@ -55,9 +64,15 @@ function renderBuildNotes(receipt) {
   const source = receipt.source;
   notes.replaceChildren();
   [
-    `Illuminate ${source.commit.slice(0, 8)}${source.dirty ? " + local changes" : ""}`,
-    `VIR ${vir.sourceCommit.slice(0, 8)}${vir.sourceDirty ? " · manifest records dirty" : ""}`,
-    `FIR ${native.fir.commit.slice(0, 8)} · ${native.browserAdapter.apiVersion} · ${native.wasm.byteLength.toLocaleString()} Wasm bytes`,
+    `Illuminate ${source.commit.slice(0, 8)}${
+      source.dirty ? " + local changes" : ""
+    }`,
+    `VIR ${vir.sourceCommit.slice(0, 8)}${
+      vir.sourceDirty ? " · manifest records dirty" : ""
+    }`,
+    `FIR ${native.fir.commit.slice(0, 8)} · ${
+      native.browserAdapter.apiVersion
+    } · ${native.wasm.byteLength.toLocaleString()} Wasm bytes`,
   ].forEach((value) => {
     const item = document.createElement("li");
     item.textContent = value;
@@ -767,7 +782,7 @@ function renderReport(report) {
   detail.textContent = `${report.samples} measured rounds · local rehearsal`;
   const open = document.createElement("button");
   open.type = "button";
-  open.textContent = "View plots";
+  open.textContent = "View report";
   open.addEventListener("click", () =>
     globalThis.PrettyBenchDashboard.openReport("scaling"),
   );
@@ -775,6 +790,20 @@ function renderReport(report) {
   reportList.appendChild(card);
   openDashboard.disabled = false;
   downloadResults.disabled = false;
+  clearResults.disabled = false;
+}
+
+function clearReport() {
+  latestReport = null;
+  globalThis.PrettyBenchDashboard.reset();
+  reportList.replaceChildren();
+  const empty = document.createElement("p");
+  empty.className = "empty-state";
+  empty.textContent = "No Illuminate benchmark has run yet.";
+  reportList.appendChild(empty);
+  openDashboard.disabled = true;
+  downloadResults.disabled = true;
+  clearResults.disabled = true;
 }
 
 function setRunning(value) {
@@ -798,7 +827,6 @@ async function execute(kind) {
       latestReport.passed ? "ready" : "failed",
       `${latestReport.parityCount}/${latestReport.scenarioCount} points agree`,
     );
-    globalThis.PrettyBenchDashboard.openReport("scaling");
     return latestReport;
   } catch (error) {
     setState(
@@ -929,9 +957,42 @@ downloadResults.addEventListener("click", () => {
       type: "application/json",
     }),
   );
-  link.download = `illuminate-player-${new Date().toISOString().replaceAll(":", "-")}.json`;
+  link.download = `illuminate-player-${new Date()
+    .toISOString()
+    .replaceAll(":", "-")}.json`;
   link.click();
   URL.revokeObjectURL(link.href);
+});
+loadResults.addEventListener("click", () => loadInput.click());
+loadInput.addEventListener("change", () => {
+  const file = loadInput.files?.[0];
+  if (!file) return;
+  file
+    .text()
+    .then((body) => {
+      const report = JSON.parse(body);
+      if (report?.workload?.id !== "illuminate-player") {
+        throw new Error("selected file is not an Illuminate player report");
+      }
+      latestReport = report;
+      globalThis.PrettyBenchDashboard.load(report);
+      renderReport(report);
+      setState("Loaded", "ready", file.name);
+    })
+    .catch((error) => {
+      setState(
+        "Failed",
+        "failed",
+        error instanceof Error ? error.message : String(error),
+      );
+    })
+    .finally(() => {
+      loadInput.value = "";
+    });
+});
+clearResults.addEventListener("click", () => {
+  clearReport();
+  setState("Ready", "ready", "Report cleared");
 });
 
 const api = {

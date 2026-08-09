@@ -1,10 +1,12 @@
-# Lean prettyM benchmark webapp
+# Lean browser benchmark app
 
-This directory is a standalone browser application for comparing five
-`Std.Format.prettyM` implementations. It also contains a local rehearsal of
-the Illuminate player as the first real second workload. The application has
-no runtime dependency on Verso, Reveal, Lake, or the parent VIR repository's
-source tree.
+This directory is one standalone browser benchmark application. Its example
+selector currently exposes `Std.Format.prettyM` and the Illuminate player at
+the same level and through the same page structure. Each example supplies its
+own semantic contract, backend set, sampling controls, and studies while the
+application owns navigation, artifact status, report actions, plotting, and
+backend filtering. It has no runtime dependency on Verso, Reveal, Lake, or the
+parent VIR repository's source tree.
 
 The complete application can be moved to the root of another repository. The
 root-level VIR npm commands are convenience pointers only and are not used by
@@ -113,10 +115,13 @@ npm run build
 npm run dev
 ```
 
-Open <http://127.0.0.1:18334>. The included server supplies the cross-origin
-isolation headers required by threaded LLVM Wasm. `_headers` and `.htaccess`
-files are included at the root of `dist/` for static hosts; configure equivalent
-headers when the hosting platform does not consume either format.
+Open <http://127.0.0.1:18334>. The root is a neutral example catalog; it does
+not load or privilege either workload. Select an example there or use the
+direct links `?example=prettyM` and `?example=illuminate`. The included server
+supplies the cross-origin isolation headers required by threaded LLVM Wasm.
+`_headers` and `.htaccess` files are included at the root of `dist/` for static
+hosts; configure equivalent headers when the hosting platform does not consume
+either format.
 
 Backend selection in the report dashboard is presentation-only. The same
 selection follows the corpus, scaling, memory, repeated-call, and interaction
@@ -132,9 +137,10 @@ Set `CHROMIUM` to an alternate Chrome/Chromium executable when necessary.
 
 ### Illuminate rehearsal
 
-`illuminate.html` reuses the plotting report and backend filter for the legacy
-JavaScript, typed VIR, and FIR-native Illuminate player implementations. Until
-the workload and all producers have clean source revisions, stage it only as a
+The `Illuminate player` example in the common application compares the legacy
+JavaScript, typed VIR, and FIR-native implementations. It has the same
+artifact-status, backend, protocol, study, and result sections as `prettyM`.
+Until it moves into the canonical artifact database, stage its inputs as a
 local rehearsal:
 
 ```sh
@@ -149,7 +155,7 @@ npm run test:illuminate
 omitted, it defaults to the SDK under the Illuminate checkout. The stager
 verifies its manifest and file digests before copying it.
 
-The page and downloaded report display the exact staged build identities and
+The application and downloaded report display the exact staged build identities and
 mark all timings as non-authoritative. See
 `docs/ILLUMINATE_REHEARSAL.md` for refreshed build hashes, correctness status,
 and the remaining semantic stop condition.
@@ -206,6 +212,8 @@ serve scripts, browser tests, package metadata, licensing files, documentation,
 and the artifact input contract are all contained here. The app uses only
 browser APIs and its own npm development dependency.
 
-The main benchmark engine remains deliberately `prettyM`-specific. Illuminate
-supplies the concrete second-client requirements; only presentation metadata,
-backend filtering, and shared report phases have been generalized so far.
+The example controllers retain their workload-specific execution contracts.
+The shared shell is deliberately smaller: it defines the uniform example
+format, chooses the controller, and owns navigation. Illuminate supplies the
+concrete second-client requirements without forcing either engine into a
+lowest-common-denominator benchmark API.
