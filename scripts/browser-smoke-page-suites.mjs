@@ -295,8 +295,16 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(surfaceBridge.href.includes("../surface/#declaration=Array.replicate"));
 
   await clickSelector(cdp, "#scope-switch button[data-scope='context']");
+  await waitForBrowserState(cdp, `(() => {
+    const selected = document.querySelector("#scope-switch button.selected")?.dataset.scope;
+    return { ready: selected === "context", value: selected };
+  })()`, { timeoutMessage: "Wasm size explorer scope transition did not finish" });
   const context = await evaluate(cdp, `({
     selectedScope: document.querySelector("#scope-switch button.selected")?.dataset.scope,
+    scopeTransition: {
+      supported: typeof document.startViewTransition === "function",
+      name: getComputedStyle(document.querySelector("#treemap")).viewTransitionName,
+    },
     root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
     note: document.querySelector("#view-note")?.textContent,
     explanationOpen: document.querySelector(".view-explanation")?.open,
@@ -348,11 +356,26 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
         density: object.meta.boundaryDensity,
       };
     })(),
+    surfaceMapping: {
+      mappedMissing: globalThis.__virWasmSize.runtimeContext.missingSurfaceEntries,
+      totalMissing: globalThis.__virWasmSize.runtimeContext.totalMissingSurfaceEntries,
+      unmappedMissing: globalThis.__virWasmSize.runtimeContext.unmappedMissingSurfaceEntries,
+      primaryRoots: globalThis.__virWasmSize.runtimeContext.primaryRoots,
+    },
   })`);
   assert.equal(context.selectedScope, "context");
+  assert.equal(context.scopeTransition.supported, true);
+  assert.equal(context.scopeTransition.name, "vir-map-scope");
   assert.equal(context.root, "Installed Lean execution context");
   assert.equal(context.explanationOpen, false);
   assert.ok(context.note.includes("exact retained Wasm symbols"));
+  assert.ok(context.surfaceMapping.mappedMissing > 300);
+  assert.ok(context.surfaceMapping.totalMissing > context.surfaceMapping.mappedMissing);
+  assert.equal(
+    context.surfaceMapping.unmappedMissing,
+    context.surfaceMapping.totalMissing - context.surfaceMapping.mappedMissing,
+  );
+  assert.ok(context.surfaceMapping.primaryRoots > 40_000);
   assert.ok(context.mixed > 0);
   assert.ok(context.outside > 0);
   assert.equal(context.depth, "4");
@@ -527,7 +550,7 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(combined.overlap > 0);
   assert.ok(combined.boundary > 0);
   assert.ok(combined.neither > 0);
-  assert.equal(combined.listTitle, "Retained but unregistered");
+  assert.equal(combined.listTitle, "Retained + blocker overlap");
   assert.equal(combined.top.length, combined.overlapLeaves);
   assert.equal(combined.legendTitle, "Green retained · orange pressure · purple overlap");
   assert.equal(combined.legendMin, "neither");

@@ -14,7 +14,7 @@ import { compactFrontierCostReport } from "./frontier-size-costs.mjs";
 import { parseLinkMap, parseWasm } from "./wasm-size-report.mjs";
 
 const HTML_FORMAT = "lean-vir-wasm-size-html";
-const HTML_VERSION = 7;
+const HTML_VERSION = 8;
 const templateDir = fileURLToPath(new URL("wasm-size-report/", import.meta.url));
 
 const [releaseWasmArg, debugWasmArg, mapArg, outputArg, ...rest] = process.argv.slice(2);
@@ -62,9 +62,15 @@ const frontierCosts = frontierCostsArg
     resolve(frontierCostsArg),
   )
   : null;
-const connectedSymbols = connectSurfaceLinks(ownershipTree, surfaceLinks);
+const surfaceDeclarationsByTarget = indexSurfaceLinks(surfaceLinks);
+const connectedSymbols = connectSurfaceLinks(ownershipTree, surfaceDeclarationsByTarget);
 annotateSurfaceSummaries(ownershipTree);
-const runtimeContext = await buildRuntimeContext(ownershipTree, identity);
+const runtimeContext = await buildRuntimeContext(
+  ownershipTree,
+  identity,
+  surfaceLinks,
+  surfaceDeclarationsByTarget,
+);
 const attributedBytes = attribution.symbols.reduce((sum, symbol) => sum + symbol.rawBytes, 0);
 
 const payload = {
@@ -250,9 +256,9 @@ function buildOwnershipTree(report) {
   };
 }
 
-function connectSurfaceLinks(root, links) {
-  if (!links) return 0;
+function indexSurfaceLinks(links) {
   const externsByTarget = new Map();
+  if (!links) return externsByTarget;
   for (const declaration of links.externs) {
     for (const target of declaration.targets) {
       const declarations = externsByTarget.get(target) ?? [];
@@ -268,6 +274,10 @@ function connectSurfaceLinks(root, links) {
       externsByTarget.set(target, declarations);
     }
   }
+  return externsByTarget;
+}
+
+function connectSurfaceLinks(root, externsByTarget) {
   let connected = 0;
   visitTree(root, (node) => {
     if (node.kind !== "symbol") return;
@@ -280,7 +290,12 @@ function connectSurfaceLinks(root, links) {
   return connected;
 }
 
-async function buildRuntimeContext(ownershipTree, identity) {
+async function buildRuntimeContext(
+  ownershipTree,
+  identity,
+  surfaceLinks,
+  surfaceDeclarationsByTarget,
+) {
   const lean = spawnSync("lean", ["--print-prefix"], { encoding: "utf8" });
   if (lean.status !== 0) {
     throw new Error(`unable to locate the Lean toolchain: ${lean.stderr || lean.stdout}`);
@@ -339,7 +354,11 @@ async function buildRuntimeContext(ownershipTree, identity) {
         boundarySizedFunctions += functions.length;
         boundarySizedFunctionBytes += functions.reduce((sum, fn) => sum + fn.bytes, 0);
       }
-      const surfaceDeclarations = boundary?.meta?.surfaceDeclarations ?? [];
+      const surfaceDeclarations = runtimeMemberSurfaceDeclarations(
+        functions,
+        boundary?.meta?.surfaceDeclarations ?? [],
+        surfaceDeclarationsByTarget,
+      );
       const memberChildren = runtimeMemberChildren({
         archive: file,
         archiveIndex: archiveIndex + 1,
@@ -453,6 +472,9 @@ async function buildRuntimeContext(ownershipTree, identity) {
     maxFrontierDensity = Math.max(maxFrontierDensity, node.meta?.frontierDensity ?? 0);
   });
   const surfaceSummary = tree.meta?.surfaceSummary ?? emptySurfaceSummary();
+  const totalSurfaceEntries = surfaceLinks?.externs.length ?? 0;
+  const totalMissingSurfaceEntries = surfaceLinks?.externs
+    .filter((declaration) => declaration.status === "missing").length ?? 0;
   return {
     summary: {
       source: "installed Lean archives",
@@ -477,14 +499,32 @@ async function buildRuntimeContext(ownershipTree, identity) {
       retainedNativeFunctionBytes,
       retainedWasmFunctionBytes,
       connectedSurfaceEntries: surfaceSummary.entries,
+      totalSurfaceEntries,
       nativeSurfaceEntries: surfaceSummary.nativeEntries,
       missingSurfaceEntries: surfaceSummary.missingEntries,
+      totalMissingSurfaceEntries,
+      unmappedMissingSurfaceEntries:
+        Math.max(0, totalMissingSurfaceEntries - surfaceSummary.missingEntries),
       primaryRoots: surfaceSummary.primaryRoots,
       primaryPublicRoots: surfaceSummary.primaryPublicRoots,
       maxFrontierDensity,
     },
     tree,
   };
+}
+
+function runtimeMemberSurfaceDeclarations(functions, boundaryDeclarations, declarationsByTarget) {
+  const declarations = new Map(
+    boundaryDeclarations.map((declaration) => [declaration.name, declaration]),
+  );
+  for (const fn of functions) {
+    for (const alias of fn.rawAliases) {
+      for (const declaration of declarationsByTarget.get(alias) ?? []) {
+        declarations.set(declaration.name, declaration);
+      }
+    }
+  }
+  return [...declarations.values()].sort((lhs, rhs) => lhs.name.localeCompare(rhs.name));
 }
 
 function buildSourceDirectoryTree(members, archive, layer, nextId) {

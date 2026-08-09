@@ -38,8 +38,12 @@ map lives in `docs/HARNESS.md`.
   It also maps the current boundary into the installed Lean native runtime
   archives using exact source provenance, separates compiled Lean program code,
   and exposes retained-code, primary-blocker-pressure, and combined overlap
-  color modes. It reports total native-support coverage and makes overlap
-  functions directly explorable. `npm run build:site`
+  color modes. Missing externs are joined to the complete installed-archive
+  function catalog rather than only to objects retained in Wasm; the report
+  states how many of the total boundaries have providers in the displayed
+  slice. It reports total native-support coverage, makes overlap functions
+  directly explorable, and animates scope changes unless reduced motion is
+  requested. `npm run build:site`
   supplies the surface-report symbol bridge; the standalone command remains
   usable without that optional cross-link data.
 - `npm run build:analysis-site`

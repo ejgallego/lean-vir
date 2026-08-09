@@ -540,16 +540,15 @@ capabilities, and makes another 24 all-IR functions and 8 public constants
 runnable with no regressions. The semantic fixture exercises all eight members
 and returns its complete 255-point score.
 
-The deployed measurement plan is now rebased on the 723,223-byte checkpoint:
+The deployed measurement plan is now rebased on the 723,398-byte checkpoint:
 
 | Remaining candidate | Names | Raw cost | Gzip cost | Exact surface gain | Current primary pressure |
 | --- | ---: | ---: | ---: | ---: | ---: |
-| `ByteArray.copySlice` | 1 | +175 B | +74 B | 46 all / 9 public | 123 all / 25 public |
-| `pow` | 2 | +9,773 B | +6,508 B | 8 all / 3 public | 8 all / 3 public |
+| `pow` | 2 | +9,773 B | +6,480 B | 8 all / 3 public | 8 all / 3 public |
 
-The current artifact is 723,223 raw and 163,519 deterministic gzip bytes, with
-321,981 of 398,519 all-IR functions and 29,208 of 36,887 public constants
-runnable. It exposes 460 native capabilities. The accepted
+The current artifact is 723,398 raw and 163,593 deterministic gzip bytes, with
+322,027 of 398,519 all-IR functions and 29,217 of 36,887 public constants
+runnable. It exposes 461 native capabilities. The accepted
 `String.Internal.getUTF8Byte` stage accounts for the final 120 raw and 186 gzip
 bytes and for 1,802 all-IR and 292 public gains, with no regressions. Its gain
 spans `Init`, `Lean`, `Lake`, and `Std`, including 1,097 Lean functions. A
@@ -557,15 +556,18 @@ host-versus-Wasm fixture reads all seven bytes of a mixed-width UTF-8 string and
 returns the exact weighted score 3,944 through Lean's ordinary generated boxed
 wrapper.
 
-`ByteArray.copySlice` is the next measured target. Its implementation is
-already retained for another caller, so exposing its generated wrapper costs
-175 raw and 74 gzip bytes on the current baseline. A fresh exact A/B scan makes
-46 all-IR functions and 9 public constants runnable with no regressions,
-notably in `Init.System.IO` and `Std.Http`. The remaining `pow` pair has no
-cascade: its eight current primary roots are exactly the eight functions it
-makes runnable, and no blocked root moves to a new boundary. It should therefore
-be accepted only for a concrete `pow` capability need, not as a
-frontier-density optimization.
+`ByteArray.copySlice` was accepted as the next measured target. Its
+implementation is already retained for another caller, so exposing its
+generated wrapper costs 175 raw and 74 gzip bytes on the current baseline. A
+fresh exact A/B scan makes 46 all-IR functions and 9 public constants runnable
+with no regressions,
+notably in `Init.System.IO` and `Std.Http`. Its host-versus-Wasm fixture covers
+both destination growth and an overlapping source/destination copy, returning
+the exact weighted score 5,795. The remaining `pow` pair has no cascade: its
+eight current primary roots are exactly the eight functions it makes runnable,
+and no blocked root moves to a new boundary. It should therefore be accepted
+only for a concrete `pow` capability need, not as a frontier-density
+optimization.
 
 ## Interactive HTML Report
 
@@ -618,24 +620,31 @@ open the matching backend-symbol search in the deployed Wasm size explorer;
 retained symbols link back to these declaration fragments.
 
 The size bridge also carries each extern's deterministic primary-blocker counts.
-The size explorer uses those counts only as current frontier pressure. They are
-additive across primary blockers, but they remain an upper bound rather than an
-unlock forecast; use an A/B surface comparison to measure the exact benefit of
-a runtime change. Its wider Lean context also matches installed native function
-aliases to exact retained Wasm linker symbols. This refines whole-object
-membership into function-level retained coverage without treating native and
-Wasm byte sizes as interchangeable. The combined context-color mode displays
-both facts at once: green is retained code, orange is frontier pressure, purple
-is overlap, and gray is neither. Overlap does not violate the accounting: it
-means the native implementation is retained for some other path but the
-corresponding Lean declaration is still unavailable through VIR's extern
-catalog. The combined-mode sidebar lists these overlap functions directly and
-opens their symbol and declaration links. Above the map, total coverage reports
-matched native-function bytes against the complete installed native-support
-archives, together with sized-function byte and function-count ratios. The
-shipped Wasm size remains a separate fact because native and Wasm bytes are
-different targets. Hovering a context block updates the compact coverage strip
-with the corresponding archive, directory, member, or function metrics.
+The size explorer joins those declarations directly to the complete sized
+function catalog of its displayed installed archives, independently of whether
+the provider is already retained in Wasm. The explanation reports both the
+mapped and total missing-extern counts; boundaries whose providers are outside
+this archive slice have no invented byte area. Pressure counts are additive
+across primary blockers, but remain an upper bound rather than an unlock
+forecast; use an A/B surface comparison to measure the exact benefit of a
+runtime change. The same context independently matches installed native
+function aliases to exact retained Wasm linker symbols. This refines
+whole-object membership into function-level retained coverage without treating
+native and Wasm byte sizes as interchangeable. The combined context-color mode
+displays both facts at once: green is retained code, orange is frontier
+pressure, purple is overlap, and gray is neither. Overlap does not violate the
+accounting: it means the native implementation is retained for some other path
+but the corresponding Lean declaration is still unavailable through VIR's
+extern catalog. The combined-mode sidebar lists these overlap functions
+directly and opens their symbol and declaration links. Above the map, total
+coverage reports matched native-function bytes against the complete installed
+native-support archives, together with sized-function byte and function-count
+ratios. The shipped Wasm size remains a separate fact because native and Wasm
+bytes are different targets. Hovering a context block updates the compact
+coverage strip with the corresponding archive, directory, member, or function
+metrics. Switching between the Wasm-boundary and installed-context scopes uses
+a short snapshot crossfade and spatial scale transition, disabled when the
+browser requests reduced motion.
 
 The generated directory contains a navigation index with the comparatively
 small extern catalog plus one compact JavaScript data file per module with

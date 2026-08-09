@@ -147,7 +147,7 @@ Author: Emilio J. Gallego Arias
     elements.scopeSwitch.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-scope]");
       if (!button || button.dataset.scope === scopeForView(view)) return;
-      setView(button.dataset.scope === "context" ? "runtimeContext" : "ownership");
+      setScopeView(button.dataset.scope === "context" ? "runtimeContext" : "ownership");
     });
     elements.viewSwitch.addEventListener("click", (event) => {
       const button = event.target.closest("button[data-view]");
@@ -213,6 +213,16 @@ Author: Emilio J. Gallego Arias
     render();
   }
 
+  function setScopeView(nextView) {
+    const reducedMotion = globalThis.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+    if (reducedMotion || typeof document.startViewTransition !== "function") {
+      setView(nextView);
+      return;
+    }
+    const transition = document.startViewTransition(() => setView(nextView));
+    transition.finished.catch(() => {});
+  }
+
   function render() {
     const scope = scopeForView(view);
     for (const button of elements.scopeSwitch.querySelectorAll("button[data-scope]")) {
@@ -258,10 +268,10 @@ Author: Emilio J. Gallego Arias
       return "The optimized debug companion retains names and DWARF sections for diagnosis.";
     }
     if (contextColor === "frontier") {
-      return `${report.runtimeContext.missingSurfaceEntries} already-retained missing externs are primary blockers for ${report.runtimeContext.primaryPublicRoots} public / ${report.runtimeContext.primaryRoots} all roots. Area is native archive bytes; color is log-scaled blocker density, averaged by child bytes, not predicted unlock.`;
+      return `${report.runtimeContext.missingSurfaceEntries} of ${report.runtimeContext.totalMissingSurfaceEntries} missing externs map to exact providers in this installed archive slice. They are primary blockers for ${report.runtimeContext.primaryPublicRoots} public / ${report.runtimeContext.primaryRoots} all roots. Area is native archive bytes; color is log-scaled blocker density, averaged by child bytes, not predicted unlock.`;
     }
     if (contextColor === "combined") {
-      return `Green marks exact retained native-function bytes, orange marks log-scaled frontier pressure, purple marks overlap, and gray marks neither. ${contextOverlapLeaves} leaf functions currently have both signals because retention and extern-catalog exposure are separate boundaries.`;
+      return `Green marks exact retained native-function bytes, orange marks log-scaled frontier pressure, purple marks overlap, and gray marks neither. ${report.runtimeContext.missingSurfaceEntries} of ${report.runtimeContext.totalMissingSurfaceEntries} missing externs have providers in this archive slice; ${contextOverlapLeaves} leaf functions currently have both signals because retention and extern-catalog exposure are separate boundaries.`;
     }
     return `${report.runtimeContext.retainedFunctions} of ${report.runtimeContext.boundarySizedFunctions} sized functions in VIR object counterparts match exact retained Wasm symbols. Color is matched native-function bytes per archive byte, averaged from child blocks.`;
   }
@@ -755,7 +765,7 @@ Author: Emilio J. Gallego Arias
             || rhs.bytes - lhs.bytes
             || lhs.name.localeCompare(rhs.name);
         });
-      elements.childListTitle.textContent = "Retained but unregistered";
+      elements.childListTitle.textContent = "Retained + blocker overlap";
       elements.childCount.textContent = overlaps.length.toLocaleString("en-US");
       elements.topChildren.replaceChildren(...overlaps.slice(0, 18).map((node) => {
         const summary = node.meta?.surfaceSummary ?? {};

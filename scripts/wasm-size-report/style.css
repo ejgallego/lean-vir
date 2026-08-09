@@ -467,6 +467,42 @@ input:focus {
   min-height: 68vh;
   overflow: hidden;
   background: #e8edef;
+  view-transition-name: vir-map-scope;
+}
+
+::view-transition-group(vir-map-scope) {
+  animation-duration: 260ms;
+  animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+::view-transition-old(vir-map-scope) {
+  animation: vir-map-scope-out 180ms ease-in both;
+}
+
+::view-transition-new(vir-map-scope) {
+  animation: vir-map-scope-in 260ms cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes vir-map-scope-out {
+  to {
+    opacity: 0;
+    transform: scale(0.985);
+  }
+}
+
+@keyframes vir-map-scope-in {
+  from {
+    opacity: 0;
+    transform: scale(1.015);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  ::view-transition-group(vir-map-scope),
+  ::view-transition-old(vir-map-scope),
+  ::view-transition-new(vir-map-scope) {
+    animation-duration: 1ms;
+  }
 }
 
 .map-block {
