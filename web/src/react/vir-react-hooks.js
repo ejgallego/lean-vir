@@ -31,7 +31,7 @@ const browserEffectFinalizer = typeof FinalizationRegistry === "function"
 // index only to move leases between speculative React render generations.
 const browserRenderPayloadLeases = new WeakMap();
 const browserRenderFinalizer = typeof FinalizationRegistry === "function"
-  ? new FinalizationRegistry((state) => releaseBrowserRenderState(state, true))
+  ? new FinalizationRegistry((ticket) => releaseBrowserRenderTeardownTicket(ticket, true))
   : null;
 const browserQueuedStateFinalizer = typeof FinalizationRegistry === "function"
   ? new FinalizationRegistry((record) => releaseBrowserQueuedStateRecord(record, true))
@@ -606,6 +606,7 @@ function createBrowserRenderGeneration(resources, componentState) {
   return {
     componentState,
     token: {},
+    teardownTicket: null,
     handedOff: false,
     ownership,
     reducers: ownership.reducers,
@@ -859,14 +860,60 @@ function handOffBrowserRenderGeneration(generation) {
     releaseBrowserRenderGeneration(generation);
     throw new Error("browser React render ownership requires FinalizationRegistry support");
   }
+  const ticket = createBrowserRenderTeardownTicket(generation.ownership);
+  try {
+    browserRenderFinalizer.register(generation.token, ticket, generation.token);
+  } catch (error) {
+    throwWithCleanup(
+      error,
+      () => releaseBrowserRenderTeardownTicket(ticket),
+      "browser React render handoff failed during ownership cleanup",
+    );
+  }
+  generation.teardownTicket = ticket;
   generation.handedOff = true;
-  browserRenderFinalizer.register(generation.token, generation.ownership, generation.token);
 }
 
 function releaseBrowserRenderGeneration(generation) {
   if (generation === null || generation === undefined) return false;
   if (generation.handedOff) browserRenderFinalizer?.unregister(generation.token);
+  const ticket = generation.teardownTicket;
+  generation.teardownTicket = null;
+  if (ticket !== null) return releaseBrowserRenderTeardownTicket(ticket);
   return releaseBrowserRenderState(generation.ownership);
+}
+
+// The runtime owns this ticket, while FinalizationRegistry observes the
+// generation token. The ticket intentionally has no path back to that token,
+// so deterministic runtime teardown and GC abandonment remain independent.
+function createBrowserRenderTeardownTicket(state) {
+  const ticket = {
+    active: true,
+    resources: state.resources,
+    state,
+    dispose() {
+      return releaseBrowserRenderTeardownTicket(ticket);
+    },
+  };
+  state.resources.addDisposable(ticket);
+  return ticket;
+}
+
+function detachBrowserRenderTeardownTicket(ticket) {
+  if (ticket?.active !== true) return null;
+  ticket.active = false;
+  const state = ticket.state;
+  const resources = ticket.resources;
+  ticket.state = null;
+  ticket.resources = null;
+  resources?.removeDisposable(ticket);
+  return state;
+}
+
+function releaseBrowserRenderTeardownTicket(ticket, fromFinalizer = false) {
+  const state = detachBrowserRenderTeardownTicket(ticket);
+  if (state === null) return false;
+  return releaseBrowserRenderState(state, fromFinalizer);
 }
 
 function releaseBrowserRenderState(state, fromFinalizer = false) {
@@ -900,7 +947,6 @@ function releaseBrowserRenderState(state, fromFinalizer = false) {
 function commitBrowserRenderGeneration(generation, commitOwnership) {
   const state = generation.ownership;
   if (state.closed) return false;
-  browserRenderFinalizer?.unregister(generation.token);
   const errors = [];
 
   for (const [hook, reducer] of state.reducers) {
@@ -958,6 +1004,9 @@ function commitBrowserRenderGeneration(generation, commitOwnership) {
   for (const lease of remainingPayloadLeases) {
     collectCleanupError(errors, () => releaseBrowserPayloadLease(lease));
   }
+  browserRenderFinalizer?.unregister(generation.token);
+  detachBrowserRenderTeardownTicket(generation.teardownTicket);
+  generation.teardownTicket = null;
   throwCollectedErrors(errors, "browser React commit ownership failed");
   return true;
 }

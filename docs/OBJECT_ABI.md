@@ -113,7 +113,8 @@ upstream linker script and JavaScript runtime consume that same manifest.
 | `vir_obj_name_string` | Inspect a Lean `Name` object as dotted text. | Returns a borrowed pointer into shim-owned string scratch storage. |
 | `vir_obj_name_string_size` | Return the byte length of `vir_obj_name_string`. | No object ownership. |
 | `vir_obj_resource` | Wrap a JavaScript `externref` resource as a Lean object. | Returns an owned Lean resource object rooted through the host resource table. |
-| `vir_obj_resource_externref` | Recover the JavaScript `externref` from a Lean resource object. | Returns the host reference; Lean object ownership is unchanged. |
+| `vir_obj_resource_externref` | Recover the JavaScript `externref` from a Lean resource object. | A nonzero `take` transfers the root's wrapper lease only when that root is owned. |
+| `vir_obj_resource_is_owned` | Query whether a Lean resource object's externref root currently owns its wrapper lease. | No ownership change; transactional lifting queries immediately before a take. |
 | `vir_obj_closure_root` | Root a Lean function object so JavaScript can call it later. | Retains the function through the closure root table; input object ownership is unchanged. |
 | `vir_closure_call_objects` | Call a rooted Lean closure with owned Lean object arguments. | Consumes all argument objects after accepting a non-null `argv`; returns one owned result object or `0` on failure. |
 | `vir_closure_call_error` | Return a borrowed pointer to the last closure-call diagnostic. | Borrowed until the next closure call or runtime teardown. |

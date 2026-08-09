@@ -61,6 +61,7 @@ export const OBJECT_VALUE_EXPORTS = [
   "vir_obj_name_string_size",
   "vir_obj_resource",
   "vir_obj_resource_externref",
+  "vir_obj_resource_is_owned",
   "vir_obj_nat",
   "vir_obj_nat_decimal",
   "vir_obj_is_scalar",

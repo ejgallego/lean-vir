@@ -44,6 +44,11 @@ extern "C" __externref_t vir_resource_get(uint32_t root_id, uint8_t take) {
     return __builtin_wasm_ref_null_extern();
 }
 
+extern "C" uint8_t vir_resource_is_owned(uint32_t root_id) {
+    (void) root_id;
+    return 0;
+}
+
 extern "C" void vir_resource_release(uint32_t root_id) {
     (void) root_id;
 }

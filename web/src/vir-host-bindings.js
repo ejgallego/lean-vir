@@ -597,9 +597,9 @@ function createBrowserEventListenerResource(resources, target, eventName, callba
   const listener = {
     remove: once(() => {
       const errors = [];
+      resources.removeDisposable(listener);
       collectCleanupError(errors, () => target.removeEventListener(eventName, handler));
       collectCleanupError(errors, () => ownedCallback.release());
-      resources.removeDisposable(listener);
       throwCollectedErrors(errors, "browser event listener removal failed");
     }),
   };

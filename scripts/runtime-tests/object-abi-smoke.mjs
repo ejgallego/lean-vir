@@ -474,6 +474,51 @@ assert.equal(hostResourceValue(teardownLeanHandleAlias).lease.released, true);
     if (arrayObj !== 0) runtime.exports.vir_obj_dec(arrayObj);
   }
 }
+{
+  let borrowedPartialLiftDisposals = 0;
+  const borrowedPartialLiftResource = createHostResource(
+    { name: "borrowed partial lift" },
+    "borrowed partial lift resource",
+    {
+      dispose: () => {
+        borrowedPartialLiftDisposals++;
+      },
+    },
+  );
+  const elements = [];
+  let arrayObj = 0;
+  try {
+    try {
+      elements.push(runtime.makeObjectValue(
+        resourceType,
+        borrowedPartialLiftResource,
+        "borrowed partial lift[0]",
+      ));
+      elements.push(runtime.makeObjectValue(unitType, undefined, "borrowed partial lift[1]"));
+      arrayObj = runtime.makeObjectArrayFromOwnedElements(elements, "borrowed partial lift");
+      assert.throws(
+        () => runtime.liftOwnedObjectValue(arrayResourceType, arrayObj, "borrowed partial lift"),
+        /borrowed partial lift\[1\].*live host resource/,
+      );
+      assert.equal(
+        borrowedPartialLiftDisposals,
+        0,
+        "result rollback must not consume a borrowed caller resource",
+      );
+      assert.notEqual(
+        hostResourceValue(borrowedPartialLiftResource),
+        null,
+        "a borrowed caller resource must remain usable after later result decoding fails",
+      );
+    } finally {
+      runtime.releaseOwnedObjects(elements);
+      if (arrayObj !== 0) runtime.exports.vir_obj_dec(arrayObj);
+    }
+  } finally {
+    releaseHostResource(borrowedPartialLiftResource);
+  }
+  assert.equal(borrowedPartialLiftDisposals, 1);
+}
 const callbackWithRawStringType = {
   type: "Function",
   interfaceTag: INTERFACE_TAG.FUNCTION,

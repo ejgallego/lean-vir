@@ -92,6 +92,7 @@ export function createVirImports(module, overrides = {}, hostState = null) {
     };
     imports.env.vir_resource_root = (value, owned) => hostState.rootResource(value, owned);
     imports.env.vir_resource_get = (rootId, take) => hostState.getRootedResource(rootId, take);
+    imports.env.vir_resource_is_owned = (rootId) => hostState.rootedResourceIsOwned(rootId);
     imports.env.vir_resource_release = (rootId) => hostState.releaseRootedResourceFromFinalizer(rootId);
   }
 

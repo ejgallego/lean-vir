@@ -116,6 +116,27 @@ const emptyResourceCounts = {
 }
 
 {
+  const resources = createHostResourceState();
+  const value = { kind: "committed move-only resource" };
+  let rollbacks = 0;
+  const resource = resources.revocableResourceForValue(value, {
+    onAbandon: () => {
+      rollbacks++;
+    },
+  });
+  assert.equal(commitHostResource(resource), true);
+  assert.throws(
+    () => retainHostResource(resource),
+    /does not support independent retain/,
+    "commit must not turn a move-only revocable capability into a generic alias",
+  );
+  resources.releaseValueResource(value);
+  assert.equal(rollbacks, 0);
+  assert.equal(hostResourceValue(resource), null);
+  resources.dispose();
+}
+
+{
   const roots = new ExternrefResourceRoots({ initial: 4 });
   assert.deepEqual(roots.debugCounts(), { active: 0, capacity: 3, reusable: 3 });
   for (let rootId = 1; rootId < roots.table.length; rootId++) {
@@ -379,6 +400,78 @@ const emptyResourceCounts = {
   assert.equal(element.listeners.has("click"), false, "WeakRef preflight must run before listener installation");
   assert.equal(callbackReleases, 0, "a rejected direct binding call must leave its incoming callback untouched");
   assert.deepEqual(state.resources.debugResourceCounts(), emptyResourceCounts);
+  state.resources.dispose();
+}
+
+{
+  const state = createVirtualDocumentState();
+  const [element] = ensureVirtualElementStates(state, "#throwing-listener-release", [
+    createVirtualElementState(),
+  ]);
+  const bindings = createVirtualDocumentHostBindings(state);
+  const elementResource = state.resources.resourceForValue(element);
+  const eventName = state.resources.resourceForValue("click");
+  let callbackReleases = 0;
+  const callback = Object.assign(() => undefined, {
+    release() {
+      if (callbackReleases !== 0) return false;
+      callbackReleases++;
+      throw new Error("listener release boom");
+    },
+  });
+  const listener = bindings["browser.element.addEventListener"](
+    elementResource,
+    eventName,
+    callback,
+  );
+  commitHostResource(listener);
+  assert.equal(state.resources.debugResourceCounts().owners, 1);
+  assert.throws(
+    () => bindings["browser.element.removeEventListener"](listener),
+    /listener release boom/,
+  );
+  assert.equal(callbackReleases, 1);
+  assert.equal(element.listeners.get("click")?.length ?? 0, 0);
+  assert.equal(
+    state.resources.debugResourceCounts().owners,
+    0,
+    "throwing listener cleanup must still detach its runtime owner",
+  );
+  assert.throws(
+    () => state.resources.resolveResource(listener, "EventListener"),
+    /resource is not live/,
+    "throwing listener cleanup must still invalidate every public alias",
+  );
+  state.resources.dispose();
+}
+
+{
+  const state = createVirtualDocumentState();
+  const bindings = createVirtualDocumentHostBindings(state);
+  let callbackReleases = 0;
+  const callback = Object.assign(() => undefined, {
+    release() {
+      if (callbackReleases !== 0) return false;
+      callbackReleases++;
+      throw new Error("timeout release boom");
+    },
+  });
+  const timeout = bindings["browser.timer.setTimeout"](
+    state.resources.resourceForValue(60_000n),
+    callback,
+  );
+  commitHostResource(timeout);
+  assert.equal(state.resources.debugResourceCounts().owners, 1);
+  assert.throws(
+    () => bindings["browser.timer.clearTimeout"](timeout),
+    /timeout release boom/,
+  );
+  assert.equal(callbackReleases, 1);
+  assert.equal(state.resources.debugResourceCounts().owners, 0);
+  assert.throws(
+    () => state.resources.resolveResource(timeout, "Timeout"),
+    /resource is not live/,
+  );
   state.resources.dispose();
 }
 

@@ -362,6 +362,11 @@ hypothetical owners do not expand the review.
 | Borrowed child → builder → parent | Release parent first and child first; reuse the surviving side. | The survivor remains usable; final release restores the payload-lease count. |
 | Callback-bearing result → WASM root | Fail result lowering after the host adopts the callback. | The adopted resource and callback root are both gone. |
 | Active registration → WASM result | Fail result lowering after listener/timer/frame/root creation; repeat with an alias of an existing root. | A registration created by the failed call is cancelled, while a pre-existing aliased root remains mounted. |
+| Borrowed caller resource → nested result rollback | Return a borrowed argument inside a product/array whose later field fails to decode. | Rollback releases no caller lease; the borrowed wrapper remains live. |
+| Committed revocable capability → identity retain | Commit a listener/root/ref, attempt an identity-result retain, then invalidate its revocation group. | The immutable move-only policy rejects the retain; no alias survives invalidation. |
+| Active registration → throwing terminal cleanup | Make callback release throw during listener removal, timer/frame cancellation, or root unmount. | The owner and every public alias detach first; all remaining cleanup is attempted once. |
+| Selector-created root → initial render failure | Throw from the first node/component render, then repeat with a pre-existing root. | Only the newly created root is unmounted and removed from the owner set. |
+| Abandoned browser generation → runtime teardown | Hand off a render that React never commits, then dispose the runtime before GC. | The opaque teardown ticket synchronously releases the staged leases without retaining its finalizer target. |
 | Updater/reducer inputs → callback | Succeed and throw while creating an unrelated resource. | Only synthetic input wrappers expire; unrelated allocations remain live. |
 | Deferred React owner → teardown | Dispose before the scheduled microtask; include throwing and non-throwing siblings. | Teardown drains once, attempts every sibling, and restores the owner count synchronously. |
 | Speculative browser owner → abandonment backstop | Remove `FinalizationRegistry` or `WeakRef`. | Browser binding construction fails before acquiring ownership. |
@@ -379,7 +384,9 @@ remains unnamed.
 borrowed or owned: dropping a borrowed argument root only removes that root,
 while dropping an unclaimed owned host-result root also invokes the wrapper's
 idempotent disposer. Lifting a result to JavaScript *takes* the owned root
-before the result object is decremented, so the returned wrapper remains live
+before the result object is decremented. Extraction reports whether that take
+actually acquired an owned root; transactional rollback records only acquired
+result leases, never a borrowed caller alias. The returned wrapper remains live
 until its JavaScript owner releases it. Returned resource wrappers provide
 idempotent `release()` and `dispose()` methods (and `Symbol.dispose` where the
 host supports explicit resource management); `releaseHostResource(resource)`
@@ -428,6 +435,10 @@ provisional rollback until complete host-result conversion commits it; failed
 conversion removes a newly installed listener, cancels a new timer/frame, or
 unmounts a newly created root. Creating another handle for an existing root
 does not attach that rollback, so failure cannot unmount a committed sibling.
+Retention policy and revocation-group identity are immutable wrapper metadata:
+commit disarms provisional rollback but cannot make a move-only capability
+generically retainable. Terminal operations detach the runtime owner and all
+revocation aliases before attempting callback or platform cleanup.
 
 Lean-owned object handles created by `js.leanRef` use the same `Js` resource
 transport, but their payload is a lease over one retained Lean object pointer.
@@ -468,6 +479,9 @@ Some resources are callback-local rather than retained:
   resource scope: unrelated `Lean.Vir.JsValue` resources that it allocates have
   ordinary `RuntimeM` lifetime and may escape. The returned state payload is
   retained or transferred into React independently of those input wrappers.
+- `useEffect` and `useEffectWithDeps` give `cleanup` the resource returned by
+  that setup invocation. This wrapper is released after `cleanup` returns and
+  must not escape; a later setup receives an independently owned wrapper.
 
 This callback-local rule is currently dynamic, not enforced by Lean's type
 system: `Lean.Vir.Js α` itself carries no scope parameter. Safe Lean can store

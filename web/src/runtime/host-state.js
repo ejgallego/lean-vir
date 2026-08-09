@@ -95,6 +95,10 @@ export class VirHostState {
     return this.resourceRoots.get(rootId, { take: take !== 0 });
   }
 
+  rootedResourceIsOwned(rootId) {
+    return this.resourceRoots.isOwned(rootId) ? 1 : 0;
+  }
+
   releaseRootedResource(rootId) {
     return this.resourceRoots.release(rootId);
   }

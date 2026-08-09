@@ -188,11 +188,11 @@ function createReactRootResource(resources, hooks, adapter) {
       currentNode = null;
       currentComponent = null;
       const errors = [];
+      collectCleanupError(errors, () => removeDisposable(resources, value));
       collectCleanupError(errors, () => adapter.unmount?.(value));
       collectCleanupError(errors, () => releaseReactNodeOwner(resources, node));
       collectCleanupError(errors, () => releaseReactComponentOwner(resources, component));
       collectCleanupError(errors, () => flushReactNodeDisposals(hooks, { force: true }));
-      collectCleanupError(errors, () => removeDisposable(resources, value));
       throwCollectedErrors(errors, "React root unmount failed");
       return undefined;
     }),

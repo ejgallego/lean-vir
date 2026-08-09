@@ -5,6 +5,11 @@ Author: Emilio J. Gallego Arias
 */
 
 const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
+const HOST_RESOURCE_RETENTION = Object.freeze({
+  MOVE_ONLY: "move-only",
+  PASSIVE: "passive",
+  RETAINABLE: "retainable",
+});
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 export const VIR_HOST_RESOLVE_BINDING = Symbol.for("lean-vir.hostResolveBinding");
 const hostResourceState = new WeakMap();
@@ -53,8 +58,20 @@ class HostResource {
     onRelease = null,
     onTake = null,
     reportFinalizerError = null,
+    retentionPolicy = null,
+    revocationGroup = null,
   } = {}) {
     const ticket = Object.freeze({});
+    const metadata = Object.freeze({
+      retentionPolicy: normalizeHostResourceRetentionPolicy(value, retentionPolicy, {
+        dispose,
+        onAbandon,
+        onFinalize,
+        onRelease,
+        onTake,
+      }),
+      revocationGroup,
+    });
     const state = {
       value,
       label,
@@ -66,6 +83,7 @@ class HostResource {
       onTake,
       reportFinalizerError,
       ticket,
+      metadata,
     };
     hostResourceState.set(this, state);
     hostResourceTicketState.set(ticket, state);
@@ -205,11 +223,14 @@ export function retainHostResource(resource, label = null) {
   const source = normalizeHostResource(resource, label ?? "host resource");
   const state = hostResourceState.get(source);
   const value = state.value;
-  if (!isRetainableHostResourcePayload(value)) {
-    if (hostResourceHasOwnedLifecycle(state)) {
-      throw new Error(`${label ?? state.label ?? "host resource"} does not support independent retain()`);
-    }
-    return createHostResource(value, label ?? state.label, { owner: state.owner });
+  if (state.metadata.retentionPolicy === HOST_RESOURCE_RETENTION.MOVE_ONLY) {
+    throw new Error(`${label ?? state.label ?? "host resource"} does not support independent retain()`);
+  }
+  if (state.metadata.retentionPolicy === HOST_RESOURCE_RETENTION.PASSIVE) {
+    return createHostResource(value, label ?? state.label, {
+      owner: state.owner,
+      retentionPolicy: HOST_RESOURCE_RETENTION.PASSIVE,
+    });
   }
   const retained = retainHostResourcePayload(value);
   try {
@@ -372,6 +393,10 @@ export class ExternrefResourceRoots {
       reusable: this.freeRootIds.length,
     };
   }
+
+  isOwned(rootId) {
+    return Number.isInteger(rootId) && this.liveRootIds.has(rootId) && this.ownedRootIds.has(rootId);
+  }
 }
 
 function releaseHostResourceState(state, resource) {
@@ -449,12 +474,29 @@ function finalizeHostResourceTicket(ticket) {
   }
 }
 
-function hostResourceHasOwnedLifecycle(state) {
-  return typeof state.dispose === "function" ||
-    typeof state.onAbandon === "function" ||
-    typeof state.onFinalize === "function" ||
-    typeof state.onRelease === "function" ||
-    typeof state.onTake === "function";
+function normalizeHostResourceRetentionPolicy(value, policy, lifecycle) {
+  const normalized = policy ?? (
+    isRetainableHostResourcePayload(value)
+      ? HOST_RESOURCE_RETENTION.RETAINABLE
+      : hostResourceHasOwnedLifecycle(lifecycle)
+        ? HOST_RESOURCE_RETENTION.MOVE_ONLY
+        : HOST_RESOURCE_RETENTION.PASSIVE
+  );
+  if (!Object.values(HOST_RESOURCE_RETENTION).includes(normalized)) {
+    throw new Error(`unsupported host resource retention policy: ${String(normalized)}`);
+  }
+  if (normalized === HOST_RESOURCE_RETENTION.RETAINABLE && !isRetainableHostResourcePayload(value)) {
+    throw new Error("retainable host resource policy requires a registered payload lifetime");
+  }
+  return normalized;
+}
+
+function hostResourceHasOwnedLifecycle(lifecycle) {
+  return typeof lifecycle.dispose === "function" ||
+    typeof lifecycle.onAbandon === "function" ||
+    typeof lifecycle.onFinalize === "function" ||
+    typeof lifecycle.onRelease === "function" ||
+    typeof lifecycle.onTake === "function";
 }
 
 function throwHostResourceErrors(errors, message) {

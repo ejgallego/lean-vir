@@ -15,5 +15,6 @@ namespace lean {
 object * vir_resource_object_from_externref(__externref_t value, bool owned);
 uint32_t vir_resource_root_id(object * value);
 __externref_t vir_resource_externref(object * value, bool take);
+bool vir_resource_is_owned(object * value);
 
 }

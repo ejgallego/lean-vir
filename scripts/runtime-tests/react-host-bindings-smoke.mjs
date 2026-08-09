@@ -409,6 +409,64 @@ function callbackLease(cell, body = () => undefined) {
 
 {
   const resources = createHostResourceState();
+  const newContainer = { kind: "new selector render container" };
+  const existingContainer = { kind: "existing selector render container" };
+  let unmounts = 0;
+  const bindings = createReactRootResourceHostBindings(
+    resources,
+    (container) => {
+      let mounted = true;
+      const root = {
+        render() {
+          throw new Error(`selector render boom: ${container.kind}`);
+        },
+        unmount() {
+          if (!mounted) return undefined;
+          mounted = false;
+          unmounts++;
+          resources.removeDisposable(root);
+          return undefined;
+        },
+      };
+      resources.addDisposable(root);
+      return root;
+    },
+    {
+      querySelector: (selector) => selector === "#new" ? newContainer : existingContainer,
+    },
+  );
+  const node = resources.resourceForValue({ kind: "borrowed selector render node" });
+  const newSelector = resources.resourceForValue("#new");
+  assert.throws(
+    () => bindings["react.root.renderIntoSelector"](newSelector, node),
+    /selector render boom: new selector render container/,
+  );
+  assert.equal(unmounts, 1, "a failed first render must unmount its newly created root");
+  assert.equal(resources.debugResourceCounts().owners, 0);
+  assert.doesNotThrow(() => resources.resolveResource(node, "ReactNode"));
+
+  const existingContainerResource = resources.resourceForValue(existingContainer);
+  const existingRoot = bindings["react.root.create"](existingContainerResource);
+  commitHostResource(existingRoot);
+  const existingSelector = resources.resourceForValue("#existing");
+  assert.throws(
+    () => bindings["react.root.renderIntoSelector"](existingSelector, node),
+    /selector render boom: existing selector render container/,
+  );
+  assert.equal(unmounts, 1, "a failed render must not roll back a pre-existing root");
+  assert.equal(resources.debugResourceCounts().owners, 1);
+  bindings["react.root.unmount"](existingRoot);
+  assert.equal(unmounts, 2);
+  assert.equal(resources.debugResourceCounts().owners, 0);
+  resources.releaseResource(existingContainerResource);
+  resources.releaseResource(existingSelector);
+  resources.releaseResource(newSelector);
+  resources.releaseResource(node);
+  resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
   const cell = { active: 0 };
   const nodeValue = createReactNodeResource(resources, {
     node: { kind: "text", value: "unrendered" },
@@ -764,6 +822,46 @@ function callbackLease(cell, body = () => undefined) {
   root.unmount();
   resources.releaseResource(replacement);
   resources.dispose();
+}
+
+{
+  const resources = createHostResourceState();
+  const payloads = { active: 0, releases: 0 };
+  const hooks = createBrowserReactHookRuntime(resources, {
+    useRef(initial) {
+      return { current: initial };
+    },
+    // An abandoned render never commits, so React discards this callback.
+    useLayoutEffect() {},
+  });
+  const component = hooks.createComponentState();
+  let released = false;
+  const payload = {};
+  payloads.active++;
+  registerHostResourcePayloadLifetime(payload, {
+    retain: () => {
+      throw new Error("abandoned render payload must not be retained again");
+    },
+    release: () => {
+      if (released) return false;
+      released = true;
+      payloads.active--;
+      payloads.releases++;
+      return true;
+    },
+  });
+  hooks.withComponentRender(component, () => {
+    const ref = hooks.useRef(payload);
+    resources.releaseResource(ref);
+    hooks.commitComponentRender(component);
+  });
+  assert.deepEqual(payloads, { active: 1, releases: 0 });
+  resources.dispose();
+  assert.deepEqual(
+    payloads,
+    { active: 0, releases: 1 },
+    "runtime disposal must synchronously drain an abandoned browser render generation",
+  );
 }
 
 {

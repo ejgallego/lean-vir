@@ -1287,15 +1287,22 @@ export class ObjectValueRuntime {
   }
 
   liftOwnedObjectResource(obj, label, ownership) {
-    const resource = this.liftObjectResource(obj, label, ownership !== null);
-    ownership?.own(() => releaseHostResource(resource));
-    return resource;
+    const lifted = this.liftObjectResourceWithOwnership(obj, label, ownership !== null);
+    if (lifted.acquired) {
+      ownership?.own(() => releaseHostResource(lifted.resource));
+    }
+    return lifted.resource;
   }
 
   liftObjectResource(obj, label, take = false) {
+    return this.liftObjectResourceWithOwnership(obj, label, take).resource;
+  }
+
+  liftObjectResourceWithOwnership(obj, label, take = false) {
+    const acquired = take && this.exports.vir_obj_resource_is_owned(obj) !== 0;
     const resource = this.exports.vir_obj_resource_externref(obj, take ? 1 : 0);
     if (isHostResource(resource) && hostResourceValue(resource) !== null) {
-      return resource;
+      return { resource, acquired };
     }
     // Some effect callback paths can expose one IO.ok wrapper around a Js result
     // at the JS lift boundary. Keep this resource-only; ordinary Lean tag-0
@@ -1304,9 +1311,10 @@ export class ObjectValueRuntime {
       const field = this.exports.vir_obj_field(obj, 0);
       if (field !== 0) {
         try {
+          const nestedAcquired = take && this.exports.vir_obj_resource_is_owned(field) !== 0;
           const nested = this.exports.vir_obj_resource_externref(field, take ? 1 : 0);
           if (isHostResource(nested) && hostResourceValue(nested) !== null) {
-            return nested;
+            return { resource: nested, acquired: nestedAcquired };
           }
         } finally {
           this.exports.vir_obj_dec(field);
