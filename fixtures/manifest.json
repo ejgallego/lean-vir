@@ -604,6 +604,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-bytearray-copy-slice-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.byteArrayCopySliceFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-string-parser-data",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.stringParserDataScore",

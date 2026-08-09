@@ -244,6 +244,20 @@ def byteArrayMkGetScore : Nat :=
   let bytes : ByteArray := ByteArray.mk #[65, 66, 67]
   (bytes.get 1 (by decide)).toNat + (bytes.get 2 (by decide)).toNat + bytes.size
 
+/-- Exercises growing and overlapping byte-array copies; success scores 5795. -/
+def byteArrayCopySliceFrontierScore : Nat :=
+  let src : ByteArray := ByteArray.mk #[10, 20, 30, 40, 50]
+  let dest : ByteArray := ByteArray.mk #[1, 2, 3]
+  let grown := src.copySlice 1 dest 2 3
+  let overlap := src.copySlice 0 src 1 4 false
+  1000 * grown.size +
+    (grown.get! 0).toNat + 2 * (grown.get! 1).toNat +
+    3 * (grown.get! 2).toNat + 4 * (grown.get! 3).toNat +
+    5 * (grown.get! 4).toNat +
+    (overlap.get! 0).toNat + 2 * (overlap.get! 1).toNat +
+    3 * (overlap.get! 2).toNat + 4 * (overlap.get! 3).toNat +
+    5 * (overlap.get! 4).toNat
+
 def stringParserDataScore : Nat :=
   let s := "Aé∀Z"
   let hashScore := s.hash.toNat % 97

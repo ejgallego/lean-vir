@@ -571,7 +571,10 @@ symbol address. `ByteArray.extract` is exposed as Lean's compiled symbol stem
 (`l_ByteArray_extract`) and delegates to the linked runtime
 `lean_byte_array_copy_slice` path. Its registered IR parameters mirror the real
 compiled declaration: the source byte array and stop index are borrowed, while
-the start index is consumed.
+the start index is consumed. `ByteArray.copySlice` now exposes that already
+retained raw provider through Lean's ordinary generated boxed wrapper. A
+differential fixture covers both destination growth and overlapping source and
+destination values, so this catalog addition needs no custom ownership adapter.
 `String.Pos.set`, `String.Pos.Raw.set`, and the legacy `String.set` each use a
 distinct native stem in the shim because their boxed arities differ, but all
 three wrappers delegate to the same linked runtime helper,

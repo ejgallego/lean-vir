@@ -76,8 +76,9 @@ The current fixture surface covers:
   `String.Internal.getUTF8Byte` raw-byte fixture over mixed-width UTF-8;
 - `Char.toUpper`/`Char.toLower`/`Char.utf8Size`;
 - `ByteArray.mk`/`ByteArray.empty`/`ByteArray.push`/`ByteArray.get`/
-  `ByteArray.get!`/`ByteArray.set!`/`ByteArray.extract`/`ByteArray.size`/
-  `ByteArray.validateUTF8`;
+  `ByteArray.get!`/`ByteArray.set!`/`ByteArray.extract`/
+  `ByteArray.copySlice`/`ByteArray.size`/`ByteArray.validateUTF8`, including
+  growing and overlapping slice copies;
 - `UInt8`/`UInt16` `toNat` plus arithmetic/bitwise/shift/comparison
   operations;
 - `UInt32` literals, `UInt32.ofNat`/`toNat`/`toUInt8`, and `UInt32`

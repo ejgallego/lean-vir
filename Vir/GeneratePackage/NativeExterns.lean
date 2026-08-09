@@ -157,6 +157,14 @@ while Lean's ordinary compiler-generated wrapper remains the ABI provider.
 private def stringByteAccessorExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `String.Internal #["getUTF8Byte"]
 
+/--
+The measured byte-array catalog gap. Its raw copy implementation is already
+retained by `ByteArray.extract`, so this stage adds only Lean's ordinary boxed
+wrapper and exposes the primitive to interpreted library closures.
+-/
+private def byteArrayCopySliceExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `ByteArray #["copySlice"]
+
 def nativeExternSpecs : Array NativeExternSpec := #[
   {
     name := `Nat.add,
@@ -1083,7 +1091,7 @@ def nativeExternSpecs : Array NativeExternSpec := #[
   }
 ] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs ++
   floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs ++
-  stringByteAccessorExternSpecs
+  stringByteAccessorExternSpecs ++ byteArrayCopySliceExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)
