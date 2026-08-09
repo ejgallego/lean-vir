@@ -158,6 +158,16 @@ private def floatBasicCompletionExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `Float32 #["add", "beq", "decLt", "div", "mul", "neg", "sub"]
 
 /--
+The measured Float geometry frontier used by native hit-testing and tracing
+workloads. These canonical libm operations stay inside the Wasm runtime; the
+six-operation cluster was priced and tested together before becoming policy,
+then `cbrt` and `floor` were added as Illuminate exposed them in cubic and arc
+root solving.
+-/
+private def floatGeometryMathExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Float #["abs", "sqrt", "sin", "cos", "acos", "atan2", "cbrt", "floor"]
+
+/--
 The remeasured internal raw-byte accessor. The expanded scalar and string
 runtime turns this formerly shallow alias into a broad library-surface gain,
 while Lean's ordinary compiler-generated wrapper remains the ABI provider.
@@ -1099,7 +1109,8 @@ def nativeExternSpecs : Array NativeExternSpec := #[
   }
 ] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs ++
   floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs ++
-  stringByteAccessorExternSpecs ++ byteArrayCopySliceExternSpecs
+  floatGeometryMathExternSpecs ++ stringByteAccessorExternSpecs ++
+  byteArrayCopySliceExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)

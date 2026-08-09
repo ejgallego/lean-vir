@@ -90,6 +90,10 @@ The current fixture surface covers:
   `shiftLeft`/`shiftRight`, small `Int` arithmetic, `USize` `sub`/`mul`/
   `land`/`shiftLeft`/`shiftRight`/`toNat`/`decLe`, `Float.scaleB`, and
   `Float.toUInt32`; the slide canvas smoke additionally covers `Float.sub`;
+- `Float.abs`/`sqrt`/`sin`/`cos`/`acos`/`atan2`/`cbrt`/`floor` over finite
+  values, both signed zeros, infinities, NaN, inverse-cosine boundaries,
+  `atan2` quadrants, positive and negative cube roots, and positive and
+  negative floors, with bit-level predicates and no JavaScript math imports;
 - `Lean.Expr` package closure and structural JS/WASM marshaling for constants,
   applications, literals, binders, levels, variables, projections, metadata
   results, and bound-variable inputs/results;

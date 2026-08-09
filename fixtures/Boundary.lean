@@ -389,4 +389,82 @@ private def floatBasicCompletionPrimitiveScore
 def floatBasicCompletionFrontierScore : Nat :=
   floatBasicCompletionPrimitiveScore 0x3fc00000 0x40000000 0x7ff0000000000000
 
+private def floatBits (value : Float) : UInt64 :=
+  (Float.toModel value).toBits
+
+private def floatBitsIsNaN (value : Float) : Bool :=
+  let bits := floatBits value
+  bits.land 0x7ff0000000000000 == 0x7ff0000000000000 &&
+    bits.land 0x000fffffffffffff != 0
+
+@[noinline]
+private def floatGeometryMathPrimitiveScore
+    (negativeFiniteBits negativeZeroBits positiveInfinityBits negativeInfinityBits
+      negativeNaNBits : UInt64) : Nat :=
+  let negativeFinite := Float.ofBits negativeFiniteBits
+  let negativeZero := Float.ofBits negativeZeroBits
+  let positiveInfinity := Float.ofBits positiveInfinityBits
+  let negativeInfinity := Float.ofBits negativeInfinityBits
+  let negativeNaN := Float.ofBits negativeNaNBits
+  let positiveFinite := Float.ofBits 0x400c000000000000
+  let one := Float.ofBits 0x3ff0000000000000
+  let negativeOne := Float.ofBits 0xbff0000000000000
+  let two := Float.ofBits 0x4000000000000000
+  let four := Float.ofBits 0x4010000000000000
+  let eight := Float.ofBits 0x4020000000000000
+  let negativeEight := Float.ofBits 0xc020000000000000
+  let piOverTwo := Float.ofBits 0x3ff921fb54442d18
+  let negativePiOverTwo := Float.ofBits 0xbff921fb54442d18
+  let pi := Float.ofBits 0x400921fb54442d18
+  (if floatBits (Float.abs negativeFinite) == 0x400c000000000000 then 1 else 0) +
+    (if floatBits (Float.abs negativeZero) == 0 then 2 else 0) +
+    (if floatBitsIsNaN (Float.abs negativeNaN) then 4 else 0) +
+    (if floatBits (Float.sqrt four) == floatBits two then 8 else 0) +
+    (if floatBits (Float.sqrt negativeZero) == negativeZeroBits then 16 else 0) +
+    (if floatBits (Float.sqrt positiveInfinity) == positiveInfinityBits then 32 else 0) +
+    (if floatBitsIsNaN (Float.sqrt negativeOne) then 64 else 0) +
+    (if floatBits (Float.sin 0) == 0 then 128 else 0) +
+    (if floatBits (Float.sin negativeZero) == negativeZeroBits then 256 else 0) +
+    (if floatBitsIsNaN (Float.sin positiveInfinity) then 512 else 0) +
+    (if floatBits (Float.cos 0) == floatBits one then 1024 else 0) +
+    (if floatBitsIsNaN (Float.cos negativeInfinity) then 2048 else 0) +
+    (if floatBits (Float.acos one) == 0 then 4096 else 0) +
+    (if floatBits (Float.acos negativeOne) == floatBits pi then 8192 else 0) +
+    (if floatBitsIsNaN (Float.acos two) then 16384 else 0) +
+    (if floatBits (Float.atan2 0 one) == 0 then 32768 else 0) +
+    (if floatBits (Float.atan2 negativeZero one) == negativeZeroBits then 65536 else 0) +
+    (if floatBits (Float.atan2 one one) == 0x3fe921fb54442d18 then 131072 else 0) +
+    (if floatBits (Float.atan2 one negativeOne) == 0x4002d97c7f3321d2 then 262144 else 0) +
+    (if floatBits (Float.atan2 negativeOne negativeOne) == 0xc002d97c7f3321d2 then 524288 else 0) +
+    (if floatBits (Float.atan2 positiveInfinity positiveInfinity) == 0x3fe921fb54442d18 then 1048576 else 0) +
+    (if floatBits (Float.sin piOverTwo) == floatBits one then 2097152 else 0) +
+    (if floatBits (Float.sin negativePiOverTwo) == floatBits negativeOne then 4194304 else 0) +
+    (if floatBits (Float.cos pi) == floatBits negativeOne then 8388608 else 0) +
+    (if floatBits (Float.acos 0) == floatBits piOverTwo then 16777216 else 0) +
+    (if floatBits (Float.cbrt eight) == floatBits two then 33554432 else 0) +
+    (if floatBits (Float.cbrt negativeEight) == floatBits (-two) then 67108864 else 0) +
+    (if floatBits (Float.cbrt 0) == 0 then 134217728 else 0) +
+    (if floatBits (Float.cbrt negativeZero) == negativeZeroBits then 268435456 else 0) +
+    (if floatBits (Float.cbrt positiveInfinity) == positiveInfinityBits then 536870912 else 0) +
+    (if floatBits (Float.cbrt negativeInfinity) == negativeInfinityBits then 1073741824 else 0) +
+    (if floatBitsIsNaN (Float.cbrt negativeNaN) then 2147483648 else 0) +
+    (if floatBits (Float.floor positiveFinite) == 0x4008000000000000 then 4294967296 else 0) +
+    (if floatBits (Float.floor negativeFinite) == 0xc010000000000000 then 8589934592 else 0) +
+    (if floatBits (Float.floor 0) == 0 then 17179869184 else 0) +
+    (if floatBits (Float.floor negativeZero) == negativeZeroBits then 34359738368 else 0) +
+    (if floatBits (Float.floor positiveInfinity) == positiveInfinityBits then 68719476736 else 0) +
+    (if floatBits (Float.floor negativeInfinity) == negativeInfinityBits then 137438953472 else 0) +
+    (if floatBitsIsNaN (Float.floor negativeNaN) then 274877906944 else 0)
+
+/--
+Exercises the measured eight-operation Float geometry frontier over finite values,
+signed zeros, infinities, NaN, `acos` boundaries, `atan2` quadrants, positive and
+negative cube roots, and positive and negative floors. All 39 checks passing
+scores 549,755,813,887.
+-/
+def floatGeometryMathFrontierScore : Nat :=
+  floatGeometryMathPrimitiveScore
+    0xc00c000000000000 0x8000000000000000 0x7ff0000000000000
+    0xfff0000000000000 0xfff8000000000042
+
 end Vir.Fixtures.Boundary

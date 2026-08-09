@@ -540,18 +540,9 @@ capabilities, and makes another 24 all-IR functions and 8 public constants
 runnable with no regressions. The semantic fixture exercises all eight members
 and returns its complete 255-point score.
 
-The deployed measurement plan is now rebased on the 723,398-byte checkpoint:
-
-| Remaining candidate | Names | Raw cost | Gzip cost | Exact surface gain | Current primary pressure |
-| --- | ---: | ---: | ---: | ---: | ---: |
-| `pow` | 2 | +9,773 B | +6,480 B | 8 all / 3 public | 8 all / 3 public |
-
-The current artifact is 723,398 raw and 163,593 deterministic gzip bytes, with
-322,027 of 398,519 all-IR functions and 29,217 of 36,887 public constants
-runnable. It exposes 461 native capabilities. The accepted
-`String.Internal.getUTF8Byte` stage accounts for the final 120 raw and 186 gzip
-bytes and for 1,802 all-IR and 292 public gains, with no regressions. Its gain
-spans `Init`, `Lean`, `Lake`, and `Std`, including 1,097 Lean functions. A
+The accepted `String.Internal.getUTF8Byte` stage accounts for 120 raw and 186
+gzip bytes and for 1,802 all-IR and 292 public gains, with no regressions. Its
+gain spans `Init`, `Lean`, `Lake`, and `Std`, including 1,097 Lean functions. A
 host-versus-Wasm fixture reads all seven bytes of a mixed-width UTF-8 string and
 returns the exact weighted score 3,944 through Lean's ordinary generated boxed
 wrapper.
@@ -568,6 +559,85 @@ eight current primary roots are exactly the eight functions it makes runnable,
 and no blocked root moves to a new boundary. It should therefore be accepted
 only for a concrete `pow` capability need, not as a frontier-density
 optimization.
+
+### Float Geometry Math
+
+A concrete Illuminate hit-testing request justified a second, deliberately
+narrow libm stage: `Float.abs`, `Float.sqrt`, `Float.sin`, `Float.cos`,
+`Float.acos`, and `Float.atan2`. Direct strict-link measurements on the
+723,398-byte checkpoint separated the cheap absolute-value wrapper from the
+shared geometry cluster:
+
+| Candidate                   | Names |  Raw cost | Gzip cost |
+| --------------------------- | ----: | --------: | --------: |
+| `Float.abs`                 |     1 |    +154 B |     +26 B |
+| Geometry libm without `abs` |     5 | +11,465 B |  +6,086 B |
+| Complete geometry cluster   |     6 | +11,635 B |  +6,119 B |
+
+The complete cluster therefore produces a 735,033-byte raw and 169,712-byte
+deterministic-gzip release artifact. The matching exact surface A/B raises the
+catalog from 461 to 467 capabilities, makes 12 all-IR functions and one public
+constant newly runnable, and has zero regressions. This small library-wide gain
+is not the acceptance argument: the consumer uses all six operations inside one
+hot application closure. A 25-predicate host-versus-Wasm fixture covers finite
+positive and negative values, signed zero, infinities, NaN, `acos` boundaries,
+and all `atan2` quadrants. It returns 33,554,431 with zero JavaScript imports
+and a strict link with no unresolved symbols.
+
+Probing the unchanged `Illuminate.HitScene.query` closure after this stage gets
+past all six requested operations and exposes the next exact boundary,
+`Float.cbrt`, through cubic Bézier root solving:
+
+```text
+Illuminate.HitScene.query
+  -> Illuminate.HitPrimitive.hitTest
+  -> Illuminate.StrokeTrace.ofPathData
+  -> pathDataHits
+  -> rayCubicBezier
+  -> cubicRootsInUnitInterval
+  -> Float.cbrt
+```
+
+That concrete closure justified a measured follow-up rather than a broad math
+expansion. On top of the six-operation artifact, `Float.cbrt` costs 434 raw and
+176 deterministic-gzip bytes, producing a 735,467-byte raw and 169,889-byte
+gzip release artifact in the exact A/B run. It adds one native capability and
+makes only `Float.cbrt._boxed` newly runnable in the scanned Lean libraries,
+with no public gain and no regressions. Its value is consumer-specific: it
+removes the exact boundary in Illuminate's one-real-root Cardano branch, where
+negative inputs require genuine cube-root semantics rather than `pow`.
+
+The seven-operation fixture extends the original 25 predicates with positive
+and negative exact cubes, both signed zeros, infinities, and NaN. All 32 checks
+return 4,294,967,295 with zero JavaScript imports and a strict link with no
+unresolved symbols. A fresh unchanged-query closure probe advances past `cbrt`
+and exposes the next exact boundary, `Float.floor`, in arc hit testing:
+
+```text
+Illuminate.HitScene.query
+  -> Illuminate.HitPrimitive.hitTest
+  -> Illuminate.StrokeTrace.ofPathData
+  -> pathDataHits
+  -> rayArc
+  -> Float.floor
+```
+
+`Float.floor` is another cheap generated-wrapper boundary: an exact link on the
+735,467-byte raw checkpoint costs 154 raw and 24 gzip bytes. The corresponding
+surface A/B adds one capability and makes only `Float.floor._boxed` newly
+runnable, with no public gain and no regressions. The eight-operation fixture
+adds positive and negative fractional values, both signed zeros, infinities,
+and NaN; all 39 checks return 549,755,813,887 with no JavaScript math imports.
+
+After registering `floor`, a temporary annotated alias of the unchanged query
+produces a complete format-10 package: 289 declarations (236 Lean IR and 53
+native externs), one typed export, zero JavaScript imports, and no missing IR,
+native registration, initializer, or package diagnostics. The consumer-owned
+295-point VIR differential remains the final integration check rather than a
+claim made by this runtime PR. The deployed frontier plan continues to
+remeasure the remaining `Float.pow`/`Float32.pow` pair against the current
+artifact so shared libm retention is reflected rather than copied from an older
+checkpoint.
 
 ## Interactive HTML Report
 
