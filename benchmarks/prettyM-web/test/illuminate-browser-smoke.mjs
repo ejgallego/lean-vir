@@ -33,7 +33,7 @@ try {
   const buildNotes = await page.locator("#build-notes").textContent();
   assert.match(buildNotes, /Illuminate b233ce7c/);
   assert.match(buildNotes, /VIR 84146bbe/);
-  assert.match(buildNotes, /FIR b5b38da5/);
+  assert.match(buildNotes, /FIR bf4d8e61/);
   assert.match(buildNotes, /fir\.illuminate-player\.browser\/v3/);
   await page.locator("#warmup").fill("0");
   await page.locator("#samples").fill("1");
