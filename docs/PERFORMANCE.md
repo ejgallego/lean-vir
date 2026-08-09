@@ -113,8 +113,9 @@ npm run bench:env-lookup:wasm-pair -- \
 
 This path compiles both modules once, alternates control/candidate order inside
 every measured round, forces V8 collection outside each timed window, and
-records explicit per-round order and ratios plus the exact Git, harness,
-package, and Wasm identities. It is useful when the
+records explicit per-round order and ratios, checksum/parity outcomes, and the
+exact Git, runtime environment, harness, package, and Wasm identities. It is
+useful when the
 standard saved-report comparator must reject an intentional build-identity
 difference. Use the median of the per-round candidate/control ratios as the
 headline; the report retains the more outlier-sensitive geometric mean and the

@@ -44,9 +44,11 @@ jobs:
             .tools/wasi-sdk-33.0-x86_64-linux
           key: ${{ runner.os }}-${{ runner.arch }}-wasi-sdk-${{ hashFiles('scripts/install-wasi-sdk.sh') }}
       - run: npm run fetch:lean
+      - run: npm run test:package-ir-builders
       - run: npm run install:wasi
       - run: npm run check:boundary-registry
       - run: npm run build:site
+      - run: npm run test:env-lookup:wasm-pair
       - run: npm run test:pages
       - run: npm run test:pages:browser
       - run: npm run test:upstream:no-build

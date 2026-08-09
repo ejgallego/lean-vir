@@ -97,6 +97,13 @@ for (const state of states) state.runtime.dispose();
 if (!execution.passed || !packageLoad.passed) {
   throw new Error("paired environment lookup checksum parity failed");
 }
+const runtimeEnvironmentIdentity = {
+  node: process.version,
+  v8: process.versions.v8,
+  platform: process.platform,
+  arch: process.arch,
+  cpu: cpus()[0]?.model ?? null,
+};
 
 const report = {
   schema: "lean-vir.env-lookup-wasm-pair.v1",
@@ -112,15 +119,10 @@ const report = {
     loadIterationsPerRound: args.loadIterations,
     package: packageIdentity,
     harnessSha256: harnessIdentity.sha256,
+    environment: runtimeEnvironmentIdentity,
   },
   git: environmentLookupGitIdentity(root),
-  environment: {
-    node: process.version,
-    v8: process.versions.v8,
-    platform: process.platform,
-    arch: process.arch,
-    cpu: cpus()[0]?.model ?? null,
-  },
+  environment: runtimeEnvironmentIdentity,
   policy: {
     warmupRounds: args.warmupRounds,
     sampleRounds: args.sampleRounds,
@@ -163,16 +165,8 @@ const report = {
     byteLength: state.wasmBytes.byteLength,
     sha256: sha256(state.wasmBytes),
   }])),
-  execution: summarizePairedSamples(
-    execution.candidates.control.samples,
-    execution.candidates.candidate.samples,
-    args.iterations,
-  ),
-  packageLoad: summarizePairedSamples(
-    packageLoad.candidates.control.samples,
-    packageLoad.candidates.candidate.samples,
-    args.loadIterations,
-  ),
+  execution: pairedReport(execution, args.iterations),
+  packageLoad: pairedReport(packageLoad, args.loadIterations),
 };
 
 if (args.jsonPath !== null) {
@@ -343,6 +337,23 @@ function loadCandidate(state) {
     teardown(runtimes) {
       for (const runtime of runtimes) runtime.dispose();
     },
+  };
+}
+
+function pairedReport(sample, iterations) {
+  return {
+    correctness: {
+      passed: sample.passed,
+      parity: sample.parity,
+      controlChecksum: sample.candidates.control.checksum,
+      candidateChecksum: sample.candidates.candidate.checksum,
+    },
+    ...summarizePairedSamples(
+      sample.candidates.control.samples,
+      sample.candidates.candidate.samples,
+      iterations,
+      sample.measuredOrders,
+    ),
   };
 }
 

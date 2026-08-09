@@ -35,18 +35,23 @@ test("nonnegative integer parsing accepts zero and rejects unsafe values", () =>
 });
 
 test("paired summaries retain measured order and per-round ratios", () => {
-  assert.deepEqual(summarizePairedSamples([20, 40], [10, 80], 10), {
+  assert.deepEqual(summarizePairedSamples(
+    [20, 40],
+    [10, 80],
+    10,
+    [["candidate", "control"], ["control", "candidate"]],
+  ), {
     rounds: [
       {
         round: 1,
-        sequence: "control-candidate",
+        sequence: "candidate-control",
         controlMs: 2,
         candidateMs: 1,
         ratio: 0.5,
       },
       {
         round: 2,
-        sequence: "candidate-control",
+        sequence: "control-candidate",
         controlMs: 4,
         candidateMs: 8,
         ratio: 2,
@@ -58,4 +63,15 @@ test("paired summaries retain measured order and per-round ratios", () => {
     equalRounds: 0,
     fasterRounds: 1,
   });
+});
+
+test("paired summaries reject missing or invalid measured orders", () => {
+  assert.throws(
+    () => summarizePairedSamples([1], [1], 1, []),
+    /one measured order per round/,
+  );
+  assert.throws(
+    () => summarizePairedSamples([1], [1], 1, [["control", "control"]]),
+    /control and candidate exactly once/,
+  );
 });

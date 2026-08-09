@@ -120,16 +120,27 @@ export function parseNonnegativeInt(value, option) {
   return parsed;
 }
 
-export function summarizePairedSamples(controlSamples, candidateSamples, iterations) {
+export function summarizePairedSamples(
+    controlSamples, candidateSamples, iterations, measuredOrders) {
   if (!Array.isArray(controlSamples) || controlSamples.length === 0 ||
       !Array.isArray(candidateSamples) || candidateSamples.length !== controlSamples.length) {
     throw new TypeError("paired samples require equally sized nonempty arrays");
+  }
+  if (!Array.isArray(measuredOrders) || measuredOrders.length !== controlSamples.length) {
+    throw new TypeError("paired samples require one measured order per round");
   }
   if (!Number.isSafeInteger(iterations) || iterations <= 0) {
     throw new TypeError("paired sample iterations must be a positive integer");
   }
   const rounds = controlSamples.map((controlTotalMs, index) => {
     const candidateTotalMs = candidateSamples[index];
+    const order = measuredOrders[index];
+    if (!Array.isArray(order) || order.length !== 2 ||
+        !order.includes("control") || !order.includes("candidate")) {
+      throw new TypeError(
+        "paired measured orders must contain control and candidate exactly once",
+      );
+    }
     if (!Number.isFinite(controlTotalMs) || controlTotalMs <= 0 ||
         !Number.isFinite(candidateTotalMs) || candidateTotalMs < 0) {
       throw new TypeError("paired sample timings must be finite with a positive control");
@@ -138,7 +149,7 @@ export function summarizePairedSamples(controlSamples, candidateSamples, iterati
     const candidateMs = candidateTotalMs / iterations;
     return {
       round: index + 1,
-      sequence: index % 2 === 0 ? "control-candidate" : "candidate-control",
+      sequence: order.join("-"),
       controlMs,
       candidateMs,
       ratio: candidateMs / controlMs,

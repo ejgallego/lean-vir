@@ -46,6 +46,11 @@ test("rotates measured candidate order and excludes warm-up timings", () => {
     "right", "left",
     "left", "right",
   ]);
+  assert.deepEqual(result.measuredOrders, [
+    ["left", "right"],
+    ["right", "left"],
+    ["left", "right"],
+  ]);
   assert.deepEqual(result.candidates.left.samples, [1, 1, 1]);
   assert.deepEqual(result.candidates.right.samples, [2, 2, 2]);
   assert.equal(result.candidates.left.medianMs, 1);
