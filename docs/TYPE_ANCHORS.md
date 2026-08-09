@@ -61,6 +61,13 @@ receivers, host-resource results, effect annotations, and deliberately omitted
 optional parameters. The report records each application as an informational
 diagnostic, so intent never becomes an invisible suppression.
 
+Selected TypeScript surfaces can request bounded dependency closure with
+`--dependency-depth`. Declarations found in the selected source are included
+automatically. A small `--dependency-policy` JSON file supplies reviewed shapes
+for external dependencies that should not be expanded, such as browser host
+resources or very large recursive library types. The generated descriptor
+records every included dependency and any unresolved names.
+
 ## Output Contract
 
 The pipeline has three public outputs.
@@ -92,6 +99,10 @@ diagnostics. Missing audited bindings are errors; weak audited comparisons are
 warnings; declared coverage gaps are informational. `--fail-on-errors` makes
 only error-severity diagnostics fail the command, while `--strict` continues to
 reject every weak or missing result.
+
+When descriptor closure is enabled, `typeScriptDependencies` records the root
+symbols, included declaration/policy dependencies, closure depth, and unresolved
+names in the comparison report.
 
 `vir-v1.anchors.md` is a rendered documentation fragment. It is not the source
 of truth. It exists so a Verso/Blueprint document or ordinary Markdown page can
@@ -131,10 +142,19 @@ set should reject weak or missing links.
 
 ## React DOM Root Seed
 
-The first port-review seed intentionally covers only seven symbols from
+The first port-review seed intentionally starts from only seven root symbols in
 `@types/react-dom/client`: `Root`, `Root.render`, `Root.unmount`, `createRoot`,
 `RootOptions`, `hydrateRoot`, and `HydrationOptions`. The first four audit the
 existing VIR wrappers. The last three are explicit gaps.
+
+Two levels of bounded closure resolve `Container` through its DOM resource
+arms. The report now identifies that VIR accepts the `Element` arm but not the
+whole container union, rather than reporting an unresolved name or overstating
+coverage. `React.ReactNode` is deliberately retained as an abstract reviewed
+dependency: expanding its recursive union would pull most of React's type
+surface into this seed, while VIR currently exposes a separately reviewed
+`ReactM (Js Node)` builder representation. Consequently an abstract ReactNode
+diagnostic is intentional and distinguishable from an unresolved symbol.
 
 ```bash
 npm run generate:react-dom-root-type-descriptors

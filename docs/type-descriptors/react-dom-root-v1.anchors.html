@@ -37,6 +37,7 @@
     }
     main { max-width: 1120px; margin: 0 auto; padding: 32px 20px 56px; }
     header { margin-bottom: 24px; }
+    .dependency-summary { margin-top: 8px; color: var(--muted); }
     h1 { margin: 0 0 8px; font-size: 28px; letter-spacing: 0; }
     h2 { margin: 0; font-size: 18px; letter-spacing: 0; }
     p { margin: 0; }
@@ -135,6 +136,7 @@
     <header>
       <h1>Lean VIR Type Anchors</h1>
       <p>TypeScript declaration documentation enriched with Lean VIR descriptor matches.</p>
+      <p class="dependency-summary">Descriptor closure: 7 roots, 8 included dependencies, 0 unresolved.</p>
     </header>
     <section class="summary" aria-label="Type anchor summary">
       <div class="summary-card exact"><strong>0</strong><span>exact</span></div>
@@ -189,15 +191,15 @@ resource Lean.Vir.React.Root</code></pre>
       </article>
       <article class="anchor" id="type-anchor-react_dom_root_render" data-vir-type-anchor-hover="weak: Lean.Vir.TypeAnchors.reactRootRenderCall -&gt; Root.render
 
-Lean exposes the TypeScript method receiver as an explicit borrowed argument; reviewed port intent supplies the dom effect absent from TypeScript declarations; unresolved TypeScript reference React.ReactNode; Lean Unit uses TypeScript void representation">
+Lean exposes the TypeScript method receiver as an explicit borrowed argument; reviewed port intent supplies the dom effect absent from TypeScript declarations; TypeScript dependency React.ReactNode is intentionally abstract: recursive ReactNode union deferred by reviewed dependency policy; Lean Unit uses TypeScript void representation">
         <div class="anchor-head">
           <div class="name">
             <h2 class="ts-name"><a href="https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L62" title="weak: Lean.Vir.TypeAnchors.reactRootRenderCall -&gt; Root.render
 
-Lean exposes the TypeScript method receiver as an explicit borrowed argument; reviewed port intent supplies the dom effect absent from TypeScript declarations; unresolved TypeScript reference React.ReactNode; Lean Unit uses TypeScript void representation">Root.render</a></h2>
+Lean exposes the TypeScript method receiver as an explicit borrowed argument; reviewed port intent supplies the dom effect absent from TypeScript declarations; TypeScript dependency React.ReactNode is intentionally abstract: recursive ReactNode union deferred by reviewed dependency policy; Lean Unit uses TypeScript void representation">Root.render</a></h2>
             <p class="lean-name">Lean: <code>Lean.Vir.TypeAnchors.reactRootRenderCall</code></p>
           </div>
-          <span class="badge weak" title="weak: Lean exposes the TypeScript method receiver as an explicit borrowed argument; reviewed port intent supplies the dom effect absent from TypeScript declarations; unresolved TypeScript reference React.ReactNode; Lean Unit uses TypeScript void representation">weak</span>
+          <span class="badge weak" title="weak: Lean exposes the TypeScript method receiver as an explicit borrowed argument; reviewed port intent supplies the dom effect absent from TypeScript declarations; TypeScript dependency React.ReactNode is intentionally abstract: recursive ReactNode union deferred by reviewed dependency policy; Lean Unit uses TypeScript void representation">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L62">node_modules/@types/react-dom/client.d.ts:62</a></span>
@@ -221,7 +223,7 @@ Lean exposes the TypeScript method receiver as an explicit borrowed argument; re
   "receiver": "borrowed",
   "retention": "callbacks until rerender, unmount, or runtime disposal"
 }</code></pre></section>
-        <ul class="diagnostics" aria-label="Review diagnostics"><li><code>info/reviewed_explicit_method_receiver</code>: Lean exposes the TypeScript method receiver as an explicit borrowed argument</li><li><code>info/reviewed_effect</code>: reviewed port intent supplies the dom effect absent from TypeScript declarations</li><li><code>warning/typescript_reference_unresolved</code>: unresolved TypeScript reference React.ReactNode</li><li><code>info/primitive_representation_compatible</code>: Lean Unit uses TypeScript void representation</li></ul>
+        <ul class="diagnostics" aria-label="Review diagnostics"><li><code>info/reviewed_explicit_method_receiver</code>: Lean exposes the TypeScript method receiver as an explicit borrowed argument</li><li><code>info/reviewed_effect</code>: reviewed port intent supplies the dom effect absent from TypeScript declarations</li><li><code>warning/typescript_dependency_abstract</code>: TypeScript dependency React.ReactNode is intentionally abstract: recursive ReactNode union deferred by reviewed dependency policy</li><li><code>info/primitive_representation_compatible</code>: Lean Unit uses TypeScript void representation</li></ul>
 
 
       </article>
@@ -267,17 +269,17 @@ Lean exposes the TypeScript method receiver as an explicit borrowed argument; re
 
 createRoot lets you create a root to display React components inside a browser DOM node.
 
-reviewed port intent supplies the dom effect absent from TypeScript declarations; reviewed port intent omits optional TypeScript parameters: options; reviewed port intent represents the TypeScript result as a host resource; unresolved TypeScript reference Container">
+reviewed port intent supplies the dom effect absent from TypeScript declarations; reviewed port intent omits optional TypeScript parameters: options; reviewed port intent represents the TypeScript result as a host resource; Lean descriptor covers 1 of 4 TypeScript union arms">
         <div class="anchor-head">
           <div class="name">
             <h2 class="ts-name"><a href="https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L86" title="weak: Lean.Vir.TypeAnchors.reactRootCreateCall -&gt; createRoot
 
 createRoot lets you create a root to display React components inside a browser DOM node.
 
-reviewed port intent supplies the dom effect absent from TypeScript declarations; reviewed port intent omits optional TypeScript parameters: options; reviewed port intent represents the TypeScript result as a host resource; unresolved TypeScript reference Container">createRoot</a></h2>
+reviewed port intent supplies the dom effect absent from TypeScript declarations; reviewed port intent omits optional TypeScript parameters: options; reviewed port intent represents the TypeScript result as a host resource; Lean descriptor covers 1 of 4 TypeScript union arms">createRoot</a></h2>
             <p class="lean-name">Lean: <code>Lean.Vir.TypeAnchors.reactRootCreateCall</code></p>
           </div>
-          <span class="badge weak" title="weak: reviewed port intent supplies the dom effect absent from TypeScript declarations; reviewed port intent omits optional TypeScript parameters: options; reviewed port intent represents the TypeScript result as a host resource; unresolved TypeScript reference Container">weak</span>
+          <span class="badge weak" title="weak: reviewed port intent supplies the dom effect absent from TypeScript declarations; reviewed port intent omits optional TypeScript parameters: options; reviewed port intent represents the TypeScript result as a host resource; Lean descriptor covers 1 of 4 TypeScript union arms">weak</span>
         </div>
         <div class="meta">
           <span>TypeScript source: <a href="https://unpkg.com/@types/react-dom@19.2.4/client.d.ts#L86">node_modules/@types/react-dom/client.d.ts:86</a></span>
@@ -298,15 +300,21 @@ reviewed port intent supplies the dom effect absent from TypeScript declarations
         <section class="intent"><p class="pane-title">Reviewed port intent</p><pre><code>{
   "disposition": "bind",
   "effect": "dom",
-  "container": "borrowed",
+  "container": {
+    "ownership": "borrowed",
+    "acceptedTypes": [
+      "Element"
+    ],
+    "coverage": "subset"
+  },
   "resultOwnership": "hostOwned",
   "resultRepresentation": "hostResource",
   "omittedOptionalParameters": [
     "options"
   ]
 }</code></pre></section>
-        <ul class="diagnostics" aria-label="Review diagnostics"><li><code>info/reviewed_effect</code>: reviewed port intent supplies the dom effect absent from TypeScript declarations</li><li><code>info/reviewed_optional_parameters_omitted</code>: reviewed port intent omits optional TypeScript parameters: options</li><li><code>info/reviewed_resource_result</code>: reviewed port intent represents the TypeScript result as a host resource</li><li><code>warning/typescript_reference_unresolved</code>: unresolved TypeScript reference Container</li></ul>
-        <p class="notes">VIR binds root creation but does not yet expose the optional RootOptions argument.</p>
+        <ul class="diagnostics" aria-label="Review diagnostics"><li><code>info/reviewed_effect</code>: reviewed port intent supplies the dom effect absent from TypeScript declarations</li><li><code>info/reviewed_optional_parameters_omitted</code>: reviewed port intent omits optional TypeScript parameters: options</li><li><code>info/reviewed_resource_result</code>: reviewed port intent represents the TypeScript result as a host resource</li><li><code>warning/typescript_union_partially_covered</code>: Lean descriptor covers 1 of 4 TypeScript union arms</li></ul>
+        <p class="notes">VIR binds root creation for Element containers, but not the other Container union arms or optional RootOptions argument.</p>
         <p class="hover">createRoot lets you create a root to display React components inside a browser DOM node.</p>
       </article>
       <article class="anchor" id="type-anchor-react_dom_root_options" data-vir-type-anchor-hover="missing: Lean.Vir.React.RootOptions -&gt; RootOptions

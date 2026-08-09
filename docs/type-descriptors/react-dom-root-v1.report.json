@@ -5,6 +5,66 @@
     "descriptors": "docs/type-descriptors/react-dom-root-v1.json",
     "lean": "docs/type-descriptors/vir-v1.manifest.json"
   },
+  "typeScriptDependencies": {
+    "depth": 2,
+    "roots": [
+      "HydrationOptions",
+      "Root",
+      "Root.render",
+      "Root.unmount",
+      "RootOptions",
+      "createRoot",
+      "hydrateRoot"
+    ],
+    "included": [
+      {
+        "id": "Container",
+        "kind": "declaration",
+        "depth": 1
+      },
+      {
+        "id": "Document",
+        "kind": "policy",
+        "depth": 1,
+        "reason": "DOM documents cross the VIR boundary as host-owned resources."
+      },
+      {
+        "id": "DocumentFragment",
+        "kind": "policy",
+        "depth": 2,
+        "reason": "DOM document fragments cross the VIR boundary as host-owned resources."
+      },
+      {
+        "id": "Element",
+        "kind": "policy",
+        "depth": 1,
+        "reason": "DOM elements cross the VIR boundary as host-owned resources."
+      },
+      {
+        "id": "ErrorInfo",
+        "kind": "declaration",
+        "depth": 1
+      },
+      {
+        "id": "React.Component",
+        "kind": "policy",
+        "depth": 1,
+        "reason": "React component instances are outside the root-surface seed."
+      },
+      {
+        "id": "React.ReactNode",
+        "kind": "policy",
+        "depth": 1,
+        "reason": "The recursive ReactNode union is intentionally abstract in the root-surface seed; VIR reviews its ReactM (Js Node) builder representation separately."
+      },
+      {
+        "id": "ReactFormState",
+        "kind": "declaration",
+        "depth": 1
+      }
+    ],
+    "unresolved": []
+  },
   "summary": {
     "exact": 0,
     "compatible": 2,
@@ -105,7 +165,7 @@
       "notes": [
         "Lean exposes the TypeScript method receiver as an explicit borrowed argument",
         "reviewed port intent supplies the dom effect absent from TypeScript declarations",
-        "unresolved TypeScript reference React.ReactNode",
+        "TypeScript dependency React.ReactNode is intentionally abstract: recursive ReactNode union deferred by reviewed dependency policy",
         "Lean Unit uses TypeScript void representation"
       ],
       "diagnostics": [
@@ -120,8 +180,8 @@
           "severity": "info"
         },
         {
-          "code": "typescript_reference_unresolved",
-          "message": "unresolved TypeScript reference React.ReactNode",
+          "code": "typescript_dependency_abstract",
+          "message": "TypeScript dependency React.ReactNode is intentionally abstract: recursive ReactNode union deferred by reviewed dependency policy",
           "severity": "warning"
         },
         {
@@ -296,7 +356,7 @@
         "reviewed port intent supplies the dom effect absent from TypeScript declarations",
         "reviewed port intent omits optional TypeScript parameters: options",
         "reviewed port intent represents the TypeScript result as a host resource",
-        "unresolved TypeScript reference Container"
+        "Lean descriptor covers 1 of 4 TypeScript union arms"
       ],
       "diagnostics": [
         {
@@ -315,17 +375,23 @@
           "severity": "info"
         },
         {
-          "code": "typescript_reference_unresolved",
-          "message": "unresolved TypeScript reference Container",
+          "code": "typescript_union_partially_covered",
+          "message": "Lean descriptor covers 1 of 4 TypeScript union arms",
           "severity": "warning"
         }
       ],
       "category": "React DOM root",
-      "note": "VIR binds root creation but does not yet expose the optional RootOptions argument.",
+      "note": "VIR binds root creation for Element containers, but not the other Container union arms or optional RootOptions argument.",
       "portIntent": {
         "disposition": "bind",
         "effect": "dom",
-        "container": "borrowed",
+        "container": {
+          "ownership": "borrowed",
+          "acceptedTypes": [
+            "Element"
+          ],
+          "coverage": "subset"
+        },
         "resultOwnership": "hostOwned",
         "resultRepresentation": "hostResource",
         "omittedOptionalParameters": [

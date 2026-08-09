@@ -22,6 +22,10 @@ Options:
   --anchors FILE  Merge explicit Lean-to-TS anchors from JSON.
   --symbol ID     Keep only this TypeScript symbol id. Repeatable.
   --symbols FILE  Keep TypeScript symbol ids listed in FILE.
+  --dependency-depth N
+                  Include referenced descriptors up to N edges away.
+  --dependency-policy FILE
+                  Supply reviewed descriptors for external dependencies.
   --source-url URL
                   Link symbols to this single declaration file URL.
   --out FILE      Write descriptor JSON to FILE. Defaults to stdout.
@@ -41,6 +45,8 @@ function parseArgs(argv) {
   let out = null;
   let check = false;
   let sourceUrl = null;
+  let dependencyDepth = 0;
+  let dependencyPolicy = null;
   const symbols = new Set();
   const symbolFiles = [];
   for (let index = 0; index < argv.length; index += 1) {
@@ -60,6 +66,15 @@ function parseArgs(argv) {
         break;
       case "--symbols":
         symbolFiles.push(resolve(root, requiredValue(argv, ++index, "--symbols")));
+        break;
+      case "--dependency-depth":
+        dependencyDepth = Number(requiredValue(argv, ++index, "--dependency-depth"));
+        if (!Number.isInteger(dependencyDepth) || dependencyDepth < 0) {
+          fail("--dependency-depth must be a non-negative integer");
+        }
+        break;
+      case "--dependency-policy":
+        dependencyPolicy = resolve(root, requiredValue(argv, ++index, "--dependency-policy"));
         break;
       case "--source-url":
         sourceUrl = requiredValue(argv, ++index, "--source-url");
@@ -89,6 +104,8 @@ function parseArgs(argv) {
     symbols,
     symbolFiles,
     sourceUrl,
+    dependencyDepth,
+    dependencyPolicy,
   };
 }
 
@@ -115,7 +132,15 @@ if (cli.out === null) {
   console.log(`wrote ${relative(root, cli.out)} (${descriptor.symbols.length} symbols)`);
 }
 
-async function generateDescriptorFile({ files, anchors, symbols: requestedSymbols, symbolFiles, sourceUrl }) {
+async function generateDescriptorFile({
+  files,
+  anchors,
+  symbols: requestedSymbols,
+  symbolFiles,
+  sourceUrl,
+  dependencyDepth,
+  dependencyPolicy,
+}) {
   const symbolFilter = new Set(requestedSymbols);
   for (const file of symbolFiles) {
     for (const id of await readSymbolIds(file)) symbolFilter.add(id);
@@ -138,30 +163,44 @@ async function generateDescriptorFile({ files, anchors, symbols: requestedSymbol
   for (const sourceFile of sourceFiles) {
     collectStatements(sourceFile.statements, sourceFile, [], symbols, symbolIds);
   }
-  let selectedSymbols = symbolFilter.size === 0
+  const availableSymbols = sourceUrl === null
     ? symbols
-    : symbols.filter((symbol) => symbolFilter.has(symbol.id));
-  const found = new Set(selectedSymbols.map((symbol) => symbol.id));
-  for (const id of symbolFilter) {
-    if (!found.has(id)) throw new Error(`requested TypeScript symbol was not found: ${id}`);
-  }
-  if (sourceUrl !== null) {
-    selectedSymbols = selectedSymbols.map((symbol) => ({
+    : symbols.map((symbol) => ({
       ...symbol,
       source: { ...symbol.source, url: sourceUrl },
     }));
+  const rootSymbols = symbolFilter.size === 0
+    ? availableSymbols
+    : availableSymbols.filter((symbol) => symbolFilter.has(symbol.id));
+  const found = new Set(rootSymbols.map((symbol) => symbol.id));
+  for (const id of symbolFilter) {
+    if (!found.has(id)) throw new Error(`requested TypeScript symbol was not found: ${id}`);
   }
+  const policy = dependencyPolicy === null
+    ? new Map()
+    : await readDependencyPolicy(dependencyPolicy);
+  const closure = dependencyClosure(rootSymbols, availableSymbols, policy, dependencyDepth);
+  const selectedSymbols = closure.symbols;
   selectedSymbols.sort((left, right) => left.id.localeCompare(right.id));
   const selectedSymbolIds = new Set(selectedSymbols.map((symbol) => symbol.id));
   const anchorData = anchors === null ? { version: 1, anchors: [] } : JSON.parse(await readFile(anchors, "utf8"));
   validateAnchors(anchorData, selectedSymbolIds);
-  return {
+  const descriptor = {
     version: 1,
     generator: "scripts/generate-ts-descriptors.mjs",
     sources: sourceFiles.map((sourceFile) => relative(root, sourceFile.fileName)).sort(),
     symbols: selectedSymbols,
     anchors: anchorData.anchors ?? [],
   };
+  if (dependencyDepth !== 0 || dependencyPolicy !== null) {
+    descriptor.dependencies = {
+      depth: dependencyDepth,
+      roots: rootSymbols.map((symbol) => symbol.id).sort(),
+      included: closure.included.sort((left, right) => left.id.localeCompare(right.id)),
+      unresolved: [...closure.unresolved].sort(),
+    };
+  }
+  return descriptor;
 }
 
 async function readSymbolIds(file) {
@@ -169,6 +208,106 @@ async function readSymbolIds(file) {
     .split(/\r?\n/gu)
     .map((line) => line.replace(/#.*/u, "").trim())
     .filter((line) => line.length !== 0);
+}
+
+async function readDependencyPolicy(file) {
+  const value = JSON.parse(await readFile(file, "utf8"));
+  if (value?.version !== 1 || !Array.isArray(value.symbols)) {
+    throw new Error("dependency policy must be { version: 1, symbols: [...] }");
+  }
+  const symbols = new Map();
+  for (const [index, entry] of value.symbols.entries()) {
+    if (typeof entry?.id !== "string" || entry.id.length === 0) {
+      throw new Error(`dependency policy symbols[${index}].id must be a non-empty string`);
+    }
+    if (entry.shape === null || typeof entry.shape !== "object" || Array.isArray(entry.shape)) {
+      throw new Error(`dependency policy symbols[${index}].shape must be an object`);
+    }
+    if (symbols.has(entry.id)) throw new Error(`duplicate dependency policy symbol ${entry.id}`);
+    symbols.set(entry.id, entry);
+  }
+  return symbols;
+}
+
+function dependencyClosure(rootSymbols, availableSymbols, policy, depth) {
+  const available = new Map(availableSymbols.map((symbol) => [symbol.id, symbol]));
+  const selected = new Map(rootSymbols.map((symbol) => [symbol.id, symbol]));
+  const included = [];
+  const unresolved = new Set();
+  let frontier = rootSymbols;
+  for (let level = 1; level <= depth && frontier.length !== 0; level += 1) {
+    const references = new Set(frontier.flatMap((symbol) => shapeReferences(symbol.shape)));
+    const next = [];
+    for (const id of references) {
+      if (selected.has(id)) continue;
+      const declaration = available.get(id);
+      if (declaration !== undefined) {
+        const symbol = {
+          ...declaration,
+          dependency: { kind: "declaration", depth: level },
+        };
+        selected.set(id, symbol);
+        included.push({ id, kind: "declaration", depth: level });
+        next.push(symbol);
+        continue;
+      }
+      const reviewed = policy.get(id);
+      if (reviewed !== undefined) {
+        const symbol = policySymbol(reviewed, level);
+        selected.set(id, symbol);
+        included.push({ id, kind: "policy", depth: level, ...(reviewed.reason ? { reason: reviewed.reason } : {}) });
+        next.push(symbol);
+        continue;
+      }
+      unresolved.add(id);
+    }
+    frontier = next;
+  }
+  return { symbols: [...selected.values()], included, unresolved };
+}
+
+function policySymbol(entry, depth) {
+  return {
+    id: entry.id,
+    kind: "policy",
+    ...(entry.source ? { source: entry.source } : {}),
+    display: entry.display ?? `reviewed dependency policy: ${entry.id}`,
+    hover: entry.reason ?? "",
+    shape: entry.shape,
+    dependency: {
+      kind: "policy",
+      depth,
+      ...(entry.reason ? { reason: entry.reason } : {}),
+    },
+  };
+}
+
+function shapeReferences(shape) {
+  if (shape === null || typeof shape !== "object") return [];
+  switch (shape.kind) {
+    case "ref":
+      return [shape.id, ...(shape.args ?? []).flatMap(shapeReferences)];
+    case "array":
+    case "option":
+    case "effect":
+      return shapeReferences(shape.element ?? shape.result);
+    case "tuple":
+      return (shape.elements ?? []).flatMap(shapeReferences);
+    case "union":
+      return (shape.options ?? []).flatMap(shapeReferences);
+    case "record":
+      return Object.values(shape.fields ?? {}).flatMap(shapeReferences);
+    case "variant":
+      return Object.values(shape.constructors ?? {}).flatMap((ctor) =>
+        Object.values(ctor.fields ?? {}).flatMap(shapeReferences));
+    case "function":
+      return [
+        ...(shape.args ?? []).flatMap((arg) => shapeReferences(arg.type)),
+        ...shapeReferences(shape.result),
+      ];
+    default:
+      return [];
+  }
 }
 
 function collectStatements(statements, sourceFile, prefix, symbols, symbolIds) {

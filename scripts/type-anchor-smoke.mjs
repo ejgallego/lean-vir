@@ -24,6 +24,8 @@ try {
   const manifest = join(tmp, "manifest.json");
   const report = join(tmp, "report.json");
   const rendered = join(tmp, "anchors.md");
+  const dependencyPolicy = join(tmp, "dependency-policy.json");
+  const dependencyDescriptors = join(tmp, "dependency-descriptors.json");
 
   await writeFile(types, `export namespace Demo {
   /** Box hover docs. */
@@ -41,8 +43,27 @@ try {
   export interface Controls {
     reset(value: string): void;
   }
+
+  /** Reviewed external dependency fixture. */
+  export type ExternalFn = (value: External.Node) => void;
 }
 `);
+
+  await writeFile(dependencyPolicy, `${JSON.stringify({
+    version: 1,
+    symbols: [
+      {
+        id: "External.Node",
+        reason: "smoke-test abstraction",
+        shape: {
+          kind: "opaque",
+          name: "External.Node",
+          abstract: true,
+          reason: "smoke-test abstraction",
+        },
+      },
+    ],
+  }, null, 2)}\n`);
 
   await writeFile(anchors, `${JSON.stringify({
     version: 1,
@@ -128,11 +149,30 @@ try {
   }, null, 2)}\n`);
 
   run(["scripts/generate-ts-descriptors.mjs", "--anchors", anchors, "--out", descriptors, types]);
+  run([
+    "scripts/generate-ts-descriptors.mjs",
+    "--symbol", "Demo.BoxFn",
+    "--symbol", "Demo.ExternalFn",
+    "--dependency-depth", "1",
+    "--dependency-policy", dependencyPolicy,
+    "--out", dependencyDescriptors,
+    types,
+  ]);
   run(["scripts/check-type-anchors.mjs", "--descriptors", descriptors, "--manifest", manifest, "--out", report]);
   runFailure(["scripts/check-type-anchors.mjs", "--fail-on-errors", "--descriptors", descriptors, "--manifest", manifest]);
   run(["scripts/render-type-anchors.mjs", "--report", report, "--out", rendered]);
 
   const comparison = JSON.parse(await readFile(report, "utf8"));
+  const dependencyComparison = JSON.parse(await readFile(dependencyDescriptors, "utf8"));
+  assert.deepEqual(dependencyComparison.dependencies.unresolved, []);
+  assert.deepEqual(
+    dependencyComparison.symbols.map((symbol) => symbol.id),
+    ["Demo.Box", "Demo.BoxFn", "Demo.Count", "Demo.ExternalFn", "External.Node"],
+  );
+  assert.equal(
+    dependencyComparison.symbols.find((symbol) => symbol.id === "External.Node")?.shape.abstract,
+    true,
+  );
   assert.deepEqual(comparison.summary, {
     exact: 1,
     compatible: 2,

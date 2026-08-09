@@ -159,6 +159,7 @@ async function buildReport({ descriptors, irpkg, manifest }) {
       descriptors: relative(root, descriptors),
       lean: irpkg === null ? relative(root, manifest) : relative(root, irpkg),
     },
+    ...(tsDescriptors.dependencies ? { typeScriptDependencies: tsDescriptors.dependencies } : {}),
     summary,
     diagnosticSummary,
     results,
@@ -562,6 +563,9 @@ function compareShapes(lean, tsShape, tsSymbols, seen) {
   if (lean?.kind === "primitive" && ts?.kind === "union") {
     return comparePrimitiveUnion(lean, ts, tsSymbols, seen);
   }
+  if (ts?.kind === "union") {
+    return compareTypeScriptUnion(lean, ts, tsSymbols, seen);
+  }
   if (ts?.kind === "ref") {
     return comparison("weak", [
       diagnostic("typescript_reference_unresolved", `unresolved TypeScript reference ${ts.id}`),
@@ -572,14 +576,22 @@ function compareShapes(lean, tsShape, tsSymbols, seen) {
       diagnostic("lean_recursive_reference", `recursive Lean reference ${lean.id}`),
     ]);
   }
+  if (ts?.kind === "opaque" && ts.abstract === true) {
+    return comparison("weak", [
+      diagnostic(
+        "typescript_dependency_abstract",
+        `TypeScript dependency ${ts.name} is intentionally abstract: ${ts.reason ?? "reviewed policy"}`,
+      ),
+    ]);
+  }
   if (lean?.kind === "primitive" && ts?.kind === "primitive") {
     return comparePrimitives(lean.name, ts.name);
   }
   if (lean?.kind === "resource" && ts?.kind === "resource") {
     return suffixEqual(lean.name, ts.name)
       ? comparison("exact")
-      : comparison("compatible", [
-        diagnostic("resource_name_mismatch", `resource names differ: ${lean.name} vs ${ts.name}`, "info"),
+      : comparison("weak", [
+        diagnostic("resource_name_mismatch", `resource names differ: ${lean.name} vs ${ts.name}`),
       ]);
   }
   if (lean?.kind !== ts?.kind) {
@@ -630,6 +642,35 @@ function comparePrimitiveUnion(lean, ts, tsSymbols, seen) {
   }
   return comparison("weak", [
     diagnostic("primitive_union_mismatch", `Lean ${lean.name} does not match TypeScript union`),
+  ]);
+}
+
+function compareTypeScriptUnion(lean, ts, tsSymbols, seen) {
+  const results = ts.options.map((option) => compareShapes(lean, option, tsSymbols, new Set(seen)));
+  const compatible = results.filter((result) =>
+    result.status === "exact" || result.status === "compatible");
+  const best = results.reduce((candidate, result) =>
+    statusRank[result.status] < statusRank[candidate.status] ? result : candidate);
+  if (compatible.length === results.length) {
+    return comparison("compatible", [
+      diagnostic(
+        "typescript_union_compatible",
+        "Lean descriptor covers all TypeScript union arms compatibly",
+        "info",
+      ),
+      ...best.diagnostics,
+    ]);
+  }
+  if (compatible.length !== 0) {
+    return comparison("weak", [
+      diagnostic(
+        "typescript_union_partially_covered",
+        `Lean descriptor covers ${compatible.length} of ${results.length} TypeScript union arms`,
+      ),
+    ]);
+  }
+  return comparison("weak", [
+    diagnostic("typescript_union_mismatch", "Lean descriptor does not match any TypeScript union arm"),
   ]);
 }
 
