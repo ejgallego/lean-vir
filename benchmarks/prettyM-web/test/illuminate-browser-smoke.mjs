@@ -31,9 +31,9 @@ try {
     ],
   );
   const buildNotes = await page.locator("#build-notes").textContent();
-  assert.match(buildNotes, /Illuminate fd98ba93/);
+  assert.match(buildNotes, /Illuminate b233ce7c/);
   assert.match(buildNotes, /VIR 84146bbe/);
-  assert.match(buildNotes, /FIR b72f2bfa/);
+  assert.match(buildNotes, /FIR b5b38da5/);
   assert.match(buildNotes, /fir\.illuminate-player\.browser\/v3/);
   await page.locator("#warmup").fill("0");
   await page.locator("#samples").fill("1");
@@ -41,13 +41,10 @@ try {
     window.__illuminateBenchApp.runStudy("quick"),
   );
   assert.equal(report.workload.id, "illuminate-player");
-  assert.equal(report.passed, false);
-  assert.equal(report.parityCount, 3);
+  assert.equal(report.passed, true);
+  assert.equal(report.parityCount, 6);
   assert.equal(report.scenarioCount, 6);
-  assert.equal(report.mismatches.length, 3);
-  assert.ok(
-    report.mismatches.every((mismatch) => mismatch.workloadId === "small"),
-  );
+  assert.deepEqual(report.mismatches, []);
   assert.ok(
     report.dimensions
       .find((dimension) => dimension.id === "parameter-heavy")
