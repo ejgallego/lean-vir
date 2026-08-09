@@ -58,7 +58,9 @@ function normalizeCandidateResult(result, candidateId) {
  * `teardown(context)` calls run outside the timed window. Warm-up results
  * participate in checksum and phase-schema stability checks, but only measured
  * timings are retained. The legacy wall timings remain in `samples` and
- * `medianMs`; named timings are in `phaseSamples` and `phaseMedians`.
+ * `medianMs`; named timings are in `phaseSamples` and `phaseMedians`. The
+ * candidate ids invoked in each measured round are retained in
+ * `measuredOrders` so reports do not need to reconstruct the schedule.
  */
 export function sampleBenchmarkCandidates(options) {
   if (options === null || typeof options !== "object") {
@@ -172,12 +174,17 @@ export function sampleBenchmarkCandidates(options) {
     }
   }
 
+  const measuredOrders = [];
   for (let round = -warmupRounds; round < sampleRounds; round += 1) {
     const measured = round >= 0;
     const rotation = measured ? round % Math.max(1, availableEntries.length) : 0;
+    const measuredOrder = [];
     for (let offset = 0; offset < availableEntries.length; offset += 1) {
-      invoke(availableEntries[(offset + rotation) % availableEntries.length], measured);
+      const entry = availableEntries[(offset + rotation) % availableEntries.length];
+      if (measured) measuredOrder.push(entry.state.id);
+      invoke(entry, measured);
     }
+    if (measured) measuredOrders.push(measuredOrder);
   }
 
   for (const entry of entries) {
@@ -201,6 +208,7 @@ export function sampleBenchmarkCandidates(options) {
   return {
     passed: parity,
     parity,
+    measuredOrders,
     candidates: Object.fromEntries(entries.map(({ state }) => [state.id, state])),
   };
 }

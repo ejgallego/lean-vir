@@ -60,6 +60,13 @@ map lives in `docs/HARNESS.md`.
 - `npm run bench:env-lookup`
   Measure repeated fresh interpreter entries through a large package, with an
   optional execution-window V8 CPU profile. See `docs/PERFORMANCE.md`.
+- `npm run bench:env-lookup:wasm-pair -- CONTROL_WASM CANDIDATE_WASM`
+  Compare two frozen Wasm build modes in one process with alternating order,
+  collection outside timing, checksum parity, and raw paired samples.
+- `npm run test:env-lookup:wasm-pair`
+  Run a post-build control/control correctness smoke of the paired Wasm runner.
+- `npm run test:package-ir-builders`
+  Check erased IR metadata object layouts at the C++ package boundary.
 - `npm run test:runtime`
   Run all JavaScript runtime, host binding, callback lifecycle, manifest,
   package-generation, and SDK import smoke tests. Use
@@ -160,6 +167,8 @@ The split helpers below are the intended extension points for focused changes:
 Performance comparison commands are documented in `docs/PERFORMANCE.md`.
 Use `npm run bench -- --json PATH` for broad report capture,
 `npm run bench:env-lookup -- --json PATH` for declaration lookup work,
+`npm run bench:env-lookup:wasm-pair -- --json PATH CONTROL_WASM CANDIDATE_WASM`
+for intentional Wasm build-mode comparisons,
 `npm run bench:compare -- BEFORE.json AFTER.json` for saved reports, and
 `npm run bench:paired -- --repeat 6 --out NEW_DIR BEFORE_CHECKOUT AFTER_CHECKOUT`
 for AB/BA repeated runs across two checked-out trees.

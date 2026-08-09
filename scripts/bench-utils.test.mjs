@@ -7,7 +7,11 @@ Author: Emilio J. Gallego Arias
 import assert from "node:assert/strict";
 import test from "node:test";
 
-import { parsePositiveInt } from "./bench-utils.mjs";
+import {
+  parseNonnegativeInt,
+  parsePositiveInt,
+  summarizePairedSamples,
+} from "./bench-utils.mjs";
 
 test("positive integer parsing rejects values outside the safe integer range", () => {
   assert.equal(parsePositiveInt("42", "--iterations"), 42);
@@ -18,5 +22,56 @@ test("positive integer parsing rejects values outside the safe integer range", (
   assert.throws(
     () => parsePositiveInt("9".repeat(400), "--iterations"),
     /safe positive integer/,
+  );
+});
+
+test("nonnegative integer parsing accepts zero and rejects unsafe values", () => {
+  assert.equal(parseNonnegativeInt("0", "--warmups"), 0);
+  assert.equal(parseNonnegativeInt("42", "--warmups"), 42);
+  assert.throws(
+    () => parseNonnegativeInt(String(Number.MAX_SAFE_INTEGER + 1), "--warmups"),
+    /safe nonnegative integer/,
+  );
+});
+
+test("paired summaries retain measured order and per-round ratios", () => {
+  assert.deepEqual(summarizePairedSamples(
+    [20, 40],
+    [10, 80],
+    10,
+    [["candidate", "control"], ["control", "candidate"]],
+  ), {
+    rounds: [
+      {
+        round: 1,
+        sequence: "candidate-control",
+        controlMs: 2,
+        candidateMs: 1,
+        ratio: 0.5,
+      },
+      {
+        round: 2,
+        sequence: "control-candidate",
+        controlMs: 4,
+        candidateMs: 8,
+        ratio: 2,
+      },
+    ],
+    medianRatio: 1.25,
+    geometricMeanRatio: 1,
+    slowerRounds: 1,
+    equalRounds: 0,
+    fasterRounds: 1,
+  });
+});
+
+test("paired summaries reject missing or invalid measured orders", () => {
+  assert.throws(
+    () => summarizePairedSamples([1], [1], 1, []),
+    /one measured order per round/,
+  );
+  assert.throws(
+    () => summarizePairedSamples([1], [1], 1, [["control", "control"]]),
+    /control and candidate exactly once/,
   );
 });

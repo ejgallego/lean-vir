@@ -13,6 +13,7 @@ import { prepareBenchArtifacts } from "./bench-artifact-cache.mjs";
 import { sampleBenchmarkCandidates } from "./bench-differential.mjs";
 import {
   environmentLookupHarnessPaths,
+  environmentLookupGitIdentity,
   environmentLookupHarnessIdentity,
   environmentLookupPackageIdentity,
   sha256,
@@ -28,6 +29,7 @@ import {
   benchmarkCacheOptionDefaults,
   formatMs,
   parseBenchmarkCacheOption,
+  parseNonnegativeInt,
   parsePositiveInt,
   requireOptionValue,
   validateBenchmarkBuildOptions,
@@ -158,14 +160,6 @@ function parseArgs(argv) {
   return parsed;
 }
 
-function parseNonnegativeInt(value, option) {
-  const parsed = Number(value);
-  if (!/^\d+$/.test(value) || !Number.isSafeInteger(parsed)) {
-    throw new Error(`${option} requires a nonnegative integer`);
-  }
-  return parsed;
-}
-
 function printUsage() {
   console.log([
     "usage: npm run bench:env-lookup -- [options]",
@@ -197,34 +191,6 @@ async function requireAbsent(path, option) {
     throw error;
   }
   throw new Error(`${option} refuses to overwrite existing path: ${path}`);
-}
-
-function sha256Text(value) {
-  return sha256(Buffer.from(value));
-}
-
-function nullableSha256Text(value) {
-  return value.length === 0 ? null : sha256Text(value);
-}
-
-function gitMetadata() {
-  const status = runSync("git", ["status", "--short", "--untracked-files=all"], {
-    cwd: root,
-    capture: true,
-    trimStdout: false,
-  });
-  const diff = runSync("git", ["diff", "--binary", "--full-index", "HEAD"], {
-    cwd: root,
-    capture: true,
-    trimStdout: false,
-  });
-  return {
-    commit: runSync("git", ["rev-parse", "HEAD"], { cwd: root, capture: true }),
-    ref: runSync("git", ["rev-parse", "--abbrev-ref", "HEAD"], { cwd: root, capture: true }),
-    dirty: status.length !== 0,
-    statusSha256: nullableSha256Text(status),
-    trackedDiffSha256: nullableSha256Text(diff),
-  };
 }
 
 function post(session, method, params = {}) {
@@ -542,7 +508,7 @@ const report = {
     fixtureSha256: sha256(fixtureBytes),
     wasmArtifact: publicArtifactPath(benchmarkWasmFile),
   },
-  git: gitMetadata(),
+  git: environmentLookupGitIdentity(root),
   environment: {
     ...runtimeEnvironmentIdentity,
     artifactPreparation: args.buildArtifacts ? "cache-or-build" : "existing-unverified",

@@ -226,15 +226,17 @@ object * mk_unreachable() {
 }
 
 object * mk_fun_decl(object * fn, object * params, type result_type, object * body) {
-    // `DeclInfo` has one object field, `sorryDep?`; packages materialize `none`.
-    object * info = mk_ctor(0, { lean_box(0) });
+    // One-field Lean structures are erased. `DeclInfo` is represented directly
+    // by its `sorryDep?` field; packages materialize `none`.
+    object * info = lean_box(0);
     return mk_ctor(0, { fn, params, lean_box(static_cast<unsigned>(result_type)), body, info });
 }
 
 object * mk_extern_decl(object * fn, object * params, type result_type) {
-    // `ExternAttrData` has one object field, `entries`; package lookup uses the
-    // static native registry, so the reconstructed IR declaration stores `[]`.
-    object * extern_data = mk_ctor(0, { lean_box(0) });
+    // `ExternAttrData` is likewise erased to its single `entries` field. Package
+    // lookup uses the static native registry, so reconstructed declarations use
+    // the empty list here.
+    object * extern_data = lean_box(0);
     return mk_ctor(1, { fn, params, lean_box(static_cast<unsigned>(result_type)), extern_data });
 }
 

@@ -31,7 +31,10 @@ coverage, and boundary fixtures.
 The WASM artifact contains a stable package decoder that reconstructs real Lean
 IR objects at load time.
 This keeps the browser demo self-contained while preserving the future
-replacement point for generated module data or a real environment loader.
+replacement point for generated module data or a narrow upstream declaration
+provider. The measured real-environment experiment and API decision are
+recorded in
+[ULC-0001](roadmap/cards/ULC-0001-ir-declaration-lookup-boundary/README.md).
 
 For module-system clients, the `:vir` facet uses Lean's owning-module
 index to resolve opaque imported dependencies on demand. It partitions the

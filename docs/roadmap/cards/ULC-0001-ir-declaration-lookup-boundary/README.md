@@ -1,26 +1,23 @@
 # ULC-0001 IR Declaration Lookup Boundary
 
-Status: candidate
+Status: ready-to-transfer
 Kind: upstream-api
 Priority: medium
 Origin: upstream Lean backlog
-Last reviewed: 2026-08-05
+Last reviewed: 2026-08-09
 Owner: none
 Issue: none linked
 Lean PR: none linked
-Upstream timing: once the API shape is justified
-Removal target: VIR's `lean_ir_find_env_decl*` replacements; possibly the dummy environment and related policy shims if the real-environment path wins
+Upstream timing: API request is justified; prepare the upstream card
+Removal target: VIR's `lean_ir_find_env_decl*` replacements; the dummy environment and other policy shims remain separate follow-up boundaries
 
 ## Summary
 
-Decide whether VIR should construct a valid `Lean.Environment` and use the
-interpreter's existing declaration lookup unchanged, or whether Lean's IR
-interpreter should accept an explicit declaration provider for runtimes that
-load real `Lean.IR.Decl` values without loading an environment.
-
-Do not propose the provider API upstream until a bounded real-environment
-experiment establishes why the default API is not an appropriate integration
-path.
+Ask Lean's IR interpreter to accept an explicit declaration provider for
+runtimes that already own real `Lean.IR.Decl` values. Keep the existing
+environment-backed entry point unchanged. A bounded real-environment experiment
+now establishes why constructing the compiler environment is disproportionate
+for VIR's declaration-only runtime.
 
 ## Impact
 
@@ -46,12 +43,18 @@ experiment is tracked separately in ULC-0002.
 
 ## Roadmap Decision
 
-Keep the current indexed provider while measuring the real-environment path.
-Prefer the existing upstream API if VIR can create a supported environment from
-its decoded declarations with acceptable Wasm size, package-load cost, and
-boundary complexity. Request an explicit provider API only if that experiment
-shows that using the default environment contract requires a materially broader
-runtime or reliance on private object representation.
+Keep the current indexed provider and prepare an upstream explicit-provider API
+request. ULC-0001's real-environment candidate is correct, but the current
+public construction path is disproportionate for a declaration-only runtime:
+it adds 3.29 MiB to the stripped Wasm file, raises package loading by roughly
+60%, and slows steady fresh-entry execution by roughly 19%.
+
+The experiment does not argue against `Lean.Environment` for normal Lean
+consumers. It shows that requiring VIR to initialize the compiler's complete
+environment-extension closure merely to provide already-decoded
+`Lean.IR.Decl` values is the wrong boundary. Keep the existing
+environment-backed entry point as Lean's default and add a caller-owned
+declaration-provider path.
 
 Do not bundle cross-invocation symbol-cache state or provider revision into
 this decision. The post-index profile selects that as a separately
@@ -71,7 +74,7 @@ The pinned upstream lookup implementations are exported from
 ownership and `Lean.IR.declMapExt`; they are not plain C++ map helpers. VIR's
 minimal Wasm link does not include those generated Lean implementations.
 
-Repository coverage includes 82 package fixtures and 16 runtime smoke tests.
+Repository coverage includes 88 package fixtures and 18 runtime smoke tests.
 The focused benchmark and the external Illuminate acceptance run both reproduce
 the expected post-change profile movement.
 
@@ -99,8 +102,8 @@ the wrong design.
 
 ## Real-Environment Experiment
 
-Use upstream Lean construction APIs rather than fabricating the private
-`Environment` object layout:
+The experiment used upstream Lean construction APIs rather than fabricating
+the private `Environment` object layout:
 
 1. Build and initialize a valid empty `Lean.Environment` in the Wasm runtime.
 2. Add the already-decoded package declarations to `Lean.IR.declMapExt` as local
@@ -112,27 +115,119 @@ Use upstream Lean construction APIs rather than fabricating the private
    local environment-policy shims that the path adds or removes.
 5. Compare Wasm size, package-load time, and fresh-entry execution with the
    current provider using the same package bytes and order-balanced benchmark.
-6. Run package reload/failure tests, all fixtures, and the Illuminate acceptance
-   workload if the focused result remains competitive.
+6. Run package reload/failure tests and all fixtures before interpreting the
+   focused result.
 
-Adding declarations as local extension entries may be sufficient because the
+Adding declarations as local extension entries was sufficient because the
 default lookup falls back to `declMapExt.getState` when a name has no imported
-module index. The experiment must verify this through the public Lean APIs and
-normal extension initialization; directly constructing extension arrays in C++
-would not count as an upstream-aligned result.
+module index. The prototype verified this through public Lean APIs and normal
+extension initialization rather than directly constructing extension arrays in
+C++.
+
+## Measured Outcome
+
+The checkpointed prototype uses `Lean.mkEmptyEnvironment`, inserts decoded
+declarations with `Lean.IR.declMapExt.addEntry`, mirrors initializer metadata
+with `Lean.regularInitAttr.setParam`, passes the resulting environment to
+unmodified `lean::ir::run_boxed`, and links upstream
+`lean_ir_find_env_decl*` and `lean_decl_get_sorry_dep`. The prototype was
+checkpointed only while collecting the experiment; it is intentionally absent
+from the production branch. This card retains the construction, artifact
+identities, results, and reproduction shape needed to justify the decision
+without depending on an unpublished implementation branch.
+
+Both artifacts use Lean `d8b18978322de05a8f3dba51ef03cf5461676c17`, the
+`wasm32-wasip1` target, `-O3`, and the same package bytes. The complete upstream
+smoke suite passes for both: `fib 17 = 1597`, the Lean DOM and React demos,
+editable SortDemo, and all 88 fixtures.
+
+| Measurement | Indexed provider | Real environment | Candidate delta |
+| --- | ---: | ---: | ---: |
+| Stripped release Wasm | 657,333 B | 4,107,316 B | +3,449,983 B (+524.8%) |
+| Release Wasm, gzip -9 -n | 150,177 B | 753,638 B | +603,461 B (+401.8%) |
+| Fresh entry, paired run 1 | 168.7 us | 217.3 us | +20.2% paired median |
+| Fresh entry, paired run 2 | 163.3 us | 193.4 us | +18.1% paired median |
+| Package load, paired run 1 | 27.28 ms | 44.74 ms | +58.9% paired median |
+| Package load, paired run 2 | 20.99 ms | 35.79 ms | +61.0% paired median |
+
+The final differential measurements load both frozen artifacts in one Node
+process and alternate their order inside every measured round. Each of two
+repetitions used the same 1,651 declarations, 5,000 fresh entries per
+observation, 20 fresh package loads per load observation, four warmups, and 30
+measured rounds. V8 collection, runtime construction, Wasm instantiation, and
+disposal remain outside the timed windows. The candidate was slower in 28/30
+and 23/30 fresh-entry rounds, and 28/30 package-load rounds in both repetitions.
+The paired geometric-mean deltas were +28.6% and +18.9% for fresh entry, and
++62.7% and +62.6% for package load. The paired medians above are the less
+outlier-sensitive headline. Both candidates produced identical checksums in
+every round. Timings are noisy evidence; the repeated order-balanced direction,
+not the last decimal place, supports the decision.
+
+The exact stripped artifacts were SHA-256
+`b1de481b7828f5dcb20679a50839d2707b693748b93e6fec21e839704e0380e3`
+for the control and
+`2ac027158c35716915d5d47129abf361f263a6687da4f5f9610e3ce6f34ae4ca`
+for the candidate. The package SHA-256 was
+`627a07e66aa8bc6bae408bd1e9f9769e2bb69774f64fb5c6bd6fc2bb750831f6`.
+These identities and the byte counts are deterministic evidence.
+
+The deterministic size attribution is also clear:
+
+- importing the current public `Lean.Compiler.IR.CompilerM` boundary has a
+  579-module generated-C closure;
+- the candidate native-support prelink has 586 inputs and 585 retain code or
+  data in the final Wasm because adapter initialization roots their module
+  initializers;
+- all 3,517,396 retained native-support bytes map back to source objects with no
+  unattributed bytes;
+- the largest retained modules are `Lean.Meta.WHNF` (264,095 B),
+  `Lean.Meta.Basic` (234,676 B), `Init.Data.Order.PackageFactories` (173,356 B),
+  `Lean.Meta.Instances` (149,738 B), and `Lean.Meta.InferType` (131,872 B).
+
+This is a lower-bound experiment. To make the compiler initialization closure
+link in WASI, the candidate still supplies narrow stubs for unused task, Meta,
+profiling, stream, and diagnostic services and links four additional kernel C++
+helpers. Replacing those stubs with full implementations would broaden the
+runtime further.
+
+The experiment exposed three additional boundary facts:
+
+1. A declaration map alone does not supply module/package ownership or extern
+   and export attributes, so VIR must still provide its restricted native-symbol
+   policy; a minimally populated environment cannot replace every current shim.
+2. `Lean.Compiler.InitAttr` declares the external `lean_run_init` with four Wasm
+   arguments while the C++ interpreter exports a five-argument implementation.
+   The candidate does not execute the mismatched generated call sites, but the
+   strict Wasm link reports the ABI collision. This is another reason not to
+   expose the entire compiler-initialization surface to the small runtime.
+3. Exercising upstream sorry-dependency lookup found an existing decoder bug:
+   VIR materialized the one-field `Lean.IR.DeclInfo` and `ExternAttrData`
+   structures with an extra constructor. Lean erases these structures to their
+   single fields. The independent fix now has direct object-layout regression
+   coverage.
 
 ## Provider Alternative
 
-If the real-environment experiment is not viable, the smallest upstream change
-is a `run_boxed` overload that accepts caller-owned lookup state and full/boxed
-declaration callbacks. The existing environment-backed entry point remains the
-default. The provider is stable for one interpreter invocation, returns a
-borrowed declaration or no result, and the interpreter retains declarations it
-caches.
+The smallest upstream change is a `run_boxed` path that accepts a declaration
+provider. Its contract should be deliberately narrow:
+
+- leave the existing environment-backed API unchanged and implement its lookup
+  through an environment-backed provider adapter;
+- bind one provider to one interpreter invocation;
+- expose exact-name lookup and the optimized boxed-name lookup as distinct
+  operations, preserving the current cheap negative boxed lookup;
+- let the provider return a borrowed declaration or no result, while requiring
+  the interpreter to retain any declaration stored in an interpreter cache;
+- preserve the current pre-execution sorry check by reading `DeclInfo.sorryDep?`
+  from the exact declaration, or by an equally explicit provider operation; and
+- avoid `.irpkg`, package-index representation, cache revisions, or
+  cross-invocation state in the upstream contract.
 
 VIR would pass its existing package maps through this interface and delete its
-replacement definitions of `lean_ir_find_env_decl*`. The API should not expose
-`.irpkg`, VIR's index representation, or a persistent interpreter cache.
+replacement definitions of `lean_ir_find_env_decl*`. Native symbol, initializer,
+export-name, and package-identity policy should not be folded into this first
+declaration-provider API; they remain explicit, separately reviewable
+boundaries.
 
 ## Scope Boundary
 
@@ -145,18 +240,14 @@ This card does not own:
 - a package-format change without separate measured evidence; or
 - further declaration-lookup optimization after the accepted hash-map result.
 
-## Expected Outcome
+## Outcome
 
-Resolve the card with one of two evidence-backed outcomes:
-
-- VIR adopts a valid environment and the existing upstream declaration API,
-  with the added code/initialization cost and deleted shims recorded; or
-- the card is transferred upstream as an explicit-provider request, carrying a
-  concrete account of why constructing an environment is disproportionate for
-  a declaration-only runtime.
-
-Either outcome must preserve package semantics and show no material regression
-in the focused and representative workloads.
+Transfer the card upstream as an explicit-provider request, carrying the
+measured account of why constructing an environment is disproportionate for a
+declaration-only runtime. VIR keeps its indexed package provider; the
+real-environment prototype is evidence, not a proposed production architecture.
+The upstream provider design must preserve package semantics and leave the
+environment-backed API unchanged.
 
 ## Evidence
 
@@ -164,6 +255,8 @@ in the focused and representative workloads.
 - [Current upstream boundary](../../../UPSTREAM_BOUNDARY.md)
 - [VIR interpreter bridge](../../../../wasm/upstream_shim/interpreter/interpreter_bridge.cpp)
 - [Package declaration provider](../../../../wasm/upstream_shim/package/package_decl_provider.cpp)
+- [IR metadata layout regression](../../../../wasm/upstream_shim/package/package_ir_builders_test.cpp)
+- [In-process paired Wasm benchmark](../../../../scripts/bench-env-lookup-wasm-pair.mjs)
 - [VIR PR #104: benchmark, indexed provider, and acceptance record](https://github.com/ejgallego/lean-vir/pull/104)
 
 The independent acceptance run measured 371.4 to 56.2 microseconds for fresh
@@ -177,4 +270,4 @@ Keep the package-owned declaration and boxed-declaration maps behind
 `decl_provider.h`, keep the dummy environment confined to the interpreter
 bridge, and keep all environment-policy replacements explicit in
 `wasm/upstream_shim/`. Do not patch the vendored upstream interpreter while the
-integration decision remains open.
+provider API is discussed upstream.
