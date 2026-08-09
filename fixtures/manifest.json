@@ -671,6 +671,12 @@
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.floatBasicCompletionFrontierScore",
       "result": { "type": "Nat" }
+    },
+    {
+      "id": "boundary-float-geometry-math-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.floatGeometryMathFrontierScore",
+      "result": { "type": "Nat" }
     }
   ]
 }
