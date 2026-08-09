@@ -299,6 +299,7 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     selectedScope: document.querySelector("#scope-switch button.selected")?.dataset.scope,
     root: document.querySelector("#breadcrumbs button:disabled")?.textContent,
     note: document.querySelector("#view-note")?.textContent,
+    explanationOpen: document.querySelector(".view-explanation")?.open,
     mixed: document.querySelectorAll("#treemap .mixed-boundary").length,
     outside: document.querySelectorAll("#treemap .outside-boundary").length,
     depth: document.querySelector("#map-depth")?.value,
@@ -350,6 +351,7 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   })`);
   assert.equal(context.selectedScope, "context");
   assert.equal(context.root, "Installed Lean execution context");
+  assert.equal(context.explanationOpen, false);
   assert.ok(context.note.includes("exact retained Wasm symbols"));
   assert.ok(context.mixed > 0);
   assert.ok(context.outside > 0);
@@ -411,6 +413,17 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.equal(hoverCoverage.hovered.percent, hoverCoverage.hovered.expectedPercent);
   assert.equal(hoverCoverage.hovered.facts.length, 2);
   assert.equal(hoverCoverage.resetTitle, "Full Lean native support");
+
+  await clickSelector(cdp, ".view-explanation summary");
+  const explanation = await evaluate(cdp, `({
+    open: document.querySelector(".view-explanation")?.open,
+    noteWidth: document.querySelector("#view-note")?.getBoundingClientRect().width,
+    breadcrumbWidth: document.querySelector("#breadcrumbs")?.getBoundingClientRect().width,
+  })`);
+  assert.equal(explanation.open, true);
+  assert.ok(explanation.noteWidth > 300);
+  assert.ok(explanation.breadcrumbWidth > 300);
+  await clickSelector(cdp, ".view-explanation summary");
 
   const deepContext = await evaluate(cdp, `(async () => {
     const input = document.querySelector("#map-depth");

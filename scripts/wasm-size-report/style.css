@@ -347,6 +347,7 @@ input:focus {
 
 .breadcrumbs {
   display: flex;
+  flex: 1 1 auto;
   align-items: center;
   min-width: 0;
   overflow: auto;
@@ -372,12 +373,35 @@ input:focus {
   color: #a1adb2;
 }
 
+.view-explanation {
+  position: relative;
+  flex: 0 0 auto;
+}
+
+.view-explanation summary {
+  color: var(--accent);
+  font-size: 0.72rem;
+  font-weight: 680;
+  cursor: pointer;
+  user-select: none;
+}
+
 .view-note {
-  flex: 0 1 auto;
+  position: absolute;
+  z-index: 20;
+  top: calc(100% + 0.45rem);
+  right: 0;
+  width: min(34rem, calc(100vw - 4rem));
   margin: 0;
+  padding: 0.75rem 0.85rem;
   color: var(--muted);
   font-size: 0.78rem;
-  text-align: right;
+  line-height: 1.45;
+  text-align: left;
+  border: 1px solid var(--border);
+  border-radius: 0.55rem;
+  background: var(--panel);
+  box-shadow: var(--shadow);
 }
 
 .color-legend {
@@ -928,7 +952,9 @@ input:focus {
   }
 
   .view-note {
-    text-align: left;
+    right: auto;
+    left: 0;
+    width: min(34rem, calc(100vw - 3rem));
   }
 
   .color-legend {
