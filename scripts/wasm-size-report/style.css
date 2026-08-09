@@ -320,6 +320,16 @@ input:focus {
   background: linear-gradient(90deg, #dfe4e6, hsl(14 76% 51%));
 }
 
+.color-legend.combined .color-legend-gradient {
+  background: linear-gradient(
+    90deg,
+    #d7dde0 0 24%,
+    #78cfad 24% 49%,
+    #df4c2f 49% 74%,
+    #8f60bf 74% 100%
+  );
+}
+
 .color-legend-value {
   white-space: nowrap;
 }
@@ -404,13 +414,9 @@ input:focus {
   background: #dfe4e6;
 }
 
-.map-block.frontier-pressure.depth-1,
-.map-block.frontier-pressure.depth-2,
-.map-block.frontier-pressure.depth-3,
-.map-block.frontier-pressure.depth-4,
-.map-block.frontier-pressure.depth-5,
-.map-block.frontier-pressure.depth-6 {
-  filter: saturate(0.92) brightness(1.05);
+.map-block.combined-context {
+  color: #2e2731;
+  background: var(--combined-color);
 }
 
 .block-label {

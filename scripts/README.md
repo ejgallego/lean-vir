@@ -37,7 +37,8 @@ map lives in `docs/HARNESS.md`.
   interactive section/subsystem/object/symbol treemap deployed under `/size/`.
   It also maps the current boundary into the installed Lean native runtime
   archives using exact source provenance, separates compiled Lean program code,
-  and exposes a primary-blocker-pressure color overlay. `npm run build:site`
+  and exposes boundary, primary-blocker-pressure, and combined overlap color
+  modes. `npm run build:site`
   supplies the surface-report symbol bridge; the standalone command remains
   usable without that optional cross-link data.
 - `npm run build:analysis-site`

@@ -358,24 +358,32 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
       && context.objectFunctions.density < 1,
   );
 
-  await setInputValueAndDispatch(cdp, "#map-depth", "7", "input");
-  const deepContext = await evaluate(cdp, `({
-    depth: document.querySelector("#map-depth")?.value,
-    output: document.querySelector("#map-depth-value")?.value,
-    hash: location.hash,
-    depthSix: document.querySelectorAll("#treemap .depth-6").length,
-    depthFourLabels: Array.from(document.querySelectorAll("#treemap .depth-4 .block-label strong"), (node) => node.textContent),
-    depthFiveLabels: Array.from(document.querySelectorAll("#treemap .depth-5 .block-label strong"), (node) => node.textContent),
-    depthSixLabels: Array.from(document.querySelectorAll("#treemap .depth-6 .block-label strong"), (node) => node.textContent),
-  })`);
+  const deepContext = await evaluate(cdp, `(async () => {
+    const input = document.querySelector("#map-depth");
+    input.value = "7";
+    const started = performance.now();
+    input.dispatchEvent(new Event("input", { bubbles: true }));
+    await new Promise(requestAnimationFrame);
+    return {
+      depth: input.value,
+      output: document.querySelector("#map-depth-value")?.value,
+      hash: location.hash,
+      renderMs: performance.now() - started,
+      depthSix: document.querySelectorAll("#treemap .depth-6").length,
+      depthFourNames: Array.from(document.querySelectorAll("#treemap .depth-4"), (node) => node.getAttribute("aria-label")),
+      depthFiveNames: Array.from(document.querySelectorAll("#treemap .depth-5"), (node) => node.getAttribute("aria-label")),
+      depthSixNames: Array.from(document.querySelectorAll("#treemap .depth-6"), (node) => node.getAttribute("aria-label")),
+    };
+  })()`);
   assert.equal(deepContext.depth, "7");
   assert.equal(deepContext.output, "7 / 7");
   assert.ok(deepContext.hash.includes("depth=7"));
+  assert.ok(deepContext.renderMs < 1500, `level-7 treemap render took ${deepContext.renderMs} ms`);
   assert.ok(deepContext.depthSix > 0);
-  assert.ok(deepContext.depthFourLabels.includes("object.cpp"));
-  assert.ok(deepContext.depthFiveLabels.includes("tcp.cpp"));
-  assert.ok(deepContext.depthFiveLabels.includes("lean_mark_mt"));
-  assert.ok(deepContext.depthSixLabels.includes("lean_uv_tcp_send"));
+  assert.ok(deepContext.depthFourNames.some((name) => name?.startsWith("object.cpp,")));
+  assert.ok(deepContext.depthFiveNames.some((name) => name?.startsWith("tcp.cpp,")));
+  assert.ok(deepContext.depthFiveNames.some((name) => name?.startsWith("lean_mark_mt,")));
+  assert.ok(deepContext.depthSixNames.some((name) => name?.startsWith("lean_uv_tcp_send,")));
 
   await clickSelector(cdp, "#top-children button");
   const nativeLayer = await evaluate(cdp, `({
@@ -419,6 +427,31 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.ok(frontier.densityAverage < 1e-9);
   assert.equal(frontier.legendTitle, "Blocker density · log color scale");
   assert.ok(frontier.legendMax.endsWith("roots / MiB"));
+
+  await clickSelector(cdp, "#context-color-switch button[data-context-color='combined']");
+  const combined = await evaluate(cdp, `({
+    selectedColor: document.querySelector("#context-color-switch button.selected")?.dataset.contextColor,
+    note: document.querySelector("#view-note")?.textContent,
+    overlap: document.querySelectorAll("#treemap .combined-overlap").length,
+    boundary: document.querySelectorAll("#treemap .combined-boundary").length,
+    neither: document.querySelectorAll("#treemap .combined-neither").length,
+    listTitle: document.querySelector("#child-list-title")?.textContent,
+    legendTitle: document.querySelector("#color-legend-title")?.textContent,
+    legendMin: document.querySelector("#color-legend-min")?.textContent,
+    legendMax: document.querySelector("#color-legend-max")?.textContent,
+    hash: location.hash,
+  })`);
+  assert.equal(combined.selectedColor, "combined");
+  assert.ok(combined.note.includes("6 leaf functions currently have both signals"));
+  assert.ok(combined.note.includes("separate boundaries"));
+  assert.ok(combined.overlap > 0);
+  assert.ok(combined.boundary > 0);
+  assert.ok(combined.neither > 0);
+  assert.equal(combined.listTitle, "Frontier pressure");
+  assert.equal(combined.legendTitle, "Green retained · orange pressure · purple overlap");
+  assert.equal(combined.legendMin, "neither");
+  assert.equal(combined.legendMax, "both");
+  assert.ok(combined.hash.includes("color=combined"));
 
   await clickSelector(cdp, "#breadcrumbs button:first-child");
   assert.equal(await evaluate(cdp, "document.querySelector('#map-depth')?.value"), "7");

@@ -184,8 +184,10 @@ places the current VIR boundary inside Lean's installed native runtime archives;
 it follows Lean's source hierarchy, separates the compiled `LeanIR.lean` program
 layer, exposes up to seven local hierarchy levels with a sticky depth slider,
 drills from source files into their sized native functions, and can color byte
-area by either exact retained-function coverage or measured primary-blocker
-density. Extern symbols link back to their coverage entries in the
+area by exact retained-function coverage, measured primary-blocker density, or
+a combined view where purple exposes code that is retained but not registered
+as a native extern. Deep zoom rendering is coalesced while dragging the slider,
+so only the newest requested level is drawn. Extern symbols link back to their coverage entries in the
 runnable-surface report. Both reports also display exact raw and gzip deltas
 from directly linked native-frontier experiments, keeping those costs separate
 from current blocker pressure:

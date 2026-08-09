@@ -351,7 +351,14 @@ colors are byte-weighted averages of their children. Frontier-pressure coloring
 shows deterministic primary blocked-root density per MiB for missing extern
 backend symbols that are already retained. Parent colors are byte-weighted
 averages of their children. This is not a predicted unlock count because
-satisfying one boundary may reveal another.
+satisfying one boundary may reveal another. A combined mode shows retained code
+in green, frontier pressure in orange, overlap in purple, and neither signal in
+gray. The overlap is intentional evidence: a native function may already be
+linked into the Wasm for another caller while its Lean declaration remains
+absent from the native-extern catalog. Deep slider input is animation-frame
+coalesced, subtree depths are cached, and the treemap uses one delegated event
+surface rather than per-block handlers; the browser smoke guards the complete
+level-seven render against regression.
 The Pages build also runs the tracked native-frontier plan against the current
 release artifact. Both reports display exact isolated and directly measured
 cluster raw/gzip deltas, while keeping those costs distinct from blocker

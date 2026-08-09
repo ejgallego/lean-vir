@@ -588,7 +588,12 @@ unlock forecast; use an A/B surface comparison to measure the exact benefit of
 a runtime change. Its wider Lean context also matches installed native function
 aliases to exact retained Wasm linker symbols. This refines whole-object
 membership into function-level retained coverage without treating native and
-Wasm byte sizes as interchangeable.
+Wasm byte sizes as interchangeable. The combined context-color mode displays
+both facts at once: green is retained code, orange is frontier pressure, purple
+is overlap, and gray is neither. Overlap does not violate the accounting: it
+means the native implementation is retained for some other path but the
+corresponding Lean declaration is still unavailable through VIR's extern
+catalog.
 
 The generated directory contains a navigation index with the comparatively
 small extern catalog plus one compact JavaScript data file per module with

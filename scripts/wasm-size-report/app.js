@@ -45,7 +45,12 @@ Author: Emilio J. Gallego Arias
   };
 
   const indexes = new Map();
+  const visibleDepthCache = new WeakMap();
   for (const [view, root] of Object.entries(report.trees)) indexes.set(view, indexTree(root));
+  const contextOverlapLeaves = indexes.get("runtimeContext")?.nodes.filter((node) =>
+    !node.children?.length
+      && (node.meta?.boundaryDensity ?? 0) > 0
+      && (node.meta?.frontierDensity ?? 0) > 0).length ?? 0;
   const defaultVisibleDepth = {
     ownership: 2,
     releaseSections: 1,
@@ -62,6 +67,7 @@ Author: Emilio J. Gallego Arias
   let selected = current;
   let highlightedId = null;
   let contextColor = "boundary";
+  let scheduledTreemapFrame = null;
 
   renderIdentity();
   renderSummary();
@@ -145,13 +151,31 @@ Author: Emilio J. Gallego Arias
       if (!button || button.dataset.contextColor === contextColor) return;
       contextColor = button.dataset.contextColor;
       writeHash();
-      render();
+      renderContextColor();
+    });
+    elements.treemap.addEventListener("pointerover", (event) => {
+      const node = treemapNodeForEvent(event);
+      if (!node || node === selected) return;
+      selected = node;
+      renderDetails(node);
+    });
+    elements.treemap.addEventListener("click", (event) => {
+      const node = treemapNodeForEvent(event);
+      if (!node) return;
+      activateNode(node);
+    });
+    elements.treemap.addEventListener("keydown", (event) => {
+      if (event.key !== "Enter" && event.key !== " ") return;
+      const node = treemapNodeForEvent(event);
+      if (!node) return;
+      event.preventDefault();
+      activateNode(node);
     });
     elements.mapDepth.addEventListener("input", () => {
       visibleDepthByView.set(view, Number(elements.mapDepth.value));
       renderDepthControl();
       writeHash();
-      renderTreemap();
+      scheduleTreemapRender();
     });
     elements.search.addEventListener("input", renderSearch);
     window.addEventListener("hashchange", () => {
@@ -216,6 +240,9 @@ Author: Emilio J. Gallego Arias
     if (contextColor === "frontier") {
       return `${report.runtimeContext.missingSurfaceEntries} already-retained missing externs are primary blockers for ${report.runtimeContext.primaryPublicRoots} public / ${report.runtimeContext.primaryRoots} all roots. Area is native archive bytes; color is log-scaled blocker density, averaged by child bytes, not predicted unlock.`;
     }
+    if (contextColor === "combined") {
+      return `Green marks exact retained native-function bytes, orange marks log-scaled frontier pressure, purple marks overlap, and gray marks neither. ${contextOverlapLeaves} leaf functions currently have both signals because retention and extern-catalog exposure are separate boundaries.`;
+    }
     return `${report.runtimeContext.retainedFunctions} of ${report.runtimeContext.boundarySizedFunctions} sized functions in VIR object counterparts match exact retained Wasm symbols. Color is matched native-function bytes per archive byte, averaged from child blocks.`;
   }
 
@@ -223,15 +250,35 @@ Author: Emilio J. Gallego Arias
     elements.colorLegend.hidden = view !== "runtimeContext";
     if (view !== "runtimeContext") return;
     const frontier = contextColor === "frontier";
+    const combined = contextColor === "combined";
     elements.colorLegend.classList.toggle("frontier", frontier);
-    elements.colorLegend.classList.toggle("boundary", !frontier);
-    elements.colorLegendTitle.textContent = frontier
-      ? "Blocker density · log color scale"
-      : "Exact retained-function byte density";
-    elements.colorLegendMin.textContent = frontier ? "0 roots / MiB" : "0%";
-    elements.colorLegendMax.textContent = frontier
-      ? formatDensity(report.runtimeContext.maxFrontierDensity)
-      : "100%";
+    elements.colorLegend.classList.toggle("combined", combined);
+    elements.colorLegend.classList.toggle("boundary", !frontier && !combined);
+    elements.colorLegendTitle.textContent = combined
+      ? "Green retained · orange pressure · purple overlap"
+      : frontier
+        ? "Blocker density · log color scale"
+        : "Exact retained-function byte density";
+    elements.colorLegendMin.textContent = combined ? "neither" : frontier ? "0 roots / MiB" : "0%";
+    elements.colorLegendMax.textContent = combined
+      ? "both"
+      : frontier
+        ? formatDensity(report.runtimeContext.maxFrontierDensity)
+        : "100%";
+  }
+
+  function renderContextColor() {
+    for (const button of elements.contextColorSwitch.querySelectorAll("button[data-context-color]")) {
+      button.classList.toggle("selected", button.dataset.contextColor === contextColor);
+    }
+    elements.note.textContent = viewNote();
+    renderColorLegend();
+    for (const block of elements.treemap.querySelectorAll(".map-block")) {
+      const node = indexes.get(view).nodeById.get(block.dataset.nodeId);
+      if (node) applyContextColor(block, node);
+    }
+    renderDetails(selected);
+    renderTopChildren();
   }
 
   function renderDepthControl() {
@@ -265,6 +312,10 @@ Author: Emilio J. Gallego Arias
   }
 
   function renderTreemap() {
+    if (scheduledTreemapFrame !== null) {
+      cancelAnimationFrame(scheduledTreemapFrame);
+      scheduledTreemapFrame = null;
+    }
     elements.treemap.replaceChildren();
     const children = current.children ?? [];
     if (children.length === 0) {
@@ -276,72 +327,65 @@ Author: Emilio J. Gallego Arias
     }
     const hueById = new Map();
     children.forEach((child, index) => hueById.set(child.id, hueFor(index)));
+    const maximumNestedDepth = visibleDepthForCurrent() - 2;
+    const mapWidth = elements.treemap.clientWidth;
+    const mapHeight = elements.treemap.clientHeight;
+    const markup = [];
     for (const rect of binaryTreemap(children, 0, 0, 100, 100)) {
-      const block = makeBlock(rect.node, rect, 0, hueById.get(rect.node.id));
-      elements.treemap.append(block);
+      markup.push(makeBlockMarkup(
+        rect.node,
+        rect,
+        0,
+        hueById.get(rect.node.id),
+        maximumNestedDepth,
+        mapWidth * rect.width / 100,
+        mapHeight * rect.height / 100,
+      ));
     }
+    elements.treemap.innerHTML = markup.join("");
   }
 
-  function makeBlock(node, rect, depth, hue) {
-    const block = document.createElement("div");
-    block.className = `map-block depth-${depth}`;
+  function scheduleTreemapRender() {
+    if (scheduledTreemapFrame !== null) cancelAnimationFrame(scheduledTreemapFrame);
+    scheduledTreemapFrame = requestAnimationFrame(() => {
+      scheduledTreemapFrame = null;
+      renderTreemap();
+    });
+  }
+
+  function makeBlockMarkup(
+    node,
+    rect,
+    depth,
+    hue,
+    maximumNestedDepth,
+    pixelWidth,
+    pixelHeight,
+  ) {
+    const classes = ["map-block", `depth-${depth}`];
+    const properties = [
+      `left:${rect.x}%`,
+      `top:${rect.y}%`,
+      `width:${rect.width}%`,
+      `height:${rect.height}%`,
+      `--block-hue:${hue}`,
+    ];
     if (view === "runtimeContext") {
-      if (contextColor === "frontier") {
-        const density = node.meta?.frontierDensity ?? 0;
-        block.classList.add(density > 0 ? "frontier-pressure" : "no-frontier-pressure");
-        const maximum = report.runtimeContext.maxFrontierDensity;
-        const intensity = maximum > 0 ? Math.log1p(density) / Math.log1p(maximum) : 0;
-        block.style.setProperty("--frontier-lightness", String(89 - intensity * 38));
-      } else {
-        const density = node.meta?.boundaryDensity ?? 0;
-        block.style.setProperty("--boundary-percent", `${density * 100}%`);
-        block.classList.add(
-          density >= 1 - Number.EPSILON
-            ? "in-boundary"
-            : density > 0
-              ? "mixed-boundary"
-              : "outside-boundary",
-        );
-      }
+      const presentation = contextColorPresentation(node);
+      classes.push(...presentation.classes);
+      properties.push(...presentation.properties);
     }
-    if (node.id === highlightedId) block.classList.add("highlighted");
-    block.dataset.nodeId = node.id;
-    block.style.left = `${rect.x}%`;
-    block.style.top = `${rect.y}%`;
-    block.style.width = `${rect.width}%`;
-    block.style.height = `${rect.height}%`;
-    block.style.setProperty("--block-hue", String(hue));
-    block.setAttribute("role", "button");
-    block.tabIndex = 0;
-    block.title = `${node.name}\n${formatBytes(node.bytes)} (${formatPercent(node.bytes / current.bytes)} of current view)`;
-
-    const label = document.createElement("span");
-    label.className = "block-label";
-    const name = document.createElement("strong");
-    name.textContent = node.name;
-    const size = document.createElement("span");
-    size.textContent = formatBytes(node.bytes);
-    label.append(name, size);
-    if (rect.width < 8 || rect.height < 7) label.classList.add("compact");
-    block.append(label);
-
-    block.addEventListener("mouseenter", (event) => {
-      event.stopPropagation();
-      selected = node;
-      renderDetails(node);
-    });
-    block.addEventListener("click", (event) => {
-      event.stopPropagation();
-      activateNode(node);
-    });
-    block.addEventListener("keydown", (event) => {
-      if (event.key !== "Enter" && event.key !== " ") return;
-      event.preventDefault();
-      event.stopPropagation();
-      activateNode(node);
-    });
-
-    const maximumNestedDepth = visibleDepthForCurrent() - 2;
+    if (node.id === highlightedId) classes.push("highlighted");
+    const contents = [];
+    if (pixelWidth >= 18 && pixelHeight >= 14) {
+      const labelClass = pixelWidth < 72 || pixelHeight < 34
+        ? "block-label compact"
+        : "block-label";
+      contents.push(
+        `<span class="${labelClass}"><strong>${escapeHtml(node.name)}</strong>`
+          + `<span>${escapeHtml(formatBytes(node.bytes))}</span></span>`,
+      );
+    }
     const minimumNestedWidth = depth === 0 ? 13 : 17;
     const minimumNestedHeight = depth === 0 ? 15 : 19;
     if (
@@ -350,14 +394,93 @@ Author: Emilio J. Gallego Arias
       && rect.width >= minimumNestedWidth
       && rect.height >= minimumNestedHeight
     ) {
-      const nested = document.createElement("div");
-      nested.className = "nested-map";
+      const nestedWidth = Math.max(0, pixelWidth - (depth === 0 ? 6 : 4));
+      const nestedHeight = Math.max(0, pixelHeight - (depth === 0 ? 41 : 31));
+      const nested = [];
       for (const childRect of binaryTreemap(node.children, 0, 0, 100, 100)) {
-        nested.append(makeBlock(childRect.node, childRect, depth + 1, hue));
+        nested.push(makeBlockMarkup(
+          childRect.node,
+          childRect,
+          depth + 1,
+          hue,
+          maximumNestedDepth,
+          nestedWidth * childRect.width / 100,
+          nestedHeight * childRect.height / 100,
+        ));
       }
-      block.append(nested);
+      contents.push(`<div class="nested-map">${nested.join("")}</div>`);
     }
-    return block;
+    const title = `${node.name}\n${formatBytes(node.bytes)} (${formatPercent(node.bytes / current.bytes)} of current view)`;
+    return `<div class="${classes.join(" ")}" data-node-id="${escapeAttribute(node.id)}"`
+      + ` style="${properties.join(";")}" role="button" tabindex="0"`
+      + ` aria-label="${escapeAttribute(`${node.name}, ${formatBytes(node.bytes)}`)}"`
+      + ` title="${escapeAttribute(title)}">${contents.join("")}</div>`;
+  }
+
+  function applyContextColor(block, node) {
+    block.classList.remove(
+      "in-boundary",
+      "mixed-boundary",
+      "outside-boundary",
+      "frontier-pressure",
+      "no-frontier-pressure",
+      "combined-context",
+      "combined-boundary",
+      "combined-frontier",
+      "combined-overlap",
+      "combined-neither",
+    );
+    block.style.removeProperty("--boundary-percent");
+    block.style.removeProperty("--frontier-lightness");
+    block.style.removeProperty("--combined-color");
+    const presentation = contextColorPresentation(node);
+    block.classList.add(...presentation.classes);
+    for (const property of presentation.properties) {
+      const separator = property.indexOf(":");
+      block.style.setProperty(property.slice(0, separator), property.slice(separator + 1));
+    }
+  }
+
+  function contextColorPresentation(node) {
+    const boundaryDensity = clampUnit(node.meta?.boundaryDensity ?? 0);
+    const frontierIntensity = normalizedFrontierDensity(node.meta?.frontierDensity ?? 0);
+    if (contextColor === "frontier") {
+      return {
+        classes: [frontierIntensity > 0 ? "frontier-pressure" : "no-frontier-pressure"],
+        properties: [`--frontier-lightness:${89 - frontierIntensity * 38}`],
+      };
+    }
+    if (contextColor === "combined") {
+      return {
+        classes: [
+          "combined-context",
+          boundaryDensity > 0 && frontierIntensity > 0
+            ? "combined-overlap"
+            : boundaryDensity > 0
+              ? "combined-boundary"
+              : frontierIntensity > 0
+                ? "combined-frontier"
+                : "combined-neither",
+        ],
+        properties: [`--combined-color:${combinedContextColor(boundaryDensity, frontierIntensity)}`],
+      };
+    }
+    return {
+      classes: [
+        boundaryDensity >= 1 - Number.EPSILON
+          ? "in-boundary"
+          : boundaryDensity > 0
+            ? "mixed-boundary"
+            : "outside-boundary",
+      ],
+      properties: [`--boundary-percent:${boundaryDensity * 100}%`],
+    };
+  }
+
+  function treemapNodeForEvent(event) {
+    const block = event.target.closest?.(".map-block");
+    if (!block || !elements.treemap.contains(block)) return null;
+    return indexes.get(view).nodeById.get(block.dataset.nodeId) ?? null;
   }
 
   function activateNode(node) {
@@ -563,7 +686,7 @@ Author: Emilio J. Gallego Arias
 
   function renderTopChildren() {
     const children = current.children ?? [];
-    if (view === "runtimeContext" && contextColor === "frontier") {
+    if (view === "runtimeContext" && contextColor !== "boundary") {
       const pressured = children
         .filter((node) => (node.meta?.surfaceSummary?.primaryRoots ?? 0) > 0)
         .sort((lhs, rhs) =>
@@ -649,7 +772,9 @@ Author: Emilio J. Gallego Arias
     const requestedView = params.get("view");
     if (report.trees[requestedView]) view = requestedView;
     const requestedColor = params.get("color");
-    if (["boundary", "frontier"].includes(requestedColor)) contextColor = requestedColor;
+    if (["boundary", "frontier", "combined"].includes(requestedColor)) {
+      contextColor = requestedColor;
+    }
     const requestedDepth = Number(params.get("depth"));
     const maximumDepth = Math.max(1, treeVisibleDepth(report.trees[view]));
     if (Number.isInteger(requestedDepth) && requestedDepth >= 1 && requestedDepth <= maximumDepth) {
@@ -670,13 +795,21 @@ Author: Emilio J. Gallego Arias
       nodeById.set(node.id, node);
       nodes.push(node);
       if (parent) parentById.set(node.id, parent);
-      for (const child of node.children ?? []) visit(child, node);
+      let maximumChildDepth = -1;
+      for (const child of node.children ?? []) {
+        maximumChildDepth = Math.max(maximumChildDepth, visit(child, node));
+      }
+      const depth = maximumChildDepth + 1;
+      visibleDepthCache.set(node, depth);
+      return depth;
     };
     visit(root, null);
     return { nodeById, parentById, nodes };
   }
 
   function treeVisibleDepth(node) {
+    const cached = visibleDepthCache.get(node);
+    if (cached != null) return cached;
     const children = node.children ?? [];
     if (children.length === 0) return 0;
     return 1 + Math.max(...children.map(treeVisibleDepth));
@@ -794,6 +927,46 @@ Author: Emilio J. Gallego Arias
   function hueFor(index) {
     const hues = [172, 210, 36, 268, 12, 326, 92, 188, 52, 238, 144, 292, 0, 118, 64];
     return hues[index % hues.length];
+  }
+
+  function normalizedFrontierDensity(density) {
+    const maximum = report.runtimeContext.maxFrontierDensity;
+    return maximum > 0 ? clampUnit(Math.log1p(density) / Math.log1p(maximum)) : 0;
+  }
+
+  function combinedContextColor(boundary, frontier) {
+    const corners = [
+      { color: [215, 221, 224], weight: (1 - boundary) * (1 - frontier) },
+      { color: [120, 207, 173], weight: boundary * (1 - frontier) },
+      { color: [223, 76, 47], weight: (1 - boundary) * frontier },
+      { color: [143, 96, 191], weight: boundary * frontier },
+    ];
+    const channels = [0, 1, 2].map((channel) => Math.round(corners.reduce(
+      (sum, corner) => sum + corner.color[channel] * corner.weight,
+      0,
+    )));
+    return `rgb(${channels.join(" ")})`;
+  }
+
+  function clampUnit(value) {
+    return Math.max(0, Math.min(1, Number.isFinite(value) ? value : 0));
+  }
+
+  function escapeHtml(value) {
+    return String(value).replace(/[&<>]/g, (character) => ({
+      "&": "&amp;",
+      "<": "&lt;",
+      ">": "&gt;",
+    })[character]);
+  }
+
+  function escapeAttribute(value) {
+    return escapeHtml(value).replace(/["'\n\r]/g, (character) => ({
+      "\"": "&quot;",
+      "'": "&#39;",
+      "\n": "&#10;",
+      "\r": "&#13;",
+    })[character]);
   }
 
   function formatBytes(bytes) {
