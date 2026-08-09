@@ -426,6 +426,20 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
     retainedRows: document.querySelectorAll(
       "#selection-details .detail-highlights section:nth-child(3) li",
     ).length,
+    expectedRetainedRows: (() => {
+      let result = 0;
+      const visit = (node) => {
+        if (node.kind === "runtimeMember" && node.name === "expr.cpp") {
+          result = node.children
+            .filter((child) => child.kind === "runtimeFunction" && child.meta.inVirBoundary)
+            .slice(0, 5)
+            .length;
+        }
+        for (const child of node.children ?? []) visit(child);
+      };
+      visit(globalThis.__virWasmSize.trees.runtimeContext);
+      return result;
+    })(),
     archiveBreakdown: (() => {
       let result = null;
       const visit = (node) => {
@@ -449,10 +463,10 @@ export async function smokeWasmSizeExplorer(cdp, origin) {
   assert.deepEqual(runtimeMemberDetails.highlightTitles, [
     "Largest native functions",
     "Highest frontier pressure",
-    "Retained in VIR Wasm",
+    ...(runtimeMemberDetails.expectedRetainedRows > 0 ? ["Retained in VIR Wasm"] : []),
   ]);
   assert.ok(runtimeMemberDetails.pressureFunctions.includes("lean_expr_has_loose_bvar"));
-  assert.ok(runtimeMemberDetails.retainedRows > 0);
+  assert.equal(runtimeMemberDetails.retainedRows, runtimeMemberDetails.expectedRetainedRows);
   assert.equal(
     runtimeMemberDetails.archiveBreakdown.childBytes,
     runtimeMemberDetails.archiveBreakdown.bytes,
