@@ -1,0 +1,7 @@
+/artifacts/
+/dist/
+/_artifacts/
+/node_modules/
+/test-results/
+/_results/
+/_sources/
