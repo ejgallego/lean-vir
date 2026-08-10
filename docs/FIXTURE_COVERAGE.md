@@ -77,8 +77,11 @@ The current fixture surface covers:
 - `Char.toUpper`/`Char.toLower`/`Char.utf8Size`;
 - `ByteArray.mk`/`ByteArray.empty`/`ByteArray.push`/`ByteArray.get`/
   `ByteArray.get!`/`ByteArray.set!`/`ByteArray.extract`/
-  `ByteArray.copySlice`/`ByteArray.size`/`ByteArray.validateUTF8`, including
-  growing and overlapping slice copies;
+  `ByteArray.copySlice`/`ByteArray.size`/`ByteArray.validateUTF8`/
+  `ByteArray.emptyWithCapacity`/`ByteArray.decEq`/`ByteArray.uget`/
+  `ByteArray.data`/`ByteArray.hash`, including growing and overlapping slice
+  copies, capacity-backed construction, equality, inequality, in-bounds
+  indexing, conversion to `Array UInt8`, and content hashing;
 - `UInt8`/`UInt16` `toNat` plus arithmetic/bitwise/shift/comparison
   operations;
 - `UInt32` literals, `UInt32.ofNat`/`toNat`/`toUInt8`, and `UInt32`
@@ -94,9 +97,6 @@ The current fixture surface covers:
   values, both signed zeros, infinities, NaN, inverse-cosine boundaries,
   `atan2` quadrants, positive and negative cube roots, and positive and
   negative floors, with bit-level predicates and no JavaScript math imports;
-- `ByteArray.emptyWithCapacity`/`decEq`/`uget`/`data`/`hash`, including
-  capacity-backed construction, equality, inequality, in-bounds indexing,
-  conversion to `Array UInt8`, and content hashing;
 - `Lean.Expr` package closure and structural JS/WASM marshaling for constants,
   applications, literals, binders, levels, variables, projections, metadata
   results, and bound-variable inputs/results;
