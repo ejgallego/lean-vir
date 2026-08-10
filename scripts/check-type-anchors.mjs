@@ -118,7 +118,7 @@ if (cli.out !== null) {
   if (cli.check) {
     const existing = await readFile(cli.out, "utf8");
     if (existing.replace(/\r\n/g, "\n") !== text) {
-      fail(`${relative(root, cli.out)} is stale; run npm run compare:type-anchors`);
+      fail(`${relative(root, cli.out)} is stale; rerun the corresponding comparison step without --check`);
     }
     console.log(`validated ${relative(root, cli.out)}`);
   } else {

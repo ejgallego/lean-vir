@@ -92,8 +92,8 @@ ownership diagrams.
 - [INTERFACE_PIPELINE.md](INTERFACE_PIPELINE.md): package configs, manifests,
   supported types, and interface internals.
 - [TYPE_ANCHORS.md](TYPE_ANCHORS.md): generated TypeScript descriptors,
-  compiler-backed Lean VIR comparison, interactive reports, and the focused
-  React DOM root review seed.
+  compiler-backed Lean VIR comparison, standalone HTML reports, and the
+  focused React DOM root review seed.
 - [GENERATE_PACKAGE.md](GENERATE_PACKAGE.md): Lean package generator module
   map, data flow, and diagnostics.
 - [UPSTREAM_BOUNDARY.md](UPSTREAM_BOUNDARY.md): upstream interpreter boundary

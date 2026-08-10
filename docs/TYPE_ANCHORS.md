@@ -68,6 +68,20 @@ for external dependencies that should not be expanded, such as browser host
 resources or very large recursive library types. The generated descriptor
 records every included dependency and any unresolved names.
 
+## Artifact Ownership
+
+The checked-in reports are generated review artifacts. Edit their authored
+inputs and regenerate them instead of editing descriptor, manifest, report,
+Markdown, or HTML output directly.
+
+| Slice | Authored inputs | Generated outputs |
+| --- | --- | --- |
+| Core fixture | `vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
+| React DOM root | `react-dom-root-v1.symbols.txt`, `react-dom-root-v1.dependencies.json`, `react-dom-root-v1.anchors.json`, pinned `@types/react-dom` declarations | `react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
+
+Intermediate `.irpkg` and generator reports under `build/type-descriptors/`
+are ignored local artifacts.
+
 ## Output Contract
 
 The pipeline has four public outputs.
@@ -111,7 +125,8 @@ show the same report with usable links and hovers.
 `vir-v1.anchors.html` is the standalone human-ready report. It treats the
 TypeScript declaration as the primary documentation surface and enriches each
 symbol with the Lean declaration, match status, notes, source jump, and hover
-text.
+text. This focused renderer is static HTML: it does not yet provide client-side
+filtering or syntax highlighting.
 
 ## Match Status
 
