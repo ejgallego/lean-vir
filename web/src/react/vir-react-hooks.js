@@ -41,9 +41,23 @@ export function createBrowserReactHookRuntime(resources, React) {
   const setters = new WeakMap();
   let currentComponent = null;
   let currentRender = null;
+  const cancelPendingComponentRenders = (componentState, ownershipKey = undefined) => {
+    const errors = [];
+    for (const ticket of Array.from(componentState?.renderTickets ?? [])) {
+      if (ownershipKey !== undefined && !Object.is(ticket.ownershipKey, ownershipKey)) continue;
+      collectCleanupError(errors, () => releaseBrowserRenderTeardownTicket(ticket));
+    }
+    throwCollectedErrors(errors, "browser React render cancellation failed");
+  };
   return {
     createComponentState() {
-      return { hookIndex: 0, hooks: [], refs: new Set(), setters: new Set() };
+      return {
+        hookIndex: 0,
+        hooks: [],
+        refs: new Set(),
+        setters: new Set(),
+        renderTickets: new Set(),
+      };
     },
     withComponentRender(componentState, render) {
       const previous = currentComponent;
@@ -75,9 +89,14 @@ export function createBrowserReactHookRuntime(resources, React) {
       const hooks = Array.isArray(componentState?.hooks) ? componentState.hooks.splice(0) : [];
       const refs = Array.from(componentState?.refs ?? []);
       const componentSetters = Array.from(componentState?.setters ?? []);
+      const renderTickets = Array.from(componentState?.renderTickets ?? []);
       componentState?.refs?.clear();
       componentState?.setters?.clear();
+      componentState?.renderTickets?.clear();
       const errors = [];
+      for (const ticket of renderTickets) {
+        collectCleanupError(errors, () => releaseBrowserRenderTeardownTicket(ticket));
+      }
       for (const hook of hooks) {
         if (hook?.kind === "state" || hook?.kind === "memo") {
           collectCleanupError(errors, () => disposeBrowserStoredValueHook(hook));
@@ -103,9 +122,16 @@ export function createBrowserReactHookRuntime(resources, React) {
     cancelComponentRender(componentState) {
       if (currentRender?.componentState === componentState) {
         releaseBrowserRenderGeneration(currentRender);
+        return;
       }
+      cancelPendingComponentRenders(componentState);
     },
-    commitComponentRender(componentState, commitOwnership = null) {
+    cancelPendingComponentRenders,
+    commitComponentRender(
+        componentState,
+        commitOwnership = null,
+        abortOwnership = null,
+        ownershipKey = null) {
       const generation = currentRender;
       if (generation?.componentState !== componentState) {
         throw new Error("browser React commit registration must occur during its component render");
@@ -113,7 +139,8 @@ export function createBrowserReactHookRuntime(resources, React) {
       if (typeof React?.useLayoutEffect !== "function") {
         throw new Error("React.useLayoutEffect is required for commit-phase resource ownership");
       }
-      handOffBrowserRenderGeneration(generation);
+      generation.ownership.abortOwnership = abortOwnership;
+      handOffBrowserRenderGeneration(generation, componentState.renderTickets, ownershipKey);
       try {
         React.useLayoutEffect(() => {
           commitBrowserRenderGeneration(generation, commitOwnership);
@@ -601,6 +628,7 @@ function createBrowserRenderGeneration(resources, componentState) {
     refs: new Map(),
     setters: new Set(),
     payloadLeases: new Set(),
+    abortOwnership: null,
     closed: false,
   };
   return {
@@ -852,7 +880,7 @@ function stageBrowserEffect(generation, hook, effect, dependencyList) {
   });
 }
 
-function handOffBrowserRenderGeneration(generation) {
+function handOffBrowserRenderGeneration(generation, ownerSet = null, ownershipKey = null) {
   if (generation.handedOff) {
     throw new Error("browser React render ownership was already handed off");
   }
@@ -860,7 +888,7 @@ function handOffBrowserRenderGeneration(generation) {
     releaseBrowserRenderGeneration(generation);
     throw new Error("browser React render ownership requires FinalizationRegistry support");
   }
-  const ticket = createBrowserRenderTeardownTicket(generation.ownership);
+  const ticket = createBrowserRenderTeardownTicket(generation.ownership, ownerSet, ownershipKey);
   try {
     browserRenderFinalizer.register(generation.token, ticket, generation.token);
   } catch (error) {
@@ -871,6 +899,7 @@ function handOffBrowserRenderGeneration(generation) {
     );
   }
   generation.teardownTicket = ticket;
+  ownerSet?.add(ticket);
   generation.handedOff = true;
 }
 
@@ -886,11 +915,13 @@ function releaseBrowserRenderGeneration(generation) {
 // The runtime owns this ticket, while FinalizationRegistry observes the
 // generation token. The ticket intentionally has no path back to that token,
 // so deterministic runtime teardown and GC abandonment remain independent.
-function createBrowserRenderTeardownTicket(state) {
+function createBrowserRenderTeardownTicket(state, ownerSet = null, ownershipKey = null) {
   const ticket = {
     active: true,
     resources: state.resources,
     state,
+    ownerSet,
+    ownershipKey,
     dispose() {
       return releaseBrowserRenderTeardownTicket(ticket);
     },
@@ -904,8 +935,12 @@ function detachBrowserRenderTeardownTicket(ticket) {
   ticket.active = false;
   const state = ticket.state;
   const resources = ticket.resources;
+  const ownerSet = ticket.ownerSet;
   ticket.state = null;
   ticket.resources = null;
+  ticket.ownerSet = null;
+  ticket.ownershipKey = null;
+  ownerSet?.delete(ticket);
   resources?.removeDisposable(ticket);
   return state;
 }
@@ -922,18 +957,21 @@ function releaseBrowserRenderState(state, fromFinalizer = false) {
   const reducers = Array.from(state.reducers.values());
   const effects = Array.from(state.effects.values(), (record) => record.effect);
   const payloadLeases = Array.from(state.payloadLeases);
+  const abortOwnership = state.abortOwnership;
   state.reducers.clear();
   state.effects.clear();
   state.candidates.clear();
   state.refs.clear();
   state.setters.clear();
   state.payloadLeases.clear();
+  state.abortOwnership = null;
   const errors = [];
   for (const reducer of reducers) collectCleanupError(errors, () => releaseLeanCallback(reducer));
   for (const effect of effects) collectCleanupError(errors, () => releaseBrowserEffect(effect));
   for (const lease of payloadLeases) {
     collectCleanupError(errors, () => releaseBrowserPayloadLease(lease));
   }
+  collectCleanupError(errors, () => abortOwnership?.());
   if (errors.length !== 0) {
     if (!fromFinalizer) throwCollectedErrors(errors, "browser React render ownership cleanup failed");
     reportReactFinalizerErrors(
@@ -947,6 +985,7 @@ function releaseBrowserRenderState(state, fromFinalizer = false) {
 function commitBrowserRenderGeneration(generation, commitOwnership) {
   const state = generation.ownership;
   if (state.closed) return false;
+  generation.componentState?.renderTickets?.delete(generation.teardownTicket);
   const errors = [];
 
   for (const [hook, reducer] of state.reducers) {
@@ -992,6 +1031,8 @@ function commitBrowserRenderGeneration(generation, commitOwnership) {
   if (typeof commitOwnership === "function") {
     collectCleanupError(errors, commitOwnership);
   }
+
+  state.abortOwnership = null;
 
   const remainingPayloadLeases = Array.from(state.payloadLeases);
   state.closed = true;

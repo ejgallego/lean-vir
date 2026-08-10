@@ -97,6 +97,8 @@ function createReactRootResource(resources, hooks, adapter) {
   const { addDisposable, removeDisposable, once } = requireReactHostHooks(hooks);
   let currentNode = null;
   let currentComponent = null;
+  let pendingRender = null;
+  let nextRenderGeneration = 1;
   let unmounted = false;
   const requireMounted = () => {
     if (unmounted) throw new Error("React root has been unmounted");
@@ -106,33 +108,122 @@ function createReactRootResource(resources, hooks, adapter) {
   // invocation environment (and its component-owner finalizer target).
   const resolveComponentNode = (node) => resolveRenderedReactNodeValue(resources, node);
   const disposeComponentNode = (node) => queueReactNodeRelease(resources, node, hooks);
+
+  const releasePendingRender = (record) => {
+    if (record === null || record.status !== "pending") return undefined;
+    record.status = "cancelled";
+    if (pendingRender === record) pendingRender = null;
+    const nodeOwner = record.nodeOwner;
+    const componentOwner = record.ownsComponent ? record.componentOwner : null;
+    const renderCallbackOwner = record.renderCallbackOwner;
+    record.nodeOwner = null;
+    record.componentOwner = null;
+    record.renderCallbackOwner = null;
+    const errors = [];
+    collectCleanupError(errors, () => releaseReactNodeOwner(resources, nodeOwner));
+    collectCleanupError(errors, () => releaseReactComponentOwner(resources, componentOwner));
+    if (renderCallbackOwner !== null) {
+      collectCleanupError(errors, () => record.component?.cancelPendingRender(renderCallbackOwner));
+      if (!record.component?.ownsRenderCallback(renderCallbackOwner)) {
+        collectCleanupError(errors, () => resources.releaseResource(renderCallbackOwner));
+      }
+    }
+    throwCollectedErrors(errors, "pending React root render release failed");
+    return undefined;
+  };
+
+  const submitPendingRender = (record, submit, failureMessage) => {
+    const previous = pendingRender;
+    pendingRender = record;
+    const errors = [];
+    const submitted = collectCleanupError(errors, submit);
+    if (!submitted.ok && record.status === "pending") {
+      pendingRender = previous?.status === "pending" ? previous : null;
+      collectCleanupError(errors, () => releasePendingRender(record));
+    } else {
+      const releasedPrevious = collectCleanupError(errors, () => releasePendingRender(previous));
+      if (!releasedPrevious.ok && record.status === "pending") {
+        collectCleanupError(errors, () => releasePendingRender(record));
+      }
+    }
+    throwCollectedErrors(errors, failureMessage);
+    return undefined;
+  };
+
+  const commitNodeRender = (record) => {
+    if (record.status !== "pending") return undefined;
+    if (unmounted || pendingRender?.generation !== record.generation) {
+      return releasePendingRender(record);
+    }
+    pendingRender = null;
+    record.status = "committed";
+    const nextOwner = record.nodeOwner;
+    record.nodeOwner = null;
+    const previousNode = currentNode;
+    const previousComponent = currentComponent;
+    currentNode = nextOwner;
+    currentComponent = null;
+    const errors = [];
+    if (previousNode !== nextOwner) {
+      collectCleanupError(errors, () => queueReactNodeRelease(resources, previousNode, hooks));
+    }
+    collectCleanupError(errors, () => queueReactComponentRelease(resources, previousComponent, hooks));
+    throwCollectedErrors(errors, "React root node commit failed during previous-owner cleanup");
+    return undefined;
+  };
+
+  const commitComponentRender = (record) => {
+    if (record.status !== "pending") return undefined;
+    if (unmounted || pendingRender?.generation !== record.generation) {
+      return releasePendingRender(record);
+    }
+    pendingRender = null;
+    record.status = "committed";
+    const previousNode = currentNode;
+    const previousComponent = currentComponent;
+    const nextComponent = record.componentOwner;
+    if (record.ownsComponent) {
+      record.componentOwner = null;
+    }
+    const errors = [];
+    if (record.renderCallbackOwner !== null) {
+      const renderCallbackOwner = record.renderCallbackOwner;
+      record.renderCallbackOwner = null;
+      if (!record.component.ownsRenderCallback(renderCallbackOwner)) {
+        errors.push(new Error("React root component committed before its render callback ownership"));
+        collectCleanupError(errors, () => resources.releaseResource(renderCallbackOwner));
+      }
+    }
+    currentNode = null;
+    currentComponent = nextComponent;
+    collectCleanupError(errors, () => queueReactNodeRelease(resources, previousNode, hooks));
+    if (previousComponent !== currentComponent) {
+      collectCleanupError(errors, () => queueReactComponentRelease(resources, previousComponent, hooks));
+    }
+    throwCollectedErrors(errors, "React root component commit failed during previous-owner cleanup");
+    return undefined;
+  };
+
   const value = {
     ...(adapter.initialState ?? {}),
     render(node) {
       requireMounted();
       const nextNode = resolveRenderedReactNode(resources, node);
       const nextOwner = retainHostResource(node, "React root node");
-      let committed = false;
-      const commitOwnership = () => {
-        if (committed) return undefined;
-        committed = true;
-        const previousNode = currentNode;
-        const previousComponent = currentComponent;
-        currentNode = nextOwner;
-        currentComponent = null;
-        if (previousNode !== nextOwner) queueReactNodeRelease(resources, previousNode, hooks);
-        queueReactComponentRelease(resources, previousComponent, hooks);
-        return undefined;
+      const record = {
+        generation: nextRenderGeneration++,
+        status: "pending",
+        nodeOwner: nextOwner,
+        component: null,
+        componentOwner: null,
+        ownsComponent: false,
+        renderCallbackOwner: null,
       };
-      try {
-        adapter.commitNode(value, nextNode, commitOwnership);
-      } catch (error) {
-        const errors = [error instanceof Error ? error : new Error(String(error))];
-        if (!committed) {
-          collectCleanupError(errors, () => releaseReactNodeOwner(resources, nextOwner));
-        }
-        throwCollectedErrors(errors, "React root node commit failed during ownership cleanup");
-      }
+      submitPendingRender(
+        record,
+        () => adapter.commitNode(value, nextNode, () => commitNodeRender(record)),
+        "React root node commit failed during ownership cleanup",
+      );
     },
     renderComponent(renderCallback) {
       requireMounted();
@@ -154,42 +245,38 @@ function createReactRootResource(resources, hooks, adapter) {
         component = resources.resolveResource(componentOwner, "ReactComponent");
         renderCallbackOwner = component.stageRenderCallback(renderCallback);
       }
-      let committed = false;
-      const commitOwnership = () => {
-        if (committed) return undefined;
-        committed = true;
-        const previousNode = currentNode;
-        const previousComponent = currentComponent;
-        currentNode = null;
-        currentComponent = componentOwner;
-        queueReactNodeRelease(resources, previousNode, hooks);
-        if (previousComponent !== componentOwner) {
-          queueReactComponentRelease(resources, previousComponent, hooks);
-        }
-        return undefined;
+      const record = {
+        generation: nextRenderGeneration++,
+        status: "pending",
+        nodeOwner: null,
+        component,
+        componentOwner,
+        ownsComponent: created,
+        renderCallbackOwner,
       };
-      try {
-        adapter.commitComponent(value, component, renderCallbackOwner, commitOwnership);
-      } catch (error) {
-        const errors = [error instanceof Error ? error : new Error(String(error))];
-        if (renderCallbackOwner !== null && !component.ownsRenderCallback(renderCallbackOwner)) {
-          collectCleanupError(errors, () => resources.releaseResource(renderCallbackOwner));
-        }
-        if (created && !committed) {
-          collectCleanupError(errors, () => releaseReactComponentOwner(resources, componentOwner));
-        }
-        throwCollectedErrors(errors, "React component commit failed during cleanup");
-      }
+      submitPendingRender(
+        record,
+        () => adapter.commitComponent(
+          value,
+          component,
+          renderCallbackOwner,
+          () => commitComponentRender(record),
+        ),
+        "React component commit failed during cleanup",
+      );
     },
     unmount: once(() => {
       unmounted = true;
       const node = currentNode;
       const component = currentComponent;
+      const pending = pendingRender;
       currentNode = null;
       currentComponent = null;
+      pendingRender = null;
       const errors = [];
       collectCleanupError(errors, () => removeDisposable(resources, value));
       collectCleanupError(errors, () => adapter.unmount?.(value));
+      collectCleanupError(errors, () => releasePendingRender(pending));
       collectCleanupError(errors, () => releaseReactNodeOwner(resources, node));
       collectCleanupError(errors, () => releaseReactComponentOwner(resources, component));
       collectCleanupError(errors, () => flushReactNodeDisposals(hooks, { force: true }));
@@ -745,27 +832,57 @@ function createReactComponentResource(
       const nextRenderCallback = resolveReactRenderCallbackOwner(resources, nextRenderCallbackOwner);
       return hookRuntime.withComponentRender(componentState, () => {
         let node = null;
-        let ownershipCommitted = false;
+        let ownership = null;
+        const abortOwnership = () => {
+          if (ownership === null || ownership.status !== "pending") return undefined;
+          ownership.status = "cancelled";
+          const pendingNode = ownership.node;
+          ownership.node = null;
+          // The committed component or its pending root record owns this
+          // callback. Speculative React generations only borrow it, so a
+          // replay sibling may release its node but never the shared callback.
+          ownership.renderCallbackOwner = null;
+          const errors = [];
+          collectCleanupError(errors, () => disposeReactNode(resources, pendingNode));
+          throwCollectedErrors(errors, "pending React component render release failed");
+          return undefined;
+        };
         try {
           node = nextRenderCallback(undefined);
           const next = renderNode(node);
+          ownership = {
+            status: "pending",
+            node,
+            renderCallbackOwner: nextRenderCallbackOwner,
+          };
           const commitOwnership = () => {
-            if (ownershipCommitted) return undefined;
-            ownershipCommitted = true;
+            if (ownership.status !== "pending") return undefined;
+            if (disposed) return abortOwnership();
+            ownership.status = "committed";
             const previous = currentNode;
             const previousRenderCallbackOwner = renderCallbackOwner;
-            currentNode = node;
-            renderCallbackOwner = nextRenderCallbackOwner;
+            const committedNode = ownership.node;
+            const committedRenderCallbackOwner = ownership.renderCallbackOwner;
+            ownership.node = null;
+            ownership.renderCallbackOwner = null;
+            currentNode = committedNode;
+            renderCallbackOwner = committedRenderCallbackOwner;
             const errors = [];
+            collectCleanupError(errors, () => hookRuntime.cancelPendingComponentRenders?.(componentState));
             collectCleanupError(errors, () => disposePreviousNode(previous));
-            if (previousRenderCallbackOwner !== nextRenderCallbackOwner) {
+            if (previousRenderCallbackOwner !== committedRenderCallbackOwner) {
               collectCleanupError(errors, () => resources.releaseResource(previousRenderCallbackOwner));
             }
             throwCollectedErrors(errors, "React component commit cleanup failed");
             return undefined;
           };
           if (typeof hookRuntime.commitComponentRender === "function") {
-            hookRuntime.commitComponentRender(componentState, commitOwnership);
+            hookRuntime.commitComponentRender(
+              componentState,
+              commitOwnership,
+              abortOwnership,
+              nextRenderCallbackOwner,
+            );
           } else {
             commitOwnership();
           }
@@ -773,7 +890,9 @@ function createReactComponentResource(
         } catch (error) {
           const errors = [error instanceof Error ? error : new Error(String(error))];
           collectCleanupError(errors, () => hookRuntime.cancelComponentRender?.(componentState));
-          if (!ownershipCommitted) {
+          if (ownership !== null) {
+            collectCleanupError(errors, abortOwnership);
+          } else {
             collectCleanupError(errors, () => disposeReactNode(resources, node));
           }
           throwCollectedErrors(errors, "React component render failed during cleanup");
@@ -797,6 +916,9 @@ function createReactComponentResource(
     ownsRenderCallback(owner) {
       return renderCallbackOwner === owner;
     },
+    cancelPendingRender(owner) {
+      return hookRuntime.cancelPendingComponentRenders?.(componentState, owner);
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -805,6 +927,7 @@ function createReactComponentResource(
       currentNode = null;
       renderCallbackOwner = null;
       const errors = [];
+      collectCleanupError(errors, () => hookRuntime.cancelPendingComponentRenders?.(componentState));
       collectCleanupError(errors, () => releaseReactNodeOwner(resources, node));
       collectCleanupError(errors, () => hookRuntime.disposeComponent(componentState));
       collectCleanupError(errors, () => resources.releaseResource(callbackOwner));

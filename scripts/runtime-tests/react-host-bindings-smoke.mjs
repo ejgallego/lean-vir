@@ -766,6 +766,22 @@ function callbackLease(cell, body = () => undefined) {
   assert.equal(renderCell.active, 1);
   assert.equal(eventCell.active, 1);
 
+  const supersededRenderCell = { active: 0 };
+  const supersededEventCell = { active: 0 };
+  const supersededRender = callbackLease(supersededRenderCell, () => resources.adoptResourceForValue(
+    createReactNodeResource(resources, {
+      node: { kind: "text", value: "superseded browser component" },
+      callbacks: [callbackLease(supersededEventCell)],
+    }),
+    { tracked: false },
+  ));
+  root.renderComponent(supersededRender);
+  renderTree(pendingTree);
+  pendingTree = null;
+  const supersededLayoutEffects = layoutEffects.splice(0);
+  assert.equal(supersededRenderCell.active, 1);
+  assert.equal(supersededEventCell.active, 1);
+
   const nextRenderCell = { active: 0 };
   const nextEventCell = { active: 0 };
   const nextRender = callbackLease(nextRenderCell, () => resources.adoptResourceForValue(
@@ -776,6 +792,14 @@ function callbackLease(cell, body = () => undefined) {
     { tracked: false },
   ));
   root.renderComponent(nextRender);
+  assert.equal(supersededRenderCell.active, 0, "component supersession must release its staged callback");
+  assert.equal(supersededEventCell.active, 0, "component supersession must release its staged node");
+  for (const setup of supersededLayoutEffects.reverse()) {
+    setup();
+    setup();
+  }
+  assert.equal(renderCell.active, 1, "a stale component generation must not replace committed ownership");
+  assert.equal(eventCell.active, 1);
   assert.equal(renderCell.active, 1, "a proposed component callback must not replace the committed callback");
   const committedComponentTree = pendingTree;
   const updatedTree = renderTree(committedComponentTree);
@@ -822,6 +846,343 @@ function callbackLease(cell, body = () => undefined) {
   root.unmount();
   resources.releaseResource(replacement);
   resources.dispose();
+}
+
+{
+  const createDeferredBrowserRoot = (resources) => {
+    const layoutEffects = [];
+    let pendingTree = null;
+    let unmounts = 0;
+    const React = {
+      createElement(type, props = null, ...children) {
+        return { type, props: { ...(props ?? {}), children } };
+      },
+      useLayoutEffect(effect) {
+        layoutEffects.push(effect);
+      },
+    };
+    const browserRoot = {
+      render(tree) {
+        pendingTree = tree;
+      },
+      unmount() {
+        pendingTree = null;
+        unmounts++;
+      },
+    };
+    const hookRuntime = createBrowserReactHookRuntime(resources, React);
+    const root = createBrowserReactRootResource(resources, browserRoot, React, {
+      ...createReactHostHooks({ resources }),
+      hookRuntime,
+    });
+    const renderPendingTree = () => {
+      let tree = pendingTree;
+      while (typeof tree?.type === "function") {
+        tree = tree.type(tree.props ?? {});
+      }
+      pendingTree = null;
+      return tree;
+    };
+    const enterPendingRoot = () => {
+      const tree = pendingTree;
+      pendingTree = null;
+      return typeof tree?.type === "function" ? tree.type(tree.props ?? {}) : tree;
+    };
+    return {
+      root,
+      layoutEffects,
+      enterPendingRoot,
+      renderPendingTree,
+      get pending() {
+        return pendingTree !== null;
+      },
+      get unmounts() {
+        return unmounts;
+      },
+    };
+  };
+
+  // React may invoke one component submission more than once before choosing
+  // a commit. The root owns its staged callback until the winning component
+  // generation commits; cancelling a replay sibling must not release it.
+  for (const componentEffectOrder of [[0, 1], [1, 0]]) {
+    const resources = createHostResourceState();
+    const deferred = createDeferredBrowserRoot(resources);
+    const oldRenderCell = { active: 0 };
+    deferred.root.renderComponent(
+      callbackLease(oldRenderCell, () =>
+        resources.adoptResourceForValue(
+          createReactNodeResource(resources, {
+            node: { kind: "text", value: "initial replay component" },
+          }),
+          { tracked: false },
+        ),
+      ),
+    );
+    deferred.renderPendingTree();
+    for (const setup of deferred.layoutEffects.splice(0).reverse()) setup();
+    assert.equal(oldRenderCell.active, 1);
+
+    const nextRenderCell = { active: 0 };
+    const eventCell = { active: 0 };
+    deferred.root.renderComponent(
+      callbackLease(nextRenderCell, () =>
+        resources.adoptResourceForValue(
+          createReactNodeResource(resources, {
+            node: { kind: "text", value: "replayed replacement component" },
+            callbacks: [callbackLease(eventCell)],
+          }),
+          { tracked: false },
+        ),
+      ),
+    );
+    const componentTree = deferred.enterPendingRoot();
+    componentTree.type(componentTree.props ?? {});
+    componentTree.type(componentTree.props ?? {});
+    const [rootEffect, ...componentEffects] = deferred.layoutEffects.splice(0);
+    assert.equal(componentEffects.length, 2);
+    assert.equal(nextRenderCell.active, 1);
+    assert.equal(eventCell.active, 2);
+
+    for (const index of componentEffectOrder) componentEffects[index]();
+    rootEffect();
+    assert.equal(oldRenderCell.active, 0);
+    assert.equal(nextRenderCell.active, 1, "replay cancellation must preserve the winning callback owner");
+    assert.equal(eventCell.active, 1, "replay cancellation must release only its generation-local node");
+
+    assert.doesNotThrow(() => componentTree.type(componentTree.props ?? {}));
+    const rerenderEffect = deferred.layoutEffects.shift();
+    rerenderEffect();
+    await Promise.resolve();
+    assert.equal(nextRenderCell.active, 1, "the winning callback must remain usable on a later render");
+    assert.equal(eventCell.active, 1);
+
+    deferred.root.unmount();
+    assert.equal(nextRenderCell.active, 0);
+    assert.equal(eventCell.active, 0);
+    assert.equal(resources.debugResourceCounts().owners, 0);
+    assert.doesNotThrow(() => deferred.root.unmount());
+    resources.dispose();
+  }
+
+  // Direct unmount must see node ownership before React enters the tree.
+  {
+    const resources = createHostResourceState();
+    const deferred = createDeferredBrowserRoot(resources);
+    const callbackCell = { active: 0 };
+    const node = resources.adoptResourceForValue(
+      createReactNodeResource(resources, {
+        node: { kind: "text", value: "deferred direct node" },
+        callbacks: [callbackLease(callbackCell)],
+      }),
+      { tracked: false },
+    );
+    deferred.root.render(node);
+    resources.releaseResource(node);
+    assert.equal(callbackCell.active, 1);
+    assert.equal(resources.debugResourceCounts().owners, 2);
+    deferred.root.unmount();
+    assert.equal(callbackCell.active, 0, "direct unmount must release a queued browser node owner");
+    assert.equal(resources.debugResourceCounts().owners, 0);
+    assert.doesNotThrow(() => deferred.root.unmount());
+    assert.equal(deferred.unmounts, 1);
+    resources.dispose();
+  }
+
+  // Exercise the public direct-unmount binding with a component queued before
+  // React invokes it on an already-created root.
+  {
+    const resources = createHostResourceState();
+    let deferred = null;
+    const bindings = createReactRootResourceHostBindings(resources, () => {
+      deferred = createDeferredBrowserRoot(resources);
+      return deferred.root;
+    });
+    const container = resources.resourceForValue({
+      kind: "direct deferred component container",
+    });
+    const root = bindings["react.root.create"](container);
+    commitHostResource(root);
+    const callbackCell = { active: 0 };
+    bindings["react.root.renderComponent"](
+      root,
+      callbackLease(callbackCell, () => {
+        throw new Error("the directly unmounted deferred component must not run");
+      }),
+    );
+    assert.equal(callbackCell.active, 1);
+    bindings["react.root.unmount"](root);
+    assert.equal(callbackCell.active, 0, "direct root unmount must release a queued component owner");
+    assert.equal(deferred.unmounts, 1);
+    assert.equal(resources.debugResourceCounts().owners, 0);
+    assert.throws(() => resources.resolveResource(root, "ReactRoot"), /resource is not live/);
+    resources.releaseResource(container);
+    resources.dispose();
+  }
+
+  // A component may have run and staged hook/node ownership before the root's
+  // layout boundary commits. Root teardown must still own that whole record.
+  {
+    const resources = createHostResourceState();
+    const deferred = createDeferredBrowserRoot(resources);
+    const renderCell = { active: 0 };
+    const eventCell = { active: 0 };
+    deferred.root.renderComponent(
+      callbackLease(renderCell, () =>
+        resources.adoptResourceForValue(
+          createReactNodeResource(resources, {
+            node: { kind: "text", value: "invoked deferred component" },
+            callbacks: [callbackLease(eventCell)],
+          }),
+          { tracked: false },
+        ),
+      ),
+    );
+    deferred.renderPendingTree();
+    assert.equal(renderCell.active, 1);
+    assert.equal(eventCell.active, 1);
+    deferred.root.unmount();
+    assert.equal(renderCell.active, 0);
+    assert.equal(eventCell.active, 0, "unmount before root layout commit must release the staged component node");
+    assert.equal(resources.debugResourceCounts().owners, 0);
+    for (const setup of deferred.layoutEffects.splice(0)) setup();
+    assert.equal(resources.debugResourceCounts().owners, 0, "stale layout commits must not reacquire cancelled ownership");
+    resources.dispose();
+  }
+
+  // Supersession must cancel the old generation, and its stale layout commit
+  // must not replace the newer pending owner.
+  {
+    const resources = createHostResourceState();
+    const deferred = createDeferredBrowserRoot(resources);
+    const firstCell = { active: 0 };
+    const secondCell = { active: 0 };
+    const first = resources.adoptResourceForValue(
+      createReactNodeResource(resources, {
+        node: { kind: "text", value: "first deferred node" },
+        callbacks: [callbackLease(firstCell)],
+      }),
+      { tracked: false },
+    );
+    const second = resources.adoptResourceForValue(
+      createReactNodeResource(resources, {
+        node: { kind: "text", value: "second deferred node" },
+        callbacks: [callbackLease(secondCell)],
+      }),
+      { tracked: false },
+    );
+    deferred.root.render(first);
+    deferred.renderPendingTree();
+    const staleCommit = deferred.layoutEffects.shift();
+    deferred.root.render(second);
+    resources.releaseResource(first);
+    resources.releaseResource(second);
+    assert.equal(firstCell.active, 0, "a superseded browser generation must release its node owner");
+    assert.equal(secondCell.active, 1);
+    staleCommit();
+    deferred.root.unmount();
+    assert.equal(secondCell.active, 0);
+    assert.equal(resources.debugResourceCounts().owners, 0);
+    resources.dispose();
+  }
+
+  // Failed scalar publication and direct unmount share the same pending-root
+  // teardown path. Cover node/component work for both new and existing roots.
+  for (const kind of ["node", "component"]) {
+    for (const existingRoot of [false, true]) {
+      const resources = createHostResourceState();
+      const container = {
+        kind: `${kind} ${existingRoot ? "existing" : "new"} deferred selector`,
+      };
+      let deferred = null;
+      const bindings = createReactRootResourceHostBindings(
+        resources,
+        () => {
+          deferred = createDeferredBrowserRoot(resources);
+          return deferred.root;
+        },
+        { querySelector: () => container },
+      );
+      let rootAlias = null;
+      let containerResource = null;
+      if (existingRoot) {
+        containerResource = resources.resourceForValue(container);
+        rootAlias = bindings["react.root.create"](containerResource);
+        commitHostResource(rootAlias);
+      }
+      const selector = resources.resourceForValue(`#deferred-${kind}`);
+      const callbackCell = { active: 0 };
+      let publication;
+      if (kind === "node") {
+        const node = resources.adoptResourceForValue(
+          createReactNodeResource(resources, {
+            node: { kind: "text", value: "deferred selector node" },
+            callbacks: [callbackLease(callbackCell)],
+          }),
+          { tracked: false },
+        );
+        publication = bindings["react.root.renderIntoSelector"](selector, node);
+        resources.releaseResource(node);
+      } else {
+        publication = bindings["react.root.renderComponentIntoSelector"](
+          selector,
+          callbackLease(callbackCell, () => {
+            throw new Error("the deferred component must not run before selector rollback");
+          }),
+        );
+      }
+      assert.equal(callbackCell.active, 1);
+      abandonHostResource(publication);
+      assert.equal(callbackCell.active, 0, `${kind} selector rollback must release queued browser ownership`);
+      assert.equal(deferred.unmounts, 1);
+      assert.equal(deferred.pending, false);
+      assert.equal(resources.debugResourceCounts().owners, 0);
+      if (rootAlias !== null) {
+        assert.equal(hostResourceValue(rootAlias), null);
+      }
+      if (containerResource !== null) resources.releaseResource(containerResource);
+      resources.releaseResource(selector);
+      resources.dispose();
+    }
+  }
+
+  // Throwing pending cleanup detaches the record first and remains idempotent.
+  {
+    const resources = createHostResourceState();
+    const deferred = createDeferredBrowserRoot(resources);
+    const callbackCell = { active: 0, releases: 0 };
+    let released = false;
+    const callback = Object.assign(() => undefined, {
+      retain() {
+        if (released) throw new Error("throwing callback lease has been released");
+        return this;
+      },
+      release() {
+        if (released) return false;
+        released = true;
+        callbackCell.active--;
+        callbackCell.releases++;
+        throw new Error("pending node release boom");
+      },
+    });
+    callbackCell.active++;
+    const node = resources.adoptResourceForValue(
+      createReactNodeResource(resources, {
+        node: { kind: "text", value: "throwing pending node" },
+        callbacks: [callback],
+      }),
+      { tracked: false },
+    );
+    deferred.root.render(node);
+    resources.releaseResource(node);
+    assert.throws(() => deferred.root.unmount(), /pending node release boom/);
+    assert.equal(callbackCell.active, 0);
+    assert.equal(callbackCell.releases, 1);
+    assert.equal(resources.debugResourceCounts().owners, 0);
+    assert.doesNotThrow(() => deferred.root.unmount());
+    assert.equal(callbackCell.releases, 1);
+    resources.dispose();
+  }
 }
 
 {

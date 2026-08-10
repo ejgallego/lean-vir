@@ -341,6 +341,7 @@ The main owners and their commit points are:
 | Active registration | Its own callback or activity lease | Creation remains provisional until its returned handle is completely lowered. Failed result conversion rolls back a newly installed registration; committed registrations release on removal, cancellation, completion, unmount, or runtime disposal. |
 | JSL alias or owned externref root | One lease over the retained Lean object or host payload | Releases that alias/root without invalidating sibling owners. |
 | React queued update | Its own state/action payload lease | Render borrows or stages from it; queue-record collection or component disposal releases it. A commit in another React lane does not. |
+| React root pending generation | A node lease or component/render-callback owner before browser adapter submission | The matching layout boundary transfers it; adapter failure, supersession, unmount, or selector publication rollback cancels it. A stale boundary generation cannot adopt it. |
 | React render generation | Candidate nodes, callbacks, and hook payload leases | A real commit-phase hook transfers selected leases; render failure or abandoned-generation cleanup releases only the staged generation. |
 | React committed hook/effect | Committed state, reducer, ref, memo, and per-setup effect leases | Replacement or unmount releases the matching owner. A callback result remains staged until callback cleanup also succeeds. |
 
@@ -368,6 +369,8 @@ hypothetical owners do not expand the review.
 | Active registration → throwing terminal cleanup | Make callback release throw during listener removal, timer/frame cancellation, or root unmount. | The owner and every public alias detach first; all remaining cleanup is attempted once. |
 | Selector-created root → initial render failure | Throw from the first node/component render, then repeat with a pre-existing root. | Only the newly created root is unmounted and removed from the owner set. |
 | Selector render → scalar result publication | Let node/component rendering succeed, then fail Bool result lowering; repeat while replacing an existing root. | The affected root is unmounted on both paths, so no mounted tree retains a callback revoked by call rollback. |
+| Browser-deferred root work → cancellation | Queue node/component work without entering React; invoke a component without its layout commit; supersede or unmount new/existing roots, including failed selector publication and throwing cleanup. | Pending records detach first, all leases release once, and stale generation callbacks cannot reacquire ownership. |
+| Browser component submission → replayed render generations | Invoke one staged replacement twice, commit either generation first, cancel its sibling, render again, and unmount. | Generations borrow the root-owned callback; the winner transfers it, while sibling cancellation releases only generation-local ownership. |
 | Abandoned browser generation → runtime teardown | Hand off a render that React never commits, then dispose the runtime before GC. | The opaque teardown ticket synchronously releases the staged leases without retaining its finalizer target. |
 | Updater/reducer inputs → callback | Succeed and throw while creating an unrelated resource. | Only synthetic input wrappers expire; unrelated allocations remain live. |
 | Deferred React owner → teardown | Dispose before the scheduled microtask; include throwing and non-throwing siblings. | Teardown drains once, attempts every sibling, and restores the owner count synchronously. |
@@ -500,12 +503,14 @@ lease and relinquish the incoming transfer lease, then release the owned lease
 at their natural lifetime boundary. Package reload/runtime disposal
 force-revokes any leases that remain.
 
-Browser React render generations do not enter a strong runtime owner registry.
-Nodes, component render-callback replacements, and root-level node/component
-replacements are inert until commit and use weak finalization only as a safety
-net. Reducer, state, ref, component-node, render-callback, and root ownership
-swaps occur from a real `useLayoutEffect` commit hook. Effect setup and cleanup
-use fresh per-invocation callback leases,
+Browser React root submissions enter one explicit pending record before the
+browser adapter receives them. Supersession, unmount, adapter failure, and
+selector-publication rollback detach and release that record; a generation
+token makes its stale layout callback inert. Once React invokes a component,
+its speculative render ownership moves into opaque teardown tickets that do
+not retain the finalizer target. Reducer, state, ref, component-node,
+render-callback, and root ownership swaps occur from a real `useLayoutEffect`
+commit hook. Effect setup and cleanup use fresh per-invocation callback leases,
 so React's development setup→cleanup→setup replay does not reuse a released
 lease. The virtual renderer keeps its explicit immediate-commit behavior.
 

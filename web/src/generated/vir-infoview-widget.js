@@ -742,39 +742,125 @@ function createReactRootResource(resources, hooks, adapter) {
   const { addDisposable, removeDisposable, once: once2 } = requireReactHostHooks(hooks);
   let currentNode = null;
   let currentComponent = null;
+  let pendingRender = null;
+  let nextRenderGeneration = 1;
   let unmounted = false;
   const requireMounted = () => {
     if (unmounted) throw new Error("React root has been unmounted");
   };
   const resolveComponentNode = (node) => resolveRenderedReactNodeValue(resources, node);
   const disposeComponentNode = (node) => queueReactNodeRelease(resources, node, hooks);
+  const releasePendingRender = (record) => {
+    if (record === null || record.status !== "pending") return void 0;
+    record.status = "cancelled";
+    if (pendingRender === record) pendingRender = null;
+    const nodeOwner = record.nodeOwner;
+    const componentOwner = record.ownsComponent ? record.componentOwner : null;
+    const renderCallbackOwner = record.renderCallbackOwner;
+    record.nodeOwner = null;
+    record.componentOwner = null;
+    record.renderCallbackOwner = null;
+    const errors = [];
+    collectCleanupError(errors, () => releaseReactNodeOwner(resources, nodeOwner));
+    collectCleanupError(errors, () => releaseReactComponentOwner(resources, componentOwner));
+    if (renderCallbackOwner !== null) {
+      collectCleanupError(errors, () => record.component?.cancelPendingRender(renderCallbackOwner));
+      if (!record.component?.ownsRenderCallback(renderCallbackOwner)) {
+        collectCleanupError(errors, () => resources.releaseResource(renderCallbackOwner));
+      }
+    }
+    throwCollectedErrors(errors, "pending React root render release failed");
+    return void 0;
+  };
+  const submitPendingRender = (record, submit, failureMessage) => {
+    const previous = pendingRender;
+    pendingRender = record;
+    const errors = [];
+    const submitted = collectCleanupError(errors, submit);
+    if (!submitted.ok && record.status === "pending") {
+      pendingRender = previous?.status === "pending" ? previous : null;
+      collectCleanupError(errors, () => releasePendingRender(record));
+    } else {
+      const releasedPrevious = collectCleanupError(errors, () => releasePendingRender(previous));
+      if (!releasedPrevious.ok && record.status === "pending") {
+        collectCleanupError(errors, () => releasePendingRender(record));
+      }
+    }
+    throwCollectedErrors(errors, failureMessage);
+    return void 0;
+  };
+  const commitNodeRender = (record) => {
+    if (record.status !== "pending") return void 0;
+    if (unmounted || pendingRender?.generation !== record.generation) {
+      return releasePendingRender(record);
+    }
+    pendingRender = null;
+    record.status = "committed";
+    const nextOwner = record.nodeOwner;
+    record.nodeOwner = null;
+    const previousNode = currentNode;
+    const previousComponent = currentComponent;
+    currentNode = nextOwner;
+    currentComponent = null;
+    const errors = [];
+    if (previousNode !== nextOwner) {
+      collectCleanupError(errors, () => queueReactNodeRelease(resources, previousNode, hooks));
+    }
+    collectCleanupError(errors, () => queueReactComponentRelease(resources, previousComponent, hooks));
+    throwCollectedErrors(errors, "React root node commit failed during previous-owner cleanup");
+    return void 0;
+  };
+  const commitComponentRender = (record) => {
+    if (record.status !== "pending") return void 0;
+    if (unmounted || pendingRender?.generation !== record.generation) {
+      return releasePendingRender(record);
+    }
+    pendingRender = null;
+    record.status = "committed";
+    const previousNode = currentNode;
+    const previousComponent = currentComponent;
+    const nextComponent = record.componentOwner;
+    if (record.ownsComponent) {
+      record.componentOwner = null;
+    }
+    const errors = [];
+    if (record.renderCallbackOwner !== null) {
+      const renderCallbackOwner = record.renderCallbackOwner;
+      record.renderCallbackOwner = null;
+      if (!record.component.ownsRenderCallback(renderCallbackOwner)) {
+        errors.push(new Error("React root component committed before its render callback ownership"));
+        collectCleanupError(errors, () => resources.releaseResource(renderCallbackOwner));
+      }
+    }
+    currentNode = null;
+    currentComponent = nextComponent;
+    collectCleanupError(errors, () => queueReactNodeRelease(resources, previousNode, hooks));
+    if (previousComponent !== currentComponent) {
+      collectCleanupError(errors, () => queueReactComponentRelease(resources, previousComponent, hooks));
+    }
+    throwCollectedErrors(errors, "React root component commit failed during previous-owner cleanup");
+    return void 0;
+  };
   const value = {
     ...adapter.initialState ?? {},
     render(node) {
       requireMounted();
       const nextNode = resolveRenderedReactNode(resources, node);
       const nextOwner = retainHostResource(node, "React root node");
-      let committed = false;
-      const commitOwnership = () => {
-        if (committed) return void 0;
-        committed = true;
-        const previousNode = currentNode;
-        const previousComponent = currentComponent;
-        currentNode = nextOwner;
-        currentComponent = null;
-        if (previousNode !== nextOwner) queueReactNodeRelease(resources, previousNode, hooks);
-        queueReactComponentRelease(resources, previousComponent, hooks);
-        return void 0;
+      const record = {
+        generation: nextRenderGeneration++,
+        status: "pending",
+        nodeOwner: nextOwner,
+        component: null,
+        componentOwner: null,
+        ownsComponent: false,
+        renderCallbackOwner: null
       };
-      try {
-        adapter.commitNode(value, nextNode, commitOwnership);
-      } catch (error) {
-        const errors = [error instanceof Error ? error : new Error(String(error))];
-        if (!committed) {
-          collectCleanupError(errors, () => releaseReactNodeOwner(resources, nextOwner));
-        }
-        throwCollectedErrors(errors, "React root node commit failed during ownership cleanup");
-      }
+      submitPendingRender(
+        record,
+        () => adapter.commitNode(value, nextNode, () => commitNodeRender(record)),
+        "React root node commit failed during ownership cleanup"
+      );
     },
     renderComponent(renderCallback) {
       requireMounted();
@@ -797,42 +883,38 @@ function createReactRootResource(resources, hooks, adapter) {
         component = resources.resolveResource(componentOwner, "ReactComponent");
         renderCallbackOwner = component.stageRenderCallback(renderCallback);
       }
-      let committed = false;
-      const commitOwnership = () => {
-        if (committed) return void 0;
-        committed = true;
-        const previousNode = currentNode;
-        const previousComponent = currentComponent;
-        currentNode = null;
-        currentComponent = componentOwner;
-        queueReactNodeRelease(resources, previousNode, hooks);
-        if (previousComponent !== componentOwner) {
-          queueReactComponentRelease(resources, previousComponent, hooks);
-        }
-        return void 0;
+      const record = {
+        generation: nextRenderGeneration++,
+        status: "pending",
+        nodeOwner: null,
+        component,
+        componentOwner,
+        ownsComponent: created,
+        renderCallbackOwner
       };
-      try {
-        adapter.commitComponent(value, component, renderCallbackOwner, commitOwnership);
-      } catch (error) {
-        const errors = [error instanceof Error ? error : new Error(String(error))];
-        if (renderCallbackOwner !== null && !component.ownsRenderCallback(renderCallbackOwner)) {
-          collectCleanupError(errors, () => resources.releaseResource(renderCallbackOwner));
-        }
-        if (created && !committed) {
-          collectCleanupError(errors, () => releaseReactComponentOwner(resources, componentOwner));
-        }
-        throwCollectedErrors(errors, "React component commit failed during cleanup");
-      }
+      submitPendingRender(
+        record,
+        () => adapter.commitComponent(
+          value,
+          component,
+          renderCallbackOwner,
+          () => commitComponentRender(record)
+        ),
+        "React component commit failed during cleanup"
+      );
     },
     unmount: once2(() => {
       unmounted = true;
       const node = currentNode;
       const component = currentComponent;
+      const pending = pendingRender;
       currentNode = null;
       currentComponent = null;
+      pendingRender = null;
       const errors = [];
       collectCleanupError(errors, () => removeDisposable(resources, value));
       collectCleanupError(errors, () => adapter.unmount?.(value));
+      collectCleanupError(errors, () => releasePendingRender(pending));
       collectCleanupError(errors, () => releaseReactNodeOwner(resources, node));
       collectCleanupError(errors, () => releaseReactComponentOwner(resources, component));
       collectCleanupError(errors, () => flushReactNodeDisposals(hooks, { force: true }));
@@ -1283,27 +1365,54 @@ function createReactComponentResource(resources, renderCallback, hookRuntime, re
       const nextRenderCallback = resolveReactRenderCallbackOwner(resources, nextRenderCallbackOwner);
       return hookRuntime.withComponentRender(componentState, () => {
         let node = null;
-        let ownershipCommitted = false;
+        let ownership = null;
+        const abortOwnership = () => {
+          if (ownership === null || ownership.status !== "pending") return void 0;
+          ownership.status = "cancelled";
+          const pendingNode = ownership.node;
+          ownership.node = null;
+          ownership.renderCallbackOwner = null;
+          const errors = [];
+          collectCleanupError(errors, () => disposeReactNode(resources, pendingNode));
+          throwCollectedErrors(errors, "pending React component render release failed");
+          return void 0;
+        };
         try {
           node = nextRenderCallback(void 0);
           const next = renderNode(node);
+          ownership = {
+            status: "pending",
+            node,
+            renderCallbackOwner: nextRenderCallbackOwner
+          };
           const commitOwnership = () => {
-            if (ownershipCommitted) return void 0;
-            ownershipCommitted = true;
+            if (ownership.status !== "pending") return void 0;
+            if (disposed) return abortOwnership();
+            ownership.status = "committed";
             const previous = currentNode;
             const previousRenderCallbackOwner = renderCallbackOwner;
-            currentNode = node;
-            renderCallbackOwner = nextRenderCallbackOwner;
+            const committedNode = ownership.node;
+            const committedRenderCallbackOwner = ownership.renderCallbackOwner;
+            ownership.node = null;
+            ownership.renderCallbackOwner = null;
+            currentNode = committedNode;
+            renderCallbackOwner = committedRenderCallbackOwner;
             const errors = [];
+            collectCleanupError(errors, () => hookRuntime.cancelPendingComponentRenders?.(componentState));
             collectCleanupError(errors, () => disposePreviousNode(previous));
-            if (previousRenderCallbackOwner !== nextRenderCallbackOwner) {
+            if (previousRenderCallbackOwner !== committedRenderCallbackOwner) {
               collectCleanupError(errors, () => resources.releaseResource(previousRenderCallbackOwner));
             }
             throwCollectedErrors(errors, "React component commit cleanup failed");
             return void 0;
           };
           if (typeof hookRuntime.commitComponentRender === "function") {
-            hookRuntime.commitComponentRender(componentState, commitOwnership);
+            hookRuntime.commitComponentRender(
+              componentState,
+              commitOwnership,
+              abortOwnership,
+              nextRenderCallbackOwner
+            );
           } else {
             commitOwnership();
           }
@@ -1311,7 +1420,9 @@ function createReactComponentResource(resources, renderCallback, hookRuntime, re
         } catch (error) {
           const errors = [error instanceof Error ? error : new Error(String(error))];
           collectCleanupError(errors, () => hookRuntime.cancelComponentRender?.(componentState));
-          if (!ownershipCommitted) {
+          if (ownership !== null) {
+            collectCleanupError(errors, abortOwnership);
+          } else {
             collectCleanupError(errors, () => disposeReactNode(resources, node));
           }
           throwCollectedErrors(errors, "React component render failed during cleanup");
@@ -1335,6 +1446,9 @@ function createReactComponentResource(resources, renderCallback, hookRuntime, re
     ownsRenderCallback(owner) {
       return renderCallbackOwner === owner;
     },
+    cancelPendingRender(owner) {
+      return hookRuntime.cancelPendingComponentRenders?.(componentState, owner);
+    },
     dispose() {
       if (disposed) return;
       disposed = true;
@@ -1343,6 +1457,7 @@ function createReactComponentResource(resources, renderCallback, hookRuntime, re
       currentNode = null;
       renderCallbackOwner = null;
       const errors = [];
+      collectCleanupError(errors, () => hookRuntime.cancelPendingComponentRenders?.(componentState));
       collectCleanupError(errors, () => releaseReactNodeOwner(resources, node));
       collectCleanupError(errors, () => hookRuntime.disposeComponent(componentState));
       collectCleanupError(errors, () => resources.releaseResource(callbackOwner));
@@ -2896,9 +3011,23 @@ function createBrowserReactHookRuntime(resources, React3) {
   const setters = /* @__PURE__ */ new WeakMap();
   let currentComponent = null;
   let currentRender = null;
+  const cancelPendingComponentRenders = (componentState, ownershipKey = void 0) => {
+    const errors = [];
+    for (const ticket of Array.from(componentState?.renderTickets ?? [])) {
+      if (ownershipKey !== void 0 && !Object.is(ticket.ownershipKey, ownershipKey)) continue;
+      collectCleanupError(errors, () => releaseBrowserRenderTeardownTicket(ticket));
+    }
+    throwCollectedErrors(errors, "browser React render cancellation failed");
+  };
   return {
     createComponentState() {
-      return { hookIndex: 0, hooks: [], refs: /* @__PURE__ */ new Set(), setters: /* @__PURE__ */ new Set() };
+      return {
+        hookIndex: 0,
+        hooks: [],
+        refs: /* @__PURE__ */ new Set(),
+        setters: /* @__PURE__ */ new Set(),
+        renderTickets: /* @__PURE__ */ new Set()
+      };
     },
     withComponentRender(componentState, render) {
       const previous = currentComponent;
@@ -2930,9 +3059,14 @@ function createBrowserReactHookRuntime(resources, React3) {
       const hooks = Array.isArray(componentState?.hooks) ? componentState.hooks.splice(0) : [];
       const refs = Array.from(componentState?.refs ?? []);
       const componentSetters = Array.from(componentState?.setters ?? []);
+      const renderTickets = Array.from(componentState?.renderTickets ?? []);
       componentState?.refs?.clear();
       componentState?.setters?.clear();
+      componentState?.renderTickets?.clear();
       const errors = [];
+      for (const ticket of renderTickets) {
+        collectCleanupError(errors, () => releaseBrowserRenderTeardownTicket(ticket));
+      }
       for (const hook of hooks) {
         if (hook?.kind === "state" || hook?.kind === "memo") {
           collectCleanupError(errors, () => disposeBrowserStoredValueHook(hook));
@@ -2958,9 +3092,12 @@ function createBrowserReactHookRuntime(resources, React3) {
     cancelComponentRender(componentState) {
       if (currentRender?.componentState === componentState) {
         releaseBrowserRenderGeneration(currentRender);
+        return;
       }
+      cancelPendingComponentRenders(componentState);
     },
-    commitComponentRender(componentState, commitOwnership = null) {
+    cancelPendingComponentRenders,
+    commitComponentRender(componentState, commitOwnership = null, abortOwnership = null, ownershipKey = null) {
       const generation = currentRender;
       if (generation?.componentState !== componentState) {
         throw new Error("browser React commit registration must occur during its component render");
@@ -2968,7 +3105,8 @@ function createBrowserReactHookRuntime(resources, React3) {
       if (typeof React3?.useLayoutEffect !== "function") {
         throw new Error("React.useLayoutEffect is required for commit-phase resource ownership");
       }
-      handOffBrowserRenderGeneration(generation);
+      generation.ownership.abortOwnership = abortOwnership;
+      handOffBrowserRenderGeneration(generation, componentState.renderTickets, ownershipKey);
       try {
         React3.useLayoutEffect(() => {
           commitBrowserRenderGeneration(generation, commitOwnership);
@@ -3219,6 +3357,7 @@ function createBrowserRenderGeneration(resources, componentState) {
     refs: /* @__PURE__ */ new Map(),
     setters: /* @__PURE__ */ new Set(),
     payloadLeases: /* @__PURE__ */ new Set(),
+    abortOwnership: null,
     closed: false
   };
   return {
@@ -3449,7 +3588,7 @@ function stageBrowserEffect(generation, hook, effect, dependencyList) {
     dependencyList: dependencyList === null ? null : dependencyList.slice()
   });
 }
-function handOffBrowserRenderGeneration(generation) {
+function handOffBrowserRenderGeneration(generation, ownerSet = null, ownershipKey = null) {
   if (generation.handedOff) {
     throw new Error("browser React render ownership was already handed off");
   }
@@ -3457,7 +3596,7 @@ function handOffBrowserRenderGeneration(generation) {
     releaseBrowserRenderGeneration(generation);
     throw new Error("browser React render ownership requires FinalizationRegistry support");
   }
-  const ticket = createBrowserRenderTeardownTicket(generation.ownership);
+  const ticket = createBrowserRenderTeardownTicket(generation.ownership, ownerSet, ownershipKey);
   try {
     browserRenderFinalizer.register(generation.token, ticket, generation.token);
   } catch (error) {
@@ -3468,6 +3607,7 @@ function handOffBrowserRenderGeneration(generation) {
     );
   }
   generation.teardownTicket = ticket;
+  ownerSet?.add(ticket);
   generation.handedOff = true;
 }
 function releaseBrowserRenderGeneration(generation) {
@@ -3478,11 +3618,13 @@ function releaseBrowserRenderGeneration(generation) {
   if (ticket !== null) return releaseBrowserRenderTeardownTicket(ticket);
   return releaseBrowserRenderState(generation.ownership);
 }
-function createBrowserRenderTeardownTicket(state) {
+function createBrowserRenderTeardownTicket(state, ownerSet = null, ownershipKey = null) {
   const ticket = {
     active: true,
     resources: state.resources,
     state,
+    ownerSet,
+    ownershipKey,
     dispose() {
       return releaseBrowserRenderTeardownTicket(ticket);
     }
@@ -3495,8 +3637,12 @@ function detachBrowserRenderTeardownTicket(ticket) {
   ticket.active = false;
   const state = ticket.state;
   const resources = ticket.resources;
+  const ownerSet = ticket.ownerSet;
   ticket.state = null;
   ticket.resources = null;
+  ticket.ownerSet = null;
+  ticket.ownershipKey = null;
+  ownerSet?.delete(ticket);
   resources?.removeDisposable(ticket);
   return state;
 }
@@ -3511,18 +3657,21 @@ function releaseBrowserRenderState(state, fromFinalizer = false) {
   const reducers = Array.from(state.reducers.values());
   const effects = Array.from(state.effects.values(), (record) => record.effect);
   const payloadLeases = Array.from(state.payloadLeases);
+  const abortOwnership = state.abortOwnership;
   state.reducers.clear();
   state.effects.clear();
   state.candidates.clear();
   state.refs.clear();
   state.setters.clear();
   state.payloadLeases.clear();
+  state.abortOwnership = null;
   const errors = [];
   for (const reducer of reducers) collectCleanupError(errors, () => releaseLeanCallback(reducer));
   for (const effect of effects) collectCleanupError(errors, () => releaseBrowserEffect(effect));
   for (const lease of payloadLeases) {
     collectCleanupError(errors, () => releaseBrowserPayloadLease(lease));
   }
+  collectCleanupError(errors, () => abortOwnership?.());
   if (errors.length !== 0) {
     if (!fromFinalizer) throwCollectedErrors(errors, "browser React render ownership cleanup failed");
     reportReactFinalizerErrors(
@@ -3535,6 +3684,7 @@ function releaseBrowserRenderState(state, fromFinalizer = false) {
 function commitBrowserRenderGeneration(generation, commitOwnership) {
   const state = generation.ownership;
   if (state.closed) return false;
+  generation.componentState?.renderTickets?.delete(generation.teardownTicket);
   const errors = [];
   for (const [hook, reducer] of state.reducers) {
     state.reducers.delete(hook);
@@ -3574,6 +3724,7 @@ function commitBrowserRenderGeneration(generation, commitOwnership) {
   if (typeof commitOwnership === "function") {
     collectCleanupError(errors, commitOwnership);
   }
+  state.abortOwnership = null;
   const remainingPayloadLeases = Array.from(state.payloadLeases);
   state.closed = true;
   state.reducers.clear();
