@@ -22,6 +22,7 @@ try {
   const anchors = join(tmp, "anchors.json");
   const descriptors = join(tmp, "descriptors.json");
   const manifest = join(tmp, "manifest.json");
+  const invalidAliasManifest = join(tmp, "invalid-alias-manifest.json");
   const report = join(tmp, "report.json");
   const rendered = join(tmp, "anchors.md");
   const dependencyPolicy = join(tmp, "dependency-policy.json");
@@ -104,7 +105,7 @@ try {
     ],
   };
 
-  await writeFile(manifest, `${JSON.stringify({
+  const manifestValue = {
     version: INTERFACE_MANIFEST_VERSION,
     artifact: "lean-vir-ir-package",
     metadata: {},
@@ -146,6 +147,18 @@ try {
     ],
     hostImports: [],
     diagnostics: [],
+  };
+  await writeFile(manifest, `${JSON.stringify(manifestValue, null, 2)}\n`);
+  await writeFile(invalidAliasManifest, `${JSON.stringify({
+    ...manifestValue,
+    metadata: {
+      typeAnchorAliases: [{
+        lean: "Demo.MissingAlias",
+        type: "Demo.MissingAlias",
+        via: "Demo.missingAliasIdentity",
+        descriptor: "resource",
+      }],
+    },
   }, null, 2)}\n`);
 
   run(["scripts/generate-ts-descriptors.mjs", "--anchors", anchors, "--out", descriptors, types]);
@@ -160,6 +173,11 @@ try {
   ]);
   run(["scripts/check-type-anchors.mjs", "--descriptors", descriptors, "--manifest", manifest, "--out", report]);
   runFailure(["scripts/check-type-anchors.mjs", "--fail-on-errors", "--descriptors", descriptors, "--manifest", manifest]);
+  runFailure([
+    "scripts/check-type-anchors.mjs",
+    "--descriptors", descriptors,
+    "--manifest", invalidAliasManifest,
+  ]);
   run(["scripts/render-type-anchors.mjs", "--report", report, "--out", rendered]);
 
   const comparison = JSON.parse(await readFile(report, "utf8"));
