@@ -183,6 +183,15 @@ wrapper and exposes the primitive to interpreted library closures.
 private def byteArrayCopySliceExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `ByteArray #["copySlice"]
 
+/--
+The measured low-cost byte-array frontier. These five ordinary runtime
+operations are kept in one stage because their combined strict link costs
+little while unlocking a broad library surface. Their compiler-generated
+wrappers preserve Lean's ownership-aware call shapes.
+-/
+private def byteArrayRuntimeFrontierExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `ByteArray #["emptyWithCapacity", "decEq", "uget", "data", "hash"]
+
 def nativeExternSpecs : Array NativeExternSpec := #[
   {
     name := `Nat.add,
@@ -1110,7 +1119,7 @@ def nativeExternSpecs : Array NativeExternSpec := #[
 ] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs ++
   floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs ++
   floatGeometryMathExternSpecs ++ stringByteAccessorExternSpecs ++
-  byteArrayCopySliceExternSpecs
+  byteArrayCopySliceExternSpecs ++ byteArrayRuntimeFrontierExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=
   nativeExternSpecs.mapM (·.resolve env)

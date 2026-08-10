@@ -639,6 +639,34 @@ remeasure the remaining `Float.pow`/`Float32.pow` pair against the current
 artifact so shared libm retention is reflected rather than copied from an older
 checkpoint.
 
+## ByteArray Runtime Binding Frontier
+
+The next library-wide scan selected a coherent five-binding byte-array frontier:
+`ByteArray.emptyWithCapacity`, `ByteArray.decEq`, `ByteArray.uget`,
+`ByteArray.data`, and `ByteArray.hash`. An exact combined strict link on the
+post-`floor` artifact costs 1,304 raw bytes and 383 deterministic-gzip bytes,
+moving the release Wasm from 735,621 to 736,925 raw bytes and from 169,908 to
+170,291 gzip bytes.
+
+The matching surface A/B adds five native capabilities and makes 339 all-IR
+functions and 97 public constants newly runnable, with zero regressions. The
+exact totals move from 322,041 to 322,380 all-IR functions and from 29,218 to
+29,315 public constants.
+
+The dynamic fixture is intentionally stricter than registration-only coverage.
+It passes a nonconstant capacity through byte-array construction, equality,
+inequality, unchecked in-bounds indexing, conversion to `Array UInt8`, and
+hashing. All eight predicates return 255 through a strict link with no
+JavaScript imports.
+
+Two initially attractive groups are deliberately not included. Dynamic tests
+of `Char.ofNatAux` and `UInt8.ofNatLT` each found an indirect-call signature
+mismatch between the current interpreted call shape and Lean's ordinary boxed
+wrapper. A cache test for `Thunk.mk`/`Thunk.get` found a separate boundary: the
+standard native thunk runtime attempts to invoke the thunk's closure through a
+compiled function pointer, while a VIR interpreter closure has no such native
+entry. Both groups need runtime design work rather than registration-only fixes.
+
 ## Interactive HTML Report
 
 The report generated from `main` is published with the hosted demo:

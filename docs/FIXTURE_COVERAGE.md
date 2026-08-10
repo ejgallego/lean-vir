@@ -94,6 +94,9 @@ The current fixture surface covers:
   values, both signed zeros, infinities, NaN, inverse-cosine boundaries,
   `atan2` quadrants, positive and negative cube roots, and positive and
   negative floors, with bit-level predicates and no JavaScript math imports;
+- `ByteArray.emptyWithCapacity`/`decEq`/`uget`/`data`/`hash`, including
+  capacity-backed construction, equality, inequality, in-bounds indexing,
+  conversion to `Array UInt8`, and content hashing;
 - `Lean.Expr` package closure and structural JS/WASM marshaling for constants,
   applications, literals, binders, levels, variables, projections, metadata
   results, and bound-variable inputs/results;
