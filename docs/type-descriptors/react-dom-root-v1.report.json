@@ -158,7 +158,7 @@
     },
     {
       "id": "react_dom.root.render",
-      "lean": "Lean.Vir.TypeAnchors.reactRootRenderCall",
+      "lean": "Lean.Vir.React.Root.render",
       "ts": "Root.render",
       "status": "weak",
       "relation": "audit",
@@ -198,10 +198,10 @@
         "retention": "callbacks until rerender, unmount, or runtime disposal"
       },
       "leanDescriptor": {
-        "kind": "export",
-        "lean": "Lean.Vir.TypeAnchors.reactRootRenderCall",
-        "label": "Lean_Vir_TypeAnchors_reactRootRenderCall",
-        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "kind": "hostImport",
+        "lean": "Lean.Vir.React.Root.render",
+        "label": "react.root.render",
+        "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
         "shape": {
           "kind": "function",
           "effect": "dom",
@@ -266,7 +266,7 @@
     },
     {
       "id": "react_dom.root.unmount",
-      "lean": "Lean.Vir.TypeAnchors.reactRootUnmountCall",
+      "lean": "Lean.Vir.React.Root.unmount",
       "ts": "Root.unmount",
       "status": "compatible",
       "relation": "audit",
@@ -300,10 +300,10 @@
         "lifecycle": "release retained render state"
       },
       "leanDescriptor": {
-        "kind": "export",
-        "lean": "Lean.Vir.TypeAnchors.reactRootUnmountCall",
-        "label": "Lean_Vir_TypeAnchors_reactRootUnmountCall",
-        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "kind": "hostImport",
+        "lean": "Lean.Vir.React.Root.unmount",
+        "label": "react.root.unmount",
+        "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
         "shape": {
           "kind": "function",
           "effect": "dom",
@@ -348,7 +348,7 @@
     },
     {
       "id": "react_dom.root.create",
-      "lean": "Lean.Vir.TypeAnchors.reactRootCreateCall",
+      "lean": "Lean.Vir.React.Root.create",
       "ts": "createRoot",
       "status": "weak",
       "relation": "audit",
@@ -399,10 +399,10 @@
         ]
       },
       "leanDescriptor": {
-        "kind": "export",
-        "lean": "Lean.Vir.TypeAnchors.reactRootCreateCall",
-        "label": "Lean_Vir_TypeAnchors_reactRootCreateCall",
-        "source": "docs/type-descriptors/vir-v1.fixture.lean",
+        "kind": "hostImport",
+        "lean": "Lean.Vir.React.Root.create",
+        "label": "react.root.create",
+        "source": "imported by docs/type-descriptors/vir-v1.fixture.lean",
         "shape": {
           "kind": "function",
           "effect": "dom",

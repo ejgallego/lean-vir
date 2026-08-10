@@ -25,11 +25,12 @@ try {
   const invalidAliasManifest = join(tmp, "invalid-alias-manifest.json");
   const report = join(tmp, "report.json");
   const rendered = join(tmp, "anchors.md");
+  const renderedHtml = join(tmp, "anchors.html");
   const dependencyPolicy = join(tmp, "dependency-policy.json");
   const dependencyDescriptors = join(tmp, "dependency-descriptors.json");
 
   await writeFile(types, `export namespace Demo {
-  /** Box hover docs. */
+  /** Box hover docs & <safe>. */
   export interface Box {
     value: string;
   }
@@ -179,6 +180,12 @@ try {
     "--manifest", invalidAliasManifest,
   ]);
   run(["scripts/render-type-anchors.mjs", "--report", report, "--out", rendered]);
+  run([
+    "scripts/render-type-anchors.mjs",
+    "--format", "html",
+    "--report", report,
+    "--out", renderedHtml,
+  ]);
 
   const comparison = JSON.parse(await readFile(report, "utf8"));
   const dependencyComparison = JSON.parse(await readFile(dependencyDescriptors, "utf8"));
@@ -216,6 +223,14 @@ try {
   assert.match(markdown, /href="types\.d\.ts#L3-L5"/);
   assert.match(markdown, /title="exact: Demo\.Box -&gt; Demo\.Box/);
   assert.match(markdown, /missing Lean descriptor Demo\.Missing/);
+  const html = await readFile(renderedHtml, "utf8");
+  assert.match(html, /<!doctype html>/);
+  assert.match(html, /id="type-anchor-box"/);
+  assert.match(html, /class="badge exact"/);
+  assert.match(html, /href="types\.d\.ts#L3-L5"/);
+  assert.match(html, /<p class="pane-title">Lean VIR descriptor<\/p>/);
+  assert.match(html, /error\/lean_descriptor_missing/);
+  assert.match(html, /Box hover docs &amp; &lt;safe&gt;\./);
 } finally {
   await rm(tmp, { recursive: true, force: true });
 }

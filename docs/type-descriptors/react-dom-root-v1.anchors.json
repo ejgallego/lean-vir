@@ -18,7 +18,7 @@
     {
       "id": "react_dom.root.render",
       "category": "React DOM root",
-      "lean": "Lean.Vir.TypeAnchors.reactRootRenderCall",
+      "lean": "Lean.Vir.React.Root.render",
       "ts": "Root.render",
       "relation": "audit",
       "portIntent": {
@@ -31,7 +31,7 @@
     {
       "id": "react_dom.root.unmount",
       "category": "React DOM root",
-      "lean": "Lean.Vir.TypeAnchors.reactRootUnmountCall",
+      "lean": "Lean.Vir.React.Root.unmount",
       "ts": "Root.unmount",
       "relation": "audit",
       "portIntent": {
@@ -44,7 +44,7 @@
     {
       "id": "react_dom.root.create",
       "category": "React DOM root",
-      "lean": "Lean.Vir.TypeAnchors.reactRootCreateCall",
+      "lean": "Lean.Vir.React.Root.create",
       "ts": "createRoot",
       "relation": "audit",
       "portIntent": {
