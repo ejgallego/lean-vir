@@ -123,7 +123,7 @@ private def primitiveCompletionExternSpecs : Array NativeExternSpec :=
     "log2", "ofBitVec", "toBitVec", "toFloat", "toFloat32", "toUSize"
   ] ++ boxedExternSpecs `UInt64 #["log2", "toBitVec", "toFloat32", "toUInt16"] ++
   boxedExternSpecs `UInt8 #[
-    "log2", "ofBitVec", "ofNat", "toBitVec", "toFloat", "toFloat32", "toUInt16",
+    "log2", "ofBitVec", "ofNat", "ofNatLT", "toBitVec", "toFloat", "toFloat32", "toUInt16",
     "toUInt64", "toUSize"
   ] ++ boxedExternSpecs `USize #[
     "complement", "div", "log2", "lor", "mod", "neg", "ofBitVec", "toBitVec",
@@ -168,6 +168,14 @@ private def floatGeometryMathExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `Float #["abs", "sqrt", "sin", "cos", "acos", "atan2", "cbrt", "floor"]
 
 /--
+The separately measured logarithm provider needed by compression heuristics.
+WASI SDK 33's strict link resolves `log2` with no unresolved symbols; its
+isolated release cost is 3,019 raw bytes (2,512 bytes under deterministic gzip).
+-/
+private def floatLogExternSpecs : Array NativeExternSpec :=
+  boxedExternSpecs `Float #["log2"]
+
+/--
 The remeasured internal raw-byte accessor. The expanded scalar and string
 runtime turns this formerly shallow alias into a broad library-surface gain,
 while Lean's ordinary compiler-generated wrapper remains the ABI provider.
@@ -184,13 +192,13 @@ private def byteArrayCopySliceExternSpecs : Array NativeExternSpec :=
   boxedExternSpecs `ByteArray #["copySlice"]
 
 /--
-The measured low-cost byte-array frontier. These five ordinary runtime
+The measured low-cost byte-array frontier. These six ordinary runtime
 operations are kept in one stage because their combined strict link costs
 little while unlocking a broad library surface. Their compiler-generated
 wrappers preserve Lean's ownership-aware call shapes.
 -/
 private def byteArrayRuntimeFrontierExternSpecs : Array NativeExternSpec :=
-  boxedExternSpecs `ByteArray #["emptyWithCapacity", "decEq", "uget", "data", "hash"]
+  boxedExternSpecs `ByteArray #["emptyWithCapacity", "decEq", "uget", "set", "data", "hash"]
 
 def nativeExternSpecs : Array NativeExternSpec := #[
   {
@@ -1118,7 +1126,7 @@ def nativeExternSpecs : Array NativeExternSpec := #[
   }
 ] ++ primitiveCompletionExternSpecs ++ floatCoreExternSpecs ++
   floatFormattingExternSpecs ++ floatBasicCompletionExternSpecs ++
-  floatGeometryMathExternSpecs ++ stringByteAccessorExternSpecs ++
+  floatGeometryMathExternSpecs ++ floatLogExternSpecs ++ stringByteAccessorExternSpecs ++
   byteArrayCopySliceExternSpecs ++ byteArrayRuntimeFrontierExternSpecs
 
 def resolveNativeExterns (env : Environment) : Except String (Array NativeExtern) :=

@@ -182,6 +182,54 @@ try {
   }
   assert.equal(markedManifest.exports.some((entry) => entry.entry === "removedStartup"), false);
 
+  const externFallbackSource = join(freshDir, "ExternFallback.lean");
+  const externFallbackPackage = join(freshDir, "extern-fallback.irpkg");
+  const externFallbackReport = join(freshDir, "extern-fallback.report.md");
+  await writeRuntimeFixture(externFallbackSource, "ExternFallback.lean");
+  const generatedExternFallback = runVirIrpkg([
+    externFallbackPackage,
+    externFallbackReport,
+    "--target-marked",
+    externFallbackSource,
+  ]);
+  assert.equal(
+    generatedExternFallback.status,
+    0,
+    generatedExternFallback.stderr || generatedExternFallback.stdout,
+  );
+  const inspectedExternFallback = spawnSync(
+    "node",
+    ["scripts/inspect-irpkg.mjs", "--json", externFallbackPackage],
+    { encoding: "utf8" },
+  );
+  assert.equal(
+    inspectedExternFallback.status,
+    0,
+    inspectedExternFallback.stderr || inspectedExternFallback.stdout,
+  );
+  manifestEntry(JSON.parse(inspectedExternFallback.stdout).manifest, "callExternIncrement");
+
+  const bodylessExternFallbackSource = join(freshDir, "BodylessExternFallback.lean");
+  await writeFile(bodylessExternFallbackSource, [
+    "import Vir",
+    "",
+    "@[extern \"vir_test_bodyless\"]",
+    "opaque bodylessExtern (n : Nat) : Nat",
+    "",
+    "vir_extern_fallback bodylessExtern",
+    "",
+  ].join("\n"));
+  const checkedBodylessExternFallback = checkLeanSource(bodylessExternFallbackSource);
+  assert.notEqual(
+    checkedBodylessExternFallback.status,
+    0,
+    "a bodyless extern unexpectedly accepted a VIR reference-body fallback",
+  );
+  assert.match(
+    combinedOutput(checkedBodylessExternFallback),
+    /extern `bodylessExtern` has no transparent Lean definition body/,
+  );
+
   const markedUnsupportedSignatureSource = join(freshDir, "MarkedUnsupportedSignature.lean");
   await writeFile(markedUnsupportedSignatureSource, [
     "import Vir",

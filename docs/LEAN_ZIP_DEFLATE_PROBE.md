@@ -3,25 +3,26 @@
 Date: 2026-08-10
 
 This probe evaluates whether lean-zip's production raw-DEFLATE entry point can
-be packaged as Lean IR for the shared Vir interpreter. It is a compatibility
-and closure report, not an acceptance result for levels 0 through 10.
+be packaged as Lean IR for the shared Vir interpreter. It now includes the
+implementation that closes the fixed level-1 and full dispatcher boundaries,
+plus runtime and native-output checks. It is not yet an acceptance result for
+all levels 0 through 10 or the high-entropy routing threshold corpus.
 
 ## Result
 
-The stored-block root is a green first slice. Its public `:vir` facet build has
-no missing IR, native externs, initializers, or host imports, and its two-member
-package set runs repeatedly through the current shared Wasm runtime. The fixed
-level-1 root is blocked by six project-local `@[extern]` declarations. The full
-dispatcher is blocked by those six, the seventh lean-zip accelerator, the
-opaque `Float.log2` primitive, and one standard primitive registration,
-`UInt8.ofNatLT`.
+The stored-block, fixed level-1, and full-dispatcher roots all produce public
+`:vir` package sets with zero missing IR, native externs, initializers, or host
+imports. Vir now exposes an explicit `vir_extern_fallback` command for
+transparent `@[extern] def`s. The lean-zip wrappers use it for their seven
+project accelerators; the native compiler remains unchanged.
 
-The current package generator cannot select the Lean reference body of an
-imported project-local extern. Adding an explicit, package-scoped reference-body
-fallback is the preferred portable extension. It would keep runtime native
-lookup closed and would cover all seven lean-zip accelerators. `Float.log2`
-needs a separate audited libm provider or a deterministic source-level
-alternative because its Lean declaration is opaque.
+The fallback expansion exposed one additional core dependency,
+`ByteArray.set`, which now uses its canonical runtime provider. The generic
+native catalog also registers `UInt8.ofNatLT` and an audited WASI-libm
+`Float.log2` provider. The strict Wasm link has zero unresolved symbols. Fixed
+level 1 and full levels 1 and 6 execute through the shared runtime, raw-inflate
+back to the input, and produce exactly the same bytes as native lean-zip for
+the checked 81-byte corpus.
 
 ## Exact revisions and source compatibility
 
@@ -44,13 +45,10 @@ used in the closure results.
 
 Lean rejects a new-module wrapper importing lean-zip's legacy, non-`module`
 files. This does not block the existing integration: Vir's public `:vir` facet
-has a legacy-source path. After marking the stored wrapper with `@[vir_export]`,
-`lake build +Zip.VirProbeStored:vir` completed all 78 jobs and emitted a
-two-member package set. The direct fixed/full closure analysis used the same
-legacy frontend in one exact rc2 environment. Lean Beam reported zero
-diagnostics for the marked stored wrapper; marking the fixed level-1 wrapper
-was rejected at its first expected blocker, `ByteArray.pushUInt64LE`, so the
-direct analyzer was used to enumerate the complete missing set.
+has a legacy-source path. The marked stored wrapper emits a two-member package
+set. After adding explicit fallback declarations, Lean Beam reports zero
+diagnostics for both `Zip.VirProbeLevel1` and `Zip.VirProbeFull`, and
+`lake build Zip.VirProbeLevel1:vir Zip.VirProbeFull:vir` completes successfully.
 
 ## Closure results
 
@@ -59,18 +57,17 @@ three closures have one interface export, zero JavaScript host imports, zero
 initializer globals, zero unsupported initializer globals, and zero missing IR
 declarations.
 
-| Root | Lean IR declarations | Registered native externs | Missing native externs | Single-package bytes | Status |
+| Root | Lean IR declarations | Registered native externs | Missing native externs | Package-set bytes | Status |
 | --- | ---: | ---: | ---: | ---: | --- |
 | level 0 stored | 6 | 14 | 0 | 5,769 | runnable |
-| fixed level 1 | 288 | 104 | 6 | 268,470 | blocked |
-| full `deflateRaw` | 645 | 132 | 9 | 1,142,545 | blocked |
+| fixed level 1 | 306 | 105 | 0 | 294,047 | runnable |
+| full `deflateRaw` | 665 | 136 | 0 | 1,175,981 | runnable |
 
-The stored row is the direct single-package serialization. The public facet
-split the same closure into a 2,262-byte root and a 4,201-byte dependency member
-(6,463 bytes total, plus its 267-byte descriptor); those are the artifacts used
-by the runtime smoke. The two blocked byte counts come from diagnostic packages
-emitted only after admitting unresolved metadata. They are useful closure-size
-estimates, but those payloads are not loadable acceptance artifacts.
+The stored row retains its original direct-package measurement. Its public
+facet split the closure into a 2,262-byte root and a 4,201-byte dependency
+member. The fixed package set has 24 members, a 15,758-byte root, 294,047 bytes
+across members, and a 2,701-byte descriptor. The full set has 36 members, a
+17,065-byte root, 1,175,981 bytes across members, and a 4,279-byte descriptor.
 
 ### Level-0 native inventory
 
@@ -95,11 +92,10 @@ Nat.sub
 
 There are no missing standard ByteArray operations or initializers at level 0.
 
-### Fixed level-1 blockers
+### Fixed level-1 fallback boundary
 
-The fixed level-1 root has no missing standard-library ByteArray operation and
-no initializer gap. Its six missing names are all lean-zip project externs,
-even though five live in the `ByteArray` namespace:
+The fixed level-1 root opts into the Lean bodies of these six lean-zip project
+externs, even though five live in the `ByteArray` namespace:
 
 ```text
 ByteArray.pushUInt64LE
@@ -110,64 +106,54 @@ ByteArray.usetUInt64LE
 ByteArray.usetUInt32LE
 ```
 
+Their bodies add `ByteArray.set` to the generic native closure. With that
+provider registered, the root has no missing declaration or initializer gap.
 `UInt32.log2Clz` is not reached by this fixed level-1 path.
 
-### Full-dispatcher blockers
+### Full-dispatcher boundary
 
-The full root reaches all six level-1 blockers and additionally:
+The full root reaches all six level-1 fallbacks and additionally:
 
 ```text
-UInt32.log2Clz       -- lean-zip project extern with a Lean body
-Float.log2           -- standard opaque extern
-UInt8.ofNatLT        -- standard primitive registration gap
+UInt32.log2Clz       -- explicit Lean reference-body fallback
+Float.log2           -- audited standard WASI-libm provider
+UInt8.ofNatLT        -- canonical standard primitive provider
 ```
 
 No further ByteArray operation or initializer is missing.
 
 ## Project-local extern strategy
 
-Vir cannot currently opt into a reference body for an imported `@[extern]`
-definition. The frontend deliberately omits imported non-host
-`Lean.IR.Decl.extern`
-declarations from its declaration index. Closure resolution then accepts only
-names in the static `nativeExternSpecs` table, and the shared Wasm contains only
-the corresponding statically generated wrappers. The existing
-`resolveNativeExternsWithExtras` helper can extend wrapper or surface analysis
-for declarations already present in its environment, but it neither changes
-package closure's static lookup nor supplies project code to the shared Wasm.
+Vir now implements the explicit package-local route as the
+`vir_extern_fallback` command. It requires an `@[extern] def` with a transparent
+kernel body and rejects bodyless, opaque, duplicate, and directly recursive
+requests. The command compiles a deterministic private clone without the extern
+attribute. Export validation follows that clone, so newly exposed dependencies
+are checked at the marker.
 
-The smallest general extension should be an explicit package-generation option
-listing project-local externs whose Lean bodies may be used. For each selected
-name, generation should:
+Package lookup gives the fallback precedence over a local or imported extern
+declaration. It emits an adapter at the original name, calls the clone, and
+bridges borrowed/owned reference parameters with explicit increments and
+decrements. This preserves the original extern IR call contract rather than
+renaming a body with a potentially different inferred borrow signature. The
+clone remains in the closure but is excluded from `--target-all` roots.
 
-1. require an `@[extern] def` with a kernel body in the exact producer
-   environment, rejecting opaque and bodyless declarations;
-2. compile that body as ordinary Lean IR while suppressing extern lowering for
-   this declaration only, retaining the original Lean name and signature;
-3. validate the resulting IR signature and ownership behavior, include its
-   ordinary dependency closure, and record the fallback and its source
-   provenance in the package report; and
-4. leave unlisted externs on the existing declared-symbol allowlist path.
-
-This needs no dynamic symbol lookup and no permanent lean-zip entries in the
-generic runtime. All seven named lean-zip accelerators are definitions with
-trusted Lean reference bodies, so they are candidates for this route.
-
-If compiling a reference body is not practical, the fallback extension point
-is a package-declared provider registry that is validated while generating the
-shared runtime. That is less portable: an `.irpkg` cannot itself deliver native
-code to an already-built shared Wasm, so every provider would still have to be
-linked into and allowlisted by that runtime.
+Unlisted externs still follow the static declared-symbol allowlist. No dynamic
+lookup or lean-zip-specific runtime registry was added. Package reports identify
+each adapter as a `Lean reference body for <name>`.
 
 ## `Float.log2` fidelity
 
 Lean rc2 declares `Float.log2` as `@[extern "log2"] opaque`, so there is no
-reference body for the package generator to select. A statically registered
-WASI-libm provider is the smallest Vir-local implementation. It preserves the
-closed lookup policy, but platform libm implementations are not guaranteed to
-produce identical last bits. Since lean-zip compares the computed entropy with
-a route-selection threshold, exact route equality for every possible input
-cannot be claimed from the API contract alone.
+reference body for the package generator to select. Vir now statically
+registers its canonical C symbol. A WASI SDK 33 strict-link A/B probe resolved
+it with zero unresolved symbols. Its isolated release cost is 3,019 raw bytes
+and 2,512 bytes under deterministic gzip.
+
+This preserves the closed lookup policy, but platform libm implementations are
+not guaranteed to produce identical last bits. Since lean-zip compares the
+computed entropy with a route-selection threshold, exact route equality for
+every possible input cannot be claimed from the API contract alone.
 
 Before accepting the full dispatcher, compare both the prescan decision and
 compressed bytes against native lean-zip on high-entropy inputs around the
@@ -177,40 +163,30 @@ implementation shared by native and interpreted builds.
 
 ## Runtime evidence and performance gate
 
-A fresh rc2 `vir-upstream.wasm` was built from this worktree in the default
-development profile with 55 objects and zero strict unresolved symbols. The
-facet-built stored package set was then loaded through the current worktree's
-Node runtime. The smoke exercised empty, four-byte, 257-byte, and 65,536-byte
-inputs, including the stored-block boundary; it checked byte-for-byte RFC
-stored-block layout, independent `node:zlib` raw-inflate round trips, and 12
-repeated calls in one interpreter instance. The complete process took 0.08
-seconds with a 74,584 KiB maximum RSS. These process-level figures include Node
-startup and are sanity evidence, not a per-call benchmark.
+A fresh rc2 `vir-upstream.wasm` was rebuilt in the default development profile
+with all generic providers and zero strict unresolved symbols. The original
+stored smoke still covers empty, four-byte, 257-byte, and 65,536-byte inputs,
+including byte-for-byte RFC stored-block layout and repeated calls.
 
-Level-1 interpreter fuel, runtime memory, and hot-declaration costs cannot be
-measured honestly until its six externs resolve and the package is runnable.
-Vir also does not currently expose an interpreter-fuel or per-declaration
-sampling counter through the public runtime. The closure paths suggest the
-merged LZ77 loop, chain walk, direct-head updates, and bit/frequency emission as
-instrumentation candidates, but that is static evidence rather than a timing
-claim. The 432-second Lean build and closure-generation memory are compiler
-costs and must not be reported as interpreter costs.
+The fixed and full package sets were then loaded through the current Node
+runtime. On the 81-byte repeated-text input, fixed level 1 and full level 1 both
+produced 50 bytes; full level 6 produced 47 bytes. All three independently
+round-tripped through `node:zlib.inflateRawSync`. A linked native lean-zip
+executable produced byte-identical output for all three cases. The three-runtime
+Node process completed in 6.8 seconds; this includes package loading and process
+startup and is not a per-call benchmark.
 
-The next performance gate should therefore be a clean fixed-level-1 package,
-followed by repeated calls in one shared interpreter instance with wall time,
-Wasm memory growth, and explicit per-declaration/fuel instrumentation. Only
-then should the 645-declaration full graph be benchmarked.
+Vir still does not expose interpreter fuel or per-declaration sampling through
+the public runtime. The next performance gate is repeated fixed/full calls in
+one interpreter instance with wall time, Wasm memory growth, and explicit hot
+declaration instrumentation. High-entropy inputs around the `Float.log2`
+prescan threshold remain required for route-fidelity acceptance.
 
 ## Smallest next green slice
 
-The immediate green slice is level 0: the public legacy-source facet and shared
-runtime are already green. Keep the two-line JavaScript adapter around
-`runtime.call` and add native lean-zip byte equality to the already-green
-stored-layout and inflate checks. It needs no runtime native additions.
-
-The next implementation slice should target fixed level 1 only: add the
-package-scoped Lean reference-body option for its six project externs, require a
-zero-missing closure, and collect the requested runtime cost evidence. Defer
-`UInt32.log2Clz`, `Float.log2`, `UInt8.ofNatLT`, the full dispatcher, and levels
-2 through 10 until that slice is green. Overall acceptance remains pending
-byte equality for levels 0 through 10 and the high-entropy prescan corpus.
+The fixed level-1 and full dispatcher slices are now green for package closure
+and the checked runtime corpus. The next smallest acceptance slice is a shared
+runtime loop over levels 0 through 10 with native byte comparison and memory
+tracking, followed by the high-entropy threshold corpus for `Float.log2` route
+fidelity. Until those checks land, the result establishes that lean-zip can run
+through VIR, not that every compression level is fully accepted.

@@ -19,6 +19,28 @@ namespace Vir.ExportValidation
 open Lean.IR
 open Vir.GeneratePackage
 
+private def underExternFallbackPrefix : Name → Name
+  | .anonymous => `_virExternFallback
+  | .str pre part => .str (underExternFallbackPrefix pre) part
+  | .num pre part => .num (underExternFallbackPrefix pre) part
+
+/-- Deterministic private declaration name used for an extern reference-body clone. -/
+def externFallbackCloneName (original : Name) : Name :=
+  underExternFallbackPrefix original
+
+/-- Return whether a declaration name belongs to the private extern-fallback namespace. -/
+def isExternFallbackCloneName : Name → Bool
+  | `_virExternFallback => true
+  | .str pre _ => isExternFallbackCloneName pre
+  | .num pre _ => isExternFallbackCloneName pre
+  | .anonymous => false
+
+/-- Return the deterministic compiled reference-body clone for an extern, if present. -/
+def externFallbackClone? (env : Environment) (original : Name) : Option Name := do
+  let clone := externFallbackCloneName original
+  let .fdecl .. ← Lean.IR.findEnvDecl env clone | none
+  return clone
+
 /-!
 # Attribute-time VIR entrypoint validation
 
@@ -92,11 +114,14 @@ private partial def collectVisibleClosure
     state
   else
     let state := { state with seen := state.seen.insert name }
-    match nativeExternSpec? name with
-    | some spec =>
-        spec.deps.foldl
-          (fun state dep => collectVisibleClosure env dep (path.push dep) state) state
-    | none =>
+    if let some clone := externFallbackClone? env name then
+      collectVisibleClosure env clone (path.push clone) state
+    else
+      match nativeExternSpec? name with
+      | some spec =>
+          spec.deps.foldl
+            (fun state dep => collectVisibleClosure env dep (path.push dep) state) state
+      | none =>
         match Lean.IR.findEnvDecl env name with
         | none =>
             if isNativeExternCandidate name then

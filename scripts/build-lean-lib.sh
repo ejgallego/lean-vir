@@ -64,6 +64,7 @@ build_module Vir/GeneratePackage/NativeExterns.lean
 build_module Vir/HostMetadata.lean
 build_module Vir/IRDependencies.lean
 build_module Vir/ExportValidation.lean
+build_module Vir/ExternFallback.lean
 build_module Vir/InterfaceValidation.lean
 build_module Vir/Interface/Model.lean
 build_module Vir/GeneratePackage/Basic.lean
