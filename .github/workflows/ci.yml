@@ -27,6 +27,8 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
+      - run: npm run check:type-anchors
+      - run: npm run check:react-dom-root-type-anchors
       - run: npm run test:bench
       - run: npm run check:package-abi
       - run: npm run check:ir-codec-tags
