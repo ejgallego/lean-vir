@@ -70,7 +70,7 @@ records every included dependency and any unresolved names.
 
 ## Output Contract
 
-The pipeline has three public outputs.
+The pipeline has four public outputs.
 
 `vir-v1.json` is the TypeScript descriptor index. Consumers may rely on:
 
@@ -190,8 +190,18 @@ full Verso/Blueprint site target to this repository.
 The generated `docs/type-descriptors/vir-v1.anchors.html` is the easiest output
 to review in a browser today.
 
-Validate all generated files and the smoke test with:
+Validate the core generated files and comparator smoke test with:
 
 ```bash
 npm run check:type-anchors
 ```
+
+Validate the React DOM root seed, including its dependency closure, with:
+
+```bash
+npm run check:react-dom-root-type-anchors
+```
+
+Both checks reject error-severity diagnostics, such as a missing audited Lean
+declaration. Weak mappings remain review warnings and declared coverage gaps
+remain informational.

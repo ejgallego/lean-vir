@@ -221,15 +221,24 @@ function collectLeanDescriptors(manifest) {
 function collectLeanTypeAnchorAliases(descriptors, manifest, exportsByEntry) {
   const aliases = manifest.metadata?.typeAnchorAliases;
   if (!Array.isArray(aliases)) return;
-  for (const alias of aliases) {
-    if (typeof alias?.lean !== "string" || typeof alias.via !== "string") continue;
+  for (const [index, alias] of aliases.entries()) {
+    if (typeof alias?.lean !== "string" || typeof alias.via !== "string") {
+      throw new Error(
+        `manifest metadata typeAnchorAliases[${index}] must name lean and via declarations`,
+      );
+    }
     const via = exportsByEntry.get(alias.via);
+    if (via === undefined) {
+      throw new Error(
+        `type anchor alias ${alias.lean} references missing compiler export ${alias.via}`,
+      );
+    }
     const descriptor = {
       kind: "type",
       lean: alias.lean,
       label: alias.type ?? alias.lean,
-      source: alias.source ?? via?.descriptor.source,
-      shape: leanAliasShape(alias, via?.entry, via?.descriptor),
+      source: alias.source ?? via.descriptor.source,
+      shape: leanAliasShape(alias, via.entry, via.descriptor),
     };
     addLeanDescriptor(descriptors, alias.lean, descriptor);
     addLeanDescriptor(descriptors, alias.type, descriptor);
