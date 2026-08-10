@@ -834,7 +834,9 @@ Evaluate `update` exactly once in the VIR host and enqueue its concrete result.
 
 The callback is not passed to React as a functional updater, so React render
 replay and development Strict Mode cannot invoke Lean effects more than once.
-The `previous` handle is callback-scoped and must not be retained.
+The `previous` handle is callback-scoped and must not escape. The current `Js`
+type does not enforce this statically; an escaped handle is invalidated after
+the callback and fails on later use.
 -/
 @[vir_js "react.state.modify"]
 opaque modify {α : Type}
@@ -867,7 +869,10 @@ Create replay-safe reducer state.
 VIR invokes `reducer` once when an action is dispatched and enqueues the
 concrete result through React state. The effectful Lean callback is never
 installed as a React reducer function and is therefore not subject to React
-render replay.
+render replay. The synthetic state and action handles are callback-scoped and
+must not escape; other resources allocated by the callback have their ordinary
+`RuntimeM` lifetime. The current `Js` type enforces this scope dynamically, not
+statically: escaped synthetic inputs are invalidated after the callback.
 -/
 @[vir_js "react.useReducer"]
 private opaque useReducerJs {state action : Type}
@@ -923,7 +928,8 @@ Runs a React effect whose setup returns a host resource cleaned up by React.
 This is the v0 resource-shaped `useEffect` binding with React's no-dependency
 behavior: React calls `setup` after each committed render and calls `cleanup`
 with the returned resource before the effect is replaced, before unmount, or
-when the runtime is disposed.
+when the runtime is disposed. The resource passed to `cleanup` is
+callback-local: it is invalid after `cleanup` returns and must not escape.
 -/
 @[vir_js "react.useEffect"]
 opaque useEffect {α : Type}
@@ -937,7 +943,8 @@ Runs a resource-shaped React effect with a dependency list.
 This is the dependency-array form of `useEffect`: React calls `setup` after the
 initial committed render and after later commits where any dependency changes
 according to `Object.is`, and calls `cleanup` with the returned resource before
-replacement or unmount. Use `#[]` for React's empty dependency array behavior.
+replacement or unmount. The resource passed to `cleanup` is callback-local and
+must not escape. Use `#[]` for React's empty dependency array behavior.
 -/
 namespace DependencyList
 

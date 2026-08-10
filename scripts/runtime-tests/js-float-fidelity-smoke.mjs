@@ -38,7 +38,6 @@ const floatCases = [
   const nan = resources.resourceForValue(Number.NaN);
   assert.notEqual(resources.resourceForValue(Number.NaN), nan);
   assert.deepEqual(resources.debugResourceCounts(), {
-    passiveStrong: 0,
     scoped: 0,
     temporaryScopes: 0,
     owners: 0,
@@ -48,7 +47,6 @@ const floatCases = [
   assert.throws(() => resources.resolveResource(negativeZero, "Js Float"), /resource is not live/);
   assert.ok(Object.is(resources.resolveResource(positiveZero, "Js Float"), 0));
   assert.deepEqual(resources.debugResourceCounts(), {
-    passiveStrong: 0,
     scoped: 0,
     temporaryScopes: 0,
     owners: 0,
@@ -56,7 +54,6 @@ const floatCases = [
 
   resources.dispose();
   assert.deepEqual(resources.debugResourceCounts(), {
-    passiveStrong: 0,
     scoped: 0,
     temporaryScopes: 0,
     owners: 0,

@@ -64,7 +64,8 @@ Browser event object class.
 
 Listener callbacks receive event values as private
 resources. The event resource is only valid for the duration of that listener
-callback.
+callback. The current `Js` type does not statically prevent escape; storing the
+event past callback return leaves an invalid handle whose later use fails.
 
 Reference: [MDN `Event`](https://developer.mozilla.org/en-US/docs/Web/API/Event).
 -/

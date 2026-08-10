@@ -55,6 +55,9 @@ def renderStatic (selector : String) : DomM Bool :=
   Root.mountFromSelector selector fun root => do
     Root.render root staticTree
 
+def renderStaticIntoSelector (selector : String) : DomM Bool :=
+  Root.renderComponentIntoSelector selector (fun _ => staticTree) ()
+
 def effectProbe : Component Unit :=
   fun _ => do
     Hooks.useEffect

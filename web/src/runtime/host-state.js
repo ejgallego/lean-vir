@@ -5,6 +5,8 @@ Author: Emilio J. Gallego Arias
 */
 
 import {
+  abandonHostResource,
+  commitHostResource,
   ExternrefResourceRoots,
   isHostResource,
   releaseHostResource,
@@ -91,6 +93,10 @@ export class VirHostState {
 
   getRootedResource(rootId, take = 0) {
     return this.resourceRoots.get(rootId, { take: take !== 0 });
+  }
+
+  rootedResourceIsOwned(rootId) {
+    return this.resourceRoots.isOwned(rootId) ? 1 : 0;
   }
 
   releaseRootedResource(rootId) {
@@ -190,17 +196,22 @@ export class VirHostState {
       const retainedIdentityResult = isHostResource(value) && args.includes(value)
         ? retainHostResource(value, resultLabel)
         : null;
+      const ownedResultResource = retainedIdentityResult ?? (isHostResource(value) ? value : null);
       try {
         const resultValue = retainedIdentityResult ?? value;
-        return explicitConversionTarget
+        const resultObject = explicitConversionTarget
           ? this.runtime.makeExplicitConversionObjectValue(entry.result, resultValue, resultLabel)
           : this.runtime.makeHostResourceObjectValue(entry.result, resultValue, resultLabel);
+        if (ownedResultResource !== null) {
+          commitHostResource(ownedResultResource);
+        }
+        return resultObject;
       } catch (error) {
-        if (retainedIdentityResult === null) throw error;
+        if (ownedResultResource === null) throw error;
         throwWithCleanup(
           error,
-          () => releaseHostResource(retainedIdentityResult),
-          `Vir host import ${entry.target} failed during identity-result cleanup`,
+          () => abandonHostResource(ownedResultResource),
+          `Vir host import ${entry.target} failed during result ownership cleanup`,
         );
       }
     } catch (error) {

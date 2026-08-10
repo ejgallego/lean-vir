@@ -11,7 +11,12 @@ with `docs/CALL_LEAN_FROM_JS.md`.
 The module is also exposed through the package entry point:
 
 ```js
-import { createVirRuntime, VirCallback, VIR_HOST_DISPOSE } from "lean-vir";
+import {
+  createVirRuntime,
+  releaseHostResource,
+  VirCallback,
+  VIR_HOST_DISPOSE,
+} from "lean-vir";
 ```
 
 Node tests and command-line tools that need `Lean.Vir.Browser.Document` calls
@@ -347,8 +352,9 @@ whose own arguments/results are `Unit` or resources, or explicit conversion targ
 object-handle boundary, which stores the Lean object behind a
 `Lean.Vir.JSL α` resource instead of decoding it to JavaScript.
 `LeanRef.retainJSL` creates an independent alias and `LeanRef.releaseJSL`
-deterministically releases only that alias; dropping the Lean wrapper releases
-its alias automatically. Host imports may additionally receive Lean function values as
+deterministically releases only that handle. Ordinary Lean copies share the
+same handle lease and become invalid together; dropping the final Lean
+reference releases that handle automatically. Host imports may additionally receive Lean function values as
 callbacks, including event handlers retained by `Lean.Vir.React.Node` resources
 created through `react.node.createElement`.
 Other raw Lean scalar, structure, array, list, option, and product imports are
@@ -541,8 +547,10 @@ each returned lease is a distinct callable object with an idempotent
 `release()`. Host imports are synchronous; returning a `Promise` is an error.
 If argument conversion, the binding itself, the synchronous-result check, or
 result conversion fails, the runtime revokes the callback root and every lease
-created from it during that failed call. A successful nested host call keeps
-its independently transferred callback roots.
+created from it during that failed call. Built-in active-resource creators also
+roll back a listener, timer, animation frame, or newly created React root when
+its handle cannot be converted into the Lean result. A successful nested host
+call keeps its independently transferred callback roots.
 Object-style
 `imports` factory options are treated as overrides on top of the generated
 import table. If you provide a custom `imports` function to
@@ -550,6 +558,35 @@ import table. If you provide a custom `imports` function to
 or otherwise install `env.vir_js_call_objects` plus the resource-root imports.
 
 ## Closure And Resource Lifetime
+
+When a JavaScript call returns a host-resource wrapper, release it explicitly
+when its useful lifetime is shorter than the runtime's. `releaseHostResource`
+is idempotent and is equivalent to the wrapper's `release()` or `dispose()`
+method:
+
+```js
+const resource = vir.call("Demo.openResource");
+try {
+  useResource(resource);
+} finally {
+  releaseHostResource(resource);
+}
+```
+
+`FinalizationRegistry` provides a best-effort backstop for dropped wrappers;
+the platform does not guarantee that collection or cleanup will occur.
+Explicit release and runtime teardown are the deterministic cleanup paths.
+Transferred retainable resources leave a wrapper-independent release ticket in
+their `HostResourceState`, so teardown does not need to dereference the wrapper
+or wait for its finalizer. Browser React additionally requires
+`FinalizationRegistry` and `WeakRef` to make speculative work eligible for
+best-effort cleanup when React provides no abandonment callback. Its binding factory
+rejects environments without those capabilities before it acquires
+speculative ownership.
+Bindings that return revocable active handles likewise preflight `WeakRef`
+before registration. Their rollback remains armed only until host-result
+conversion succeeds; it is not the ordinary lifetime disposer for a committed
+listener, timer, frame, or root.
 
 `VirCallback` is the JavaScript wrapper for a rooted Lean closure:
 
@@ -569,7 +606,10 @@ Callbacks are idempotently releasable through `callback.release()` or
 `callback.dispose()`. `callback.retain()` returns a new callable lease over the
 same rooted Lean closure. Releasing one lease does not invalidate its siblings;
 the runtime calls `vir_closure_release` only after the last lease is released.
-Calling an individually released lease throws. JavaScript-provided function
+When supported, `FinalizationRegistry` releases an otherwise abandoned callback
+lease without keeping its public function wrapper alive. This is not an
+eventual-release guarantee; explicit release and runtime teardown remain the
+deterministic paths. Calling an individually released lease throws. JavaScript-provided function
 values are not accepted as Lean arguments in this phase; function values flow
 from Lean to JavaScript as callable `VirCallback` objects backed by internal
 closure root ids. `VirCallback` objects intentionally do not expose a numeric
@@ -607,11 +647,11 @@ and a later `dispose()` is a no-op.
 Calling `vir.loadIrPackageSetBytes(...)` on a runtime that already has a package
 set loaded performs an atomic fresh-instance replacement as described above.
 Old package resources are cleaned up only after the candidate set has loaded
-successfully. See `docs/HOST_BINDINGS.md`
-for the built-in resource cleanup behavior.
-
-See `docs/EVENT_CALLBACK_ROADMAP.md` for the detailed callback ownership
-contract and follow-up work.
+successfully. See the current
+[resource ownership policy](HOST_BINDINGS.md#resource-ownership-policy) for the
+built-in cleanup contract and the
+[event callback roadmap](EVENT_CALLBACK_ROADMAP.md) for callback-specific
+follow-up work.
 
 ## Trust Boundary
 

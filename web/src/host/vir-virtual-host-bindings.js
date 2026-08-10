@@ -32,6 +32,7 @@ import {
 import { createNullableValue, nullablePayload } from "./vir-js-value-bindings.js";
 import { createStaticNodeList } from "./vir-js-collection-bindings.js";
 import { takeCallbackLease } from "../runtime/callbacks.js";
+import { collectCleanupError, throwCollectedErrors } from "../runtime/cleanup.js";
 
 export function createVirtualDocumentState({
   title = "",
@@ -153,7 +154,10 @@ export function createVirtualDocumentHostBindings(
   state.resources = resources;
   const reactHookRuntime = createVirtualReactHookRuntime(resources);
   const reactHooks = {
-    ...createReactHostHooks(),
+    ...createReactHostHooks({
+      resources,
+      reportError: (error) => resources.recordGcFinalizerError(error),
+    }),
     hookRuntime: reactHookRuntime,
   };
   return {
@@ -522,8 +526,10 @@ function virtualCallbackEventListenerState(target, eventName, callback, resource
       listener.removed = true;
       const listeners = target.listeners.get(eventName) ?? [];
       target.listeners.set(eventName, listeners.filter((candidate) => candidate !== listener));
-      ownedCallback.release();
       resources.removeDisposable(listener);
+      const errors = [];
+      collectCleanupError(errors, () => ownedCallback.release());
+      throwCollectedErrors(errors, "virtual event listener removal failed");
     },
   };
   return listener;

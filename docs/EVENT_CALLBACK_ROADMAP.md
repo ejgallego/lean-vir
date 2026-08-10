@@ -1,10 +1,14 @@
 # Event Callback And Closure Roadmap
 
+The authoritative current resource and callback ownership contract is
+[Resource Ownership Policy](HOST_BINDINGS.md#resource-ownership-policy). This
+document keeps callback-specific context, test history, and future directions.
+
 `Lean.Vir.Browser.Element.addEventListener`, `Timer.setTimeout`, and
 `Animation.requestAnimationFrame` are the callback APIs for browser-driven
 reentry into Lean. Event listeners use retained Lean closures directly.
 
-## Current Contract
+## Callback Surface Snapshot
 
 - Opaque browser resources are represented in Lean as `Lean.Vir.Js` handles
   over abstract marker classes such as `Element`, `Event`, `EventListener`,
@@ -114,11 +118,14 @@ callback from the current callback.
 
 ## Remaining Work
 
-1. Add more focused helpers for common events while keeping `Event` opaque.
-2. Keep the closure-root table simple. If release overhead becomes visible,
+1. Replace the dynamic callback-local `Js Event` contract with a scoped or
+   generative borrow API that makes safe-Lean escape unrepresentable. Today an
+   escaped wrapper is invalidated after dispatch and fails on later use.
+2. Add more focused helpers for common events while keeping `Event` opaque.
+3. Keep the closure-root table simple. If release overhead becomes visible,
    optimize root-id allocation/release in a second phase, after leak tests make
    the ownership contract hard to regress.
-3. Keep async host imports out of the current synchronous boundary.
+4. Keep async host imports out of the current synchronous boundary.
    Promise-returning host bindings need a later JSPI or task-queue design that
    can report rejection without leaving the interpreter state ambiguous.
 

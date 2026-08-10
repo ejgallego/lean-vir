@@ -235,6 +235,139 @@ assert.equal(resultLiftCallback.released, true);
 assert.equal(resultLiftRuntime.liveCallbacks.size, 0);
 resultLiftRuntime.dispose();
 
+let adoptedResultCallback = null;
+let adoptedResultResource = null;
+const adoptedResultDocumentState = createVirtualDocumentState();
+const adoptedResultRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageSetBytes: [hostPackageBytes],
+  virtualDocumentState: adoptedResultDocumentState,
+  hostBindings: {
+    "test.callNatCallback": (_input, callback) => {
+      adoptedResultCallback = callback;
+      adoptedResultResource = adoptedResultRuntime.hostState.defaultBindings["js.value.react.eventHandler"]({
+        name: "onClick",
+        callback,
+      });
+      return adoptedResultResource;
+    },
+    "test.recordNat": () => undefined,
+  },
+});
+const lowerAdoptedResult = adoptedResultRuntime.makeHostResourceObjectValue.bind(adoptedResultRuntime);
+adoptedResultRuntime.makeHostResourceObjectValue = (type, value, label) => {
+  if (value === adoptedResultResource) {
+    throw new Error("adopted host result lowering boom");
+  }
+  return lowerAdoptedResult(type, value, label);
+};
+assert.throws(
+  () => adoptedResultRuntime.call("HostInterop.callbackRoundTrip", 1),
+  /adopted host result lowering boom/,
+);
+assert.equal(adoptedResultCallback.released, true);
+assert.equal(adoptedResultRuntime.liveCallbacks.size, 0);
+assert.equal(
+  adoptedResultDocumentState.resources.debugResourceCounts().owners,
+  0,
+  "failed result lowering must release a resource that adopted the callback",
+);
+assert.throws(
+  () => adoptedResultDocumentState.resources.resolveResource(adoptedResultResource, "React event handler"),
+  /resource is not live/,
+);
+adoptedResultRuntime.makeHostResourceObjectValue = lowerAdoptedResult;
+adoptedResultRuntime.dispose();
+
+const abandonedListenerDocumentState = createVirtualDocumentState();
+ensureVirtualElementState(abandonedListenerDocumentState, "#abandoned-listener-result");
+const abandonedListenerRuntime = await createVirRuntime({
+  wasmBytes,
+  irPackageSetBytes: [hostPackageBytes],
+  virtualDocumentState: abandonedListenerDocumentState,
+  hostBindings: {
+    "test.recordNat": () => undefined,
+  },
+});
+const lowerAbandonedListenerResult = abandonedListenerRuntime.makeHostResourceObjectValue.bind(
+  abandonedListenerRuntime,
+);
+abandonedListenerRuntime.makeHostResourceObjectValue = (type, value, label) => {
+  if (label === "browser.element.addEventListener result") {
+    throw new Error("active listener result lowering boom");
+  }
+  return lowerAbandonedListenerResult(type, value, label);
+};
+assert.throws(
+  () => abandonedListenerRuntime.call("HostInterop.mountCallbackEvent", "#abandoned-listener-result"),
+  /active listener result lowering boom/,
+);
+const abandonedListenerTarget = abandonedListenerDocumentState.elements.get("#abandoned-listener-result");
+assert.equal(
+  abandonedListenerTarget.listeners.get("click")?.length ?? 0,
+  0,
+  "failed result lowering must remove the listener installed by that call",
+);
+assert.equal(
+  abandonedListenerDocumentState.resources.debugResourceCounts().owners,
+  0,
+  "failed result lowering must release the active registration owner",
+);
+assert.equal(abandonedListenerRuntime.liveCallbacks.size, 0);
+abandonedListenerRuntime.makeHostResourceObjectValue = lowerAbandonedListenerResult;
+abandonedListenerRuntime.dispose();
+
+for (const existingRoot of [false, true]) {
+  const selector = existingRoot
+    ? "#selector-result-existing-root"
+    : "#selector-result-new-root";
+  const documentState = createVirtualDocumentState();
+  const target = ensureVirtualElementState(documentState, selector);
+  const selectorResultRuntime = await createVirRuntime({
+    wasmBytes,
+    irPackageSetBytes: [hostPackageBytes],
+    virtualDocumentState: documentState,
+    hostBindings: { "test.recordNat": () => undefined },
+  });
+  if (existingRoot) {
+    assert.equal(
+      selectorResultRuntime.call("ReactCounter.renderStaticIntoSelector", selector),
+      true,
+    );
+    assert.ok(target.reactRoot, "the setup render must create the existing selector root");
+  }
+  const lowerSelectorResult = selectorResultRuntime.makeHostResourceObjectValue.bind(
+    selectorResultRuntime,
+  );
+  selectorResultRuntime.makeHostResourceObjectValue = (type, value, label) => {
+    if (label === "react.root.renderComponentIntoSelector result") {
+      throw new Error("selector result lowering boom");
+    }
+    return lowerSelectorResult(type, value, label);
+  };
+  assert.throws(
+    () => selectorResultRuntime.call("ReactCounter.renderStaticIntoSelector", selector),
+    /selector result lowering boom/,
+  );
+  assert.equal(
+    target.reactRoot ?? null,
+    null,
+    "failed selector result publication must terminate the affected root",
+  );
+  assert.equal(
+    documentState.resources.debugResourceCounts().owners,
+    0,
+    "failed selector result publication must release every root owner",
+  );
+  assert.equal(
+    selectorResultRuntime.liveCallbacks.size,
+    0,
+    "failed selector result publication must not leave a mounted dead callback",
+  );
+  selectorResultRuntime.makeHostResourceObjectValue = lowerSelectorResult;
+  selectorResultRuntime.dispose();
+}
+
 let combinedFailureCallback = null;
 const combinedFailureRuntime = await createVirRuntime({
   wasmBytes,
@@ -378,7 +511,6 @@ assertAggregateMessages(
 );
 assert.deepEqual(throwingResourceCleanup, ["first", "second"]);
 assert.deepEqual(throwingResources.debugResourceCounts(), {
-  passiveStrong: 0,
   scoped: 0,
   temporaryScopes: 0,
   owners: 0,

@@ -64,6 +64,7 @@ const requiredFunctionExports = [
   "vir_obj_name_string_size",
   "vir_obj_resource",
   "vir_obj_resource_externref",
+  "vir_obj_resource_is_owned",
   "vir_obj_scalar",
   "vir_obj_is_scalar",
   "vir_obj_scalar_value",

@@ -7,6 +7,10 @@ Author: Emilio J. Gallego Arias
 import { collectCleanupError, throwCollectedErrors } from "./cleanup.js";
 
 const virCallbackStates = new WeakMap();
+const virCallbackRootTrackers = new WeakMap();
+const virCallbackFinalizer = typeof FinalizationRegistry === "function"
+  ? new FinalizationRegistry((lease) => finalizeVirCallbackLease(lease))
+  : null;
 
 export class VirCallback {
   call(...args) {
@@ -26,14 +30,7 @@ export class VirCallback {
   }
 
   release() {
-    const state = requireVirCallbackState(this);
-    if (state.released || state.root.released) return false;
-    state.released = true;
-    state.root.leases.delete(this);
-    if (state.root.leases.size === 0) {
-      releaseVirCallbackRoot(state.root);
-    }
-    return true;
+    return releaseVirCallbackLease(requireVirCallbackState(this));
   }
 
   dispose() {
@@ -60,23 +57,50 @@ export function createVirCallback(runtime, rootId, type) {
     tracker: null,
     released: false,
   };
+  const tracker = Object.freeze({});
+  root.tracker = tracker;
+  virCallbackRootTrackers.set(tracker, root);
   const callback = createVirCallbackLease(root);
-  root.tracker = callback;
-  runtime.trackCallback(callback);
+  runtime.trackCallback(tracker);
   return callback;
 }
 
 function createVirCallbackLease(root) {
+  const lease = {
+    root,
+    released: false,
+  };
   const callback = function virCallback(...args) {
     return callback.call(...args);
   };
   Object.setPrototypeOf(callback, VirCallback.prototype);
-  virCallbackStates.set(callback, {
-    root,
-    released: false,
-  });
-  root.leases.add(callback);
+  virCallbackStates.set(callback, lease);
+  root.leases.add(lease);
+  virCallbackFinalizer?.register(callback, lease, lease);
   return callback;
+}
+
+function releaseVirCallbackLease(lease, { unregister = true } = {}) {
+  if (lease.released || lease.root.released) return false;
+  lease.released = true;
+  if (unregister) virCallbackFinalizer?.unregister(lease);
+  lease.root.leases.delete(lease);
+  if (lease.root.leases.size === 0) {
+    releaseVirCallbackRoot(lease.root);
+  }
+  return true;
+}
+
+function finalizeVirCallbackLease(lease) {
+  try {
+    releaseVirCallbackLease(lease, { unregister: false });
+  } catch (error) {
+    try {
+      lease.root.runtime.hostState?.recordFinalizerError(error);
+    } catch {
+      // Finalization must never surface an exception through the host job queue.
+    }
+  }
 }
 
 // Takes the callback lease transferred into a built-in host binding and gives
@@ -90,19 +114,32 @@ export function takeCallbackLease(callback, label = "Vir callback") {
   if (typeof callback.retain !== "function") {
     return callback;
   }
-  const lease = callback.retain();
-  if (lease === callback || typeof lease !== "function" || typeof lease.release !== "function") {
-    if (lease !== callback && typeof lease?.release === "function") {
-      lease.release();
-    }
-    throw new Error(`${label}.retain() must return a distinct releasable function`);
-  }
+  const lease = retainCallbackLease(callback, label);
   try {
     callback.release();
   } catch (error) {
     const errors = [error];
     collectCleanupError(errors, () => lease.release());
     throwCollectedErrors(errors, `${label} lease transfer failed`);
+  }
+  return lease;
+}
+
+// Borrows the supplied lease and gives another owner an independent lease.
+// Unlike takeCallbackLease, this never releases the source callback.
+export function retainCallbackLease(callback, label = "Vir callback") {
+  if (typeof callback !== "function" || typeof callback.release !== "function") {
+    throw new Error(`${label} must be a releasable function`);
+  }
+  if (typeof callback.retain !== "function") {
+    throw new Error(`${label} must support retain() for independent ownership`);
+  }
+  const lease = callback.retain();
+  if (lease === callback || typeof lease !== "function" || typeof lease.release !== "function") {
+    if (lease !== callback && typeof lease?.release === "function") {
+      lease.release();
+    }
+    throw new Error(`${label}.retain() must return a distinct releasable function`);
   }
   return lease;
 }
@@ -119,8 +156,8 @@ export function releaseCallbacks(callbacks) {
 export function releaseCallbackRoots(callbacks) {
   const pending = takeCallbacks(callbacks);
   const roots = new Set();
-  for (const callback of pending) {
-    roots.add(requireVirCallbackState(callback).root);
+  for (const callbackOrTracker of pending) {
+    roots.add(requireVirCallbackRoot(callbackOrTracker));
   }
   const errors = [];
   for (const root of roots) {
@@ -132,11 +169,9 @@ export function releaseCallbackRoots(callbacks) {
 function releaseVirCallbackRoot(root) {
   if (root.released) return false;
   root.released = true;
-  for (const callback of root.leases) {
-    const state = virCallbackStates.get(callback);
-    if (state !== undefined) {
-      state.released = true;
-    }
+  for (const lease of root.leases) {
+    lease.released = true;
+    virCallbackFinalizer?.unregister(lease);
   }
   root.leases.clear();
   const errors = [];
@@ -144,6 +179,12 @@ function releaseVirCallbackRoot(root) {
   collectCleanupError(errors, () => root.runtime.untrackCallback(root.tracker));
   throwCollectedErrors(errors, "Vir callback root release failed");
   return true;
+}
+
+function requireVirCallbackRoot(callbackOrTracker) {
+  const trackedRoot = virCallbackRootTrackers.get(callbackOrTracker);
+  if (trackedRoot !== undefined) return trackedRoot;
+  return requireVirCallbackState(callbackOrTracker).root;
 }
 
 function takeCallbacks(callbacks) {

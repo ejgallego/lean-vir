@@ -101,6 +101,7 @@
             "ReactCounter.mount",
             "ReactCounter.mountDefault",
             "ReactCounter.renderStatic",
+            "ReactCounter.renderStaticIntoSelector",
             "ReactCounter.mountEffect",
             "ReactCounter.mountMemo",
             "ReactCounter.mountMemoStable",

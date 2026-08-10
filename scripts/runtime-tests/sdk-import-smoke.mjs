@@ -54,6 +54,7 @@ try {
   assert.equal(typeof runtime.createVirRuntimeFactory, "function");
   assert.equal(typeof runtime.createVirImports, "function");
   assert.equal(typeof runtime.VirCallback, "function");
+  assert.equal(typeof runtime.releaseHostResource, "function");
   assert.equal(typeof runtime.VIR_HOST_DISPOSE, "symbol");
   assert.equal(runtime.VIR_WASM_RELEASE_FILE, "vir-upstream.wasm");
   assert.equal(runtime.VIR_WASM_DEV_FILE, "vir-upstream.dev.wasm");
@@ -63,12 +64,14 @@ try {
   assert.equal(Object.hasOwn(runtime, "roundTripInterfaceTypeDescriptor"), false);
   assert.equal(Object.hasOwn(runtime, "sameInterfaceTypeDescriptor"), false);
   assert.equal(nodeRuntime.debugWasmUrlFor, runtime.debugWasmUrlFor);
+  assert.equal(nodeRuntime.releaseHostResource, runtime.releaseHostResource);
   assert.equal(typeof nodeRuntime.createVirRuntime, "function");
   assert.equal(Object.hasOwn(nodeRuntime, "VirRuntime"), false);
   assert.equal(Object.hasOwn(nodeRuntime, "VIR_HOST_RESOLVE_BINDING"), false);
   assert.equal(Object.hasOwn(nodeRuntime, "roundTripInterfaceTypeDescriptor"), false);
   assert.equal(Object.hasOwn(nodeRuntime, "sameInterfaceTypeDescriptor"), false);
   assert.equal(typeof hostBindings.createHostResourceState, "function");
+  assert.equal(hostBindings.releaseHostResource, runtime.releaseHostResource);
   assert.equal(typeof codec.decodeTypeDescriptor, "function");
   assert.equal(typeof codec.roundTripInterfaceTypeDescriptor, "function");
   assert.equal(typeof reactNode.virtualReactTextContent, "function");

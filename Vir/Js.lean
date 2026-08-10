@@ -265,9 +265,11 @@ opaque fromJSL {α : Type} (value : @& JSL α) : RuntimeM α
 /--
 Creates an independent JavaScript handle for the same retained Lean-owned value.
 
-Each `JSL` alias owns an independent lease. `releaseJSL` can release that lease
-early; otherwise dropping the Lean wrapper releases it automatically. Releasing
-one alias does not invalidate any other live alias.
+The returned handle owns an independent lease. An ordinary Lean copy of a
+`JSL` value is only another reference to the same handle and lease;
+`releaseJSL` through either copy invalidates both. Use `retainJSL` when two
+owners need independently releasable lifetimes. Dropping the final Lean
+reference to either handle releases that handle's lease automatically.
 -/
 @[vir_js "js.leanRef.retain"]
 opaque retainJSL {α : Type} (value : @& JSL α) : RuntimeM (JSL α)
@@ -278,7 +280,8 @@ wrapper also releases it automatically.
 
 Releasing the handle does not affect Lean values already returned by
 `LeanRef.fromJSL` or other aliases created by `LeanRef.retainJSL`; those calls
-receive independent ownership. Using the released handle again is a runtime
+receive independent ownership. Ordinary Lean copies of the released handle
+share its lease and become invalid too. Using any such copy again is a runtime
 error.
 -/
 @[vir_js "js.leanRef.release"]

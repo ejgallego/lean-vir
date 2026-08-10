@@ -5,11 +5,20 @@ Author: Emilio J. Gallego Arias
 */
 
 const EXTERNREF_TABLE_INITIAL_LENGTH = 1;
+const HOST_RESOURCE_RETENTION = Object.freeze({
+  MOVE_ONLY: "move-only",
+  PASSIVE: "passive",
+  RETAINABLE: "retainable",
+});
 export const VIR_HOST_DISPOSE = Symbol.for("lean-vir.hostDispose");
 export const VIR_HOST_RESOLVE_BINDING = Symbol.for("lean-vir.hostResolveBinding");
 const hostResourceState = new WeakMap();
+const hostResourceTicketState = new WeakMap();
 const hostResourceOwnerState = new WeakMap();
 const hostResourcePayloadLifetimes = new WeakMap();
+const hostResourceFinalizer = typeof FinalizationRegistry === "function"
+  ? new FinalizationRegistry((ticket) => finalizeHostResourceTicket(ticket))
+  : null;
 let externrefTableSupport = null;
 
 export function hasExternrefTableSupport() {
@@ -36,11 +45,76 @@ export function requireExternrefTableSupport() {
   }
 }
 
+export function hasHostResourceFinalizationSupport() {
+  return hostResourceFinalizer !== null && typeof WeakRef === "function";
+}
+
 class HostResource {
-  constructor(value, label, { dispose = null, owner = null } = {}) {
-    hostResourceState.set(this, { value, label, dispose, owner });
+  constructor(value, label, {
+    dispose = null,
+    owner = null,
+    onAbandon = null,
+    onFinalize = null,
+    onRelease = null,
+    onTake = null,
+    reportFinalizerError = null,
+    retainResource = null,
+    retentionPolicy = null,
+    revocationGroup = null,
+  } = {}) {
+    const ticket = Object.freeze({});
+    const metadata = Object.freeze({
+      retentionPolicy: normalizeHostResourceRetentionPolicy(value, retentionPolicy, {
+        dispose,
+        onAbandon,
+        onFinalize,
+        onRelease,
+        onTake,
+      }),
+      retainResource,
+      revocationGroup,
+    });
+    const state = {
+      value,
+      label,
+      dispose,
+      owner,
+      onAbandon,
+      onFinalize,
+      onRelease,
+      onTake,
+      reportFinalizerError,
+      ticket,
+      metadata,
+    };
+    hostResourceState.set(this, state);
+    hostResourceTicketState.set(ticket, state);
+    if (typeof dispose === "function" || typeof onFinalize === "function") {
+      hostResourceFinalizer?.register(this, ticket, ticket);
+    }
     Object.freeze(this);
   }
+
+  release() {
+    return releaseHostResource(this);
+  }
+
+  dispose() {
+    return releaseHostResource(this);
+  }
+
+  [VIR_HOST_DISPOSE]() {
+    return releaseHostResource(this);
+  }
+}
+
+if (typeof Symbol.dispose === "symbol") {
+  Object.defineProperty(HostResource.prototype, Symbol.dispose, {
+    configurable: true,
+    value() {
+      return releaseHostResource(this);
+    },
+  });
 }
 
 export function createHostResourceOwner(label = "host resource owner") {
@@ -151,41 +225,116 @@ export function retainHostResource(resource, label = null) {
   const source = normalizeHostResource(resource, label ?? "host resource");
   const state = hostResourceState.get(source);
   const value = state.value;
-  if (!isRetainableHostResourcePayload(value)) {
-    return createHostResource(value, label ?? state.label, { owner: state.owner });
+  if (state.metadata.retentionPolicy === HOST_RESOURCE_RETENTION.MOVE_ONLY) {
+    throw new Error(`${label ?? state.label ?? "host resource"} does not support independent retain()`);
+  }
+  if (state.metadata.retentionPolicy === HOST_RESOURCE_RETENTION.PASSIVE) {
+    return createHostResource(value, label ?? state.label, {
+      owner: state.owner,
+      retentionPolicy: HOST_RESOURCE_RETENTION.PASSIVE,
+    });
+  }
+  if (typeof state.metadata.retainResource === "function") {
+    return state.metadata.retainResource(value, label ?? state.label);
   }
   const retained = retainHostResourcePayload(value);
   try {
     return createHostResource(retained, label ?? state.label, {
       owner: state.owner,
       dispose: () => releaseHostResourcePayload(retained),
+      reportFinalizerError: state.reportFinalizerError,
     });
   } catch (error) {
-    releaseHostResourcePayload(retained);
-    throw error;
+    const errors = [asError(error)];
+    try {
+      releaseHostResourcePayload(retained);
+    } catch (cleanupError) {
+      errors.push(asError(cleanupError));
+    }
+    throwHostResourceErrors(errors, "host resource retain failed during ownership rollback");
   }
 }
 
 export function releaseHostResource(resource) {
   const state = hostResourceState.get(resource);
-  if (state !== undefined) {
-    const value = state.value;
-    state.value = null;
-    const dispose = state.dispose;
-    state.dispose = null;
-    if (value !== null && value !== undefined && typeof dispose === "function") {
-      dispose(value);
+  if (state === undefined || state.value === null || state.value === undefined) return false;
+  hostResourceFinalizer?.unregister(state.ticket);
+  return releaseHostResourceState(state, resource);
+}
+
+// Host bindings may install an active registration before its result wrapper
+// has been lowered into Lean. That ownership is provisional until complete
+// result conversion succeeds. Abandonment rolls back the provisional action
+// and then invalidates the wrapper; ordinary release only invalidates it.
+export function abandonHostResource(resource) {
+  const state = hostResourceState.get(resource);
+  if (state === undefined || state.value === null || state.value === undefined) return false;
+  const onAbandon = state.onAbandon;
+  state.onAbandon = null;
+  const errors = [];
+  if (typeof onAbandon === "function") {
+    try {
+      onAbandon(state.value);
+    } catch (error) {
+      errors.push(asError(error));
     }
   }
+  try {
+    releaseHostResource(resource);
+  } catch (error) {
+    errors.push(asError(error));
+  }
+  throwHostResourceErrors(errors, "host resource abandonment failed");
+  return true;
+}
+
+export function commitHostResource(resource) {
+  const state = hostResourceState.get(resource);
+  if (state === undefined || state.value === null || state.value === undefined) return false;
+  state.onAbandon = null;
+  return true;
+}
+
+// An opaque release ticket names the same idempotent obligation as its public
+// wrapper without directly retaining that wrapper. Runtime owners keep tickets,
+// not WeakRefs to wrappers, so deterministic teardown does not depend on GC or
+// FinalizationRegistry scheduling. Payload-to-wrapper back-edges remain an
+// unsupported mixed ownership cycle documented in HOST_BINDINGS.md.
+export function hostResourceReleaseTicket(resource) {
+  const state = hostResourceState.get(resource);
+  if (state === undefined || state.value === null || state.value === undefined) return null;
+  return state.ticket;
+}
+
+export function releaseHostResourceTicket(ticket) {
+  const state = hostResourceTicketState.get(ticket);
+  if (state === undefined || state.value === null || state.value === undefined) return false;
+  hostResourceFinalizer?.unregister(ticket);
+  return releaseHostResourceState(state, null);
+}
+
+export function transferHostResource(resource) {
+  const state = hostResourceState.get(resource);
+  if (state === undefined || state.value === null || state.value === undefined) return false;
+  const onTake = state.onTake;
+  if (typeof onTake === "function") onTake(resource);
+  state.onTake = null;
+  return true;
 }
 
 export class ExternrefResourceRoots {
   constructor({ initial = EXTERNREF_TABLE_INITIAL_LENGTH } = {}) {
     requireExternrefTableSupport();
-    this.table = new WebAssembly.Table({ element: "externref", initial });
+    if (!Number.isInteger(initial) || initial < 1) {
+      throw new Error("externref resource root table initial length must reserve root id 0");
+    }
+    this.table = new WebAssembly.Table({ element: "externref", initial }, null);
     this.freeRootIds = [];
+    for (let rootId = initial - 1; rootId >= 1; rootId -= 1) {
+      this.freeRootIds.push(rootId);
+    }
+    this.liveRootIds = new Set();
     this.ownedRootIds = new Set();
-    this.activeRoots = 0;
   }
 
   root(value, { owned = false } = {}) {
@@ -193,66 +342,176 @@ export class ExternrefResourceRoots {
     if (resource === null) {
       return 0;
     }
-    const rootId = this.freeRootIds.pop() ?? this.table.grow(1);
+    const rootId = this.freeRootIds.pop() ?? this.table.grow(1, null);
     if (rootId <= 0 || rootId > 0xffffffff) {
       throw new Error("Lean VIR externref resource root table exceeded the 32-bit root id range");
     }
     this.table.set(rootId, resource);
+    this.liveRootIds.add(rootId);
     if (owned) {
       this.ownedRootIds.add(rootId);
     }
-    this.activeRoots++;
     return rootId;
   }
 
   get(rootId, { take = false } = {}) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
+    if (!Number.isInteger(rootId) || !this.liveRootIds.has(rootId)) {
       return null;
     }
     const resource = this.table.get(rootId);
-    if (resource !== null && take) {
+    if (resource !== null && take && this.ownedRootIds.has(rootId)) {
+      transferHostResource(resource);
       this.ownedRootIds.delete(rootId);
     }
     return resource;
   }
 
   release(rootId) {
-    if (!Number.isInteger(rootId) || rootId <= 0 || rootId >= this.table.length) {
+    if (!Number.isInteger(rootId) || !this.liveRootIds.delete(rootId)) {
       return undefined;
     }
     const resource = this.table.get(rootId);
-    if (resource === null) return undefined;
     const owned = this.ownedRootIds.delete(rootId);
     this.table.set(rootId, null);
     this.freeRootIds.push(rootId);
-    this.activeRoots--;
     if (owned) releaseHostResource(resource);
     return undefined;
   }
 
   clear() {
     const errors = [];
-    for (let rootId = 1; rootId < this.table.length; rootId += 1) {
+    for (const rootId of Array.from(this.liveRootIds)) {
       try {
         this.release(rootId);
       } catch (error) {
         errors.push(error instanceof Error ? error : new Error(String(error)));
       }
     }
-    this.freeRootIds.length = 0;
-    this.ownedRootIds.clear();
-    this.activeRoots = 0;
     if (errors.length === 1) throw errors[0];
     if (errors.length > 1) throw new AggregateError(errors, "externref resource root cleanup failed");
   }
 
   debugCounts() {
     return {
-      active: this.activeRoots,
+      active: this.liveRootIds.size,
       capacity: this.table.length - 1,
       reusable: this.freeRootIds.length,
     };
   }
+
+  isOwned(rootId) {
+    return Number.isInteger(rootId) && this.liveRootIds.has(rootId) && this.ownedRootIds.has(rootId);
+  }
+}
+
+function releaseHostResourceState(state, resource) {
+  const value = state.value;
+  const dispose = state.dispose;
+  const onRelease = state.onRelease;
+  const onFinalize = state.onFinalize;
+  const ticket = state.ticket;
+  state.value = null;
+  state.dispose = null;
+  state.onAbandon = null;
+  state.onFinalize = null;
+  state.onRelease = null;
+  state.onTake = null;
+  state.reportFinalizerError = null;
+  hostResourceTicketState.delete(ticket);
+  const errors = [];
+  const transition = resource === null ? onFinalize : onRelease;
+  if (typeof transition === "function") {
+    try {
+      transition(resource);
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  if (typeof dispose === "function") {
+    try {
+      dispose(value);
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  throwHostResourceErrors(errors, "host resource release failed");
+  return true;
+}
+
+function finalizeHostResourceTicket(ticket) {
+  const state = hostResourceTicketState.get(ticket);
+  if (state?.value === null || state?.value === undefined) return;
+  const value = state.value;
+  const dispose = state.dispose;
+  const onFinalize = state.onFinalize;
+  const report = state.reportFinalizerError;
+  state.value = null;
+  state.dispose = null;
+  state.onAbandon = null;
+  state.onFinalize = null;
+  state.onRelease = null;
+  state.onTake = null;
+  state.reportFinalizerError = null;
+  hostResourceTicketState.delete(ticket);
+  const errors = [];
+  if (typeof onFinalize === "function") {
+    try {
+      onFinalize();
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  if (typeof dispose === "function") {
+    try {
+      dispose(value);
+    } catch (error) {
+      errors.push(asError(error));
+    }
+  }
+  if (typeof report === "function") {
+    for (const error of errors) {
+      try {
+        report(error);
+      } catch {
+        // Finalization must never surface an exception through the host job queue.
+      }
+    }
+  }
+}
+
+function normalizeHostResourceRetentionPolicy(value, policy, lifecycle) {
+  const normalized = policy ?? (
+    isRetainableHostResourcePayload(value)
+      ? HOST_RESOURCE_RETENTION.RETAINABLE
+      : hostResourceHasOwnedLifecycle(lifecycle)
+        ? HOST_RESOURCE_RETENTION.MOVE_ONLY
+        : HOST_RESOURCE_RETENTION.PASSIVE
+  );
+  if (!Object.values(HOST_RESOURCE_RETENTION).includes(normalized)) {
+    throw new Error(`unsupported host resource retention policy: ${String(normalized)}`);
+  }
+  if (normalized === HOST_RESOURCE_RETENTION.RETAINABLE && !isRetainableHostResourcePayload(value)) {
+    throw new Error("retainable host resource policy requires a registered payload lifetime");
+  }
+  return normalized;
+}
+
+function hostResourceHasOwnedLifecycle(lifecycle) {
+  return typeof lifecycle.dispose === "function" ||
+    typeof lifecycle.onAbandon === "function" ||
+    typeof lifecycle.onFinalize === "function" ||
+    typeof lifecycle.onRelease === "function" ||
+    typeof lifecycle.onTake === "function";
+}
+
+function throwHostResourceErrors(errors, message) {
+  if (errors.length === 0) return;
+  if (errors.length === 1) throw errors[0];
+  throw new AggregateError(errors, message);
+}
+
+function asError(error) {
+  return error instanceof Error ? error : new Error(String(error));
 }
 
 function hostResourceOwnerIsUsable(owner) {

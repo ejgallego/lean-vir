@@ -108,6 +108,7 @@ mkdir -p web/public
 cat > "$allowed_undefined" <<'EOF'
 vir_js_call_objects
 vir_resource_get
+vir_resource_is_owned
 vir_resource_release
 vir_resource_root
 EOF
