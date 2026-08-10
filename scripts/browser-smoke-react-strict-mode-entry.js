@@ -9,8 +9,15 @@ import { flushSync } from "react-dom";
 import { createRoot } from "react-dom/client";
 
 import { registerHostResourcePayloadLifetime } from "../web/src/host-resource.js";
-import { createHostResourceState } from "../web/src/host/vir-host-resources.js";
+import {
+  createHostResourceState,
+  createReactHostHooks,
+} from "../web/src/host/vir-host-resources.js";
 import { createBrowserReactHookRuntime } from "../web/src/react/vir-react-hooks.js";
+import {
+  createBrowserReactRootResource,
+  createReactNodeResource,
+} from "../web/src/react/vir-react-node.js";
 
 const resultKey = "__leanVirReactStrictModeSmoke";
 const stateKey = "__leanVirReactStrictModeLifetimeState";
@@ -25,6 +32,14 @@ const lifetimeState = {
     payloads: lifetimeCounter(),
     setupCallbacks: lifetimeCounter(),
     cleanupCallbacks: lifetimeCounter(),
+  },
+  componentReplay: {
+    initialRenders: 0,
+    replacementRenders: 0,
+    initialRenderCallbacks: lifetimeCounter(),
+    initialNodeCallbacks: lifetimeCounter(),
+    replacementRenderCallbacks: lifetimeCounter(),
+    replacementNodeCallbacks: lifetimeCounter(),
   },
   abandoned: {
     renders: 0,
@@ -64,6 +79,7 @@ globalThis[resultKey] = runReactLifetimeSmoke().then(
 async function runReactLifetimeSmoke() {
   return {
     strict: await runStrictModeEffectProbe(),
+    componentReplay: await runStrictModeComponentReplayProbe(),
     lanes: await runInterleavedStateLaneProbe(),
     abandoned: await runAbandonedSuspenseProbe(),
   };
@@ -122,6 +138,120 @@ async function runStrictModeEffectProbe() {
   } finally {
     if (!unmounted) flushSync(() => root.unmount());
     if (!componentDisposed) hooks.disposeComponent(component);
+    if (!resourcesPreserved) resources.dispose();
+    container.remove();
+  }
+}
+
+async function runStrictModeComponentReplayProbe() {
+  const state = lifetimeState.componentReplay;
+  const resources = createHostResourceState();
+  const hookRuntime = createBrowserReactHookRuntime(resources, React);
+  const container = document.createElement("div");
+  container.id = "react-strict-mode-component-replay-smoke-root";
+  document.body.append(container);
+  const reactRoot = createRoot(container);
+  let submittedTree = null;
+  const browserRoot = {
+    render(tree) {
+      submittedTree = tree;
+      reactRoot.render(React.createElement(React.StrictMode, null, tree));
+    },
+    unmount() {
+      reactRoot.unmount();
+    },
+  };
+  const root = createBrowserReactRootResource(resources, browserRoot, React, {
+    ...createReactHostHooks({ resources }),
+    hookRuntime,
+  });
+  let unmounted = false;
+  let resourcesPreserved = false;
+
+  const renderNode = (text, callbackCounter) => resources.adoptResourceForValue(
+    createReactNodeResource(resources, {
+      node: React.createElement("div", null, text),
+      callbacks: [createCallbackLease(callbackCounter, () => undefined)],
+    }),
+    { tracked: false },
+  );
+
+  try {
+    flushSync(() => root.renderComponent(createCallbackLease(
+      state.initialRenderCallbacks,
+      () => {
+        state.initialRenders++;
+        return renderNode("initial component", state.initialNodeCallbacks);
+      },
+    )));
+    await Promise.resolve();
+    requireState(state.initialRenders === 2, "Strict Mode must replay the initial component render", state);
+    requireState(state.initialRenderCallbacks.active === 1, "the initial render callback must stay live", state);
+    requireState(state.initialNodeCallbacks.active === 1, "only the committed initial node may remain", state);
+    requireState(
+      resources.debugResourceCounts().owners === 2,
+      "initial commit must retain exactly its component and node",
+      state,
+    );
+
+    flushSync(() => root.renderComponent(createCallbackLease(
+      state.replacementRenderCallbacks,
+      () => {
+        state.replacementRenders++;
+        return renderNode("replacement component", state.replacementNodeCallbacks);
+      },
+    )));
+    await Promise.resolve();
+    requireState(state.initialRenderCallbacks.active === 0, "replacement must release the old render callback", state);
+    requireState(state.initialNodeCallbacks.active === 0, "replacement must release the old node callback", state);
+    requireState(state.replacementRenders === 2, "Strict Mode must replay the replacement component render", state);
+    requireState(
+      state.replacementRenderCallbacks.active === 1,
+      "the winning replacement callback must stay live",
+      state,
+    );
+    requireState(state.replacementNodeCallbacks.active === 1, "only the winning replacement node may remain", state);
+    requireState(
+      resources.debugResourceCounts().owners === 2,
+      "replacement commit must retire its replay sibling",
+      state,
+    );
+
+    const replayedComponent = React.cloneElement(submittedTree.props.rendered);
+    const replayedBoundary = React.cloneElement(submittedTree, { rendered: replayedComponent });
+    flushSync(() => reactRoot.render(React.createElement(React.StrictMode, null, replayedBoundary)));
+    await Promise.resolve();
+    requireState(
+      state.replacementRenders === 4,
+      "the committed replacement callback must support a later replay",
+      state,
+    );
+    requireState(
+      state.replacementRenderCallbacks.active === 1,
+      "later replay must preserve the committed callback",
+      state,
+    );
+    requireState(state.replacementNodeCallbacks.active === 1, "later replay must retain only its winning node", state);
+    requireState(
+      resources.debugResourceCounts().owners === 2,
+      "later replay must not accumulate speculative owners",
+      state,
+    );
+    requireState(container.textContent === "replacement component", "later replay must remain renderable", state);
+
+    flushSync(() => root.unmount());
+    unmounted = true;
+    requireState(state.replacementRenderCallbacks.active === 0, "unmount must release the replacement callback", state);
+    requireState(state.replacementNodeCallbacks.active === 0, "unmount must release the replacement node", state);
+    requireState(resources.debugResourceCounts().owners === 0, "unmount must release every component owner", state);
+    liveResourceStates.push(resources);
+    resourcesPreserved = true;
+    return {
+      initialRenders: state.initialRenders,
+      replacementRenders: state.replacementRenders,
+    };
+  } finally {
+    if (!unmounted) flushSync(() => root.unmount());
     if (!resourcesPreserved) resources.dispose();
     container.remove();
   }

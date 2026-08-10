@@ -56,6 +56,11 @@ async function smokeBrowserReactStrictModeLifetime(cdp) {
   }
   assert.equal(result.value.strict.renders, 2, "Strict Mode must perform its development render replay");
   assert.deepEqual(result.value.strict, { renders: 2, setups: 2, cleanups: 2 });
+  assert.deepEqual(
+    result.value.componentReplay,
+    { initialRenders: 2, replacementRenders: 4 },
+    "Strict Mode must replay a replacement callback without releasing its winner",
+  );
   assert.ok(result.value.lanes.renders.includes("urgent"), "the urgent React lane must render");
   assert.equal(result.value.lanes.renders.at(-1), "transition", "the queued transition lane must commit last");
   assert.ok(result.value.abandoned.renders >= 1, "Suspense must start at least one discarded render");
@@ -78,6 +83,22 @@ async function smokeBrowserReactStrictModeLifetime(cdp) {
     assert.equal(state.strict.setupCallbacks.active, 0, "discarded Strict Mode setup leases must be collectible");
     assert.equal(state.strict.cleanupCallbacks.active, 0, "discarded Strict Mode cleanup leases must be collectible");
     assert.equal(state.strict.payloads.active, 0, "Strict Mode payload leases must all be released");
+    assertLifetimeCounterReleased(
+      state.componentReplay.initialRenderCallbacks,
+      "initial component render callbacks",
+    );
+    assertLifetimeCounterReleased(
+      state.componentReplay.initialNodeCallbacks,
+      "initial component node callbacks",
+    );
+    assertLifetimeCounterReleased(
+      state.componentReplay.replacementRenderCallbacks,
+      "replacement component render callbacks",
+    );
+    assertLifetimeCounterReleased(
+      state.componentReplay.replacementNodeCallbacks,
+      "replacement component node callbacks",
+    );
     assert.equal(state.lanes.initialPayloads.active, 0, "React lane initial payload leases must all be released");
     assert.equal(state.lanes.urgentPayloads.active, 0, "React lane urgent payload leases must all be released");
     assert.equal(state.lanes.transitionPayloads.active, 0, "React lane transition payload leases must all be released");
@@ -94,10 +115,19 @@ function reactLifetimeStateReleased(state) {
   return state?.strict?.setupCallbacks?.active === 0 &&
     state?.strict?.cleanupCallbacks?.active === 0 &&
     state?.strict?.payloads?.active === 0 &&
+    state?.componentReplay?.initialRenderCallbacks?.active === 0 &&
+    state?.componentReplay?.initialNodeCallbacks?.active === 0 &&
+    state?.componentReplay?.replacementRenderCallbacks?.active === 0 &&
+    state?.componentReplay?.replacementNodeCallbacks?.active === 0 &&
     state?.lanes?.initialPayloads?.active === 0 &&
     state?.lanes?.urgentPayloads?.active === 0 &&
     state?.lanes?.transitionPayloads?.active === 0 &&
     state?.abandoned?.payloads?.active === 0;
+}
+
+function assertLifetimeCounterReleased(counter, label) {
+  assert.equal(counter.active, 0, `${label} must all be released`);
+  assert.equal(counter.releases, counter.created, `${label} must release exactly once`);
 }
 
 async function evaluateBrowserProbe(cdp, source, sourceName) {
