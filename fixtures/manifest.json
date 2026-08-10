@@ -610,6 +610,12 @@
       "result": { "type": "Nat" }
     },
     {
+      "id": "boundary-bytearray-runtime-bindings-frontier",
+      "source": "fixtures/Boundary.lean",
+      "entry": "Vir.Fixtures.Boundary.byteArrayRuntimeBindingsFrontierScore",
+      "result": { "type": "Nat" }
+    },
+    {
       "id": "boundary-string-parser-data",
       "source": "fixtures/Boundary.lean",
       "entry": "Vir.Fixtures.Boundary.stringParserDataScore",

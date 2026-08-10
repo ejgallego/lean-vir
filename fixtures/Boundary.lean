@@ -258,6 +258,35 @@ def byteArrayCopySliceFrontierScore : Nat :=
     3 * (overlap.get! 2).toNat + 4 * (overlap.get! 3).toNat +
     5 * (overlap.get! 4).toNat
 
+@[noinline]
+private def byteArrayRuntimeBindingPrimitiveScore
+    (capacity : Nat) : Nat :=
+  let bytes :=
+    (ByteArray.emptyWithCapacity capacity).push 17 |>.push 23 |>.push 42
+  let same := ByteArray.mk #[17, 23, 42]
+  let different := ByteArray.mk #[17, 23, 43]
+  let middle := ByteArray.uget same 1 (by simp [same, ByteArray.size])
+  let equal := bytes = same
+  let unequal := bytes ≠ different
+  let hashEqual := bytes.hash == same.hash
+  let data := bytes.data
+  (if bytes.size == 3 then 1 else 0) +
+    (if middle == 23 then 2 else 0) +
+    (if equal then 4 else 0) +
+    (if unequal then 8 else 0) +
+    (if data.size == 3 then 16 else 0) +
+    (if data == #[17, 23, 42] then 32 else 0) +
+    (if data != #[17, 23, 43] then 64 else 0) +
+    (if hashEqual then 128 else 0)
+
+/--
+Exercises the five-member byte-array runtime frontier over capacity-backed
+construction, equality, in-bounds indexing, conversion to `Array UInt8`, and
+content hashing. All eight predicates passing scores 255.
+-/
+def byteArrayRuntimeBindingsFrontierScore : Nat :=
+  byteArrayRuntimeBindingPrimitiveScore 8
+
 def stringParserDataScore : Nat :=
   let s := "Aé∀Z"
   let hashScore := s.hash.toNat % 97

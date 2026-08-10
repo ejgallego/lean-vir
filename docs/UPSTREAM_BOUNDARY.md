@@ -284,12 +284,21 @@ Proof-erased call shapes still require dynamic validation rather than inference
 from a shared raw symbol. Current `.irpkg` call expressions preserve irrelevant
 arguments, so the interpreter and Lean's ordinary three-argument boxed wrapper
 agree for `String.Internal.getUTF8Byte`; a mixed-width UTF-8 differential fixture
-checks all seven raw byte positions. Other proof-bearing declarations such as
-`Char.ofNatAux`, `Int.divExact`, `Nat.divExact`,
+checks all seven raw byte positions. Dynamic checks of `Char.ofNatAux` and
+`UInt8.ofNatLT` instead reach an indirect-call signature mismatch between the
+current interpreted call shape and Lean's ordinary generated boxed wrapper;
+they remain unsupported until those shapes are aligned. Other proof-bearing
+declarations such as `Int.divExact`, `Nat.divExact`,
 `String.Internal.ugetUTF8Byte`, `String.get'`, `String.getUtf8Byte`,
-`String.next'`, `UInt16.ofNatLT`, `UInt8.ofNatLT`, and `USize.ofNat32` remain
-unsupported until independently checked. Native lookup must not infer an alias
-from a coincidentally shared raw symbol.
+`String.next'`, `UInt16.ofNatLT`, and `USize.ofNat32` remain unsupported until
+independently checked. Native lookup must not infer an alias from a
+coincidentally shared raw symbol.
+
+`Thunk.mk` and `Thunk.get` have a separate interpreter boundary. Their ordinary
+wrappers register and link, but a dynamic cache test traps when the native
+thunk runtime attempts to force a VIR interpreter closure through a compiled
+function pointer. Supporting this pair needs an interpreter-aware thunk forcing
+design rather than two catalog entries.
 
 ## Native Extern Metadata
 
@@ -576,6 +585,14 @@ the start index is consumed. `ByteArray.copySlice` now exposes that already
 retained raw provider through Lean's ordinary generated boxed wrapper. A
 differential fixture covers both destination growth and overlapping source and
 destination values, so this catalog addition needs no custom ownership adapter.
+The subsequent five-operation byte-array frontier adds
+`ByteArray.emptyWithCapacity`, `ByteArray.decEq`, `ByteArray.uget`,
+`ByteArray.data`, and `ByteArray.hash` through the same generated-wrapper path.
+Its differential fixture covers capacity-backed construction, equal and
+unequal values, proof-bearing in-bounds indexing, conversion to `Array UInt8`,
+and content hashing; all operations use Lean's inferred ownership metadata and
+need no shim-specific provider.
+
 `String.Pos.set`, `String.Pos.Raw.set`, and the legacy `String.set` each use a
 distinct native stem in the shim because their boxed arities differ, but all
 three wrappers delegate to the same linked runtime helper,
