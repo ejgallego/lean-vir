@@ -195,7 +195,7 @@ try {
     rows: document.querySelectorAll(".extern-results tbody tr").length,
   })`);
   assert.deepEqual(externState, { badge: "2/2", status: "missing", rows: 2 });
-  await evaluate(cdp, `document.querySelector("#top-blockers-view").click()`);
+  await evaluate(cdp, `document.querySelector("#blockers-view").click()`);
   assert.deepEqual(await currentView(cdp), {
     hash: "#view=blockers",
     heading: "Complete blocker frontier",

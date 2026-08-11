@@ -49,6 +49,9 @@ export function validateSurfaceReport(
     throw new Error(`${label}: version 3 is missing complete-blocker-frontier semantics`);
   }
   if (value.version >= 3) {
+    if (!Array.isArray(value.selectedDeclarations) || !Array.isArray(value.externs)) {
+      throw new Error(`${label}: version 3 is missing selected declarations or externs`);
+    }
     const stringSemantics = [
       "headline", "primaryBlockerPolicy", "blockerCoverage", "externScope", "missingNodeKind",
     ];
@@ -61,9 +64,11 @@ export function validateSurfaceReport(
       throw new Error(`${label}: version 3 is missing analysis-definition semantics`);
     }
     const primitiveNamespaces = value.runtimeCapabilities.primitiveNamespaces;
+    const nativeExterns = value.runtimeCapabilities.nativeExterns;
     if (!Array.isArray(primitiveNamespaces)
-        || primitiveNamespaces.some((namespace) => typeof namespace !== "string")) {
-      throw new Error(`${label}: version 3 is missing primitive-namespace policy`);
+        || primitiveNamespaces.some((namespace) => typeof namespace !== "string")
+        || !Array.isArray(nativeExterns)) {
+      throw new Error(`${label}: version 3 is missing runtime-capability policy`);
     }
   }
   if (value.closure !== undefined) {
@@ -79,6 +84,27 @@ export function validateSurfaceReport(
   const completeFrontier = value.definition.completeBlockerFrontier === true;
   if (completeFrontier !== Array.isArray(value.reachableBlockers)) {
     throw new Error(`${label}: complete-frontier semantics do not match reachable blockers`);
+  }
+  if (completeFrontier) {
+    const declarationByName = new Map(
+      value.declarations.map((declaration) => [declaration.name, declaration]),
+    );
+    for (const name of value.selectedDeclarations ?? []) {
+      const declaration = declarationByName.get(name);
+      if (!declaration) {
+        throw new Error(`${label}: selected declaration ${JSON.stringify(name)} is missing`);
+      }
+      if (!Array.isArray(declaration.blockers)) {
+        throw new Error(
+          `${label}: selected declaration ${JSON.stringify(name)} is missing its complete blocker set`,
+        );
+      }
+      if (declaration.runnable !== (declaration.blockers.length === 0)) {
+        throw new Error(
+          `${label}: selected declaration ${JSON.stringify(name)} has inconsistent blocker status`,
+        );
+      }
+    }
   }
   if (value.counts.total !== value.declarations.length) {
     throw new Error(

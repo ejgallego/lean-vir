@@ -31,19 +31,10 @@ test("target graph analysis uses VIR capabilities and keeps every terminal block
       node("Other.opaque", "missing"),
     ],
   };
-  const capabilities = {
-    format: "lean-vir-library-surface",
-    version: 3,
-    lean: { version: "4.33.0-rc2", toolchain: "leanprover/lean4:4.33.0-rc2", githash: "policy" },
-    runtimeCapabilities: {
-      nativeExternCount: 2,
-      primitiveNamespaces: ["IO"],
-      nativeExterns: [
-        { name: "Library.native", deps: ["Library.capabilityDependency"] },
-        { name: "Library.unused", deps: ["Library.unusedCapabilityDependency"] },
-      ],
-    },
-  };
+  const capabilities = capabilityReport([
+    { name: "Library.native", deps: ["Library.capabilityDependency"] },
+    { name: "Library.unused", deps: ["Library.unusedCapabilityDependency"] },
+  ], ["IO"]);
   const report = analyzeSurfaceGraph(
     graph,
     capabilities,
@@ -52,6 +43,7 @@ test("target graph analysis uses VIR capabilities and keeps every terminal block
   assert.equal(report.counts.blocked, 1);
   assert.equal(report.capture.graphSha256, "graph-sha");
   assert.equal(report.capture.sourceSha256, "source-sha");
+  assert.match(report.capture.rootGraphSha256, /^[0-9a-f]{64}$/);
   assert.equal(report.runtimeCapabilities.lean.githash, "policy");
   assert.deepEqual(report.closure, {
     selectedRoots: 1,
@@ -74,6 +66,20 @@ test("target graph analysis uses VIR capabilities and keeps every terminal block
   assert.equal(report.reachableBlockers[0].blocker.name, "Other.opaque");
   assert.match(renderTargetSurfaceMarkdown(report), /Complete Blocker Frontier/);
   assert.match(renderTargetSurfaceMarkdown(report), /Root-reachable graph nodes: 6 \/ 7 captured/);
+
+  const graphWithMoreSupport = structuredClone(graph);
+  graphWithMoreSupport.capture.supportRoots.push("Library.anotherUnusedSupport");
+  graphWithMoreSupport.nodes.push(node("Library.anotherUnusedSupport", "function"));
+  const reportWithMoreSupport = analyzeSurfaceGraph(graphWithMoreSupport, capabilities);
+  assert.equal(reportWithMoreSupport.capture.rootGraphSha256, report.capture.rootGraphSha256);
+
+  const graphWithChangedDependency = structuredClone(graph);
+  graphWithChangedDependency.nodes
+    .find((entry) => entry.name === "Library.helper")
+    .deps.push("Other.newBoundary");
+  graphWithChangedDependency.nodes.push(node("Other.newBoundary", "missing"));
+  const reportWithChangedDependency = analyzeSurfaceGraph(graphWithChangedDependency, capabilities);
+  assert.notEqual(reportWithChangedDependency.capture.rootGraphSha256, report.capture.rootGraphSha256);
 });
 
 test("target graph analysis aggregates complete blocker membership across several roots", () => {
@@ -97,16 +103,7 @@ test("target graph analysis aggregates complete blocker membership across severa
       node("ByteArray.secondaryOnly", "missing"),
     ],
   };
-  const capabilities = {
-    format: "lean-vir-library-surface",
-    version: 3,
-    lean: { version: "4.33.0-rc2", toolchain: "leanprover/lean4:4.33.0-rc2", githash: "policy" },
-    runtimeCapabilities: {
-      nativeExternCount: 0,
-      primitiveNamespaces: ["ByteArray", "IO"],
-      nativeExterns: [],
-    },
-  };
+  const capabilities = capabilityReport([], ["ByteArray", "IO"]);
 
   const report = analyzeSurfaceGraph(graph, capabilities);
   assert.deepEqual(
@@ -137,5 +134,48 @@ function node(name, kind, deps = []) {
     unsupportedInitGlobal: false,
     type: name === "Library.main" ? "IO Unit" : null,
     doc: name === "Library.main" ? "Runs the library entry point." : null,
+  };
+}
+
+function capabilityReport(nativeExterns, primitiveNamespaces) {
+  const counts = {
+    total: 0, runnable: 0, blocked: 0, publicTotal: 0, publicRunnable: 0,
+    privateTotal: 0, boxedTotal: 0, generatedTotal: 0,
+  };
+  return {
+    format: "lean-vir-library-surface",
+    version: 3,
+    lean: {
+      version: "4.33.0-rc2",
+      toolchain: "leanprover/lean4:4.33.0-rc2",
+      githash: "policy",
+    },
+    definition: {
+      headline: "static transitive IR closure completeness",
+      encodingIsGate: false,
+      interfaceCallabilityIsGate: false,
+      dynamicValidationIsGate: false,
+      primaryBlockerPolicy: "shortest terminal path, then lexical boundary",
+      completeBlockerFrontier: false,
+      blockerCoverage: "one primary terminal blocker per blocked root",
+      externScope: "extern declarations owned by selected modules",
+      hostProvisioningVerified: false,
+      missingNodeKind: "namespace heuristic",
+    },
+    selectedModules: [],
+    selectedDeclarations: [],
+    loadedModules: 0,
+    closure: { selectedRoots: 0, capturedNodes: 0, rootReachableNodes: 0, supportOnlyNodes: 0 },
+    runtimeCapabilities: {
+      nativeExternCount: nativeExterns.length,
+      primitiveNamespaces,
+      nativeExterns,
+    },
+    counts,
+    libraries: [],
+    modules: [],
+    primaryBlockers: [],
+    externs: [],
+    declarations: [],
   };
 }

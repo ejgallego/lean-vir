@@ -4,6 +4,7 @@ Released under Apache 2.0 license as described in the file LICENSE.
 Author: Emilio J. Gallego Arias
 */
 
+import { createHash } from "node:crypto";
 import { readFile, writeFile, mkdir } from "node:fs/promises";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -11,6 +12,7 @@ import { fileURLToPath } from "node:url";
 import {
   CURRENT_SURFACE_REPORT_VERSION,
   SURFACE_REPORT_FORMAT,
+  validateSurfaceReport,
 } from "./surface-report-schema.mjs";
 
 const GRAPH_FORMAT = "lean-ir-surface-graph";
@@ -64,7 +66,7 @@ export function analyzeSurfaceGraph(graph, capabilityReport, provenance = {}) {
     ...capabilityReport.runtimeCapabilities,
     lean: capabilityReport.lean,
   };
-  return {
+  const report = {
     format: SURFACE_REPORT_FORMAT,
     version: CURRENT_SURFACE_REPORT_VERSION,
     lean: graph.lean,
@@ -73,6 +75,7 @@ export function analyzeSurfaceGraph(graph, capabilityReport, provenance = {}) {
       source: graph.capture.source,
       sourceSha256: provenance.sourceSha256 ?? null,
       graphSha256: provenance.graphSha256 ?? null,
+      rootGraphSha256: rootReachableGraphSha256(graph),
       module: graph.capture.module,
       supportRoots: graph.capture.supportRoots,
       graphFormat: graph.format,
@@ -108,6 +111,47 @@ export function analyzeSurfaceGraph(graph, capabilityReport, provenance = {}) {
     externs,
     declarations,
   };
+  return validateSurfaceReport(report, {
+    label: "analyzed surface report",
+    versions: [CURRENT_SURFACE_REPORT_VERSION],
+  });
+}
+
+function rootReachableGraphSha256(graph) {
+  const nodes = new Map(graph.nodes.map((node) => [node.name, node]));
+  const pending = [...graph.capture.roots];
+  const reached = new Set();
+  for (let cursor = 0; cursor < pending.length; cursor += 1) {
+    const name = pending[cursor];
+    if (reached.has(name)) continue;
+    reached.add(name);
+    for (const dependency of nodes.get(name)?.deps ?? []) {
+      if (!reached.has(dependency)) pending.push(dependency);
+    }
+  }
+  const identity = {
+    format: graph.format,
+    version: graph.version,
+    lean: graph.lean,
+    capture: {
+      module: graph.capture.module,
+      roots: graph.capture.roots,
+    },
+    nodes: [...reached]
+      .sort(compareText)
+      .map((name) => nodes.get(name) ?? { name, kind: "uncaptured" }),
+  };
+  return createHash("sha256").update(JSON.stringify(canonicalize(identity))).digest("hex");
+}
+
+function canonicalize(value) {
+  if (Array.isArray(value)) return value.map(canonicalize);
+  if (value && typeof value === "object") {
+    return Object.fromEntries(
+      Object.keys(value).sort(compareText).map((key) => [key, canonicalize(value[key])]),
+    );
+  }
+  return value;
 }
 
 function analyzeRoot(root, nodes, capabilities, primitiveNamespaces) {
@@ -262,11 +306,10 @@ function validateInputs(graph, capabilityReport) {
   if (!Array.isArray(graph.capture?.roots) || graph.capture.roots.length === 0) {
     throw new Error("surface graph has no selected roots");
   }
-  if (capabilityReport?.format !== SURFACE_REPORT_FORMAT
-      || !Array.isArray(capabilityReport.runtimeCapabilities?.nativeExterns)
-      || !Array.isArray(capabilityReport.runtimeCapabilities?.primitiveNamespaces)) {
-    throw new Error("capability input is not a VIR surface report");
-  }
+  validateSurfaceReport(capabilityReport, {
+    label: "capability input",
+    versions: [CURRENT_SURFACE_REPORT_VERSION],
+  });
 }
 
 export function renderTargetSurfaceMarkdown(report) {

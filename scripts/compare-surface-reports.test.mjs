@@ -102,7 +102,21 @@ test("exact-target comparison rejects a different captured source", () => {
   );
 });
 
-function exactTargetReport(declarations, sourceSha256) {
+test("exact-target comparison rejects a different root-reachable graph", () => {
+  const declarations = [blocked("A.entry", "Lean.A", "publicConstant", eqv)];
+  const control = exactTargetReport(declarations, "a".repeat(64), "c".repeat(64));
+  const candidate = exactTargetReport(declarations, "a".repeat(64), "d".repeat(64));
+  assert.throws(
+    () => compareSurfaceReports(control, candidate),
+    /root-reachable graph SHA-256 differs/,
+  );
+});
+
+function exactTargetReport(
+  declarations,
+  sourceSha256,
+  rootGraphSha256 = "d".repeat(64),
+) {
   const value = report(declarations);
   value.version = 3;
   value.capture = {
@@ -110,6 +124,7 @@ function exactTargetReport(declarations, sourceSha256) {
     source: "Library/Entry.lean",
     sourceSha256,
     graphSha256: "c".repeat(64),
+    rootGraphSha256,
     module: "Library.Entry",
     graphFormat: "lean-ir-surface-graph",
     graphVersion: 2,

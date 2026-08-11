@@ -103,7 +103,7 @@ try {
       ["scripts/render-surface-report.mjs", invalidReportPath, join(outputDir, "invalid-html")],
       { cwd: repoRoot, capture: true },
     ),
-    /version 3 is missing primitive-namespace policy/,
+    /version 3 is missing runtime-capability policy/,
   );
 
   const legacyReport = structuredClone(report);
@@ -220,8 +220,20 @@ try {
   assert.equal(targetReport.capture.source, "SurfaceSmoke.lean");
   assert.equal(targetReport.capture.sourceSha256.length, 64);
   assert.equal(targetReport.capture.graphSha256.length, 64);
+  assert.equal(targetReport.capture.rootGraphSha256.length, 64);
   assert.equal((await readFile(`${targetOutputPrefix}.graph.json`, "utf8")).includes(outputDir), false);
   assert.equal(JSON.stringify(targetReport).includes(outputDir), false);
+  const incompleteFrontierReport = structuredClone(targetReport);
+  delete incompleteFrontierReport.declarations[0].blockers;
+  await writeFile(invalidReportPath, `${JSON.stringify(incompleteFrontierReport)}\n`);
+  assert.throws(
+    () => runSync(
+      process.execPath,
+      ["scripts/render-surface-report.mjs", invalidReportPath, join(outputDir, "invalid-html")],
+      { cwd: repoRoot, capture: true },
+    ),
+    /is missing its complete blocker set/,
+  );
   assert.deepEqual(targetReport.declarations[0].blocker, sourceReport.declarations[0].blocker);
   assert.deepEqual(targetReport.declarations[0].blockerPath, sourceReport.declarations[0].blockerPath);
   assert.equal(targetReport.declarations[0].type, sourceReport.declarations[0].type);
@@ -280,12 +292,12 @@ try {
   assert.match(indexHtml, /VIR Runnable Surface/);
   assert.match(indexHtml, /data\/index\.js/);
   assert.match(indexHtml, /assets\/app\.js/);
-  assert.match(indexHtml, /id="top-blockers-view"/);
+  assert.match(indexHtml, /id="blockers-view"/);
   assert.match(indexHtml, /class="coverage-legend"/);
 
   const appSource = await readFile(join(htmlDir, "assets/app.js"), "utf8");
   const styleSource = await readFile(join(htmlDir, "assets/style.css"), "utf8");
-  assert.match(appSource, /renderTopBlockersView/);
+  assert.match(appSource, /renderBlockersView/);
   assert.match(appSource, /coverageTableCell/);
   assert.match(appSource, /progressTone/);
   assert.match(styleSource, /\.tree-progress/);

@@ -219,10 +219,10 @@ export async function smokeSurfaceExplorer(cdp, origin) {
   });
   assert.equal(sticky.status, "blocked");
 
-  await clickSelector(cdp, "#top-blockers-view");
+  await clickSelector(cdp, "#blockers-view");
   const blockers = await evaluate(cdp, `({
     hash: location.hash,
-    selected: document.querySelector("#top-blockers-view")?.classList.contains("selected"),
+    selected: document.querySelector("#blockers-view")?.classList.contains("selected"),
     title: document.querySelector("#report-main .content-heading h2")?.textContent,
   })`);
   assert.equal(blockers.hash, "#view=blockers");

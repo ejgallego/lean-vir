@@ -175,8 +175,25 @@ function validateComparableReports(control, candidate) {
     );
     requireEqual("capture graph format", control.capture?.graphFormat, candidate.capture?.graphFormat);
     requireEqual("capture graph version", control.capture?.graphVersion, candidate.capture?.graphVersion);
+    if (control.capture?.mode === "targetToolchainSource") {
+      requireCaptureHash("control", control.capture, "sourceSha256");
+      requireCaptureHash("candidate", candidate.capture, "sourceSha256");
+      requireCaptureHash("control", control.capture, "rootGraphSha256");
+      requireCaptureHash("candidate", candidate.capture, "rootGraphSha256");
+      requireEqual(
+        "root-reachable graph SHA-256",
+        control.capture.rootGraphSha256,
+        candidate.capture.rootGraphSha256,
+      );
+    }
   }
   requireEqual("declaration count", control.declarations.length, candidate.declarations.length);
+}
+
+function requireCaptureHash(label, capture, field) {
+  if (typeof capture?.[field] !== "string" || !/^[0-9a-f]{64}$/.test(capture[field])) {
+    throw new Error(`${label} capture is missing ${field}`);
+  }
 }
 
 function validateAlignedDeclaration(before, after, index) {
@@ -347,6 +364,7 @@ function reportIdentity(report, file = "(report)") {
     counts: report.counts,
     selectedModuleCount: report.selectedModules.length,
     nativeExternCount: report.runtimeCapabilities.nativeExternCount,
+    capture: report.capture ?? null,
   };
 }
 

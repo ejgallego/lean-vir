@@ -68,7 +68,7 @@ Author: Emilio J. Gallego Arias
   const metricSelect = document.querySelector("#metric-select");
   const moduleSearch = document.querySelector("#module-search");
   const librariesView = document.querySelector("#libraries-view");
-  const blockersView = document.querySelector("#top-blockers-view");
+  const blockersView = document.querySelector("#blockers-view");
   const blockerSetsView = document.querySelector("#blocker-sets-view");
   const externsView = document.querySelector("#externs-view");
   const moduleBrowser = document.querySelector("#module-browser");
@@ -112,7 +112,7 @@ Author: Emilio J. Gallego Arias
 
   renderReportIdentity();
   librariesView.addEventListener("click", () => selectPrimaryView());
-  blockersView.addEventListener("click", () => selectTopBlockers());
+  blockersView.addEventListener("click", () => selectBlockers());
   blockerSetsView.addEventListener("click", () => selectBlockerSets());
   externsView.addEventListener("click", () => selectExterns());
   metricSelect.addEventListener("change", () => {
@@ -132,7 +132,7 @@ Author: Emilio J. Gallego Arias
     if (initial?.type === "targetSet" && focusedReport && selectedDeclarations.length > 1) {
       selectPrimaryView(false);
     } else if (initial?.type === "blockers") {
-      selectTopBlockers(false);
+      selectBlockers(false);
     } else if (initial?.type === "blockerSets" && blockerSetsAvailable) {
       selectBlockerSets(false);
     } else if (initial?.type === "externs") {
@@ -270,12 +270,12 @@ Author: Emilio J. Gallego Arias
     document.querySelector("#libraries-view-label").textContent = focusedReport
       ? selectedDeclarations.length === 1 ? "Target" : "Target set"
       : "All libraries";
-    document.querySelector("#top-blockers-view-label").textContent = completeBlockerFrontier
+    document.querySelector("#blockers-view-label").textContent = completeBlockerFrontier
       ? "All blockers"
       : "Primary blockers";
     document.querySelector("#libraries-view-count").textContent =
       number.format(focusedReport ? selectedDeclarations.length : report.selectedModuleCount);
-    document.querySelector("#top-blockers-view-count").textContent =
+    document.querySelector("#blockers-view-count").textContent =
       number.format(blockerSummaries.length);
     blockerSetsView.hidden = !blockerSetsAvailable;
     document.querySelector("#blocker-sets-view-count").textContent =
@@ -498,14 +498,14 @@ Author: Emilio J. Gallego Arias
     });
   }
 
-  function selectTopBlockers(updateHash = true) {
+  function selectBlockers(updateHash = true) {
     state.selectedType = "blockers";
     state.selectedValue = null;
     state.requestVersion += 1;
     if (updateHash) setHash("view", "blockers");
     renderViewNavigation();
     renderTree();
-    renderTopBlockersView();
+    renderBlockersView();
   }
 
   function selectBlockerSets(updateHash = true) {
@@ -554,7 +554,7 @@ Author: Emilio J. Gallego Arias
       renderFolderContents(folder),
     );
     if (folder === rootFolder && blockerSummaries.length > 0) {
-      main.append(renderTopBlockers(25));
+      main.append(renderBlockers(25));
     }
   }
 
@@ -617,7 +617,7 @@ Author: Emilio J. Gallego Arias
     );
   }
 
-  function renderTopBlockersView() {
+  function renderBlockersView() {
     const publicBlocked = report.counts.publicTotal - report.counts.publicRunnable;
     const stats = element("div", "stat-grid");
     if (focusedReport) {
@@ -654,7 +654,7 @@ Author: Emilio J. Gallego Arias
       stats,
     ];
     if (frontierCosts.length > 0) sections.push(renderFrontierCosts());
-    sections.push(renderTopBlockers());
+    sections.push(renderBlockers());
     main.replaceChildren(...sections);
   }
 
@@ -1012,7 +1012,7 @@ Author: Emilio J. Gallego Arias
     return row;
   }
 
-  function renderTopBlockers(limit = null) {
+  function renderBlockers(limit = null) {
     const summaries = limit === null ? blockerSummaries : blockerSummaries.slice(0, limit);
     const singleTarget = focusedReport && selectedDeclarations.length === 1;
     const card = sectionCard(

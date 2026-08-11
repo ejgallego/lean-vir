@@ -110,7 +110,10 @@ the neutral graph with VIR's current policy. It writes:
 - `.json`: full analysis used by comparison and the explorer; and
 - `.md`: concise verdict and complete terminal frontier.
 
-The report records both Lean identities plus source and graph SHA-256 hashes.
+The report records both Lean identities plus source, complete captured-graph,
+and root-reachable graph SHA-256 hashes. The root-reachable identity excludes
+support captured only for VIR capabilities, so policy experiments remain
+comparable while changes in imported target dependencies are rejected.
 Source labels are project-relative (or reduced to a basename for files outside
 the project) so reports and graph hashes do not expose checkout locations.
 
@@ -277,8 +280,9 @@ npm run compare:surface -- \
 
 The comparator requires the same report version, Lean git hash, selected
 modules, and declaration universe. Exact-target comparisons also require the
-same captured source hash. It reports exact newly runnable functions,
-regressions, nearest-blocker transitions, and module/library rollups.
+same captured source and root-reachable graph hashes. It reports exact newly
+runnable functions, regressions, nearest-blocker transitions, and
+module/library rollups.
 
 This distinction matters: removing the current primary blocker may merely
 expose the next boundary. Only the comparison's `newlyRunnable` set is an exact
