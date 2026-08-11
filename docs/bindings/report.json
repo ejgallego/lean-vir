@@ -41,14 +41,19 @@
   ],
   "summary": {
     "libraries": 6,
-    "roots": 29,
+    "apiGroups": 29,
     "targets": 132,
     "provided": 132,
     "missingProvider": 0,
     "runtimeOnly": 0,
-    "auditedRoots": 2,
-    "pendingRoots": 21,
-    "internalRoots": 6,
+    "analysis": {
+      "externalGroups": 23,
+      "complete": 1,
+      "inProgress": 0,
+      "curated": 1,
+      "notRun": 21,
+      "notApplicable": 6
+    },
     "semantic": {
       "exact": 0,
       "compatible": 7,
@@ -57,7 +62,7 @@
     },
     "upstreamSymbols": 321,
     "coverage": {
-      "roots": 1,
+      "groups": 1,
       "members": 271,
       "mapped": 4,
       "missing": 267
@@ -65,8 +70,7 @@
     "issues": {
       "error": 0,
       "warning": 2,
-      "gap": 4,
-      "review": 21
+      "gap": 4
     }
   },
   "libraries": [
@@ -81,11 +85,11 @@
         ]
       },
       "summary": {
-        "roots": 10,
+        "apiGroups": 10,
         "bindings": 64,
-        "issues": 9
+        "issues": 1
       },
-      "roots": [
+      "apiGroups": [
         {
           "id": "animation",
           "title": "Animation frames",
@@ -142,11 +146,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 2,
             "provided": 2,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -214,15 +222,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "browser",
-              "root": "animation",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Animation frames has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "canvas-2d",
@@ -284,11 +284,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 17,
             "provided": 17,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -819,15 +823,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "browser",
-              "root": "canvas-2d",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Canvas 2D has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "console",
@@ -871,11 +867,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 1,
             "provided": 1,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -911,15 +911,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "browser",
-              "root": "console",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Console has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "document",
@@ -7252,7 +7244,11 @@
               }
             ]
           },
-          "status": "missing",
+          "analysis": {
+            "status": "complete",
+            "scope": "complete-upstream-surface"
+          },
+          "findingStatus": "gap",
           "summary": {
             "bindings": 5,
             "provided": 5,
@@ -8177,7 +8173,7 @@
           "issues": [
             {
               "library": "browser",
-              "root": "document",
+              "group": "document",
               "kind": "upstream-members-missing",
               "severity": "gap",
               "message": "267 of 271 upstream members have no shipped VIR binding"
@@ -8269,11 +8265,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 16,
             "provided": 16,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -8783,15 +8783,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "browser",
-              "root": "element",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Element has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "event",
@@ -8835,11 +8827,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 6,
             "provided": 6,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -9035,15 +9031,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "browser",
-              "root": "event",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Events has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "canvas-element",
@@ -9089,11 +9077,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 6,
             "provided": 6,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -9283,15 +9275,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "browser",
-              "root": "canvas-element",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "HTML canvas element has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "input-element",
@@ -9338,11 +9322,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 5,
             "provided": 5,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -9506,15 +9494,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "browser",
-              "root": "input-element",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "HTML input element has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "timers",
@@ -9602,11 +9582,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 4,
             "provided": 4,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -9738,15 +9722,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "browser",
-              "root": "timers",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Timers has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "owned-primitives",
@@ -9760,7 +9736,11 @@
           "upstream": {
             "kind": "internal"
           },
-          "status": "internal",
+          "analysis": {
+            "status": "not-applicable",
+            "scope": "no-upstream-contract"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 2,
             "provided": 2,
@@ -9838,66 +9818,10 @@
       "issues": [
         {
           "library": "browser",
-          "root": "animation",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Animation frames has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "browser",
-          "root": "canvas-2d",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Canvas 2D has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "browser",
-          "root": "console",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Console has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "browser",
-          "root": "document",
+          "group": "document",
           "kind": "upstream-members-missing",
           "severity": "gap",
           "message": "267 of 271 upstream members have no shipped VIR binding"
-        },
-        {
-          "library": "browser",
-          "root": "element",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Element has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "browser",
-          "root": "event",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Events has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "browser",
-          "root": "canvas-element",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "HTML canvas element has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "browser",
-          "root": "input-element",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "HTML input element has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "browser",
-          "root": "timers",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Timers has an identified typescript surface but no semantic comparison yet"
         }
       ]
     },
@@ -9912,11 +9836,11 @@
         ]
       },
       "summary": {
-        "roots": 1,
+        "apiGroups": 1,
         "bindings": 2,
         "issues": 0
       },
-      "roots": [
+      "apiGroups": [
         {
           "id": "common",
           "title": "Common helpers",
@@ -9928,7 +9852,11 @@
           "upstream": {
             "kind": "internal"
           },
-          "status": "internal",
+          "analysis": {
+            "status": "not-applicable",
+            "scope": "no-upstream-contract"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 2,
             "provided": 2,
@@ -10016,11 +9944,11 @@
         ]
       },
       "summary": {
-        "roots": 2,
+        "apiGroups": 2,
         "bindings": 3,
-        "issues": 2
+        "issues": 0
       },
-      "roots": [
+      "apiGroups": [
         {
           "id": "clipboard",
           "title": "Clipboard",
@@ -10063,11 +9991,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 1,
             "provided": 1,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -10103,15 +10035,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "infoview",
-              "root": "clipboard",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Clipboard has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "commands",
@@ -10125,11 +10049,15 @@
           "upstream": {
             "kind": "local"
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 2,
             "provided": 2,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -10197,33 +10125,10 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "infoview",
-              "root": "commands",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Editor commands has an identified local surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         }
       ],
-      "issues": [
-        {
-          "library": "infoview",
-          "root": "clipboard",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Clipboard has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "infoview",
-          "root": "commands",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Editor commands has an identified local surface but no semantic comparison yet"
-        }
-      ]
+      "issues": []
     },
     {
       "id": "javascript",
@@ -10236,11 +10141,11 @@
         ]
       },
       "summary": {
-        "roots": 5,
+        "apiGroups": 5,
         "bindings": 21,
-        "issues": 2
+        "issues": 0
       },
-      "roots": [
+      "apiGroups": [
         {
           "id": "array",
           "title": "Array",
@@ -10283,11 +10188,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 2,
             "provided": 2,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -10355,15 +10264,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "javascript",
-              "root": "array",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Array has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "node-list",
@@ -10407,11 +10308,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 3,
             "provided": 3,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -10511,15 +10416,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "javascript",
-              "root": "node-list",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "NodeList has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "nullable",
@@ -10532,7 +10429,11 @@
           "upstream": {
             "kind": "internal"
           },
-          "status": "internal",
+          "analysis": {
+            "status": "not-applicable",
+            "scope": "no-upstream-contract"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 4,
             "provided": 4,
@@ -10681,7 +10582,11 @@
           "upstream": {
             "kind": "internal"
           },
-          "status": "internal",
+          "analysis": {
+            "status": "not-applicable",
+            "scope": "no-upstream-contract"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 4,
             "provided": 4,
@@ -10826,7 +10731,11 @@
           "upstream": {
             "kind": "internal"
           },
-          "status": "internal",
+          "analysis": {
+            "status": "not-applicable",
+            "scope": "no-upstream-contract"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 8,
             "provided": 8,
@@ -11093,22 +11002,7 @@
           "issues": []
         }
       ],
-      "issues": [
-        {
-          "library": "javascript",
-          "root": "array",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Array has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "javascript",
-          "root": "node-list",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "NodeList has an identified typescript surface but no semantic comparison yet"
-        }
-      ]
+      "issues": []
     },
     {
       "id": "proofwidgets",
@@ -11121,11 +11015,11 @@
         ]
       },
       "summary": {
-        "roots": 1,
+        "apiGroups": 1,
         "bindings": 5,
-        "issues": 1
+        "issues": 0
       },
-      "roots": [
+      "apiGroups": [
         {
           "id": "rpc-references",
           "title": "RPC references",
@@ -11137,11 +11031,15 @@
           "upstream": {
             "kind": "local"
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 5,
             "provided": 5,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -11305,26 +11203,10 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "proofwidgets",
-              "root": "rpc-references",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "RPC references has an identified local surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         }
       ],
-      "issues": [
-        {
-          "library": "proofwidgets",
-          "root": "rpc-references",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "RPC references has an identified local surface but no semantic comparison yet"
-        }
-      ]
+      "issues": []
     },
     {
       "id": "react",
@@ -11337,11 +11219,11 @@
         ]
       },
       "summary": {
-        "roots": 10,
+        "apiGroups": 10,
         "bindings": 37,
-        "issues": 13
+        "issues": 5
       },
-      "roots": [
+      "apiGroups": [
         {
           "id": "value-conversions",
           "title": "React value conversions",
@@ -11354,7 +11236,11 @@
           "upstream": {
             "kind": "internal"
           },
-          "status": "internal",
+          "analysis": {
+            "status": "not-applicable",
+            "scope": "no-upstream-contract"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 2,
             "provided": 2,
@@ -11470,11 +11356,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 2,
             "provided": 2,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -11542,15 +11432,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "react",
-              "root": "dependencies",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Hook dependencies has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "element-type",
@@ -11594,11 +11476,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 1,
             "provided": 1,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -11634,15 +11520,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "react",
-              "root": "element-type",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Element types has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "nodes",
@@ -11701,11 +11579,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 5,
             "provided": 5,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -11869,15 +11751,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "react",
-              "root": "nodes",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "React nodes has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "props",
@@ -11938,11 +11812,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 5,
             "provided": 5,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -12106,15 +11984,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "react",
-              "root": "props",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "React properties has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "reducers",
@@ -12174,11 +12044,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 3,
             "provided": 3,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -12278,15 +12152,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "react",
-              "root": "reducers",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Reducers has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "references",
@@ -12346,11 +12212,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 2,
             "provided": 2,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -12418,15 +12288,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "react",
-              "root": "references",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "References has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "react-dom-root",
@@ -12824,7 +12686,11 @@
               "unresolved": []
             }
           },
-          "status": "missing",
+          "analysis": {
+            "status": "curated",
+            "scope": "selected-symbol-comparison"
+          },
+          "findingStatus": "warning",
           "summary": {
             "bindings": 7,
             "provided": 7,
@@ -13921,7 +13787,7 @@
           "issues": [
             {
               "library": "react",
-              "root": "react-dom-root",
+              "group": "react-dom-root",
               "kind": "type-fidelity",
               "severity": "warning",
               "message": "Lean.Vir.React.Root.render weakly matches Root.render",
@@ -13930,7 +13796,7 @@
             },
             {
               "library": "react",
-              "root": "react-dom-root",
+              "group": "react-dom-root",
               "kind": "type-fidelity",
               "severity": "warning",
               "message": "Lean.Vir.React.Root.create weakly matches createRoot",
@@ -13939,7 +13805,7 @@
             },
             {
               "library": "react",
-              "root": "react-dom-root",
+              "group": "react-dom-root",
               "kind": "coverage-gap",
               "severity": "gap",
               "message": "Root creation options are an explicit coverage gap.",
@@ -13947,7 +13813,7 @@
             },
             {
               "library": "react",
-              "root": "react-dom-root",
+              "group": "react-dom-root",
               "kind": "coverage-gap",
               "severity": "gap",
               "message": "Hydration is not exposed by the current VIR React surface.",
@@ -13955,7 +13821,7 @@
             },
             {
               "library": "react",
-              "root": "react-dom-root",
+              "group": "react-dom-root",
               "kind": "coverage-gap",
               "severity": "gap",
               "message": "Hydration options are paired with the unsupported hydration entry point.",
@@ -14021,11 +13887,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 4,
             "provided": 4,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -14157,15 +14027,7 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "react",
-              "root": "state",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "State has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         },
         {
           "id": "hooks",
@@ -14269,11 +14131,15 @@
               }
             ]
           },
-          "status": "pending",
+          "analysis": {
+            "status": "not-run",
+            "scope": "identified-upstream-entry-points"
+          },
+          "findingStatus": "none",
           "summary": {
             "bindings": 6,
             "provided": 6,
-            "issues": 1
+            "issues": 0
           },
           "bindings": [
             {
@@ -14469,63 +14335,13 @@
               ]
             }
           ],
-          "issues": [
-            {
-              "library": "react",
-              "root": "hooks",
-              "kind": "audit-pending",
-              "severity": "review",
-              "message": "Hooks has an identified typescript surface but no semantic comparison yet"
-            }
-          ]
+          "issues": []
         }
       ],
       "issues": [
         {
           "library": "react",
-          "root": "dependencies",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Hook dependencies has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "react",
-          "root": "element-type",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Element types has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "react",
-          "root": "nodes",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "React nodes has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "react",
-          "root": "props",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "React properties has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "react",
-          "root": "reducers",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Reducers has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "react",
-          "root": "references",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "References has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "react",
-          "root": "react-dom-root",
+          "group": "react-dom-root",
           "kind": "type-fidelity",
           "severity": "warning",
           "message": "Lean.Vir.React.Root.render weakly matches Root.render",
@@ -14534,7 +14350,7 @@
         },
         {
           "library": "react",
-          "root": "react-dom-root",
+          "group": "react-dom-root",
           "kind": "type-fidelity",
           "severity": "warning",
           "message": "Lean.Vir.React.Root.create weakly matches createRoot",
@@ -14543,7 +14359,7 @@
         },
         {
           "library": "react",
-          "root": "react-dom-root",
+          "group": "react-dom-root",
           "kind": "coverage-gap",
           "severity": "gap",
           "message": "Root creation options are an explicit coverage gap.",
@@ -14551,7 +14367,7 @@
         },
         {
           "library": "react",
-          "root": "react-dom-root",
+          "group": "react-dom-root",
           "kind": "coverage-gap",
           "severity": "gap",
           "message": "Hydration is not exposed by the current VIR React surface.",
@@ -14559,25 +14375,11 @@
         },
         {
           "library": "react",
-          "root": "react-dom-root",
+          "group": "react-dom-root",
           "kind": "coverage-gap",
           "severity": "gap",
           "message": "Hydration options are paired with the unsupported hydration entry point.",
           "anchor": "react_dom.hydration.options"
-        },
-        {
-          "library": "react",
-          "root": "state",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "State has an identified typescript surface but no semantic comparison yet"
-        },
-        {
-          "library": "react",
-          "root": "hooks",
-          "kind": "audit-pending",
-          "severity": "review",
-          "message": "Hooks has an identified typescript surface but no semantic comparison yet"
         }
       ]
     }
@@ -14585,147 +14387,14 @@
   "issues": [
     {
       "library": "browser",
-      "root": "animation",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Animation frames has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "browser",
-      "root": "canvas-2d",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Canvas 2D has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "browser",
-      "root": "console",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Console has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "browser",
-      "root": "document",
+      "group": "document",
       "kind": "upstream-members-missing",
       "severity": "gap",
       "message": "267 of 271 upstream members have no shipped VIR binding"
     },
     {
-      "library": "browser",
-      "root": "element",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Element has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "browser",
-      "root": "event",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Events has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "browser",
-      "root": "canvas-element",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "HTML canvas element has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "browser",
-      "root": "input-element",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "HTML input element has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "browser",
-      "root": "timers",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Timers has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "infoview",
-      "root": "clipboard",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Clipboard has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "infoview",
-      "root": "commands",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Editor commands has an identified local surface but no semantic comparison yet"
-    },
-    {
-      "library": "javascript",
-      "root": "array",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Array has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "javascript",
-      "root": "node-list",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "NodeList has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "proofwidgets",
-      "root": "rpc-references",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "RPC references has an identified local surface but no semantic comparison yet"
-    },
-    {
       "library": "react",
-      "root": "dependencies",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Hook dependencies has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "react",
-      "root": "element-type",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Element types has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "react",
-      "root": "nodes",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "React nodes has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "react",
-      "root": "props",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "React properties has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "react",
-      "root": "reducers",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Reducers has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "react",
-      "root": "references",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "References has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "react",
-      "root": "react-dom-root",
+      "group": "react-dom-root",
       "kind": "type-fidelity",
       "severity": "warning",
       "message": "Lean.Vir.React.Root.render weakly matches Root.render",
@@ -14734,7 +14403,7 @@
     },
     {
       "library": "react",
-      "root": "react-dom-root",
+      "group": "react-dom-root",
       "kind": "type-fidelity",
       "severity": "warning",
       "message": "Lean.Vir.React.Root.create weakly matches createRoot",
@@ -14743,7 +14412,7 @@
     },
     {
       "library": "react",
-      "root": "react-dom-root",
+      "group": "react-dom-root",
       "kind": "coverage-gap",
       "severity": "gap",
       "message": "Root creation options are an explicit coverage gap.",
@@ -14751,7 +14420,7 @@
     },
     {
       "library": "react",
-      "root": "react-dom-root",
+      "group": "react-dom-root",
       "kind": "coverage-gap",
       "severity": "gap",
       "message": "Hydration is not exposed by the current VIR React surface.",
@@ -14759,25 +14428,11 @@
     },
     {
       "library": "react",
-      "root": "react-dom-root",
+      "group": "react-dom-root",
       "kind": "coverage-gap",
       "severity": "gap",
       "message": "Hydration options are paired with the unsupported hydration entry point.",
       "anchor": "react_dom.hydration.options"
-    },
-    {
-      "library": "react",
-      "root": "state",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "State has an identified typescript surface but no semantic comparison yet"
-    },
-    {
-      "library": "react",
-      "root": "hooks",
-      "kind": "audit-pending",
-      "severity": "review",
-      "message": "Hooks has an identified typescript surface but no semantic comparison yet"
     }
   ]
 }

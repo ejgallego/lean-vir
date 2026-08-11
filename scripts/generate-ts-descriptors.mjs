@@ -20,8 +20,8 @@ function usage() {
 Generate Lean VIR TypeScript descriptor JSON from TypeScript declarations.
 
 Options:
-  --binding-root FILE#ID
-                  Load declarations, roots, policy, and anchors from a binding-library root.
+  --api-group FILE#ID
+                  Load entry points, policy, and anchors from a configured API group.
   --anchors FILE  Merge explicit Lean-to-TS anchors from JSON.
   --symbol ID     Keep only this TypeScript symbol id. Repeatable.
   --symbols FILE  Keep TypeScript symbol ids listed in FILE.
@@ -65,8 +65,9 @@ function parseArgs(argv) {
         if (!anchors || anchors.startsWith("--")) fail("--anchors requires a file");
         index += 1;
         break;
+      case "--api-group":
       case "--binding-root":
-        bindingRoot = requiredValue(argv, ++index, "--binding-root");
+        bindingRoot = requiredValue(argv, ++index, arg);
         break;
       case "--symbol":
         symbols.add(requiredValue(argv, ++index, "--symbol"));
@@ -101,12 +102,12 @@ function parseArgs(argv) {
     }
   }
   if (files.length === 0 && bindingRoot === null) {
-    fail("at least one TypeScript declaration file or --binding-root is required");
+    fail("at least one TypeScript declaration file or --api-group is required");
   }
   if (bindingRoot !== null &&
       (files.length !== 0 || anchors !== null || symbols.size !== 0 || symbolFiles.length !== 0 ||
        sourceUrl !== null || dependencyDepth !== 0 || dependencyPolicy !== null)) {
-    fail("--binding-root supplies declarations, roots, policy, and anchors; do not pass those options separately");
+    fail("--api-group supplies declarations, entry points, policy, and anchors; do not pass those options separately");
   }
   if (check && out === null) fail("--check requires --out");
   if (sourceUrl !== null && files.length !== 1) fail("--source-url requires exactly one declaration file");
@@ -203,7 +204,7 @@ export async function generateDescriptorFile({
     ? availableSymbols
     : expandInterfaceSurfaces(requestedRoots, availableSymbols);
   const policy = dependencyPolicyData !== null
-    ? validateDependencyPolicy({ version: 1, symbols: dependencyPolicyData }, "binding root dependency policy")
+    ? validateDependencyPolicy({ version: 1, symbols: dependencyPolicyData }, "API group dependency policy")
     : dependencyPolicy === null ? new Map() : await readDependencyPolicy(dependencyPolicy);
   const closure = dependencyClosure(rootSymbols, availableSymbols, policy, dependencyDepth);
   const selectedSymbols = closure.symbols;
@@ -234,7 +235,7 @@ async function resolveBindingRoot(options) {
   if (options.bindingRoot === null) return options;
   const separator = options.bindingRoot.lastIndexOf("#");
   if (separator <= 0 || separator === options.bindingRoot.length - 1) {
-    fail("--binding-root must use FILE#ID syntax");
+    fail("--api-group must use FILE#ID syntax");
   }
   const configPath = resolve(root, options.bindingRoot.slice(0, separator));
   const rootId = options.bindingRoot.slice(separator + 1);
@@ -243,14 +244,14 @@ async function resolveBindingRoot(options) {
     fail(`${relative(root, configPath)} is not a binding-library v1 configuration`);
   }
   const binding = config.roots.find((entry) => entry?.id === rootId);
-  if (binding === undefined) fail(`${relative(root, configPath)} has no binding root ${rootId}`);
+  if (binding === undefined) fail(`${relative(root, configPath)} has no API group ${rootId}`);
   const upstream = binding.upstream;
   if (upstream?.kind !== "typescript" || !Array.isArray(upstream.declarations) ||
       !Array.isArray(upstream.roots)) {
-    fail(`binding root ${config.id}/${rootId} does not define a TypeScript declaration surface`);
+    fail(`API group ${config.id}/${rootId} does not define a TypeScript declaration surface`);
   }
   if (upstream.sourceUrl !== undefined && upstream.declarations.length !== 1) {
-    fail(`binding root ${config.id}/${rootId} sourceUrl requires exactly one declaration file`);
+    fail(`API group ${config.id}/${rootId} sourceUrl requires exactly one declaration file`);
   }
   return {
     ...options,

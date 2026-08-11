@@ -56,7 +56,7 @@ For normal package work, pass a real `.irpkg` with
 `.irpkg` and generator report stay under ignored `build/` paths.
 
 Anchors classify each relation as either `audit` or `coverageGap`. They may
-also carry a reviewed `portIntent` object. The first React DOM root intent data
+also carry a reviewed `portIntent` object. The first React DOM API-group intent
 records decisions that TypeScript cannot express by itself: host-resource
 representation, effects, borrowing, result ownership, callback retention, and
 lifetime boundaries.
@@ -76,12 +76,12 @@ records every included dependency and any unresolved names.
 
 The descriptor reader also supports ambient declaration libraries such as
 TypeScript's `lib.dom.d.ts` and `@types/react`. Interface properties, methods,
-and accessors are indexed, inherited members are expanded onto requested root
+and accessors are indexed, inherited members are expanded onto requested entry-point
 interfaces with their declaring-interface provenance, and overloads are
 retained as alternative callable shapes. The consolidated explorer expands
-members only for roots with authored mappings and groups roots that share a
+members only for API groups with authored mappings and groups entry points that share a
 declaration source, so a large ambient library is parsed once per generation
-group rather than once per configured root.
+group rather than once per configured API group.
 
 ## Artifact Ownership
 
@@ -93,7 +93,7 @@ Markdown, or HTML output directly.
 | --- | --- | --- |
 | Core fixture | `vir-v1.types.d.ts`, `vir-v1.anchors.json`, `vir-v1.fixture.lean`, `vir-v1.roots.txt`, `vir-v1.aliases.json` | `vir-v1.json`, `vir-v1.manifest.json`, `vir-v1.report.json`, `vir-v1.anchors.md`, `vir-v1.anchors.html` |
 | DOM Document | `Vir/Browser.bindings.json`, TypeScript's pinned `lib.dom.d.ts` | `document-v1.json`, `document-v1.report.json` |
-| React DOM root | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
+| React DOM selected symbols | `Vir/React.bindings.json`, pinned `@types/react-dom` declarations | `react-dom-root-v1.json`, `react-dom-root-v1.report.json`, `react-dom-root-v1.anchors.html` |
 
 The binding explorer consumes the React DOM comparison alongside the lower-
 level shipped census. Its primary outputs are `docs/bindings/report.json` and
@@ -178,9 +178,9 @@ as an audit signal:
 Default checks do not require exact matches. Use `--strict` when a mature anchor
 set should reject weak or missing links.
 
-## React DOM Root Seed
+## React DOM Curated Comparison
 
-The first port-review seed intentionally starts from only seven root symbols in
+This selected-symbol comparison intentionally starts from only seven symbols in
 `@types/react-dom/client`: `Root`, `Root.render`, `Root.unmount`, `createRoot`,
 `RootOptions`, `hydrateRoot`, and `HydrationOptions`. The first four audit the
 existing VIR wrappers. The last three are explicit gaps.
@@ -207,7 +207,7 @@ The machine-facing output is
 
 ## DOM Document Audit
 
-The first complete-root audit selects `Document` from TypeScript's pinned
+The first complete API-group analysis selects `Document` from TypeScript's pinned
 `lib.dom.d.ts`, expands all inherited interfaces, and reconciles every member
 against the mappings in `Vir/Browser.bindings.json`. Property accessors,
 overload selection, JavaScript-resource arguments/results, and omitted optional

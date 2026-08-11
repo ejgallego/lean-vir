@@ -234,16 +234,27 @@ function semanticIssues(comparison) {
   return issues;
 }
 
-function rootStatus(bindingRoot, bindings, comparison, issues) {
-  if (bindings.some((binding) => binding.status !== "provided")) return "error";
-  if (issues.some((entry) => entry.severity === "error")) return "error";
-  if (issues.some((entry) => entry.severity === "gap")) return "missing";
-  if (comparison !== null && comparison.summary.missing !== 0) return "missing";
-  if (issues.some((entry) => entry.severity === "warning")) return "weak";
-  if (comparison !== null && comparison.summary.weak !== 0) return "weak";
-  if (comparison !== null) return "reviewed";
-  if (bindingRoot.upstream.kind === "internal") return "internal";
-  return "pending";
+function analysisState(bindingRoot, coverage, comparison) {
+  if (bindingRoot.upstream.kind === "internal") {
+    return { status: "not-applicable", scope: "no-upstream-contract" };
+  }
+  if (coverage !== null) {
+    return comparison !== null && coverage.summary.unreviewed === 0
+      ? { status: "complete", scope: "complete-upstream-surface" }
+      : { status: "in-progress", scope: "complete-upstream-surface" };
+  }
+  if (comparison !== null) {
+    return { status: "curated", scope: "selected-symbol-comparison" };
+  }
+  return { status: "not-run", scope: "identified-upstream-entry-points" };
+}
+
+function findingStatus(bindings, issues) {
+  if (bindings.some((binding) => binding.status !== "provided") ||
+      issues.some((entry) => entry.severity === "error")) return "error";
+  if (issues.some((entry) => entry.severity === "warning")) return "warning";
+  if (issues.some((entry) => entry.severity === "gap")) return "gap";
+  return "none";
 }
 
 function buildSurfaceCoverage(config, bindingRoot, typeScript, bindings, comparison) {
@@ -376,13 +387,6 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
           issues.push(issue("runtime-only", "error", `${binding.target} has no compiler declaration`, { target: binding.target }));
         }
       }
-      if (comparison === null && bindingRoot.upstream.kind !== "internal") {
-        issues.push(issue(
-          "audit-pending",
-          "review",
-          `${bindingRoot.title} has an identified ${bindingRoot.upstream.kind} surface but no semantic comparison yet`,
-        ));
-      }
       if (coverage !== null && coverage.summary.missing !== 0) {
         issues.push(issue(
           "upstream-members-missing",
@@ -399,7 +403,7 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
           }
         }
       }
-      const decoratedIssues = issues.map((entry) => ({ library: config.id, root: bindingRoot.id, ...entry }));
+      const decoratedIssues = issues.map((entry) => ({ library: config.id, group: bindingRoot.id, ...entry }));
       libraryIssues.push(...decoratedIssues);
       allIssues.push(...decoratedIssues);
       roots.push({
@@ -410,7 +414,8 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
         upstream: bindingRoot.upstream,
         ...(typescript === null ? {} : { typescript }),
         ...(coverage === null ? {} : { coverage }),
-        status: rootStatus(bindingRoot, bindings, comparison, issues),
+        analysis: analysisState(bindingRoot, coverage, comparison),
+        findingStatus: findingStatus(bindings, issues),
         summary: {
           bindings: bindings.length,
           provided: bindings.filter((entry) => entry.status === "provided").length,
@@ -428,18 +433,25 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
       config: config.path,
       lean: config.lean,
       summary: {
-        roots: roots.length,
+        apiGroups: roots.length,
         bindings: roots.reduce((sum, entry) => sum + entry.summary.bindings, 0),
         issues: libraryIssues.length,
       },
-      roots,
+      apiGroups: roots,
       issues: libraryIssues,
     });
   }
   libraries.sort((left, right) => left.title.localeCompare(right.title));
-  const roots = libraries.flatMap((library) => library.roots);
-  const coveredRoots = roots.filter((entry) => entry.coverage !== undefined);
-  const issueCounts = { error: 0, warning: 0, gap: 0, review: 0 };
+  const apiGroups = libraries.flatMap((library) => library.apiGroups);
+  const coveredGroups = apiGroups.filter((entry) => entry.coverage !== undefined);
+  const analysisCounts = {
+    complete: apiGroups.filter((entry) => entry.analysis.status === "complete").length,
+    inProgress: apiGroups.filter((entry) => entry.analysis.status === "in-progress").length,
+    curated: apiGroups.filter((entry) => entry.analysis.status === "curated").length,
+    notRun: apiGroups.filter((entry) => entry.analysis.status === "not-run").length,
+    notApplicable: apiGroups.filter((entry) => entry.analysis.status === "not-applicable").length,
+  };
+  const issueCounts = { error: 0, warning: 0, gap: 0 };
   for (const entry of allIssues) issueCounts[entry.severity] += 1;
   return {
     format: "lean-vir-binding-explorer",
@@ -453,22 +465,23 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
     providers: coverage.providers,
     summary: {
       libraries: libraries.length,
-      roots: roots.length,
+      apiGroups: apiGroups.length,
       targets: coverage.summary.totalTargets,
       provided: coverage.summary.provided,
       missingProvider: coverage.summary.missingProvider,
       runtimeOnly: coverage.summary.runtimeOnly,
-      auditedRoots: roots.filter((entry) => entry.comparison !== undefined).length,
-      pendingRoots: roots.filter((entry) => entry.status === "pending").length,
-      internalRoots: roots.filter((entry) => entry.status === "internal").length,
+      analysis: {
+        externalGroups: apiGroups.length - analysisCounts.notApplicable,
+        ...analysisCounts,
+      },
       semantic: semanticSummary,
-      upstreamSymbols: roots.reduce((sum, entry) => sum + (entry.typescript?.symbols.length ?? 0), 0),
+      upstreamSymbols: apiGroups.reduce((sum, entry) => sum + (entry.typescript?.symbols.length ?? 0), 0),
       coverage: {
-        roots: coveredRoots.length,
-        members: coveredRoots.reduce((sum, entry) => sum + entry.coverage.members.length, 0),
-        mapped: coveredRoots.reduce((sum, entry) =>
+        groups: coveredGroups.length,
+        members: coveredGroups.reduce((sum, entry) => sum + entry.coverage.members.length, 0),
+        mapped: coveredGroups.reduce((sum, entry) =>
           sum + entry.coverage.members.filter((member) => member.status !== "missing").length, 0),
-        missing: coveredRoots.reduce((sum, entry) => sum + entry.coverage.summary.missing, 0),
+        missing: coveredGroups.reduce((sum, entry) => sum + entry.coverage.summary.missing, 0),
       },
       issues: issueCounts,
     },
@@ -479,6 +492,10 @@ async function buildReport(coverage, configs, typeScriptSurfaces) {
 
 function renderHtml(report) {
   const data = JSON.stringify(report).replaceAll("<", "\\u003c");
+  const analysis = report.summary.analysis;
+  const completeGroups = `${analysis.complete} external API group${analysis.complete === 1 ? "" : "s"} ${analysis.complete === 1 ? "has" : "have"} a complete upstream-surface analysis`;
+  const curatedGroups = `${analysis.curated} ${analysis.curated === 1 ? "has" : "have"} a curated comparison only`;
+  const internalGroups = `${analysis.notApplicable} internal API group${analysis.notApplicable === 1 ? "" : "s"} ${analysis.notApplicable === 1 ? "has" : "have"} no upstream parity contract`;
   return `<!doctype html>
 <!-- Generated by scripts/generate-binding-explorer.mjs; regenerate instead of editing. -->
 <html lang="en" data-theme="dark">
@@ -503,7 +520,7 @@ function renderHtml(report) {
     .filters { display:grid; grid-template-columns:1fr 1fr; gap:8px; padding:0 14px 14px; background:var(--panel2); border-bottom:1px solid var(--line); } .result-head { padding:10px 15px; color:var(--muted); border-bottom:1px solid var(--line); }
     #results { max-height:670px; overflow:auto; } .row { width:100%; display:grid; grid-template-columns:1fr auto; gap:8px; text-align:left; padding:13px 15px; border:0; border-bottom:1px solid var(--line); background:transparent; cursor:pointer; }
     .row:hover,.row.active { background:#65e0b10d; } .row.active { box-shadow:inset 3px 0 var(--mint); } .name { font:650 13px/1.35 ui-monospace,SFMono-Regular,Menlo,monospace; overflow-wrap:anywhere; } .sub { display:block; color:var(--muted); font-size:12px; margin-top:4px; }
-    .pill,.badge { display:inline-flex; align-items:center; width:max-content; border:1px solid var(--line); border-radius:999px; padding:3px 8px; font-size:11px; font-weight:750; } .reviewed,.provided,.exact,.compatible { color:var(--mint); border-color:#65e0b166; } .pending,.review,.weak,.warning { color:var(--amber); border-color:#ffc76866; } .missing,.gap { color:var(--purple); border-color:#bd9cff66; } .error,.missing-provider,.runtime-only { color:var(--red); border-color:#ff7c8866; } .internal { color:var(--blue); border-color:#75baff66; }
+    .pill,.badge { display:inline-flex; align-items:center; width:max-content; border:1px solid var(--line); border-radius:999px; padding:3px 8px; font-size:11px; font-weight:750; } .complete,.provided,.exact,.compatible { color:var(--mint); border-color:#65e0b166; } .not-run,.in-progress,.weak,.warning { color:var(--amber); border-color:#ffc76866; } .gap { color:var(--purple); border-color:#bd9cff66; } .error,.missing-provider,.runtime-only { color:var(--red); border-color:#ff7c8866; } .curated,.not-applicable { color:var(--blue); border-color:#75baff66; }
     .detail { padding:26px; min-width:0; overflow:auto; max-height:760px; } .detail h2 { font-size:clamp(28px,4vw,46px); line-height:1.05; margin:8px 0; letter-spacing:-.035em; } .detail h3 { margin:0 0 12px; font-size:13px; text-transform:uppercase; letter-spacing:.12em; color:var(--muted); }
     .badges { display:flex; flex-wrap:wrap; gap:7px; margin:12px 0 18px; } .badge { color:var(--blue); } .section { border-top:1px solid var(--line); padding-top:20px; margin-top:20px; }
     .issue,.anchor,.binding { border:1px solid var(--line); border-radius:15px; padding:14px; margin:10px 0; background:var(--panel2); } .issue { border-left-width:4px; } .issue.error { border-left-color:var(--red); } .issue.warning,.issue.review { border-left-color:var(--amber); } .issue.gap { border-left-color:var(--purple); }
@@ -515,18 +532,18 @@ function renderHtml(report) {
   </style>
 </head>
 <body><main>
-  <header><div><div class="eyebrow">Lean VIR · binding fidelity</div><h1>Library explorer</h1><p class="lede">One view from upstream library roots through public Lean APIs and compiler-validated JavaScript boundaries to shipped runtime providers. Pending audits and concrete fidelity gaps stay visible.</p></div><button class="theme" id="theme" type="button">Toggle theme</button></header>
+  <header><div><div class="eyebrow">Lean VIR · runtime coverage and API fidelity</div><h1>Binding explorer</h1><p class="lede">Every API group reports runtime coverage and upstream-analysis progress separately. A shipped target can be fully provided even when its correspondence with the upstream library has not yet been analyzed.</p></div><button class="theme" id="theme" type="button">Toggle theme</button></header>
   <section class="metrics">
     <article class="metric good"><strong id="provided-metric">${report.summary.provided}/${report.summary.targets}</strong><span>runtime targets provided</span></article>
-    <article class="metric"><strong>${report.summary.auditedRoots}/${report.summary.roots}</strong><span>roots semantically audited</span></article>
+    <article class="metric"><strong>${report.summary.analysis.complete}/${report.summary.analysis.externalGroups}</strong><span>complete upstream analyses</span></article>
     <article class="metric ${report.summary.semantic.weak + report.summary.semantic.missing + report.summary.coverage.missing === 0 ? "good" : "warn"}"><strong>${report.summary.semantic.weak + report.summary.semantic.missing + report.summary.coverage.missing}</strong><span>member/type findings</span></article>
-    <article class="metric ${report.summary.pendingRoots === 0 ? "good" : "warn"}"><strong>${report.summary.pendingRoots}</strong><span>root audits pending</span></article>
+    <article class="metric ${report.summary.analysis.notRun === 0 ? "good" : "warn"}"><strong>${report.summary.analysis.notRun}</strong><span>upstream analyses not run</span></article>
   </section>
-  <div class="scope"><b>Measured surface:</b> ${report.summary.libraries} libraries · ${report.summary.roots} configured roots · ${report.summary.targets} compiler/runtime targets. An internal root has no external parity contract; a pending root has an identified upstream surface that has not yet been compared.</div>
+  <div class="scope"><b>Measured surface:</b> ${report.summary.libraries} libraries · ${report.summary.apiGroups} API groups · ${report.summary.targets} compiler/runtime targets. ${completeGroups}; ${curatedGroups}; ${internalGroups}.</div>
   <section class="workspace">
     <div class="left">
-      <div class="toolbar"><input id="search" type="search" placeholder="Search library, root, target, type…" aria-label="Search binding roots"><select id="status"><option value="all">All root statuses</option><option value="error">Errors</option><option value="missing">Missing</option><option value="weak">Weak</option><option value="pending">Audit pending</option><option value="reviewed">Reviewed</option><option value="internal">Internal</option></select></div>
-      <div class="filters"><select id="library"><option value="all">All libraries</option>${report.libraries.map((entry) => `<option value="${entry.id}">${entry.title}</option>`).join("")}</select><select id="issue"><option value="all">All findings</option><option value="error">Errors</option><option value="warning">Warnings</option><option value="gap">Coverage gaps</option><option value="review">Review pending</option><option value="none">No findings</option></select></div>
+      <div class="toolbar"><input id="search" type="search" placeholder="Search library, API group, target, type…" aria-label="Search API groups"><select id="analysis"><option value="all">All analysis states</option><option value="complete">Complete surface analysis</option><option value="in-progress">Analysis in progress</option><option value="curated">Curated comparison only</option><option value="not-run">Upstream analysis not run</option><option value="not-applicable">No upstream contract</option></select></div>
+      <div class="filters"><select id="library"><option value="all">All libraries</option>${report.libraries.map((entry) => `<option value="${entry.id}">${entry.title}</option>`).join("")}</select><select id="issue"><option value="all">All findings</option><option value="error">Errors</option><option value="warning">Type warnings</option><option value="gap">Coverage gaps</option><option value="none">No findings</option></select></div>
       <div class="result-head" id="count"></div><div id="results"></div>
     </div>
     <article class="detail" id="detail"></article>
@@ -535,24 +552,24 @@ function renderHtml(report) {
 <script id="report-data" type="application/json">${data}</script>
 <script>
   const report = JSON.parse(document.querySelector("#report-data").textContent);
-  const roots = report.libraries.flatMap((library) => library.roots.map((root) => ({ ...root, library })));
-  const byId = new Map(roots.map((root) => [root.library.id + "/" + root.id, root]));
-  const elements = Object.fromEntries(["search","status","library","issue","count","results","detail","theme"].map((id) => [id, document.querySelector("#" + id)]));
-  let selected = decodeURIComponent(location.hash.replace(/^#root=/, ""));
-  if (!byId.has(selected)) selected = roots.find((root) => ["error","missing","weak"].includes(root.status)) ? (roots.find((root) => ["error","missing","weak"].includes(root.status)).library.id + "/" + roots.find((root) => ["error","missing","weak"].includes(root.status)).id) : (roots[0] ? roots[0].library.id + "/" + roots[0].id : "");
+  const groups = report.libraries.flatMap((library) => library.apiGroups.map((group) => ({ ...group, library })));
+  const byId = new Map(groups.map((group) => [group.library.id + "/" + group.id, group]));
+  const elements = Object.fromEntries(["search","analysis","library","issue","count","results","detail","theme"].map((id) => [id, document.querySelector("#" + id)]));
+  let selected = decodeURIComponent(location.hash.replace(/^#(?:group|root)=/, ""));
+  if (!byId.has(selected)) { const finding=groups.find((group)=>group.findingStatus!=="none"); selected=finding ? finding.library.id+"/"+finding.id : (groups[0] ? groups[0].library.id+"/"+groups[0].id : ""); }
   const escapeHtml = (value) => String(value ?? "").replace(/[&<>\"]/g, (character) => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[character]));
-  const statusLabel = (value) => ({ reviewed:"reviewed", pending:"audit pending", internal:"internal contract", weak:"weak types", missing:"coverage gaps", error:"error" }[value] || value);
-  function rootText(root) { return [root.library.title,root.title,root.description,...(root.lean.public || []),...(root.upstream.roots || []),...(root.typescript?.symbols || []).flatMap((symbol) => [symbol.id,symbol.display,symbol.hover]),...root.bindings.flatMap((binding) => [binding.target,...binding.declarations.flatMap((decl) => [decl.declaration,decl.type])]),...(root.comparison?.results || []).flatMap((item) => [item.lean,item.ts,item.note,...item.notes])].join(" ").toLowerCase(); }
-  function matches(root) { const query=elements.search.value.trim().toLowerCase(); const issue=elements.issue.value; return (!query || rootText(root).includes(query)) && (elements.status.value === "all" || root.status === elements.status.value) && (elements.library.value === "all" || root.library.id === elements.library.value) && (issue === "all" || (issue === "none" ? root.issues.length === 0 : root.issues.some((entry) => entry.severity === issue))); }
-  function render() { const visible=roots.filter(matches); elements.count.textContent=visible.length + (visible.length === 1 ? " binding root" : " binding roots"); elements.results.innerHTML=visible.length === 0 ? '<div class="empty">No roots match these filters.</div>' : visible.map((root) => { const id=root.library.id+"/"+root.id; return '<button type="button" class="row '+(id===selected?'active':'')+'" data-id="'+escapeHtml(id)+'"><span><span class="name">'+escapeHtml(root.library.title+" · "+root.title)+'</span><span class="sub">'+root.summary.bindings+' targets · '+root.summary.issues+' findings</span></span><span class="pill '+escapeHtml(root.status)+'">'+escapeHtml(statusLabel(root.status))+'</span></button>'; }).join(""); elements.results.querySelectorAll("[data-id]").forEach((button) => button.addEventListener("click", () => select(button.dataset.id))); renderDetail(byId.get(selected)); }
-  function select(id) { selected=id; history.replaceState(null,"","#root="+encodeURIComponent(id)); render(); }
+  const analysisLabel = (value) => ({ complete:"complete surface analysis", "in-progress":"analysis in progress", curated:"curated comparison only", "not-run":"upstream analysis not run", "not-applicable":"no upstream contract" }[value] || value);
+  function groupText(group) { return [group.library.title,group.title,group.description,...(group.lean.public || []),...(group.upstream.roots || []),...(group.typescript?.symbols || []).flatMap((symbol) => [symbol.id,symbol.display,symbol.hover]),...group.bindings.flatMap((binding) => [binding.target,...binding.declarations.flatMap((decl) => [decl.declaration,decl.type])]),...(group.comparison?.results || []).flatMap((item) => [item.lean,item.ts,item.note,...item.notes])].join(" ").toLowerCase(); }
+  function matches(group) { const query=elements.search.value.trim().toLowerCase(); const issue=elements.issue.value; return (!query || groupText(group).includes(query)) && (elements.analysis.value === "all" || group.analysis.status === elements.analysis.value) && (elements.library.value === "all" || group.library.id === elements.library.value) && (issue === "all" || (issue === "none" ? group.issues.length === 0 : group.issues.some((entry) => entry.severity === issue))); }
+  function render() { const visible=groups.filter(matches); elements.count.textContent=visible.length + (visible.length === 1 ? " API group" : " API groups"); elements.results.innerHTML=visible.length === 0 ? '<div class="empty">No API groups match these filters.</div>' : visible.map((group) => { const id=group.library.id+"/"+group.id; const findings=group.summary.issues===0?'':(' · '+group.summary.issues+(group.summary.issues===1?' finding':' findings')); return '<button type="button" class="row '+(id===selected?'active':'')+'" data-id="'+escapeHtml(id)+'"><span><span class="name">'+escapeHtml(group.library.title+" · "+group.title)+'</span><span class="sub">runtime '+group.summary.provided+'/'+group.summary.bindings+' provided'+findings+'</span></span><span class="pill '+escapeHtml(group.analysis.status)+'">'+escapeHtml(analysisLabel(group.analysis.status))+'</span></button>'; }).join(""); elements.results.querySelectorAll("[data-id]").forEach((button) => button.addEventListener("click", () => select(button.dataset.id))); renderDetail(byId.get(selected)); }
+  function select(id) { selected=id; history.replaceState(null,"","#group="+encodeURIComponent(id)); render(); }
   function badges(values) { return values.map((value) => '<span class="badge">'+escapeHtml(value)+'</span>').join(""); }
-  function renderIssues(root) { if (root.issues.length === 0) return '<div class="empty">No findings for this root.</div>'; return root.issues.map((entry) => '<div class="issue '+escapeHtml(entry.severity)+'"><div class="card-head"><span class="card-title">'+escapeHtml(entry.kind)+'</span><span class="pill '+escapeHtml(entry.severity)+'">'+escapeHtml(entry.severity)+'</span></div><p class="note">'+escapeHtml(entry.message)+'</p>'+(entry.target?'<a href="#target-'+escapeHtml(entry.target)+'">'+escapeHtml(entry.target)+'</a>':'')+'</div>').join(""); }
-  function renderAnchors(root) { const results=root.comparison?.results || []; if (results.length === 0) return '<div class="empty">No semantic comparison generated yet.</div>'; return results.map((item) => { const ts=item.tsSymbol?.display || JSON.stringify(item.tsSymbol?.shape || {},null,2); const lean=JSON.stringify(item.leanDescriptor?.shape || {},null,2); const diagnostics=(item.diagnostics || []).map((entry) => '<span class="badge '+escapeHtml(entry.severity)+'" title="'+escapeHtml(entry.message)+'">'+escapeHtml(entry.code)+'</span>').join(""); return '<article class="anchor"><div class="card-head"><span class="card-title">'+escapeHtml(item.lean)+' ↔ '+escapeHtml(item.ts)+'</span><span class="pill '+escapeHtml(item.status)+'">'+escapeHtml(item.status)+'</span></div>'+(item.note?'<p class="note">'+escapeHtml(item.note)+'</p>':'')+'<div class="badges">'+diagnostics+'</div><div class="panes"><div><div class="pane-title">Lean VIR descriptor</div><pre>'+escapeHtml(lean)+'</pre></div><div><div class="pane-title">TypeScript declaration</div><pre>'+escapeHtml(ts)+'</pre></div></div></article>'; }).join(""); }
+  function renderIssues(group) { if (group.issues.length === 0) return '<div class="empty">No runtime, coverage, or type-fidelity findings for this API group.</div>'; return group.issues.map((entry) => '<div class="issue '+escapeHtml(entry.severity)+'"><div class="card-head"><span class="card-title">'+escapeHtml(entry.kind)+'</span><span class="pill '+escapeHtml(entry.severity)+'">'+escapeHtml(entry.severity)+'</span></div><p class="note">'+escapeHtml(entry.message)+'</p>'+(entry.target?'<a href="#target-'+escapeHtml(entry.target)+'">'+escapeHtml(entry.target)+'</a>':'')+'</div>').join(""); }
+  function renderAnchors(group) { const results=group.comparison?.results || []; if (results.length === 0) return '<div class="empty">Type fidelity has not been evaluated for this API group.</div>'; return results.map((item) => { const ts=item.tsSymbol?.display || JSON.stringify(item.tsSymbol?.shape || {},null,2); const lean=JSON.stringify(item.leanDescriptor?.shape || {},null,2); const diagnostics=(item.diagnostics || []).map((entry) => '<span class="badge '+escapeHtml(entry.severity)+'" title="'+escapeHtml(entry.message)+'">'+escapeHtml(entry.code)+'</span>').join(""); return '<article class="anchor"><div class="card-head"><span class="card-title">'+escapeHtml(item.lean)+' ↔ '+escapeHtml(item.ts)+'</span><span class="pill '+escapeHtml(item.status)+'">'+escapeHtml(item.status)+'</span></div>'+(item.note?'<p class="note">'+escapeHtml(item.note)+'</p>':'')+'<div class="badges">'+diagnostics+'</div><div class="panes"><div><div class="pane-title">Lean VIR descriptor</div><pre>'+escapeHtml(lean)+'</pre></div><div><div class="pane-title">TypeScript declaration</div><pre>'+escapeHtml(ts)+'</pre></div></div></article>'; }).join(""); }
   function renderTypeScript(root) { const symbols=root.typescript?.symbols || []; if (symbols.length === 0) return '<div class="empty">This root has no external TypeScript declaration surface.</div>'; const coverage=new Map((root.coverage?.members || []).map((member)=>[member.id,member])); return symbols.map((symbol) => { const source=symbol.source?.url?'<a class="source" href="'+escapeHtml(symbol.source.url)+'#L'+symbol.source.startLine+'" target="_blank" rel="noreferrer">source</a>':symbol.source?.path?'<a class="source" href="../../'+escapeHtml(symbol.source.path)+'#L'+symbol.source.startLine+'">source</a>':''; const member=coverage.get(symbol.id); const status=member?'<span class="pill '+escapeHtml(member.status)+'">'+escapeHtml(member.status)+'</span>':''; const inherited=symbol.inheritedFrom?'<span class="badge">from '+escapeHtml(symbol.inheritedFrom)+'</span>':''; return '<details class="binding"><summary><span class="card-title">'+escapeHtml(symbol.id)+'</span> <span class="badge">'+escapeHtml(symbol.kind)+'</span> '+inherited+' '+status+'</summary><div class="card-head"><p class="note">'+escapeHtml(symbol.hover || 'No declaration documentation.')+'</p>'+source+'</div><pre>'+escapeHtml(symbol.display)+'</pre></details>'; }).join(""); }
   function renderBindings(root) { return root.bindings.map((binding) => { const declarations=binding.declarations.map((decl) => { const source=decl.source?.path?'<a class="source" href="../../'+escapeHtml(decl.source.path)+'#L'+decl.source.startLine+'">'+escapeHtml(decl.module+":"+decl.source.startLine)+'</a>':''; return '<div class="binding"><div class="card-head"><span class="card-title">'+escapeHtml(decl.declaration)+'</span>'+source+'</div><div class="badges">'+badges([decl.marker,decl.boundary,decl.private?'private boundary':'public boundary'])+'</div><pre>'+escapeHtml(decl.type)+'</pre></div>'; }).join(""); return '<details id="target-'+escapeHtml(binding.target)+'"><summary><span class="card-title">'+escapeHtml(binding.target)+'</span> <span class="pill '+escapeHtml(binding.status)+'">'+escapeHtml(binding.status)+'</span></summary><div class="badges">'+badges(binding.providers)+'</div>'+declarations+'</details>'; }).join(""); }
-  function renderDetail(root) { if (!root) { elements.detail.innerHTML='<div class="empty">Select a binding root.</div>'; return; } const upstream=[root.upstream.kind,root.upstream.package,root.upstream.version].filter(Boolean); const publicLean=root.lean.public || []; const docs=root.upstream.docs?'<a href="'+escapeHtml(root.upstream.docs)+'" target="_blank" rel="noreferrer">Upstream documentation</a>':''; elements.detail.innerHTML='<span class="pill '+escapeHtml(root.status)+'">'+escapeHtml(statusLabel(root.status))+'</span><h2>'+escapeHtml(root.title)+'</h2><p class="note">'+escapeHtml(root.description || root.library.description)+'</p><div class="badges">'+badges([root.library.title,...upstream])+'</div>'+docs+'<section class="section"><h3>Configured roots</h3><div class="badges">'+badges([...(root.upstream.roots || []),...publicLean])+'</div></section><section class="section"><h3>Findings</h3>'+renderIssues(root)+'</section><section class="section"><h3>Upstream TypeScript surface</h3>'+renderTypeScript(root)+'</section><section class="section"><h3>Semantic comparison</h3>'+renderAnchors(root)+'</section><section class="section"><h3>Shipped targets</h3>'+renderBindings(root)+'</section>'; }
-  [elements.search,elements.status,elements.library,elements.issue].forEach((element) => element.addEventListener(element===elements.search?"input":"change",render));
+  function renderDetail(group) { if (!group) { elements.detail.innerHTML='<div class="empty">Select an API group.</div>'; return; } const upstream=[...new Set([group.upstream.kind,group.upstream.package,group.upstream.version].filter(Boolean))]; const publicLean=group.lean.public || []; const docs=group.upstream.docs?'<a href="'+escapeHtml(group.upstream.docs)+'" target="_blank" rel="noreferrer">Upstream documentation</a>':''; const runtime='<span class="pill '+(group.summary.provided===group.summary.bindings?'provided':'error')+'">runtime '+group.summary.provided+'/'+group.summary.bindings+' provided</span>'; const finding=group.findingStatus==='none'?'':'<span class="pill '+escapeHtml(group.findingStatus)+'">'+escapeHtml(group.findingStatus==='gap'?'coverage gaps':group.findingStatus)+'</span>'; elements.detail.innerHTML='<div class="badges"><span class="pill '+escapeHtml(group.analysis.status)+'">'+escapeHtml(analysisLabel(group.analysis.status))+'</span>'+runtime+finding+'</div><h2>'+escapeHtml(group.title)+'</h2><p class="note">'+escapeHtml(group.description || group.library.description)+'</p><div class="badges">'+badges([group.library.title,...upstream])+'</div>'+docs+'<section class="section"><h3>API group definition</h3><p class="note">Upstream entry points and public Lean API:</p><div class="badges">'+badges([...(group.upstream.roots || []),...publicLean])+'</div></section><section class="section"><h3>Findings</h3>'+renderIssues(group)+'</section><section class="section"><h3>Upstream TypeScript surface</h3>'+renderTypeScript(group)+'</section><section class="section"><h3>Type fidelity comparisons</h3>'+renderAnchors(group)+'</section><section class="section"><h3>Shipped runtime targets</h3>'+renderBindings(group)+'</section>'; }
+  [elements.search,elements.analysis,elements.library,elements.issue].forEach((element) => element.addEventListener(element===elements.search?"input":"change",render));
   elements.theme.addEventListener("click",()=>{document.documentElement.dataset.theme=document.documentElement.dataset.theme==="light"?"dark":"light";}); document.addEventListener("keydown",(event)=>{if(event.key==="/"&&document.activeElement!==elements.search){event.preventDefault();elements.search.focus();}}); render();
 </script></body></html>
 `;
@@ -588,9 +605,9 @@ try {
   await emit(options.html, renderHtml(report), options.check);
   console.log("\nLean VIR binding explorer");
   console.log(`  libraries: ${report.summary.libraries}`);
-  console.log(`  configured roots: ${report.summary.roots}`);
+  console.log(`  API groups: ${report.summary.apiGroups}`);
   console.log(`  shipped targets: ${report.summary.provided}/${report.summary.targets} provided`);
-  console.log(`  semantic roots: ${report.summary.auditedRoots} audited, ${report.summary.pendingRoots} pending`);
+  console.log(`  upstream analysis: ${report.summary.analysis.complete} complete, ${report.summary.analysis.curated} curated, ${report.summary.analysis.notRun} not run`);
   console.log(`  upstream symbols: ${report.summary.upstreamSymbols}`);
   console.log(`  member coverage: ${report.summary.coverage.mapped}/${report.summary.coverage.members} mapped`);
   console.log(`  findings: ${report.summary.semantic.weak} weak, ${report.summary.semantic.missing} missing`);
