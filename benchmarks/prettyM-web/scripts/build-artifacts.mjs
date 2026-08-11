@@ -37,6 +37,7 @@ import {
   sha256,
   validateSeed,
 } from "./artifact-set-lib.mjs";
+import { verifyGitCheckout } from "./git-checkout-lib.mjs";
 import {
   checkoutReceipt,
   parsePathAssignment,
@@ -145,58 +146,6 @@ function run(
     );
   }
   return capture ? result.stdout.trim() : "";
-}
-
-function normalizedRepository(repository) {
-  const trimmed = repository.replace(/\/+$/, "").replace(/\.git$/, "");
-  const githubScp = /^git@github\.com:(.+)$/.exec(trimmed);
-  if (githubScp) return `https://github.com/${githubScp[1]}`;
-  const githubSsh = /^ssh:\/\/git@github\.com\/(.+)$/.exec(trimmed);
-  if (githubSsh) return `https://github.com/${githubSsh[1]}`;
-  return trimmed;
-}
-
-async function verifyCheckout(checkoutId, path, selectedSource) {
-  if (!(await stat(path).catch(() => null))?.isDirectory()) {
-    throw new Error(`checkout ${checkoutId} is not a directory: ${path}`);
-  }
-  const root = resolve(
-    run("git", ["-C", path, "rev-parse", "--show-toplevel"], { capture: true }),
-  );
-  if (root !== path)
-    throw new Error(
-      `checkout ${checkoutId} must point at its Git root: ${root}`,
-    );
-  const origin = run("git", ["-C", path, "remote", "get-url", "origin"], {
-    capture: true,
-  });
-  if (
-    normalizedRepository(origin) !==
-    normalizedRepository(selectedSource.repository)
-  ) {
-    throw new Error(
-      `checkout ${checkoutId} origin mismatch: ` +
-        `expected ${selectedSource.repository}, got ${origin}`,
-    );
-  }
-  const revision = run("git", ["-C", path, "rev-parse", "HEAD"], {
-    capture: true,
-  });
-  if (revision !== selectedSource.revision) {
-    throw new Error(
-      `checkout ${checkoutId} revision mismatch: expected ${selectedSource.revision}, got ${revision}`,
-    );
-  }
-  const dirty = run("git", ["-C", path, "status", "--porcelain"], {
-    capture: true,
-  });
-  if (dirty !== "") throw new Error(`checkout ${checkoutId} is dirty: ${path}`);
-  return {
-    path,
-    revision,
-    sourceId: selectedSource.id,
-    repository: selectedSource.repository,
-  };
 }
 
 function checkoutFor(component, role, resolvedCheckouts) {
@@ -504,7 +453,7 @@ async function main() {
   const toolchainRoles = checkoutSelection.toolchainRoles;
   const resolvedCheckouts = {};
   for (const [checkoutId, selectedSource] of Object.entries(sources)) {
-    resolvedCheckouts[checkoutId] = await verifyCheckout(
+    resolvedCheckouts[checkoutId] = await verifyGitCheckout(
       checkoutId,
       checkoutSelection.paths.get(checkoutId),
       selectedSource,
@@ -566,7 +515,7 @@ async function main() {
   }
 
   for (const [checkoutId, selectedSource] of Object.entries(sources)) {
-    await verifyCheckout(
+    await verifyGitCheckout(
       checkoutId,
       resolvedCheckouts[checkoutId].path,
       selectedSource,

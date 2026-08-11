@@ -178,6 +178,7 @@ export function validateExampleTestPackage(value, exampleId) {
       throw new Error(`${label} must declare a differential test`);
     }
     const testIds = new Set();
+    const studyIds = new Set();
     for (const [testIndex, testItem] of variant.tests.entries()) {
       const testLabel = `${label} tests[${testIndex}]`;
       const test = object(testItem, testLabel);
@@ -191,7 +192,11 @@ export function validateExampleTestPackage(value, exampleId) {
         throw new Error(`${label} repeats test ${testId}`);
       }
       testIds.add(testId);
-      identifier(test.study, `${testLabel} study`);
+      const studyId = identifier(test.study, `${testLabel} study`);
+      if (studyIds.has(studyId)) {
+        throw new Error(`${label} repeats study ${studyId}`);
+      }
+      studyIds.add(studyId);
       if (!Array.isArray(test.backends) || test.backends.length < 2) {
         throw new Error(`${testLabel} must require at least two backends`);
       }
@@ -220,7 +225,13 @@ export function validateExampleTestPackage(value, exampleId) {
       new Set(["study", "data"]),
       `${label} benchmark`,
     );
-    identifier(benchmark.study, `${label} benchmark study`);
+    const benchmarkStudyId = identifier(
+      benchmark.study,
+      `${label} benchmark study`,
+    );
+    if (studyIds.has(benchmarkStudyId)) {
+      throw new Error(`${label} repeats study ${benchmarkStudyId}`);
+    }
     object(benchmark.data, `${label} benchmark data`);
   }
   if (testPackage.variants[0].id !== "default") {

@@ -25,8 +25,11 @@ Select the complete build-and-test unit by example and variant:
 ```sh
 npm run example -- prettyM default --plan
 npm run example -- prettyM default --test-only
-# Builds, packs, imports, validates, then runs the declared differential tests:
-npm run example -- prettyM default --toolchain /path/to/lean-fir
+# From a clean checkout, materializes exact sources, prepares producers, builds,
+# packs, imports, validates, then runs the declared differential tests:
+npm run example -- prettyM default --materialize --prepare
+# Existing FIR/VIR checkouts may instead be selected explicitly:
+npm run example -- prettyM default --prepare --toolchain /path/to/lean-fir
 ```
 
 The benchmark suite is part of the package but is not measured by these
@@ -40,10 +43,8 @@ commands. Performance collection remains an explicit controlled-machine step.
 - collect marshal, execute, decode, and total timings;
 - run corpus, scaling, interaction, retained-memory, and repeated-call studies;
 - collect cold-start and isolated-runtime observations in fresh browser contexts;
-- aggregate multiple fresh browser processes and generate forwardable cards;
-- import a stable external attribution summary without embedding profiler code;
-- display reports and campaigns with a shared, non-destructive backend filter;
-  and
+- aggregate multiple fresh browser processes into campaign reports;
+- display reports and campaigns with a shared, non-destructive backend filter; and
 - import/export the complete JSON representation independently of the active
   presentation filter.
 
@@ -225,41 +226,15 @@ repeated-call traces for the two VIR entry points. The earlier independent JSON
 round-trip control is intentionally no longer collected; the two VIR backends
 still preserve the useful string-ABI versus direct-Format comparison.
 
-For process-to-process variability and owner-ready summaries:
+For process-to-process variability:
 
 ```sh
 npm run campaign
-npm run cards
 ```
 
 `campaign` launches the Node collector in fresh processes and writes both JSON
-and Markdown. `cards` is the historical set-0001 evidence flow: it turns a
-matching default report into VIR-001 through VIR-003. Both Python scripts use
-only the standard library; browser automation continues to use this package's
-Playwright dependency.
-
-VIR-002 also reads the committed
-`evidence/vir-pr104-runtime-call-profile.json`. This is a bounded, hash-identified
-summary of two external diagnostic captures against the locked VIR package; raw
-profiles and profiler machinery remain in the VIR producer worktree. Card
-generation rejects the attribution when its Lean version or bounded runtime JS,
-Wasm, and IR-package identities do not match the benchmark report.
-The refreshed set-0002 candidate intentionally has different package bytes, so
-its correctness reports and campaigns cannot generate these cards until new
-controlled-machine evidence is reviewed and fingerprinted.
-
-The complete historical set-0001 evidence refresh is:
-
-```sh
-npm run refresh
-```
-
-It reuses the currently staged examples, builds and serves the app, collects a
-report, refreshes cards, and runs a three-process campaign. Its card step will
-reject set 0002 rather than attribute set-0001 profiles to changed binaries.
-Pass `--artifact-set _artifacts/sets/<set-id>` to atomically stage one verified
-v2 set first. It never publishes or reads artifact directories outside this
-application.
+and Markdown. The Python driver uses only the standard library; browser
+automation continues to use this package's Playwright dependency.
 
 ## Spin-off boundary
 

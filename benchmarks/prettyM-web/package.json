@@ -19,8 +19,6 @@
     "serve": "node scripts/serve.mjs",
     "report": "node scripts/collect-report.mjs",
     "campaign": "python3 scripts/run-campaign.py",
-    "cards": "python3 scripts/generate-observation-cards.py",
-    "refresh": "python3 scripts/refresh-benchmark.py",
     "test": "npm run test:unit && npm run test:browser",
     "test:unit": "npm run test:tools && npm run test:examples && npm run test:toolchains && npm run test:artifact-set",
     "test:examples": "node --test test/example-catalog.test.mjs",

@@ -142,6 +142,23 @@ test("validates self-contained test variants and JavaScript oracles", () => {
     /repeats test parity/,
   );
 
+  const duplicateTestStudy = structuredClone(base);
+  duplicateTestStudy.variants[0].tests.push({
+    ...structuredClone(duplicateTestStudy.variants[0].tests[0]),
+    id: "another-test",
+  });
+  assert.throws(
+    () => validateExampleTestPackage(duplicateTestStudy, "small"),
+    /repeats study smoke/,
+  );
+
+  const duplicateBenchmarkStudy = structuredClone(base);
+  duplicateBenchmarkStudy.variants[0].benchmark.study = "smoke";
+  assert.throws(
+    () => validateExampleTestPackage(duplicateBenchmarkStudy, "small"),
+    /repeats study smoke/,
+  );
+
   const missingOracle = structuredClone(base);
   missingOracle.variants[0].tests[0].backends = ["vir", "fir"];
   assert.throws(

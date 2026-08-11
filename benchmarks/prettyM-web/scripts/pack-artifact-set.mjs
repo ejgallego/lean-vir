@@ -1,4 +1,4 @@
-import { cp, mkdir, readFile, rm, writeFile } from "node:fs/promises";
+import { cp, mkdir, rm, writeFile } from "node:fs/promises";
 import { dirname, join, relative, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -8,6 +8,7 @@ import {
   fileRecord,
   fileRecords,
   inside,
+  readJson,
   sha256,
   validateSeed,
   verifyArtifactSet,
@@ -105,6 +106,9 @@ async function main() {
     databasePath,
     examplePath,
     testPackagePath,
+    databaseFile: relative(appRoot, databasePath),
+    exampleFile: relative(appRoot, examplePath),
+    testPackageFile: relative(appRoot, testPackagePath),
     exampleId: config.example.id,
     variantId: config.example.variant,
     buildId: options.build,

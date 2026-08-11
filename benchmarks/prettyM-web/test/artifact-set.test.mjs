@@ -268,6 +268,11 @@ test("source receipts bind portable provenance to staged bytes", async () => {
       native: { adapter: "fir-native", files },
     },
   };
+  const receiptFiles = {
+    databaseFile: "artifact-builds.json",
+    exampleFile: "examples/prettyM/example.json",
+    testPackageFile: "examples/prettyM/tests.json",
+  };
   await writeFile(receiptPath, canonicalJson(receipt));
   assert.doesNotMatch(JSON.stringify(receipt), /\/home\//);
   await assert.doesNotReject(() =>
@@ -276,6 +281,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
       databasePath,
       examplePath,
       testPackagePath,
+      ...receiptFiles,
       exampleId: "prettyM",
       variantId: "default",
       buildId: "prettyM",
@@ -285,6 +291,28 @@ test("source receipts bind portable provenance to staged bytes", async () => {
       seed,
     }),
   );
+  receipt.database.file = "other-artifact-builds.json";
+  await writeFile(receiptPath, canonicalJson(receipt));
+  await assert.rejects(
+    () =>
+      verifySourceBuildReceipt({
+        receiptPath,
+        databasePath,
+        examplePath,
+        testPackagePath,
+        ...receiptFiles,
+        exampleId: "prettyM",
+        variantId: "default",
+        buildId: "prettyM",
+        setId: "prettyM-bounded-set-0002",
+        sources,
+        components,
+        seed,
+      }),
+    /paths do not match/,
+  );
+  receipt.database.file = receiptFiles.databaseFile;
+  await writeFile(receiptPath, canonicalJson(receipt));
   await writeFile(testPackagePath, '{"tests":"changed"}\n');
   await assert.rejects(
     () =>
@@ -293,6 +321,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
         databasePath,
         examplePath,
         testPackagePath,
+        ...receiptFiles,
         exampleId: "prettyM",
         variantId: "default",
         buildId: "prettyM",
@@ -312,6 +341,7 @@ test("source receipts bind portable provenance to staged bytes", async () => {
         databasePath,
         examplePath,
         testPackagePath,
+        ...receiptFiles,
         exampleId: "prettyM",
         variantId: "default",
         buildId: "prettyM",

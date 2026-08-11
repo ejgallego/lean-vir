@@ -19,6 +19,7 @@ but is not measured by this command.
 
   --test-only              use the currently staged artifacts
   --plan                   print the selected build and tests without running
+  --materialize            create or verify exact catalogued source checkouts
   --sources-dir PATH       forward the candidate source checkout root
   --toolchain [NAME=]PATH  forward a FIR/VIR toolchain selection
   --toolchain-config PATH  forward a toolchain config
@@ -32,6 +33,8 @@ function parseArgs(argv) {
     variant: "default",
     plan: false,
     testOnly: false,
+    materialize: false,
+    sourcesDir: null,
     candidateArgs: [],
   };
   const positional = [];
@@ -39,12 +42,14 @@ function parseArgs(argv) {
     const argument = argv[index];
     if (argument === "--plan") options.plan = true;
     else if (argument === "--test-only") options.testOnly = true;
+    else if (argument === "--materialize") options.materialize = true;
     else if (argument === "--prepare") options.candidateArgs.push(argument);
     else if (
       ["--sources-dir", "--toolchain", "--toolchain-config"].includes(argument)
     ) {
       const value = argv[++index];
       if (!value) throw new Error(`${argument} requires a value`);
+      if (argument === "--sources-dir") options.sourcesDir = value;
       options.candidateArgs.push(argument, value);
     } else if (argument === "--help" || argument === "-h") {
       usage();
@@ -58,6 +63,9 @@ function parseArgs(argv) {
   }
   options.example = positional[0];
   options.variant = positional[1] ?? "default";
+  if (options.testOnly && options.materialize) {
+    throw new Error("--test-only cannot be combined with --materialize");
+  }
   return options;
 }
 
@@ -119,12 +127,23 @@ async function main() {
     );
   }
   console.log(`benchmark: ${variant.benchmark.study} (not measured)`);
+  if (options.materialize) console.log("sources: materialize catalogued revisions");
   if (options.plan) return;
   if (!options.testOnly) {
     if (!build) {
       throw new Error(
         `${example.id}/${variant.id} has no catalogued build; use --test-only with staged rehearsal artifacts`,
       );
+    }
+    if (options.materialize) {
+      const sourceArgs = [
+        "scripts/checkout-artifact-sources.mjs",
+        variant.build,
+      ];
+      if (options.sourcesDir) {
+        sourceArgs.push("--sources-dir", options.sourcesDir);
+      }
+      run(process.execPath, sourceArgs);
     }
     run(process.execPath, [
       "scripts/build-artifact-candidate.mjs",

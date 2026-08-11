@@ -99,14 +99,18 @@ Run or inspect one complete selection with:
 
 ```sh
 npm run example -- client-example default --plan
-npm run example -- client-example default
+npm run example -- client-example default --materialize --prepare
 npm run example -- client-example default --test-only
 ```
 
-The full command builds and imports the variant's catalogued candidate and then
-runs every declared differential test. `--test-only` uses already-staged
-artifacts. Neither command treats benchmark timings as evidence; the benchmark
-entry point is registered for explicit controlled-machine runs. Candidate
+`--materialize` creates or verifies every exact catalogued source below the
+controlled `_sources/` directory, and `--prepare` runs producer-owned setup.
+The full command then builds and imports the variant's candidate and runs every
+declared differential test. Existing clean producer checkouts may instead be
+selected with `--toolchain` or a toolchain config. `--test-only` uses
+already-staged artifacts. None of these commands treats benchmark timings as
+evidence; the benchmark entry point is registered for explicit
+controlled-machine runs. Candidate
 bundles retain the complete `EXAMPLE_TEST.json` run, including test-package
 identity, oracle, exercised backends, inputs echoed by the workload report, and
 artifact provenance.

@@ -2,196 +2,84 @@
 
 Last verified: 2026-08-11
 
-## Resume here
+## Purpose
 
-- Worktree: `/home/egallego/lean/vir/.worktrees/artifact-example-catalog`
-- Branch: `feat/artifact-example-catalog`
-- Starting checkpoint for this consolidation: `26d2682`
-- Application root: `benchmarks/prettyM-web/`
+`benchmarks/prettyM-web/` is a standalone browser benchmark catalog hosted in
+VIR. It has no runtime dependency on the parent VIR source tree, Verso Slides,
+Reveal, or Lake. Producer source stays in the repositories that own it; this
+application owns selection, artifact assembly, correctness testing, serving,
+and report presentation.
 
-Read `/home/egallego/lean/vir/AGENTS.md`, this file, and
-`benchmarks/prettyM-web/README.md` before changing anything. Keep generated
-artifacts and reports inside this worktree. Do not push unless the user asks.
+Read `AGENTS.md`, this file, and `benchmarks/prettyM-web/README.md` before
+changing the catalog. Generated sources, packages, artifacts, reports, and
+machine-local toolchain configuration stay below the ignored application
+directories.
 
-## Purpose and repository boundary
+## Canonical contracts
 
-`benchmarks/prettyM-web/` is the extracted, standalone browser benchmark
-catalog. The directory is deliberately movable as a future repository root.
-It has no runtime dependency on Verso Slides, Reveal, Lake, or the parent VIR
-source tree. VIR happens to host the application today; producer source stays
-in the repositories that own it.
+- `examples/<id>/example.json` declares identity, lifecycle, VIR package
+  targets and exports, the browser controller, and the test package.
+- `examples/<id>/tests.json` declares selectable variants, differential inputs,
+  required backends, an optional JavaScript oracle, and the benchmark suite.
+- `artifact-builds.json` selects exact producer revisions, component adapters,
+  package files, dependencies, and artifact-set identity for canonical builds.
+- `browser-benchmarks/source-package/v1` is the producer output boundary for
+  FIR, VIR, LLVM, and future artifact producers.
+- Artifact-set schema v2 requires every payload below `<example-id>/`; the
+  generic stager atomically replaces only that example's artifact directory.
+- `browser-benchmarks/controller/v1` is the workload-independent browser
+  controller boundary. The shared shell owns discovery, variants, artifact
+  status, controls, report placement, and backend filtering.
 
-This worktree owns:
+See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
+`ARTIFACT_SETS.md` for the complete formats.
 
-- a compact example descriptor and catalog;
-- the `Std.Format.prettyM` and Illuminate player examples at the same level;
-- JavaScript, VIR, FIR-native, and LLVM backends selected per example;
-- marshal, execute, decode, total, startup, repeated-call, and memory studies;
-- corpus, one-axis scaling, and interaction workloads;
-- report/campaign JSON, the dashboard, and forwardable performance cards; and
-- source-build receipts, immutable artifact-set assembly and verification, and
-  generic per-example staging.
+## Current state
 
-It does not own VIR interpreter profiling or optimization. Resume that work in
-`/home/egallego/lean/vir/.worktrees/pr104-internal-counters`; import only stable
-summaries or refreshed bounded artifacts here.
+- `prettyM/default` is the active canonical example. Its build contains VIR,
+  FIR-native, and FIR-LLVM components and exercises five browser backends.
+- `illuminate/default` is the second real client and uses the same catalog,
+  shell, variant selector, artifact root, and report workflow. It remains a
+  local rehearsal until Illuminate and FIR expose complete canonical producer
+  entry points.
+- Every canonical candidate is built from exact clean revisions materialized
+  below `_sources/` or selected through an explicit FIR/VIR toolchain config.
+- Source-build receipts bind the catalog, example, test package, producer
+  identities, and staged bytes without recording machine-local paths.
+- The fetcher and stager accept only namespaced artifact-set schema v2. No
+  historical prototype lock or compatibility verifier is retained.
+- `.github/workflows/example-candidate.yml` derives its matrix from catalogued
+  example variants, builds non-publishing candidates, re-imports them through
+  the consumer path, runs differential tests, and uploads short-lived payloads.
+- Dashboard backend filters are presentation-only; exported JSON retains the
+  complete report.
+- Timings from an uncontrolled or loaded machine are observations, not accepted
+  performance evidence.
 
-## Completed state
-
-- Benchmark execution was removed from the slide runtime and fully extracted
-  into `benchmarks/prettyM-web/`.
-- Five-backend output and styling-event parity is the compatibility gate.
-- The app has standalone build, serve, browser-test, report, campaign, card,
-  and refresh commands.
-- Dashboard, corpus, scaling, memory, repeated-call, and interaction views share
-  one backend selection. The selection follows the user between report views,
-  filters both charts and tables, and never changes complete JSON exports.
-- Artifact paths are confined to the application directory and archives are
-  normalized, checksummed, verified, and installed atomically.
-- The artifact boundary is generic over Lean versions:
-
-  ```text
-  Sigma (leanVersion), boundedRuntime leanVersion x prettyMWorkload leanVersion
-  ```
-
-- The build catalog targets `prettyM-bounded-set-0002`, retains the VIR and
-  workload revisions, selects merged FIR `298682a`, and namespaces all payload
-  files below `prettyM/`.
-- The generic v2 stager derives the example from `ARTIFACT_SET.json`, replaces
-  only `artifacts/<example-id>/`, and preserves sibling examples. There are no
-  prettyM- or Illuminate-specific canonical set adapters.
-- Every example owns a self-contained `tests.json` package. Its variants bind
-  differential inputs, oracle and backend coverage, a benchmark suite, and an
-  optional canonical build. The generic `npm run example -- EXAMPLE VARIANT`
-  command selects that complete unit for compilation and testing.
-- The browser exposes the same example variants in the shared header. Candidate
-  CI discovers every non-null variant build from the catalog rather than
-  carrying a workload-specific job.
-- The browser derives verified/rehearsal/unverified status from the staged
-  example manifest instead of controller labels.
-- The final PR #104 bounded validation report is locally available at
-  `benchmarks/prettyM-web/_results/pr104-bounded-validation.json` when the
-  ignored results directory has been preserved.
-- VIR-002 imports two hash-identified public-`runtime.call` sampled captures
-  from `benchmarks/prettyM-web/evidence/vir-pr104-runtime-call-profile.json`.
-  Card generation rejects reports whose Lean version, runtime JS, runtime Wasm,
-  or IR package does not match that evidence.
-- A fresh full report from set 0001 passed 45/45 corpus cases, 32/32 scaling
-  points, 36/36 interaction points, repeated calls, isolated repeats, and
-  isolated memory collection. It is locally preserved at
-  `benchmarks/prettyM-web/_results/pretty-benchmark.json` with SHA-256
-  `e3f364dc6b91c5ea2bbcff6297ea8cef38ba695a1ce5448c9d2d826ea79994ee`.
-
-The current artifact lock is `local-prototype`: its archive digest and size are
-committed, but `archive.url` is intentionally null. Public artifact publication
-is unfinished rather than broken.
-
-Source-build preparation is now application-owned. The canonical
-`benchmarks/prettyM-web/artifact-builds.json` record names the exact VIR, FIR,
-and workload commits, producer entry points, package mappings, dependencies,
-and pack provenance. `npm run artifacts:build` resolves that record against
-clean materialized sources or configured FIR/VIR toolchains, validates producer
-packages, and assembles the seed without running performance measurements.
-Its schema-v2 receipt records only portable identities and hashes; checkout and
-config paths do not leak into CI payloads. Packing reads the same record and
-refuses a seed that does not match the receipt. See
-`benchmarks/prettyM-web/docs/ARTIFACT_BUILDS.md`.
-
-## Immediate status
-
-The stable public-call attribution is now imported without adding profiler code
-to this application. Across two captures of both structural targets, 75.6-79.1%
-of samples roll up to object-ABI import/result lifting and only 21.2-24.4% are
-Wasm self samples. Eager `customInductiveShape` construction is the largest
-self symbol. VIR-002 records the evidence classes, artifact hashes, caveats,
-and a narrow runtime follow-up.
-
-Do not add the VIR CPU profiler, internal counters, or an optimization here.
-The producer-side one-entry symbol-MRU prototype has local AB/BA screens, but
-this machine is frequently loaded and the observed deltas are not stable enough
-for an accepted or rejected optimization conclusion. Treat them as
-inconclusive, leave bounded set 0001 unchanged, and require measurements from a
-controlled host before importing a decision.
-
-The full `prettyM` source build passed with merged FIR `main` at
-`298682a766d80e90053d3e76ee2f3e4af78a52aa`, including the native marshaling
-change. VIR, FIR native, and FIR LLVM produced complete packages; the
-producer-local checks passed, native and LLVM agreed on exact traces, and the
-assembled candidate passed the application's tool, artifact-set, and
-five-backend browser smoke tests. The latest local build selected four exact
-sources: FIR, VIR, Lean interpreter/runtime, and the Verso Slides workload. CI
-will materialize all four below the application-local `_sources/` directory.
-The portable receipt is
-`benchmarks/prettyM-web/_artifacts/builds/prettyM/BUILD.json`, and its candidate
-archive has SHA-256
-`109d1d254fa4799295019a24581e753418a9851488b741f034d7e38a80f73847`
-and size 2,686,976 bytes. Repacking the same seed reproduced that digest. No
-performance measurement was collected.
-
-The obsolete unnamespaced prototype lock has been removed. The
-application-local ignored `artifacts/prettyM/` tree is staged from the verified
-set-0002 candidate and carries its v2 `ARTIFACT_SET.json`; the UI reports the
-exact set ID. The generic import preserved `artifacts/illuminate/`, and both
-browser clients passed. Treat set 0002 as a candidate until its generated v2
-lock is explicitly accepted.
-
-Keep producer worktrees in controlled, ignored locations rather than `/tmp`.
-The validated candidate layout is the self-contained
-`benchmarks/prettyM-web/_sources/{vir,fir,lean,workload}` tree populated from
-the catalog. Lean's interpreter/runtime source is an explicit checkout, not an
-ambient VIR setup dependency. Existing clean linked worktrees may still be
-passed explicitly to the lower-level source builder, but they are not part of
-the CI contract.
-
-The current VIR `.irpkg` generator embeds generation time and source-path
-spelling. Source identity is exact, but fresh VIR packages are not yet expected
-to reproduce an old archive digest byte-for-byte. The CI candidate-build path
-is now prepared in `.github/workflows/example-candidate.yml`. Its matrix is
-derived from the example test packages and build catalog. For each row it
-materializes the exact catalogued sources below
-`benchmarks/prettyM-web/_sources/`, runs the selected example and variant,
-packs to a separate candidate lock, re-imports and tests the archive, and
-uploads the archive plus checksums, manifests, source receipt, and differential
-test report.
-It does not compare fresh bytes with the current lock or publish/promote them.
-The workflow still needs to run on GitHub before its hosted-runner setup and
-uploaded payload can be accepted as the validation record.
-The workflow now produces the namespaced set-0002 candidate and a separate
-ignored candidate lock. Deterministic VIR package metadata and the remaining
-Wasm byte differences are separate consolidation work before lock replacement
-becomes automatic.
-
-The report UI consolidation was completed after the original handoff. Its
-browser regression narrows the dashboard to one backend, checks that chart
-series are filtered, opens the corpus report, and verifies that the selection
-persists. A full preserved report was also used to exercise scaling, memory,
-repeated-call, and interaction filters without changing the report data.
-
-The second real client is Illuminate. Keep workload execution in each example
-controller; generalize only the source/package/staging boundary demonstrated by
-both examples. Illuminate remains a non-publishable rehearsal until its owning
-repository provides source-package-v1 producer entry points and the catalog can
-build it without application-side package knowledge. Illuminate commit
-`b4a005b17aacfcb28949160c5cf1a41ea6de81cc` consolidates its two local VIR
-stagers, but that script still installs/builds/copies client inputs itself and
-does not yet emit a fresh source-package-v1 directory through a stable producer
-entry point. Generic client staging remains separate follow-up work and should
-consume the catalog, source-package, and controller contracts recorded here.
-
-## Commands
+## Operator commands
 
 Run application commands from `benchmarks/prettyM-web/`:
 
 ```bash
 npm install
-npm run artifacts:build -- prettyM --plan
-npm run build
-npm test
+npm run examples:check
+npm run example -- prettyM default --plan
+npm run example -- prettyM default --materialize --prepare
+npm run test:unit
+npm run test:browser
+npm run test:illuminate
 npm run dev
 ```
 
-After building and packing a fresh set-0002 candidate, import it through the
-consumer path:
+Existing clean FIR/VIR checkouts may replace materialized sources:
+
+```bash
+npm run example -- prettyM default --prepare \
+  --toolchain fir=/path/to/lean-fir \
+  --toolchain vir=/path/to/lean-vir
+```
+
+The lower-level candidate consumer path is:
 
 ```bash
 npm run artifacts:pack -- --build prettyM
@@ -200,53 +88,24 @@ npm run artifacts:fetch -- \
   --archive _artifacts/releases/<generated-archive>.tar
 ```
 
-The fetcher and generic stager accept only namespaced artifact-set schema v2.
-
-The development server listens on `http://127.0.0.1:18334` and supplies the
-cross-origin-isolation headers required by threaded LLVM Wasm.
-
-With the server running:
-
-```bash
-npm run report
-npm run campaign
-npm run cards
-```
-
-`cards` also validates the committed VIR attribution against the report's exact
-runtime JS, Wasm, package, and Lean version. An older or unrelated report is
-rejected rather than silently receiving the imported conclusion.
-
-For a complete local refresh without publication:
-
-```bash
-npm run refresh
-```
-
-See `benchmarks/prettyM-web/docs/ARTIFACT_SETS.md` before modifying the lock or
-publishing artifacts. Never point it at a mutable `latest` URL.
+These commands never publish an artifact or update an accepted lock.
 
 ## Validation expectations
 
-Before handing off a benchmark or artifact change:
+Before handing off a catalog, controller, or artifact change:
 
-- run `npm test` inside the application directory;
-- require exact rendered-text and styling-event parity at every point;
-- preserve phase timing rather than moving work into an unmeasured adapter;
-- record candidate-local Lean/runtime/adapter/workload provenance; and
-- keep reports and binaries ignored while committing their configuration,
-  summaries, and immutable digests.
+- validate the example and build catalogs;
+- run the unit suite and the affected example's browser differential suite;
+- preserve exact rendered-text and styling-event parity;
+- preserve prepare, execute, decode, and total phase boundaries;
+- keep generated binaries and reports ignored; and
+- record only portable source and artifact identities in generated receipts.
 
-## Related continuation point
+## Remaining integration
 
-VIR internal counters and the next sampled-profile experiment are documented
-in:
-
-```text
-/home/egallego/lean/vir/.worktrees/pr104-internal-counters/HANDOFF.md
-/home/egallego/lean/vir/.worktrees/pr104-internal-counters/docs/INTERPRETER_COUNTERS.md
-```
-
-The separate producer-side MRU experiment is active in
-`/home/egallego/lean/vir/.worktrees/pr104-symbol-mru`. It currently has local
-changes; do not modify or clean that worktree from this application task.
+1. Add canonical Illuminate producer entry points and a clean catalog build,
+   then remove its application-local rehearsal stager.
+2. Decide whether a reviewed v2 candidate should be published and selected by
+   an accepted lock. Candidate CI intentionally stops before publication.
+3. Remove generation timestamps and source-path spelling from VIR package
+   metadata if byte-for-byte candidate reproducibility becomes a requirement.

@@ -16,8 +16,6 @@ const commands = [
   [process.execPath, ["scripts/stage-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/collect-report.mjs", "--help"]],
   ["python3", ["scripts/run-campaign.py", "--help"]],
-  ["python3", ["scripts/generate-observation-cards.py", "--help"]],
-  ["python3", ["scripts/refresh-benchmark.py", "--help"]],
 ];
 
 for (const [command, args] of commands) {
@@ -37,6 +35,21 @@ for (const [command, args] of commands) {
   assert.match(result.stdout, /usage:/i);
 }
 
+const packManifestLoad = spawnSync(
+  process.execPath,
+  [
+    "scripts/pack-artifact-set.mjs",
+    "--build",
+    "prettyM",
+    "--receipt",
+    `test-results/missing-receipt-${process.pid}.json`,
+  ],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.notEqual(packManifestLoad.status, 0);
+assert.match(packManifestLoad.stderr, /ENOENT/);
+assert.doesNotMatch(packManifestLoad.stderr, /readJson is not defined/);
+
 const exampleList = spawnSync(
   process.execPath,
   ["scripts/check-example-catalog.mjs"],
@@ -48,7 +61,13 @@ assert.match(exampleList.stdout, /^prettyM\tactive\tStd\.Format\.prettyM$/m);
 
 const examplePlan = spawnSync(
   process.execPath,
-  ["scripts/run-example.mjs", "prettyM", "default", "--plan"],
+  [
+    "scripts/run-example.mjs",
+    "prettyM",
+    "default",
+    "--plan",
+    "--materialize",
+  ],
   { cwd: appRoot, encoding: "utf8" },
 );
 assert.equal(examplePlan.status, 0, examplePlan.stderr);
@@ -58,6 +77,24 @@ assert.match(
   /^test: smoke-parity · smoke · js, vir, vir-format, native, llvm · oracle js$/m,
 );
 assert.match(examplePlan.stdout, /^benchmark: suite \(not measured\)$/m);
+assert.match(examplePlan.stdout, /^sources: materialize catalogued revisions$/m);
+
+const contradictoryExample = spawnSync(
+  process.execPath,
+  [
+    "scripts/run-example.mjs",
+    "prettyM",
+    "default",
+    "--test-only",
+    "--materialize",
+  ],
+  { cwd: appRoot, encoding: "utf8" },
+);
+assert.notEqual(contradictoryExample.status, 0);
+assert.match(
+  contradictoryExample.stderr,
+  /--test-only cannot be combined with --materialize/,
+);
 
 const buildList = spawnSync(
   process.execPath,
@@ -130,26 +167,4 @@ const collector = readFileSync(
 );
 assert.doesNotMatch(collector, /runJsonRoundTripStudy/);
 
-const attribution = JSON.parse(
-  readFileSync(
-    join(appRoot, "evidence/vir-pr104-runtime-call-profile.json"),
-    "utf8",
-  ),
-);
-assert.equal(attribution.schemaVersion, 1);
-assert.equal(attribution.kind, "prettyM-runtime-call-profile-attribution");
-assert.equal(attribution.runs.length, 2);
-for (const run of attribution.runs) {
-  assert.deepEqual(run.workloads.map(({ id }) => id).sort(), [
-    "nodes-2047",
-    "tag-transitions-64x64",
-  ]);
-  for (const workload of run.workloads) {
-    assert.ok(workload.samples > 0);
-    assert.match(workload.outputDigest, /^[0-9a-f]{64}$/);
-  }
-}
-
-console.log(
-  "PASS standalone report, campaign, card, and refresh tool contracts",
-);
+console.log("PASS standalone report and campaign tool contracts");

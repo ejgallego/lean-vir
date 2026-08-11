@@ -18,6 +18,9 @@ export async function verifySourceBuildReceipt({
   databasePath,
   examplePath,
   testPackagePath,
+  databaseFile,
+  exampleFile,
+  testPackageFile,
   exampleId,
   variantId,
   buildId,
@@ -26,12 +29,13 @@ export async function verifySourceBuildReceipt({
   components,
   seed,
 }) {
-  const [receiptBytes, databaseBytes, exampleBytes, testPackageBytes] = await Promise.all([
-    readFile(receiptPath),
-    readFile(databasePath),
-    readFile(examplePath),
-    readFile(testPackagePath),
-  ]);
+  const [receiptBytes, databaseBytes, exampleBytes, testPackageBytes] =
+    await Promise.all([
+      readFile(receiptPath),
+      readFile(databasePath),
+      readFile(examplePath),
+      readFile(testPackagePath),
+    ]);
   const receipt = JSON.parse(receiptBytes);
   if (
     receipt.schemaVersion !== 2 ||
@@ -40,6 +44,13 @@ export async function verifySourceBuildReceipt({
     receipt.artifactSet !== setId
   ) {
     throw new Error("source-build receipt identity does not match the build");
+  }
+  if (
+    receipt.database?.file !== databaseFile ||
+    receipt.example?.file !== exampleFile ||
+    receipt.example?.testPackage?.file !== testPackageFile
+  ) {
+    throw new Error("source-build receipt paths do not match the catalog inputs");
   }
   if (
     receipt.database?.sha256 !== sha256(databaseBytes) ||
