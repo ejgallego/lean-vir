@@ -103,6 +103,22 @@ jobs:
       - name: Build and validate candidate
         run: npm --prefix benchmarks/prettyM-web run example -- ${{ matrix.example }} ${{ matrix.variant }} --prepare
 
+      - name: Build admitted Pages benchmark
+        run: |
+          npm --prefix benchmarks/prettyM-web run build -- --deploy ${{ matrix.example }}=${{ matrix.variant }}
+          npm run build:benchmark-pages
+
+      - name: Test Pages benchmark subtree
+        run: |
+          npm --prefix benchmarks/prettyM-web run test:pages -- \
+            --directory ../../web/dist/benchmarks \
+            --deploy ${{ matrix.example }}=${{ matrix.variant }}
+          npm --prefix benchmarks/prettyM-web run test:pages:browser -- \
+            --directory ../../web/dist \
+            --base-path /benchmarks/ \
+            --example ${{ matrix.example }} \
+            --variant ${{ matrix.variant }}
+
       - name: Upload candidate archive and receipt
         uses: actions/upload-artifact@v4
         with:

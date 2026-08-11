@@ -125,6 +125,29 @@ archive, runs the application tests, and uploads the archive, checksums,
 manifest, source receipt, and `CANDIDATE.json` as a short-lived CI artifact.
 It never edits an accepted lock or publishes a release asset.
 
+## GitHub Pages deployment
+
+GitHub Pages consumes a candidate generated inside its own build job; it does
+not require a release asset or accepted lock. After the candidate is staged,
+the deployment build is explicit:
+
+```sh
+npm run build -- --deploy prettyM=default
+```
+
+Deployment admission requires a canonical build, an exact example/variant and
+artifact-set identity, the canonical `tests.json` digest, and no missing,
+changed, extra, or symbolic-link artifact files. Only admitted example
+directories and artifacts are copied. The generated `examples/catalog.json`
+therefore exposes `prettyM/default` on Pages while Illuminate remains a local
+rehearsal.
+
+The app normally receives COOP/COEP headers from `scripts/serve.mjs`. Static
+hosts without configurable headers use the scoped `coi-serviceworker.js`
+fallback and reload once before starting the application. CI tests that path
+without server-supplied isolation and still requires all five prettyM backends
+and the declared differential smoke test to pass.
+
 The artifact set is generic over Lean versions. Each candidate is a complete
 bounded runtime carrying its own Lean version, runtime, adapter, and `prettyM`
 workload. The browser only observes the common semantic input/output and timing

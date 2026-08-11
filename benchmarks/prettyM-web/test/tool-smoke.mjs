@@ -15,6 +15,9 @@ const commands = [
   [process.execPath, ["scripts/fetch-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/stage-artifact-set.mjs", "--help"]],
   [process.execPath, ["scripts/collect-report.mjs", "--help"]],
+  [process.execPath, ["scripts/build.mjs", "--help"]],
+  [process.execPath, ["test/pages-artifact-smoke.mjs", "--help"]],
+  [process.execPath, ["test/example-package-smoke.mjs", "--help"]],
   ["python3", ["scripts/run-campaign.py", "--help"]],
 ];
 
@@ -143,15 +146,6 @@ assert.deepEqual(JSON.parse(candidateMatrix.stdout), {
     { example: "prettyM", variant: "default", build: "prettyM" },
   ],
 });
-
-const buildPlan = spawnSync(
-  process.execPath,
-  ["scripts/build-artifacts.mjs", "prettyM", "--plan"],
-  { cwd: appRoot, encoding: "utf8" },
-);
-assert.equal(buildPlan.status, 0, buildPlan.stderr);
-assert.match(buildPlan.stdout, /^artifact set: prettyM-bounded-set-0002$/m);
-assert.match(buildPlan.stdout, /^components: vir -> native -> llvm$/m);
 
 const escapedOutput = spawnSync(
   process.execPath,

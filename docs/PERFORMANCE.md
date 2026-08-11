@@ -163,6 +163,11 @@ collector in fresh processes without publishing. See
 artifact and result layouts and the commands that work directly from the
 application directory.
 
+The Pages workflow generates and validates the canonical prettyM candidate in
+its own job, then deploys the admitted application under `/lean-vir/benchmarks/`.
+Its public catalog and `tests.json` are the same validated files used by the
+candidate build; no release publication step is involved.
+
 ## Reading The Numbers
 
 Use a different comparison point depending on the question:

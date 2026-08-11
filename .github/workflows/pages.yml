@@ -21,6 +21,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 120
     steps:
       - uses: actions/checkout@v5
       - name: Install Lean
@@ -49,6 +50,29 @@ jobs:
       - run: npm run install:wasi
       - run: npm run build:site
       - run: npm run test:pages
+      - name: Install benchmark dependencies
+        run: npm --prefix benchmarks/prettyM-web ci
+      - name: Materialize benchmark sources
+        run: npm --prefix benchmarks/prettyM-web run artifacts:sources -- prettyM
+      - name: Cache benchmark producer toolchains
+        uses: actions/cache@v4
+        with:
+          path: |
+            benchmarks/prettyM-web/_artifacts/npm-cache
+            benchmarks/prettyM-web/_sources/**/.lake
+            benchmarks/prettyM-web/_sources/**/.tools/cache
+            benchmarks/prettyM-web/_sources/**/.deps
+          key: ${{ runner.os }}-${{ runner.arch }}-prettyM-producers-${{ hashFiles('benchmarks/prettyM-web/artifact-builds.json') }}
+      - name: Install benchmark Chromium
+        run: npm --prefix benchmarks/prettyM-web run playwright:install
+      - name: Build and validate benchmark candidate
+        run: npm --prefix benchmarks/prettyM-web run example -- prettyM default --prepare
+      - name: Install admitted benchmark under Pages
+        run: |
+          npm --prefix benchmarks/prettyM-web run build -- --deploy prettyM=default
+          npm run build:benchmark-pages
+      - name: Test deployed benchmark subtree
+        run: npm run test:benchmark-pages
       - uses: actions/upload-artifact@v4
         with:
           name: lean-vir-local

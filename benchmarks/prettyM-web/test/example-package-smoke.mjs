@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import { spawn } from "node:child_process";
 import { existsSync } from "node:fs";
 import { writeFile } from "node:fs/promises";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 
@@ -14,12 +14,22 @@ import { canonicalJson, inside } from "../scripts/artifact-set-lib.mjs";
 
 const appRoot = dirname(dirname(fileURLToPath(import.meta.url)));
 const args = process.argv.slice(2);
-const outputIndex = args.indexOf("--output");
-const output = outputIndex === -1 ? null : args[outputIndex + 1];
-if (outputIndex !== -1) {
-  if (!output) throw new Error("--output requires a path");
-  args.splice(outputIndex, 2);
+function takeOption(name) {
+  const index = args.indexOf(name);
+  if (index === -1) return null;
+  const value = args[index + 1];
+  if (!value) throw new Error(`${name} requires a value`);
+  args.splice(index, 2);
+  return value;
 }
+const output = takeOption("--output");
+const directory = resolve(appRoot, takeOption("--directory") ?? "dist");
+const requestedBasePath = takeOption("--base-path") ?? "/";
+const basePath =
+  `/${requestedBasePath.replace(/^\/+|\/+$/g, "")}/`.replace(/^\/\/$/, "/");
+const staticHostIndex = args.indexOf("--static-host");
+const staticHost = staticHostIndex !== -1;
+if (staticHost) args.splice(staticHostIndex, 1);
 const [exampleId, requestedVariant = "default", extra] = args;
 if (
   !exampleId ||
@@ -27,9 +37,15 @@ if (
   process.argv.includes("--help") ||
   process.argv.includes("-h")
 ) {
-  console.log(`Usage: node test/example-package-smoke.mjs [--output PATH] EXAMPLE [VARIANT]
+  console.log(`Usage: node test/example-package-smoke.mjs [OPTIONS] EXAMPLE [VARIANT]
 
-Run every differential test declared by one self-contained example variant.`);
+Run every differential test declared by one self-contained example variant.
+
+Options:
+  --output PATH       Write the test report
+  --directory PATH    Serve this build directory
+  --base-path PATH    Open the application below this URL path
+  --static-host       Omit server isolation headers and test the SW fallback`);
   process.exit(exampleId ? 0 : 1);
 }
 
@@ -48,12 +64,20 @@ const port = Number(
   process.env.BENCH_PORT ?? String(19000 + (process.pid % 1000)),
 );
 const origin = `http://127.0.0.1:${port}`;
-const url = `${origin}/?example=${encodeURIComponent(exampleId)}&variant=${encodeURIComponent(variant.id)}`;
-const server = spawn(
-  process.execPath,
-  [join(appRoot, "scripts/serve.mjs"), "--port", String(port)],
-  { cwd: appRoot, stdio: ["ignore", "pipe", "pipe"] },
-);
+const query = new URLSearchParams({ example: exampleId, variant: variant.id });
+const url = `${origin}${basePath}?${query}`;
+const serverArguments = [
+  join(appRoot, "scripts/serve.mjs"),
+  "--port",
+  String(port),
+  "--directory",
+  directory,
+];
+if (staticHost) serverArguments.push("--no-isolation");
+const server = spawn(process.execPath, serverArguments, {
+  cwd: appRoot,
+  stdio: ["ignore", "pipe", "pipe"],
+});
 
 async function waitForServer() {
   let output = "";
@@ -93,9 +117,26 @@ try {
   const page = await browser.newPage();
   const pageErrors = [];
   page.on("pageerror", (error) => pageErrors.push(String(error)));
-  await page.goto(url, { waitUntil: "networkidle" });
+  await page.goto(url, {
+    waitUntil: staticHost ? "domcontentloaded" : "networkidle",
+  });
+  await page.waitForFunction(() => Boolean(globalThis.__benchmarkApp), null, {
+    timeout: 60_000,
+  });
   const readiness = await page.evaluate(() => globalThis.__benchmarkApp.ready);
   assert.equal(readiness.example, exampleId);
+  if (staticHost) {
+    assert.equal(readiness.readyCount, readiness.backendCount);
+    assert.ok(readiness.backendCount > 0);
+    assert.equal(
+      await page.evaluate(() => globalThis.crossOriginIsolated),
+      true,
+    );
+    assert.equal(
+      await page.evaluate(() => Boolean(navigator.serviceWorker.controller)),
+      true,
+    );
+  }
   assert.equal(
     await page.evaluate(() => globalThis.__benchmarkApp.getVariant()?.id),
     variant.id,

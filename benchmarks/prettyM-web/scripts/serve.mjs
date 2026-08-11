@@ -13,6 +13,7 @@ const option = (name, fallback) => {
 };
 const port = Number(option("--port", process.env.PORT ?? "18334"));
 const root = resolve(appRoot, option("--directory", "dist"));
+const isolation = !args.includes("--no-isolation");
 const mime = {
   ".css": "text/css; charset=utf-8",
   ".html": "text/html; charset=utf-8",
@@ -35,14 +36,17 @@ const server = createServer(async (request, response) => {
       throw new Error("path escapes root");
     const info = await stat(file);
     if (!info.isFile()) throw new Error("not a file");
-    response.writeHead(200, {
+    const headers = {
       "Content-Type": mime[extname(file)] ?? "application/octet-stream",
       "Content-Length": info.size,
       "Cache-Control": "no-store",
-      "Cross-Origin-Opener-Policy": "same-origin",
-      "Cross-Origin-Embedder-Policy": "require-corp",
-      "Cross-Origin-Resource-Policy": "same-origin",
-    });
+    };
+    if (isolation) {
+      headers["Cross-Origin-Opener-Policy"] = "same-origin";
+      headers["Cross-Origin-Embedder-Policy"] = "require-corp";
+      headers["Cross-Origin-Resource-Policy"] = "same-origin";
+    }
+    response.writeHead(200, headers);
     createReadStream(file).pipe(response);
   } catch {
     response.writeHead(404, { "Content-Type": "text/plain; charset=utf-8" });

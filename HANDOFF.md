@@ -51,6 +51,10 @@ See `benchmarks/prettyM-web/docs/EXAMPLE_FORMAT.md`, `ARTIFACT_BUILDS.md`, and
 - `.github/workflows/example-candidate.yml` derives its matrix from catalogued
   example variants, builds non-publishing candidates, re-imports them through
   the consumer path, runs differential tests, and uploads short-lived payloads.
+- The Pages workflow builds the same canonical `prettyM/default` candidate,
+  admits it only after its staged manifest and test-package digest match the
+  catalog, and installs the filtered app under `web/dist/benchmarks/`. It does
+  not publish or promote an artifact archive.
 - Dashboard backend filters are presentation-only; exported JSON retains the
   complete report.
 - Timings from an uncontrolled or loaded machine are observations, not accepted
@@ -104,7 +108,7 @@ Before handing off a catalog, controller, or artifact change:
 ## Remaining integration
 
 1. Add canonical Illuminate producer entry points and a clean catalog build,
-   then remove its application-local rehearsal stager.
+   then admit it to Pages and remove its application-local rehearsal stager.
 2. Decide whether a reviewed v2 candidate should be published and selected by
    an accepted lock. Candidate CI intentionally stops before publication.
 3. Remove generation timestamps and source-path spelling from VIR package

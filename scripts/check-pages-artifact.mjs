@@ -215,6 +215,7 @@ assertLink(indexHtml, "downloads/lean-vir-sdk.tar.gz");
 assertLink(indexHtml, "https://ejgallego.github.io/lean-vir/surface/");
 assertLink(indexHtml, "https://ejgallego.github.io/lean-vir/size/");
 assertLink(indexHtml, "format.html?case=list&amp;width=12");
+assertLink(indexHtml, "benchmarks/");
 assertLink(indexHtml, "dev.html?package=local-quickstart.irpkg&amp;entry=Quickstart.total");
 assertLink(indexHtml, `dev.html?package=${defaultPackageFile}&amp;entry=Vir_Fixtures_InterfaceShapes_profileStatsBump`);
 assertLink(indexHtml, `dev.html?package=${hostPackageFile}&amp;entry=HostInterop_titleHandshake`);

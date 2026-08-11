@@ -119,6 +119,14 @@ CI discovers every non-null variant build from these packages. The generic
 candidate matrix then selects the example and variant through the same command,
 so adding a canonical build does not require a workload-specific workflow.
 
+Static deployment is a separate admission step. `--deploy EXAMPLE=VARIANT`
+requires the selected variant to own a canonical build and requires its staged
+artifact manifest, payload hashes, and complete test-package identity to match
+that build. A static artifact root represents one variant per example, so the
+deployment builder rejects multi-variant test packages until their artifact
+sets have a variant-aware static layout. Rehearsals with `build: null` remain
+available locally but are not included in the public catalog.
+
 ## Uniform VIR compilation
 
 The central catalog supplies the client's repository and exact revision. For
